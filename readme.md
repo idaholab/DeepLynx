@@ -1,5 +1,7 @@
 ![img.png](lynx_blue.png)
 
+# NOTE: This version of the application is archived. DeepLynx Nexus will be uploaded in an effort to supercede DeepLynx 1 in late 2025.
+
 ## What is DeepLynx?
 
 DeepLynx is a open-source data warehouse focused on enabling complex projects to embrace digital engineering. It accomplishes bringing digital thread and digital twins to these projects with integrations to a large collection of software systems across a project's lifecycle.
