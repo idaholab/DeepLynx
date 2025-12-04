@@ -1,6 +1,6 @@
 ![img.png](lynx_blue.png)
 
-# NOTE: This version of the application is archived. DeepLynx Nexus will be uploaded in an effort to supercede DeepLynx 1 in late 2025.
+# NOTE: This version of the application is DEPRECATED. Please use code from the `main` or `develop` branch for the latest updates.
 
 ## What is DeepLynx?
 
