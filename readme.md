@@ -1,6 +1,6 @@
 ![img.png](lynx_blue.png)
 
-# NOTE: This version of the application will be replaced by DeepLynx Nexus in late 2025. test test test
+# NOTE: This version of the application is DEPRECATED. Please use code from the `main` or `develop` branch for the latest updates.
 
 ## What is DeepLynx?
 
