@@ -14,6 +14,7 @@
       <ProjectReference Include="..\deeplynx.models\deeplynx.models.csproj" />
     </ItemGroup>
     <ItemGroup>
+      <PackageReference Include="Azure.Storage.Blobs" Version="12.26.0" />
       <PackageReference Include="BCrypt.Net-Next" Version="4.0.3" />
       <PackageReference Include="DotNetEnv" Version="3.1.1" />
       <PackageReference Include="Microsoft.AspNetCore.Authentication.Cookies" Version="2.3.0" />

@@ -39,6 +39,7 @@ public class FileFilesystemBusiness : IFileBusiness
     /// <param name="file">The file the user wants to upload</param>
     /// <param name="guid">The unique identifier for file names</param>
     public async Task<string> UploadFile(
+        long organizationId,
         long projectId,
         long dataSourceId,
         ObjectStorageConfigDto objectStorageConfig,
@@ -125,7 +126,7 @@ public class FileFilesystemBusiness : IFileBusiness
     /// <returns></returns>
     /// <exception cref="ArgumentException"></exception>
     /// <exception cref="FileNotFoundException"></exception>
-    public async Task<FileStreamResult> DownloadFile(RecordResponseDto record)
+    public async Task<FileStreamResult> DownloadFile(RecordResponseDto record, ObjectStorageConfigDto? objectStorageConfig)
     {
         var filePath = record.Uri;
         if (filePath == null)
@@ -167,7 +168,7 @@ public class FileFilesystemBusiness : IFileBusiness
     /// <returns></returns>
     /// <exception cref="ArgumentException"></exception>
     /// <exception cref="FileNotFoundException"></exception>
-    public async Task<bool> DeleteFile(RecordResponseDto record)
+    public async Task<bool> DeleteFile(RecordResponseDto record, ObjectStorageConfigDto objectStorageConfig)
     {
         var filePath = record.Uri;
         if (string.IsNullOrWhiteSpace(filePath))
@@ -182,23 +183,15 @@ public class FileFilesystemBusiness : IFileBusiness
         
         File.Delete(filePath);
         
-        var objectStorage = await _context.ObjectStorages.FirstOrDefaultAsync(os => os.ProjectId == record.ProjectId && os.Id == record.ObjectStorageId && !os.IsArchived);
-
-        if (objectStorage == null)
-        {
-            throw new Exception("Object storage does not exist.");
-        }
-        var configData = JsonConvert.DeserializeObject<ObjectStorageConfigDto>(objectStorage.Config);
-        
         var directory = Path.GetDirectoryName(filePath);
 
-        if (configData == null || configData.MountPath == null)
+        if (objectStorageConfig.MountPath == null)
         {
             throw new Exception("File system mount path not set in object storage");
         }
 
         // Normalize paths for comparison
-        var normalizedBasePath = Path.GetFullPath(configData.MountPath).TrimEnd(Path.DirectorySeparatorChar);
+        var normalizedBasePath = Path.GetFullPath(objectStorageConfig.MountPath).TrimEnd(Path.DirectorySeparatorChar);
         
         // deletes all empty directories up to but not including the base path
         while (!string.IsNullOrEmpty(directory) &&

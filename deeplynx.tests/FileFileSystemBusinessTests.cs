@@ -55,7 +55,7 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
         try
         {
             // Act
-            var result = await _fileBusiness.UploadFile(1, 1, config, fileMock.Object, guid);
+            var result = await _fileBusiness.UploadFile(organizationId, pid, 1, config, fileMock.Object, guid);
 
             // Assert
             Assert.Contains(guid.ToString(), result);
@@ -129,7 +129,7 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
         try
         {
             // Act
-            var result = await _fileBusiness.DownloadFile(record);
+            var result = await _fileBusiness.DownloadFile(record, null);
 
             // Assert
             Assert.NotNull(result);
@@ -162,7 +162,7 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
         // need the try finally for if the test fails, still want to do cleanup
         try
         {
-            var result = await _fileBusiness.UploadFile(1, 1, config, fileMock.Object, guid);
+            var result = await _fileBusiness.UploadFile(organizationId, pid, 1, config, fileMock.Object, guid);
 
             Assert.Contains(guid.ToString(), result);
             Assert.True(File.Exists(result));
@@ -177,7 +177,7 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
             };
 
             // Act
-            var delete = await _fileBusiness.DeleteFile(record);
+            var delete = await _fileBusiness.DeleteFile(record, null);
 
             // Assert
             Assert.True(delete);
