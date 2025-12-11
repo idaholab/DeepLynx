@@ -13,7 +13,7 @@ public class FileS3Business:  IFileBusiness
         return "";
     }
 
-    public async Task<string> UpdateFile(RecordResponseDto record, IFormFile file)
+    public async Task<string> UpdateFile(RecordResponseDto record, ObjectStorageConfigDto? objectStorageConfig, IFormFile file, Guid guid)
     {
         return "";
     }

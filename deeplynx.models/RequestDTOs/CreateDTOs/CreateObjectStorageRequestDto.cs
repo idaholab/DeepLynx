@@ -1,5 +1,5 @@
+using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
-using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 
 namespace deeplynx.models;
@@ -10,7 +10,25 @@ public class CreateObjectStorageRequestDto
 
     [Required]
     [JsonPropertyName("config")]
-    public JsonObject Config { get; set; }
+    public ObjectStorageConfigDto Config { get; set; } = null!;
 
-    [JsonPropertyName("default")] public bool Default { get; set; } = false;
+    [DefaultValue(false)]
+    [JsonPropertyName("default")] public bool Default { get; set; }
+}
+
+public class ObjectStorageConfigDto
+{
+    public string? MountPath {get; set;}
+    
+    [JsonPropertyName("azureObjectConfig")]
+    [DefaultValue(null)]
+    public AzureObjectConfigDto? AzureObjectConfig { get; set; }
+    
+    public string? AwsConnectionString {get; set;}
+}
+
+public class AzureObjectConfigDto
+{
+    public string AzureConnectionString { get; set; } =  null!;
+    public string? AzureContainerName { get; set; }
 }

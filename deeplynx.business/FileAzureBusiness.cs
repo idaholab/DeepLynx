@@ -1,5 +1,4 @@
 using Azure.Storage.Blobs;
-using Azure.Storage.Blobs.Models;
 using deeplynx.interfaces;
 using deeplynx.models;
 using Microsoft.AspNetCore.Http;
@@ -11,7 +10,7 @@ namespace deeplynx.business;
 public class FileAzureBusiness: IFileBusiness
 {
     /// <summary>
-    /// 
+    /// Uploads a file to azure object storage instance specified in the object storage config
     /// </summary>
     /// <param name="organizationId"></param>
     /// <param name="projectId"></param>
@@ -23,40 +22,88 @@ public class FileAzureBusiness: IFileBusiness
     public async Task<string> UploadFile(long organizationId, long projectId, long datasourceId, ObjectStorageConfigDto objectStorageConfig,
         IFormFile file, Guid guid)
     {
-        if (objectStorageConfig.AzureConnectionString == null)
+        if (objectStorageConfig.AzureObjectConfig == null)
         {
             throw new ArgumentException("Azure connection string is null");
         }
-        string containerName = "nexus-files";
 
-        string fileName = $"organizations/{organizationId}/projects/{projectId}/datasources/{datasourceId}/{guid}_{file.FileName}";
+        var fileName = $"organization_{organizationId}/project_{projectId}/datasource_{datasourceId}/{guid}_{file.FileName}";
 
         // Get a reference to the container
-        BlobContainerClient container = new BlobContainerClient(objectStorageConfig.AzureConnectionString, containerName);
+        var container = new BlobContainerClient(objectStorageConfig.AzureObjectConfig.AzureConnectionString, objectStorageConfig.AzureObjectConfig.AzureContainerName);
         await container.CreateIfNotExistsAsync();
 
         // Get a reference to a blob (using the original filename from the uploaded file)
-        BlobClient blob = container.GetBlobClient(fileName);
+        var blob = container.GetBlobClient(fileName);
 
         // Upload the IFormFile
         await using var stream = file.OpenReadStream(); 
         await blob.UploadAsync(stream, overwrite: true);
         
-        
-        await foreach (BlobItem blobItem in container.GetBlobsAsync())
-        {
-            Console.WriteLine($"Blob: {blobItem.Name}");
-        }
         return fileName;
     }
 
-    public async Task<string> UpdateFile(RecordResponseDto record,  IFormFile file)
+    /// <summary>
+    /// Replaces old file with a new one in Azure Object Storage
+    /// </summary>
+    /// <param name="record"></param>
+    /// <param name="objectStorageConfig"></param>
+    /// <param name="file"></param>
+    /// <param name="guid"></param>
+    /// <returns></returns>
+    /// <exception cref="ArgumentException"></exception>
+    /// <exception cref="FileNotFoundException"></exception>
+    /// <exception cref="Exception"></exception>
+    public async Task<string> UpdateFile(RecordResponseDto record, ObjectStorageConfigDto? objectStorageConfig,  IFormFile file, Guid guid)
     {
-        return "";
+        if (record.Uri == null)
+        {
+            throw new ArgumentException("Record Uri is null");
+        }
+    
+        if (objectStorageConfig?.AzureObjectConfig == null)
+        {
+            throw new ArgumentException("Azure configuration object is null");
+        }
+    
+        var container = new BlobContainerClient(objectStorageConfig.AzureObjectConfig.AzureConnectionString, objectStorageConfig.AzureObjectConfig.AzureContainerName);
+        if (!await container.ExistsAsync())
+        {
+            throw new FileNotFoundException($"Cannot connect to container");
+        }
+
+        var oldBlob = container.GetBlobClient(record.Uri);
+    
+        if (!await oldBlob.ExistsAsync())
+        {
+            throw new FileNotFoundException($"File not found: {record.Uri}");
+        }
+    
+        var newFileName = $"organization_{record.OrganizationId}/projects_{record.ProjectId}/datasource_{record.DataSourceId}/{guid}_{file.FileName}";
+        var newBlob = container.GetBlobClient(newFileName);
+        
+        // try-catch to try and revert to original state on failure
+        try
+        {
+            // Upload new file FIRST
+            await using var stream = file.OpenReadStream();
+            await newBlob.UploadAsync(stream, overwrite: true);
+
+            // Only delete old file after successful upload
+            await oldBlob.DeleteAsync();
+
+            return newFileName;
+        }
+        catch (Exception ex)
+        {
+            await newBlob.DeleteIfExistsAsync();
+
+            throw new Exception($"Failed to update file: {ex.Message}", ex);
+        }
     }
     
     /// <summary>
-    /// 
+    /// Downloads a file from Azure Object Storage
     /// </summary>
     /// <param name="record"></param>
     /// <param name="objectStorageConfig"></param>
@@ -70,29 +117,23 @@ public class FileAzureBusiness: IFileBusiness
             throw new ArgumentException("Record Uri is null");
         }
         
-        if (objectStorageConfig?.AzureConnectionString == null)
+        if (objectStorageConfig?.AzureObjectConfig == null)
         {
             throw new ArgumentException("Azure connection string is null");
         }
         
-        string containerName = "nexus-files";
-        
-        BlobContainerClient container = new BlobContainerClient(objectStorageConfig.AzureConnectionString, containerName);
+        var container = new BlobContainerClient(objectStorageConfig.AzureObjectConfig.AzureConnectionString, objectStorageConfig.AzureObjectConfig.AzureContainerName);
         if (!await container.ExistsAsync())
         {
             throw new FileNotFoundException($"Can not connect to container");
         }
 
-        BlobClient blob = container.GetBlobClient(record.Uri);
+        var blob = container.GetBlobClient(record.Uri);
 
         if (!await blob.ExistsAsync())
         {
             throw new FileNotFoundException($"File not found: {record.Uri}");
         }
-
-        var memoryStream = new MemoryStream();
-        await blob.DownloadToAsync(memoryStream);
-        memoryStream.Position = 0;
         
         // Detect file type
         var provider = new FileExtensionContentTypeProvider();
@@ -100,15 +141,27 @@ public class FileAzureBusiness: IFileBusiness
         {
             contentType = "application/octet-stream"; // Default fallback
         }
-        // Create a simple stub with empty content
-        return new FileStreamResult(memoryStream, contentType)
+        
+        var memoryStream = new MemoryStream();
+        try
         {
-            FileDownloadName = record.Name
-        };
+            await blob.DownloadToAsync(memoryStream);
+            memoryStream.Position = 0;
+            return new FileStreamResult(memoryStream, contentType)
+            {
+                FileDownloadName = record.Name
+            };
+        }
+        catch
+        {
+            // explicit memory disposal so we do not rely on garbage cleanup after error
+            await memoryStream.DisposeAsync();
+            throw;
+        }
     }
     
     /// <summary>
-    /// 
+    /// Deletes a file from Azure Object Storage
     /// </summary>
     /// <param name="record"></param>
     /// <param name="objectStorageConfig"></param>
@@ -117,15 +170,13 @@ public class FileAzureBusiness: IFileBusiness
     /// <exception cref="FileNotFoundException"></exception>
     public async Task<bool> DeleteFile(RecordResponseDto record, ObjectStorageConfigDto objectStorageConfig)
     {
-        if (objectStorageConfig.AzureConnectionString == null)
+        if (objectStorageConfig.AzureObjectConfig == null)
         {
             throw new ArgumentException("Azure connection string is null");
         }
-    
-        string containerName = "nexus-files";
 
         // Get a reference to the container
-        BlobContainerClient container = new BlobContainerClient(objectStorageConfig.AzureConnectionString, containerName);
+        var container = new BlobContainerClient(objectStorageConfig.AzureObjectConfig.AzureConnectionString, objectStorageConfig.AzureObjectConfig.AzureContainerName);
 
         if (!await container.ExistsAsync())
         {

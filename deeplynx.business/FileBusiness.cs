@@ -132,13 +132,19 @@ public class FileBusiness
 
         if (record.ObjectStorageId == null) throw new KeyNotFoundException("Record needs an object storage id");
 
-        var objectStorage =
-            await _objectStorageBusiness.GetObjectStorage(organizationId, projectId, record.ObjectStorageId.Value,
-                true);
+        var objectStorage = _context.ObjectStorages.FirstOrDefault(os => os.OrganizationId == organizationId && 
+                                                                         (os.ProjectId == projectId || os.ProjectId == null) && 
+                                                                         os.Id == record.ObjectStorageId.Value);
+        if  (objectStorage is null) throw new KeyNotFoundException("No object storage found for project");
+        
+        var configData = JsonConvert.DeserializeObject<ObjectStorageConfigDto>(objectStorage.Config);
+        if (configData == null) throw new InvalidOperationException("Config data for object storage is null or invalid");
 
         var fileBusiness = _factory.CreateFileBusiness(objectStorage.Type);
+        
+        var guid = Guid.NewGuid();
 
-        var uri = await fileBusiness.UpdateFile(record, file);
+        var uri = await fileBusiness.UpdateFile(record, configData, file, guid);
 
         var updateRecordRequest = new UpdateRecordRequestDto
         {
@@ -146,6 +152,7 @@ public class FileBusiness
             {
                 ["fileType"] = Path.GetExtension(file.FileName).TrimStart('.').ToLower()
             },
+            OriginalId = guid.ToString(),
             Name = file.FileName,
             Uri = uri,
             FileType = Path.GetExtension(file.FileName).TrimStart('.').ToLower()

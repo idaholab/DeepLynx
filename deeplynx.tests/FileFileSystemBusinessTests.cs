@@ -91,11 +91,13 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
         fileMock.Setup(f => f.FileName).Returns("new.txt");
         fileMock.Setup(f => f.CopyToAsync(It.IsAny<Stream>(), default))
             .Returns((Stream stream, CancellationToken token) => ms.CopyToAsync(stream));
+        
+        var guid = Guid.NewGuid();
 
         try
         {
             // Act
-            var updatedPath = await _fileBusiness.UpdateFile(record, fileMock.Object);
+            var updatedPath = await _fileBusiness.UpdateFile(record, null, fileMock.Object, guid);
 
             // Assert
             Assert.True(File.Exists(updatedPath));
@@ -177,7 +179,7 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
             };
 
             // Act
-            var delete = await _fileBusiness.DeleteFile(record, null);
+            var delete = await _fileBusiness.DeleteFile(record, config);
 
             // Assert
             Assert.True(delete);

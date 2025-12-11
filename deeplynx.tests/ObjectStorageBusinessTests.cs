@@ -386,8 +386,11 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
     public async Task Create_Success_ReturnsNameAndType()
     {
         // Arrange
-        var config = new JsonObject();
-        config["mountPath"] = "./storage/";
+        var config = new ObjectStorageConfigDto()
+        {
+            MountPath = "./storage/"
+        };
+        
         var dto = new CreateObjectStorageRequestDto
         {
             Name = "Test",
@@ -409,8 +412,11 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
     public async Task Create_Success_ReturnsCorrectValues()
     {
         // Arrange
-        var config = new JsonObject();
-        config["mountPath"] = "./storage/";
+        var config = new ObjectStorageConfigDto()
+        {
+            MountPath = "./storage/"
+        };
+        
         var dto = new CreateObjectStorageRequestDto
         {
             Name = "Test",
@@ -444,24 +450,35 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
     public async Task Create_Success_ReturnsNameAndCorrectType()
     {
         // Arrange
-        var config = new JsonObject();
-        config["azureConnectionString"] = "example-connection-string";
+        var config = new ObjectStorageConfigDto()
+        {
+            MountPath = "./storage/"
+        };
+        
         var dto = new CreateObjectStorageRequestDto
         {
             Name = "Test",
             Config = config
         };
 
-        var config2 = new JsonObject();
-        config2["awsConnectionString"] = "example-connection-string";
+        var config2 = new ObjectStorageConfigDto
+        {
+            AwsConnectionString = "example-connection-string"
+        };
         var dto2 = new CreateObjectStorageRequestDto
         {
             Name = "Test 2",
             Config = config2
         };
 
-        var config3 = new JsonObject();
-        config3["mountPath"] = "./storage/";
+        var config3 = new ObjectStorageConfigDto
+        {
+            AzureObjectConfig = new  AzureObjectConfigDto
+            {
+                AzureConnectionString = "test-azure-connection-string",
+                AzureContainerName = "test-container-name"
+            }
+        };
         var dto3 = new CreateObjectStorageRequestDto
         {
             Name = "Test 3",
@@ -481,16 +498,17 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
         Assert.Equal(dto.Name, objectStorageResponse.Name);
         Assert.Equal(dto2.Name, objectStorageResponse2.Name);
         Assert.Equal(dto3.Name, objectStorageResponse3.Name);
-        Assert.Equal("azure_object", objectStorageResponse.Type);
+        Assert.Equal("filesystem", objectStorageResponse.Type);
         Assert.Equal("aws_s3", objectStorageResponse2.Type);
-        Assert.Equal("filesystem", objectStorageResponse3.Type);
+        Assert.Equal("azure_object", objectStorageResponse3.Type);
     }
 
     [Fact]
     public async Task Create_Fails_WhenConfigIsEmpty()
     {
         // Arrange
-        var config = new JsonObject();
+        var config = new ObjectStorageConfigDto();
+        
         var dto = new CreateObjectStorageRequestDto
         {
             Name = "Test",
@@ -498,9 +516,9 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
         };
 
         // Act & Assert
-        var exception = await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
             _objectStorageBusiness.CreateObjectStorage(uid, organizationId, pid, dto));
-        Assert.Contains("Request does not contain recognized config", exception.Message);
+        Assert.Contains($"Exactly one config must be provided, you provided {0}. Check for empty strings and/or objects.", exception.Message);
     }
 
     #endregion

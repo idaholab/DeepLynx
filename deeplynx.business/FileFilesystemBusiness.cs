@@ -82,7 +82,7 @@ public class FileFilesystemBusiness : IFileBusiness
     /// <exception cref="ArgumentException"></exception>
     /// <exception cref="FileNotFoundException"></exception>
     /// <exception cref="DirectoryNotFoundException"></exception>
-    public async Task<string> UpdateFile(RecordResponseDto record, IFormFile file)
+    public async Task<string> UpdateFile(RecordResponseDto record, ObjectStorageConfigDto? objectStorageConfig, IFormFile file, Guid guid)
     {
         var filePath = record.Uri;
         
@@ -103,7 +103,7 @@ public class FileFilesystemBusiness : IFileBusiness
             throw new DirectoryNotFoundException("Directory not found.");
         }
 
-        var newFileName = $"{record.OriginalId}_{file.FileName}";
+        var newFileName = $"{guid}_{file.FileName}";
         
         var updatedPath = Path.Combine(directory, newFileName);
         
