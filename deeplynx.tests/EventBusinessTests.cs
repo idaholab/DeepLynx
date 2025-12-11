@@ -638,6 +638,7 @@ namespace deeplynx.tests
             Assert.Null(result.ProjectId);
             Assert.Equal(dto.Operation, result.Operation);
             Assert.Equal(dto.EntityType, result.EntityType);
+            Assert.Equal("{\"Count\":1}", result.Properties);
         }
 
         [Fact]
@@ -662,6 +663,7 @@ namespace deeplynx.tests
             Assert.NotEqual(0, result.Id);
             Assert.Equal(pid, result.ProjectId);
             Assert.Equal(mockOrganizationId, result.OrganizationId);
+            Assert.Equal("{\"Count\":1}", result.Properties);
         }
 
         [Fact]
@@ -700,81 +702,6 @@ namespace deeplynx.tests
             // Act & Assert
             await Assert.ThrowsAsync<ArgumentException>(() =>
                 _eventBusiness.CreateEvent(mockUserId, mockOrganizationId, null, dto));
-        }
-
-        #endregion
-
-        #region BulkCreateEvents Tests
-
-        [Fact]
-        public async Task BulkCreateEvents_Success_WithOrganizationId()
-        {
-            // Arrange
-            var events = new List<CreateEventRequestDto>
-            {
-                new CreateEventRequestDto
-                {
-                    Operation = "create",
-                    EntityType = "metadata",
-                    EntityId = 1,
-                    DataSourceId = null,
-                    Properties = "{}",
-                    LastUpdatedBy = mockUserId
-                },
-                new CreateEventRequestDto
-                {
-                    Operation = "create",
-                    EntityType = "metadata",
-                    EntityId = 2,
-                    DataSourceId = null,
-                    Properties = "{}",
-                    LastUpdatedBy = mockUserId
-                }
-            };
-
-            // Act
-            var result = await _eventBusiness.BulkCreateEvents(mockUserId, events, mockOrganizationId, null);
-
-            // Assert
-            Assert.NotNull(result);
-            Assert.Equal(mockOrganizationId, result.OrganizationId);
-            Assert.Null(result.ProjectId);
-            Assert.Contains("\"BulkCount\":2", result.Properties);
-        }
-
-        [Fact]
-        public async Task BulkCreateEvents_Success_WithProjectId()
-        {
-            // Arrange
-            var events = new List<CreateEventRequestDto>
-            {
-                new CreateEventRequestDto
-                {
-                    Operation = "create",
-                    EntityType = "metadata",
-                    EntityId = 1,
-                    DataSourceId = null,
-                    Properties = "{}",
-                    LastUpdatedBy = mockUserId
-                },
-                new CreateEventRequestDto
-                {
-                    Operation = "create",
-                    EntityType = "metadata",
-                    EntityId = 2,
-                    DataSourceId = null,
-                    Properties = "{}",
-                    LastUpdatedBy = mockUserId
-                }
-            };
-
-            // Act
-            var result = await _eventBusiness.BulkCreateEvents(mockUserId, events, mockOrganizationId, pid);
-
-            // Assert
-            Assert.NotNull(result);
-            Assert.Equal(pid, result.ProjectId);
-            Assert.Equal(mockOrganizationId, result.OrganizationId);
         }
 
         #endregion

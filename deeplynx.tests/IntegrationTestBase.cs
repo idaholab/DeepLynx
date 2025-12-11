@@ -116,6 +116,7 @@ public class IntegrationTestBase : IAsyncLifetime
     protected void SwitchCacheType(string cacheType)
     {
         Environment.SetEnvironmentVariable("CACHE_PROVIDER_TYPE", cacheType);
+        Environment.SetEnvironmentVariable("REDIS_CONNECTION_STRING", _fixture.RedisConnectionString);
         CacheService.ResetCacheService();
     }
 

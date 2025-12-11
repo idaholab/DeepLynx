@@ -254,19 +254,13 @@ public class ClassBusiness : IClassBusiness
             .SqlQueryRaw<ClassResponseDto>(sql, parameters.ToArray())
             .ToListAsync();
 
-        // for each created class Bulk log events
-        var events = new List<CreateEventRequestDto>();
-        foreach (var item in result)
-            events.Add(new CreateEventRequestDto
-            {
-                Operation = "create",
-                EntityType = "class",
-                EntityId = item.Id,
-                EntityName = item.Name,
-                DataSourceId = null,
-                Properties = JsonSerializer.Serialize(new { item.Name })
-            });
-        await _eventBusiness.BulkCreateEvents(currentUserId, events, organizationId, projectId);
+        var createEvent = new CreateEventRequestDto
+        {
+            Operation = "create",
+            EntityType = "class",
+            DataSourceId = null,
+        };
+        await _eventBusiness.CreateEvent(currentUserId, organizationId, projectId, createEvent, result.Count);
 
         return result;
     }

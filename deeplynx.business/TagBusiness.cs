@@ -229,21 +229,14 @@ public class TagBusiness : ITagBusiness
         var result = await _context.Database
             .SqlQueryRaw<TagResponseDto>(sql, parameters.ToArray())
             .ToListAsync();
+        
+        var createEvent = new CreateEventRequestDto
+        {
+            Operation = "create",
+            EntityType = "tag",
+        };
 
-        // TODO: Bulk create events rework
-        var events = new List<CreateEventRequestDto> { };
-        foreach (var item in result)
-            events.Add(new CreateEventRequestDto
-            {
-                Operation = "create",
-                EntityType = "tag",
-                EntityId = item.Id,
-                EntityName = item.Name,
-                Properties = JsonSerializer.Serialize(new { item.Name }),
-                DataSourceId = null
-            });
-
-        await _eventBusiness.BulkCreateEvents(currentUserId, events, organizationId, projectId);
+        await _eventBusiness.CreateEvent(currentUserId, organizationId, projectId, createEvent, result.Count);
 
         return result;
     }

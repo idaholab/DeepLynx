@@ -64,7 +64,7 @@ public class MetadataBusinessTests : IntegrationTestBase
             Context, _mockEdgeBusiness.Object, _eventBusiness);
 
         _tagBusiness = new TagBusiness(Context, _eventBusiness);
-        _recordBusiness = new RecordBusiness(Context, _eventBusiness);
+        _recordBusiness = new RecordBusiness(Context, _eventBusiness, _tagBusiness);
         _edgeBusiness = new EdgeBusiness(Context, _eventBusiness);
 
         _metadataBusiness = new MetadataBusiness(

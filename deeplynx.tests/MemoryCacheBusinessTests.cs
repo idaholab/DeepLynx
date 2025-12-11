@@ -16,7 +16,6 @@ namespace deeplynx.tests
         
         public override async Task InitializeAsync()
         {
-            // Environment.SetEnvironmentVariable("CACHE_PROVIDER_TYPE", "memory");
             SwitchCacheType("memory");
             await base.InitializeAsync();
         }

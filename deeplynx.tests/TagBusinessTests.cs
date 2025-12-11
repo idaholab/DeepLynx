@@ -378,7 +378,6 @@ public class TagBusinessTests : IntegrationTestBase
         Assert.Equal("create", firstEvent.Operation);
         Assert.Equal("tag", firstEvent.EntityType);
         Assert.Equal(result[0].ProjectId, firstEvent.ProjectId);
-        Assert.Equal(result[0].Id, firstEvent.EntityId);
     }
 
     [Fact]

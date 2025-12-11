@@ -1,3 +1,4 @@
+using System.Security;
 using System.Web;
 using deeplynx.helpers.Context;
 using deeplynx.interfaces;
@@ -65,6 +66,24 @@ public class OauthHandshakeController : ControllerBase
             return BadRequest(new
             {
                 error = "invalid_request",
+                error_description = ex.Message
+            });
+        }
+        catch (KeyNotFoundException ex)
+        {
+            _logger.LogWarning(ex, $"OAuth application not found for client {clientId}");
+            return NotFound(new
+            {
+                error = "invalid_client",
+                error_description = ex.Message
+            });
+        }
+        catch (InvalidOperationException ex)
+        {
+            _logger.LogWarning(ex, $"Invalid operation in token exchange for client {clientId}");
+            return BadRequest(new
+            {
+                error = "invalid_grant",
                 error_description = ex.Message
             });
         }
@@ -144,13 +163,13 @@ public class OauthHandshakeController : ControllerBase
                 error_description = ex.Message
             });
         }
-        catch (UnauthorizedAccessException ex)
+        catch (KeyNotFoundException ex)
         {
-            _logger.LogWarning(ex, $"Unauthorized token exchange attempt for client {clientId}: {ex.Message}");
-            return Unauthorized(new
+            _logger.LogWarning(ex, $"OAuth application not found for client {clientId}");
+            return NotFound(new
             {
                 error = "invalid_client",
-                error_description = "Invalid client credentials or authorization code"
+                error_description = ex.Message
             });
         }
         catch (InvalidOperationException ex)
@@ -160,6 +179,15 @@ public class OauthHandshakeController : ControllerBase
             {
                 error = "invalid_grant",
                 error_description = ex.Message
+            });
+        }
+        catch (SecurityException ex)
+        {
+            _logger.LogError(ex, $"Security violation in token exchange for client {clientId}");
+            return BadRequest(new
+            {
+                error = "invalid_grant",
+                error_description = "State validation failed"
             });
         }
         catch (Exception ex)

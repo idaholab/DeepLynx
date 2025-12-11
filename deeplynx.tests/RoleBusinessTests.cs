@@ -407,7 +407,6 @@ public class RoleBusinessTests : IntegrationTestBase
         // Ensure create event is logged
         var eventList = await Context.Events.ToListAsync();
         Assert.Single(eventList);
-        Assert.Equal(rid4, eventList[0].EntityId);
         Assert.Equal("create", eventList[0].Operation);
         Assert.Equal("role", eventList[0].EntityType);
     }

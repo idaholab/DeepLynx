@@ -253,29 +253,20 @@ public class RoleBusiness : IRoleBusiness
         var result = await _context.Database
             .SqlQueryRaw<RoleResponseDto>(sql, parameters.ToArray())
             .ToListAsync();
-
-        // for each created role Bulk log events
-        var events = new List<CreateEventRequestDto> { };
-        foreach (var item in result)
+        
+        var createEvent = new CreateEventRequestDto
         {
-            events.Add(new CreateEventRequestDto
-            {
-                Operation = "create",
-                EntityType = "role",
-                EntityId = item.Id,
-                EntityName = item.Name,
-                DataSourceId = null,
-                Properties = JsonSerializer.Serialize(new {item.Name}),
-            });
-        }
+            Operation = "create",
+            EntityType = "role"
+        };
         
         if (projectId.HasValue)
         {
-           await _eventBusiness.BulkCreateEvents(currentUserId, events, organizationId, projectId.Value);
+            await _eventBusiness.CreateEvent(currentUserId, organizationId, projectId, createEvent, result.Count);
         }
         else
         {
-            await _eventBusiness.BulkCreateEvents(currentUserId, events, organizationId);
+            await _eventBusiness.CreateEvent(currentUserId, organizationId, null, createEvent, result.Count);
         }
         
         return result;

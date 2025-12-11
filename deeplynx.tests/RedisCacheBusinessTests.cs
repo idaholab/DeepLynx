@@ -16,7 +16,6 @@ public class RedisCacheBusinessTests : IntegrationTestBase
     public override async Task InitializeAsync()
     {
         // Set the cache provider
-        // Environment.SetEnvironmentVariable("CACHE_PROVIDER_TYPE", "redis");
         SwitchCacheType("redis");
         await base.InitializeAsync();
     }

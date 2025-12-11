@@ -287,23 +287,13 @@ public class RelationshipBusiness : IRelationshipBusiness
         var result = await _context.Database
             .SqlQueryRaw<RelationshipResponseDto>(sql, parameters.ToArray())
             .ToListAsync();
-
-        // Bulk log events for each relationship creation
-        var events = new List<CreateEventRequestDto> { };
         
-        foreach (var relationship in result)
+        var createEvent = new CreateEventRequestDto
         {
-            events.Add(new CreateEventRequestDto
-            {
-                Operation = "create",
-                EntityType = "relationship",
-                EntityId = relationship.Id,
-                EntityName = relationship.Name,
-                Properties = "{}",
-            });
-        }
-        
-        await _eventBusiness.BulkCreateEvents(currentUserId, events, organizationId, projectId);
+            Operation = "create",
+            EntityType = "relationship"
+        };
+        await _eventBusiness.CreateEvent(currentUserId, organizationId, projectId, createEvent, result.Count);
         
         return result;
     }
