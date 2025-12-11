@@ -69,7 +69,7 @@ public class FileAzureBusiness: IFileBusiness
         var container = new BlobContainerClient(objectStorageConfig.AzureObjectConfig.AzureConnectionString, objectStorageConfig.AzureObjectConfig.AzureContainerName);
         if (!await container.ExistsAsync())
         {
-            throw new FileNotFoundException($"Cannot connect to container");
+            throw new InvalidOperationException("Azure Object Storage container does not exist");
         }
 
         var oldBlob = container.GetBlobClient(record.Uri);
@@ -125,7 +125,7 @@ public class FileAzureBusiness: IFileBusiness
         var container = new BlobContainerClient(objectStorageConfig.AzureObjectConfig.AzureConnectionString, objectStorageConfig.AzureObjectConfig.AzureContainerName);
         if (!await container.ExistsAsync())
         {
-            throw new FileNotFoundException($"Can not connect to container");
+            throw new InvalidOperationException("Azure Object Storage container does not exist");
         }
 
         var blob = container.GetBlobClient(record.Uri);

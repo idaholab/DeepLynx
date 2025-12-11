@@ -14,7 +14,6 @@ public class TestSuiteFixture : IAsyncLifetime
 {
     private readonly PostgreSqlContainer _postgresContainer;
     private readonly RedisContainer _redisContainer;
-    private readonly AzuriteContainer _azuriteContainer;
 
     public TestSuiteFixture()
     {
@@ -25,16 +24,10 @@ public class TestSuiteFixture : IAsyncLifetime
         _redisContainer = new RedisBuilder()
             .WithImage("redis:7-alpine")
             .Build();
-        
-        _azuriteContainer = new AzuriteBuilder()
-            .WithImage("mcr.microsoft.com/azure-storage/azurite:latest")
-            .Build();
     }
 
     public string PostgresConnectionString { get; private set; }
     public string RedisConnectionString { get; private set; }
-    
-    public string AzuriteConnectionString { get; private set; }
     
     public DeeplynxContext Context { get; private set; }
 
@@ -44,15 +37,12 @@ public class TestSuiteFixture : IAsyncLifetime
         // Start containers
         await _postgresContainer.StartAsync();
         await _redisContainer.StartAsync();
-        await _azuriteContainer.StartAsync();
 
         // Set up configuration for redis cache tests
         RedisConnectionString = _redisContainer.GetConnectionString();
         Environment.SetEnvironmentVariable("REDIS_CONNECTION_STRING", RedisConnectionString);
 
         PostgresConnectionString = _postgresContainer.GetConnectionString();
-        
-        AzuriteConnectionString = _azuriteContainer.GetConnectionString();
 
         var options = new DbContextOptionsBuilder<DeeplynxContext>()
             .UseNpgsql(PostgresConnectionString)
@@ -77,7 +67,6 @@ public class TestSuiteFixture : IAsyncLifetime
         await Context.DisposeAsync();
         await _postgresContainer.DisposeAsync();
         await _redisContainer.DisposeAsync();
-        await _azuriteContainer.DisposeAsync();
     }
 }
 
@@ -95,7 +84,7 @@ public class TestSuiteCollection : ICollectionFixture<TestSuiteFixture>
 [Collection("Test Suite Collection")]
 public class IntegrationTestBase : IAsyncLifetime
 {
-    protected readonly TestSuiteFixture _fixture;
+    private readonly TestSuiteFixture _fixture;
 
     protected IntegrationTestBase(TestSuiteFixture fixture)
     {

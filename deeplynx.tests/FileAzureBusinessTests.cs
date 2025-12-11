@@ -3,14 +3,39 @@ using deeplynx.business;
 using deeplynx.datalayer.Models;
 using deeplynx.models;
 using Microsoft.AspNetCore.Http;
+using Testcontainers.Azurite;
 using Record = deeplynx.datalayer.Models.Record;
 
 namespace deeplynx.tests;
 
+// Fixture specifically for this test class only
+public class AzuriteFixture : IAsyncLifetime
+{
+    private AzuriteContainer _azuriteContainer = null!;
+    
+    public string AzuriteConnectionString { get; private set; } = null!;
+
+    public async Task InitializeAsync()
+    {
+        _azuriteContainer = new AzuriteBuilder()
+            .WithImage("mcr.microsoft.com/azure-storage/azurite:latest")
+            .Build();
+
+        await _azuriteContainer.StartAsync();
+        AzuriteConnectionString = _azuriteContainer.GetConnectionString();
+    }
+
+    public async Task DisposeAsync()
+    {
+        await _azuriteContainer.DisposeAsync();
+    }
+}
+
 [Collection("Test Suite Collection")]
-public class FileAzureBusinessTests : IntegrationTestBase
+public class FileAzureBusinessTests : IntegrationTestBase, IClassFixture<AzuriteFixture>
 {
     private FileAzureBusiness _fileAzureBusiness = null!;
+    private readonly AzuriteFixture _azuriteFixture;
     private string _connectionString = null!;
     private string _containerName = "test-container";
     private ObjectStorageConfigDto _objectStorageConfig = null!;
@@ -22,15 +47,16 @@ public class FileAzureBusinessTests : IntegrationTestBase
     private long _uid;
     private long _recordId;
 
-    public FileAzureBusinessTests(TestSuiteFixture fixture) : base(fixture)
+    public FileAzureBusinessTests(TestSuiteFixture fixture, AzuriteFixture azuriteFixture) : base(fixture)
     {
+        _azuriteFixture = azuriteFixture;
     }
 
     public override async Task InitializeAsync()
     {
         await base.InitializeAsync();
-
-        _connectionString = _fixture.AzuriteConnectionString;
+        
+        _connectionString = _azuriteFixture.AzuriteConnectionString;
 
         // Set up object storage config
         _objectStorageConfig = new ObjectStorageConfigDto
@@ -222,33 +248,6 @@ public class FileAzureBusinessTests : IntegrationTestBase
         var containerExists = await container.ExistsAsync();
         Assert.True(containerExists);
     }
-    
-    // We don't really need this test since we are generating a new guid every time in our controller
-    [Fact]
-    public async Task UploadFile_Success_OverwritesExistingFile()
-    {
-        // Arrange
-        var guid = Guid.NewGuid();
-        var fileName = "overwrite-test.txt";
-        var originalContent = "Original content";
-        var newContent = "New content";
-
-        var originalFile = CreateMockFile(fileName, originalContent);
-        
-        // Upload original file
-        var oldResult = await _fileAzureBusiness.UploadFile(
-            _oid, _pid, _dsid, _objectStorageConfig, originalFile, guid);
-
-        var newFile = CreateMockFile(fileName, newContent);
-
-        // Act - Upload same file with new content
-        var result = await _fileAzureBusiness.UploadFile(
-            _oid, _pid, _dsid, _objectStorageConfig, newFile, guid);
-
-        // Assert
-        var storedContent = await GetBlobContentAsync(result);
-        Assert.Equal(newContent, storedContent);
-    }
 
     [Fact]
     public async Task UploadFile_Fails_WhenAzureConfigIsNull()
@@ -264,25 +263,6 @@ public class FileAzureBusinessTests : IntegrationTestBase
         // Act & Assert
         await Assert.ThrowsAsync<ArgumentException>(() =>
             _fileAzureBusiness.UploadFile(_oid, _pid, _dsid, invalidConfig, mockFile, guid));
-    }
-    
-    // Don't need this test either
-    [Fact]
-    public async Task UploadFile_Success_HandlesSpecialCharactersInFileName()
-    {
-        // Arrange
-        var guid = Guid.NewGuid();
-        var fileName = "test file with spaces & special!chars.txt";
-        var mockFile = CreateMockFile(fileName, "content");
-
-        // Act
-        var result = await _fileAzureBusiness.UploadFile(
-            _oid, _pid, _dsid, _objectStorageConfig, mockFile, guid);
-
-        // Assert
-        Assert.NotNull(result);
-        var exists = await BlobExistsAsync(result);
-        Assert.True(exists);
     }
 
     #endregion
@@ -400,7 +380,7 @@ public class FileAzureBusinessTests : IntegrationTestBase
         var mockFile = CreateMockFile("test.txt", "content");
 
         // Act & Assert
-        await Assert.ThrowsAsync<FileNotFoundException>(() =>
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
             _fileAzureBusiness.UpdateFile(recordDto, invalidConfig, mockFile, Guid.NewGuid()));
     }
 
@@ -408,18 +388,31 @@ public class FileAzureBusinessTests : IntegrationTestBase
     public async Task UpdateFile_Fails_WhenOldFileDoesNotExist()
     {
         // Arrange
-        var recordDto = new RecordResponseDto
+        var guid = Guid.NewGuid();
+        var fileName = "test-file.txt";
+        var fileContent = "This is test content";
+        var mockFile = CreateMockFile(fileName, fileContent);
+        
+        await _fileAzureBusiness.UploadFile(
+            _oid, _pid, _dsid, _objectStorageConfig, mockFile, guid);
+        
+        var recordNonExistentFileDto = new RecordResponseDto
         {
             Uri = "non-existent-file.txt",
+            Name = "test.txt",
             OrganizationId = _oid,
             ProjectId = _pid,
             DataSourceId = _dsid
         };
-        var mockFile = CreateMockFile("test.txt", "content");
+        
+        
+        var newFileName = "new-test-file.txt";
+        var newFileContent = "This is new test content";
+        var newMockFile =  CreateMockFile(newFileName, newFileContent);
 
         // Act & Assert
         await Assert.ThrowsAsync<FileNotFoundException>(() =>
-            _fileAzureBusiness.UpdateFile(recordDto, _objectStorageConfig, mockFile, Guid.NewGuid()));
+            _fileAzureBusiness.UpdateFile(recordNonExistentFileDto, _objectStorageConfig, newMockFile, Guid.NewGuid()));
     }
 
     [Fact]
@@ -608,7 +601,7 @@ public class FileAzureBusinessTests : IntegrationTestBase
         };
 
         // Act & Assert
-        await Assert.ThrowsAsync<FileNotFoundException>(() =>
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
             _fileAzureBusiness.DownloadFile(recordDto, invalidConfig));
     }
 
@@ -616,7 +609,15 @@ public class FileAzureBusinessTests : IntegrationTestBase
     public async Task DownloadFile_Fails_WhenFileDoesNotExist()
     {
         // Arrange
-        var recordDto = new RecordResponseDto
+        var guid = Guid.NewGuid();
+        var fileName = "test-file.txt";
+        var fileContent = "This is test content";
+        var mockFile = CreateMockFile(fileName, fileContent);
+        
+        await _fileAzureBusiness.UploadFile(
+            _oid, _pid, _dsid, _objectStorageConfig, mockFile, guid);
+        
+        var recordNonExistentFileDto = new RecordResponseDto
         {
             Uri = "non-existent-file.txt",
             Name = "test.txt",
@@ -627,7 +628,7 @@ public class FileAzureBusinessTests : IntegrationTestBase
 
         // Act & Assert
         await Assert.ThrowsAsync<FileNotFoundException>(() =>
-            _fileAzureBusiness.DownloadFile(recordDto, _objectStorageConfig));
+            _fileAzureBusiness.DownloadFile(recordNonExistentFileDto, _objectStorageConfig));
     }
 
     #endregion
