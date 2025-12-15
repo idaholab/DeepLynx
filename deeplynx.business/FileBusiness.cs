@@ -70,21 +70,20 @@ public class FileBusiness
 
         if (objectStorageId is not null)
         {
-            objectStorage = await _context.ObjectStorages.FirstOrDefaultAsync(os => os.Id == objectStorageId
-                && os.ProjectId == projectId
-                && !os.IsArchived
-            );
+            objectStorage = await GetObjectStorageWithConfig(organizationId, projectId, objectStorageId.Value);
         }
         else
         {
-            var defaultObjectStorageResponseDto = await _objectStorageBusiness.GetDefaultObjectStorage(
-                organizationId, projectId);
-            objectStorage = await _context.ObjectStorages.FindAsync(defaultObjectStorageResponseDto.Id);
+            // Works for now, but will need to change depending on how we are managing default org and project object
+            // storages in the future
+            objectStorage = _context.ObjectStorages.FirstOrDefault(os => os.OrganizationId == organizationId && 
+                                                                         os.ProjectId == projectId && 
+                                                                         os.Default);
         }
 
         if (objectStorage is null) throw new KeyNotFoundException("No object storage found for project");
 
-        // Check config to confirm it is valid (could be part of the object storage fetch)
+        // Check config to confirm it is valid
         var configData = JsonConvert.DeserializeObject<ObjectStorageConfigDto>(objectStorage.Config);
         if (configData == null) throw new InvalidOperationException("Config data for object storage is null");
 
@@ -132,10 +131,7 @@ public class FileBusiness
 
         if (record.ObjectStorageId == null) throw new KeyNotFoundException("Record needs an object storage id");
 
-        var objectStorage = _context.ObjectStorages.FirstOrDefault(os => os.OrganizationId == organizationId && 
-                                                                         (os.ProjectId == projectId || os.ProjectId == null) && 
-                                                                         os.Id == record.ObjectStorageId.Value);
-        if  (objectStorage is null) throw new KeyNotFoundException("No object storage found for project");
+        var objectStorage = await GetObjectStorageWithConfig(organizationId, projectId, record.ObjectStorageId.Value);
         
         var configData = JsonConvert.DeserializeObject<ObjectStorageConfigDto>(objectStorage.Config);
         if (configData == null) throw new InvalidOperationException("Config data for object storage is null or invalid");
@@ -172,16 +168,13 @@ public class FileBusiness
         var record = await _recordBusiness.GetRecord(organizationId, projectId, recordId, true);
         if (record.ObjectStorageId == null) throw new KeyNotFoundException("Record needs an object storage id");
         
-        var objectStorage = _context.ObjectStorages.FirstOrDefault(os => os.OrganizationId == organizationId && 
-                                                                         (os.ProjectId == projectId || os.ProjectId == null) && 
-                                                                         os.Id == record.ObjectStorageId.Value);
-        if  (objectStorage is null) throw new KeyNotFoundException("No object storage found for project");
+        var objectStorage = await GetObjectStorageWithConfig(organizationId, projectId, record.ObjectStorageId.Value);
         
         var configData = JsonConvert.DeserializeObject<ObjectStorageConfigDto>(objectStorage.Config);
         if (configData == null) throw new InvalidOperationException("Config data for object storage is null or invalid");
         
         var fileBusiness = _factory.CreateFileBusiness(objectStorage.Type);
-        return await fileBusiness.DownloadFile(record, objectStorage.Type == "filesystem" ? null : configData);
+        return await fileBusiness.DownloadFile(record, configData);
     }
 
     /// <summary>
@@ -197,10 +190,7 @@ public class FileBusiness
         if (record == null) throw new KeyNotFoundException("Record not found");
         if (record.ObjectStorageId == null) throw new KeyNotFoundException("Record needs an object storage id");
         
-        var objectStorage = _context.ObjectStorages.FirstOrDefault(os => os.OrganizationId == organizationId && 
-                                                                         (os.ProjectId == projectId || os.ProjectId == null) && 
-                                                                         os.Id == record.ObjectStorageId.Value);
-        if  (objectStorage is null) throw new KeyNotFoundException("No object storage found for project");
+        var objectStorage = await GetObjectStorageWithConfig(organizationId, projectId, record.ObjectStorageId.Value);
         
         var configData = JsonConvert.DeserializeObject<ObjectStorageConfigDto>(objectStorage.Config);
         if (configData == null) throw new InvalidOperationException("Config data for object storage is null or invalid");
@@ -209,5 +199,15 @@ public class FileBusiness
         await fileBusiness.DeleteFile(record, configData);
         
         return await _recordBusiness.DeleteRecord(currentUserId, organizationId, projectId, recordId);
+    }
+
+    private async Task<ObjectStorage> GetObjectStorageWithConfig(long organizationId, long projectId, long recordObjectStorageId)
+    {
+        var objectStorage = _context.ObjectStorages.FirstOrDefault(os => os.OrganizationId == organizationId && 
+                                                                         (os.ProjectId == projectId || os.ProjectId == null) && 
+                                                                         os.Id == recordObjectStorageId);
+        if  (objectStorage is null) throw new KeyNotFoundException("No object storage found for project");
+        
+        return objectStorage;
     }
 }

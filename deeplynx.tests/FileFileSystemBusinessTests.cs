@@ -76,6 +76,7 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
     {
         // Arrange
         Directory.CreateDirectory(_testDirectory);
+        var config = new ObjectStorageConfigDto { MountPath = _testDirectory };
         var originalFilePath = Path.Combine(_testDirectory, "original.txt");
         await File.WriteAllTextAsync(originalFilePath, "Old content");
 
@@ -97,7 +98,7 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
         try
         {
             // Act
-            var updatedPath = await _fileBusiness.UpdateFile(record, null, fileMock.Object, guid);
+            var updatedPath = await _fileBusiness.UpdateFile(record, config, fileMock.Object, guid);
 
             // Assert
             Assert.True(File.Exists(updatedPath));
@@ -118,6 +119,7 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
     {
         // Arrange
         Directory.CreateDirectory(_testDirectory);
+        var config = new ObjectStorageConfigDto { MountPath = _testDirectory };
         var filePath = Path.Combine(_testDirectory, "download.txt");
         var content = "Downloadable content";
         await File.WriteAllTextAsync(filePath, content);
@@ -131,7 +133,7 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
         try
         {
             // Act
-            var result = await _fileBusiness.DownloadFile(record, null);
+            var result = await _fileBusiness.DownloadFile(record, config);
 
             // Assert
             Assert.NotNull(result);

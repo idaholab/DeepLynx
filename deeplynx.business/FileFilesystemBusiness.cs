@@ -82,7 +82,7 @@ public class FileFilesystemBusiness : IFileBusiness
     /// <exception cref="ArgumentException"></exception>
     /// <exception cref="FileNotFoundException"></exception>
     /// <exception cref="DirectoryNotFoundException"></exception>
-    public async Task<string> UpdateFile(RecordResponseDto record, ObjectStorageConfigDto? objectStorageConfig, IFormFile file, Guid guid)
+    public async Task<string> UpdateFile(RecordResponseDto record, ObjectStorageConfigDto objectStorageConfig, IFormFile file, Guid guid)
     {
         var filePath = record.Uri;
         
@@ -123,10 +123,11 @@ public class FileFilesystemBusiness : IFileBusiness
     /// Downloads a file from local file storage
     /// </summary>
     /// <param name="record">The record that has the file info</param>
+    /// <param name="objectStorageConfig">The configuration data of the object storage</param>
     /// <returns></returns>
     /// <exception cref="ArgumentException"></exception>
     /// <exception cref="FileNotFoundException"></exception>
-    public async Task<FileStreamResult> DownloadFile(RecordResponseDto record, ObjectStorageConfigDto? objectStorageConfig)
+    public async Task<FileStreamResult> DownloadFile(RecordResponseDto record, ObjectStorageConfigDto objectStorageConfig)
     {
         var filePath = record.Uri;
         if (filePath == null)

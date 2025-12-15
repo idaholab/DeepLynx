@@ -110,7 +110,7 @@ public class FileAzureBusiness: IFileBusiness
     /// <returns></returns>
     /// <exception cref="ArgumentException"></exception>
     /// <exception cref="FileNotFoundException"></exception>
-    public async Task<FileStreamResult> DownloadFile(RecordResponseDto record, ObjectStorageConfigDto? objectStorageConfig)
+    public async Task<FileStreamResult> DownloadFile(RecordResponseDto record, ObjectStorageConfigDto objectStorageConfig)
     {
         if (record.Uri == null)
         {

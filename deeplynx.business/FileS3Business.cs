@@ -13,12 +13,12 @@ public class FileS3Business:  IFileBusiness
         return "";
     }
 
-    public async Task<string> UpdateFile(RecordResponseDto record, ObjectStorageConfigDto? objectStorageConfig, IFormFile file, Guid guid)
+    public async Task<string> UpdateFile(RecordResponseDto record, ObjectStorageConfigDto objectStorageConfig, IFormFile file, Guid guid)
     {
         return "";
     }
 
-    public async Task<FileStreamResult> DownloadFile(RecordResponseDto record,  ObjectStorageConfigDto? objectStorageConfig)
+    public async Task<FileStreamResult> DownloadFile(RecordResponseDto record,  ObjectStorageConfigDto objectStorageConfig)
     {
         // Create a simple stub with empty content
         var emptyStream = new MemoryStream();
