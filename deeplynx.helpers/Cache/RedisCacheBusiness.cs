@@ -1,10 +1,9 @@
 using System.Text.Json;
 using StackExchange.Redis;
 using System.Text.Json.Serialization;
-using deeplynx.datalayer.Models;
 using JsonSerializer = System.Text.Json.JsonSerializer;
 using deeplynx.interfaces;
-using Microsoft.EntityFrameworkCore;
+using deeplynx.helpers;
 
 namespace deeplynx.business
 {
@@ -46,8 +45,6 @@ namespace deeplynx.business
                 return default;
             }
 
-            await SetAsync("type", "redis", (TimeSpan?)null);
-
             return JsonSerializer.Deserialize<T>(value.ToString(), _jsonOptions);
         }
 
@@ -64,7 +61,7 @@ namespace deeplynx.business
             bool result;
             if (ttl.HasValue)
             {
-                result = await _db.StringSetAsync(key, json, ttl);
+                result = await _db.StringSetAsync(key, json, ttl.Value);
             }
             else
             {

@@ -1,6 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using deeplynx.business;
 using deeplynx.datalayer.Models;
+using deeplynx.helpers;
 using deeplynx.helpers.Hubs;
 using deeplynx.interfaces;
 using deeplynx.models;
@@ -37,8 +38,8 @@ public class SensitivityLabelBusinessTests : IntegrationTestBase
         _mockNotificationLogger = new Mock<ILogger<NotificationBusiness>>();
         _notificationBusiness =
             new NotificationBusiness(Context, _mockNotificationLogger.Object, _mockHubContext.Object);
-        _eventBusiness = new EventBusiness(Context, _cacheBusiness, _notificationBusiness);
-        _labelBusiness = new SensitivityLabelBusiness(Context, _cacheBusiness, _eventBusiness);
+        _eventBusiness = new EventBusiness(Context, _notificationBusiness);
+        _labelBusiness = new SensitivityLabelBusiness(Context, _eventBusiness);
     }
 
     protected override async Task SeedTestDataAsync()

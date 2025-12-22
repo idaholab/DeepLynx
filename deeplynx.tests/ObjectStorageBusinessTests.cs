@@ -1,6 +1,7 @@
 using System.Text.Json.Nodes;
 using deeplynx.business;
 using deeplynx.datalayer.Models;
+using deeplynx.helpers;
 using deeplynx.helpers.Hubs;
 using deeplynx.interfaces;
 using deeplynx.models;
@@ -46,19 +47,18 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
     {
         await base.InitializeAsync();
         _organizationBusiness = new Mock<IOrganizationBusiness>();
-        _objectStorageBusiness = new ObjectStorageBusiness(Context, _cacheBusiness);
+        _objectStorageBusiness = new ObjectStorageBusiness(Context);
         _mockHubContext = new Mock<IHubContext<EventNotificationHub>>();
         _mockNotificationLogger = new Mock<ILogger<NotificationBusiness>>();
         _notificationBusiness =
             new NotificationBusiness(Context, _mockNotificationLogger.Object, _mockHubContext.Object);
-        _eventBusiness = new EventBusiness(Context, _cacheBusiness, _notificationBusiness);
+        _eventBusiness = new EventBusiness(Context, _notificationBusiness);
         _mockLogger = new Mock<ILogger<ProjectBusiness>>();
         _mockClassBusiness = new Mock<IClassBusiness>();
         _mockDataSourceBusiness = new Mock<IDataSourceBusiness>();
         _mockRoleBusiness = new Mock<IRoleBusiness>();
         _projectBusiness = new ProjectBusiness(
             Context,
-            _cacheBusiness,
             _mockLogger.Object,
             _mockClassBusiness.Object,
             _mockRoleBusiness.Object,

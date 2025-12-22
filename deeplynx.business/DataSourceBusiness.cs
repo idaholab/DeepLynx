@@ -10,7 +10,6 @@ namespace deeplynx.business;
 
 public class DataSourceBusiness : IDataSourceBusiness
 {
-    private readonly ICacheBusiness _cacheBusiness;
     private readonly DeeplynxContext _context;
 
     // dependants used to trigger downstream soft deletes
@@ -22,13 +21,11 @@ public class DataSourceBusiness : IDataSourceBusiness
     ///     Initializes a new instance of the <see cref="DataSourceBusiness" /> class.
     /// </summary>
     /// <param name="context">The database context used for the data source operations.</param>
-    /// <param name="cacheBusiness">Used to access cache operations</param>
     /// <param name="edgeBusiness">Passed in context for downstream edge objects.</param>
     /// <param name="recordBusiness">Passed in context for downstream record objects.</param>
     /// <param name="eventBusiness">Used for logging events during create, update, and delete Operations.</param>
     public DataSourceBusiness(
         DeeplynxContext context,
-        ICacheBusiness cacheBusiness,
         IEdgeBusiness edgeBusiness,
         IRecordBusiness recordBusiness,
         IEventBusiness eventBusiness
@@ -38,7 +35,6 @@ public class DataSourceBusiness : IDataSourceBusiness
         _edgeBusiness = edgeBusiness;
         _recordBusiness = recordBusiness;
         _eventBusiness = eventBusiness;
-        _cacheBusiness = cacheBusiness;
     }
 
     /// <summary>

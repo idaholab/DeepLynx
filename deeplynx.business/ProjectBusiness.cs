@@ -15,7 +15,6 @@ namespace deeplynx.business;
 
 public class ProjectBusiness : IProjectBusiness
 {
-    private readonly ICacheBusiness _cacheBusiness;
     private readonly IClassBusiness _classBusiness;
     private readonly DeeplynxContext _context;
     private readonly IDataSourceBusiness _dataSourceBusiness;
@@ -38,7 +37,6 @@ public class ProjectBusiness : IProjectBusiness
     ///     Initializes a new instance of the <see cref="ProjectBusiness" /> class.
     /// </summary>
     /// <param name="context">The database context used for the project operations.</param>
-    /// <param name="cacheBusiness">Used to cache project data</param>
     /// <param name="classBusiness">Used to create default classes automatically on project creation.</param>
     /// <param name="roleBusiness">Used to create default roles automatically on project creation.</param>
     /// <param name="dataSourceBusiness">Used to create a default datasource on project creation.</param>
@@ -46,7 +44,7 @@ public class ProjectBusiness : IProjectBusiness
     /// <param name="logger">Used for uniformity in logging</param>
     /// <param name="objectStorageBusiness">Used to create a default object storage upon project creation.</param>
     public ProjectBusiness(
-        DeeplynxContext context, ICacheBusiness cacheBusiness, ILogger<ProjectBusiness> logger,
+        DeeplynxContext context, ILogger<ProjectBusiness> logger,
         IClassBusiness classBusiness, IRoleBusiness roleBusiness, IDataSourceBusiness dataSourceBusiness,
         IObjectStorageBusiness objectStorageBusiness, IEventBusiness eventBusiness,
         IOrganizationBusiness organizationBusiness)
@@ -58,7 +56,6 @@ public class ProjectBusiness : IProjectBusiness
         _dataSourceBusiness = dataSourceBusiness;
         _objectStorageBusiness = objectStorageBusiness;
         _eventBusiness = eventBusiness;
-        _cacheBusiness = cacheBusiness;
         _organizationBusiness = organizationBusiness;
     }
 
@@ -142,13 +139,13 @@ public class ProjectBusiness : IProjectBusiness
         };
 
         // Update the Project Cache List
-        var cachedProjectList = await _cacheBusiness.GetAsync<List<ProjectResponseDto>>(ProjectsCacheKey);
+        var cachedProjectList = await CacheService.Instance.GetAsync<List<ProjectResponseDto>>(ProjectsCacheKey);
 
         if (cachedProjectList == null) cachedProjectList = new List<ProjectResponseDto>();
 
         // add the new project to the project list and set the cache
         cachedProjectList.Add(projectResponseDto);
-        await _cacheBusiness.SetAsync(ProjectsCacheKey, cachedProjectList, cacheTTL);
+        await CacheService.Instance.SetAsync(ProjectsCacheKey, cachedProjectList, cacheTTL);
 
         // If project cache count differs from the database refresh it to match the database and return
         if (cachedProjectList.Count != _context.Projects.Count()) await RefreshProjectsCache();
@@ -182,13 +179,13 @@ public class ProjectBusiness : IProjectBusiness
     /// <exception cref="KeyNotFoundException">Returned if project not found or is archived</exception>
     public async Task<ProjectResponseDto> GetProject(long organizationId, long projectId, bool hideArchived = true)
     {
-        var cachedProjectList = await _cacheBusiness.GetAsync<List<ProjectResponseDto>>(ProjectsCacheKey);
+        var cachedProjectList = await CacheService.Instance.GetAsync<List<ProjectResponseDto>>(ProjectsCacheKey);
 
         // If no projects are cached update the Cache
         if (cachedProjectList == null || !cachedProjectList.Any())
         {
             await RefreshProjectsCache();
-            cachedProjectList = await _cacheBusiness.GetAsync<List<ProjectResponseDto>>(ProjectsCacheKey);
+            cachedProjectList = await CacheService.Instance.GetAsync<List<ProjectResponseDto>>(ProjectsCacheKey);
 
             if (cachedProjectList == null) cachedProjectList = new List<ProjectResponseDto>();
         }
@@ -262,7 +259,7 @@ public class ProjectBusiness : IProjectBusiness
         };
 
         // Update the Project Cache List
-        var cachedProjectList = await _cacheBusiness.GetAsync<List<ProjectResponseDto>>(ProjectsCacheKey);
+        var cachedProjectList = await CacheService.Instance.GetAsync<List<ProjectResponseDto>>(ProjectsCacheKey);
 
         // If cache list is empty, refresh it to match the database and return
         if (cachedProjectList == null)
@@ -276,7 +273,7 @@ public class ProjectBusiness : IProjectBusiness
         if (projectIndex != -1) cachedProjectList[projectIndex] = updatedProject;
 
         // Set the updated list back to the cache
-        await _cacheBusiness.SetAsync(ProjectsCacheKey, cachedProjectList, cacheTTL);
+        await CacheService.Instance.SetAsync(ProjectsCacheKey, cachedProjectList, cacheTTL);
 
         return updatedProject;
     }
@@ -305,7 +302,7 @@ public class ProjectBusiness : IProjectBusiness
         await _context.SaveChangesAsync();
 
         // Update the Project Cache List
-        var cachedProjectList = await _cacheBusiness.GetAsync<List<ProjectResponseDto>>(ProjectsCacheKey);
+        var cachedProjectList = await CacheService.Instance.GetAsync<List<ProjectResponseDto>>(ProjectsCacheKey);
 
         // If cache list is empty, refresh it to match the database and return
         if (cachedProjectList == null)
@@ -317,7 +314,7 @@ public class ProjectBusiness : IProjectBusiness
         var projectIndex = cachedProjectList.FindIndex(p => p.Id == projectId);
         if (projectIndex != -1) cachedProjectList.RemoveAt(projectIndex);
 
-        await _cacheBusiness.SetAsync(ProjectsCacheKey, cachedProjectList, cacheTTL);
+        await CacheService.Instance.SetAsync(ProjectsCacheKey, cachedProjectList, cacheTTL);
 
         return true;
     }
@@ -386,7 +383,7 @@ public class ProjectBusiness : IProjectBusiness
         };
 
         // Update the Project Cache List
-        var cachedProjectList = await _cacheBusiness.GetAsync<List<ProjectResponseDto>>(ProjectsCacheKey);
+        var cachedProjectList = await CacheService.Instance.GetAsync<List<ProjectResponseDto>>(ProjectsCacheKey);
 
         // If cache list is empty, refresh it to match the database and return
         if (cachedProjectList == null)
@@ -400,7 +397,7 @@ public class ProjectBusiness : IProjectBusiness
             if (projectIndex != -1) cachedProjectList[projectIndex] = projectResponse;
     
             // Set the updated list back to the cache
-            await _cacheBusiness.SetAsync(ProjectsCacheKey, cachedProjectList, cacheTTL);
+            await CacheService.Instance.SetAsync(ProjectsCacheKey, cachedProjectList, cacheTTL);
         }
 
         // Log the archive event
@@ -480,7 +477,7 @@ public class ProjectBusiness : IProjectBusiness
             };
 
             // Update the Project Cache List
-            var cachedProjectList = await _cacheBusiness.GetAsync<List<ProjectResponseDto>>(ProjectsCacheKey);
+            var cachedProjectList = await CacheService.Instance.GetAsync<List<ProjectResponseDto>>(ProjectsCacheKey);
 
             // If cache list is empty, refresh it to match the database and return
             if (cachedProjectList == null)
@@ -494,7 +491,7 @@ public class ProjectBusiness : IProjectBusiness
                 if (projectIndex != -1) cachedProjectList[projectIndex] = projectResponse;
     
                 // Set the updated list back to the cache
-                await _cacheBusiness.SetAsync(ProjectsCacheKey, cachedProjectList, cacheTTL);
+                await CacheService.Instance.SetAsync(ProjectsCacheKey, cachedProjectList, cacheTTL);
             }
             
             // Log the unarchive event
@@ -757,7 +754,7 @@ public class ProjectBusiness : IProjectBusiness
     {
         var dbProjects = await _context.Projects.ToListAsync();
         var projectResponseDtoList = MapProjectsToResponseDto(dbProjects);
-        await _cacheBusiness.SetAsync(ProjectsCacheKey, projectResponseDtoList, cacheTTL);
+        await CacheService.Instance.SetAsync(ProjectsCacheKey, projectResponseDtoList, cacheTTL);
         return true;
     }
 

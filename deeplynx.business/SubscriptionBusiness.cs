@@ -9,14 +9,11 @@ namespace deeplynx.business;
 
 public class SubscriptionBusiness : ISubscriptionBusiness
 {
-    private readonly ICacheBusiness _cacheBusiness;
-
     private readonly DeeplynxContext _context;
 
-    public SubscriptionBusiness(DeeplynxContext context, ICacheBusiness cacheBusiness)
+    public SubscriptionBusiness(DeeplynxContext context)
     {
         _context = context;
-        _cacheBusiness = cacheBusiness;
     }
 
     /// <summary>
@@ -288,7 +285,7 @@ public class SubscriptionBusiness : ISubscriptionBusiness
     /// <returns>A list of created subscriptions</returns>
     public async Task<bool> BulkDeleteSubscriptions(long currentUserId, long projectId, List<long> subscriptionIds)
     {
-        await ExistenceHelper.EnsureProjectExistsAsync(_context, projectId, _cacheBusiness);
+        await ExistenceHelper.EnsureProjectExistsAsync(_context, projectId);
 
         // Build the SQL statement
         var sql = @"
@@ -326,7 +323,7 @@ public class SubscriptionBusiness : ISubscriptionBusiness
     /// <returns>A list of created subscriptions</returns>
     public async Task<bool> BulkArchiveSubscriptions(long currentUserId, long projectId, List<long> subscriptionIds)
     {
-        await ExistenceHelper.EnsureProjectExistsAsync(_context, projectId, _cacheBusiness);
+        await ExistenceHelper.EnsureProjectExistsAsync(_context, projectId);
 
         // Build the SQL statement
         var sql = @"
@@ -369,7 +366,7 @@ public class SubscriptionBusiness : ISubscriptionBusiness
     /// <returns>A list of created subscriptions</returns>
     public async Task<bool> BulkUnarchiveSubscriptions(long currentUserId, long projectId, List<long> subscriptionIds)
     {
-        await ExistenceHelper.EnsureProjectExistsAsync(_context, projectId, _cacheBusiness);
+        await ExistenceHelper.EnsureProjectExistsAsync(_context, projectId);
 
         // Build the SQL statement
         var sql = @"

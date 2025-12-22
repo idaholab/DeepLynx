@@ -12,18 +12,15 @@ public interface IOrganizationService
 
 public class OrganizationService : IOrganizationService
 {
-    private readonly ICacheBusiness _cacheBusiness;
     private readonly DeeplynxContext _dbContext;
     private readonly ILogger<SysAdminService> _logger;
 
     public OrganizationService(
         DeeplynxContext dbContext,
-        ILogger<SysAdminService> logger,
-        ICacheBusiness cacheBusiness)
+        ILogger<SysAdminService> logger)
     {
         _dbContext = dbContext;
         _logger = logger;
-        _cacheBusiness = cacheBusiness;
     }
 
     public async Task<long> CheckExistence(long? projectId, long? organizationId, bool includeArchived = false)
@@ -40,7 +37,6 @@ public class OrganizationService : IOrganizationService
             await ExistenceHelper.EnsureProjectExistsAsync(
                 _dbContext,
                 projectId.Value,
-                _cacheBusiness,
                 !includeArchived
             );
 

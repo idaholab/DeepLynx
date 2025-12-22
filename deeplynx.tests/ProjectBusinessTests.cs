@@ -63,7 +63,7 @@ public class ProjectBusinessTests : IntegrationTestBase
         _mockNotificationLogger = new Mock<ILogger<NotificationBusiness>>();
         _notificationBusiness =
             new NotificationBusiness(Context, _mockNotificationLogger.Object, _mockHubContext.Object);
-        _eventBusiness = new EventBusiness(Context, _cacheBusiness, _notificationBusiness);
+        _eventBusiness = new EventBusiness(Context, _notificationBusiness);
         _objectStorageBusiness = new Mock<IObjectStorageBusiness>();
         _mockRecordBusiness = new Mock<IRecordBusiness>();
         _mockRelationshipBusiness = new Mock<IRelationshipBusiness>();
@@ -71,15 +71,15 @@ public class ProjectBusinessTests : IntegrationTestBase
         _mockLogger = new Mock<ILogger<ProjectBusiness>>();
         _organizationBusiness = new Mock<IOrganizationBusiness>();
 
-        _roleBusiness = new RoleBusiness(Context, _cacheBusiness, _eventBusiness);
+        _roleBusiness = new RoleBusiness(Context, _eventBusiness);
         _dataSourceBusiness = new DataSourceBusiness(
-            Context, _cacheBusiness, _mockEdgeBusiness.Object,
+            Context, _mockEdgeBusiness.Object,
             _mockRecordBusiness.Object, _eventBusiness);
         _classBusiness = new ClassBusiness(
-            Context, _cacheBusiness, _mockRecordBusiness.Object,
+            Context, _mockRecordBusiness.Object,
             _mockRelationshipBusiness.Object, _eventBusiness);
         _projectBusiness = new ProjectBusiness(
-            Context, _cacheBusiness, _mockLogger.Object,
+            Context, _mockLogger.Object,
             _classBusiness, _roleBusiness, _dataSourceBusiness,
             _objectStorageBusiness.Object, _eventBusiness, _organizationBusiness.Object);
     }

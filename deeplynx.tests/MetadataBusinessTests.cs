@@ -54,22 +54,21 @@ public class MetadataBusinessTests : IntegrationTestBase
         _mockNotificationLogger = new Mock<ILogger<NotificationBusiness>>();
         _notificationBusiness =
             new NotificationBusiness(Context, _mockNotificationLogger.Object, _mockHubContext.Object);
-        _eventBusiness = new EventBusiness(Context, _cacheBusiness, _notificationBusiness);
+        _eventBusiness = new EventBusiness(Context, _notificationBusiness);
 
         _classBusiness = new ClassBusiness(
-            Context, _cacheBusiness, _mockRecordBusiness.Object,
+            Context, _mockRecordBusiness.Object,
             _mockRelationshipBusiness.Object, _eventBusiness);
 
         _relationshipBusiness = new RelationshipBusiness(
-            Context, _cacheBusiness, _mockEdgeBusiness.Object, _eventBusiness);
+            Context, _mockEdgeBusiness.Object, _eventBusiness);
 
-        _tagBusiness = new TagBusiness(Context, _cacheBusiness, _eventBusiness);
-        _recordBusiness = new RecordBusiness(Context, _cacheBusiness, _eventBusiness);
-        _edgeBusiness = new EdgeBusiness(Context, _cacheBusiness, _eventBusiness);
+        _tagBusiness = new TagBusiness(Context, _eventBusiness);
+        _recordBusiness = new RecordBusiness(Context, _eventBusiness, _tagBusiness);
+        _edgeBusiness = new EdgeBusiness(Context, _eventBusiness);
 
         _metadataBusiness = new MetadataBusiness(
             Context,
-            _cacheBusiness,
             _classBusiness,
             _relationshipBusiness,
             _tagBusiness,

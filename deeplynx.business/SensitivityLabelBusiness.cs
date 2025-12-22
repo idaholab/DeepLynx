@@ -9,7 +9,6 @@ namespace deeplynx.business;
 
 public class SensitivityLabelBusiness : ISensitivityLabelBusiness
 {
-    private readonly ICacheBusiness _cacheBusiness;
     private readonly DeeplynxContext _context;
     private readonly IEventBusiness _eventBusiness;
 
@@ -17,12 +16,10 @@ public class SensitivityLabelBusiness : ISensitivityLabelBusiness
     ///     Initializes a new instance of the <see cref="SensitivityLabelBusiness" /> class.
     /// </summary>
     /// <param name="context">The database context to be used for sensitivity label operations</param>
-    /// <param name="cacheBusiness">Used to access cache operations</param>
     /// <param name="eventBusiness">Used for logging events during CRUD operations</param>
-    public SensitivityLabelBusiness(DeeplynxContext context, ICacheBusiness cacheBusiness, IEventBusiness eventBusiness)
+    public SensitivityLabelBusiness(DeeplynxContext context, IEventBusiness eventBusiness)
     {
         _context = context;
-        _cacheBusiness = cacheBusiness;
         _eventBusiness = eventBusiness;
     }
 

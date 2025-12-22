@@ -10,7 +10,6 @@ namespace deeplynx.business;
 
 public class RelationshipBusiness : IRelationshipBusiness
 {
-    private readonly ICacheBusiness _cacheBusiness;
     private readonly DeeplynxContext _context;
     private readonly IEdgeBusiness _edgeBusiness;
     private readonly IEventBusiness _eventBusiness;
@@ -19,13 +18,11 @@ public class RelationshipBusiness : IRelationshipBusiness
     ///     Initializes a new instance of the <see cref="RelationshipBusiness" /> class.
     /// </summary>
     /// <param name="context">The database context used for the relationship operations.</param>
-    /// <param name="cacheBusiness">Used to access cache operations</param>
     /// <param name="edgeBusiness">Passed in context of edge objects.</param>
     /// <param name="eventBusiness">Used to access event operations</param>
-    public RelationshipBusiness(DeeplynxContext context, ICacheBusiness cacheBusiness, IEdgeBusiness edgeBusiness,
+    public RelationshipBusiness(DeeplynxContext context, IEdgeBusiness edgeBusiness,
         IEventBusiness eventBusiness)
     {
-        _cacheBusiness = cacheBusiness;
         _edgeBusiness = edgeBusiness;
         _context = context;
         _eventBusiness = eventBusiness;
@@ -290,23 +287,13 @@ public class RelationshipBusiness : IRelationshipBusiness
         var result = await _context.Database
             .SqlQueryRaw<RelationshipResponseDto>(sql, parameters.ToArray())
             .ToListAsync();
-
-        // Bulk log events for each relationship creation
-        var events = new List<CreateEventRequestDto> { };
         
-        foreach (var relationship in result)
+        var createEvent = new CreateEventRequestDto
         {
-            events.Add(new CreateEventRequestDto
-            {
-                Operation = "create",
-                EntityType = "relationship",
-                EntityId = relationship.Id,
-                EntityName = relationship.Name,
-                Properties = "{}",
-            });
-        }
-        
-        await _eventBusiness.BulkCreateEvents(currentUserId, events, organizationId, projectId);
+            Operation = "create",
+            EntityType = "relationship"
+        };
+        await _eventBusiness.CreateEvent(currentUserId, organizationId, projectId, createEvent, result.Count);
         
         return result;
     }

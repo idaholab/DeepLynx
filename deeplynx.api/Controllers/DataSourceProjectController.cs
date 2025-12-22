@@ -16,9 +16,7 @@ namespace deeplynx.api.Controllers;
 [ApiController]
 [Route("projects/{projectId:long}/datasources")]
 [Authorize]
-[Tags(
-    // "Project Management",
-    "DataSource")]
+[Tags("Project - DataSource")]
 public class DataSourceProjectController : ControllerBase
 {
     private readonly IDataSourceBusiness _dataSourceBusiness;
@@ -37,7 +35,7 @@ public class DataSourceProjectController : ControllerBase
     }
 
     /// <summary>
-    ///     Get All Data Sources (Project)
+    ///     Get All Data Sources 
     /// </summary>
     /// <param name="projectId">The ID of the project whose data sources are to be retrieved</param>
     /// <param name="hideArchived">Flag indicating whether to hide archived data sources from the result (Default true)</param>
@@ -63,7 +61,7 @@ public class DataSourceProjectController : ControllerBase
     }
 
     /// <summary>
-    ///     Get a Data Source (Project)
+    ///     Get a Data Source 
     /// </summary>
     /// <param name="projectId">The ID of the project to which the data source belongs</param>
     /// <param name="dataSourceId">The ID whereby to fetch the data source</param>
@@ -92,7 +90,7 @@ public class DataSourceProjectController : ControllerBase
     }
 
     /// <summary>
-    ///     Get Default Data Source (Project)
+    ///     Get Default Data Source 
     /// </summary>
     /// <param name="projectId">The ID of the project to which the data source belongs</param>
     /// <returns>The default data source for the project</returns>
@@ -116,7 +114,7 @@ public class DataSourceProjectController : ControllerBase
     }
 
     /// <summary>
-    ///     Create a Data Source (Project)
+    ///     Create a Data Source 
     /// </summary>
     /// <param name="projectId">The ID of the project to which the data source belongs</param>
     /// <param name="dto">The data transfer object containing data source details</param>
@@ -143,7 +141,7 @@ public class DataSourceProjectController : ControllerBase
     }
 
     /// <summary>
-    ///     Update a Data Source (Project)
+    ///     Update a Data Source 
     /// </summary>
     /// <param name="projectId">The ID of the project to which the data source belongs</param>
     /// <param name="dataSourceId">The ID of the data source to update</param>
@@ -173,7 +171,7 @@ public class DataSourceProjectController : ControllerBase
     }
 
     /// <summary>
-    ///     Delete a Data Source (Project)
+    ///     Delete a Data Source 
     /// </summary>
     /// <param name="projectId">The ID of the project to which the data source belongs</param>
     /// <param name="dataSourceId">The ID of the data source to delete</param>
@@ -199,7 +197,7 @@ public class DataSourceProjectController : ControllerBase
     }
 
     /// <summary>
-    ///     Archive or Unarchive a Data Source (Project)
+    ///     Archive or Unarchive a Data Source 
     /// </summary>
     /// <param name="projectId">The ID of the project to which the data source belongs</param>
     /// <param name="dataSourceId">The ID of the data source to archive or unarchive</param>
@@ -236,7 +234,7 @@ public class DataSourceProjectController : ControllerBase
     }
 
     /// <summary>
-    ///     Set Default Data Source (Project)
+    ///     Set Default Data Source 
     /// </summary>
     /// <param name="projectId">The ID of the project to which the data source belongs</param>
     /// <param name="dataSourceId">The ID of the data source to set as default</param>

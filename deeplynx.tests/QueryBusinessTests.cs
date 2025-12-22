@@ -9,7 +9,6 @@ namespace deeplynx.tests;
 [Collection("Test Suite Collection")]
 public class QueryBusinessTests : IntegrationTestBase
 {
-    private readonly CacheBusiness _cacheBusiness = null!;
     private QueryBusiness _queryBusiness = null!;
     private long cid;
     private long did;
@@ -30,7 +29,7 @@ public class QueryBusinessTests : IntegrationTestBase
     public override async Task InitializeAsync()
     {
         await base.InitializeAsync();
-        _queryBusiness = new QueryBusiness(Context, _cacheBusiness);
+        _queryBusiness = new QueryBusiness(Context);
     }
 
     #region GetMultiProjectRecords Tests

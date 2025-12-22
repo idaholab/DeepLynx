@@ -1,6 +1,7 @@
 // src/app/(home)/organization_management/groups/CreateGroupInlineForm.tsx
 "use client";
 
+import { useLanguage } from "@/app/contexts/Language";
 import React from "react";
 
 /* -------------------------------------------------------------------------- */
@@ -32,19 +33,24 @@ const CreateGroupInlineForm: React.FC<CreateGroupInlineFormProps> = ({
   onCancel,
   onSubmit,
 }) => {
+  const { t } = useLanguage();
   if (!show) return null;
 
   return (
     <div className="bg-base-200 rounded-lg shadow-lg p-6 mb-4 border-2 border-primary">
-      <h3 className="font-bold text-xl mb-4">Create New Group</h3>
+      <h3 className="font-bold text-xl mb-4">
+        {t.translations.CREATE_NEW_GROUP}
+      </h3>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
         <div className="form-control">
           <label className="label">
-            <span className="label-text font-semibold">Group Name *</span>
+            <span className="label-text font-semibold">
+              {t.translations.GROUP_NAME_STAR}
+            </span>
           </label>
           <input
             type="text"
-            placeholder="e.g., Engineering Team"
+            placeholder={t.translations.EG_ENGINEERING_TEAM}
             className="input input-bordered w-full"
             value={newGroupName}
             onChange={(e) => onChangeName(e.target.value)}
@@ -53,11 +59,13 @@ const CreateGroupInlineForm: React.FC<CreateGroupInlineFormProps> = ({
         </div>
         <div className="form-control">
           <label className="label">
-            <span className="label-text font-semibold">Description</span>
+            <span className="label-text font-semibold">
+              {t.translations.DESCRIPTION}
+            </span>
           </label>
           <input
             type="text"
-            placeholder="Brief description"
+            placeholder={t.translations.BRIEF_DESCRIPTION}
             className="input input-bordered w-full"
             value={newGroupDescription}
             onChange={(e) => onChangeDescription(e.target.value)}
@@ -67,7 +75,7 @@ const CreateGroupInlineForm: React.FC<CreateGroupInlineFormProps> = ({
       </div>
       <div className="flex gap-2 justify-end">
         <button className="btn btn-ghost" onClick={onCancel} disabled={loading}>
-          Cancel
+          {t.translations.CANCEL}
         </button>
         <button
           className="btn btn-primary"
@@ -77,7 +85,7 @@ const CreateGroupInlineForm: React.FC<CreateGroupInlineFormProps> = ({
           {loading ? (
             <span className="loading loading-spinner loading-sm" />
           ) : (
-            "Create Group"
+            t.translations.CREATE_GROUP
           )}
         </button>
       </div>

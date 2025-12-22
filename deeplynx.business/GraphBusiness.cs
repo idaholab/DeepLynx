@@ -7,7 +7,6 @@ namespace deeplynx.business;
 
 public class GraphBusiness : IGraphBusiness
 {
-    private readonly ICacheBusiness _cacheBusiness;
     private readonly DeeplynxContext _context;
     private readonly IEventBusiness _eventBusiness;
 
@@ -15,13 +14,11 @@ public class GraphBusiness : IGraphBusiness
     ///     Initializes a new instance of the <see cref="GraphBusiness" /> class.
     /// </summary>
     /// <param name="context">The database context used for the Graph operations.</param>
-    /// <param name="cacheBusiness">Used to access cache operations</param>
     /// <param name="eventBusiness">Used for logging events during create, update, and delete Operations.</param>
     public GraphBusiness(
-        DeeplynxContext context, ICacheBusiness cacheBusiness, IEventBusiness eventBusiness)
+        DeeplynxContext context, IEventBusiness eventBusiness)
     {
         _context = context;
-        _cacheBusiness = cacheBusiness;
         _eventBusiness = eventBusiness;
     }
 

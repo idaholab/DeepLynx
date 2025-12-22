@@ -9,13 +9,11 @@ namespace deeplynx.business;
 // TODO: add event system
 public class ObjectStorageBusiness : IObjectStorageBusiness
 {
-    private readonly ICacheBusiness _cacheBusiness;
     private readonly DeeplynxContext _context;
 
-    public ObjectStorageBusiness(DeeplynxContext context, ICacheBusiness cacheBusiness)
+    public ObjectStorageBusiness(DeeplynxContext context)
     {
         _context = context;
-        _cacheBusiness = cacheBusiness;
     }
 
     /// <summary>

@@ -47,8 +47,8 @@ public class PermissionBusinessTests : IntegrationTestBase
         _mockNotificationLogger = new Mock<ILogger<NotificationBusiness>>();
         _notificationBusiness =
             new NotificationBusiness(Context, _mockNotificationLogger.Object, _mockHubContext.Object);
-        _eventBusiness = new EventBusiness(Context, _cacheBusiness, _notificationBusiness);
-        _permissionBusiness = new PermissionBusiness(Context, _eventBusiness, _cacheBusiness);
+        _eventBusiness = new EventBusiness(Context, _notificationBusiness);
+        _permissionBusiness = new PermissionBusiness(Context, _eventBusiness);
     }
 
     protected override async Task SeedTestDataAsync()

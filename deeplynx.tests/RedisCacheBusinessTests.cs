@@ -2,6 +2,7 @@ using deeplynx.business;
 using deeplynx.datalayer.Models;
 using deeplynx.models;
 using Moq;
+using deeplynx.helpers;
 
 namespace deeplynx.tests;
 
@@ -15,18 +16,14 @@ public class RedisCacheBusinessTests : IntegrationTestBase
     public override async Task InitializeAsync()
     {
         // Set the cache provider
-        Environment.SetEnvironmentVariable("CACHE_PROVIDER_TYPE", "redis");
-        
-        // Reset the cache instance to pick up the new environment variable
-        _cacheBusiness.ResetCacheInstance();
-        
+        SwitchCacheType("redis");
         await base.InitializeAsync();
     }
 
     [Fact]
     public async Task ConfirmTestingCorrectCacheType()
     {
-        var type = _cacheBusiness.CacheType;
+        var type = CacheService.Instance.CacheType;
         Assert.True(type == "redis");
     }
     
@@ -47,8 +44,8 @@ public class RedisCacheBusinessTests : IntegrationTestBase
         }).ToList();
 
         // Act
-        await _cacheBusiness.SetAsync(key, value, (TimeSpan?)null);
-        var cachedValue = await _cacheBusiness.GetAsync<List<ProjectResponseDto>>(key);
+        await CacheService.Instance.SetAsync(key, value, (TimeSpan?)null);
+        var cachedValue = await CacheService.Instance.GetAsync<List<ProjectResponseDto>>(key);
         
         // Assert
         Assert.Equal(value.Count, cachedValue.Count);
@@ -79,11 +76,11 @@ public class RedisCacheBusinessTests : IntegrationTestBase
             LastUpdatedBy = project.LastUpdatedBy,
             IsArchived = project.IsArchived
         }).ToList();
-        await _cacheBusiness.SetAsync(key, value, (TimeSpan?)null);
+        await CacheService.Instance.SetAsync(key, value, (TimeSpan?)null);
 
         // Act
-        await _cacheBusiness.DeleteAsync(key);
-        var cachedValue = await _cacheBusiness.GetAsync<string>(key);
+        await CacheService.Instance.DeleteAsync(key);
+        var cachedValue = await CacheService.Instance.GetAsync<string>(key);
 
         // Assert
         Assert.Null(cachedValue);
@@ -105,13 +102,13 @@ public class RedisCacheBusinessTests : IntegrationTestBase
             LastUpdatedBy = project.LastUpdatedBy,
             IsArchived = project.IsArchived
         }).ToList();
-        await _cacheBusiness.SetAsync(key1, value, (TimeSpan?)null);
-        await _cacheBusiness.SetAsync(key2, value, (TimeSpan?)null);
+        await CacheService.Instance.SetAsync(key1, value, (TimeSpan?)null);
+        await CacheService.Instance.SetAsync(key2, value, (TimeSpan?)null);
 
         // Act
-        await _cacheBusiness.FlushAsync();
-        var cachedValue1 = await _cacheBusiness.GetAsync<string>(key1);
-        var cachedValue2 = await _cacheBusiness.GetAsync<string>(key2);
+        await CacheService.Instance.FlushAsync();
+        var cachedValue1 = await CacheService.Instance.GetAsync<string>(key1);
+        var cachedValue2 = await CacheService.Instance.GetAsync<string>(key2);
 
         // Assert
         Assert.Null(cachedValue1);

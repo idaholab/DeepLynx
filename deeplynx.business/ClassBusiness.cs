@@ -11,7 +11,6 @@ namespace deeplynx.business;
 
 public class ClassBusiness : IClassBusiness
 {
-    private readonly ICacheBusiness _cacheBusiness;
     private readonly DeeplynxContext _context;
     private readonly IEventBusiness _eventBusiness;
     private readonly IRecordBusiness _recordBusiness;
@@ -21,14 +20,12 @@ public class ClassBusiness : IClassBusiness
     ///     Initializes a new instance of the <see cref="ClassBusiness" /> class.
     /// </summary>
     /// <param name="context">The database context to be used for class operations</param>
-    /// <param name="cacheBusiness">Used to access cache operations</param>
     /// <param name="edgeMappingBusiness">Passed in context of edge mapping objects</param>
     /// <param name="recordBusiness">Passed in context of record objects</param>
     /// <param name="relationshipBusiness">Passed in context of relationship objects</param>
     /// <param name="eventBusiness">Used for logging events during create, update, and delete Operations.</param>
     public ClassBusiness(
         DeeplynxContext context,
-        ICacheBusiness? cacheBusiness,
         IRecordBusiness recordBusiness,
         IRelationshipBusiness relationshipBusiness,
         IEventBusiness eventBusiness
@@ -38,7 +35,6 @@ public class ClassBusiness : IClassBusiness
         _recordBusiness = recordBusiness;
         _relationshipBusiness = relationshipBusiness;
         _eventBusiness = eventBusiness;
-        _cacheBusiness = cacheBusiness;
     }
 
     /// <summary>
@@ -258,19 +254,13 @@ public class ClassBusiness : IClassBusiness
             .SqlQueryRaw<ClassResponseDto>(sql, parameters.ToArray())
             .ToListAsync();
 
-        // for each created class Bulk log events
-        var events = new List<CreateEventRequestDto>();
-        foreach (var item in result)
-            events.Add(new CreateEventRequestDto
-            {
-                Operation = "create",
-                EntityType = "class",
-                EntityId = item.Id,
-                EntityName = item.Name,
-                DataSourceId = null,
-                Properties = JsonSerializer.Serialize(new { item.Name })
-            });
-        await _eventBusiness.BulkCreateEvents(currentUserId, events, organizationId, projectId);
+        var createEvent = new CreateEventRequestDto
+        {
+            Operation = "create",
+            EntityType = "class",
+            DataSourceId = null,
+        };
+        await _eventBusiness.CreateEvent(currentUserId, organizationId, projectId, createEvent, result.Count);
 
         return result;
     }

@@ -1,0 +1,51 @@
+---
+title: Administrator Functions
+description: How Nexus handles access control
+---
+import { Footer, Layout, Navbar } from 'nextra-theme-docs'
+import { Banner, Head } from 'nextra/components'
+import { getPageMap } from 'nextra/page-map'
+
+# Administrator Functions
+
+Nexus supports three types of administrators: **Site Admins**, **Organization Admins**, and **Project Admins**. Each level provides specific controls and permissions that cascade down the hierarchy.
+
+## Permission Hierarchy
+
+Projects inherit roles and permissions from their parent organizations, while also allowing custom roles, permissions, tags, and security labels to be created at the project level.
+
+
+## Site Management
+
+**Site Admins** have the highest level of access and can:
+
+- Invite users to Nexus
+- Create organizations
+- Manage organization members
+- Create OAuth Applications
+
+
+## Organization Management
+
+**Organization Admins** have control over their organization's structure and can:
+
+- Add users to the organization
+- Assign roles and permissions
+- Create and manage groups
+- Assign users to groups
+- Design tags and security labels
+
+**Note:** All users are placed into the default **INL organization** and can be added to other organizations as needed. Roles and permissions configured at this level are inherited by all projects within the organization.
+
+
+## Project Management
+
+**Project Admins** have detailed control over individual projects and can:
+
+- Invite users and groups to projects
+- Assign roles and permissions
+- Create data sources
+- Allocate object storage
+- Design tags and security labels
+
+**Note:** While projects inherit roles and permissions from their parent organizations, Project Admins can create custom roles and permissions specific to their project's requirements.

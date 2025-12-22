@@ -37,7 +37,6 @@ namespace deeplynx.tests.Middleware
 
             // Set JWT_SECRET_KEY for all tests
             Environment.SetEnvironmentVariable("JWT_SECRET_KEY", TEST_JWT_SECRET);
-
             // Setup mocks
             _optionsMock = new Mock<IOptionsMonitor<JwtBearerOptions>>();
             _optionsMock.Setup(x => x.Get(It.IsAny<string>()))
@@ -98,7 +97,6 @@ namespace deeplynx.tests.Middleware
         {
             // Arrange
             Environment.SetEnvironmentVariable("DISABLE_BACKEND_AUTHENTICATION", "true");
-            
             // Create existing local dev user (not sys admin)
             var localDevUser = new User
             {
@@ -242,7 +240,6 @@ namespace deeplynx.tests.Middleware
         {
             // Arrange
             Environment.SetEnvironmentVariable("DISABLE_BACKEND_AUTHENTICATION", "true");
-            
             var user = await Context.Users.FindAsync(uid1);
             var apiKey = await Context.ApiKeys.FindAsync(akid1);
             Assert.NotNull(user);
@@ -273,7 +270,6 @@ namespace deeplynx.tests.Middleware
         {
             // Arrange
             Environment.SetEnvironmentVariable("DISABLE_BACKEND_AUTHENTICATION", "true");
-            
             var context = CreateHttpContext("invalid-token-format");
             var middleware = await CreateAndInitializeMiddleware(context);
 
@@ -295,7 +291,6 @@ namespace deeplynx.tests.Middleware
         {
             // Arrange
             Environment.SetEnvironmentVariable("DISABLE_BACKEND_AUTHENTICATION", "true");
-            
             var user = await Context.Users.FindAsync(uid1);
             var apiKey = await Context.ApiKeys.FindAsync(akid1);
             Assert.NotNull(user);
@@ -324,7 +319,6 @@ namespace deeplynx.tests.Middleware
         {
             // Arrange
             Environment.SetEnvironmentVariable("DISABLE_BACKEND_AUTHENTICATION", "true");
-    
             var user = await Context.Users.FindAsync(uid1);
             var apiKey = await Context.ApiKeys.FindAsync(akid1);
             Assert.NotNull(user);
@@ -354,7 +348,6 @@ namespace deeplynx.tests.Middleware
         {
             // Arrange
             Environment.SetEnvironmentVariable("DISABLE_BACKEND_AUTHENTICATION", "true");
-            
             var user = await Context.Users.FindAsync(uid1);
             Assert.NotNull(user);
 
@@ -382,7 +375,6 @@ namespace deeplynx.tests.Middleware
         {
             // Arrange
             Environment.SetEnvironmentVariable("DISABLE_BACKEND_AUTHENTICATION", "true");
-            
             // Create a malformed token that will throw during validation
             var token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.malformed.signature";
             var context = CreateHttpContext(token);
@@ -449,7 +441,6 @@ namespace deeplynx.tests.Middleware
         {
             // Arrange
             Environment.SetEnvironmentVariable("DISABLE_BACKEND_AUTHENTICATION", "false");
-
             var user = await Context.Users.FindAsync(uid1);
             var apiKey = await Context.ApiKeys.FindAsync(akid1);
             Assert.NotNull(user);
@@ -475,7 +466,6 @@ namespace deeplynx.tests.Middleware
         {
             // Arrange
             Environment.SetEnvironmentVariable("DISABLE_BACKEND_AUTHENTICATION", "false");
-
             var user = await Context.Users.FindAsync(uid1);
             Assert.NotNull(user);
 
@@ -500,7 +490,6 @@ namespace deeplynx.tests.Middleware
         {
             // Arrange
             Environment.SetEnvironmentVariable("DISABLE_BACKEND_AUTHENTICATION", "false");
-
             var user = await Context.Users.FindAsync(uid1);
             var apiKey = await Context.ApiKeys.FindAsync(akid1);
             Assert.NotNull(user);
@@ -532,7 +521,6 @@ namespace deeplynx.tests.Middleware
         {
             // Arrange
             Environment.SetEnvironmentVariable("DISABLE_BACKEND_AUTHENTICATION", "false");
-
             var user = await Context.Users.FindAsync(uid1);
             var apiKey = await Context.ApiKeys.FindAsync(akid1);
             Assert.NotNull(user);
@@ -574,7 +562,6 @@ namespace deeplynx.tests.Middleware
         {
             // Arrange
             Environment.SetEnvironmentVariable("DISABLE_BACKEND_AUTHENTICATION", "false");
-
             // No OAuth token created since user doesn't exist
             var token = await GenerateHS256TokenAsync("nonexistent@test.com", "test-key", "test-secret");
             var context = CreateHttpContext(token);
@@ -731,7 +718,6 @@ namespace deeplynx.tests.Middleware
         {
             // Arrange
             Environment.SetEnvironmentVariable("DISABLE_BACKEND_AUTHENTICATION", "false");
-
             var user = await Context.Users.FindAsync(uid1);
             var apiKey = await Context.ApiKeys.FindAsync(akid1);
             Assert.NotNull(user);
@@ -765,7 +751,6 @@ namespace deeplynx.tests.Middleware
         {
             // Arrange
             Environment.SetEnvironmentVariable("DISABLE_BACKEND_AUTHENTICATION", "false");
-
             var user = await Context.Users.FindAsync(uid1);
             var apiKey = await Context.ApiKeys.FindAsync(akid1);
             Assert.NotNull(user);
@@ -799,7 +784,6 @@ namespace deeplynx.tests.Middleware
         {
             // Arrange
             Environment.SetEnvironmentVariable("DISABLE_BACKEND_AUTHENTICATION", "false");
-
             var user = await Context.Users.FindAsync(uid1);
             var apiKey = await Context.ApiKeys.FindAsync(akid1);
             Assert.NotNull(user);
@@ -833,7 +817,6 @@ namespace deeplynx.tests.Middleware
         {
             // Arrange
             Environment.SetEnvironmentVariable("DISABLE_BACKEND_AUTHENTICATION", "false");
-
             var apiKey = await Context.ApiKeys.FindAsync(akid1);
             Assert.NotNull(apiKey);
 
@@ -1082,7 +1065,6 @@ namespace deeplynx.tests.Middleware
         {
             // Arrange
             Environment.SetEnvironmentVariable("SUPERUSER_EMAIL", "admin@test.com");
-            
             var claims = new[]
             {
                 new Claim(ClaimTypes.Email, "admin@test.com"),
@@ -1114,7 +1096,6 @@ namespace deeplynx.tests.Middleware
         {
             // Arrange
             Environment.SetEnvironmentVariable("SUPERUSER_EMAIL", "admin@test.com");
-            
             var claims = new[]
             {
                 new Claim(ClaimTypes.Email, "regularuser@test.com"),
@@ -1146,7 +1127,6 @@ namespace deeplynx.tests.Middleware
         {
             // Arrange
             Environment.SetEnvironmentVariable("SUPERUSER_EMAIL", "Admin@Test.COM");
-            
             var claims = new[]
             {
                 new Claim(ClaimTypes.Email, "admin@test.com"),
@@ -1178,7 +1158,6 @@ namespace deeplynx.tests.Middleware
         {
             // Arrange
             Environment.SetEnvironmentVariable("SUPERUSER_EMAIL", "admin@test.com");
-    
             // Create existing user with SSO ID (not admin yet)
             var existingUser = new User
             {

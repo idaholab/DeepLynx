@@ -11,7 +11,6 @@ namespace deeplynx.business;
 
 public class RoleBusiness : IRoleBusiness
 {
-    private readonly ICacheBusiness _cacheBusiness;
     private readonly DeeplynxContext _context;
     private readonly IEventBusiness _eventBusiness;
 
@@ -19,13 +18,11 @@ public class RoleBusiness : IRoleBusiness
     ///     Initializes a new instance of the <see cref="RoleBusiness" /> class.
     /// </summary>
     /// <param name="context">The database context to be used for role operations</param>
-    /// <param name="cacheBusiness">Used to access cache operations</param>
     /// <param name="eventBusiness">Used for logging events during CRUD operations</param>
-    public RoleBusiness(DeeplynxContext context, ICacheBusiness cacheBusiness, IEventBusiness eventBusiness)
+    public RoleBusiness(DeeplynxContext context, IEventBusiness eventBusiness)
     {
         _context = context;
         _eventBusiness = eventBusiness;
-        _cacheBusiness = cacheBusiness;
     }
 
     /// <summary>
@@ -196,7 +193,7 @@ public class RoleBusiness : IRoleBusiness
         // If projectId is provided, ensure it exists and belongs to the organization
         if (projectId.HasValue)
         {
-            await ExistenceHelper.EnsureProjectExistsAsync(_context, projectId.Value, _cacheBusiness);
+            await ExistenceHelper.EnsureProjectExistsAsync(_context, projectId.Value);
 
             var project = await _context.Projects.FindAsync(projectId.Value);
             if (project?.OrganizationId != organizationId)
@@ -256,29 +253,20 @@ public class RoleBusiness : IRoleBusiness
         var result = await _context.Database
             .SqlQueryRaw<RoleResponseDto>(sql, parameters.ToArray())
             .ToListAsync();
-
-        // for each created role Bulk log events
-        var events = new List<CreateEventRequestDto> { };
-        foreach (var item in result)
+        
+        var createEvent = new CreateEventRequestDto
         {
-            events.Add(new CreateEventRequestDto
-            {
-                Operation = "create",
-                EntityType = "role",
-                EntityId = item.Id,
-                EntityName = item.Name,
-                DataSourceId = null,
-                Properties = JsonSerializer.Serialize(new {item.Name}),
-            });
-        }
+            Operation = "create",
+            EntityType = "role"
+        };
         
         if (projectId.HasValue)
         {
-           await _eventBusiness.BulkCreateEvents(currentUserId, events, organizationId, projectId.Value);
+            await _eventBusiness.CreateEvent(currentUserId, organizationId, projectId, createEvent, result.Count);
         }
         else
         {
-            await _eventBusiness.BulkCreateEvents(currentUserId, events, organizationId);
+            await _eventBusiness.CreateEvent(currentUserId, organizationId, null, createEvent, result.Count);
         }
         
         return result;

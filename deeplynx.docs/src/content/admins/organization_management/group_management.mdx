@@ -1,0 +1,108 @@
+---
+title: Group Management
+description: How Nexus handles access control
+---
+import { Footer, Layout, Navbar } from 'nextra-theme-docs'
+import { Banner, Head } from 'nextra/components'
+import { getPageMap } from 'nextra/page-map'
+import Image from 'next/image'
+
+# Group Management
+
+The Groups tab of the Organization Management page has a table containing all active groups within the organization.
+Organization admins have the ability to create, edit, delete, and add users to groups.
+
+## Creating Groups
+
+1. Navigate to the Organization Management page by clicking the slider bar icon on the outtermost toolbar.
+2. On the Groups tab of the Organization Management page, click the "Create Group" button.
+
+<Image
+  src="/docs/images/create-group-org.png"
+  alt="Create Group UI"
+  width={800}
+  height={600}
+/>
+
+3. Enter the group name and description then click "Create Group".
+4. The group will be added to the organization and displayed in the groups table.
+
+<Image
+  src="/docs/images/create-group-save-org.png"
+  alt="Save Group UI"
+  width={800}
+  height={600}
+/>
+
+## Adding Users to Groups
+
+1. Navigate to the Group Management tab of the Organization Management page.
+2. Inside the Groups table, click the pencil icon OR the group name to edit it's members.
+3. Enter the user's email address in the search bar under "Add Members".
+4. A list of users will appear under the search bar, click the green plus sign of the selected user.
+4. The user will be added to the group and appear under the "Current Members" header!
+
+<Image
+  src="/docs/images/add-user-group-org.png"
+  alt="Add User to Group UI"
+  width={800}
+  height={600}
+/>
+
+## Editing Groups
+
+1. Click the pencil icon in the action column of the organization management groups table.
+    Or click the "Edit Details" button when the group is expanded.
+
+<Image
+  src="/docs/images/edit-group-org.png"
+  alt="Edit Group UI"
+  width={800}
+  height={600}
+/>
+
+<Image
+  src="/docs/images/edit-group-opt-org.png"
+  alt="Edit Details Group UI"
+  width={800}
+  height={600}
+/>
+
+2. Update the group's information in the Edit Group modal and hit save.
+
+<Image
+  src="/docs/images/edit-group-save-org.png"
+  alt="Save Edit Group UI"
+  width={800}
+  height={600}
+/>
+
+## Removing Users from Groups
+
+1. Click the name of the Group to expand it's information and members.
+2. Under the "Current Members" header, click the red "X" button next to the email of the user to be removed.
+3. The user will be removed from the "Current Members" of the selected group.
+
+**Note:** Once a user is removed from a group they must be added again to regain access.
+
+<Image
+  src="/docs/images/delete-user-group-org.png"
+  alt="Delete User Group UI"
+  width={800}
+  height={600}
+/>
+
+## Removing Groups
+
+1. Click the trashcan icon in the action column of the group management table.
+2. This will remove the group from the organization.
+
+**Note:** Once a group is removed from the organization, it will be permanently archived.
+A new group with invitaitons to each user must be created to regain access.
+
+<Image
+  src="/docs/images/delete-group-org.png"
+  alt="Delete Group UI"
+  width={800}
+  height={600}
+/>

@@ -38,10 +38,10 @@ public class NexusAuthenticationMiddleware : JwtBearerHandler
     {
         // Extract token
         var token = ExtractToken(Request);
-        var disableAuth = Environment.GetEnvironmentVariable("DISABLE_BACKEND_AUTHENTICATION")?.ToLower() == "true";
+        var disableAuth = Environment.GetEnvironmentVariable("DISABLE_BACKEND_AUTHENTICATION");
 
         // If local bypass is enabled, try to use the token but fall back to superuser on any issues
-        if (disableAuth)
+        if (disableAuth == "true")
         {
             // No token provided - use superuser
             if (string.IsNullOrEmpty(token))

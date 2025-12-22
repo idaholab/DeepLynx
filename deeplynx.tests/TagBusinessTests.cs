@@ -43,11 +43,10 @@ public class TagBusinessTests : IntegrationTestBase
         _mockNotificationLogger = new Mock<ILogger<NotificationBusiness>>();
         _notificationBusiness =
             new NotificationBusiness(Context, _mockNotificationLogger.Object, _mockHubContext.Object);
-        _eventBusiness = new EventBusiness(Context, _cacheBusiness, _notificationBusiness);
+        _eventBusiness = new EventBusiness(Context, _notificationBusiness);
 
         _tagBusiness = new TagBusiness(
             Context,
-            _cacheBusiness,
             _eventBusiness);
     }
 
@@ -379,7 +378,6 @@ public class TagBusinessTests : IntegrationTestBase
         Assert.Equal("create", firstEvent.Operation);
         Assert.Equal("tag", firstEvent.EntityType);
         Assert.Equal(result[0].ProjectId, firstEvent.ProjectId);
-        Assert.Equal(result[0].Id, firstEvent.EntityId);
     }
 
     [Fact]

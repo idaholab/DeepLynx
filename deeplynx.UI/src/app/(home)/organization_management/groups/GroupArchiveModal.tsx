@@ -2,6 +2,7 @@
 
 import React from "react";
 import { ExclamationTriangleIcon } from "@heroicons/react/24/outline";
+import { useLanguage } from "@/app/contexts/Language";
 
 interface GroupArchiveModalProps {
   isOpen: boolean;
@@ -20,6 +21,7 @@ const GroupArchiveModal: React.FC<GroupArchiveModalProps> = ({
   onConfirm,
   loading = false,
 }) => {
+  const { t } = useLanguage();
   if (!isOpen) return null;
 
   const isSingle = groupNames.length === 1;
@@ -34,12 +36,15 @@ const GroupArchiveModal: React.FC<GroupArchiveModalProps> = ({
           </div>
           <div>
             <h3 className="font-bold text-xl mb-1">
-              {isSingle ? "Archive this group?" : "Archive selected groups?"}
+              {isSingle
+                ? t.translations.ARCHIVE_THIS_GROUP
+                : t.translations.ARCHIVE_SELECTED_GROUPS}
             </h3>
             <p className="text-sm text-base-content/70">
               {isSingle
-                ? "This group will be archived. Members will be removed from this group but will remain in the organization."
-                : "The selected groups will be archived. Members will be removed from those groups but will remain in the organization."}
+                ? t.translations.GROUP_WILL_BE_ARCHIVED_MEMBERS_WILL_BE_REMOVED
+                : t.translations
+                    .SELECTED_GROUP_WILL_BE_ARCHIVED_MEMBERS_WILL_BE_REMOVED}
             </p>
           </div>
         </div>
@@ -51,22 +56,24 @@ const GroupArchiveModal: React.FC<GroupArchiveModalProps> = ({
               <div className="font-semibold mb-1">{groupNames[0]}</div>
               {typeof totalMembers === "number" && (
                 <div className="text-base-content/70">
-                  {totalMembers} member{totalMembers === 1 ? "" : "s"} in this
-                  group
+                  {totalMembers} {t.translations.MEMBER}
+                  {totalMembers === 1 ? "" : "s"} {t.translations.IN_THIS_GROUP}
                 </div>
               )}
             </>
           ) : (
             <>
               <div className="font-semibold mb-1">
-                {groupNames.length} groups selected
+                {groupNames.length} {t.translations.GROUPS_SELECTED}
               </div>
               <ul className="list-disc list-inside text-base-content/70 space-y-0.5 max-h-24 overflow-y-auto">
                 {groupNames.slice(0, 4).map((name) => (
                   <li key={name}>{name}</li>
                 ))}
                 {groupNames.length > 4 && (
-                  <li className="italic">+{groupNames.length - 4} more…</li>
+                  <li className="italic">
+                    +{groupNames.length - 4} {t.translations.MORE_}
+                  </li>
                 )}
               </ul>
             </>
@@ -77,12 +84,10 @@ const GroupArchiveModal: React.FC<GroupArchiveModalProps> = ({
         <div className="alert alert-warning mb-4">
           <ExclamationTriangleIcon className="w-5 h-5" />
           <div>
-            <h4 className="font-semibold text-sm">What happens next?</h4>
-            <p className="text-xs">
-              The group will no longer appear in group lists. Users will not
-              lose access to the organization itself, only this group
-              association.
-            </p>
+            <h4 className="font-semibold text-sm">
+              {t.translations.WHAT_HAPPENS_NEXT}
+            </h4>
+            <p className="text-xs">{t.translations.GROUP_NO_LONGER_APPEAR}</p>
           </div>
         </div>
 
@@ -93,7 +98,7 @@ const GroupArchiveModal: React.FC<GroupArchiveModalProps> = ({
             onClick={onClose}
             disabled={loading}
           >
-            Cancel
+            {t.translations.CANCEL}
           </button>
           <button
             className={`btn btn-error gap-2 ${loading ? "btn-disabled" : ""}`}
@@ -103,7 +108,8 @@ const GroupArchiveModal: React.FC<GroupArchiveModalProps> = ({
             {loading ? (
               <span className="loading loading-spinner loading-sm" />
             ) : null}
-            Archive {isSingle ? "Group" : "Groups"}
+            {t.translations.ARCHIVE}{" "}
+            {isSingle ? t.translations.GROUP : t.translations.GROUPS}
           </button>
         </div>
       </div>

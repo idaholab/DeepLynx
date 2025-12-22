@@ -11,7 +11,6 @@ namespace deeplynx.business;
 
 public class EdgeBusiness : IEdgeBusiness
 {
-    private readonly ICacheBusiness _cacheBusiness;
     private readonly DeeplynxContext _context;
     private readonly IEventBusiness _eventBusiness;
 
@@ -19,13 +18,11 @@ public class EdgeBusiness : IEdgeBusiness
     ///     Initializes a new instance of the <see cref="EdgeBusiness" /> class.
     /// </summary>
     /// <param name="context">The database context used for the edge operations.</param>
-    /// <param name="cacheBusiness">Used to access cache operations</param>
     /// <param name="eventBusiness">Used for logging events during create, update, and delete Operations.</param>
     public EdgeBusiness(
-        DeeplynxContext context, ICacheBusiness cacheBusiness, IEventBusiness eventBusiness)
+        DeeplynxContext context, IEventBusiness eventBusiness)
     {
         _context = context;
-        _cacheBusiness = cacheBusiness;
         _eventBusiness = eventBusiness;
     }
 
@@ -262,20 +259,14 @@ public class EdgeBusiness : IEdgeBusiness
         var result = await _context.Database
             .SqlQueryRaw<EdgeResponseDto>(sql, parameters.ToArray())
             .ToListAsync();
-
-        // log edge create event for each create
-        var events = new List<CreateEventRequestDto>();
-        foreach (var newEdge in result)
-            events.Add(new CreateEventRequestDto
-            {
-                Operation = "create",
-                EntityType = "edge",
-                EntityId = newEdge.Id,
-                DataSourceId = newEdge.DataSourceId,
-                Properties = "{}" // TODO: Determine the extent of data edge properties need
-            });
         
-        await _eventBusiness.BulkCreateEvents(currentUserId, events, organizationId, projectId);
+        var createEvent = new CreateEventRequestDto
+        {
+            Operation = "create",
+            EntityType = "edge",
+            DataSourceId = dataSourceId,
+        };
+        await _eventBusiness.CreateEvent(currentUserId, organizationId, projectId, createEvent, result.Count);
 
         return result;
     }

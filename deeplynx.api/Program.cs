@@ -1,3 +1,4 @@
+using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using deeplynx.business;
 using deeplynx.datalayer.MigrationRunner;
@@ -10,13 +11,10 @@ using Microsoft.AspNetCore.Http.Features;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
-using Microsoft.OpenApi.Models;
-using Microsoft.OpenApi.Models.Interfaces;
-using Microsoft.OpenApi.Models.References;
 using Scalar.AspNetCore;
 using Serilog;
-using StackExchange.Redis;
 using Log = Serilog.Log;
+
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -140,32 +138,6 @@ try
 
     builder.Services.AddSignalR(); // Used for event system pub/sub and notifications
 
-    // Register Cache Service as a singleton
-    var cacheProviderType = Environment.GetEnvironmentVariable("CACHE_PROVIDER_TYPE");
-    if (cacheProviderType == "redis")
-    {
-        var redisConnectionString = Environment.GetEnvironmentVariable("REDIS_CONNECTION_STRING");
-        if (!string.IsNullOrEmpty(redisConnectionString))
-        {
-            builder.Services.AddSingleton(provider =>
-            {
-                var options = ConfigurationOptions.Parse(redisConnectionString);
-                options.AllowAdmin = true;
-                return ConnectionMultiplexer.Connect(options);
-            });
-            builder.Services.AddSingleton<ICacheBusiness, RedisCacheBusiness>();
-        }
-        else
-        {
-            throw new Exception("Redis connection string not found in environment variables.");
-        }
-    }
-    else
-    {
-        // Default to memory cache if CACHE_PROVIDER_TYPE is not set or is not "redis"
-        builder.Services.AddSingleton<ICacheBusiness, MemoryCacheBusiness>();
-    }
-
     builder.Services.AddTransient<IRecordBusiness, RecordBusiness>();
     builder.Services.AddTransient<IObjectStorageBusiness, ObjectStorageBusiness>();
     builder.Services.AddTransient<IClassBusiness, ClassBusiness>();
@@ -207,212 +179,250 @@ try
     builder.Services.AddTransient<ISavedSearchBusiness, SavedSearchBusiness>();
     builder.Services.AddTransient<IGraphBusiness, GraphBusiness>();
 
+    //OpenApi Documentation
     builder.Services.AddOpenApi(options =>
     {
-        options.OpenApiVersion = OpenApiSpecVersion.OpenApi3_0;
-        options.AddDocumentTransformer(async (document, context, cancellationToken) =>
+        options.AddDocumentTransformer((document, context, cancellationToken) =>
         {
-            document.Info.Version = "v1";
-            document.Info.Title = "DeepLynx Nexus";
-            document.Info.Description = "DeepLynx Nexus Api Documentation";
-            // Add security scheme
+            document.Info = new OpenApiInfo
+            {
+                Version = "v1",
+                Title = "DeepLynx Nexus API",
+                Description =
+                    "DeepLynx Nexus API for managing organizational data and relationships. Endpoints are organized by Organization-level (/api/organizations/{organizationId}) and Project-level (/api/projects/{projectId}) scopes.",
+                Contact = new OpenApiContact
+                { 
+                    Name = "Nexus Support",
+                    Email = "Jaren.Brownlee@inl.gov"
+                }
+            };
+
+            document.Servers = new List<OpenApiServer>
+            {
+                new()
+                {
+                    Url = "https://deeplynx.inl.gov/api/v1/",
+                    Description = "Production"
+                },
+                new()
+                {
+                    Url = "https://deeplynx.dev.inl.gov/api/v1/",
+                    Description = "Develop"
+                },
+                new()
+                {
+                    Url = "https://deeplynx-test.dev.inl.gov/api/v1/",
+                    Description = "Test"
+                },
+                new()
+                {
+                    Url = "http://localhost:5000/api/v1/",
+                    Description = "Docker Environment"
+                },
+                new()
+                {
+                    Url = "http://localhost:5095/api/v1/",
+                    Description = "Local Development"
+                }
+            };
+            document.ExternalDocs = new OpenApiExternalDocs
+            {
+                Description = "Nexus Documentation",
+                Url = new Uri("https://deeplynx.inl.gov/docs")
+            };
+
+            // Define all tags with hierarchical names (alphabetized)
+            document.Tags = new HashSet<OpenApiTag>
+            {
+                // Administration
+                new() { Name = "Organization", Description = "Organization management" },
+                new() { Name = "Project", Description = "Project management" },
+                new() { Name = "User", Description = "User management" },
+                new() { Name = "Group", Description = "Group management" },
+
+                // Authentication
+                new() { Name = "OauthHandshake", Description = "OAuth2 authorization flow" },
+                new() { Name = "Token", Description = "API key and JWT token management" },
+                new() { Name = "OauthApplication", Description = "OAuth apps" },
+
+                // Class tags
+                new() { Name = "Organization - Class", Description = "Organization-level class operations" },
+                new() { Name = "Project - Class", Description = "Project-level class operations" },
+
+                // Data
+                new() { Name = "Record", Description = "Record management" },
+                new() { Name = "File", Description = "File operations" },
+                new() { Name = "Metadata", Description = "Metadata operations" },
+                new() { Name = "Historical Record", Description = "Record history" },
+                new() { Name = "Historical Edge", Description = "Edge history" },
+                new() { Name = "Edge", Description = "Edges" },
+
+                // DataSource tags
+                new() { Name = "Organization - DataSource", Description = "Organization-level data sources" },
+                new() { Name = "Project - DataSource", Description = "Project-level data sources" },
+
+                // Events
+                new() { Name = "Event", Description = "Event logs" },
+
+                // ObjectStorage tags
+                new() { Name = "Organization - Object Storage", Description = "Organization-level storage" },
+                new() { Name = "Project - Object Storage", Description = "Project-level storage" },
+
+                // Permission tags
+                new() { Name = "Organization - Permission", Description = "Organization-level permissions" },
+                new() { Name = "Project - Permission", Description = "Project-level permissions" },
+
+                // Query
+                new() { Name = "Query", Description = "Search and filtering" },
+                new() { Name = "Saved Search", Description = "Saved searches" },
+
+                // Relationship tags
+                new() { Name = "Organization - Relationship", Description = "Organization-level relationships" },
+                new() { Name = "Project - Relationship", Description = "Project-level relationships" },
+
+                // Role tags
+                new() { Name = "Organization - Role", Description = "Organization-level roles" },
+                new() { Name = "Project - Role", Description = "Project-level roles" },
+
+                // SensitivityLabel tags
+                new() { Name = "Organization - Sensitivity Label", Description = "Organization-level labels" },
+                new() { Name = "Project - Sensitivity Label", Description = "Project-level labels" },
+
+                // Tag tags
+                new() { Name = "Organization - Tag", Description = "Organization-level tags" },
+                new() { Name = "Project - Tag", Description = "Project-level tags" },
+
+                // Timeseries
+                new() { Name = "Timeseries", Description = "Time-series data" },
+
+                // Other
+                new() { Name = "Notification", Description = "Notifications" }
+            };
+
+            // Create x-tagGroups for nested folder structure (alphabetized)
+            var tagGroups = new JsonArray
+            {
+                new JsonObject
+                {
+                    ["name"] = "Administration",
+                    ["tags"] = new JsonArray { "Organization", "Project", "User", "Group" }
+                },
+                new JsonObject
+                {
+                    ["name"] = "Authentication",
+                    ["tags"] = new JsonArray { "OauthHandshake", "Token", "OauthApplication" }
+                },
+                new JsonObject
+                {
+                    ["name"] = "Class",
+                    ["tags"] = new JsonArray { "Organization - Class", "Project - Class" }
+                },
+                new JsonObject
+                {
+                    ["name"] = "Data",
+                    ["tags"] = new JsonArray
+                        { "Record", "Historical Record", "Edge", "Historical Edge", "File", "Metadata" }
+                },
+                new JsonObject
+                {
+                    ["name"] = "DataSource",
+                    ["tags"] = new JsonArray { "Organization - DataSource", "Project - DataSource" }
+                },
+                new JsonObject
+                {
+                    ["name"] = "Events",
+                    ["tags"] = new JsonArray { "Event" }
+                },
+                new JsonObject
+                {
+                    ["name"] = "Object Storage",
+                    ["tags"] = new JsonArray { "Organization - Object Storage", "Project - Object Storage" }
+                },
+                new JsonObject
+                {
+                    ["name"] = "Permission",
+                    ["tags"] = new JsonArray { "Organization - Permission", "Project - Permission" }
+                },
+                new JsonObject
+                {
+                    ["name"] = "Query",
+                    ["tags"] = new JsonArray { "Query", "Saved Search" }
+                },
+                new JsonObject
+                {
+                    ["name"] = "Relationship",
+                    ["tags"] = new JsonArray { "Organization - Relationship", "Project - Relationship" }
+                },
+                new JsonObject
+                {
+                    ["name"] = "Role",
+                    ["tags"] = new JsonArray { "Organization - Role", "Project - Role" }
+                },
+                new JsonObject
+                {
+                    ["name"] = "Sensitivity Label",
+                    ["tags"] = new JsonArray { "Organization - Sensitivity Label", "Project - Sensitivity Label" }
+                },
+                new JsonObject
+                {
+                    ["name"] = "Tag",
+                    ["tags"] = new JsonArray { "Organization - Tag", "Project - Tag" }
+                },
+                new JsonObject
+                {
+                    ["name"] = "Timeseries",
+                    ["tags"] = new JsonArray { "Timeseries" }
+                },
+                new JsonObject
+                {
+                    ["name"] = "Other",
+                    ["tags"] = new JsonArray { "Notification" }
+                }
+            };
+
+            // Initialize Extensions if null, then wrap in JsonNodeExtension for v2
+            document.Extensions ??= new Dictionary<string, IOpenApiExtension>();
+            document.Extensions["x-tagGroups"] = new JsonNodeExtension(tagGroups);
+
+            // Wrap in JsonNodeExtension for v2
+            document.Extensions["x-tagGroups"] = new JsonNodeExtension(tagGroups);
+
+            // Security scheme
             document.Components ??= new OpenApiComponents();
             document.Components.SecuritySchemes ??= new Dictionary<string, IOpenApiSecurityScheme>();
-        
-            var bearerScheme = new OpenApiSecurityScheme
+
+            document.Components.SecuritySchemes["Bearer"] = new OpenApiSecurityScheme
             {
                 Type = SecuritySchemeType.Http,
                 Scheme = "bearer",
                 BearerFormat = "JWT",
                 Description = "Enter your JWT token"
             };
-        
-            document.Components.SecuritySchemes["Bearer"] = bearerScheme;
-            // Create a security scheme reference using the constructor
-            var securitySchemeReference = new OpenApiSecuritySchemeReference("Bearer", document);
-            var securityRequirement = new OpenApiSecurityRequirement
-            {
-                [securitySchemeReference] = new List<string>()
-            };
-            // Apply to all operations
-            foreach (var path in document.Paths.Values)
-            {
-                foreach (var operation in path.Operations.Values)
-                {
-                    operation.Security ??= new List<OpenApiSecurityRequirement>();
-                    operation.Security.Add(securityRequirement);
-                }
-            }
 
-            document.Tags = new HashSet<OpenApiTag>
+            return Task.CompletedTask;
+        });
+        // Add operation transformer for common responses
+        options.AddOperationTransformer((operation, context, cancellationToken) =>
+        {
+            // Add common error responses to all operations
+            operation.Responses.TryAdd("401", new OpenApiResponse
             {
-                // parent tags
-                
-                // Todo: Add this back after new scaler version
-                
-                // new()
-                // {
-                //     Name = "Project Management",
-                //     Description =
-                //         "Handles project-level operations including classes, records, edges, and relationships"
-                // },
-                // new()
-                // {
-                //     Name = "Organization Management",
-                //     Description = "Handles organization-level operations including classes, users, groups, and projects"
-                // },
-                
-                // child tags
-                new()
-                {
-                    Name = "Token",
-                    Description =
-                        "Provides endpoints to create tokens and api keys"
-                },
-                new()
-                {
-                    Name = "Class",
-                    Description =
-                        "Handles class management including creation, updates, retrieval, and deletion of class entities."
-                },
-                new()
-                {
-                    Name = "DataSource",
-                    Description = "Manages data sources, including their creation, retrieval, updating, and deletion."
-                },
-                new()
-                {
-                    Name = "Edge",
-                    Description =
-                        "Oversees relationships between entities, allowing for the creation, retrieval, updating, and deletion of edges."
-                },
-                new()
-                {
-                    Name = "Event",
-                    Description = "Handles Event fetching by project and user subscriptions."
-                },
-                new()
-                {
-                    Name = "File",
-                    Description = "Handles operations related to file management"
-                },
-                new()
-                {
-                    Name = "Group",
-                    Description = "Handles operations related to Group management"
-                },
-                new()
-                {
-                    Name = "HistoricalEdge",
-                    Description =
-                        "Handles operations related to historical edges, including retrieval and analysis of past relationships."
-                },
-                new()
-                {
-                    Name = "HistoricalRecord",
-                    Description =
-                        "Manages operations related to historical records, including retrieval and analysis of past records."
-                },
-                new()
-                {
-                    Name = "Metadata",
-                    Description = "Handles the management and processing of metadata associated with various entities."
-                },
-                new()
-                {
-                    Name = "Notification",
-                    Description = "Handles notification operations."
-                },
-                new()
-                {
-                    Name = "OauthApplication",
-                    Description = "Handles operations related to registered Oauth2 Application management."
-                },
-                new()
-                {
-                    Name = "OauthHandshake",
-                    Description =
-                        "Facilitates the Oauth2 Handshake between Nexus and external apps, with Nexus acting as an Oauth2 provider."
-                },
-                new()
-                {
-                    Name = "ObjectStorage",
-                    Description = "Handles the management and processing of metadata associated with object storages."
-                },
-                new()
-                {
-                    Name = "Organization",
-                    Description = "Handles operations related to Organization management"
-                },
-                new()
-                {
-                    Name = "Permission",
-                    Description = "Handles operations related to Permission management"
-                },
-                new()
-                {
-                    Name = "Project",
-                    Description =
-                        "Facilitates project lifecycle management, including creating, updating, retrieving, and archiving projects."
-                },
-                new()
-                {
-                    Name = "Query",
-                    Description = "Facilitates data filtering operations for efficient data retrieval and management."
-                },
-                new()
-                {
-                    Name = "Record",
-                    Description =
-                        "Manages all operations related to record creation, retrieval, updating, deletion, and tagging."
-                },
-                new()
-                {
-                    Name = "Relationship",
-                    Description =
-                        "Handles complex relationships between various entities, allowing for creation, updates, retrieval, and deletion."
-                },
-                new()
-                {
-                    Name = "Role",
-                    Description = "Handles operations related to Role management"
-                },
-                new()
-                {
-                    Name = "SavedSearch",
-                    Description = "Handles operations related to saving queries for future re-use"
-                },
-                new()
-                {
-                    Name = "Sensitivity Label",
-                    Description = "Handles operations related to Sensitivity Label management"
-                },
-                new()
-                {
-                    Name = "Subscription",
-                    Description = "Handles operations related to subscription creation, retrieval, and deletion."
-                },
-                new()
-                {
-                    Name = "Tag",
-                    Description =
-                        "Manages tagging operations for entities, including creating, updating, retrieving, and deleting tags."
-                },
-                new()
-                {
-                    Name = "Timeseries",
-                    Description =
-                        "Handles operations related to time-series data, including querying and uploading time-series data."
-                },
-                new()
-                {
-                    Name = "User",
-                    Description =
-                        "Manages user-related operations, including user creation, updates, retrieval, and authentication processes."
-                }
-            };
+                Description = "Unauthorized - Invalid or missing authentication token"
+            });
+            operation.Responses.TryAdd("403", new OpenApiResponse
+            {
+                Description = "Forbidden - Insufficient permissions"
+            });
+            operation.Responses.TryAdd("500", new OpenApiResponse
+            {
+                Description = "Internal Server Error"
+            });
+
+            return Task.CompletedTask;
         });
     });
+ 
+
 
 /* ╔════════════════════════════╗
    ║      Apply Migrations      ║
@@ -439,6 +449,10 @@ try
     app.UseAuthorization(); // Fourth
     app.MapControllers(); // Last
 
+    //Health check endpoint
+    app.MapGet("/health", () => Results.Ok(new { status = "healthy", timestamp = DateTime.UtcNow }))
+        .ExcludeFromDescription(); // hide from docs
+
     // Check if the notification service is enabled (defaults to false if not set)
     if (Environment.GetEnvironmentVariable("ENABLE_NOTIFICATION_SERVICE") == "true")
         app.MapHub<EventNotificationHub>("/eventNotificationHub"); // endpoint for real-time notifications with SignalR
@@ -448,7 +462,7 @@ try
     ╚════════════════════════════╝ */
     // Always using scalar:
     //if (app.Environment.IsDevelopment()) { ...
-    app.UseOpenApi();
+    // app.UseOpenApi();
     app.MapOpenApi();
 
     var customcss = File.ReadAllText("moon.css");
@@ -477,12 +491,14 @@ try
 
     app.MapScalarApiReference(options =>
     {
-        options.WithDarkMode()
+        options
+            .WithDarkMode()
             .WithBaseServerUrl(basePath.ToString())
             .WithTheme(ScalarTheme.Kepler)
             .WithTitle("DeepLynx Nexus API")
             .WithCustomCss(customcss)
             .AddHeaderContent(scalarHeaderContent);
+
 
         if (!string.IsNullOrEmpty(hostedLink))
         {

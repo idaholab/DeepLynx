@@ -63,7 +63,7 @@ export function RBACProvider({
   const disableAuth =
     process.env.NEXT_PUBLIC_DISABLE_FRONTEND_AUTHENTICATION === "true";
 
-  const { data: session, status } = useSafeSession();
+  const { data: session, status, update } = useSafeSession();
   const [user, setUser] = useState<RBACUser | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -147,13 +147,57 @@ export function RBACProvider({
   /*                              Refresh Handler                             */
   /* ------------------------------------------------------------------------ */
 
-  const refreshUser = useCallback(() => {
+  const refreshUser = useCallback(async () => {
     if (disableAuth) {
       fetchDevUser();
-    } else if (status === "authenticated") {
-      fetchUserData();
+    } else {
+      // Force NextAuth to re-validate the session with the server
+      const refreshedSession = await update();
+
+      if (refreshedSession) {
+        fetchUserData();
+      } else {
+        // Session is truly expired/invalid, sign them out
+        const { signOut } = await import("next-auth/react");
+        signOut({ callbackUrl: "/login" });
+      }
     }
-  }, [disableAuth, status, fetchDevUser, fetchUserData]);
+  }, [disableAuth, update, fetchDevUser, fetchUserData]);
+
+  useEffect(() => {
+    const handleVisibilityChange = async () => {
+      if (
+        document.visibilityState === "visible" &&
+        status === "authenticated"
+      ) {
+        const refreshedSession = await update();
+        if (refreshedSession) {
+          fetchUserData();
+        }
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [status, update, fetchUserData]);
+
+  // Add this useEffect in RBACContext.tsx, after your other useEffects
+
+  useEffect(() => {
+    if (
+      session?.error === "RefreshAccessTokenError" ||
+      session?.error === "NoRefreshToken"
+    ) {
+      // Token refresh failed, sign them out
+      const handleSessionError = async () => {
+        const { signOut } = await import("next-auth/react");
+        signOut({ callbackUrl: "/login/signin" });
+      };
+      handleSessionError();
+    }
+  }, [session?.error]);
 
   /* ------------------------------------------------------------------------ */
   /*                               Load States                                */

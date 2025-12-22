@@ -1,6 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using deeplynx.business;
 using deeplynx.datalayer.Models;
+using deeplynx.helpers;
 using deeplynx.helpers.Hubs;
 using deeplynx.interfaces;
 using deeplynx.models;
@@ -63,17 +64,17 @@ public class ClassBusinessTests : IntegrationTestBase
         _mockNotificationLogger = new Mock<ILogger<NotificationBusiness>>();
         _notificationBusiness =
             new NotificationBusiness(Context, _mockNotificationLogger.Object, _mockHubContext.Object);
-        _eventBusiness = new EventBusiness(Context, _cacheBusiness, _notificationBusiness);
+        _eventBusiness = new EventBusiness(Context, _notificationBusiness);
         _objectStorageBusiness = new Mock<IObjectStorageBusiness>();
         _roleBusiness = new Mock<IRoleBusiness>();
         _organizationBusiness = new Mock<IOrganizationBusiness>();
 
         _classBusiness = new ClassBusiness(
-            Context, _cacheBusiness, _recordBusiness.Object,
+            Context, _recordBusiness.Object,
             _relationshipBusiness.Object, _eventBusiness);
 
         _projectBusiness = new ProjectBusiness(
-            Context, _cacheBusiness, _mockLogger.Object,
+            Context, _mockLogger.Object,
             _classBusiness, _roleBusiness.Object, _dataSourceBusiness.Object,
             _objectStorageBusiness.Object, _eventBusiness, _organizationBusiness.Object);
     }

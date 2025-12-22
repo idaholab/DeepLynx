@@ -7,7 +7,7 @@ namespace deeplynx.business;
 
 public class FileAzureBusiness: IFileBusiness
 {
-    public async Task<string> UploadFile(long projectId, long datasourceId, ObjectStorageConfigDto objectStorageId,
+    public async Task<string> UploadFile(long organizationId, long projectId, long datasourceId, ObjectStorageConfigDto objectStorageId,
         IFormFile file, Guid guid)
     {
         return "";

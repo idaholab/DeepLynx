@@ -1,6 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using deeplynx.business;
 using deeplynx.datalayer.Models;
+using deeplynx.helpers;
 using deeplynx.helpers.Hubs;
 using deeplynx.interfaces;
 using deeplynx.models;
@@ -46,8 +47,8 @@ public class RoleBusinessTests : IntegrationTestBase
         _mockNotificationLogger = new Mock<ILogger<NotificationBusiness>>();
         _notificationBusiness =
             new NotificationBusiness(Context, _mockNotificationLogger.Object, _mockHubContext.Object);
-        _eventBusiness = new EventBusiness(Context, _cacheBusiness, _notificationBusiness);
-        _roleBusiness = new RoleBusiness(Context, _cacheBusiness, _eventBusiness);
+        _eventBusiness = new EventBusiness(Context, _notificationBusiness);
+        _roleBusiness = new RoleBusiness(Context, _eventBusiness);
     }
 
     protected override async Task SeedTestDataAsync()
@@ -406,7 +407,6 @@ public class RoleBusinessTests : IntegrationTestBase
         // Ensure create event is logged
         var eventList = await Context.Events.ToListAsync();
         Assert.Single(eventList);
-        Assert.Equal(rid4, eventList[0].EntityId);
         Assert.Equal("create", eventList[0].Operation);
         Assert.Equal("role", eventList[0].EntityType);
     }

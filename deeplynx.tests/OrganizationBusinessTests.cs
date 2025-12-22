@@ -41,8 +41,8 @@ public class OrganizationBusinessTests : IntegrationTestBase
         _mockNotificationLogger = new Mock<ILogger<NotificationBusiness>>();
         _notificationBusiness =
             new NotificationBusiness(Context, _mockNotificationLogger.Object, _mockHubContext.Object);
-        _eventBusiness = new EventBusiness(Context, _cacheBusiness, _notificationBusiness);
-        _roleBusiness = new RoleBusiness(Context, _cacheBusiness, _eventBusiness);
+        _eventBusiness = new EventBusiness(Context, _notificationBusiness);
+        _roleBusiness = new RoleBusiness(Context, _eventBusiness);
 
         // org business and dependencies
         _mockLoggerOrg = new Mock<ILogger<OrganizationBusiness>>();

@@ -58,15 +58,19 @@ const OrganizationManagementClient = ({
 
   const tabData = [
     {
-      label: "Users",
-      content: <UsersTable
-        initialMembers={members}
-        header={"Organization Users"}
-        description={"Manage users in your organization. Invite new users via email or add them directly."}
-      />,
+      label: t.translations.USERS,
+      content: (
+        <UsersTable
+          initialMembers={members}
+          header={"Organization Users"}
+          description={
+            "Manage users in your organization. Invite new users via email or add them directly."
+          }
+        />
+      ),
     },
     {
-      label: "Roles & Permissions",
+      label: t.translations.ROLES_AND_PERMISSIONS,
       content: (
         <RolesAndPermissions
           initialRoles={initialRoles}
@@ -75,7 +79,7 @@ const OrganizationManagementClient = ({
       ),
     },
     {
-      label: "Groups",
+      label: t.translations.GROUPS,
       content: (
         <InlineGroupsTable
           initialGroups={groups}
@@ -86,15 +90,15 @@ const OrganizationManagementClient = ({
       ),
     },
     {
-      label: "Tags and Security Labels",
+      label: t.translations.TAGS_AND_SECURITY_LABELS,
       content: <OptionThree projects={initialProjects} />,
     },
     {
-      label: "Settings",
+      label: t.translations.SETTINGS,
       content: organization ? (
         <OrganizationSettings organization={organization} />
       ) : (
-        <div>No organization selected</div>
+        <div>{t.translations.NO_ORG_SELECTED}</div>
       ),
     },
   ];

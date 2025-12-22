@@ -59,7 +59,7 @@ public class UserBusinessTests : IntegrationTestBase
     public override async Task InitializeAsync()
     {
         await base.InitializeAsync();
-        _userBusiness = new UserBusiness(Context, _cacheBusiness);
+        _userBusiness = new UserBusiness(Context);
     }
 
     protected override async Task SeedTestDataAsync()

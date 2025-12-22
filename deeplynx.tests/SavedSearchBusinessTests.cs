@@ -22,7 +22,7 @@ public class SavedSearchBusinessTests : IntegrationTestBase
     public override async Task InitializeAsync()
     {
         await base.InitializeAsync();
-        _savedSearchBusiness = new SavedSearchBusiness(Context, _cacheBusiness);
+        _savedSearchBusiness = new SavedSearchBusiness(Context);
     }
 
     protected override async Task SeedTestDataAsync()

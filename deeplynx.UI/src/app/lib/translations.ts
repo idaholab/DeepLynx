@@ -244,7 +244,35 @@ export const translations = {
             EDIT_OAUTH_APP: "Edit OAuth Application",
             ORGANIZATION_MANAGEMENT: "Organization Management",
             CREATE_OBJECT_STORAGE: "Create Object Storage",
-            CONNECTION_STRING: "Connection String"
+            CONNECTION_STRING: "Connection String",
+            ROLES_AND_PERMISSIONS: "Roles & Permissions",
+            TAGS_AND_SECURITY_LABELS: "Tags and Security Labels",
+            NO_ORG_SELECTED: "No organization selected",
+            CREATE_NEW_GROUP: "Create New Group",
+            GROUP_NAME_STAR: "Group Name *",
+            BRIEF_DESCRIPTION: "Brief description",
+            CREATE_GROUP: "Create Group",
+            EG_ENGINEERING_TEAM: "e.g., Engineering Team",
+
+            ARCHIVE_THIS_GROUP: "Archive this group?",
+            ARCHIVE_SELECTED_GROUPS: "Archive selected groups?",
+            GROUP_WILL_BE_ARCHIVED_MEMBERS_WILL_BE_REMOVED: "This group will be archived. Members will be removed from this group but will remain in the organization.",
+            SELECTED_GROUP_WILL_BE_ARCHIVED_MEMBERS_WILL_BE_REMOVED: "The selected groups will be archived. Members will be removed from those groups but will remain in the organization.",
+            IN_THIS_GROUP: "in this group",
+            GROUPS_SELECTED: "groups selected",
+            MORE_: "more ...",
+            WHAT_HAPPENS_NEXT: "What happens next?",
+            GROUP_NO_LONGER_APPEAR: "The group will no longer appear in group lists. Users will not lose access to the organization itself, only this group association.",
+            ARCHIVE: "Archive",
+
+            NO_PROJECT: "No Project",
+            ACTIVE: "Active",
+            PROJECT_DASHBOARD: "Project Dashboard",
+            EVENT_MANAGEMENT: "Event Management",
+
+
+
+
         }
     },
     es: {
@@ -501,7 +529,31 @@ export const translations = {
             EDIT_OAUTH_APP: "Editar aplicación OAuth",
             ORGANIZATION_MANAGEMENT: "Organization Management",
             CREATE_OBJECT_STORAGE: "Create Object Storage",
-            CONNECTION_STRING: "Connection String"
+            CONNECTION_STRING: "Cadena de conexión",
+            ROLES_AND_PERMISSIONS: "Roles y permisos",
+            TAGS_AND_SECURITY_LABELS: "Tags y etiquetas de seguridad",
+            NO_ORG_SELECTED: "Ninguna organización seleccionada",
+            CREATE_NEW_GROUP: "Crear nuevo grupo",
+            GROUP_NAME_STAR: "Nombre del grupo *",
+            BRIEF_DESCRIPTION: "Descripción breve",
+            CREATE_GROUP: "Crear grupo",
+            EG_ENGINEERING_TEAM: "p. ej., Equipo de Ingeniería",
+            ARCHIVE_THIS_GROUP: "¿Archivar este grupo?",
+            ARCHIVE_SELECTED_GROUPS: "¿Archivar los grupos seleccionados?",
+            GROUP_WILL_BE_ARCHIVED_MEMBERS_WILL_BE_REMOVED: "Este grupo será archivado. Los miembros serán removidos de este grupo, pero permanecerán en la organización.",
+            SELECTED_GROUP_WILL_BE_ARCHIVED_MEMBERS_WILL_BE_REMOVED: "Los grupos seleccionados serán archivados. Los miembros serán removidos de esos grupos, pero permanecerán en la organización.",
+            IN_THIS_GROUP: "en este grupo",
+            GROUPS_SELECTED: "grupos seleccionados",
+            MORE_: "más ...",
+            WHAT_HAPPENS_NEXT: "¿Qué sigue?",
+            GROUP_NO_LONGER_APPEAR: "El grupo ya no aparecerá en las listas de grupos. Los usuarios no perderán acceso a la organización, solo a la asociación con este grupo.",
+            ARCHIVE: "Archivar",
+            NO_PROJECT: "Sin proyecto",
+            ACTIVE: "Activo",
+            PROJECT_DASHBOARD: "Tablero del proyecto",
+            EVENT_MANAGEMENT: "Gestión de eventos",
+
+
         }
     }
 }

@@ -14,7 +14,6 @@ namespace deeplynx.business;
 
 public class TimeseriesBusiness(
     DeeplynxContext context,
-    ICacheBusiness cacheBusiness,
     IRecordBusiness recordBusiness,
     IClassBusiness classBusiness,
     ILogger<TimeseriesBusiness> logger,
@@ -23,7 +22,6 @@ public class TimeseriesBusiness(
     private static readonly string _duckDbBasePath =
         Environment.GetEnvironmentVariable("DUCKDB_BASE_PATH") ?? "/data/duckdb";
 
-    private readonly ICacheBusiness _cacheBusiness = cacheBusiness;
     private readonly IClassBusiness _classBusiness = classBusiness;
     private readonly DeeplynxContext _context = context;
     private readonly IRecordBusiness _recordBusiness = recordBusiness;

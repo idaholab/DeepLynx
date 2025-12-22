@@ -1,0 +1,100 @@
+---
+title: Tags and Security Labels
+description: Organization level tags and security labels
+---
+import { Footer, Layout, Navbar } from 'nextra-theme-docs'
+import { Banner, Head } from 'nextra/components'
+import { getPageMap } from 'nextra/page-map'
+import Image from 'next/image'
+
+# Tags and Security Labels
+
+Nexus also supports **attribute based access controls (ABAC)** where resources within parent organizations
+are assigned tags and security labels that are passed down the heirarchy to projects.
+Currently, organization admins have the ability to create, edit, and delete tags.
+
+**Note:** Security labels will be enabled in a future release.
+
+## Understanding Standard Tags and Security Labels
+
+**Tags** can be added to organizations to classify their projects and resources.
+In a future release, **security labels** will be enabled for organizations to enforce custom rules.
+Security labels will also be passed down the heirarchy to projects.
+
+## Creating Custom Tags
+
+1. Navigate to the Organization Management page by clicking the slider bar icon on the outtermost toolbar.
+2. On the Tags and Security Labels tab of the Organization Management page, click the "New Tag" button.
+
+<Image
+  src="/docs/images/create-tag-org.png"
+  alt="Creating Tags UI"
+  width={800}
+  height={600}
+/>
+
+3. Enter the new tag's name and click "Create Tag".
+4. The new tag will appear in the organization tags widget of the Tag Management page!
+
+<Image
+  src="/docs/images/name-tag-org.png"
+  alt="Creating Tags UI"
+  width={800}
+  height={600}
+/>
+
+## Editing Tags
+
+Organization admins can edit the names of existing organization tags.
+
+1. Click the "Edit" button next to the selected tag inside the Organization Tags widget.
+
+<Image
+  src="/docs/images/pre-edit-tag-org.png"
+  alt="Pre Editing Tags UI"
+  width={800}
+  height={600}
+/>
+
+2. Update the tag's information in the Edit Tag modal and hit save.
+
+<Image
+  src="/docs/images/edit-tag-org.png"
+  alt="Editing Tags UI"
+  width={800}
+  height={600}
+/>
+
+## Locking Tags
+
+The organization admin has the ability to lock organization tags by toggling the lock icon on the Organization Tags Widget.
+This prevents users from updating tags on a project level.
+
+**Unlocked Tags:**
+<Image
+  src="/docs/images/pre-lock-tag-org.png"
+  alt="Editing Tags UI"
+  width={800}
+  height={600}
+/>
+
+**Locked Tags:**
+<Image
+  src="/docs/images/lock-tag-org.png"
+  alt="Editing Tags UI"
+  width={800}
+  height={600}
+/>
+
+## Removing Tags
+
+The organization admin has the ability to remove organization tags by clicking the "Delete" button of Organization Tags Widget.
+
+**Note:** Once a tag is archived it can no longer be used. It must be restored to be reapplied to an organization.
+
+<Image
+  src="/docs/images/delete-tag-org.png"
+  alt="Removing Tags UI"
+  width={800}
+  height={600}
+/>

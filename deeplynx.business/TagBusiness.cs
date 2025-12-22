@@ -11,7 +11,6 @@ namespace deeplynx.business;
 
 public class TagBusiness : ITagBusiness
 {
-    private readonly ICacheBusiness _cacheBusiness;
     private readonly DeeplynxContext _context;
     private readonly IEventBusiness _eventBusiness;
 
@@ -19,12 +18,10 @@ public class TagBusiness : ITagBusiness
     ///     Initializes a new instance of the <see cref="TagBusiness" /> class.
     /// </summary>
     /// <param name="context">The database context to be used for tag operations.</param>
-    /// <param name="cacheBusiness">Used to access cache operations</param>
     /// <param name="eventBusiness">Used to access event operations</param>
-    public TagBusiness(DeeplynxContext context, ICacheBusiness cacheBusiness, IEventBusiness eventBusiness)
+    public TagBusiness(DeeplynxContext context, IEventBusiness eventBusiness)
     {
         _context = context;
-        _cacheBusiness = cacheBusiness;
         _eventBusiness = eventBusiness;
     }
 
@@ -232,21 +229,14 @@ public class TagBusiness : ITagBusiness
         var result = await _context.Database
             .SqlQueryRaw<TagResponseDto>(sql, parameters.ToArray())
             .ToListAsync();
+        
+        var createEvent = new CreateEventRequestDto
+        {
+            Operation = "create",
+            EntityType = "tag",
+        };
 
-        // TODO: Bulk create events rework
-        var events = new List<CreateEventRequestDto> { };
-        foreach (var item in result)
-            events.Add(new CreateEventRequestDto
-            {
-                Operation = "create",
-                EntityType = "tag",
-                EntityId = item.Id,
-                EntityName = item.Name,
-                Properties = JsonSerializer.Serialize(new { item.Name }),
-                DataSourceId = null
-            });
-
-        await _eventBusiness.BulkCreateEvents(currentUserId, events, organizationId, projectId);
+        await _eventBusiness.CreateEvent(currentUserId, organizationId, projectId, createEvent, result.Count);
 
         return result;
     }

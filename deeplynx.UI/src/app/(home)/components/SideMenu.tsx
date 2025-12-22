@@ -1,9 +1,18 @@
 // src/app/(home)/components/SideMenu.tsx
 "use client";
 
+import React, { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
+
 import { useLanguage } from "@/app/contexts/Language";
 import { useOrganizationSession } from "@/app/contexts/OrganizationSessionProvider";
 import { useProjectSession } from "@/app/contexts/ProjectSessionProvider";
+import { getAllProjects } from "@/app/lib/client_service/projects_services.client";
+import { ProjectAdminRoute } from "../rbac/RBACComponents";
+
+import type { ProjectResponseDto } from "../types/responseDTOs";
+
 import {
   AdjustmentsHorizontalIcon,
   ArrowUpTrayIcon,
@@ -15,36 +24,49 @@ import {
   FolderIcon,
   RectangleGroupIcon,
 } from "@heroicons/react/24/outline";
-import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import React, { useCallback, useEffect, useState } from "react";
-import { ProjectResponseDto } from "../types/responseDTOs";
-import { getAllProjects } from "@/app/lib/client_service/projects_services.client";
-import { ProjectAdminRoute } from "../rbac/RBACComponents";
+
+/* -------------------------------------------------------------------------- */
+/*                                   Types                                    */
+/* -------------------------------------------------------------------------- */
 
 interface SideMenuProps {
   onToggle: (isCollapsed: boolean) => void;
 }
 
+/* -------------------------------------------------------------------------- */
+/*                               Helper Constants                             */
+/* -------------------------------------------------------------------------- */
+
+const orgAllowedPaths = ["/organization_management"];
+
+/* -------------------------------------------------------------------------- */
+/*                               SideMenu Component                           */
+/* -------------------------------------------------------------------------- */
+
 const SideMenu: React.FC<SideMenuProps> = ({ onToggle }) => {
+  /* --------------------------------- Hooks -------------------------------- */
+
   const { t } = useLanguage();
   const router = useRouter();
   const pathname = usePathname();
+
   const { project, setProject } = useProjectSession();
   const { organization } = useOrganizationSession();
 
-  // State variables
+  const isOrgPortalRoute = pathname?.startsWith("/organization_management");
+
+  /* --------------------------------- State -------------------------------- */
+
   const [selectedItem, setSelectedItem] = useState<string>("");
-  const [isCollapsed, setIsCollapsed] = useState<boolean>(false);
+  const [isCollapsed, setIsCollapsed] = useState<boolean>(isOrgPortalRoute);
   const [isProjectsExpanded, setIsProjectsExpanded] = useState<boolean>(false);
+
   const [projects, setProjects] = useState<ProjectResponseDto[]>([]);
   const [loadingProjects, setLoadingProjects] = useState(false);
   const [activeProject, setActiveProject] = useState<ProjectResponseDto>();
 
-  // Determine if we should hide the projects section
-  const shouldHideProjects = pathname === "/organization_management";
+  /* ---------------------------- Data Fetching ----------------------------- */
 
-  // Memoize fetchProjects to prevent it from changing on every render
   const fetchProjects = useCallback(async () => {
     if (!organization) return;
 
@@ -61,6 +83,8 @@ const SideMenu: React.FC<SideMenuProps> = ({ onToggle }) => {
       setLoadingProjects(false);
     }
   }, [organization]);
+
+  /* -------------------------------- Effects ------------------------------- */
 
   // Fetch projects when organization changes
   useEffect(() => {
@@ -90,34 +114,43 @@ const SideMenu: React.FC<SideMenuProps> = ({ onToggle }) => {
     }
   }, [project, projects, setProject]);
 
-  // Effect to set the selected item based on the current pathname
+  // Keep selectedItem in sync with pathname
   useEffect(() => {
     setSelectedItem(pathname);
   }, [pathname]);
 
-  // Effect to get the selected item from localStorage on initial render
+  // Load selectedItem from localStorage on mount
   useEffect(() => {
     const savedItem = localStorage.getItem("selectedItem");
     if (savedItem) setSelectedItem(savedItem);
   }, []);
 
-  // Effect to save the selected item to localStorage whenever it changes
+  // Persist selectedItem to localStorage
   useEffect(() => {
     localStorage.setItem("selectedItem", selectedItem);
   }, [selectedItem]);
 
+  // Notify parent of collapse state (single source of truth)
   useEffect(() => {
     onToggle(isCollapsed);
   }, [isCollapsed, onToggle]);
 
-  // Function to toggle the collapse state of the menu
+  // Force collapsed state on org portal routes
+  useEffect(() => {
+    if (isOrgPortalRoute) {
+      setIsCollapsed(true);
+    }
+  }, [isOrgPortalRoute]);
+
+  /* ------------------------------- Handlers ------------------------------- */
+
   const toggleMenu = () => {
-    const newState = !isCollapsed;
-    setIsCollapsed(newState);
-    onToggle(newState);
+    // Lock collapsed on org portal
+    if (isOrgPortalRoute) return;
+
+    setIsCollapsed((prev) => !prev);
   };
 
-  // Function to handle project selection
   const handleProjectClick = (selectedProject: ProjectResponseDto) => {
     setProject({
       projectId: selectedProject.id.toString(),
@@ -127,58 +160,54 @@ const SideMenu: React.FC<SideMenuProps> = ({ onToggle }) => {
     router.push(`/project/${selectedProject.id}`);
   };
 
-  // Function to handle item click events
   const handleItemClick = (
     item: string,
     event: React.MouseEvent<HTMLElement>
   ) => {
+    if (isDisabled(item)) {
+      event.preventDefault();
+      return;
+    }
+
     event.preventDefault();
     setSelectedItem(item);
     router.push(item);
   };
 
-  // Function to check if an item is disabled
-  const isDisabled = (targetPath: string) =>
-    pathname === "/" && targetPath !== "/";
+  /* -------------------------- Derived / Helpers --------------------------- */
 
-  // Function to get the CSS class for an item based on its state
+  const isDisabled = (targetPath: string) => {
+    // Original home-page rule
+    if (pathname === "/" && targetPath !== "/") return true;
+
+    // On org portal, disable anything not explicitly allowed
+    if (isOrgPortalRoute && !orgAllowedPaths.includes(targetPath)) return true;
+
+    return false;
+  };
+
   const getItemClass = (targetPath: string) => {
-    const alwaysActivePaths = [
-      "/settings",
-      "/help",
-      "/contact",
-      "/fileBug",
-      "/upload_center",
-      "project_homepage",
-      "/member_management",
-      "/event_management",
-      "/tag_management",
-    ];
     const isExactMatch = selectedItem === targetPath;
     const isDynamicProject =
       targetPath === "/project/[id]" && /^\/project\/[^/]+$/.test(pathname);
     const isSelected = isExactMatch || isDynamicProject;
-    const isAlwaysActive = alwaysActivePaths.includes(targetPath);
 
     return [
       "flex items-center block py-2 px-4 rounded transition",
       isSelected ? "bg-info/30" : "hover:bg-info/30",
-      isDisabled(targetPath) && !isAlwaysActive
+      isDisabled(targetPath)
         ? "pointer-events-none opacity-50 cursor-not-allowed"
         : "",
     ].join(" ");
   };
 
-  // Check if a project is currently active
   const isProjectActive = (projectId: string | number) => {
-    // Check if we're on the project page
     const isOnProjectPage = pathname.includes(`/project/${projectId}`);
-
-    // Check if this is the current session project (for data catalog, etc.)
     const isSessionProject = project?.projectId === projectId.toString();
-
     return isOnProjectPage || isSessionProject;
   };
+
+  /* --------------------------------- Main Render ---------------------------------- */
 
   return (
     <div className="fixed top-18 bottom-0 left-18 flex z-30">
@@ -187,9 +216,10 @@ const SideMenu: React.FC<SideMenuProps> = ({ onToggle }) => {
           isCollapsed ? "w-22" : "w-64"
         } bg-[var(--base-400)] brightness-120 text-primary-content p-4 transition-all duration-300 flex flex-col overflow-y-auto`}
       >
-        {/* Projects Section */}
-        {!shouldHideProjects && (
+        {/* ----------------------------- Projects ---------------------------- */}
+        {!isOrgPortalRoute && (
           <div className="mt-5">
+            {/* Projects Header */}
             <div
               className="flex items-center justify-between py-2 px-4 cursor-pointer hover:bg-info/20 rounded transition"
               onClick={() => setIsProjectsExpanded(!isProjectsExpanded)}
@@ -202,7 +232,7 @@ const SideMenu: React.FC<SideMenuProps> = ({ onToggle }) => {
                       {t.translations.PROJECTS}
                     </span>
                     <h1 className="text-lg font-bold truncate">
-                      {activeProject?.name || "No Project"}
+                      {activeProject?.name || t.translations.NO_PROJECT}
                     </h1>
                   </div>
                 )}
@@ -224,11 +254,11 @@ const SideMenu: React.FC<SideMenuProps> = ({ onToggle }) => {
                 {loadingProjects ? (
                   <li className="py-2 px-4 text-sm text-primary-content/70">
                     <span className="loading loading-spinner loading-sm"></span>
-                    <span className="ml-2">Loading...</span>
+                    <span className="ml-2">{t.translations.LOADING}</span>
                   </li>
                 ) : projects.length === 0 ? (
                   <li className="py-2 px-4 text-sm text-base-content/70">
-                    No projects found
+                    {t.translations.NO_PROJECT_FOUND}
                   </li>
                 ) : (
                   projects.map((proj) => (
@@ -244,7 +274,7 @@ const SideMenu: React.FC<SideMenuProps> = ({ onToggle }) => {
                         <span className="truncate">{proj.name}</span>
                         {isProjectActive(proj.id) && (
                           <span className="ml-auto badge badge-xs flex-shrink-0">
-                            Active
+                            {t.translations.ACTIVE}
                           </span>
                         )}
                       </button>
@@ -256,8 +286,9 @@ const SideMenu: React.FC<SideMenuProps> = ({ onToggle }) => {
           </div>
         )}
 
-        {/* Home */}
+        {/* ------------------------------ Menu ------------------------------- */}
         <ul className="mt-8">
+          {/* Project Dashboard */}
           <li>
             <Link
               href={`/project/${project?.projectId}`}
@@ -268,12 +299,16 @@ const SideMenu: React.FC<SideMenuProps> = ({ onToggle }) => {
               className={getItemClass(`/project/${project?.projectId}`)}
             >
               <RectangleGroupIcon className="size-6" />
-              {!isCollapsed && <p className="ml-2">Project Dashboard</p>}
+              {!isCollapsed && (
+                <p className="ml-2">{t.translations.PROJECT_DASHBOARD}</p>
+              )}
             </Link>
           </li>
+
+          {/* Upload Center */}
           <li className="mt-2">
             <Link
-              href={"/upload_center"}
+              href="/upload_center"
               className={getItemClass("/upload_center")}
             >
               <ArrowUpTrayIcon className="size-6" />
@@ -283,16 +318,21 @@ const SideMenu: React.FC<SideMenuProps> = ({ onToggle }) => {
             </Link>
           </li>
 
+          {/* Event Management */}
           <li className="mt-2">
             <Link
-              href="#"
+              href="/event_management"
               onClick={(e) => handleItemClick("/event_management", e)}
               className={getItemClass("/event_management")}
             >
               <BellIcon className="size-6" />
-              {!isCollapsed && <p className="ml-2">Event Management</p>}
+              {!isCollapsed && (
+                <p className="ml-2">{t.translations.EVENT_MANAGEMENT}</p>
+              )}
             </Link>
           </li>
+
+          {/* Project Settings (Admin only) */}
           <ProjectAdminRoute>
             <li className="mt-2">
               <Link
@@ -317,7 +357,7 @@ const SideMenu: React.FC<SideMenuProps> = ({ onToggle }) => {
         </ul>
       </aside>
 
-      {/* Toggle tab */}
+      {/* ---------------------------- Toggle Tab ----------------------------- */}
       <div
         className="h-8 w-4 bg-base-300 brightness-120 text-primary-content flex items-center justify-center cursor-pointer rounded-r-md mt-16"
         onClick={toggleMenu}

@@ -28,7 +28,7 @@
     "graphology-types": "^0.24.8",
     "jsonwebtoken": "^9.0.2",
     "motion": "^12.18.1",
-    "next": "^15.2.4",
+    "next": "^15.2.8",
     "next-auth": "^5.0.0-beta.28",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",

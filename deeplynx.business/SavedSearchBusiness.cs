@@ -11,17 +11,15 @@ namespace deeplynx.business;
 /// </summary>
 public class SavedSearchBusiness : ISavedSearchBusiness
 {
-    private readonly ICacheBusiness _cache;
     private readonly DeeplynxContext _context;
 
     /// <summary>
     ///     Filter record request
     /// </summary>
     /// <param name="context">The database context to be used for filter operations.</param>
-    public SavedSearchBusiness(DeeplynxContext context, ICacheBusiness? cacheBusiness)
+    public SavedSearchBusiness(DeeplynxContext context)
     {
         _context = context;
-        _cache = cacheBusiness;
     }
 
     /// <summary>

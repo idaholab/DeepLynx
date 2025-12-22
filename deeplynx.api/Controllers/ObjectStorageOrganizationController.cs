@@ -16,9 +16,7 @@ namespace deeplynx.api.Controllers;
 [ApiController]
 [Route("organizations/{organizationId:long}/storages")]
 [Authorize]
-[Tags(
-    // "Organization Management",
-    "ObjectStorage")]
+[Tags("Organization - Object Storage")]
 public class ObjectStorageOrganizationController : ControllerBase
 {
     private readonly ILogger<ObjectStorageProjectController> _logger;
@@ -38,7 +36,7 @@ public class ObjectStorageOrganizationController : ControllerBase
     }
 
     /// <summary>
-    ///     Get All Object Storages (Organization)
+    ///     Get All Object Storages 
     /// </summary>
     /// <param name="organizationId">The ID of the organization to which the object storage belongs</param>
     /// <param name="hideArchived">Flag indicating whether to hide archived object storages from the result (Default true)</param>
@@ -65,7 +63,7 @@ public class ObjectStorageOrganizationController : ControllerBase
     }
 
     /// <summary>
-    ///     Get an Object Storage (Organization)
+    ///     Get an Object Storage 
     /// </summary>
     /// <param name="organizationId">The ID of the organization to which the object storage belongs</param>
     /// <param name="objectStorageId">The ID of the object storage to retrieve</param>
@@ -94,7 +92,7 @@ public class ObjectStorageOrganizationController : ControllerBase
     }
 
     /// <summary>
-    ///     Create an Object Storage (Organization)
+    ///     Create an Object Storage 
     /// </summary>
     /// <param name="organizationId">The ID of the organization to which the object storage belongs</param>
     /// <param name="dto">The data transfer object containing object storage details</param>
@@ -121,7 +119,7 @@ public class ObjectStorageOrganizationController : ControllerBase
     }
 
     /// <summary>
-    ///     Update an Object Storage (Organization)
+    ///     Update an Object Storage 
     /// </summary>
     /// <param name="organizationId">The ID of the organization to which the object storage belongs</param>
     /// <param name="objectStorageId">The ID of the object storage to update</param>
@@ -150,7 +148,7 @@ public class ObjectStorageOrganizationController : ControllerBase
     }
 
     /// <summary>
-    ///     Delete an Object Storage (Organization)
+    ///     Delete an Object Storage 
     /// </summary>
     /// <param name="organizationId">The ID of the organization to which the object storage belongs</param>
     /// <param name="objectStorageId">The ID of the object storage to delete</param>
@@ -177,7 +175,7 @@ public class ObjectStorageOrganizationController : ControllerBase
     }
 
     /// <summary>
-    ///     Archive or Unarchive an Object Storage (Organization)
+    ///     Archive or Unarchive an Object Storage 
     /// </summary>
     /// <param name="organizationId">The ID of the organization to which the object storage belongs</param>
     /// <param name="objectStorageId">The ID of the object storage to archive or unarchive</param>
@@ -214,7 +212,7 @@ public class ObjectStorageOrganizationController : ControllerBase
     }
 
     /// <summary>
-    ///     Get Default Object Storage (Organization)
+    ///     Get Default Object Storage 
     /// </summary>
     /// <param name="organizationId">The ID of the organization to which the object storage belongs</param>
     /// <returns>The default object storage for the organization</returns>
@@ -239,7 +237,7 @@ public class ObjectStorageOrganizationController : ControllerBase
     }
 
     /// <summary>
-    ///     Set Default Object Storage (Organization)
+    ///     Set Default Object Storage 
     /// </summary>
     /// <param name="organizationId">The ID of the organization to which the object storage belongs</param>
     /// <param name="objectStorageId">The ID of the object storage to set as default</param>

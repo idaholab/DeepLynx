@@ -22,6 +22,7 @@ public class RecordBusinessTests : IntegrationTestBase
     private Mock<ILogger<NotificationBusiness>> _mockNotificationLogger = null!;
     private INotificationBusiness _notificationBusiness = null!;
     private RecordBusiness _recordBusiness;
+    private TagBusiness _tagBusiness = null!;
     public long cid; // class ID
     public long did; // datasource ID
     private long organizationId;
@@ -48,8 +49,9 @@ public class RecordBusinessTests : IntegrationTestBase
         _mockNotificationLogger = new Mock<ILogger<NotificationBusiness>>();
         _notificationBusiness =
             new NotificationBusiness(Context, _mockNotificationLogger.Object, _mockHubContext.Object);
-        _eventBusiness = new EventBusiness(Context, _cacheBusiness, _notificationBusiness);
-        _recordBusiness = new RecordBusiness(Context, _cacheBusiness, _eventBusiness);
+        _eventBusiness = new EventBusiness(Context, _notificationBusiness);
+        _tagBusiness = new TagBusiness(Context, _eventBusiness);
+        _recordBusiness = new RecordBusiness(Context, _eventBusiness, _tagBusiness);
     }
 
     #region RecordResponseDto Tests
@@ -860,6 +862,201 @@ public class RecordBusinessTests : IntegrationTestBase
         Assert.Empty(eventList);
     }
 
+    [Fact]
+    public async Task CreateRecord_WithExistingTags_AttachesTagsToRecord()
+    {
+        // Arrange
+        var dto = new CreateRecordRequestDto
+        {
+            Name = "Record With Existing Tag",
+            Description = "Test Record with existing tag",
+            Properties = (JsonObject)JsonNode.Parse(JsonSerializer.Serialize(new { TestProp = "TestValue" }))!,
+            OriginalId = "original-with-tag",
+            Tags = new List<string> { "Test Tag" } // This tag already exists in seed data
+        };
+
+        // Act
+        var result = await _recordBusiness.CreateRecord(uid, organizationId, pid, did, dto);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.NotNull(result.Tags);
+        Assert.Single(result.Tags);
+        Assert.Equal("Test Tag", result.Tags.First().Name);
+        Assert.Equal(tid, result.Tags.First().Id); // Should be the existing tag ID
+
+        // Verify in database
+        var createdRecord = await Context.Records
+            .Include(r => r.Tags)
+            .FirstOrDefaultAsync(r => r.Id == result.Id);
+        Assert.NotNull(createdRecord);
+        Assert.Single(createdRecord.Tags);
+        Assert.Equal(tid, createdRecord.Tags.First().Id);
+    }
+
+    [Fact]
+    public async Task CreateRecord_WithNewTags_CreatesAndAttachesNewTags()
+    {
+        // Arrange
+        var dto = new CreateRecordRequestDto
+        {
+            Name = "Record With New Tags",
+            Description = "Test Record with new tags",
+            Properties = (JsonObject)JsonNode.Parse(JsonSerializer.Serialize(new { TestProp = "TestValue" }))!,
+            OriginalId = "original-new-tags",
+            Tags = new List<string> { "New Tag 1", "New Tag 2" }
+        };
+
+        // Act
+        var result = await _recordBusiness.CreateRecord(uid, organizationId, pid, did, dto);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.NotNull(result.Tags);
+        Assert.Equal(2, result.Tags.Count);
+
+        var tagNames = result.Tags.Select(t => t.Name).OrderBy(n => n).ToList();
+        Assert.Equal("New Tag 1", tagNames[0]);
+        Assert.Equal("New Tag 2", tagNames[1]);
+
+        // Verify tags were created in database
+        var newTag1 = await Context.Tags.FirstOrDefaultAsync(t => t.Name == "New Tag 1" && t.ProjectId == pid);
+        var newTag2 = await Context.Tags.FirstOrDefaultAsync(t => t.Name == "New Tag 2" && t.ProjectId == pid);
+        Assert.NotNull(newTag1);
+        Assert.NotNull(newTag2);
+
+        // Verify record-tag associations
+        var createdRecord = await Context.Records
+            .Include(r => r.Tags)
+            .FirstOrDefaultAsync(r => r.Id == result.Id);
+        Assert.NotNull(createdRecord);
+        Assert.Equal(2, createdRecord.Tags.Count);
+    }
+
+    [Fact]
+    public async Task CreateRecord_WithMixedExistingAndNewTags_HandlesCorrectly()
+    {
+        // Arrange
+        var dto = new CreateRecordRequestDto
+        {
+            Name = "Record With Mixed Tags",
+            Description = "Test Record with mixed tags",
+            Properties = (JsonObject)JsonNode.Parse(JsonSerializer.Serialize(new { TestProp = "TestValue" }))!,
+            OriginalId = "original-mixed-tags",
+            Tags = new List<string> { "Test Tag", "Brand New Tag", "Another New Tag" }
+        };
+
+        // Act
+        var result = await _recordBusiness.CreateRecord(uid, organizationId, pid, did, dto);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.NotNull(result.Tags);
+        Assert.Equal(3, result.Tags.Count);
+
+        var existingTag = result.Tags.FirstOrDefault(t => t.Name == "Test Tag");
+        Assert.NotNull(existingTag);
+        Assert.Equal(tid, existingTag.Id); // Should reuse existing tag
+
+        var newTag1 = result.Tags.FirstOrDefault(t => t.Name == "Brand New Tag");
+        var newTag2 = result.Tags.FirstOrDefault(t => t.Name == "Another New Tag");
+        Assert.NotNull(newTag1);
+        Assert.NotNull(newTag2);
+
+        // Verify in database
+        var createdRecord = await Context.Records
+            .Include(r => r.Tags)
+            .FirstOrDefaultAsync(r => r.Id == result.Id);
+        Assert.NotNull(createdRecord);
+        Assert.Equal(3, createdRecord.Tags.Count);
+    }
+
+    [Fact]
+    public async Task CreateRecord_WithoutTags_CreatesRecordSuccessfully()
+    {
+        // Arrange
+        var dto = new CreateRecordRequestDto
+        {
+            Name = "Record Without Tags",
+            Description = "Test Record without tags",
+            Properties = (JsonObject)JsonNode.Parse(JsonSerializer.Serialize(new { TestProp = "TestValue" }))!,
+            OriginalId = "original-no-tags"
+        };
+
+        // Act
+        var result = await _recordBusiness.CreateRecord(uid, organizationId, pid, did, dto);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.NotNull(result.Tags);
+        Assert.Empty(result.Tags);
+
+        // Verify in database
+        var createdRecord = await Context.Records
+            .Include(r => r.Tags)
+            .FirstOrDefaultAsync(r => r.Id == result.Id);
+        Assert.NotNull(createdRecord);
+        Assert.Empty(createdRecord.Tags);
+    }
+
+    [Fact]
+    public async Task CreateRecord_WithEmptyTagsList_CreatesRecordSuccessfully()
+    {
+        // Arrange
+        var dto = new CreateRecordRequestDto
+        {
+            Name = "Record With Empty Tags List",
+            Description = "Test Record with empty tags list",
+            Properties = (JsonObject)JsonNode.Parse(JsonSerializer.Serialize(new { TestProp = "TestValue" }))!,
+            OriginalId = "original-empty-tags",
+            Tags = new List<string>()
+        };
+
+        // Act
+        var result = await _recordBusiness.CreateRecord(uid, organizationId, pid, did, dto);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.NotNull(result.Tags);
+        Assert.Empty(result.Tags);
+    }
+
+    [Fact]
+    public async Task CreateRecord_WithDuplicateTags_DeduplicatesCorrectly()
+    {
+        // Arrange
+        var dto = new CreateRecordRequestDto
+        {
+            Name = "Record With Duplicate Tags",
+            Description = "Test Record with duplicate tag names",
+            Properties = (JsonObject)JsonNode.Parse(JsonSerializer.Serialize(new { TestProp = "TestValue" }))!,
+            OriginalId = "original-duplicate-tags",
+            Tags = new List<string> { "Duplicate Tag", "Duplicate Tag", "Unique Tag" }
+        };
+
+        // Act
+        var result = await _recordBusiness.CreateRecord(uid, organizationId, pid, did, dto);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.NotNull(result.Tags);
+
+        // Verify tags were created without duplicates
+        var tagCount = await Context.Tags
+            .Where(t => t.Name == "Duplicate Tag" && t.ProjectId == pid)
+            .CountAsync();
+        Assert.Equal(1, tagCount); // Should only create one tag with this name
+
+        // Verify record associations
+        var createdRecord = await Context.Records
+            .Include(r => r.Tags)
+            .FirstOrDefaultAsync(r => r.Id == result.Id);
+        Assert.NotNull(createdRecord);
+
+        var duplicateTagsOnRecord = createdRecord.Tags.Count(t => t.Name == "Duplicate Tag");
+        Assert.Equal(1, duplicateTagsOnRecord); // Should only be attached once
+    }
+
     #endregion
 
     #region BulkCreateRecords Tests
@@ -1477,7 +1674,7 @@ public class RecordBusinessTests : IntegrationTestBase
         var updatedRecord = await Context.Records.Include(r => r.Tags).FirstAsync(r => r.Id == record.Id);
         Assert.Contains(updatedRecord.Tags, t => t.Id == newTag.Id);
     }
-    
+
     [Fact]
     public async Task AttachTag_SuccessfullyAttachesOrgTagToRecord()
     {
@@ -1539,10 +1736,10 @@ public class RecordBusinessTests : IntegrationTestBase
         // Arrange
         var record = await Context.Records.Include(r => r.Tags).FirstAsync(r => r.Id == rid);
         Assert.Contains(record.Tags, t => t.Id == tid);
-        
+
         //ensures that the record tags are not in the record context
         Context.ChangeTracker.Clear();
-        
+
         // Act
         var result = await _recordBusiness.UnattachTag(organizationId, pid, record.Id, tid);
 

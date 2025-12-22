@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Mail;
 using deeplynx.datalayer.Models;
+using deeplynx.helpers;
 using deeplynx.interfaces;
 using Microsoft.Extensions.Logging;
 using deeplynx.helpers.Hubs;
@@ -279,29 +280,25 @@ public class NotificationBusiness : INotificationBusiness
     {
        try
        {
-        var smtpServer = Environment.GetEnvironmentVariable("SMTP_SERVER")
-            ?? throw new InvalidOperationException("SMTP_SERVER environment variable is not set");
+        var smtpServer = Environment.GetEnvironmentVariable("SMTP_SERVER") ?? throw new InvalidOperationException("SMTP_SERVER environment variable is not set");
 
-        var smtpPortStr = Environment.GetEnvironmentVariable("SMTP_PORT") ?? "587";
+        var smtpPortStr = Environment.GetEnvironmentVariable("SMTP_PORT");
         if (!int.TryParse(smtpPortStr, out int smtpPort))
         {
             smtpPort = 587; //default
         }
 
-        var fromEmail = Environment.GetEnvironmentVariable("FROM_EMAIL")
-            ?? throw new InvalidOperationException("FROM_EMAIL environment variable is not set");
+        var fromEmail = Environment.GetEnvironmentVariable("FROM_EMAIL") ?? throw new InvalidOperationException("FROM_EMAIL environment variable is not set");
 
-        var support = Environment.GetEnvironmentVariable("SUPPORT_EMAIL")
-                        ?? throw new InvalidOperationException("SUPPORT_EMAIL environment variable is not set");
+        var support = Environment.GetEnvironmentVariable("SUPPORT_EMAIL") ?? throw new InvalidOperationException("SUPPORT_EMAIL environment variable is not set");
 
         var emailPassword = "";
 
-        var fromName = Environment.GetEnvironmentVariable("FROM_NAME") ?? "DeepLynx Nexus Notification";
+        var fromName = Environment.GetEnvironmentVariable("FROM_NAME");
 
-        var url = Environment.GetEnvironmentVariable("INVITE_URL")
-            ?? throw new InvalidOperationException("Invite URL environment variable is not set");;
+        var url = Environment.GetEnvironmentVariable("INVITE_URL") ?? throw new InvalidOperationException("Invite URL environment variable is not set");;
 
-        var enableSslStr = Environment.GetEnvironmentVariable("SMTP_ENABLE_SSL") ?? "true";
+        var enableSslStr = Environment.GetEnvironmentVariable("SMTP_ENABLE_SSL");
         bool.TryParse(enableSslStr, out bool enableSsl);
 
         string templateContent = @"<!DOCTYPE html PUBLIC ""-//W3C//DTD XHTML 1.0 Transitional//EN"" ""http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"">

@@ -12,21 +12,21 @@ namespace deeplynx.business;
 
 public class RecordBusiness : IRecordBusiness
 {
-    private readonly ICacheBusiness _cacheBusiness;
     private readonly DeeplynxContext _context;
     private readonly IEventBusiness _eventBusiness;
+    private readonly ITagBusiness _tagBusiness;
 
     /// <summary>
     ///     Initializes a new instance of the <see cref="RecordBusiness" /> class.
     /// </summary>
     /// <param name="context">The database context used for the record operations.</param>
-    /// <param name="cacheBusiness">Used to access cache operations</param>
     /// <param name="eventBusiness">Used for logging events during create, update, and delete Operations.</param>
-    public RecordBusiness(DeeplynxContext context, ICacheBusiness cacheBusiness, IEventBusiness eventBusiness)
+    /// <param name="tagBusiness">Used for creating tags related to a record.</param>
+    public RecordBusiness(DeeplynxContext context, IEventBusiness eventBusiness, ITagBusiness tagBusiness)
     {
         _context = context;
-        _cacheBusiness = cacheBusiness;
         _eventBusiness = eventBusiness;
+        _tagBusiness = tagBusiness;
     }
 
     /// <summary>
@@ -218,7 +218,7 @@ public class RecordBusiness : IRecordBusiness
         var record = await _context.Records
             .Include(r => r.Tags)
             .FirstOrDefaultAsync(r => r.Id == recordId);
-        
+
         var tag = await _context.Tags.FindAsync(tagId);
 
         record.Tags.Add(tag);
@@ -392,59 +392,75 @@ public class RecordBusiness : IRecordBusiness
 
         if (dto.ObjectStorageId != null) await CheckObjectStorageExists(projectId, dto.ObjectStorageId.Value);
 
-        var record = new Record
+        await using var transaction = await _context.Database.BeginTransactionAsync();
+
+        try
         {
-            ProjectId = projectId,
-            DataSourceId = dataSourceId,
-            Uri = dto.Uri,
-            ObjectStorageId = dto.ObjectStorageId,
-            Properties = dto.Properties.ToString()!,
-            OriginalId = dto.OriginalId,
-            Name = dto.Name,
-            Description = dto.Description,
-            ClassId = dto.ClassId,
-            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
-            LastUpdatedBy = currentUserId,
-            FileType = dto.FileType,
-            OrganizationId = organizationId
-        };
-
-        _context.Records.Add(record);
-        await _context.SaveChangesAsync();
-
-        // Log Record Create Event
-        await _eventBusiness.CreateEvent(
-            currentUserId,
-            organizationId,
-            projectId,
-            new CreateEventRequestDto
+            var record = new Record
             {
-                EntityType = "record",
-                EntityId = record.Id,
-                EntityName = record.Name,
-                Operation = "create",
-                Properties = "{}",
-                DataSourceId = record.DataSourceId
-            });
+                ProjectId = projectId,
+                DataSourceId = dataSourceId,
+                Uri = dto.Uri,
+                ObjectStorageId = dto.ObjectStorageId,
+                Properties = dto.Properties.ToString()!,
+                OriginalId = dto.OriginalId,
+                Name = dto.Name,
+                Description = dto.Description,
+                ClassId = dto.ClassId,
+                LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+                LastUpdatedBy = currentUserId,
+                FileType = dto.FileType,
+                OrganizationId = organizationId
+            };
 
-        return new RecordResponseDto
+            _context.Records.Add(record);
+            await _context.SaveChangesAsync();
+
+            // We need to handle tag creation/linking separate of record object save
+            var tags = await ProcessTags(currentUserId, organizationId, projectId, record.Id, dto.Tags);
+
+            // Log Record Create Event
+            await _eventBusiness.CreateEvent(
+                currentUserId,
+                organizationId,
+                projectId,
+                new CreateEventRequestDto
+                {
+                    EntityType = "record",
+                    EntityId = record.Id,
+                    EntityName = record.Name,
+                    Operation = "create",
+                    Properties = "{}",
+                    DataSourceId = record.DataSourceId
+                });
+
+            await transaction.CommitAsync();
+
+            return new RecordResponseDto
+            {
+                Id = record.Id,
+                Description = record.Description,
+                Uri = record.Uri,
+                Properties = record.Properties,
+                ObjectStorageId = record.ObjectStorageId,
+                OriginalId = record.OriginalId,
+                Name = record.Name,
+                ClassId = record.ClassId,
+                DataSourceId = record.DataSourceId,
+                ProjectId = record.ProjectId,
+                OrganizationId = record.OrganizationId,
+                LastUpdatedBy = record.LastUpdatedBy,
+                LastUpdatedAt = record.LastUpdatedAt,
+                IsArchived = record.IsArchived,
+                FileType = record.FileType,
+                Tags = tags
+            };
+        }
+        catch
         {
-            Id = record.Id,
-            Description = record.Description,
-            Uri = record.Uri,
-            Properties = record.Properties,
-            ObjectStorageId = record.ObjectStorageId,
-            OriginalId = record.OriginalId,
-            Name = record.Name,
-            ClassId = record.ClassId,
-            DataSourceId = record.DataSourceId,
-            ProjectId = record.ProjectId,
-            OrganizationId = record.OrganizationId,
-            LastUpdatedBy = record.LastUpdatedBy,
-            LastUpdatedAt = record.LastUpdatedAt,
-            IsArchived = record.IsArchived,
-            FileType = record.FileType
-        };
+            await transaction.RollbackAsync();
+            throw new Exception("Unable to create record and/or create/attach tags");
+        }
     }
 
     /// <summary>
@@ -466,7 +482,7 @@ public class RecordBusiness : IRecordBusiness
         List<CreateRecordRequestDto> records)
     {
         // Leaving existence check in here for project as this method can be invoked without middleware
-        await ExistenceHelper.EnsureProjectExistsAsync(_context, projectId, _cacheBusiness);
+        await ExistenceHelper.EnsureProjectExistsAsync(_context, projectId);
         await ExistenceHelper.EnsureDataSourceExistsForProjectAsync(_context, dataSourceId, projectId);
 
         if (records.Count == 0) throw new Exception("Unable to bulk create records: no records selected for creation");
@@ -531,19 +547,13 @@ public class RecordBusiness : IRecordBusiness
             .SqlQueryRaw<RecordResponseDto>(sql, parameters.ToArray())
             .ToListAsync();
 
-        // Log Event for all records created
-        var events = new List<CreateEventRequestDto>();
-        foreach (var record in result)
-            events.Add(new CreateEventRequestDto
-            {
-                Operation = "create",
-                EntityType = "record",
-                EntityId = record.Id,
-                EntityName = record.Name,
-                Properties = "{}",
-                DataSourceId = record.DataSourceId
-            });
-        await _eventBusiness.BulkCreateEvents(currentUserId, events, organizationId, projectId);
+        var createEvent = new CreateEventRequestDto
+        {
+            Operation = "create",
+            EntityType = "record",
+            DataSourceId = dataSourceId
+        };
+        await _eventBusiness.CreateEvent(currentUserId, organizationId, projectId, createEvent, result.Count);
 
         return result;
     }
@@ -850,5 +860,51 @@ public class RecordBusiness : IRecordBusiness
             await _context.ObjectStorages.FirstOrDefaultAsync(o => o.ProjectId == projectId && o.Id == objectStorageId);
         if (referencedObjectStorage == null)
             throw new KeyNotFoundException($"Object storage with ID {objectStorageId} does not exist");
+    }
+
+    private async Task<ICollection<RecordTagDto>> ProcessTags(long currentUserId, long organizationId, long projectId,
+        long recordId,
+        List<string>? tags)
+    {
+        // Handle tags if provided
+        if (tags == null || !tags.Any())
+            return new List<RecordTagDto>();
+
+        // Deduplicate tags before processing
+        var distinctTags = tags.Distinct().ToList();
+
+        var tagsToInsert = distinctTags.Select(t => new CreateTagRequestDto { Name = t }).ToList();
+        var tagMap = await BulkUpsertTags(organizationId, currentUserId, projectId, tagsToInsert);
+
+        var recordTags = distinctTags
+            .Where(tag => tagMap.ContainsKey(tag))
+            .Select(tag => new RecordTagLinkDto
+            {
+                RecordId = recordId,
+                TagId = tagMap[tag].Id
+            })
+            .ToList();
+
+        if (recordTags.Any()) await BulkAttachTags(recordTags);
+
+        // Convert tagMap to RecordTagDto collection
+        return distinctTags
+            .Where(tag => tagMap.ContainsKey(tag))
+            .Select(tag => new RecordTagDto
+            {
+                Id = tagMap[tag].Id,
+                Name = tagMap[tag].Name
+            })
+            .ToList();
+    }
+
+    private async Task<Dictionary<string, TagResponseDto>> BulkUpsertTags(
+        long organizationId,
+        long currentUserId,
+        long projectId,
+        List<CreateTagRequestDto> tags)
+    {
+        var inserted = await _tagBusiness.BulkCreateTags(organizationId, currentUserId, projectId, tags);
+        return inserted.ToDictionary(t => t.Name, t => t);
     }
 }

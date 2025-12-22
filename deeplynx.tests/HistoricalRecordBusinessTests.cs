@@ -22,6 +22,8 @@ public class HistoricalRecordBusinessTests : IntegrationTestBase
     private Mock<ILogger<NotificationBusiness>> _mockNotificationLogger = null!;
     private INotificationBusiness _notificationBusiness = null!;
     private RecordBusiness _recordBusiness = null!;
+    private TagBusiness _tagBusiness = null!;
+
     public long cid;
     public long did;
     public long did2;
@@ -45,8 +47,9 @@ public class HistoricalRecordBusinessTests : IntegrationTestBase
         _mockNotificationLogger = new Mock<ILogger<NotificationBusiness>>();
         _notificationBusiness =
             new NotificationBusiness(Context, _mockNotificationLogger.Object, _mockHubContext.Object);
-        _eventBusiness = new EventBusiness(Context, _cacheBusiness, _notificationBusiness);
-        _recordBusiness = new RecordBusiness(Context, _cacheBusiness, _eventBusiness);
+        _eventBusiness = new EventBusiness(Context, _notificationBusiness);
+        _tagBusiness = new TagBusiness(Context, _eventBusiness);
+        _recordBusiness = new RecordBusiness(Context, _eventBusiness, _tagBusiness);
     }
 
     protected override async Task SeedTestDataAsync()
@@ -608,7 +611,7 @@ public class HistoricalRecordBusinessTests : IntegrationTestBase
 
         // Act
         await _recordBusiness.UpdateRecord(uid, organizationId, pid, rid, dto);
-        await _recordBusiness.ArchiveRecord(uid,  organizationId, pid,rid);
+        await _recordBusiness.ArchiveRecord(uid, organizationId, pid, rid);
         var historicalRecord = await _historicalRecordBusiness.GetHistoricalRecord(rid, organizationId, null, false);
 
         // Assert
@@ -633,7 +636,7 @@ public class HistoricalRecordBusinessTests : IntegrationTestBase
         };
 
         await _recordBusiness.UpdateRecord(uid, organizationId, pid, rid, dto);
-        await _recordBusiness.ArchiveRecord(uid,  organizationId,pid, rid);
+        await _recordBusiness.ArchiveRecord(uid, organizationId, pid, rid);
 
         // Act & Assert
         var exception =

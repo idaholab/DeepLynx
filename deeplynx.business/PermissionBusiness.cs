@@ -17,7 +17,6 @@ namespace deeplynx.business;
 /// </summary>
 public class PermissionBusiness : IPermissionBusiness
 {
-    private readonly ICacheBusiness _cacheBusiness;
     private readonly DeeplynxContext _context;
     private readonly IEventBusiness _eventBusiness;
 
@@ -25,13 +24,10 @@ public class PermissionBusiness : IPermissionBusiness
     ///     Initializes a new instance of the <see cref="PermissionBusiness" /> class.
     /// </summary>
     /// <param name="context">The database context to be used for permission operations</param>
-    /// <param name="eventBusiness">Used to access cache operations</param>
-    /// <param name="cacheBusiness">Used for logging events during CRUD operations</param>
-    public PermissionBusiness(DeeplynxContext context, IEventBusiness eventBusiness, ICacheBusiness cacheBusiness)
+    public PermissionBusiness(DeeplynxContext context, IEventBusiness eventBusiness)
     {
         _context = context;
         _eventBusiness = eventBusiness;
-        _cacheBusiness = cacheBusiness;
     }
 
     /// <summary>

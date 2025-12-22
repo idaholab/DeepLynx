@@ -232,7 +232,7 @@ const LayoutShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             onClick={() => router.push("/")}
           />
           {/* <span className="text-xs text-base-200 flex justify-end mt-2">
-            V 0.2.0
+            V 0.3.0
           </span> */}
         </div>
       </header>
@@ -359,7 +359,7 @@ const LayoutShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                   <QuestionMarkCircleIcon className="size-10" />
                 </Link>
               </li>
-              <span className="text-xs font-bold text-base-200/50">V0.2.0</span>
+              <span className="text-xs font-bold text-base-200/50">V0.3.0</span>
             </ul>
           </aside>
         </div>

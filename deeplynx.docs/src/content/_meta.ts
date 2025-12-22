@@ -1,5 +1,6 @@
 export default {
   users: {title: 'Using DeepLynx Nexus'},
+  admins: {title: 'Managing DeepLynx Nexus'},
   ecosystem: {title: 'Integrating with DeepLynx Nexus'},
   developers: {title: 'Contributing to DeepLynx Nexus'},
   documentation: {title: 'DeepLynx Nexus Documentation'},

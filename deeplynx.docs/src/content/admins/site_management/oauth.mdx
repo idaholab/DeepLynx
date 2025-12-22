@@ -1,0 +1,47 @@
+---
+title: Oauth Applications
+description: How Nexus handles oauth
+---
+import { Footer, Layout, Navbar } from 'nextra-theme-docs'
+import { Banner, Head } from 'nextra/components'
+import { getPageMap } from 'nextra/page-map'
+import Image from 'next/image'
+
+# Oauth Applications
+
+Site admins can register and manage OAuth 2.0 applications for secure third-party integrations.
+
+## Adding OAuth Applications
+
+1. Navigate to the Site Management page by clicking the cog icon on the outtermost toolbar.
+2. On the OAuth tab of the Site Management page, click the "OAuth Application" button.
+
+<Image
+  src="/docs/images/oauth-add.png"
+  alt="Create Group UI"
+  width={800}
+  height={600}
+/>
+
+3. Enter the application's required fields then click "Create".
+4. The connection will be added to Nexus and displayed in the OAuth Applications table.
+
+<Image
+  src="/docs/images/oauth-save.png"
+  alt="Save Group UI"
+  width={800}
+  height={600}
+/>
+
+## Editing OAuth Applications
+
+1. Click the pencil icon in the action column of the OAuth Application table.
+2. Update the application's information in the Edit OAuth Application modal and hit "Save".
+
+## Removing OAuth Applications
+
+1. Click the trashcan icon in the action column of the OAuth Application table.
+2. This will remove the application from the Nexus.
+
+**Note:** Once an application is removed, it will be permanently archived.
+A new OAuth Application must be created to regain access.

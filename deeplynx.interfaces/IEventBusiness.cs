@@ -8,11 +8,5 @@ public interface IEventBusiness
     Task<PaginatedResponse<EventResponseDto>> QueryAuthorizedEvents (long currentUserId, long organizationId, long? projectId, EventsQueryRequestDTO? filterDto);
     Task<PaginatedResponse<EventResponseDto>> QueryEventsBySubscriptions(long currentUserId, long organizationId, long? projectId,
     EventsQueryRequestDTO? queryDto);
-    Task<EventResponseDto> CreateEvent(long currentUserId, long organizationId, long? projectId, CreateEventRequestDto dto);
-    Task<EventResponseDto> BulkCreateEvents(
-        long currentUserId,
-        List<CreateEventRequestDto> events,
-        long organizationId,
-        long? projectId = null
-        );
+    Task<EventResponseDto> CreateEvent(long currentUserId, long organizationId, long? projectId, CreateEventRequestDto dto, long? count = 1);
 }

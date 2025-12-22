@@ -8,18 +8,15 @@ namespace deeplynx.business;
 
 public class UserBusiness : IUserBusiness
 {
-    private readonly ICacheBusiness _cacheBusiness;
     private readonly DeeplynxContext _context;
 
     /// <summary>
     ///     Initializes a new instance of the <see cref="UserBusiness" /> class.
     /// </summary>
     /// <param name="context">The database context used for the user operations.</param>
-    /// <param name="cacheBusiness">Used to access cache operations</param>
-    public UserBusiness(DeeplynxContext context, ICacheBusiness cacheBusiness)
+    public UserBusiness(DeeplynxContext context)
     {
         _context = context;
-        _cacheBusiness = cacheBusiness;
     }
 
     /// <summary>

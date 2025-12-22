@@ -1,6 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using deeplynx.business;
 using deeplynx.datalayer.Models;
+using deeplynx.helpers;
 using deeplynx.models;
 using Microsoft.EntityFrameworkCore;
 using Action = deeplynx.datalayer.Models.Action;
@@ -26,8 +27,8 @@ public class SubscriptionBusinessTests : IntegrationTestBase
     public override async Task InitializeAsync()
     {
         await base.InitializeAsync();
-        _subscriptionBusiness = new SubscriptionBusiness(Context, _cacheBusiness);
-        await _cacheBusiness.SetAsync("projects", null, TimeSpan.FromSeconds(1));
+        _subscriptionBusiness = new SubscriptionBusiness(Context);
+        await CacheService.Instance.SetAsync("projects", null, TimeSpan.FromSeconds(1));
     }
 
     #region BulkUpdateSubscriptions Tests

@@ -9,7 +9,6 @@ using System.Text.Json;
 
 public class EventBusiness : IEventBusiness
 {
-    private readonly ICacheBusiness _cacheBusiness;
     private readonly DeeplynxContext _context;
     private readonly INotificationBusiness _notificationBusiness;
 
@@ -17,16 +16,13 @@ public class EventBusiness : IEventBusiness
     /// Initializes a new instance of the <see cref="EventBusiness" /> class.
     /// </summary>
     /// <param name="context">The database context to be used for class operations</param>
-    /// <param name="cacheBusiness">Used to access cache operations</param>
     /// <param name="notificationBusiness">Used for initiating notifications for subscribed users</param>
     public EventBusiness(
         DeeplynxContext context,
-        ICacheBusiness cacheBusiness,
         INotificationBusiness notificationBusiness
     )
     {
         _context = context;
-        _cacheBusiness = cacheBusiness;
         _notificationBusiness = notificationBusiness;
     }
 
@@ -494,9 +490,12 @@ public class EventBusiness : IEventBusiness
     /// Creates a new Event based on the event data provided.
     /// </summary>
     /// <param name="currentUserId">ID of the User executing this method.</param>
+    /// <param name="organizationId">ID of the organization the event belongs to.</param>
+    /// <param name="projectId">ID of the project the event belongs to.</param>
     /// <param name="dto">A data transfer object with details on the new event to be created.</param>
+    /// <param name="count">A data transfer object with details on the new event to be created.</param>
     /// <returns>The new Event which was just created.</returns>
-    public async Task<EventResponseDto> CreateEvent(long currentUserId, long organizationId, long? projectId, CreateEventRequestDto dto)
+    public async Task<EventResponseDto> CreateEvent(long currentUserId, long organizationId, long? projectId, CreateEventRequestDto dto, long? count = 1)
     {
         ValidationHelper.ValidateModel(dto);
         ValidationHelper.ValidateTypes(dto.EntityType, "EntityType");
@@ -511,86 +510,12 @@ public class EventBusiness : IEventBusiness
         var dataSource = dto.DataSourceId.HasValue
             ? await _context.DataSources.FindAsync(dto.DataSourceId.Value)
             : null;
-
-        var newEvent = new Event
-        {
-            Operation = dto.Operation,
-            EntityType = dto.EntityType,
-            OrganizationId = organizationId,
-            ProjectId = projectId,
-            Properties = dto.Properties,
-            LastUpdatedBy = currentUserId,
-            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
-            DataSourceId = dto.DataSourceId,
-            EntityId = dto.EntityId,
-            EntityName = dto.EntityName,
-        };
-
-        _context.Events.Add(newEvent);
-        await _context.SaveChangesAsync();
-
-        var response = new EventResponseDto
-        {
-            Id = newEvent.Id,
-            Operation = newEvent.Operation,
-            EntityType = newEvent.EntityType,
-            EntityId = newEvent.EntityId,
-            EntityName = newEvent.EntityName,
-            ProjectId = newEvent.ProjectId,
-            OrganizationId = newEvent.OrganizationId,
-            DataSourceId = newEvent.DataSourceId,
-            Properties = newEvent.Properties,
-            LastUpdatedAt = newEvent.LastUpdatedAt,
-            LastUpdatedBy = newEvent.LastUpdatedBy,
-            ProjectName = project?.Name,
-            DataSourceName = dataSource?.Name,
-            OrganizationName = organization?.Name
-        };
-
-        if (Environment.GetEnvironmentVariable("ENABLE_NOTIFICATION_SERVICE") == "true")
-            await _notificationBusiness.SendEventNotification(response);
-
-        return response;
-    }
-
-    /// <summary>
-    /// Creates a single Event for a bulk operation with the total count in properties.
-    /// </summary>
-    /// <param name="currentUserId">The id of the organization this event occurred in</param>
-    /// <param name="organizationId">The id of the organization this event occurred in</param>
-    /// <param name="events">A List of data transfer objects representing the bulk operation</param>
-    /// <param name="projectId">The ID of the project to which the event belongs</param>
-    /// <returns>The single Event created for the bulk operation.</returns>
-    public async Task<EventResponseDto> BulkCreateEvents(
-        long currentUserId,
-        List<CreateEventRequestDto> events,
-        long organizationId,
-        long? projectId = null
-    )
-    {
-        if (!events.Any())
-            throw new ArgumentException("Events list cannot be empty");
-
-        var firstEvent = events.First();
-
-        ValidationHelper.ValidateTypes(firstEvent.EntityType, "EntityType");
-        ValidationHelper.ValidateTypes(firstEvent.Operation, "Operation");
-
-        var project = projectId != null
-            ? await _context.Projects.FindAsync(projectId)
-            : null;
-
-        var organization = await _context.Organizations.FindAsync(organizationId);
-
-        var dataSource = firstEvent.DataSourceId.HasValue
-            ? await _context.DataSources.FindAsync(firstEvent.DataSourceId.Value)
-            : null;
-
+        
         Dictionary<string, object> properties;
 
-        if (!string.IsNullOrWhiteSpace(firstEvent.Properties))
+        if (!string.IsNullOrWhiteSpace(dto.Properties))
         {
-            properties = JsonSerializer.Deserialize<Dictionary<string, object>>(firstEvent.Properties)
+            properties = JsonSerializer.Deserialize<Dictionary<string, object>>(dto.Properties)
                          ?? new Dictionary<string, object>();
         }
         else
@@ -598,22 +523,22 @@ public class EventBusiness : IEventBusiness
             properties = new Dictionary<string, object>();
         }
 
-        properties["BulkCount"] = events.Count;
+        properties["Count"] = count.Value;
 
         var propertiesJson = JsonSerializer.Serialize(properties);
 
         var newEvent = new Event
         {
+            Operation = dto.Operation,
+            EntityType = dto.EntityType,
             OrganizationId = organizationId,
             ProjectId = projectId,
-            Operation = firstEvent.Operation,
-            EntityType = firstEvent.EntityType,
-            EntityId = firstEvent.EntityId,
-            EntityName = firstEvent.EntityName,
             Properties = propertiesJson,
-            DataSourceId = firstEvent.DataSourceId,
             LastUpdatedBy = currentUserId,
-            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            DataSourceId = dto.DataSourceId,
+            EntityId = dto.EntityId,
+            EntityName = dto.EntityName,
         };
 
         _context.Events.Add(newEvent);

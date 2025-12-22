@@ -1,27 +1,43 @@
+using deeplynx.business;
 using StackExchange.Redis;
-using DotNetEnv;
 using deeplynx.interfaces;
+using deeplynx.helpers;
 
-namespace deeplynx.business
+namespace deeplynx.helpers
 {
-    public class CacheFactory
+    public class CacheService
     {
+        private static ICacheBusiness _instance;
+        
+        static CacheService() 
+        {
+            _instance = CreateCache();
+        }
+        
+        public static ICacheBusiness Instance => _instance;
+
         /// <summary>
-        /// Used to determine what cache service to use by the ENV CACHE_PROVIDER_TYPE variable
+        /// Resets the cache service instance. Used primarily for testing to switch between cache providers.
+        /// </summary>
+        public static void ResetCacheService()
+        {
+            _instance = CreateCache();
+        }
+        
+        /// <summary>
+        /// Used to determine what cache service to use by the Config.CACHE_PROVIDER_TYPE variable
         /// </summary>
         /// <returns>The Cache Business Object</returns>
         /// <exception cref="Exception">Returned if CACHE_PROVIDER_TYPE = redis but no REDIS_CONNECTION_STRING is provided</exception>
         public static ICacheBusiness CreateCache()
         {
-            Env.Load("../.env");
-            var cacheProviderType = Environment.GetEnvironmentVariable("CACHE_PROVIDER_TYPE");
-
-            switch (cacheProviderType)
+            var cacheType = Environment.GetEnvironmentVariable("CACHE_PROVIDER_TYPE");
+            var redisConnectionString = Environment.GetEnvironmentVariable("REDIS_CONNECTION_STRING");
+            switch (cacheType)
             {
                 case "memory":
                     return new MemoryCacheBusiness();
                 case "redis":
-                    var redisConnectionString = Environment.GetEnvironmentVariable("REDIS_CONNECTION_STRING");
                     if (!string.IsNullOrEmpty(redisConnectionString))
                     {
                         var options = ConfigurationOptions.Parse(redisConnectionString);

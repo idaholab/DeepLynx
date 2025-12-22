@@ -1,5 +1,8 @@
 using deeplynx.business;
 using deeplynx.datalayer.Models;
+using deeplynx.helpers;
+using deeplynx.interfaces;
+using deeplynx.tests;
 using DotNetEnv;
 using Microsoft.EntityFrameworkCore;
 using Testcontainers.PostgreSql;
@@ -80,7 +83,6 @@ public class TestSuiteCollection : ICollectionFixture<TestSuiteFixture>
 public class IntegrationTestBase : IAsyncLifetime
 {
     private readonly TestSuiteFixture _fixture;
-    protected CacheBusiness _cacheBusiness;
 
     protected IntegrationTestBase(TestSuiteFixture fixture)
     {
@@ -88,7 +90,6 @@ public class IntegrationTestBase : IAsyncLifetime
         Context = new DeeplynxContext(new DbContextOptionsBuilder<DeeplynxContext>()
             .UseNpgsql(_fixture.PostgresConnectionString)
             .Options);
-        _cacheBusiness = CacheBusiness.Instance;
     }
 
     protected DeeplynxContext Context { get; }
@@ -104,7 +105,17 @@ public class IntegrationTestBase : IAsyncLifetime
     {
         Environment.SetEnvironmentVariable("CACHE_PROVIDER_TYPE", null);
         await Context.DisposeAsync();
-        await _cacheBusiness.FlushAsync();
+        await CacheService.Instance.FlushAsync();
+    }
+    
+    /// <summary>
+    /// Switch cache type for testing - just create a new instance
+    /// </summary>
+    protected void SwitchCacheType(string cacheType)
+    {
+        Environment.SetEnvironmentVariable("CACHE_PROVIDER_TYPE", cacheType);
+        Environment.SetEnvironmentVariable("REDIS_CONNECTION_STRING", _fixture.RedisConnectionString);
+        CacheService.ResetCacheService();
     }
 
     /// <summary>
@@ -193,7 +204,7 @@ public class IntegrationTestBase : IAsyncLifetime
         Context.Organizations.RemoveRange(organizations);
         await Context.SaveChangesAsync();
 
-        await _cacheBusiness.FlushAsync();
+        await CacheService.Instance.FlushAsync();
     }
 
     protected virtual async Task SeedTestDataAsync()

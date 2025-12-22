@@ -1,6 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using deeplynx.business;
 using deeplynx.datalayer.Models;
+using deeplynx.helpers;
 using deeplynx.helpers.Hubs;
 using deeplynx.interfaces;
 using deeplynx.models;
@@ -59,18 +60,18 @@ public class EdgeBusinessTests : IntegrationTestBase
         _mockNotificationLogger = new Mock<ILogger<NotificationBusiness>>();
         _notificationBusiness =
             new NotificationBusiness(Context, _mockNotificationLogger.Object, _mockHubContext.Object);
-        _eventBusiness = new EventBusiness(Context, _cacheBusiness, _notificationBusiness);
+        _eventBusiness = new EventBusiness(Context, _notificationBusiness);
         _mockOrganizationBusiness = new Mock<IOrganizationBusiness>();
 
-        _edgeBusiness = new EdgeBusiness(Context, _cacheBusiness, _eventBusiness);
-        _dataSourceBusiness = new DataSourceBusiness(Context, _cacheBusiness, _edgeBusiness, _mockRecordBusiness.Object,
+        _edgeBusiness = new EdgeBusiness(Context, _eventBusiness);
+        _dataSourceBusiness = new DataSourceBusiness(Context, _edgeBusiness, _mockRecordBusiness.Object,
             _eventBusiness);
         _classBusiness = new ClassBusiness(
-            Context, _cacheBusiness, _mockRecordBusiness.Object,
+            Context, _mockRecordBusiness.Object,
             _mockRelationshipBusiness.Object, _eventBusiness);
 
         _projectBusiness = new ProjectBusiness(
-            Context, _cacheBusiness, _mockLogger.Object, _classBusiness,
+            Context, _mockLogger.Object, _classBusiness,
             _mockRoleBusiness.Object, _dataSourceBusiness,
             _mockObjectStorageBusiness.Object, _eventBusiness, _mockOrganizationBusiness.Object);
     }

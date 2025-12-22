@@ -8,7 +8,6 @@ namespace deeplynx.business;
 
 public class MetadataBusiness : IMetadataBusiness
 {
-    private readonly ICacheBusiness _cacheBusiness;
     private readonly IClassBusiness _classBusiness;
     private readonly DeeplynxContext _context;
     private readonly IEdgeBusiness _edgeBusiness;
@@ -20,7 +19,6 @@ public class MetadataBusiness : IMetadataBusiness
     ///     Initializes a new instance of the <see cref="MetadataBusiness" /> class.
     /// </summary>
     /// <param name="context">The database context to be used for CRUD operations.</param>
-    /// <param name="cacheBusiness">Used to access cache operations</param>
     /// <param name="classBusiness">The class context to be used during metadata parsing.</param>
     /// <param name="relationshipBusiness">The relationship context to be used during metadata parsing.</param>
     /// <param name="tagBusiness">The tag context to be used during metadata parsing.</param>
@@ -28,7 +26,6 @@ public class MetadataBusiness : IMetadataBusiness
     /// <param name="edgeBusiness">The edge context to be used during metadata parsing.</param>
     public MetadataBusiness(
         DeeplynxContext context,
-        ICacheBusiness cacheBusiness,
         IClassBusiness classBusiness,
         IRelationshipBusiness relationshipBusiness,
         ITagBusiness tagBusiness,
@@ -37,7 +34,6 @@ public class MetadataBusiness : IMetadataBusiness
     )
     {
         _context = context;
-        _cacheBusiness = cacheBusiness;
         _classBusiness = classBusiness;
         _relationshipBusiness = relationshipBusiness;
         _tagBusiness = tagBusiness;

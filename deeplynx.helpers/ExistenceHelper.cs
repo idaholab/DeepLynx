@@ -5,8 +5,6 @@ using deeplynx.helpers.exceptions;
 using deeplynx.interfaces;
 using deeplynx.models;
 using Microsoft.EntityFrameworkCore;
-using deeplynx.helpers.json;
-using System.Text.Json.Nodes;
 
 namespace deeplynx.helpers
 {
@@ -45,16 +43,10 @@ namespace deeplynx.helpers
         public static async Task<ProjectResponseDto> EnsureProjectExistsAsync(
             DeeplynxContext context,
             long projectId,
-            ICacheBusiness cacheBusiness,
             bool hideArchived = true)
         {
-            if (cacheBusiness == null)
-            {
-                throw new KeyNotFoundException("Cache business instance cannot be null.");
-            }
-
             // Try to get the cached list of projects
-            var projectResponseList = await cacheBusiness.GetAsync<List<ProjectResponseDto>>("projects");
+            var projectResponseList = await CacheService.Instance.GetAsync<List<ProjectResponseDto>>("projects");
 
             if (projectResponseList == null || projectResponseList.Count == 0)
             {
@@ -74,7 +66,7 @@ namespace deeplynx.helpers
                 }).ToList();
 
                 // Store the list in the cache
-                await cacheBusiness.SetAsync("projects", projectResponseList, TimeSpan.FromHours(1));
+                await CacheService.Instance.SetAsync("projects", projectResponseList, TimeSpan.FromHours(1));
             }
 
             // Find the project by ID from the list

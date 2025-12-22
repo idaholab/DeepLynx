@@ -12,7 +12,6 @@ namespace deeplynx.business;
 
 public class FileBusiness
 {
-    private readonly ICacheBusiness _cacheBusiness;
     private readonly IClassBusiness _classBusiness;
     private readonly DeeplynxContext _context;
     private readonly IDataSourceBusiness _dataSourceBusiness;
@@ -22,7 +21,6 @@ public class FileBusiness
 
     public FileBusiness(
         DeeplynxContext context,
-        ICacheBusiness cacheBusiness,
         IFileBusinessFactory factory,
         IObjectStorageBusiness objectStorageBusiness,
         IDataSourceBusiness dataSourceBusiness,
@@ -30,7 +28,6 @@ public class FileBusiness
         IRecordBusiness recordBusiness)
     {
         _context = context;
-        _cacheBusiness = cacheBusiness;
         _factory = factory;
         _objectStorageBusiness = objectStorageBusiness;
         _dataSourceBusiness = dataSourceBusiness;
@@ -95,7 +92,7 @@ public class FileBusiness
 
         var guid = Guid.NewGuid();
 
-        var uri = await fileBusiness.UploadFile(projectId, realDataSourceId, configData, file, guid);
+        var uri = await fileBusiness.UploadFile(organizationId, projectId, realDataSourceId, configData, file, guid);
 
         var fileClass = await _classBusiness.GetOrCreateClass(currentUserId, organizationId, projectId, "File");
         var recordRequest = new CreateRecordRequestDto
