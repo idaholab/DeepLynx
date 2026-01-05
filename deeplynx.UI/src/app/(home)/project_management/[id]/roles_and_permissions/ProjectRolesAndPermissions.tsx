@@ -5,12 +5,27 @@
 import React, { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import { useOrganizationSession } from "@/app/contexts/OrganizationSessionProvider";
+import { useProjectSession } from "@/app/contexts/ProjectSessionProvider";
+import {
+  archiveRole,
+  createRole,
+  getOrgRolePermissions,
+  setPermissionsForRole,
+  updateRole,
+} from "@/app/lib/client_service/role_services.client";
+
+import {
+  CreateRoleRequestDto,
+  UpdateRoleRequestDto,
+} from "../../../types/requestDTOs";
 import {
   PermissionResponseDto,
   RoleResponseDto,
 } from "@/app/(home)/types/responseDTOs";
+
 import { LockClosedIcon } from "@heroicons/react/24/outline";
 import { getPermissionsForRole } from "@/app/lib/client_service/permission_services.client";
+import CreateRoleModal from "@/app/(home)/organization_management/roles_and_permissions/CreateRoleModal";
 import MatrixViewLayout from "./MatrixViewLayout";
 import SplitViewLayout from "./SplitViewLayout";
 
@@ -56,8 +71,8 @@ const ProjectRolesAndPermissions = ({
   const [selectedRoleId, setSelectedRoleId] = useState<number | null>(
     standardInitialRoles[0]?.id || null
   );
-  const [roles] = useState<RoleResponseDto[]>(standardInitialRoles);
-  const [permissions] = useState<PermissionResponseDto[]>(initialPermissions);
+  const [roles, setRoles] = useState(initialRoles);
+  const [permissions, setPermissions] = useState(initialPermissions);
 
   const [rolePermissions, setRolePermissions] = useState<
     Record<number, PermissionResponseDto[]>
@@ -66,6 +81,48 @@ const ProjectRolesAndPermissions = ({
   const [initialLoadComplete, setInitialLoadComplete] = useState(false);
 
   const { organization } = useOrganizationSession();
+
+  /* ------------------------------------------------------------------------ */
+  /*                           Context: Project                         */
+  /* ------------------------------------------------------------------------ */
+
+    const { project } = useProjectSession();
+
+  /* ------------------------------------------------------------------------ */
+  /*                             Create Role Modal                            */
+  /* ------------------------------------------------------------------------ */
+
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+
+  const handleCreateRole = async (data: {
+    name: string;
+    description: string | null;
+  }) => {
+    if (!organization?.organizationId) {
+      throw new Error("No organization selected");
+    }
+
+    const dto: CreateRoleRequestDto = {
+      name: data.name,
+      description: data.description,
+    };
+
+    try {
+      const newRole = await createRole(
+        organization.organizationId as number,
+        project?.projectId as number,
+        dto
+      );
+
+      setRoles((prev) => [...prev, newRole]);
+      setSelectedRoleId(newRole.id);
+      toast.success("Created new role");
+    } catch (error) {
+      console.error("Error creating role:", error);
+      toast.error("Failed to create new role");
+      throw error;
+    }
+  };
 
   /* ------------------------------------------------------------------------ */
   /*                 Permission grouping & derived helpers                    */
@@ -258,6 +315,7 @@ const ProjectRolesAndPermissions = ({
           isOrganizationRole={isOrganizationRole}
           isProjectRole={isProjectRole}
           getRoleSource={getRoleSource}
+          onCreateRole={() => setIsCreateModalOpen(true)}
           isLoadingPermissions={isLoadingPermissions}
         />
       )}
@@ -275,6 +333,14 @@ const ProjectRolesAndPermissions = ({
           initialLoadComplete={initialLoadComplete}
         />
       )}
+
+      {/* Modals */}
+      <CreateRoleModal
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        onSubmit={handleCreateRole}
+        organizationId={organization?.organizationId || 0}
+      />
     </div>
   );
 };

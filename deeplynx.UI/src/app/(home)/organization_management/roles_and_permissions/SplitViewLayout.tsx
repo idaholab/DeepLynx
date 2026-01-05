@@ -27,6 +27,7 @@ interface SplitViewLayoutProps {
   onRoleSelection: (roleId: number) => void;
   onEditClick: (role: RoleResponseDto) => void;
   onDeleteClick: (role: RoleResponseDto) => void;
+  onCreateRole: () => void;
   onStartEditingPermissions: () => void;
   onCancelEditingPermissions: () => void;
   onSavePermissions: () => void;
@@ -48,6 +49,7 @@ const SplitViewLayout: React.FC<SplitViewLayoutProps> = ({
   onRoleSelection,
   onEditClick,
   onDeleteClick,
+  onCreateRole,
   onStartEditingPermissions,
   onCancelEditingPermissions,
   onSavePermissions,
@@ -62,10 +64,20 @@ const SplitViewLayout: React.FC<SplitViewLayoutProps> = ({
         <div className="card bg-base-100 shadow-xl h-full flex flex-col border-2 border-primary">
           <div className="card-body p-0">
             <div className="px-4 py-3 border-base-300">
-              <h2 className="card-title text-base">Roles</h2>
-              <p className="text-xs text-base-content/60 mt-1">
-                {roles.length} total
-              </p>
+              <div className="flex items-start justify-between">
+                <div>
+                  <h2 className="card-title text-base">Roles</h2>
+                  <p className="text-xs text-base-content/60 mt-1">
+                    {roles.length} total
+                  </p>
+                </div>
+                <button
+                  onClick={onCreateRole}
+                  className="btn btn-primary btn-sm"
+                >
+                  Create Role
+                </button>
+              </div>
             </div>
             <div className="divider px-3"></div>
             <div className="flex-1 overflow-y-auto">

@@ -584,6 +584,7 @@ const RolesAndPermissions = ({
           onRoleSelection={handleRoleSelection}
           onEditClick={handleEditClick}
           onDeleteClick={handleDeleteClick}
+          onCreateRole={() => setIsCreateModalOpen(true)}
           onStartEditingPermissions={handleStartEditingPermissions}
           onCancelEditingPermissions={handleCancelEditingPermissions}
           onSavePermissions={handleSavePermissions}

@@ -16,29 +16,32 @@ import { PermissionCategory } from "./ProjectRolesAndPermissions";
 interface SplitViewLayoutProps {
   roles: RoleResponseDto[];
   selectedRoleId: number | null;
-  onSelectRole: (roleId: number) => void;
   permissionCategories: PermissionCategory[];
   currentRole: RoleResponseDto | null;
+  isLoadingPermissions: boolean;
+
+  onSelectRole: (roleId: number) => void;
+  onCreateRole: () => void;
   roleHasPermission: (roleId: number, permissionId: number) => boolean;
   isStandardRole: (role: RoleResponseDto) => boolean;
   isOrganizationRole: (role: RoleResponseDto) => boolean;
   isProjectRole: (role: RoleResponseDto) => boolean;
   getRoleSource: (role: RoleResponseDto) => string;
-  isLoadingPermissions: boolean;
 }
 
 const SplitViewLayout: React.FC<SplitViewLayoutProps> = ({
   roles,
   selectedRoleId,
-  onSelectRole,
+  isLoadingPermissions,
   permissionCategories,
   currentRole,
+  onSelectRole,
+  onCreateRole,
   roleHasPermission,
   isStandardRole,
   isOrganizationRole,
   isProjectRole,
   getRoleSource,
-  isLoadingPermissions,
 }) => {
   return (
     <div className="flex gap-6" style={{ height: "calc(100vh - 28rem)" }}>
@@ -47,10 +50,20 @@ const SplitViewLayout: React.FC<SplitViewLayoutProps> = ({
         <div className="card bg-base-100 shadow-xl h-full flex flex-col border-2 border-primary">
           <div className="card-body p-0">
             <div className="px-4 py-3 border-base-300">
-              <h2 className="card-title text-base">Roles</h2>
-              <p className="text-xs text-base-content/60 mt-1">
-                {roles.length} total
-              </p>
+              <div className="flex items-start justify-between">
+                <div>
+                  <h2 className="card-title text-base">Roles</h2>
+                  <p className="text-xs text-base-content/60 mt-1">
+                    {roles.length} total
+                  </p>
+                </div>
+                <button
+                  onClick={onCreateRole}
+                  className="btn btn-primary btn-sm"
+                >
+                  Create Role
+                </button>
+              </div>
             </div>
             <div className="divider px-3"></div>
             <div className="flex-1 overflow-y-auto">
