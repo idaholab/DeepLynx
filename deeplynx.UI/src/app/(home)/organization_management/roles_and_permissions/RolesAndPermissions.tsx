@@ -105,6 +105,10 @@ const RolesAndPermissions = ({
         dto
       );
 
+      console.log("Created role:", newRole); // Check the response
+      console.log("Organization ID:", newRole.organizationId); // Verify scope
+      console.log("Project ID:", newRole.projectId); // Should be null for org roles
+
       setRoles((prev) => [...prev, newRole]);
       setSelectedRoleId(newRole.id);
       toast.success("Created new role");
