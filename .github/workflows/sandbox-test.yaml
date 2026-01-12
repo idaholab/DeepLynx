@@ -44,7 +44,6 @@ jobs:
           BACKEND_BASE_URL: ${{ vars.BACKEND_BASE_URL }}
           NEXT_PUBLIC_DISABLE_FRONTEND_AUTHENTICATION: ${{ vars.NEXT_PUBLIC_DISABLE_FRONTEND_AUTHENTICATION }}
           HOSTED_LINK: ${{ vars.HOSTED_LINK }}
-          MCP_SERVER_URL: ${{ vars.MCP_SERVER_URL }}
         run: |
           cd "$GITHUB_WORKSPACE"
 
@@ -96,7 +95,7 @@ jobs:
             .
 
           az acr build --registry $ACR_REGISTRY \
-            --image $ACR_PATH:deeplynxv3-mcp-$GITHUB_RUN_NUMBER \
+            --image $ACR_PATH:deeplynx-mcp-$GITHUB_RUN_NUMBER \
             --file Dockerfiles/mcp/Dockerfile.public \
             .
 
@@ -143,7 +142,6 @@ jobs:
             --from-literal=backend-base-url="${{ vars.BACKEND_BASE_URL }}" \
             --from-literal=disabled-front-auth="${{ vars.DISABLNEXT_PUBLIC_DISABLE_FRONTEND_AUTHENTICATIONE_FRONTEND_AUTHENTICATION }}" \
             --from-literal=hosted-link="${{ vars.HOSTED_LINK }}" \
-            --from-literal=mcp-server-url="${{ vars.MCP_SERVER_URL }}" \
             --namespace=deeplynx-test \
             --dry-run=client -o yaml | kubectl apply -f -
       # Overwrites ${VARIABLES} in the kube manifest with secrets

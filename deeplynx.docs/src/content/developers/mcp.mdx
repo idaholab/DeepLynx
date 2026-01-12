@@ -136,7 +136,7 @@ ollama pull llama3.1:8b
     height={600}
 />
 
-10. Add this into the yaml file that is created. Insert the URL that your mcp server is hosted on.
+10. Add this into the yaml file that is created. Insert the URL that your mcp server is hosted on, as well as your bearer token as a header.
 
 ```yaml copy
 name: Nexus
@@ -146,6 +146,8 @@ mcpServers:
 - name: Nexus MCP Server
   type: streamable-http
   url: <Insert MCP URL Here>
+  headers:
+    Authorization: Bearer <Insert Your Token Here>
 ```
 
 Now you should be able to ask the agent questions like: 
@@ -158,6 +160,26 @@ Keep in mind, we do not have direct control over how the model/agent serializes 
 So, it may hallucinate and add random values or may send the string "true" instead of a boolean true or visa-versa. This is not
 the best agent-model pair that is available, but it is free. Feel free to use other services if you come across another that
 works better for you. That is the beauty of MCP servers, they can be used with any! 
+
+### Testing with cURL
+You can also test your MCP server directly using curl:
+
+```bash copy
+curl -X POST <MCP_URL> \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <YOUR_TOKEN>" \
+  -d '{
+    "jsonrpc": "2.0",
+    "id": 1,
+    "method": "tools/call",
+    "params": {
+      "name": "get_all_projects",
+      "arguments": {
+        "organizationId": 2
+      }
+    }
+  }'
+```
 
 ## For Nexus Contributors: Adding tools
 All the tools for the MCP server are located in the 'tools' folder. Each file is separated by the entity you are wanting to

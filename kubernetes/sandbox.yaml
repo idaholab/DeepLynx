@@ -304,11 +304,6 @@ spec:
                 configMapKeyRef:
                   name: app-config
                   key: hosted-link
-            - name: MCP_SERVER_URL
-              valueFrom:
-                configMapKeyRef:
-                  name: app-config
-                  key: mcp-server-url
           resources:
             limits:
               memory: "4Gi"
@@ -379,11 +374,6 @@ spec:
           image: ${CI_REGISTRY}/${CI_REGISTRY_PATH}:deeplynx-mcp-${GITHUB_RUN_NUMBER}
           imagePullPolicy: Always
           env:
-            - name: MCP_SERVER_URL
-              valueFrom:
-                configMapKeyRef:
-                  name: app-config
-                  key: mcp-server-url
             - name: NEXUS_API_URL
               valueFrom:
                 configMapKeyRef:
@@ -511,6 +501,13 @@ spec:
             backend:
               service:  
                 name: deeplynx-docs-service
+                port:  
+                  number: 80 
+          - path: /mcp
+            pathType: Prefix
+            backend:
+              service:  
+                name: deeplynx-mcp-service
                 port:  
                   number: 80 
 

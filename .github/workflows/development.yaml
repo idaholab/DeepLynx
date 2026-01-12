@@ -38,7 +38,6 @@ jobs:
           BACKEND_BASE_URL: ${{ vars.BACKEND_BASE_URL }}
           NEXT_PUBLIC_DISABLE_FRONTEND_AUTHENTICATION: ${{ vars.NEXT_PUBLIC_DISABLE_FRONTEND_AUTHENTICATION }}
           HOSTED_LINK: ${{ vars.HOSTED_LINK }}
-          # MCP_SERVER_URL: ${{ vars.MCP_SERVER_URL }}
         run: |
           cd $GITHUB_WORKSPACE
           az cloud set --name AzureUSGovernment
@@ -133,7 +132,6 @@ jobs:
             --from-literal=hosted-link="${{ vars.HOSTED_LINK }}" \
             --namespace=deeplynxv3-dev \
             --dry-run=client -o yaml | kubectl apply -f -
-      # --from-literal=mcp-server-url="${{ vars.MCP_SERVER_URL }}" \ !!!INSERT ABOVE IF THIS PLAN FAILS!!!
       # Overwrites ${VARIABLES} in the kube manifest with secrets
       - shell: bash
         name: Manifest env substitute

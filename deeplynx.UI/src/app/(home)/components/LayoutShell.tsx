@@ -28,6 +28,7 @@ import { useOrganizationSession } from "@/app/contexts/OrganizationSessionProvid
 import { OrganizationResponseDto } from "../types/responseDTOs";
 import { useSafeSession } from "@/app/hooks/useSafeSession";
 import { getAllOrganizationsForUser } from "@/app/lib/client_service/organization_services.client";
+import TopBanner from "./VulnerabilityBanner";
 
 const LayoutShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { t } = useLanguage();
@@ -134,8 +135,10 @@ const LayoutShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
   return (
     <div className="flex flex-col min-h-screen bg-base-100 text-base-content">
+      {/* Top Banner */}
+      <TopBanner />
       {/* Banner/Header */}
-      <header className="bg-[var(--base-400)] text-primary-content flex justify-between items-center px-5 py-3 z-50 fixed w-full">
+      <header className="bg-[var(--base-400)] text-primary-content flex justify-between items-center px-5 py-3 z-50 fixed w-full top-6">
         {/* Organization Switcher */}
         <div className="dropdown">
           <div className="flex items-center">
@@ -182,11 +185,10 @@ const LayoutShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                     <li key={org.id} className="w-full">
                       <a
                         onClick={() => handleOrganizationSwitch(org)}
-                        className={`flex items-center gap-2 w-full max-w-full ${
-                          organization?.organizationId === org.id
+                        className={`flex items-center gap-2 w-full max-w-full ${organization?.organizationId === org.id
                             ? "active bg-info/60"
                             : ""
-                        }`}
+                          }`}
                       >
                         <div className="min-w-0 flex-1 overflow-hidden">
                           <div className=" font-medium truncate">
@@ -231,15 +233,12 @@ const LayoutShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             className="rounded cursor-pointer"
             onClick={() => router.push("/")}
           />
-          {/* <span className="text-xs text-base-200 flex justify-end mt-2">
-            V 0.3.0
-          </span> */}
         </div>
       </header>
       {/* Page Content */}
-      <div className="flex h-full z-0">
+      <div className="flex h-full z-0 mt-6">
         {/* Side Menu */}
-        <div className="fixed top-18 bottom-0 flex z-40">
+        <div className="fixed top-20 bottom-0 flex z-40">
           <aside
             className={
               "h-full shadow-xl w-18 login text-primary-content p-4 transition-all duration-300 flex flex-col"
@@ -283,7 +282,14 @@ const LayoutShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                 </SysAdminRoute>
               </li>
               <li className="mt-5">
-                <Link href={"/api/v1/scalar"} prefetch={false}>
+                <Link
+                  href={
+                    process.env.NEXT_PUBLIC_API_URL
+                      ? `${process.env.NEXT_PUBLIC_API_URL}/scalar`
+                      : "/api/v1/scalar"
+                  }
+                  prefetch={false}
+                >
                   <CommandLineIcon className="size-10" />
                 </Link>
               </li>
@@ -365,9 +371,8 @@ const LayoutShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         </div>
         <SideMenu onToggle={handleMenuToggle} />
         <main
-          className={`transition-all duration-300 w-full mt-18 ${
-            isMenuCollapsed ? "ml-40" : "ml-82"
-          }`}
+          className={`transition-all duration-300 w-full mt-20 ${isMenuCollapsed ? "ml-40" : "ml-82"
+            }`}
         >
           {children}
         </main>
