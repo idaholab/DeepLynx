@@ -1,5 +1,4 @@
 using System.ComponentModel;
-using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Web;
@@ -9,8 +8,23 @@ using ModelContextProtocol.Server;
 namespace deeplynx.mcp.tools;
 
 [McpServerToolType]
-public static class ProjectTools
+public class ProjectTools
 {
+    public class Organization
+    {
+        [Description("The database ID of the organization")]
+        public long Id { get; set; }
+
+        [Description("The name of the organization")]
+        public string Name { get; set; } = null!;
+
+        [Description("The description of the organization")]
+        public string? Description { get; set; }
+
+        [Description("A boolean that indicates whether an organization is archived")]
+        public bool IsArchived { get; set; }
+    }
+
     public class Project
     {
         [Description("The database ID of the project")]
@@ -26,7 +40,7 @@ public static class ProjectTools
         public DateTime LastUpdatedAt { get; set; }
     
         [Description("The user that last updated the project in the database")]
-        public string? LastUpdatedBy { get; set; }
+        public long? LastUpdatedBy { get; set; }
     
         [Description("The project description that contains useful information about the purpose of the project")]
         public string? Description { get; set; }
@@ -42,46 +56,80 @@ public static class ProjectTools
         
     }
     
-    private static readonly HttpClient _httpClient = new HttpClient
-    {
-        BaseAddress = new Uri(EnvironmentHelper.GetRequiredEnvironmentVariable("NEXUS_API_URL")),
-    };
-    
+    private readonly IAuthenticatedHttpClientFactory _httpClientFactory;
 
-    [McpServerTool(UseStructuredContent = true), Description("Get all projects from the API. Returns stringified JSON array of projects. Optional parameters: organizationId (filter by organization), hideArchived (default true).")]
-    public static async Task<string> GetAllProjects(
-        [Description("An optional parameter of the ID of the organization to filter by")]long? organizationId = null, 
-        [Description("Indicates whether to hide a project where isArchived is true. The value for this parameter can be the string 'true' or the string 'false'. The default value is 'true' ")]string hideArchived = "true",
-        [Description("An optional bearer token for testing")]string? authToken = null)
+    public ProjectTools(IAuthenticatedHttpClientFactory httpClientFactory)
+    {
+        _httpClientFactory = httpClientFactory;
+    }
+
+    [McpServerTool, Description("Get all organizations the user has access to. Returns stringified JSON array of organizations. " +
+                                "Use this to find the organizationId needed for other API calls.")]
+    public async Task<string> GetAllOrganizations(
+        [Description("Indicates whether to hide archived organizations. Default is true.")] string hideArchived = "true")
     {
         try
         {
-            
+            var hideArchivedBool = string.IsNullOrEmpty(hideArchived) || bool.Parse(hideArchived);
             var query = HttpUtility.ParseQueryString(string.Empty);
-            query["hideArchived"] = hideArchived.ToString().ToLower();
-            // Build query string
-            
-            if (organizationId.HasValue)
-                query["organizationId"] = organizationId.ToString();
-            
-            var queryString = query.ToString();
-            var url = $"projects/GetAllProjects?{queryString}";
+            query["hideArchived"] = hideArchivedBool.ToString().ToLower();
 
-            // Create request
-            var request = new HttpRequestMessage(HttpMethod.Get, url);
-            
-            // Add authorization header if token provided
-            if (!string.IsNullOrEmpty(authToken))
-            {
-                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", authToken);
-            }
+            using var httpClient = await _httpClientFactory.CreateClientAsync();
+            var response = await httpClient.GetAsync($"organizations/user?{query}");
 
-            // Make the API call
-            var response = await _httpClient.SendAsync(request);
-            
             if (!response.IsSuccessStatusCode)
             {
-                throw new HttpRequestException(response.ReasonPhrase);
+                var errorContent = await response.Content.ReadAsStringAsync();
+                throw new HttpRequestException(
+                    $"API request failed with status {response.StatusCode}: {response.ReasonPhrase}. Details: {errorContent}");
+            }
+
+            var content = await response.Content.ReadFromJsonAsync<List<Organization>>(new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            });
+
+            return JsonSerializer.Serialize(content, new JsonSerializerOptions
+            {
+                WriteIndented = true
+            });
+        }
+        catch (Exception ex)
+        {
+            var errorResponse = new
+            {
+                success = false,
+                error = "Exception",
+                message = ex.Message,
+                stackTrace = ex.StackTrace
+            };
+
+            return JsonSerializer.Serialize(errorResponse, new JsonSerializerOptions
+            {
+                WriteIndented = true
+            });
+        }
+    }
+
+    [McpServerTool(UseStructuredContent = true), Description("Get all projects for a specific organization. Returns stringified JSON array of projects. Optional parameters: hideArchived (default true).")]
+    public async Task<string> GetAllProjects(
+        [Description("The ID of the organization to list projects from")] long organizationId,
+        [Description("Indicates whether to hide archived projects. Default is true.")] string hideArchived = "true")
+    {
+        try
+        {
+            var hideArchivedBool = string.IsNullOrEmpty(hideArchived) || bool.Parse(hideArchived);
+            var query = HttpUtility.ParseQueryString(string.Empty);
+            query["hideArchived"] = hideArchivedBool.ToString().ToLower();
+
+            using var httpClient = await _httpClientFactory.CreateClientAsync();
+            var response = await httpClient.GetAsync($"organizations/{organizationId}/projects?{query}");
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorContent = await response.Content.ReadAsStringAsync();
+                throw new HttpRequestException(
+                    $"API request failed with status {response.StatusCode}: {response.ReasonPhrase}. Details: {errorContent}");
             }
             
             var content = await response.Content.ReadFromJsonAsync<List<Project>>(new JsonSerializerOptions() 

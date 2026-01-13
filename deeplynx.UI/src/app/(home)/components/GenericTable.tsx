@@ -52,8 +52,8 @@ type GenericTableProps<T extends object> = {
   onPageChange?: (pageNumber: number) => void;
   onPageSizeChange?: (pageSize: number) => void;
   filters?: FilterConfig[];
-  filterValues?: Record<string, string | number | undefined>;
-  onFilterChange?: (filters: Record<string, string | number | undefined>) => void;
+  filterValues?: Record<string, string | number | number[] | undefined>;
+  onFilterChange?: (filters: Record<string, string | number | number[] | undefined>) => void;
 };
 
 const GenericTable = <T extends object>({
@@ -89,7 +89,7 @@ const GenericTable = <T extends object>({
 
   const [showFilters, setShowFilters] = useState(false);
   const [initialFilters, setInitialFilters] = useState(filterValues);
-  const [tempFilters, setTempFilters] = useState<Record<string, string | number | undefined>>({});
+  const [tempFilters, setTempFilters] = useState<Record<string, string | number | number[] | undefined>>({});
 
   // Sync local page state with backend pagination metadata
   useEffect(() => {

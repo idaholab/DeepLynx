@@ -14,15 +14,20 @@ public class ProjectController : ControllerBase
 {
     private readonly ILogger<ProjectController> _logger;
     private readonly IProjectBusiness _projectBusiness;
+    private readonly IInvitationBusiness _invitationBusiness;
 
     /// <summary>
     ///     Initializes a new instance of the <see cref="ProjectController" /> class
     /// </summary>
     /// <param name="projectBusiness">The business logic interface for handling project operations.</param>
     /// <param name="logger">Error/Info logging interface for database log table.</param>
-    public ProjectController(IProjectBusiness projectBusiness, ILogger<ProjectController> logger)
+    public ProjectController(
+        IProjectBusiness projectBusiness,
+        IInvitationBusiness invitationBusiness,
+        ILogger<ProjectController> logger)
     {
         _projectBusiness = projectBusiness;
+        _invitationBusiness = invitationBusiness;
         _logger = logger;
     }
 
@@ -348,6 +353,37 @@ public class ProjectController : ControllerBase
         catch (Exception exc)
         {
             var message = $"An error occurred while removing member from project {projectId}: {exc}";
+            _logger.LogError(message);
+            return StatusCode(StatusCodes.Status500InternalServerError, message);
+        }
+    }
+    
+    /// <summary>
+    /// Invite/Add User to Project
+    /// </summary>
+    /// <param name="organizationId"></param>
+    /// <param name="projectId"></param>
+    /// <param name="userEmail"></param>
+    /// <param name="userName"></param>
+    /// <param name="roleId"></param>
+    /// <returns></returns>
+    [HttpPost("{projectId:long}/invite", Name = "api_invite_user_to_project")]
+    [Auth("write", "user")]
+    public async Task<ActionResult> InviteUserToProject(
+        long organizationId,
+        long projectId,
+        [FromQuery] string userEmail,
+        [FromQuery] string? userName,
+        [FromQuery] long? roleId)
+    {
+        try
+        {
+            await _invitationBusiness.InviteAndAddUserToHierarchy(organizationId,projectId, roleId, userEmail, userName);
+            return Ok(new { message = $"Invited and added inactive user with email {userEmail} to organization {organizationId}" });
+        }
+        catch (Exception exc)
+        {
+            var message = $"An error occurred while adding user with email {userEmail} to organization {organizationId}: {exc}";
             _logger.LogError(message);
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }

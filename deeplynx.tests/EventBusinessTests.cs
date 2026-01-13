@@ -123,7 +123,7 @@ namespace deeplynx.tests
         public async Task QueryAllEvents_Success_FilterByLastUpdatedBy()
         {
             // Arrange
-            var queryDto = new EventsQueryRequestDTO { lastUpdatedBy = mockUserId };
+            var queryDto = new EventsQueryRequestDto { LastUpdatedBy = mockUserId };
 
             // Act
             var result = await _eventBusiness.QueryAllEvents(mockOrganizationId, null, queryDto);
@@ -137,7 +137,7 @@ namespace deeplynx.tests
         public async Task QueryAllEvents_Success_FilterByOperation()
         {
             // Arrange
-            var queryDto = new EventsQueryRequestDTO { operation = "create" };
+            var queryDto = new EventsQueryRequestDto { Operation = "create" };
 
             // Act
             var result = await _eventBusiness.QueryAllEvents(mockOrganizationId, pid, queryDto);
@@ -151,7 +151,7 @@ namespace deeplynx.tests
         public async Task QueryAllEvents_Success_FilterByEntityType()
         {
             // Arrange
-            var queryDto = new EventsQueryRequestDTO { entityType = "edge" };
+            var queryDto = new EventsQueryRequestDto { EntityType = "edge" };
 
             // Act
             var result = await _eventBusiness.QueryAllEvents(mockOrganizationId, null, queryDto);
@@ -165,7 +165,7 @@ namespace deeplynx.tests
         public async Task QueryAllEvents_Success_FilterByEntityName()
         {
             // Arrange
-            var queryDto = new EventsQueryRequestDTO { entityName = "TestEntity" };
+            var queryDto = new EventsQueryRequestDto { EntityName = "TestEntity" };
 
             // Act
             var result = await _eventBusiness.QueryAllEvents(mockOrganizationId, pid, queryDto);
@@ -178,7 +178,7 @@ namespace deeplynx.tests
         public async Task QueryAllEvents_Success_FilterByDataSourceName()
         {
             // Arrange
-            var queryDto = new EventsQueryRequestDTO { dataSourceName = "DataSource1" };
+            var queryDto = new EventsQueryRequestDto { DataSourceName = "DataSource1" };
 
             // Act
             var result = await _eventBusiness.QueryAllEvents(mockOrganizationId, null, queryDto);
@@ -193,7 +193,7 @@ namespace deeplynx.tests
         {
             // Arrange
             var futureDate = now.AddHours(1);
-            var queryDto = new EventsQueryRequestDTO { startDate = futureDate };
+            var queryDto = new EventsQueryRequestDto { StartDate = futureDate };
 
             // Act
             var result = await _eventBusiness.QueryAllEvents(mockOrganizationId, pid, queryDto);
@@ -208,7 +208,7 @@ namespace deeplynx.tests
         {
             // Arrange
             var pastDate = now.AddHours(-1);
-            var queryDto = new EventsQueryRequestDTO { endDate = pastDate };
+            var queryDto = new EventsQueryRequestDto { EndDate = pastDate };
 
             // Act
             var result = await _eventBusiness.QueryAllEvents(mockOrganizationId, pid, queryDto);
@@ -224,10 +224,10 @@ namespace deeplynx.tests
             // Arrange
             var startDate = now.AddHours(-1);
             var endDate = now.AddHours(1);
-            var queryDto = new EventsQueryRequestDTO
+            var queryDto = new EventsQueryRequestDto
             {
-                startDate = startDate,
-                endDate = endDate
+                StartDate = startDate,
+                EndDate = endDate
             };
 
             // Act
@@ -246,10 +246,10 @@ namespace deeplynx.tests
         public async Task QueryAllEvents_Success_MultipleFilters_WithProjectId()
         {
             // Arrange
-            var queryDto = new EventsQueryRequestDTO
+            var queryDto = new EventsQueryRequestDto
             {
-                operation = "delete",
-                entityType = "edge"
+                Operation = "delete",
+                EntityType = "edge"
             };
 
             // Act
@@ -267,7 +267,7 @@ namespace deeplynx.tests
         public async Task QueryAllEvents_Success_CustomPageSize()
         {
             // Arrange
-            var queryDto = new EventsQueryRequestDTO
+            var queryDto = new EventsQueryRequestDto
             {
                 PageNumber = 1,
                 PageSize = 3
@@ -287,7 +287,7 @@ namespace deeplynx.tests
         public async Task QueryAllEvents_Success_SecondPage()
         {
             // Arrange
-            var queryDto = new EventsQueryRequestDTO
+            var queryDto = new EventsQueryRequestDto
             {
                 PageNumber = 2,
                 PageSize = 3
@@ -307,9 +307,9 @@ namespace deeplynx.tests
         public async Task QueryAllEvents_Success_WithFiltersAndPagination()
         {
             // Arrange
-            var queryDto = new EventsQueryRequestDTO
+            var queryDto = new EventsQueryRequestDto
             {
-                entityType = "edge",
+                EntityType = "edge",
                 PageNumber = 1,
                 PageSize = 2
             };
@@ -345,7 +345,7 @@ namespace deeplynx.tests
             await Context.SaveChangesAsync();
 
             // Act
-            var result = await _eventBusiness.QueryAuthorizedEvents(mockUserId, mockOrganizationId, null, null);
+            var result = await _eventBusiness.QueryAuthorizedEvents(mockUserId, mockOrganizationId, Array.Empty<long>(), null);
 
             // Assert
             Assert.Equal(10, result.TotalCount);
@@ -366,7 +366,7 @@ namespace deeplynx.tests
             await Context.SaveChangesAsync();
 
             // Act
-            var result = await _eventBusiness.QueryAuthorizedEvents(mockUserId, mockOrganizationId, pid, null);
+            var result = await _eventBusiness.QueryAuthorizedEvents(mockUserId, mockOrganizationId, new[] { pid }, null);
 
             // Assert
             Assert.Equal(6, result.TotalCount);
@@ -386,7 +386,7 @@ namespace deeplynx.tests
             await Context.SaveChangesAsync();
 
             // Act
-            var result = await _eventBusiness.QueryAuthorizedEvents(mockUserId, mockOrganizationId, null, null);
+            var result = await _eventBusiness.QueryAuthorizedEvents(mockUserId, mockOrganizationId, Array.Empty<long>(), null);
 
             // Assert
             Assert.Equal(10, result.TotalCount); // All events from both projects
@@ -404,10 +404,10 @@ namespace deeplynx.tests
             Context.ProjectMembers.AddRange(projectMembers);
             await Context.SaveChangesAsync();
 
-            var queryDto = new EventsQueryRequestDTO { PageNumber = 1, PageSize = 3 };
+            var queryDto = new EventsQueryRequestDto { PageNumber = 1, PageSize = 3 };
 
             // Act
-            var result = await _eventBusiness.QueryAuthorizedEvents(mockUserId, mockOrganizationId, null, queryDto);
+            var result = await _eventBusiness.QueryAuthorizedEvents(mockUserId, mockOrganizationId, Array.Empty<long>(), queryDto);
 
             // Assert
             Assert.Equal(10, result.TotalCount);
@@ -422,10 +422,10 @@ namespace deeplynx.tests
             Context.ProjectMembers.Add(projectMember);
             await Context.SaveChangesAsync();
 
-            var queryDto = new EventsQueryRequestDTO { operation = "create" };
+            var queryDto = new EventsQueryRequestDto { Operation = "create" };
 
             // Act
-            var result = await _eventBusiness.QueryAuthorizedEvents(mockUserId, mockOrganizationId, null, queryDto);
+            var result = await _eventBusiness.QueryAuthorizedEvents(mockUserId, mockOrganizationId, Array.Empty<long>(), queryDto);
 
             // Assert
             Assert.Equal(2, result.TotalCount);
@@ -444,16 +444,15 @@ namespace deeplynx.tests
             Context.ProjectMembers.AddRange(projectMembers);
             await Context.SaveChangesAsync();
 
-            var queryDto = new EventsQueryRequestDTO { projectName = "Project 2" };
+            var queryDto = new EventsQueryRequestDto { ProjectName = "Project 2" };
 
             // Act
-            var result = await _eventBusiness.QueryAuthorizedEvents(mockUserId, mockOrganizationId, null, queryDto);
+            var result = await _eventBusiness.QueryAuthorizedEvents(mockUserId, mockOrganizationId, Array.Empty<long>(), queryDto);
 
             // Assert
             Assert.Equal(2, result.TotalCount);
             Assert.All(result.Items, e => Assert.Equal("Project 2", e.ProjectName));
         }
-
         #endregion
 
         #region QueryEventsBySubscriptions Tests
@@ -501,7 +500,7 @@ namespace deeplynx.tests
             Context.Subscriptions.Add(subscription);
             await Context.SaveChangesAsync();
 
-            var queryDto = new EventsQueryRequestDTO { PageNumber = 1, PageSize = 3 };
+            var queryDto = new EventsQueryRequestDto { PageNumber = 1, PageSize = 3 };
 
             // Act
             var result = await _eventBusiness.QueryEventsBySubscriptions(mockUserId, mockOrganizationId, pid, queryDto);
@@ -529,7 +528,7 @@ namespace deeplynx.tests
             Context.Subscriptions.Add(subscription);
             await Context.SaveChangesAsync();
 
-            var queryDto = new EventsQueryRequestDTO { operation = "create" };
+            var queryDto = new EventsQueryRequestDto { Operation = "create" };
 
             // Act
             var result = await _eventBusiness.QueryEventsBySubscriptions(mockUserId, mockOrganizationId, pid, queryDto);
@@ -600,7 +599,7 @@ namespace deeplynx.tests
         public async Task QueryEventsBySubscriptions_ReturnsEmpty_NoSubscriptions()
         {
             // Arrange
-            var queryDto = new EventsQueryRequestDTO();
+            var queryDto = new EventsQueryRequestDto();
 
             // Act
             var result = await _eventBusiness.QueryEventsBySubscriptions(mockUserId, mockOrganizationId, pid, queryDto);

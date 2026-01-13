@@ -248,13 +248,9 @@ class TestQueryAuthorizedEvents:
     
     def test_query_authorized_events_basic(self, client, organization, project):
         """Test basic authorized events query."""
-        params = {
-            "organizationId": organization,
-            "projectId": project,
-            "pageNumber": 1,
-            "pageSize": 10
-        }
-        response = client.get("/events/QueryAuthorizedEvents", params=params)
+        response = client.get(
+            f"/events/QueryAuthorizedEvents/{organization}?projectIds={project}&pageNumber=1&pageSize=10"
+        )
         assert response.status_code == 200
         
         result = response.json()
@@ -267,15 +263,43 @@ class TestQueryAuthorizedEvents:
             assert "items" in result
             assert isinstance(result["items"], list)
     
+    def test_query_authorized_events_multiple_projects(self, client, organization, project, project2):
+        """Test authorized events query with multiple projects."""
+        response = client.get(
+            f"/events/QueryAuthorizedEvents/{organization}?projectIds={project}&projectIds={project2}&pageNumber=1&pageSize=10"
+        )
+        assert response.status_code == 200
+        
+        result = response.json()
+        
+        if isinstance(result, list):
+            items = result
+        else:
+            items = result.get("items", [])
+        
+        assert isinstance(items, list)
+    
+    def test_query_authorized_events_no_project_filter(self, client, organization):
+        """Test authorized events query without project filter (all accessible projects)."""
+        response = client.get(
+            f"/events/QueryAuthorizedEvents/{organization}?pageNumber=1&pageSize=10"
+        )
+        assert response.status_code == 200
+        
+        result = response.json()
+        
+        if isinstance(result, list):
+            items = result
+            assert isinstance(items, list)
+        else:
+            assert "items" in result
+            assert isinstance(result["items"], list)
+    
     def test_query_authorized_events_with_operation_filter(self, client, organization, project):
         """Test authorized events query with operation filter."""
-        params = {
-            "organizationId": organization,
-            "projectId": project,
-            "operation": "create",
-            "pageSize": 5
-        }
-        response = client.get("/events/QueryAuthorizedEvents", params=params)
+        response = client.get(
+            f"/events/QueryAuthorizedEvents/{organization}?projectIds={project}&operation=create&pageSize=5"
+        )
         assert response.status_code == 200
         
         result = response.json()
@@ -292,13 +316,9 @@ class TestQueryAuthorizedEvents:
     
     def test_query_authorized_events_with_entity_type_filter(self, client, organization, project):
         """Test authorized events query with entity type filter."""
-        params = {
-            "organizationId": organization,
-            "projectId": project,
-            "entityType": "record",
-            "pageSize": 5
-        }
-        response = client.get("/events/QueryAuthorizedEvents", params=params)
+        response = client.get(
+            f"/events/QueryAuthorizedEvents/{organization}?projectIds={project}&entityType=record&pageSize=5"
+        )
         assert response.status_code == 200
         
         result = response.json()
@@ -314,13 +334,9 @@ class TestQueryAuthorizedEvents:
     
     def test_query_authorized_events_pagination(self, client, organization, project):
         """Test authorized events query with pagination."""
-        params = {
-            "organizationId": organization,
-            "projectId": project,
-            "pageNumber": 1,
-            "pageSize": 5
-        }
-        response = client.get("/events/QueryAuthorizedEvents", params=params)
+        response = client.get(
+            f"/events/QueryAuthorizedEvents/{organization}?projectIds={project}&pageNumber=1&pageSize=5"
+        )
         assert response.status_code == 200
         
         result = response.json()
@@ -330,7 +346,16 @@ class TestQueryAuthorizedEvents:
                 assert result["pageNumber"] == 1
             if "pageSize" in result:
                 assert result["pageSize"] == 5
-
+    
+    def test_query_authorized_events_with_all_filters(self, client, organization, project):
+        """Test authorized events query with multiple filters."""
+        response = client.get(
+            f"/events/QueryAuthorizedEvents/{organization}?projectIds={project}&operation=create&entityType=record&pageNumber=1&pageSize=5"
+        )
+        assert response.status_code == 200
+        
+        result = response.json()
+        assert isinstance(result, (list, dict))
 
 class TestQueryEventsBySubscriptions:
     """Tests for GET /events/QueryEventsBySubscriptions endpoint."""

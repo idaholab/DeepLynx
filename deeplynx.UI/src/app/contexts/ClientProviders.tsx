@@ -12,7 +12,8 @@ export default function ClientProviders({
 }) {
   // Always render SessionProvider to avoid hook errors
   return (
-    <SessionProvider>
+    <SessionProvider
+      refetchOnWindowFocus={false}>
       <LanguageProvider>
         {children}
         <Toaster />

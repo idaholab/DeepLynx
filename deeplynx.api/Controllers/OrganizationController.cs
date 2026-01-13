@@ -14,16 +14,20 @@ public class OrganizationController : ControllerBase
 {
     private readonly ILogger<OrganizationController> _logger;
     private readonly IOrganizationBusiness _organizationBusiness;
+    private readonly IInvitationBusiness _invitationBusiness;
 
     /// <summary>
     ///     Initializes a new instance of the <see cref="OrganizationController" /> class
     /// </summary>
     /// <param name="organizationBusiness">The business logic interface for handling Organization operations.</param>
     /// <param name="logger">Error/Info logging interface for database log table.</param>
-    public OrganizationController(IOrganizationBusiness organizationBusiness,
+    public OrganizationController(
+        IOrganizationBusiness organizationBusiness,
+        IInvitationBusiness invitationBusiness,
         ILogger<OrganizationController> logger)
     {
         _organizationBusiness = organizationBusiness;
+        _invitationBusiness = invitationBusiness;
         _logger = logger;
     }
 
@@ -280,6 +284,33 @@ public class OrganizationController : ControllerBase
         catch (Exception exc)
         {
             var message = $"An error occurred while removing user {userId} from organization {organizationId}: {exc}";
+            _logger.LogError(message);
+            return StatusCode(StatusCodes.Status500InternalServerError, message);
+        }
+    }
+    
+    /// <summary>
+    /// Invite/Add User to Organization
+    /// </summary>
+    /// <param name="organizationId"></param>
+    /// <param name="userEmail"></param>
+    /// <param name="userName"></param>
+    /// <returns></returns>
+    [HttpPost("{organizationId:long}/invite", Name = "api_invite_user_to_organization")]
+    [Auth("write", "user")]
+    public async Task<ActionResult> InviteUserToOrganization(
+        long organizationId,
+        [FromQuery] string userEmail,
+        [FromQuery] string? userName)
+    {
+        try
+        {
+            await _invitationBusiness.InviteAndAddUserToHierarchy(organizationId, null, null, userEmail, userName);
+            return Ok(new { message = $"Invited and added inactive user with email {userEmail} to organization {organizationId}" });
+        }
+        catch (Exception exc)
+        {
+            var message = $"An error occurred while adding user with email {userEmail} to organization {organizationId}: {exc}";
             _logger.LogError(message);
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }

@@ -99,6 +99,20 @@ services:
     volumes:
       - nx_postgres_data:/var/lib/postgresql/data
     
+  mcp:
+    build:
+      context: ./
+      dockerfile: Dockerfiles/mcp/Dockerfile.local
+    environment:
+      NEXUS_API_URL: "http://server:5000/api/v1"
+      MCP_SERVER_URL: "http://0.0.0.0:43656"
+    ports:
+      - "43656:43656"
+    networks:
+      - nexus-network
+    depends_on:
+      - server
+
 networks:
   nexus-network:
     driver: bridge

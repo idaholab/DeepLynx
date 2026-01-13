@@ -354,6 +354,43 @@ spec:
 
 ---
 
+#mcp
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: deeplynx-mcp
+  namespace: deeplynx-test
+spec:
+  selector:
+    matchLabels:
+      app: deeplynx-mcp
+  template:
+    metadata:
+      labels:
+        app: deeplynx-mcp
+    spec:
+      containers:
+        - name: deeplynx-test
+          image: ${CI_REGISTRY}/${CI_REGISTRY_PATH}:deeplynx-mcp-${GITHUB_RUN_NUMBER}
+          imagePullPolicy: Always
+          env:
+            - name: NEXUS_API_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: backend-base-url
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          ports:
+            - containerPort: 43656
+
+---
+
 apiVersion: v1
 kind: Service
 metadata:
@@ -399,6 +436,22 @@ spec:
       targetPort: 3001
   selector:
     app: deeplynx-docs
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: deeplynx-mcp-service
+  namespace: deeplynx-test
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 80
+      targetPort: 43656
+  selector:
+    app: deeplynx-mcp
 
 ---
 
@@ -448,6 +501,13 @@ spec:
             backend:
               service:  
                 name: deeplynx-docs-service
+                port:  
+                  number: 80 
+          - path: /mcp
+            pathType: Prefix
+            backend:
+              service:  
+                name: deeplynx-mcp-service
                 port:  
                   number: 80 
 

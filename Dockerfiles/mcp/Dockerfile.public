@@ -1,0 +1,21 @@
+# Stage 1: Build the C# Backend
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+WORKDIR /src
+
+# Copy the solution file and restore dependencies
+COPY deeplynx.mcp/*.csproj ./deeplynx.mcp/
+RUN dotnet restore ./deeplynx.mcp/deeplynx.mcp.csproj
+
+# Copy source code and build
+COPY deeplynx.mcp/ ./deeplynx.mcp/
+RUN dotnet publish ./deeplynx.mcp/deeplynx.mcp.csproj -c Release -o /app/publish
+
+# Stage 2: Runtime
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
+WORKDIR /app
+
+COPY --from=build /app/publish .
+
+EXPOSE 43656
+
+ENTRYPOINT ["dotnet", "deeplynx.mcp.dll"]

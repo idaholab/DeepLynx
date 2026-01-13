@@ -82,7 +82,7 @@ export default function ProjectDetailClient({
   if (!project) return <p className="p-4">{t.translations.NO_PROJECT_FOUND}</p>;
 
   return (
-    <div className="min-h-screen bg-base-100 mt-3">
+    <div className="min-h-screen bg-base-100">
       {/* Project Header */}
       <div className="bg-base-200/50 border-b border-base-300/30 py-4 px-6 lg:px-12">
         <h1 className="text-2xl font-bold text-base-content">{project.name}</h1>
