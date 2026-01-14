@@ -22,6 +22,7 @@ import {
   ChevronRightIcon,
   ChevronUpIcon,
   FolderIcon,
+  PresentationChartLineIcon,
   RectangleGroupIcon,
 } from "@heroicons/react/24/outline";
 
@@ -321,7 +322,7 @@ const SideMenu: React.FC<SideMenuProps> = ({ onToggle }) => {
               href="/timeseries_viewer"
               className={getItemClass("/timeseries_viewer")}
             >
-              <ArrowUpTrayIcon className="size-6" />
+              <PresentationChartLineIcon className="size-6" />
               {!isCollapsed && (
                 <p className="ml-2">{t.translations.TIMESERIES_VIEWER}</p>
               )}

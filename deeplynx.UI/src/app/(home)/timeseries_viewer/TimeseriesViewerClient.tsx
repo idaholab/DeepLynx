@@ -5,17 +5,11 @@ import Tabs from '../components/Tabs';
 import { useLanguage } from '@/app/contexts/Language';
 import { useOrganizationSession } from '@/app/contexts/OrganizationSessionProvider';
 import EChartsLineChart from './LineChart';
+import { ArrowDownTrayIcon } from '@heroicons/react/24/outline';
 
 type Props = {
     initialProjects: { id: string; name: string }[];
     initialSelectedProjects: string[];
-};
-
-type TimePreset = {
-    label: string;
-    start: number;
-    end: number;
-    icon: string;
 };
 
 export default function TimeseriesViewerClient({ initialProjects, initialSelectedProjects }: Props) {
@@ -80,9 +74,8 @@ export default function TimeseriesViewerClient({ initialProjects, initialSelecte
     const [dataZoom, setDataZoom] = useState({ start: 0, end: 100, show: true });
 
     // Chart settings
-    const [smoothing, setSmoothing] = useState(true);
-    const [showGrid, setShowGrid] = useState(true);
-    const [showTooltips, setShowTooltips] = useState(true);
+    const [showMarkPoints, setShowMarkPoints] = useState(true);
+    const [showMarkLines, setShowMarkLines] = useState(true);
 
     // Series visibility - default all visible
     const [visibleSeries, setVisibleSeries] = useState<Record<string, boolean>>({
@@ -102,40 +95,10 @@ export default function TimeseriesViewerClient({ initialProjects, initialSelecte
         }));
     };
 
-    // Time presets
-    const timePresets: TimePreset[] = [
-        { label: 'First 20%', start: 0, end: 20, icon: '◐' },
-        { label: 'First Half', start: 0, end: 50, icon: '◐' },
-        { label: 'Second Half', start: 50, end: 100, icon: '◑' },
-        { label: 'Last 20%', start: 80, end: 100, icon: '◑' },
-        { label: 'Middle 50%', start: 25, end: 75, icon: '▣' },
-        { label: 'All Data', start: 0, end: 100, icon: '⬜' },
-    ];
-
-    const handleSliderChange = (e: React.ChangeEvent<HTMLInputElement>, type: 'start' | 'end') => {
-        const value = Number(e.target.value);
-
-        if (type === 'start') {
-            setSliderStart(Math.min(value, sliderEnd));
-        } else {
-            setSliderEnd(Math.max(value, sliderStart));
-        }
-    };
-
     const handleApplyTimeRange = () => {
         setDataZoom({
             start: sliderStart,
             end: sliderEnd,
-            show: true
-        });
-    };
-
-    const handlePresetClick = (preset: TimePreset) => {
-        setSliderStart(preset.start);
-        setSliderEnd(preset.end);
-        setDataZoom({
-            start: preset.start,
-            end: preset.end,
             show: true
         });
     };
@@ -148,30 +111,9 @@ export default function TimeseriesViewerClient({ initialProjects, initialSelecte
     // Tab content components
     const TimeRangeTab = () => (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Left Column - Quick Presets */}
-            <div className="lg:col-span-1">
-                <div className="card bg-base-100 border border-base-300">
-                    <div className="card-body">
-                        <h3 className="font-semibold mb-3">Quick Select</h3>
-                        <div className="space-y-2">
-                            {timePresets.map((preset) => (
-                                <button
-                                    key={preset.label}
-                                    onClick={() => handlePresetClick(preset)}
-                                    className="btn btn-outline btn-sm w-full justify-start gap-2"
-                                >
-                                    <span>{preset.icon}</span>
-                                    {preset.label}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            {/* Right Column - Custom Range */}
+            {/* Custom Range */}
             <div className="lg:col-span-2">
-                <div className="card bg-base-100 border border-base-300">
+                <div className="card bg-base-100 shadow-xl">
                     <div className="card-body">
                         <h3 className="font-semibold mb-4">Custom Time Range</h3>
 
@@ -201,44 +143,6 @@ export default function TimeseriesViewerClient({ initialProjects, initialSelecte
                                 />
                             </div>
                         </div>
-
-                        <div className="divider my-2">OR</div>
-
-                        {/* Range Slider */}
-                        <div className="form-control mb-6">
-                            <label className="label">
-                                <span className="label-text font-medium">Percentage Range</span>
-                                <span className="label-text-alt">{sliderStart}% - {sliderEnd}%</span>
-                            </label>
-                            <div className="relative h-3 bg-base-200 rounded-full">
-                                <div
-                                    className="absolute h-3 bg-primary rounded-full transition-all"
-                                    style={{
-                                        left: `${sliderStart}%`,
-                                        width: `${sliderEnd - sliderStart}%`
-                                    }}
-                                />
-
-                                <input
-                                    type="range"
-                                    min="0"
-                                    max="100"
-                                    value={sliderStart}
-                                    onChange={(e) => handleSliderChange(e, 'start')}
-                                    className="range range-primary absolute w-full opacity-0 pointer-events-auto"
-                                />
-
-                                <input
-                                    type="range"
-                                    min="0"
-                                    max="100"
-                                    value={sliderEnd}
-                                    onChange={(e) => handleSliderChange(e, 'end')}
-                                    className="range range-primary absolute w-full opacity-0 pointer-events-auto"
-                                />
-                            </div>
-                        </div>
-
                         {/* Action Buttons */}
                         <div className="flex justify-end gap-2">
                             <button
@@ -265,200 +169,21 @@ export default function TimeseriesViewerClient({ initialProjects, initialSelecte
         </div>
     );
 
-    const SettingsTab = () => (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Chart Display Settings */}
-            <div className="card bg-base-100 border border-base-300">
-                <div className="card-body">
-                    <h3 className="font-semibold mb-4">Chart Display</h3>
-                    <div className="space-y-4">
-                        <div className="form-control">
-                            <label className="label cursor-pointer justify-start gap-3">
-                                <input
-                                    type="checkbox"
-                                    checked={smoothing}
-                                    onChange={(e) => setSmoothing(e.target.checked)}
-                                    className="toggle toggle-primary"
-                                />
-                                <div>
-                                    <span className="label-text font-medium">Line smoothing</span>
-                                    <div className="text-xs text-base-content/60">Apply curve smoothing to line charts</div>
-                                </div>
-                            </label>
-                        </div>
-
-                        <div className="divider my-2"></div>
-
-                        <div className="form-control">
-                            <label className="label cursor-pointer justify-start gap-3">
-                                <input
-                                    type="checkbox"
-                                    checked={dataZoom.show}
-                                    onChange={(e) => setDataZoom({ ...dataZoom, show: e.target.checked })}
-                                    className="toggle toggle-primary"
-                                />
-                                <div>
-                                    <span className="label-text font-medium">Zoom controls</span>
-                                    <div className="text-xs text-base-content/60">Show interactive zoom slider on chart</div>
-                                </div>
-                            </label>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            {/* Series Visibility Settings */}
-            <div className="card bg-base-100 border border-base-300">
-                <div className="card-body">
-                    <h3 className="font-semibold mb-4">Series Visibility</h3>
-                    <div className="space-y-3">
-                        {Object.entries(visibleSeries).map(([seriesName, isVisible]) => (
-                            <div key={seriesName} className="form-control">
-                                <label className="label cursor-pointer justify-start gap-3">
-                                    <input
-                                        type="checkbox"
-                                        checked={isVisible}
-                                        onChange={() => toggleSeries(seriesName)}
-                                        className="checkbox checkbox-primary"
-                                    />
-                                    <span className="label-text">{seriesName}</span>
-                                </label>
-                            </div>
-                        ))}
-                    </div>
-
-                    <div className="divider my-2"></div>
-
-                    <div className="flex gap-2">
-                        <button
-                            onClick={() => {
-                                const allVisible: Record<string, boolean> = {};
-                                Object.keys(visibleSeries).forEach(key => {
-                                    allVisible[key] = true;
-                                });
-                                setVisibleSeries(allVisible);
-                            }}
-                            className="btn btn-sm btn-outline flex-1"
-                        >
-                            Show All
-                        </button>
-                        <button
-                            onClick={() => {
-                                const allHidden: Record<string, boolean> = {};
-                                Object.keys(visibleSeries).forEach(key => {
-                                    allHidden[key] = false;
-                                });
-                                setVisibleSeries(allHidden);
-                            }}
-                            className="btn btn-sm btn-outline flex-1"
-                        >
-                            Hide All
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    );
-
-    const ExportTab = () => (
-        <div className="space-y-6">
-            {/* Export Options */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="card bg-base-100 border border-base-300 hover:border-primary transition-colors">
-                    <div className="card-body">
-                        <div className="flex items-center gap-3 mb-3">
-                            <div className="text-3xl">📊</div>
-                            <h3 className="card-title text-base">CSV Export</h3>
-                        </div>
-                        <p className="text-sm text-base-content/70 mb-4">
-                            Export raw time-series data in CSV format for analysis in Excel or other tools.
-                        </p>
-                        <ul className="text-xs text-base-content/60 space-y-1 mb-4">
-                            <li>✓ Raw data values</li>
-                            <li>✓ Timestamps included</li>
-                            <li>✓ All sensors exported</li>
-                        </ul>
-                        <button
-                            onClick={() => handleExport('csv')}
-                            className="btn btn-primary btn-sm w-full"
-                        >
-                            Download CSV
-                        </button>
-                    </div>
-                </div>
-
-                <div className="card bg-base-100 border border-base-300 hover:border-primary transition-colors">
-                    <div className="card-body">
-                        <div className="flex items-center gap-3 mb-3">
-                            <div className="text-3xl">🖼️</div>
-                            <h3 className="card-title text-base">PNG Image</h3>
-                        </div>
-                        <p className="text-sm text-base-content/70 mb-4">
-                            Save the current chart view as a high-resolution PNG image file.
-                        </p>
-                        <ul className="text-xs text-base-content/60 space-y-1 mb-4">
-                            <li>✓ High resolution (300 DPI)</li>
-                            <li>✓ Current zoom level</li>
-                            <li>✓ Transparent background</li>
-                        </ul>
-                        <button
-                            onClick={() => handleExport('png')}
-                            className="btn btn-primary btn-sm w-full"
-                        >
-                            Download PNG
-                        </button>
-                    </div>
-                </div>
-
-                <div className="card bg-base-100 border border-base-300 hover:border-primary transition-colors">
-                    <div className="card-body">
-                        <div className="flex items-center gap-3 mb-3">
-                            <div className="text-3xl">📄</div>
-                            <h3 className="card-title text-base">PDF Report</h3>
-                        </div>
-                        <p className="text-sm text-base-content/70 mb-4">
-                            Generate a comprehensive PDF report with chart and data summary.
-                        </p>
-                        <ul className="text-xs text-base-content/60 space-y-1 mb-4">
-                            <li>✓ Chart visualization</li>
-                            <li>✓ Data summary table</li>
-                            <li>✓ Time range metadata</li>
-                        </ul>
-                        <button
-                            onClick={() => handleExport('pdf')}
-                            className="btn btn-primary btn-sm w-full"
-                        >
-                            Generate PDF
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    );
-
     const tabData = [
         {
             label: "Time Range",
             content: <TimeRangeTab />
-        },
-        {
-            label: "Chart Settings",
-            content: <SettingsTab />
-        },
-        {
-            label: "Export",
-            content: <ExportTab />
         }
     ];
 
     return (
         <div>
             {/* Header */}
-            <div className="bg-base-200/40 pl-12 p-6">
+            <div className="bg-base-200/40 pl-12 p-4">
                 <h1 className="text-2xl font-bold text-base-content">
                     {t.translations.TIMESERIES_VIEWER}
                 </h1>
-                <div className="mt-4">
+                <div className="">
                     <ProjectDropdown
                         projects={projects}
                         onSelectionChange={setSelectedProjects}
@@ -470,23 +195,110 @@ export default function TimeseriesViewerClient({ initialProjects, initialSelecte
                     />
                 </div>
             </div>
+            <div className="flex justify-end p-4">
+                <div className="dropdown dropdown-end">
+                    <button tabIndex={0} className="btn btn-primary btn-sm">
+                        <ArrowDownTrayIcon className="size-6" />
+                    </button>
+                    <ul tabIndex={0} className="dropdown-content menu bg-base-100 rounded-box z-[1] w-52 p-2 shadow-lg border border-base-300">
+                        <li>
+                            <a onClick={() => handleExport('csv')}>
+                                <span>Export as CSV</span>
+                            </a>
+                        </li>
+                        <li>
+                            <a onClick={() => handleExport('png')}>
+                                <span>Export as PNG</span>
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            </div>
 
-            {/* Chart Viewer */}
+            {/* Chart Viewer with Series Controls */}
             <div className="px-6 pt-6">
-                <div className="card bg-base-100 shadow-sm">
-                    <div className="card-body p-4">
-                        <EChartsLineChart
-                            dataZoom={dataZoom}
-                            smoothing={smoothing}
-                            timeseriesData={timeseriesData}
-                            visibleSeries={visibleSeries}
-                        />
+                <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+                    {/* Chart */}
+                    <div className="lg:col-span-3">
+                        <div className="card bg-base-100 shadow-sm">
+                            <div className="card-body p-4">
+                                <EChartsLineChart
+                                    dataZoom={dataZoom}
+                                    timeseriesData={timeseriesData}
+                                    visibleSeries={visibleSeries}
+                                    showMarkPoints={showMarkPoints}
+                                    showMarkLines={showMarkLines}
+                                />
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Right Sidebar with Controls */}
+                    <div className="lg:col-span-1 space-y-4">
+                        {/* Series Visibility Controls */}
+                        <div className="card bg-base-100 shadow-xl">
+                            <div className="card-body p-4">
+                                <h3 className="font-semibold text-sm mb-3">Series Visibility</h3>
+                                <div className="space-y-2">
+                                    {Object.entries(visibleSeries).map(([seriesName, isVisible]) => (
+                                        <div key={seriesName} className="form-control">
+                                            <label className="label cursor-pointer justify-start gap-2 py-1">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={isVisible}
+                                                    onChange={() => toggleSeries(seriesName)}
+                                                    className="checkbox checkbox-primary checkbox-sm"
+                                                />
+                                                <span className="label-text text-sm">{seriesName}</span>
+                                            </label>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Chart Settings */}
+                        <div className="card bg-base-100 shadow-xl">
+                            <div className="card-body p-4">
+                                <h3 className="font-semibold text-sm mb-3">Chart Settings</h3>
+                                <div className="space-y-3">
+                                    <div className="form-control">
+                                        <label className="label cursor-pointer justify-start gap-2 py-1">
+                                            <input
+                                                type="checkbox"
+                                                checked={dataZoom.show}
+                                                onChange={(e) => setDataZoom({ ...dataZoom, show: e.target.checked })}
+                                                className="checkbox checkbox-primary checkbox-sm"
+                                            />
+                                            <div>
+                                                <span className="label-text text-sm font-medium">Zoom controls</span>
+                                                <div className="text-xs text-base-content/60">Interactive zoom slider</div>
+                                            </div>
+                                        </label>
+                                    </div>
+                                    <div className="form-control">
+                                        <label className="label cursor-pointer justify-start gap-2 py-1">
+                                            <input
+                                                type="checkbox"
+                                                checked={showMarkPoints}
+                                                onChange={(e) => setShowMarkPoints(e.target.checked)}
+                                                className="checkbox checkbox-primary checkbox-sm"
+                                            />
+                                            <div>
+                                                <span className="label-text text-sm font-medium">Min/max markers</span>
+                                                <div className="text-xs text-base-content/60">Show value markers</div>
+                                            </div>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
 
             {/* Controls in Tabs */}
-            <div className="p-2">
+            <div className="p-4">
                 <Tabs
                     tabs={tabData}
                     className="tabs tabs-border ml-5"

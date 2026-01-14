@@ -14,16 +14,18 @@ interface TimeseriesDataItem {
 
 interface EChartsLineChartProps {
     dataZoom?: DataZoomConfig;
-    smoothing?: boolean;
     timeseriesData: TimeseriesDataItem[];
     visibleSeries: Record<string, boolean>;
+    showMarkPoints?: boolean;
+    showMarkLines?: boolean;
 }
 
 export default function EChartsLineChart({
     dataZoom = { start: 0, end: 100, show: true },
-    smoothing = true,
     timeseriesData,
-    visibleSeries
+    visibleSeries,
+    showMarkPoints = true,
+    showMarkLines = true
 }: EChartsLineChartProps) {
     const chartRef = useRef<HTMLDivElement>(null);
 
@@ -38,28 +40,50 @@ export default function EChartsLineChart({
         // Filter data based on visibility and separate temperature and other data for dual Y-axes
         const series = timeseriesData
             .filter(item => item.name !== 'time_x' && visibleSeries[item.name])
-            .map((item, index) => ({
-                name: item.name,
-                type: 'line' as const,
-                smooth: smoothing,
-                data: item.values,
-                // Temperature uses yAxis 0, others use yAxis 1
-                yAxisIndex: item.name === 'Temperature (K)' ? 0 : 1,
-                itemStyle: {
-                    color: colors[index % colors.length]
-                },
-                lineStyle: {
-                    width: 2
-                },
-                areaStyle: item.name === 'Temperature (K)' ? {
-                    opacity: 0.1
-                } : undefined,
-                emphasis: {
-                    focus: 'series'
-                }
-            }));
+            .map((item, index) => {
+                const baseSeries: any = {
+                    name: item.name,
+                    type: 'line' as const,
+                    data: item.values,
+                    // Temperature uses yAxis 0, others use yAxis 1
+                    yAxisIndex: item.name === 'Temperature (K)' ? 0 : 1,
+                    itemStyle: {
+                        color: colors[index % colors.length]
+                    },
+                    lineStyle: {
+                        width: 2
+                    },
+                    areaStyle: item.name === 'Temperature (K)' ? {
+                        opacity: 0.1
+                    } : undefined,
+                    emphasis: {
+                        focus: 'series'
+                    }
+                };
 
-        const legendData = series.map(s => s.name);
+                // Add markPoint if enabled
+                if (showMarkPoints) {
+                    baseSeries.markPoint = {
+                        data: [
+                            { type: 'max', name: 'Max' },
+                            { type: 'min', name: 'Min' }
+                        ]
+                    };
+                }
+
+                // Add markLine if enabled
+                if (showMarkLines) {
+                    baseSeries.markLine = {
+                        data: [
+                            { type: 'average', name: 'Avg' }
+                        ]
+                    };
+                }
+
+                return baseSeries;
+            });
+
+        const legendData = series.map((s: any) => s.name);
 
         const option = {
             title: {
@@ -162,9 +186,9 @@ export default function EChartsLineChart({
             window.removeEventListener('resize', handleResize);
             chart.dispose();
         };
-    }, [dataZoom, smoothing, timeseriesData, visibleSeries]);
+    }, [dataZoom, timeseriesData, visibleSeries, showMarkPoints, showMarkLines]);
 
     return (
-        <div ref={chartRef} className="w-full h-[400px]" />
+        <div ref={chartRef} className="w-full h-[475px]" />
     );
 }
