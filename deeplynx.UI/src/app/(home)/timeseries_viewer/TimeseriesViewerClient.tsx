@@ -202,7 +202,7 @@ export default function TimeseriesViewerClient({ initialProjects, initialSelecte
             <div className="lg:col-span-1">
                 <div className="card bg-base-100 shadow-xl">
                     <div className="card-body">
-                        <h3 className="font-semibold mb-4">Available Data Files</h3>
+                        <h3 className="font-semibold mb-4">Available Timeseries Files</h3>
 
                         <div className="space-y-2 max-h-[300px] overflow-y-auto">
                             {availableFiles.map((file, index) => (
@@ -294,10 +294,55 @@ export default function TimeseriesViewerClient({ initialProjects, initialSelecte
         </div>
     );
 
+    const SchemaTab = () => (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2">
+                <div className="card bg-base-100 shadow-xl">
+                    <div className="card-body">
+                    </div>
+                </div>
+            </div>
+        </div>
+    )
+
+    const ColumnTab = () => (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2">
+                <div className="card bg-base-100 shadow-xl">
+                    <div className="card-body">
+                    </div>
+                </div>
+            </div>
+        </div>
+    )
+
+    const AnnotationTab = () => (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2">
+                <div className="card bg-base-100 shadow-xl">
+                    <div className="card-body">
+                    </div>
+                </div>
+            </div>
+        </div>
+    )
+
     const tabData = [
         {
-            label: "Time Range",
+            label: "Set Up",
             content: <TimeRangeTab />
+        },
+        {
+            label: "Data Check",
+            content: <ColumnTab />
+        },
+        {
+            label: "Data Schema",
+            content: <SchemaTab />
+        },
+        {
+            label: "Data Annotation",
+            content: <AnnotationTab />
         }
     ];
 
@@ -368,7 +413,7 @@ export default function TimeseriesViewerClient({ initialProjects, initialSelecte
                         {/* Series Visibility Controls */}
                         <div className="card bg-base-100 shadow-xl">
                             <div className="card-body p-4">
-                                <h3 className="font-semibold text-sm mb-3">Series Visibility</h3>
+                                <h3 className="font-semibold text-sm mb-3">Plot Options</h3>
                                 <div className="space-y-2">
                                     {Object.entries(visibleSeries).map(([seriesName, isVisible]) => (
                                         <div key={seriesName} className="form-control">
