@@ -12,20 +12,38 @@ interface TimeseriesDataItem {
     values: (string | number)[];
 }
 
+interface YAxisConfig {
+    name: string;
+    position: 'left' | 'right';
+    formatter?: string;
+    min?: number;
+    max?: number;
+}
+
 interface EChartsLineChartProps {
+    title?: string;
+    xAxisName?: string;
+    yAxisConfigs?: YAxisConfig[];
     dataZoom?: DataZoomConfig;
     timeseriesData: TimeseriesDataItem[];
     visibleSeries: Record<string, boolean>;
     showMarkPoints?: boolean;
     showMarkLines?: boolean;
+    seriesYAxisMapping?: Record<string, number>; // Maps series name to yAxis index
 }
 
 export default function EChartsLineChart({
+    title = 'Chart',
+    xAxisName = 'Time',
+    yAxisConfigs = [
+        { name: 'Value', position: 'left', formatter: '{value}' }
+    ],
     dataZoom = { start: 0, end: 100, show: true },
     timeseriesData,
     visibleSeries,
     showMarkPoints = true,
-    showMarkLines = true
+    showMarkLines = true,
+    seriesYAxisMapping = {}
 }: EChartsLineChartProps) {
     const chartRef = useRef<HTMLDivElement>(null);
 
@@ -37,7 +55,6 @@ export default function EChartsLineChart({
 
         const colors = ['#5470c6', '#91cc75', '#fac858', '#ee6666', '#73c0de', '#3ba272'];
 
-        // Filter data based on visibility and separate temperature and other data for dual Y-axes
         const series = timeseriesData
             .filter(item => item.name !== 'time_x' && visibleSeries[item.name])
             .map((item, index) => {
@@ -45,17 +62,14 @@ export default function EChartsLineChart({
                     name: item.name,
                     type: 'line' as const,
                     data: item.values,
-                    // Temperature uses yAxis 0, others use yAxis 1
-                    yAxisIndex: item.name === 'Temperature (K)' ? 0 : 1,
+                    // Use mapping if provided, otherwise default to 0
+                    yAxisIndex: seriesYAxisMapping[item.name] ?? 0,
                     itemStyle: {
                         color: colors[index % colors.length]
                     },
                     lineStyle: {
                         width: 2
                     },
-                    areaStyle: item.name === 'Temperature (K)' ? {
-                        opacity: 0.1
-                    } : undefined,
                     emphasis: {
                         focus: 'series'
                     }
@@ -85,9 +99,21 @@ export default function EChartsLineChart({
 
         const legendData = series.map((s: any) => s.name);
 
+        // Build yAxis configuration from props
+        const yAxisOptions = yAxisConfigs.map(config => ({
+            type: 'value' as const,
+            name: config.name,
+            position: config.position,
+            axisLabel: {
+                formatter: config.formatter || '{value}'
+            },
+            ...(config.min !== undefined && { min: config.min }),
+            ...(config.max !== undefined && { max: config.max })
+        }));
+
         const option = {
             title: {
-                text: 'Temperature & Data Monitoring',
+                text: title,
                 left: 'center',
                 textStyle: {
                     fontSize: 18,
@@ -105,8 +131,7 @@ export default function EChartsLineChart({
                 formatter: function (params: any) {
                     let result = `${params[0].axisValue}<br/>`;
                     params.forEach((param: any) => {
-                        const unit = param.seriesName === 'Temperature (K)' ? 'K' : '';
-                        result += `${param.marker} ${param.seriesName}: <strong>${param.value}${unit}</strong><br/>`;
+                        result += `${param.marker} ${param.seriesName}: <strong>${param.value}</strong><br/>`;
                     });
                     return result;
                 }
@@ -126,31 +151,13 @@ export default function EChartsLineChart({
             xAxis: {
                 type: 'category',
                 boundaryGap: false,
+                name: xAxisName,
                 data: xAxisData,
                 axisLabel: {
                     rotate: 45
                 }
             },
-            yAxis: [
-                {
-                    type: 'value',
-                    name: 'Temperature (K)',
-                    position: 'left',
-                    axisLabel: {
-                        formatter: '{value}K'
-                    }
-                },
-                {
-                    type: 'value',
-                    name: 'Data Values',
-                    position: 'right',
-                    axisLabel: {
-                        formatter: '{value}'
-                    },
-                    min: 0,
-                    max: 6
-                }
-            ],
+            yAxis: yAxisOptions,
             dataZoom: dataZoom.show ? [
                 {
                     type: 'slider',
@@ -186,9 +193,9 @@ export default function EChartsLineChart({
             window.removeEventListener('resize', handleResize);
             chart.dispose();
         };
-    }, [dataZoom, timeseriesData, visibleSeries, showMarkPoints, showMarkLines]);
+    }, [dataZoom, timeseriesData, visibleSeries, showMarkPoints, showMarkLines, title, xAxisName, yAxisConfigs, seriesYAxisMapping]);
 
     return (
-        <div ref={chartRef} className="w-full h-[475px]" />
+        <div ref={chartRef} className="w-full h-[475px] echarts-timeseries-chart" />
     );
 }

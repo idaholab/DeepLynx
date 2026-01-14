@@ -6,6 +6,7 @@ import { useLanguage } from '@/app/contexts/Language';
 import { useOrganizationSession } from '@/app/contexts/OrganizationSessionProvider';
 import EChartsLineChart from './LineChart';
 import { ArrowDownTrayIcon } from '@heroicons/react/24/outline';
+import * as echarts from 'echarts';
 
 type Props = {
     initialProjects: { id: string; name: string }[];
@@ -22,6 +23,36 @@ export default function TimeseriesViewerClient({ initialProjects, initialSelecte
         initialSelectedProjects
     );
     const [activeTab, setActiveTab] = useState("");
+
+    // ============================================
+    // CHART CONFIGURATION - Replace with backend data
+    // ============================================
+    const chartTitle = "Temperature & Data Monitoring";
+    const xAxisName = "Time Points";
+
+    const yAxisConfigs = [
+        {
+            name: 'Temperature (K)',
+            position: 'left' as const,
+            formatter: '{value}K'
+        },
+        {
+            name: 'Data Values',
+            position: 'right' as const,
+            formatter: '{value}',
+            min: 0,
+            max: 6
+        }
+    ];
+
+    const seriesYAxisMapping: Record<string, number> = {
+        'Temperature (K)': 0,
+        'Data_1': 1,
+        'Data_2': 1,
+        'Data_3': 1,
+        'Data_4': 1,
+        'Data_5': 1
+    };
 
     // CSV data converted to timeseries format
     const timeseriesData = [
@@ -66,6 +97,17 @@ export default function TimeseriesViewerClient({ initialProjects, initialSelecte
         }
     ];
 
+    const availableFiles = [
+        { name: 'temperature_data_2024_01.csv', date: '2024-01-15', size: '2.4 MB' },
+        { name: 'temperature_data_2024_02.csv', date: '2024-02-12', size: '2.1 MB' },
+        { name: 'temperature_data_2024_03.csv', date: '2024-03-10', size: '2.6 MB' },
+        { name: 'sensor_readings_q1.csv', date: '2024-03-31', size: '5.2 MB' },
+        { name: 'sensor_readings_q2.csv', date: '2024-06-30', size: '4.8 MB' },
+    ];
+    // ============================================
+    // END CHART CONFIGURATION
+    // ============================================
+
     // Time range state
     const [startDate, setStartDate] = useState('2024-01-01T00:00');
     const [endDate, setEndDate] = useState('2024-01-07T23:59');
@@ -76,6 +118,9 @@ export default function TimeseriesViewerClient({ initialProjects, initialSelecte
     // Chart settings
     const [showMarkPoints, setShowMarkPoints] = useState(true);
     const [showMarkLines, setShowMarkLines] = useState(true);
+
+    // File selection
+    const [selectedFile, setSelectedFile] = useState('temperature_data_2024_01.csv');
 
     // Series visibility - default all visible
     const [visibleSeries, setVisibleSeries] = useState<Record<string, boolean>>({
@@ -104,13 +149,93 @@ export default function TimeseriesViewerClient({ initialProjects, initialSelecte
     };
 
     const handleExport = (format: 'csv' | 'png' | 'pdf') => {
-        console.log(`Exporting as ${format}`);
-        alert(`Export as ${format.toUpperCase()} - Feature coming soon!`);
+        if (format === 'png') {
+            const chartDiv = document.querySelector('.echarts-timeseries-chart') as HTMLDivElement;
+            if (chartDiv) {
+                const chartInstance = echarts.getInstanceByDom(chartDiv);
+                if (chartInstance) {
+                    const url = chartInstance.getDataURL({
+                        type: 'png',
+                        pixelRatio: 2,
+                        backgroundColor: '#ffffff'
+                    });
+
+                    const link = document.createElement('a');
+                    link.download = `timeseries-chart-${new Date().toISOString().slice(0, 10)}.png`;
+                    link.href = url;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                }
+            }
+        } else if (format === 'csv') {
+            const headers = timeseriesData.map(item => item.name).join(',');
+            const rows: string[] = [];
+
+            const maxLength = Math.max(...timeseriesData.map(item => item.values.length));
+
+            for (let i = 0; i < maxLength; i++) {
+                const row = timeseriesData.map(item => item.values[i] ?? '').join(',');
+                rows.push(row);
+            }
+
+            const csvContent = [headers, ...rows].join('\n');
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+
+            const link = document.createElement('a');
+            link.download = `timeseries-data-${new Date().toISOString().slice(0, 10)}.csv`;
+            link.href = url;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+        } else if (format === 'pdf') {
+            alert('PDF export requires additional library (jsPDF). Feature coming soon!');
+        }
     };
 
     // Tab content components
     const TimeRangeTab = () => (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Available Data Files */}
+            <div className="lg:col-span-1">
+                <div className="card bg-base-100 shadow-xl">
+                    <div className="card-body">
+                        <h3 className="font-semibold mb-4">Available Data Files</h3>
+
+                        <div className="space-y-2 max-h-[300px] overflow-y-auto">
+                            {availableFiles.map((file, index) => (
+                                <div
+                                    key={index}
+                                    className={`p-3 rounded-lg border cursor-pointer transition-all ${selectedFile === file.name
+                                        ? 'border-primary bg-primary/10'
+                                        : 'border-base-300 hover:border-primary/50 hover:bg-base-200'
+                                        }`}
+                                    onClick={() => setSelectedFile(file.name)}
+                                >
+                                    <div className="flex items-start justify-between">
+                                        <div className="flex-1 min-w-0">
+                                            <p className={`text-sm font-medium truncate ${selectedFile === file.name ? 'text-primary' : ''
+                                                }`}>
+                                                {file.name}
+                                            </p>
+                                            <div className="flex items-center gap-3 mt-1">
+                                                <span className="text-xs text-base-content/60">
+                                                    {file.date}
+                                                </span>
+                                                <span className="text-xs text-base-content/60">
+                                                    {file.size}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            </div>
             {/* Custom Range */}
             <div className="lg:col-span-2">
                 <div className="card bg-base-100 shadow-xl">
@@ -195,17 +320,18 @@ export default function TimeseriesViewerClient({ initialProjects, initialSelecte
                     />
                 </div>
             </div>
+
             <div className="flex justify-end p-4">
                 <div className="dropdown dropdown-end">
                     <button tabIndex={0} className="btn btn-primary btn-sm">
                         <ArrowDownTrayIcon className="size-6" />
                     </button>
                     <ul tabIndex={0} className="dropdown-content menu bg-base-100 rounded-box z-[1] w-52 p-2 shadow-lg border border-base-300">
-                        <li>
+                        {/* <li>
                             <a onClick={() => handleExport('csv')}>
                                 <span>Export as CSV</span>
                             </a>
-                        </li>
+                        </li> */}
                         <li>
                             <a onClick={() => handleExport('png')}>
                                 <span>Export as PNG</span>
@@ -223,6 +349,10 @@ export default function TimeseriesViewerClient({ initialProjects, initialSelecte
                         <div className="card bg-base-100 shadow-sm">
                             <div className="card-body p-4">
                                 <EChartsLineChart
+                                    title={chartTitle}
+                                    xAxisName={xAxisName}
+                                    yAxisConfigs={yAxisConfigs}
+                                    seriesYAxisMapping={seriesYAxisMapping}
                                     dataZoom={dataZoom}
                                     timeseriesData={timeseriesData}
                                     visibleSeries={visibleSeries}
