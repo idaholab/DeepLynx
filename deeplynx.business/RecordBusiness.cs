@@ -826,6 +826,22 @@ public class RecordBusiness : IRecordBusiness
     }
 
     /// <summary>
+    ///     Returns a list of textual descriptors for the Records table to be used by Lattice.
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization to which the records belong</param>
+    /// <param name="projectId">The ID of the project to which the records belong</param>
+    /// <returns>List of record textual descriptor columns, including class names</returns>
+    public async Task<List<LatticeRecordDto>> GetKnowledgeGraphRecords(long organizationId, long projectId)
+    {
+        var classes = await _context.Database
+            .SqlQuery<LatticeRecordDto>(
+                $"SELECT * FROM deeplynx.get_knowledge_graph_records({organizationId}, {projectId})"
+            ).ToListAsync();
+
+        return classes;
+    }
+
+    /// <summary>
     ///     Private method used to calculate json depth of properties (should be less than three)
     /// </summary>
     /// <param name="node"></param>

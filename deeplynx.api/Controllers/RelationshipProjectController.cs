@@ -244,4 +244,27 @@ public class RelationshipProjectController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
+
+    /// <summary>
+    ///     Textual Summary of Relationships in the Ontology
+    /// </summary>
+    /// <param name="projectId">The ID of the project to which the relationships belong</param>
+    /// <returns>Table of descriptive relationship fields including class names</returns>
+    [HttpGet(Name = "api_get_ontology_relationships_project")]
+    [Auth("read", "relationship")]
+    public async Task<ActionResult<IEnumerable<LatticeRelationshipDto>>> GetOntologyRelationships(long projectId)
+    {
+        try
+        {
+            var organizationId = UserContextStorage.OrganizationId;
+            var relationships = await _relationshipBusiness.GetOntologyRelationships(organizationId, projectId);
+            return Ok(relationships);
+        }
+        catch (Exception exc)
+        {
+            var message = $"An unexpected error occurred while fetching ontology relationship descriptions: {exc}";
+            _logger.LogError(message);
+            return StatusCode(StatusCodes.Status500InternalServerError, message);
+        }
+    }
 }

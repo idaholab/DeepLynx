@@ -400,4 +400,28 @@ public class EdgeController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
+
+    /// <summary>
+    ///     Textual Summary of Edges in the Knowledge Graph
+    /// </summary>
+    /// <param name="projectId">The ID of the project to which the edges belong</param>
+    /// <returns>Table of descriptive edge fields including class, record, and relationship names</returns>
+    [HttpGet(Name = "api_get_knowledge_graph_edges_project")]
+    [Auth("read", "edge")]
+    [Auth("read", "record")]
+    public async Task<ActionResult<IEnumerable<LatticeEdgeDto>>> GetKnowledgeGraphEdges(long projectId)
+    {
+        try
+        {
+            var organizationId = UserContextStorage.OrganizationId;
+            var edges = await _edgeBusiness.GetKnowledgeGraphEdges(organizationId, projectId);
+            return Ok(edges);
+        }
+        catch (Exception exc)
+        {
+            var message = $"An unexpected error occurred while fetching knowledge graph edge descriptions: {exc}";
+            _logger.LogError(message);
+            return StatusCode(StatusCodes.Status500InternalServerError, message);
+        }
+    }
 }

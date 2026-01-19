@@ -32,4 +32,5 @@ public interface IRecordBusiness
     Task<bool> UnattachTag(long organizationId, long projectId, long recordId, long tagId);
     Task<bool> BulkAttachTags(List<RecordTagLinkDto> dtos);
     Task<List<RecordResponseDto>> GetRecordsByOriginalId(long organizationId, long projectId, List<string> originalIds);
+    Task<List<LatticeRecordDto>> GetKnowledgeGraphRecords(long organizationId, long projectId);
 }

@@ -30,4 +30,6 @@ public interface IEdgeBusiness
 
     Task<long> UnarchiveEdge(
         long currentUserId, long organizationId, long projectId, long? edgeId, long? originId, long? destinationId);
+
+    Task<List<LatticeEdgeDto>> GetKnowledgeGraphEdges(long organizationId, long projectId);
 }

@@ -557,4 +557,20 @@ public class RelationshipBusiness : IRelationshipBusiness
 
         return true;
     }
+
+    /// <summary>
+    ///     Returns a list of textual descriptors for the Relationship table to be used by Lattice.
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization to which the relationships belong</param>
+    /// <param name="projectId">The ID of the project to which the relationships belong</param>
+    /// <returns>List of Relationship textual descriptor columns, including class names</returns>
+    public async Task<List<LatticeRelationshipDto>> GetOntologyRelationships(long organizationId, long projectId)
+    {
+        var relationships = await _context.Database
+            .SqlQuery<LatticeRelationshipDto>(
+                $"SELECT * FROM deeplynx.get_ontology_relationships({organizationId}, {projectId})"
+            ).ToListAsync();
+
+        return relationships;
+    }
 }

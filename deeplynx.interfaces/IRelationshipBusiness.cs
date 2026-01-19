@@ -25,4 +25,6 @@ public interface IRelationshipBusiness
 
     Task<List<RelationshipResponseDto>> GetRelationshipsByName(long organizationId, long? projectId,
         List<string> relationshipNames);
+
+    Task<List<LatticeRelationshipDto>> GetOntologyRelationships(long organizationId, long projectId);
 }

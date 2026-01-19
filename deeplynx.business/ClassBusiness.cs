@@ -563,4 +563,20 @@ public class ClassBusiness : IClassBusiness
         return await CreateClass(currentUserId, organizationId, projectId,
             new CreateClassRequestDto { Name = className });
     }
+
+    /// <summary>
+    ///     Returns a list of textual descriptors for the Class table to be used by Lattice.
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization to which the classes belong</param>
+    /// <param name="projectId">The ID of the project to which the classes belong</param>
+    /// <returns>List of class textual descriptor columns</returns>
+    public async Task<List<LatticeClassDto>> GetOntologyClasses(long organizationId, long projectId)
+    {
+        var classes = await _context.Database
+            .SqlQuery<LatticeClassDto>(
+                $"SELECT * FROM deeplynx.get_ontology_classes({organizationId}, {projectId})"
+            ).ToListAsync();
+
+        return classes;
+    }
 }
