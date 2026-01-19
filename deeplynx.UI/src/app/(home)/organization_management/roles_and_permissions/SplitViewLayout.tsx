@@ -62,8 +62,8 @@ const SplitViewLayout: React.FC<SplitViewLayoutProps> = ({
       {/* Left Sidebar - Role List */}
       <div className="w-80 flex-shrink-0">
         <div className="card bg-base-100 shadow-xl h-full flex flex-col border-2 border-primary">
-          <div className="card-body p-0">
-            <div className="px-4 py-3 border-base-300">
+          <div className="card-body p-0 flex flex-col h-full">
+            <div className="px-4 py-3 border-base-300 flex-shrink-0">
               <div className="flex items-start justify-between">
                 <div>
                   <h2 className="card-title text-base">Roles</h2>

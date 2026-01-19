@@ -4,11 +4,11 @@ import React, { useEffect, useRef, useState } from "react";
 import { useOrganizationSession } from "@/app/contexts/OrganizationSessionProvider";
 import { useProjectSession } from "@/app/contexts/ProjectSessionProvider";
 import {
-  archiveRole,
-  createRole,
+  archiveOrgRole,
+  createOrgRole,
   getOrgRolePermissions,
-  setPermissionsForRole,
-  updateRole,
+  setPermissionsForOrgRole,
+  updateOrgRole,
 } from "@/app/lib/client_service/role_services.client";
 import { ExclamationCircleIcon } from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
@@ -98,16 +98,21 @@ const RolesAndPermissions = ({
       description: data.description,
     };
 
+    //SWAP FOR ORG LEVEL CREATE ROLE LIKE TAGS
     try {
-      const newRole = await createRole(
+      const newRole = await createOrgRole(
         organization.organizationId as number,
-        project?.projectId as number,
         dto
       );
 
       console.log("Created role:", newRole); // Check the response
       console.log("Organization ID:", newRole.organizationId); // Verify scope
-      console.log("Project ID:", newRole.projectId); // Should be null for org roles
+      console.log("✅ Created org role:", {
+      id: newRole.id,
+      name: newRole.name,
+      organizationId: newRole.organizationId,
+      projectId: newRole.projectId,  // Should be null!
+      });
 
       setRoles((prev) => [...prev, newRole]);
       setSelectedRoleId(newRole.id);
@@ -133,9 +138,8 @@ const RolesAndPermissions = ({
   ) => {
     try {
       const dto: UpdateRoleRequestDto = { name, description };
-      const updatedRole = await updateRole(
+      const updatedRole = await updateOrgRole(
         organization?.organizationId as number,
-        project?.projectId as number,
         roleId,
         dto
       );
@@ -174,9 +178,8 @@ const RolesAndPermissions = ({
     if (!roleToDelete) return;
 
     try {
-      await archiveRole(
+      await archiveOrgRole(
         organization?.organizationId as number,
-        project?.projectId as number,
         roleToDelete.id
       );
 
@@ -244,9 +247,8 @@ const RolesAndPermissions = ({
     if (!currentRole) return;
 
     try {
-      await setPermissionsForRole(
+      await setPermissionsForOrgRole(
         organization?.organizationId as number,
-        project?.projectId as number,
         currentRole.id,
         Array.from(tempPermissions)
       );
@@ -346,9 +348,8 @@ const RolesAndPermissions = ({
     try {
       const updatePromises = roles.map((role) => {
         const newPermissions = Array.from(matrixTempPermissions[role.id] || []);
-        return setPermissionsForRole(
+        return setPermissionsForOrgRole(
           organization?.organizationId as number,
-          project?.projectId as number,
           role.id,
           newPermissions
         );
