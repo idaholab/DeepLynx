@@ -20,7 +20,7 @@ public class FileAzureBusiness: IFileBusiness
     /// <param name="file"></param>
     /// <param name="guid"></param>
     /// <returns></returns>
-    public async Task<string> UploadFile(long organizationId, long organizationId, long projectId, long datasourceId, ObjectStorageConfigDto objectStorageConfig,
+    public async Task<string> UploadFile(long organizationId, long projectId, long datasourceId, ObjectStorageConfigDto objectStorageConfig,
         IFormFile file, Guid guid)
     {
         if (objectStorageConfig.AzureObjectConfig == null)

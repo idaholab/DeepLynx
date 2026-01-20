@@ -872,4 +872,445 @@ public class FileAzureBusinessTests : IntegrationTestBase, IClassFixture<Azurite
     }
 
     #endregion
+    
+    #region GenerateUploadUrl Tests
+
+    [Fact]
+    public async Task GenerateUploadUrl_Success_ReturnsValidSasUri()
+    {
+        // Arrange
+        var guid = Guid.NewGuid();
+        var fileName = "upload-test.txt";
+
+        // Act
+        var result = await _fileAzureBusiness.GenerateUploadUrl(
+            _oid, _pid, _dsid, _objectStorageConfig, fileName, guid, expirationHours: 24);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Contains(_containerName, result);
+        Assert.Contains($"{guid}_{fileName}", result);
+        Assert.Contains("sig=", result); // SAS token signature
+        Assert.Contains("se=", result); // Expiry time
+        Assert.Contains("sp=", result); // Permissions
+    }
+
+    [Fact]
+    public async Task GenerateUploadUrl_Success_CreatesContainerIfNotExists()
+    {
+        // Arrange
+        var guid = Guid.NewGuid();
+        var fileName = "test-upload.txt";
+
+        // Ensure container doesn't exist
+        var container = new BlobContainerClient(_connectionString, _containerName);
+        await container.DeleteIfExistsAsync();
+        Assert.False(await container.ExistsAsync());
+
+        // Act
+        var result = await _fileAzureBusiness.GenerateUploadUrl(
+            _oid, _pid, _dsid, _objectStorageConfig, fileName, guid);
+
+        // Assert
+        Assert.NotNull(result);
+        var containerExists = await container.ExistsAsync();
+        Assert.True(containerExists);
+    }
+
+    [Fact]
+    public async Task GenerateUploadUrl_Success_GeneratedUrlCanBeUsedForUpload()
+    {
+        // Arrange
+        var guid = Guid.NewGuid();
+        var fileName = "direct-upload-test.txt";
+        var fileContent = "This content was uploaded via SAS URL";
+
+        // Act - Generate SAS URL
+        var sasUrl = await _fileAzureBusiness.GenerateUploadUrl(
+            _oid, _pid, _dsid, _objectStorageConfig, fileName, guid, expirationHours: 1);
+
+        // Use the SAS URL to upload directly
+        var blobClient = new BlobClient(new Uri(sasUrl));
+        var bytes = System.Text.Encoding.UTF8.GetBytes(fileContent);
+        using var stream = new MemoryStream(bytes);
+        await blobClient.UploadAsync(stream, overwrite: true);
+
+        // Assert - Verify the file was uploaded successfully
+        var expectedBlobName = $"organization_{_oid}/project_{_pid}/datasource_{_dsid}/{guid}_{fileName}";
+        var exists = await BlobExistsAsync(expectedBlobName);
+        Assert.True(exists);
+
+        var storedContent = await GetBlobContentAsync(expectedBlobName);
+        Assert.Equal(fileContent, storedContent);
+    }
+
+    [Fact]
+    public async Task GenerateUploadUrl_Fails_WhenAzureConfigIsNull()
+    {
+        // Arrange
+        var guid = Guid.NewGuid();
+        var fileName = "test.txt";
+        var invalidConfig = new ObjectStorageConfigDto
+        {
+            AzureObjectConfig = null
+        };
+
+        // Act & Assert
+        await Assert.ThrowsAsync<ArgumentException>(() =>
+            _fileAzureBusiness.GenerateUploadUrl(_oid, _pid, _dsid, invalidConfig, fileName, guid));
+    }
+
+    [Fact]
+    public async Task GenerateUploadUrl_Success_IncludesCorrectPermissions()
+    {
+        // Arrange
+        var guid = Guid.NewGuid();
+        var fileName = "permissions-test.txt";
+
+        // Act
+        var result = await _fileAzureBusiness.GenerateUploadUrl(
+            _oid, _pid, _dsid, _objectStorageConfig, fileName, guid);
+
+        // Assert
+        Assert.NotNull(result);
+        // SAS URL should contain write (w) and create (c) permissions
+        // The sp parameter contains the permissions
+        Assert.Contains("sp=", result);
+        var uri = new Uri(result);
+        var queryParams = System.Web.HttpUtility.ParseQueryString(uri.Query);
+        var permissions = queryParams["sp"];
+        Assert.NotNull(permissions);
+        Assert.Contains("w", permissions); // Write permission
+        Assert.Contains("c", permissions); // Create permission
+    }
+
+    [Fact]
+    public async Task GenerateUploadUrl_Success_ExpirationTimeIsCorrect()
+    {
+        // Arrange
+        var guid = Guid.NewGuid();
+        var fileName = "expiry-test.txt";
+        var expirationHours = 12;
+
+        // Act
+        var result = await _fileAzureBusiness.GenerateUploadUrl(
+            _oid, _pid, _dsid, _objectStorageConfig, fileName, guid, expirationHours);
+
+        // Assert
+        Assert.NotNull(result);
+        var uri = new Uri(result);
+        var queryParams = System.Web.HttpUtility.ParseQueryString(uri.Query);
+        var expiryString = queryParams["se"];
+        Assert.NotNull(expiryString);
+
+        var expiry = DateTimeOffset.Parse(expiryString);
+        var now = DateTimeOffset.UtcNow;
+        var expectedExpiry = now.AddHours(expirationHours);
+
+        // Allow 5 minute tolerance for test execution time
+        Assert.InRange(expiry, expectedExpiry.AddMinutes(-5), expectedExpiry.AddMinutes(5));
+    }
+
+    #endregion
+
+    #region GenerateDownloadUrl Tests
+
+    [Fact]
+    public async Task GenerateDownloadUrl_Success_ReturnsValidSasUri()
+    {
+        // Arrange
+        var guid = Guid.NewGuid();
+        var fileName = "download-sas-test.txt";
+        var fileContent = "Content for SAS download";
+        var mockFile = CreateMockFile(fileName, fileContent);
+
+        // Upload file first
+        var uri = await _fileAzureBusiness.UploadFile(
+            _oid, _pid, _dsid, _objectStorageConfig, mockFile, guid);
+
+        var recordDto = new RecordResponseDto
+        {
+            Uri = uri,
+            Name = fileName,
+            OrganizationId = _oid,
+            ProjectId = _pid,
+            DataSourceId = _dsid
+        };
+
+        // Act
+        var result = await _fileAzureBusiness.GenerateDownloadUrl(
+            recordDto, _objectStorageConfig, expirationHours: 1);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Contains(_containerName, result);
+        Assert.Contains($"{guid}_{fileName}", result);
+        Assert.Contains("sig=", result); // SAS token signature
+        Assert.Contains("se=", result); // Expiry time
+        Assert.Contains("sp=", result); // Permissions
+    }
+
+    [Fact]
+    public async Task GenerateDownloadUrl_Success_GeneratedUrlCanBeUsedForDownload()
+    {
+        // Arrange
+        var guid = Guid.NewGuid();
+        var fileName = "direct-download-test.txt";
+        var fileContent = "This content will be downloaded via SAS URL";
+        var mockFile = CreateMockFile(fileName, fileContent);
+
+        // Upload file first
+        var uri = await _fileAzureBusiness.UploadFile(
+            _oid, _pid, _dsid, _objectStorageConfig, mockFile, guid);
+
+        var recordDto = new RecordResponseDto
+        {
+            Uri = uri,
+            Name = fileName,
+            OrganizationId = _oid,
+            ProjectId = _pid,
+            DataSourceId = _dsid
+        };
+
+        // Act - Generate download SAS URL
+        var sasUrl = await _fileAzureBusiness.GenerateDownloadUrl(
+            recordDto, _objectStorageConfig, expirationHours: 1);
+
+        // Use the SAS URL to download directly
+        var blobClient = new BlobClient(new Uri(sasUrl));
+        var downloadResponse = await blobClient.DownloadContentAsync();
+        var downloadedContent = downloadResponse.Value.Content.ToString();
+
+        // Assert
+        Assert.Equal(fileContent, downloadedContent);
+    }
+
+    [Fact]
+    public async Task GenerateDownloadUrl_Fails_WhenRecordUriIsNull()
+    {
+        // Arrange
+        var recordDto = new RecordResponseDto
+        {
+            Uri = null,
+            OrganizationId = _oid,
+            ProjectId = _pid,
+            DataSourceId = _dsid
+        };
+
+        // Act & Assert
+        await Assert.ThrowsAsync<ArgumentException>(() =>
+            _fileAzureBusiness.GenerateDownloadUrl(recordDto, _objectStorageConfig));
+    }
+
+    [Fact]
+    public async Task GenerateDownloadUrl_Fails_WhenAzureConfigIsNull()
+    {
+        // Arrange
+        var recordDto = new RecordResponseDto
+        {
+            Uri = "some-uri",
+            OrganizationId = _oid,
+            ProjectId = _pid,
+            DataSourceId = _dsid
+        };
+
+        // Act & Assert
+        await Assert.ThrowsAsync<ArgumentException>(() =>
+            _fileAzureBusiness.GenerateDownloadUrl(recordDto, null));
+    }
+
+    [Fact]
+    public async Task GenerateDownloadUrl_Fails_WhenContainerDoesNotExist()
+    {
+        // Arrange
+        var invalidConfig = new ObjectStorageConfigDto
+        {
+            AzureObjectConfig = new AzureObjectConfigDto
+            {
+                AzureConnectionString = _connectionString,
+                AzureContainerName = "non-existent-container"
+            }
+        };
+
+        var recordDto = new RecordResponseDto
+        {
+            Uri = "some-uri",
+            OrganizationId = _oid,
+            ProjectId = _pid,
+            DataSourceId = _dsid
+        };
+
+        // Act & Assert
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            _fileAzureBusiness.GenerateDownloadUrl(recordDto, invalidConfig));
+    }
+
+    [Fact]
+    public async Task GenerateDownloadUrl_Fails_WhenFileDoesNotExist()
+    {
+        // Arrange
+        // Create container but don't upload the file
+        var container = new BlobContainerClient(_connectionString, _containerName);
+        await container.CreateIfNotExistsAsync();
+
+        var recordDto = new RecordResponseDto
+        {
+            Uri = "non-existent-file.txt",
+            Name = "test.txt",
+            OrganizationId = _oid,
+            ProjectId = _pid,
+            DataSourceId = _dsid
+        };
+
+        // Act & Assert
+        await Assert.ThrowsAsync<FileNotFoundException>(() =>
+            _fileAzureBusiness.GenerateDownloadUrl(recordDto, _objectStorageConfig));
+    }
+
+    [Fact]
+    public async Task GenerateDownloadUrl_Success_IncludesOnlyReadPermission()
+    {
+        // Arrange
+        var guid = Guid.NewGuid();
+        var fileName = "read-permission-test.txt";
+        var mockFile = CreateMockFile(fileName, "content");
+
+        var uri = await _fileAzureBusiness.UploadFile(
+            _oid, _pid, _dsid, _objectStorageConfig, mockFile, guid);
+
+        var recordDto = new RecordResponseDto
+        {
+            Uri = uri,
+            Name = fileName,
+            OrganizationId = _oid,
+            ProjectId = _pid,
+            DataSourceId = _dsid
+        };
+
+        // Act
+        var result = await _fileAzureBusiness.GenerateDownloadUrl(
+            recordDto, _objectStorageConfig);
+
+        // Assert
+        Assert.NotNull(result);
+        var uri_parsed = new Uri(result);
+        var queryParams = System.Web.HttpUtility.ParseQueryString(uri_parsed.Query);
+        var permissions = queryParams["sp"];
+        Assert.NotNull(permissions);
+        Assert.Equal("r", permissions); // Should only have read permission
+    }
+
+    [Fact]
+    public async Task GenerateDownloadUrl_Success_ExpirationTimeIsCorrect()
+    {
+        // Arrange
+        var guid = Guid.NewGuid();
+        var fileName = "expiry-download-test.txt";
+        var mockFile = CreateMockFile(fileName, "content");
+
+        var uri = await _fileAzureBusiness.UploadFile(
+            _oid, _pid, _dsid, _objectStorageConfig, mockFile, guid);
+
+        var recordDto = new RecordResponseDto
+        {
+            Uri = uri,
+            Name = fileName,
+            OrganizationId = _oid,
+            ProjectId = _pid,
+            DataSourceId = _dsid
+        };
+
+        var expirationHours = 2;
+
+        // Act
+        var result = await _fileAzureBusiness.GenerateDownloadUrl(
+            recordDto, _objectStorageConfig, expirationHours);
+
+        // Assert
+        Assert.NotNull(result);
+        var uri_parsed = new Uri(result);
+        var queryParams = System.Web.HttpUtility.ParseQueryString(uri_parsed.Query);
+        var expiryString = queryParams["se"];
+        Assert.NotNull(expiryString);
+
+        var expiry = DateTimeOffset.Parse(expiryString);
+        var now = DateTimeOffset.UtcNow;
+        var expectedExpiry = now.AddHours(expirationHours);
+
+        // Allow 5 minute tolerance for test execution time
+        Assert.InRange(expiry, expectedExpiry.AddMinutes(-5), expectedExpiry.AddMinutes(5));
+    }
+
+    #endregion
+
+    #region SAS Integration Tests
+
+    [Fact]
+    public async Task SasUrlWorkflow_UploadViaGeneratedUrl_ThenDownloadViaGeneratedUrl()
+    {
+        // Arrange
+        var guid = Guid.NewGuid();
+        var fileName = "sas-workflow-test.txt";
+        var fileContent = "End-to-end SAS workflow test content";
+
+        // Act 1: Generate upload URL
+        var uploadUrl = await _fileAzureBusiness.GenerateUploadUrl(
+            _oid, _pid, _dsid, _objectStorageConfig, fileName, guid, expirationHours: 1);
+
+        // Act 2: Upload using the SAS URL
+        var blobClient = new BlobClient(new Uri(uploadUrl));
+        var bytes = System.Text.Encoding.UTF8.GetBytes(fileContent);
+        using (var uploadStream = new MemoryStream(bytes))
+        {
+            await blobClient.UploadAsync(uploadStream, overwrite: true);
+        }
+
+        // Act 3: Create record DTO with the uploaded file URI
+        var uploadedUri = $"organization_{_oid}/project_{_pid}/datasource_{_dsid}/{guid}_{fileName}";
+        var recordDto = new RecordResponseDto
+        {
+            Uri = uploadedUri,
+            Name = fileName,
+            OrganizationId = _oid,
+            ProjectId = _pid,
+            DataSourceId = _dsid
+        };
+
+        // Act 4: Generate download URL
+        var downloadUrl = await _fileAzureBusiness.GenerateDownloadUrl(
+            recordDto, _objectStorageConfig, expirationHours: 1);
+
+        // Act 5: Download using the SAS URL
+        var downloadBlobClient = new BlobClient(new Uri(downloadUrl));
+        var downloadResponse = await downloadBlobClient.DownloadContentAsync();
+        var downloadedContent = downloadResponse.Value.Content.ToString();
+
+        // Assert
+        Assert.Equal(fileContent, downloadedContent);
+    }
+
+    [Fact]
+    public async Task GenerateUploadUrl_Success_DifferentFilesGetDifferentUrls()
+    {
+        // Arrange
+        var guid1 = Guid.NewGuid();
+        var guid2 = Guid.NewGuid();
+        var fileName1 = "file1.txt";
+        var fileName2 = "file2.txt";
+
+        // Act
+        var url1 = await _fileAzureBusiness.GenerateUploadUrl(
+            _oid, _pid, _dsid, _objectStorageConfig, fileName1, guid1);
+        var url2 = await _fileAzureBusiness.GenerateUploadUrl(
+            _oid, _pid, _dsid, _objectStorageConfig, fileName2, guid2);
+
+        // Assert
+        Assert.NotEqual(url1, url2);
+        Assert.Contains(fileName1, url1);
+        Assert.Contains(fileName2, url2);
+        Assert.Contains(guid1.ToString(), url1);
+        Assert.Contains(guid2.ToString(), url2);
+    }
+
+#endregion
 }
