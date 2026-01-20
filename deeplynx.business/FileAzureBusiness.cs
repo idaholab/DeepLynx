@@ -1,4 +1,5 @@
 using Azure.Storage.Blobs;
+using Azure.Storage.Sas;
 using deeplynx.interfaces;
 using deeplynx.models;
 using Microsoft.AspNetCore.Http;
@@ -191,5 +192,138 @@ public class FileAzureBusiness: IFileBusiness
     
         // Returns true if the blob was deleted, false if it didn't exist
         return response.Value;
+    }
+    
+    /// <summary>
+    /// Generates a pre-signed URL (SAS token) for uploading a file directly to Azure Blob Storage
+    /// </summary>
+    /// <param name="organizationId"></param>
+    /// <param name="projectId"></param>
+    /// <param name="datasourceId"></param>
+    /// <param name="objectStorageConfig"></param>
+    /// <param name="fileName">The name of the file to be uploaded</param>
+    /// <param name="guid">Unique identifier for the file</param>
+    /// <param name="expirationHours">Hours until the SAS token expires (default: 24)</param>
+    /// <returns>Pre-signed URL with SAS token for direct upload</returns>
+    /// <exception cref="ArgumentException"></exception>
+    public async Task<string> GenerateUploadUrl(
+        long organizationId, 
+        long projectId, 
+        long datasourceId, 
+        ObjectStorageConfigDto objectStorageConfig,
+        string fileName, 
+        Guid guid,
+        int expirationHours = 24)
+    {
+        if (objectStorageConfig?.AzureObjectConfig == null)
+        {
+            throw new ArgumentException("Azure configuration is null");
+        }
+
+        var blobName = $"organization_{organizationId}/project_{projectId}/datasource_{datasourceId}/{guid}_{fileName}";
+
+        // Create BlobContainerClient with connection string
+        var containerClient = new BlobContainerClient(
+            objectStorageConfig.AzureObjectConfig.AzureConnectionString, 
+            objectStorageConfig.AzureObjectConfig.AzureContainerName);
+
+        // Ensure container exists
+        await containerClient.CreateIfNotExistsAsync();
+
+        // Get blob client reference
+        var blobClient = containerClient.GetBlobClient(blobName);
+
+        // Check if the blob client can generate SAS URI (requires Shared Key authentication)
+        if (!blobClient.CanGenerateSasUri)
+        {
+            throw new InvalidOperationException("BlobClient must be authorized with Shared Key credentials to generate SAS tokens");
+        }
+
+        // Create SAS builder with write and create permissions
+        var sasBuilder = new BlobSasBuilder
+        {
+            BlobContainerName = objectStorageConfig.AzureObjectConfig.AzureContainerName,
+            BlobName = blobName,
+            Resource = "b", // "b" for blob
+            StartsOn = DateTimeOffset.UtcNow.AddMinutes(-5), // Account for clock skew
+            ExpiresOn = DateTimeOffset.UtcNow.AddHours(expirationHours)
+        };
+
+        // Set permissions for upload (Write and Create)
+        sasBuilder.SetPermissions(BlobSasPermissions.Write | BlobSasPermissions.Create);
+
+        // Generate the SAS URI
+        var sasUri = blobClient.GenerateSasUri(sasBuilder);
+
+        return sasUri.ToString();
+    }
+    
+    /// <summary>
+    /// Generates a pre-signed URL (SAS token) for downloading a file directly from Azure Blob Storage
+    /// </summary>
+    /// <param name="record"></param>
+    /// <param name="objectStorageConfig"></param>
+    /// <param name="expirationHours">Hours until the SAS token expires (default: 1)</param>
+    /// <returns>Pre-signed URL with SAS token for direct download</returns>
+    /// <exception cref="ArgumentException"></exception>
+    /// <exception cref="FileNotFoundException"></exception>
+    public async Task<string> GenerateDownloadUrl(
+        RecordResponseDto record, 
+        ObjectStorageConfigDto objectStorageConfig,
+        int expirationHours = 1)
+    {
+        if (record.Uri == null)
+        {
+            throw new ArgumentException("Record Uri is null");
+        }
+
+        if (objectStorageConfig?.AzureObjectConfig == null)
+        {
+            throw new ArgumentException("Azure configuration is null");
+        }
+
+        // Create BlobContainerClient with connection string
+        var containerClient = new BlobContainerClient(
+            objectStorageConfig.AzureObjectConfig.AzureConnectionString, 
+            objectStorageConfig.AzureObjectConfig.AzureContainerName);
+
+        // Verify container exists
+        if (!await containerClient.ExistsAsync())
+        {
+            throw new InvalidOperationException("Azure Object Storage container does not exist");
+        }
+
+        // Get blob client reference
+        var blobClient = containerClient.GetBlobClient(record.Uri);
+
+        // Verify blob exists
+        if (!await blobClient.ExistsAsync())
+        {
+            throw new FileNotFoundException($"File not found: {record.Uri}");
+        }
+
+        // Check if the blob client can generate SAS URI
+        if (!blobClient.CanGenerateSasUri)
+        {
+            throw new InvalidOperationException("BlobClient must be authorized with Shared Key credentials to generate SAS tokens");
+        }
+
+        // Create SAS builder with read permissions
+        var sasBuilder = new BlobSasBuilder
+        {
+            BlobContainerName = objectStorageConfig.AzureObjectConfig.AzureContainerName,
+            BlobName = record.Uri,
+            Resource = "b", // "b" for blob
+            StartsOn = DateTimeOffset.UtcNow.AddMinutes(-5), // Account for clock skew
+            ExpiresOn = DateTimeOffset.UtcNow.AddHours(expirationHours)
+        };
+
+        // Set permissions for download (Read only)
+        sasBuilder.SetPermissions(BlobSasPermissions.Read);
+
+        // Generate the SAS URI
+        var sasUri = blobClient.GenerateSasUri(sasBuilder);
+
+        return sasUri.ToString();
     }
 }
