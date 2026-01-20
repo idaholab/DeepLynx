@@ -241,6 +241,9 @@ try
                 new() { Name = "User", Description = "User management" },
                 new() { Name = "Group", Description = "Group management" },
 
+                // AI Services
+                new() { Name = "Lattice", Description = "Useful data views for DeepLynx Lattice use"},
+
                 // Authentication
                 new() { Name = "OauthHandshake", Description = "OAuth2 authorization flow" },
                 new() { Name = "Token", Description = "API key and JWT token management" },
@@ -307,6 +310,11 @@ try
                 {
                     ["name"] = "Administration",
                     ["tags"] = new JsonArray { "Organization", "Project", "User", "Group" }
+                },
+                new JsonObject
+                {
+                    ["name"] = "AI Services",
+                    ["tags"] = new JsonArray { "Lattice" }
                 },
                 new JsonObject
                 {

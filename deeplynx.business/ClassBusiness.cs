@@ -570,11 +570,11 @@ public class ClassBusiness : IClassBusiness
     /// <param name="organizationId">The ID of the organization to which the classes belong</param>
     /// <param name="projectId">The ID of the project to which the classes belong</param>
     /// <returns>List of class textual descriptor columns</returns>
-    public async Task<List<LatticeClassDto>> GetOntologyClasses(long organizationId, long projectId)
+    public async Task<List<LatticeClassDto>> GetLatticeClasses(long organizationId, long projectId)
     {
         var classes = await _context.Database
             .SqlQuery<LatticeClassDto>(
-                $"SELECT * FROM deeplynx.get_ontology_classes({organizationId}, {projectId})"
+                $"SELECT * FROM deeplynx.get_lattice_classes({organizationId}, {projectId})"
             ).ToListAsync();
 
         return classes;

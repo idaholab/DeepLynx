@@ -58,7 +58,7 @@ namespace deeplynx.datalayer.Migrations
                 columns: new[] { "organization_id", "project_id" });
 
             migrationBuilder.Sql(@"
-                CREATE OR REPLACE FUNCTION deeplynx.get_ontology_relationships(
+                CREATE OR REPLACE FUNCTION deeplynx.get_lattice_relationships(
                     p_organization_id BIGINT, p_project_id BIGINT)
                 RETURNS TABLE(
                     origin_class_name TEXT,
@@ -87,7 +87,7 @@ namespace deeplynx.datalayer.Migrations
             $$;");
 
             migrationBuilder.Sql(@"
-                CREATE OR REPLACE FUNCTION deeplynx.get_ontology_classes(
+                CREATE OR REPLACE FUNCTION deeplynx.get_lattice_classes(
                     p_organization_id BIGINT, p_project_id BIGINT)
                 RETURNS TABLE(
                     class_name TEXT,
@@ -108,7 +108,7 @@ namespace deeplynx.datalayer.Migrations
             $$;");
 
             migrationBuilder.Sql(@"
-                CREATE OR REPLACE FUNCTION deeplynx.get_knowledge_graph_edges(
+                CREATE OR REPLACE FUNCTION deeplynx.get_lattice_edges(
                     p_organization_id BIGINT, p_project_id BIGINT)
                 RETURNS TABLE(
                     origin_name TEXT,
@@ -140,7 +140,7 @@ namespace deeplynx.datalayer.Migrations
             $$;");
 
             migrationBuilder.Sql(@"
-                CREATE OR REPLACE FUNCTION deeplynx.get_knowledge_graph_records(
+                CREATE OR REPLACE FUNCTION deeplynx.get_lattice_records(
                     p_organization_id BIGINT, p_project_id BIGINT)
                 RETURNS TABLE(
                     record_name TEXT,
@@ -167,10 +167,10 @@ namespace deeplynx.datalayer.Migrations
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.Sql("DROP FUNCTION IF EXISTS deeplynx.get_ontology_classes;");
-            migrationBuilder.Sql("DROP FUNCTION IF EXISTS deeplynx.get_ontology_relationships;");
-            migrationBuilder.Sql("DROP FUNCTION IF EXISTS deeplynx.get_knowledge_graph_records;");
-            migrationBuilder.Sql("DROP FUNCTION IF EXISTS deeplynx.get_knowledge_graph_edges;");
+            migrationBuilder.Sql("DROP FUNCTION IF EXISTS deeplynx.get_lattice_classes;");
+            migrationBuilder.Sql("DROP FUNCTION IF EXISTS deeplynx.get_lattice_relationships;");
+            migrationBuilder.Sql("DROP FUNCTION IF EXISTS deeplynx.get_lattice_records;");
+            migrationBuilder.Sql("DROP FUNCTION IF EXISTS deeplynx.get_lattice_edges;");
 
             migrationBuilder.DropIndex(
                 name: "idx_classes_org_project",

@@ -831,11 +831,11 @@ public class RecordBusiness : IRecordBusiness
     /// <param name="organizationId">The ID of the organization to which the records belong</param>
     /// <param name="projectId">The ID of the project to which the records belong</param>
     /// <returns>List of record textual descriptor columns, including class names</returns>
-    public async Task<List<LatticeRecordDto>> GetKnowledgeGraphRecords(long organizationId, long projectId)
+    public async Task<List<LatticeRecordDto>> GetLatticeRecords(long organizationId, long projectId)
     {
         var classes = await _context.Database
             .SqlQuery<LatticeRecordDto>(
-                $"SELECT * FROM deeplynx.get_knowledge_graph_records({organizationId}, {projectId})"
+                $"SELECT * FROM deeplynx.get_lattice_records({organizationId}, {projectId})"
             ).ToListAsync();
 
         return classes;

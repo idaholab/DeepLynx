@@ -513,11 +513,11 @@ public class EdgeBusiness : IEdgeBusiness
     /// <param name="organizationId">The ID of the organization to which the edges belong</param>
     /// <param name="projectId">The ID of the project to which the edges belong</param>
     /// <returns>List of edge textual descriptor columns, including class, record and relationship names</returns>
-    public async Task<List<LatticeEdgeDto>> GetKnowledgeGraphEdges(long organizationId, long projectId)
+    public async Task<List<LatticeEdgeDto>> GetLatticeEdges(long organizationId, long projectId)
     {
         var classes = await _context.Database
             .SqlQuery<LatticeEdgeDto>(
-                $"SELECT * FROM deeplynx.get_knowledge_graph_edges({organizationId}, {projectId})"
+                $"SELECT * FROM deeplynx.get_lattice_edges({organizationId}, {projectId})"
             ).ToListAsync();
 
         return classes;

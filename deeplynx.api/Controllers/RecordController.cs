@@ -441,27 +441,4 @@ public class RecordController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
-
-    /// <summary>
-    ///     Textual Summary of Records in the Knowledge Graph
-    /// </summary>
-    /// <param name="projectId">The ID of the project to which the records belong</param>
-    /// <returns>Table of descriptive record fields including class name</returns>
-    [HttpGet(Name = "api_get_knowledge_graph_records_project")]
-    [Auth("read", "record")]
-    public async Task<ActionResult<IEnumerable<LatticeRecordDto>>> GetKnowledgeGraphRecords(long projectId)
-    {
-        try
-        {
-            var organizationId = UserContextStorage.OrganizationId;
-            var records = await _recordBusiness.GetKnowledgeGraphRecords(organizationId, projectId);
-            return Ok(records);
-        }
-        catch (Exception exc)
-        {
-            var message = $"An unexpected error occurred while fetching knowledge graph record descriptions: {exc}";
-            _logger.LogError(message);
-            return StatusCode(StatusCodes.Status500InternalServerError, message);
-        }
-    }
 }
