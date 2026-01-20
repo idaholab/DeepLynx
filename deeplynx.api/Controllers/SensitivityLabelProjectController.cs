@@ -10,9 +10,7 @@ namespace deeplynx.api.Controllers;
 [ApiController]
 [Route("projects/{projectId:long}/labels")]
 [Authorize]
-[Tags(
-    // "Project Management",
-    "Sensitivity Label")]
+[Tags("Project - Sensitivity Label")]
 public class SensitivityLabelProjectController : ControllerBase
 {
     private readonly ILogger<SensitivityLabelProjectController> _logger;
@@ -31,7 +29,7 @@ public class SensitivityLabelProjectController : ControllerBase
     }
 
     /// <summary>
-    ///     Get All Sensitivity Labels (Project)
+    ///     Get All Sensitivity Labels 
     /// </summary>
     /// <param name="projectId">ID of the project across which to search</param>
     /// <param name="hideArchived">Flag indicating whether to hide or show archived labels</param>
@@ -59,7 +57,7 @@ public class SensitivityLabelProjectController : ControllerBase
     }
 
     /// <summary>
-    ///     Get a Sensitivity Label (Project)
+    ///     Get a Sensitivity Label 
     /// </summary>
     /// <param name="projectId">ID of the project to which the label belongs</param>
     /// <param name="labelId">ID of sensitivity label</param>
@@ -87,7 +85,7 @@ public class SensitivityLabelProjectController : ControllerBase
     }
 
     /// <summary>
-    ///     Create a Sensitivity Label (Project)
+    ///     Create a Sensitivity Label 
     /// </summary>
     /// <param name="projectId">ID of the project to which the label belongs</param>
     /// <param name="dto">Data structure of sensitivity label to create</param>
@@ -115,7 +113,7 @@ public class SensitivityLabelProjectController : ControllerBase
     }
 
     /// <summary>
-    ///     Update a Sensitivity Label (Project)
+    ///     Update a Sensitivity Label 
     /// </summary>
     /// <param name="projectId">ID of the project to which the label belongs</param>
     /// <param name="labelId">ID of the sensitivity label</param>
@@ -145,7 +143,7 @@ public class SensitivityLabelProjectController : ControllerBase
     }
 
     /// <summary>
-    ///     Delete a Sensitivity Label (Project)
+    ///     Delete a Sensitivity Label 
     /// </summary>
     /// <param name="projectId">ID of the project to which the label belongs</param>
     /// <param name="labelId">ID of the sensitivity label to hard delete</param>
@@ -172,7 +170,7 @@ public class SensitivityLabelProjectController : ControllerBase
     }
 
     /// <summary>
-    ///     Archive or Unarchive a Sensitivity Label (Project)
+    ///     Archive or Unarchive a Sensitivity Label 
     /// </summary>
     /// <param name="projectId">ID of the project to which the label belongs</param>
     /// <param name="labelId">The ID of the sensitivity label to archive or unarchive.</param>

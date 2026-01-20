@@ -1,73 +1,131 @@
 using System.ComponentModel;
-using System.Net.Http.Headers;
 using System.Text.Json;
 using System.Web;
 using deeplynx.mcp.helpers;
 using ModelContextProtocol.Server;
+using System.Net.Http.Json;
 
 namespace deeplynx.mcp.tools;
 
 [McpServerToolType]
 
-public static class RecordTools
+public class RecordTools
 {
-    private static readonly HttpClient _httpClient = new HttpClient
+    public class RecordTag
     {
-        BaseAddress = new Uri(EnvironmentHelper.GetRequiredEnvironmentVariable("NEXUS_API_URL"))
-    };
+        [Description("The database ID of the tag")]
+        public long Id { get; set; }
+
+        [Description("The name of the tag")]
+        public string Name { get; set; } = null!;
+    }
+
+    public class Record
+    {
+        [Description("The database ID of the record")]
+        public long Id { get; set; }
+
+        [Description("The name of the record")]
+        public string Name { get; set; } = null!;
+
+        [Description("The description of the record")]
+        public string? Description { get; set; }
+
+        [Description("The URI of the record")]
+        public string? Uri { get; set; }
+
+        [Description("JSON string containing record properties")]
+        public string Properties { get; set; } = null!;
+
+        [Description("The ID of the object in storage, if applicable")]
+        public long? ObjectStorageId { get; set; }
+
+        [Description("The original ID from the source system")]
+        public string? OriginalId { get; set; }
+
+        [Description("The class ID of the record")]
+        public long? ClassId { get; set; }
+
+        [Description("The ID of the data source this record belongs to")]
+        public long DataSourceId { get; set; }
+
+        [Description("The ID of the project this record belongs to")]
+        public long ProjectId { get; set; }
+
+        [Description("The ID of the organization this record belongs to")]
+        public long OrganizationId { get; set; }
+
+        [Description("The timestamp when the record was last updated")]
+        public DateTime LastUpdatedAt { get; set; }
+
+        [Description("The ID of the user who last updated the record")]
+        public long? LastUpdatedBy { get; set; }
+
+        [Description("Whether the record is archived")]
+        public bool IsArchived { get; set; }
+
+        [Description("The file type/extension if this record represents a file")]
+        public string? FileType { get; set; }
+
+        [Description("Tags associated with this record")]
+        public ICollection<RecordTag>? Tags { get; set; }
+    }
+
+    public class RelatedRecord
+    {
+        [Description("The name of the related record")]
+        public string RelatedRecordName { get; set; } = null!;
+
+        [Description("The database ID of the related record")]
+        public long RelatedRecordId { get; set; }
+
+        [Description("The project ID of the related record")]
+        public long RelatedRecordProjectId { get; set; }
+
+        [Description("The name of the relationship between records")]
+        public string? RelationshipName { get; set; }
+    }
+
+    private readonly IAuthenticatedHttpClientFactory _httpClientFactory;
+
+    public RecordTools(IAuthenticatedHttpClientFactory httpClientFactory)
+    {
+        _httpClientFactory = httpClientFactory;
+    }
     
     [McpServerTool, Description("Gets all of the records that are related to the record with the ID that is provided. " +
                                 "Returns related records in a stringified JSON array. ")]
-    public static async Task<string> GetRelatedRecords(
-        [Description("The ID of the record we want to get related records for.")]long recordId,
-        [Description("Indicates wehter to find relationships where the recordId is the origin of the relationship or not")]string isOrigin,
+    public async Task<string> GetRelatedRecords(
+        [Description("The ID of the organization to which the project belongs")] long organizationId,
+        [Description("The ID of the project to which the record belongs")] long projectId,
+        [Description("The ID of the record we want to get related records for.")] long recordId,
+        [Description("Indicates whether to find relationships where the recordId is the origin of the relationship or not")] string isOrigin,
         [Description("The results are paginated. This is the page number that the user wants")] int page,
-        [Description("The page size. Default is 20.")] int pageSize = 20,
-        [Description("Indicates if user wants to hide archived records. Default is true")] string hideArchived = "true",
-        [Description("The optional Auth Bearer token")] string? authToken = null)
+        [Description("The page size. Default is 20.")] int pageSize = 20)
     {
         try
         {
-            bool isOriginBool = bool.Parse(isOrigin);
-            bool hideArchivedBool = bool.Parse(hideArchived);
             var query = HttpUtility.ParseQueryString(string.Empty);
-            // Build query string
-            query["isOrigin"] = isOriginBool.ToString().ToLower();
-            query["hideArchived"] = hideArchivedBool.ToString().ToLower();
-            query["recordId"] = recordId.ToString();
+            query["isOrigin"] = bool.Parse(isOrigin).ToString().ToLower();
             query["page"] = page.ToString();
             query["pageSize"] = pageSize.ToString();
             
-            var queryString = query.ToString();
-            var url = $"projects/{0}/edges/GetAllEdgesByRecord?{queryString}";
+            using var httpClient = await _httpClientFactory.CreateClientAsync();
+            var url = $"organizations/{organizationId}/projects/{projectId}/records/{recordId}/edges?{query}";
+            var response = await httpClient.GetAsync(url);
 
-            // Create request
-            var request = new HttpRequestMessage(HttpMethod.Get, url);
-            
-            // Add authorization header if token provided
-            if (!string.IsNullOrEmpty(authToken))
-            {
-                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", authToken);
-            }
-
-            // Make the API call
-            var response = await _httpClient.SendAsync(request);
-            
             if (!response.IsSuccessStatusCode)
             {
-                throw new HttpRequestException(response.ReasonPhrase);
+                var error = await response.Content.ReadAsStringAsync();
+                throw new HttpRequestException($"API error {response.StatusCode}: {error}");
             }
-            // Read the response content as a string
-            var jsonString = await response.Content.ReadAsStringAsync();
 
-            // Parse the JSON string into a JsonDocument
-            using var jsonDoc = JsonDocument.Parse(jsonString);
-
-            // Serialize it back with indentation for readability
-            return JsonSerializer.Serialize(jsonDoc, new JsonSerializerOptions 
-            { 
-                WriteIndented = true 
+            var content = await response.Content.ReadFromJsonAsync<List<RelatedRecord>>(new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
             });
+
+            return JsonSerializer.Serialize(content, new JsonSerializerOptions { WriteIndented = true });
         }
         catch (Exception ex)
         {
@@ -86,62 +144,41 @@ public static class RecordTools
     
     [McpServerTool, Description("Gets all records for a specific project, optionally filtered by datasource and file type. " +
                             "Returns records in a stringified JSON array.")]
-    public static async Task<string> GetAllRecords(
+    public async Task<string> GetAllRecords(
+        [Description("The ID of the organization to which the project belongs")] long organizationId,
         [Description("The ID of the project whose records are to be retrieved")] long projectId,
         [Description("The optional ID of the datasource to filter records by")] long? dataSourceId = null,
         [Description("Indicates if user wants to hide archived records. Default is true")] string hideArchived = "true",
-        [Description("Optional file extension to filter by (e.g., pdf, png, jpg)")] string? fileType = null,
-        [Description("The optional Auth Bearer token")] string? authToken = null)
+        [Description("Optional file extension to filter by (e.g., pdf, png, jpg)")] string? fileType = null)
     {
         try
         {
-            bool hideArchivedBool = bool.Parse(hideArchived);
+            var hideArchivedBool = string.IsNullOrEmpty(hideArchived) || bool.Parse(hideArchived);
             var query = HttpUtility.ParseQueryString(string.Empty);
-            
-            // Build query string
             query["hideArchived"] = hideArchivedBool.ToString().ToLower();
-            
+
             if (dataSourceId.HasValue)
-            {
                 query["dataSourceId"] = dataSourceId.Value.ToString();
-            }
-            
+
             if (!string.IsNullOrWhiteSpace(fileType))
-            {
                 query["fileType"] = fileType;
-            }
-            
-            var queryString = query.ToString();
-            var url = $"projects/{projectId}/records/GetAllRecords?{queryString}";
 
-            // Create request
-            var request = new HttpRequestMessage(HttpMethod.Get, url);
-            
-            // Add authorization header if token provided
-            if (!string.IsNullOrEmpty(authToken))
-            {
-                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", authToken);
-            }
+            using var httpClient = await _httpClientFactory.CreateClientAsync();
+            var url = $"organizations/{organizationId}/projects/{projectId}/records?{query}";
+            var response = await httpClient.GetAsync(url);
 
-            // Make the API call
-            var response = await _httpClient.SendAsync(request);
-            
             if (!response.IsSuccessStatusCode)
             {
-                throw new HttpRequestException($"API request failed with status {response.StatusCode}: {response.ReasonPhrase}");
+                var error = await response.Content.ReadAsStringAsync();
+                throw new HttpRequestException($"API error {response.StatusCode}: {error}");
             }
-            
-            // Read the response content as a string
-            var jsonString = await response.Content.ReadAsStringAsync();
 
-            // Parse the JSON string into a JsonDocument
-            using var jsonDoc = JsonDocument.Parse(jsonString);
-
-            // Serialize it back with indentation for readability
-            return JsonSerializer.Serialize(jsonDoc, new JsonSerializerOptions 
-            { 
-                WriteIndented = true 
+            var content = await response.Content.ReadFromJsonAsync<List<Record>>(new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
             });
+
+            return JsonSerializer.Serialize(content, new JsonSerializerOptions { WriteIndented = true });
         }
         catch (Exception ex)
         {

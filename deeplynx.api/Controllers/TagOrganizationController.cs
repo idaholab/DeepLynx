@@ -10,9 +10,7 @@ namespace deeplynx.api.Controllers;
 [Route("organizations/{organizationId:long}/tags")]
 [ApiController]
 [Authorize]
-[Tags(
-    // "Organization Management", 
-    "Tag")]
+[Tags("Organization - Tag")]
 public class TagOrganizationController : ControllerBase
 {
     private readonly ITagBusiness _tagBusiness;
@@ -30,7 +28,7 @@ public class TagOrganizationController : ControllerBase
     }
 
     /// <summary>
-    ///     Get All Tags (Organization)
+    ///     Get All Tags 
     /// </summary>
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
     /// <param name="projectIds">(Optional)An array of project IDs within the organization to filter by</param>
@@ -55,7 +53,7 @@ public class TagOrganizationController : ControllerBase
     }
 
     /// <summary>
-    ///     Get a Tag (Organization)
+    ///     Get a Tag 
     /// </summary>
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
     /// <param name="tagId">The ID of the tag to retrieve.</param>
@@ -82,7 +80,7 @@ public class TagOrganizationController : ControllerBase
     }
 
     /// <summary>
-    ///     Create a Tag (Organization)
+    ///     Create a Tag 
     /// </summary>
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
     /// <param name="tagRequestDto">The tag data transfer object containing tag details.</param>
@@ -108,7 +106,7 @@ public class TagOrganizationController : ControllerBase
     }
 
     /// <summary>
-    ///     Create Many Tags (Organization)
+    ///     Create Many Tags 
     /// </summary>
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
     /// <param name="tagRequestDto">The tag data transfer object containing tag details.</param>
@@ -134,7 +132,7 @@ public class TagOrganizationController : ControllerBase
     }
 
     /// <summary>
-    /// Update a Tag (Organization)
+    /// Update a Tag 
     /// </summary>
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
     /// <param name="tagId">The ID of the tag to update.</param>
@@ -161,7 +159,7 @@ public class TagOrganizationController : ControllerBase
     }
 
     /// <summary>
-    ///     Delete a Tag (Organization)
+    ///     Delete a Tag 
     /// </summary>
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
     /// <param name="tagId">The ID of the tag to delete.</param>
@@ -185,7 +183,7 @@ public class TagOrganizationController : ControllerBase
     }
 
     /// <summary>
-    ///     Archive or Unarchive a Tag (Organization)
+    ///     Archive or Unarchive a Tag 
     /// </summary>
     /// <param name="organizationId">The ID of the organization to which the tag's project belongs</param>
     /// <param name="tagId">The ID of the tag to archive or unarchive.</param>

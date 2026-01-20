@@ -1,5 +1,5 @@
 # Stage 1: Build the C# backend
-FROM mcr.microsoft.com/dotnet/nightly/sdk:10.0-preview AS build
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 
 # Define build arguments
 ARG OKTA_CLIENT_ID
@@ -46,7 +46,7 @@ RUN dotnet restore deeplynx.sln
 RUN dotnet publish deeplynx.sln -c Release -o /app/publish /p:UseAppHost=false
 
 # Stage 2: Create the final .net runtime image 
-FROM mcr.microsoft.com/dotnet/nightly/sdk:10.0-preview AS final
+FROM mcr.microsoft.com/dotnet/nightly/sdk:10.0 AS final
 
 # Set the working directory
 WORKDIR /usr/src/app

@@ -318,20 +318,6 @@ const SideMenu: React.FC<SideMenuProps> = ({ onToggle }) => {
             </Link>
           </li>
 
-          {/* Event Management */}
-          <li className="mt-2">
-            <Link
-              href="/event_management"
-              onClick={(e) => handleItemClick("/event_management", e)}
-              className={getItemClass("/event_management")}
-            >
-              <BellIcon className="size-6" />
-              {!isCollapsed && (
-                <p className="ml-2">{t.translations.EVENT_MANAGEMENT}</p>
-              )}
-            </Link>
-          </li>
-
           {/* Project Settings (Admin only) */}
           <ProjectAdminRoute>
             <li className="mt-2">

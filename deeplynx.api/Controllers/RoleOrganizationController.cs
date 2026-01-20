@@ -16,9 +16,7 @@ namespace deeplynx.api.Controllers;
 [ApiController]
 [Route("organizations/{organizationId:long}/roles")]
 [Authorize]
-[Tags(
-    // "Organization Management",
-    "Role")]
+[Tags("Organization - Role")]
 public class RoleOrganizationController : ControllerBase
 {
     private readonly ILogger<RoleProjectController> _logger;
@@ -36,7 +34,7 @@ public class RoleOrganizationController : ControllerBase
     }
 
     /// <summary>
-    ///     Get All Roles (Organization)
+    ///     Get All Roles 
     /// </summary>
     /// <param name="organizationId">The ID of the organization to which the role belongs</param>
     /// <param name="hideArchived">Flag indicating whether to hide archived roles from the result (Default true)</param>
@@ -61,7 +59,7 @@ public class RoleOrganizationController : ControllerBase
     }
 
     /// <summary>
-    ///     Get a Role (Organization)
+    ///     Get a Role 
     /// </summary>
     /// <param name="organizationId">The ID of the organization to which the role belongs</param>
     /// <param name="roleId">The ID of the role to retrieve</param>
@@ -88,7 +86,7 @@ public class RoleOrganizationController : ControllerBase
     }
 
     /// <summary>
-    ///     Create a Role (Organization)
+    ///     Create a Role 
     /// </summary>
     /// <param name="organizationId">The ID of the organization to which the role belongs</param>
     /// <param name="dto">The data transfer object containing role details</param>
@@ -114,7 +112,7 @@ public class RoleOrganizationController : ControllerBase
     }
 
     /// <summary>
-    ///     Update a Role (Organization)
+    ///     Update a Role 
     /// </summary>
     /// <param name="organizationId">The ID of the organization to which the role belongs</param>
     /// <param name="roleId">The ID of the role to update</param>
@@ -142,7 +140,7 @@ public class RoleOrganizationController : ControllerBase
     }
 
     /// <summary>
-    ///     Delete a Role (Organization)
+    ///     Delete a Role 
     /// </summary>
     /// <param name="organizationId">The ID of the organization to which the role belongs</param>
     /// <param name="roleId">The ID of the role to delete</param>
@@ -168,7 +166,7 @@ public class RoleOrganizationController : ControllerBase
     }
 
     /// <summary>
-    ///     Archive or Unarchive a Role (Organization)
+    ///     Archive or Unarchive a Role 
     /// </summary>
     /// <param name="organizationId">The ID of the organization to which the role belongs</param>
     /// <param name="roleId">The ID of the role to archive or unarchive</param>
@@ -203,7 +201,7 @@ public class RoleOrganizationController : ControllerBase
     }
 
     /// <summary>
-    ///     Get Permissions for a Role (Organization)
+    ///     Get Permissions for a Role 
     /// </summary>
     /// <param name="organizationId">The ID of the organization to which the role belongs</param>
     /// <param name="roleId">The ID of the role whose permissions to retrieve</param>
@@ -228,7 +226,7 @@ public class RoleOrganizationController : ControllerBase
     }
 
     /// <summary>
-    ///     Add Permission to Role (Organization)
+    ///     Add Permission to Role 
     /// </summary>
     /// <param name="organizationId">The ID of the organization to which the role belongs</param>
     /// <param name="roleId">The ID of the role</param>
@@ -255,7 +253,7 @@ public class RoleOrganizationController : ControllerBase
     }
 
     /// <summary>
-    ///     Remove Permission from Role (Organization)
+    ///     Remove Permission from Role 
     /// </summary>
     /// <param name="organizationId">The ID of the organization to which the role belongs</param>
     /// <param name="roleId">The ID of the role</param>
@@ -282,7 +280,7 @@ public class RoleOrganizationController : ControllerBase
     }
 
     /// <summary>
-    ///     Set All Permissions for a Role (Organization)
+    ///     Set All Permissions for a Role 
     /// </summary>
     /// <param name="organizationId">The ID of the organization to which the role belongs</param>
     /// <param name="roleId">The ID of the role</param>

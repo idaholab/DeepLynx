@@ -81,7 +81,7 @@ const ProjectDropdown: React.FC<ProjectDropdownProps> = ({
   );
 
   const selectedLabel = useMemo(() => {
-    if (selectedIds.includes("ALL")) return "All your Projects";
+    if (selectedIds.includes("ALL")) return "All Your Projects";
     if (selectedIds.length === 1) {
       const project = projects.find((p) => p.id === selectedIds[0]);
       return project?.name || "1 project selected";

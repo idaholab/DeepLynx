@@ -178,3 +178,8 @@ export type UsersTableRow = {
   roleName?: string;
   projects?: Array<{ id: number; name: string; role: string }>;
 };
+
+export type Project = {
+  id: string,
+  name: string
+}

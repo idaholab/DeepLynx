@@ -1,0 +1,62 @@
+---
+title: Organization Management
+description: How Nexus handles organizations
+---
+import { Footer, Layout, Navbar } from 'nextra-theme-docs'
+import { Banner, Head } from 'nextra/components'
+import { getPageMap } from 'nextra/page-map'
+import Image from 'next/image'
+
+# Organization Management
+
+The Organizations tab of the Site Management page has a table containing all active organizations within Nexus.
+**Site admins** can create, edit, and delete organizations.
+
+## Creating Organizations
+
+1. Navigate to the Site Management page by clicking the cog icon on the outtermost toolbar.
+2. On the Organization Management tab of the Site Management page, click the "Organization" button.
+
+<Image
+  src="/docs/images/add-org-site.png"
+  alt="Create Group UI"
+  width={800}
+  height={600}
+/>
+
+3. Enter the organization's name and description then click "Create".
+4. The organization will be added to Nexus and displayed in the Organization Management table.
+
+<Image
+  src="/docs/images/save-org-site.png"
+  alt="Save Group UI"
+  width={800}
+  height={600}
+/>
+
+## Editing Organizations
+
+1. Click the pencil icon in the action column of the organization management table.
+2. Update the organization's information in the Edit Organization modal and hit "Save".
+
+<Image
+  src="/docs/images/edit-org-site.png"
+  alt="Save Edit Group UI"
+  width={800}
+  height={600}
+/>
+
+## Deleting Organizations
+
+1. Click the trashcan icon in the action column of the organization management table.
+2. This will remove the organization from Nexus.
+
+**Note:** Once an organization is removed, it will be permanently archived.
+A new organization must be created to regain access.
+
+<Image
+  src="/docs/images/delete-org-site.png"
+  alt="Delete Group UI"
+  width={800}
+  height={600}
+/>

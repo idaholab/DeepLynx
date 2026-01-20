@@ -2,7 +2,6 @@
 "use client";
 
 import { RecordTableRow } from "@/app/(home)/types/types";
-import { useProjectSession } from "@/app/contexts/ProjectSessionProvider";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 // import { getAllRecordsForMultipleProjects } from "@/app/lib/projects_services.client";
@@ -36,8 +35,7 @@ export default function DataCatalogClient({
   initialRecords,
 }: Props) {
   const { t } = useLanguage();
-  const { hasLoaded, setProject: setProjectSession } = useProjectSession();
-  const { organization} = useOrganizationSession();
+  const { organization } = useOrganizationSession();
 
   // Use ref to store initial values to prevent re-renders
   const initialSelectedProjectsRef = useRef(initialSelectedProjects);
@@ -185,34 +183,9 @@ export default function DataCatalogClient({
     await performFullTextSearch(searchTerm, selectedProjects);
   };
 
-  useEffect(() => {
-    if (!hasLoaded) return;
-
-    // Determine which project to set - prioritize current selection, fall back to initial
-    const projectToSet =
-      selectedProjects.length > 0
-        ? selectedProjects[0]
-        : initialSelectedProjectsRef.current.length > 0
-          ? initialSelectedProjectsRef.current[0]
-          : null;
-
-    if (projectToSet && projectToSet !== "ALL") {
-      const selectedProject = projects.find(
-        (project) => project.id === projectToSet
-      );
-
-      if (selectedProject) {
-        setProjectSession({
-          projectId: selectedProject.id,
-          projectName: selectedProject.name,
-        });
-      }
-    }
-  }, [hasLoaded, selectedProjects, projects, setProjectSession]);
-
   // Handle initial search term
   useEffect(() => {
-    if (!hasLoaded || hasInitialSearchRun) return;
+    if (hasInitialSearchRun) return;
 
     const initialTerm = initialSearchTermRef.current;
     const initialProjects = initialSelectedProjectsRef.current;
@@ -221,11 +194,11 @@ export default function DataCatalogClient({
       setHasInitialSearchRun(true);
       performFullTextSearch(initialTerm, initialProjects);
     }
-  }, [hasLoaded, hasInitialSearchRun, performFullTextSearch]);
+  }, [hasInitialSearchRun, performFullTextSearch]);
 
   // Fetch records when selection changes (if no active filters)
   useEffect(() => {
-    if (!hasLoaded || activeFilters.length > 0) return;
+    if (activeFilters.length > 0) return;
 
     const ctrl = new AbortController();
     fetchRecordsForSelection(ctrl.signal).catch((e: RecordTableRow) => {
@@ -236,13 +209,10 @@ export default function DataCatalogClient({
 
     return () => ctrl.abort();
   }, [
-    hasLoaded,
     activeFilters.length,
     selectedProjectsToken,
     fetchRecordsForSelection,
   ]);
-
-  if (!hasLoaded) return null;
 
   return (
     <div className="mt-3">

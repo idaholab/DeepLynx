@@ -145,6 +145,28 @@ def project(client, organization):
     assert response.status_code == 200
     return response.json().get("id")
 
+@pytest.fixture(scope="session")    
+def project2(client, organization):
+    """Create or reuse test project."""
+    project_name = "DeepLynx API Test Project #2"
+    
+    # Check if exists
+    response = client.get(f"/organizations/{organization}/projects")
+    for proj in response.json():
+        if proj.get("name") == project_name:
+            return proj.get("id")
+    
+    # Create new
+    response = client.post(
+        f"/organizations/{organization}/projects",
+        json={
+            "organizationId": organization,
+            "name": project_name,
+            "description": "Test project"
+        }
+    )
+    assert response.status_code == 200
+    return response.json().get("id")
 
 # ============================================================================
 # SESSION FIXTURES FOR EDGE TESTING

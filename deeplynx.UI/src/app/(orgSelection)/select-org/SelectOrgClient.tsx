@@ -164,7 +164,7 @@ const SelectOrgClient = ({ session }: Props) => {
             height={213.9}
             priority
           />
-          <div className="card bg-base-100 shadow-xl w-full mt-6">
+          <div className="card bg-base-100 shadow-xl w-full">
             {/* Header */}
             <div className="card-body p-6">
               <div className="flex items-center justify-between mb-4">

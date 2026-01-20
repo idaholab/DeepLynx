@@ -82,6 +82,11 @@ jobs:
             --build-arg HOSTED_LINK=${{ vars.HOSTED_LINK }} \
             .
 
+          az acr build --registry $ACR_REGISTRY \
+            --image $ACR_PATH:deeplynxv3-mcp-$GITHUB_RUN_NUMBER \
+            --file Dockerfiles/mcp/Dockerfile.public \
+            .
+
   kubernetes:
     needs: build
     runs-on: [self-hosted]
@@ -145,18 +150,6 @@ jobs:
           JWT_SECRET_KEY: ${{ secrets.JWT_SECRET_KEY }}
           JWT_AUDIENCE: ${{vars.JWT_AUDIENCE}}
           POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
-          STORAGE_DIRECTORY: ${{ vars.STORAGE_DIRECTORY }}
-          DUCKDB_BASE_PATH: ${{ vars.DUCKDB_BASE_PATH }}
-          SMTP_SERVER: ${{ vars.SMTP_SERVER }}
-          SMTP_PORT: ${{ vars.SMTP_PORT }}
-          SMTP_ENABLE_SSL: ${{ vars.SMTP_ENABLE_SSL }}
-          FROM_EMAIL: ${{ vars.FROM_EMAIL }}
-          FROM_NAME: ${{ vars.FROM_NAME }}
-          INVITE_URL: ${{ vars.INVITE_URL }}
-          SUPPORT_EMAIL: ${{ vars.SUPPORT_EMAIL }}
-          DISABLE_BACKEND_AUTHENTICATION: ${{ vars.DISABLE_BACKEND_AUTHENTICATION }}
-          SUPERUSER_EMAIL: ${{ vars.SUPERUSER_EMAIL }}
-          HOSTED_LINK: ${{ vars.HOSTED_LINK }}
 
         run: |
           cd $GITHUB_WORKSPACE/kubernetes

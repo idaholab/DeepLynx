@@ -16,9 +16,7 @@ namespace deeplynx.api.Controllers;
 [ApiController]
 [Route("organizations/{organizationId:long}/projects/{projectId:long}/permissions")]
 [Authorize]
-[Tags(
-    // "Project Management", 
-    "Permission")]
+[Tags("Project - Permission")]
 public class PermissionProjectController : ControllerBase
 {
     private readonly ILogger<PermissionProjectController> _logger;
@@ -36,7 +34,7 @@ public class PermissionProjectController : ControllerBase
     }
 
     /// <summary>
-    ///     Get All Permissions (Project)
+    ///     Get All Permissions 
     /// </summary>
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
     /// <param name="projectId">The ID of the project whose permissions are to be retrieved</param>
@@ -67,7 +65,7 @@ public class PermissionProjectController : ControllerBase
     }
 
     /// <summary>
-    ///     Get a Permission (Project)
+    ///     Get a Permission 
     /// </summary>
     /// <param name="organizationId">The ID of the organization to which the permission belongs</param>
     /// <param name="projectId">The ID of the project to which the permission belongs</param>
@@ -96,7 +94,7 @@ public class PermissionProjectController : ControllerBase
     }
 
     /// <summary>
-    ///     Create a Permission (Project)
+    ///     Create a Permission 
     /// </summary>
     /// <param name="organizationId">The ID of the organization to which the permission belongs</param>
     /// <param name="projectId">The ID of the project to which the permission belongs</param>
@@ -126,7 +124,7 @@ public class PermissionProjectController : ControllerBase
     }
 
     /// <summary>
-    ///     Update a Permission (Project)
+    ///     Update a Permission 
     /// </summary>
     /// <param name="organizationId">The ID of the organization to which the permission belongs</param>
     /// <param name="projectId">The ID of the project to which the permission belongs</param>
@@ -156,7 +154,7 @@ public class PermissionProjectController : ControllerBase
     }
 
     /// <summary>
-    ///     Delete a Permission (Project)
+    ///     Delete a Permission 
     /// </summary>
     /// <param name="organizationId">The ID of the organization to which the permission belongs</param>
     /// <param name="projectId">The ID of the project to which the permission belongs</param>
@@ -184,7 +182,7 @@ public class PermissionProjectController : ControllerBase
     }
 
     /// <summary>
-    ///     Archive or Unarchive a Permission (Project)
+    ///     Archive or Unarchive a Permission 
     /// </summary>
     /// <param name="organizationId">The ID of the organization to which the permission belongs</param>
     /// <param name="projectId">The ID of the project to which the permission belongs</param>

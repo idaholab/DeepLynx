@@ -1,0 +1,64 @@
+---
+title: Member Management
+description: How Nexus handles inviting users
+---
+import { Footer, Layout, Navbar } from 'nextra-theme-docs'
+import { Banner, Head } from 'nextra/components'
+import { getPageMap } from 'nextra/page-map'
+import Image from 'next/image'
+
+# Member Management
+
+The Member Management tab of the Site Management page has a table containing all active and pending members.
+**Site admins** can invite users, edit their details, and remove users from Nexus.
+All users are placed in the INL organization as a default, but can be added to other organizations.
+
+## Inviting Users
+
+1. Navigate to the Member Management page by clicking the cog icon on the outtermost toolbar.
+2. On the Member Management tab of the Site Management page, click the "Invite User" button.
+
+<Image
+  src="/docs/images/invite-site.png"
+  alt="Invite User UI"
+  width={800}
+  height={600}
+/>
+
+3. Enter the user's email address and hit "Send Invitation".
+4. The user will receive an email containing a link to join Nexus!
+
+**Note:** Once a user accepts an email invitation their status will be switched to "Active".
+
+<Image
+  src="/docs/images/invite-save-site.png"
+  alt="Invite User UI"
+  width={800}
+  height={600}
+/>
+
+## Editing Users
+
+1. Click the pencil icon in the action column of the member management table.
+2. Update the member's information in the Edit User modal and hit save.
+
+<Image
+  src="/docs/images/edit-user-site.png"
+  alt="Edit User UI"
+  width={800}
+  height={400}
+/>
+
+## Removing Users
+
+1. Click the trashcan icon in the action column of the member management table.
+2. This will remove the user from Nexus.
+
+**Note:** Once a user is removed from the organization, a new invitation is required to regain access.
+
+<Image
+  src="/docs/images/delete-user-site.png"
+  alt="Delete User UI"
+  width={800}
+  height={400}
+/>

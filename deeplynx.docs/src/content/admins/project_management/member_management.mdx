@@ -1,0 +1,104 @@
+---
+title: Member Management
+description: Project level user management
+---
+import { Footer, Layout, Navbar } from 'nextra-theme-docs'
+import { Banner, Head } from 'nextra/components'
+import { getPageMap } from 'nextra/page-map'
+import Image from 'next/image'
+
+# Member Management
+
+The Users tab of the Project Management page has a table containing all active and pending members.
+**Project admins** have the ability to add, edit, and remove users and groups from projects.
+
+## Adding Members to Projects
+
+1. From the landing page, select the "Explore" button of the desired project within the "You Projects" modal.
+
+<Image
+  src="/docs/images/nav-proj-management.png"
+  alt="Invite User UI"
+  width={800}
+  height={600}
+/>
+
+2. Once on the Project Management page, navigate to the "Project Settings" section by clicking the slider bar icon on the inner toolbar.
+
+<Image
+  src="/docs/images/proj-settings.png"
+  alt="Invite User UI"
+  width={800}
+  height={600}
+/>
+
+2. On the Users tab of the Project Management page, click the "Add Group" or "Add User" button.
+
+<Image
+  src="/docs/images/add-member-proj.png"
+  alt="Invite User UI"
+  width={800}
+  height={600}
+/>
+
+3. Select the members and their roles then click "Add to Project".
+    - For Groups: select an existing group and role.
+    - For Users: select the user's email address and role.
+
+<Image
+  src="/docs/images/add-group-proj.png"
+  alt="Invite User UI"
+  width={800}
+  height={600}
+/>
+
+<Image
+  src="/docs/images/add-user-proj.png"
+  alt="Invite User UI"
+  width={800}
+  height={600}
+/>
+
+4. The new members will appear in the members table of the Project Management page!
+
+
+
+## Editing Members in Projects
+
+1. Click the pencil icon in the actions column of the member management table.
+2. Update the member's information in the Edit Member modal and hit save.
+
+<Image
+  src="/docs/images/edit-member-proj.png"
+  alt="Edit User UI"
+  width={800}
+  height={400}
+/>
+
+<Image
+  src="/docs/images/save-edit-proj.png"
+  alt="Edit User UI"
+  width={800}
+  height={400}
+/>
+
+## Removing Members from Projects
+
+1. Click the trashcan icon in the action column of the member management table.
+2. This will remove the member from the project.
+
+**Note:** Once a member is removed from the project, they must be readded to regain access.
+
+<Image
+  src="/docs/images/delete-member-proj.png"
+  alt="Delete User UI"
+  width={800}
+  height={400}
+/>
+
+<Image
+  src="/docs/images/delete-mem-save-proj.png"
+  alt="Delete User UI"
+  width={800}
+  height={400}
+/>

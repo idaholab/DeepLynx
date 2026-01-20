@@ -16,6 +16,7 @@
 //     [ApiController]
 //     [Route("subscriptions")]
 //     [Authorize]
+//TODO: Add tag for openapi 
 //     public class SubscriptionController : ControllerBase
 //     {
 //         private readonly ISubscriptionBusiness _subscriptionBusiness;

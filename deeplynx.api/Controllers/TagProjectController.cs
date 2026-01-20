@@ -10,9 +10,7 @@ namespace deeplynx.api.Controllers;
 [Route("projects/{projectId:long}/tags")]
 [ApiController]
 [Authorize]
-[Tags(
-    // "Project Management", 
-    "Tag")]
+[Tags("Project - Tag")]
 public class TagProjectController : ControllerBase
 {
     private readonly ILogger<TagProjectController> _logger;
@@ -30,7 +28,7 @@ public class TagProjectController : ControllerBase
     }
 
     /// <summary>
-    ///     Get all Tags (Project)
+    ///     Get all Tags 
     /// </summary>
     /// <param name="projectId">The ID of the project whose tags are to be retrieved</param>
     /// <param name="hideArchived">Flag indicating whether to hide archived tags from the result (Default true)</param>
@@ -55,7 +53,7 @@ public class TagProjectController : ControllerBase
     }
 
     /// <summary>
-    ///     Get a tag (Project)
+    ///     Get a tag 
     /// </summary>
     /// <param name="projectId">The ID of the project to which the tag belongs</param>
     /// <param name="tagId">The ID of the tag to retrieve.</param>
@@ -83,7 +81,7 @@ public class TagProjectController : ControllerBase
     }
 
     /// <summary>
-    ///     Creates a tag (Project)
+    ///     Creates a tag 
     /// </summary>
     /// <param name="projectId">The ID of the project to which the tag belongs</param>
     /// <param name="tagRequestDto">The tag data transfer object containing tag details.</param>
@@ -110,7 +108,7 @@ public class TagProjectController : ControllerBase
     }
 
     /// <summary>
-    ///     Create Many Tags (Project)
+    ///     Create Many Tags 
     /// </summary>
     /// <param name="projectId">The ID of the project to which the tag belongs</param>
     /// <param name="tagRequestDto">The tag data transfer object containing tag details.</param>
@@ -137,7 +135,7 @@ public class TagProjectController : ControllerBase
     }
 
     /// <summary>
-    /// Update a Tag (Project)
+    /// Update a Tag 
     /// </summary>
     /// <param name="projectId">The ID of the project to which the tag belongs</param>
     /// <param name="tagId">The ID of the tag to update.</param>
@@ -165,7 +163,7 @@ public class TagProjectController : ControllerBase
     }
 
     /// <summary>
-    ///     Delete a Tag (Project)
+    ///     Delete a Tag 
     /// </summary>
     /// <param name="projectId">The ID of the project to which the tag belongs</param>
     /// <param name="tagId">The ID of the tag to delete.</param>
@@ -190,7 +188,7 @@ public class TagProjectController : ControllerBase
     }
 
     /// <summary>
-    ///     Archive or Unarchive a Tag (Project)
+    ///     Archive or Unarchive a Tag 
     /// </summary>
     /// <param name="projectId">The ID of the project to which the tag belongs</param>
     /// <param name="tagId">The ID of the tag to archive or unarchive.</param>

@@ -16,9 +16,7 @@ namespace deeplynx.api.Controllers;
 [ApiController]
 [Route("organizations/{organizationId:long}/relationships")]
 [Authorize]
-[Tags(
-    // "Organization Management",
-    "Relationship")]
+[Tags("Organization - Relationship")]
 public class RelationshipOrganizationController : ControllerBase
 {
     private readonly ILogger<RelationshipOrganizationController> _logger;
@@ -37,7 +35,7 @@ public class RelationshipOrganizationController : ControllerBase
     }
 
     /// <summary>
-    ///     Get All Relationships (Organization)
+    ///     Get All Relationships 
     /// </summary>
     /// <param name="organizationId">The ID of the organization to which the relationship's project belongs</param>
     /// <param name="projectIds">(Optional)An array of project IDs within the organization to filter by</param>
@@ -65,7 +63,7 @@ public class RelationshipOrganizationController : ControllerBase
     }
 
     /// <summary>
-    ///     Get a Relationship (Organization)
+    ///     Get a Relationship 
     /// </summary>
     /// <param name="organizationId">The ID of the organization to which the relationship's project belongs</param>
     /// <param name="relationshipId">The ID of the relationship to retrieve</param>
@@ -97,7 +95,7 @@ public class RelationshipOrganizationController : ControllerBase
     }
 
     /// <summary>
-    ///     Create a Relationship (Organization)
+    ///     Create a Relationship 
     /// </summary>
     /// <param name="organizationId">The ID of the organization to which the relationship's project belongs</param>
     /// <param name="dto">The relationship request data transfer object containing relationship details</param>
@@ -123,7 +121,7 @@ public class RelationshipOrganizationController : ControllerBase
     }
 
     /// <summary>
-    ///     Bulk Create Relationships (Organization)
+    ///     Bulk Create Relationships 
     /// </summary>
     /// <param name="organizationId">The ID of the organization to which the relationship's project belongs</param>
     /// <param name="relationships">List of relationship request data transfer objects containing relationship details</param>
@@ -151,7 +149,7 @@ public class RelationshipOrganizationController : ControllerBase
     }
 
     /// <summary>
-    ///     Update a Relationship (Organization)
+    ///     Update a Relationship 
     /// </summary>
     /// <param name="organizationId">The ID of the organization to which the relationship's project belongs</param>
     /// <param name="relationshipId">The ID of the relationship to update</param>
@@ -181,7 +179,7 @@ public class RelationshipOrganizationController : ControllerBase
     }
 
     /// <summary>
-    ///     Delete a Relationship (Organization)
+    ///     Delete a Relationship 
     /// </summary>
     /// <param name="organizationId">The ID of the organization to which the relationship's project belongs</param>
     /// <param name="relationshipId">The ID of the relationship to delete</param>
@@ -207,7 +205,7 @@ public class RelationshipOrganizationController : ControllerBase
     }
 
     /// <summary>
-    ///     Archive or Unarchive a Relationship (Organization)
+    ///     Archive or Unarchive a Relationship 
     /// </summary>
     /// <param name="organizationId">The ID of the organization to which the relationship's project belongs</param>
     /// <param name="relationshipId">The ID of the relationship to archive or unarchive</param>

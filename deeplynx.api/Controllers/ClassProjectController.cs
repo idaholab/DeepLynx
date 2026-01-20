@@ -16,9 +16,7 @@ namespace deeplynx.api.Controllers;
 [ApiController]
 [Route("projects/{projectId:long}/classes")]
 [Authorize]
-[Tags(
-    // "Project Management",
-    "Class")]
+[Tags("Project - Class")]
 public class ClassProjectController : ControllerBase
 {
     private readonly IClassBusiness _classBusiness;
@@ -36,7 +34,7 @@ public class ClassProjectController : ControllerBase
     }
 
     /// <summary>
-    ///     Get All Classes (Project)
+    ///     Get All Classes 
     /// </summary>
     /// <param name="projectId">The ID of the project to which the class belongs</param>
     /// <param name="hideArchived">Flag indicating whether to hide archived classes from the result (Default true)</param>
@@ -63,7 +61,7 @@ public class ClassProjectController : ControllerBase
     }
 
     /// <summary>
-    ///     Get a Class (Project)
+    ///     Get a Class 
     /// </summary>
     /// <param name="projectId">The ID of the project to which the class belongs</param>
     /// <param name="classId">The ID of the class to retrieve</param>
@@ -92,7 +90,7 @@ public class ClassProjectController : ControllerBase
     }
 
     /// <summary>
-    ///     Create a Class (Project)
+    ///     Create a Class 
     /// </summary>
     /// <param name="projectId">The ID of the project to which the class belongs</param>
     /// <param name="dto">The request DTO for classes</param>
@@ -120,7 +118,7 @@ public class ClassProjectController : ControllerBase
     }
 
     /// <summary>
-    ///     Bulk Create Classes (Project)
+    ///     Bulk Create Classes 
     /// </summary>
     /// <param name="projectId">The ID of the project to which the class belongs</param>
     /// <param name="classes">List of request DTOs for classes</param>
@@ -148,7 +146,7 @@ public class ClassProjectController : ControllerBase
     }
 
     /// <summary>
-    ///     Update a Class (Project)
+    ///     Update a Class 
     /// </summary>
     /// <param name="projectId">The ID of the project to which the class belongs</param>
     /// ///
@@ -179,7 +177,7 @@ public class ClassProjectController : ControllerBase
     }
 
     /// <summary>
-    ///     Delete a Class (Project)
+    ///     Delete a Class 
     /// </summary>
     /// <param name="projectId">The ID of the project to which the class belongs</param>
     /// <param name="classId">The ID of the class to delete.</param>
@@ -207,7 +205,7 @@ public class ClassProjectController : ControllerBase
     }
 
     /// <summary>
-    ///     Archive or Unarchive a Class (Project)
+    ///     Archive or Unarchive a Class 
     /// </summary>
     /// <param name="projectId">The ID of the project to which the class belongs</param>
     /// <param name="classId">The ID of the class to archive or unarchive.</param>

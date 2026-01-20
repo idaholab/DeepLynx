@@ -15,6 +15,7 @@ namespace deeplynx.api.Controllers;
 [ApiController]
 [Route("saved-searches")]
 [Authorize]
+[Tags("Saved Search")]
 public class SavedSearchController : ControllerBase
 {
     private readonly ILogger<SavedSearchController> _logger;

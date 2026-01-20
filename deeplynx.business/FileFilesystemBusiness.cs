@@ -33,6 +33,7 @@ public class FileFilesystemBusiness : IFileBusiness
     /// <summary>
     /// Uploads a file to the local file system
     /// </summary>
+    /// <param name="organizationId">The organization the file is associated with</param>
     /// <param name="projectId">The project the file is associated with</param>
     /// <param name="dataSourceId">The data source the file is associated with</param>
     /// <param name="objectStorageConfig">The config containing the file path</param>
@@ -57,7 +58,8 @@ public class FileFilesystemBusiness : IFileBusiness
         
         // create a file path in the format <mountdir>/project_<id>/datasource_<id>/filename
         var filePath = Path.Combine(
-            objectStorageConfig.MountPath, 
+            objectStorageConfig.MountPath,
+            "org_" + organizationId.ToString(),
             "project_" + projectId.ToString(),
             "datasource_" + dataSourceId.ToString(),
             fileName);

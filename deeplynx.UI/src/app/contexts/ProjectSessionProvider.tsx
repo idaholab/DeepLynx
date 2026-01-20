@@ -53,8 +53,6 @@ export const ProjectSessionProvider = ({
     const stored =
       storedLocal || (storedCookie ? decodeURIComponent(storedCookie) : null);
 
-    console.log("ProjectSessionProvider hydrate - raw stored:", stored);
-
     if (stored) {
       try {
         const parsed: ProjectSession | null = JSON.parse(stored);

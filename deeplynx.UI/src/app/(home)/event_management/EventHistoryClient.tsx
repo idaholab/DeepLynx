@@ -10,15 +10,23 @@ import {
   PaginatedEventsResponseDto,
 } from "../types/responseDTOs";
 import { useOrganizationSession } from "@/app/contexts/OrganizationSessionProvider";
-import { useProjectSession } from "@/app/contexts/ProjectSessionProvider";
 import {
   EventFilterParams,
-  getAllEventsPaginated,
   queryAuthorizedEvents,
 } from "@/app/lib/client_service/event_services.client";
+import ProjectDropdown from "../components/ProjectDropdown";
 
-const EventsHistoryClient = () => {
+type Props = {
+  initialProjects: { id: string; name: string }[];
+  initialSelectedProjects: string[];
+};
+
+const EventsHistoryClient = ({initialProjects, initialSelectedProjects}: Props) => {
   const [rowsPerPage, setRowsPerPage] = useState(25);
+  const [projects] = useState(initialProjects);
+  const [selectedProjects, setSelectedProjects] = useState<string[]>(
+    initialSelectedProjects
+  );
 
   const getThirtyDaysAgo = () => {
     const date = new Date();
@@ -37,7 +45,6 @@ const EventsHistoryClient = () => {
     startDate: getThirtyDaysAgo(),
   });
   const { organization, hasLoaded: orgLoaded } = useOrganizationSession();
-  const { project, hasLoaded: projectLoaded } = useProjectSession();
 
   type FilterConfig = {
     key: string;
@@ -84,36 +91,40 @@ const EventsHistoryClient = () => {
 
   // Handler for when filters change
   const handleFilterChange = (newFilters: EventFilterParams) => {
-    console.log("Filters applied:", newFilters);
     setFilters(newFilters);
   };
 
-  // Fetch events from backend - memoized with useCallback
   const fetchEvents = useCallback(
     async (pageNumber: number, pageSize: number) => {
-      console.log("Org Client: ", organization?.organizationId);
-      console.log("Project Client: ", project?.projectId);
 
-      // HARD GUARD: do not call the API if org or project is missing
-      if (!organization?.organizationId || !project?.projectId) {
-        console.log("Skipping fetch: missing org/project ", {
-          orgId: organization?.organizationId,
-          projectId: project?.projectId,
+      if (!organization?.organizationId || selectedProjects.length === 0) {
+        setData([]);
+        setPagination({
+          pageNumber: 1,
+          pageSize: rowsPerPage,
+          totalCount: 0,
         });
-        return; // <-- this is critical
+        return;
       }
 
       setLoading(true);
       try {
-        const result: PaginatedEventsResponseDto = await queryAuthorizedEvents({
-          organizationId: organization.organizationId as number,
-          projectId: project.projectId as number,
-          pageNumber,
-          pageSize,
-          ...filters,
-        });
+        const organizationId = Number(organization.organizationId);
+        const isAllSelected = selectedProjects.length === initialProjects.length;
+        
+        const projectIds = isAllSelected
+          ? []
+          : selectedProjects.map(Number);
 
-        console.log("Events result: ", result);
+        const result: PaginatedEventsResponseDto = await queryAuthorizedEvents(
+          organizationId,         
+          projectIds,
+          {
+            pageNumber,
+            pageSize,
+            ...filters,
+          }
+        );
 
         setData(result.items);
         setPagination({
@@ -133,21 +144,35 @@ const EventsHistoryClient = () => {
         setLoading(false);
       }
     },
-    [filters, rowsPerPage, organization?.organizationId, project?.projectId]
+    [filters, rowsPerPage, organization?.organizationId, selectedProjects]
   );
 
-  // Initial fetch
+  const getCleanFilters = (filters: EventFilterParams): Record<string, string | number | number[] | undefined> => {
+  const cleaned: Record<string, string | number | number[] | undefined> = {};
+  Object.entries(filters).forEach(([key, value]) => {
+    if (value !== null && value !== undefined) {
+      cleaned[key] = value;
+    }
+  });
+  return cleaned;
+};
+
+  // Fetch when selectedProjects changes
   useEffect(() => {
-    // Wait until BOTH org and project sessions are hydrated
-    if (!orgLoaded || !projectLoaded) {
+    if (!orgLoaded) {
       return;
     }
 
-    // Also ensure we actually *have* ids before calling the API
-    if (!organization?.organizationId || !project?.projectId) {
-      console.log("Skipping fetch: missing org/project", {
-        orgId: organization?.organizationId,
-        projectId: project?.projectId,
+    if (!organization?.organizationId) {
+      return;
+    }
+
+    if (selectedProjects.length === 0) {
+      setData([]);
+      setPagination({
+        pageNumber: 1,
+        pageSize: rowsPerPage,
+        totalCount: 0,
       });
       return;
     }
@@ -156,23 +181,20 @@ const EventsHistoryClient = () => {
   }, [
     fetchEvents,
     orgLoaded,
-    projectLoaded,
     organization?.organizationId,
-    project?.projectId,
     rowsPerPage,
+    selectedProjects,
   ]);
 
-  // Handle page changes
   const handlePageChange = (pageNumber: number) => {
     fetchEvents(pageNumber, pagination.pageSize);
   };
 
-  // Handle page size changes (optional)
   const handlePageSizeChange = (pageSize: number) => {
+    setRowsPerPage(pageSize);
     fetchEvents(1, pageSize);
   };
 
-  // Define columns
   const columns: Column<EventResponseDto>[] = [
     {
       header: "Time Stamp",
@@ -250,6 +272,15 @@ const EventsHistoryClient = () => {
         <h1 className="text-2xl my-6 font-bold text-info-content">
           Event History
         </h1>
+        <ProjectDropdown 
+          projects={projects}
+          onSelectionChange={setSelectedProjects}
+          defaultSelected={
+            initialSelectedProjects.length
+              ? initialSelectedProjects
+              : undefined
+          }
+        />
       </div>
 
       {loading && (
@@ -283,7 +314,7 @@ const EventsHistoryClient = () => {
             rowsPerPage={rowsPerPage}
             setRowsPerPage={setRowsPerPage}
             filters={filterConfig}
-            filterValues={filters}
+            filterValues={getCleanFilters(filters)}
             onFilterChange={handleFilterChange}
           />
         </div>

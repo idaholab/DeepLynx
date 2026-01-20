@@ -9,11 +9,14 @@ If you are looking to upload many metadata records at once, Nexus can support th
 
 1. Paste raw JSON into the request body here:
 
-`https://deeplynx.inl.gov/api/v1/projects/{projectId}/datasources/{dataSourceId}/metadata/CreateMetadata`
+`{{your.nexus.url}}/api/v1/projects/{projectId}/datasources/{dataSourceId}/metadata/CreateMetadata`
 
 2. Provide a JSON file here:
 
-`https://deeplynx.inl.gov/api/v1/projects/{projectId}/datasources/{dataSourceId}/metadata/CreateMetadataFromFile`
+`{{your.nexus.url}}/api/v1/projects/{projectId}/datasources/{dataSourceId}/metadata/CreateMetadataFromFile`
+
+**Note:** Bulk uploading metadata will be enabled in a future release.
+For **deployed instances**, replace `{your_nexus_url}` with the URL of your Nexus deployment (e.g., `https://deeplynx.inl.gov`).
 
 ## Build a raw JSON payload
 

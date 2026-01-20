@@ -270,6 +270,37 @@ export const translations = {
             PROJECT_DASHBOARD: "Project Dashboard",
             EVENT_MANAGEMENT: "Event Management",
 
+            DOWNLOAD_CSV_TEMPLATE: "Download CSV Template",
+            BULK_CSV_UPLOAD: "Bulk CSV Upload",
+            CSV_UPLOAD_INSTRUCTIONS: "Upload multiple records at once using our CSV template",
+
+            UPLOAD_MODE: "Upload Mode",
+            FILE_UPLOAD: "File Upload",
+            BULK_METADATA: "Bulk Metadata",
+            BULK_METADATA_UPLOAD: "Bulk Metadata Upload",
+            BULK_METADATA_INSTRUCTIONS: "Create multiple records at once by uploading a CSV file with metadata. No actual files are uploaded - only record metadata is created.",
+
+            CONFIRM_BULK_UPLOAD: "Confirm Bulk Upload",
+            YOUR_ABOUT_TO_UPLOAD: "You are about to upload",
+            L_RECORDS: "records",
+            TO_THE_SYSTEM: "to the system.",
+            SUCESSFULLY_PARSED: "Successfully parsed",
+            ROWS_FROM_CSV: "rows from CSV",
+            PLEASE_SELECT_PROJECT_AND_DATASOURCE: "Please select project and data source first",
+            ALL: "All",
+            RECORDS_VALIDATED_SUCCESSFULLY: "records validated successfully!",
+            VALIDATION_FAILED: "Validation failed",
+            RECORDS_HAVE_ERRORS: "records have errors",
+            ERROR_VALIDATING_RECORDS: "Error validating records",
+            FAILED_TO_PARSE_CSV_FILE: "Failed to parse CSV file",
+            ERROR_PARSING_CSV_FILE: "Error parsing CSV file",
+            STEP_1_DOWNLOAD_TEMPLATE: "Step 1: Download Template",
+            STEP_2_UPLOAD_YOUR_CSV: "Step 2: Upload Your CSV",
+            SELECTED: "Selected",
+
+
+
+
 
 
 
@@ -552,6 +583,36 @@ export const translations = {
             ACTIVE: "Activo",
             PROJECT_DASHBOARD: "Tablero del proyecto",
             EVENT_MANAGEMENT: "Gestión de eventos",
+
+            DOWNLOAD_CSV_TEMPLATE: "Descargar plantilla CSV",
+            BULK_CSV_UPLOAD: "Carga masiva de CSV",
+            CSV_UPLOAD_INSTRUCTIONS: "Cargue múltiples registros a la vez usando nuestra plantilla CSV",
+
+            UPLOAD_MODE: "Modo de carga",
+            SINGLE_FILE_UPLOAD: "Carga de un solo archivo",
+
+            FILE_UPLOAD: "Carga de archivos",
+            BULK_METADATA: "Metadatos masivos",
+            BULK_METADATA_UPLOAD: "Carga masiva de metadatos",
+            BULK_METADATA_INSTRUCTIONS: "Cree múltiples registros a la vez cargando un archivo CSV con metadatos. No se cargan archivos reales; solo se crean los metadatos de los registros.",
+
+            CONFIRM_BULK_UPLOAD: "Confirmar carga masiva",
+            YOUR_ABOUT_TO_UPLOAD: "Está a punto de cargar",
+            L_RECORDS: "registros",
+            TO_THE_SYSTEM: "al sistema.",
+            SUCESSFULLY_PARSED: "Analizado correctamente",
+            ROWS_FROM_CSV: "filas del CSV",
+            PLEASE_SELECT_PROJECT_AND_DATASOURCE: "Por favor, seleccione primero el proyecto y la fuente de datos",
+            ALL: "Todos",
+            RECORDS_VALIDATED_SUCCESSFULLY: "¡registros validados correctamente!",
+            VALIDATION_FAILED: "La validación falló",
+            RECORDS_HAVE_ERRORS: "los registros tienen errores",
+            ERROR_VALIDATING_RECORDS: "Error al validar los registros",
+            FAILED_TO_PARSE_CSV_FILE: "No se pudo analizar el archivo CSV",
+            ERROR_PARSING_CSV_FILE: "Error al analizar el archivo CSV",
+            STEP_1_DOWNLOAD_TEMPLATE: "Paso 1: Descargar plantilla",
+            STEP_2_UPLOAD_YOUR_CSV: "Paso 2: Cargue su CSV",
+            SELECTED: "Seleccionado",
 
 
         }

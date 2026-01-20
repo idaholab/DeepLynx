@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { Project } from "../types/types";
 import Tabs from "../components/Tabs";
 import {
   OauthApplicationResponseDto,
@@ -13,23 +14,27 @@ import SiteOrganizationManagement from "../components/SiteManagementPortal/SiteO
 import { getAllOrganizations } from "@/app/lib/client_service/organization_services.client";
 import { getAllOauthApplications } from "@/app/lib/client_service/oauth_services.client";
 import { getAllUsers } from "@/app/lib/client_service/user_services.client";
+import EventsHistoryClient from "../event_management/EventHistoryClient";
 
 interface SysAdminProps {
   organizations: OrganizationResponseDto[];
   applications: OauthApplicationResponseDto[];
   members: UserResponseDto[];
+  initialProjects: Project[];
+  initialSelectedProjects: string[];
 }
 
 const SysAdminClient = ({
   organizations: initialOrganizations,
   applications: initialApplications,
   members: initialMembers,
+  initialProjects,
+  initialSelectedProjects,
 }: SysAdminProps) => {
   const [activeTab, setActiveTab] = useState("");
   const [organizations, setOrganizations] = useState<OrganizationResponseDto[]>(initialOrganizations);
   const [applications, setApplications] = useState<OauthApplicationResponseDto[]>(initialApplications);
   const [members, setMembers] = useState<UserResponseDto[]>(initialMembers);
-
 
   const refreshOrganizations = async () => {
     try {
@@ -45,15 +50,16 @@ const SysAdminClient = ({
       const updatedData = await getAllOauthApplications();
       setApplications(updatedData);
     } catch (err) {
-      console.error("Failed to refresh organizations:", err);
+      console.error("Failed to refresh applications:", err);
     }
   };
+
   const refreshUsers = async () => {
     try {
       const updatedData = await getAllUsers();
       setMembers(updatedData);
     } catch (err) {
-      console.error("Failed to refresh organizations:", err);
+      console.error("Failed to refresh users:", err);
     }
   };
 
@@ -69,17 +75,32 @@ const SysAdminClient = ({
     },
     {
       label: "Oauth Application",
-      content: <OAuthManagement
-        initialApplications={applications}
-        onApplicationsChange={refreshApplications} />,
+      content: (
+        <OAuthManagement
+          initialApplications={applications}
+          onApplicationsChange={refreshApplications}
+        />
+      ),
     },
     {
       label: "Member Management",
-      content: <UsersTable
-        initialMembers={members}
-        header={"Site Users"}
-        description={"Manage users for the site. Invite new users via email."}
-        onUsersChange={refreshUsers} />,
+      content: (
+        <UsersTable
+          initialMembers={members}
+          header={"Site Users"}
+          description={"Manage users for the site. Invite new users via email."}
+          onUsersChange={refreshUsers}
+        />
+      ),
+    },
+    {
+      label: "Event History",
+      content: (
+        <EventsHistoryClient 
+          initialProjects={initialProjects}
+          initialSelectedProjects={initialSelectedProjects}
+        />
+      ),
     },
   ];
 

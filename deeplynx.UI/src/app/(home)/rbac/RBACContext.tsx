@@ -109,7 +109,6 @@ export function RBACProvider({
   const fetchUserData = useCallback(async () => {
     setLoading(true);
     try {
-      // 🔥 Here we now use orgId/projectId from props
       const response = await getCurrentUser(orgId, projectId);
 
       const userData: RBACUser = {
@@ -164,27 +163,7 @@ export function RBACProvider({
     }
   }, [disableAuth, update, fetchDevUser, fetchUserData]);
 
-  useEffect(() => {
-    const handleVisibilityChange = async () => {
-      if (
-        document.visibilityState === "visible" &&
-        status === "authenticated"
-      ) {
-        const refreshedSession = await update();
-        if (refreshedSession) {
-          fetchUserData();
-        }
-      }
-    };
-
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-    return () => {
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-    };
-  }, [status, update, fetchUserData]);
-
-  // Add this useEffect in RBACContext.tsx, after your other useEffects
-
+  // Handle session errors (token refresh failures)
   useEffect(() => {
     if (
       session?.error === "RefreshAccessTokenError" ||

@@ -1,0 +1,88 @@
+---
+title: Tags and Security Labels
+description: Project level tags and security labels
+---
+import { Footer, Layout, Navbar } from 'nextra-theme-docs'
+import { Banner, Head } from 'nextra/components'
+import { getPageMap } from 'nextra/page-map'
+
+import Image from 'next/image'
+
+# Tags and Security Labels
+
+Nexus supports **attribute based access controls (ABAC)** where resources within projects
+are classified by tags and security labels.
+- Projects inherit tags and security labels from their parent organizations.
+- Project admins have the ability to create, edit, and delete project level tags.
+
+**Note:** Security labels will be enabled in a future release.
+
+## Understanding Standard Tags and Security Labels
+
+**Tags** can be added to projects to classify their resources.
+In a future release, **security labels** will be enabled for projects to enforce custom rules.
+Security labels will also be inherited from parent organizations.
+
+## Creating Custom Tags
+
+1. Navigate to the Project Management page by clicking the slider bar icon on the inner toolbar.
+2. On the Tags and Security Labels tab of the Project Management page, click the "New Tag" button.
+
+<Image
+  src="/docs/images/add-tag-proj.png"
+  alt="Creating Tags UI"
+  width={800}
+  height={600}
+/>
+
+3. Enter the new tag's name and click "Create Tag".
+4. The new tag will appear in the project tags widget of the Tag Management page!
+
+<Image
+  src="/docs/images/name-tag-proj.png"
+  alt="Creating Tags UI"
+  width={800}
+  height={600}
+/>
+
+## Editing Tags
+
+Project admins can edit the names of existing project tags.
+
+1. Click the "Edit" button next to the selected tag inside the Project Tags widget.
+
+<Image
+  src="/docs/images/edit-tag-proj.png"
+  alt="Pre Editing Tags UI"
+  width={800}
+  height={600}
+/>
+
+2. Update the tag's information in the Edit Tag modal and hit save.
+
+<Image
+  src="/docs/images/edit-tag-save-proj.png"
+  alt="Editing Tags UI"
+  width={800}
+  height={600}
+/>
+
+## Removing Tags
+
+The project admin has the ability to remove project tags by clicking the "Delete" button of Project Tags Widget.
+
+**Note:** Once a tag is archived it can no longer be used. It must be restored to be reapplied to a project.
+
+<Image
+  src="/docs/images/delete-tag-proj.png"
+  alt="Removing Tags UI"
+  width={800}
+  height={600}
+/>
+
+<Image
+  src="/docs/images/delete-tag-save-proj.png"
+  alt="Removing Tags UI"
+  width={800}
+  height={600}
+/>

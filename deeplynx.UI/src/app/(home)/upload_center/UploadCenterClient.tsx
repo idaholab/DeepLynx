@@ -1,149 +1,146 @@
-// src/app/(home)/upload_center/UploadCenterClient.tsx
 "use client";
 
 import { useLanguage } from "@/app/contexts/Language";
 import { useOrganizationSession } from "@/app/contexts/OrganizationSessionProvider";
-import { getAllDataSources } from "@/app/lib/client_service/data_source_services.client";
 import {
   uploadFile,
   uploadFilesBatch,
 } from "@/app/lib/client_service/file_upload_services.client";
-import { getAllObjectStorages } from "@/app/lib/client_service/object_storage_services.client";
-import { getAllProjects } from "@/app/lib/client_service/projects_services.client";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { uploadBulkMetadata } from "@/app/lib/client_service/metadata_service.client";
+import { useEffect, useMemo } from "react";
 import toast from "react-hot-toast";
-import DropUpload from "../components/DropUpload";
+import { parseBackendErrors } from "@/app/lib/error_parser";
+
+// Components
 import FileDetailsCard from "../components/FileDetailCard";
-import NewFileUploadCard from "../components/NewFileUploadCard";
 import SelectedFilesCard from "../components/SelectedFilesCard";
+
+// Hooks
+import { useUploadState } from "./hooks/useUploadState";
+import { useBulkUploadState } from "./hooks/useBulkUploadState";
+import { useProjectResources } from "./hooks/useProjectResources";
+
+// Types
+import type { ExistingFile, RecentUpload } from "../types/types";
+import ProjectResourceSelectors from "./components/ProjectResourceSelectors";
+import BulkUploadSection from "./components/BulkUploadSection";
+import FileUploadSection from "./components/FileUploadSection";
 import {
-  DataSourceResponseDto,
-  ObjectStorageResponseDto,
-  ProjectResponseDto,
-} from "../types/responseDTOs";
-import {
-  ExistingFile,
-  FileMetadata,
-  RecentUpload,
-  UploadType,
-} from "../types/types";
+  ArrowUpOnSquareStackIcon,
+  DocumentIcon,
+} from "@heroicons/react/24/outline";
+
+// ============================================================================
+// TYPES
+// ============================================================================
 
 type Props = {
   initialAvailableFiles: ExistingFile[];
-  initialRecentUploads: RecentUpload[];
-  uploadText: string;
 };
+
+// ============================================================================
+// MAIN COMPONENT
+// ============================================================================
 
 export default function UploadCenterClient({ initialAvailableFiles }: Props) {
   const { t } = useLanguage();
   const { organization } = useOrganizationSession();
-  const [multi, setMulti] = useState(false);
-  const [showMultiFileWarning, setShowMultiFileWarning] = useState(false);
-  const [uploadType, setUploadType] = useState<UploadType>("new");
-  const [targetFileId, setTargetFileId] = useState("");
-  const [destination, setDestination] = useState("");
-  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
-  const showRightPanel = selectedFiles.length > 0;
-  const [projects, setProjects] = useState<ProjectResponseDto[]>([]);
-  const [objectStorage, setObjectstorage] = useState<
-    ObjectStorageResponseDto[]
-  >([]);
-  const [dataSources, setDataSources] = useState<DataSourceResponseDto[]>([]);
-  const [projectId, setProjectId] = useState<string>("");
-  const [dataSourceId, setDataSourceId] = useState<string>("");
-  const [objectStorageId, setObjectstorageId] = useState<string>("");
-  const [filesMetadata, setFilesMetadata] = useState<
-    Record<number, FileMetadata>
-  >({});
-  const [isLoadingDataSources, setIsLoadingDataSources] = useState(false);
-  const [isLoadingObjectStorage, setIsLoadingObjectStorage] = useState(false);
-  const [isLoadingProjects, setIsLoadingProjects] = useState(false);
 
-  const handleMetadataChange = useCallback(
-    (fileIndex: number, metadata: FileMetadata) => {
-      setFilesMetadata((prev) => ({ ...prev, [fileIndex]: metadata }));
-    },
-    []
+  // ============================================================================
+  // STATE MANAGEMENT (via Custom Hooks)
+  // ============================================================================
+
+  const fileUploadState = useUploadState();
+  const bulkUploadState = useBulkUploadState();
+  const projectResources = useProjectResources(
+    organization?.organizationId as number
   );
 
-  const needsTarget = uploadType === "version" || uploadType === "properties";
+  const { setTargetFileId, setMulti } = fileUploadState;
+  const { multi } = fileUploadState;
+
+  // ============================================================================
+  // COMPUTED VALUES
+  // ============================================================================
+
+  const needsTarget =
+    fileUploadState.uploadType === "version" ||
+    fileUploadState.uploadType === "properties";
+  const isMultiAllowed = fileUploadState.uploadType === "new";
+  const showRightPanel =
+    fileUploadState.selectedFiles.length > 0 &&
+    fileUploadState.uploadMode === "file";
+
   const availableFiles = useMemo(
     () => initialAvailableFiles,
     [initialAvailableFiles]
   );
+
   const selectedTarget = useMemo(
-    () => availableFiles.find((f) => f.id === targetFileId) ?? null,
-    [availableFiles, targetFileId]
+    () =>
+      availableFiles.find((f) => f.id === fileUploadState.targetFileId) ?? null,
+    [availableFiles, fileUploadState.targetFileId]
   );
 
-  const [dropKey, setDropKey] = useState(0);
-
-  const resetForm = (opts?: { keepProject?: boolean }) => {
-    const keepProject = opts?.keepProject ?? true;
-
-    setSelectedFiles([]);
-    setUploadType("new");
-    setDestination("");
-    setTargetFileId("");
-    setMulti(false);
-    setFilesMetadata({});
-
-    if (!keepProject) {
-      setProjectId("");
-      setDataSources([]);
-      setObjectstorage([]);
-    }
-    setDataSourceId("");
-    setObjectstorageId("");
-
-    setDropKey((k) => k + 1);
-  };
-
   const canUpload =
-    selectedFiles.length > 0 &&
-    !!projectId &&
-    !!dataSourceId &&
-    !!objectStorageId &&
-    (!needsTarget || !!targetFileId);
+    fileUploadState.selectedFiles.length > 0 &&
+    !!projectResources.projectId &&
+    !!projectResources.dataSourceId &&
+    !!projectResources.objectStorageId &&
+    (!needsTarget || !!fileUploadState.targetFileId);
 
+  // ============================================================================
+  // EFFECTS
+  // ============================================================================
+
+  // Clear target file when not needed
   useEffect(() => {
     if (!needsTarget) setTargetFileId("");
-  }, [needsTarget]);
+  }, [needsTarget, setTargetFileId]);
 
-  const removeAt = (idx: number) =>
-    setSelectedFiles((prev) => prev.filter((_, i) => i !== idx));
-  const clearAll = () => setSelectedFiles([]);
+  // Manage multi toggle
+  useEffect(() => {
+    if (!isMultiAllowed && multi) {
+      setMulti(false);
+    }
+  }, [isMultiAllowed, multi, setMulti]);
 
-  const handleUpload = async () => {
-    if (!projectId || selectedFiles.length === 0) {
+  // ============================================================================
+  // FILE UPLOAD HANDLERS
+  // ============================================================================
+
+  const handleFileUpload = async () => {
+    if (
+      !projectResources.projectId ||
+      fileUploadState.selectedFiles.length === 0
+    ) {
       toast.error("Select a project and at least one file.");
       return;
     }
+
     try {
-      if (selectedFiles.length === 1) {
-        const file = selectedFiles[0];
-        const metadata = filesMetadata[0] ?? {};
+      if (fileUploadState.selectedFiles.length === 1) {
+        const file = fileUploadState.selectedFiles[0];
+        const metadata = fileUploadState.filesMetadata[0] ?? {};
+
         await uploadFile({
           organizationId: organization?.organizationId as number,
-          projectId,
-          dataSourceId, // may be undefined
-          objectStorageId, // may be undefined
+          projectId: projectResources.projectId,
+          dataSourceId: projectResources.dataSourceId,
+          objectStorageId: projectResources.objectStorageId,
           file,
           name: metadata.name || file.name,
           description: metadata.description || "",
-          // properties: metadata.properties, // if you collect extra JSON
-          // tags: metadata.tags, // if you collect tags
         });
+
         toast.success("File uploaded!");
       } else {
-        // Use your batch helper (returns Promise.allSettled)
         const results = await uploadFilesBatch({
           organizationId: organization?.organizationId as number,
-          projectId,
-          dataSourceId,
-          objectStorageId,
-          files: selectedFiles,
-          // optional shared metadata defaults
+          projectId: projectResources.projectId,
+          dataSourceId: projectResources.dataSourceId,
+          objectStorageId: projectResources.objectStorageId,
+          files: fileUploadState.selectedFiles,
         });
 
         const ok = results.filter((r) => r.status === "fulfilled").length;
@@ -153,103 +150,92 @@ export default function UploadCenterClient({ initialAvailableFiles }: Props) {
         );
         if (fail) console.warn("Batch upload failures:", results);
       }
-      resetForm({ keepProject: true });
+
+      fileUploadState.resetFileUpload();
     } catch (err) {
       console.error(err);
       toast.error("Upload failed. See console for details.");
     }
   };
 
-  const isMultiAllowed = uploadType === "new";
+  // ============================================================================
+  // BULK UPLOAD HANDLERS
+  // ============================================================================
 
-  useEffect(() => {
-    if (!isMultiAllowed && multi) setMulti(false);
-  }, [isMultiAllowed, multi]);
-
-  useEffect(() => {
-    if (!projectId) {
-      setDataSources([]);
-      setObjectstorage([]);
-      setDataSourceId("");
-      setObjectstorageId("");
-      setIsLoadingDataSources(false);
-      setIsLoadingObjectStorage(false);
+  const handleBulkUpload = async () => {
+    if (
+      !bulkUploadState.validationResult ||
+      !bulkUploadState.validationResult.isValid
+    ) {
+      toast.error("Please fix validation errors before uploading");
       return;
     }
 
-    setIsLoadingDataSources(true);
-    setIsLoadingObjectStorage(true);
-
-    setDataSourceId("");
-    setObjectstorageId("");
-
-    (async () => {
-      try {
-        const dataSource = await getAllDataSources(Number(projectId));
-        setDataSources(dataSource);
-        if (dataSource.length === 1) {
-          setDataSourceId(String(dataSource[0].id));
-        }
-        setIsLoadingDataSources(false);
-      } catch (error) {
-        console.error("Error fetching data sources:", error);
-        setDataSources([]);
-        setIsLoadingDataSources(false);
-      }
-
-      try {
-        const objectStorage = await getAllObjectStorages(
-          organization?.organizationId as number,
-          Number(projectId)
-        );
-        setObjectstorage(objectStorage);
-        if (objectStorage.length === 1) {
-          setObjectstorageId(String(objectStorage[0].id));
-        }
-        setIsLoadingObjectStorage(false);
-      } catch (error) {
-        console.error("Error fetching object storage:", error);
-        setObjectstorage([]);
-        setIsLoadingObjectStorage(false);
-      }
-    })();
-  }, [organization?.organizationId, projectId]);
-
-  // Memoize the fetch projects function
-  const fetchProjects = useCallback(async () => {
-    if (!organization) {
-      setProjects([]);
-      setProjectId("");
-      setIsLoadingProjects(false);
+    if (!projectResources.projectId || !projectResources.dataSourceId) {
+      toast.error("Please select project and data source");
       return;
     }
 
-    setIsLoadingProjects(true);
+    if (!organization?.organizationId) {
+      toast.error("Organization not found");
+      return;
+    }
+
+    bulkUploadState.setIsUploading(true);
+    bulkUploadState.setBackendErrors([]);
+    bulkUploadState.setUploadProgress(0);
 
     try {
-      const data = await getAllProjects(
-        organization.organizationId as number,
-        true
-      );
-      setProjects(data);
-      if (data.length === 1) {
-        setProjectId(String(data[0].id));
-      }
-    } catch (error) {
-      console.error("Error fetching projects:", error);
-      setProjects([]);
-    } finally {
-      setIsLoadingProjects(false);
-    }
-  }, [organization]);
+      // Progress simulation
+      const progressInterval = setInterval(() => {
+        bulkUploadState.setUploadProgress((prev) => {
+          if (prev >= 90) return prev;
+          return prev + 10;
+        });
+      }, 200);
 
-  // Fetch projects filtered by organization
-  useEffect(() => {
-    fetchProjects();
-  }, [fetchProjects]);
+      // Upload
+      await uploadBulkMetadata(
+        organization.organizationId as number,
+        Number(projectResources.projectId),
+        Number(projectResources.dataSourceId),
+        bulkUploadState.validationResult.validRecords
+      );
+
+      clearInterval(progressInterval);
+      bulkUploadState.setUploadProgress(100);
+
+      await new Promise((resolve) => setTimeout(resolve, 500));
+
+      toast.success(
+        `Successfully uploaded ${bulkUploadState.validationResult.validCount} records!`
+      );
+
+      bulkUploadState.resetBulkUpload();
+    } catch (error: unknown) {
+      console.error("Upload error:", error);
+
+      bulkUploadState.setUploadProgress(0);
+
+      // Extract error messages
+      const errorMessages = extractErrorMessages(error);
+
+      const parsedErrors = parseBackendErrors(errorMessages);
+      bulkUploadState.setBackendErrors(parsedErrors);
+
+      toast.error("Upload failed. Please check the error details below.");
+    } finally {
+      bulkUploadState.setIsUploading(false);
+    }
+  };
+
+  // ============================================================================
+  // RENDER
+  // ============================================================================
 
   return (
     <div>
+      {/* HEADER */}
       <div className="bg-base-200/40 pl-12 p-6">
         <h1 className="text-2xl font-bold text-base-content">
           {t.translations.UPLOAD_CENTER}
@@ -261,182 +247,97 @@ export default function UploadCenterClient({ initialAvailableFiles }: Props) {
           showRightPanel ? "justify-between" : "justify-center"
         }`}
       >
-        {/* LEFT */}
+        {/* LEFT PANEL */}
         <div
           className={`w-full lg:w-3/5 ${
             showRightPanel ? "" : "max-w-5xl mx-auto"
           }`}
         >
-          <h2>{t.translations.START_UPLOAD_BY_CHOOSING_TYPE}</h2>
+          {/* UPLOAD MODE TOGGLE */}
+          <div className="mb-6">
+            <label className="label">
+              <span className="label-text font-bold text-base-content">
+                {t.translations.UPLOAD_MODE || "Upload Mode"}
+              </span>
+            </label>
+            <div className="btn-group">
+              <button
+                type="button"
+                className={`btn btn-sm mr-5 ${
+                  fileUploadState.uploadMode === "file"
+                    ? "btn-primary"
+                    : "btn-ghost"
+                }`}
+                onClick={() => {
+                  fileUploadState.setUploadMode("file");
+                  bulkUploadState.setCsvFile(null);
+                }}
+              >
+                <DocumentIcon className="size-6" />
+                {t.translations.FILE_UPLOAD || "File Upload"}
+              </button>
+              <button
+                type="button"
+                className={`btn btn-sm ${
+                  fileUploadState.uploadMode === "bulk"
+                    ? "btn-primary"
+                    : "btn-ghost"
+                }`}
+                onClick={() => {
+                  fileUploadState.setUploadMode("bulk");
+                  fileUploadState.setSelectedFiles([]);
+                  fileUploadState.resetFileUpload();
+                }}
+              >
+                <ArrowUpOnSquareStackIcon className="size-6" />
+                {t.translations.BULK_METADATA || "Bulk Metadata"}
+              </button>
+            </div>
+          </div>
+
+          {/* PROJECT RESOURCE SELECTORS */}
           <div className="p-4 space-y-4">
-            <fieldset className="space-x-4">
-              <label className="label flex-col items-start text-base-content font-bold">
-                <span className="label-text mb-1">
-                  Select a project
-                  {isLoadingProjects && (
-                    <span className="loading loading-spinner loading-xs ml-2"></span>
-                  )}
-                </span>
-                <select
-                  value={projectId}
-                  onChange={(e) => setProjectId(e.target.value)}
-                  className="select select-info select-sm mt-2"
-                  required
-                  disabled={!organization || isLoadingProjects}
-                >
-                  <option value="" disabled>
-                    {!organization
-                      ? "Select an organization first"
-                      : isLoadingProjects
-                      ? "Loading projects..."
-                      : t.translations.PROJECT}
-                  </option>
-                  {projects.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
+            <ProjectResourceSelectors
+              {...projectResources}
+              hasOrganization={!!organization}
+              uploadMode={fileUploadState.uploadMode}
+            />
 
-              <label className="label flex-col items-start text-base-content font-bold">
-                <span className="label-text mb-1">
-                  {t.translations.DATA_SOURCE}
-                  {isLoadingDataSources && (
-                    <span className="loading loading-spinner loading-xs ml-2"></span>
-                  )}
-                </span>
-                <select
-                  value={dataSourceId}
-                  onChange={(e) => setDataSourceId(e.target.value)}
-                  className="select select-info select-sm mt-2"
-                  required
-                  disabled={!projectId || isLoadingDataSources}
-                >
-                  <option value="" disabled>
-                    {!projectId
-                      ? "Select a project first"
-                      : isLoadingDataSources
-                      ? "Loading data sources..."
-                      : "Data Sources"}
-                  </option>
-                  {dataSources.map((d) => (
-                    <option key={d.id} value={String(d.id)}>
-                      {d.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <label className="label flex-col items-start text-base-content font-bold">
-                <span className="label-text mb-1">
-                  {t.translations.STORAGE_DESTINATION}
-                  {isLoadingObjectStorage && (
-                    <span className="loading loading-spinner loading-xs ml-2"></span>
-                  )}
-                </span>
-                <select
-                  value={objectStorageId}
-                  onChange={(e) => setObjectstorageId(e.target.value)}
-                  className="select select-info select-sm mt-2"
-                  required
-                  disabled={!projectId || isLoadingObjectStorage}
-                >
-                  <option value="" disabled>
-                    {!projectId
-                      ? "Select a project first"
-                      : isLoadingObjectStorage
-                      ? "Loading object storages..."
-                      : "Object storages"}
-                  </option>
-                  {objectStorage.map((object) => (
-                    <option key={object.id} value={String(object.id)}>
-                      {object.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </fieldset>
-            <fieldset>
-              <label className="label text-base-content font-bold">
-                {t.translations.UPLOADING}
-                <select
-                  value={uploadType}
-                  onChange={(e) => setUploadType(e.target.value as UploadType)}
-                  className="select select-info select-sm mt-2"
-                  required
-                >
-                  <option value="new">{t.translations.NEW_FILE}</option>
-                  {/* Future options can be added here */}
-                </select>
-                {needsTarget && (
-                  <select
-                    value={targetFileId}
-                    onChange={(e) => setTargetFileId(e.target.value)}
-                    className="select select-info select-sm mt-2"
-                    required
-                  >
-                    <option value="" disabled>
-                      {t.translations.SELECT_EXISTING_FILE}
-                    </option>
-                    {availableFiles.map((f) => (
-                      <option key={f.id} value={f.id}>
-                        {f.name}
-                      </option>
-                    ))}
-                  </select>
-                )}
-              </label>
-            </fieldset>
-
-            <fieldset>
-              <label className="label cursor-pointer justify-start gap-3">
-                <span className="label-text text-xs">
-                  {t.translations.UPLOAD_MULTIPLE_FILES}
-                </span>
-                <input
-                  type="checkbox"
-                  checked={multi}
-                  disabled={!isMultiAllowed}
-                  onChange={(e) => {
-                    if (!isMultiAllowed) return;
-                    const checked = e.target.checked;
-                    if (!checked && selectedFiles.length > 1) {
-                      setShowMultiFileWarning(true);
-                      return;
-                    }
-                    setMulti(checked);
-                  }}
-                  className="toggle toggle-secondary"
-                  aria-describedby="multi-files-hint"
-                />
-              </label>
-            </fieldset>
-
-            {(multi || selectedFiles.length === 0) && (
-              <DropUpload
-                key={dropKey}
-                multiple={multi}
-                files={selectedFiles}
-                onFilesChange={setSelectedFiles}
-                disabled={!uploadType || (needsTarget && !targetFileId)}
+            {/* MODE-SPECIFIC CONTENT */}
+            {fileUploadState.uploadMode === "file" ? (
+              <FileUploadSection
+                uploadType={fileUploadState.uploadType}
+                setUploadType={fileUploadState.setUploadType}
+                multi={fileUploadState.multi}
+                setMulti={fileUploadState.setMulti}
+                selectedFiles={fileUploadState.selectedFiles}
+                setSelectedFiles={fileUploadState.setSelectedFiles}
+                setShowMultiFileWarning={
+                  fileUploadState.setShowMultiFileWarning
+                }
+                dropKey={fileUploadState.dropKey}
+                filesMetadata={fileUploadState.filesMetadata}
+                handleMetadataChange={fileUploadState.handleMetadataChange}
+                targetFileId={fileUploadState.targetFileId}
+                setTargetFileId={fileUploadState.setTargetFileId}
+                availableFiles={availableFiles}
+                needsTarget={needsTarget}
+                isMultiAllowed={isMultiAllowed}
+              />
+            ) : (
+              <BulkUploadSection
+                {...bulkUploadState}
+                projectId={projectResources.projectId}
+                dataSourceId={projectResources.dataSourceId}
+                organizationId={organization?.organizationId as number}
+                projects={projectResources.projects}
+                dataSources={projectResources.dataSources}
               />
             )}
-
-            {selectedFiles.length >= 1 &&
-              selectedFiles.map((file, index) => (
-                <NewFileUploadCard
-                  key={index}
-                  defaultName={file.name}
-                  uploadType={uploadType}
-                  fileIndex={index}
-                  onMetadataChange={handleMetadataChange}
-                />
-              ))}
           </div>
         </div>
 
-        {/* RIGHT — render only when needed */}
+        {/* RIGHT PANEL */}
         {showRightPanel && (
           <div className="lg:w-2/5">
             <FileDetailsCard
@@ -444,17 +345,20 @@ export default function UploadCenterClient({ initialAvailableFiles }: Props) {
               selectedTarget={selectedTarget}
             />
             <SelectedFilesCard
-              files={selectedFiles}
-              onRemoveAt={removeAt}
-              onClear={clearAll}
-              onUpload={handleUpload}
+              files={fileUploadState.selectedFiles}
+              onRemoveAt={fileUploadState.removeAt}
+              onClear={fileUploadState.clearAll}
+              onUpload={handleFileUpload}
               canUpload={canUpload}
             />
           </div>
         )}
       </div>
 
-      {showMultiFileWarning && (
+      {/* MODALS */}
+
+      {/* Multi File Warning Modal */}
+      {fileUploadState.showMultiFileWarning && (
         <div className="modal modal-open">
           <div className="modal-box">
             <h3 className="font-bold text-lg">
@@ -464,7 +368,7 @@ export default function UploadCenterClient({ initialAvailableFiles }: Props) {
             <div className="modal-action">
               <button
                 className="btn btn-secondary"
-                onClick={() => setShowMultiFileWarning(false)}
+                onClick={() => fileUploadState.setShowMultiFileWarning(false)}
               >
                 {t.translations.OKAY}
               </button>
@@ -472,10 +376,142 @@ export default function UploadCenterClient({ initialAvailableFiles }: Props) {
           </div>
           <div
             className="modal-backdrop"
-            onClick={() => setShowMultiFileWarning(false)}
+            onClick={() => fileUploadState.setShowMultiFileWarning(false)}
           />
         </div>
       )}
+
+      {/* Upload Confirmation Modal */}
+      {bulkUploadState.showUploadConfirm &&
+        bulkUploadState.validationResult && (
+          <div className="modal modal-open">
+            <div className="modal-box">
+              <h3 className="font-bold text-lg">
+                {t.translations.CONFIRM_BULK_UPLOAD}
+              </h3>
+              <p className="py-4">
+                {t.translations.YOUR_ABOUT_TO_UPLOAD}{" "}
+                <span className="font-bold">
+                  {bulkUploadState.validationResult.validCount}{" "}
+                  {t.translations.L_RECORDS}
+                </span>{" "}
+                {t.translations.TO_THE_SYSTEM}
+              </p>
+              <div className="bg-base-200 p-3 rounded text-sm space-y-1">
+                <p>
+                  <strong>{t.translations.PROJECT}:</strong>{" "}
+                  {
+                    projectResources.projects.find(
+                      (p) => p.id === Number(projectResources.projectId)
+                    )?.name
+                  }
+                </p>
+                <p>
+                  <strong>{t.translations.DATA_SOURCE}:</strong>{" "}
+                  {
+                    projectResources.dataSources.find(
+                      (d) => d.id === Number(projectResources.dataSourceId)
+                    )?.name
+                  }
+                </p>
+              </div>
+              <div className="modal-action">
+                <button
+                  className="btn btn-ghost"
+                  onClick={() => bulkUploadState.setShowUploadConfirm(false)}
+                  disabled={bulkUploadState.isUploading}
+                >
+                  {t.translations.CANCEL}
+                </button>
+                <button
+                  className="btn btn-primary"
+                  onClick={() => {
+                    bulkUploadState.setShowUploadConfirm(false);
+                    handleBulkUpload();
+                  }}
+                  disabled={bulkUploadState.isUploading}
+                >
+                  {bulkUploadState.isUploading ? (
+                    <>
+                      <span className="loading loading-spinner loading-sm"></span>
+                      {t.translations.UPLOADING}
+                    </>
+                  ) : (
+                    "Confirm Upload"
+                  )}
+                </button>
+              </div>
+            </div>
+            <div
+              className="modal-backdrop"
+              onClick={() =>
+                !bulkUploadState.isUploading &&
+                bulkUploadState.setShowUploadConfirm(false)
+              }
+            />
+          </div>
+        )}
     </div>
   );
+}
+
+type ErrorResponseData = {
+  errors?: unknown[];
+  error?: unknown;
+  message?: unknown;
+};
+
+function extractErrorMessages(error: unknown): string[] {
+  const fallback = ["Unknown error occurred"];
+
+  if (typeof error !== "object" || error === null) {
+    return fallback;
+  }
+
+  const maybeError = error as {
+    response?: { data?: unknown };
+    message?: unknown;
+  };
+
+  const data = maybeError.response?.data;
+  if (typeof data === "string") {
+    return [data];
+  }
+
+  if (typeof data === "object" && data !== null) {
+    const d = data as ErrorResponseData;
+
+    if (Array.isArray(d.errors)) {
+      return d.errors.map((err) => toMessage(err));
+    }
+
+    if (d.error !== undefined) {
+      return [toMessage(d.error)];
+    }
+
+    if (typeof d.message === "string") {
+      return [d.message];
+    }
+
+    return [JSON.stringify(d)];
+  }
+
+  if (typeof maybeError.message === "string") {
+    return [maybeError.message];
+  }
+
+  return fallback;
+}
+
+function toMessage(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (typeof value === "object" && value !== null) {
+    const maybe = value as { message?: unknown };
+    if (typeof maybe.message === "string") return maybe.message;
+  }
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return "Unknown error";
+  }
 }
