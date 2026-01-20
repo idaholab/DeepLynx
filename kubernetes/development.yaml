@@ -349,10 +349,15 @@ spec:
           volumeMounts:
             - name: duckdb-storage
               mountPath: /data/duckdb
+            - name: blob-storage
+              mountPath: /data/blob
       volumes:
         - name: duckdb-storage
           persistentVolumeClaim:
             claimName: deeplynx-duckdb-pvc
+        - name: blob-storage
+          persistentVolumeClaim:
+            claimName: deeplynx-blob-pvc
 
 ---
 
