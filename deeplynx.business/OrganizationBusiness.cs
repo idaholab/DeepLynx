@@ -206,6 +206,7 @@ public class OrganizationBusiness : IOrganizationBusiness
         organization.DefaultOrg = dto.DefaultOrg ?? organization.DefaultOrg;
         organization.LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
         organization.LastUpdatedBy = currentUserId;
+        organization.Banner = dto.Banner; 
 
         _context.Organizations.Update(organization);
 
@@ -236,6 +237,7 @@ public class OrganizationBusiness : IOrganizationBusiness
             LastUpdatedBy = organization.LastUpdatedBy,
             IsArchived = organization.IsArchived,
             DefaultOrg = organization.DefaultOrg,
+            Banner = organization.Banner
         };
     }
 

@@ -202,6 +202,11 @@ try
             {
                 new()
                 {
+                    Url = "http://localhost:5000/api/v1/",
+                    Description = "Docker Environment"
+                },
+                new()
+                {
                     Url = "https://deeplynx.inl.gov/api/v1/",
                     Description = "Production"
                 },
@@ -214,11 +219,6 @@ try
                 {
                     Url = "https://deeplynx-test.dev.inl.gov/api/v1/",
                     Description = "Test"
-                },
-                new()
-                {
-                    Url = "http://localhost:5000/api/v1/",
-                    Description = "Docker Environment"
                 },
                 new()
                 {

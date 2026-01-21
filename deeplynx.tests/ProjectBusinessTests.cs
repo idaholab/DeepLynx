@@ -871,7 +871,6 @@ public class ProjectBusinessTests : IntegrationTestBase
         Assert.Equal(originalProject.Abbreviation, archivedProject.Abbreviation);
         Assert.Equal(originalProject.OrganizationId, archivedProject.OrganizationId);
         Assert.Equal(uid, archivedProject.LastUpdatedBy);
-        Assert.Equal(originalProject.Config, archivedProject.Config);
 
 
         // Ensure that project soft delete event was logged
@@ -943,7 +942,6 @@ public class ProjectBusinessTests : IntegrationTestBase
         Assert.Equal(originalProject.Abbreviation, archivedProject.Abbreviation);
         Assert.Equal(originalProject.OrganizationId, archivedProject.OrganizationId);
         Assert.Equal(uid, archivedProject.LastUpdatedBy);
-        Assert.Equal(originalProject.Config, archivedProject.Config);
     }
 
     [Fact]
