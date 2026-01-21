@@ -59,10 +59,12 @@ export type UpdateOauthApplicationRequestDto = {
 export type CreateObjectStorageRequestDto = {
   name: string;
   config: string;
+  default?: boolean;
 }
 
 export type UpdateObjectStorageRequestDto = {
   name: string;
+  default: boolean;
 }
 
 export type CreateClassRequestDto = {
