@@ -29,17 +29,15 @@ import {
   CreateObjectStorageRequestDto,
   UpdateObjectStorageRequestDto,
 } from "@/app/(home)/types/requestDTOs";
+import ProjectLogoSection from "@/app/(home)/project_management/[id]/settings/components/ProjectLogoSection";
+import StorageSettingsSection from "@/app/(home)/project_management/[id]/settings/components/StorageSettingsSection";
+import CreateStorageModal from "@/app/(home)/project_management/[id]/settings/components/CreateStorageModal";
+import EditStorageModal from "@/app/(home)/project_management/[id]/settings/components/EditStorageModal";
+import DeleteStorageModal from "@/app/(home)/project_management/[id]/settings/components/DeleteStorageModal";
+import ArchiveStorageModal from "@/app/(home)/project_management/[id]/settings/components/ArchiveStorageModal";
+import RemoveLogoModal from "@/app/(home)/project_management/[id]/settings/components/RemoveLogoModal";
 import { useLanguage } from "@/app/contexts/Language";
-import {
-  ExclamationTriangleIcon,
-  InformationCircleIcon,
-  CircleStackIcon,
-  PlusIcon,
-  PencilIcon,
-  TrashIcon,
-  ArchiveBoxIcon,
-  ArchiveBoxXMarkIcon,
-} from "@heroicons/react/24/outline";
+import { ExclamationTriangleIcon } from "@heroicons/react/24/outline";
 
 interface ProjectSettingsProps {
   project: ProjectResponseDto | null;
@@ -496,375 +494,40 @@ const ProjectSettings = ({ project }: ProjectSettingsProps) => {
         {/* Two-column layout for Logo and Storage */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Logo Section */}
-          <div className="card bg-base-100 border border-primary/40 shadow-sm">
-            <div className="card-body">
-              <h3 className="card-title text-lg mb-4">
-                {t.translations.PROJECT_LOGO}
-              </h3>
-
-              <div className="flex items-start gap-6 mb-6">
-                {/* Logo Preview */}
-                <div className="avatar">
-                  <div className="w-32 h-32 rounded-xl bg-base-200 flex items-center justify-center overflow-hidden border-2 border-base-300">
-                    {logoPreview ? (
-                      <img
-                        src={logoPreview}
-                        alt="Project Logo"
-                        className="object-contain w-full h-full p-2"
-                        onError={() => {
-                          setLogoPreview(null);
-                        }}
-                      />
-                    ) : (
-                      <div className="text-center p-4">
-                        <span className="text-base-content/40 text-sm">
-                          {t.translations.NO_LOGO}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Logo Controls */}
-                <div className="flex flex-col gap-3 flex-1">
-                  <div>
-                    <span className="font-semibold text-lg block">
-                      {project?.name || "Project"}
-                    </span>
-                    <span className="text-sm text-base-content/60">
-                      {t.translations.PROJECT_LOGO}
-                    </span>
-                  </div>
-
-                  <div className="flex flex-wrap gap-2">
-                    <label className="btn btn-sm btn-primary">
-                      {logoFile ? "Change Logo" : "Select Logo"}
-                      <input
-                        type="file"
-                        accept=".png,.jpg,.jpeg,.svg,.webp"
-                        className="hidden"
-                        onChange={(e) => handleLogoChange(e.target.files)}
-                      />
-                    </label>
-
-                    {logoFile && (
-                      <>
-                        <button
-                          type="button"
-                          className="btn btn-sm btn-success"
-                          onClick={handleUploadLogo}
-                          disabled={isUploading}
-                        >
-                          {isUploading && (
-                            <span className="loading loading-spinner loading-xs" />
-                          )}
-                          {t.translations.UPLOAD}
-                        </button>
-
-                        <button
-                          type="button"
-                          className="btn btn-sm btn-ghost"
-                          onClick={handleCancelSelection}
-                          disabled={isUploading}
-                        >
-                          {t.translations.CANCEL}
-                        </button>
-                      </>
-                    )}
-
-                    {logoPreview && !logoFile && (
-                      <label
-                        htmlFor="remove_project_logo"
-                        className="btn btn-sm btn-error btn-outline"
-                      >
-                        {t.translations.REMOVE_LOGO}
-                      </label>
-                    )}
-                  </div>
-
-                  {logoFile && (
-                    <div className="alert alert-info">
-                      <InformationCircleIcon className="size-5" />
-                      <span className="text-sm">
-                        {t.translations.CLICK_UPLOAD_TO_SAVE_YOUR_CHANGES}
-                      </span>
-                    </div>
-                  )}
-
-                  <div className="text-xs text-base-content/60 bg-base-200 p-3 rounded-lg">
-                    <p className="font-semibold mb-1">
-                      {t.translations.LOGO_GUIDLINES}:
-                    </p>
-                    <ul className="list-disc list-inside space-y-1">
-                      <li>
-                        {
-                          t.translations
-                            .REPLACES_THE_FOLDER_ICON_NEXT_TO_THE_PROJECT_NAME
-                        }
-                      </li>
-                      <li>
-                        {
-                          t.translations
-                            .RECOMMENDED_PNG_WITH_TRANSPARENT_BACKGROUND
-                        }
-                      </li>
-                      <li>{t.translations.OPTIMAL_SIZE_FOR_LOGO}</li>
-                      <li>{t.translations.FILE_SIZE_MUST_BE_5MB}</li>
-                      <li>{t.translations.SUPPORTED_FORMATS_FOR_LOGO}</li>
-                    </ul>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
+          <ProjectLogoSection
+            project={project}
+            logoPreview={logoPreview}
+            logoFile={logoFile}
+            isUploading={isUploading}
+            onLogoChange={handleLogoChange}
+            onUploadLogo={handleUploadLogo}
+            onCancelSelection={handleCancelSelection}
+            onLogoError={() => setLogoPreview(null)}
+            t={t}
+          />
 
           {/* Storage Settings Section with Tabs */}
-          <div className="card bg-base-100 border border-primary/40 shadow-sm">
-            <div className="card-body">
-              <div className="flex justify-between">
-                <div className="flex items-center gap-2 mb-4">
-                  <CircleStackIcon className="w-6 h-6 text-primary" />
-                  <h3 className="card-title text-lg">
-                    {t.translations.STORAGE_SETTINGS}
-                  </h3>
-                </div>
-                {/* Save Button */}
-                {selectedStorageId &&
-                  selectedStorageId !== defaultStorage?.id && (
-                    <button
-                      className="btn btn-primary btn-sm mt-2 ml-4"
-                      onClick={handleSaveDefaultStorage}
-                      disabled={isSavingStorage}
-                    >
-                      {isSavingStorage && (
-                        <span className="loading loading-spinner loading-xs" />
-                      )}
-                      Save Default Storage
-                    </button>
-                  )}
-              </div>
-
-              {/* Tabs */}
-              <div role="tablist" className="tabs tabs-bordered mb-4 gap-4">
-                <button
-                  role="tab"
-                  className={`tab ${activeTab === "default" ? "tab-active" : ""}`}
-                  onClick={() => setActiveTab("default")}
-                >
-                  Default Storage
-                </button>
-                <button
-                  role="tab"
-                  className={`tab ${activeTab === "manage" ? "tab-active" : ""}`}
-                  onClick={() => setActiveTab("manage")}
-                >
-                  Manage Storages
-                </button>
-              </div>
-
-              {/* Tab Content */}
-              {activeTab === "default" && (
-                <div>
-                  <p className="text-sm text-base-content/70 mb-4">
-                    {t.translations.SET_DEFAULT_UNMOUNTED_OBJECT_STORAGE}
-                  </p>
-
-                  <div className="form-control">
-                    <label className="label">
-                      <span className="label-text font-semibold mr-4 mb-6">
-                        {t.translations.DEFAULT_UNMOUNT_STORAGE}
-                      </span>
-                    </label>
-
-                    {availableStorages.length === 0 ? (
-                      <div className="alert alert-warning">
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          className="stroke-current shrink-0 h-6 w-6"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth="2"
-                            d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-                          />
-                        </svg>
-                        <span>
-                          No storage locations available. Create one in the
-                          "Manage Storages" tab.
-                        </span>
-                      </div>
-                    ) : (
-                      <>
-                        <select
-                          className="select select-bordered"
-                          value={selectedStorageId || ""}
-                          onChange={(e) =>
-                            setSelectedStorageId(Number(e.target.value))
-                          }
-                        >
-                          <option value="" disabled>
-                            Select a storage location
-                          </option>
-                          {availableStorages.map((storage) => (
-                            <option key={storage.id} value={storage.id}>
-                              {storage.name}
-                              {storage.default ? " (Current Default)" : ""}
-                              {storage.isArchived ? " [Archived]" : ""}
-                            </option>
-                          ))}
-                        </select>
-
-                        {/* Current Default Display */}
-                        {defaultStorage && (
-                          <div>
-                            <label className="label">
-                              <span className="label-text-alt text-base-content/60">
-                                This will be the default storage for data
-                                sources in this project
-                              </span>
-                            </label>
-                            <div className="alert alert-info mt-3">
-                              <svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                className="stroke-current shrink-0 w-6 h-6"
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth="2"
-                                  d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                                />
-                              </svg>
-                              <span className="text-sm">
-                                Current default:{" "}
-                                <strong>{defaultStorage.name}</strong>
-                              </span>
-                            </div>
-                          </div>
-                        )}
-                      </>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {activeTab === "manage" && (
-                <div>
-                  <div className="flex justify-between items-center mb-4">
-                    <p className="text-sm text-base-content/70">
-                      Create, edit, and manage your storage locations
-                    </p>
-                    <button
-                      className="btn btn-primary btn-sm"
-                      onClick={() => {
-                        resetStorageForm();
-                        setIsCreateModalOpen(true);
-                      }}
-                    >
-                      <PlusIcon className="w-4 h-4" />
-                      Create Storage
-                    </button>
-                  </div>
-
-                  {/* Storage List */}
-                  <div className="space-y-2 max-h-96 overflow-y-auto">
-                    {availableStorages.length === 0 ? (
-                      <div className="text-center py-8 text-base-content/60">
-                        <CircleStackIcon className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                        <p>No storages created yet</p>
-                        <p className="text-sm">
-                          Click "Create Storage" to add one
-                        </p>
-                      </div>
-                    ) : (
-                      availableStorages.map((storage) => (
-                        <div
-                          key={storage.id}
-                          className={`card bg-base-200 border ${storage.isArchived ? "border-warning/30 opacity-60" : "border-base-300"}`}
-                        >
-                          <div className="card-body p-4">
-                            <div className="flex items-start justify-between">
-                              <div className="flex-1">
-                                <div className="flex items-center gap-2 mb-1">
-                                  <h4 className="font-semibold">
-                                    {storage.name}
-                                  </h4>
-                                  {storage.default && (
-                                    <span className="badge badge-primary badge-sm">
-                                      Default
-                                    </span>
-                                  )}
-                                  {storage.isArchived && (
-                                    <span className="badge badge-warning badge-sm">
-                                      Archived
-                                    </span>
-                                  )}
-                                </div>
-                                <p className="text-xs text-base-content/60">
-                                  Type: {storage.type || "N/A"}
-                                </p>
-                                <p className="text-xs text-base-content/60">
-                                  Last updated:{" "}
-                                  {new Date(
-                                    storage.lastUpdatedAt,
-                                  ).toLocaleDateString()}
-                                </p>
-                              </div>
-
-                              <div className="flex gap-1">
-                                <button
-                                  className="btn btn-ghost btn-xs disabled:cursor-not-allowed"
-                                  onClick={() => openEditModal(storage)}
-                                  disabled={storage.isArchived}
-                                  title={
-                                    storage.isArchived
-                                      ? "Archived storages cannot be edited"
-                                      : "Edit"
-                                  }
-                                >
-                                  <PencilIcon className="w-4 h-4" />
-                                </button>
-                                <button
-                                  className="btn btn-ghost btn-xs"
-                                  onClick={() => {
-                                    setArchiveStorageId(storage.id as number);
-                                    setArchiveAction(!storage.isArchived);
-                                  }}
-                                  title={
-                                    storage.isArchived ? "Unarchive" : "Archive"
-                                  }
-                                >
-                                  {storage.isArchived ? (
-                                    <ArchiveBoxXMarkIcon className="w-4 h-4" />
-                                  ) : (
-                                    <ArchiveBoxIcon className="w-4 h-4" />
-                                  )}
-                                </button>
-                                <button
-                                  className="btn btn-ghost btn-xs text-error"
-                                  onClick={() =>
-                                    setDeleteStorageId(storage.id as number)
-                                  }
-                                  title="Delete"
-                                >
-                                  <TrashIcon className="w-4 h-4" />
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
+          <StorageSettingsSection
+            activeTab={activeTab}
+            onChangeTab={setActiveTab}
+            availableStorages={availableStorages}
+            selectedStorageId={selectedStorageId}
+            onSelectStorage={setSelectedStorageId}
+            defaultStorage={defaultStorage}
+            isSavingStorage={isSavingStorage}
+            onSaveDefaultStorage={handleSaveDefaultStorage}
+            onCreateStorage={() => {
+              resetStorageForm();
+              setIsCreateModalOpen(true);
+            }}
+            onEditStorage={openEditModal}
+            onToggleArchive={(storage) => {
+              setArchiveStorageId(storage.id as number);
+              setArchiveAction(!storage.isArchived);
+            }}
+            onDeleteStorage={(storageId) => setDeleteStorageId(storageId)}
+            t={t}
+          />
         </div>
 
         {/* Archive Project Section */}
@@ -888,328 +551,44 @@ const ProjectSettings = ({ project }: ProjectSettingsProps) => {
         </div>
       </div>
 
-      {/* Create Storage Modal */}
-      <input
-        type="checkbox"
-        id="create_storage_modal"
-        className="modal-toggle"
-        checked={isCreateModalOpen}
-        onChange={() => setIsCreateModalOpen(!isCreateModalOpen)}
+      <CreateStorageModal
+        isOpen={isCreateModalOpen}
+        onToggle={setIsCreateModalOpen}
+        storageType={storageType}
+        setStorageType={setStorageType}
+        storageFormData={storageFormData}
+        setStorageFormData={setStorageFormData}
+        filesystemPath={filesystemPath}
+        setFilesystemPath={setFilesystemPath}
+        s3Endpoint={s3Endpoint}
+        setS3Endpoint={setS3Endpoint}
+        s3BucketName={s3BucketName}
+        setS3BucketName={setS3BucketName}
+        onCreate={handleCreateStorage}
+        onResetForm={resetStorageForm}
       />
-      <div className="modal" role="dialog">
-        <div className="modal-box max-w-2xl">
-          <h3 className="text-lg font-bold mb-4">Create Storage</h3>
-
-          <div className="form-control mb-4">
-            <label className="label">
-              <span className="label-text">Storage Name *</span>
-            </label>
-            <input
-              type="text"
-              placeholder="e.g., Primary Storage"
-              className="input input-bordered"
-              value={storageFormData.name}
-              onChange={(e) =>
-                setStorageFormData({ ...storageFormData, name: e.target.value })
-              }
-            />
-          </div>
-
-          <div className="form-control mb-4">
-            <label className="label">
-              <span className="label-text">Storage Type *</span>
-            </label>
-            <select
-              className="select select-bordered"
-              value={storageType}
-              onChange={(e) => setStorageType(e.target.value)}
-            >
-              <option value="filesystem">Filesystem</option>
-              <option value="aws_s3">AWS S3 (Coming Soon)</option>
-              <option value="azure_blob">Azure Blob Storage</option>
-            </select>
-          </div>
-
-          {/* Filesystem Config */}
-          {storageType === "filesystem" && (
-            <div className="form-control mb-4">
-              <label className="label">
-                <span className="label-text">Filesystem Path *</span>
-              </label>
-              <input
-                type="text"
-                placeholder="/path/to/storage"
-                className="input input-bordered"
-                value={filesystemPath}
-                onChange={(e) => setFilesystemPath(e.target.value)}
-              />
-              <label className="label">
-                <span className="label-text-alt">
-                  Absolute path where files will be stored
-                </span>
-              </label>
-            </div>
-          )}
-
-          {/* S3/MinIO Config */}
-          {storageType === "aws_s3" && (
-            <div className="alert alert-warning">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="stroke-current shrink-0 h-6 w-6"
-                fill="none"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2"
-                  d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-                />
-              </svg>
-              <div>
-                <p className="font-semibold">
-                  AWS S3 Configuration Coming Soon
-                </p>
-                <p className="text-sm">
-                  The backend configuration for AWS S3 storage is currently
-                  being finalized.
-                </p>
-              </div>
-            </div>
-          )}
-
-          {/* Azure Blob Config */}
-          {storageType === "azure_blob" && (
-            <>
-              <div className="form-control mb-4">
-                <label className="label">
-                  <span className="label-text">Connection String *</span>
-                </label>
-                <input
-                  type="text"
-                  placeholder="DefaultEndpointsProtocol=https;AccountName=..."
-                  className="input input-bordered"
-                  value={s3Endpoint}
-                  onChange={(e) => setS3Endpoint(e.target.value)}
-                />
-              </div>
-
-              <div className="form-control mb-4">
-                <label className="label">
-                  <span className="label-text">Container Name *</span>
-                </label>
-                <input
-                  type="text"
-                  placeholder="my-container"
-                  className="input input-bordered"
-                  value={s3BucketName}
-                  onChange={(e) => setS3BucketName(e.target.value)}
-                />
-              </div>
-            </>
-          )}
-
-          <div className="form-control mb-4">
-            <label className="cursor-pointer label">
-              <span className="label-text">Set as default storage</span>
-              <input
-                type="checkbox"
-                className="checkbox checkbox-primary"
-                checked={storageFormData.default}
-                onChange={(e) =>
-                  setStorageFormData({
-                    ...storageFormData,
-                    default: e.target.checked,
-                  })
-                }
-              />
-            </label>
-          </div>
-
-          <div className="modal-action">
-            <button
-              className="btn"
-              onClick={() => {
-                setIsCreateModalOpen(false);
-                resetStorageForm();
-              }}
-            >
-              Cancel
-            </button>
-            <button className="btn btn-primary" onClick={handleCreateStorage}>
-              Create
-            </button>
-          </div>
-        </div>
-        <label
-          className="modal-backdrop"
-          onClick={() => setIsCreateModalOpen(false)}
-        >
-          Close
-        </label>
-      </div>
-
-      {/* Edit Storage Modal */}
-      <input
-        type="checkbox"
-        id="edit_storage_modal"
-        className="modal-toggle"
-        checked={isEditModalOpen}
-        onChange={() => setIsEditModalOpen(!isEditModalOpen)}
+      <EditStorageModal
+        isOpen={isEditModalOpen}
+        onToggle={setIsEditModalOpen}
+        storageFormData={storageFormData}
+        setStorageFormData={setStorageFormData}
+        onEdit={handleEditStorage}
+        setEditingStorage={setEditingStorage}
       />
-      <div className="modal" role="dialog">
-        <div className="modal-box">
-          <h3 className="text-lg font-bold mb-4">Edit Storage</h3>
-
-          <div className="form-control mb-4">
-            <label className="label">
-              <span className="label-text">Storage Name *</span>
-            </label>
-            <input
-              type="text"
-              placeholder="e.g., Primary Storage"
-              className="input input-bordered"
-              value={storageFormData.name}
-              onChange={(e) =>
-                setStorageFormData({ ...storageFormData, name: e.target.value })
-              }
-            />
-          </div>
-
-          <div className="form-control mb-4">
-            <label className="cursor-pointer label">
-              <span className="label-text">Set as default storage</span>
-              <input
-                type="checkbox"
-                className="checkbox checkbox-primary"
-                checked={storageFormData.default}
-                onChange={(e) =>
-                  setStorageFormData({
-                    ...storageFormData,
-                    default: e.target.checked,
-                  })
-                }
-              />
-            </label>
-          </div>
-
-          <div className="modal-action">
-            <button
-              className="btn"
-              onClick={() => {
-                setIsEditModalOpen(false);
-                setEditingStorage(null);
-                setStorageFormData({ name: "", config: {}, default: false });
-              }}
-            >
-              Cancel
-            </button>
-            <button className="btn btn-primary" onClick={handleEditStorage}>
-              Save Changes
-            </button>
-          </div>
-        </div>
-        <label
-          className="modal-backdrop"
-          onClick={() => setIsEditModalOpen(false)}
-        >
-          Close
-        </label>
-      </div>
-
-      {/* Delete Storage Modal */}
-      <input
-        type="checkbox"
-        id="delete_storage_modal"
-        className="modal-toggle"
-        checked={deleteStorageId !== null}
-        onChange={() => setDeleteStorageId(null)}
+      <DeleteStorageModal
+        isOpen={deleteStorageId !== null}
+        onToggle={(value) => setDeleteStorageId(value ? deleteStorageId : null)}
+        onDelete={handleDeleteStorage}
       />
-      <div className="modal" role="dialog">
-        <div className="modal-box">
-          <h3 className="text-lg font-bold text-error">Delete Storage</h3>
-          <p className="py-4">
-            Are you sure you want to delete this storage? This action cannot be
-            undone.
-          </p>
-          <div className="modal-action">
-            <button className="btn" onClick={() => setDeleteStorageId(null)}>
-              Cancel
-            </button>
-            <button className="btn btn-error" onClick={handleDeleteStorage}>
-              Delete
-            </button>
-          </div>
-        </div>
-        <label
-          className="modal-backdrop"
-          onClick={() => setDeleteStorageId(null)}
-        >
-          Close
-        </label>
-      </div>
-
-      {/* Archive/Unarchive Storage Modal */}
-      <input
-        type="checkbox"
-        id="archive_storage_modal"
-        className="modal-toggle"
-        checked={archiveStorageId !== null}
-        onChange={() => setArchiveStorageId(null)}
+      <ArchiveStorageModal
+        isOpen={archiveStorageId !== null}
+        onToggle={(value) =>
+          setArchiveStorageId(value ? archiveStorageId : null)
+        }
+        archiveAction={archiveAction}
+        onArchive={handleArchiveStorage}
       />
-      <div className="modal" role="dialog">
-        <div className="modal-box">
-          <h3 className="text-lg font-bold">
-            {archiveAction ? "Archive" : "Unarchive"} Storage
-          </h3>
-          <p className="py-4">
-            Are you sure you want to {archiveAction ? "archive" : "unarchive"}{" "}
-            this storage?
-          </p>
-          <div className="modal-action">
-            <button className="btn" onClick={() => setArchiveStorageId(null)}>
-              Cancel
-            </button>
-            <button className="btn btn-warning" onClick={handleArchiveStorage}>
-              {archiveAction ? "Archive" : "Unarchive"}
-            </button>
-          </div>
-        </div>
-        <label
-          className="modal-backdrop"
-          onClick={() => setArchiveStorageId(null)}
-        >
-          Close
-        </label>
-      </div>
-
-      {/* Remove Logo Modal */}
-      <input
-        type="checkbox"
-        id="remove_project_logo"
-        className="modal-toggle"
-      />
-      <div className="modal" role="dialog">
-        <div className="modal-box">
-          <h3 className="text-lg font-bold">{t.translations.REMOVE_LOGO}</h3>
-          <p className="py-4">
-            {t.translations.ARE_YOU_SURE_YOU_WANT_TO_REMOVE_LOGO_FROM_PROJECT}
-          </p>
-          <div className="modal-action">
-            <label htmlFor="remove_project_logo" className="btn">
-              {t.translations.CANCEL}
-            </label>
-            <label
-              htmlFor="remove_project_logo"
-              className="btn btn-outline btn-secondary"
-              onClick={handleRemoveLogo}
-            >
-              {t.translations.REMOVE}
-            </label>
-          </div>
-        </div>
-      </div>
+      <RemoveLogoModal onRemoveLogo={handleRemoveLogo} t={t} />
     </div>
   );
 };
