@@ -30,6 +30,7 @@ import ProjectDeleteRoleModal from "./ProjectDeleteRoleModal";
 import ProjectEditRoleModal from "./ProjectEditRoleModal";
 import MatrixViewLayout from "./MatrixViewLayout";
 import SplitViewLayout from "./SplitViewLayout";
+import { useLanguage } from "@/app/contexts/Language";
 
 /* -------------------------------------------------------------------------- */
 /*                                   Types                                    */
@@ -62,11 +63,16 @@ const ProjectRolesAndPermissions = ({
   /*                               Core State                                */
   /* ------------------------------------------------------------------------ */
 
+  // For this release: only standard roles (Admin, User, Viewer)
+  const standardInitialRoles = initialRoles.filter((role) =>
+    ["Admin", "User", "Viewer"].includes(role.name),
+  );
+
   const [activeLayout, setActiveLayout] = useState<"split-view" | "matrix">(
-    "split-view"
+    "split-view",
   );
   const [selectedRoleId, setSelectedRoleId] = useState<number | null>(
-    initialRoles[0]?.id || null
+    standardInitialRoles[0]?.id || null,
   );
   const [roles, setRoles] = useState(initialRoles);
   const [permissions, setPermissions] = useState(initialPermissions);
@@ -78,6 +84,8 @@ const ProjectRolesAndPermissions = ({
   const [initialLoadComplete, setInitialLoadComplete] = useState(false);
 
   const { organization } = useOrganizationSession();
+
+  const { t } = useLanguage();
 
   /* ------------------------------------------------------------------------ */
   /*                           Context: Project                               */
@@ -413,12 +421,15 @@ const ProjectRolesAndPermissions = ({
   /* ------------------------------------------------------------------------ */
 
   const groupPermissionsByResource = (): PermissionCategory[] => {
-    const grouped = permissions.reduce((acc, perm) => {
-      const resource = perm.resource || "General";
-      if (!acc[resource]) acc[resource] = [];
-      acc[resource].push(perm);
-      return acc;
-    }, {} as Record<string, PermissionResponseDto[]>);
+    const grouped = permissions.reduce(
+      (acc, perm) => {
+        const resource = perm.resource || "General";
+        if (!acc[resource]) acc[resource] = [];
+        acc[resource].push(perm);
+        return acc;
+      },
+      {} as Record<string, PermissionResponseDto[]>,
+    );
 
     return Object.entries(grouped).map(([resource, perms]) => ({
       id: resource.toLowerCase().replace(/\s+/g, "-"),
@@ -443,7 +454,7 @@ const ProjectRolesAndPermissions = ({
       const perms = await getPermissionsForRole(
         Number(organization.organizationId),
         projectId,
-        roleId
+        roleId,
       );
       setRolePermissions((prev) => ({
         ...prev,
@@ -470,10 +481,10 @@ const ProjectRolesAndPermissions = ({
           .catch((error) => {
             console.error(
               `Error fetching permissions for role ${role.id}:`,
-              error
+              error,
             );
             return { roleId: role.id, perms: [] as PermissionResponseDto[] };
-          })
+          }),
       );
 
       const results = await Promise.all(promises);
@@ -575,13 +586,14 @@ const ProjectRolesAndPermissions = ({
   return (
     <div className="p-6 mx-auto">
       {/* Header */}
-      <div className="mb-6">
+      <div className="mb-6 border-b border-base-300 pb-4">
         <div className="flex items-center justify-between mb-2">
-          <h1 className="text-2xl font-bold">Project Roles & Permissions</h1>
+          <h1 className="text-2xl font-bold">
+            {t.translations.PROJECT_ROLES_AND_PERMISSIONS}
+          </h1>
         </div>
         <p className="text-base-content/70">
-          View project-level roles and their permissions. Standard roles are
-          defined by the system and are read-only in this release.
+          {t.translations.VIEW_PROJECT_LEVEL_ROLES_AND_PERMISSIONS}
         </p>
       </div>
 
@@ -590,10 +602,12 @@ const ProjectRolesAndPermissions = ({
         <div className="alert alert-warning mb-6">
           <LockClosedIcon className="w-6 h-6" />
           <div>
-            <h3 className="font-bold">Roles Locked by Organization</h3>
+            <h3 className="font-bold">{t.translations.ROLES_LOCKED_BY_ORG}</h3>
             <div className="text-sm">
-              Project-level role creation and permission modification is
-              disabled. Contact your organization administrator to unlock.
+              {
+                t.translations
+                  .PROJECT_LEVEL_ROLE_CREATION_AND_PERMISSION_MODIFICATION_DESCRIPTION
+              }
             </div>
           </div>
         </div>
@@ -602,7 +616,9 @@ const ProjectRolesAndPermissions = ({
       {/* Layout toggle */}
       <div className="mb-6">
         <label className="label">
-          <span className="label-text font-medium">View Layout:</span>
+          <span className="label-text font-medium">
+            {t.translations.VIEW_LAYOUT}:
+          </span>
         </label>
         <div className="btn-group">
           <button
@@ -611,7 +627,7 @@ const ProjectRolesAndPermissions = ({
               activeLayout === "split-view" ? "btn-primary" : "btn-ghost"
             }`}
           >
-            Split View
+            {t.translations.SPLIT_VIEW}
           </button>
           <button
             onClick={() => setActiveLayout("matrix")}
@@ -619,7 +635,7 @@ const ProjectRolesAndPermissions = ({
               activeLayout === "matrix" ? "btn-primary" : "btn-ghost"
             }`}
           >
-            Matrix View
+            {t.translations.MATRIX_VIEW}
           </button>
         </div>
       </div>

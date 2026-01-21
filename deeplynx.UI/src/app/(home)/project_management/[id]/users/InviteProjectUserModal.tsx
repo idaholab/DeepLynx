@@ -1,57 +1,51 @@
-// src/app/(home)/organization_management/users/InviteUserModal.tsx
+// src/app/(home)/project_management/[id]/users/InviteProjectUserModal.tsx
 
 import React from "react";
 import { EnvelopeIcon, XMarkIcon } from "@heroicons/react/24/outline";
-import {
-  ProjectResponseDto,
-  RoleResponseDto,
-} from "../../types/responseDTOs";
+import { RoleResponseDto } from "@/app/(home)/types/responseDTOs";
+import { useLanguage } from "@/app/contexts/Language";
 
 /* -------------------------------------------------------------------------- */
-/*                            Invite User Dialog UI                           */
+/*                     Invite User to Project Dialog                          */
 /* -------------------------------------------------------------------------- */
 
-interface InviteUserModalProps {
+interface InviteProjectUserModalProps {
   isOpen: boolean;
   inviteEmail: string;
-  selectedProjectId: string;
   selectedRoleId: string;
-  availableProjects: ProjectResponseDto[];
-  availableRoles: RoleResponseDto[];
+  roles: RoleResponseDto[];
   modalLoading: boolean;
 
   onClose: () => void;
   onInvite: () => void;
   onChangeEmail: (value: string) => void;
-  onChangeProject: (value: string) => void;
   onChangeRole: (value: string) => void;
 }
 
-const InviteUserModal: React.FC<InviteUserModalProps> = ({
+const InviteProjectUserModal: React.FC<InviteProjectUserModalProps> = ({
   isOpen,
   inviteEmail,
-  selectedProjectId,
   selectedRoleId,
-  availableProjects,
-  availableRoles,
+  roles,
   modalLoading,
   onClose,
   onInvite,
   onChangeEmail,
-  onChangeProject,
   onChangeRole,
 }) => {
+  const { t } = useLanguage();
   if (!isOpen) return null;
 
-  const inviteDisabled =
-    !inviteEmail || (selectedProjectId && !selectedRoleId) || modalLoading;
+  const inviteDisabled = !inviteEmail || !selectedRoleId || modalLoading;
 
   return (
     <div className="modal modal-open">
-      <div className="modal-box max-w-2xl">
+      <div className="modal-box max-w-xl">
         {/* Header */}
         <div className="flex justify-between items-center mb-6">
-          <h3 className="font-bold text-2xl">Invite User to Organization</h3>
+          <h3 className="font-bold text-2xl">
+            {t.translations.INVITE_USER_TO_PROJECT}
+          </h3>
           <button
             className="btn btn-sm btn-circle btn-ghost"
             onClick={onClose}
@@ -72,7 +66,8 @@ const InviteUserModal: React.FC<InviteUserModalProps> = ({
               <div className="form-control">
                 <label className="label">
                   <span className="label-text font-semibold">
-                    Email Address <span className="text-error">*</span>
+                    {t.translations.EMAIL_ADDRESS}{" "}
+                    <span className="text-error mr-2">*</span>
                   </span>
                 </label>
                 <input
@@ -82,69 +77,45 @@ const InviteUserModal: React.FC<InviteUserModalProps> = ({
                   value={inviteEmail}
                   onChange={(e) => onChangeEmail(e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key === "Enter" && inviteEmail && !inviteDisabled) {
+                    if (e.key === "Enter" && !inviteDisabled) {
                       onInvite();
                     }
                   }}
+                  autoFocus
                 />
               </div>
 
-              {/* <div className="divider">Optional Project Assignment</div> */}
-
-              {/* Project Selector */}
-              {/* <div className="form-control">
+              {/* Role Selection */}
+              <div className="form-control">
                 <label className="label">
-                  <span className="label-text font-semibold mr-2">
-                    Assign to Project (Optional)
+                  <span className="label-text font-semibold">
+                    {t.translations.PROJECT_ROLES}{" "}
+                    <span className="text-error mr-2">*</span>
                   </span>
                 </label>
                 <select
                   className="select select-bordered select-lg"
-                  value={selectedProjectId}
-                  onChange={(e) => onChangeProject(e.target.value)}
+                  value={selectedRoleId}
+                  onChange={(e) => onChangeRole(e.target.value)}
                 >
-                  <option value="">No project (org access only)</option>
-                  {availableProjects.map((project) => (
-                    <option key={project.id} value={project.id}>
-                      {project.name}
+                  <option value="">{t.translations.SELECT_A_ROLE_}</option>
+                  {roles.map((role) => (
+                    <option key={role.id} value={role.id}>
+                      {role.name}
                     </option>
                   ))}
                 </select>
-              </div> */}
-
-              {/* Role Selector (conditional) */}
-              {selectedProjectId && (
-                <div className="form-control">
-                  <label className="label">
-                    <span className="label-text font-semibold">
-                      Project Role <span className="text-error mr-2">*</span>
-                    </span>
-                  </label>
-                  <select
-                    className="select select-bordered select-lg"
-                    value={selectedRoleId}
-                    onChange={(e) => onChangeRole(e.target.value)}
-                  >
-                    <option value="">Select a role...</option>
-                    {availableRoles.map((role) => (
-                      <option key={role.id} value={role.id}>
-                        {role.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
+              </div>
 
               {/* Info Alert */}
               <div className="alert alert-info">
                 <EnvelopeIcon className="w-6 h-6" />
                 <div>
-                  <h4 className="font-semibold">Email Notification</h4>
+                  <h4 className="font-semibold">
+                    {t.translations.EMAIL_NOTIFICATIONS}
+                  </h4>
                   <p className="text-sm">
-                    An invitation email will be sent with instructions to join
-                    the organization.
-                    {selectedProjectId &&
-                      " The user will be automatically assigned to the selected project with the specified role upon accepting."}
+                    {t.translations.EMAIL_INVITATION_DESCRIPTION}
                   </p>
                 </div>
               </div>
@@ -157,11 +128,12 @@ const InviteUserModal: React.FC<InviteUserModalProps> = ({
                 onClick={onClose}
                 disabled={modalLoading}
               >
-                Cancel
+                {t.translations.CANCEL}
               </button>
               <button
-                className={`btn btn-primary gap-2 ${inviteDisabled ? "btn-disabled" : ""
-                  }`}
+                className={`btn btn-primary gap-2 ${
+                  inviteDisabled ? "btn-disabled" : ""
+                }`}
                 disabled={inviteDisabled}
                 onClick={onInvite}
               >
@@ -170,7 +142,7 @@ const InviteUserModal: React.FC<InviteUserModalProps> = ({
                 ) : (
                   <EnvelopeIcon className="w-5 h-5" />
                 )}
-                Send Invitation
+                {t.translations.SEND_INVITATION}
               </button>
             </div>
           </>
@@ -182,4 +154,4 @@ const InviteUserModal: React.FC<InviteUserModalProps> = ({
   );
 };
 
-export default InviteUserModal;
+export default InviteProjectUserModal;

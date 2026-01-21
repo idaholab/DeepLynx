@@ -30,6 +30,7 @@
     "motion": "^12.18.1",
     "next": "^15.2.8",
     "next-auth": "^5.0.0-beta.28",
+    "papaparse": "^5.5.3",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "react-hot-toast": "^2.5.2",
@@ -40,13 +41,15 @@
     "shepherd.js": "^14.5.1",
     "sigma": "^3.0.2",
     "slick-carousel": "^1.8.1",
-    "usehooks-ts": "^3.1.1"
+    "usehooks-ts": "^3.1.1",
+    "zod": "^4.3.5"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
     "@tailwindcss/postcss": "^4",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^20",
+    "@types/papaparse": "^5.5.2",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/react-slick": "^0.23.13",

@@ -1,7 +1,15 @@
-import { CreateOrganizationRequestDto, UpdateOrganizationRequestDto } from "@/app/(home)/types/requestDTOs";
+import { 
+    CreateOrganizationRequestDto, 
+    InviteUserToOrganizationRequestDto, 
+    UpdateOrganizationRequestDto 
+} from "@/app/(home)/types/requestDTOs";
 import { OrganizationResponseDto } from "@/app/(home)/types/responseDTOs";
 import api from "./api";
+import { UploadLogoRequest, UploadLogoResponse, RemoveLogoRequest, RemoveLogoResponse } from "@/app/(home)/types/org_setting_types";
 
+/* -------------------------------------------------------------------------- */
+/*                         Organization CRUD Operations                        */
+/* -------------------------------------------------------------------------- */
 
 /**
  * Get all organizations
@@ -149,6 +157,10 @@ export const archiveOrganization = async (
     }
 };
 
+/* -------------------------------------------------------------------------- */
+/*                      Organization User Management                          */
+/* -------------------------------------------------------------------------- */
+
 /**
  * Add a user to an organization
  * @param organizationId - The ID of the organization
@@ -217,6 +229,121 @@ export const removeUserFromOrganization = async (
         return res.data;
     } catch (error) {
         console.error(`Error removing user ${userId} from organization ${organizationId}:`, error);
+        throw error;
+    }
+};
+
+/**
+ * Upload organization logo
+ * Saves the logo to /public/images/org-{organizationId}-logo.{ext}
+ */
+export const uploadOrganizationLogo = async (
+  request: UploadLogoRequest
+): Promise<UploadLogoResponse> => {
+  const formData = new FormData();
+  formData.append("file", request.file);
+
+  const response = await fetch(
+    `/api/organization/${request.organizationId}/logo`,
+    {
+      method: "POST",
+      body: formData,
+    }
+  );
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message || "Failed to upload logo");
+  }
+
+  return response.json();
+};
+
+/**
+ * Remove organization logo
+ * Deletes the logo file from /public/images
+ */
+export const removeOrganizationLogo = async (
+  request: RemoveLogoRequest
+): Promise<RemoveLogoResponse> => {
+  const response = await fetch(
+    `/api/organization/${request.organizationId}/logo`,
+    {
+      method: "DELETE",
+    }
+  );
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message || "Failed to remove logo");
+  }
+
+  return response.json();
+};
+
+/**
+ * Get organization logo URL and check if it exists
+ * Returns the logo URL if the file exists, null otherwise
+ */
+export const getOrganizationLogoUrl = async (
+  organizationId: number
+): Promise<string | null> => {
+  try {
+    const response = await fetch(`/api/organization/${organizationId}/logo`, {
+      method: "GET",
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const data = await response.json();
+    return data.exists ? data.logoUrl : null;
+  } catch (error) {
+    console.error("Error getting logo URL:", error);
+    return null;
+  }
+};
+
+/**
+ * Check if organization logo exists
+ * Returns true if a logo file exists for the organization
+ */
+export const checkLogoExists = async (
+  organizationId: number
+): Promise<boolean> => {
+  try {
+    const logoUrl = await getOrganizationLogoUrl(organizationId);
+    return logoUrl !== null;
+  } catch (error) {
+    console.error("Error checking logo existence:", error);
+    return false;
+  }
+}
+
+  /*
+ * Invite a user to an organization
+ * @param organizationId - The ID of the organization
+ * @param inviteData - The invite request data (userEmail, optional userName)
+ * @returns Promise<void>
+ */
+export const inviteUserToOrganization = async (
+    organizationId: number,
+    inviteData: InviteUserToOrganizationRequestDto
+): Promise<void> => {
+    try {
+        await api.post(
+            `/organizations/${organizationId}/invite`,
+            null,
+            {
+                params: {
+                    userEmail: inviteData.userEmail,
+                    ...(inviteData.userName && { userName: inviteData.userName })
+                }
+            }
+        );
+    } catch (error) {
+        console.error(`Error inviting user to organization ${organizationId}:`, error);
         throw error;
     }
 };

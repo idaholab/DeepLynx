@@ -37,8 +37,8 @@ const ProjectOverviewWidget = () => {
         console.error("Failed to fetch project stats:", error);
       }
     };
-    if (project?.projectId) fetchStats();
-  }, [project?.projectId]);
+    if (project?.projectId && organization?.organizationId) fetchStats();
+  }, [project?.projectId, organization?.organizationId]);
 
   return (
     <div className="card-body">

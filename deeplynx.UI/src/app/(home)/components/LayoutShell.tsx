@@ -27,7 +27,10 @@ import { useRBAC } from "../rbac/useRBAC";
 import { useOrganizationSession } from "@/app/contexts/OrganizationSessionProvider";
 import { OrganizationResponseDto } from "../types/responseDTOs";
 import { useSafeSession } from "@/app/hooks/useSafeSession";
-import { getAllOrganizationsForUser } from "@/app/lib/client_service/organization_services.client";
+import {
+  getAllOrganizationsForUser,
+  getOrganizationLogoUrl,
+} from "@/app/lib/client_service/organization_services.client";
 import TopBanner from "./VulnerabilityBanner";
 
 const LayoutShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -43,11 +46,12 @@ const LayoutShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
   const [selectedItem, setSelectedItem] = useState<string>("");
   const [organizations, setOrganizations] = useState<OrganizationResponseDto[]>(
-    []
+    [],
   );
   const [loadingOrgs, setLoadingOrgs] = useState(false);
   const [isOrgDropdownOpen, setIsOrgDropdownOpen] = useState(false);
   const [isUserDropdownOpen, setIsUserDropdownOpen] = useState(false);
+  const [orgLogoUrl, setOrgLogoUrl] = useState<string | null>(null);
 
   // Handle menu toggle
   const [isMenuCollapsed, setIsMenuCollapsed] = React.useState(false);
@@ -68,6 +72,28 @@ const LayoutShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
     fetchOrganizations();
   }, []);
+
+  // Load organization logo
+  useEffect(() => {
+    const loadOrganizationLogo = async () => {
+      if (!organization?.organizationId) {
+        setOrgLogoUrl(null);
+        return;
+      }
+
+      try {
+        const logoUrl = await getOrganizationLogoUrl(
+          organization.organizationId as number,
+        );
+        setOrgLogoUrl(logoUrl);
+      } catch (error) {
+        console.error("Failed to load organization logo:", error);
+        setOrgLogoUrl(null);
+      }
+    };
+
+    loadOrganizationLogo();
+  }, [organization?.organizationId]);
 
   const handleMenuToggle = (isCollapsed: boolean) => {
     setIsMenuCollapsed(isCollapsed);
@@ -126,7 +152,7 @@ const LayoutShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   // Function to handle item click events
   const handleItemClick = (
     item: string,
-    event: React.MouseEvent<HTMLElement>
+    event: React.MouseEvent<HTMLElement>,
   ) => {
     event.preventDefault();
     setSelectedItem(item);
@@ -142,10 +168,33 @@ const LayoutShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         {/* Organization Switcher */}
         <div className="dropdown">
           <div className="flex items-center">
-            <div className="flex items-center py-2">
-              <UserGroupIcon className="size-8 mr-3" />
+            <div className="flex items-center py-2 gap-3">
+              {/* Organization Logo (if exists) */}
+              {orgLogoUrl ? (
+                <div className="avatar">
+                  <div className="w-10 h-10 rounded-lg overflow-hidden bg-base-100 flex items-center justify-center relative">
+                    <Image
+                      src={orgLogoUrl}
+                      alt={organization?.organizationName || "Organization"}
+                      fill
+                      sizes="40px"
+                      className="object-contain p-1"
+                      onError={() => {
+                        // If image fails to load, hide it
+                        setOrgLogoUrl(null);
+                      }}
+                    />
+                  </div>
+                </div>
+              ) : (
+                // Fallback to UserGroupIcon if no logo
+                <UserGroupIcon className="size-8" />
+              )}
+
               <div className="flex flex-col">
-                <span className="text-xs opacity-70">Organization</span>
+                <span className="text-xs opacity-70">
+                  {t.translations.ORGANIZATION}
+                </span>
                 <h1 className="text-lg font-bold truncate">
                   {organization?.organizationName || "No Organization"}
                 </h1>
@@ -178,17 +227,18 @@ const LayoutShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                 <>
                   <li className="menu-title">
                     <span className="text-base-content/70">
-                      Switch Organization
+                      {t.translations.SWITCH_ORGANIZATION}
                     </span>
                   </li>
                   {organizations.map((org) => (
                     <li key={org.id} className="w-full">
                       <a
                         onClick={() => handleOrganizationSwitch(org)}
-                        className={`flex items-center gap-2 w-full max-w-full ${organization?.organizationId === org.id
+                        className={`flex items-center gap-2 w-full max-w-full ${
+                          organization?.organizationId === org.id
                             ? "active bg-info/60"
                             : ""
-                          }`}
+                        }`}
                       >
                         <div className="min-w-0 flex-1 overflow-hidden">
                           <div className=" font-medium truncate">
@@ -202,7 +252,7 @@ const LayoutShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                         </div>
                         {organization?.organizationId === org.id && (
                           <span className="badge badge-sm shrink-0 whitespace-nowrap !text-base-content">
-                            Current
+                            {t.translations.CURRENT}
                           </span>
                         )}
                       </a>
@@ -216,7 +266,7 @@ const LayoutShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                       onClick={() => setIsOrgDropdownOpen(false)}
                     >
                       <UserGroupIcon className="size-5" />
-                      View All Organizations
+                      {t.translations.VIEW_ALL_ORGANIZATIONS}
                     </Link>
                   </li>
                 </>
@@ -371,8 +421,9 @@ const LayoutShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         </div>
         <SideMenu onToggle={handleMenuToggle} />
         <main
-          className={`transition-all duration-300 w-full mt-20 ${isMenuCollapsed ? "ml-40" : "ml-82"
-            }`}
+          className={`transition-all duration-300 w-full mt-20 ${
+            isMenuCollapsed ? "ml-40" : "ml-82"
+          }`}
         >
           {children}
         </main>

@@ -3,7 +3,7 @@ export default {
   admins: {title: 'Managing DeepLynx Nexus'},
   ecosystem: {title: 'Integrating with DeepLynx Nexus'},
   developers: {title: 'Deploying DeepLynx Nexus'},
-  documentation: {title: 'DeepLynx Nexus Documentation'},
+  documentation: {display: 'hidden', title: 'DeepLynx Nexus Documentation'},
   deeplynx: {
     title: "Back to DeepLynx",
     type: 'page',

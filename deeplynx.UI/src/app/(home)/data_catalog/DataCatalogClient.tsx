@@ -108,7 +108,7 @@ export default function DataCatalogClient({
       setTableData(mappedData);
       setViewMode("list");
     },
-    [effectiveProjectIds]
+    [effectiveProjectIds, organization?.organizationId]
   );
 
   // Clear all filters
@@ -164,7 +164,7 @@ export default function DataCatalogClient({
         setIsSearching(false);
       }
     },
-    [activeFilters, nextFilterId]
+    [activeFilters, nextFilterId, organization?.organizationId]
   );
 
   // Handle search from search bar

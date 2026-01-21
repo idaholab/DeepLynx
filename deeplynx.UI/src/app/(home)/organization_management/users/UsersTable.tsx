@@ -4,34 +4,29 @@
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 
-import EditSysUser from "../SiteManagementPortal/EditSysUser";
-import {
-  ProjectResponseDto,
-  RoleResponseDto,
-  UserResponseDto,
-} from "../../types/responseDTOs";
+import EditSysUser from "../../components/SiteManagementPortal/EditSysUser";
+import { UserResponseDto } from "../../types/responseDTOs";
 
 import { useOrganizationSession } from "@/app/contexts/OrganizationSessionProvider";
-import { sendEmail } from "@/app/lib/client_service/notification_services.client";
-import { removeUserFromOrganization } from "@/app/lib/client_service/organization_services.client";
-import { getAllProjects } from "@/app/lib/client_service/projects_services.client";
-import { getAllRoles } from "@/app/lib/client_service/role_services.client";
+import {
+  removeUserFromOrganization,
+  inviteUserToOrganization,
+} from "@/app/lib/client_service/organization_services.client";
 import { getAllUsers } from "@/app/lib/client_service/user_services.client";
+import { InviteUserToOrganizationRequestDto } from "../../types/requestDTOs";
 import DeleteModal from "./DeleteModal";
 import InviteUserModal from "./InviteUserModal";
 import UsersHeaderStats from "./UsersHeaderStats";
 import UsersListTable from "./UsersListTable";
 import { UsersTableRow } from "../../types/types";
+import { useLanguage } from "@/app/contexts/Language";
 
 /* -------------------------------------------------------------------------- */
 /*                                   Types                                    */
 /* -------------------------------------------------------------------------- */
 
 interface Props {
-  initialMembers: UserResponseDto[];
-  header: string;
-  description: string;
-  onUsersChange?: () => Promise<void>; // Add this prop
+  members: UserResponseDto[];
 }
 
 type ConfirmModalState = {
@@ -46,23 +41,6 @@ type ConfirmModalState = {
 /* -------------------------------------------------------------------------- */
 
 const buildTableData = (users: UserResponseDto[]): UsersTableRow[] => {
-  // TODO: Replace mock with real pending invites from backend
-  const mockPendingInvites: UsersTableRow[] = [
-    {
-      id: 9999,
-      name: "",
-      email: "pending@example.com",
-      username: null,
-      isActive: false,
-      isArchived: false,
-      isSysAdmin: false,
-      isPending: true,
-      invitedAt: new Date().toISOString(),
-      projectName: "Alpha Project",
-      roleName: "Developer",
-    },
-  ];
-
   const activeUsers: UsersTableRow[] = users.map((user) => ({
     id: user.id,
     name: user.name || "",
@@ -74,22 +52,23 @@ const buildTableData = (users: UserResponseDto[]): UsersTableRow[] => {
     isPending: false,
   }));
 
-  return [...mockPendingInvites, ...activeUsers];
+  return [...activeUsers];
 };
 
 /* -------------------------------------------------------------------------- */
 /*                           UsersTable Component                             */
 /* -------------------------------------------------------------------------- */
 
-const UsersTable = ({ initialMembers, header, description, onUsersChange }: Props) => {
+const UsersTable = ({ members }: Props) => {
   /* ------------------------------------------------------------------------ */
   /*                               Core State                                */
   /* ------------------------------------------------------------------------ */
 
   const [tableData, setTableData] = useState<UsersTableRow[]>(() =>
-    buildTableData(initialMembers)
+    buildTableData(members)
   );
   const [loading, setLoading] = useState(false);
+  const { t } = useLanguage();
 
   /* ------------------------------------------------------------------------ */
   /*                           Invite Modal State                             */
@@ -97,12 +76,6 @@ const UsersTable = ({ initialMembers, header, description, onUsersChange }: Prop
 
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [inviteEmail, setInviteEmail] = useState("");
-  const [selectedProjectId, setSelectedProjectId] = useState("");
-  const [selectedRoleId, setSelectedRoleId] = useState("");
-  const [availableProjects, setAvailableProjects] = useState<
-    ProjectResponseDto[]
-  >([]);
-  const [availableRoles, setAvailableRoles] = useState<RoleResponseDto[]>([]);
   const [modalLoading, setModalLoading] = useState(false);
 
   /* ------------------------------------------------------------------------ */
@@ -134,131 +107,106 @@ const UsersTable = ({ initialMembers, header, description, onUsersChange }: Prop
   /* ------------------------------------------------------------------------ */
 
   const loadAllData = async () => {
-    if (!organization?.organizationId) return; // guard
+    if (!organization?.organizationId) return;
 
     try {
       const users: UserResponseDto[] = await getAllUsers(
         organization.organizationId
       );
       setTableData(buildTableData(users));
-      if (onUsersChange) {
-        await onUsersChange();
-      }
     } catch (error) {
       console.error("Failed to load data:", error);
     }
   };
 
-  // ✅ When server-side members prop changes, sync local state (no extra fetch)
+  // When server-side members prop changes, sync local state
   useEffect(() => {
-    setTableData(buildTableData(initialMembers));
-  }, [initialMembers]);
+    setTableData(buildTableData(members));
+  }, [members]);
 
   /* ------------------------------------------------------------------------ */
-  /*                        Invite Flow: Open & Options                       */
+  /*                        Invite Flow: Open Modal                           */
   /* ------------------------------------------------------------------------ */
 
-  const handleOpenInviteModal = async () => {
+  const handleOpenInviteModal = () => {
     setShowInviteModal(true);
-    setModalLoading(true);
-
-    try {
-      if (!organization?.organizationId) {
-        throw new Error("No organization selected");
-      }
-
-      const projects = await getAllProjects(
-        organization.organizationId as number
-      );
-      setAvailableProjects(projects);
-    } catch (error) {
-      console.error("Failed to fetch projects:", error);
-      toast.error("Unable to load projects");
-    } finally {
-      setModalLoading(false);
-    }
   };
 
-  // Load roles when project selection changes
-  useEffect(() => {
-    const fetchRolesForProject = async () => {
-      if (!selectedProjectId || !organization?.organizationId) {
-        setAvailableRoles([]);
-        return;
-      }
-
-      try {
-        const roles = await getAllRoles(
-          organization.organizationId as number,
-          Number(selectedProjectId)
-        );
-        setAvailableRoles(roles);
-      } catch (error) {
-        console.error("Failed to fetch roles:", error);
-        toast.error("Unable to load roles for selected project");
-      }
-    };
-
-    fetchRolesForProject();
-  }, [selectedProjectId, organization?.organizationId]);
-
   /* ------------------------------------------------------------------------ */
-  /*                          Invite Flow: Send Email                         */
+  /*                          Invite Flow: Send Invitation                    */
   /* ------------------------------------------------------------------------ */
 
   const handleInviteUser = async () => {
     if (!inviteEmail) {
-      toast.error("Please enter an email address");
+      toast.error(t.translations.PLEASE_ENTER_EMAIL_ADDRESS);
       return;
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(inviteEmail)) {
-      toast.error("Please enter a valid email address");
+      toast.error(t.translations.PLEASE_ENTER_VALID_EMAIL_ADDRESS);
       return;
     }
 
-    if (selectedProjectId && !selectedRoleId) {
-      toast.error("Please select a role for the project");
+    if (!organization?.organizationId) {
+      toast.error(t.translations.NO_ORG_SELECTED);
       return;
     }
 
     try {
       setModalLoading(true);
 
-      await sendEmail(inviteEmail, "New User");
+      // Prepare organization invite data
+      const inviteData: InviteUserToOrganizationRequestDto = {
+        userEmail: inviteEmail,
+        userName: inviteEmail.split("@")[0], // Extract username from email
+      };
 
-      if (selectedProjectId && selectedRoleId) {
-        toast.success(
-          `Invitation sent to ${inviteEmail}. They will be added to the selected project upon accepting.`
-        );
-      } else {
-        toast.success(`Invitation sent to ${inviteEmail}`);
-      }
+      // Call organization invite API
+      await inviteUserToOrganization(
+        organization.organizationId as number,
+        inviteData
+      );
 
-      // ✅ Now re-fetch from API (already org-scoped)
+      toast.success(`${t.translations.INVITATION_SENT_TO_} ${inviteEmail}`);
+
+      // Refresh the user list
       await loadAllData();
 
+      // Close modal and reset form
       setShowInviteModal(false);
       setInviteEmail("");
-      setSelectedProjectId("");
-      setSelectedRoleId("");
     } catch (error) {
       console.error("Error inviting user:", error);
-      toast.error("Failed to send invitation");
+      toast.error(t.translations.FAILED_TO_SEND_INVITATION);
     } finally {
       setModalLoading(false);
     }
   };
 
   const handleResendInvite = async (email: string) => {
+    if (!organization?.organizationId) {
+      toast.error(t.translations.NO_ORG_SELECTED);
+      return;
+    }
+
     try {
       setLoading(true);
-      await sendEmail(email, "Resend Invitation");
-      toast.success(`Invitation resent to ${email}`);
+
+      const inviteData: InviteUserToOrganizationRequestDto = {
+        userEmail: email,
+        userName: email.split("@")[0], // Extract username from email
+      };
+
+      await inviteUserToOrganization(
+        organization.organizationId as number,
+        inviteData
+      );
+
+      toast.success(`${t.translations.INVITATION_RESENT_TO_} ${email}`);
     } catch (error) {
       console.error("Failed to resend invite:", error);
-      toast.error("Failed to resend invitation");
+      toast.error(t.translations.FAILED_TO_RESEND_INVITATION);
     } finally {
       setLoading(false);
     }
@@ -276,7 +224,7 @@ const UsersTable = ({ initialMembers, header, description, onUsersChange }: Prop
 
       if (confirmModal.isPending) {
         // TODO: API call to cancel invite
-        toast.success("Invitation cancelled");
+        toast.success(t.translations.INVITATION_CANCELED);
       } else {
         if (!organization?.organizationId) {
           throw new Error("No organization selected");
@@ -287,10 +235,10 @@ const UsersTable = ({ initialMembers, header, description, onUsersChange }: Prop
           confirmModal.itemId
         );
 
-        toast.success("User removed from organization");
+        toast.success(t.translations.USER_REMOVED_FROM_ORG);
       }
 
-      // ✅ Refresh org-scoped list
+      // Refresh org-scoped list
       await loadAllData();
 
       setConfirmModal({
@@ -303,8 +251,8 @@ const UsersTable = ({ initialMembers, header, description, onUsersChange }: Prop
       console.error("Failed to remove/cancel:", error);
       toast.error(
         confirmModal.isPending
-          ? "Failed to cancel invitation"
-          : "Failed to remove user"
+          ? t.translations.FAILED_TO_CANCEL_INVITATION
+          : t.translations.FAILED_TO_REMOVE_USER
       );
     } finally {
       setLoading(false);
@@ -318,7 +266,7 @@ const UsersTable = ({ initialMembers, header, description, onUsersChange }: Prop
   const activeUserCount = tableData.filter(
     (u) => !u.isPending && u.isActive && !u.isArchived
   ).length;
-  const pendingCount = tableData.filter((u) => u.isPending).length;
+  const pendingCount = tableData.filter((u) => u.isActive === false).length;
   const totalCount = activeUserCount + pendingCount;
 
   /* ------------------------------------------------------------------------ */
@@ -336,8 +284,6 @@ const UsersTable = ({ initialMembers, header, description, onUsersChange }: Prop
             totalCount={totalCount}
             loading={loading}
             onInviteClick={handleOpenInviteModal}
-            header={header}
-            description={description}
           />
 
           {/* Combined Users & Pending Invites Table */}
@@ -358,24 +304,13 @@ const UsersTable = ({ initialMembers, header, description, onUsersChange }: Prop
       <InviteUserModal
         isOpen={showInviteModal}
         inviteEmail={inviteEmail}
-        selectedProjectId={selectedProjectId}
-        selectedRoleId={selectedRoleId}
-        availableProjects={availableProjects}
-        availableRoles={availableRoles}
         modalLoading={modalLoading}
         onClose={() => {
           setShowInviteModal(false);
           setInviteEmail("");
-          setSelectedProjectId("");
-          setSelectedRoleId("");
         }}
         onInvite={handleInviteUser}
         onChangeEmail={setInviteEmail}
-        onChangeProject={(value) => {
-          setSelectedProjectId(value);
-          setSelectedRoleId("");
-        }}
-        onChangeRole={setSelectedRoleId}
       />
 
       {/* Edit User Modal */}
@@ -404,14 +339,26 @@ const UsersTable = ({ initialMembers, header, description, onUsersChange }: Prop
           })
         }
         onConfirm={handleRemoveOrCancel}
-        title={confirmModal.isPending ? "Cancel Invitation?" : "Remove User?"}
+        title={
+          confirmModal.isPending
+            ? t.translations.CANCEL_INVITATION
+            : t.translations.REMOVE_USER
+        }
         message={
           confirmModal.isPending
-            ? `Are you sure you want to cancel the invitation for ${confirmModal.itemName}? They will not be able to join with this invite link.`
-            : `Are you sure you want to remove ${confirmModal.itemName} from this organization? They will lose access to all projects.`
+            ? `${t.translations.SURE_YOU_WANT_TO_CANCEL_INVITATION_FOR_} ${confirmModal.itemName}? ${t.translations.THEY_WILL_NOT_BE_ABLE_TO_JOIN_WITH_LINK}`
+            : `${t.translations.ARE_YOU_SURE_YOU_WANT_TO_REMOVE_} ${confirmModal.itemName} ${t.translations.THEY_WILL_LOSE_ACCESS_FROM_ALL_PROJECTS}`
         }
-        confirmText={confirmModal.isPending ? "Cancel Invite" : "Remove"}
-        cancelText={confirmModal.isPending ? "Keep Invite" : "Cancel"}
+        confirmText={
+          confirmModal.isPending
+            ? t.translations.CANCEL_INVITE
+            : t.translations.REMOVE
+        }
+        cancelText={
+          confirmModal.isPending
+            ? t.translations.KEEP_INVITE
+            : t.translations.CANCEL
+        }
         isDestructive={true}
         loading={loading}
       />
