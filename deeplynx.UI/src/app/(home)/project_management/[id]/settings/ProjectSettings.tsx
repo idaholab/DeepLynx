@@ -365,6 +365,10 @@ const ProjectSettings = ({ project }: ProjectSettingsProps) => {
   const handleEditStorage = async () => {
     if (!organization?.organizationId || !project?.id || !editingStorage)
       return;
+    if (editingStorage.isArchived) {
+      toast.error("Archived storages cannot be edited");
+      return;
+    }
 
     if (!storageFormData.name.trim()) {
       toast.error("Storage name is required");
@@ -445,6 +449,9 @@ const ProjectSettings = ({ project }: ProjectSettingsProps) => {
   };
 
   const openEditModal = (storage: ObjectStorageResponseDto) => {
+    if (storage.isArchived) {
+      return;
+    }
     setEditingStorage(storage);
     setStorageFormData({
       name: storage.name,
@@ -710,33 +717,34 @@ const ProjectSettings = ({ project }: ProjectSettingsProps) => {
                           ))}
                         </select>
 
-                        <label className="label">
-                          <span className="label-text-alt text-base-content/60">
-                            This will be the default storage for data sources in
-                            this project
-                          </span>
-                        </label>
-
                         {/* Current Default Display */}
                         {defaultStorage && (
-                          <div className="alert alert-info mt-3">
-                            <svg
-                              xmlns="http://www.w3.org/2000/svg"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                              className="stroke-current shrink-0 w-6 h-6"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth="2"
-                                d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                              />
-                            </svg>
-                            <span className="text-sm">
-                              Current default:{" "}
-                              <strong>{defaultStorage.name}</strong>
-                            </span>
+                          <div>
+                            <label className="label">
+                              <span className="label-text-alt text-base-content/60">
+                                This will be the default storage for data
+                                sources in this project
+                              </span>
+                            </label>
+                            <div className="alert alert-info mt-3">
+                              <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                className="stroke-current shrink-0 w-6 h-6"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth="2"
+                                  d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                                />
+                              </svg>
+                              <span className="text-sm">
+                                Current default:{" "}
+                                <strong>{defaultStorage.name}</strong>
+                              </span>
+                            </div>
                           </div>
                         )}
                       </>
@@ -810,9 +818,14 @@ const ProjectSettings = ({ project }: ProjectSettingsProps) => {
 
                               <div className="flex gap-1">
                                 <button
-                                  className="btn btn-ghost btn-xs"
+                                  className="btn btn-ghost btn-xs disabled:cursor-not-allowed"
                                   onClick={() => openEditModal(storage)}
-                                  title="Edit"
+                                  disabled={storage.isArchived}
+                                  title={
+                                    storage.isArchived
+                                      ? "Archived storages cannot be edited"
+                                      : "Edit"
+                                  }
                                 >
                                   <PencilIcon className="w-4 h-4" />
                                 </button>
