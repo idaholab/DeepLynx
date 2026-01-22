@@ -119,6 +119,23 @@ const ProjectRolesAndPermissions = ({
         dto
       );
 
+      const userRole = roles.find((r) => r.name === "User");
+      if (userRole && rolePermissions[userRole.id]) {
+        const userPermissionIds = rolePermissions[userRole.id].map((p) => Number(p.id));
+
+        await setPermissionsForRole(
+          organization.organizationId as number,
+          project?.projectId as number,
+          newRole.id,
+          userPermissionIds
+        );
+
+        setRolePermissions((prev) => ({
+          ...prev,
+          [newRole.id]: rolePermissions[userRole.id],
+        }));
+      }
+
       setRoles((prev) => [...prev, newRole]);
       setSelectedRoleId(newRole.id);
       toast.success("Created new role");
