@@ -563,7 +563,7 @@ public class ClassBusiness : IClassBusiness
 
         var returnedClass = await query.FirstOrDefaultAsync();
         // if a class by the supplied name is found, return it
-        if (returnedClass is not null || !returnedClass.IsArchived)
+        if (returnedClass is not null && !returnedClass.IsArchived)
             return new ClassResponseDto
             {
                 Id = returnedClass.Id,

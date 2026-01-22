@@ -681,6 +681,19 @@ def cleanup_created_users(client):
         except:
             pass
 
+@pytest.fixture
+def cleanup_timeseries(client, organization, project, test_datasource_project):
+    """Track and cleanup timeseries tables created during tests."""
+    table_names = []
+    yield table_names
+    # Note: Add actual cleanup logic once you have a delete endpoint
+    for table_name in table_names:
+        try:
+            # delete the leftovers
+            pass
+        except:
+            pass
+
 # ============================================================================
 # FUNCTION-SCOPED FIXTURES FOR EDGE TESTING
 # ============================================================================
