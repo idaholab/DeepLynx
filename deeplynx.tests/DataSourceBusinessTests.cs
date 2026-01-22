@@ -2,6 +2,7 @@ using System.Text.Json.Nodes;
 using deeplynx.business;
 using deeplynx.datalayer.Models;
 using deeplynx.helpers;
+using deeplynx.helpers.BigData;
 using deeplynx.helpers.Hubs;
 using deeplynx.interfaces;
 using deeplynx.models;
@@ -20,6 +21,7 @@ public class DataSourceBusinessTests : IntegrationTestBase
     private readonly Mock<ILogger<NotificationBusiness>> _mockNotificationLogger = null!;
     private readonly Mock<IRecordBusiness> _mockRecordBusiness;
     private readonly INotificationBusiness _notificationBusiness = null!;
+    private readonly IBulkCopyUpsertExecutor _bulkCopyUpsertExecutor = null!;
     private DataSourceBusiness _dataSourceBusiness;
     public long did;
     public long did2;
@@ -37,7 +39,8 @@ public class DataSourceBusinessTests : IntegrationTestBase
         _mockNotificationLogger = new Mock<ILogger<NotificationBusiness>>();
         _notificationBusiness =
             new NotificationBusiness(Context, _mockNotificationLogger.Object, _mockHubContext.Object);
-        _eventBusiness = new EventBusiness(Context, _notificationBusiness);
+        _bulkCopyUpsertExecutor = new BulkCopyUpsertExecutor();
+        _eventBusiness = new EventBusiness(Context, _notificationBusiness, _bulkCopyUpsertExecutor);
     }
 
     public override async Task InitializeAsync()

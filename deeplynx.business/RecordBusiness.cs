@@ -1,17 +1,21 @@
+using System.Data;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using deeplynx.datalayer.Models;
 using deeplynx.helpers;
+using deeplynx.helpers.Context;
 using deeplynx.helpers.exceptions;
 using deeplynx.interfaces;
 using deeplynx.models;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
+using NpgsqlTypes;
 
 namespace deeplynx.business;
 
 public class RecordBusiness : IRecordBusiness
 {
+    private readonly IBulkCopyUpsertExecutor _bulkCopyUpsertExecutor;
     private readonly DeeplynxContext _context;
     private readonly IEventBusiness _eventBusiness;
     private readonly ITagBusiness _tagBusiness;
@@ -21,12 +25,15 @@ public class RecordBusiness : IRecordBusiness
     /// </summary>
     /// <param name="context">The database context used for the record operations.</param>
     /// <param name="eventBusiness">Used for logging events during create, update, and delete Operations.</param>
+    /// ///
     /// <param name="tagBusiness">Used for creating tags related to a record.</param>
-    public RecordBusiness(DeeplynxContext context, IEventBusiness eventBusiness, ITagBusiness tagBusiness)
+    public RecordBusiness(DeeplynxContext context, IEventBusiness eventBusiness,
+        IBulkCopyUpsertExecutor bulkCopyUpsertExecutor, ITagBusiness tagBusiness)
     {
         _context = context;
         _eventBusiness = eventBusiness;
         _tagBusiness = tagBusiness;
+        _bulkCopyUpsertExecutor = bulkCopyUpsertExecutor;
     }
 
     /// <summary>
@@ -470,10 +477,10 @@ public class RecordBusiness : IRecordBusiness
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
     /// <param name="projectId">The ID of the project under which to create the record</param>
     /// <param name="dataSourceId">The ID of the data source under which to create the record</param>
-    /// <param name="records">The data transfer object containing details on the records to be created</param>
+    /// <param name="records">Enumerable list for of record transfer objects containing details on the records to be created</param>
     /// <returns>The newly created metadata record</returns>
     /// <exception cref="KeyNotFoundException">Returned if the project or datasource are not found</exception>
-    /// <exception cref="Exception">Returned if the metadata is too deeply nested</exception>
+    /// <exception cref="Exception">Returned on other general errors</exception>
     public async Task<List<RecordResponseDto>> BulkCreateRecords(
         long currentUserId,
         long organizationId,
@@ -481,88 +488,116 @@ public class RecordBusiness : IRecordBusiness
         long dataSourceId,
         List<CreateRecordRequestDto> records)
     {
-        // Leaving existence check in here for project as this method can be invoked without middleware
-        await ExistenceHelper.EnsureProjectExistsAsync(_context, projectId);
         await ExistenceHelper.EnsureDataSourceExistsForProjectAsync(_context, dataSourceId, projectId);
 
         if (records.Count == 0) throw new Exception("Unable to bulk create records: no records selected for creation");
 
-        // Checks to see if Object Storage Ids reference an existing object storage in the project
-        foreach (var dto in records)
-            if (dto.ObjectStorageId != null)
-                await CheckObjectStorageExists(projectId, dto.ObjectStorageId.Value);
+        await EnsureMultipleObjectStoragesExistOnce(projectId, records);
 
-        // Bulk insert into records; if there is an original ID collision, update name, desc, uri, class, and props
-        var sql = @"
-            INSERT INTO deeplynx.records (project_id, data_source_id, name, description, uri,
-                              original_id, properties, class_id, object_storage_id, file_type,
-                              last_updated_at, is_archived, last_updated_by, organization_id)
-            VALUES {0}
-            ON CONFLICT (project_id, data_source_id, original_id) DO UPDATE SET
-                name = COALESCE(EXCLUDED.name, records.name),
-                description = COALESCE(EXCLUDED.description, records.description),
-                uri = COALESCE(EXCLUDED.uri, records.uri),
-                properties = COALESCE(EXCLUDED.properties, records.properties),
-                class_id = COALESCE(EXCLUDED.class_id, records.class_id),
-                object_storage_id = COALESCE(EXCLUDED.object_storage_id, records.object_storage_id),
-                last_updated_at = @now,
-                last_updated_by = @lastUpdatedBy,
-                file_type = COALESCE(EXCLUDED.file_type, records.file_type)
-            RETURNING *;                                                          
-        ";
+        var conn = (NpgsqlConnection)_context.Database.GetDbConnection();
+        if (conn.State != ConnectionState.Open) await conn.OpenAsync();
+        await using var tx = await conn.BeginTransactionAsync();
 
-        // establish "constant" parameters
-        var parameters = new List<NpgsqlParameter>
-        {
-            new("@projectId", projectId),
-            new("@dataSourceId", dataSourceId),
-            new("@now", DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)),
-            new("@lastUpdatedBy", currentUserId),
-            new("@organizationId", organizationId)
-        };
+        var now = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
 
-        // establish "dynamic" parameters (new for each dto in the list)
-        parameters.AddRange(records.SelectMany((dto, i) => new[]
-        {
-            new NpgsqlParameter($"@p{i}_name", dto.Name),
-            new NpgsqlParameter($"@p{i}_desc", dto.Description),
-            new NpgsqlParameter($"@p{i}_uri", (object?)dto.Uri ?? DBNull.Value),
-            new NpgsqlParameter($"@p{i}_props", JsonSerializer.Serialize(dto.Properties)),
-            new NpgsqlParameter($"@p{i}_orig", dto.OriginalId),
-            new NpgsqlParameter($"@p{i}_class", (object?)dto.ClassId ?? DBNull.Value),
-            new NpgsqlParameter($"@p{i}_object_storage", (object?)dto.ObjectStorageId ?? DBNull.Value),
-            new NpgsqlParameter($"@p{i}_file_type", (object?)dto.FileType ?? DBNull.Value)
-        }));
+        const string createTempSql = @"
+        CREATE TEMP TABLE tmp_records
+        (
+            organization_id     BIGINT NOT NULL,
+            project_id          BIGINT NOT NULL,
+            data_source_id      BIGINT NOT NULL,
+            name                TEXT NULL,
+            description         TEXT NULL,
+            uri                 TEXT NULL,
+            original_id         TEXT NOT NULL,
+            properties          JSONB NULL,
+            class_id            BIGINT NULL,
+            object_storage_id   BIGINT NULL,
+            file_type           TEXT NULL,
+            last_updated_at     TIMESTAMP WITHOUT TIME ZONE NOT NULL,
+            is_archived         BOOLEAN NOT NULL,
+            last_updated_by     BIGINT NULL
+        ) ON COMMIT DROP;";
 
-        // stringify the params and comma separate them
-        var valueTuples = string.Join(", ", records.Select((dto, i) =>
-            $"(@projectId, @dataSourceId, @p{i}_name, @p{i}_desc, " +
-            $"@p{i}_uri, @p{i}_orig, @p{i}_props::jsonb, @p{i}_class, @p{i}_object_storage, @p{i}_file_type, @now, false, @lastUpdatedBy, @organizationId)"));
+        const string copyCmd = @"
+        COPY tmp_records
+        (organization_id, project_id, data_source_id, name, description, uri,
+         original_id, properties, class_id, object_storage_id, file_type,
+         last_updated_at, is_archived, last_updated_by)
+        FROM STDIN (FORMAT BINARY)";
 
-        // put everything together and execute the query
-        sql = string.Format(sql, valueTuples);
+        const string upsertSql = @"
+        INSERT INTO deeplynx.records
+        (organization_id, project_id, data_source_id, name, description, uri,
+         original_id, properties, class_id, object_storage_id, file_type,
+         last_updated_at, is_archived, last_updated_by)
+        SELECT organization_id, project_id, data_source_id, name, description, uri,
+               original_id, properties, class_id, object_storage_id, file_type,
+               last_updated_at, is_archived, last_updated_by
+        FROM tmp_records
+        ON CONFLICT (project_id, data_source_id, original_id) DO UPDATE
+          SET name              = COALESCE(EXCLUDED.name, records.name),
+              description       = COALESCE(EXCLUDED.description, records.description),
+              uri               = COALESCE(EXCLUDED.uri, records.uri),
+              properties        = COALESCE(EXCLUDED.properties, records.properties),
+              class_id          = COALESCE(EXCLUDED.class_id, records.class_id),
+              object_storage_id = COALESCE(EXCLUDED.object_storage_id, records.object_storage_id),
+              last_updated_at   = EXCLUDED.last_updated_at,
+              file_type         = COALESCE(EXCLUDED.file_type, records.file_type), 
+              last_updated_by   = EXCLUDED.last_updated_by
+        RETURNING id, organization_id, project_id, data_source_id, original_id, name, class_id, object_storage_id, file_type, last_updated_by, description, properties;";
 
-        // returns the resulting upserted classes
-        var result = await _context.Database
-            .SqlQueryRaw<RecordResponseDto>(sql, parameters.ToArray())
-            .ToListAsync();
+        var inserted = await _bulkCopyUpsertExecutor.CopyUpsertAsync(
+            conn, tx,
+            createTempSql,
+            copyCmd,
+            records,
+            (w, dto) =>
+            {
+                w.Write(organizationId, NpgsqlDbType.Bigint);
+                w.Write(projectId, NpgsqlDbType.Bigint);
+                w.Write(dataSourceId, NpgsqlDbType.Bigint);
+                if (dto.Name is null) w.WriteNull();
+                else w.Write(dto.Name, NpgsqlDbType.Text);
+                if (dto.Description is null) w.WriteNull();
+                else w.Write(dto.Description, NpgsqlDbType.Text);
+                if (dto.Uri is null) w.WriteNull();
+                else w.Write(dto.Uri, NpgsqlDbType.Text);
+                w.Write(dto.OriginalId, NpgsqlDbType.Text);
+                if (dto.Properties is null) w.WriteNull();
+                else w.Write(JsonSerializer.Serialize(dto.Properties), NpgsqlDbType.Jsonb);
 
-        var createEvent = new CreateEventRequestDto
+                if (dto.ClassId.HasValue) w.Write(dto.ClassId.Value, NpgsqlDbType.Bigint);
+                else w.WriteNull();
+                if (dto.ObjectStorageId.HasValue) w.Write(dto.ObjectStorageId.Value, NpgsqlDbType.Bigint);
+                else w.WriteNull();
+                if (dto.FileType is null) w.WriteNull();
+                else w.Write(dto.FileType, NpgsqlDbType.Text);
+
+                w.Write(now, NpgsqlDbType.Timestamp);
+                w.Write(false, NpgsqlDbType.Boolean);
+                w.Write(currentUserId, NpgsqlDbType.Bigint);
+            },
+            upsertSql,
+            MapRecord
+        );
+
+        // events logging
+        var events = new CreateEventRequestDto
         {
             Operation = "create",
             EntityType = "record",
             DataSourceId = dataSourceId
         };
-        await _eventBusiness.CreateEvent(currentUserId, organizationId, projectId, createEvent, result.Count);
+        await _eventBusiness.CreateEvent(currentUserId, organizationId, projectId, events, 1);
 
-        return result;
+        await tx.CommitAsync();
+        return inserted;
     }
 
     /// <summary>
     ///     Archive a metadata record.
     /// </summary>
-    /// <param name="currentUserId">ID of the User executing this method.</param>
-    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
     /// <param name="projectId">The project to which the record belongs</param>
     /// <param name="recordId">The record to be archived</param>
     /// <returns>Boolean indicating record was archived</returns>
@@ -826,6 +861,27 @@ public class RecordBusiness : IRecordBusiness
     }
 
     /// <summary>
+    ///     Delete a metadata record.
+    /// </summary>
+    /// <param name="projectId">The project to which the record belongs</param>
+    /// <param name="recordId">The record in question</param>
+    /// <returns>Boolean indicating record was deleted</returns>
+    /// <exception cref="KeyNotFoundException">Returned if the record to delete was not found.</exception>
+    /// TODO: return warning that historical data will be entirely wiped with this action
+    public async Task<bool> DeleteRecord(long projectId, long recordId)
+    {
+        var record = await _context.Records.FindAsync(recordId);
+
+        if (record == null || record.ProjectId != projectId)
+            throw new KeyNotFoundException($"Record with id {recordId} not found");
+
+        _context.Records.Remove(record);
+        await _context.SaveChangesAsync();
+
+        return true;
+    }
+
+    /// <summary>
     ///     Private method used to calculate json depth of properties (should be less than three)
     /// </summary>
     /// <param name="node"></param>
@@ -852,6 +908,35 @@ public class RecordBusiness : IRecordBusiness
             }
 
         return maxDepth + 1;
+    }
+
+    /// <summary>
+    /// Make sure every object storage ID exists, filtering in memory with one DB trip
+    /// </summary>
+    /// <param name="projectId"> Shared project ID of the object storages </param>
+    ///<param name="records"> Records with object storages to check</param>
+    ///<exception cref="KeyNotFoundException">If an object storage ID is not found</exception>
+    ///<returns>Exception if obj storage ID not exist</returns>
+    private async Task EnsureMultipleObjectStoragesExistOnce(long projectId, List<CreateRecordRequestDto> records)
+    {
+        var ids = records.Where(r => r.ObjectStorageId.HasValue)
+            .Select(r => r.ObjectStorageId!.Value)
+            .Distinct()
+            .ToArray();
+        if (ids.Length == 0) return;
+
+        // One database round trip                                                                                                            
+        var ok = await _context.ObjectStorages
+            .Where(os => os.ProjectId == projectId && ids.Contains(os.Id))
+            .Select(os => os.Id)
+            .ToListAsync();
+
+        if (ok.Count != ids.Length)
+        {
+            var missing = ids.Except(ok).Take(5);
+            throw new KeyNotFoundException(
+                $"One or more object storage IDs do not exist in project {projectId} (e.g., {string.Join(",", missing)}).");
+        }
     }
 
     private async Task CheckObjectStorageExists(long projectId, long objectStorageId)
@@ -906,5 +991,40 @@ public class RecordBusiness : IRecordBusiness
     {
         var inserted = await _tagBusiness.BulkCreateTags(organizationId, currentUserId, projectId, tags);
         return inserted.ToDictionary(t => t.Name, t => t);
+    }
+
+    /// <summary>
+    ///     Map an NPGSQL data reader to a return DTO usually during high scale read operations
+    /// </summary>
+    /// <param name="r">NPGSQL reader object containing DTO params</param>
+    /// <returns>A response data transfer object with fields mapped from the pg reader</returns>
+    private static RecordResponseDto MapRecord(NpgsqlDataReader r)
+    {
+        var iId = r.GetOrdinal("id");
+        var iProj = r.GetOrdinal("project_id");
+        var iDs = r.GetOrdinal("data_source_id");
+        var iOrig = r.GetOrdinal("original_id");
+        var iName = r.GetOrdinal("name");
+        var iCls = r.GetOrdinal("class_id");
+        var iObj = r.GetOrdinal("object_storage_id");
+        var iType = r.GetOrdinal("file_type");
+        var iUser = r.GetOrdinal("last_updated_by");
+        var iDesc = r.GetOrdinal("description");
+        var iProp = r.GetOrdinal("properties");
+
+        return new RecordResponseDto
+        {
+            Id = r.GetInt64(iId),
+            ProjectId = r.GetInt64(iProj),
+            DataSourceId = r.GetInt64(iDs),
+            OriginalId = r.GetString(iOrig),
+            Name = r.IsDBNull(iName) ? null : r.GetString(iName),
+            ClassId = r.IsDBNull(iCls) ? null : r.GetInt64(iCls),
+            ObjectStorageId = r.IsDBNull(iObj) ? null : r.GetInt64(iObj),
+            FileType = r.IsDBNull(iType) ? null : r.GetString(iType), 
+            LastUpdatedBy = r.IsDBNull(iUser) ? null : r.GetInt64(iUser), 
+            Description = r.IsDBNull(iDesc) ? null : r.GetString(iDesc),
+            Properties = r.IsDBNull(iProp) ? null : r.GetString(iProp)
+        };
     }
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { FileMetadata, UploadType } from "../../types/types";
+import { FileMetadata, UploadType, UploadProgressEvent } from "../../types/types";
 
 export type UploadMode = "file" | "bulk";
 
@@ -15,6 +15,10 @@ export function useUploadState() {
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [filesMetadata, setFilesMetadata] = useState<Record<number, FileMetadata>>({});
   const [dropKey, setDropKey] = useState(0);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<UploadProgressEvent | null>(null);
+  const [currentUploadId, setCurrentUploadId] = useState<string | null>(null);
+  const [isCancelling, setIsCancelling] = useState(false);
 
   // Upload Mode Toggle
   const [uploadMode, setUploadMode] = useState<UploadMode>("file");
@@ -42,6 +46,8 @@ export function useUploadState() {
     setMulti(false);
     setFilesMetadata({});
     setDropKey((k) => k + 1);
+    setUploadProgress(null);
+    setIsCancelling(false);
   };
 
   return {
@@ -55,6 +61,11 @@ export function useUploadState() {
     filesMetadata,
     dropKey,
     uploadMode,
+    isUploading,
+    uploadProgress,
+    currentUploadId,
+    isCancelling,
+    
     
     // Setters
     setMulti,
@@ -64,6 +75,10 @@ export function useUploadState() {
     setDestination,
     setSelectedFiles,
     setUploadMode,
+    setIsUploading,
+    setUploadProgress,
+    setCurrentUploadId,
+    setIsCancelling,
     
     // Methods
     handleMetadataChange,

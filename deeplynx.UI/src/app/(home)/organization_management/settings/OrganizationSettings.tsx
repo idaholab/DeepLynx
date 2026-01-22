@@ -18,6 +18,7 @@ import {
 } from "@/app/lib/client_service/organization_services.client";
 import { useLanguage } from "@/app/contexts/Language";
 import React from "react";
+import Image from "next/image";
 
 /* -------------------------------------------------------------------------- */
 /*                           Service Interface                                */
@@ -222,12 +223,14 @@ const OrganizationSettings = () => {
                 {/* Logo Section - ACTIVE */}
                 <div className="flex items-start gap-4 mb-6">
                   <div className="avatar">
-                    <div className="w-24 h-24 rounded-xl bg-base-200 flex items-center justify-center overflow-hidden border-2 border-base-300">
+                    <div className="w-24 h-24 rounded-xl bg-base-200 flex items-center justify-center overflow-hidden border-2 border-base-300 relative">
                       {logoPreview ? (
-                        <img
+                        <Image
                           src={logoPreview}
                           alt="Organization Logo"
-                          className="object-contain w-full h-full p-2"
+                          fill
+                          sizes="96px"
+                          className="object-contain p-2"
                           onError={() => {
                             setLogoPreview(null);
                           }}

@@ -34,7 +34,7 @@ const ExpandedProjectCard: React.FC<Props> = ({ project, onClose }) => {
   const [users, setUsers] = useState<{ name: string }[]>([]);
 
   useEffect(() => {
-    if (!project.id) return;
+    if (!project.id || !organization?.organizationId) return;
 
     const fetchStats = async () => {
       try {
@@ -52,7 +52,7 @@ const ExpandedProjectCard: React.FC<Props> = ({ project, onClose }) => {
       }
     };
     fetchStats();
-  }, [project.id]);
+  }, [project.id, organization?.organizationId]);
 
   useEffect(() => {
     const fetchAllUsers = async () => {

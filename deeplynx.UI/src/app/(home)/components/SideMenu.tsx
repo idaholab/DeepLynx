@@ -2,6 +2,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 
@@ -101,7 +102,7 @@ const SideMenu: React.FC<SideMenuProps> = ({ onToggle }) => {
       setActiveProject(undefined);
       setProjectLogoUrl(null);
     }
-  }, [organization?.organizationId, setProject]);
+  }, [organization]);
 
   // Sync activeProject with the project context
   useEffect(() => {
@@ -253,11 +254,13 @@ const SideMenu: React.FC<SideMenuProps> = ({ onToggle }) => {
                 {/* Project Logo or Folder Icon */}
                 {projectLogoUrl ? (
                   <div className="avatar flex-shrink-0">
-                    <div className="w-8 h-8 rounded-lg overflow-hidden bg-base-100 flex items-center justify-center">
-                      <img
+                    <div className="w-8 h-8 rounded-lg overflow-hidden bg-base-100 flex items-center justify-center relative">
+                      <Image
                         src={projectLogoUrl}
                         alt={activeProject?.name || "Project"}
-                        className="object-contain w-full h-full p-1"
+                        fill
+                        sizes="32px"
+                        className="object-contain p-1"
                         onError={() => {
                           setProjectLogoUrl(null);
                         }}

@@ -172,11 +172,13 @@ const LayoutShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
               {/* Organization Logo (if exists) */}
               {orgLogoUrl ? (
                 <div className="avatar">
-                  <div className="w-10 h-10 rounded-lg overflow-hidden bg-base-100 flex items-center justify-center">
-                    <img
+                  <div className="w-10 h-10 rounded-lg overflow-hidden bg-base-100 flex items-center justify-center relative">
+                    <Image
                       src={orgLogoUrl}
                       alt={organization?.organizationName || "Organization"}
-                      className="object-contain w-full h-full p-1"
+                      fill
+                      sizes="40px"
+                      className="object-contain p-1"
                       onError={() => {
                         // If image fails to load, hide it
                         setOrgLogoUrl(null);
