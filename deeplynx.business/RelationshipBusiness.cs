@@ -58,6 +58,7 @@ public class RelationshipBusiness : IRelationshipBusiness
                 r.Id,
                 r.Name,
                 r.Description,
+                r.Properties,
                 r.Uuid,
                 r.ProjectId,
                 r.OrganizationId,
@@ -76,6 +77,7 @@ public class RelationshipBusiness : IRelationshipBusiness
             Id = r.Id,
             Name = r.Name,
             Description = r.Description,
+            Properties = r.Properties,
             Uuid = r.Uuid,
             ProjectId = r.ProjectId,
             OrganizationId = r.OrganizationId,
@@ -122,6 +124,7 @@ public class RelationshipBusiness : IRelationshipBusiness
             Id = relationship.Id,
             Name = relationship.Name,
             Description = relationship.Description,
+            Properties = relationship.Properties,
             Uuid = relationship.Uuid,
             ProjectId = relationship.ProjectId,
             OrganizationId = relationship.OrganizationId,
@@ -166,6 +169,7 @@ public class RelationshipBusiness : IRelationshipBusiness
         {
             Name = dto.Name,
             Description = dto.Description,
+            Properties = dto.Properties?.ToString(),
             Uuid = dto.Uuid,
             OriginId = dto.OriginId,
             DestinationId = dto.DestinationId,
@@ -190,23 +194,24 @@ public class RelationshipBusiness : IRelationshipBusiness
 
         // log relationship create event
         await _eventBusiness.CreateEvent(
-            currentUserId, 
-            organizationId, 
-            projectId, 
+            currentUserId,
+            organizationId,
+            projectId,
             new CreateEventRequestDto
             {
                 Operation = "create",
                 EntityType = "relationship",
                 EntityId = relationship.Id,
                 EntityName = relationship.Name,
-                Properties = JsonSerializer.Serialize(new {relationship.Name}),
+                Properties = JsonSerializer.Serialize(new { relationship.Name })
             });
-        
+
         return new RelationshipResponseDto
         {
             Id = relationship.Id,
             Name = relationship.Name,
             Description = relationship.Description,
+            Properties = relationship.Properties,
             Uuid = relationship.Uuid,
             OrganizationId = relationship.OrganizationId,
             ProjectId = relationship.ProjectId,
@@ -239,21 +244,25 @@ public class RelationshipBusiness : IRelationshipBusiness
         // Bulk insert into relationships; if there is a name collision, update the description and uuid if present
         var sql = projectId.HasValue
             ? @"
-          INSERT INTO deeplynx.relationships (organization_id, project_id, name, description, uuid, last_updated_at, is_archived, last_updated_by)
+          INSERT INTO deeplynx.relationships (organization_id, project_id, name, description, properties,
+                                              uuid, last_updated_at, is_archived, last_updated_by)
             VALUES {0}
             ON CONFLICT (organization_id, project_id, name) WHERE project_id IS NOT NULL
             DO UPDATE SET
                 description = COALESCE(EXCLUDED.description, relationships.description),
+                properties = COALESCE(EXCLUDED.properties, relationships.properties),
                 uuid = COALESCE(EXCLUDED.uuid, relationships.uuid),
                 last_updated_at = @now,
                 last_updated_by = @lastUpdatedBy
             RETURNING *;"
             : @"
-            INSERT INTO deeplynx.relationships (organization_id, project_id, name, description, uuid, last_updated_at, is_archived, last_updated_by)
+            INSERT INTO deeplynx.relationships (organization_id, project_id, name, description, properties,
+                                                uuid, last_updated_at, is_archived, last_updated_by)
             VALUES {0}
             ON CONFLICT (organization_id, name) WHERE project_id IS NULL
             DO UPDATE SET
                 description = COALESCE(EXCLUDED.description, relationships.description),
+                properties = COALESCE(EXCLUDED.properties, relationships.properties),
                 uuid = COALESCE(EXCLUDED.uuid, relationships.uuid),
                 last_updated_at = @now,
                 last_updated_by = @lastUpdatedBy
@@ -273,12 +282,13 @@ public class RelationshipBusiness : IRelationshipBusiness
         {
             new NpgsqlParameter($"@p{i}_name", dto.Name),
             new NpgsqlParameter($"@p{i}_desc", (object?)dto.Description ?? DBNull.Value),
+            new NpgsqlParameter($"@p{i}_props", (object?)dto.Properties ?? DBNull.Value),
             new NpgsqlParameter($"@p{i}_uuid", (object?)dto.Uuid ?? DBNull.Value)
         }));
 
         // stringify the params and comma separate them
         var valueTuples = string.Join(", ", relationships.Select((dto, i) =>
-            $"(@organizationId, @projectId, @p{i}_name, @p{i}_desc, @p{i}_uuid, @now, false, @lastUpdatedBy)"));
+            $"(@organizationId, @projectId, @p{i}_name, @p{i}_desc, @p{i}_props, @p{i}_uuid, @now, false, @lastUpdatedBy)"));
 
         // put everything together and execute the query
         sql = string.Format(sql, valueTuples);
@@ -287,14 +297,14 @@ public class RelationshipBusiness : IRelationshipBusiness
         var result = await _context.Database
             .SqlQueryRaw<RelationshipResponseDto>(sql, parameters.ToArray())
             .ToListAsync();
-        
+
         var createEvent = new CreateEventRequestDto
         {
             Operation = "create",
             EntityType = "relationship"
         };
         await _eventBusiness.CreateEvent(currentUserId, organizationId, projectId, createEvent, result.Count);
-        
+
         return result;
     }
 
@@ -321,7 +331,7 @@ public class RelationshipBusiness : IRelationshipBusiness
         var relationship = await query.FirstOrDefaultAsync();
         if (relationship is null || relationship.IsArchived)
             throw new KeyNotFoundException($"Relationship with ID {relationshipId} not found.");
-        
+
         if (dto.OriginId.HasValue)
         {
             var originClass =
@@ -340,6 +350,7 @@ public class RelationshipBusiness : IRelationshipBusiness
 
         relationship.Name = dto.Name ?? relationship.Name;
         relationship.Description = dto.Description ?? relationship.Description;
+        relationship.Properties = dto.Properties != null ? dto.Properties.ToString() : relationship.Properties;
         relationship.Uuid = dto.Uuid ?? relationship.Uuid;
         relationship.OriginId = dto.OriginId ?? relationship.OriginId;
         relationship.DestinationId = dto.DestinationId ?? relationship.DestinationId;
@@ -355,14 +366,15 @@ public class RelationshipBusiness : IRelationshipBusiness
             EntityType = "relationship",
             EntityId = relationship.Id,
             EntityName = relationship.Name,
-            Properties = JsonSerializer.Serialize(new {relationship.Name}),
+            Properties = JsonSerializer.Serialize(new { relationship.Name })
         });
-        
+
         return new RelationshipResponseDto
         {
             Id = relationship.Id,
             Name = relationship.Name,
             Description = relationship.Description,
+            Properties = relationship.Properties,
             Uuid = relationship.Uuid,
             OrganizationId = organizationId,
             ProjectId = relationship.ProjectId,
@@ -404,9 +416,9 @@ public class RelationshipBusiness : IRelationshipBusiness
             EntityId = relationship.Id,
             EntityName = relationship.Name,
             DataSourceId = null,
-            Properties = JsonSerializer.Serialize(new {relationship.Name}),
+            Properties = JsonSerializer.Serialize(new { relationship.Name })
         });
-        
+
         return true;
     }
 
@@ -442,7 +454,7 @@ public class RelationshipBusiness : IRelationshipBusiness
         //     DataSourceId = null,
         //     Properties = JsonSerializer.Serialize(new {relationship.Name}),
         // });
-        
+
         return true;
     }
 
@@ -482,6 +494,7 @@ public class RelationshipBusiness : IRelationshipBusiness
                 r.Id,
                 r.Name,
                 r.Description,
+                r.Properties,
                 r.Uuid,
                 r.ProjectId,
                 r.LastUpdatedBy,
@@ -507,6 +520,7 @@ public class RelationshipBusiness : IRelationshipBusiness
             Id = r.Id,
             Name = r.Name,
             Description = r.Description,
+            Properties = r.Properties,
             Uuid = r.Uuid,
             ProjectId = r.ProjectId,
             LastUpdatedBy = r.LastUpdatedBy,
@@ -545,14 +559,14 @@ public class RelationshipBusiness : IRelationshipBusiness
 
         _context.Relationships.Remove(relationship);
         await _context.SaveChangesAsync();
-        
+
         await _eventBusiness.CreateEvent(currentUserId, organizationId, projectId, new CreateEventRequestDto
         {
             Operation = "delete",
             EntityType = "relationship",
             EntityId = relationship.Id,
             EntityName = relationship.Name,
-            Properties = JsonSerializer.Serialize(new {relationship.Name}),
+            Properties = JsonSerializer.Serialize(new { relationship.Name })
         });
 
         return true;

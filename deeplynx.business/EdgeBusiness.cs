@@ -56,6 +56,7 @@ public class EdgeBusiness : IEdgeBusiness
             .Select(e => new EdgeResponseDto
             {
                 Id = e.Id,
+                Properties = e.Properties,
                 OriginId = e.OriginId,
                 DestinationId = e.DestinationId,
                 RelationshipId = e.RelationshipId,
@@ -100,6 +101,7 @@ public class EdgeBusiness : IEdgeBusiness
         return new EdgeResponseDto
         {
             Id = edge.Id,
+            Properties = edge.Properties,
             OriginId = edge.OriginId,
             DestinationId = edge.DestinationId,
             RelationshipId = edge.RelationshipId,
@@ -145,6 +147,7 @@ public class EdgeBusiness : IEdgeBusiness
 
         var edge = new Edge
         {
+            Properties = dto.Properties?.ToString(),
             OriginId = dto.OriginId.Value,
             DestinationId = dto.DestinationId.Value,
             ProjectId = projectId,
@@ -179,6 +182,7 @@ public class EdgeBusiness : IEdgeBusiness
         return new EdgeResponseDto
         {
             Id = edge.Id,
+            Properties = edge.Properties,
             OriginId = edge.OriginId,
             DestinationId = edge.DestinationId,
             RelationshipId = edge.RelationshipId,
@@ -199,67 +203,78 @@ public class EdgeBusiness : IEdgeBusiness
     /// <param name="dataSourceId">The ID of the data source to which the edge belongs</param>
     /// <param name="edges">Enumerable list of edge request data transfer objects containing edge details</param>
     /// <returns>Enumerable list of created edges</returns>
-   public async Task<List<EdgeResponseDto>> BulkCreateEdges(
-    long currentUserId,
-    long organizationId,
-    long projectId,
-    long dataSourceId,
-    List<CreateEdgeRequestDto> edges)
-{
-    await ExistenceHelper.EnsureDataSourceExistsForProjectAsync(_context, dataSourceId, projectId);
-    var conn = (NpgsqlConnection)_context.Database.GetDbConnection();
-    if (conn.State != ConnectionState.Open) await conn.OpenAsync();
-    await using var tx = await conn.BeginTransactionAsync();
+    public async Task<List<EdgeResponseDto>> BulkCreateEdges(
+        long currentUserId,
+        long organizationId,
+        long projectId,
+        long dataSourceId,
+        List<CreateEdgeRequestDto> edges)
+    {
+        await ExistenceHelper.EnsureDataSourceExistsForProjectAsync(_context, dataSourceId, projectId);
+        var conn = (NpgsqlConnection)_context.Database.GetDbConnection();
+        if (conn.State != ConnectionState.Open) await conn.OpenAsync();
+        await using var tx = await conn.BeginTransactionAsync();
 
-    var now = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
+        var now = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
 
-    var createTempSql = @"
+        var createTempSql = @"
     CREATE TEMP TABLE tmp_edges
     (
         organization_id   BIGINT NOT NULL,
         project_id        BIGINT NOT NULL,
         data_source_id    BIGINT NOT NULL,
         origin_id         BIGINT NOT NULL,
+        properties        JSONB NULL,
         destination_id    BIGINT NOT NULL,
         relationship_id   BIGINT NULL,
         last_updated_at   TIMESTAMP WITHOUT TIME ZONE NOT NULL,
         is_archived       BOOLEAN NOT NULL
     ) ON COMMIT DROP;";
 
-    var copyCmd = @"
-    COPY tmp_edges (organization_id, project_id, data_source_id, origin_id, destination_id, relationship_id, last_updated_at, is_archived)
+        var copyCmd = @"
+    COPY tmp_edges (organization_id, project_id, data_source_id, origin_id, properties,
+                    destination_id, relationship_id, last_updated_at, is_archived)
     FROM STDIN (FORMAT BINARY)";
 
-    var upsertSql = @"
+        var upsertSql = @"
     INSERT INTO deeplynx.edges
-    (organization_id, project_id, data_source_id, origin_id, destination_id, relationship_id, last_updated_at, is_archived)
-    SELECT organization_id, project_id, data_source_id, origin_id, destination_id, relationship_id, last_updated_at, is_archived
+            (organization_id, project_id, data_source_id, origin_id, properties,
+            destination_id, relationship_id, last_updated_at, is_archived)
+    SELECT organization_id, project_id, data_source_id, origin_id, properties,
+           destination_id, relationship_id, last_updated_at, is_archived
     FROM tmp_edges
     ON CONFLICT (project_id, origin_id, destination_id) DO UPDATE
       SET relationship_id = COALESCE(EXCLUDED.relationship_id, edges.relationship_id),
-          last_updated_at = EXCLUDED.last_updated_at
-    RETURNING id, organization_id, project_id, data_source_id, origin_id, destination_id, relationship_id;";
+        properties = COALESCE(EXCLUDED.properties, edges.properties),
+        last_updated_at = EXCLUDED.last_updated_at
+    RETURNING id, properties, organization_id, project_id, data_source_id, origin_id, destination_id, relationship_id;";
 
-    var result = await _bulkCopyUpsertExecutor.CopyUpsertAsync(
-        conn, tx,
-        createTempSql,
-        copyCmd,
-        edges,
-        (w, e) =>
-        {
-            w.Write(organizationId, NpgsqlDbType.Bigint);
-            w.Write(projectId, NpgsqlDbType.Bigint);
-            w.Write(dataSourceId, NpgsqlDbType.Bigint);
-            w.Write(e.OriginId!.Value, NpgsqlDbType.Bigint);
-            w.Write(e.DestinationId!.Value, NpgsqlDbType.Bigint);
-            if (e.RelationshipId.HasValue) w.Write(e.RelationshipId.Value, NpgsqlDbType.Bigint);
-            else w.WriteNull();
-            w.Write(now, NpgsqlDbType.Timestamp);
-            w.Write(false, NpgsqlDbType.Boolean);
-        },
-        upsertSql,
-        MapEdge
-    );
+        var result = await _bulkCopyUpsertExecutor.CopyUpsertAsync(
+            conn, tx,
+            createTempSql,
+            copyCmd,
+            edges,
+            (w, e) =>
+            {
+                w.Write(organizationId, NpgsqlDbType.Bigint);
+                w.Write(projectId, NpgsqlDbType.Bigint);
+                w.Write(dataSourceId, NpgsqlDbType.Bigint);
+                w.Write(e.OriginId!.Value, NpgsqlDbType.Bigint);
+                if (e.Properties != null)
+                    w.Write(e.Properties, NpgsqlDbType.Jsonb);
+                else
+                    w.WriteNull();
+                w.Write(e.DestinationId!.Value, NpgsqlDbType.Bigint);
+                if (e.RelationshipId.HasValue)
+                    w.Write(e.RelationshipId.Value, NpgsqlDbType.Bigint);
+                else
+                    w.WriteNull();
+                w.Write(now, NpgsqlDbType.Timestamp);
+                w.Write(false, NpgsqlDbType.Boolean);
+            },
+            upsertSql,
+            MapEdge
+        );
 
         // events logging
         var createEvent = new CreateEventRequestDto
@@ -270,9 +285,9 @@ public class EdgeBusiness : IEdgeBusiness
         };
         await _eventBusiness.CreateEvent(currentUserId, organizationId, projectId, createEvent, result.Count);
 
-    await tx.CommitAsync();
-    return result;
-}
+        await tx.CommitAsync();
+        return result;
+    }
 
     /// <summary>
     ///     Updates an existing edge by its ID or origin/destination.
@@ -303,6 +318,7 @@ public class EdgeBusiness : IEdgeBusiness
         edge.OriginId = dto.OriginId ?? edge.OriginId;
         edge.DestinationId = dto.DestinationId ?? edge.DestinationId;
         edge.RelationshipId = dto.RelationshipId ?? edge.RelationshipId;
+        edge.Properties = dto.Properties != null ? dto.Properties.ToString() : edge.Properties;
         edge.LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
         edge.LastUpdatedBy = currentUserId;
 
@@ -329,6 +345,7 @@ public class EdgeBusiness : IEdgeBusiness
         return new EdgeResponseDto
         {
             Id = edge.Id,
+            Properties = edge.Properties,
             OriginId = edge.OriginId,
             DestinationId = edge.DestinationId,
             RelationshipId = edge.RelationshipId,
@@ -469,6 +486,22 @@ public class EdgeBusiness : IEdgeBusiness
     }
 
     /// <summary>
+    ///     Returns a list of textual descriptors for the Edges table to be used by Lattice.
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization to which the edges belong</param>
+    /// <param name="projectId">The ID of the project to which the edges belong</param>
+    /// <returns>List of edge textual descriptor columns, including class, record and relationship names</returns>
+    public async Task<List<LatticeEdgeDto>> GetLatticeEdges(long organizationId, long projectId)
+    {
+        var classes = await _context.Database
+            .SqlQuery<LatticeEdgeDto>(
+                $"SELECT * FROM deeplynx.get_lattice_edges({organizationId}, {projectId})"
+            ).ToListAsync();
+
+        return classes;
+    }
+
+    /// <summary>
     ///     Processes a list of edges, adding new nodes and links to our graph data structures
     /// </summary>
     /// <param name="edges">The edges to process</param>
@@ -565,7 +598,6 @@ public class EdgeBusiness : IEdgeBusiness
         return edge;
     }
 
-
     /// <summary>
     ///     Map an NPGSQL data reader to a return DTO usually during high scale read operations
     /// </summary>
@@ -574,6 +606,7 @@ public class EdgeBusiness : IEdgeBusiness
     private static EdgeResponseDto MapEdge(NpgsqlDataReader r)
     {
         var iId = r.GetOrdinal("id");
+        var iProps = r.GetOrdinal("properties");
         var iProj = r.GetOrdinal("project_id");
         var iDs = r.GetOrdinal("data_source_id");
         var iOrig = r.GetOrdinal("origin_id");
@@ -583,6 +616,7 @@ public class EdgeBusiness : IEdgeBusiness
         return new EdgeResponseDto
         {
             Id = r.GetInt64(iId),
+            Properties = r.IsDBNull(iProps) ? null : r.GetString(iProps),
             ProjectId = r.GetInt64(iProj),
             DataSourceId = r.GetInt64(iDs),
             OriginId = r.GetInt64(iOrig),

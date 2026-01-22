@@ -147,6 +147,7 @@ public class ClassBusiness : IClassBusiness
             ProjectId = projectId,
             Name = dto.Name,
             Description = dto.Description,
+            Properties = dto.Properties?.ToString(),
             Uuid = dto.Uuid,
             LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
             LastUpdatedBy = currentUserId,
