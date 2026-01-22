@@ -385,7 +385,8 @@ public class ProjectBusinessTests : IntegrationTestBase
         {
             Name = $"Test Project {DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}",
             Description = "Test Description",
-            Abbreviation = "TST"
+            Abbreviation = "TST", 
+            Banner = "Test Banner",
         };
 
         // Act
@@ -399,6 +400,7 @@ public class ProjectBusinessTests : IntegrationTestBase
         Assert.Equal(dto.Abbreviation, result.Abbreviation);
         Assert.Equal(oid, result.OrganizationId);
         Assert.Equal(uid, result.LastUpdatedBy);
+        Assert.Equal(dto.Banner, result.Banner);
 
         // Ensure that the project create event was logged
         var eventList = await Context.Events.ToListAsync();
@@ -420,7 +422,8 @@ public class ProjectBusinessTests : IntegrationTestBase
         {
             Name = $"Test Project {DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}",
             Description = "Test Description",
-            Abbreviation = "TST"
+            Abbreviation = "TST", 
+            Banner = "Test Banner",
         };
 
         // Act
@@ -434,6 +437,7 @@ public class ProjectBusinessTests : IntegrationTestBase
         Assert.Equal(dto.Abbreviation, result.Abbreviation);
         Assert.Equal(oid, result.OrganizationId);
         Assert.Equal(uid, result.LastUpdatedBy);
+        Assert.Equal(dto.Banner, result.Banner);
 
         var defaultRoles = await Context.Roles.Where(r => r.ProjectId == result.Id).Include(r => r.Permissions)
             .ToListAsync();
@@ -757,7 +761,8 @@ public class ProjectBusinessTests : IntegrationTestBase
         {
             Name = $"Updated Project {DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}",
             Description = "Updated Description",
-            Abbreviation = "UPD"
+            Abbreviation = "UPD", 
+            Banner = "Updated Banner"
         };
 
         // Act
@@ -771,6 +776,7 @@ public class ProjectBusinessTests : IntegrationTestBase
         Assert.Equal(originalProj.Abbreviation, updatedResult.Abbreviation);
         Assert.Equal(originalProj.OrganizationId, updatedResult.OrganizationId);
         Assert.Equal(uid, updatedResult.LastUpdatedBy);
+        Assert.Equal(dto.Banner, updatedResult.Banner);
 
         // Ensure that Project Update Event was logged
         var eventList = await Context.Events.ToListAsync();
