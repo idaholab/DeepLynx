@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { getAllDataSources } from "@/app/lib/client_service/data_source_services.client";
-import { getAllObjectStorages } from "@/app/lib/client_service/object_storage_services.client";
+import { getAllProjectObjectStorages } from "@/app/lib/client_service/object_storage_services.client";
 import { getAllProjects } from "@/app/lib/client_service/projects_services.client";
 import {
   DataSourceResponseDto,
@@ -86,7 +86,7 @@ export function useProjectResources(organizationId?: number) {
       // Fetch Object Storage
       if (organizationId) {
         try {
-          const objectStorage = await getAllObjectStorages(
+          const objectStorage = await getAllProjectObjectStorages(
             organizationId,
             Number(projectId)
           );

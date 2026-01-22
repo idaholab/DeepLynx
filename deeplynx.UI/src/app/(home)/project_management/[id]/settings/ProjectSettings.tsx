@@ -1,7 +1,7 @@
 // src/app/(home)/project_management/[id]/settings/ProjectSettings.tsx
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import toast from "react-hot-toast";
 import { useProjectSession } from "@/app/contexts/ProjectSessionProvider";
 import { useOrganizationSession } from "@/app/contexts/OrganizationSessionProvider";
@@ -118,7 +118,7 @@ const ProjectSettings = ({ project }: ProjectSettingsProps) => {
   }, [project?.id]);
 
   // Load available storages and default storage
-  const loadStorages = async () => {
+  const loadStorages = useCallback(async () => {
     if (!organization?.organizationId || !project?.id) {
       setIsLoadingStorages(false);
       return;
@@ -154,11 +154,11 @@ const ProjectSettings = ({ project }: ProjectSettingsProps) => {
     } finally {
       setIsLoadingStorages(false);
     }
-  };
+  }, [organization?.organizationId, project?.id]);
 
   useEffect(() => {
     loadStorages();
-  }, [organization?.organizationId, project?.id]);
+  }, [loadStorages]);
 
   const handleLogoChange = (fileList: FileList | null) => {
     if (!fileList || fileList.length === 0) return;
@@ -308,7 +308,7 @@ const ProjectSettings = ({ project }: ProjectSettingsProps) => {
     }
 
     // Build config based on storage type
-    let config: any = {};
+    let config: Record<string, unknown> = {};
 
     if (storageType === "filesystem") {
       if (!filesystemPath.trim()) {
@@ -336,7 +336,7 @@ const ProjectSettings = ({ project }: ProjectSettingsProps) => {
     try {
       const dto: CreateObjectStorageRequestDto = {
         name: storageFormData.name,
-        config: config,
+        config: JSON.stringify(config),
       };
 
       console.log("Creating storage with DTO:", JSON.stringify(dto, null, 2));
