@@ -58,7 +58,7 @@ export type UpdateOauthApplicationRequestDto = {
 
 export type CreateObjectStorageRequestDto = {
   name: string;
-  config: string;
+  config: Record<string, unknown>;
   default?: boolean;
 }
 

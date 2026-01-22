@@ -336,7 +336,7 @@ const ProjectSettings = ({ project }: ProjectSettingsProps) => {
     try {
       const dto: CreateObjectStorageRequestDto = {
         name: storageFormData.name,
-        config: JSON.stringify(config),
+        config: config,
       };
 
       console.log("Creating storage with DTO:", JSON.stringify(dto, null, 2));
