@@ -146,6 +146,7 @@ public class FileFilesystemBusiness : IFileBusiness
     ///     Deletes a file from local file storage
     /// </summary>
     /// <param name="record">Record that contains file info</param>
+    /// <param name="objectStorageConfig">Contains the config info</param>
     /// <returns></returns>
     /// <exception cref="ArgumentException"></exception>
     /// <exception cref="FileNotFoundException"></exception>
@@ -162,7 +163,6 @@ public class FileFilesystemBusiness : IFileBusiness
         var directory = Path.GetDirectoryName(filePath);
 
         if (objectStorageConfig.MountPath == null)
-        {
             throw new Exception("File system mount path not set in object storage");
 
         // Normalize paths for comparison
@@ -183,6 +183,5 @@ public class FileFilesystemBusiness : IFileBusiness
             }
 
         return true;
-    }
     }
 }
