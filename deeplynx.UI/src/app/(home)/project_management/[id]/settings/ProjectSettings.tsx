@@ -29,13 +29,13 @@ import {
   CreateObjectStorageRequestDto,
   UpdateObjectStorageRequestDto,
 } from "@/app/(home)/types/requestDTOs";
-import ProjectLogoSection from "@/app/(home)/project_management/[id]/settings/components/ProjectLogoSection";
-import StorageSettingsSection from "@/app/(home)/project_management/[id]/settings/components/StorageSettingsSection";
-import CreateStorageModal from "@/app/(home)/project_management/[id]/settings/components/CreateStorageModal";
-import EditStorageModal from "@/app/(home)/project_management/[id]/settings/components/EditStorageModal";
-import DeleteStorageModal from "@/app/(home)/project_management/[id]/settings/components/DeleteStorageModal";
-import ArchiveStorageModal from "@/app/(home)/project_management/[id]/settings/components/ArchiveStorageModal";
-import RemoveLogoModal from "@/app/(home)/project_management/[id]/settings/components/RemoveLogoModal";
+import ProjectLogoSection from "./components/ProjectLogoSection";
+import StorageSettingsSection from "./components/StorageSettingsSection";
+import CreateStorageModal from "./components/CreateStorageModal";
+import EditStorageModal from "./components/EditStorageModal";
+import DeleteStorageModal from "./components/DeleteStorageModal";
+import ArchiveStorageModal from "./components/ArchiveStorageModal";
+import RemoveLogoModal from "./components/RemoveLogoModal";
 import { useLanguage } from "@/app/contexts/Language";
 import { ExclamationTriangleIcon } from "@heroicons/react/24/outline";
 
@@ -150,7 +150,7 @@ const ProjectSettings = ({ project }: ProjectSettingsProps) => {
       }
     } catch (error) {
       console.error("Error loading storages:", error);
-      toast.error("Failed to load storage configurations");
+      toast.error(t.translations.FAILED_TO_LOAD_STORAGE_CONFIGURATIONS);
     } finally {
       setIsLoadingStorages(false);
     }
@@ -246,13 +246,13 @@ const ProjectSettings = ({ project }: ProjectSettingsProps) => {
 
   const handleSaveDefaultStorage = async () => {
     if (!organization?.organizationId || !project?.id || !selectedStorageId) {
-      toast.error("Please select a storage location");
+      toast.error(t.translations.PLEASE_SELECT_A_STORAGE_LOCATION);
       return;
     }
 
     // Check if the selected storage is already the default
     if (defaultStorage?.id === selectedStorageId) {
-      toast.error("This storage is already set as default");
+      toast.error(t.translations.THIS_STORAGE_IS_ALREADY_SET_AS_DEFAULT);
       return;
     }
 
@@ -273,13 +273,15 @@ const ProjectSettings = ({ project }: ProjectSettingsProps) => {
         setDefaultStorage(updatedDefault);
       }
 
-      toast.success("Default storage location updated successfully");
+      toast.success(
+        t.translations.DEFAULT_STORAGE_LOCATION_UPDATED_SUCCESSFULLY,
+      );
     } catch (error) {
       console.error("Failed to set default storage:", error);
       toast.error(
         error instanceof Error
           ? error.message
-          : "Failed to update default storage",
+          : t.translations.FALIED_TO_UPDATE_DEFAULT_STORAGE,
       );
     } finally {
       setIsSavingStorage(false);
@@ -301,7 +303,7 @@ const ProjectSettings = ({ project }: ProjectSettingsProps) => {
     if (!organization?.organizationId || !project?.id) return;
 
     if (!storageFormData.name.trim()) {
-      toast.error("Storage name is required");
+      toast.error(t.translations.STORAGE_NAME_IS_REQUIRED);
       return;
     }
 
@@ -310,7 +312,7 @@ const ProjectSettings = ({ project }: ProjectSettingsProps) => {
 
     if (storageType === "filesystem") {
       if (!filesystemPath.trim()) {
-        toast.error("Filesystem path is required");
+        toast.error(t.translations.FILESYSTEM_PATH_IS_REQUIRED);
         return;
       }
       config = {
@@ -318,7 +320,7 @@ const ProjectSettings = ({ project }: ProjectSettingsProps) => {
       };
     } else if (storageType === "azure_blob") {
       if (!s3Endpoint.trim() || !s3BucketName.trim()) {
-        toast.error("All Azure Blob fields are required");
+        toast.error(t.translations.ALL_AZURE_BLOB_FIELDS_ARE_REQUIRED);
         return;
       }
       config = {
@@ -347,7 +349,7 @@ const ProjectSettings = ({ project }: ProjectSettingsProps) => {
         storageFormData.default,
       );
 
-      toast.success("Storage created successfully");
+      toast.success(t.translations.STORAGE_CREATED_SUCCESSFULLY);
       setIsCreateModalOpen(false);
       resetStorageForm();
       loadStorages();
@@ -355,7 +357,9 @@ const ProjectSettings = ({ project }: ProjectSettingsProps) => {
       console.error("Failed to create storage:", error);
       console.error("Error details:", error);
       toast.error(
-        error instanceof Error ? error.message : "Failed to create storage",
+        error instanceof Error
+          ? error.message
+          : t.translations.FAILED_TO_CREATE_STORAGE,
       );
     }
   };
@@ -364,12 +368,12 @@ const ProjectSettings = ({ project }: ProjectSettingsProps) => {
     if (!organization?.organizationId || !project?.id || !editingStorage)
       return;
     if (editingStorage.isArchived) {
-      toast.error("Archived storages cannot be edited");
+      toast.error(t.translations.ARCHIVED_STORAGE_CANNOT_BE_EDITED);
       return;
     }
 
     if (!storageFormData.name.trim()) {
-      toast.error("Storage name is required");
+      toast.error(t.translations.STORAGE_NAME_IS_REQUIRED);
       return;
     }
 
@@ -386,7 +390,7 @@ const ProjectSettings = ({ project }: ProjectSettingsProps) => {
         dto,
       );
 
-      toast.success("Storage updated successfully");
+      toast.success(t.translations.STORAGE_UPADTED_SUCCESSFULLY);
       setIsEditModalOpen(false);
       setEditingStorage(null);
       setStorageFormData({ name: "", config: {}, default: false });
@@ -394,7 +398,9 @@ const ProjectSettings = ({ project }: ProjectSettingsProps) => {
     } catch (error) {
       console.error("Failed to update storage:", error);
       toast.error(
-        error instanceof Error ? error.message : "Failed to update storage",
+        error instanceof Error
+          ? error.message
+          : t.translations.FAILED_TO_UPDATE_STORAGE,
       );
     }
   };
@@ -410,13 +416,15 @@ const ProjectSettings = ({ project }: ProjectSettingsProps) => {
         deleteStorageId,
       );
 
-      toast.success("Storage deleted successfully");
+      toast.success(t.translations.STORAGE_DELETE_SUCCESSFULLY);
       setDeleteStorageId(null);
       loadStorages();
     } catch (error) {
       console.error("Failed to delete storage:", error);
       toast.error(
-        error instanceof Error ? error.message : "Failed to delete storage",
+        error instanceof Error
+          ? error.message
+          : t.translations.FAILED_TO_DELETE_STORAGE,
       );
     }
   };
@@ -434,14 +442,16 @@ const ProjectSettings = ({ project }: ProjectSettingsProps) => {
       );
 
       toast.success(
-        `Storage ${archiveAction ? "archived" : "unarchived"} successfully`,
+        `${t.translations.STORAGE} ${archiveAction ? t.translations.ARCHIVE : t.translations.UNARCHIVE} ${t.translations.SUCCESSFULLY}`,
       );
       setArchiveStorageId(null);
       loadStorages();
     } catch (error) {
       console.error("Failed to archive/unarchive storage:", error);
       toast.error(
-        error instanceof Error ? error.message : "Failed to archive storage",
+        error instanceof Error
+          ? error.message
+          : t.translations.FAILED_TO_ARCHIVE_STORAGE,
       );
     }
   };
