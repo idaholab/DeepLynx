@@ -64,8 +64,7 @@ const StorageSettingsSection = ({
           <div className="alert alert-warning">
             <ExclamationTriangleIcon className="h-6 w-6" />
             <span>
-              No storage locations available. Create one in the "Manage
-              Storages" tab.
+              {t.translations.NO_STORAGE_LOCATIONS_AVAILABLE_CREATE_ONE}
             </span>
           </div>
         ) : (
@@ -76,13 +75,13 @@ const StorageSettingsSection = ({
               onChange={(e) => onSelectStorage(Number(e.target.value))}
             >
               <option value="" disabled>
-                Select a storage location
+                {t.translations.SELECT_STORAGE_LOCATION}
               </option>
               {availableStorages.map((storage) => (
                 <option key={storage.id} value={storage.id}>
                   {storage.name}
-                  {storage.default ? " (Current Default)" : ""}
-                  {storage.isArchived ? " [Archived]" : ""}
+                  {storage.default ? t.translations.CURRENT_DEFAULT_SUFFIX : ""}
+                  {storage.isArchived ? t.translations.ARCHIVED_SUFFIX : ""}
                 </option>
               ))}
             </select>
@@ -91,14 +90,14 @@ const StorageSettingsSection = ({
               <div>
                 <label className="label">
                   <span className="label-text-alt text-base-content/60">
-                    This will be the default storage for data sources in this
-                    project
+                    {t.translations.DEFAULT_STORAGE_FOR_DATA_SOURCES_HELPER}
                   </span>
                 </label>
                 <div className="alert alert-info mt-3">
                   <InformationCircleIcon className="h-6 w-6" />
                   <span className="text-sm">
-                    Current default: <strong>{defaultStorage.name}</strong>
+                    {t.translations.CURRENT_DEFAULT}{" "}
+                    <strong>{defaultStorage.name}</strong>
                   </span>
                 </div>
               </div>
@@ -113,11 +112,11 @@ const StorageSettingsSection = ({
     <div className="mt-4">
       <div className="flex justify-between items-center mb-4">
         <p className="text-sm text-base-content/70">
-          Create, edit, and manage your storage locations
+          {t.translations.CREATE_EDIT_MANAGE_STORAGE_LOCATIONS}
         </p>
         <button className="btn btn-primary btn-sm" onClick={onCreateStorage}>
           <PlusIcon className="w-4 h-4" />
-          Create Storage
+          {t.translations.CREATE_STORAGE}
         </button>
       </div>
 
@@ -125,8 +124,10 @@ const StorageSettingsSection = ({
         {availableStorages.length === 0 ? (
           <div className="text-center py-8 text-base-content/60">
             <CircleStackIcon className="w-12 h-12 mx-auto mb-2 opacity-50" />
-            <p>No storages created yet</p>
-            <p className="text-sm">Click "Create Storage" to add one</p>
+            <p>{t.translations.NO_STORAGES_CREATED_YET}</p>
+            <p className="text-sm">
+              {t.translations.CLICK_CREATE_STORAGE_TO_ADD_ONE}
+            </p>
           </div>
         ) : (
           availableStorages.map((storage) => (
@@ -141,20 +142,21 @@ const StorageSettingsSection = ({
                       <h4 className="font-semibold">{storage.name}</h4>
                       {storage.default && (
                         <span className="badge badge-primary badge-sm">
-                          Default
+                          {t.translations.DEFAULT_BADGE}
                         </span>
                       )}
                       {storage.isArchived && (
                         <span className="badge badge-warning badge-sm">
-                          Archived
+                          {t.translations.ARCHIVED_BADGE}
                         </span>
                       )}
                     </div>
                     <p className="text-xs text-base-content/60">
-                      Type: {storage.type || "N/A"}
+                      {t.translations.STORAGE_TYPE_LABEL}{" "}
+                      {storage.type || t.translations.NOT_AVAILABLE}
                     </p>
                     <p className="text-xs text-base-content/60">
-                      Last updated:{" "}
+                      {t.translations.LAST_UPDATED_LABEL}{" "}
                       {new Date(storage.lastUpdatedAt).toLocaleDateString()}
                     </p>
                   </div>
@@ -166,8 +168,8 @@ const StorageSettingsSection = ({
                       disabled={storage.isArchived}
                       title={
                         storage.isArchived
-                          ? "Archived storages cannot be edited"
-                          : "Edit"
+                          ? t.translations.ARCHIVED_STORAGE_CANNOT_BE_EDITED
+                          : t.translations.EDIT_STORAGE
                       }
                     >
                       <PencilIcon className="w-4 h-4" />
@@ -175,7 +177,11 @@ const StorageSettingsSection = ({
                     <button
                       className="btn btn-ghost btn-xs"
                       onClick={() => onToggleArchive(storage)}
-                      title={storage.isArchived ? "Unarchive" : "Archive"}
+                      title={
+                        storage.isArchived
+                          ? t.translations.UNARCHIVE
+                          : t.translations.ARCHIVE
+                      }
                     >
                       {storage.isArchived ? (
                         <ArchiveBoxXMarkIcon className="w-4 h-4" />
@@ -186,7 +192,7 @@ const StorageSettingsSection = ({
                     <button
                       className="btn btn-ghost btn-xs text-error"
                       onClick={() => onDeleteStorage(storage.id as number)}
-                      title="Delete"
+                      title={t.translations.DELETE}
                     >
                       <TrashIcon className="w-4 h-4" />
                     </button>
@@ -201,11 +207,13 @@ const StorageSettingsSection = ({
   );
 
   const tabs = [
-    { label: "Default Storage", content: defaultTabContent },
-    { label: "Manage Storages", content: manageTabContent },
+    { label: t.translations.DEFAULT_STORAGE_TAB, content: defaultTabContent },
+    { label: t.translations.MANAGE_STORAGES_TAB, content: manageTabContent },
   ];
   const activeTabLabel =
-    activeTab === "default" ? "Default Storage" : "Manage Storages";
+    activeTab === "default"
+      ? t.translations.DEFAULT_STORAGE_TAB
+      : t.translations.MANAGE_STORAGES_TAB;
 
   return (
     <div className="card bg-base-100 border border-primary/40 shadow-sm">
@@ -226,7 +234,7 @@ const StorageSettingsSection = ({
               {isSavingStorage && (
                 <span className="loading loading-spinner loading-xs" />
               )}
-              Save Default Storage
+              {t.translations.SAVE_DEFAULT_STORAGE}
             </button>
           )}
         </div>
@@ -235,7 +243,11 @@ const StorageSettingsSection = ({
           tabs={tabs}
           activeTab={activeTabLabel}
           onTabChange={(label) =>
-            onChangeTab(label === "Default Storage" ? "default" : "manage")
+            onChangeTab(
+              label === t.translations.DEFAULT_STORAGE_TAB
+                ? "default"
+                : "manage",
+            )
           }
           className="mb-4"
         />
