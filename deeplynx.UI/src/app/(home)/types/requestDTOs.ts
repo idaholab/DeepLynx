@@ -33,11 +33,13 @@ export type PermissionRequestDto =
 export type CreateOrganizationRequestDto = {
   name: string;
   description?: string;
+  banner?: string;
 }
 
 export type UpdateOrganizationRequestDto = {
   name: string;
   description?: string;
+  banner?: string;
 }
 
 export type CreateOauthApplicationRequestDto = {
@@ -242,12 +244,12 @@ export type UpdateTagRequestDto = {
 }
 
 export interface InviteUserToOrganizationRequestDto {
-    userEmail: string;
-    userName?: string;
+  userEmail: string;
+  userName?: string;
 }
 
 export interface InviteUserToProjectRequestDto {
-    userEmail: string;
-    userName?: string;
-    roleId?: number | string;
+  userEmail: string;
+  userName?: string;
+  roleId?: number | string;
 }

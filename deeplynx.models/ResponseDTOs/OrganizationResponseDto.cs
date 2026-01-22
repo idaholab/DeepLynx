@@ -10,5 +10,5 @@ public class OrganizationResponseDto
     public bool IsArchived { get; set; }
     public bool DefaultOrg { get; set; } = false;
     
-    public string Banner { get; set; }
+    public string? Banner { get; set; }
 }
