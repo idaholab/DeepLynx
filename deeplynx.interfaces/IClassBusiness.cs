@@ -24,4 +24,6 @@ public interface IClassBusiness
 
     Task<ClassResponseDto> GetOrCreateClass(
         long currentUserId, long organizationId, long? projectId, string className);
+
+    Task<List<LatticeClassDto>> GetLatticeClasses(long organizationId, long projectId);
 }
