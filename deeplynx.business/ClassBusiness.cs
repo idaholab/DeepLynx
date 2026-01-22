@@ -69,6 +69,7 @@ public class ClassBusiness : IClassBusiness
                 Id = c.Id,
                 Name = c.Name,
                 Description = c.Description,
+                Properties = c.Properties,
                 Uuid = c.Uuid,
                 ProjectId = c.ProjectId,
                 OrganizationId = c.OrganizationId,
@@ -112,6 +113,7 @@ public class ClassBusiness : IClassBusiness
             Id = returnedClass.Id,
             Name = returnedClass.Name,
             Description = returnedClass.Description,
+            Properties = returnedClass.Properties,
             Uuid = returnedClass.Uuid,
             ProjectId = returnedClass.ProjectId,
             OrganizationId = returnedClass.OrganizationId,
@@ -174,6 +176,7 @@ public class ClassBusiness : IClassBusiness
             Id = newClass.Id,
             Name = newClass.Name,
             Description = newClass.Description,
+            Properties = newClass.Properties,
             Uuid = newClass.Uuid,
             OrganizationId = newClass.OrganizationId,
             ProjectId = newClass.ProjectId,
@@ -202,27 +205,31 @@ public class ClassBusiness : IClassBusiness
         var sql = projectId.HasValue
             ? @"
             INSERT INTO deeplynx.classes (
-                organization_id, project_id, name, description, uuid, last_updated_at, is_archived, last_updated_by)
+                organization_id, project_id, name, description, 
+                properties, uuid, last_updated_at, is_archived, last_updated_by)
             VALUES {0}
             ON CONFLICT (organization_id, project_id, name) WHERE project_id IS NOT NULL 
             DO UPDATE SET
                 description = COALESCE(EXCLUDED.description, classes.description),
+                properties = COALESCE(EXCLUDED.properties, classes.properties),
                 uuid = COALESCE(EXCLUDED.uuid, classes.uuid),
                 last_updated_at = @now,
                 last_updated_by = @lastUpdatedBy
-           RETURNING id, project_id, organization_id, name, description, 
+           RETURNING id, project_id, organization_id, name, description, properties,
                 uuid, last_updated_at, last_updated_by, is_archived;"
             : @"
             INSERT INTO deeplynx.classes (
-                organization_id, project_id, name, description, uuid, last_updated_at, is_archived, last_updated_by)
+                organization_id, project_id, name, description,
+                properties, uuid, last_updated_at, is_archived, last_updated_by)
             VALUES {0}
             ON CONFLICT (organization_id, name) WHERE project_id IS NULL 
             DO UPDATE SET
                 description = COALESCE(EXCLUDED.description, classes.description),
+                properties = COALESCE(EXCLUDED.properties, classes.properties),
                 uuid = COALESCE(EXCLUDED.uuid, classes.uuid),
                 last_updated_at = @now,
                 last_updated_by = @lastUpdatedBy
-           RETURNING id, project_id, organization_id, name, description, 
+           RETURNING id, project_id, organization_id, name, description, properties,
                 uuid, last_updated_at, last_updated_by, is_archived;";
 
         // establish "constant" parameters
@@ -239,12 +246,13 @@ public class ClassBusiness : IClassBusiness
         {
             new NpgsqlParameter($"@p{i}_name", dto.Name),
             new NpgsqlParameter($"@p{i}_desc", (object?)dto.Description ?? DBNull.Value),
+            new NpgsqlParameter($"@p{i}_props", (object?)dto.Properties ?? DBNull.Value),
             new NpgsqlParameter($"@p{i}_uuid", (object?)dto.Uuid ?? DBNull.Value)
         }));
 
         // stringify the params and comma separate them
         var valueTuples = string.Join(", ", classes.Select((dto, i) =>
-            $"(@organizationId, @projectId, @p{i}_name, @p{i}_desc, @p{i}_uuid, @now, false, @lastUpdatedBy)"));
+            $"(@organizationId, @projectId, @p{i}_name, @p{i}_desc, @p{i}_props, @p{i}_uuid, @now, false, @lastUpdatedBy)"));
 
         // put everything together and execute the query
         sql = string.Format(sql, valueTuples);
@@ -258,7 +266,7 @@ public class ClassBusiness : IClassBusiness
         {
             Operation = "create",
             EntityType = "class",
-            DataSourceId = null,
+            DataSourceId = null
         };
         await _eventBusiness.CreateEvent(currentUserId, organizationId, projectId, createEvent, result.Count);
 
@@ -294,6 +302,7 @@ public class ClassBusiness : IClassBusiness
 
         returnedClass.Name = dto.Name ?? returnedClass.Name;
         returnedClass.Description = dto.Description ?? returnedClass.Description;
+        returnedClass.Properties = dto.Properties != null ? dto.Properties.ToString() : returnedClass.Properties;
         returnedClass.Uuid = dto.Uuid ?? returnedClass.Uuid;
         returnedClass.LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
         returnedClass.LastUpdatedBy = currentUserId;
@@ -321,6 +330,7 @@ public class ClassBusiness : IClassBusiness
             Id = returnedClass.Id,
             Name = returnedClass.Name,
             Description = returnedClass.Description,
+            Properties = returnedClass.Properties,
             Uuid = returnedClass.Uuid,
             OrganizationId = returnedClass.OrganizationId,
             ProjectId = returnedClass.ProjectId,

@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 
 const ProjectManagementIndexPage = async () => {
-  // No project id provided: send them home (or wherever you want)
+  // No project id provided: send them home
   redirect("/");
 };
 

@@ -26,6 +26,8 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
     private ObjectStorageBusiness _objectStorageBusiness;
     private Mock<IOrganizationBusiness> _organizationBusiness = null!;
     private ProjectBusiness _projectBusiness;
+    private Mock<IBulkCopyUpsertExecutor> _bulkCopyUpsertExecutor = null!;
+    
     public long archivedOs;
     private long organizationId;
     public long os1;
@@ -52,7 +54,8 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
         _mockNotificationLogger = new Mock<ILogger<NotificationBusiness>>();
         _notificationBusiness =
             new NotificationBusiness(Context, _mockNotificationLogger.Object, _mockHubContext.Object);
-        _eventBusiness = new EventBusiness(Context, _notificationBusiness);
+        _bulkCopyUpsertExecutor = new Mock<IBulkCopyUpsertExecutor>();
+        _eventBusiness = new EventBusiness(Context, _notificationBusiness, _bulkCopyUpsertExecutor.Object);
         _mockLogger = new Mock<ILogger<ProjectBusiness>>();
         _mockClassBusiness = new Mock<IClassBusiness>();
         _mockDataSourceBusiness = new Mock<IDataSourceBusiness>();

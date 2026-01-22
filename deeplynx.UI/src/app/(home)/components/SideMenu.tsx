@@ -2,13 +2,17 @@
 "use client";
 
 import React, { useCallback, useEffect, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 
 import { useLanguage } from "@/app/contexts/Language";
 import { useOrganizationSession } from "@/app/contexts/OrganizationSessionProvider";
 import { useProjectSession } from "@/app/contexts/ProjectSessionProvider";
-import { getAllProjects } from "@/app/lib/client_service/projects_services.client";
+import {
+  getAllProjects,
+  getProjectLogoUrl,
+} from "@/app/lib/client_service/projects_services.client";
 import { ProjectAdminRoute } from "../rbac/RBACComponents";
 
 import type { ProjectResponseDto } from "../types/responseDTOs";
@@ -64,6 +68,7 @@ const SideMenu: React.FC<SideMenuProps> = ({ onToggle }) => {
   const [projects, setProjects] = useState<ProjectResponseDto[]>([]);
   const [loadingProjects, setLoadingProjects] = useState(false);
   const [activeProject, setActiveProject] = useState<ProjectResponseDto>();
+  const [projectLogoUrl, setProjectLogoUrl] = useState<string | null>(null);
 
   /* ---------------------------- Data Fetching ----------------------------- */
 
@@ -74,7 +79,7 @@ const SideMenu: React.FC<SideMenuProps> = ({ onToggle }) => {
       setLoadingProjects(true);
       const data = await getAllProjects(
         organization.organizationId as number,
-        true
+        true,
       );
       setProjects(data);
     } catch (error) {
@@ -95,14 +100,15 @@ const SideMenu: React.FC<SideMenuProps> = ({ onToggle }) => {
   useEffect(() => {
     if (organization) {
       setActiveProject(undefined);
+      setProjectLogoUrl(null);
     }
-  }, [organization?.organizationId, setProject]);
+  }, [organization]);
 
   // Sync activeProject with the project context
   useEffect(() => {
     if (project?.projectId && projects.length > 0) {
       const foundProject = projects.find(
-        (p) => p.id.toString() === project.projectId
+        (p) => p.id.toString() === project.projectId,
       );
       if (foundProject) {
         setActiveProject(foundProject);
@@ -113,6 +119,26 @@ const SideMenu: React.FC<SideMenuProps> = ({ onToggle }) => {
       setActiveProject(undefined);
     }
   }, [project, projects, setProject]);
+
+  // Load project logo when active project changes
+  useEffect(() => {
+    const loadProjectLogo = async () => {
+      if (!activeProject?.id) {
+        setProjectLogoUrl(null);
+        return;
+      }
+
+      try {
+        const logoUrl = await getProjectLogoUrl(activeProject.id as number);
+        setProjectLogoUrl(logoUrl);
+      } catch (error) {
+        console.error("Failed to load project logo:", error);
+        setProjectLogoUrl(null);
+      }
+    };
+
+    loadProjectLogo();
+  }, [activeProject?.id]);
 
   // Keep selectedItem in sync with pathname
   useEffect(() => {
@@ -162,7 +188,7 @@ const SideMenu: React.FC<SideMenuProps> = ({ onToggle }) => {
 
   const handleItemClick = (
     item: string,
-    event: React.MouseEvent<HTMLElement>
+    event: React.MouseEvent<HTMLElement>,
   ) => {
     if (isDisabled(item)) {
       event.preventDefault();
@@ -224,10 +250,29 @@ const SideMenu: React.FC<SideMenuProps> = ({ onToggle }) => {
               className="flex items-center justify-between py-2 px-4 cursor-pointer hover:bg-info/20 rounded transition"
               onClick={() => setIsProjectsExpanded(!isProjectsExpanded)}
             >
-              <div className="flex items-center min-w-0 flex-1">
-                <FolderIcon className="size-6 flex-shrink-0" />
+              <div className="flex items-center min-w-0 flex-1 gap-3">
+                {/* Project Logo or Folder Icon */}
+                {projectLogoUrl ? (
+                  <div className="avatar flex-shrink-0">
+                    <div className="w-8 h-8 rounded-lg overflow-hidden bg-base-100 flex items-center justify-center relative">
+                      <Image
+                        src={projectLogoUrl}
+                        alt={activeProject?.name || "Project"}
+                        fill
+                        sizes="32px"
+                        className="object-contain p-1"
+                        onError={() => {
+                          setProjectLogoUrl(null);
+                        }}
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <FolderIcon className="size-6 flex-shrink-0" />
+                )}
+
                 {!isCollapsed && (
-                  <div className="flex flex-col p-4 min-w-0">
+                  <div className="flex flex-col min-w-0">
                     <span className="text-xs opacity-70">
                       {t.translations.PROJECTS}
                     </span>
@@ -326,11 +371,11 @@ const SideMenu: React.FC<SideMenuProps> = ({ onToggle }) => {
                 onClick={(e) =>
                   handleItemClick(
                     `/project_management/${project?.projectId || ""}`,
-                    e
+                    e,
                   )
                 }
                 className={getItemClass(
-                  `/project_management/${project?.projectId || ""}`
+                  `/project_management/${project?.projectId || ""}`,
                 )}
               >
                 <AdjustmentsHorizontalIcon className="size-6" />

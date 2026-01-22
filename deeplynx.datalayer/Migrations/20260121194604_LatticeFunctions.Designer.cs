@@ -12,7 +12,7 @@ using deeplynx.datalayer.Models;
 namespace deeplynx.datalayer.Migrations
 {
     [DbContext(typeof(DeeplynxContext))]
-    [Migration("20260116225907_LatticeFunctions")]
+    [Migration("20260121194604_LatticeFunctions")]
     partial class LatticeFunctions
     {
         /// <inheritdoc />
@@ -245,6 +245,10 @@ namespace deeplynx.datalayer.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("project_id");
 
+                    b.Property<string>("Properties")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("properties");
+
                     b.Property<string>("Uuid")
                         .HasColumnType("text")
                         .HasColumnName("uuid");
@@ -421,6 +425,10 @@ namespace deeplynx.datalayer.Migrations
                     b.Property<long>("ProjectId")
                         .HasColumnType("bigint")
                         .HasColumnName("project_id");
+
+                    b.Property<string>("Properties")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("properties");
 
                     b.Property<long?>("RelationshipId")
                         .HasColumnType("bigint")
@@ -1495,6 +1503,10 @@ namespace deeplynx.datalayer.Migrations
                     b.Property<long?>("ProjectId")
                         .HasColumnType("bigint")
                         .HasColumnName("project_id");
+
+                    b.Property<string>("Properties")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("properties");
 
                     b.Property<string>("Uuid")
                         .HasColumnType("text")

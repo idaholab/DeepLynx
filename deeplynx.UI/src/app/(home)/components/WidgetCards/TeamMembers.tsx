@@ -37,8 +37,10 @@ const TeamMembersWidget: React.FC = () => {
       }
     };
 
-    fetchAllUsers();
-  }, [project]);
+    if (organization?.organizationId && project?.projectId) {
+      fetchAllUsers();
+    }
+  }, [organization?.organizationId, project?.projectId]);
 
   const teamMemberColumns: Column<TeamMember>[] = [
     {

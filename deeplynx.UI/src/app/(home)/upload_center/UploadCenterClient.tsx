@@ -5,6 +5,8 @@ import { useOrganizationSession } from "@/app/contexts/OrganizationSessionProvid
 import {
   uploadFile,
   uploadFilesBatch,
+  cancelChunkedUpload,
+  cancelCurrentUpload
 } from "@/app/lib/client_service/file_upload_services.client";
 import { uploadBulkMetadata } from "@/app/lib/client_service/metadata_service.client";
 import { useEffect, useMemo } from "react";
@@ -118,6 +120,9 @@ export default function UploadCenterClient({ initialAvailableFiles }: Props) {
       return;
     }
 
+    fileUploadState.setIsUploading(true);
+    fileUploadState.setUploadProgress(null);
+
     try {
       if (fileUploadState.selectedFiles.length === 1) {
         const file = fileUploadState.selectedFiles[0];
@@ -131,9 +136,12 @@ export default function UploadCenterClient({ initialAvailableFiles }: Props) {
           file,
           name: metadata.name || file.name,
           description: metadata.description || "",
+          onProgress: (progress) => {
+            fileUploadState.setUploadProgress(progress);
+          },
         });
 
-        toast.success("File uploaded!");
+        toast.success("File uploaded successfully!");
       } else {
         const results = await uploadFilesBatch({
           organizationId: organization?.organizationId as number,
@@ -153,8 +161,31 @@ export default function UploadCenterClient({ initialAvailableFiles }: Props) {
 
       fileUploadState.resetFileUpload();
     } catch (err) {
-      console.error(err);
+      console.error("Upload error:", err);
       toast.error("Upload failed. See console for details.");
+      fileUploadState.setUploadProgress(null);
+    } finally {
+      fileUploadState.setIsUploading(false);
+      fileUploadState.setIsCancelling(false);
+    }
+  };
+
+  const handleCancel = async () => {
+    if (!fileUploadState.uploadProgress?.uploadId) return;
+
+    fileUploadState.setIsCancelling(true);
+    cancelCurrentUpload();
+
+    try {
+      await cancelChunkedUpload({
+        organizationId: organization?.organizationId as number,
+        projectId: projectResources.projectId,
+        dataSourceId: projectResources.dataSourceId,
+        objectStorageId: projectResources.objectStorageId,
+        uploadId: fileUploadState.uploadProgress.uploadId,
+      });
+    } catch (err) {
+      console.error("Failed to cleanup cancelled upload:", err);
     }
   };
 
@@ -323,6 +354,7 @@ export default function UploadCenterClient({ initialAvailableFiles }: Props) {
                 availableFiles={availableFiles}
                 needsTarget={needsTarget}
                 isMultiAllowed={isMultiAllowed}
+                isUploading={fileUploadState.isUploading}
               />
             ) : (
               <BulkUploadSection
@@ -350,7 +382,55 @@ export default function UploadCenterClient({ initialAvailableFiles }: Props) {
               onClear={fileUploadState.clearAll}
               onUpload={handleFileUpload}
               canUpload={canUpload}
+              isUploading={fileUploadState.isUploading}
             />
+            {/* Upload Status: Spinner + Progress */}
+            {fileUploadState.isUploading && (
+              <>
+                {/* Show spinner while waiting for progress to start */}
+                {!fileUploadState.uploadProgress && (
+                    <div className="mt-4 p-4 bg-base-200 rounded-lg flex flex-col items-center justify-center space-y-3">
+                      <span className="loading loading-spinner loading-lg text-primary"></span>
+                      <p className="text-sm text-base-content/70 text-center">
+                        Preparing upload...
+                      </p>
+                    </div>
+                )}
+
+              {/* Show progress bar once chunked upload starts */}
+              {fileUploadState.uploadProgress && (
+                <div className="mt-4 p-4 bg-base-200 rounded-lg">
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-sm font-medium">
+                      {fileUploadState.uploadProgress.chunksCompleted} / {fileUploadState.uploadProgress.totalChunks} chunks
+                    </span>
+                    <span className="text-sm font-bold text-base-content">
+                      {Math.round(fileUploadState.uploadProgress.percentComplete)}%
+                    </span>
+                  </div>
+                  <progress
+                      className="progress progress-success w-full"
+                      value={fileUploadState.uploadProgress.percentComplete}
+                      max="100"
+                  ></progress>
+                  <button
+                      className="btn btn-sm btn-outline btn-error w-full mt-3"
+                      onClick={handleCancel}
+                      disabled={fileUploadState.isCancelling}
+                  >
+                    {fileUploadState.isCancelling ? (
+                        <>
+                          <span className="loading loading-spinner loading-xs"></span>
+                          Cancelling and cleaning up...
+                        </>
+                    ) : (
+                        'Cancel Upload'
+                    )}
+                  </button>
+                </div>
+                )}
+            </>
+            )}
           </div>
         )}
       </div>

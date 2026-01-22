@@ -1,10 +1,22 @@
-// src/app/lib/projects_services.client.ts
+// src/app/lib/client_service/projects_services.client.ts
 "use client";
 
-import { CreateProjectRequestDto, UpdateProjectRequestDto } from "@/app/(home)/types/requestDTOs";
-import { ProjectResponseDto, ProjectStatResponseDto, ProjectMemberResponseDto } from "@/app/(home)/types/responseDTOs";
+import { 
+  CreateProjectRequestDto, 
+  UpdateProjectRequestDto,
+  InviteUserToProjectRequestDto 
+} from "@/app/(home)/types/requestDTOs";
+import { 
+  ProjectResponseDto, 
+  ProjectStatResponseDto, 
+  ProjectMemberResponseDto 
+} from "@/app/(home)/types/responseDTOs";
 import api from "./api";
+import { UploadProjectLogoRequest, UploadProjectLogoResponse, RemoveProjectLogoRequest, RemoveProjectLogoResponse, ProjectBannerSettings, SaveProjectBannerRequest, ProjectStorageSettings, AddStorageLocationRequest, RemoveStorageLocationRequest } from "@/app/(home)/types/project_setting_types";
 
+/* -------------------------------------------------------------------------- */
+/*                         Project CRUD Operations                            */
+/* -------------------------------------------------------------------------- */
 
 /**
  * Get all projects for an organization
@@ -167,6 +179,10 @@ export async function getProjectStats(
   }
 }
 
+/* -------------------------------------------------------------------------- */
+/*                         Project Member Management                          */
+/* -------------------------------------------------------------------------- */
+
 /**
  * Get all members of a project
  * @param organizationId - The ID of the organization
@@ -189,12 +205,40 @@ export async function getProjectMembers(
 }
 
 /**
+ * Invite a user to a project
+ * @param organizationId - The ID of the organization
+ * @param projectId - The ID of the project
+ * @param inviteData - The invite request data (userEmail, userName, roleId)
+ * @returns Promise<void>
+ */
+export async function inviteUserToProject(
+  organizationId: number,
+  projectId: number,
+  inviteData: InviteUserToProjectRequestDto
+): Promise<void> {
+  try {
+    await api.post(
+      `/organizations/${organizationId}/projects/${projectId}/invite`,
+      null,
+      {
+        params: {
+          userEmail: inviteData.userEmail,
+          ...(inviteData.userName && { userName: inviteData.userName }),
+          ...(inviteData.roleId && { roleId: inviteData.roleId })
+        }
+      }
+    );
+  } catch (error) {
+    console.error(`Error inviting user to project ${projectId}:`, error);
+    throw error;
+  }
+}
+
+/**
  * Add a user or group to a project
  * @param organizationId - The ID of the organization
  * @param projectId - The ID of the project
- * @param roleId - Optional role ID
- * @param userId - Optional user ID (required if not providing groupId)
- * @param groupId - Optional group ID (required if not providing userId)
+ * @param data - Object containing roleId and either userId or groupId
  * @returns Promise with success message
  */
 export async function addMemberToProject(
@@ -218,7 +262,6 @@ export async function addMemberToProject(
     throw error;
   }
 }
-
 
 /**
  * Update a member's role in a project
@@ -274,3 +317,95 @@ export async function removeMemberFromProject(
     throw error;
   }
 }
+
+/* -------------------------------------------------------------------------- */
+/*                            PROJECT LOGO SERVICES                           */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Upload project logo
+ * Saves the logo to /public/images/project-{projectId}-logo.{ext}
+ */
+export const uploadProjectLogo = async (
+  request: UploadProjectLogoRequest
+): Promise<UploadProjectLogoResponse> => {
+  const formData = new FormData();
+  formData.append("file", request.file);
+
+  const response = await fetch(
+    `/api/project/${request.projectId}/logo`,
+    {
+      method: "POST",
+      body: formData,
+    }
+  );
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message || "Failed to upload logo");
+  }
+
+  return response.json();
+};
+
+/**
+ * Remove project logo
+ * Deletes the logo file from /public/images
+ */
+export const removeProjectLogo = async (
+  request: RemoveProjectLogoRequest
+): Promise<RemoveProjectLogoResponse> => {
+  const response = await fetch(
+    `/api/project/${request.projectId}/logo`,
+    {
+      method: "DELETE",
+    }
+  );
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message || "Failed to remove logo");
+  }
+
+  return response.json();
+};
+
+/**
+ * Get project logo URL and check if it exists
+ * Returns the logo URL if the file exists, null otherwise
+ */
+export const getProjectLogoUrl = async (
+  projectId: number
+): Promise<string | null> => {
+  try {
+    const response = await fetch(`/api/project/${projectId}/logo`, {
+      method: "GET",
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const data = await response.json();
+    return data.exists ? data.logoUrl : null;
+  } catch (error) {
+    console.error("Error getting project logo URL:", error);
+    return null;
+  }
+};
+
+/**
+ * Check if project logo exists
+ * Returns true if a logo file exists for the project
+ */
+export const checkProjectLogoExists = async (
+  projectId: number
+): Promise<boolean> => {
+  try {
+    const logoUrl = await getProjectLogoUrl(projectId);
+    return logoUrl !== null;
+  } catch (error) {
+    console.error("Error checking project logo existence:", error);
+    return false;
+  }
+};

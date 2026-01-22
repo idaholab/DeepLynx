@@ -103,7 +103,7 @@ const GenericTable = <T extends object>({
     if (filters.length > 0) {
       setTempFilters(filterValues || {});
     }
-  }, [filterValues]);
+  }, [filterValues, filters.length]);
 
   // Filter data based on the search input
   const filteredData = React.useMemo(() => {

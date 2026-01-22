@@ -240,3 +240,14 @@ export type CreateTagRequestDto = {
 export type UpdateTagRequestDto = {
   name?: string;
 }
+
+export interface InviteUserToOrganizationRequestDto {
+    userEmail: string;
+    userName?: string;
+}
+
+export interface InviteUserToProjectRequestDto {
+    userEmail: string;
+    userName?: string;
+    roleId?: number | string;
+}

@@ -40,3 +40,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Ignore everything in public/images
+public/images/*
+
+# But keep the directory
+!public/images/.gitkeep

@@ -13,29 +13,8 @@ namespace deeplynx.datalayer.Migrations
             migrationBuilder.AddColumn<string>(
                 name: "properties",
                 schema: "deeplynx",
-                table: "classes",
-                type: "jsonb",
-                nullable: true);
-
-            migrationBuilder.AddColumn<string>(
-                name: "properties",
-                schema: "deeplynx",
                 table: "relationships",
                 type: "jsonb",
-                nullable: true);
-
-            migrationBuilder.AddColumn<string>(
-                name: "validation_status",
-                schema: "deeplynx",
-                table: "records",
-                type: "text",
-                nullable: true);
-
-            migrationBuilder.AddColumn<string>(
-                name: "validation_status",
-                schema: "deeplynx",
-                table: "edges",
-                type: "text",
                 nullable: true);
 
             migrationBuilder.AddColumn<string>(
@@ -45,19 +24,14 @@ namespace deeplynx.datalayer.Migrations
                 type: "jsonb",
                 nullable: true);
 
-            migrationBuilder.CreateIndex(
-                name: "idx_classes_org_project",
+            migrationBuilder.AddColumn<string>(
+                name: "properties",
                 schema: "deeplynx",
                 table: "classes",
-                columns: new[] { "organization_id", "project_id" });
-
-            migrationBuilder.CreateIndex(
-                name: "idx_relationships_org_project",
-                schema: "deeplynx",
-                table: "relationships",
-                columns: new[] { "organization_id", "project_id" });
-
-            migrationBuilder.Sql(@"
+                type: "jsonb",
+                nullable: true);
+            
+             migrationBuilder.Sql(@"
                 CREATE OR REPLACE FUNCTION deeplynx.get_lattice_relationships(
                     p_organization_id BIGINT, p_project_id BIGINT)
                 RETURNS TABLE(
@@ -171,41 +145,21 @@ namespace deeplynx.datalayer.Migrations
             migrationBuilder.Sql("DROP FUNCTION IF EXISTS deeplynx.get_lattice_relationships;");
             migrationBuilder.Sql("DROP FUNCTION IF EXISTS deeplynx.get_lattice_records;");
             migrationBuilder.Sql("DROP FUNCTION IF EXISTS deeplynx.get_lattice_edges;");
-
-            migrationBuilder.DropIndex(
-                name: "idx_classes_org_project",
-                schema: "deeplynx",
-                table: "classes");
-
-            migrationBuilder.DropIndex(
-                name: "idx_relationships_org_project",
-                schema: "deeplynx",
-                table: "relationships");
-
-            migrationBuilder.DropColumn(
-                name: "properties",
-                schema: "deeplynx",
-                table: "classes");
-
+            
             migrationBuilder.DropColumn(
                 name: "properties",
                 schema: "deeplynx",
                 table: "relationships");
 
             migrationBuilder.DropColumn(
-                name: "validation_status",
-                schema: "deeplynx",
-                table: "records");
-
-            migrationBuilder.DropColumn(
-                name: "validation_status",
+                name: "properties",
                 schema: "deeplynx",
                 table: "edges");
 
             migrationBuilder.DropColumn(
                 name: "properties",
                 schema: "deeplynx",
-                table: "edges");
+                table: "classes");
         }
     }
 }

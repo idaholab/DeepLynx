@@ -6,28 +6,34 @@ using deeplynx.models;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using System.Text.Json;
+using NpgsqlTypes;
 
 public class EventBusiness : IEventBusiness
 {
+    private readonly IBulkCopyUpsertExecutor _bulkCopyUpsertExecutor;
+    private readonly ICacheBusiness _cacheBusiness;
     private readonly DeeplynxContext _context;
     private readonly INotificationBusiness _notificationBusiness;
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="EventBusiness" /> class.
+    ///     Initializes a new instance of the <see cref="EventBusiness" /> class.
     /// </summary>
     /// <param name="context">The database context to be used for class operations</param>
     /// <param name="notificationBusiness">Used for initiating notifications for subscribed users</param>
+    /// <param name="bulkCopyUpsertExecutor">Used to access bulk upsert operations</param>
     public EventBusiness(
         DeeplynxContext context,
-        INotificationBusiness notificationBusiness
+        INotificationBusiness notificationBusiness,
+        IBulkCopyUpsertExecutor bulkCopyUpsertExecutor
     )
     {
         _context = context;
         _notificationBusiness = notificationBusiness;
+        _bulkCopyUpsertExecutor = bulkCopyUpsertExecutor;
     }
 
     /// <summary>
-    /// Retrieves all events without pagination.
+    ///     Retrieves all events without pagination.
     /// </summary>
     /// <param name="projectId">Optional filter to only include events matching the projectId</param>
     /// <param name="organizationId">Optional filter </param>
@@ -79,7 +85,7 @@ public class EventBusiness : IEventBusiness
     }
 
     /// <summary>
-    /// Retrieves all project events with pagination.
+    ///     Retrieves all project events with pagination.
     /// </summary>
     /// <param name="queryDto">Filter criteria and pagination parameters</param>
     /// <param name="organizationId">The id of the organization the events are a part of</param>
@@ -189,7 +195,7 @@ public class EventBusiness : IEventBusiness
     }
 
     /// <summary>
-    /// Retrieves all project events for projects that the user is a member of, with pagination.
+    ///     Retrieves all project events for projects that the user is a member of, with pagination.
     /// </summary>
     /// <param name="queryDto">Filter criteria and pagination parameters</param>
     /// <returns>Paginated response containing events and pagination metadata</returns>
@@ -502,7 +508,7 @@ public class EventBusiness : IEventBusiness
     }
 
     /// <summary>
-    /// Creates a new Event based on the event data provided.
+    ///     Creates a new Event based on the event data provided.
     /// </summary>
     /// <param name="currentUserId">ID of the User executing this method.</param>
     /// <param name="organizationId">ID of the organization the event belongs to.</param>
@@ -580,6 +586,173 @@ public class EventBusiness : IEventBusiness
 
         if (Environment.GetEnvironmentVariable("ENABLE_NOTIFICATION_SERVICE") == "true")
             await _notificationBusiness.SendEventNotification(response);
+
+        return response;
+    }
+
+    /// <summary>
+    ///     Bulk creates Events based on the event data provided using the copy executor.
+    /// </summary>
+    /// <param name="conn">NPGSQL PostgreSQL Connection</param>
+    /// <param name="tx">NPGSQL PostgreSQL Transaction for rollback</param>
+    /// <param name="events">Event objects to upsert</param>
+    /// <param name="projectId">The ID of the project to which the event belongs</param>
+    /// <param name="userId">The ID of the user who will be the last to update these</param>
+    /// <param name="ct">Optional cancellation token to end long rquests</param>
+    /// <returns>The list of new Events which were created.</returns>
+    public async Task BulkInsertEventsWithCopyAsync(
+        NpgsqlConnection conn,
+        NpgsqlTransaction tx,
+        IReadOnlyList<CreateEventRequestDto> events,
+        long projectId,
+        long? userId,
+        CancellationToken ct = default)
+    {
+        if (events is null || events.Count == 0) return;
+
+        // If your table is not public.events, fully-qualify it and quote as needed:
+        // e.g., deeplynx.events or deeplynx."Events"
+        const string createTempSql = @"
+        CREATE TEMP TABLE tmp_events
+        (
+            project_id      BIGINT NOT NULL,
+            operation       TEXT   NOT NULL,
+            entity_type     TEXT   NOT NULL,
+            entity_id       BIGINT NOT NULL,
+            entity_name     TEXT   NULL,
+            data_source_id  BIGINT NULL,
+            properties      JSONB  NOT NULL,
+            last_updated_by BIGINT NULL,
+            last_updated_at TIMESTAMP WITHOUT TIME ZONE NOT NULL
+        ) ON COMMIT DROP;";
+
+        const string copyCmd = @"
+        COPY tmp_events
+        (project_id, operation, entity_type, entity_id, entity_name, data_source_id, properties, last_updated_by, last_updated_at)
+        FROM STDIN (FORMAT BINARY)";
+
+        // adjust table identifier to your real one (schema + quoting)
+        const string insertSql = @"
+        INSERT INTO deeplynx.events
+        (project_id, operation, entity_type, entity_id, entity_name, data_source_id, properties, last_updated_by, last_updated_at)
+        SELECT project_id, operation, entity_type, entity_id, entity_name, data_source_id, properties, last_updated_by, last_updated_at
+        FROM tmp_events;";
+
+        var now = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
+
+        await _bulkCopyUpsertExecutor.CopyInsertAsync(
+            conn, tx,
+            createTempSql, copyCmd,
+            events,
+            (w, e) =>
+            {
+                w.Write(projectId, NpgsqlDbType.Bigint);
+                w.Write(e.Operation, NpgsqlDbType.Text);
+                w.Write(e.EntityType, NpgsqlDbType.Text);
+                w.Write(e.EntityId, NpgsqlDbType.Bigint);
+                if (e.EntityName is null) w.WriteNull();
+                else w.Write(e.EntityName, NpgsqlDbType.Text);
+                if (e.DataSourceId.HasValue) w.Write(e.DataSourceId.Value, NpgsqlDbType.Bigint);
+                else w.WriteNull();
+                w.Write(e.Properties ?? "{}", NpgsqlDbType.Jsonb);
+                if (userId.HasValue) w.Write(userId.Value, NpgsqlDbType.Bigint);
+                else w.WriteNull();
+                w.Write(now, NpgsqlDbType.Timestamp);
+            },
+            insertSql,
+            ct);
+    }
+
+    /// <summary>
+    ///     Map an NPGSQL data reader to a return DTO usually during high scale read operations
+    /// </summary>
+    /// <param name="r">NPGSQL reader object containing DTO params</param>
+    /// <returns>A response data transfer object with fields mapped from the pg reader</returns>
+    private static Func<NpgsqlDataReader, EventResponseDto> MakeEventMapper(NpgsqlDataReader r)
+    {
+        var iId = r.GetOrdinal("id");
+        var iOp = r.GetOrdinal("operation");
+        var iType = r.GetOrdinal("entity_type");
+        var iEid = r.GetOrdinal("entity_id");
+        var iEname = r.GetOrdinal("entity_name");
+        var iProj = r.GetOrdinal("project_id");
+        var iDs = r.GetOrdinal("data_source_id");
+        var iProps = r.GetOrdinal("properties");
+        var iLuat = r.GetOrdinal("last_updated_at");
+        var iLuBy = r.GetOrdinal("last_updated_by");
+
+        return rr => new EventResponseDto
+        {
+            Id = rr.GetInt64(iId),
+            Operation = rr.GetString(iOp),
+            EntityType = rr.GetString(iType),
+            EntityId = rr.GetInt64(iEid),
+            EntityName = rr.IsDBNull(iEname) ? null : rr.GetString(iEname),
+            ProjectId = rr.GetInt64(iProj),
+            DataSourceId = rr.IsDBNull(iDs) ? null : rr.GetInt64(iDs),
+            Properties = rr.GetFieldValue<string>(iProps), // or JSON -> string
+            LastUpdatedAt = rr.GetDateTime(iLuat),
+            LastUpdatedBy = rr.IsDBNull(iLuBy) ? null : rr.GetInt64(iLuBy)
+        };
+    }
+
+    /// <summary>
+    /// Bulk creates Events based on the event data provided.
+    /// </summary>
+    /// <param name="projectId">The ID of the project to which the event belongs</param>
+    /// <param name="events">A List of data transfer objects with details on the new event to be created.</param>
+    /// <returns>The list of new Events which were created.</returns>
+    public async Task<List<EventResponseDto>> BulkCreateEvents(
+        long projectId,
+        List<CreateEventRequestDto> events
+    )
+    {
+        foreach (var dto in events)
+        {
+            ValidationHelper.ValidateTypes(dto.EntityType, "EntityType");
+            ValidationHelper.ValidateTypes(dto.Operation, "Operation");
+        }
+
+        var project = await _context.Projects.FindAsync(projectId);
+        var dataSource = events.First().DataSourceId != null
+            ? await _context.DataSources.FindAsync(events.First().DataSourceId)
+            : null;
+
+        var eventEntities = events.Select(dto => new Event
+        {
+            ProjectId = projectId,
+            Operation = dto.Operation,
+            EntityType = dto.EntityType,
+            EntityId = dto.EntityId,
+            EntityName = dto.EntityName,
+            Properties = dto.Properties,
+            DataSourceId = dto.DataSourceId,
+            LastUpdatedBy = UserContextStorage.UserId,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
+        }).ToList();
+
+        _context.Events.AddRange(eventEntities);
+        await _context.SaveChangesAsync();
+
+        var response = eventEntities.Select(e => new EventResponseDto
+        {
+            Id = e.Id,
+            Operation = e.Operation,
+            EntityType = e.EntityType,
+            EntityId = e.EntityId,
+            EntityName = e.EntityName,
+            ProjectId = e.ProjectId,
+            OrganizationId = e.OrganizationId,
+            DataSourceId = e.DataSourceId,
+            Properties = e.Properties,
+            LastUpdatedAt = e.LastUpdatedAt,
+            LastUpdatedBy = e.LastUpdatedBy,
+            ProjectName = project?.Name,
+            DataSourceName = dataSource?.Name
+        }).ToList();
+
+        if (Environment.GetEnvironmentVariable("ENABLE_NOTIFICATION_SERVICE") == "true")
+            await _notificationBusiness.SendBulkEventNotifications(response);
 
         return response;
     }
