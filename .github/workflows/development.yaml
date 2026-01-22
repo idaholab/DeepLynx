@@ -138,7 +138,7 @@ jobs:
         env:
           AWS_S3_CONNECTION_STRING: ${{ secrets.AWS_S3_CONNECTION_STRING }}
           AZURE_OBJECT_CONNECTION_STRING: ${{ secrets.AZURE_OBJECT_CONNECTION_STRING }}
-          AZURE_CONTAINER_NAME: {{vars.AZURE_CONTAINER_NAME}}
+          AZURE_CONTAINER_NAME: ${{ vars.AZURE_CONTAINER_NAME }}
           CI_REGISTRY: ${{ secrets.CI_REGISTRY }}
           CI_REGISTRY_PATH: ${{ secrets.CI_REGISTRY_PATH }}
           GITHUB_RUN_NUMBER: ${{ github.RUN_NUMBER }}
