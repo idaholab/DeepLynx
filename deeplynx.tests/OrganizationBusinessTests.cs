@@ -22,6 +22,7 @@ public class OrganizationBusinessTests : IntegrationTestBase
     private Mock<ILogger<NotificationBusiness>> _mockNotificationLogger = null!;
     private INotificationBusiness _notificationBusiness = null!;
     private OrganizationBusiness _organizationBusiness = null!;
+    private Mock<IBulkCopyUpsertExecutor> _mockBulkCopyUpsertExecutor = null!;
 
     public long oid; // organization ID
     public long oid2; // second organization ID
@@ -41,7 +42,8 @@ public class OrganizationBusinessTests : IntegrationTestBase
         _mockNotificationLogger = new Mock<ILogger<NotificationBusiness>>();
         _notificationBusiness =
             new NotificationBusiness(Context, _mockNotificationLogger.Object, _mockHubContext.Object);
-        _eventBusiness = new EventBusiness(Context, _notificationBusiness);
+        _mockBulkCopyUpsertExecutor = new Mock<IBulkCopyUpsertExecutor>();
+        _eventBusiness = new EventBusiness(Context, _notificationBusiness, _mockBulkCopyUpsertExecutor.Object);
         _roleBusiness = new RoleBusiness(Context, _eventBusiness);
 
         // org business and dependencies

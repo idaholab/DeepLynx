@@ -1,15 +1,15 @@
 // src/app/(home)/components/SelectedFilesCard.tsx
 
 "use client";
-import { useState } from "react";
-import { useLanguage } from "@/app/contexts/Language";
+import {useLanguage} from "@/app/contexts/Language";
 
 type Props = {
   files: File[];
   onRemoveAt: (idx: number) => void;
   onClear: () => void;
-  onUpload: () => Promise<void>; // Changed to async
+  onUpload: () => Promise<void>;
   canUpload: boolean;
+  isUploading?: boolean;
 };
 
 export default function SelectedFilesCard({
@@ -18,18 +18,9 @@ export default function SelectedFilesCard({
   onClear,
   onUpload,
   canUpload,
-}: Props) {
-  const { t } = useLanguage();
-  const [isUploading, setIsUploading] = useState(false);
-
-  const handleUpload = async () => {
-    setIsUploading(true);
-    try {
-      await onUpload();
-    } finally {
-      setIsUploading(false);
-    }
-  };
+  isUploading = false,
+  }: Props) {
+  const {t} = useLanguage();
 
   if (files.length === 0) return null;
 
@@ -72,7 +63,7 @@ export default function SelectedFilesCard({
               </button>
               <button
                 className="btn btn-secondary btn-sm"
-                onClick={handleUpload}
+                onClick={onUpload}
                 disabled={!canUpload || isUploading}
               >
                 {isUploading ? (
@@ -86,7 +77,7 @@ export default function SelectedFilesCard({
               </button>
             </div>
           </>
-        )}
+      )}
       </div>
     </div>
   );

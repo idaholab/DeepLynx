@@ -30,6 +30,7 @@ public class ProjectBusinessTests : IntegrationTestBase
     private Mock<IOrganizationBusiness> _organizationBusiness = null!;
     private ProjectBusiness _projectBusiness = null!;
     private RoleBusiness _roleBusiness = null!;
+    private Mock<IBulkCopyUpsertExecutor> _bulkCopyUpsertExecutor = null!;
     private long cid; // class ID
     private long did; // datasource ID
     private long gid; // group ID
@@ -63,7 +64,8 @@ public class ProjectBusinessTests : IntegrationTestBase
         _mockNotificationLogger = new Mock<ILogger<NotificationBusiness>>();
         _notificationBusiness =
             new NotificationBusiness(Context, _mockNotificationLogger.Object, _mockHubContext.Object);
-        _eventBusiness = new EventBusiness(Context, _notificationBusiness);
+        _bulkCopyUpsertExecutor = new Mock<IBulkCopyUpsertExecutor>();
+        _eventBusiness = new EventBusiness(Context, _notificationBusiness, _bulkCopyUpsertExecutor.Object);
         _objectStorageBusiness = new Mock<IObjectStorageBusiness>();
         _mockRecordBusiness = new Mock<IRecordBusiness>();
         _mockRelationshipBusiness = new Mock<IRelationshipBusiness>();

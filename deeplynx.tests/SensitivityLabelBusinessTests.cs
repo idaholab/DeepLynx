@@ -20,6 +20,7 @@ public class SensitivityLabelBusinessTests : IntegrationTestBase
     private Mock<IHubContext<EventNotificationHub>> _mockHubContext = null!;
     private Mock<ILogger<NotificationBusiness>> _mockNotificationLogger = null!;
     private INotificationBusiness _notificationBusiness = null!;
+    private Mock<IBulkCopyUpsertExecutor> _mockBulkCopyUpsertExecutor = null!;
     public long lid; // label ID
     public long lid2; // archived label ID
 
@@ -38,7 +39,8 @@ public class SensitivityLabelBusinessTests : IntegrationTestBase
         _mockNotificationLogger = new Mock<ILogger<NotificationBusiness>>();
         _notificationBusiness =
             new NotificationBusiness(Context, _mockNotificationLogger.Object, _mockHubContext.Object);
-        _eventBusiness = new EventBusiness(Context, _notificationBusiness);
+        _mockBulkCopyUpsertExecutor = new Mock<IBulkCopyUpsertExecutor>();
+        _eventBusiness = new EventBusiness(Context, _notificationBusiness, _mockBulkCopyUpsertExecutor.Object);
         _labelBusiness = new SensitivityLabelBusiness(Context, _eventBusiness);
     }
 

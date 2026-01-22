@@ -21,6 +21,7 @@ interface FileUploadSectionProps {
   availableFiles: ExistingFile[];
   needsTarget: boolean;
   isMultiAllowed: boolean;
+  isUploading: boolean;
 }
 
 export default function FileUploadSection({
@@ -39,6 +40,7 @@ export default function FileUploadSection({
   availableFiles,
   needsTarget,
   isMultiAllowed,
+  isUploading,
 }: FileUploadSectionProps) {
   const { t } = useLanguage();
 
@@ -107,7 +109,7 @@ export default function FileUploadSection({
           multiple={multi}
           files={selectedFiles}
           onFilesChange={setSelectedFiles}
-          disabled={!uploadType || (needsTarget && !targetFileId)}
+          disabled={!uploadType || (needsTarget && !targetFileId) || isUploading}
         />
       )}
 

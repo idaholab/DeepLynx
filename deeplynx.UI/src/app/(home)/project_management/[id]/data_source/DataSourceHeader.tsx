@@ -7,7 +7,7 @@ type HeaderProps = {
 
 const DataSourceHeader = ({ hideArchived, setHideArchived }: HeaderProps) => {
   return (
-    <div className="mb-6 flex items-center justify-between">
+    <div className="mb-6 flex items-center justify-between border-b border-base-300 pb-4">
       <div>
         <h2 className="text-2xl font-bold mb-2">Data Sources</h2>
         <p className="text-base-content/70">

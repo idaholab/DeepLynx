@@ -1,26 +1,22 @@
+// src/app/(home)/organization_management/OrganizationManagementClient.tsx
 "use client";
 
-import React, { useState } from "react";
+import { useLanguage } from "@/app/contexts/Language";
+import { useOrganizationSession } from "@/app/contexts/OrganizationSessionProvider";
+import { useState } from "react";
 import Tabs from "../components/Tabs";
 import {
   GroupResponseDto,
-  ProjectResponseDto,
-  UserResponseDto,
-  RoleResponseDto,
   PermissionResponseDto,
+  ProjectResponseDto,
+  RoleResponseDto,
+  UserResponseDto,
 } from "../types/responseDTOs";
-import UsersTable from "../components/users/UsersTable";
-import { useLanguage } from "@/app/contexts/Language";
-import { useOrganizationSession } from "@/app/contexts/OrganizationSessionProvider";
 import InlineGroupsTable from "./groups/InlineGroupsTable";
 import RolesAndPermissions from "./roles_and_permissions/RolesAndPermissions";
 import OrganizationSettings from "./settings/OrganizationSettings";
 import TagManagementClient from "./tag_management/TagManagementClient";
-import OptionThree from "./tag_management/OptionThree";
-import SettingsOne from "./settings/SettingsOne";
-import SettingsTwo from "./settings/SettingsTwo";
-import SettingsThree from "./settings/SettingsThree";
-import { getAllGroups } from "@/app/lib/client_service/group_services.client"; // Add this import
+import UsersTable from "./users/UsersTable";
 
 interface OrganizationManagementProps {
   members: UserResponseDto[];
@@ -39,35 +35,13 @@ const OrganizationManagementClient = ({
   initialProjects,
 }: OrganizationManagementProps) => {
   const [activeTab, setActiveTab] = useState("");
-  const [groups, setGroups] = useState<GroupResponseDto[]>(initialGroups);
   const { t } = useLanguage();
   const { organization } = useOrganizationSession();
-
-  const refreshGroups = async () => {
-    if (!organization?.organizationId) return;
-
-    try {
-      const updatedGroups = await getAllGroups(
-        organization.organizationId as number
-      );
-      setGroups(updatedGroups);
-    } catch (err) {
-      console.error("Failed to refresh groups:", err);
-    }
-  };
 
   const tabData = [
     {
       label: t.translations.USERS,
-      content: (
-        <UsersTable
-          initialMembers={members}
-          header={"Organization Users"}
-          description={
-            "Manage users in your organization. Invite new users via email or add them directly."
-          }
-        />
-      ),
+      content: <UsersTable members={members} />,
     },
     {
       label: t.translations.ROLES_AND_PERMISSIONS,
@@ -82,21 +56,20 @@ const OrganizationManagementClient = ({
       label: t.translations.GROUPS,
       content: (
         <InlineGroupsTable
-          initialGroups={groups}
+          initialGroups={initialGroups}
           availableUsers={members}
           organizationId={organization?.organizationId}
-          onGroupsChange={refreshGroups}
         />
       ),
     },
     {
       label: t.translations.TAGS_AND_SECURITY_LABELS,
-      content: <OptionThree projects={initialProjects} />,
+      content: <TagManagementClient projects={initialProjects} />,
     },
     {
       label: t.translations.SETTINGS,
       content: organization ? (
-        <OrganizationSettings organization={organization} />
+        <OrganizationSettings />
       ) : (
         <div>{t.translations.NO_ORG_SELECTED}</div>
       ),

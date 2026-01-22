@@ -108,6 +108,8 @@ spec:
               value: ${FILE_STORAGE_METHOD}
             - name: STORAGE_DIRECTORY
               value: ${STORAGE_DIRECTORY}
+            - name: RECOMMENDED_CHUNK_SIZE
+              value: ${RECOMMENDED_CHUNK_SIZE}
             - name: POSTGRES_DB_HOST
               value: ${POSTGRES_DB_HOST}
             - name: POSTGRES_DB_NAME
@@ -252,6 +254,8 @@ spec:
               value: ${FILE_STORAGE_METHOD}
             - name: STORAGE_DIRECTORY
               value: ${STORAGE_DIRECTORY}
+            - name: RECOMMENDED_CHUNK_SIZE
+              value: ${RECOMMENDED_CHUNK_SIZE}
             - name: POSTGRES_DB_HOST
               value: ${POSTGRES_DB_HOST}
             - name: POSTGRES_DB_NAME
