@@ -148,6 +148,7 @@ export type ProjectResponseDto = {
   lastUpdatedBy?: string | null;
   isArchived: boolean;
   organizationId: number | string;
+  banner?: string;
 };
 
 export type ProjectStatResponseDto = {
