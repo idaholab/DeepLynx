@@ -10,4 +10,6 @@ public class ProjectResponseDto
     public long? LastUpdatedBy { get; set; }
     public bool IsArchived { get; set; } = false;
     public long? OrganizationId { get; set; }
+    
+    public string? Banner { get; set; }
 }
