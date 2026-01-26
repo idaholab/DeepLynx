@@ -278,8 +278,8 @@ public class TimeseriesController : ControllerBase
     /// <param name="dataSourceId">ID of data source that timeseries data is associated with</param>
     /// <param name="recordId">Name of the duckDB table on which the timeseries data is encoded</param>
     /// <param name="limit">Maximum number of data points to include</param>
-    /// /// <param name="rowStride">every nth row to get (row number 4 = every 4th row)</param>
-    /// <returns></returns>
+    /// <param name="rowStride">every nth row to get (row number 4 = every 4th row)</param>
+    /// <returns>JSON: { timeseriesPlotData: { columns: [], data: [][] } }</returns>
     [HttpGet("plot", Name = "api_plot_data")]
     [Auth("read", "record")]
     public async Task<IActionResult> GetPlotData(long organizationId, long projectId, long dataSourceId, [FromQuery] long recordId, [FromQuery] long limit, [FromQuery] long rowStride)
@@ -288,7 +288,7 @@ public class TimeseriesController : ControllerBase
         {
             var currentUserId = UserContextStorage.UserId;
             var timeseriesPlotData = await _timeseriesBusiness.GetPlotData(organizationId, projectId, dataSourceId, recordId, limit, rowStride);
-            return Ok(timeseriesPlotData);
+            return Ok(new { TimeseriesPlotData = timeseriesPlotData });
         }
         catch (ArgumentException e)
         {
@@ -309,7 +309,7 @@ public class TimeseriesController : ControllerBase
     /// <param name="projectId">ID of project that timeseries data is associated with</param>
     /// <param name="dataSourceId">ID of data source that timeseries data is associated with</param>
     /// <param name="recordId">Name of the duckDB table on which the timeseries data is encoded</param>
-    /// <returns></returns>
+    /// <returns>JSON object with column names as keys and the latest row's values</returns>
     [HttpGet("latest", Name = "api_latest_row")]
     [Auth("read", "record")]
     public async Task<IActionResult> GetLatestRow(long organizationId, long projectId, long dataSourceId, [FromQuery] long recordId)
@@ -318,7 +318,7 @@ public class TimeseriesController : ControllerBase
         {
             var currentUserId = UserContextStorage.UserId;
             var latestRow = await _timeseriesBusiness.GetLatestRow(organizationId, projectId, dataSourceId, recordId);
-            return Ok(latestRow);
+            return Ok(new { LatestRowData = latestRow });
         }
         catch (ArgumentException e)
         {

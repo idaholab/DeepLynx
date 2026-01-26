@@ -637,6 +637,16 @@ public class TimeseriesBusiness(
         return recordResponse;
     }
 
+    /// <summary>
+    ///     Get a view of data points
+    /// </summary>
+    /// <param name="organizationId">ID of organization that timeseries data is associated with</param>
+    /// <param name="projectId">ID of project that timeseries data is associated with</param>
+    /// <param name="dataSourceId">ID of data source that timeseries data is associated with</param>
+    /// <param name="recordId">Name of the duckDB table on which the timeseries data is encoded</param>
+    /// <param name="limit">Maximum number of data points to include</param>
+    /// <param name="rowStride">every nth row to get (row number 4 = every 4th row)</param>
+    /// <returns>A json array of plot data</returns>
     public async Task<PlotDataDto> GetPlotData(long organizationId, long projectId,
         long dataSourceId, long recordId, long limit, long rowStride)
     {
@@ -692,6 +702,14 @@ public class TimeseriesBusiness(
         return new PlotDataDto { Columns = columns, Data = [.. points] };
     }
 
+    /// <summary>
+    ///     Get the most recent row
+    /// </summary>
+    /// <param name="organizationId">ID of organization that timeseries data is associated with</param>
+    /// <param name="projectId">ID of project that timeseries data is associated with</param>
+    /// <param name="dataSourceId">ID of data source that timeseries data is associated with</param>
+    /// <param name="recordId">Name of the duckDB table on which the timeseries data is encoded</param>
+    /// <returns>The most recently inserted row as json</returns>
     public async Task<Dictionary<string, object?>> GetLatestRow(long organizationId, long projectId,
         long dataSourceId, long recordId)
     {
