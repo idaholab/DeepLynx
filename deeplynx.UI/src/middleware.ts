@@ -6,15 +6,24 @@ export function middleware(request: NextRequest) {
   const isAuthDisabled = process.env.NEXT_PUBLIC_DISABLE_FRONTEND_AUTHENTICATION === "true";
   
   if (isAuthDisabled) {
-    // If auth is disabled and user is trying to access login pages, redirect to home
     if (request.nextUrl.pathname.startsWith("/login")) {
       return NextResponse.redirect(new URL("/", request.url));
     }
     
-    // Optional: Also redirect org selection page if auth is disabled
-    // (since dev user likely has a default org)
+    const orgSessionCookie = request.cookies.get("organizationSession");
+    const hasOrgSession = orgSessionCookie?.value;
+    
     if (request.nextUrl.pathname.startsWith("/select-org")) {
-      return NextResponse.redirect(new URL("/", request.url));
+      if (hasOrgSession) {
+        console.log("Org session exists, redirecting away from /select-org to home");
+        return NextResponse.redirect(new URL("/", request.url));
+      }
+      return NextResponse.next();
+    }
+    
+    if (!hasOrgSession) {
+      console.log("No org session found, redirecting to /select-org");
+      return NextResponse.redirect(new URL("/select-org", request.url));
     }
   }
   
