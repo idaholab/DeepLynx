@@ -53,6 +53,11 @@ public class RoleBusiness : IRoleBusiness
         {
              roleQuery = roleQuery.Where( r => r.ProjectId == projectId.Value || r.ProjectId == null);
         }
+        else
+        {
+            // Only return org-level roles when no project specified
+            roleQuery = roleQuery.Where(r => r.ProjectId == null);
+        }
 
         if (roleQuery == null)
             throw new KeyNotFoundException(
@@ -101,6 +106,11 @@ public class RoleBusiness : IRoleBusiness
         if (projectId.HasValue)
         {
             roleQuery = roleQuery.Where( r => r.ProjectId == projectId.Value || r.ProjectId == null);
+        } 
+        else
+        {
+            // Only return org-level roles when no project specified
+            roleQuery = roleQuery.Where(r => r.ProjectId == null);
         }
 
         var role = await roleQuery.FirstOrDefaultAsync();
@@ -618,6 +628,11 @@ public class RoleBusiness : IRoleBusiness
         {
             roleQuery = roleQuery.Where( r => r.ProjectId == projectId.Value || r.ProjectId == null);
         }
+        else
+        {
+            // Only return org-level roles when no project specified
+            roleQuery = roleQuery.Where(r => r.ProjectId == null);
+        }
 
         var role = await roleQuery.Include(r => r.Permissions).FirstOrDefaultAsync();
 
@@ -662,6 +677,11 @@ public class RoleBusiness : IRoleBusiness
         if (projectId.HasValue)
         {
             roleQuery = roleQuery.Where( r => r.ProjectId == projectId.Value || r.ProjectId == null);
+        }
+        else
+        {
+            // Only return org-level roles when no project specified
+            roleQuery = roleQuery.Where(r => r.ProjectId == null);
         }
 
         var role = await roleQuery.Include(r => r.Permissions).FirstOrDefaultAsync();
@@ -711,6 +731,11 @@ public class RoleBusiness : IRoleBusiness
         {
             roleQuery = roleQuery.Where( r => r.ProjectId == projectId.Value || r.ProjectId == null);
         }
+        else
+        {
+            // Only return org-level roles when no project specified
+            roleQuery = roleQuery.Where(r => r.ProjectId == null);
+        }
 
         var role = await roleQuery.Include(r => r.Permissions).FirstOrDefaultAsync();
         
@@ -754,6 +779,11 @@ public class RoleBusiness : IRoleBusiness
         if (projectId.HasValue)
         {
             roleQuery = roleQuery.Where( r => r.ProjectId == projectId.Value || r.ProjectId == null);
+        }
+        else
+        {
+            // Only return org-level roles when no project specified
+            roleQuery = roleQuery.Where(r => r.ProjectId == null);
         }
 
         var role = await roleQuery.Include(r => r.Permissions).FirstOrDefaultAsync();
@@ -808,6 +838,11 @@ public class RoleBusiness : IRoleBusiness
         if (projectId.HasValue)
         {
             roleQuery = roleQuery.Where( r => r.ProjectId == projectId.Value || r.ProjectId == null);
+        }
+        else
+        {
+            // Only return org-level roles when no project specified
+            roleQuery = roleQuery.Where(r => r.ProjectId == null);
         }
 
         var role = await roleQuery.Include(r => r.Permissions).FirstOrDefaultAsync();
