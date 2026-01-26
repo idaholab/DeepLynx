@@ -818,8 +818,11 @@ public class ProjectBusiness : IProjectBusiness
         if (defaultObjectStorageMethod == "filesystem")
         {
             var mountPath =
-                Environment.GetEnvironmentVariable("STORAGE_DIRECTORY") ??
-                throw new NullReferenceException("Storage file path not set");
+                Environment.GetEnvironmentVariable("STORAGE_DIRECTORY");
+            
+            if (string.IsNullOrWhiteSpace(mountPath))
+                throw new ArgumentException($"Mount path cannot be empty string. Mount path is {mountPath}");
+            
             configDto.MountPath = mountPath;
         }
         else if (defaultObjectStorageMethod == "azure_object")

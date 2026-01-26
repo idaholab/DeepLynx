@@ -109,7 +109,7 @@ spec:
             - name: FILE_STORAGE_METHOD
               value: ${FILE_STORAGE_METHOD}
             - name: STORAGE_DIRECTORY
-              value: "/data/duckdb"
+              value: ${STORAGE_DIRECTORY}
             - name: RECOMMENDED_CHUNK_SIZE
               value: ${RECOMMENDED_CHUNK_SIZE}
             - name: POSTGRES_DB_HOST
@@ -257,7 +257,7 @@ spec:
             - name: FILE_STORAGE_METHOD
               value: ${FILE_STORAGE_METHOD}
             - name: STORAGE_DIRECTORY
-              value: "/data/duckdb"
+              value: ${STORAGE_DIRECTORY}
             - name: RECOMMENDED_CHUNK_SIZE
               value: ${RECOMMENDED_CHUNK_SIZE}
             - name: POSTGRES_DB_HOST
