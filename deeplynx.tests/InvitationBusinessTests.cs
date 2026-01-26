@@ -1,5 +1,6 @@
 using deeplynx.business;
 using deeplynx.datalayer.Models;
+using deeplynx.helpers.BigData;
 using deeplynx.helpers.Hubs;
 using deeplynx.interfaces;
 using Microsoft.AspNetCore.SignalR;
@@ -28,6 +29,7 @@ public class InvitationBusinessTests : IntegrationTestBase
     private Mock<IRecordBusiness> _recordBusiness = null!;
     private Mock<IRelationshipBusiness> _relationshipBusiness = null!;
     private Mock<IRoleBusiness> _roleBusiness = null!;
+    private BulkCopyUpsertExecutor _bulkCopyUpsertExecutor = null!;
 
     public long oid; // organization ID
     public long oid2; // organization 2 ID
@@ -55,7 +57,8 @@ public class InvitationBusinessTests : IntegrationTestBase
         _userBusiness = new UserBusiness(Context);
         _notificationBusiness = new Mock<INotificationBusiness>();
         _mockOrgLogger = new Mock<ILogger<OrganizationBusiness>>();
-        _eventBusiness = new EventBusiness(Context, _notificationBusiness.Object);
+        _bulkCopyUpsertExecutor = new BulkCopyUpsertExecutor();
+        _eventBusiness = new EventBusiness(Context, _notificationBusiness.Object, _bulkCopyUpsertExecutor);
         _objectStorageBusiness = new Mock<IObjectStorageBusiness>();
         _roleBusiness = new Mock<IRoleBusiness>();
         _organizationBusiness = new OrganizationBusiness(

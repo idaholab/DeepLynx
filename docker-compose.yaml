@@ -60,6 +60,7 @@ services:
       POSTGRES_PORT: 5432
       FILE_STORAGE_METHOD: filesystem # values can be filesystem, azure_object, and aws_s3
       STORAGE_DIRECTORY: /data
+      RECOMMENDED_CHUNK_SIZE: 100000000
       AZURE_OBJECT_CONNECTION_STRING: azure-example-connection-string
       AWS_S3_CONNECTION_STRING: aws-example-connection-string
       JWT_SECRET_KEY: demo_ZGDcnDdkRjLcx1kty9lXzlZ9L2ywFv3rC/91I3Z6fLQ= # for your local backend and can be changed

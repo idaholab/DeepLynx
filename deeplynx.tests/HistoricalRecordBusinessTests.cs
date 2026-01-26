@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using deeplynx.business;
 using deeplynx.datalayer.Models;
+using deeplynx.helpers.BigData;
 using deeplynx.helpers.Hubs;
 using deeplynx.interfaces;
 using deeplynx.models;
@@ -23,6 +24,7 @@ public class HistoricalRecordBusinessTests : IntegrationTestBase
     private INotificationBusiness _notificationBusiness = null!;
     private RecordBusiness _recordBusiness = null!;
     private TagBusiness _tagBusiness = null!;
+    private IBulkCopyUpsertExecutor _bulkCopyUpsertExecutor = null!;
 
     public long cid;
     public long did;
@@ -47,9 +49,10 @@ public class HistoricalRecordBusinessTests : IntegrationTestBase
         _mockNotificationLogger = new Mock<ILogger<NotificationBusiness>>();
         _notificationBusiness =
             new NotificationBusiness(Context, _mockNotificationLogger.Object, _mockHubContext.Object);
-        _eventBusiness = new EventBusiness(Context, _notificationBusiness);
+        _bulkCopyUpsertExecutor = new BulkCopyUpsertExecutor();
+        _eventBusiness = new EventBusiness(Context, _notificationBusiness, _bulkCopyUpsertExecutor);
         _tagBusiness = new TagBusiness(Context, _eventBusiness);
-        _recordBusiness = new RecordBusiness(Context, _eventBusiness, _tagBusiness);
+        _recordBusiness = new RecordBusiness(Context, _eventBusiness, _bulkCopyUpsertExecutor, _tagBusiness);
     }
 
     protected override async Task SeedTestDataAsync()

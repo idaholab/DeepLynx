@@ -21,6 +21,7 @@ public class OauthApplicationBusinessTests : IntegrationTestBase
     private Mock<ILogger<OauthApplicationBusiness>> _mockOauthLogger = null!;
     private INotificationBusiness _notificationBusiness = null!;
     private OauthApplicationBusiness _oauthApplicationBusiness;
+    private Mock<IBulkCopyUpsertExecutor> _mockBulkCopyUpsertExecutor = null!;
     public long appid1; // oauth application IDs
     public long appid2;
     public long appid3;
@@ -39,7 +40,8 @@ public class OauthApplicationBusinessTests : IntegrationTestBase
         _mockOauthLogger = new Mock<ILogger<OauthApplicationBusiness>>();
         _notificationBusiness =
             new NotificationBusiness(Context, _mockNotificationLogger.Object, _mockHubContext.Object);
-        _eventBusiness = new EventBusiness(Context, _notificationBusiness);
+        _mockBulkCopyUpsertExecutor = new Mock<IBulkCopyUpsertExecutor>();
+        _eventBusiness = new EventBusiness(Context, _notificationBusiness, _mockBulkCopyUpsertExecutor.Object);
         _oauthApplicationBusiness = new OauthApplicationBusiness(Context, _mockOauthLogger.Object, _eventBusiness);
     }
 

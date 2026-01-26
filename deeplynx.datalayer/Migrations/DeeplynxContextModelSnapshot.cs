@@ -242,6 +242,10 @@ namespace deeplynx.datalayer.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("project_id");
 
+                    b.Property<string>("Properties")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("properties");
+
                     b.Property<string>("Uuid")
                         .HasColumnType("text")
                         .HasColumnName("uuid");
@@ -418,6 +422,10 @@ namespace deeplynx.datalayer.Migrations
                     b.Property<long>("ProjectId")
                         .HasColumnType("bigint")
                         .HasColumnName("project_id");
+
+                    b.Property<string>("Properties")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("properties");
 
                     b.Property<long?>("RelationshipId")
                         .HasColumnType("bigint")
@@ -1495,6 +1503,10 @@ namespace deeplynx.datalayer.Migrations
                     b.Property<long?>("ProjectId")
                         .HasColumnType("bigint")
                         .HasColumnName("project_id");
+
+                    b.Property<string>("Properties")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("properties");
 
                     b.Property<string>("Uuid")
                         .HasColumnType("text")
