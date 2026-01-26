@@ -709,9 +709,6 @@ public partial class DeeplynxContext : DbContext
                 .HasDatabaseName("idx_projects_organization_id");
 
             entity.Property(e => e.Id).UseIdentityAlwaysColumn();
-            entity.Property(e => e.Config)
-                .HasDefaultValueSql(
-                    "'{\"tagsMutable\": false, \"ontologyMutable\": false, \"edgeRecordsMutable\": false}'::jsonb");
             entity.Property(e => e.LastUpdatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
 
             entity.Property(e => e.IsArchived).HasDefaultValue(false);

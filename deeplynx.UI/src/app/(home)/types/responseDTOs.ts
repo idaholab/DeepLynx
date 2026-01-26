@@ -111,6 +111,7 @@ export type OrganizationResponseDto = {
   lastUpdatedBy?: string | null;
   isArchived: boolean;
   defaultOrg?: boolean;
+  banner?: string;
 }
 
 export type PermissionResponseDto = {
@@ -147,6 +148,7 @@ export type ProjectResponseDto = {
   lastUpdatedBy?: string | null;
   isArchived: boolean;
   organizationId: number | string;
+  banner?: string;
 };
 
 export type ProjectStatResponseDto = {
@@ -189,7 +191,7 @@ export type UserResponseDto =
     role?: string;
   }
 
-  export type UserAdminInfoDto = {
+export type UserAdminInfoDto = {
   id: number;
   name: string;
   email: string;
@@ -257,21 +259,21 @@ export type PaginatedEventsResponseDto =
   };
 
 export type EventResponseDto = {
-    id: number;
-    operation: string;
-    entityType: string;
-    entityId?: number | null;
-    projectId: number;
-    organizationId?: number | null;
-    organizationName: string;
-    dataSourceId?: number | null;
-    properties?: JSON | string | null;
-    projectName?: string | null;
-    entityName?: string | null;
-    dataSourceName?: string | null;
-    lastUpdatedAt?: string | null;
-    lastUpdatedBy?: number | null;
-    lastUpdatedByUserName?: string | null;
+  id: number;
+  operation: string;
+  entityType: string;
+  entityId?: number | null;
+  projectId: number;
+  organizationId?: number | null;
+  organizationName: string;
+  dataSourceId?: number | null;
+  properties?: JSON | string | null;
+  projectName?: string | null;
+  entityName?: string | null;
+  dataSourceName?: string | null;
+  lastUpdatedAt?: string | null;
+  lastUpdatedBy?: number | null;
+  lastUpdatedByUserName?: string | null;
 };
 
 export type EdgeResponseDto = {
