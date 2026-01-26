@@ -59,6 +59,7 @@ public class OrganizationBusiness : IOrganizationBusiness
                 LastUpdatedBy = o.LastUpdatedBy,
                 IsArchived = o.IsArchived,
                 DefaultOrg = o.DefaultOrg,
+                Banner = o.Banner
             });
     }
 
@@ -96,6 +97,7 @@ public class OrganizationBusiness : IOrganizationBusiness
                 LastUpdatedBy = o.LastUpdatedBy,
                 IsArchived = o.IsArchived,
                 DefaultOrg = o.DefaultOrg,
+                Banner = o.Banner
             })
             .ToListAsync();
     }
@@ -128,6 +130,7 @@ public class OrganizationBusiness : IOrganizationBusiness
             LastUpdatedBy = organization.LastUpdatedBy,
             IsArchived = organization.IsArchived,
             DefaultOrg = organization.DefaultOrg,
+            Banner = organization.Banner
         };
     }
 
@@ -148,7 +151,8 @@ public class OrganizationBusiness : IOrganizationBusiness
             Description = dto.Description,
             DefaultOrg = isDefault,
             LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
-            LastUpdatedBy = currentUserId
+            LastUpdatedBy = currentUserId,
+            Banner = dto.Banner
         };
 
         _context.Organizations.Add(organization);
@@ -182,6 +186,7 @@ public class OrganizationBusiness : IOrganizationBusiness
             LastUpdatedBy = organization.LastUpdatedBy,
             IsArchived = organization.IsArchived,
             DefaultOrg = organization.DefaultOrg,
+            Banner = organization.Banner
         };
     }
 
@@ -206,6 +211,7 @@ public class OrganizationBusiness : IOrganizationBusiness
         organization.DefaultOrg = dto.DefaultOrg ?? organization.DefaultOrg;
         organization.LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
         organization.LastUpdatedBy = currentUserId;
+        organization.Banner = dto.Banner; 
 
         _context.Organizations.Update(organization);
 
@@ -236,6 +242,7 @@ public class OrganizationBusiness : IOrganizationBusiness
             LastUpdatedBy = organization.LastUpdatedBy,
             IsArchived = organization.IsArchived,
             DefaultOrg = organization.DefaultOrg,
+            Banner = organization.Banner
         };
     }
 
