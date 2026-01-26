@@ -640,15 +640,23 @@ public class RoleBusinessTests : IntegrationTestBase
     }
 
     [Fact]
-    public async Task GetAllRoles_FiltersByOrganization()
+    public async Task GetAllRoles_OnlyForOrganization()
     {
         // Act
         var result = (await _roleBusiness.GetAllRoles(oid, null)).ToList();
         
         // Assert.All(result, r => Assert.Equal(false, r.IsArchived));
         Assert.Contains(result, r => r.Id == rid1);
+    }
+    
+    [Fact]
+    public async Task GetAllRoles_ForProjectAndOrgInheritance()
+    {
+        // Act
+        var result = (await _roleBusiness.GetAllRoles(oid, pid)).ToList();
+        
+        Assert.Contains(result, r => r.Id == rid1);
         Assert.Contains(result, r => r.Id == rid4);
-        Assert.Contains(result, r => r.Id == rid5);
     }
 
     #endregion
