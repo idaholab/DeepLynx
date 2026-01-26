@@ -821,7 +821,7 @@ public class ProjectBusiness : IProjectBusiness
                 Environment.GetEnvironmentVariable("STORAGE_DIRECTORY");
             
             if (string.IsNullOrWhiteSpace(mountPath))
-                throw new ArgumentException($"Mount path cannot be empty string. Mount path is {mountPath}");
+                throw new ArgumentException($"Mount path cannot be empty string. Mount path is {mountPath}. Storage method is {defaultObjectStorageMethod}.");
             
             configDto.MountPath = mountPath;
         }
