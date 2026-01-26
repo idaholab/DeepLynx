@@ -19,8 +19,6 @@ jobs:
         env:
           ACR_SP_USER: ${{ secrets.CI_SP_USER }}
           ACR_SP_PASSWORD: ${{ secrets.CI_SP_PASSWORD }}
-          STORAGE_DIRECTORY: ${{ vars.STORAGE_DIRECTORY }}
-          AZURE_CONTAINER_NAME: ${{ vars.AZURE_CONTAINER_NAME }}
           ACR_REGISTRY: ${{ secrets.CI_REGISTRY }}
           ACR_PATH: ${{ secrets.CI_REGISTRY_PATH }}
           ACR_SP_TENANT: ${{ secrets.CI_SP_TENANT }}
@@ -146,6 +144,7 @@ jobs:
           GITHUB_RUN_NUMBER: ${{ github.RUN_NUMBER }}
           DATABASE_CONNECTION_STRING: ${{ secrets.DATABASE_CONNECTION_STRING }}
           FILE_STORAGE_METHOD: ${{ vars.FILE_STORAGE_METHOD }}
+          DUCKDB_BASE_PATH: ${{ vars.DUCKDB_BASE_PATH }}
           STORAGE_DIRECTORY: ${{ vars.STORAGE_DIRECTORY }}
           RECOMMENDED_CHUNK_SIZE: ${{ vars.RECOMMENDED_CHUNK_SIZE }}
           POSTGRES_DB_HOST: ${{ vars.POSTGRES_DB_HOST }}

@@ -821,18 +821,19 @@ public class ProjectBusiness : IProjectBusiness
                 Environment.GetEnvironmentVariable("STORAGE_DIRECTORY");
             
             if (string.IsNullOrWhiteSpace(mountPath))
-                throw new ArgumentException($"Mount path cannot be empty string. Mount path is {mountPath}. Storage method is {defaultObjectStorageMethod}.");
+                throw new ArgumentException($"STORAGE_DIRECTORY is null or white space, please check your environment variables.");
             
             configDto.MountPath = mountPath;
         }
         else if (defaultObjectStorageMethod == "azure_object")
         {
-            var azureConnectionString =
-                Environment.GetEnvironmentVariable("AZURE_OBJECT_CONNECTION_STRING") ??
-                                     throw new NullReferenceException("Azure connection string not set");
-            
-            var azureContainerName = Environment.GetEnvironmentVariable("AZURE_CONTAINER_NAME") ?? 
-                                     throw new NullReferenceException("Azure container name not set");
+            var azureConnectionString = Environment.GetEnvironmentVariable("AZURE_OBJECT_CONNECTION_STRING");
+            if (string.IsNullOrWhiteSpace(azureConnectionString))
+                throw new ArgumentException("AZURE_OBJECT_CONNECTION_STRING is null or white space, please check your environment variables.");
+
+            var azureContainerName = Environment.GetEnvironmentVariable("AZURE_CONTAINER_NAME");
+            if (string.IsNullOrWhiteSpace(azureContainerName))
+                throw new ArgumentException("AZURE_CONTAINER_NAME is null or white space, please check your environment variables.");
             
             configDto.AzureObjectConfig = new AzureObjectConfigDto()
             {
@@ -843,8 +844,10 @@ public class ProjectBusiness : IProjectBusiness
         else if (defaultObjectStorageMethod == "aws_s3")
         {
             var awsConnectionString =
-                Environment.GetEnvironmentVariable("AWS_S3_CONNECTION_STRING") ??
-                throw new NullReferenceException("AWS connection string not set");
+                Environment.GetEnvironmentVariable("AWS_S3_CONNECTION_STRING");
+            if (string.IsNullOrWhiteSpace(awsConnectionString))
+                throw new ArgumentException("AWS_S3_CONNECTION_STRING is null or white space, please check your environment variables.");
+            
             configDto.AwsConnectionString = awsConnectionString;
         }
         else
@@ -866,12 +869,17 @@ public class ProjectBusiness : IProjectBusiness
         // CREATE DEFAULT TIMESERIES MOUNT
         // ===============================
         // TODO: project config should determine whether to do this (true by default)
+        
+        var duckdbMountPath = Environment.GetEnvironmentVariable("DUCKDB_MOUNT_PATH");
+        if (string.IsNullOrWhiteSpace(duckdbMountPath))
+            throw new NullReferenceException("Duckdb mount path not set or is white space, check your environment variables.");
+        
         var timeseriesObjectStorageMethod = new CreateObjectStorageRequestDto
         {
             Name = "Timeseries Default",
             Config = new ObjectStorageConfigDto()
             {
-                MountPath = Environment.GetEnvironmentVariable("DUCKDB_BASE_PATH") ?? "/data/duckdb"
+                MountPath = duckdbMountPath
             }
         };
         var obj = await _objectStorageBusiness.CreateObjectStorage(currentUserId, organizationId, projectId,
