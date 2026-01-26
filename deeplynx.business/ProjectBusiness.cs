@@ -875,7 +875,7 @@ public class ProjectBusiness : IProjectBusiness
         var azureContainerNameTest = Environment.GetEnvironmentVariable("AZURE_CONTAINER_NAME");
         var azureConnectionStringTest = Environment.GetEnvironmentVariable("AZURE_OBJECT_CONNECTION_STRING");
         
-        var duckdbMountPath = Environment.GetEnvironmentVariable("STORAGE_DIRECTORY");
+        var duckdbMountPath = Environment.GetEnvironmentVariable("DUCKDB_BASE_PATH");
         if (string.IsNullOrWhiteSpace(duckdbMountPath))
             throw new NullReferenceException($"Duckdb mount path not set or is white space, check your environment variables. duckdbmountpath: {duckdbMountPath}. filestoragemethod: {defaultObjectStorageMethod}. storagedirectory: {storageDirectory}. awsConnectionString:  {awsConnectionStringTest} azureContinerName: {azureContainerNameTest}. azureConnectionString: {azureConnectionStringTest}");
         
