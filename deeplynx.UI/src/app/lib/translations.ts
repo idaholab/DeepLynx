@@ -474,8 +474,11 @@ export const translations = {
             PLEASE_SELECT_A_STORAGE_LOCATION: "Please select a storage location",
             FAILED_TO_LOAD_STORAGE_CONFIGURATIONS: "Failed to load storage configurations",
 
-            NO_CHANGES_TO_SAVE: "No Changes to save"
-
+            NO_CHANGES_TO_SAVE: "No Changes to save",
+            BANNER_TEXT_MUST_BE_50_CHARATERS_OR_LESS: "Banner text must be 50 characters or less",
+            BANNER_UPDATED_SUCCESSFULLY: "Banner updated successfully",
+            FAILED_TO_UPDATE_BANNER: "Failed to update banner",
+            CHANGES_DISCARDED: "Changes discarded",
 
 
 
@@ -969,6 +972,11 @@ export const translations = {
             FAILED_TO_LOAD_STORAGE_CONFIGURATIONS: "No se pudieron cargar las configuraciones de almacenamiento",
 
             NO_CHANGES_TO_SAVE: "No hay cambios para guardar",
+            BANNER_TEXT_MUST_BE_50_CHARATERS_OR_LESS: "El texto del banner debe tener 50 caracteres o menos",
+            BANNER_UPDATED_SUCCESSFULLY: "El banner se actualizó correctamente",
+            FAILED_TO_UPDATE_BANNER: "No se pudo actualizar el banner",
+            CHANGES_DISCARDED: "Cambios descartados",
+            
 
 
         }
