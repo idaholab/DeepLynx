@@ -92,6 +92,8 @@ const ProjectSettings = ({ project }: ProjectSettingsProps) => {
   const [deleteStorageId, setDeleteStorageId] = useState<number | null>(null);
   const [archiveStorageId, setArchiveStorageId] = useState<number | null>(null);
   const [archiveAction, setArchiveAction] = useState<boolean>(true);
+  const failedLoadStorageConfigurations =
+    t.translations.FAILED_TO_LOAD_STORAGE_CONFIGURATIONS;
 
   // Load existing logo on mount
   useEffect(() => {
@@ -151,11 +153,15 @@ const ProjectSettings = ({ project }: ProjectSettingsProps) => {
       }
     } catch (error) {
       console.error("Error loading storages:", error);
-      toast.error(t.translations.FAILED_TO_LOAD_STORAGE_CONFIGURATIONS);
+      toast.error(failedLoadStorageConfigurations);
     } finally {
       setIsLoadingStorages(false);
     }
-  }, [organization?.organizationId, project?.id]);
+  }, [
+    organization?.organizationId,
+    project?.id,
+    failedLoadStorageConfigurations,
+  ]);
 
   useEffect(() => {
     loadStorages();

@@ -12,12 +12,20 @@ import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useSafeSession } from "@/app/hooks/useSafeSession";
 import TopBanner from "@/app/(home)/components/VulnerabilityBanner";
+import {
+  ExclamationTriangleIcon,
+  XMarkIcon,
+} from "@heroicons/react/24/outline";
 
 function SigninContent() {
   const [isChecked, setChecked] = useState(true);
   const [isSigningIn, setIsSigningIn] = useState(false);
   const [hasAcknowledged, setHasAcknowledged] = useState(false);
   const [showModal, setShowModal] = useState(true);
+
+  // ✅ ADD: State for session expiry message
+  const [showExpiredMessage, setShowExpiredMessage] = useState(false);
+
   const { data: session, status } = useSafeSession();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -27,6 +35,21 @@ function SigninContent() {
   // Check if auth is disabled
   const isAuthDisabled =
     process.env.NEXT_PUBLIC_DISABLE_FRONTEND_AUTHENTICATION === "true";
+
+  // ✅ ADD: Check for session expiration parameter
+  useEffect(() => {
+    const sessionExpired = searchParams.get("session_expired");
+    if (sessionExpired === "true") {
+      setShowExpiredMessage(true);
+
+      // Auto-hide after 15 seconds
+      const timer = setTimeout(() => {
+        setShowExpiredMessage(false);
+      }, 15000);
+
+      return () => clearTimeout(timer);
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     // If auth is disabled, redirect immediately to home
@@ -146,16 +169,26 @@ function SigninContent() {
               </h2>
               <div className="text-gray-700 mb-6 space-y-3 text-sm max-h-96 overflow-y-auto">
                 <p>
-                  This is a DOE computer system. DOE computer systems are provided for the processing of official U.S. Government information only.
+                  This is a DOE computer system. DOE computer systems are
+                  provided for the processing of official U.S. Government
+                  information only.
                 </p>
                 <p>
-                  All data contained within DOE computer systems is owned by DOE and may be audited, intercepted, recorded, read, copied, or captured in any manner and disclosed in any manner by authorized personnel.
+                  All data contained within DOE computer systems is owned by DOE
+                  and may be audited, intercepted, recorded, read, copied, or
+                  captured in any manner and disclosed in any manner by
+                  authorized personnel.
                 </p>
                 <p>
-                  THERE IS NO RIGHT OF PRIVACY IN THIS SYSTEM. System personnel may disclose any potential evidence of crime found on DOE computer systems to appropriate authorities.
+                  THERE IS NO RIGHT OF PRIVACY IN THIS SYSTEM. System personnel
+                  may disclose any potential evidence of crime found on DOE
+                  computer systems to appropriate authorities.
                 </p>
                 <p>
-                  USE OF THIS SYSTEM BY ANY USER, AUTHORIZED OR UNAUTHORIZED, CONSTITUTES CONSENT TO THIS AUDITING, INTERCEPTION, RECORDING, READING, COPYING, CAPTURING, and DISCLOSURE OF COMPUTER ACTIVITY.
+                  USE OF THIS SYSTEM BY ANY USER, AUTHORIZED OR UNAUTHORIZED,
+                  CONSTITUTES CONSENT TO THIS AUDITING, INTERCEPTION, RECORDING,
+                  READING, COPYING, CAPTURING, and DISCLOSURE OF COMPUTER
+                  ACTIVITY.
                 </p>
                 <p className="font-bold text-red-600 text-center text-base mt-4">
                   **WARNING**WARNING**WARNING**WARNING**WARNING**
@@ -166,6 +199,27 @@ function SigninContent() {
                 className="w-full py-4 text-sm text-center text-gray-50 bg-gray-700 border-2 border-black rounded-xl hover:bg-gray-600 transition-colors"
               >
                 I Acknowledge
+              </button>
+            </div>
+          </div>
+        )}
+
+        {showExpiredMessage && (
+          <div className="w-full max-w-lg mb-4 px-4">
+            <div className="alert alert-warning shadow-lg">
+              <ExclamationTriangleIcon className="size-6" />
+              <div className="flex-1">
+                <h3 className="font-bold">Session Expired</h3>
+                <div className="text-sm">
+                  Your session has expired due to a system update. Please sign
+                  in again to continue.
+                </div>
+              </div>
+              <button
+                className="btn btn-sm btn-ghost"
+                onClick={() => setShowExpiredMessage(false)}
+              >
+                <XMarkIcon className="size-6" />
               </button>
             </div>
           </div>
