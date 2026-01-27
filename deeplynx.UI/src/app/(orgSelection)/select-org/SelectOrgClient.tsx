@@ -30,7 +30,7 @@ interface OrgWithCounts extends OrganizationResponseDto {
 }
 
 interface Props {
-  session: Session | null;
+  session: Session;
 }
 
 const SelectOrgClient = ({ session }: Props) => {
@@ -83,7 +83,7 @@ const SelectOrgClient = ({ session }: Props) => {
               userCount: 0,
             };
           }
-        }),
+        })
       );
 
       setOrganizations(orgsWithCounts);
@@ -170,7 +170,7 @@ const SelectOrgClient = ({ session }: Props) => {
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-3">
                   <h2 className="text-xl font-semibold">
-                    Welcome back, {formatUserName(session?.user.name)}
+                    Welcome back, {formatUserName(session.user.name)}
                   </h2>
                 </div>
                 <RoleGate role="sysAdmin">
