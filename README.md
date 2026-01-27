@@ -1,4 +1,7 @@
 # DeepLynx Nexus
+## Feature Requests and Bug Reporting
+*  INL Users & Developers: Please use INL's Jira instance to submit both new feature requests and to report bugs
+*  External Users & Developers: Please use the GitHub Issues page of this repository for both feature requests and bug reports.
 ## Prerequisites
 1. Postgres download:
     * Download [PostgreSQL](https://www.postgresql.org/) natively, OR

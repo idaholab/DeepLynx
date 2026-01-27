@@ -31,7 +31,7 @@ const RoleSettings = ({ id }: RoleSettingsProps) => {
   // Fetch role and permissions data on component mount
   useEffect(() => {
     const roleId = searchParams.get("roleId");
-    if (roleId) {
+    if (roleId && organization?.organizationId && project?.projectId) {
       getAllRoles(
         organization?.organizationId as number,
         project?.projectId as number
@@ -46,7 +46,7 @@ const RoleSettings = ({ id }: RoleSettingsProps) => {
           console.error("Error fetching role data:", error);
         });
     }
-  }, [searchParams]);
+  }, [searchParams, organization?.organizationId, project?.projectId]);
 
   const onCancel = () => {
     router.push(`/project/${id}/project_settings?tab=Roles`);

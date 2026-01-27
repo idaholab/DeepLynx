@@ -46,11 +46,5 @@ export default async function Page() {
     },
   ];
 
-  return (
-    <UploadCenterClient
-      initialAvailableFiles={initialAvailableFiles}
-      initialRecentUploads={initialRecentUploads}
-      uploadText="uploaded a new source"
-    />
-  );
+  return <UploadCenterClient initialAvailableFiles={initialAvailableFiles} />;
 }

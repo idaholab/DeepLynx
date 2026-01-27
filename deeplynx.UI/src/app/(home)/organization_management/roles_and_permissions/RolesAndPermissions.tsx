@@ -1,6 +1,6 @@
 // src/app/(home)/organization_management/roles_and_permissions/RolesAndPermissions.tsx
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useOrganizationSession } from "@/app/contexts/OrganizationSessionProvider";
 import { useProjectSession } from "@/app/contexts/ProjectSessionProvider";
 import {
@@ -419,7 +419,7 @@ const RolesAndPermissions = ({
   /*                    Fetching Role Permissions (API Calls)                 */
   /* ------------------------------------------------------------------------ */
 
-  const fetchRolePermissions = async (roleId: number) => {
+  const fetchRolePermissions = useCallback(async (roleId: number) => {
     if (rolePermissions[roleId]) return;
     if (!organization?.organizationId) return;
 
@@ -438,9 +438,9 @@ const RolesAndPermissions = ({
     } finally {
       setIsLoadingPermissions(false);
     }
-  };
+  }, [organization?.organizationId, rolePermissions]);
 
-  const fetchAllRolePermissions = async () => {
+  const fetchAllRolePermissions = useCallback(async () => {
     if (!organization?.organizationId) return;
 
     setIsLoadingPermissions(true);
@@ -473,7 +473,7 @@ const RolesAndPermissions = ({
     } finally {
       setIsLoadingPermissions(false);
     }
-  };
+  }, [organization?.organizationId, roles]);
 
   /* ------------------------------------------------------------------------ */
   /*                               useEffect Hooks                            */

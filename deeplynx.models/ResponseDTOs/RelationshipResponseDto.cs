@@ -10,6 +10,8 @@ public class RelationshipResponseDto
 
     [Column("description")] public string? Description { get; set; }
 
+    [Column("properties")] public string? Properties { get; set; }
+
     [Column("uuid")] public string? Uuid { get; set; }
 
     [Column("project_id")] public long? ProjectId { get; set; }

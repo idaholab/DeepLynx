@@ -26,6 +26,7 @@ import ConfirmArchiveTagModal from "@/app/(home)/organization_management/tag_man
 import TagEditModal from "@/app/(home)/organization_management/tag_management/TagEditModal";
 import ProjectTagsPanel from "./ProjectTagsPanel";
 import ProjectLabelsComingSoonCard from "./ProjectLabelsComingSoonCard";
+import { useLanguage } from "@/app/contexts/Language";
 
 /* -------------------------------------------------------------------------- */
 /*                                   Types                                    */
@@ -67,7 +68,7 @@ const ProjectTagAndLabelManagementClient: React.FC<Props> = ({
       normalizedTagSearch
         ? tags.filter((t) => t.name.toLowerCase().includes(normalizedTagSearch))
         : tags,
-    [tags, normalizedTagSearch]
+    [tags, normalizedTagSearch],
   );
 
   /* ------------------------------------------------------------------------ */
@@ -78,7 +79,7 @@ const ProjectTagAndLabelManagementClient: React.FC<Props> = ({
   const [editingTag, setEditingTag] = useState<TagResponseDto | null>(null);
   const [nameInput, setNameInput] = useState("");
   const [savingTag, setSavingTag] = useState(false);
-
+  const { t } = useLanguage();
   const [showArchiveModal, setShowArchiveModal] = useState(false);
   const [tagToArchive, setTagToArchive] = useState<TagResponseDto | null>(null);
 
@@ -131,7 +132,7 @@ const ProjectTagAndLabelManagementClient: React.FC<Props> = ({
       const dtoList: TagResponseDto[] = await getAllTagsOrg(
         orgId,
         [projectId as number],
-        true // hide archived by default
+        true, // hide archived by default
       );
 
       setTags(dtoList.filter((t) => !t.isArchived));
@@ -163,7 +164,7 @@ const ProjectTagAndLabelManagementClient: React.FC<Props> = ({
 
     if (orgTagsLocked) {
       toast.error(
-        "Tags are locked at the organization level. Cannot create or edit project tags."
+        "Tags are locked at the organization level. Cannot create or edit project tags.",
       );
       return;
     }
@@ -177,11 +178,7 @@ const ProjectTagAndLabelManagementClient: React.FC<Props> = ({
           name: nameInput.trim(),
         };
 
-        const updated = await updateTagOrg(
-          orgId,
-          editingTag.id,
-          updatePayload
-        );
+        const updated = await updateTagOrg(orgId, editingTag.id, updatePayload);
 
         setTags((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
         toast.success("Project tag updated.");
@@ -191,10 +188,7 @@ const ProjectTagAndLabelManagementClient: React.FC<Props> = ({
           name: nameInput.trim(),
         };
 
-        const created = await createTagOrg(
-          orgId,
-          createPayload
-        );
+        const created = await createTagOrg(orgId, createPayload);
         setTags((prev) => [...prev, created]);
         toast.success("Project tag created.");
       }
@@ -217,7 +211,7 @@ const ProjectTagAndLabelManagementClient: React.FC<Props> = ({
 
     if (orgTagsLocked) {
       toast.error(
-        "Tags are locked at the organization level. Cannot archive project tags."
+        "Tags are locked at the organization level. Cannot archive project tags.",
       );
       return;
     }
@@ -259,14 +253,15 @@ const ProjectTagAndLabelManagementClient: React.FC<Props> = ({
   return (
     <div className="p-6">
       {/* Page Header */}
-      <div className="mb-4">
+      <div className="mb-4 border-b border-base-300 pb-4">
         <h2 className="text-2xl font-bold text-base-content">
-          Project Tag Management
+          {t.translations.PROJECT_TAG_MANAGEMENT}
         </h2>
-        <p className="text-base-content/70 mt-1 max-w-3xl text-sm">
-          Define project-level tags for classification, workflows, and search.
-          Organization-level locks determine whether this project can define
-          additional tags beyond those inherited from the organization.
+        <p className="text-base-content/70 mt-1 max-w-3xl">
+          {
+            t.translations
+              .DEFINE_PROJECT_TAGS_FOR_CLASSIFICATION_WORKFLOWS_AND_SEARCH
+          }
         </p>
       </div>
 

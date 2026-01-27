@@ -4,38 +4,31 @@ using System.ComponentModel.DataAnnotations.Schema;
 namespace deeplynx.datalayer.Models;
 
 [Table("edges", Schema = "deeplynx")]
-public partial class Edge
+public class Edge
 {
-    [Column("origin_id")]
-    public long OriginId { get; set; }
+    [Column("origin_id")] public long OriginId { get; set; }
 
-    [Column("destination_id")]
-    public long DestinationId { get; set; }
+    [Column("destination_id")] public long DestinationId { get; set; }
 
-    [Column("relationship_id")]
-    public long? RelationshipId { get; set; }
+    [Column("relationship_id")] public long? RelationshipId { get; set; }
 
-    [Column("data_source_id")]
-    public long DataSourceId { get; set; }
+    [Column("data_source_id")] public long DataSourceId { get; set; }
 
-    [Column("project_id")]
-    public long ProjectId { get; set; }
-    
-    [Column("organization_id")]
-    public long OrganizationId { get; set; }
+    [Column("project_id")] public long ProjectId { get; set; }
+
+    [Column("properties", TypeName = "jsonb")]
+    public string? Properties { get; set; }
+
+    [Column("organization_id")] public long OrganizationId { get; set; }
 
     [Column("last_updated_at", TypeName = "timestamp without time zone")]
     public DateTime LastUpdatedAt { get; set; }
 
-    [Column("last_updated_by")]
-    public long? LastUpdatedBy { get; set; }
+    [Column("last_updated_by")] public long? LastUpdatedBy { get; set; }
 
-    [Key]
-    [Column("id")]
-    public long Id { get; set; }
+    [Key] [Column("id")] public long Id { get; set; }
 
-    [Column("is_archived")]
-    public bool IsArchived { get; set; }
+    [Column("is_archived")] public bool IsArchived { get; set; }
 
     [ForeignKey("DataSourceId")]
     [InverseProperty("Edges")]
@@ -55,7 +48,7 @@ public partial class Edge
     [ForeignKey("ProjectId")]
     [InverseProperty("Edges")]
     public virtual Project Project { get; set; } = null!;
-    
+
     [ForeignKey("OrganizationId")]
     [InverseProperty("Edges")]
     public virtual Organization Organization { get; set; } = null!;
@@ -63,7 +56,6 @@ public partial class Edge
     [ForeignKey("RelationshipId")]
     [InverseProperty("Edges")]
     public virtual Relationship? Relationship { get; set; }
-    
-    [InverseProperty("LastUpdatedEdges")]
-    public virtual User? LastUpdatedByUser { get; set; }
+
+    [InverseProperty("LastUpdatedEdges")] public virtual User? LastUpdatedByUser { get; set; }
 }

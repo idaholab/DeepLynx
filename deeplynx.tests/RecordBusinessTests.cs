@@ -3,6 +3,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using deeplynx.business;
 using deeplynx.datalayer.Models;
+using deeplynx.helpers.BigData;
 using deeplynx.helpers.Hubs;
 using deeplynx.interfaces;
 using deeplynx.models;
@@ -23,6 +24,7 @@ public class RecordBusinessTests : IntegrationTestBase
     private INotificationBusiness _notificationBusiness = null!;
     private RecordBusiness _recordBusiness;
     private TagBusiness _tagBusiness = null!;
+    private BulkCopyUpsertExecutor _mockBulkCopyUpsertExecutor = null!;
     public long cid; // class ID
     public long did; // datasource ID
     private long organizationId;
@@ -49,9 +51,10 @@ public class RecordBusinessTests : IntegrationTestBase
         _mockNotificationLogger = new Mock<ILogger<NotificationBusiness>>();
         _notificationBusiness =
             new NotificationBusiness(Context, _mockNotificationLogger.Object, _mockHubContext.Object);
-        _eventBusiness = new EventBusiness(Context, _notificationBusiness);
+        _mockBulkCopyUpsertExecutor = new BulkCopyUpsertExecutor();
+        _eventBusiness = new EventBusiness(Context, _notificationBusiness, _mockBulkCopyUpsertExecutor);
         _tagBusiness = new TagBusiness(Context, _eventBusiness);
-        _recordBusiness = new RecordBusiness(Context, _eventBusiness, _tagBusiness);
+        _recordBusiness = new RecordBusiness(Context, _eventBusiness, _mockBulkCopyUpsertExecutor, _tagBusiness);
     }
 
     #region RecordResponseDto Tests
@@ -1141,7 +1144,7 @@ public class RecordBusinessTests : IntegrationTestBase
         var exception = await Assert.ThrowsAsync<KeyNotFoundException>(() =>
             _recordBusiness.BulkCreateRecords(uid, organizationId, 999L, 1L, records));
 
-        Assert.Contains("Project with id 999 not found.", exception.Message);
+        Assert.Contains($"DataSource with id 1 not found in project with id 999", exception.Message);
 
         // Ensure that no record create event was logged
         var eventList = await Context.Events.ToListAsync();

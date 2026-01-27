@@ -269,4 +269,67 @@ public class TimeseriesController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
+
+    /// <summary>
+    ///     Get a view of data points
+    /// </summary>
+    /// <param name="organizationId">ID of organization that timeseries data is associated with</param>
+    /// <param name="projectId">ID of project that timeseries data is associated with</param>
+    /// <param name="dataSourceId">ID of data source that timeseries data is associated with</param>
+    /// <param name="recordId">Name of the duckDB table on which the timeseries data is encoded</param>
+    /// <param name="limit">Maximum number of data points to include</param>
+    /// <param name="rowStride">every nth row to get (row number 4 = every 4th row)</param>
+    /// <returns>JSON: { timeseriesPlotData: { columns: [], data: [][] } }</returns>
+    [HttpGet("plot", Name = "api_plot_data")]
+    [Auth("read", "record")]
+    public async Task<IActionResult> GetPlotData(long organizationId, long projectId, long dataSourceId, [FromQuery] long recordId, [FromQuery] long limit, [FromQuery] long rowStride)
+    {
+        try
+        {
+            var currentUserId = UserContextStorage.UserId;
+            var timeseriesPlotData = await _timeseriesBusiness.GetPlotData(organizationId, projectId, dataSourceId, recordId, limit, rowStride);
+            return Ok(new { TimeseriesPlotData = timeseriesPlotData });
+        }
+        catch (ArgumentException e)
+        {
+            _logger.LogWarning(e, "Invalid request for plot data");
+            return BadRequest(e.Message);
+        }
+        catch (Exception e)
+        {
+            _logger.LogError(e, "Error retrieving plot data for record {RecordId}", recordId);
+            return StatusCode(StatusCodes.Status500InternalServerError, e.Message);
+        }
+    }
+
+    /// <summary>
+    ///     Get the most recent row
+    /// </summary>
+    /// <param name="organizationId">ID of organization that timeseries data is associated with</param>
+    /// <param name="projectId">ID of project that timeseries data is associated with</param>
+    /// <param name="dataSourceId">ID of data source that timeseries data is associated with</param>
+    /// <param name="recordId">Name of the duckDB table on which the timeseries data is encoded</param>
+    /// <returns>JSON object with column names as keys and the latest row's values</returns>
+    [HttpGet("latest", Name = "api_latest_row")]
+    [Auth("read", "record")]
+    public async Task<IActionResult> GetLatestRow(long organizationId, long projectId, long dataSourceId, [FromQuery] long recordId)
+    {
+        try
+        {
+            var currentUserId = UserContextStorage.UserId;
+            var latestRow = await _timeseriesBusiness.GetLatestRow(organizationId, projectId, dataSourceId, recordId);
+            return Ok(new { LatestRowData = latestRow });
+        }
+        catch (ArgumentException e)
+        {
+            _logger.LogWarning(e, "Invalid request for latest row");
+            return BadRequest(e.Message);
+        }
+        catch (Exception e)
+        {
+            if (_logger.IsEnabled(LogLevel.Error))
+                _logger.LogError(e, "Error retrieving latest row for record {RecordId}", recordId);
+            return StatusCode(StatusCodes.Status500InternalServerError, e.Message);
+        }
+    }
 }

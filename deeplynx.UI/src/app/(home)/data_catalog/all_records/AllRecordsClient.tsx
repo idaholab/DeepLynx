@@ -145,7 +145,7 @@ export default function DataCatalogClient({
       setTableData(transformedData);
       setViewMode("list");
     },
-    [effectiveProjectIds]
+    [effectiveProjectIds, organization?.organizationId, projects]
   );
 
   // Clear all now fetches from API for the current scope (not local filtering)
@@ -195,7 +195,13 @@ export default function DataCatalogClient({
       setSearchTerm("");
       setViewMode("list");
     },
-    [activeFilters, nextFilterId, effectiveProjectIds, projects.length]
+    [
+      activeFilters,
+      nextFilterId,
+      effectiveProjectIds,
+      projects,
+      organization?.organizationId,
+    ]
   );
 
   // If we arrive with a search term, run it once after session is ready

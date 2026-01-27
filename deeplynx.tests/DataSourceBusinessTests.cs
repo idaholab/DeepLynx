@@ -1,7 +1,7 @@
 using System.Text.Json.Nodes;
 using deeplynx.business;
 using deeplynx.datalayer.Models;
-using deeplynx.helpers;
+using deeplynx.helpers.BigData;
 using deeplynx.helpers.Hubs;
 using deeplynx.interfaces;
 using deeplynx.models;
@@ -14,6 +14,7 @@ namespace deeplynx.tests;
 
 public class DataSourceBusinessTests : IntegrationTestBase
 {
+    private readonly IBulkCopyUpsertExecutor _bulkCopyUpsertExecutor = null!;
     private readonly EventBusiness _eventBusiness;
     private readonly Mock<IEdgeBusiness> _mockEdgeBusiness;
     private readonly Mock<IHubContext<EventNotificationHub>> _mockHubContext = null!;
@@ -37,7 +38,8 @@ public class DataSourceBusinessTests : IntegrationTestBase
         _mockNotificationLogger = new Mock<ILogger<NotificationBusiness>>();
         _notificationBusiness =
             new NotificationBusiness(Context, _mockNotificationLogger.Object, _mockHubContext.Object);
-        _eventBusiness = new EventBusiness(Context, _notificationBusiness);
+        _bulkCopyUpsertExecutor = new BulkCopyUpsertExecutor();
+        _eventBusiness = new EventBusiness(Context, _notificationBusiness, _bulkCopyUpsertExecutor);
     }
 
     public override async Task InitializeAsync()
@@ -93,7 +95,7 @@ public class DataSourceBusinessTests : IntegrationTestBase
             LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified).AddMonths(-12),
             IsArchived = false
         };
-        var dataSource2 = new DataSource
+        var dataSource2 = new DataSource // org-level data source
         {
             Name = "Customer CRM Database 2",
             Description = "Primary customer relationship management database",
@@ -103,7 +105,7 @@ public class DataSourceBusinessTests : IntegrationTestBase
             Config =
                 @"{""driver"":""sqlserver"",""host"":""crm-prod.company.com"",""port"":1433,""database"":""CustomerData"",""ssl_enabled"":true}",
             OrganizationId = oid,
-            ProjectId = pid,
+            ProjectId = null, // org-level
             LastUpdatedBy = testUser.Id,
             LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified).AddMonths(-12),
             IsArchived = false
@@ -195,20 +197,21 @@ public class DataSourceBusinessTests : IntegrationTestBase
         var exception = await Assert.ThrowsAsync<KeyNotFoundException>(() =>
             _dataSourceBusiness.GetDefaultDataSource(oid, pid));
 
-        Assert.Contains($"Default data source for project {pid} not found", exception.Message);
+        Assert.Contains("Default data source not found for the specified organization/project context",
+            exception.Message);
     }
 
     [Fact]
     public async Task GetDefaultDataSource_OrgLevel_NoDefault_ThrowsKeyNotFoundException()
     {
-        // Arrange - Only project-level data sources exist (all have ProjectId = pid)
         // No org-level defaults exist
 
         // Act & Assert
         var exception = await Assert.ThrowsAsync<KeyNotFoundException>(() =>
             _dataSourceBusiness.GetDefaultDataSource(oid, null));
 
-        Assert.Contains($"Default data source for organization {oid} not found", exception.Message);
+        Assert.Contains("Default data source not found for the specified organization/project context",
+            exception.Message);
     }
 
     [Fact]
@@ -223,7 +226,8 @@ public class DataSourceBusinessTests : IntegrationTestBase
         var exception = await Assert.ThrowsAsync<KeyNotFoundException>(() =>
             _dataSourceBusiness.GetDefaultDataSource(oid, pid));
 
-        Assert.Contains($"Default data source for project {pid} not found", exception.Message);
+        Assert.Contains("Default data source not found for the specified organization/project context",
+            exception.Message);
     }
 
     [Fact]
@@ -268,7 +272,8 @@ public class DataSourceBusinessTests : IntegrationTestBase
         var exception = await Assert.ThrowsAsync<KeyNotFoundException>(() =>
             _dataSourceBusiness.GetDefaultDataSource(oid, null));
 
-        Assert.Contains($"Default data source for organization {oid} not found", exception.Message);
+        Assert.Contains("Default data source not found for the specified organization/project context",
+            exception.Message);
     }
 
     #endregion
@@ -276,19 +281,42 @@ public class DataSourceBusinessTests : IntegrationTestBase
     #region SetDefaultDataSource
 
     [Fact]
+    public async Task SetDefaultDataSource_WithProjectId_ThrowsWhenOrgLevel()
+    {
+        // Act & Assert - Cannot set org-level data source as default from a project context
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            _dataSourceBusiness.SetDefaultDataSource(oid, pid, uid, did2));
+
+        Assert.Contains("Organization data sources cannot be updated from the child projects",
+            exception.Message);
+    }
+
+    [Fact]
     public async Task SetDefaultDataSource_ProjectLevel_SetsDefaultAndUnsetsPrevious()
     {
         // Arrange - Set did as current default
         var currentDefault = await Context.DataSources.FindAsync(did);
         currentDefault!.Default = true;
+
+        // Arrange - Create second project-level data source
+        var newDefault = new DataSource
+        {
+            Name = "Project Default",
+            ProjectId = pid,
+            Default = false,
+            OrganizationId = oid,
+            LastUpdatedBy = uid,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            IsArchived = false
+        };
+        Context.DataSources.Add(newDefault);
         await Context.SaveChangesAsync();
 
-        // Act - Set did2 as new default
-        var result = await _dataSourceBusiness.SetDefaultDataSource(oid, pid, uid, did2);
+        // Act - Set newDefault as new default
+        var result = await _dataSourceBusiness.SetDefaultDataSource(oid, pid, uid, newDefault.Id);
 
         // Assert - New default is set
         Assert.NotNull(result);
-        Assert.Equal(did2, result.Id);
         Assert.True(result.Default);
         Assert.Equal(uid, result.LastUpdatedBy);
 
@@ -299,7 +327,7 @@ public class DataSourceBusinessTests : IntegrationTestBase
         Assert.Equal(uid, previousDefault.LastUpdatedBy);
 
         // Assert - Event was created
-        var events = await Context.Events.Where(e => e.EntityId == did2).ToListAsync();
+        var events = await Context.Events.Where(e => e.EntityId == newDefault.Id).ToListAsync();
         Assert.Single(events);
         Assert.Equal("update", events[0].Operation);
         Assert.Equal("data_source", events[0].EntityType);
@@ -412,6 +440,34 @@ public class DataSourceBusinessTests : IntegrationTestBase
         Assert.True(projectDefaultAfter!.Default); // Should still be true
     }
 
+
+    [Fact]
+    public async Task SetDefaultDataSource_NoProjectId_CannotSetProjectLevelDefault()
+    {
+        // Act & Assert - Cannot set project-level data source as default without projectId
+        var exception = await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            _dataSourceBusiness.SetDefaultDataSource(oid, null, uid, did));
+
+        Assert.Contains("not found or does not belong to the specified organization/project context",
+            exception.Message);
+    }
+
+    [Fact]
+    public async Task SetDefaultDataSource_NoProjectId_CanSetOrgLevelDefault()
+    {
+        // Act
+        var result = await _dataSourceBusiness.SetDefaultDataSource(oid, null, uid, did2);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.True(result.Default);
+
+        // Verify in database
+        Context.ChangeTracker.Clear();
+        var updated = await Context.DataSources.FindAsync(did2);
+        Assert.True(updated!.Default);
+    }
+
     #endregion
 
     #region GetAllDataSources Tests
@@ -425,7 +481,7 @@ public class DataSourceBusinessTests : IntegrationTestBase
 
         // Assert
         Assert.Equal(2, dataSources.Count);
-        Assert.All(dataSources, ds => Assert.Equal(pid, ds.ProjectId));
+        Assert.All(dataSources, ds => Assert.Equal(oid, ds.OrganizationId));
         Assert.All(dataSources, ds => Assert.False(ds.IsArchived));
         Assert.Contains(dataSources, ds => ds.Id == did);
         Assert.Contains(dataSources, ds => ds.Id == did2);
@@ -447,7 +503,7 @@ public class DataSourceBusinessTests : IntegrationTestBase
         // Assert
         Assert.Equal(2, dataSources.Count);
         Assert.DoesNotContain(dataSources, ds => ds.Name == "Project 2 Data Source");
-        Assert.All(dataSources, ds => Assert.Equal(pid, ds.ProjectId));
+        Assert.All(dataSources, ds => Assert.Equal(oid, ds.OrganizationId));
     }
 
     [Fact]
@@ -493,6 +549,31 @@ public class DataSourceBusinessTests : IntegrationTestBase
         Assert.Null(dataSource.Config);
     }
 
+    [Fact]
+    public async Task GetAllDataSources_NoProjectIds_ReturnsOnlyOrgLevel()
+    {
+        // Act - Request org-level data sources only (no projectIds)
+        var result = await _dataSourceBusiness.GetAllDataSources(oid, null);
+
+        // Assert - Should only return org-level data source (did2)
+        Assert.Single(result);
+        Assert.Equal(did2, result[0].Id);
+        Assert.Null(result[0].ProjectId);
+    }
+
+    [Fact]
+    public async Task GetAllDataSources_WithProjectIds_ReturnsProjectAndOrgLevel()
+    {
+        // Act - Request data sources for specific project (includes org-level inheritance)
+        var result = await _dataSourceBusiness.GetAllDataSources(oid, new[] { pid });
+
+        // Assert - Should return project-level (did) and org-level (did2)
+        Assert.Equal(2, result.Count);
+        var ids = result.Select(d => d.Id).ToList();
+        Assert.Contains(did, ids);
+        Assert.Contains(did2, ids);
+    }
+
     #endregion
 
     #region GetDataSource Tests
@@ -523,7 +604,9 @@ public class DataSourceBusinessTests : IntegrationTestBase
             await Assert.ThrowsAsync<KeyNotFoundException>(() =>
                 _dataSourceBusiness.GetDataSource(oid, pid, 999, false));
 
-        Assert.Contains("Data Source with id 999 not found", exception.Message);
+        Assert.Contains(
+            "Data source with id 999 not found or does not belong to the specified organization/project context",
+            exception.Message);
     }
 
     [Fact]
@@ -535,7 +618,9 @@ public class DataSourceBusinessTests : IntegrationTestBase
             did,
             false)); // DataSource belongs to project with pid, not pid2
 
-        Assert.Contains($"Data Source with id {did} not found", exception.Message);
+        Assert.Contains(
+            $"Data source with id {did} not found or does not belong to the specified organization/project context",
+            exception.Message);
     }
 
     [Fact]
@@ -546,7 +631,9 @@ public class DataSourceBusinessTests : IntegrationTestBase
             await Assert.ThrowsAsync<KeyNotFoundException>(() =>
                 _dataSourceBusiness.GetDataSource(oid, pid, did3, true)); // did3 is archived
 
-        Assert.Contains($"Data Source with id {did3} is archived", exception.Message);
+        Assert.Contains(
+            $"Data source with id {did3} not found or does not belong to the specified organization/project context",
+            exception.Message);
     }
 
     [Fact]
@@ -560,6 +647,53 @@ public class DataSourceBusinessTests : IntegrationTestBase
         Assert.Equal("sqlserver", result.Config["driver"]?.ToString());
         Assert.Equal("crm-prod.company.com", result.Config["host"]?.ToString());
         Assert.Equal(1433, result.Config["port"]?.GetValue<int>());
+    }
+
+    [Fact]
+    public async Task GetDataSource_NoProjectId_ReturnsOnlyOrgLevel()
+    {
+        // Act - Request org-level data source without projectId
+        var result = await _dataSourceBusiness.GetDataSource(oid, null, did2, true);
+
+        // Assert - Should return org-level data source
+        Assert.NotNull(result);
+        Assert.Equal(did2, result.Id);
+        Assert.Null(result.ProjectId);
+    }
+
+    [Fact]
+    public async Task GetDataSource_NoProjectId_ThrowsWhenRequestingProjectLevel()
+    {
+        // Act & Assert - Requesting project-level data source without projectId should throw
+        var exception = await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            _dataSourceBusiness.GetDataSource(oid, null, did, true));
+
+        Assert.Contains("not found or does not belong to the specified organization/project context",
+            exception.Message);
+    }
+
+    [Fact]
+    public async Task GetDataSource_WithProjectId_ReturnsProjectAndOrgLevel()
+    {
+        // Act - Request project-level data source with projectId (should also access org-level)
+        var result = await _dataSourceBusiness.GetDataSource(oid, pid, did, true);
+
+        // Assert - Should return project-level data source
+        Assert.NotNull(result);
+        Assert.Equal(did, result.Id);
+        Assert.Equal(pid, result.ProjectId);
+    }
+
+    [Fact]
+    public async Task GetDataSource_WithProjectId_ReturnsInheritedOrgLevel()
+    {
+        // Act - Request org-level data source with projectId (inheritance)
+        var result = await _dataSourceBusiness.GetDataSource(oid, pid, did2, true);
+
+        // Assert - Should return org-level data source (inherited by project)
+        Assert.NotNull(result);
+        Assert.Equal(did2, result.Id);
+        Assert.Null(result.ProjectId);
     }
 
     #endregion
@@ -841,6 +975,18 @@ public class DataSourceBusinessTests : IntegrationTestBase
     #region UpdateDataSource Tests
 
     [Fact]
+    public async Task UpdateDataSource_WithProjectId_ThrowsWhenOrgLevel()
+    {
+        // Act & Assert - Cannot update org-level data source from a project context
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            _dataSourceBusiness.UpdateDataSource(oid, pid, uid, did2,
+                new UpdateDataSourceRequestDto { Name = "Updated Name" }));
+
+        Assert.Contains("Organization data sources cannot be updated from the child projects",
+            exception.Message);
+    }
+
+    [Fact]
     public async Task UpdateDataSource_ValidUpdate_UpdatesDataSource()
     {
         // Arrange
@@ -954,7 +1100,9 @@ public class DataSourceBusinessTests : IntegrationTestBase
             await Assert.ThrowsAsync<KeyNotFoundException>(() =>
                 _dataSourceBusiness.UpdateDataSource(oid, pid, uid, 999, dto));
 
-        Assert.Contains("Data Source with id 999 not found", exception.Message);
+        Assert.Contains(
+            "Data source with id 999 not found or does not belong to the specified organization/project context",
+            exception.Message);
 
         // Ensure that datasource update event was NOT logged
         var eventList = await Context.Events.ToListAsync();
@@ -976,7 +1124,9 @@ public class DataSourceBusinessTests : IntegrationTestBase
             await Assert.ThrowsAsync<KeyNotFoundException>(() =>
                 _dataSourceBusiness.UpdateDataSource(oid, pid2, uid, did, dto)); // did belongs to pid not pid2
 
-        Assert.Contains($"Data Source with id {did} not found", exception.Message);
+        Assert.Contains(
+            $"Data source with id {did} not found or does not belong to the specified organization/project context",
+            exception.Message);
 
         // Ensure that datasource update event was NOT logged
         var eventList = await Context.Events.ToListAsync();
@@ -998,7 +1148,9 @@ public class DataSourceBusinessTests : IntegrationTestBase
             await Assert.ThrowsAsync<KeyNotFoundException>(() =>
                 _dataSourceBusiness.UpdateDataSource(oid, pid, uid, did3, dto)); // DataSource 3 is archived
 
-        Assert.Contains($"Data Source with id {did3} not found", exception.Message);
+        Assert.Contains(
+            $"Data source with id {did3} not found or does not belong to the specified organization/project context",
+            exception.Message);
 
         // Ensure that datasource update event was NOT logged
         var eventList = await Context.Events.ToListAsync();
@@ -1036,9 +1188,51 @@ public class DataSourceBusinessTests : IntegrationTestBase
         Assert.Equal(result.Id, actualEvent.EntityId);
     }
 
+    [Fact]
+    public async Task UpdateDataSource_NoProjectId_CannotUpdateProjectLevel()
+    {
+        // Act & Assert - Cannot update project-level data source without projectId
+        var exception = await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            _dataSourceBusiness.UpdateDataSource(oid, null, uid, did,
+                new UpdateDataSourceRequestDto { Name = "Updated Name" }));
+
+        Assert.Contains("not found or does not belong to the specified organization/project context",
+            exception.Message);
+    }
+
+    [Fact]
+    public async Task UpdateDataSource_NoProjectId_CanUpdateOrgLevel()
+    {
+        // Arrange
+        var updateDto = new UpdateDataSourceRequestDto { Name = "Updated Org DataSource" };
+
+        // Act
+        var result = await _dataSourceBusiness.UpdateDataSource(oid, null, uid, did2, updateDto);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal("Updated Org DataSource", result.Name);
+
+        // Verify in database
+        Context.ChangeTracker.Clear();
+        var updated = await Context.DataSources.FindAsync(did2);
+        Assert.Equal("Updated Org DataSource", updated!.Name);
+    }
+
     #endregion
 
     #region DeleteDataSource Tests
+
+    [Fact]
+    public async Task DeleteDataSource_WithProjectId_ThrowsWhenOrgLevel()
+    {
+        // Act & Assert - Cannot delete org-level data source from a project context
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            _dataSourceBusiness.DeleteDataSource(oid, pid, did2));
+
+        Assert.Contains("Organization data sources cannot be updated from the child projects",
+            exception.Message);
+    }
 
     [Fact]
     public async Task DeleteDataSource_ValidDataSource_DeletesSuccessfully()
@@ -1061,7 +1255,9 @@ public class DataSourceBusinessTests : IntegrationTestBase
         var exception =
             await Assert.ThrowsAsync<KeyNotFoundException>(() => _dataSourceBusiness.DeleteDataSource(oid, pid, 999));
 
-        Assert.Contains("Data Source with id 999 not found", exception.Message);
+        Assert.Contains(
+            "Data source with id 999 not found or does not belong to the specified organization/project context",
+            exception.Message);
     }
 
     [Fact]
@@ -1072,12 +1268,51 @@ public class DataSourceBusinessTests : IntegrationTestBase
             await Assert.ThrowsAsync<KeyNotFoundException>(() =>
                 _dataSourceBusiness.DeleteDataSource(oid, pid2, did)); // DataSource 1 belongs to project 1
 
-        Assert.Contains($"Data Source with id {did} not found", exception.Message);
+        Assert.Contains(
+            $"Data source with id {did} not found or does not belong to the specified organization/project context",
+            exception.Message);
+    }
+
+    [Fact]
+    public async Task DeleteDataSource_NoProjectId_CannotDeleteProjectLevel()
+    {
+        // Act & Assert - Cannot delete project-level data source without projectId
+        var exception = await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            _dataSourceBusiness.DeleteDataSource(oid, null, did));
+
+        Assert.Contains("not found or does not belong to the specified organization/project context",
+            exception.Message);
+    }
+
+    [Fact]
+    public async Task DeleteDataSource_NoProjectId_CanDeleteOrgLevel()
+    {
+        // Act
+        var result = await _dataSourceBusiness.DeleteDataSource(oid, null, did2);
+
+        // Assert
+        Assert.True(result);
+
+        // Verify deleted
+        Context.ChangeTracker.Clear();
+        var deleted = await Context.DataSources.FindAsync(did2);
+        Assert.Null(deleted);
     }
 
     #endregion
 
     #region ArchiveDataSource Tests
+
+    [Fact]
+    public async Task ArchiveDataSource_WithProjectId_ThrowsWhenOrgLevel()
+    {
+        // Act & Assert - Cannot archive org-level data source from a project context
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            _dataSourceBusiness.ArchiveDataSource(oid, pid, uid, did2));
+
+        Assert.Contains("Organization data sources cannot be updated from the child projects",
+            exception.Message);
+    }
 
     [Fact]
     public async Task ArchiveDataSource_ValidDataSource_ArchivesSuccessfully()
@@ -1126,7 +1361,9 @@ public class DataSourceBusinessTests : IntegrationTestBase
             await Assert.ThrowsAsync<KeyNotFoundException>(() =>
                 _dataSourceBusiness.ArchiveDataSource(oid, pid, uid, 999));
 
-        Assert.Contains("Data Source with id 999 not found", exception.Message);
+        Assert.Contains(
+            "Data source with id 999 not found or does not belong to the specified organization/project context",
+            exception.Message);
 
         // Ensure that data source soft delete event was NOT logged
         var eventList = await Context.Events.ToListAsync();
@@ -1141,7 +1378,9 @@ public class DataSourceBusinessTests : IntegrationTestBase
             await Assert.ThrowsAsync<KeyNotFoundException>(() =>
                 _dataSourceBusiness.ArchiveDataSource(oid, pid, uid, did3)); // DataSource 3 is already archived
 
-        Assert.Contains($"Data Source with id {did3} not found", exception.Message);
+        Assert.Contains(
+            $"Data source with id {did3} not found or does not belong to the specified organization/project context",
+            exception.Message);
 
         // Ensure that data source soft delete event was NOT logged
         var eventList = await Context.Events.ToListAsync();
@@ -1171,6 +1410,32 @@ public class DataSourceBusinessTests : IntegrationTestBase
         Assert.Equal("archive", actualEvent.Operation);
         Assert.Equal("data_source", actualEvent.EntityType);
         Assert.Equal(did, actualEvent.EntityId);
+    }
+
+    [Fact]
+    public async Task ArchiveDataSource_NoProjectId_CannotArchiveProjectLevel()
+    {
+        // Act & Assert - Cannot archive project-level data source without projectId
+        var exception = await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            _dataSourceBusiness.ArchiveDataSource(oid, null, uid, did));
+
+        Assert.Contains("not found or does not belong to the specified organization/project context",
+            exception.Message);
+    }
+
+    [Fact]
+    public async Task ArchiveDataSource_NoProjectId_CanArchiveOrgLevel()
+    {
+        // Act
+        var result = await _dataSourceBusiness.ArchiveDataSource(oid, null, uid, did2);
+
+        // Assert
+        Assert.True(result);
+
+        // Verify archived
+        Context.ChangeTracker.Clear();
+        var archived = await Context.DataSources.FindAsync(did2);
+        Assert.True(archived!.IsArchived);
     }
 
     #endregion
@@ -1337,6 +1602,31 @@ public class DataSourceBusinessTests : IntegrationTestBase
     #region UnarchiveDataSource Tests
 
     [Fact]
+    public async Task UnarchiveDataSource_WithProjectId_ThrowsWhenOrgLevel()
+    {
+        // Arrange - Create archived org-level data source
+        var archivedOrgDs = new DataSource
+        {
+            Name = "Archived Org DataSource",
+            OrganizationId = oid,
+            ProjectId = null,
+            IsArchived = true,
+            LastUpdatedBy = uid,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
+        };
+        Context.DataSources.Add(archivedOrgDs);
+        await Context.SaveChangesAsync();
+        var archivedOrgDsId = archivedOrgDs.Id;
+
+        // Act & Assert - Cannot unarchive org-level data source from a project context
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            _dataSourceBusiness.UnarchiveDataSource(oid, pid, uid, archivedOrgDsId));
+
+        Assert.Contains("Organization data sources cannot be updated from the child projects",
+            exception.Message);
+    }
+
+    [Fact]
     public async Task UnarchiveDataSource_ValidArchivedDataSource_UnarchivesSuccessfully()
     {
         var now = DateTime.UtcNow;
@@ -1369,7 +1659,9 @@ public class DataSourceBusinessTests : IntegrationTestBase
         var ex = await Assert.ThrowsAsync<KeyNotFoundException>(() =>
             _dataSourceBusiness.UnarchiveDataSource(oid, pid, uid, 99999));
 
-        Assert.Contains("Data Source with id 99999 not found", ex.Message);
+        Assert.Contains(
+            "Data source with id 99999 not found or does not belong to the specified organization/project context",
+            ex.Message);
         // Ensure that data source unarchive event was NOT logged
         var eventList = await Context.Events.ToListAsync();
         Assert.Empty(eventList);
@@ -1382,7 +1674,9 @@ public class DataSourceBusinessTests : IntegrationTestBase
         var ex = await Assert.ThrowsAsync<KeyNotFoundException>(() =>
             _dataSourceBusiness.UnarchiveDataSource(oid, pid2, uid, did3)); // did3 is archived and belongs to pid
 
-        Assert.Contains($"Data Source with id {did3} not found", ex.Message);
+        Assert.Contains(
+            $"Data source with id {did3} not found or does not belong to the specified organization/project context",
+            ex.Message);
         // Ensure that data source unarchive event was NOT logged
         var eventList = await Context.Events.ToListAsync();
         Assert.Empty(eventList);
@@ -1395,10 +1689,52 @@ public class DataSourceBusinessTests : IntegrationTestBase
         var ex = await Assert.ThrowsAsync<KeyNotFoundException>(() =>
             _dataSourceBusiness.UnarchiveDataSource(oid, pid, uid, did)); // did is not archived
 
-        Assert.Contains($"Data Source with id {did} not found", ex.Message);
+        Assert.Contains(
+            $"Data source with id {did} not found or does not belong to the specified organization/project context",
+            ex.Message);
         // Ensure that data source unarchive event was NOT logged
         var eventList = await Context.Events.ToListAsync();
         Assert.Empty(eventList);
+    }
+
+    [Fact]
+    public async Task UnarchiveDataSource_NoProjectId_CannotUnarchiveProjectLevel()
+    {
+        // Act & Assert - Cannot unarchive project-level data source without projectId
+        var exception = await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            _dataSourceBusiness.UnarchiveDataSource(oid, null, uid, did3));
+
+        Assert.Contains("not found or does not belong to the specified organization/project context",
+            exception.Message);
+    }
+
+    [Fact]
+    public async Task UnarchiveDataSource_NoProjectId_CanUnarchiveOrgLevel()
+    {
+        // Arrange - Create archived org-level data source
+        var archivedOrgDs = new DataSource
+        {
+            Name = "Archived Org DataSource",
+            OrganizationId = oid,
+            ProjectId = null,
+            IsArchived = true,
+            LastUpdatedBy = uid,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
+        };
+        Context.DataSources.Add(archivedOrgDs);
+        await Context.SaveChangesAsync();
+        var archivedOrgDsId = archivedOrgDs.Id;
+
+        // Act
+        var result = await _dataSourceBusiness.UnarchiveDataSource(oid, null, uid, archivedOrgDsId);
+
+        // Assert
+        Assert.True(result);
+
+        // Verify unarchived
+        Context.ChangeTracker.Clear();
+        var unarchived = await Context.DataSources.FindAsync(archivedOrgDsId);
+        Assert.False(unarchived!.IsArchived);
     }
 
     #endregion

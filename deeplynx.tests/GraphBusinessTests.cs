@@ -1,5 +1,6 @@
 using deeplynx.business;
 using deeplynx.datalayer.Models;
+using deeplynx.helpers.BigData;
 using deeplynx.helpers.Hubs;
 using deeplynx.interfaces;
 using Microsoft.AspNetCore.SignalR;
@@ -27,6 +28,7 @@ public class GraphBusinessTests : IntegrationTestBase
     private Mock<IRoleBusiness> _mockRoleBusiness = null!;
     private INotificationBusiness _notificationBusiness = null!;
     private ProjectBusiness _projectBusiness = null!;
+    private IBulkCopyUpsertExecutor _bulkCopyUpsertExecutor = null!;
     
     public long classId;
     public long dsid;
@@ -56,11 +58,13 @@ public class GraphBusinessTests : IntegrationTestBase
         _mockNotificationLogger = new Mock<ILogger<NotificationBusiness>>();
         _notificationBusiness =
             new NotificationBusiness(Context, _mockNotificationLogger.Object, _mockHubContext.Object);
-        _eventBusiness = new EventBusiness(Context, _notificationBusiness);
+        _bulkCopyUpsertExecutor = new BulkCopyUpsertExecutor();
+        _eventBusiness = new EventBusiness(Context, _notificationBusiness, _bulkCopyUpsertExecutor);
+        
         _mockOrganizationBusiness = new Mock<IOrganizationBusiness>();
 
         _graphBusiness = new GraphBusiness(Context, _eventBusiness);
-        _edgeBusiness = new EdgeBusiness(Context, _eventBusiness);
+        _edgeBusiness = new EdgeBusiness(Context, _eventBusiness, _bulkCopyUpsertExecutor);
         _dataSourceBusiness = new DataSourceBusiness(Context, _edgeBusiness, _mockRecordBusiness.Object,
             _eventBusiness);
         _classBusiness = new ClassBusiness(

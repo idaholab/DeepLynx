@@ -20,6 +20,7 @@ namespace deeplynx.tests
         private INotificationBusiness _notificationBusiness = null!;
         private Mock<ILogger<NotificationBusiness>> _mockNotificationLogger = null!;
         private Mock<IHubContext<EventNotificationHub>> _mockHubContext = null!;
+        private Mock<IBulkCopyUpsertExecutor> _mockBulkCopyUpsertExecutor = null!;
         private long pid;
         private long pid2;
         private DateTime now = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
@@ -43,7 +44,8 @@ namespace deeplynx.tests
             _mockNotificationLogger = new Mock<ILogger<NotificationBusiness>>();
             _notificationBusiness =
                 new NotificationBusiness(Context, _mockNotificationLogger.Object, _mockHubContext.Object);
-            _eventBusiness = new EventBusiness(Context, _notificationBusiness);
+            _mockBulkCopyUpsertExecutor = new Mock<IBulkCopyUpsertExecutor>();
+            _eventBusiness = new EventBusiness(Context, _notificationBusiness, _mockBulkCopyUpsertExecutor.Object);
         }
 
         #region GetAllEvents (Simplified - No Pagination)

@@ -5,6 +5,7 @@ using deeplynx.datalayer.MigrationRunner;
 using deeplynx.datalayer.Models;
 using deeplynx.helpers;
 using deeplynx.helpers.Hubs;
+using deeplynx.helpers.BigData;
 using deeplynx.interfaces;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Http.Features;
@@ -174,6 +175,7 @@ try
     builder.Services.AddTransient<IPermissionBusiness, PermissionBusiness>();
     builder.Services.AddTransient<IProjectRolePermissionService, ProjectRolePermissionService>();
     builder.Services.AddTransient<IOrgRolePermissionService, OrgRolePermissionService>();
+    builder.Services.AddScoped<IBulkCopyUpsertExecutor, BulkCopyUpsertExecutor>();
     builder.Services.AddTransient<ISysAdminService, SysAdminService>();
     builder.Services.AddTransient<IOauthHandshakeBusiness, OauthHandshakeBusiness>();
     builder.Services.AddTransient<IOrganizationService, OrganizationService>();
@@ -202,6 +204,11 @@ try
             {
                 new()
                 {
+                    Url = "http://localhost:5000/api/v1/",
+                    Description = "Docker Environment"
+                },
+                new()
+                {
                     Url = "https://deeplynx.inl.gov/api/v1/",
                     Description = "Production"
                 },
@@ -214,11 +221,6 @@ try
                 {
                     Url = "https://deeplynx-test.dev.inl.gov/api/v1/",
                     Description = "Test"
-                },
-                new()
-                {
-                    Url = "http://localhost:5000/api/v1/",
-                    Description = "Docker Environment"
                 },
                 new()
                 {
@@ -240,6 +242,9 @@ try
                 new() { Name = "Project", Description = "Project management" },
                 new() { Name = "User", Description = "User management" },
                 new() { Name = "Group", Description = "Group management" },
+
+                // AI Services
+                new() { Name = "Lattice", Description = "Useful data views for DeepLynx Lattice use"},
 
                 // Authentication
                 new() { Name = "OauthHandshake", Description = "OAuth2 authorization flow" },
@@ -307,6 +312,11 @@ try
                 {
                     ["name"] = "Administration",
                     ["tags"] = new JsonArray { "Organization", "Project", "User", "Group" }
+                },
+                new JsonObject
+                {
+                    ["name"] = "AI Services",
+                    ["tags"] = new JsonArray { "Lattice" }
                 },
                 new JsonObject
                 {

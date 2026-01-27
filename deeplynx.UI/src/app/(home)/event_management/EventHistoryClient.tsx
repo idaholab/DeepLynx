@@ -144,7 +144,13 @@ const EventsHistoryClient = ({initialProjects, initialSelectedProjects}: Props) 
         setLoading(false);
       }
     },
-    [filters, rowsPerPage, organization?.organizationId, selectedProjects]
+    [
+      filters,
+      rowsPerPage,
+      organization?.organizationId,
+      selectedProjects,
+      initialProjects.length,
+    ]
   );
 
   const getCleanFilters = (filters: EventFilterParams): Record<string, string | number | number[] | undefined> => {

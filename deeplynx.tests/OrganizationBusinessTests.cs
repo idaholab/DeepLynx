@@ -22,6 +22,7 @@ public class OrganizationBusinessTests : IntegrationTestBase
     private Mock<ILogger<NotificationBusiness>> _mockNotificationLogger = null!;
     private INotificationBusiness _notificationBusiness = null!;
     private OrganizationBusiness _organizationBusiness = null!;
+    private Mock<IBulkCopyUpsertExecutor> _mockBulkCopyUpsertExecutor = null!;
 
     public long oid; // organization ID
     public long oid2; // second organization ID
@@ -41,7 +42,8 @@ public class OrganizationBusinessTests : IntegrationTestBase
         _mockNotificationLogger = new Mock<ILogger<NotificationBusiness>>();
         _notificationBusiness =
             new NotificationBusiness(Context, _mockNotificationLogger.Object, _mockHubContext.Object);
-        _eventBusiness = new EventBusiness(Context, _notificationBusiness);
+        _mockBulkCopyUpsertExecutor = new Mock<IBulkCopyUpsertExecutor>();
+        _eventBusiness = new EventBusiness(Context, _notificationBusiness, _mockBulkCopyUpsertExecutor.Object);
         _roleBusiness = new RoleBusiness(Context, _eventBusiness);
 
         // org business and dependencies
@@ -208,6 +210,7 @@ public class OrganizationBusinessTests : IntegrationTestBase
         {
             Name = "New Test Organization",
             Description = "New Test Organization Description",
+            Banner = "Banner"
         };
         
         var now =  DateTime.UtcNow;
@@ -224,6 +227,7 @@ public class OrganizationBusinessTests : IntegrationTestBase
         Assert.False(result.IsArchived);
         Assert.True(result.LastUpdatedAt >= now);
         Assert.Equal(uid, result.LastUpdatedBy);
+        Assert.Equal(dto.Banner, result.Banner);
 
         // verify org was actually created in database
         var createdOrg = await Context.Organizations.FindAsync(result.Id);
@@ -294,7 +298,8 @@ public class OrganizationBusinessTests : IntegrationTestBase
         var dto = new CreateOrganizationRequestDto
         {
             Name = "Event Test Organization",
-            Description = "A test organization for event logging"
+            Description = "A test organization for event logging",
+            Banner = "Banner"
         };
 
         // Act
@@ -303,6 +308,7 @@ public class OrganizationBusinessTests : IntegrationTestBase
         // Assert
         Assert.NotNull(result);
         Assert.Equal("Event Test Organization", result.Name);
+        Assert.Equal(dto.Banner, result.Banner);
 
         // Ensure that the Organization create event was logged
         var eventList = await Context.Events.ToListAsync();
@@ -436,7 +442,8 @@ public class OrganizationBusinessTests : IntegrationTestBase
             var dto = new UpdateOrganizationRequestDto
             {
                 Name = "Updated Organization",
-                Description = "Updated description"
+                Description = "Updated description", 
+                Banner = "Updated banner"
             };
             
             var now = DateTime.UtcNow;
@@ -453,6 +460,7 @@ public class OrganizationBusinessTests : IntegrationTestBase
             Assert.False(result.IsArchived);
             Assert.True(result.LastUpdatedAt >= now);
             Assert.Equal(uid, result.LastUpdatedBy);
+            Assert.Equal(dto.Banner, result.Banner);
 
         // Verify it was actually saved to DB
         var savedOrg = await Context.Organizations.FindAsync(oid);
@@ -477,7 +485,8 @@ public class OrganizationBusinessTests : IntegrationTestBase
         // Arrange
         var dto = new UpdateOrganizationRequestDto
         {
-            Name = "Event Updated Organization"
+            Name = "Event Updated Organization",
+            Banner = "Updated banner"
         };
 
         // Act
@@ -486,6 +495,7 @@ public class OrganizationBusinessTests : IntegrationTestBase
         // Assert
         Assert.NotNull(result);
         Assert.Equal("Event Updated Organization", result.Name);
+        Assert.Equal(dto.Banner, result.Banner);
 
         // Ensure that the Organization update event was logged
         var eventList = await Context.Events.ToListAsync();

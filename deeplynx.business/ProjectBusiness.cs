@@ -95,7 +95,8 @@ public class ProjectBusiness : IProjectBusiness
                 LastUpdatedAt = p.LastUpdatedAt,
                 LastUpdatedBy = p.LastUpdatedBy,
                 IsArchived = p.IsArchived,
-                OrganizationId = p.OrganizationId
+                OrganizationId = p.OrganizationId,
+                Banner = p.Banner  
             })
             .ToListAsync();
     }
@@ -119,7 +120,8 @@ public class ProjectBusiness : IProjectBusiness
             Abbreviation = dto.Abbreviation,
             OrganizationId = organizationId,
             LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
-            LastUpdatedBy = userId
+            LastUpdatedBy = userId,
+            Banner = dto.Banner
         };
 
         _context.Projects.Add(project);
@@ -135,7 +137,8 @@ public class ProjectBusiness : IProjectBusiness
             Abbreviation = project.Abbreviation,
             LastUpdatedBy = project.LastUpdatedBy,
             LastUpdatedAt = project.LastUpdatedAt,
-            OrganizationId = project.OrganizationId
+            OrganizationId = project.OrganizationId,
+            Banner = project.Banner
         };
 
         // Update the Project Cache List
@@ -231,6 +234,7 @@ public class ProjectBusiness : IProjectBusiness
         project.Abbreviation = dto.Abbreviation ?? project.Abbreviation;
         project.LastUpdatedBy = currentUserId;
         project.LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
+        project.Banner = dto.Banner; 
 
         _context.Projects.Update(project);
         await _context.SaveChangesAsync();
@@ -255,7 +259,8 @@ public class ProjectBusiness : IProjectBusiness
             IsArchived = project.IsArchived,
             LastUpdatedAt = project.LastUpdatedAt,
             LastUpdatedBy = project.LastUpdatedBy,
-            OrganizationId = project.OrganizationId
+            OrganizationId = project.OrganizationId,
+            Banner = project.Banner
         };
 
         // Update the Project Cache List
@@ -379,7 +384,8 @@ public class ProjectBusiness : IProjectBusiness
             Abbreviation = project.Abbreviation,
             LastUpdatedAt = project.LastUpdatedAt,
             LastUpdatedBy = project.LastUpdatedBy,
-            IsArchived = project.IsArchived
+            IsArchived = project.IsArchived,
+            Banner = project.Banner
         };
 
         // Update the Project Cache List
@@ -473,7 +479,8 @@ public class ProjectBusiness : IProjectBusiness
                 Abbreviation = project.Abbreviation,
                 LastUpdatedAt = project.LastUpdatedAt,
                 LastUpdatedBy = project.LastUpdatedBy,
-                IsArchived = project.IsArchived
+                IsArchived = project.IsArchived,
+                Banner = project.Banner
             };
 
             // Update the Project Cache List

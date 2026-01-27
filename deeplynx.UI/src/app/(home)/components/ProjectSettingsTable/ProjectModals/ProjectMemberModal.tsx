@@ -30,7 +30,7 @@ const AddProjectMember = ({
   const { organization, hasLoaded } = useOrganizationSession();
 
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && organization?.organizationId) {
       // Fetch users
       getAllUsers()
         .then((response: UserResponseDto[]) => {
@@ -41,7 +41,7 @@ const AddProjectMember = ({
         });
 
       // Fetch roles for the specific project
-      getAllRoles(organization!.organizationId as number, projectId)
+      getAllRoles(organization.organizationId as number, projectId)
         .then((response: RoleResponseDto[]) => {
           setRoles(response);
         })
@@ -49,7 +49,7 @@ const AddProjectMember = ({
           console.error("Error fetching roles:", error);
         });
     }
-  }, [isOpen, projectId]);
+  }, [isOpen, projectId, organization?.organizationId]);
 
   const handleUserChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
     const userId = parseInt(event.target.value, 10);

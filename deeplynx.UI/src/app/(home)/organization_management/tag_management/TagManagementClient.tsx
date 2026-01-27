@@ -1,330 +1,314 @@
 "use client";
 
+/* -------------------------------------------------------------------------- */
+/*                                   Imports                                  */
+/* -------------------------------------------------------------------------- */
+
+import React, { useEffect, useMemo, useState } from "react";
+import toast from "react-hot-toast";
+
 import { useOrganizationSession } from "@/app/contexts/OrganizationSessionProvider";
-import { getRecordsByTags } from "@/app/lib/client_service/record_services.client";
 import {
-  archiveTagOrg,
   getAllTagsOrg,
+  createTagOrg,
+  archiveTagOrg,
   updateTagOrg,
 } from "@/app/lib/client_service/tag_services.client";
-import { useCallback, useEffect, useState } from "react";
-import toast from "react-hot-toast";
-import { RecordResponseDto, TagResponseDto } from "../../types/responseDTOs";
-import CreateTag, {
-  CreateTagRecordsList,
-} from "./search_create_attach_edit-tag-page/CreateTag";
-import EditTags, {
-  EditTagsNameFields,
-} from "./search_create_attach_edit-tag-page/EditTags";
-import SearchTags, {
-  SearchTagsRecordsList,
-} from "./search_create_attach_edit-tag-page/SearchTags";
+import type {
+  ProjectResponseDto,
+  TagResponseDto,
+} from "@/app/(home)/types/responseDTOs";
 
-const parseTags = (
-  tags: string | TagResponseDto[] | undefined | null
-): TagResponseDto[] => {
-  if (!tags) return [];
+import ConfirmArchiveTagModal from "./ConfirmArchiveTagModal";
+import TagOverviewStrip from "./TagOverviewStrip";
+import LabelsComingSoonCard from "./LabelsComingSoonCard";
+import OrgTagsPanel from "./OrgTagsPanel";
+import TagEditModal from "./TagEditModal";
 
-  if (typeof tags === "string") {
-    try {
-      return JSON.parse(tags) as TagResponseDto[];
-    } catch (e) {
-      console.error("Error parsing tags:", e);
-      return [];
-    }
-  }
+/* -------------------------------------------------------------------------- */
+/*                                   Types                                    */
+/* -------------------------------------------------------------------------- */
 
-  if (Array.isArray(tags)) {
-    return tags;
-  }
+interface Props {
+  projects: ProjectResponseDto[];
+}
 
-  return [];
-};
+type ModalMode = "tag";
 
-const TagManagementClient = () => {
-  const [selectedMenuItem, setSelectedMenuItems] = useState("Search Tags");
-  const [tags, setTags] = useState<TagResponseDto[]>([]);
-  const [filteredTags, setFilteredTags] = useState<TagResponseDto[]>([]);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [selectedTagIds, setSelectedTagIds] = useState<Set<number>>(new Set());
-  const [recordsFromTagSearch, setRecordsFromTagSearch] = useState<
-    RecordResponseDto[]
-  >([]);
-  const [isSearchingByTags, setIsSearchingByTags] = useState(false);
+/* -------------------------------------------------------------------------- */
+/*                       TagManagementClientOption3                           */
+/* -------------------------------------------------------------------------- */
 
-  const menuItems = ["Search Tags", "Create Tag", "Edit Tags"];
+const TagManagementClient: React.FC<Props> = ({ projects }) => {
+  /* ------------------------------------------------------------------------ */
+  /*                        Organization / Core Tag State                     */
+  /* ------------------------------------------------------------------------ */
+
   const { organization } = useOrganizationSession();
+  const orgId = organization?.organizationId as number | undefined;
 
-  useEffect(() => {
-    setSelectedTagIds(new Set());
-  }, [selectedMenuItem]);
+  // Labels are not yet supported – used only for "coming soon" UI.
+  const [labelsLocked] = useState(false);
+  const labelCount = 0;
 
-  const refetchTags = useCallback(async () => {
-    if (!organization?.organizationId) {
-      setTags([]);
-      setFilteredTags([]);
-      return;
+  // Tags loaded from backend
+  const [tags, setTags] = useState<TagResponseDto[]>([]);
+  const [tagsLocked, setTagsLocked] = useState(false);
+
+  const [tagsLoading, setTagsLoading] = useState(false);
+  const [tagsError, setTagsError] = useState<string | null>(null);
+
+  // For archive (soft delete) UX
+  const [archivingTagId, setArchivingTagId] = useState<number | null>(null);
+
+  /* ------------------------------------------------------------------------ */
+  /*                               Search State                               */
+  /* ------------------------------------------------------------------------ */
+
+  const [tagSearch, setTagSearch] = useState("");
+  const normalizedTagSearch = tagSearch.trim().toLowerCase();
+
+  const filteredTags = useMemo(
+    () =>
+      normalizedTagSearch
+        ? tags.filter((t) => t.name.toLowerCase().includes(normalizedTagSearch))
+        : tags,
+    [tags, normalizedTagSearch],
+  );
+
+  /* ------------------------------------------------------------------------ */
+  /*                               Modal State                                */
+  /* ------------------------------------------------------------------------ */
+
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [modalMode, setModalMode] = useState<ModalMode>("tag");
+  const [editingTag, setEditingTag] = useState<TagResponseDto | null>(null);
+  const [nameInput, setNameInput] = useState("");
+  const [savingTag, setSavingTag] = useState(false);
+
+  const [showArchiveModal, setShowArchiveModal] = useState(false);
+  const [tagToArchive, setTagToArchive] = useState<TagResponseDto | null>(null);
+
+  const resetModalState = () => {
+    setEditingTag(null);
+    setNameInput("");
+    setSavingTag(false);
+  };
+
+  const openCreateTagModal = () => {
+    resetModalState();
+    setModalMode("tag");
+    setIsModalOpen(true);
+  };
+
+  const openEditTagModal = (id: number) => {
+    resetModalState();
+    setModalMode("tag");
+    const found = tags.find((t) => t.id === id) || null;
+    if (found) {
+      setEditingTag(found);
+      setNameInput(found.name);
+      setIsModalOpen(true);
     }
+  };
 
-    setLoading(true);
-    setError(null);
+  const closeEditCreateModal = () => {
+    setIsModalOpen(false);
+    resetModalState();
+  };
+
+  const openArchiveModal = (tag: TagResponseDto) => {
+    setTagToArchive(tag);
+    setShowArchiveModal(true);
+  };
+
+  /* ------------------------------------------------------------------------ */
+  /*                           Load Tags from Backend                         */
+  /* ------------------------------------------------------------------------ */
+
+  const loadOrganizationTags = async () => {
+    if (!orgId) return;
 
     try {
-      const allTags = await getAllTagsOrg(
-        organization.organizationId as number
+      setTagsLoading(true);
+      setTagsError(null);
+
+      const dtoList: TagResponseDto[] = await getAllTagsOrg(
+        orgId,
+        undefined,
+        true, // hide archived by default
       );
-      setTags(allTags);
-      setFilteredTags(allTags);
+
+      setTags(dtoList.filter((t) => !t.isArchived));
     } catch (error) {
-      setError("Failed to fetch tags");
-      console.error("Error fetching tags:", error);
+      console.error("Failed to load organization tags:", error);
+      setTagsError("Failed to load organization tags.");
+      toast.error("Failed to load organization tags.");
     } finally {
-      setLoading(false);
+      setTagsLoading(false);
     }
-  }, [organization?.organizationId]);
+  };
 
   useEffect(() => {
-    refetchTags();
-  }, [refetchTags]);
+    loadOrganizationTags();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orgId]);
 
-  useEffect(() => {
-    if (!searchQuery.trim()) {
-      setFilteredTags(tags);
+  /* ------------------------------------------------------------------------ */
+  /*                         Create / Update / Archive                        */
+  /* ------------------------------------------------------------------------ */
+
+  const handleSave = async () => {
+    if (!nameInput.trim()) return;
+
+    if (!orgId) {
+      toast.error("No organization selected. Unable to save tag.");
       return;
     }
 
-    const query = searchQuery.toLowerCase();
-    const filtered = tags.filter((tag) =>
-      tag.name?.toLowerCase().includes(query)
-    );
-    setFilteredTags(filtered);
-  }, [searchQuery, tags]);
+    if (modalMode !== "tag") return;
 
-  const handleSearchByTags = async (tagIds: number[]) => {
-    // TODO: Update to organization-level endpoint
-    setIsSearchingByTags(true);
     try {
-      const records = await getRecordsByTags(
-        organization?.organizationId as number,
-        0, // TODO: Remove projectId dependency
-        tagIds
-      );
+      setSavingTag(true);
 
-      if (records.length === 0) {
-        toast.error("No records found with these tags");
-        setRecordsFromTagSearch([]);
-        return;
+      if (editingTag) {
+        // Update existing tag
+        const updatePayload: TagResponseDto = {
+          ...editingTag,
+          name: nameInput.trim(),
+        };
+
+        const updated = await updateTagOrg(orgId, editingTag.id, updatePayload);
+
+        setTags((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+        toast.success("Organization tag updated.");
+      } else {
+        // Create new tag
+        const createPayload: TagResponseDto = {
+          id: 0, // backend should ignore / overwrite
+          name: nameInput.trim(),
+          projectId: 0, // sentinel for "org-level"
+          isArchived: false,
+          lastUpdatedAt: null,
+          lastUpdatedBy: null,
+          archivedAt: null,
+        };
+
+        const created = await createTagOrg(orgId, createPayload);
+        setTags((prev) => [...prev, created]);
+        toast.success("Organization tag created.");
       }
 
-      const recordsWithParsedTags = records.map(
-        (record: RecordResponseDto) => ({
-          ...record,
-          tags: parseTags(
-            record.tags as string | TagResponseDto[] | undefined | null
-          ),
-        })
-      );
-
-      setRecordsFromTagSearch(recordsWithParsedTags);
-      toast.success(
-        `Found ${records.length} record${records.length !== 1 ? "s" : ""
-        } with selected tags`
-      );
+      closeEditCreateModal();
     } catch (error) {
-      console.error("Error fetching records by tags:", error);
-      toast.error("Failed to search records");
-      throw error;
+      console.error("Failed to save organization tag:", error);
+      toast.error("Failed to save organization tag.");
     } finally {
-      setIsSearchingByTags(false);
+      setSavingTag(false);
     }
   };
 
-  const handleClearSearch = () => {
-    setRecordsFromTagSearch([]);
-    setSelectedTagIds(new Set());
-  };
+  const confirmArchiveTag = async () => {
+    if (!tagToArchive || !orgId) return;
 
-  const handleRefreshSearch = async () => {
-    if (selectedTagIds.size > 0) {
-      await handleSearchByTags(Array.from(selectedTagIds));
-    }
-  };
-
-  const handleUpdateTag = async (tagId: number, newName: string) => {
     try {
-      await updateTagOrg(
-        organization?.organizationId as number,
-        tagId,
-        {
-          name: newName,
-        }
-      );
-      await refetchTags();
-      toast.success("Tag updated successfully");
+      setArchivingTagId(tagToArchive.id);
+      await archiveTagOrg(orgId, tagToArchive.id, true);
+
+      setTags((prev) => prev.filter((t) => t.id !== tagToArchive.id));
+      toast.success(`Tag "${tagToArchive.name}" archived.`);
     } catch (error) {
-      console.error("Error updating tag:", error);
-      toast.error("Failed to update tag");
-      throw error;
+      console.error("Failed to archive tag:", error);
+      toast.error("Failed to archive tag.");
+    } finally {
+      setArchivingTagId(null);
+      setShowArchiveModal(false);
+      setTagToArchive(null);
     }
   };
 
-  const handleArchiveTag = async (tagId: number) => {
-    try {
-      await archiveTagOrg(
-        organization?.organizationId as number,
-        tagId,
-        true
-      );
-      const newSelected = new Set(selectedTagIds);
-      newSelected.delete(tagId);
-      setSelectedTagIds(newSelected);
-      await refetchTags();
-      toast.success("Tag archived successfully");
-    } catch (error) {
-      console.error("Error archiving tag:", error);
-      toast.error("Failed to archive tag");
-      throw error;
-    }
-  };
+  /* ------------------------------------------------------------------------ */
+  /*                               Derived Data                               */
+  /* ------------------------------------------------------------------------ */
 
-  const handleUnarchiveTag = async (tagId: number) => {
-    try {
-      await archiveTagOrg(
-        organization?.organizationId as number,
-        tagId,
-        false
-      );
-      await refetchTags();
-      toast.success("Tag unarchived successfully");
-    } catch (error) {
-      console.error("Error unarchiving tag:", error);
-      toast.error("Failed to unarchive tag");
-      throw error;
-    }
-  };
+  const tagCount = tags.length;
+  const filteredCount = filteredTags.length;
 
-  const selectedTags = tags.filter((tag) => selectedTagIds.has(tag.id));
+  const projectsWithLabels = 0; // labels not yet supported
+  const projectsWithTags = projects.length;
+
+  /* ------------------------------------------------------------------------ */
+  /*                               Main Render                                */
+  /* ------------------------------------------------------------------------ */
 
   return (
-    <div>
-      {/* Header */}
-      <div className="p-6">
-        <h1 className="text-2xl font-bold text-base-content">
-          Tags & Security Labels
-        </h1>
-        <p className="text-base-content/70 mt-2">
-          Define organization-level tags and security labels for attribute-based
-          access controls. These settings will propagate to all projects within
-          the organization.
+    <div className="p-6">
+      {/* Page Header */}
+      <div className="mb-4">
+        <h2 className="text-2xl font-bold text-base-content">Tag Management</h2>
+        <p className="text-base-content/70 mt-1 max-w-3xl text-sm">
+          Define organization-wide tags today. Security labels will be added in
+          a future release and will appear here once available.
         </p>
       </div>
 
-      {/* Main Content Grid with Height Constraint */}
-      <div
-        className="grid grid-cols-[20%_40%_40%] p-6 gap-6 transition-all"
-        style={{ height: "calc(100vh - 20rem)" }}
-      >
-        {/* Left Menu */}
-        <div className="card shadow-xl rounded-lg p-6 overflow-y-auto">
-          <ul>
-            {menuItems.map((item) => (
-              <li
-                key={item}
-                onClick={() => setSelectedMenuItems(item)}
-                className={`cursor-pointer px-4 py-2 rounded-lg transition-colors font-bold ${selectedMenuItem === item
-                    ? "bg-info/50 text-info-content"
-                    : "hover:bg-base-200"
-                  }`}
-              >
-                {item}
-              </li>
-            ))}
-          </ul>
-        </div>
+      {/* Overview Strip */}
+      <TagOverviewStrip
+        labelCount={labelCount}
+        projectsWithLabels={projectsWithLabels}
+        tagCount={tagCount}
+        projectsWithTags={projectsWithTags}
+        tagsLocked={tagsLocked}
+        labelsLocked={labelsLocked}
+      />
 
-        {/* Middle Panel */}
-        <div className="card shadow-xl rounded-lg p-6 overflow-y-auto">
-          {selectedMenuItem === "Search Tags" && (
-            <SearchTags
-              loading={loading}
-              error={error}
-              filteredTags={filteredTags}
-              tags={tags}
-              searchQuery={searchQuery}
-              onSearchChange={setSearchQuery}
-              selectedTagIds={selectedTagIds}
-              setSelectedTagIds={setSelectedTagIds}
-              onSearchByTags={handleSearchByTags}
-              projectId={""}
-            />
-          )}
-          {selectedMenuItem === "Create Tag" && (
-            <CreateTag
-              onTagCreated={refetchTags}
-              selectedTagIds={selectedTagIds}
-              setSelectedTagIds={setSelectedTagIds}
-            />
-          )}
-          {/* {selectedMenuItem === "Attach Tags" && (
-            <AttachTags
-              loading={loading}
-              error={error}
-              filteredTags={filteredTags}
-              tags={tags}
-              searchQuery={searchQuery}
-              onSearchChange={setSearchQuery}
-              selectedTagIds={selectedTagIds}
-              setSelectedTagIds={setSelectedTagIds}
-            />
-          )} */}
-          {selectedMenuItem === "Edit Tags" && (
-            <EditTags
-              loading={loading}
-              error={error}
-              filteredTags={filteredTags}
-              tags={tags}
-              searchQuery={searchQuery}
-              onSearchChange={setSearchQuery}
-              selectedTagIds={selectedTagIds}
-              setSelectedTagIds={setSelectedTagIds}
-            />
-          )}
-        </div>
+      {/* Two-Column Layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Labels column – Coming soon */}
+        <LabelsComingSoonCard />
 
-        {/* Right Panel */}
-        <div className="card shadow-xl rounded-lg p-6 overflow-y-auto">
-          {selectedMenuItem === "Search Tags" && (
-            <SearchTagsRecordsList
-              selectedTagIds={selectedTagIds}
-              onClearSelectedTags={() => setSelectedTagIds(new Set())}
-              recordsFromTagSearch={recordsFromTagSearch}
-              isSearchingByTags={isSearchingByTags}
-              onClearSearch={handleClearSearch}
-              onRefreshSearch={handleRefreshSearch}
-              projectId={""}
-            />
-          )}
-          {selectedMenuItem === "Create Tag" && (
-            <CreateTagRecordsList selectedTagIds={selectedTagIds} />
-          )}
-          {/* {selectedMenuItem === "Attach Tags" && (
-            <AttachTagsRecordsList
-              selectedTagIds={selectedTagIds}
-              onClearSelectedTags={() => setSelectedTagIds(new Set())}
-              projectId={""}
-            />
-          )} */}
-          {selectedMenuItem === "Edit Tags" && (
-            <EditTagsNameFields
-              selectedTags={selectedTags}
-              onUpdateTag={handleUpdateTag}
-              onArchiveTag={handleArchiveTag}
-            />
-          )}
-        </div>
+        {/* Tags column – Fully functional */}
+        <OrgTagsPanel
+          tags={tags}
+          tagsLocked={tagsLocked}
+          tagsLoading={tagsLoading}
+          tagsError={tagsError}
+          filteredTags={filteredTags}
+          tagSearch={tagSearch}
+          setTagSearch={setTagSearch}
+          filteredCount={filteredCount}
+          tagCount={tagCount}
+          orgId={orgId}
+          archivingTagId={archivingTagId}
+          onToggleLock={() => setTagsLocked((prev) => !prev)}
+          onCreateTag={openCreateTagModal}
+          onEditTag={openEditTagModal}
+          onArchiveClick={openArchiveModal}
+        />
       </div>
+
+      {/* Edit/Create Tag Modal */}
+      <TagEditModal
+        isOpen={isModalOpen && modalMode === "tag"}
+        isSaving={savingTag}
+        editingTag={!!editingTag}
+        nameInput={nameInput}
+        onNameChange={setNameInput}
+        onCancel={closeEditCreateModal}
+        onSave={handleSave}
+      />
+
+      {/* Confirm Archive Modal */}
+      <ConfirmArchiveTagModal
+        isOpen={showArchiveModal}
+        tagName={tagToArchive?.name ?? ""}
+        onClose={() => {
+          setShowArchiveModal(false);
+          setTagToArchive(null);
+        }}
+        onConfirm={confirmArchiveTag}
+        loading={archivingTagId === tagToArchive?.id}
+      />
     </div>
   );
 };

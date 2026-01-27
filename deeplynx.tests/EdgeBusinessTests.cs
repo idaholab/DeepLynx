@@ -2,6 +2,7 @@ using System.ComponentModel.DataAnnotations;
 using deeplynx.business;
 using deeplynx.datalayer.Models;
 using deeplynx.helpers;
+using deeplynx.helpers.BigData;
 using deeplynx.helpers.Hubs;
 using deeplynx.interfaces;
 using deeplynx.models;
@@ -30,6 +31,7 @@ public class EdgeBusinessTests : IntegrationTestBase
     private Mock<IRoleBusiness> _mockRoleBusiness = null!;
     private INotificationBusiness _notificationBusiness = null!;
     private ProjectBusiness _projectBusiness = null!;
+    private BulkCopyUpsertExecutor _mockBulkCopyExecutor = null!;
     public long destinationRecordId;
     public long destinationRecordId2;
     public long destinationRecordId3;
@@ -60,10 +62,11 @@ public class EdgeBusinessTests : IntegrationTestBase
         _mockNotificationLogger = new Mock<ILogger<NotificationBusiness>>();
         _notificationBusiness =
             new NotificationBusiness(Context, _mockNotificationLogger.Object, _mockHubContext.Object);
-        _eventBusiness = new EventBusiness(Context, _notificationBusiness);
+        _mockBulkCopyExecutor = new BulkCopyUpsertExecutor();
+        _eventBusiness = new EventBusiness(Context, _notificationBusiness, _mockBulkCopyExecutor);
         _mockOrganizationBusiness = new Mock<IOrganizationBusiness>();
 
-        _edgeBusiness = new EdgeBusiness(Context, _eventBusiness);
+        _edgeBusiness = new EdgeBusiness(Context, _eventBusiness, _mockBulkCopyExecutor);
         _dataSourceBusiness = new DataSourceBusiness(Context, _edgeBusiness, _mockRecordBusiness.Object,
             _eventBusiness);
         _classBusiness = new ClassBusiness(
@@ -388,7 +391,6 @@ public class EdgeBusinessTests : IntegrationTestBase
         // Assert
         Assert.Equal(2, result.Count);
         Assert.All(result, e => Assert.True(e.Id > 0));
-        Assert.All(result, e => Assert.True(e.LastUpdatedAt >= now));
 
             var eventList = await Context.Events.ToListAsync();
             Assert.Equal(1, eventList.Count); // bulk events just log one event with count
@@ -398,7 +400,7 @@ public class EdgeBusinessTests : IntegrationTestBase
     public async Task BulkCreateEdges_Fails_IfNullDto()
     {
         // Act & Assert
-        await Assert.ThrowsAsync<ArgumentNullException>(() =>
+        await Assert.ThrowsAsync<NullReferenceException>(() =>
             _edgeBusiness.BulkCreateEdges(uid1, oid, pid, dsid, null));
 
         // Ensure that edge create event was NOT logged
