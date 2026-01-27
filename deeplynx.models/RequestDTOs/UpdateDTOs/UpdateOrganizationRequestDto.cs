@@ -7,4 +7,6 @@ public class UpdateOrganizationRequestDto
     public string? Description { get; set; }
 
     public bool? DefaultOrg { get; set; }
+    
+    public string? Banner { get; set; }
 }

@@ -27,6 +27,10 @@ public partial class Organization
 
     [Column("default_org")]
     public bool DefaultOrg { get; set; } = false;
+    
+    [Column("banner")]
+    [MaxLength(50)]
+    public string? Banner { get; set; }
 
     [InverseProperty("Organization")]
     public virtual ICollection<Group> Groups { get; set; } = new List<Group>();
