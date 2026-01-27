@@ -1,7 +1,6 @@
 // src/app/(home)/project_management/[id]/settings/components/ProjectLogoSection.tsx
 "use client";
 
-import Image from "next/image";
 import { InformationCircleIcon } from "@heroicons/react/24/outline";
 import { ProjectResponseDto } from "@/app/(home)/types/responseDTOs";
 
@@ -36,14 +35,10 @@ const ProjectLogoSection = ({
         <div className="avatar">
           <div className="w-32 h-32 rounded-xl bg-base-200 flex items-center justify-center overflow-hidden border-2 border-base-300">
             {logoPreview ? (
-              <Image
-                loader={({ src }) => src}
+              <img
                 src={logoPreview}
                 alt="Project Logo"
-                width={128}
-                height={128}
                 className="object-contain w-full h-full p-2"
-                unoptimized
                 onError={() => {
                   onLogoError();
                 }}
