@@ -14,6 +14,7 @@ export interface OrganizationSession {
   organizationId: string | number;
   organizationName: string;
   logoUrl?: string;
+  banner?: string | null;
 }
 
 interface OrganizationSessionContextType {
@@ -31,7 +32,7 @@ export const useOrganizationSession = (): OrganizationSessionContextType => {
   const context = useContext(OrganizationSessionContext);
   if (!context) {
     throw new Error(
-      "useOrganizationSession must be used within an OrganizationSessionProvider"
+      "useOrganizationSession must be used within an OrganizationSessionProvider",
     );
   }
   return context;
@@ -79,7 +80,7 @@ export const OrganizationSessionProvider = ({
     // Save to cookie (expires in 30 days, accessible by server)
     const maxAge = 30 * 24 * 60 * 60; // 30 days in seconds
     document.cookie = `organizationSession=${encodeURIComponent(
-      serialized
+      serialized,
     )}; path=/; max-age=${maxAge}; SameSite=Lax`;
   }, []);
 

@@ -10,11 +10,13 @@ import {
   EyeIcon,
   LockClosedIcon,
   InformationCircleIcon,
+  ExclamationTriangleIcon,
 } from "@heroicons/react/24/outline";
 import {
   getOrganizationLogoUrl,
   uploadOrganizationLogo,
   removeOrganizationLogo,
+  updateOrganization,
 } from "@/app/lib/client_service/organization_services.client";
 import { useLanguage } from "@/app/contexts/Language";
 import React from "react";
@@ -41,11 +43,10 @@ const OrganizationSettings = () => {
   const [isCheckingLogo, setIsCheckingLogo] = useState(true);
 
   // Placeholder states (disabled)
-  const [bannerText, setBannerText] = useState(
-    t.translations.THIS_ORG_SPACE_MAY_CONTAIN_SENSATIVE_DATA,
-  );
-  const [storageLocation, setStorageLocation] = useState<string>("org-default");
+  const [bannerText, setBannerText] = useState<string>("");
+  const [originalBannerText, setOriginalBannerText] = useState<string>("");
   const [expandedService, setExpandedService] = useState<string | null>(null);
+  const [isSavingBanner, setIsSavingBanner] = useState(false);
 
   // TODO: This is just place fillers for now
   const services: Service[] = [
@@ -180,6 +181,30 @@ const OrganizationSettings = () => {
       setLogoPreview(logoUrl);
     } else {
       setLogoPreview(null);
+    }
+  };
+
+  useEffect(() => {
+    if (organization?.banner !== undefined) {
+      const banner = organization.banner || "";
+      setBannerText(banner);
+      setOriginalBannerText(banner);
+    }
+  }, [organization?.banner]);
+
+  const handleSaveBanner = async () => {
+    if (!organization?.organizationId) {
+      toast.error(t.translations.NO_ORG_SELECTED);
+      return;
+    }
+
+    if (bannerText === originalBannerText) {
+      toast.custom(
+        <div className="text-info">
+          <ExclamationTriangleIcon className="size-4" />
+          {t.translations.NO_CHANGES_TO_SAVE}
+        </div>,
+      );
     }
   };
 

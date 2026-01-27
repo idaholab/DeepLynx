@@ -474,7 +474,7 @@ export const translations = {
             PLEASE_SELECT_A_STORAGE_LOCATION: "Please select a storage location",
             FAILED_TO_LOAD_STORAGE_CONFIGURATIONS: "Failed to load storage configurations",
 
-
+            NO_CHANGES_TO_SAVE: "No Changes to save"
 
 
 
@@ -967,6 +967,8 @@ export const translations = {
             THIS_STORAGE_IS_ALREADY_SET_AS_DEFAULT: "Este almacenamiento ya está configurado como predeterminado",
             PLEASE_SELECT_A_STORAGE_LOCATION: "Por favor, selecciona una ubicación de almacenamiento",
             FAILED_TO_LOAD_STORAGE_CONFIGURATIONS: "No se pudieron cargar las configuraciones de almacenamiento",
+
+            NO_CHANGES_TO_SAVE: "No hay cambios para guardar",
 
 
         }

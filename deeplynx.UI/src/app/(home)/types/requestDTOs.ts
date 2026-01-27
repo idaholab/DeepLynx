@@ -37,9 +37,10 @@ export type CreateOrganizationRequestDto = {
 }
 
 export type UpdateOrganizationRequestDto = {
-  name: string;
-  description?: string;
-  banner?: string;
+  name?: string | null;
+  description?: string | null;
+  defaultOrg?: boolean | null;
+  banner?: string | null;
 }
 
 export type CreateOauthApplicationRequestDto = {
