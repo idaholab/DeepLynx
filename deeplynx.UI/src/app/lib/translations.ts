@@ -273,7 +273,7 @@ export const translations = {
             GROUP_NO_LONGER_APPEAR: "The group will no longer appear in group lists. Users will not lose access to the organization itself, only this group association.",
             ARCHIVE: "Archive",
 
-            PREMISSION_MATRIX: "Permission Matrix",
+            PERMISSION_MATRIX: "Permission Matrix",
             ACTION: "Action: ",
             ROLE_NAME: "Role Name",
             CREATE_NEW_ROLE: "Create New Role",
@@ -404,7 +404,6 @@ export const translations = {
             NO_MEMBER_SELECTED_TO_REMOVE: "No member selected to remove",
             MEMBER_REMOVED_FROM_PROJECT: "Member removed from project",
             FAILED_TO_REMOVE_MEMBER: "Failed to remove member",
-            PERMISSION_MATRIX: "Permission Matrix",
             EDIT_MATRIX: "Edit Matrix",
             LOADING_PERMISSIONS: "Loading Permissions...",
             PERMISSION: "Permission",
