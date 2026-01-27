@@ -32,6 +32,7 @@ import {
   getOrganizationLogoUrl,
 } from "@/app/lib/client_service/organization_services.client";
 import TopBanner from "./VulnerabilityBanner";
+import { OrganizationBanner } from "./OrganizationBanner";
 
 const LayoutShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { t } = useLanguage();
@@ -120,12 +121,10 @@ const LayoutShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     setOrganization({
       organizationId: org.id,
       organizationName: org.name,
+      banner: org.banner ?? null,
     });
 
-    // Close dropdown
     setIsOrgDropdownOpen(false);
-
-    // Navigate to home page - this will trigger a full server-side re-render
     router.push("/");
   };
 
@@ -425,6 +424,12 @@ const LayoutShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             isMenuCollapsed ? "ml-40" : "ml-82"
           }`}
         >
+          {/* Organization Banner - appears below header, above content */}
+          <div className="sticky top-25 z-20">
+            <OrganizationBanner />
+          </div>
+
+          {/* Page Content */}
           {children}
         </main>
       </div>

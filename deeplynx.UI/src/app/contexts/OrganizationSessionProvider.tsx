@@ -9,6 +9,7 @@ import React, {
   useCallback,
 } from "react";
 import type { ReactNode, Context } from "react";
+import { getOrganization } from "@/app/lib/client_service/organization_services.client";
 
 export interface OrganizationSession {
   organizationId: string | number;
@@ -68,6 +69,44 @@ export const OrganizationSessionProvider = ({
     }
     setHasLoaded(true);
   }, []);
+
+  // Fetch full organization data when organizationId changes
+  useEffect(() => {
+    const fetchFullOrganization = async () => {
+      if (!organization?.organizationId) return;
+
+      try {
+        // Fetch the complete organization data from the backend
+        const fullOrg = await getOrganization(
+          Number(organization.organizationId),
+        );
+
+        // Update the context with complete data (including banner)
+        setOrganizationState((prev) => ({
+          ...prev!,
+          banner: fullOrg.banner ?? null,
+          // Add any other fields you need
+        }));
+
+        // Also update localStorage/cookie with the new data
+        const updated = {
+          ...organization,
+          banner: fullOrg.banner ?? null,
+        };
+        const serialized = JSON.stringify(updated);
+        localStorage.setItem("organizationSession", serialized);
+
+        const maxAge = 30 * 24 * 60 * 60;
+        document.cookie = `organizationSession=${encodeURIComponent(
+          serialized,
+        )}; path=/; max-age=${maxAge}; SameSite=Lax`;
+      } catch (error) {
+        console.error("Failed to fetch full organization data:", error);
+      }
+    };
+
+    fetchFullOrganization();
+  }, [organization?.organizationId]);
 
   // Save to BOTH localStorage and cookies
   const setOrganization = useCallback((org: OrganizationSession) => {
