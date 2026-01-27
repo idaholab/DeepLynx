@@ -8,6 +8,7 @@ import {
 } from "@heroicons/react/24/outline";
 import { useState } from "react";
 import { RoleResponseDto } from "../../../types/responseDTOs";
+import { useLanguage } from "../../../../contexts/Language";
 
 interface DeleteRoleModalProps {
   isOpen: boolean;
@@ -23,6 +24,7 @@ const ProjectDeleteRoleModal = ({
   role,
 }: DeleteRoleModalProps) => {
   const [isDeleting, setIsDeleting] = useState(false);
+  const { t } = useLanguage();
 
   const handleConfirm = async () => {
     setIsDeleting(true);
@@ -43,15 +45,19 @@ const ProjectDeleteRoleModal = ({
       <div className="modal-box">
         <h3 className="font-bold text-lg flex items-center gap-2">
           <ExclamationCircleIcon className="w-6 h-6 text-error" />
-          Delete Role
+          {t.translations.DELETE_ROLE}
         </h3>
 
         <div className="py-4 space-y-4">
           <div className="alert alert-warning">
             <ExclamationCircleIcon className="w-5 h-5 flex-shrink-0" />
             <div className="text-sm">
-              <p className="font-semibold">This role will be archived!</p>
-              <p>You can restore it later if needed.</p>
+              <p className="font-semibold">
+                {t.translations.ROLE_ARCHIVE}
+              </p>
+              <p>
+                {t.translations.ROLE_RESTORE}
+              </p>
             </div>
           </div>
           <div className="space-y-2">
@@ -68,12 +74,18 @@ const ProjectDeleteRoleModal = ({
             </div>
           </div>
           <p className="text-sm text-base-content/70">
-            Deleting this role will:
+            {t.translations.ROLE_DELETED}
           </p>
           <ul className="list-disc list-inside text-sm text-base-content/70 space-y-1">
-            <li>Archive this role (it can be restored later)</li>
-            <li>Hide it from active role lists</li>
-            <li>Preserve all permission assignments</li>
+            <li>
+                {t.translations.ROLE_DELETED}
+            </li>
+            <li>
+                {t.translations.HIDE_ROLE}
+            </li>
+            <li>
+              {t.translations.PRESERVE_PERMISSIONS}
+            </li>
           </ul>
         </div>
 
@@ -83,7 +95,7 @@ const ProjectDeleteRoleModal = ({
             className="btn btn-ghost"
             disabled={isDeleting}
           >
-            Cancel
+            {t.translations.CANCEL}
           </button>
           <button
             onClick={handleConfirm}
@@ -93,19 +105,21 @@ const ProjectDeleteRoleModal = ({
             {isDeleting ? (
               <>
                 <span className="loading loading-spinner loading-sm"></span>
-                Deleting...
+                {t.translations.DELETING}
               </>
             ) : (
               <>
                 <TrashIcon className="w-4 h-4" />
-                Delete
+                {t.translations.DELETE}
               </>
             )}
           </button>
         </div>
       </div>
       <form method="dialog" className="modal-backdrop" onClick={onClose}>
-        <button>close</button>
+        <button>
+          {t.translations.CLOSE}
+        </button>
       </form>
     </dialog>
   );

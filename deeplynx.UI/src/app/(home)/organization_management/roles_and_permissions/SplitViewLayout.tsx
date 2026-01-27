@@ -13,6 +13,7 @@ import {
   RoleResponseDto,
 } from "../../types/responseDTOs";
 import { PermissionCategory } from "./RolesAndPermissions";
+import { useLanguage } from "../../../contexts/Language";
 
 interface SplitViewLayoutProps {
   roles: RoleResponseDto[];
@@ -57,6 +58,9 @@ const SplitViewLayout: React.FC<SplitViewLayoutProps> = ({
   roleHasPermission,
   isStandardRole,
 }) => {
+
+  const { t } = useLanguage();
+
   return (
     <div className="flex gap-6" style={{ height: "calc(100vh - 28rem)" }}>
       {/* Left Sidebar - Role List */}
@@ -66,16 +70,19 @@ const SplitViewLayout: React.FC<SplitViewLayoutProps> = ({
             <div className="px-4 py-3 border-base-300 flex-shrink-0">
               <div className="flex items-start justify-between">
                 <div>
-                  <h2 className="card-title text-base">Roles</h2>
+                  <h2 className="card-title text-base">
+                    {t.translations.ROLES}
+                  </h2>
                   <p className="text-xs text-base-content/60 mt-1">
-                    {roles.length} total
+                    {roles.length}
+                    {t.translations.TOTAL}
                   </p>
                 </div>
                 <button
                   onClick={onCreateRole}
                   className="btn btn-primary btn-sm"
                 >
-                  Create Role
+                  {t.translations.CREATE_ROLE}
                 </button>
               </div>
             </div>
@@ -108,7 +115,9 @@ const SplitViewLayout: React.FC<SplitViewLayoutProps> = ({
                       <span className="font-medium text-sm">{role.name}</span>
                     </div>
                     {isStandardRole(role) && (
-                      <div className="badge badge-info badge-sm">STD</div>
+                      <div className="badge badge-info badge-sm">
+                        {t.translations.STD}
+                      </div>
                     )}
                   </div>
                   {role.description && (
@@ -135,7 +144,7 @@ const SplitViewLayout: React.FC<SplitViewLayoutProps> = ({
                     <h2 className="card-title">{currentRole.name}</h2>
                     {isStandardRole(currentRole) && (
                       <div className="badge badge-info">
-                        Standard Role (Read-Only)
+                        {t.translations.STANDARD_ROLE}
                       </div>
                     )}
                   </div>
@@ -145,7 +154,7 @@ const SplitViewLayout: React.FC<SplitViewLayoutProps> = ({
                     </p>
                   )}
                   <p className="text-sm text-base-content/60 mt-2">
-                    Last updated:{" "}
+                    {t.translations.LAST_UPDATED}{" "}
                     {new Date(currentRole.lastUpdatedAt).toLocaleDateString()}
                   </p>
                 </div>
@@ -181,7 +190,9 @@ const SplitViewLayout: React.FC<SplitViewLayoutProps> = ({
             {/* Permissions Section */}
             <div className="flex-1 overflow-y-auto p-6">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-sm font-semibold">Permissions</h3>
+                <h3 className="text-sm font-semibold">
+                  {t.translations.PERMISSIONS}
+                </h3>
                 {!isEditingPermissions ? (
                   <button
                     disabled={
@@ -200,7 +211,7 @@ const SplitViewLayout: React.FC<SplitViewLayoutProps> = ({
                     }
                   >
                     <PencilIcon className="w-4 h-4" />
-                    Edit Permissions
+                    {t.translations.EDIT_PERMISSIONS}
                   </button>
                 ) : (
                   <div className="flex gap-2">
@@ -208,14 +219,14 @@ const SplitViewLayout: React.FC<SplitViewLayoutProps> = ({
                       onClick={onCancelEditingPermissions}
                       className="btn btn-ghost btn-sm"
                     >
-                      Cancel
+                      {t.translations.CANCEL}
                     </button>
                     <button
                       onClick={onSavePermissions}
                       className="btn btn-primary btn-sm gap-2"
                     >
                       <CheckIcon className="w-4 h-4" />
-                      Save Changes
+                      {t.translations.SAVE_CHANGES}
                     </button>
                   </div>
                 )}
@@ -226,8 +237,7 @@ const SplitViewLayout: React.FC<SplitViewLayoutProps> = ({
                 <div className="alert alert-info mb-4">
                   <ExclamationCircleIcon className="w-5 h-5 flex-shrink-0" />
                   <span className="text-sm">
-                    This is a standard role and cannot be modified. Create a
-                    custom role if you need different permissions.
+                    {t.translations.STANDARD_ROLE_DESC}
                   </span>
                 </div>
               )}
@@ -239,7 +249,9 @@ const SplitViewLayout: React.FC<SplitViewLayoutProps> = ({
                 </div>
               ) : permissionCategories.length === 0 ? (
                 <div className="alert">
-                  <span>No permissions available.</span>
+                  <span>
+                    {t.translations.NO_PERMISSIONS}
+                  </span>
                 </div>
               ) : (
                 <div className="space-y-4">
@@ -292,7 +304,7 @@ const SplitViewLayout: React.FC<SplitViewLayoutProps> = ({
         ) : (
           <div className="flex items-center justify-center h-full">
             <p className="text-base-content/60">
-              Select a role to view details
+              {t.translations.SELECT_ROLE}
             </p>
           </div>
         )}

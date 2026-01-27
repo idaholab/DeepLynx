@@ -171,11 +171,12 @@ export async function archiveRole(
  */
 export async function getRolePermissions(
   organizationId: number,
+  projectId: number,
   roleId: number
 ): Promise<PermissionResponseDto[]> {
   try {
     const res = await api.get(
-      `/organizations/${organizationId}/roles/${roleId}/permissions`
+      `/organizations/${organizationId}/projects/${projectId}/roles/${roleId}/permissions`
     );
     return res.data;
   } catch (error) {
@@ -271,13 +272,11 @@ export async function setPermissionsForRole(
  * Get all roles for an org
  * @param organizationId - The ID of the organization
  * @param hideArchived - Flag to hide archived roles (default: true)
- * @param projectId - The ID of the project
  * @returns Promise with array of RoleResponseDto
  */
 export async function getAllOrgRoles(
   organizationId: number,
   hideArchived: boolean = true,
-  projectId?: number,
 ): Promise<RoleResponseDto[]> {
   try {
     const res = await api.get(
@@ -296,14 +295,12 @@ export async function getAllOrgRoles(
  * @param organizationId - The ID of the organization
  * @param roleId - The ID of the role
  * @param hideArchived - Flag to hide archived roles (default: true)
- * @param projectId - The ID of the project
  * @returns Promise with RoleResponseDto
  */
 export async function getOrgRoleById(
   organizationId: number,
   roleId: number,
   hideArchived: boolean = true,
-  projectId?: number
 ): Promise<RoleResponseDto> {
   try {
     const res = await api.get(
@@ -321,13 +318,11 @@ export async function getOrgRoleById(
  * Create a new org role
  * @param organizationId - The ID of the organization
  * @param dto - The role creation request DTO
- * @param projectId - The ID of the project
  * @returns Promise with RoleResponseDto
  */
 export async function createOrgRole(
   organizationId: number,
   dto: CreateRoleRequestDto,
-  projectId?: number
 ): Promise<RoleResponseDto> {
   try {
     const res = await api.post(
@@ -347,14 +342,12 @@ export async function createOrgRole(
  * @param organizationId - The ID of the organization
  * @param roleId - The ID of the role to update
  * @param dto - The role update request DTO
- * @param projectId - The ID of the project
  * @returns Promise with RoleResponseDto
  */
 export async function updateOrgRole(
   organizationId: number,
   roleId: number,
   dto: UpdateRoleRequestDto,
-  projectId?: number
 ): Promise<RoleResponseDto> {
   try {
     const res = await api.put(
@@ -373,13 +366,11 @@ export async function updateOrgRole(
  * Delete a role
  * @param organizationId - The ID of the organization
  * @param roleId - The ID of the role to delete
- * @param projectId - The ID of the project
  * @returns Promise with success message
  */
 export async function deleteOrgRole(
   organizationId: number,
   roleId: number,
-  projectId?: number,
 ): Promise<{ message: string }> {
   try {
     const res = await api.delete(
@@ -396,7 +387,6 @@ export async function deleteOrgRole(
  * Archive or unarchive a role
  * @param organizationId - The ID of the organization
  * @param roleId - The ID of the role to archive/unarchive
- * @param projectId - The ID of the project
  * @param archive - True to archive, false to unarchive
  * @returns Promise with success message
  */
@@ -404,7 +394,6 @@ export async function archiveOrgRole(
   organizationId: number,
   roleId: number,
   archive: boolean = true,
-  projectId?: number
 ): Promise<{ message: string }> {
   try {
     const res = await api.patch(
@@ -447,14 +436,12 @@ export async function getOrgRolePermissions(
  * @param organizationId - The ID of the organization
  * @param roleId - The ID of the role
  * @param permissionId - The ID of the permission to add
- * @param projectId - The ID of the project
  * @returns Promise with success message
  */
 export async function addPermissionToOrgRole(
   organizationId: number,
   roleId: number,
   permissionId: number,
-  projectId?: number
 ): Promise<{ message: string }> {
   try {
     const res = await api.post(
@@ -472,14 +459,12 @@ export async function addPermissionToOrgRole(
  * @param organizationId - The ID of the organization
  * @param roleId - The ID of the role
  * @param permissionId - The ID of the permission to remove
- * @param projectId - The ID of the project
  * @returns Promise with success message
  */
 export async function removePermissionFromOrgRole(
   organizationId: number,
   roleId: number,
   permissionId: number,
-  projectId?: number
 ): Promise<{ message: string }> {
   try {
     const res = await api.delete(
@@ -497,14 +482,12 @@ export async function removePermissionFromOrgRole(
  * @param organizationId - The ID of the organization
  * @param roleId - The ID of the role
  * @param permissionIds - Array of permission IDs to assign to the role
- * @param projectId - The ID of the project
  * @returns Promise with success message
  */
 export async function setPermissionsForOrgRole(
   organizationId: number,
   roleId: number,
   permissionIds: number[],
-  projectId?: number
 ): Promise<{ message: string }> {
   try {
     const res = await api.put(

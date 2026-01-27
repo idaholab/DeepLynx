@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { RoleResponseDto } from "../../../types/responseDTOs";
-
-// Add this to your file (after CreateRoleModal or in a separate file)
+import { useLanguage } from "../../../../contexts/Language";
 interface EditRoleModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -23,8 +22,8 @@ const ProjectEditRoleModal = ({
   const [description, setDescription] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { t } = useLanguage();
 
-  // Update form when role changes
   useEffect(() => {
     if (role) {
       setName(role.name);
@@ -57,13 +56,16 @@ const ProjectEditRoleModal = ({
   return (
     <dialog className="modal modal-open">
       <div className="modal-box">
-        <h3 className="font-bold text-lg mb-4">Edit Role</h3>
+        <h3 className="font-bold text-lg mb-4">
+          {t.translations.EDIT_ROLE}
+        </h3>
 
         <form onSubmit={handleSubmit}>
           <div className="form-control mb-4">
             <label className="label">
               <span className="label-text">
-                Role Name <span className="text-error">*</span>
+                {t.translations.ROLE_NAME}
+                <span className="text-error">*</span>
               </span>
             </label>
             <input
@@ -79,7 +81,9 @@ const ProjectEditRoleModal = ({
 
           <div className="form-control mb-4">
             <label className="label">
-              <span className="label-text">Description</span>
+              <span className="label-text">
+                {t.translations.DESCRIPTION}
+              </span>
             </label>
             <textarea
               value={description}
@@ -104,7 +108,7 @@ const ProjectEditRoleModal = ({
               className="btn btn-ghost"
               disabled={isSubmitting}
             >
-              Cancel
+              {t.translations.CANCEL}
             </button>
             <button
               type="submit"
@@ -114,7 +118,7 @@ const ProjectEditRoleModal = ({
               {isSubmitting ? (
                 <>
                   <span className="loading loading-spinner loading-sm"></span>
-                  Updating...
+                  {t.translations.UPDATING}
                 </>
               ) : (
                 "Update Role"
@@ -124,7 +128,9 @@ const ProjectEditRoleModal = ({
         </form>
       </div>
       <form method="dialog" className="modal-backdrop" onClick={onClose}>
-        <button>close</button>
+        <button>
+          {t.translations.CLOSE}
+        </button>
       </form>
     </dialog>
   );

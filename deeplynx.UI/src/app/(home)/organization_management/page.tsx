@@ -80,7 +80,7 @@ const OrganizationManagementPage = async ({
     if (roles.length > 0) {
       permissions = await getOrgRolePermissionsServer(
         Number(organizationId),
-        roles[0].id //
+        roles[0].id
       );
     } else {
       permissions = [];

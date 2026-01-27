@@ -14,6 +14,7 @@ import {
   RoleResponseDto,
 } from "@/app/(home)/types/responseDTOs";
 import { PermissionCategory } from "./ProjectRolesAndPermissions";
+import { useLanguage } from "../../../../contexts/Language";
 
 interface MatrixViewLayoutProps {
   roles: RoleResponseDto[];
@@ -56,6 +57,9 @@ const MatrixViewLayout: React.FC<MatrixViewLayoutProps> = ({
   isProjectRole,
   getRoleSource,
 }) => {
+
+  const { t } = useLanguage();
+
   // Determine if there are editable (project-only) roles
   const hasEditableRoles = roles.some(
     (role) => isProjectRole(role) && !isStandardRole(role)
@@ -79,7 +83,9 @@ const MatrixViewLayout: React.FC<MatrixViewLayoutProps> = ({
       <div className="card bg-base-100 shadow-xl h-full flex flex-col overflow-hidden border-2 border-primary">
         {/* Matrix Header / Controls */}
         <div className="px-6 py-3 border-b border-base-300 flex items-center justify-between">
-          <h3 className="text-sm font-semibold">Permission Matrix</h3>
+          <h3 className="text-sm font-semibold">
+            {t.translations.PERMISSION_MATRIX}
+          </h3>
 
           {/* Toggle editable matrix mode */}
           {!isEditingMatrix ? (
@@ -91,11 +97,11 @@ const MatrixViewLayout: React.FC<MatrixViewLayoutProps> = ({
               className="btn btn-primary btn-sm gap-2"
               title={
                 editMatrixDisabledReason ||
-                "Edit permissions for project roles in matrix view."
+                "Edit permissions for project roles in matrix view"
               }
             >
               <PencilIcon className="w-4 h-4" />
-              Edit Matrix
+              {t.translations.EDIT_MATRIX}
             </button>
           ) : (
             <div className="flex gap-2">
@@ -103,14 +109,14 @@ const MatrixViewLayout: React.FC<MatrixViewLayoutProps> = ({
                 onClick={onCancelEditingMatrix}
                 className="btn btn-ghost btn-sm"
               >
-                Cancel
+                {t.translations.CANCEL}
               </button>
               <button
                 onClick={onSaveMatrixPermissions}
                 className="btn btn-primary btn-sm gap-2"
               >
                 <CheckIcon className="w-4 h-4" />
-                Save All Changes
+                {t.translations.SAVE_CHANGES}
               </button>
             </div>
           )}
@@ -122,7 +128,7 @@ const MatrixViewLayout: React.FC<MatrixViewLayoutProps> = ({
             <div className="text-center">
               <span className="loading loading-spinner loading-lg text-primary"></span>
               <p className="mt-4 text-base-content/60">
-                Loading permissions...
+                {t.translations.LOADING_PERMISSIONS}
               </p>
             </div>
           </div>
@@ -131,7 +137,9 @@ const MatrixViewLayout: React.FC<MatrixViewLayoutProps> = ({
             <table className="table">
               <thead className="sticky top-0 z-20 bg-base-100">
                 <tr>
-                  <th className="sticky left-0 bg-base-200 z-30">Permission</th>
+                  <th className="sticky left-0 bg-base-200 z-30">
+                    {t.translations.PERMISSION}
+                  </th>
                   {roles.map((role) => {
                     const isStd = isStandardRole(role);
                     const isOrg = isOrganizationRole(role);
@@ -152,16 +160,20 @@ const MatrixViewLayout: React.FC<MatrixViewLayoutProps> = ({
                             <ShieldCheckIcon className="w-4 h-4 text-primary" />
                             <span className="font-medium">{role.name}</span>
                             {isStd && (
-                              <div className="badge badge-info badge-xs">STD</div>
+                              <div className="badge badge-info badge-xs">
+                                {t.translations.STD}
+                              </div>
                             )}
                             {isOrg && (
                               <div className="badge badge-secondary badge-xs flex gap-1">
                                 <BuildingOfficeIcon className="w-3 h-3" />
-                                ORG
+                                {t.translations.ORG}
                               </div>
                             )}
                             {isPrj && (
-                              <div className="badge badge-primary badge-xs">PRJ</div>
+                              <div className="badge badge-primary badge-xs">
+                                {t.translations.PRJ}
+                              </div>
                             )}
                             {!isEditingMatrix && (
                               <button
@@ -215,7 +227,7 @@ const MatrixViewLayout: React.FC<MatrixViewLayoutProps> = ({
                               </span>
                             )}
                             <span className="text-xs text-base-content/50 mt-1">
-                              Action: {perm.action}
+                              {t.translations.ACTION}{perm.action}
                             </span>
                           </div>
                         </td>
@@ -232,8 +244,6 @@ const MatrixViewLayout: React.FC<MatrixViewLayoutProps> = ({
                             <td key={role.id} className="text-center">
                               <div
                                 onClick={(e) => {
-                                  e.preventDefault();
-                                  e.stopPropagation();
                                   if (isEditingMatrix && editable) {
                                     onToggleMatrixPermission(
                                       role.id,
