@@ -32,7 +32,7 @@ public class TestSuiteFixture : IAsyncLifetime
     public DeeplynxContext Context { get; private set; }
 
     // Runs at the beginning of every test suite
-    public virtual async Task InitializeAsync()
+    public async Task InitializeAsync()
     {
         // Start containers
         await _postgresContainer.StartAsync();
