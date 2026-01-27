@@ -49,18 +49,26 @@ public class DataSourceBusiness : IDataSourceBusiness
         long[]? projectIds,
         bool hideArchived = true)
     {
-        var dataSources = _context.DataSources
-            .Where(c => c.OrganizationId == organizationId).AsQueryable();
+        var dsQuery = _context.DataSources
+            .Where(d => d.OrganizationId == organizationId);
 
-        // Filter by projectIds if provided and not empty
-        if (projectIds is { Length: > 0 })
-            dataSources = dataSources.Where(c => c.ProjectId.HasValue && projectIds.Contains(c.ProjectId.Value));
-
-        // Optionally hide archived classes
+        // hide archived data sources
         if (hideArchived)
-            dataSources = dataSources.Where(c => !c.IsArchived);
+            dsQuery = dsQuery.Where(d => !d.IsArchived);
 
-        var dataSourceList = await dataSources.ToListAsync();
+        // If project ids supplied, inherit org level data sources too 
+        if (projectIds is { Length: > 0 })
+            dsQuery = dsQuery.Where(d =>
+                (d.ProjectId.HasValue && projectIds.Contains(d.ProjectId.Value)) || d.ProjectId == null);
+        else
+            // If no project ids, only org-level data sources
+            dsQuery = dsQuery.Where(d => d.ProjectId == null);
+
+        var dataSourceList = await dsQuery.ToListAsync();
+
+        if (dataSourceList.Count == 0)
+            throw new KeyNotFoundException(
+                "Data sources not found or do not belong to the specified organization/project context");
 
         return dataSourceList.Select(d => new DataSourceResponseDto
         {
@@ -96,19 +104,25 @@ public class DataSourceBusiness : IDataSourceBusiness
         bool hideArchived
     )
     {
-        var query = _context.DataSources
-            .Where(d => d.OrganizationId == organizationId && d.Id == datasourceId)
-            .AsQueryable();
+        var dsQuery = _context.DataSources
+            .Where(d => d.OrganizationId == organizationId && d.Id == datasourceId);
 
-        if (projectId is not null)
-            query = query.Where(d => d.ProjectId == projectId);
+        // hide archived data sources
+        if (hideArchived)
+            dsQuery = dsQuery.Where(d => !d.IsArchived);
 
-        var dataSource = await query.FirstOrDefaultAsync();
+        // If project id supplied, inherit org level data sources too
+        if (projectId.HasValue)
+            dsQuery = dsQuery.Where(d => d.ProjectId == projectId.Value || d.ProjectId == null);
+        else
+            // If no project id, only org-level data sources
+            dsQuery = dsQuery.Where(d => d.ProjectId == null);
+
+        var dataSource = await dsQuery.FirstOrDefaultAsync();
+
         if (dataSource == null)
-            throw new KeyNotFoundException($"Data Source with id {datasourceId} not found");
-
-        if (hideArchived && dataSource.IsArchived)
-            throw new KeyNotFoundException($"Data Source with id {datasourceId} is archived");
+            throw new KeyNotFoundException(
+                $"Data source with id {datasourceId} not found or does not belong to the specified organization/project context");
 
         return new DataSourceResponseDto
         {
@@ -139,24 +153,21 @@ public class DataSourceBusiness : IDataSourceBusiness
     /// <exception cref="KeyNotFoundException">Returned if the data source is not found or is archived</exception>
     public async Task<DataSourceResponseDto> GetDefaultDataSource(long organizationId, long? projectId)
     {
-        var query = _context.DataSources
+        var dsQuery = _context.DataSources
             .Where(d => d.OrganizationId == organizationId && d.Default == true && !d.IsArchived);
 
-        // If projectId is provided, get project-level default
-        // If projectId is null, get org-level default (where ProjectId IS NULL)
-        query = projectId.HasValue
-            ? query.Where(d => d.ProjectId == projectId.Value)
-            : query.Where(d => d.ProjectId == null);
+        // If project id supplied, inherit org level data sources too
+        if (projectId.HasValue)
+            dsQuery = dsQuery.Where(d => d.ProjectId == projectId.Value || d.ProjectId == null);
+        else
+            // If no project id, only org-level data sources
+            dsQuery = dsQuery.Where(d => d.ProjectId == null);
 
-        var dataSource = await query.FirstOrDefaultAsync();
+        var dataSource = await dsQuery.FirstOrDefaultAsync();
 
         if (dataSource == null)
-        {
-            var context = projectId.HasValue
-                ? $"project {projectId}"
-                : $"organization {organizationId}";
-            throw new KeyNotFoundException($"Default data source for {context} not found");
-        }
+            throw new KeyNotFoundException(
+                "Default data source not found for the specified organization/project context");
 
         return new DataSourceResponseDto
         {
@@ -267,15 +278,26 @@ public class DataSourceBusiness : IDataSourceBusiness
     {
         ValidationHelper.ValidateModel(dto);
 
-        var query = _context.DataSources
-            .Where(d => d.Id == dataSourceId && d.OrganizationId == organizationId);
+        var dsQuery = _context.DataSources.Where(d => d.OrganizationId == organizationId
+                                                      && d.Id == dataSourceId
+                                                      && !d.IsArchived);
 
-        if (projectId.HasValue) query = query.Where(d => d.ProjectId == projectId.Value);
+        // If project id supplied, inherit org level data sources too 
+        if (projectId.HasValue)
+            dsQuery = dsQuery.Where(d => d.ProjectId == projectId.Value || d.ProjectId == null);
+        else
+            // If no project id, only org-level data sources
+            dsQuery = dsQuery.Where(d => d.ProjectId == null);
 
-        var dataSource = await query.FirstOrDefaultAsync();
+        var dataSource = await dsQuery.FirstOrDefaultAsync();
 
-        if (dataSource is null || dataSource.IsArchived)
-            throw new KeyNotFoundException($"Data Source with id {dataSourceId} not found");
+        if (dataSource == null)
+            throw new KeyNotFoundException(
+                $"Data source with id {dataSourceId} not found or does not belong to the specified organization/project context");
+
+        // Organization data sources cannot be updated from a project level
+        if (projectId.HasValue && dataSource.ProjectId == null)
+            throw new InvalidOperationException("Organization data sources cannot be updated from the child projects.");
 
         using var transaction = await _context.Database.BeginTransactionAsync();
         try
@@ -339,16 +361,25 @@ public class DataSourceBusiness : IDataSourceBusiness
     /// <exception cref="KeyNotFoundException">Returned if data source not found or if ids missing</exception>
     public async Task<bool> DeleteDataSource(long organizationId, long? projectId, long dataSourceId)
     {
-        var query = _context.DataSources
-            .Where(d =>
-                d.Id == dataSourceId &&
-                d.OrganizationId == organizationId);
+        var dsQuery = _context.DataSources.Where(d => d.OrganizationId == organizationId
+                                                      && d.Id == dataSourceId);
 
-        if (projectId.HasValue) query = query.Where(d => d.ProjectId == projectId.Value);
+        // If project id supplied, inherit org level data sources too
+        if (projectId.HasValue)
+            dsQuery = dsQuery.Where(d => d.ProjectId == projectId.Value || d.ProjectId == null);
+        else
+            // If no project id, only org-level data sources
+            dsQuery = dsQuery.Where(d => d.ProjectId == null);
 
-        var dataSource = await query.FirstOrDefaultAsync();
+        var dataSource = await dsQuery.FirstOrDefaultAsync();
 
-        if (dataSource == null) throw new KeyNotFoundException($"Data Source with id {dataSourceId} not found");
+        if (dataSource == null)
+            throw new KeyNotFoundException(
+                $"Data source with id {dataSourceId} not found or does not belong to the specified organization/project context");
+
+        // Organization data sources cannot be updated from a project level
+        if (projectId.HasValue && dataSource.ProjectId == null)
+            throw new InvalidOperationException("Organization data sources cannot be updated from the child projects.");
 
         _context.DataSources.Remove(dataSource);
         await _context.SaveChangesAsync();
@@ -368,16 +399,26 @@ public class DataSourceBusiness : IDataSourceBusiness
     public async Task<bool> ArchiveDataSource(long organizationId, long? projectId, long currentUserId,
         long dataSourceId)
     {
-        var query = _context.DataSources
-            .Where(d =>
-                d.Id == dataSourceId &&
-                d.OrganizationId == organizationId &&
-                (!projectId.HasValue || d.ProjectId == projectId.Value) &&
-                !d.IsArchived);
+        var dsQuery = _context.DataSources.Where(d => d.OrganizationId == organizationId
+                                                      && d.Id == dataSourceId
+                                                      && d.IsArchived == false);
 
-        var dataSource = await query.FirstOrDefaultAsync();
+        // If project id supplied, inherit org level data sources too 
+        if (projectId.HasValue)
+            dsQuery = dsQuery.Where(d => d.ProjectId == projectId.Value || d.ProjectId == null);
+        else
+            // If no project id, only org-level data sources
+            dsQuery = dsQuery.Where(d => d.ProjectId == null);
 
-        if (dataSource == null) throw new KeyNotFoundException($"Data Source with id {dataSourceId} not found");
+        var dataSource = await dsQuery.FirstOrDefaultAsync();
+
+        if (dataSource == null)
+            throw new KeyNotFoundException(
+                $"Data source with id {dataSourceId} not found or does not belong to the specified organization/project context");
+
+        // Organization data sources cannot be updated from a project level
+        if (projectId.HasValue && dataSource.ProjectId == null)
+            throw new InvalidOperationException("Organization data sources cannot be updated from the child projects.");
 
         dataSource.IsArchived = true;
         dataSource.LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
@@ -411,15 +452,26 @@ public class DataSourceBusiness : IDataSourceBusiness
     public async Task<bool> UnarchiveDataSource(long organizationId, long? projectId, long currentUserId,
         long dataSourceId)
     {
-        var dataSource = await _context.DataSources
-            .FirstOrDefaultAsync(d =>
-                d.Id == dataSourceId &&
-                d.OrganizationId == organizationId &&
-                (!projectId.HasValue || d.ProjectId == projectId.Value) &&
-                d.IsArchived);
+        var dsQuery = _context.DataSources.Where(d => d.OrganizationId == organizationId
+                                                      && d.Id == dataSourceId
+                                                      && d.IsArchived == true);
+
+        // If project id supplied, inherit org level data sources too 
+        if (projectId.HasValue)
+            dsQuery = dsQuery.Where(d => d.ProjectId == projectId.Value || d.ProjectId == null);
+        else
+            // If no project id, only org-level data sources
+            dsQuery = dsQuery.Where(d => d.ProjectId == null);
+
+        var dataSource = await dsQuery.FirstOrDefaultAsync();
 
         if (dataSource == null)
-            throw new KeyNotFoundException($"Data Source with id {dataSourceId} not found or is not archived");
+            throw new KeyNotFoundException(
+                $"Data source with id {dataSourceId} not found or does not belong to the specified organization/project context");
+
+        // Organization data sources cannot be updated from a project level
+        if (projectId.HasValue && dataSource.ProjectId == null)
+            throw new InvalidOperationException("Organization data sources cannot be updated from the child projects.");
 
         dataSource.IsArchived = false;
         dataSource.LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
@@ -454,15 +506,26 @@ public class DataSourceBusiness : IDataSourceBusiness
         long currentUserId,
         long dataSourceId)
     {
-        var dataSource = await _context.DataSources
-            .FirstOrDefaultAsync(d =>
-                d.Id == dataSourceId &&
-                d.OrganizationId == organizationId &&
-                (!projectId.HasValue || d.ProjectId == projectId.Value) &&
-                !d.IsArchived);
+        var dsQuery = _context.DataSources.Where(d => d.OrganizationId == organizationId
+                                                      && d.Id == dataSourceId
+                                                      && d.IsArchived == false);
+
+        // If project id supplied, inherit org level data sources too 
+        if (projectId.HasValue)
+            dsQuery = dsQuery.Where(d => d.ProjectId == projectId.Value || d.ProjectId == null);
+        else
+            // If no project id, only org-level data sources
+            dsQuery = dsQuery.Where(d => d.ProjectId == null);
+
+        var dataSource = await dsQuery.FirstOrDefaultAsync();
 
         if (dataSource == null)
-            throw new KeyNotFoundException($"Data Source with id {dataSourceId} not found");
+            throw new KeyNotFoundException(
+                $"Data source with id {dataSourceId} not found or does not belong to the specified organization/project context");
+
+        // Organization data sources cannot be updated from a project level
+        if (projectId.HasValue && dataSource.ProjectId == null)
+            throw new InvalidOperationException("Organization data sources cannot be updated from the child projects.");
 
         if (!dataSource.Default)
         {
