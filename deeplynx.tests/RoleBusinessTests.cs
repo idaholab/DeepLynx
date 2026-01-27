@@ -735,6 +735,17 @@ public class RoleBusinessTests : IntegrationTestBase
             $"Role with id {rid4} not found or does not belong to the specified organization/project context",
             exception.Message);
     }
+    
+    [Fact]
+    public async Task GetRole_Succeeds_WhenExistsWithinOrg()
+    {
+        // Act
+        var result = await _roleBusiness.GetRole(rid1, oid, pid);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(rid1, result.Id);
+    }
 
     #endregion
 
@@ -1007,6 +1018,22 @@ public class RoleBusinessTests : IntegrationTestBase
         var eventList = await Context.Events.ToListAsync();
         Assert.Empty(eventList);
     }
+    
+    [Fact]
+    public async Task ArchiveRole_Fails_IfArchivingOrgRoleFromProject()
+    {
+        // Act & Assert
+        var exception =
+            await Assert.ThrowsAsync<InvalidOperationException>(() => _roleBusiness.ArchiveRole(uid, rid1, oid, pid));
+
+        Assert.Contains(
+            $"Organization roles cannot be updated from the child projects.",
+            exception.Message);
+
+        // Ensure that no event was logged
+        var eventList = await Context.Events.ToListAsync();
+        Assert.Empty(eventList);
+    }
 
     #endregion
 
@@ -1136,6 +1163,18 @@ public class RoleBusinessTests : IntegrationTestBase
         // Ensure that no event was logged
         var eventList = await Context.Events.ToListAsync();
         Assert.Empty(eventList);
+    }
+    
+    [Fact]
+    public async Task DeleteRole_Fails_IfTryingToDeleteOrgRoleFromProject()
+    {
+        // Act & Assert
+        var exception =
+            await Assert.ThrowsAsync<InvalidOperationException>(() => _roleBusiness.DeleteRole(uid, rid1, oid, pid));
+
+        Assert.Contains(
+            $"Organization roles cannot be updated from the child projects.",
+            exception.Message);
     }
 
     #endregion
