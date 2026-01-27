@@ -7,28 +7,35 @@ import { useOrganizationSession } from '@/app/contexts/OrganizationSessionProvid
 import EChartsLineChart from './LineChart';
 import { ArrowDownTrayIcon } from '@heroicons/react/24/outline';
 import * as echarts from 'echarts';
+import { queryBuilder } from '@/app/lib/client_service/query_services.client';
+import { QueryBuilderQuery } from '../types/types';
+import { CustomQueryRequestDto } from '../types/requestDTOs';
+import { useProjectSession } from '@/app/contexts/ProjectSessionProvider';
+import { HistoricalRecordResponseDto } from '../types/responseDTOs';
 
 type Props = {
-    initialProjects: { id: string; name: string }[];
-    initialSelectedProjects: string[];
+    timeseriesFiles: HistoricalRecordResponseDto[]
 };
 
-export default function TimeseriesViewerClient({ initialProjects, initialSelectedProjects }: Props) {
+export default function TimeseriesViewerClient({ timeseriesFiles }: Props) {
     const { t } = useLanguage();
     const { organization } = useOrganizationSession();
-
-    const initialSelectedProjectsRef = useRef(initialSelectedProjects);
-    const [projects] = useState(initialProjects);
-    const [selectedProjects, setSelectedProjects] = useState<string[]>(
-        initialSelectedProjects
-    );
+    const { project } = useProjectSession();
     const [activeTab, setActiveTab] = useState("");
+    const [files, setFiles] = useState<HistoricalRecordResponseDto[]>(timeseriesFiles);
 
     // ============================================
     // CHART CONFIGURATION - Replace with backend data
     // ============================================
     const chartTitle = "Temperature & Data Monitoring";
     const xAxisName = "Time Points";
+
+    //Using query builder to grab Timeseries files for now
+    const dto: CustomQueryRequestDto = {
+        filter: "class_name",
+        operator: '=',
+        value: "Timeseries"
+    }
 
     const yAxisConfigs = [
         {
@@ -205,14 +212,14 @@ export default function TimeseriesViewerClient({ initialProjects, initialSelecte
                         <h3 className="font-semibold mb-4">Available Timeseries Files</h3>
 
                         <div className="space-y-2 max-h-[300px] overflow-y-auto">
-                            {availableFiles.map((file, index) => (
+                            {timeseriesFiles.map((file, index) => (
                                 <div
                                     key={index}
                                     className={`p-3 rounded-lg border cursor-pointer transition-all ${selectedFile === file.name
                                         ? 'border-primary bg-primary/10'
                                         : 'border-base-300 hover:border-primary/50 hover:bg-base-200'
                                         }`}
-                                    onClick={() => setSelectedFile(file.name)}
+                                    onClick={() => setSelectedFile(file.name!)}
                                 >
                                     <div className="flex items-start justify-between">
                                         <div className="flex-1 min-w-0">
@@ -222,10 +229,7 @@ export default function TimeseriesViewerClient({ initialProjects, initialSelecte
                                             </p>
                                             <div className="flex items-center gap-3 mt-1">
                                                 <span className="text-xs text-base-content/60">
-                                                    {file.date}
-                                                </span>
-                                                <span className="text-xs text-base-content/60">
-                                                    {file.size}
+                                                    {file.lastUpdatedAt}
                                                 </span>
                                             </div>
                                         </div>
@@ -353,7 +357,7 @@ export default function TimeseriesViewerClient({ initialProjects, initialSelecte
                 <h1 className="text-2xl font-bold text-base-content">
                     {t.translations.TIMESERIES_VIEWER}
                 </h1>
-                <div className="">
+                {/* <div className="">
                     <ProjectDropdown
                         projects={projects}
                         onSelectionChange={setSelectedProjects}
@@ -363,7 +367,7 @@ export default function TimeseriesViewerClient({ initialProjects, initialSelecte
                                 : undefined
                         }
                     />
-                </div>
+                </div> */}
             </div>
 
             <div className="flex justify-end p-4">
