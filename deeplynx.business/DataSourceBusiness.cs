@@ -66,6 +66,10 @@ public class DataSourceBusiness : IDataSourceBusiness
 
         var dataSourceList = await dsQuery.ToListAsync();
 
+        if (dataSourceList.Count == 0)
+            throw new KeyNotFoundException(
+                "Data sources not found or do not belong to the specified organization/project context");
+
         return dataSourceList.Select(d => new DataSourceResponseDto
         {
             Id = d.Id,
