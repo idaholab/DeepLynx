@@ -74,8 +74,7 @@ const SplitViewLayout: React.FC<SplitViewLayoutProps> = ({
                     {t.translations.ROLES}
                   </h2>
                   <p className="text-xs text-base-content/60 mt-1">
-                    {roles.length}
-                    {t.translations.TOTAL}
+                    {roles.length} {t.translations.TOTAL}
                   </p>
                 </div>
                 <button
