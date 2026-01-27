@@ -562,17 +562,16 @@ public class ClassBusiness : IClassBusiness
             query = query.Where(c => c.ProjectId == projectId);
 
         var returnedClass = await query.FirstOrDefaultAsync();
-        // if a class by the supplied name is found, return it
-        if (returnedClass is not null || !returnedClass.IsArchived)
-            return new ClassResponseDto
-            {
-                Id = returnedClass.Id,
-                Name = returnedClass.Name
-            };
 
-        // otherwise, create a new class with the supplied name
-        return await CreateClass(currentUserId, organizationId, projectId,
-            new CreateClassRequestDto { Name = className });
+        if (returnedClass is null || returnedClass.IsArchived)
+            return await CreateClass(currentUserId, organizationId, projectId,
+                new CreateClassRequestDto { Name = className });
+
+        return new ClassResponseDto
+        {
+            Id = returnedClass.Id,
+            Name = returnedClass.Name
+        };
     }
 
     /// <summary>

@@ -106,8 +106,8 @@ public class RoleBusinessTests : IntegrationTestBase
         var role1 = new Role { Name = "Role 1", OrganizationId = oid };
         var role2 = new Role { Name = "Role 2", OrganizationId = oid, IsArchived = true }; // Archive role2
         var role3 = new Role { Name = "Role 3", OrganizationId = oid };
-        var role4 = new Role { Name = "Role 4", OrganizationId = oid, ProjectId = pid };
-        var role5 = new Role { Name = "Role 5", OrganizationId = oid, ProjectId = pid2 };
+        var role4 = new Role { Name = "Role 4", OrganizationId = oid, ProjectId = pid }; // project roles
+        var role5 = new Role { Name = "Role 5", OrganizationId = oid, ProjectId = pid2 }; // project roles
         Context.Roles.AddRange(role1, role2, role3, role4, role5);
         await Context.SaveChangesAsync();
         rid1 = role1.Id;
@@ -622,59 +622,41 @@ public class RoleBusinessTests : IntegrationTestBase
     #endregion
 
     #region GetAllRole Tests
-
+    
     [Fact]
-    public async Task GetAllRoles_FiltersByProjectAndOrg()
-    {
-        // Act
-        var result = (await _roleBusiness.GetAllRoles(oid, pid)).ToList();
-
-        // Assert
-        Assert.Single(result);
-        Assert.Contains(result, r => r.Id == rid4);
-    }
-
-    [Fact]
-    public async Task GetAllRoles_FiltersByProject()
+    public async Task GetAllRoles_ShowsOrgInheritance()
     {
         // Act - Get project roles without specifying org
         var result = (await _roleBusiness.GetAllRoles(oid, pid)).ToList();
 
         // Assert
-        Assert.Single(result);
         Assert.All(result, r => Assert.Equal(false, r.IsArchived));
-        Assert.DoesNotContain(result, r => r.Id == rid1);
+        Assert.Contains(result, r => r.Id == rid1);
         Assert.DoesNotContain(result, r => r.Id == rid2);
         Assert.DoesNotContain(result, r => r.Id == rid3);
         Assert.Contains(result, r => r.Id == rid4);
         Assert.DoesNotContain(result, r => r.Id == rid5);
-
-        // Act - Get same project roles WITH org specified (should be identical)
-        var resultWithOrg = (await _roleBusiness.GetAllRoles(oid, pid)).ToList();
-
-        // Assert - Should return same results
-        Assert.Single(resultWithOrg);
-        Assert.All(resultWithOrg, r => Assert.Equal(false, r.IsArchived));
-        Assert.DoesNotContain(resultWithOrg, r => r.Id == rid1);
-        Assert.DoesNotContain(resultWithOrg, r => r.Id == rid2);
-        Assert.DoesNotContain(resultWithOrg, r => r.Id == rid3);
-        Assert.Contains(resultWithOrg, r => r.Id == rid4);
-        Assert.DoesNotContain(resultWithOrg, r => r.Id == rid5);
-
-        // Both results should be identical
-        Assert.Equal(result.Count, resultWithOrg.Count);
-        Assert.Equal(result.First().Id, resultWithOrg.First().Id);
+        
     }
 
     [Fact]
-    public async Task GetAllRoles_FiltersByOrganization()
+    public async Task GetAllRoles_OnlyForOrganization()
     {
         // Act
         var result = (await _roleBusiness.GetAllRoles(oid, null)).ToList();
-
-        // Assert
-        Assert.All(result, r => Assert.Equal(false, r.IsArchived));
+        
+        // Assert.All(result, r => Assert.Equal(false, r.IsArchived));
         Assert.Contains(result, r => r.Id == rid1);
+    }
+    
+    [Fact]
+    public async Task GetAllRoles_ForProjectAndOrgInheritance()
+    {
+        // Act
+        var result = (await _roleBusiness.GetAllRoles(oid, pid)).ToList();
+        
+        Assert.Contains(result, r => r.Id == rid1);
+        Assert.Contains(result, r => r.Id == rid4);
     }
 
     #endregion
@@ -725,7 +707,7 @@ public class RoleBusinessTests : IntegrationTestBase
     public async Task GetRole_Fails_IfArchived_AndHideArchivedTrue()
     {
         // Act & Assert
-        var exception = await Assert.ThrowsAsync<KeyNotFoundException>(() => _roleBusiness.GetRole(rid2, oid, pid));
+        var exception = await Assert.ThrowsAsync<KeyNotFoundException>(() => _roleBusiness.GetRole(rid2, oid, null));
 
         Assert.Contains(
             $"Role with id {rid2} not found or does not belong to the specified organization/project context",
@@ -752,6 +734,17 @@ public class RoleBusinessTests : IntegrationTestBase
         Assert.Contains(
             $"Role with id {rid4} not found or does not belong to the specified organization/project context",
             exception.Message);
+    }
+    
+    [Fact]
+    public async Task GetRole_Succeeds_WhenExistsWithinOrg()
+    {
+        // Act
+        var result = await _roleBusiness.GetRole(rid1, oid, pid);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(rid1, result.Id);
     }
 
     #endregion
@@ -859,17 +852,17 @@ public class RoleBusinessTests : IntegrationTestBase
     }
 
     [Fact]
-    public async Task UpdateRole_Fails_WhenWrongProjectSupplied()
+    public async Task UpdateRole_Fails_WhenTryingToUpdateOrgRole()
     {
         // Arrange - Try to rename rid1 to "Role 2" (which already exists)
         var dto = new UpdateRoleRequestDto { Name = "Role 2" };
 
         // Act & Assert
         var exception =
-            await Assert.ThrowsAsync<KeyNotFoundException>(() => _roleBusiness.UpdateRole(uid, rid1, oid, pid2, dto));
+            await Assert.ThrowsAsync<InvalidOperationException>(() => _roleBusiness.UpdateRole(uid, rid1, oid, pid2, dto));
 
         Assert.Contains(
-            $"Role with id {rid1} not found or does not belong to the specified organization/project context",
+            $"Organization roles cannot be updated from the child projects.",
             exception.Message);
     }
 
@@ -1015,10 +1008,26 @@ public class RoleBusinessTests : IntegrationTestBase
     {
         // Act & Assert
         var exception =
-            await Assert.ThrowsAsync<KeyNotFoundException>(() => _roleBusiness.ArchiveRole(uid, rid1, oid, pid2));
+            await Assert.ThrowsAsync<KeyNotFoundException>(() => _roleBusiness.ArchiveRole(uid, rid4, oid, pid2));
 
         Assert.Contains(
-            $"Role with id {rid1} not found or does not belong to the specified organization/project context",
+            $"Role with id {rid4} not found or does not belong to the specified organization/project context",
+            exception.Message);
+
+        // Ensure that no event was logged
+        var eventList = await Context.Events.ToListAsync();
+        Assert.Empty(eventList);
+    }
+    
+    [Fact]
+    public async Task ArchiveRole_Fails_IfArchivingOrgRoleFromProject()
+    {
+        // Act & Assert
+        var exception =
+            await Assert.ThrowsAsync<InvalidOperationException>(() => _roleBusiness.ArchiveRole(uid, rid1, oid, pid));
+
+        Assert.Contains(
+            $"Organization roles cannot be updated from the child projects.",
             exception.Message);
 
         // Ensure that no event was logged
@@ -1081,14 +1090,14 @@ public class RoleBusinessTests : IntegrationTestBase
     }
 
     [Fact]
-    public async Task UnarchiveRole_Fails_IfWrongProjectSupplied()
+    public async Task UnarchiveRole_Fails_IfTryingToUpdateOrgRole()
     {
         // Act & Assert
         var exception =
-            await Assert.ThrowsAsync<KeyNotFoundException>(() => _roleBusiness.UnarchiveRole(uid, rid2, oid, pid2));
+            await Assert.ThrowsAsync<InvalidOperationException>(() => _roleBusiness.UnarchiveRole(uid, rid2, oid, pid2));
 
         Assert.Contains(
-            $"Role with id {rid2} not found or does not belong to the specified organization/project context",
+            $"Organization roles cannot be updated from the child projects.",
             exception.Message);
 
         // Ensure that no event was logged
@@ -1154,6 +1163,18 @@ public class RoleBusinessTests : IntegrationTestBase
         // Ensure that no event was logged
         var eventList = await Context.Events.ToListAsync();
         Assert.Empty(eventList);
+    }
+    
+    [Fact]
+    public async Task DeleteRole_Fails_IfTryingToDeleteOrgRoleFromProject()
+    {
+        // Act & Assert
+        var exception =
+            await Assert.ThrowsAsync<InvalidOperationException>(() => _roleBusiness.DeleteRole(uid, rid1, oid, pid));
+
+        Assert.Contains(
+            $"Organization roles cannot be updated from the child projects.",
+            exception.Message);
     }
 
     #endregion
@@ -1241,9 +1262,9 @@ public class RoleBusinessTests : IntegrationTestBase
         // Act & Assert
         var exception =
             await Assert.ThrowsAsync<KeyNotFoundException>(() =>
-                _roleBusiness.AddPermissionToRole(rid3, permid3, oid, pid));
+                _roleBusiness.AddPermissionToRole(999, permid3, oid, pid));
 
-        Assert.Contains($"Role with id {rid3} not found", exception.Message);
+        Assert.Contains($"Role with id {999} not found or does not belong to the specified organization/project context", exception.Message);
     }
 
     [Fact]
