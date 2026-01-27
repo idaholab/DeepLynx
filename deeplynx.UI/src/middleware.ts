@@ -1,6 +1,7 @@
 // src/middleware.ts
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { auth } from "../auth";
 
 // CRITICAL: Force middleware to use Node.js runtime (not Edge)
 // This is needed because auth.ts uses jsonwebtoken which requires Node.js crypto
