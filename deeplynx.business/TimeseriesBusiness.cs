@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace deeplynx.business;
 
@@ -27,6 +28,8 @@ public class TimeseriesBusiness(
     private readonly IRecordBusiness _recordBusiness = recordBusiness;
     private readonly IServiceScopeFactory _serviceScopeFactory = serviceScopeFactory;
 
+    private readonly MemoryCache _tableCache = new(new MemoryCacheOptions());
+
     /// <summary>
     ///     Creates DuckDB table based on the table name and the file path
     /// </summary>
@@ -36,7 +39,8 @@ public class TimeseriesBusiness(
     /// <param name="tableName">Timeseries table name</param>
     /// <param name="filePath">The path of the file being uploaded to DuckDB</param>
     /// <param name="fileType">The Type of the file (accepts CSV or Parquet)</param>
-    public async Task CreateTimeseriesTable(long organizationId, long projectId, long dataSourceId, string tableName, string filePath,
+    public async Task CreateTimeseriesTable(long organizationId, long projectId, long dataSourceId, string tableName,
+        string filePath,
         string fileType)
     {
         using var duckDbConnection = await GetDuckDbConnection(organizationId, projectId, dataSourceId);
@@ -79,7 +83,8 @@ public class TimeseriesBusiness(
         // folder prep
         var uploadId = Guid.NewGuid().ToString();
         var tableName = uploadId + "_" + file.FileName;
-        var folderPath = Path.Combine(_duckDbBasePath, "org_" + organizationId, "project_" + projectId, "datasource_" + dataSourceId);
+        var folderPath = Path.Combine(_duckDbBasePath, "org_" + organizationId, "project_" + projectId,
+            "datasource_" + dataSourceId);
         var filePath = Path.Combine(folderPath, tableName);
         Directory.CreateDirectory(folderPath ?? throw new InvalidOperationException("error creating upload path"));
 
@@ -189,7 +194,8 @@ public class TimeseriesBusiness(
         await ExistenceHelper.EnsureDataSourceExistsForProjectAsync(_context, dataSourceId, projectId);
 
         var uploadId = Guid.NewGuid().ToString();
-        var folderPath = Path.Combine(_duckDbBasePath, "org_" + organizationId, "project_" + projectId, "datasource_" + dataSourceId, uploadId);
+        var folderPath = Path.Combine(_duckDbBasePath, "org_" + organizationId, "project_" + projectId,
+            "datasource_" + dataSourceId, uploadId);
         Directory.CreateDirectory(folderPath);
 
         return uploadId;
@@ -209,7 +215,8 @@ public class TimeseriesBusiness(
     public async Task<string> UploadChunk(long organizationId, long projectId, long dataSourceId, IFormFile chunk,
         string uploadId, int chunkNumber)
     {
-        var baseFolderPath = Path.Combine(_duckDbBasePath, "org_" + organizationId, "project_" + projectId, "datasource_" + dataSourceId);
+        var baseFolderPath = Path.Combine(_duckDbBasePath, "org_" + organizationId, "project_" + projectId,
+            "datasource_" + dataSourceId);
         var tempFolderPath = Path.Combine(baseFolderPath, uploadId);
         var tempFilePath = Path.Combine(tempFolderPath, $"{chunkNumber}.part");
 
@@ -251,7 +258,8 @@ public class TimeseriesBusiness(
         long dataSourceId,
         TimeseriesUploadCompleteRequestDto request)
     {
-        var dataSourceFolderPath = Path.Combine(_duckDbBasePath, "org_" + organizationId, "project_" + projectId, "datasource_" + dataSourceId);
+        var dataSourceFolderPath = Path.Combine(_duckDbBasePath, "org_" + organizationId, "project_" + projectId,
+            "datasource_" + dataSourceId);
         var tempFolderPath = Path.Combine(dataSourceFolderPath, request.UploadId);
         var tableName = request.UploadId + "_" + request.FileName;
         var finalFilePath = Path.Combine(tempFolderPath, request.UploadId + "_" + request.FileName);
@@ -366,7 +374,8 @@ public class TimeseriesBusiness(
     /// <param name="tableName">The table to append</param>
     /// <exception cref="ArgumentException"></exception>
     /// <exception cref="Exception"></exception>
-    public async Task AppendTimeseriesTable(long organizationId, long projectId, long dataSourceId, IFormFile file, string tableName)
+    public async Task AppendTimeseriesTable(long organizationId, long projectId, long dataSourceId, IFormFile file,
+        string tableName)
     {
         var fileType = Path.GetExtension(file.FileName);
         if (fileType != ".csv" && fileType != ".parquet")
@@ -378,6 +387,24 @@ public class TimeseriesBusiness(
         await ExistenceHelper.EnsureDataSourceExistsForProjectAsync(_context, dataSourceId, projectId);
 
         using var duckDbConnection = await GetDuckDbConnection(organizationId, projectId, dataSourceId);
+
+        // injection protection
+        var cacheKey = $"tables_{dataSourceId}";
+        if (!_tableCache.TryGetValue(cacheKey, out HashSet<string>? validTables))
+        {
+            validTables = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            using var tableCmd = duckDbConnection.CreateCommand();
+            tableCmd.CommandText = "SELECT table_name FROM duckdb_tables()";
+            using var tableReader = await tableCmd.ExecuteReaderAsync();
+            while (await tableReader.ReadAsync())
+            {
+                validTables.Add(tableReader.GetString(0));
+            }
+            _tableCache.Set(cacheKey, validTables, TimeSpan.FromSeconds(120));
+        }
+
+        if (!validTables!.Contains(tableName))
+            throw new ArgumentException($"Invalid table name: {tableName}");
 
         // save file to temporary directory
         var guid = Guid.NewGuid();
@@ -566,7 +593,6 @@ public class TimeseriesBusiness(
     public async Task<RecordResponseDto> QueryTimeseries(long currentUserId, TimeseriesQueryRequestDto request,
         long organizationId, long projectId, long dataSourceId, string fileType)
     {
-
         await ExistenceHelper.EnsureDataSourceExistsForProjectAsync(_context, dataSourceId, projectId);
 
         var queryId = Guid.NewGuid().ToString();
@@ -611,9 +637,132 @@ public class TimeseriesBusiness(
         return recordResponse;
     }
 
-    private static async Task<DuckDBConnection> GetDuckDbConnection(long organizationId, long projectId, long dataSourceId)
+    /// <summary>
+    ///     Get a view of data points
+    /// </summary>
+    /// <param name="organizationId">ID of organization that timeseries data is associated with</param>
+    /// <param name="projectId">ID of project that timeseries data is associated with</param>
+    /// <param name="dataSourceId">ID of data source that timeseries data is associated with</param>
+    /// <param name="recordId">Name of the duckDB table on which the timeseries data is encoded</param>
+    /// <param name="limit">Maximum number of data points to include</param>
+    /// <param name="rowStride">every nth row to get (row number 4 = every 4th row)</param>
+    /// <returns>A json array of plot data</returns>
+    public async Task<PlotDataDto> GetPlotData(long organizationId, long projectId,
+        long dataSourceId, long recordId, long limit, long rowStride)
     {
-        var baseDir = Path.Combine(_duckDbBasePath, "org_" + organizationId, "project_" + projectId, "datasource_" + dataSourceId);
+        await ExistenceHelper.EnsureDataSourceExistsForProjectAsync(_context, dataSourceId, projectId);
+        using var connection = await GetReadOnlyDuckDbConnection(organizationId, projectId, dataSourceId);
+
+        // injection protection (here it's for stuff like DoS inducing expensive requests)
+        var cacheKey = $"tables_{dataSourceId}";
+        if (!_tableCache.TryGetValue(cacheKey, out HashSet<string>? validTables))
+        {
+            validTables = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            using var tableCmd = connection.CreateCommand();
+            tableCmd.CommandText = "SELECT table_name FROM duckdb_tables()";
+            using var tableReader = await tableCmd.ExecuteReaderAsync();
+            while (await tableReader.ReadAsync())
+            {
+                validTables.Add(tableReader.GetString(0));
+            }
+            _tableCache.Set(cacheKey, validTables, TimeSpan.FromSeconds(120));
+        }
+
+        var record = await _recordBusiness.GetRecord(organizationId, projectId, recordId, true);
+
+        if (string.IsNullOrEmpty(record.Uri))
+            throw new ArgumentException($"Record {recordId} does not have a URI");
+
+        var tableName = ExtractTableNameFromUri(record.Uri);
+
+        if (!validTables!.Contains(tableName))
+            throw new ArgumentException($"Invalid table name: {tableName}");
+
+        using var cmd = connection.CreateCommand();
+        cmd.CommandText = $"SELECT * FROM \"{tableName}\" WHERE rowid % {rowStride} = 0 ORDER BY rowid DESC LIMIT {limit}";
+        using var reader = await cmd.ExecuteReaderAsync();
+
+        var columnCount = reader.FieldCount;
+        var columns = new string[columnCount];
+        for (var i = 0; i < columnCount; i++)
+            columns[i] = reader.GetName(i);
+
+        var points = new List<object[]>();
+
+        while (await reader.ReadAsync())
+        {
+            var row = new object[columnCount];
+            for (var i = 0; i < columnCount; i++)
+                row[i] = reader.GetValue(i);
+            points.Add(row);
+        }
+
+        points.Reverse(); // back to chronological order
+
+        return new PlotDataDto { Columns = columns, Data = [.. points] };
+    }
+
+    /// <summary>
+    ///     Get the most recent row
+    /// </summary>
+    /// <param name="organizationId">ID of organization that timeseries data is associated with</param>
+    /// <param name="projectId">ID of project that timeseries data is associated with</param>
+    /// <param name="dataSourceId">ID of data source that timeseries data is associated with</param>
+    /// <param name="recordId">Name of the duckDB table on which the timeseries data is encoded</param>
+    /// <returns>The most recently inserted row as json</returns>
+    public async Task<Dictionary<string, object?>> GetLatestRow(long organizationId, long projectId,
+        long dataSourceId, long recordId)
+    {
+        await ExistenceHelper.EnsureDataSourceExistsForProjectAsync(_context, dataSourceId, projectId);
+        using var connection = await GetReadOnlyDuckDbConnection(organizationId, projectId, dataSourceId);
+
+        // injection protection (here it's for stuff like DoS inducing expensive requests)
+        var cacheKey = $"tables_{dataSourceId}";
+        if (!_tableCache.TryGetValue(cacheKey, out HashSet<string>? validTables))
+        {
+            validTables = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            using var tableCmd = connection.CreateCommand();
+            tableCmd.CommandText = "SELECT table_name FROM duckdb_tables()";
+            using var tableReader = await tableCmd.ExecuteReaderAsync();
+            while (await tableReader.ReadAsync())
+            {
+                validTables.Add(tableReader.GetString(0));
+            }
+            _tableCache.Set(cacheKey, validTables, TimeSpan.FromSeconds(120));
+        }
+
+        var record = await _recordBusiness.GetRecord(organizationId, projectId, recordId, true);
+
+        if (string.IsNullOrEmpty(record.Uri))
+            throw new ArgumentException($"Record {recordId} does not have a URI");
+
+        var tableName = ExtractTableNameFromUri(record.Uri);
+
+        if (!validTables!.Contains(tableName))
+            throw new ArgumentException($"Invalid table name: {tableName}");
+
+        // NOTE: relies on rowid for ordering, which is safe for append-only timeseries
+        // If we ever support user-initiated deletes, revisit this
+        using var cmd = connection.CreateCommand();
+        cmd.CommandText = $"SELECT * FROM \"{tableName}\" ORDER BY rowid DESC LIMIT 1";
+        using var reader = await cmd.ExecuteReaderAsync();
+
+        if (!await reader.ReadAsync())
+            return [];
+
+        var result = new Dictionary<string, object?>(reader.FieldCount);
+        for (int i = 0; i < reader.FieldCount; i++)
+        {
+            result[reader.GetName(i)] = reader.IsDBNull(i) ? null : reader.GetValue(i);
+        }
+        return result;
+    }
+
+    private static async Task<DuckDBConnection> GetDuckDbConnection(long organizationId, long projectId,
+        long dataSourceId)
+    {
+        var baseDir = Path.Combine(_duckDbBasePath, "org_" + organizationId, "project_" + projectId,
+            "datasource_" + dataSourceId);
         Directory.CreateDirectory(baseDir);
 
         var dbPath = Path.Combine(baseDir, "timeseries.duckdb");
@@ -625,9 +774,11 @@ public class TimeseriesBusiness(
         return connection;
     }
 
-    private static async Task<DuckDBConnection> GetReadOnlyDuckDbConnection(long organizationId, long projectId, long dataSourceId)
+    private static async Task<DuckDBConnection> GetReadOnlyDuckDbConnection(long organizationId, long projectId,
+        long dataSourceId)
     {
-        var baseDir = Path.Combine(_duckDbBasePath, "org_" + organizationId, "project_" + projectId, "datasource_" + dataSourceId);
+        var baseDir = Path.Combine(_duckDbBasePath, "org_" + organizationId, "project_" + projectId,
+            "datasource_" + dataSourceId);
         var dbPath = Path.Combine(baseDir, "timeseries.duckdb");
 
         if (!File.Exists(dbPath))
@@ -653,7 +804,8 @@ public class TimeseriesBusiness(
     /// <param name="fileType">The type of the file being written</param>
     /// <exception cref="KeyNotFoundException">Thrown when the record cannot be found</exception>
     /// <exception cref="Exception">Thrown if the report cannot be written</exception>
-    private async Task RunBackgroundJob(RecordResponseDto recordResponse, string query, long organizationId, long projectId,
+    private async Task RunBackgroundJob(RecordResponseDto recordResponse, string query, long organizationId,
+        long projectId,
         long dataSourceId, string fileName, string fileType)
     {
         // Runs in the background and lets the request finish
@@ -780,7 +932,8 @@ public class TimeseriesBusiness(
     /// <param name="dataSourceId">The data source ID</param>
     /// <param name="tableName">Timeseries table name</param>
     /// <returns>JSON array of columns</returns>
-    private static async Task<JsonArray> GetColumnsFromDb(long organizationId, long projectId, long dataSourceId, string tableName)
+    private static async Task<JsonArray> GetColumnsFromDb(long organizationId, long projectId, long dataSourceId,
+        string tableName)
     {
         var columns = new JsonArray();
         using var duckDbConnection = await GetDuckDbConnection(organizationId, projectId, dataSourceId);
@@ -807,6 +960,16 @@ public class TimeseriesBusiness(
         }
 
         return columns;
+    }
+
+    private static string ExtractTableNameFromUri(string uri)
+    {
+        const string scheme = "duckdb://";
+
+        if (!uri.StartsWith(scheme, StringComparison.OrdinalIgnoreCase))
+            throw new ArgumentException($"Unsupported URI scheme. Expected '{scheme}', got: {uri}");
+
+        return uri[scheme.Length..];
     }
 
     private void CleanDirectoryUpToBasePath(string? startDirectoryPath)
