@@ -870,14 +870,9 @@ public class ProjectBusiness : IProjectBusiness
         // ===============================
         // TODO: project config should determine whether to do this (true by default)
         
-        var storageDirectory = Environment.GetEnvironmentVariable("STORAGE_DIRECTORY");
-        var awsConnectionStringTest = Environment.GetEnvironmentVariable("AWS_S3_CONNECTION_STRING");
-        var azureContainerNameTest = Environment.GetEnvironmentVariable("AZURE_CONTAINER_NAME");
-        var azureConnectionStringTest = Environment.GetEnvironmentVariable("AZURE_OBJECT_CONNECTION_STRING");
-        
         var duckdbMountPath = Environment.GetEnvironmentVariable("DUCKDB_BASE_PATH");
         if (string.IsNullOrWhiteSpace(duckdbMountPath))
-            throw new NullReferenceException($"Duckdb mount path not set or is white space, check your environment variables. duckdbmountpath: {duckdbMountPath}. filestoragemethod: {defaultObjectStorageMethod}. storagedirectory: {storageDirectory}. awsConnectionString:  {awsConnectionStringTest} azureContinerName: {azureContainerNameTest}. azureConnectionString: {azureConnectionStringTest}");
+            throw new ArgumentException("Duckdb mount path not set or is white space, check your environment variables.");
         
         var timeseriesObjectStorageMethod = new CreateObjectStorageRequestDto
         {
@@ -887,7 +882,8 @@ public class ProjectBusiness : IProjectBusiness
                 MountPath = duckdbMountPath
             }
         };
-        var obj = await _objectStorageBusiness.CreateObjectStorage(currentUserId, organizationId, projectId,
+        
+        await _objectStorageBusiness.CreateObjectStorage(currentUserId, organizationId, projectId,
             timeseriesObjectStorageMethod);
 
         // ===============================

@@ -113,7 +113,7 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
         ValidationHelper.ValidateModel(dto);
         
         bool hasFilesystem = dto.Config.MountPath is not null;
-        var hasAzure = dto.Config.AzureObjectConfig is not null;
+        bool hasAzure = dto.Config.AzureObjectConfig is not null;
         bool hasAws = dto.Config.AwsConnectionString is not null;
         
         
@@ -142,9 +142,11 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
             if (string.IsNullOrWhiteSpace(dto.Config.AzureObjectConfig.AzureContainerName))
             {
                 Env.Load("../.env");
-                dto.Config.AzureObjectConfig.AzureContainerName = 
-                    Environment.GetEnvironmentVariable("AZURE_CONTAINER_NAME") ?? 
-                    throw new NullReferenceException("Azure container name not set");
+                var azureContainerName = Environment.GetEnvironmentVariable("AZURE_CONTAINER_NAME"); 
+                if (string.IsNullOrWhiteSpace(azureContainerName))
+                    throw new ArgumentException("Default Azure container name is not set or is empty, please provide a container name or set default using env variables");
+                
+                dto.Config.AzureObjectConfig.AzureContainerName = azureContainerName;
             }
             type = "azure_object";
         }
