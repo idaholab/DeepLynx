@@ -1,14 +1,14 @@
 export default {
-  users: {title: 'Using DeepLynx Nexus'},
-  admins: {title: 'Managing DeepLynx Nexus'},
-  ecosystem: {title: 'Integrating with DeepLynx Nexus'},
-  developers: {title: 'Deploying DeepLynx Nexus'},
-  documentation: {display: 'hidden', title: 'DeepLynx Nexus Documentation'},
+  users: { title: 'Using DeepLynx Nexus' },
+  admins: { title: 'Managing DeepLynx Nexus' },
+  ecosystem: { title: 'Integrating with DeepLynx Nexus' },
+  developers: { title: 'Deploying DeepLynx Nexus' },
+  documentation: { display: 'hidden', title: 'DeepLynx Nexus Documentation' },
   deeplynx: {
     title: "Back to DeepLynx",
     type: 'page',
     href: process.env.HOSTED_LINK ? process.env.HOSTED_LINK : "http://localhost:3000"
   },
-  about: {display: 'hidden'},
-  overview: {display: 'hidden'}
+  about: { display: 'hidden' },
+  overview: { display: 'hidden' }
 }
