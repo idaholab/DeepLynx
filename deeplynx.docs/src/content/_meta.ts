@@ -7,7 +7,7 @@ export default {
   deeplynx: {
     title: "Back to DeepLynx",
     type: 'page',
-    href: process.env.HOSTED_LINK ? process.env.HOSTED_LINK : "/"
+    href: process.env.HOSTED_LINK ? process.env.HOSTED_LINK : "http://localhost:3000"
   },
   about: {display: 'hidden'},
   overview: {display: 'hidden'}
