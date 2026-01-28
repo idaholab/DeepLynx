@@ -270,6 +270,8 @@ public class FileBusiness
             throw new InvalidOperationException("File system mount path not set in object storage");
 
         var uploadId = Guid.NewGuid().ToString();
+        
+        //TODO: FACTORY HERE
 
         // Create directory for chunks based on storage type
         var uploadPath = Path.Combine(
@@ -347,6 +349,9 @@ public class FileBusiness
         if (objectStorage is null) throw new KeyNotFoundException("No object storage found for project");
 
         var configData = JsonConvert.DeserializeObject<ObjectStorageConfigDto>(objectStorage.Config);
+        
+        //TODO: FACTORY HERE
+        
         if (configData == null) throw new InvalidOperationException("Config data for object storage is null");
         if (configData.MountPath == null)
             throw new InvalidOperationException("File system mount path not set in object storage");
@@ -436,6 +441,9 @@ public class FileBusiness
         if (objectStorage is null) throw new KeyNotFoundException("No object storage found for project");
 
         var configData = JsonConvert.DeserializeObject<ObjectStorageConfigDto>(objectStorage.Config);
+        
+        //TODO: FACTORY HERE
+        
         if (configData == null) throw new InvalidOperationException("Config data for object storage is null");
         if (configData.MountPath == null)
             throw new InvalidOperationException("File system mount path not set in object storage");
@@ -581,6 +589,9 @@ public class FileBusiness
         if (objectStorage is null) throw new KeyNotFoundException("No object storage found for project");
 
         var configData = JsonConvert.DeserializeObject<ObjectStorageConfigDto>(objectStorage.Config);
+        
+        //TODO: FACTORY HERE
+        
         if (configData == null) throw new InvalidOperationException("Config data for object storage is null");
         if (configData.MountPath == null)
             throw new InvalidOperationException("File system mount path not set in object storage");
