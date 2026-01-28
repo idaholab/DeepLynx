@@ -11,9 +11,8 @@ const page = async () => {
   if (isAuthDisabled) {
     const mockSession: Session = {
       user: {
-        id: "local-dev-user",
-        name: "Local Dev User",
-        email: "dev@localhost",
+        name: "Local Developer",
+        email: "developer@localhost",
         image: undefined,
       },
       expires: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
