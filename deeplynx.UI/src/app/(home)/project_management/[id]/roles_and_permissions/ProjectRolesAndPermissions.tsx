@@ -529,14 +529,13 @@ const ProjectRolesAndPermissions = ({
     if (!initialLoadComplete && roles.length > 0) {
       fetchAllRolePermissions();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
   }, [roles, initialLoadComplete, fetchAllRolePermissions]);
 
   useEffect(() => {
     if (selectedRoleId && initialLoadComplete) {
       fetchRolePermissions(selectedRoleId);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedRoleId, initialLoadComplete, fetchRolePermissions]);
 
     /* ------------------------------------------------------------------------ */
@@ -689,7 +688,7 @@ const ProjectRolesAndPermissions = ({
           onCancelEditingMatrix={handleCancelEditingMatrix}
           onSaveMatrixPermissions={handleSaveMatrixPermissions}
           onToggleMatrixPermission={handleToggleMatrixPermission}
-          roleHasPermission={roleHasPermission}
+          roleHasPermission={matrixRoleHasPermission}
           isStandardRole={isStandardRole}
           isOrganizationRole={isOrganizationRole}
           isProjectRole={isProjectRole}

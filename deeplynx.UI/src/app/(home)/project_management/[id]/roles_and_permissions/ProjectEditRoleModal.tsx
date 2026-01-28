@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { RoleResponseDto } from "../../../types/responseDTOs";
 import { useLanguage } from "../../../../contexts/Language";
+
 interface EditRoleModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -31,15 +32,15 @@ const ProjectEditRoleModal = ({
     }
   }, [role]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async () => {
     if (!role) return;
 
     setError(null);
     setIsSubmitting(true);
 
     try {
-      await onSubmit(role.id,
+      await onSubmit(
+        role.id,
         name.trim() || null,
         description.trim() || null,
       );
@@ -60,7 +61,7 @@ const ProjectEditRoleModal = ({
           {t.translations.EDIT_ROLE}
         </h3>
 
-        <form onSubmit={handleSubmit}>
+        <div>
           <div className="form-control mb-4">
             <label className="label">
               <span className="label-text">
@@ -74,7 +75,6 @@ const ProjectEditRoleModal = ({
               onChange={(e) => setName(e.target.value)}
               placeholder="Enter role name"
               className="input input-bordered w-full"
-              required
               disabled={isSubmitting}
             />
           </div>
@@ -111,7 +111,8 @@ const ProjectEditRoleModal = ({
               {t.translations.CANCEL}
             </button>
             <button
-              type="submit"
+              type="button"
+              onClick={handleSubmit}
               className="btn btn-primary"
               disabled={isSubmitting || !name.trim()}
             >
@@ -125,7 +126,7 @@ const ProjectEditRoleModal = ({
               )}
             </button>
           </div>
-        </form>
+        </div>
       </div>
       <form method="dialog" className="modal-backdrop" onClick={onClose}>
         <button>

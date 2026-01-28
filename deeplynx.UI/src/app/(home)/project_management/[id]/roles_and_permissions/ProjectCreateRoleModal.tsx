@@ -23,8 +23,7 @@ const ProjectCreateRoleModal = ({
   const [error, setError] = useState<string | null>(null);
   const { t } = useLanguage();
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async () => {
     setError(null);
     setIsSubmitting(true);
 
@@ -33,7 +32,6 @@ const ProjectCreateRoleModal = ({
         name: name.trim(),
         description: description.trim() || null,
       });
-      // Reset form
       setName("");
       setDescription("");
       onClose();
@@ -52,8 +50,7 @@ const ProjectCreateRoleModal = ({
         <h3 className="font-bold text-lg mb-4">
           {t.translations.CREATE_NEW_ROLE}
         </h3>
-
-        <form onSubmit={handleSubmit}>
+        <div>
           <div className="form-control mb-4">
             <label className="label">
               <span className="label-text">
@@ -67,7 +64,6 @@ const ProjectCreateRoleModal = ({
               onChange={(e) => setName(e.target.value)}
               placeholder="Enter role name"
               className="input input-bordered w-full"
-              required
               disabled={isSubmitting}
             />
           </div>
@@ -104,7 +100,8 @@ const ProjectCreateRoleModal = ({
               {t.translations.CANCEL}
             </button>
             <button
-              type="submit"
+              type="button"
+              onClick={handleSubmit}
               className="btn btn-primary"
               disabled={isSubmitting || !name.trim()}
             >
@@ -118,12 +115,10 @@ const ProjectCreateRoleModal = ({
               )}
             </button>
           </div>
-        </form>
+        </div>
       </div>
       <form method="dialog" className="modal-backdrop" onClick={onClose}>
-        <button>
-          {t.translations.CLOSE}
-        </button>
+        <button>{t.translations.CLOSE}</button>
       </form>
     </dialog>
   );
