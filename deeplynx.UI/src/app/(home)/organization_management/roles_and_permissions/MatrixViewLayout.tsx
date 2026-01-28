@@ -63,7 +63,7 @@ const MatrixViewLayout: React.FC<MatrixViewLayoutProps> = ({
 
   return (
     <div style={{ height: "calc(100vh - 28rem)" }}>
-      <div className="card bg-base-100 shadow-xl h-full flex flex-col overflow-hidden">
+      <div className="card bg-base-100 shadow-xl h-full flex flex-col overflow-hidden border-2 border-primary">
         {/* Matrix Header / Controls */}
         <div className="px-6 py-3 border-b border-base-300 flex items-center justify-between">
           <h3 className="text-sm font-semibold">
@@ -186,7 +186,7 @@ const MatrixViewLayout: React.FC<MatrixViewLayoutProps> = ({
                     {/* Permission Rows */}
                     {category.permissions.map((perm: PermissionResponseDto) => (
                       <tr key={perm.id} className="hover">
-                        <td className="sticky left-0 z-10">
+                        <td className="sticky left-0 z-10 bg-base-100">
                           <div className="flex flex-col">
                             <span className="font-medium text-sm">
                               {perm.name}

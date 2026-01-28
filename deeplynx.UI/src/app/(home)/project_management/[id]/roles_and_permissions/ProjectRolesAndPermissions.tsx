@@ -74,8 +74,8 @@ const ProjectRolesAndPermissions = ({
   const [selectedRoleId, setSelectedRoleId] = useState<number | null>(
     standardInitialRoles[0]?.id || null,
   );
-  const [roles, setRoles] = useState(initialRoles);
-  const [permissions, setPermissions] = useState(initialPermissions);
+  const [roles, setRoles] = useState<RoleResponseDto[]>(initialRoles);
+  const [permissions, setPermissions] = useState<PermissionResponseDto[]>(initialPermissions);
 
   const [rolePermissions, setRolePermissions] = useState<
     Record<number, PermissionResponseDto[]>
@@ -575,14 +575,6 @@ const ProjectRolesAndPermissions = ({
         project.projectId as number,
         true
       );
-
-      console.log("Refetched project roles:", updatedRoles.map(r => ({
-        id: r.id,
-        name: r.name,
-        orgId: r.organizationId,
-        projId: r.projectId,
-        source: r.projectId === null ? "ORG" : r.projectId === project.projectId ? "PROJECT" : "OTHER"
-      })));
 
       setRoles(updatedRoles);
     } catch (error) {

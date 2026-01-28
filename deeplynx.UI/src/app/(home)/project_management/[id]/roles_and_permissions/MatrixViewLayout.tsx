@@ -1,5 +1,4 @@
 "use client";
-
 import React from "react";
 import {
   BuildingOfficeIcon,
@@ -8,7 +7,6 @@ import {
   ShieldCheckIcon,
   XMarkIcon,
 } from "@heroicons/react/24/outline";
-
 import {
   PermissionResponseDto,
   RoleResponseDto,
