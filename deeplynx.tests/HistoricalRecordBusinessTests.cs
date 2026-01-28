@@ -18,6 +18,7 @@ namespace deeplynx.tests;
 public class HistoricalRecordBusinessTests : IntegrationTestBase
 {
     private EventBusiness _eventBusiness;
+    private SensitivityLabelBusiness _sensitivityLabelBusiness = null!;
     private HistoricalRecordBusiness _historicalRecordBusiness = null!;
     private Mock<IHubContext<EventNotificationHub>> _mockHubContext = null!;
     private Mock<ILogger<NotificationBusiness>> _mockNotificationLogger = null!;
@@ -52,7 +53,8 @@ public class HistoricalRecordBusinessTests : IntegrationTestBase
         _bulkCopyUpsertExecutor = new BulkCopyUpsertExecutor();
         _eventBusiness = new EventBusiness(Context, _notificationBusiness, _bulkCopyUpsertExecutor);
         _tagBusiness = new TagBusiness(Context, _eventBusiness);
-        _recordBusiness = new RecordBusiness(Context, _eventBusiness, _bulkCopyUpsertExecutor, _tagBusiness);
+        _sensitivityLabelBusiness = new SensitivityLabelBusiness(Context, _eventBusiness);
+        _recordBusiness = new RecordBusiness(Context, _eventBusiness, _bulkCopyUpsertExecutor, _tagBusiness, _sensitivityLabelBusiness);
     }
 
     protected override async Task SeedTestDataAsync()
@@ -526,7 +528,7 @@ public class HistoricalRecordBusinessTests : IntegrationTestBase
         var archived = await _recordBusiness.ArchiveRecord(uid, organizationId, pid, rid);
         Assert.True(archived);
 
-        var archivedRecord = await _recordBusiness.GetRecord(organizationId, pid, rid, false);
+        var archivedRecord = await _recordBusiness.GetRecord(uid, organizationId, pid, rid, false);
         Assert.NotNull(archivedRecord);
 
         // Act

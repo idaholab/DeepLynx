@@ -28,6 +28,7 @@ public class TimeseriesBusinessTests : IntegrationTestBase, IAsyncLifetime
     }
     private ClassBusiness _classBusiness = null!;
     private EventBusiness _eventBusiness = null!;
+    private SensitivityLabelBusiness _sensitivityLabelBusiness = null!;
     private Mock<IHubContext<EventNotificationHub>> _mockHubContext = null!;
     private Mock<ILogger<NotificationBusiness>> _mockNotificationLogger = null!;
     private Mock<ILogger<TimeseriesBusiness>> _mockTimeseriesLogger = null!;
@@ -74,7 +75,8 @@ public class TimeseriesBusinessTests : IntegrationTestBase, IAsyncLifetime
         _notificationBusiness = new NotificationBusiness(Context, _mockNotificationLogger.Object, _mockHubContext.Object);
         _eventBusiness = new EventBusiness(Context, _notificationBusiness, _mockBulkCopyUpsertExecutor);
         _tagBusiness = new TagBusiness(Context, _eventBusiness);
-        _recordBusiness = new RecordBusiness(Context, _eventBusiness, _mockBulkCopyUpsertExecutor, _tagBusiness);
+        _sensitivityLabelBusiness = new SensitivityLabelBusiness(Context, _eventBusiness);
+        _recordBusiness = new RecordBusiness(Context, _eventBusiness, _mockBulkCopyUpsertExecutor, _tagBusiness, _sensitivityLabelBusiness);
         _classBusiness = new ClassBusiness(Context, _recordBusiness, _relationshipBusiness, _eventBusiness);
 
         _timeseriesBusiness = new TimeseriesBusiness(
@@ -517,7 +519,7 @@ public class TimeseriesBusinessTests : IntegrationTestBase, IAsyncLifetime
 
         // Verify the table was created and has data
         var latestRow = await _timeseriesBusiness.GetLatestRow(
-            _organizationId, _projectId, _dataSourceId, completeResult.Id);
+            _userId, _organizationId, _projectId, _dataSourceId, completeResult.Id);
         Assert.NotEmpty(latestRow);
     }
 
@@ -571,7 +573,7 @@ public class TimeseriesBusinessTests : IntegrationTestBase, IAsyncLifetime
 
         // Verify data integrity - check we can query the table
         var plotData = await _timeseriesBusiness.GetPlotData(
-            _organizationId, _projectId, _dataSourceId, result.Id, 10, 1);
+            _userId, _organizationId, _projectId, _dataSourceId, result.Id, 10, 1);
         Assert.NotNull(plotData.Data);
     }
 
@@ -589,7 +591,7 @@ public class TimeseriesBusinessTests : IntegrationTestBase, IAsyncLifetime
 
         // Act
         var result = await _timeseriesBusiness.GetPlotData(
-            _organizationId, _projectId, _dataSourceId, uploadResult.Id, 100, 1);
+            _userId, _organizationId, _projectId, _dataSourceId, uploadResult.Id, 100, 1);
 
         // Assert
         Assert.NotNull(result);
@@ -607,7 +609,7 @@ public class TimeseriesBusinessTests : IntegrationTestBase, IAsyncLifetime
 
         // Act & Assert - use a record ID that doesn't exist
         await Assert.ThrowsAnyAsync<Exception>(() =>
-            _timeseriesBusiness.GetPlotData(_organizationId, _projectId, _dataSourceId, -1, 100, 1));
+            _timeseriesBusiness.GetPlotData(_userId, _organizationId, _projectId, _dataSourceId, -1, 100, 1));
     }
 
     #endregion
@@ -624,7 +626,7 @@ public class TimeseriesBusinessTests : IntegrationTestBase, IAsyncLifetime
 
         // Act
         var result = await _timeseriesBusiness.GetLatestRow(
-            _organizationId, _projectId, _dataSourceId, uploadResult.Id);
+            _userId, _organizationId, _projectId, _dataSourceId, uploadResult.Id);
 
         // Assert
         Assert.NotNull(result);
@@ -643,7 +645,7 @@ public class TimeseriesBusinessTests : IntegrationTestBase, IAsyncLifetime
 
         // Act & Assert
         await Assert.ThrowsAnyAsync<Exception>(() =>
-            _timeseriesBusiness.GetLatestRow(_organizationId, _projectId, _dataSourceId, -1));
+            _timeseriesBusiness.GetLatestRow(_userId, _organizationId, _projectId, _dataSourceId, -1));
     }
 
     #endregion
@@ -670,7 +672,7 @@ public class TimeseriesBusinessTests : IntegrationTestBase, IAsyncLifetime
 
         // Assert - verify by getting latest row
         var latestRow = await _timeseriesBusiness.GetLatestRow(
-            _organizationId, _projectId, _dataSourceId, uploadResult.Id);
+            _userId, _organizationId, _projectId, _dataSourceId, uploadResult.Id);
         Assert.Equal(99.9, Convert.ToDouble(latestRow["value"]));
     }
 
@@ -837,7 +839,7 @@ public class TimeseriesBusinessTests : IntegrationTestBase, IAsyncLifetime
 
         // Act
         var result = await _timeseriesBusiness.GetPlotData(
-            _organizationId, _projectId, _dataSourceId, uploadResult.Id, 100, 1);
+            _userId, _organizationId, _projectId, _dataSourceId, uploadResult.Id, 100, 1);
 
         // Assert
         Assert.NotNull(result);

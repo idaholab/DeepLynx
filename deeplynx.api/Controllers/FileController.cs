@@ -113,7 +113,8 @@ public class FileController : ControllerBase
     {
         try
         {
-            var fileStreamResult = await _fileBusiness.DownloadFile(organizationId, projectId, recordId);
+            var currentUserId = UserContextStorage.UserId;
+            var fileStreamResult = await _fileBusiness.DownloadFile(currentUserId, organizationId, projectId, recordId);
             return fileStreamResult;
         }
         catch (Exception exc)

@@ -12,12 +12,12 @@ public class HistoricalRecordResponseDto
     public string? ClassName { get; set; }
     public long DataSourceId { get; set; }
     public string DataSourceName { get; set; }
-    
     public long? ObjectStorageId { get; set; }
     public string? ObjectStorageName { get; set; }
     public long ProjectId { get; set; }
     public string ProjectName { get; set; }
     public string? Tags { get; set; } = null!;
+    public string? Labels { get; set; } = null!;
     public DateTime LastUpdatedAt { get; set; }
     public string? LastUpdatedBy { get; set; }
     public bool IsArchived { get; set; } = false;

@@ -12,6 +12,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Record = deeplynx.datalayer.Models.Record;
+using deeplynx.helpers;
 
 namespace deeplynx.tests;
 
@@ -19,6 +20,7 @@ namespace deeplynx.tests;
 public class RecordBusinessTests : IntegrationTestBase
 {
     private EventBusiness _eventBusiness;
+    private SensitivityLabelBusiness _sensitivityLabelBusiness;
     private Mock<IHubContext<EventNotificationHub>> _mockHubContext = null!;
     private Mock<ILogger<NotificationBusiness>> _mockNotificationLogger = null!;
     private INotificationBusiness _notificationBusiness = null!;
@@ -53,8 +55,10 @@ public class RecordBusinessTests : IntegrationTestBase
             new NotificationBusiness(Context, _mockNotificationLogger.Object, _mockHubContext.Object);
         _mockBulkCopyUpsertExecutor = new BulkCopyUpsertExecutor();
         _eventBusiness = new EventBusiness(Context, _notificationBusiness, _mockBulkCopyUpsertExecutor);
+        _sensitivityLabelBusiness = new SensitivityLabelBusiness(Context, _eventBusiness);
         _tagBusiness = new TagBusiness(Context, _eventBusiness);
-        _recordBusiness = new RecordBusiness(Context, _eventBusiness, _mockBulkCopyUpsertExecutor, _tagBusiness);
+        _recordBusiness = new RecordBusiness(Context, _eventBusiness, _mockBulkCopyUpsertExecutor, _tagBusiness,
+            _sensitivityLabelBusiness);
     }
 
     #region RecordResponseDto Tests
@@ -229,6 +233,27 @@ public class RecordBusinessTests : IntegrationTestBase
         Context.Tags.Add(testTag);
         await Context.SaveChangesAsync();
 
+        var testRole = new Role
+        {
+            Name = "Test Role",
+            Description = "Test role for unit tests",
+            ProjectId = pid,
+            OrganizationId = organizationId,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid
+        };
+        Context.Roles.Add(testRole);
+        await Context.SaveChangesAsync();
+
+        var projectMember = new ProjectMember
+        {
+            ProjectId = pid,
+            UserId = uid,
+            RoleId = testRole.Id
+        };
+        Context.ProjectMembers.Add(projectMember);
+        await Context.SaveChangesAsync();
+
         rid = testRecord.Id;
         tid = testTag.Id;
         rprop = testRecord.Properties;
@@ -236,6 +261,95 @@ public class RecordBusinessTests : IntegrationTestBase
         rdesc = testRecord.Description;
         ruri = testRecord.Uri;
         rfiletype = testRecord.FileType;
+    }
+
+    private async Task<long> CreateRecordWithLabels(List<string> labelNames, bool giveUserAccess, string action)
+    {
+        var record = new Record
+        {
+            Name = "Test Record",
+            Description = "Test record for unit tests",
+            OriginalId = Guid.NewGuid().ToString(),
+            Properties = JsonSerializer.Serialize(new { TestProperty = "TestValue" }),
+            ProjectId = pid,
+            DataSourceId = did,
+            ClassId = cid,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            Uri = "localhost:8090",
+            FileType = "pdf",
+            OrganizationId = organizationId
+        };
+
+        Context.Records.Add(record);
+        await Context.SaveChangesAsync();
+
+        // Get the user's role ONCE before the loop
+        var roleId = await Context.ProjectMembers
+            .Where(pm => pm.ProjectId == pid && pm.UserId == uid)
+            .Select(pm => pm.RoleId)
+            .FirstOrDefaultAsync();
+
+        if (giveUserAccess && roleId == 0)
+            throw new KeyNotFoundException($"Role not found for user {uid} in project {pid}");
+
+        var role = giveUserAccess
+            ? await Context.Roles
+                .Include(r => r.Permissions)
+                .FirstOrDefaultAsync(r => r.Id == roleId)
+            : null;
+
+        if (giveUserAccess && role == null)
+            throw new KeyNotFoundException($"Role with id {roleId} not found");
+
+        foreach (var labelName in labelNames)
+        {
+            var labelDto = new CreateSensitivityLabelRequestDto
+            {
+                Name = labelName,
+                Description = labelName,
+            };
+
+            var label = await _sensitivityLabelBusiness.CreateSensitivityLabel(uid, labelDto, pid, organizationId);
+            await _recordBusiness.AttachLabel(uid, organizationId, pid, record.Id, label.Id);
+
+            if (giveUserAccess)
+            {
+                // Refresh the context to ensure we get the latest permissions created by CreateSensitivityLabel
+                await Context.Entry(role).ReloadAsync();
+
+                var permission = await Context.Permissions
+                    .AsNoTracking() // Use AsNoTracking to avoid caching issues
+                    .Where(p => p.LabelId == label.Id && p.Action == action)
+                    .FirstOrDefaultAsync();
+
+                if (permission == null)
+                    throw new KeyNotFoundException($"Permission not found for label {labelName} with action {action}");
+
+                // Re-attach the permission to this context if it's not already tracked
+                var trackedPermission = Context.Permissions.Local.FirstOrDefault(p => p.Id == permission.Id);
+                if (trackedPermission == null)
+                {
+                    Context.Attach(permission);
+                }
+                else
+                {
+                    permission = trackedPermission;
+                }
+
+                if (!role.Permissions.Any(p => p.Id == permission.Id))
+                {
+                    role.Permissions.Add(permission);
+                }
+            }
+        }
+
+        if (giveUserAccess)
+        {
+            await Context.SaveChangesAsync();
+        }
+
+        return record.Id;
     }
 
     #region GetRecordsCountByDataSource Tests
@@ -397,7 +511,7 @@ public class RecordBusinessTests : IntegrationTestBase
     public async Task GetAllRecords_ValidProjectId_ReturnsRecords()
     {
         // Act
-        var result = await _recordBusiness.GetAllRecords(organizationId, pid, null, true);
+        var result = await _recordBusiness.GetAllRecords(uid, organizationId, pid, null, true);
 
         // Assert
         Assert.NotNull(result);
@@ -409,7 +523,7 @@ public class RecordBusinessTests : IntegrationTestBase
     public async Task GetAllRecords_ReturnsTags()
     {
         // Act
-        var result = await _recordBusiness.GetAllRecords(organizationId, pid, null, true);
+        var result = await _recordBusiness.GetAllRecords(uid, organizationId, pid, null, true);
 
         // Assert
         Assert.NotNull(result);
@@ -423,7 +537,7 @@ public class RecordBusinessTests : IntegrationTestBase
     public async Task GetAllRecords_WithDataSourceId_ReturnsFilteredRecords()
     {
         // Act
-        var result = await _recordBusiness.GetAllRecords(organizationId, pid, did, true);
+        var result = await _recordBusiness.GetAllRecords(uid, organizationId, pid, did, true);
 
         // Assert
         Assert.NotNull(result);
@@ -435,16 +549,415 @@ public class RecordBusinessTests : IntegrationTestBase
     public async Task GetAllRecords_WithFileType_ReturnsFilteredRecords()
     {
         // Arrange - Make sure incorrect fileType filter results in no results (we only have 1 record seeded and its of pdf type)
-        var incorrectFileTypeResponse = await _recordBusiness.GetAllRecords(organizationId, pid, did, true, "png");
+        var incorrectFileTypeResponse = await _recordBusiness.GetAllRecords(uid, organizationId, pid, did, true, "png");
         Assert.Empty(incorrectFileTypeResponse);
 
         // Act
-        var correctFileTypeResponse = await _recordBusiness.GetAllRecords(organizationId, pid, did, true, "pdf");
+        var correctFileTypeResponse = await _recordBusiness.GetAllRecords(uid, organizationId, pid, did, true, "pdf");
 
         // Assert
         Assert.NotNull(correctFileTypeResponse);
         Assert.Single(correctFileTypeResponse);
         Assert.Equal("pdf", correctFileTypeResponse.First().FileType);
+    }
+
+    #endregion
+
+    #region GetAllRecords_SensitivityLabelsAuthorization Tests
+
+    [Fact]
+    public async Task GetAllRecords_FilterOutUnauthorizedRecordsBySensitivityLabels_ReturnsFilteredRecords()
+    {
+        // Create record with Top Secret label, but don't give user access
+        var recordWithLabel = await CreateRecordWithLabels(
+            new List<string> { "Top Secret" },
+            giveUserAccess: false,
+            action: "read"
+        );
+
+        // Record with sensitivity label should not be returned because user does not have access
+        var records = await _recordBusiness.GetAllRecords(uid, organizationId, pid, null, true);
+
+        Assert.NotNull(records);
+        Assert.DoesNotContain(records, r => r.Id == recordWithLabel);
+    }
+
+    [Fact]
+    public async Task GetAllRecords_UserHasAccessToAllLabels_ReturnsRecords()
+    {
+        // Create a label, give user permission to it, attach to record
+        var recordWithLabel = await CreateRecordWithLabels(
+            new List<string> { "Top Secret" },
+            giveUserAccess: true,
+            action: "read");
+
+        // Verify the record IS returned
+        var records = await _recordBusiness.GetAllRecords(uid, organizationId, pid, null, true);
+
+        Assert.NotNull(records);
+        Assert.Contains(records, r => r.Id == recordWithLabel);
+    }
+
+    [Fact]
+    public async Task GetAllRecords_MultipleRecordsMixedAccess_ReturnsOnlyAuthorized()
+    {
+        // Record 1: No labels (should be returned) - using the seeded record
+        var record1Id = rid;
+
+        // Record 2: Label user has access to (should be returned)
+        var record2Id = await CreateRecordWithLabels(
+            new List<string> { "Confidential" },
+            giveUserAccess: true,
+            action: "read"
+        );
+
+        // Record 3: Label user doesn't have access to (should NOT be returned)
+        var record3Id = await CreateRecordWithLabels(
+            new List<string> { "Top Secret" },
+            giveUserAccess: false,
+            action: "read"
+        );
+
+        // Act
+        var records = await _recordBusiness.GetAllRecords(uid, organizationId, pid, null, true);
+
+        // Assert
+        Assert.NotNull(records);
+        Assert.Equal(2, records.Count); // Only records 1 and 2
+        Assert.Contains(records, r => r.Id == record1Id); // No labels
+        Assert.Contains(records, r => r.Id == record2Id); // User has access
+        Assert.DoesNotContain(records, r => r.Id == record3Id); // User lacks access
+    }
+
+    [Fact]
+    public async Task GetAllRecords_RecordWithMultipleLabels_UserHasAll_ReturnsRecord()
+    {
+        // Create a record with 2 labels, give user access to BOTH
+        var recordId = await CreateRecordWithLabels(
+            new List<string> { "Confidential", "Internal" },
+            giveUserAccess: true,
+            action: "read"
+        );
+    
+        // Act
+        var records = await _recordBusiness.GetAllRecords(
+            uid, organizationId, pid, null, true);
+    
+        // Assert
+        Assert.NotNull(records);
+        Assert.Contains(records, r => r.Id == recordId);
+    
+        var returnedRecord = records.First(r => r.Id == recordId);
+        Assert.Equal(2, returnedRecord.Labels.Count);
+    }
+
+    [Fact]
+    public async Task GetAllRecords_RecordWithMultipleLabels_UserMissingOne_FiltersRecord()
+    {
+        // Create first label with access
+        var label1Dto = new CreateSensitivityLabelRequestDto
+        {
+            Name = "Public",
+            Description = "Public label"
+        };
+        var label1 = await _sensitivityLabelBusiness.CreateSensitivityLabel(uid, label1Dto, pid, organizationId);
+
+        // Give user access to first label
+        var roleId = await Context.ProjectMembers
+            .Where(pm => pm.ProjectId == pid && pm.UserId == uid)
+            .Select(pm => pm.RoleId)
+            .FirstOrDefaultAsync();
+
+        var permission1 = await Context.Permissions
+            .Where(p => p.LabelId == label1.Id && p.Action == "read")
+            .FirstOrDefaultAsync();
+
+        var role = await Context.Roles
+            .Include(r => r.Permissions)
+            .FirstOrDefaultAsync(r => r.Id == roleId);
+
+        if (!role.Permissions.Contains(permission1))
+        {
+            role.Permissions.Add(permission1);
+            await Context.SaveChangesAsync();
+        }
+
+        // Create second label WITHOUT access
+        var label2Dto = new CreateSensitivityLabelRequestDto
+        {
+            Name = "Restricted",
+            Description = "Restricted label"
+        };
+        var label2 = await _sensitivityLabelBusiness.CreateSensitivityLabel(uid, label2Dto, pid, organizationId);
+
+        // Create record with both labels
+        var record = new Record
+        {
+            Name = "Multi-Label Record",
+            Description = "Record with multiple labels",
+            OriginalId = Guid.NewGuid().ToString(),
+            Properties = JsonSerializer.Serialize(new { TestProperty = "TestValue" }),
+            ProjectId = pid,
+            DataSourceId = did,
+            ClassId = cid,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            Uri = "localhost:8090",
+            FileType = "pdf",
+            OrganizationId = organizationId
+        };
+
+        Context.Records.Add(record);
+        await Context.SaveChangesAsync();
+
+        // Attach both labels
+        await _recordBusiness.AttachLabel(uid, organizationId, pid, record.Id, label1.Id);
+        await _recordBusiness.AttachLabel(uid, organizationId, pid, record.Id, label2.Id);
+
+        // Act
+        var records = await _recordBusiness.GetAllRecords(uid, organizationId, pid, null, true);
+
+        // Assert - record should NOT be returned because user lacks access to label2
+        Assert.NotNull(records);
+        Assert.DoesNotContain(records, r => r.Id == record.Id);
+    }
+
+    [Fact]
+    public async Task GetAllRecords_WithDataSourceFilter_AndLabelAuth_ReturnsBothFiltered()
+    {
+        // Create a second data source
+        var dataSource2 = new DataSource
+        {
+            Name = "Test Data Source 2",
+            Description = "Second data source for filtering tests",
+            ProjectId = pid,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            OrganizationId = organizationId
+        };
+        Context.DataSources.Add(dataSource2);
+        await Context.SaveChangesAsync();
+
+        // Record 1: First datasource, no labels (should be returned)
+        var record1 = new Record
+        {
+            Name = "DS1 No Labels",
+            OriginalId = Guid.NewGuid().ToString(),
+            Properties = "{}",
+            ProjectId = pid,
+            DataSourceId = did,
+            ClassId = cid,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            OrganizationId = organizationId
+        };
+        Context.Records.Add(record1);
+        await Context.SaveChangesAsync();
+
+        // Record 2: Second datasource, label with access (should NOT be returned - wrong datasource)
+        var record2Id = await CreateRecordWithLabelsAndDataSource(
+            new List<string> { "Public" },
+            giveUserAccess: true,
+            action: "read",
+            dataSourceId: dataSource2.Id
+        );
+
+        // Record 3: First datasource, label without access (should NOT be returned - no label access)
+        var record3Id = await CreateRecordWithLabels(
+            new List<string> { "Secret" },
+            giveUserAccess: false,
+            action: "read"
+        );
+
+        // Act - filter by first datasource
+        var records = await _recordBusiness.GetAllRecords(uid, organizationId, pid, did, true);
+
+        // Assert
+        Assert.NotNull(records);
+        Assert.Contains(records, r => r.Id == record1.Id); // Correct datasource, no labels
+        Assert.DoesNotContain(records, r => r.Id == record2Id); // Wrong datasource
+        Assert.DoesNotContain(records, r => r.Id == record3Id); // Correct datasource, but no label access
+    }
+
+    [Fact]
+    public async Task GetAllRecords_WithFileTypeFilter_AndLabelAuth_ReturnsBothFiltered()
+    {
+        // Record 1: PDF with no labels (should be returned)
+        var record1 = new Record
+        {
+            Name = "PDF No Labels",
+            OriginalId = Guid.NewGuid().ToString(),
+            Properties = "{}",
+            ProjectId = pid,
+            DataSourceId = did,
+            ClassId = cid,
+            FileType = "pdf",
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            OrganizationId = organizationId
+        };
+        Context.Records.Add(record1);
+        await Context.SaveChangesAsync();
+
+        // Record 2: PDF with label user has access to (should be returned)
+        var record2Id = await CreateRecordWithLabelsAndFileType(
+            new List<string> { "Public" },
+            giveUserAccess: true,
+            action: "read",
+            fileType: "pdf"
+        );
+
+        // Record 3: PNG with label user has access to (should NOT be returned - wrong file type)
+        var record3Id = await CreateRecordWithLabelsAndFileType(
+            new List<string> { "Public" },
+            giveUserAccess: true,
+            action: "read",
+            fileType: "png"
+        );
+
+        // Record 4: PDF with label user doesn't have access to (should NOT be returned - no label access)
+        var record4Id = await CreateRecordWithLabelsAndFileType(
+            new List<string> { "Classified" },
+            giveUserAccess: false,
+            action: "read",
+            fileType: "pdf"
+        );
+
+        // Act - filter by PDF file type
+        var records = await _recordBusiness.GetAllRecords(uid, organizationId, pid, null, true, "pdf");
+
+        // Assert
+        Assert.NotNull(records);
+        Assert.Contains(records, r => r.Id == record1.Id); // Correct file type, no labels
+        Assert.Contains(records, r => r.Id == record2Id); // Correct file type, user has access
+        Assert.DoesNotContain(records, r => r.Id == record3Id); // Wrong file type
+        Assert.DoesNotContain(records, r => r.Id == record4Id); // Correct file type, but no label access
+    }
+
+// Helper method for datasource-specific records
+    private async Task<long> CreateRecordWithLabelsAndDataSource(
+        List<string> labelNames,
+        bool giveUserAccess,
+        string action,
+        long dataSourceId)
+    {
+        var record = new Record
+        {
+            Name = "Test Record",
+            Description = "Test record for unit tests",
+            OriginalId = Guid.NewGuid().ToString(),
+            Properties = JsonSerializer.Serialize(new { TestProperty = "TestValue" }),
+            ProjectId = pid,
+            DataSourceId = dataSourceId, // Use custom datasource
+            ClassId = cid,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            Uri = "localhost:8090",
+            FileType = "pdf",
+            OrganizationId = organizationId
+        };
+
+        Context.Records.Add(record);
+        await Context.SaveChangesAsync();
+
+        foreach (var labelName in labelNames)
+        {
+            var labelDto = new CreateSensitivityLabelRequestDto
+            {
+                Name = labelName,
+                Description = labelName,
+            };
+
+            var label = await _sensitivityLabelBusiness.CreateSensitivityLabel(uid, labelDto, pid, organizationId);
+            await _recordBusiness.AttachLabel(uid, organizationId, pid, record.Id, label.Id);
+
+            if (giveUserAccess)
+            {
+                var roleId = await Context.ProjectMembers
+                    .Where(pm => pm.ProjectId == pid && pm.UserId == uid)
+                    .Select(pm => pm.RoleId)
+                    .FirstOrDefaultAsync();
+
+                var permission = await Context.Permissions
+                    .Where(p => p.LabelId == label.Id && p.Action == action)
+                    .FirstOrDefaultAsync();
+
+                var role = await Context.Roles
+                    .Include(r => r.Permissions)
+                    .FirstOrDefaultAsync(r => r.Id == roleId);
+
+                if (!role.Permissions.Contains(permission))
+                {
+                    role.Permissions.Add(permission);
+                    await Context.SaveChangesAsync();
+                }
+            }
+        }
+
+        return record.Id;
+    }
+
+// Helper method for file type-specific records
+    private async Task<long> CreateRecordWithLabelsAndFileType(
+        List<string> labelNames,
+        bool giveUserAccess,
+        string action,
+        string fileType)
+    {
+        var record = new Record
+        {
+            Name = "Test Record",
+            Description = "Test record for unit tests",
+            OriginalId = Guid.NewGuid().ToString(),
+            Properties = JsonSerializer.Serialize(new { TestProperty = "TestValue" }),
+            ProjectId = pid,
+            DataSourceId = did,
+            ClassId = cid,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            Uri = "localhost:8090",
+            FileType = fileType, // Use custom file type
+            OrganizationId = organizationId
+        };
+
+        Context.Records.Add(record);
+        await Context.SaveChangesAsync();
+
+        foreach (var labelName in labelNames)
+        {
+            var labelDto = new CreateSensitivityLabelRequestDto
+            {
+                Name = labelName,
+                Description = labelName,
+            };
+
+            var label = await _sensitivityLabelBusiness.CreateSensitivityLabel(uid, labelDto, pid, organizationId);
+            await _recordBusiness.AttachLabel(uid, organizationId, pid, record.Id, label.Id);
+
+            if (giveUserAccess)
+            {
+                var roleId = await Context.ProjectMembers
+                    .Where(pm => pm.ProjectId == pid && pm.UserId == uid)
+                    .Select(pm => pm.RoleId)
+                    .FirstOrDefaultAsync();
+
+                var permission = await Context.Permissions
+                    .Where(p => p.LabelId == label.Id && p.Action == action)
+                    .FirstOrDefaultAsync();
+
+                var role = await Context.Roles
+                    .Include(r => r.Permissions)
+                    .FirstOrDefaultAsync(r => r.Id == roleId);
+
+                if (!role.Permissions.Contains(permission))
+                {
+                    role.Permissions.Add(permission);
+                    await Context.SaveChangesAsync();
+                }
+            }
+        }
+
+        return record.Id;
     }
 
     #endregion
@@ -455,7 +968,7 @@ public class RecordBusinessTests : IntegrationTestBase
     public async Task GetRecordsByTags_ValidProjectIdWithSingleTag_ReturnsMatchingRecords()
     {
         // Act
-        var result = await _recordBusiness.GetRecordsByTags(organizationId, pid, [tid], true);
+        var result = await _recordBusiness.GetRecordsByTags(uid, organizationId, pid, [tid], true);
 
         // Assert
         Assert.NotNull(result);
@@ -515,7 +1028,7 @@ public class RecordBusinessTests : IntegrationTestBase
         await Context.SaveChangesAsync();
 
         // Act - Query for records with both testTag AND tag2
-        var result = await _recordBusiness.GetRecordsByTags(organizationId, pid, [tid, tag2.Id], true);
+        var result = await _recordBusiness.GetRecordsByTags(uid, organizationId, pid, [tid, tag2.Id], true);
 
         // Assert - Should only get the record with ALL tags
         Assert.NotNull(result);
@@ -559,7 +1072,7 @@ public class RecordBusinessTests : IntegrationTestBase
         await Context.SaveChangesAsync();
 
         // Act - Query for records with both tags but in different valid project (pid2)
-        var result = await _recordBusiness.GetRecordsByTags(organizationId, pid2, [tid, tag2.Id], true);
+        var result = await _recordBusiness.GetRecordsByTags(uid, organizationId, pid2, [tid, tag2.Id], true);
 
         // Assert - Should return empty because records exist in pid, not pid2
         Assert.NotNull(result);
@@ -570,7 +1083,7 @@ public class RecordBusinessTests : IntegrationTestBase
     public async Task GetRecordsByTags_EmptyTagArray_ReturnsAllNonArchivedRecords()
     {
         // Act
-        var result = await _recordBusiness.GetRecordsByTags(organizationId, pid, [], true);
+        var result = await _recordBusiness.GetRecordsByTags(uid, organizationId, pid, [], true);
 
         // Assert
         Assert.NotNull(result);
@@ -605,7 +1118,7 @@ public class RecordBusinessTests : IntegrationTestBase
         await Context.SaveChangesAsync();
 
         // Act
-        var result = await _recordBusiness.GetRecordsByTags(organizationId, pid, [tid], true);
+        var result = await _recordBusiness.GetRecordsByTags(uid, organizationId, pid, [tid], true);
 
         // Assert - Should only get the non-archived seeded record
         Assert.NotNull(result);
@@ -641,7 +1154,7 @@ public class RecordBusinessTests : IntegrationTestBase
         await Context.SaveChangesAsync();
 
         // Act
-        var result = await _recordBusiness.GetRecordsByTags(organizationId, pid, [tid], false);
+        var result = await _recordBusiness.GetRecordsByTags(uid, organizationId, pid, [tid], false);
 
         // Assert - Should get both archived and non-archived records
         Assert.NotNull(result);
@@ -654,11 +1167,11 @@ public class RecordBusinessTests : IntegrationTestBase
     public async Task GetRecordsByTags_NonExistentTag_ReturnsEmpty()
     {
         // Arrange - Make sure non-existent tag results in no results
-        var nonExistentTagResult = await _recordBusiness.GetRecordsByTags(organizationId, pid, [99999], true);
+        var nonExistentTagResult = await _recordBusiness.GetRecordsByTags(uid, organizationId, pid, [99999], true);
         Assert.Empty(nonExistentTagResult);
 
         // Act - Verify correct tag returns results
-        var correctTagResult = await _recordBusiness.GetRecordsByTags(organizationId, pid, [tid], true);
+        var correctTagResult = await _recordBusiness.GetRecordsByTags(uid, organizationId, pid, [tid], true);
 
         // Assert
         Assert.NotNull(correctTagResult);
@@ -674,7 +1187,7 @@ public class RecordBusinessTests : IntegrationTestBase
     public async Task GetRecord_ValidIds_ReturnsRecord()
     {
         // Act
-        var result = await _recordBusiness.GetRecord(organizationId, pid, rid, true);
+        var result = await _recordBusiness.GetRecord(uid, organizationId, pid, rid, true);
 
         // Assert
         Assert.NotNull(result);
@@ -687,7 +1200,7 @@ public class RecordBusinessTests : IntegrationTestBase
     {
         // Act & Assert
         var exception = await Assert.ThrowsAsync<KeyNotFoundException>(() =>
-            _recordBusiness.GetRecord(organizationId, 999L, rid, true));
+            _recordBusiness.GetRecord(uid, organizationId, 999L, rid, true));
 
         Assert.Contains($"Record with id {rid} not found", exception.Message);
     }
@@ -1187,7 +1700,7 @@ public class RecordBusinessTests : IntegrationTestBase
         Assert.Equal("Updated Test Record", updatedRecord.Name);
 
         // Verify that get function gets updated version
-        var getResult = await _recordBusiness.GetRecord(organizationId, pid, rid, true);
+        var getResult = await _recordBusiness.GetRecord(uid, organizationId, pid, rid, true);
         Assert.NotNull(getResult);
         Assert.Equal("Updated Test Record", getResult.Name);
         Assert.Equal("Updated Description", getResult.Description);
@@ -1235,7 +1748,7 @@ public class RecordBusinessTests : IntegrationTestBase
         Assert.Equal(rdesc, updatedRecord.Description);
 
         // Verify that get function gets updated version
-        var getResult = await _recordBusiness.GetRecord(organizationId, pid, rid, true);
+        var getResult = await _recordBusiness.GetRecord(uid, organizationId, pid, rid, true);
         Assert.NotNull(getResult);
         Assert.Equal("New-ish Test Record", getResult.Name);
         Assert.Equal(rdesc, getResult.Description);
@@ -1361,7 +1874,7 @@ public class RecordBusinessTests : IntegrationTestBase
         var exception = await Assert.ThrowsAsync<KeyNotFoundException>(() =>
             _recordBusiness.DeleteRecord(uid, organizationId, pid, 999L));
 
-        Assert.Contains("Record with id 999 not found", exception.Message);
+        Assert.Contains("Record with id 999 is archived or not found", exception.Message);
     }
 
     #endregion
@@ -1670,7 +2183,7 @@ public class RecordBusinessTests : IntegrationTestBase
         await Context.SaveChangesAsync();
 
         // Act
-        var result = await _recordBusiness.AttachTag(organizationId, pid, record.Id, newTag.Id);
+        var result = await _recordBusiness.AttachTag(uid, organizationId, pid, record.Id, newTag.Id);
 
         // Assert
         Assert.True(result);
@@ -1695,7 +2208,7 @@ public class RecordBusinessTests : IntegrationTestBase
         await Context.SaveChangesAsync();
 
         // Act
-        var result = await _recordBusiness.AttachTag(organizationId, pid, record.Id, newTag.Id);
+        var result = await _recordBusiness.AttachTag(uid, organizationId, pid, record.Id, newTag.Id);
 
         // Assert
         Assert.True(result);
@@ -1708,7 +2221,7 @@ public class RecordBusinessTests : IntegrationTestBase
     {
         // Act & Assert
         var exception = await Assert.ThrowsAsync<KeyNotFoundException>(() =>
-            _recordBusiness.AttachTag(organizationId, pid, 9999L, tid));
+            _recordBusiness.AttachTag(uid, organizationId, pid, 9999L, tid));
 
         Assert.Contains("Record with id 9999 not found", exception.Message);
     }
@@ -1718,9 +2231,10 @@ public class RecordBusinessTests : IntegrationTestBase
     {
         // Act & Assert
         var exception = await Assert.ThrowsAsync<KeyNotFoundException>(() =>
-            _recordBusiness.AttachTag(organizationId, pid, rid, 9999L));
+            _recordBusiness.AttachTag(uid, organizationId, pid, rid, 9999L));
 
-        Assert.Contains("Tag with id 9999 not found or is archived.", exception.Message);
+        Assert.Contains("Tag with id 9999 not found, is archived, or does not belong to this organization/project.",
+            exception.Message);
     }
 
     [Fact]
@@ -1728,7 +2242,7 @@ public class RecordBusinessTests : IntegrationTestBase
     {
         // Act & Assert
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            _recordBusiness.AttachTag(organizationId, pid, rid, tid));
+            _recordBusiness.AttachTag(uid, organizationId, pid, rid, tid));
 
         Assert.Contains($"Tag with id {tid} is already attached to record {rid}", exception.Message);
     }
@@ -1744,7 +2258,7 @@ public class RecordBusinessTests : IntegrationTestBase
         Context.ChangeTracker.Clear();
 
         // Act
-        var result = await _recordBusiness.UnattachTag(organizationId, pid, record.Id, tid);
+        var result = await _recordBusiness.UnattachTag(uid, organizationId, pid, record.Id, tid);
 
         // Assert
         Assert.True(result);
@@ -1757,7 +2271,7 @@ public class RecordBusinessTests : IntegrationTestBase
     {
         // Act & Assert
         var exception = await Assert.ThrowsAsync<KeyNotFoundException>(() =>
-            _recordBusiness.UnattachTag(organizationId, pid, 9999L, tid));
+            _recordBusiness.UnattachTag(uid, organizationId, pid, 9999L, tid));
 
         Assert.Contains("Record with id 9999 not found or is archived.", exception.Message);
     }
@@ -1767,9 +2281,9 @@ public class RecordBusinessTests : IntegrationTestBase
     {
         // Act & Assert
         var exception = await Assert.ThrowsAsync<KeyNotFoundException>(() =>
-            _recordBusiness.UnattachTag(organizationId, pid, rid, 9999L));
+            _recordBusiness.UnattachTag(uid, organizationId, pid, rid, 9999L));
 
-        Assert.Contains("Tag with id 9999 not found or is archived.", exception.Message);
+        Assert.Contains("Tag with id 9999 is not attached to record", exception.Message);
     }
 
     #endregion
@@ -1780,7 +2294,7 @@ public class RecordBusinessTests : IntegrationTestBase
     public async Task GetRecordsByOriginalId_ValidOriginalIds_ReturnsMatchingRecords()
     {
         // Act
-        var result = await _recordBusiness.GetRecordsByOriginalId(organizationId, pid, ["og_id"]);
+        var result = await _recordBusiness.GetRecordsByOriginalId(uid, organizationId, pid, ["og_id"]);
 
         // Assert
         Assert.Equal(1, result.Count);
@@ -1794,9 +2308,9 @@ public class RecordBusinessTests : IntegrationTestBase
         // Act & Assert
         var exception =
             await Assert.ThrowsAsync<KeyNotFoundException>(() =>
-                _recordBusiness.GetRecordsByOriginalId(organizationId, pid, ["non-existent-id"]));
+                _recordBusiness.GetRecordsByOriginalId(uid, organizationId, pid, ["non-existent-id"]));
 
-        Assert.Contains("Records not found with original IDs", exception.Message);
+        Assert.Contains("Records not found or access is unauthorized with original IDs", exception.Message);
     }
 
     [Fact]
@@ -1804,7 +2318,7 @@ public class RecordBusinessTests : IntegrationTestBase
     {
         // Act & Assert
         await Assert.ThrowsAsync<ArgumentException>(() =>
-            _recordBusiness.GetRecordsByOriginalId(organizationId, pid, null));
+            _recordBusiness.GetRecordsByOriginalId(uid, organizationId, pid, null));
     }
 
     [Fact]
@@ -1818,7 +2332,7 @@ public class RecordBusinessTests : IntegrationTestBase
         // Act & Assert
         var exception =
             await Assert.ThrowsAsync<KeyNotFoundException>(() =>
-                _recordBusiness.GetRecordsByOriginalId(organizationId, pid, ["og_id"]));
+                _recordBusiness.GetRecordsByOriginalId(uid, organizationId, pid, ["og_id"]));
 
         Assert.Contains("og_id", exception.Message);
     }
@@ -1829,9 +2343,9 @@ public class RecordBusinessTests : IntegrationTestBase
         // Act & Assert
         var exception =
             await Assert.ThrowsAsync<KeyNotFoundException>(() =>
-                _recordBusiness.GetRecordsByOriginalId(organizationId, 999L, ["some-id"]));
+                _recordBusiness.GetRecordsByOriginalId(uid, organizationId, 999L, ["some-id"]));
 
-        Assert.Contains("Records not found with original IDs", exception.Message);
+        Assert.Contains("Records not found or access is unauthorized with original IDs", exception.Message);
     }
 
     #endregion

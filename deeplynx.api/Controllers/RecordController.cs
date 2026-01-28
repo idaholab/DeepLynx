@@ -58,8 +58,9 @@ public class RecordController : ControllerBase
     {
         try
         {
+            var currentUserId = UserContextStorage.UserId;
             var records =
-                await _recordBusiness.GetAllRecords(organizationId, projectId, dataSourceId, hideArchived, fileType);
+                await _recordBusiness.GetAllRecords(currentUserId, organizationId, projectId, dataSourceId, hideArchived, fileType);
             return Ok(records);
         }
         catch (Exception exc)
@@ -89,7 +90,8 @@ public class RecordController : ControllerBase
     {
         try
         {
-            var records = await _recordBusiness.GetRecordsByTags(organizationId, projectId, tagIds, hideArchived);
+            var currentUserId = UserContextStorage.UserId;
+            var records = await _recordBusiness.GetRecordsByTags(currentUserId, organizationId, projectId, tagIds, hideArchived);
             return Ok(records);
         }
         catch (Exception exc)
@@ -118,7 +120,8 @@ public class RecordController : ControllerBase
     {
         try
         {
-            var record = await _recordBusiness.GetRecord(organizationId, projectId, recordId, hideArchived);
+            var currentUserId = UserContextStorage.UserId;
+            var record = await _recordBusiness.GetRecord(currentUserId, organizationId, projectId, recordId, hideArchived);
             return Ok(record);
         }
         catch (Exception exc)
@@ -337,7 +340,8 @@ public class RecordController : ControllerBase
     {
         try
         {
-            await _recordBusiness.AttachTag(organizationId, projectId, recordId, tagId);
+            var currentUserId = UserContextStorage.UserId;
+            await _recordBusiness.AttachTag(currentUserId, organizationId, projectId, recordId, tagId);
             return Ok(new { message = $"Tag {tagId} attached to record {recordId}" });
         }
         catch (Exception exc)
@@ -367,7 +371,8 @@ public class RecordController : ControllerBase
     {
         try
         {
-            await _recordBusiness.UnattachTag(organizationId, projectId, recordId, tagId);
+            var currentUserId = UserContextStorage.UserId;
+            await _recordBusiness.UnattachTag(currentUserId, organizationId, projectId, recordId, tagId);
             return Ok(new { message = $"Tag {tagId} unattached from record {recordId}" });
         }
         catch (Exception exc)
