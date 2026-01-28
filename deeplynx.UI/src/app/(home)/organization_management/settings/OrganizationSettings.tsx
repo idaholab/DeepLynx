@@ -370,7 +370,7 @@ const OrganizationSettings = () => {
                   </div>
                 </div>
 
-                {/* Banner Text Section - NOW ACTIVE */}
+                {/* Banner Text Section */}
                 <div className="divider"></div>
                 <div className="relative">
                   <div className="form-control">

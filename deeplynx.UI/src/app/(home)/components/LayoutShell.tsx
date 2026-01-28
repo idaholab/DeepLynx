@@ -32,7 +32,7 @@ import {
   getOrganizationLogoUrl,
 } from "@/app/lib/client_service/organization_services.client";
 import TopBanner from "./VulnerabilityBanner";
-import { OrganizationBanner } from "./OrganizationBanner";
+import { Banner } from "./Banner";
 
 const LayoutShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { t } = useLanguage();
@@ -273,6 +273,7 @@ const LayoutShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             </ul>
           )}
         </div>
+        somewhere here
         <div>
           <Image
             src="/assets/nexusWhite.png"
@@ -426,7 +427,7 @@ const LayoutShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         >
           {/* Organization Banner - appears below header, above content */}
           <div className="sticky top-25 z-20">
-            <OrganizationBanner />
+            <Banner />
           </div>
 
           {/* Page Content */}

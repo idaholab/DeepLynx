@@ -9,6 +9,12 @@ interface ProjectLogoSectionProps {
   logoPreview: string | null;
   logoFile: File | null;
   isUploading: boolean;
+  bannerText: string;
+  setBannerText: (value: string) => void;
+  isSavingBanner: boolean;
+  originalBannerText: string;
+  onSaveBanner: () => void;
+  onCancelBanner: () => void;
   onLogoChange: (fileList: FileList | null) => void;
   onUploadLogo: () => void;
   onCancelSelection: () => void;
@@ -16,11 +22,17 @@ interface ProjectLogoSectionProps {
   t: { translations: Record<string, string> };
 }
 
-const ProjectLogoSection = ({
+const ProjectSettingsLeftColumn = ({
   project,
   logoPreview,
   logoFile,
   isUploading,
+  bannerText,
+  setBannerText,
+  isSavingBanner,
+  originalBannerText,
+  onSaveBanner,
+  onCancelBanner,
   onLogoChange,
   onUploadLogo,
   onCancelSelection,
@@ -117,30 +129,82 @@ const ProjectLogoSection = ({
               </span>
             </div>
           )}
+        </div>
+      </div>
+    </div>
 
-          <div className="text-xs text-base-content/60 bg-base-200 p-3 rounded-lg">
-            <p className="font-semibold mb-1">
-              {t.translations.LOGO_GUIDLINES}:
-            </p>
-            <ul className="list-disc list-inside space-y-1">
-              <li>
-                {
-                  t.translations
-                    .REPLACES_THE_FOLDER_ICON_NEXT_TO_THE_PROJECT_NAME
-                }
-              </li>
-              <li>
-                {t.translations.RECOMMENDED_PNG_WITH_TRANSPARENT_BACKGROUND}
-              </li>
-              <li>{t.translations.OPTIMAL_SIZE_FOR_LOGO}</li>
-              <li>{t.translations.FILE_SIZE_MUST_BE_5MB}</li>
-              <li>{t.translations.SUPPORTED_FORMATS_FOR_LOGO}</li>
-            </ul>
+    <div className="divider px-4"></div>
+
+    <div className="card bg-base-100 shadow-sm">
+      <div className="card-body">
+        <h3 className="card-title text-lg mb-4">
+          {t.translations.PROJECT_WARNING_BANNER}
+        </h3>
+
+        <div className="form-control">
+          <div>
+            <label className="label mr-4">
+              <span className="label-text font-semibold">
+                {t.translations.BANNER_TEXT}
+              </span>
+            </label>
+            <textarea
+              className="textarea textarea-bordered min-h-20"
+              placeholder={t.translations.BANNER_EXAMPLE_CUI}
+              value={bannerText}
+              onChange={(e) => setBannerText(e.target.value)}
+              disabled={isSavingBanner}
+              maxLength={240}
+            />
           </div>
+
+          <label className="label">
+            <span className="label-text-alt text-base-content/60">
+              {
+                t.translations
+                  .DISPLAY_BENEATH_THE_TOP_HEADER_FOR_ALL_PAGES_IN_PROJECT
+              }
+            </span>
+            <span
+              className={`label-text-alt mt-4 ${bannerText.length > 50 ? "text-error" : "text-base-content/40"}`}
+            >
+              {bannerText.length} / 50
+            </span>
+          </label>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex gap-2 mt-4">
+          <button
+            type="button"
+            className="btn btn-primary btn-sm"
+            onClick={onSaveBanner}
+            disabled={
+              isSavingBanner ||
+              bannerText === originalBannerText ||
+              bannerText.length > 240
+            }
+          >
+            {isSavingBanner && (
+              <span className="loading loading-spinner loading-xs" />
+            )}
+            {t.translations.SAVE}
+          </button>
+
+          {bannerText !== originalBannerText && (
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
+              onClick={onCancelBanner}
+              disabled={isSavingBanner}
+            >
+              {t.translations.CANCEL}
+            </button>
+          )}
         </div>
       </div>
     </div>
   </div>
 );
 
-export default ProjectLogoSection;
+export default ProjectSettingsLeftColumn;

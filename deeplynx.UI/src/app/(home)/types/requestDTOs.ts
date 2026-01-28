@@ -184,7 +184,7 @@ export type UpdateProjectRequestDto = {
   name?: string;
   description?: string;
   abbreviation?: string;
-  banner?: string;
+  banner?: string | null;
 };
 
 export type CreateRecordRequestDto = {

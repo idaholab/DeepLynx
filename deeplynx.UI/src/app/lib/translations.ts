@@ -480,7 +480,9 @@ export const translations = {
             FAILED_TO_UPDATE_BANNER: "Failed to update banner",
             CHANGES_DISCARDED: "Changes discarded",
 
-
+            PROJECT_WARNING_BANNER: "Project Warning Banner",
+            BANNER_TEXT: "Banner Text",
+            DISPLAY_BENEATH_THE_TOP_HEADER_FOR_ALL_PAGES_IN_PROJECT: "Display beneath the top header for all pages in this project",
 
 
         }
@@ -977,6 +979,9 @@ export const translations = {
             FAILED_TO_UPDATE_BANNER: "No se pudo actualizar el banner",
             CHANGES_DISCARDED: "Cambios descartados",
             
+            PROJECT_WARNING_BANNER: "Banner de advertencia del proyecto",
+            BANNER_TEXT: "Texto del banner",
+            DISPLAY_BENEATH_THE_TOP_HEADER_FOR_ALL_PAGES_IN_PROJECT: "Se muestra debajo del encabezado superior en todas las páginas de este proyecto",
 
 
         }
