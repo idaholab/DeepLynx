@@ -9,6 +9,7 @@ using deeplynx.models.Configuration;
 using DotNetEnv;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Newtonsoft.Json;
 using JsonSerializer = System.Text.Json.JsonSerializer;
 
 namespace deeplynx.business;
@@ -813,28 +814,41 @@ public class ProjectBusiness : IProjectBusiness
         // TODO: project config should determine whether to do this (true by default)
         Env.Load("../.env");
         var defaultObjectStorageMethod = Environment.GetEnvironmentVariable("FILE_STORAGE_METHOD");
-
-        var config = new JsonObject();
+        var configDto = new ObjectStorageConfigDto();
         if (defaultObjectStorageMethod == "filesystem")
         {
             var mountPath =
-                Environment.GetEnvironmentVariable("STORAGE_DIRECTORY") ??
-                throw new NullReferenceException("Storage file path not set");
-            config["mountPath"] = mountPath;
+                Environment.GetEnvironmentVariable("STORAGE_DIRECTORY");
+            
+            if (string.IsNullOrWhiteSpace(mountPath))
+                throw new ArgumentException($"STORAGE_DIRECTORY is null or white space, please check your environment variables.");
+            
+            configDto.MountPath = mountPath;
         }
         else if (defaultObjectStorageMethod == "azure_object")
         {
-            var azureConnectionString =
-                Environment.GetEnvironmentVariable("AZURE_OBJECT_CONNECTION_STRING") ??
-                throw new NullReferenceException("Azure connection string not set");
-            config["azureConnectionString"] = azureConnectionString;
+            var azureConnectionString = Environment.GetEnvironmentVariable("AZURE_OBJECT_CONNECTION_STRING");
+            if (string.IsNullOrWhiteSpace(azureConnectionString))
+                throw new ArgumentException("AZURE_OBJECT_CONNECTION_STRING is null or white space, please check your environment variables.");
+
+            var azureContainerName = Environment.GetEnvironmentVariable("AZURE_CONTAINER_NAME");
+            if (string.IsNullOrWhiteSpace(azureContainerName))
+                throw new ArgumentException("AZURE_CONTAINER_NAME is null or white space, please check your environment variables.");
+            
+            configDto.AzureObjectConfig = new AzureObjectConfigDto()
+            {
+                AzureConnectionString = azureConnectionString,
+                AzureContainerName = azureContainerName
+            };
         }
         else if (defaultObjectStorageMethod == "aws_s3")
         {
             var awsConnectionString =
-                Environment.GetEnvironmentVariable("AWS_S3_CONNECTION_STRING") ??
-                throw new NullReferenceException("AWS connection string not set");
-            config["awsConnectionString"] = awsConnectionString;
+                Environment.GetEnvironmentVariable("AWS_S3_CONNECTION_STRING");
+            if (string.IsNullOrWhiteSpace(awsConnectionString))
+                throw new ArgumentException("AWS_S3_CONNECTION_STRING is null or white space, please check your environment variables.");
+            
+            configDto.AwsConnectionString = awsConnectionString;
         }
         else
         {
@@ -845,7 +859,7 @@ public class ProjectBusiness : IProjectBusiness
         var objectStorageRequestDto = new CreateObjectStorageRequestDto
         {
             Name = "Instance Default",
-            Config = config,
+            Config = configDto,
             Default = true
         };
         await _objectStorageBusiness.CreateObjectStorage(
@@ -855,15 +869,21 @@ public class ProjectBusiness : IProjectBusiness
         // CREATE DEFAULT TIMESERIES MOUNT
         // ===============================
         // TODO: project config should determine whether to do this (true by default)
+        
+        var duckdbMountPath = Environment.GetEnvironmentVariable("DUCKDB_BASE_PATH");
+        if (string.IsNullOrWhiteSpace(duckdbMountPath))
+            throw new ArgumentException("Duckdb mount path not set or is white space, check your environment variables.");
+        
         var timeseriesObjectStorageMethod = new CreateObjectStorageRequestDto
         {
             Name = "Timeseries Default",
-            Config = new JsonObject
+            Config = new ObjectStorageConfigDto()
             {
-                ["mountPath"] = Environment.GetEnvironmentVariable("DUCKDB_BASE_PATH") ?? "/data/duckdb"
+                MountPath = duckdbMountPath
             }
         };
-        var obj = await _objectStorageBusiness.CreateObjectStorage(currentUserId, organizationId, projectId,
+        
+        await _objectStorageBusiness.CreateObjectStorage(currentUserId, organizationId, projectId,
             timeseriesObjectStorageMethod);
 
         // ===============================

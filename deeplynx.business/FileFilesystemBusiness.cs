@@ -81,7 +81,7 @@ public class FileFilesystemBusiness : IFileBusiness
     /// <exception cref="ArgumentException"></exception>
     /// <exception cref="FileNotFoundException"></exception>
     /// <exception cref="DirectoryNotFoundException"></exception>
-    public async Task<string> UpdateFile(RecordResponseDto record, IFormFile file)
+    public async Task<string> UpdateFile(RecordResponseDto record, ObjectStorageConfigDto objectStorageConfig, IFormFile file, Guid guid)
     {
         var filePath = record.Uri;
 
@@ -95,7 +95,7 @@ public class FileFilesystemBusiness : IFileBusiness
         if (directory == null || !Directory.Exists(directory))
             throw new DirectoryNotFoundException("Directory not found.");
 
-        var newFileName = $"{record.OriginalId}_{file.FileName}";
+        var newFileName = $"{guid}_{file.FileName}";
 
         var updatedPath = Path.Combine(directory, newFileName);
 
@@ -115,10 +115,11 @@ public class FileFilesystemBusiness : IFileBusiness
     ///     Downloads a file from local file storage
     /// </summary>
     /// <param name="record">The record that has the file info</param>
+    /// <param name="objectStorageConfig">The configuration data of the object storage</param>
     /// <returns></returns>
     /// <exception cref="ArgumentException"></exception>
     /// <exception cref="FileNotFoundException"></exception>
-    public async Task<FileStreamResult> DownloadFile(RecordResponseDto record)
+    public async Task<FileStreamResult> DownloadFile(RecordResponseDto record, ObjectStorageConfigDto objectStorageConfig)
     {
         var filePath = record.Uri;
         if (filePath == null) throw new ArgumentNullException("File path/uri is not specified in the record.");
@@ -145,10 +146,11 @@ public class FileFilesystemBusiness : IFileBusiness
     ///     Deletes a file from local file storage
     /// </summary>
     /// <param name="record">Record that contains file info</param>
+    /// <param name="objectStorageConfig">Contains the config info</param>
     /// <returns></returns>
     /// <exception cref="ArgumentException"></exception>
     /// <exception cref="FileNotFoundException"></exception>
-    public async Task<bool> DeleteFile(RecordResponseDto record)
+    public async Task<bool> DeleteFile(RecordResponseDto record, ObjectStorageConfigDto objectStorageConfig)
     {
         var filePath = record.Uri;
         if (string.IsNullOrWhiteSpace(filePath))
@@ -157,20 +159,14 @@ public class FileFilesystemBusiness : IFileBusiness
         if (!File.Exists(filePath)) throw new FileNotFoundException("The file to update does not exist.", filePath);
 
         File.Delete(filePath);
-
-        var objectStorage = await _context.ObjectStorages.FirstOrDefaultAsync(os =>
-            os.ProjectId == record.ProjectId && os.Id == record.ObjectStorageId && !os.IsArchived);
-
-        if (objectStorage == null) throw new Exception("Object storage does not exist.");
-        var configData = JsonConvert.DeserializeObject<ObjectStorageConfigDto>(objectStorage.Config);
-
+        
         var directory = Path.GetDirectoryName(filePath);
 
-        if (configData == null || configData.MountPath == null)
+        if (objectStorageConfig.MountPath == null)
             throw new Exception("File system mount path not set in object storage");
 
         // Normalize paths for comparison
-        var normalizedBasePath = Path.GetFullPath(configData.MountPath).TrimEnd(Path.DirectorySeparatorChar);
+        var normalizedBasePath = Path.GetFullPath(objectStorageConfig.MountPath).TrimEnd(Path.DirectorySeparatorChar);
 
         // deletes all empty directories up to but not including the base path
         while (!string.IsNullOrEmpty(directory) &&

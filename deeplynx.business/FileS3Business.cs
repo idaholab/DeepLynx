@@ -13,12 +13,12 @@ public class FileS3Business:  IFileBusiness
         return "";
     }
 
-    public async Task<string> UpdateFile(RecordResponseDto record, IFormFile file)
+    public async Task<string> UpdateFile(RecordResponseDto record, ObjectStorageConfigDto objectStorageConfig, IFormFile file, Guid guid)
     {
         return "";
     }
 
-    public async Task<FileStreamResult> DownloadFile(RecordResponseDto record)
+    public async Task<FileStreamResult> DownloadFile(RecordResponseDto record,  ObjectStorageConfigDto objectStorageConfig)
     {
         // Create a simple stub with empty content
         var emptyStream = new MemoryStream();
@@ -28,7 +28,7 @@ public class FileS3Business:  IFileBusiness
         };
     }
 
-    public async Task<bool> DeleteFile(RecordResponseDto record)
+    public async Task<bool> DeleteFile(RecordResponseDto record, ObjectStorageConfigDto objectStorageConfig)
     {
         return true;
     }
