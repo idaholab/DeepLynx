@@ -1,17 +1,15 @@
 'use client';
-import React, { useRef, useState } from 'react'
-import ProjectDropdown from '../components/ProjectDropdown';
+import React, { useEffect, useState } from 'react'
 import Tabs from '../components/Tabs';
 import { useLanguage } from '@/app/contexts/Language';
 import { useOrganizationSession } from '@/app/contexts/OrganizationSessionProvider';
 import EChartsLineChart from './LineChart';
+import Heatmap from './HeatMap';
 import { ArrowDownTrayIcon } from '@heroicons/react/24/outline';
 import * as echarts from 'echarts';
-import { queryBuilder } from '@/app/lib/client_service/query_services.client';
-import { QueryBuilderQuery } from '../types/types';
-import { CustomQueryRequestDto } from '../types/requestDTOs';
 import { useProjectSession } from '@/app/contexts/ProjectSessionProvider';
 import { HistoricalRecordResponseDto } from '../types/responseDTOs';
+import { getTimeseriesPlotData } from '@/app/lib/client_service/timeseries_services.client';
 
 type Props = {
     timeseriesFiles: HistoricalRecordResponseDto[]
@@ -22,142 +20,126 @@ export default function TimeseriesViewerClient({ timeseriesFiles }: Props) {
     const { organization } = useOrganizationSession();
     const { project } = useProjectSession();
     const [activeTab, setActiveTab] = useState("");
-    const [files, setFiles] = useState<HistoricalRecordResponseDto[]>(timeseriesFiles);
+    const [activeFile, setActiveFile] = useState<HistoricalRecordResponseDto | null>(null);
+    const [loading, setLoading] = useState(false);
+    const [visibleSeries, setVisibleSeries] = useState<Record<string, boolean>>({});
+    const [schema, setSchema] = useState<string[]>();
+    const [limit, setLimit] = useState<number>(20);
+    const [rowStride, setRowStride] = useState<number>(4);
+    const [selectedXAxis, setSelectedXAxis] = useState<string>("");
+    const [selectedYAxes, setSelectedYAxes] = useState<string[]>([]);
+    const [chartType, setChartType] = useState<'2d-line' | 'heatmap'>('2d-line');
+    const isReadyToLoad = activeFile !== null && selectedXAxis !== "" && selectedYAxes.length > 0;
+
+
+    const [timeseriesData, setTimeseriesData] = useState<Array<{
+        name: string;
+        values: (string | number)[];
+    }>>([]);
+
+    const loadTimeseriesData = async (datasourceId: number, recordId: number, limitValue: number, rowStrideValue: number) => {
+        try {
+            setLoading(true);
+
+            const plotData = await getTimeseriesPlotData(
+                Number(organization?.organizationId),
+                Number(project?.projectId),
+                datasourceId,
+                recordId,
+                limitValue,
+                rowStrideValue
+            );
+
+            const { columns, data } = plotData;
+            setSchema(columns)
+
+            const transformed = columns.map((colName, colIndex) => ({
+                name: colName,
+                values: data.map(row => row[colIndex])
+            }));
+
+            setTimeseriesData(transformed);
+
+            // Set default X axis (first column)
+            if (transformed.length > 0) {
+                setSelectedXAxis(transformed[0].name);
+            }
+
+            // Set default Y axes (all columns except first)
+            if (transformed.length > 1) {
+                const yAxisOptions = transformed.slice(1).map(s => s.name);
+                setSelectedYAxes(yAxisOptions);
+            }
+
+            // Set all series as visible
+            const newVisibleSeries: Record<string, boolean> = {};
+            transformed.slice(1).forEach(series => {
+                newVisibleSeries[series.name] = true;
+            });
+            setVisibleSeries(newVisibleSeries);
+
+        } catch (err) {
+            console.error("Error loading timeseries data:", err);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const filteredTimeseriesData = React.useMemo(() => {
+        if (!selectedXAxis || selectedYAxes.length === 0) return [];
+
+        const xAxisData = timeseriesData.find(col => col.name === selectedXAxis);
+        const yAxisData = timeseriesData.filter(col => selectedYAxes.includes(col.name));
+
+        if (!xAxisData) return [];
+        return [xAxisData, ...yAxisData];
+    }, [timeseriesData, selectedXAxis, selectedYAxes]);
+
+    // Load data when activeFile changes
+    useEffect(() => {
+        if (activeFile?.dataSourceId && activeFile?.id) {
+            loadTimeseriesData(activeFile.dataSourceId, activeFile.id, limit, rowStride);
+        }
+    }, [activeFile, limit, rowStride]);
 
     // ============================================
-    // CHART CONFIGURATION - Replace with backend data
+    // CHART CONFIGURATION
     // ============================================
-    const chartTitle = "Temperature & Data Monitoring";
-    const xAxisName = "Time Points";
-
-    //Using query builder to grab Timeseries files for now
-    const dto: CustomQueryRequestDto = {
-        filter: "class_name",
-        operator: '=',
-        value: "Timeseries"
-    }
+    const chartTitle = activeFile?.name || "Chart";
+    const xAxisName = selectedXAxis || "X Axis";
 
     const yAxisConfigs = [
         {
-            name: 'Temperature (K)',
+            name: "Y Axis",
             position: 'left' as const,
             formatter: '{value}K'
-        },
-        {
-            name: 'Data Values',
-            position: 'right' as const,
-            formatter: '{value}',
-            min: 0,
-            max: 6
         }
     ];
 
-    const seriesYAxisMapping: Record<string, number> = {
-        'Temperature (K)': 0,
-        'Data_1': 1,
-        'Data_2': 1,
-        'Data_3': 1,
-        'Data_4': 1,
-        'Data_5': 1
-    };
-
-    // CSV data converted to timeseries format
-    const timeseriesData = [
-        {
-            "name": "time_x",
-            "values": Array(101).fill(0).map((_, i) => `Point ${i + 1}`)
-        },
-        {
-            "name": "Temperature (K)",
-            "values": [
-                912.01, 895.58, 914.13, 911.14, 934.53, 899.63, 877.43, 903.92, 879.81, 899.08,
-                882.6, 937.65, 931.76, 875.54, 898.76, 967.42, 874.32, 949.69, 901.21, 877.24,
-                891.18, 885.95, 950.3, 940, 898.78, 911.82, 877.1, 945.57, 890.16, 942.95,
-                972.28, 933.17, 929.19, 955.62, 898.11, 893.58, 932.34, 961.13, 947.5, 873.93,
-                922.77, 959.06, 924.29, 892.76, 942.11, 899.31, 935.92, 957.9, 958.69, 901.49,
-                954.18, 905.93, 968.97, 939.75, 971.81, 919.62, 939.75, 892.92, 909.82, 879.83,
-                970.61, 886.75, 925.72, 920.99, 967.67, 967.62, 956.61, 881.43, 955.91, 882.54,
-                886.4, 874.96, 935.11, 897.41, 913.33, 944.22, 928.71, 875.64, 882.9, 961.1,
-                917.03, 941.35, 972.27, 961.29, 907.68, 893.73, 900.98, 944.16, 934.28, 957.76,
-                898.07, 943.96, 899.57, 920.43, 915.27, 944.75, 917.49, 922.39, 967.65, 931.91, 938.93
-            ]
-        },
-        {
-            "name": "Data_1",
-            "values": Array(101).fill(1)
-        },
-        {
-            "name": "Data_2",
-            "values": Array(101).fill(2)
-        },
-        {
-            "name": "Data_3",
-            "values": Array(101).fill(3)
-        },
-        {
-            "name": "Data_4",
-            "values": Array(101).fill(4)
-        },
-        {
-            "name": "Data_5",
-            "values": Array(101).fill(5)
-        }
-    ];
-
-    const availableFiles = [
-        { name: 'temperature_data_2024_01.csv', date: '2024-01-15', size: '2.4 MB' },
-        { name: 'temperature_data_2024_02.csv', date: '2024-02-12', size: '2.1 MB' },
-        { name: 'temperature_data_2024_03.csv', date: '2024-03-10', size: '2.6 MB' },
-        { name: 'sensor_readings_q1.csv', date: '2024-03-31', size: '5.2 MB' },
-        { name: 'sensor_readings_q2.csv', date: '2024-06-30', size: '4.8 MB' },
-    ];
-    // ============================================
-    // END CHART CONFIGURATION
-    // ============================================
-
-    // Time range state
-    const [startDate, setStartDate] = useState('2024-01-01T00:00');
-    const [endDate, setEndDate] = useState('2024-01-07T23:59');
-    const [sliderStart, setSliderStart] = useState(0);
-    const [sliderEnd, setSliderEnd] = useState(100);
-    const [dataZoom, setDataZoom] = useState({ start: 0, end: 100, show: true });
-
-    // Chart settings
-    const [showMarkPoints, setShowMarkPoints] = useState(true);
-    const [showMarkLines, setShowMarkLines] = useState(true);
-
-    // File selection
-    const [selectedFile, setSelectedFile] = useState('temperature_data_2024_01.csv');
-
-    // Series visibility - default all visible
-    const [visibleSeries, setVisibleSeries] = useState<Record<string, boolean>>({
-        'Temperature (K)': true,
-        'Data_1': true,
-        'Data_2': true,
-        'Data_3': true,
-        'Data_4': true,
-        'Data_5': true
+    const seriesYAxisMapping: Record<string, number> = {};
+    timeseriesData.slice(1).forEach(series => {
+        seriesYAxisMapping[series.name] = 0;
     });
 
-    // Toggle series visibility
-    const toggleSeries = (seriesName: string) => {
-        setVisibleSeries(prev => ({
-            ...prev,
-            [seriesName]: !prev[seriesName]
-        }));
-    };
+    // ============================================
+    // CHART TOGGLES
+    // ============================================
+    const [dataZoom, setDataZoom] = useState({ start: 0, end: 100, show: true });
+    const [showMarkPoints, setShowMarkPoints] = useState(true);
 
-    const handleApplyTimeRange = () => {
-        setDataZoom({
-            start: sliderStart,
-            end: sliderEnd,
-            show: true
-        });
-    };
+    // Also update seriesYAxisMapping dynamically
+    useEffect(() => {
+        if (timeseriesData.length > 0) {
+            const newMapping: Record<string, number> = {};
+            timeseriesData.slice(1).forEach(series => {
+                newMapping[series.name] = 0;
+            });
+        }
+    }, [timeseriesData]);
 
     const handleExport = (format: 'csv' | 'png' | 'pdf') => {
         if (format === 'png') {
-            const chartDiv = document.querySelector('.echarts-timeseries-chart') as HTMLDivElement;
+            const chartDiv = document.querySelector('.echarts-timeseries-chart, .echarts-heatmap-chart') as HTMLDivElement;
             if (chartDiv) {
                 const chartInstance = echarts.getInstanceByDom(chartDiv);
                 if (chartInstance) {
@@ -203,27 +185,26 @@ export default function TimeseriesViewerClient({ timeseriesFiles }: Props) {
     };
 
     // Tab content components
-    const TimeRangeTab = () => (
+    const SetUpTab = () => (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Available Data Files */}
+            {/* Available Data Files - Row 1, Col 1 */}
             <div className="lg:col-span-1">
                 <div className="card bg-base-100 shadow-xl">
                     <div className="card-body">
                         <h3 className="font-semibold mb-4">Available Timeseries Files</h3>
-
                         <div className="space-y-2 max-h-[300px] overflow-y-auto">
                             {timeseriesFiles.map((file, index) => (
                                 <div
                                     key={index}
-                                    className={`p-3 rounded-lg border cursor-pointer transition-all ${selectedFile === file.name
+                                    className={`p-3 rounded-lg border cursor-pointer transition-all ${activeFile?.id === file.id
                                         ? 'border-primary bg-primary/10'
                                         : 'border-base-300 hover:border-primary/50 hover:bg-base-200'
                                         }`}
-                                    onClick={() => setSelectedFile(file.name!)}
+                                    onClick={() => setActiveFile(file)}
                                 >
                                     <div className="flex items-start justify-between">
                                         <div className="flex-1 min-w-0">
-                                            <p className={`text-sm font-medium truncate ${selectedFile === file.name ? 'text-primary' : ''
+                                            <p className={`text-sm font-medium truncate ${activeFile?.id === file.id ? 'text-primary' : ''
                                                 }`}>
                                                 {file.name}
                                             </p>
@@ -240,57 +221,35 @@ export default function TimeseriesViewerClient({ timeseriesFiles }: Props) {
                     </div>
                 </div>
             </div>
-            {/* Custom Range */}
-            <div className="lg:col-span-2">
+
+            {/* Chart Type Selector - Row 2, Col 1 */}
+            <div className="lg:col-span-1">
                 <div className="card bg-base-100 shadow-xl">
                     <div className="card-body">
-                        <h3 className="font-semibold mb-4">Custom Time Range</h3>
-
-                        {/* Date Time Inputs */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                            <div className="form-control">
-                                <label className="label">
-                                    <span className="label-text font-medium">Start Date & Time</span>
-                                </label>
+                        <h3 className="font-semibold mb-4">Chart Type</h3>
+                        <div className="form-control">
+                            <label className="label cursor-pointer">
+                                <span className="label-text">2D Line Chart</span>
                                 <input
-                                    type="datetime-local"
-                                    value={startDate}
-                                    onChange={(e) => setStartDate(e.target.value)}
-                                    className="input input-bordered w-full"
+                                    type="radio"
+                                    name="chartType"
+                                    className="radio radio-primary"
+                                    checked={chartType === '2d-line'}
+                                    onChange={() => setChartType('2d-line')}
                                 />
-                            </div>
-
-                            <div className="form-control">
-                                <label className="label">
-                                    <span className="label-text font-medium">End Date & Time</span>
-                                </label>
-                                <input
-                                    type="datetime-local"
-                                    value={endDate}
-                                    onChange={(e) => setEndDate(e.target.value)}
-                                    className="input input-bordered w-full"
-                                />
-                            </div>
+                            </label>
                         </div>
-                        {/* Action Buttons */}
-                        <div className="flex justify-end gap-2">
-                            <button
-                                onClick={() => {
-                                    setSliderStart(0);
-                                    setSliderEnd(100);
-                                    setStartDate('2024-01-01T00:00');
-                                    setEndDate('2024-01-07T23:59');
-                                }}
-                                className="btn btn-ghost btn-sm"
-                            >
-                                Reset
-                            </button>
-                            <button
-                                onClick={handleApplyTimeRange}
-                                className="btn btn-primary btn-sm"
-                            >
-                                Apply Selection
-                            </button>
+                        <div className="form-control">
+                            <label className="label cursor-pointer">
+                                <span className="label-text">Heatmap</span>
+                                <input
+                                    type="radio"
+                                    name="chartType"
+                                    className="radio radio-primary"
+                                    checked={chartType === 'heatmap'}
+                                    onChange={() => setChartType('heatmap')}
+                                />
+                            </label>
                         </div>
                     </div>
                 </div>
@@ -303,6 +262,9 @@ export default function TimeseriesViewerClient({ timeseriesFiles }: Props) {
             <div className="lg:col-span-2">
                 <div className="card bg-base-100 shadow-xl">
                     <div className="card-body">
+                        <pre className="text-sm overflow-auto">
+                            {JSON.stringify(schema, null, 2)}
+                        </pre>
                     </div>
                 </div>
             </div>
@@ -310,21 +272,32 @@ export default function TimeseriesViewerClient({ timeseriesFiles }: Props) {
     )
 
     const ColumnTab = () => (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2">
-                <div className="card bg-base-100 shadow-xl">
-                    <div className="card-body">
-                    </div>
-                </div>
-            </div>
-        </div>
-    )
-
-    const AnnotationTab = () => (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2">
-                <div className="card bg-base-100 shadow-xl">
-                    <div className="card-body">
+        <div className="grid grid-cols-1 gap-6">
+            <div className="card bg-base-100 shadow-xl">
+                <div className="card-body">
+                    <div className="overflow-x-auto max-h-[500px]">
+                        <table className="table table-zebra table-pin-rows table-sm">
+                            <thead>
+                                <tr>
+                                    {timeseriesData.map((column, index) => (
+                                        <th key={index} className="text-left">
+                                            {column.name}
+                                        </th>
+                                    ))}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {timeseriesData[0]?.values.map((_, rowIndex) => (
+                                    <tr key={rowIndex}>
+                                        {timeseriesData.map((column, colIndex) => (
+                                            <td key={colIndex}>
+                                                {column.values[rowIndex]}
+                                            </td>
+                                        ))}
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             </div>
@@ -334,7 +307,7 @@ export default function TimeseriesViewerClient({ timeseriesFiles }: Props) {
     const tabData = [
         {
             label: "Set Up",
-            content: <TimeRangeTab />
+            content: <SetUpTab />
         },
         {
             label: "Data Check",
@@ -343,10 +316,6 @@ export default function TimeseriesViewerClient({ timeseriesFiles }: Props) {
         {
             label: "Data Schema",
             content: <SchemaTab />
-        },
-        {
-            label: "Data Annotation",
-            content: <AnnotationTab />
         }
     ];
 
@@ -357,17 +326,6 @@ export default function TimeseriesViewerClient({ timeseriesFiles }: Props) {
                 <h1 className="text-2xl font-bold text-base-content">
                     {t.translations.TIMESERIES_VIEWER}
                 </h1>
-                {/* <div className="">
-                    <ProjectDropdown
-                        projects={projects}
-                        onSelectionChange={setSelectedProjects}
-                        defaultSelected={
-                            initialSelectedProjects.length
-                                ? initialSelectedProjects
-                                : undefined
-                        }
-                    />
-                </div> */}
             </div>
 
             <div className="flex justify-end p-4">
@@ -376,11 +334,6 @@ export default function TimeseriesViewerClient({ timeseriesFiles }: Props) {
                         <ArrowDownTrayIcon className="size-6" />
                     </button>
                     <ul tabIndex={0} className="dropdown-content menu bg-base-100 rounded-box z-[1] w-52 p-2 shadow-lg border border-base-300">
-                        {/* <li>
-                            <a onClick={() => handleExport('csv')}>
-                                <span>Export as CSV</span>
-                            </a>
-                        </li> */}
                         <li>
                             <a onClick={() => handleExport('png')}>
                                 <span>Export as PNG</span>
@@ -397,42 +350,193 @@ export default function TimeseriesViewerClient({ timeseriesFiles }: Props) {
                     <div className="lg:col-span-3">
                         <div className="card bg-base-100 shadow-sm">
                             <div className="card-body p-4">
-                                <EChartsLineChart
-                                    title={chartTitle}
-                                    xAxisName={xAxisName}
-                                    yAxisConfigs={yAxisConfigs}
-                                    seriesYAxisMapping={seriesYAxisMapping}
-                                    dataZoom={dataZoom}
-                                    timeseriesData={timeseriesData}
-                                    visibleSeries={visibleSeries}
-                                    showMarkPoints={showMarkPoints}
-                                    showMarkLines={showMarkLines}
-                                />
+                                {!activeFile ? (
+                                    <div className="flex items-center justify-center min-h-96">
+                                        <div className="text-center">
+                                            <h3 className="text-xl font-semibold mb-2">No File Selected</h3>
+                                            <p className="text-base-content/60">
+                                                Please select a timeseries file from the "Set Up" tab to begin
+                                            </p>
+                                        </div>
+                                    </div>
+                                ) : loading ? (
+                                    <div className="flex items-center justify-center h-96">
+                                        <span className="loading loading-spinner loading-lg"></span>
+                                    </div>
+                                ) : !selectedXAxis || selectedYAxes.length === 0 ? (
+                                    <div className="flex items-center justify-center min-h-96">
+                                        <div className="text-center">
+                                            <h3 className="text-xl font-semibold mb-2">Configure Axes</h3>
+                                            <p className="text-base-content/60">
+                                                {!selectedXAxis ? "Select an X axis column" : "Select at least one Y axis column"}
+                                            </p>
+                                        </div>
+                                    </div>
+                                ) : chartType === '2d-line' ? (
+                                    <EChartsLineChart
+                                        title={chartTitle}
+                                        xAxisName={xAxisName}
+                                        yAxisConfigs={yAxisConfigs}
+                                        seriesYAxisMapping={seriesYAxisMapping}
+                                        dataZoom={dataZoom}
+                                        timeseriesData={filteredTimeseriesData}
+                                        visibleSeries={visibleSeries}
+                                        showMarkPoints={showMarkPoints}
+                                        showMarkLines={false}
+                                    />
+                                ) : (
+                                    <Heatmap
+                                        title={chartTitle}
+                                        xAxisName={xAxisName}
+                                        yAxisName="Series"
+                                        timeseriesData={filteredTimeseriesData}
+                                    />
+                                )}
                             </div>
                         </div>
                     </div>
 
                     {/* Right Sidebar with Controls */}
                     <div className="lg:col-span-1 space-y-4">
-                        {/* Series Visibility Controls */}
                         <div className="card bg-base-100 shadow-xl">
                             <div className="card-body p-4">
-                                <h3 className="font-semibold text-sm mb-3">Plot Options</h3>
-                                <div className="space-y-2">
-                                    {Object.entries(visibleSeries).map(([seriesName, isVisible]) => (
-                                        <div key={seriesName} className="form-control">
-                                            <label className="label cursor-pointer justify-start gap-2 py-1">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={isVisible}
-                                                    onChange={() => toggleSeries(seriesName)}
-                                                    className="checkbox checkbox-primary checkbox-sm"
-                                                />
-                                                <span className="label-text text-sm">{seriesName}</span>
-                                            </label>
-                                        </div>
-                                    ))}
+                                <div className="flex items-center justify-between mb-3">
+                                    <h3 className="font-semibold text-sm">Plot Options</h3>
+                                    {isReadyToLoad ? (
+                                        <div className="badge badge-success badge-sm">Ready</div>
+                                    ) : (
+                                        <div className="badge badge-warning badge-sm">Configure</div>
+                                    )}
                                 </div>
+
+                                {/* Limit Control */}
+                                <div className="mb-4">
+                                    <label className="label">
+                                        <span className="label-text font-medium">Limit: {limit}</span>
+                                        <span className="label-text-alt">Max data points</span>
+                                    </label>
+                                    <input
+                                        type="range"
+                                        min={10}
+                                        max={100}
+                                        value={limit}
+                                        className="range range-sm range-primary"
+                                        step={10}
+                                        onChange={(e) => setLimit(Number(e.target.value))}
+                                    />
+                                    <div className="flex justify-between px-2 mt-1 text-xs">
+                                        <span>10</span>
+                                        <span>25</span>
+                                        <span>50</span>
+                                        <span>75</span>
+                                        <span>100</span>
+                                    </div>
+                                </div>
+
+                                {/* Row Stride Control */}
+                                <div className="mb-4">
+                                    <label className="label">
+                                        <span className="label-text font-medium">Row Stride: {rowStride}</span>
+                                        <span className="label-text-alt">Every nth row</span>
+                                    </label>
+                                    <input
+                                        type="range"
+                                        min={1}
+                                        max={10}
+                                        value={rowStride}
+                                        className="range range-sm range-primary"
+                                        step={1}
+                                        onChange={(e) => setRowStride(Number(e.target.value))}
+                                    />
+                                    <div className="flex justify-between px-2 mt-1 text-xs">
+                                        <span>1</span>
+                                        <span>3</span>
+                                        <span>5</span>
+                                        <span>7</span>
+                                        <span>10</span>
+                                    </div>
+                                </div>
+
+                                <div className="divider my-2">Axis Selection</div>
+
+                                {/* X Axis Selection */}
+                                <div className="mb-4">
+                                    <label className="label">
+                                        <span className="label-text font-medium">X Axis</span>
+                                    </label>
+                                    <select
+                                        className="select select-bordered select-sm w-full"
+                                        value={selectedXAxis}
+                                        onChange={(e) => setSelectedXAxis(e.target.value)}
+                                        disabled={timeseriesData.length === 0}
+                                    >
+                                        <option value="">Select X axis...</option>
+                                        {timeseriesData.map((col) => (
+                                            <option key={col.name} value={col.name}>
+                                                {col.name}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                {/* Y Axes Selection - Same for both chart types */}
+                                <div className="mb-4">
+                                    <label className="label">
+                                        <span className="label-text font-medium">Y Axes (Multiple)</span>
+                                    </label>
+                                    <div className="space-y-1 max-h-[200px] overflow-y-auto border border-base-300 rounded-lg p-2">
+                                        {timeseriesData.length === 0 ? (
+                                            <p className="text-xs text-base-content/60 text-center py-2">
+                                                No columns available
+                                            </p>
+                                        ) : (
+                                            timeseriesData
+                                                .filter(col => col.name !== selectedXAxis)
+                                                .map((col) => (
+                                                    <div key={col.name} className="form-control">
+                                                        <label className="label cursor-pointer justify-start gap-2 py-1">
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={selectedYAxes.includes(col.name)}
+                                                                onChange={(e) => {
+                                                                    if (e.target.checked) {
+                                                                        setSelectedYAxes([...selectedYAxes, col.name]);
+                                                                    } else {
+                                                                        setSelectedYAxes(selectedYAxes.filter(name => name !== col.name));
+                                                                    }
+                                                                }}
+                                                                className="checkbox checkbox-primary checkbox-sm"
+                                                            />
+                                                            <span className="label-text text-sm">{col.name}</span>
+                                                        </label>
+                                                    </div>
+                                                ))
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Quick actions */}
+                                {timeseriesData.length > 0 && (
+                                    <div className="flex gap-2">
+                                        <button
+                                            className="btn btn-xs btn-ghost"
+                                            onClick={() => {
+                                                const allY = timeseriesData
+                                                    .filter(col => col.name !== selectedXAxis)
+                                                    .map(col => col.name);
+                                                setSelectedYAxes(allY);
+                                            }}
+                                        >
+                                            Select All
+                                        </button>
+                                        <button
+                                            className="btn btn-xs btn-ghost"
+                                            onClick={() => setSelectedYAxes([])}
+                                        >
+                                            Clear All
+                                        </button>
+                                    </div>
+                                )}
                             </div>
                         </div>
 
@@ -455,20 +559,22 @@ export default function TimeseriesViewerClient({ timeseriesFiles }: Props) {
                                             </div>
                                         </label>
                                     </div>
-                                    <div className="form-control">
-                                        <label className="label cursor-pointer justify-start gap-2 py-1">
-                                            <input
-                                                type="checkbox"
-                                                checked={showMarkPoints}
-                                                onChange={(e) => setShowMarkPoints(e.target.checked)}
-                                                className="checkbox checkbox-primary checkbox-sm"
-                                            />
-                                            <div>
-                                                <span className="label-text text-sm font-medium">Min/max markers</span>
-                                                <div className="text-xs text-base-content/60">Show value markers</div>
-                                            </div>
-                                        </label>
-                                    </div>
+                                    {chartType === '2d-line' && (
+                                        <div className="form-control">
+                                            <label className="label cursor-pointer justify-start gap-2 py-1">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={showMarkPoints}
+                                                    onChange={(e) => setShowMarkPoints(e.target.checked)}
+                                                    className="checkbox checkbox-primary checkbox-sm"
+                                                />
+                                                <div>
+                                                    <span className="label-text text-sm font-medium">Min/max markers</span>
+                                                    <div className="text-xs text-base-content/60">Show value markers</div>
+                                                </div>
+                                            </label>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         </div>
