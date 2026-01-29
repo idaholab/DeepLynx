@@ -81,25 +81,23 @@ export const OrganizationSessionProvider = ({
           Number(organization.organizationId),
         );
 
-        // Update the context with complete data (including banner)
-        setOrganizationState((prev) => ({
-          ...prev!,
-          banner: fullOrg.banner ?? null,
-          // Add any other fields you need
-        }));
+        setOrganizationState((prev) => {
+          if (!prev) return prev;
 
-        // Also update localStorage/cookie with the new data
-        const updated = {
-          ...organization,
-          banner: fullOrg.banner ?? null,
-        };
-        const serialized = JSON.stringify(updated);
-        localStorage.setItem("organizationSession", serialized);
+          const updated = {
+            ...prev,
+            banner: fullOrg.banner ?? null,
+          };
+          const serialized = JSON.stringify(updated);
+          localStorage.setItem("organizationSession", serialized);
 
-        const maxAge = 30 * 24 * 60 * 60;
-        document.cookie = `organizationSession=${encodeURIComponent(
-          serialized,
-        )}; path=/; max-age=${maxAge}; SameSite=Lax`;
+          const maxAge = 30 * 24 * 60 * 60;
+          document.cookie = `organizationSession=${encodeURIComponent(
+            serialized,
+          )}; path=/; max-age=${maxAge}; SameSite=Lax`;
+
+          return updated;
+        });
       } catch (error) {
         console.error("Failed to fetch full organization data:", error);
       }

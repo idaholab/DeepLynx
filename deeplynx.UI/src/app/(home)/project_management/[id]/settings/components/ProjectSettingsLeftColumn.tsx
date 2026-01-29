@@ -3,6 +3,7 @@
 
 import { InformationCircleIcon } from "@heroicons/react/24/outline";
 import { ProjectResponseDto } from "@/app/(home)/types/responseDTOs";
+import Image from "next/image";
 
 interface ProjectLogoSectionProps {
   project: ProjectResponseDto;
@@ -47,13 +48,16 @@ const ProjectSettingsLeftColumn = ({
         <div className="avatar">
           <div className="w-32 h-32 rounded-xl bg-base-200 flex items-center justify-center overflow-hidden border-2 border-base-300">
             {logoPreview ? (
-              <img
+              <Image
                 src={logoPreview}
                 alt="Project Logo"
+                width={128}
+                height={128}
                 className="object-contain w-full h-full p-2"
                 onError={() => {
                   onLogoError();
                 }}
+                unoptimized
               />
             ) : (
               <div className="text-center p-4">

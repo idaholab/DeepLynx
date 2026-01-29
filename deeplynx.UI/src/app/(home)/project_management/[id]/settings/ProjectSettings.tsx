@@ -226,7 +226,11 @@ const ProjectSettings = ({ project }: ProjectSettingsProps) => {
     } finally {
       setIsLoadingStorages(false);
     }
-  }, [organization?.organizationId, project?.id]);
+  }, [
+    organization?.organizationId,
+    project?.id,
+    t.translations.FAILED_TO_LOAD_STORAGE_CONFIGURATIONS,
+  ]);
 
   useEffect(() => {
     loadStorages();

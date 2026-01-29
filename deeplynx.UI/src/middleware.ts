@@ -18,7 +18,8 @@ export async function middleware(request: NextRequest) {
     "/api/auth",
     "/_next",
     "/favicon.ico",
-    "/assets"
+    "/assets",
+    "/images"
   ];
   
   const isPublicRoute = publicRoutes.some(route => pathname.startsWith(route));
@@ -129,6 +130,6 @@ export const config = {
      * - favicon.ico (favicon file)
      * - assets (your static assets)
      */
-    "/((?!api|_next/static|_next/image|favicon.ico|assets).*)",
+    "/((?!api|_next/static|_next/image|favicon.ico|assets|images).*)",
   ],
 };
