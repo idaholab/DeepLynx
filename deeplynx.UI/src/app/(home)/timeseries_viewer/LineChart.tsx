@@ -29,7 +29,30 @@ interface EChartsLineChartProps {
     visibleSeries: Record<string, boolean>;
     showMarkPoints?: boolean;
     showMarkLines?: boolean;
-    seriesYAxisMapping?: Record<string, number>; // Maps series name to yAxis index
+    seriesYAxisMapping?: Record<string, number>;
+}
+
+interface SeriesData {
+    name: string;
+    type: 'line';
+    data: (string | number)[];
+    yAxisIndex: number;
+    itemStyle: { color: string };
+    lineStyle: { width: number };
+    emphasis: { focus: string };
+    markPoint?: {
+        data: Array<{ type: string; name: string }>;
+    };
+    markLine?: {
+        data: Array<{ type: string; name: string }>;
+    };
+}
+
+interface TooltipFormatterParam {
+    marker: string;
+    seriesName: string;
+    value: string | number;
+    axisValue?: string | number;
 }
 
 export default function EChartsLineChart({
@@ -51,18 +74,17 @@ export default function EChartsLineChart({
         if (!chartRef.current) return;
 
         const chart = echarts.init(chartRef.current);
-        const xAxisData = timeseriesData.find(item => item.name === 'time_x')?.values || [];
+        const xAxisData = timeseriesData[0]?.values || [];
 
         const colors = ['#5470c6', '#91cc75', '#fac858', '#ee6666', '#73c0de', '#3ba272'];
 
-        const series = timeseriesData
+        const series: SeriesData[] = timeseriesData
             .filter(item => item.name !== 'time_x' && visibleSeries[item.name])
             .map((item, index) => {
-                const baseSeries: any = {
+                const baseSeries: SeriesData = {
                     name: item.name,
-                    type: 'line' as const,
+                    type: 'line',
                     data: item.values,
-                    // Use mapping if provided, otherwise default to 0
                     yAxisIndex: seriesYAxisMapping[item.name] ?? 0,
                     itemStyle: {
                         color: colors[index % colors.length]
@@ -75,7 +97,6 @@ export default function EChartsLineChart({
                     }
                 };
 
-                // Add markPoint if enabled
                 if (showMarkPoints) {
                     baseSeries.markPoint = {
                         data: [
@@ -85,7 +106,6 @@ export default function EChartsLineChart({
                     };
                 }
 
-                // Add markLine if enabled
                 if (showMarkLines) {
                     baseSeries.markLine = {
                         data: [
@@ -97,9 +117,8 @@ export default function EChartsLineChart({
                 return baseSeries;
             });
 
-        const legendData = series.map((s: any) => s.name);
+        const legendData = series.map(s => s.name);
 
-        // Build yAxis configuration from props
         const yAxisOptions = yAxisConfigs.map(config => ({
             type: 'value' as const,
             name: config.name,
@@ -128,9 +147,10 @@ export default function EChartsLineChart({
                         backgroundColor: '#6a7985'
                     }
                 },
-                formatter: function (params: any) {
-                    let result = `${params[0].axisValue}<br/>`;
-                    params.forEach((param: any) => {
+                formatter: function (params: TooltipFormatterParam | TooltipFormatterParam[]) {
+                    if (!Array.isArray(params)) return '';
+                    let result = `${params[0]?.axisValue}<br/>`;
+                    params.forEach((param) => {
                         result += `${param.marker} ${param.seriesName}: <strong>${param.value}</strong><br/>`;
                     });
                     return result;
@@ -196,6 +216,6 @@ export default function EChartsLineChart({
     }, [dataZoom, timeseriesData, visibleSeries, showMarkPoints, showMarkLines, title, xAxisName, yAxisConfigs, seriesYAxisMapping]);
 
     return (
-        <div ref={chartRef} className="w-full h-[475px] echarts-timeseries-chart" />
+        <div ref={chartRef} className="w-full h-[550px] md:h-[650px] lg:h-[750px] echarts-timeseries-chart" />
     );
 }
