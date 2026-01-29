@@ -191,7 +191,7 @@ export default function TimeseriesViewerClient({ timeseriesFiles }: Props) {
             <div className="lg:col-span-1">
                 <div className="card bg-base-100 shadow-xl">
                     <div className="card-body">
-                        <h3 className="font-semibold mb-4">Available Timeseries Files</h3>
+                        <h3 className="font-semibold mb-4">{t.translations.AVAILABLE_TIMESERIES_FILES}</h3>
                         <div className="space-y-2 max-h-[300px] overflow-y-auto">
                             {timeseriesFiles.map((file, index) => (
                                 <div
@@ -226,10 +226,10 @@ export default function TimeseriesViewerClient({ timeseriesFiles }: Props) {
             <div className="lg:col-span-1">
                 <div className="card bg-base-100 shadow-xl">
                     <div className="card-body">
-                        <h3 className="font-semibold mb-4">Chart Type</h3>
+                        <h3 className="font-semibold mb-4">{t.translations.CHART_TYPE}</h3>
                         <div className="form-control">
                             <label className="label cursor-pointer">
-                                <span className="label-text">2D Line Chart</span>
+                                <span className="label-text">{t.translations.LINE_CHART_2D}</span>
                                 <input
                                     type="radio"
                                     name="chartType"
@@ -241,7 +241,7 @@ export default function TimeseriesViewerClient({ timeseriesFiles }: Props) {
                         </div>
                         <div className="form-control">
                             <label className="label cursor-pointer">
-                                <span className="label-text">Heatmap</span>
+                                <span className="label-text">{t.translations.HEATMAP}</span>
                                 <input
                                     type="radio"
                                     name="chartType"
@@ -306,15 +306,15 @@ export default function TimeseriesViewerClient({ timeseriesFiles }: Props) {
 
     const tabData = [
         {
-            label: "Set Up",
+            label: t.translations.SET_UP,
             content: <SetUpTab />
         },
         {
-            label: "Data Check",
+            label: t.translations.DATA_CHECK,
             content: <ColumnTab />
         },
         {
-            label: "Data Schema",
+            label: t.translations.DATA_SCHEMA,
             content: <SchemaTab />
         }
     ];
@@ -336,7 +336,7 @@ export default function TimeseriesViewerClient({ timeseriesFiles }: Props) {
                     <ul tabIndex={0} className="dropdown-content menu bg-base-100 rounded-box z-[1] w-52 p-2 shadow-lg border border-base-300">
                         <li>
                             <a onClick={() => handleExport('png')}>
-                                <span>Export as PNG</span>
+                                <span>{t.translations.EXPORT_AS_PNG}</span>
                             </a>
                         </li>
                     </ul>
@@ -353,10 +353,10 @@ export default function TimeseriesViewerClient({ timeseriesFiles }: Props) {
                                 {!activeFile ? (
                                     <div className="flex items-center justify-center min-h-96">
                                         <div className="text-center">
-                                            <h3 className="text-xl font-semibold mb-2">No File Selected</h3>
-                                            <p className="text-base-content/60">
-                                                Please select a timeseries file from the "Set Up" tab to begin
-                                            </p>
+                                            <h3 className="text-xl font-semibold mb-2">{t.translations.NO_FILE_SELECTED}</h3>
+
+                                            <p className="text-base-content/60">{t.translations.SELECT_FILE_TO_BEGIN}</p>
+
                                         </div>
                                     </div>
                                 ) : loading ? (
@@ -366,9 +366,10 @@ export default function TimeseriesViewerClient({ timeseriesFiles }: Props) {
                                 ) : !selectedXAxis || selectedYAxes.length === 0 ? (
                                     <div className="flex items-center justify-center min-h-96">
                                         <div className="text-center">
-                                            <h3 className="text-xl font-semibold mb-2">Configure Axes</h3>
+                                            <h3 className="text-xl font-semibold mb-2">{t.translations.CONFIGURE_AXES}</h3>
+
                                             <p className="text-base-content/60">
-                                                {!selectedXAxis ? "Select an X axis column" : "Select at least one Y axis column"}
+                                                {!selectedXAxis ? t.translations.SELECT_X_AXIS_COLUMN : t.translations.SELECT_Y_AXIS_COLUMN}
                                             </p>
                                         </div>
                                     </div>
@@ -401,19 +402,19 @@ export default function TimeseriesViewerClient({ timeseriesFiles }: Props) {
                         <div className="card bg-base-100 shadow-xl">
                             <div className="card-body p-4">
                                 <div className="flex items-center justify-between mb-3">
-                                    <h3 className="font-semibold text-sm">Plot Options</h3>
+                                    <h3 className="font-semibold text-sm">{t.translations.PLOT_OPTIONS}</h3>
                                     {isReadyToLoad ? (
-                                        <div className="badge badge-success badge-sm">Ready</div>
+                                        <div className="badge badge-success badge-sm">{t.translations.READY}</div>
                                     ) : (
-                                        <div className="badge badge-warning badge-sm">Configure</div>
+                                        <div className="badge badge-warning badge-sm">{t.translations.CONFIGURE}</div>
                                     )}
                                 </div>
 
                                 {/* Limit Control */}
                                 <div className="mb-4">
                                     <label className="label">
-                                        <span className="label-text font-medium">Limit: {limit}</span>
-                                        <span className="label-text-alt">Max data points</span>
+                                        <span className="label-text font-medium">{t.translations.LIMIT}: {limit}</span>
+                                        <span className="label-text-alt">{t.translations.MAX_DATA_POINTS}</span>
                                     </label>
                                     <input
                                         type="range"
@@ -436,8 +437,8 @@ export default function TimeseriesViewerClient({ timeseriesFiles }: Props) {
                                 {/* Row Stride Control */}
                                 <div className="mb-4">
                                     <label className="label">
-                                        <span className="label-text font-medium">Row Stride: {rowStride}</span>
-                                        <span className="label-text-alt">Every nth row</span>
+                                        <span className="label-text font-medium">{t.translations.ROW_STRIDE}: {rowStride}</span>
+                                        <span className="label-text-alt">{t.translations.EVERY_NTH_ROW}</span>
                                     </label>
                                     <input
                                         type="range"
@@ -457,12 +458,12 @@ export default function TimeseriesViewerClient({ timeseriesFiles }: Props) {
                                     </div>
                                 </div>
 
-                                <div className="divider my-2">Axis Selection</div>
+                                <div className="divider my-2">{t.translations.AXIS_SELECTION}</div>
 
                                 {/* X Axis Selection */}
                                 <div className="mb-4">
                                     <label className="label">
-                                        <span className="label-text font-medium">X Axis</span>
+                                        <span className="label-text font-medium">{t.translations.X_AXIS}</span>
                                     </label>
                                     <select
                                         className="select select-bordered select-sm w-full"
@@ -470,7 +471,8 @@ export default function TimeseriesViewerClient({ timeseriesFiles }: Props) {
                                         onChange={(e) => setSelectedXAxis(e.target.value)}
                                         disabled={timeseriesData.length === 0}
                                     >
-                                        <option value="">Select X axis...</option>
+                                        <option value="">{t.translations.SELECT_X_AXIS}</option>
+
                                         {timeseriesData.map((col) => (
                                             <option key={col.name} value={col.name}>
                                                 {col.name}
@@ -482,12 +484,13 @@ export default function TimeseriesViewerClient({ timeseriesFiles }: Props) {
                                 {/* Y Axes Selection - Same for both chart types */}
                                 <div className="mb-4">
                                     <label className="label">
-                                        <span className="label-text font-medium">Y Axes (Multiple)</span>
+                                        <span className="label-text font-medium">{t.translations.Y_AXES_MULTIPLE}</span>
+
                                     </label>
                                     <div className="space-y-1 max-h-[200px] overflow-y-auto border border-base-300 rounded-lg p-2">
                                         {timeseriesData.length === 0 ? (
                                             <p className="text-xs text-base-content/60 text-center py-2">
-                                                No columns available
+                                                {t.translations.NO_COLUMNS_AVAILABLE}
                                             </p>
                                         ) : (
                                             timeseriesData
@@ -527,13 +530,13 @@ export default function TimeseriesViewerClient({ timeseriesFiles }: Props) {
                                                 setSelectedYAxes(allY);
                                             }}
                                         >
-                                            Select All
+                                            {t.translations.SELECT_ALL}
                                         </button>
                                         <button
                                             className="btn btn-xs btn-ghost"
                                             onClick={() => setSelectedYAxes([])}
                                         >
-                                            Clear All
+                                            {t.translations.CLEAR_ALL}
                                         </button>
                                     </div>
                                 )}
@@ -543,7 +546,7 @@ export default function TimeseriesViewerClient({ timeseriesFiles }: Props) {
                         {/* Chart Settings */}
                         <div className="card bg-base-100 shadow-xl">
                             <div className="card-body p-4">
-                                <h3 className="font-semibold text-sm mb-3">Chart Settings</h3>
+                                <h3 className="font-semibold text-sm mb-3">{t.translations.CHART_SETTINGS}</h3>
                                 <div className="space-y-3">
                                     <div className="form-control">
                                         <label className="label cursor-pointer justify-start gap-2 py-1">
@@ -554,8 +557,8 @@ export default function TimeseriesViewerClient({ timeseriesFiles }: Props) {
                                                 className="checkbox checkbox-primary checkbox-sm"
                                             />
                                             <div>
-                                                <span className="label-text text-sm font-medium">Zoom controls</span>
-                                                <div className="text-xs text-base-content/60">Interactive zoom slider</div>
+                                                <span className="label-text text-sm font-medium">{t.translations.ZOOM_CONTROLS}</span>
+                                                <div className="text-xs text-base-content/60">{t.translations.INTERACTIVE_ZOOM_SLIDER}</div>
                                             </div>
                                         </label>
                                     </div>
@@ -569,8 +572,8 @@ export default function TimeseriesViewerClient({ timeseriesFiles }: Props) {
                                                     className="checkbox checkbox-primary checkbox-sm"
                                                 />
                                                 <div>
-                                                    <span className="label-text text-sm font-medium">Min/max markers</span>
-                                                    <div className="text-xs text-base-content/60">Show value markers</div>
+                                                    <span className="label-text text-sm font-medium">{t.translations.MIN_MAX_MARKERS}</span>
+                                                    <div className="text-xs text-base-content/60">{t.translations.SHOW_VALUE_MARKERS}</div>
                                                 </div>
                                             </label>
                                         </div>
