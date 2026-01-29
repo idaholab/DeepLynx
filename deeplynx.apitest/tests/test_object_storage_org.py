@@ -45,9 +45,10 @@ def test_create_org_storage_azure(client, organization, cleanup_org_storages):
     """Test creating an organization-level Azure storage"""
     payload = {
         "name": "pytest_OrgStorage_Azure",
-        "description": "A test Azure object storage",
         "config": {
-            "azureConnectionString": "DefaultEndpointsProtocol=https;AccountName=testaccount;AccountKey=testkey;EndpointSuffix=core.windows.net"
+            "azureObjectConfig": {
+                "azureConnectionString": "DefaultEndpointsProtocol=https;AccountName=testaccount;AccountKey=testkey;EndpointSuffix=core.windows.net",
+            }
         }
     }
     

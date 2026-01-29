@@ -2,7 +2,9 @@ using deeplynx.datalayer.Models;
 using deeplynx.helpers;
 using deeplynx.interfaces;
 using deeplynx.models;
+using DotNetEnv;
 using Microsoft.EntityFrameworkCore;
+using Newtonsoft.Json;
 
 namespace deeplynx.business;
 
@@ -109,16 +111,51 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
         CreateObjectStorageRequestDto dto)
     {
         ValidationHelper.ValidateModel(dto);
+        
+        bool hasFilesystem = dto.Config.MountPath is not null;
+        bool hasAzure = dto.Config.AzureObjectConfig is not null;
+        bool hasAws = dto.Config.AwsConnectionString is not null;
+        
+        
+        int populatedCount = new[] 
+        {
+            hasFilesystem,
+            hasAzure,
+            hasAws
+        }.Count(x => x);
+
+        if (populatedCount != 1)
+            throw new InvalidOperationException($"Exactly one config must be provided, you provided {populatedCount}. Check for empty strings and/or objects.");
 
         string type;
-        if (dto.Config.ContainsKey("mountPath"))
+        if (hasFilesystem)
+        {
+            if (string.IsNullOrWhiteSpace(dto.Config.MountPath))
+                throw new ArgumentException("Mount path cannot be empty string");
             type = "filesystem";
-        else if (dto.Config.ContainsKey("azureConnectionString"))
+        }
+        else if (hasAzure)
+        {
+            if (string.IsNullOrWhiteSpace(dto.Config.AzureObjectConfig.AzureConnectionString))
+                throw new ArgumentException("Azure connection string is empty");
+
+            if (string.IsNullOrWhiteSpace(dto.Config.AzureObjectConfig.AzureContainerName))
+            {
+                Env.Load("../.env");
+                var azureContainerName = Environment.GetEnvironmentVariable("AZURE_CONTAINER_NAME"); 
+                if (string.IsNullOrWhiteSpace(azureContainerName))
+                    throw new ArgumentException("Default Azure container name is not set or is empty, please provide a container name or set default using env variables");
+                
+                dto.Config.AzureObjectConfig.AzureContainerName = azureContainerName;
+            }
             type = "azure_object";
-        else if (dto.Config.ContainsKey("awsConnectionString"))
+        }
+        else // hasAws
+        {
+            if (string.IsNullOrWhiteSpace(dto.Config.AwsConnectionString))
+                throw new ArgumentException("AWS connection string cannot be empty");
             type = "aws_s3";
-        else
-            throw new KeyNotFoundException("Request does not contain recognized config");
+        }
 
         using var transaction = await _context.Database.BeginTransactionAsync();
 
@@ -131,7 +168,7 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
                 Default = dto.Default,
                 ProjectId = projectId,
                 OrganizationId = organizationId,
-                Config = dto.Config.ToJsonString(),
+                Config = JsonConvert.SerializeObject(dto.Config),
                 LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
                 LastUpdatedBy = currentUserId
             };
