@@ -12,7 +12,6 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Record = deeplynx.datalayer.Models.Record;
-using deeplynx.helpers;
 
 namespace deeplynx.tests;
 
@@ -41,6 +40,7 @@ public class RecordBusinessTests : IntegrationTestBase
     public string ruri;
     public long tid; // tag ID
     public long uid;
+    public long roleId;
 
     public RecordBusinessTests(TestSuiteFixture fixture) : base(fixture)
     {
@@ -254,6 +254,7 @@ public class RecordBusinessTests : IntegrationTestBase
         Context.ProjectMembers.Add(projectMember);
         await Context.SaveChangesAsync();
 
+        roleId = testRole.Id;
         rid = testRecord.Id;
         tid = testTag.Id;
         rprop = testRecord.Properties;
@@ -261,95 +262,6 @@ public class RecordBusinessTests : IntegrationTestBase
         rdesc = testRecord.Description;
         ruri = testRecord.Uri;
         rfiletype = testRecord.FileType;
-    }
-
-    private async Task<long> CreateRecordWithLabels(List<string> labelNames, bool giveUserAccess, string action)
-    {
-        var record = new Record
-        {
-            Name = "Test Record",
-            Description = "Test record for unit tests",
-            OriginalId = Guid.NewGuid().ToString(),
-            Properties = JsonSerializer.Serialize(new { TestProperty = "TestValue" }),
-            ProjectId = pid,
-            DataSourceId = did,
-            ClassId = cid,
-            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
-            LastUpdatedBy = uid,
-            Uri = "localhost:8090",
-            FileType = "pdf",
-            OrganizationId = organizationId
-        };
-
-        Context.Records.Add(record);
-        await Context.SaveChangesAsync();
-
-        // Get the user's role ONCE before the loop
-        var roleId = await Context.ProjectMembers
-            .Where(pm => pm.ProjectId == pid && pm.UserId == uid)
-            .Select(pm => pm.RoleId)
-            .FirstOrDefaultAsync();
-
-        if (giveUserAccess && roleId == 0)
-            throw new KeyNotFoundException($"Role not found for user {uid} in project {pid}");
-
-        var role = giveUserAccess
-            ? await Context.Roles
-                .Include(r => r.Permissions)
-                .FirstOrDefaultAsync(r => r.Id == roleId)
-            : null;
-
-        if (giveUserAccess && role == null)
-            throw new KeyNotFoundException($"Role with id {roleId} not found");
-
-        foreach (var labelName in labelNames)
-        {
-            var labelDto = new CreateSensitivityLabelRequestDto
-            {
-                Name = labelName,
-                Description = labelName,
-            };
-
-            var label = await _sensitivityLabelBusiness.CreateSensitivityLabel(uid, labelDto, pid, organizationId);
-            await _recordBusiness.AttachLabel(uid, organizationId, pid, record.Id, label.Id);
-
-            if (giveUserAccess)
-            {
-                // Refresh the context to ensure we get the latest permissions created by CreateSensitivityLabel
-                await Context.Entry(role).ReloadAsync();
-
-                var permission = await Context.Permissions
-                    .AsNoTracking() // Use AsNoTracking to avoid caching issues
-                    .Where(p => p.LabelId == label.Id && p.Action == action)
-                    .FirstOrDefaultAsync();
-
-                if (permission == null)
-                    throw new KeyNotFoundException($"Permission not found for label {labelName} with action {action}");
-
-                // Re-attach the permission to this context if it's not already tracked
-                var trackedPermission = Context.Permissions.Local.FirstOrDefault(p => p.Id == permission.Id);
-                if (trackedPermission == null)
-                {
-                    Context.Attach(permission);
-                }
-                else
-                {
-                    permission = trackedPermission;
-                }
-
-                if (!role.Permissions.Any(p => p.Id == permission.Id))
-                {
-                    role.Permissions.Add(permission);
-                }
-            }
-        }
-
-        if (giveUserAccess)
-        {
-            await Context.SaveChangesAsync();
-        }
-
-        return record.Id;
     }
 
     #region GetRecordsCountByDataSource Tests
@@ -568,34 +480,135 @@ public class RecordBusinessTests : IntegrationTestBase
     [Fact]
     public async Task GetAllRecords_FilterOutUnauthorizedRecordsBySensitivityLabels_ReturnsFilteredRecords()
     {
-        // Create record with Top Secret label, but don't give user access
-        var recordWithLabel = await CreateRecordWithLabels(
-            new List<string> { "Top Secret" },
-            giveUserAccess: false,
-            action: "read"
-        );
+        var labelDto = new CreateSensitivityLabelRequestDto
+        {
+            Name = "Top Secret Label",
+            Description = "Top Secret Label",
+        };
+        var label = await _sensitivityLabelBusiness.CreateSensitivityLabel(uid, labelDto, pid, organizationId);
+
+        var record = new Record
+        {
+            Name = "Test Record",
+            Description = "Test record for unit tests",
+            OriginalId = Guid.NewGuid().ToString(),
+            Properties = JsonSerializer.Serialize(new { TestProperty = "TestValue" }),
+            ProjectId = pid,
+            DataSourceId = did,
+            ClassId = cid,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            Uri = "localhost:8090",
+            FileType = "pdf",
+            OrganizationId = organizationId
+        };
+        Context.Records.Add(record);
+        await Context.SaveChangesAsync();
+
+        Context.ChangeTracker.Clear();
+
+        // give user write permission with this label so that it can be attached to the record (work around that does not invalidate the test)
+        var permission = await Context.Permissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "write");
+
+        var role = await Context.Roles
+            .AsNoTracking()
+            .Include(r => r.Permissions)
+            .FirstOrDefaultAsync(r => r.Id == roleId);
+
+        if (role != null && permission != null)
+        {
+            Context.Attach(role);
+            role.Permissions.Add(permission);
+            await Context.SaveChangesAsync();
+        }
+
+        await _recordBusiness.AttachLabel(uid, organizationId, pid, record.Id, label.Id);
 
         // Record with sensitivity label should not be returned because user does not have access
         var records = await _recordBusiness.GetAllRecords(uid, organizationId, pid, null, true);
 
         Assert.NotNull(records);
-        Assert.DoesNotContain(records, r => r.Id == recordWithLabel);
+        Assert.DoesNotContain(records, r => r.Id == record.Id);
     }
 
     [Fact]
     public async Task GetAllRecords_UserHasAccessToAllLabels_ReturnsRecords()
     {
         // Create a label, give user permission to it, attach to record
-        var recordWithLabel = await CreateRecordWithLabels(
-            new List<string> { "Top Secret" },
-            giveUserAccess: true,
-            action: "read");
+        var labelDto = new CreateSensitivityLabelRequestDto
+        {
+            Name = "Top Secret 2",
+            Description = "Top Secret Label",
+        };
+        var label = await _sensitivityLabelBusiness.CreateSensitivityLabel(uid, labelDto, pid, organizationId);
+
+        var newRecord = new Record
+        {
+            Name = "Test Record 2",
+            Description = "Test record 2 for unit tests",
+            OriginalId = Guid.NewGuid().ToString(),
+            Properties = JsonSerializer.Serialize(new { TestProperty = "TestValue" }),
+            ProjectId = pid,
+            DataSourceId = did,
+            ClassId = cid,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            Uri = "localhost:8090",
+            FileType = "pdf",
+            OrganizationId = organizationId
+        };
+        Context.Records.Add(newRecord);
+        await Context.SaveChangesAsync();
+
+        Context.ChangeTracker.Clear();
+
+        // Give user write permission so label can be attached (workaround that doesn't invalidate test)
+        var labelWritePermission = await Context.Permissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "write");
+
+        var role = await Context.Roles
+            .AsNoTracking()
+            .Include(r => r.Permissions)
+            .FirstOrDefaultAsync(r => r.Id == roleId);
+
+        if (role != null && labelWritePermission != null)
+        {
+            Context.Attach(role);
+            role.Permissions.Add(labelWritePermission);
+            await Context.SaveChangesAsync();
+        }
+
+        await _recordBusiness.AttachLabel(uid, organizationId, pid, newRecord.Id, label.Id);
+
+        Context.ChangeTracker.Clear();
+
+        // Get read permission without tracking
+        var labelReadPermission = await Context.Permissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "read");
+
+        // Get the role without tracking
+        role = await Context.Roles
+            .AsNoTracking()
+            .Include(r => r.Permissions)
+            .FirstOrDefaultAsync(r => r.Id == roleId);
+
+        if (role != null && labelReadPermission != null)
+        {
+            // Attach and mark as modified
+            Context.Attach(role);
+            role.Permissions.Add(labelReadPermission);
+            await Context.SaveChangesAsync();
+        }
 
         // Verify the record IS returned
         var records = await _recordBusiness.GetAllRecords(uid, organizationId, pid, null, true);
 
         Assert.NotNull(records);
-        Assert.Contains(records, r => r.Id == recordWithLabel);
+        Assert.Contains(records, r => r.Id == newRecord.Id);
     }
 
     [Fact]
@@ -604,19 +617,103 @@ public class RecordBusinessTests : IntegrationTestBase
         // Record 1: No labels (should be returned) - using the seeded record
         var record1Id = rid;
 
-        // Record 2: Label user has access to (should be returned)
-        var record2Id = await CreateRecordWithLabels(
-            new List<string> { "Confidential" },
-            giveUserAccess: true,
-            action: "read"
-        );
+        // Create a label, give user permission to it, attach to record
+        var labelDto = new CreateSensitivityLabelRequestDto
+        {
+            Name = "Need To Know_" + Guid.NewGuid(),
+            Description = "Need To Know",
+        };
+        var labelDto2 = new CreateSensitivityLabelRequestDto
+        {
+            Name = "Confidential_" + Guid.NewGuid(),
+            Description = "Confidential",
+        };
+        var label1 = await _sensitivityLabelBusiness.CreateSensitivityLabel(uid, labelDto, pid, organizationId);
+        var label2 = await _sensitivityLabelBusiness.CreateSensitivityLabel(uid, labelDto2, pid, organizationId);
 
-        // Record 3: Label user doesn't have access to (should NOT be returned)
-        var record3Id = await CreateRecordWithLabels(
-            new List<string> { "Top Secret" },
-            giveUserAccess: false,
-            action: "read"
-        );
+        // Record 2: No labels (should be returned)
+        var newRecord2 = new Record
+        {
+            Name = "Test_Record_" + Guid.NewGuid(),
+            Description = "Test record 3 for unit tests",
+            OriginalId = Guid.NewGuid().ToString(),
+            Properties = JsonSerializer.Serialize(new { TestProperty = "TestValue" }),
+            ProjectId = pid,
+            DataSourceId = did,
+            ClassId = cid,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            Uri = "localhost:8090",
+            FileType = "pdf",
+            OrganizationId = organizationId
+        };
+        // Record 3: No labels (should be returned)
+        var newRecord3 = new Record
+        {
+            Name = "Test_Record_" + Guid.NewGuid(),
+            Description = "Test record 3 for unit tests",
+            OriginalId = Guid.NewGuid().ToString(),
+            Properties = JsonSerializer.Serialize(new { TestProperty = "TestValue" }),
+            ProjectId = pid,
+            DataSourceId = did,
+            ClassId = cid,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            Uri = "localhost:8090",
+            FileType = "pdf",
+            OrganizationId = organizationId
+        };
+        Context.Records.Add(newRecord2);
+        Context.Records.Add(newRecord3);
+        await Context.SaveChangesAsync();
+
+        Context.ChangeTracker.Clear();
+
+        // Give user write permissions to both labels so they can be attached (workaround that doesn't invalidate test)
+        var label1WritePermission = await Context.Permissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label1.Id && p.Action == "write");
+
+        var label2WritePermission = await Context.Permissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label2.Id && p.Action == "write");
+
+        var role = await Context.Roles
+            .AsNoTracking()
+            .Include(r => r.Permissions)
+            .FirstOrDefaultAsync(r => r.Id == roleId);
+
+        if (role != null && label1WritePermission != null && label2WritePermission != null)
+        {
+            Context.Attach(role);
+            role.Permissions.Add(label1WritePermission);
+            role.Permissions.Add(label2WritePermission);
+            await Context.SaveChangesAsync();
+        }
+
+        await _recordBusiness.AttachLabel(uid, organizationId, pid, newRecord2.Id, label1.Id);
+        await _recordBusiness.AttachLabel(uid, organizationId, pid, newRecord3.Id, label2.Id);
+
+        Context.ChangeTracker.Clear();
+
+        // Get read permission without tracking (only for label1, NOT label2)
+        var label1ReadPermission = await Context.Permissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label1.Id && p.Action == "read");
+
+        // Get the role without tracking
+        role = await Context.Roles
+            .AsNoTracking()
+            .Include(r => r.Permissions)
+            .FirstOrDefaultAsync(r => r.Id == roleId);
+
+        if (role != null && label1ReadPermission != null)
+        {
+            // Attach and mark as modified
+            Context.Attach(role);
+            role.Permissions.Add(label1ReadPermission);
+            await Context.SaveChangesAsync();
+        }
 
         // Act
         var records = await _recordBusiness.GetAllRecords(uid, organizationId, pid, null, true);
@@ -625,28 +722,114 @@ public class RecordBusinessTests : IntegrationTestBase
         Assert.NotNull(records);
         Assert.Equal(2, records.Count); // Only records 1 and 2
         Assert.Contains(records, r => r.Id == record1Id); // No labels
-        Assert.Contains(records, r => r.Id == record2Id); // User has access
-        Assert.DoesNotContain(records, r => r.Id == record3Id); // User lacks access
+        Assert.Contains(records, r => r.Id == newRecord2.Id); // User has access
+        Assert.DoesNotContain(records, r => r.Id == newRecord3.Id); // User lacks access
     }
 
     [Fact]
     public async Task GetAllRecords_RecordWithMultipleLabels_UserHasAll_ReturnsRecord()
     {
-        // Create a record with 2 labels, give user access to BOTH
-        var recordId = await CreateRecordWithLabels(
-            new List<string> { "Confidential", "Internal" },
-            giveUserAccess: true,
-            action: "read"
-        );
-    
+        // Create two labels
+        var labelDto1 = new CreateSensitivityLabelRequestDto
+        {
+            Name = "Confidential_" + Guid.NewGuid(),
+            Description = "Confidential",
+        };
+        var labelDto2 = new CreateSensitivityLabelRequestDto
+        {
+            Name = "Internal_" + Guid.NewGuid(),
+            Description = "Internal",
+        };
+        var label1 = await _sensitivityLabelBusiness.CreateSensitivityLabel(uid, labelDto1, pid, organizationId);
+        var label2 = await _sensitivityLabelBusiness.CreateSensitivityLabel(uid, labelDto2, pid, organizationId);
+
+        // Create a record with both labels
+        var newRecord = new Record
+        {
+            Name = "Test_Record_" + Guid.NewGuid(),
+            Description = "Test record with multiple labels",
+            OriginalId = Guid.NewGuid().ToString(),
+            Properties = JsonSerializer.Serialize(new { TestProperty = "TestValue" }),
+            ProjectId = pid,
+            DataSourceId = did,
+            ClassId = cid,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            Uri = "localhost:8090",
+            FileType = "pdf",
+            OrganizationId = organizationId
+        };
+        Context.Records.Add(newRecord);
+        await Context.SaveChangesAsync();
+
+        var recordId = newRecord.Id;
+
+        Context.ChangeTracker.Clear();
+
+        // Get read and write permissions for both labels
+        var label1ReadPermission = await Context.Permissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label1.Id && p.Action == "read");
+
+        var label1WritePermission = await Context.Permissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label1.Id && p.Action == "write");
+
+        var label2ReadPermission = await Context.Permissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label2.Id && p.Action == "read");
+
+        var label2WritePermission = await Context.Permissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label2.Id && p.Action == "write");
+
+        Assert.NotNull(label1ReadPermission);
+        Assert.NotNull(label2ReadPermission);
+        Assert.NotNull(label1WritePermission);
+        Assert.NotNull(label2WritePermission);
+
+        // Get the role and attach permissions
+        var role = await Context.Roles
+            .FirstOrDefaultAsync(r => r.Id == roleId);
+
+        Assert.NotNull(role);
+
+        var permissionsToAdd = new[]
+        {
+            label1ReadPermission,
+            label2ReadPermission,
+            label1WritePermission,
+            label2WritePermission
+        };
+
+        foreach (var permission in permissionsToAdd)
+        {
+            if (Context.Entry(permission).State == EntityState.Detached)
+            {
+                Context.Attach(permission);
+            }
+
+            if (!role.Permissions.Any(p => p.Id == permission.Id))
+            {
+                role.Permissions.Add(permission);
+            }
+        }
+
+        await Context.SaveChangesAsync();
+        Context.ChangeTracker.Clear();
+
+        // Attach both labels to the record
+        await _recordBusiness.AttachLabel(uid, organizationId, pid, recordId, label1.Id);
+        await _recordBusiness.AttachLabel(uid, organizationId, pid, recordId, label2.Id);
+
         // Act
         var records = await _recordBusiness.GetAllRecords(
             uid, organizationId, pid, null, true);
-    
+
         // Assert
         Assert.NotNull(records);
         Assert.Contains(records, r => r.Id == recordId);
-    
+
         var returnedRecord = records.First(r => r.Id == recordId);
         Assert.Equal(2, returnedRecord.Labels.Count);
     }
@@ -654,43 +837,23 @@ public class RecordBusinessTests : IntegrationTestBase
     [Fact]
     public async Task GetAllRecords_RecordWithMultipleLabels_UserMissingOne_FiltersRecord()
     {
-        // Create first label with access
+        // Create first label
         var label1Dto = new CreateSensitivityLabelRequestDto
         {
-            Name = "Public",
+            Name = "Public_" + Guid.NewGuid(),
             Description = "Public label"
         };
         var label1 = await _sensitivityLabelBusiness.CreateSensitivityLabel(uid, label1Dto, pid, organizationId);
 
-        // Give user access to first label
-        var roleId = await Context.ProjectMembers
-            .Where(pm => pm.ProjectId == pid && pm.UserId == uid)
-            .Select(pm => pm.RoleId)
-            .FirstOrDefaultAsync();
-
-        var permission1 = await Context.Permissions
-            .Where(p => p.LabelId == label1.Id && p.Action == "read")
-            .FirstOrDefaultAsync();
-
-        var role = await Context.Roles
-            .Include(r => r.Permissions)
-            .FirstOrDefaultAsync(r => r.Id == roleId);
-
-        if (!role.Permissions.Contains(permission1))
-        {
-            role.Permissions.Add(permission1);
-            await Context.SaveChangesAsync();
-        }
-
-        // Create second label WITHOUT access
+        // Create second label
         var label2Dto = new CreateSensitivityLabelRequestDto
         {
-            Name = "Restricted",
+            Name = "Restricted_" + Guid.NewGuid(),
             Description = "Restricted label"
         };
         var label2 = await _sensitivityLabelBusiness.CreateSensitivityLabel(uid, label2Dto, pid, organizationId);
 
-        // Create record with both labels
+        // Create record
         var record = new Record
         {
             Name = "Multi-Label Record",
@@ -710,7 +873,55 @@ public class RecordBusinessTests : IntegrationTestBase
         Context.Records.Add(record);
         await Context.SaveChangesAsync();
 
-        // Attach both labels
+        Context.ChangeTracker.Clear();
+
+        // Get permissions for label1 only (give user access to label1 but NOT label2)
+        var label1ReadPermission = await Context.Permissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label1.Id && p.Action == "read");
+
+        var label1WritePermission = await Context.Permissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label1.Id && p.Action == "write");
+
+        var label2WritePermission = await Context.Permissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label2.Id && p.Action == "write");
+
+        Assert.NotNull(label1ReadPermission);
+        Assert.NotNull(label1WritePermission);
+        Assert.NotNull(label2WritePermission);
+
+        // Get the role and attach only label1 permissions
+        var role = await Context.Roles
+            .FirstOrDefaultAsync(r => r.Id == roleId);
+
+        Assert.NotNull(role);
+
+        var permissionsToAdd = new[]
+        {
+            label1ReadPermission,
+            label1WritePermission,
+            label2WritePermission
+        };
+
+        foreach (var permission in permissionsToAdd)
+        {
+            if (Context.Entry(permission).State == EntityState.Detached)
+            {
+                Context.Attach(permission);
+            }
+
+            if (!role.Permissions.Any(p => p.Id == permission.Id))
+            {
+                role.Permissions.Add(permission);
+            }
+        }
+
+        await Context.SaveChangesAsync();
+        Context.ChangeTracker.Clear();
+
+        // Attach both labels to the record
         await _recordBusiness.AttachLabel(uid, organizationId, pid, record.Id, label1.Id);
         await _recordBusiness.AttachLabel(uid, organizationId, pid, record.Id, label2.Id);
 
@@ -742,6 +953,7 @@ public class RecordBusinessTests : IntegrationTestBase
         var record1 = new Record
         {
             Name = "DS1 No Labels",
+            Description = "DS1 No Labels",
             OriginalId = Guid.NewGuid().ToString(),
             Properties = "{}",
             ProjectId = pid,
@@ -754,20 +966,108 @@ public class RecordBusinessTests : IntegrationTestBase
         Context.Records.Add(record1);
         await Context.SaveChangesAsync();
 
+        // Create labels
+        var publicLabelDto = new CreateSensitivityLabelRequestDto
+        {
+            Name = "Public_" + Guid.NewGuid(),
+            Description = "Public label"
+        };
+        var secretLabelDto = new CreateSensitivityLabelRequestDto
+        {
+            Name = "Secret_" + Guid.NewGuid(),
+            Description = "Secret label"
+        };
+        var publicLabel =
+            await _sensitivityLabelBusiness.CreateSensitivityLabel(uid, publicLabelDto, pid, organizationId);
+        var secretLabel =
+            await _sensitivityLabelBusiness.CreateSensitivityLabel(uid, secretLabelDto, pid, organizationId);
+
         // Record 2: Second datasource, label with access (should NOT be returned - wrong datasource)
-        var record2Id = await CreateRecordWithLabelsAndDataSource(
-            new List<string> { "Public" },
-            giveUserAccess: true,
-            action: "read",
-            dataSourceId: dataSource2.Id
-        );
+        var record2 = new Record
+        {
+            Name = "DS2 With Public Label",
+            Description = "DS1 No Labels",
+            OriginalId = Guid.NewGuid().ToString(),
+            Properties = "{}",
+            ProjectId = pid,
+            DataSourceId = dataSource2.Id,
+            ClassId = cid,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            OrganizationId = organizationId
+        };
+        Context.Records.Add(record2);
+        await Context.SaveChangesAsync();
+        var record2Id = record2.Id;
 
         // Record 3: First datasource, label without access (should NOT be returned - no label access)
-        var record3Id = await CreateRecordWithLabels(
-            new List<string> { "Secret" },
-            giveUserAccess: false,
-            action: "read"
-        );
+        var record3 = new Record
+        {
+            Name = "DS1 With Secret Label",
+            Description = "DS1 No Labels",
+            OriginalId = Guid.NewGuid().ToString(),
+            Properties = "{}",
+            ProjectId = pid,
+            DataSourceId = did,
+            ClassId = cid,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            OrganizationId = organizationId
+        };
+        Context.Records.Add(record3);
+        await Context.SaveChangesAsync();
+        var record3Id = record3.Id;
+
+        Context.ChangeTracker.Clear();
+
+        // Get permissions for public label only (NOT secret label)
+        var publicReadPermission = await Context.Permissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == publicLabel.Id && p.Action == "read");
+
+        var publicWritePermission = await Context.Permissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == publicLabel.Id && p.Action == "write");
+
+        var secretWritePermission = await Context.Permissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == secretLabel.Id && p.Action == "write");
+
+        Assert.NotNull(publicReadPermission);
+        Assert.NotNull(publicWritePermission);
+
+        // Get the role and attach only public label permissions
+        var role = await Context.Roles
+            .FirstOrDefaultAsync(r => r.Id == roleId);
+
+        Assert.NotNull(role);
+
+        var permissionsToAdd = new[]
+        {
+            publicReadPermission,
+            publicWritePermission,
+            secretWritePermission
+        };
+
+        foreach (var permission in permissionsToAdd)
+        {
+            if (Context.Entry(permission).State == EntityState.Detached)
+            {
+                Context.Attach(permission);
+            }
+
+            if (!role.Permissions.Any(p => p.Id == permission.Id))
+            {
+                role.Permissions.Add(permission);
+            }
+        }
+
+        await Context.SaveChangesAsync();
+        Context.ChangeTracker.Clear();
+
+        // Attach labels to records
+        await _recordBusiness.AttachLabel(uid, organizationId, pid, record2Id, publicLabel.Id);
+        await _recordBusiness.AttachLabel(uid, organizationId, pid, record3Id, secretLabel.Id);
 
         // Act - filter by first datasource
         var records = await _recordBusiness.GetAllRecords(uid, organizationId, pid, did, true);
@@ -782,10 +1082,27 @@ public class RecordBusinessTests : IntegrationTestBase
     [Fact]
     public async Task GetAllRecords_WithFileTypeFilter_AndLabelAuth_ReturnsBothFiltered()
     {
+        // Create labels
+        var publicLabelDto = new CreateSensitivityLabelRequestDto
+        {
+            Name = "Public_" + Guid.NewGuid(),
+            Description = "Public label"
+        };
+        var classifiedLabelDto = new CreateSensitivityLabelRequestDto
+        {
+            Name = "Classified_" + Guid.NewGuid(),
+            Description = "Classified label"
+        };
+        var publicLabel =
+            await _sensitivityLabelBusiness.CreateSensitivityLabel(uid, publicLabelDto, pid, organizationId);
+        var classifiedLabel =
+            await _sensitivityLabelBusiness.CreateSensitivityLabel(uid, classifiedLabelDto, pid, organizationId);
+
         // Record 1: PDF with no labels (should be returned)
         var record1 = new Record
         {
             Name = "PDF No Labels",
+            Description = "No Labels",
             OriginalId = Guid.NewGuid().ToString(),
             Properties = "{}",
             ProjectId = pid,
@@ -797,31 +1114,115 @@ public class RecordBusinessTests : IntegrationTestBase
             OrganizationId = organizationId
         };
         Context.Records.Add(record1);
-        await Context.SaveChangesAsync();
 
         // Record 2: PDF with label user has access to (should be returned)
-        var record2Id = await CreateRecordWithLabelsAndFileType(
-            new List<string> { "Public" },
-            giveUserAccess: true,
-            action: "read",
-            fileType: "pdf"
-        );
+        var record2 = new Record
+        {
+            Name = "PDF With Public Label",
+            Description = "Public label",
+            OriginalId = Guid.NewGuid().ToString(),
+            Properties = "{}",
+            ProjectId = pid,
+            DataSourceId = did,
+            ClassId = cid,
+            FileType = "pdf",
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            OrganizationId = organizationId
+        };
+        Context.Records.Add(record2);
 
         // Record 3: PNG with label user has access to (should NOT be returned - wrong file type)
-        var record3Id = await CreateRecordWithLabelsAndFileType(
-            new List<string> { "Public" },
-            giveUserAccess: true,
-            action: "read",
-            fileType: "png"
-        );
+        var record3 = new Record
+        {
+            Name = "PNG With Public Label",
+            Description = "Public label",
+            OriginalId = Guid.NewGuid().ToString(),
+            Properties = "{}",
+            ProjectId = pid,
+            DataSourceId = did,
+            ClassId = cid,
+            FileType = "png",
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            OrganizationId = organizationId
+        };
+        Context.Records.Add(record3);
 
         // Record 4: PDF with label user doesn't have access to (should NOT be returned - no label access)
-        var record4Id = await CreateRecordWithLabelsAndFileType(
-            new List<string> { "Classified" },
-            giveUserAccess: false,
-            action: "read",
-            fileType: "pdf"
-        );
+        var record4 = new Record
+        {
+            Name = "PDF With Classified Label",
+            Description = "Classified label",
+            OriginalId = Guid.NewGuid().ToString(),
+            Properties = "{}",
+            ProjectId = pid,
+            DataSourceId = did,
+            ClassId = cid,
+            FileType = "pdf",
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            OrganizationId = organizationId
+        };
+        Context.Records.Add(record4);
+
+        await Context.SaveChangesAsync();
+
+        var record2Id = record2.Id;
+        var record3Id = record3.Id;
+        var record4Id = record4.Id;
+
+        Context.ChangeTracker.Clear();
+
+        // Get permissions for public label only (NOT classified label)
+        var publicReadPermission = await Context.Permissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == publicLabel.Id && p.Action == "read");
+
+        var publicWritePermission = await Context.Permissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == publicLabel.Id && p.Action == "write");
+
+        var classifiedWritePermission = await Context.Permissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == classifiedLabel.Id && p.Action == "write");
+
+        Assert.NotNull(publicReadPermission);
+        Assert.NotNull(publicWritePermission);
+
+        // Get the role and attach only public label permissions
+        var role = await Context.Roles
+            .FirstOrDefaultAsync(r => r.Id == roleId);
+
+        Assert.NotNull(role);
+
+        var permissionsToAdd = new[]
+        {
+            publicReadPermission,
+            publicWritePermission,
+            classifiedWritePermission
+        };
+
+        foreach (var permission in permissionsToAdd)
+        {
+            if (Context.Entry(permission).State == EntityState.Detached)
+            {
+                Context.Attach(permission);
+            }
+
+            if (!role.Permissions.Any(p => p.Id == permission.Id))
+            {
+                role.Permissions.Add(permission);
+            }
+        }
+
+        await Context.SaveChangesAsync();
+        Context.ChangeTracker.Clear();
+
+        // Attach labels to records
+        await _recordBusiness.AttachLabel(uid, organizationId, pid, record2Id, publicLabel.Id);
+        await _recordBusiness.AttachLabel(uid, organizationId, pid, record3Id, publicLabel.Id);
+        await _recordBusiness.AttachLabel(uid, organizationId, pid, record4Id, classifiedLabel.Id);
 
         // Act - filter by PDF file type
         var records = await _recordBusiness.GetAllRecords(uid, organizationId, pid, null, true, "pdf");
@@ -832,132 +1233,6 @@ public class RecordBusinessTests : IntegrationTestBase
         Assert.Contains(records, r => r.Id == record2Id); // Correct file type, user has access
         Assert.DoesNotContain(records, r => r.Id == record3Id); // Wrong file type
         Assert.DoesNotContain(records, r => r.Id == record4Id); // Correct file type, but no label access
-    }
-
-// Helper method for datasource-specific records
-    private async Task<long> CreateRecordWithLabelsAndDataSource(
-        List<string> labelNames,
-        bool giveUserAccess,
-        string action,
-        long dataSourceId)
-    {
-        var record = new Record
-        {
-            Name = "Test Record",
-            Description = "Test record for unit tests",
-            OriginalId = Guid.NewGuid().ToString(),
-            Properties = JsonSerializer.Serialize(new { TestProperty = "TestValue" }),
-            ProjectId = pid,
-            DataSourceId = dataSourceId, // Use custom datasource
-            ClassId = cid,
-            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
-            LastUpdatedBy = uid,
-            Uri = "localhost:8090",
-            FileType = "pdf",
-            OrganizationId = organizationId
-        };
-
-        Context.Records.Add(record);
-        await Context.SaveChangesAsync();
-
-        foreach (var labelName in labelNames)
-        {
-            var labelDto = new CreateSensitivityLabelRequestDto
-            {
-                Name = labelName,
-                Description = labelName,
-            };
-
-            var label = await _sensitivityLabelBusiness.CreateSensitivityLabel(uid, labelDto, pid, organizationId);
-            await _recordBusiness.AttachLabel(uid, organizationId, pid, record.Id, label.Id);
-
-            if (giveUserAccess)
-            {
-                var roleId = await Context.ProjectMembers
-                    .Where(pm => pm.ProjectId == pid && pm.UserId == uid)
-                    .Select(pm => pm.RoleId)
-                    .FirstOrDefaultAsync();
-
-                var permission = await Context.Permissions
-                    .Where(p => p.LabelId == label.Id && p.Action == action)
-                    .FirstOrDefaultAsync();
-
-                var role = await Context.Roles
-                    .Include(r => r.Permissions)
-                    .FirstOrDefaultAsync(r => r.Id == roleId);
-
-                if (!role.Permissions.Contains(permission))
-                {
-                    role.Permissions.Add(permission);
-                    await Context.SaveChangesAsync();
-                }
-            }
-        }
-
-        return record.Id;
-    }
-
-// Helper method for file type-specific records
-    private async Task<long> CreateRecordWithLabelsAndFileType(
-        List<string> labelNames,
-        bool giveUserAccess,
-        string action,
-        string fileType)
-    {
-        var record = new Record
-        {
-            Name = "Test Record",
-            Description = "Test record for unit tests",
-            OriginalId = Guid.NewGuid().ToString(),
-            Properties = JsonSerializer.Serialize(new { TestProperty = "TestValue" }),
-            ProjectId = pid,
-            DataSourceId = did,
-            ClassId = cid,
-            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
-            LastUpdatedBy = uid,
-            Uri = "localhost:8090",
-            FileType = fileType, // Use custom file type
-            OrganizationId = organizationId
-        };
-
-        Context.Records.Add(record);
-        await Context.SaveChangesAsync();
-
-        foreach (var labelName in labelNames)
-        {
-            var labelDto = new CreateSensitivityLabelRequestDto
-            {
-                Name = labelName,
-                Description = labelName,
-            };
-
-            var label = await _sensitivityLabelBusiness.CreateSensitivityLabel(uid, labelDto, pid, organizationId);
-            await _recordBusiness.AttachLabel(uid, organizationId, pid, record.Id, label.Id);
-
-            if (giveUserAccess)
-            {
-                var roleId = await Context.ProjectMembers
-                    .Where(pm => pm.ProjectId == pid && pm.UserId == uid)
-                    .Select(pm => pm.RoleId)
-                    .FirstOrDefaultAsync();
-
-                var permission = await Context.Permissions
-                    .Where(p => p.LabelId == label.Id && p.Action == action)
-                    .FirstOrDefaultAsync();
-
-                var role = await Context.Roles
-                    .Include(r => r.Permissions)
-                    .FirstOrDefaultAsync(r => r.Id == roleId);
-
-                if (!role.Permissions.Contains(permission))
-                {
-                    role.Permissions.Add(permission);
-                    await Context.SaveChangesAsync();
-                }
-            }
-        }
-
-        return record.Id;
     }
 
     #endregion
@@ -1181,6 +1456,730 @@ public class RecordBusinessTests : IntegrationTestBase
 
     #endregion
 
+    #region GetRecordsByTags_SensitivityLabelsAuthorization Tests
+
+    [Fact]
+    public async Task GetRecordsByTags_FilterOutUnauthorizedRecordsBySensitivityLabels_ReturnsFilteredRecords()
+    {
+        // Arrange - Create a sensitivity label
+        var labelDto = new CreateSensitivityLabelRequestDto
+        {
+            Name = "Top Secret Label",
+            Description = "Top Secret Label",
+        };
+        var label = await _sensitivityLabelBusiness.CreateSensitivityLabel(uid, labelDto, pid, organizationId);
+
+        // Create a record with a tag and the sensitivity label
+        var testTag = await Context.Tags.FindAsync(tid);
+
+        var record = new Record
+        {
+            Name = "Tagged Record With Label",
+            Description = "Record with tag and sensitivity label",
+            OriginalId = Guid.NewGuid().ToString(),
+            Properties = JsonSerializer.Serialize(new { TestProperty = "TestValue" }),
+            ProjectId = pid,
+            DataSourceId = did,
+            ClassId = cid,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            Tags = new List<Tag> { testTag },
+            Uri = "localhost:8090",
+            FileType = "pdf",
+            OrganizationId = organizationId
+        };
+        Context.Records.Add(record);
+        await Context.SaveChangesAsync();
+
+        Context.ChangeTracker.Clear();
+
+        // Give user write permission with this label so that it can be attached to the record (workaround that does not invalidate the test)
+        var permission = await Context.Permissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "write");
+
+        var role = await Context.Roles
+            .AsNoTracking()
+            .Include(r => r.Permissions)
+            .FirstOrDefaultAsync(r => r.Id == roleId);
+
+        if (role != null && permission != null)
+        {
+            Context.Attach(role);
+            role.Permissions.Add(permission);
+            await Context.SaveChangesAsync();
+        }
+
+        await _recordBusiness.AttachLabel(uid, organizationId, pid, record.Id, label.Id);
+
+        // Act - Query by tag (user does NOT have access to the label)
+        var records = await _recordBusiness.GetRecordsByTags(uid, organizationId, pid, [tid], true);
+
+        // Assert - Record with sensitivity label should NOT be returned because user lacks access
+        Assert.NotNull(records);
+        Assert.DoesNotContain(records, r => r.Id == record.Id);
+        // The seeded record (which has the same tag but no label) should still be returned
+        Assert.Single(records);
+        Assert.Equal("Test Record", records.First().Name);
+    }
+
+    [Fact]
+    public async Task GetRecordsByTags_UserHasAccessToAllLabels_ReturnsRecords()
+    {
+        // Arrange - Create a sensitivity label
+        var labelDto = new CreateSensitivityLabelRequestDto
+        {
+            Name = "Confidential_" + Guid.NewGuid(),
+            Description = "Confidential Label",
+        };
+        var label = await _sensitivityLabelBusiness.CreateSensitivityLabel(uid, labelDto, pid, organizationId);
+
+        // Create a record with a tag and the sensitivity label
+        var testTag = await Context.Tags.FindAsync(tid);
+
+        var newRecord = new Record
+        {
+            Name = "Tagged Record With Accessible Label",
+            Description = "Record with tag and accessible label",
+            OriginalId = Guid.NewGuid().ToString(),
+            Properties = JsonSerializer.Serialize(new { TestProperty = "TestValue" }),
+            ProjectId = pid,
+            DataSourceId = did,
+            ClassId = cid,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            Tags = new List<Tag> { testTag },
+            Uri = "localhost:8090",
+            FileType = "pdf",
+            OrganizationId = organizationId
+        };
+        Context.Records.Add(newRecord);
+        await Context.SaveChangesAsync();
+
+        Context.ChangeTracker.Clear();
+
+        // Give user write permission so label can be attached (workaround that doesn't invalidate test)
+        var writePermission = await Context.Permissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "write");
+
+        var role = await Context.Roles
+            .AsNoTracking()
+            .Include(r => r.Permissions)
+            .FirstOrDefaultAsync(r => r.Id == roleId);
+
+        if (role != null && writePermission != null)
+        {
+            Context.Attach(role);
+            role.Permissions.Add(writePermission);
+            await Context.SaveChangesAsync();
+        }
+
+        await _recordBusiness.AttachLabel(uid, organizationId, pid, newRecord.Id, label.Id);
+
+        Context.ChangeTracker.Clear();
+
+        // Give user read permission to access the label
+        var readPermission = await Context.Permissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "read");
+
+        role = await Context.Roles
+            .AsNoTracking()
+            .Include(r => r.Permissions)
+            .FirstOrDefaultAsync(r => r.Id == roleId);
+
+        if (role != null && readPermission != null)
+        {
+            Context.Attach(role);
+            role.Permissions.Add(readPermission);
+            await Context.SaveChangesAsync();
+        }
+
+        // Act - Query by tag (user DOES have access to the label)
+        var records = await _recordBusiness.GetRecordsByTags(uid, organizationId, pid, [tid], true);
+
+        // Assert - Record with accessible label SHOULD be returned
+        Assert.NotNull(records);
+        Assert.Contains(records, r => r.Id == newRecord.Id);
+        // Should have both the seeded record and the new record
+        Assert.Equal(2, records.Count);
+    }
+
+    [Fact]
+    public async Task GetRecordsByTags_MultipleRecordsMixedAccess_ReturnsOnlyAuthorized()
+    {
+        // Arrange - Create two sensitivity labels
+        var labelDto1 = new CreateSensitivityLabelRequestDto
+        {
+            Name = "Accessible_" + Guid.NewGuid(),
+            Description = "Accessible Label",
+        };
+        var accessibleLabel =
+            await _sensitivityLabelBusiness.CreateSensitivityLabel(uid, labelDto1, pid, organizationId);
+
+        var labelDto2 = new CreateSensitivityLabelRequestDto
+        {
+            Name = "Restricted_" + Guid.NewGuid(),
+            Description = "Restricted Label",
+        };
+        var restrictedLabel =
+            await _sensitivityLabelBusiness.CreateSensitivityLabel(uid, labelDto2, pid, organizationId);
+
+        var testTag = await Context.Tags.FindAsync(tid);
+
+        // Record 1: Has requested tag, no labels (should be returned)
+        var record1 = new Record
+        {
+            Name = "Record Without Labels",
+            Description = "Record with tag but no labels",
+            OriginalId = Guid.NewGuid().ToString(),
+            Properties = JsonSerializer.Serialize(new { TestProperty = "TestValue" }),
+            ProjectId = pid,
+            DataSourceId = did,
+            ClassId = cid,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            Tags = new List<Tag> { testTag },
+            Uri = "localhost:8090",
+            FileType = "pdf",
+            OrganizationId = organizationId
+        };
+
+        // Record 2: Has requested tag, label with user access (should be returned)
+        var record2 = new Record
+        {
+            Name = "Record With Accessible Label",
+            Description = "Record with tag and accessible label",
+            OriginalId = Guid.NewGuid().ToString(),
+            Properties = JsonSerializer.Serialize(new { TestProperty = "TestValue" }),
+            ProjectId = pid,
+            DataSourceId = did,
+            ClassId = cid,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            Tags = new List<Tag> { testTag },
+            Uri = "localhost:8090",
+            FileType = "pdf",
+            OrganizationId = organizationId
+        };
+
+        // Record 3: Has requested tag, label without user access (should NOT be returned)
+        var record3 = new Record
+        {
+            Name = "Record With Restricted Label",
+            Description = "Record with tag and restricted label",
+            OriginalId = Guid.NewGuid().ToString(),
+            Properties = JsonSerializer.Serialize(new { TestProperty = "TestValue" }),
+            ProjectId = pid,
+            DataSourceId = did,
+            ClassId = cid,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            Tags = new List<Tag> { testTag },
+            Uri = "localhost:8090",
+            FileType = "pdf",
+            OrganizationId = organizationId
+        };
+
+        Context.Records.AddRange(record1, record2, record3);
+        await Context.SaveChangesAsync();
+
+        Context.ChangeTracker.Clear();
+
+        // Give user write permission for accessible label to attach it
+        var accessibleWritePermission = await Context.Permissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == accessibleLabel.Id && p.Action == "write");
+
+        var role = await Context.Roles
+            .AsNoTracking()
+            .Include(r => r.Permissions)
+            .FirstOrDefaultAsync(r => r.Id == roleId);
+
+        if (role != null && accessibleWritePermission != null)
+        {
+            Context.Attach(role);
+            role.Permissions.Add(accessibleWritePermission);
+            await Context.SaveChangesAsync();
+        }
+
+        await _recordBusiness.AttachLabel(uid, organizationId, pid, record2.Id, accessibleLabel.Id);
+
+        Context.ChangeTracker.Clear();
+
+        // Give user write permission for restricted label to attach it
+        var restrictedWritePermission = await Context.Permissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == restrictedLabel.Id && p.Action == "write");
+
+        role = await Context.Roles
+            .AsNoTracking()
+            .Include(r => r.Permissions)
+            .FirstOrDefaultAsync(r => r.Id == roleId);
+
+        if (role != null && restrictedWritePermission != null)
+        {
+            Context.Attach(role);
+            role.Permissions.Add(restrictedWritePermission);
+            await Context.SaveChangesAsync();
+        }
+
+        await _recordBusiness.AttachLabel(uid, organizationId, pid, record3.Id, restrictedLabel.Id);
+
+        Context.ChangeTracker.Clear();
+
+        // Give user read permission to accessible label only
+        var accessibleReadPermission = await Context.Permissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == accessibleLabel.Id && p.Action == "read");
+
+        role = await Context.Roles
+            .AsNoTracking()
+            .Include(r => r.Permissions)
+            .FirstOrDefaultAsync(r => r.Id == roleId);
+
+        if (role != null && accessibleReadPermission != null)
+        {
+            Context.Attach(role);
+            role.Permissions.Add(accessibleReadPermission);
+            await Context.SaveChangesAsync();
+        }
+
+        // Act
+        var records = await _recordBusiness.GetRecordsByTags(uid, organizationId, pid, [tid], true);
+
+        // Assert - Only records 1 and 2 should be returned
+        Assert.NotNull(records);
+        Assert.Contains(records, r => r.Id == record1.Id);
+        Assert.Contains(records, r => r.Id == record2.Id);
+        Assert.DoesNotContain(records, r => r.Id == record3.Id);
+        // Should have the seeded record, record1, and record2
+        Assert.Equal(3, records.Count);
+    }
+
+    [Fact]
+    public async Task GetRecordsByTags_RecordWithMultipleLabels_UserHasAll_ReturnsRecord()
+    {
+        // Arrange - Create two sensitivity labels
+        var labelDto1 = new CreateSensitivityLabelRequestDto
+        {
+            Name = "Label1_" + Guid.NewGuid(),
+            Description = "First Label",
+        };
+        var label1 = await _sensitivityLabelBusiness.CreateSensitivityLabel(uid, labelDto1, pid, organizationId);
+
+        var labelDto2 = new CreateSensitivityLabelRequestDto
+        {
+            Name = "Label2_" + Guid.NewGuid(),
+            Description = "Second Label",
+        };
+        var label2 = await _sensitivityLabelBusiness.CreateSensitivityLabel(uid, labelDto2, pid, organizationId);
+
+        var testTag = await Context.Tags.FindAsync(tid);
+
+        // Create a record with a tag and will attach two labels
+        var record = new Record
+        {
+            Name = "Record With Two Labels",
+            Description = "Record with tag and two labels",
+            OriginalId = Guid.NewGuid().ToString(),
+            Properties = JsonSerializer.Serialize(new { TestProperty = "TestValue" }),
+            ProjectId = pid,
+            DataSourceId = did,
+            ClassId = cid,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            Tags = new List<Tag> { testTag },
+            Uri = "localhost:8090",
+            FileType = "pdf",
+            OrganizationId = organizationId
+        };
+        Context.Records.Add(record);
+        await Context.SaveChangesAsync();
+
+        Context.ChangeTracker.Clear();
+
+        // Give user write permission for label1
+        var writePermission1 = await Context.Permissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label1.Id && p.Action == "write");
+
+        var role = await Context.Roles
+            .AsNoTracking()
+            .Include(r => r.Permissions)
+            .FirstOrDefaultAsync(r => r.Id == roleId);
+
+        if (role != null && writePermission1 != null)
+        {
+            Context.Attach(role);
+            role.Permissions.Add(writePermission1);
+            await Context.SaveChangesAsync();
+        }
+
+        await _recordBusiness.AttachLabel(uid, organizationId, pid, record.Id, label1.Id);
+
+        Context.ChangeTracker.Clear();
+
+        // Give user write permission for label2
+        var writePermission2 = await Context.Permissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label2.Id && p.Action == "write");
+
+        role = await Context.Roles
+            .AsNoTracking()
+            .Include(r => r.Permissions)
+            .FirstOrDefaultAsync(r => r.Id == roleId);
+
+        if (role != null && writePermission2 != null)
+        {
+            Context.Attach(role);
+            role.Permissions.Add(writePermission2);
+            await Context.SaveChangesAsync();
+        }
+
+        await _recordBusiness.AttachLabel(uid, organizationId, pid, record.Id, label2.Id);
+
+        Context.ChangeTracker.Clear();
+
+        // Give user read permission to BOTH labels
+        var readPermission1 = await Context.Permissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label1.Id && p.Action == "read");
+
+        role = await Context.Roles
+            .AsNoTracking()
+            .Include(r => r.Permissions)
+            .FirstOrDefaultAsync(r => r.Id == roleId);
+
+        if (role != null && readPermission1 != null)
+        {
+            Context.Attach(role);
+            role.Permissions.Add(readPermission1);
+            await Context.SaveChangesAsync();
+        }
+
+        Context.ChangeTracker.Clear();
+
+        var readPermission2 = await Context.Permissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label2.Id && p.Action == "read");
+
+        role = await Context.Roles
+            .AsNoTracking()
+            .Include(r => r.Permissions)
+            .FirstOrDefaultAsync(r => r.Id == roleId);
+
+        if (role != null && readPermission2 != null)
+        {
+            Context.Attach(role);
+            role.Permissions.Add(readPermission2);
+            await Context.SaveChangesAsync();
+        }
+
+        // Act
+        var records = await _recordBusiness.GetRecordsByTags(uid, organizationId, pid, [tid], true);
+
+        // Assert - Record with both accessible labels SHOULD be returned
+        Assert.NotNull(records);
+        Assert.Contains(records, r => r.Id == record.Id);
+        // Should have the seeded record and the new record
+        Assert.Equal(2, records.Count);
+    }
+
+    [Fact]
+    public async Task GetRecordsByTags_RecordWithMultipleLabels_UserMissingOne_FiltersRecord()
+    {
+        // Arrange - Create two sensitivity labels
+        var labelDto1 = new CreateSensitivityLabelRequestDto
+        {
+            Name = "Label1_" + Guid.NewGuid(),
+            Description = "First Label",
+        };
+        var label1 = await _sensitivityLabelBusiness.CreateSensitivityLabel(uid, labelDto1, pid, organizationId);
+
+        var labelDto2 = new CreateSensitivityLabelRequestDto
+        {
+            Name = "Label2_" + Guid.NewGuid(),
+            Description = "Second Label",
+        };
+        var label2 = await _sensitivityLabelBusiness.CreateSensitivityLabel(uid, labelDto2, pid, organizationId);
+
+        var testTag = await Context.Tags.FindAsync(tid);
+
+        // Create a record with a tag and will attach two labels
+        var record = new Record
+        {
+            Name = "Record With Two Labels",
+            Description = "Record with tag and two labels",
+            OriginalId = Guid.NewGuid().ToString(),
+            Properties = JsonSerializer.Serialize(new { TestProperty = "TestValue" }),
+            ProjectId = pid,
+            DataSourceId = did,
+            ClassId = cid,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            Tags = new List<Tag> { testTag },
+            Uri = "localhost:8090",
+            FileType = "pdf",
+            OrganizationId = organizationId
+        };
+        Context.Records.Add(record);
+        await Context.SaveChangesAsync();
+
+        Context.ChangeTracker.Clear();
+
+        // Give user write permission for label1
+        var writePermission1 = await Context.Permissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label1.Id && p.Action == "write");
+
+        var role = await Context.Roles
+            .AsNoTracking()
+            .Include(r => r.Permissions)
+            .FirstOrDefaultAsync(r => r.Id == roleId);
+
+        if (role != null && writePermission1 != null)
+        {
+            Context.Attach(role);
+            role.Permissions.Add(writePermission1);
+            await Context.SaveChangesAsync();
+        }
+
+        await _recordBusiness.AttachLabel(uid, organizationId, pid, record.Id, label1.Id);
+
+        Context.ChangeTracker.Clear();
+
+        // Give user write permission for label2
+        var writePermission2 = await Context.Permissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label2.Id && p.Action == "write");
+
+        role = await Context.Roles
+            .AsNoTracking()
+            .Include(r => r.Permissions)
+            .FirstOrDefaultAsync(r => r.Id == roleId);
+
+        if (role != null && writePermission2 != null)
+        {
+            Context.Attach(role);
+            role.Permissions.Add(writePermission2);
+            await Context.SaveChangesAsync();
+        }
+
+        await _recordBusiness.AttachLabel(uid, organizationId, pid, record.Id, label2.Id);
+
+        Context.ChangeTracker.Clear();
+
+        // Give user read permission to only ONE label (label1)
+        var readPermission1 = await Context.Permissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label1.Id && p.Action == "read");
+
+        role = await Context.Roles
+            .AsNoTracking()
+            .Include(r => r.Permissions)
+            .FirstOrDefaultAsync(r => r.Id == roleId);
+
+        if (role != null && readPermission1 != null)
+        {
+            Context.Attach(role);
+            role.Permissions.Add(readPermission1);
+            await Context.SaveChangesAsync();
+        }
+
+        // Act
+        var records = await _recordBusiness.GetRecordsByTags(uid, organizationId, pid, [tid], true);
+
+        // Assert - Record should NOT be returned (user must have access to ALL labels)
+        Assert.NotNull(records);
+        Assert.DoesNotContain(records, r => r.Id == record.Id);
+        // Should only have the seeded record
+        Assert.Single(records);
+    }
+
+    [Fact]
+    public async Task GetRecordsByTags_WithMultipleTags_AndLabelAuth_ReturnsBothFiltered()
+    {
+        // Arrange - Create two tags and two labels
+        var tag1 = await Context.Tags.FindAsync(tid);
+
+        var tag2 = new Tag
+        {
+            Name = "SecondTag_" + Guid.NewGuid(),
+            ProjectId = pid,
+            OrganizationId = organizationId
+        };
+        Context.Tags.Add(tag2);
+        await Context.SaveChangesAsync();
+
+        var labelDto1 = new CreateSensitivityLabelRequestDto
+        {
+            Name = "Accessible_" + Guid.NewGuid(),
+            Description = "Accessible Label",
+        };
+        var accessibleLabel =
+            await _sensitivityLabelBusiness.CreateSensitivityLabel(uid, labelDto1, pid, organizationId);
+
+        var labelDto2 = new CreateSensitivityLabelRequestDto
+        {
+            Name = "Restricted_" + Guid.NewGuid(),
+            Description = "Restricted Label",
+        };
+        var restrictedLabel =
+            await _sensitivityLabelBusiness.CreateSensitivityLabel(uid, labelDto2, pid, organizationId);
+
+        // Record 1: Has all requested tags, no labels (should be returned)
+        var record1 = new Record
+        {
+            Name = "Record With All Tags No Labels",
+            Description = "Has both tags, no labels",
+            OriginalId = Guid.NewGuid().ToString(),
+            Properties = JsonSerializer.Serialize(new { TestProperty = "TestValue" }),
+            ProjectId = pid,
+            DataSourceId = did,
+            ClassId = cid,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            Tags = new List<Tag> { tag1, tag2 },
+            Uri = "localhost:8090",
+            FileType = "pdf",
+            OrganizationId = organizationId
+        };
+
+        // Record 2: Has all requested tags, label with access (should be returned)
+        var record2 = new Record
+        {
+            Name = "Record With All Tags And Accessible Label",
+            Description = "Has both tags and accessible label",
+            OriginalId = Guid.NewGuid().ToString(),
+            Properties = JsonSerializer.Serialize(new { TestProperty = "TestValue" }),
+            ProjectId = pid,
+            DataSourceId = did,
+            ClassId = cid,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            Tags = new List<Tag> { tag1, tag2 },
+            Uri = "localhost:8090",
+            FileType = "pdf",
+            OrganizationId = organizationId
+        };
+
+        // Record 3: Has only some tags, label with access (should NOT be returned - missing tags)
+        var record3 = new Record
+        {
+            Name = "Record With Partial Tags",
+            Description = "Has only one tag and accessible label",
+            OriginalId = Guid.NewGuid().ToString(),
+            Properties = JsonSerializer.Serialize(new { TestProperty = "TestValue" }),
+            ProjectId = pid,
+            DataSourceId = did,
+            ClassId = cid,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            Tags = new List<Tag> { tag1 },
+            Uri = "localhost:8090",
+            FileType = "pdf",
+            OrganizationId = organizationId
+        };
+
+        // Record 4: Has all requested tags, label without access (should NOT be returned - no label access)
+        var record4 = new Record
+        {
+            Name = "Record With All Tags And Restricted Label",
+            Description = "Has both tags and restricted label",
+            OriginalId = Guid.NewGuid().ToString(),
+            Properties = JsonSerializer.Serialize(new { TestProperty = "TestValue" }),
+            ProjectId = pid,
+            DataSourceId = did,
+            ClassId = cid,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            Tags = new List<Tag> { tag1, tag2 },
+            Uri = "localhost:8090",
+            FileType = "pdf",
+            OrganizationId = organizationId
+        };
+
+        Context.Records.AddRange(record1, record2, record3, record4);
+        await Context.SaveChangesAsync();
+
+        Context.ChangeTracker.Clear();
+
+        // Give user write permission for accessible label
+        var accessibleWritePermission = await Context.Permissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == accessibleLabel.Id && p.Action == "write");
+
+        var role = await Context.Roles
+            .AsNoTracking()
+            .Include(r => r.Permissions)
+            .FirstOrDefaultAsync(r => r.Id == roleId);
+
+        if (role != null && accessibleWritePermission != null)
+        {
+            Context.Attach(role);
+            role.Permissions.Add(accessibleWritePermission);
+            await Context.SaveChangesAsync();
+        }
+
+        await _recordBusiness.AttachLabel(uid, organizationId, pid, record2.Id, accessibleLabel.Id);
+        await _recordBusiness.AttachLabel(uid, organizationId, pid, record3.Id, accessibleLabel.Id);
+
+        Context.ChangeTracker.Clear();
+
+        // Give user write permission for restricted label
+        var restrictedWritePermission = await Context.Permissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == restrictedLabel.Id && p.Action == "write");
+
+        role = await Context.Roles
+            .AsNoTracking()
+            .Include(r => r.Permissions)
+            .FirstOrDefaultAsync(r => r.Id == roleId);
+
+        if (role != null && restrictedWritePermission != null)
+        {
+            Context.Attach(role);
+            role.Permissions.Add(restrictedWritePermission);
+            await Context.SaveChangesAsync();
+        }
+
+        await _recordBusiness.AttachLabel(uid, organizationId, pid, record4.Id, restrictedLabel.Id);
+
+        Context.ChangeTracker.Clear();
+
+        // Give user read permission to accessible label only
+        var accessibleReadPermission = await Context.Permissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == accessibleLabel.Id && p.Action == "read");
+
+        role = await Context.Roles
+            .AsNoTracking()
+            .Include(r => r.Permissions)
+            .FirstOrDefaultAsync(r => r.Id == roleId);
+
+        if (role != null && accessibleReadPermission != null)
+        {
+            Context.Attach(role);
+            role.Permissions.Add(accessibleReadPermission);
+            await Context.SaveChangesAsync();
+        }
+
+        // Act - Query by both tags
+        var records = await _recordBusiness.GetRecordsByTags(uid, organizationId, pid, [tid, tag2.Id], true);
+
+        // Assert - Only records 1 and 2 should be returned
+        Assert.NotNull(records);
+        Assert.Contains(records, r => r.Id == record1.Id);
+        Assert.Contains(records, r => r.Id == record2.Id);
+        Assert.DoesNotContain(records, r => r.Id == record3.Id); // Missing tags
+        Assert.DoesNotContain(records, r => r.Id == record4.Id); // No label access
+        Assert.Equal(2, records.Count);
+    }
+
+    #endregion
+
     #region GetRecord Tests
 
     [Fact]
@@ -1207,6 +2206,541 @@ public class RecordBusinessTests : IntegrationTestBase
 
     #endregion
 
+    #region GetRecord_SensitivityLabelsAuthorization Tests
+
+    [Fact]
+    public async Task GetRecord_FilterOutUnauthorizedRecordBySensitivityLabel_ThrowsKeyNotFoundException()
+    {
+        // Arrange - Create a sensitivity label
+        var labelDto = new CreateSensitivityLabelRequestDto
+        {
+            Name = "Top Secret Label",
+            Description = "Top Secret Label",
+        };
+        var label = await _sensitivityLabelBusiness.CreateSensitivityLabel(uid, labelDto, pid, organizationId);
+
+        var record = new Record
+        {
+            Name = "Test Record",
+            Description = "Test record for unit tests",
+            OriginalId = Guid.NewGuid().ToString(),
+            Properties = JsonSerializer.Serialize(new { TestProperty = "TestValue" }),
+            ProjectId = pid,
+            DataSourceId = did,
+            ClassId = cid,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            Uri = "localhost:8090",
+            FileType = "pdf",
+            OrganizationId = organizationId
+        };
+        Context.Records.Add(record);
+        await Context.SaveChangesAsync();
+
+        Context.ChangeTracker.Clear();
+
+        // Give user write permission to attach the label
+        var writePermission = await Context.Permissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "write");
+
+        var role = await Context.Roles
+            .AsNoTracking()
+            .Include(r => r.Permissions)
+            .FirstOrDefaultAsync(r => r.Id == roleId);
+
+        if (role != null && writePermission != null)
+        {
+            Context.Attach(role);
+            role.Permissions.Add(writePermission);
+            await Context.SaveChangesAsync();
+        }
+
+        await _recordBusiness.AttachLabel(uid, organizationId, pid, record.Id, label.Id);
+
+        // Act & Assert - Record with sensitivity label should NOT be returned because user lacks access
+        var exception = await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            _recordBusiness.GetRecord(uid, organizationId, pid, record.Id, true));
+
+        Assert.Contains($"You do not have access to all required sensitivity labels for record {record.Id}", exception.Message);
+    }
+
+    [Fact]
+    public async Task GetRecord_UserHasAccessToLabel_ReturnsRecord()
+    {
+        // Arrange - Create a sensitivity label
+        var labelDto = new CreateSensitivityLabelRequestDto
+        {
+            Name = "Confidential_" + Guid.NewGuid(),
+            Description = "Confidential Label",
+        };
+        var label = await _sensitivityLabelBusiness.CreateSensitivityLabel(uid, labelDto, pid, organizationId);
+
+        var record = new Record
+        {
+            Name = "Record With Accessible Label",
+            Description = "Record with accessible label",
+            OriginalId = Guid.NewGuid().ToString(),
+            Properties = JsonSerializer.Serialize(new { TestProperty = "TestValue" }),
+            ProjectId = pid,
+            DataSourceId = did,
+            ClassId = cid,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            Uri = "localhost:8090",
+            FileType = "pdf",
+            OrganizationId = organizationId
+        };
+        Context.Records.Add(record);
+        await Context.SaveChangesAsync();
+
+        Context.ChangeTracker.Clear();
+
+        // Give user write permission to attach the label
+        var writePermission = await Context.Permissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "write");
+
+        var role = await Context.Roles
+            .AsNoTracking()
+            .Include(r => r.Permissions)
+            .FirstOrDefaultAsync(r => r.Id == roleId);
+
+        if (role != null && writePermission != null)
+        {
+            Context.Attach(role);
+            role.Permissions.Add(writePermission);
+            await Context.SaveChangesAsync();
+        }
+
+        await _recordBusiness.AttachLabel(uid, organizationId, pid, record.Id, label.Id);
+
+        Context.ChangeTracker.Clear();
+
+        // Give user read permission to access the label
+        var readPermission = await Context.Permissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "read");
+
+        role = await Context.Roles
+            .AsNoTracking()
+            .Include(r => r.Permissions)
+            .FirstOrDefaultAsync(r => r.Id == roleId);
+
+        if (role != null && readPermission != null)
+        {
+            Context.Attach(role);
+            role.Permissions.Add(readPermission);
+            await Context.SaveChangesAsync();
+        }
+
+        // Act - Get record (user DOES have access to the label)
+        var result = await _recordBusiness.GetRecord(uid, organizationId, pid, record.Id, true);
+
+        // Assert - Record with accessible label SHOULD be returned
+        Assert.NotNull(result);
+        Assert.Equal(record.Id, result.Id);
+        Assert.Equal("Record With Accessible Label", result.Name);
+    }
+
+    [Fact]
+    public async Task GetRecord_NoLabel_ReturnsRecord()
+    {
+        // Arrange - Create a record without any labels
+        var record = new Record
+        {
+            Name = "Record Without Labels",
+            Description = "Record with no labels",
+            OriginalId = Guid.NewGuid().ToString(),
+            Properties = JsonSerializer.Serialize(new { TestProperty = "TestValue" }),
+            ProjectId = pid,
+            DataSourceId = did,
+            ClassId = cid,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            Uri = "localhost:8090",
+            FileType = "pdf",
+            OrganizationId = organizationId
+        };
+        Context.Records.Add(record);
+        await Context.SaveChangesAsync();
+
+        // Act - Get record (no labels to check)
+        var result = await _recordBusiness.GetRecord(uid, organizationId, pid, record.Id, true);
+
+        // Assert - Record without labels SHOULD be returned
+        Assert.NotNull(result);
+        Assert.Equal(record.Id, result.Id);
+        Assert.Equal("Record Without Labels", result.Name);
+    }
+
+    [Fact]
+    public async Task GetRecord_RecordWithMultipleLabels_UserHasAll_ReturnsRecord()
+    {
+        // Arrange - Create two sensitivity labels
+        var labelDto1 = new CreateSensitivityLabelRequestDto
+        {
+            Name = "Label1_" + Guid.NewGuid(),
+            Description = "First Label",
+        };
+        var label1 = await _sensitivityLabelBusiness.CreateSensitivityLabel(uid, labelDto1, pid, organizationId);
+
+        var labelDto2 = new CreateSensitivityLabelRequestDto
+        {
+            Name = "Label2_" + Guid.NewGuid(),
+            Description = "Second Label",
+        };
+        var label2 = await _sensitivityLabelBusiness.CreateSensitivityLabel(uid, labelDto2, pid, organizationId);
+
+        // Create a record that will have two labels
+        var record = new Record
+        {
+            Name = "Record With Two Labels",
+            Description = "Record with two labels",
+            OriginalId = Guid.NewGuid().ToString(),
+            Properties = JsonSerializer.Serialize(new { TestProperty = "TestValue" }),
+            ProjectId = pid,
+            DataSourceId = did,
+            ClassId = cid,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            Uri = "localhost:8090",
+            FileType = "pdf",
+            OrganizationId = organizationId
+        };
+        Context.Records.Add(record);
+        await Context.SaveChangesAsync();
+
+        Context.ChangeTracker.Clear();
+
+        // Give user write permission for label1
+        var writePermission1 = await Context.Permissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label1.Id && p.Action == "write");
+
+        var role = await Context.Roles
+            .AsNoTracking()
+            .Include(r => r.Permissions)
+            .FirstOrDefaultAsync(r => r.Id == roleId);
+
+        if (role != null && writePermission1 != null)
+        {
+            Context.Attach(role);
+            role.Permissions.Add(writePermission1);
+            await Context.SaveChangesAsync();
+        }
+
+        await _recordBusiness.AttachLabel(uid, organizationId, pid, record.Id, label1.Id);
+
+        Context.ChangeTracker.Clear();
+
+        // Give user write permission for label2
+        var writePermission2 = await Context.Permissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label2.Id && p.Action == "write");
+
+        role = await Context.Roles
+            .AsNoTracking()
+            .Include(r => r.Permissions)
+            .FirstOrDefaultAsync(r => r.Id == roleId);
+
+        if (role != null && writePermission2 != null)
+        {
+            Context.Attach(role);
+            role.Permissions.Add(writePermission2);
+            await Context.SaveChangesAsync();
+        }
+
+        await _recordBusiness.AttachLabel(uid, organizationId, pid, record.Id, label2.Id);
+
+        Context.ChangeTracker.Clear();
+
+        // Give user read permission to BOTH labels
+        var readPermission1 = await Context.Permissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label1.Id && p.Action == "read");
+
+        role = await Context.Roles
+            .AsNoTracking()
+            .Include(r => r.Permissions)
+            .FirstOrDefaultAsync(r => r.Id == roleId);
+
+        if (role != null && readPermission1 != null)
+        {
+            Context.Attach(role);
+            role.Permissions.Add(readPermission1);
+            await Context.SaveChangesAsync();
+        }
+
+        Context.ChangeTracker.Clear();
+
+        var readPermission2 = await Context.Permissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label2.Id && p.Action == "read");
+
+        role = await Context.Roles
+            .AsNoTracking()
+            .Include(r => r.Permissions)
+            .FirstOrDefaultAsync(r => r.Id == roleId);
+
+        if (role != null && readPermission2 != null)
+        {
+            Context.Attach(role);
+            role.Permissions.Add(readPermission2);
+            await Context.SaveChangesAsync();
+        }
+
+        // Act - Get record (user has access to both labels)
+        var result = await _recordBusiness.GetRecord(uid, organizationId, pid, record.Id, true);
+
+        // Assert - Record with both accessible labels SHOULD be returned
+        Assert.NotNull(result);
+        Assert.Equal(record.Id, result.Id);
+        Assert.Equal("Record With Two Labels", result.Name);
+    }
+
+    [Fact]
+    public async Task GetRecord_RecordWithMultipleLabels_UserMissingOne_ThrowsKeyNotFoundException()
+    {
+        // Arrange - Create two sensitivity labels
+        var labelDto1 = new CreateSensitivityLabelRequestDto
+        {
+            Name = "Label1_" + Guid.NewGuid(),
+            Description = "First Label",
+        };
+        var label1 = await _sensitivityLabelBusiness.CreateSensitivityLabel(uid, labelDto1, pid, organizationId);
+
+        var labelDto2 = new CreateSensitivityLabelRequestDto
+        {
+            Name = "Label2_" + Guid.NewGuid(),
+            Description = "Second Label",
+        };
+        var label2 = await _sensitivityLabelBusiness.CreateSensitivityLabel(uid, labelDto2, pid, organizationId);
+
+        // Create a record that will have two labels
+        var record = new Record
+        {
+            Name = "Record With Two Labels",
+            Description = "Record with two labels",
+            OriginalId = Guid.NewGuid().ToString(),
+            Properties = JsonSerializer.Serialize(new { TestProperty = "TestValue" }),
+            ProjectId = pid,
+            DataSourceId = did,
+            ClassId = cid,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            Uri = "localhost:8090",
+            FileType = "pdf",
+            OrganizationId = organizationId
+        };
+        Context.Records.Add(record);
+        await Context.SaveChangesAsync();
+
+        Context.ChangeTracker.Clear();
+
+        // Give user write permission for label1
+        var writePermission1 = await Context.Permissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label1.Id && p.Action == "write");
+
+        var role = await Context.Roles
+            .AsNoTracking()
+            .Include(r => r.Permissions)
+            .FirstOrDefaultAsync(r => r.Id == roleId);
+
+        if (role != null && writePermission1 != null)
+        {
+            Context.Attach(role);
+            role.Permissions.Add(writePermission1);
+            await Context.SaveChangesAsync();
+        }
+
+        await _recordBusiness.AttachLabel(uid, organizationId, pid, record.Id, label1.Id);
+
+        Context.ChangeTracker.Clear();
+
+        // Give user write permission for label2
+        var writePermission2 = await Context.Permissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label2.Id && p.Action == "write");
+
+        role = await Context.Roles
+            .AsNoTracking()
+            .Include(r => r.Permissions)
+            .FirstOrDefaultAsync(r => r.Id == roleId);
+
+        if (role != null && writePermission2 != null)
+        {
+            Context.Attach(role);
+            role.Permissions.Add(writePermission2);
+            await Context.SaveChangesAsync();
+        }
+
+        await _recordBusiness.AttachLabel(uid, organizationId, pid, record.Id, label2.Id);
+
+        Context.ChangeTracker.Clear();
+
+        // Give user read permission to only ONE label (label1)
+        var readPermission1 = await Context.Permissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label1.Id && p.Action == "read");
+
+        role = await Context.Roles
+            .AsNoTracking()
+            .Include(r => r.Permissions)
+            .FirstOrDefaultAsync(r => r.Id == roleId);
+
+        if (role != null && readPermission1 != null)
+        {
+            Context.Attach(role);
+            role.Permissions.Add(readPermission1);
+            await Context.SaveChangesAsync();
+        }
+
+        // Act & Assert - Record should NOT be returned (user must have access to ALL labels)
+        var exception = await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            _recordBusiness.GetRecord(uid, organizationId, pid, record.Id, true));
+
+        Assert.Contains($"You do not have access to all required sensitivity labels for record {record.Id}", exception.Message);
+    }
+
+    [Fact]
+    public async Task GetRecord_MixedLabelAccess_WithAccessibleLabel_ReturnsRecord()
+    {
+        // Arrange - Create two sensitivity labels
+        var labelDto1 = new CreateSensitivityLabelRequestDto
+        {
+            Name = "Accessible_" + Guid.NewGuid(),
+            Description = "Accessible Label",
+        };
+        var accessibleLabel =
+            await _sensitivityLabelBusiness.CreateSensitivityLabel(uid, labelDto1, pid, organizationId);
+
+        var labelDto2 = new CreateSensitivityLabelRequestDto
+        {
+            Name = "Restricted_" + Guid.NewGuid(),
+            Description = "Restricted Label",
+        };
+        var restrictedLabel =
+            await _sensitivityLabelBusiness.CreateSensitivityLabel(uid, labelDto2, pid, organizationId);
+
+        // Create a record with accessible label
+        var recordWithAccess = new Record
+        {
+            Name = "Record With Accessible Label",
+            Description = "Record with accessible label",
+            OriginalId = Guid.NewGuid().ToString(),
+            Properties = JsonSerializer.Serialize(new { TestProperty = "TestValue" }),
+            ProjectId = pid,
+            DataSourceId = did,
+            ClassId = cid,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            Uri = "localhost:8090",
+            FileType = "pdf",
+            OrganizationId = organizationId
+        };
+
+        // Create a record with restricted label
+        var recordWithoutAccess = new Record
+        {
+            Name = "Record With Restricted Label",
+            Description = "Record with restricted label",
+            OriginalId = Guid.NewGuid().ToString(),
+            Properties = JsonSerializer.Serialize(new { TestProperty = "TestValue" }),
+            ProjectId = pid,
+            DataSourceId = did,
+            ClassId = cid,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            Uri = "localhost:8090",
+            FileType = "pdf",
+            OrganizationId = organizationId
+        };
+
+        Context.Records.AddRange(recordWithAccess, recordWithoutAccess);
+        await Context.SaveChangesAsync();
+
+        Context.ChangeTracker.Clear();
+
+        // Give user write permission for accessible label
+        var accessibleWritePermission = await Context.Permissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == accessibleLabel.Id && p.Action == "write");
+
+        var role = await Context.Roles
+            .AsNoTracking()
+            .Include(r => r.Permissions)
+            .FirstOrDefaultAsync(r => r.Id == roleId);
+
+        if (role != null && accessibleWritePermission != null)
+        {
+            Context.Attach(role);
+            role.Permissions.Add(accessibleWritePermission);
+            await Context.SaveChangesAsync();
+        }
+
+        await _recordBusiness.AttachLabel(uid, organizationId, pid, recordWithAccess.Id, accessibleLabel.Id);
+
+        Context.ChangeTracker.Clear();
+
+        // Give user write permission for restricted label (so that the user can attach the label to the record)
+        var restrictedWritePermission = await Context.Permissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == restrictedLabel.Id && p.Action == "write");
+
+        role = await Context.Roles
+            .AsNoTracking()
+            .Include(r => r.Permissions)
+            .FirstOrDefaultAsync(r => r.Id == roleId);
+
+        if (role != null && restrictedWritePermission != null)
+        {
+            Context.Attach(role);
+            role.Permissions.Add(restrictedWritePermission);
+            await Context.SaveChangesAsync();
+        }
+
+        await _recordBusiness.AttachLabel(uid, organizationId, pid, recordWithoutAccess.Id, restrictedLabel.Id);
+
+        Context.ChangeTracker.Clear();
+
+        // Give user read permission to accessible label only
+        var accessibleReadPermission = await Context.Permissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == accessibleLabel.Id && p.Action == "read");
+
+        role = await Context.Roles
+            .AsNoTracking()
+            .Include(r => r.Permissions)
+            .FirstOrDefaultAsync(r => r.Id == roleId);
+
+        if (role != null && accessibleReadPermission != null)
+        {
+            Context.Attach(role);
+            role.Permissions.Add(accessibleReadPermission);
+            await Context.SaveChangesAsync();
+        }
+
+        // Act - Get record with accessible label
+        var result = await _recordBusiness.GetRecord(uid, organizationId, pid, recordWithAccess.Id, true);
+
+        // Assert - Record with accessible label SHOULD be returned
+        Assert.NotNull(result);
+        Assert.Equal(recordWithAccess.Id, result.Id);
+        Assert.Equal("Record With Accessible Label", result.Name);
+
+        // Also verify that the record without access throws exception
+        var exception = await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            _recordBusiness.GetRecord(uid, organizationId, pid, recordWithoutAccess.Id, true));
+
+        Assert.Contains($"You do not have access to all required sensitivity labels for record {recordWithoutAccess.Id}", exception.Message);
+    }
+
+    #endregion
+
+    // TODO: if user is creating a record and provides a label to attach ensure the user has write access
+    
     #region CreateRecord Tests
 
     [Fact]

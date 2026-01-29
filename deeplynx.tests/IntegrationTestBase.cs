@@ -162,6 +162,10 @@ public class IntegrationTestBase : IAsyncLifetime
         var relationships = await Context.Relationships.ToListAsync();
         Context.Relationships.RemoveRange(relationships);
         await Context.SaveChangesAsync();
+        
+        var sensitivityLabels = await Context.SensitivityLabels.ToListAsync();
+        Context.SensitivityLabels.RemoveRange(sensitivityLabels);
+        await Context.SaveChangesAsync();
 
         var tags = await Context.Tags.ToListAsync();
         Context.Tags.RemoveRange(tags);

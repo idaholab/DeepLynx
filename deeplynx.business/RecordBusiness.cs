@@ -29,8 +29,8 @@ public class RecordBusiness : IRecordBusiness
     /// <param name="tagBusiness">Used for creating tags related to a record.</param>
     /// <param name="labelBusiness">Used for creating tags related to a record.</param>
     public RecordBusiness(
-        DeeplynxContext context, 
-        IEventBusiness eventBusiness, 
+        DeeplynxContext context,
+        IEventBusiness eventBusiness,
         IBulkCopyUpsertExecutor bulkCopyUpsertExecutor,
         ITagBusiness tagBusiness,
         ISensitivityLabelBusiness labelBusiness)
@@ -57,36 +57,35 @@ public class RecordBusiness : IRecordBusiness
     {
         var recordQuery = _context.Records
             .Where(r => r.ProjectId == projectId && r.OrganizationId == organizationId);
-    
+
         if (hideArchived) recordQuery = recordQuery.Where(r => !r.IsArchived);
-    
+
         if (dataSourceId.HasValue) recordQuery = recordQuery.Where(r => r.DataSourceId == dataSourceId);
-    
-        // Filtering Record By User's Sensitivity Label access
-        var userAuthorizedLabels =
-            await PermissionHelper.GetAuthorizedSensitivityLabels(
-                _context, currentUserId, organizationId, projectId, "read");
-    
-        recordQuery = recordQuery.Where(r =>
-                !r.Labels.Any() || // If the record has no labels, allow access
-                r.Labels.All(label =>
-                    userAuthorizedLabels
-                        .Contains(label
-                            .Id)) // If the record has multiple labels, the user must have access to all of them
-        );
-    
+
         if (!string.IsNullOrWhiteSpace(fileType))
         {
             var formattedFileType = fileType.TrimStart('.').ToLower();
             recordQuery = recordQuery.Where(r => r.FileType == formattedFileType);
         }
-    
+
+        // Load records with their labels and tags
         var records = await recordQuery
             .Include(r => r.Tags)
             .Include(r => r.Labels)
             .ToListAsync();
-    
-        return records
+
+        // Get user's authorized labels
+        var userAuthorizedLabels =
+            await PermissionHelper.GetAuthorizedSensitivityLabels(
+                _context, currentUserId, organizationId, projectId, "read");
+
+        // Filter records in memory based on sensitivity label access
+        var authorizedRecords = records.Where(r =>
+                r.Labels.Count == 0 || // If the record has no labels, allow access
+                r.Labels.All(label => userAuthorizedLabels.Contains(label.Id)) // User must have access to all labels
+        ).ToList();
+
+        return authorizedRecords
             .Select(r => new RecordResponseDto
             {
                 Id = r.Id,
@@ -178,10 +177,10 @@ public class RecordBusiness : IRecordBusiness
                 }).ToList(),
                 Labels = r.Labels.Select(l => new RecordLabelDto
                 {
-                Id = l.Id,
-                Name = l.Name
-            }).ToList()
-        }).ToList();
+                    Id = l.Id,
+                    Name = l.Name
+                }).ToList()
+            }).ToList();
     }
 
     /// <summary>
@@ -317,8 +316,8 @@ public class RecordBusiness : IRecordBusiness
 
         return true;
     }
-    
-        /// <summary>
+
+    /// <summary>
     ///     Attaches a sensitivity label to a record
     /// </summary>
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
@@ -343,20 +342,15 @@ public class RecordBusiness : IRecordBusiness
             throw new KeyNotFoundException($"Record with id {recordId} not found or is archived.");
 
         // Check sensitivity label authorization if record has labels
-        if (record.Labels.Count > 0)
-        {
-            var userAuthorizedLabels = await PermissionHelper.GetAuthorizedSensitivityLabels(
-                _context, currentUserId, organizationId, projectId, "write");
 
-            var recordLabelIds = record.Labels.Select(l => l.Id).ToList();
-            var hasAllRequiredLabels = recordLabelIds.All(lId =>
-                userAuthorizedLabels.Contains(lId));
+        var userAuthorizedLabels = await PermissionHelper.GetAuthorizedSensitivityLabels(
+            _context, currentUserId, organizationId, projectId, "write");
 
-            if (!hasAllRequiredLabels)
-            {
-                throw new UnauthorizedAccessException(
-                    $"You do not have access to all required sensitivity labels for record {recordId}");
-            }
+        var hasAllRequiredLabel = userAuthorizedLabels.Contains(labelId);
+
+        if (!hasAllRequiredLabel) 
+        { 
+            throw new UnauthorizedAccessException($"You do not have access to all required sensitivity labels for record {recordId}");
         }
 
         // Check if already attached
@@ -443,7 +437,7 @@ public class RecordBusiness : IRecordBusiness
         return true;
     }
 
-        /// <summary>
+    /// <summary>
     ///     Unattach a sensitivity label from a record
     /// </summary>
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
@@ -502,7 +496,7 @@ public class RecordBusiness : IRecordBusiness
 
         return true;
     }
-    
+
     /// <summary>
     ///     Bulk attach tags and records
     /// </summary>
@@ -535,7 +529,7 @@ public class RecordBusiness : IRecordBusiness
 
         return true;
     }
-    
+
     /// <summary>
     ///     Bulk attach sensitivity labels and records
     /// </summary>
@@ -1338,8 +1332,9 @@ public class RecordBusiness : IRecordBusiness
             })
             .ToList();
     }
-    
-    private async Task<ICollection<RecordLabelDto>> ProcessSensitivityLabels(long currentUserId, long organizationId, long projectId,
+
+    private async Task<ICollection<RecordLabelDto>> ProcessSensitivityLabels(long currentUserId, long organizationId,
+        long projectId,
         long recordId,
         List<string>? labels)
     {
@@ -1384,14 +1379,15 @@ public class RecordBusiness : IRecordBusiness
         var inserted = await _tagBusiness.BulkCreateTags(organizationId, currentUserId, projectId, tags);
         return inserted.ToDictionary(t => t.Name, t => t);
     }
-    
+
     private async Task<Dictionary<string, SensitivityLabelResponseDto>> BulkUpsertLabels(
         long organizationId,
         long currentUserId,
         long projectId,
         List<CreateSensitivityLabelRequestDto> labels)
     {
-        var inserted = await _labelBusiness.BulkCreateSensitivityLabels(organizationId, currentUserId, projectId, labels);
+        var inserted =
+            await _labelBusiness.BulkCreateSensitivityLabels(organizationId, currentUserId, projectId, labels);
         return inserted.ToDictionary(t => t.Name, t => t);
     }
 
@@ -1423,8 +1419,8 @@ public class RecordBusiness : IRecordBusiness
             Name = r.IsDBNull(iName) ? null : r.GetString(iName),
             ClassId = r.IsDBNull(iCls) ? null : r.GetInt64(iCls),
             ObjectStorageId = r.IsDBNull(iObj) ? null : r.GetInt64(iObj),
-            FileType = r.IsDBNull(iType) ? null : r.GetString(iType), 
-            LastUpdatedBy = r.IsDBNull(iUser) ? null : r.GetInt64(iUser), 
+            FileType = r.IsDBNull(iType) ? null : r.GetString(iType),
+            LastUpdatedBy = r.IsDBNull(iUser) ? null : r.GetInt64(iUser),
             Description = r.IsDBNull(iDesc) ? null : r.GetString(iDesc),
             Properties = r.IsDBNull(iProp) ? null : r.GetString(iProp)
         };
