@@ -273,7 +273,6 @@ const LayoutShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             </ul>
           )}
         </div>
-        somewhere here
         <div>
           <Image
             src="/assets/nexusWhite.png"
@@ -425,7 +424,7 @@ const LayoutShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             isMenuCollapsed ? "ml-40" : "ml-82"
           }`}
         >
-          {/* Organization Banner - appears below header, above content */}
+          {/* Organization Banne */}
           <div className="sticky top-25 z-20">
             <Banner />
           </div>
