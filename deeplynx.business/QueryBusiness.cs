@@ -460,10 +460,11 @@ public class QueryBusiness : IQueryBusiness
     /// <param name="projects">Array of project ids whose records are to be retrieved</param>
     /// <param name="hideArchived">Flag indicating whether to hide archived records from the result</param>
     /// <returns>A list of records based on the applied filters.</returns>
-    public async Task<IEnumerable<HistoricalRecordResponseDto>> GetMultiProjectRecords(long currentUserId, long organizationId,
-        long[] projects, bool hideArchived)
+    public async Task<IEnumerable<HistoricalRecordResponseDto>> GetMultiProjectRecords(
+        long currentUserId, long organizationId, long[] projects, bool hideArchived)
     {
-        var authorizedLabelIds = await PermissionHelper.GetAuthorizedSensitivityLabels(_context, currentUserId, organizationId, projects, "read");   
+        var authorizedLabelIds = await PermissionHelper.GetAuthorizedSensitivityLabels(
+            _context, currentUserId, organizationId, projects, "read");   
         
         var projectSet = new HashSet<long>(projects);
 
@@ -488,7 +489,8 @@ public class QueryBusiness : IQueryBusiness
 
         var records = await recordQuery
             .GroupBy(e => e.RecordId)
-            .Select(g => g.OrderByDescending(r => r.LastUpdatedAt).FirstOrDefault())
+            .Select(g => g
+                .OrderByDescending(r => r.LastUpdatedAt).FirstOrDefault())
             .ToListAsync();
 
         return records

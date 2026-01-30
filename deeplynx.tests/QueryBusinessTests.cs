@@ -1,7 +1,14 @@
 using System.Text.Json;
 using deeplynx.business;
 using deeplynx.datalayer.Models;
+using deeplynx.helpers.Hubs;
+using deeplynx.interfaces;
 using deeplynx.models;
+using Microsoft.AspNetCore.SignalR;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
+using deeplynx.helpers.BigData;
+using Moq;
 using Record = deeplynx.datalayer.Models.Record;
 
 namespace deeplynx.tests;
@@ -9,10 +16,20 @@ namespace deeplynx.tests;
 [Collection("Test Suite Collection")]
 public class QueryBusinessTests : IntegrationTestBase
 {
+    private EventBusiness _eventBusiness;
+    private SensitivityLabelBusiness _sensitivityLabelBusiness;
+    private Mock<IHubContext<EventNotificationHub>> _mockHubContext = null!;
+    private Mock<ILogger<NotificationBusiness>> _mockNotificationLogger = null!;
+    private INotificationBusiness _notificationBusiness = null!;
+    private RecordBusiness _recordBusiness;
+    private TagBusiness _tagBusiness = null!;
+    private BulkCopyUpsertExecutor _mockBulkCopyUpsertExecutor = null!;
     private QueryBusiness _queryBusiness = null!;
     private long uid;
     private long cid;
+    private long cid2;
     private long did;
+    private long did2;
     private long organizationId;
 
     private long pid; // project ID
@@ -20,6 +37,7 @@ public class QueryBusinessTests : IntegrationTestBase
     private long pid3;
     private long pid4;
     private long rid; // record ID
+    public long roleId;
 
     public QueryBusinessTests(TestSuiteFixture fixture) : base(fixture)
     {
@@ -30,6 +48,16 @@ public class QueryBusinessTests : IntegrationTestBase
     public override async Task InitializeAsync()
     {
         await base.InitializeAsync();
+        _mockHubContext = new Mock<IHubContext<EventNotificationHub>>();
+        _mockNotificationLogger = new Mock<ILogger<NotificationBusiness>>();
+        _notificationBusiness =
+            new NotificationBusiness(Context, _mockNotificationLogger.Object, _mockHubContext.Object);
+        _mockBulkCopyUpsertExecutor = new BulkCopyUpsertExecutor();
+        _eventBusiness = new EventBusiness(Context, _notificationBusiness, _mockBulkCopyUpsertExecutor);
+        _sensitivityLabelBusiness = new SensitivityLabelBusiness(Context, _eventBusiness);
+        _tagBusiness = new TagBusiness(Context, _eventBusiness);
+        _recordBusiness = new RecordBusiness(Context, _eventBusiness, _mockBulkCopyUpsertExecutor, _tagBusiness,
+            _sensitivityLabelBusiness);
         _queryBusiness = new QueryBusiness(Context);
     }
 
@@ -67,10 +95,10 @@ public class QueryBusinessTests : IntegrationTestBase
         Context.Users.Add(user);
         await Context.SaveChangesAsync();
         uid = user.Id;
-        
+
         var organization = new Organization { Name = "Test Organization" };
         Context.Organizations.Add(organization);
-        
+
         await Context.SaveChangesAsync();
         organizationId = organization.Id;
 
@@ -105,6 +133,17 @@ public class QueryBusinessTests : IntegrationTestBase
         await Context.SaveChangesAsync();
         did = dataSource.Id;
 
+        var dataSource2 = new DataSource
+        {
+            Name = "R2D2 v2",
+            Description = "Weeeeeeeee!",
+            ProjectId = project.Id,
+            OrganizationId = organizationId
+        };
+        await Context.DataSources.AddAsync(dataSource2);
+        await Context.SaveChangesAsync();
+        did2 = dataSource2.Id;
+
         var testClass = new Class
         {
             Name = "Darth Maul",
@@ -115,6 +154,19 @@ public class QueryBusinessTests : IntegrationTestBase
         await Context.Classes.AddAsync(testClass);
         await Context.SaveChangesAsync();
         cid = testClass.Id;
+
+        var testClass2 = new Class
+        {
+            Name = "Test Class 2",
+            Description = "Test class 2 for unit tests",
+            ProjectId = pid,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            OrganizationId = organizationId
+        };
+        Context.Classes.Add(testClass2);
+        await Context.SaveChangesAsync();
+        cid2 = testClass2.Id;
 
         // Project 2: The Rebellion
         var rebellionProject = new Project
@@ -135,6 +187,20 @@ public class QueryBusinessTests : IntegrationTestBase
         };
         await Context.Tags.AddAsync(rebelTag);
         await Context.SaveChangesAsync();
+
+        var testRole = new Role
+        {
+            Name = "Test Role",
+            Description = "Test role for unit tests",
+            ProjectId = pid,
+            OrganizationId = organizationId,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid
+        };
+        Context.Roles.Add(testRole);
+        await Context.SaveChangesAsync();
+
+        roleId = testRole.Id;
 
         var rebelDataSource = new DataSource
         {
@@ -510,7 +576,7 @@ public class QueryBusinessTests : IntegrationTestBase
     public async Task Search_Success_FindsRecordByFullName()
     {
         // Act
-        var result = await _queryBusiness.Search(uid, "Captain Rex", organizationId,[pid]);
+        var result = await _queryBusiness.Search(uid, "Captain Rex", organizationId, [pid]);
         var records = result.ToList();
 
         // Assert
@@ -523,7 +589,7 @@ public class QueryBusinessTests : IntegrationTestBase
     public async Task Search_Success_FindsRecordByPartialName()
     {
         // Act
-        var result = await _queryBusiness.Search(uid,"capt", organizationId, [pid]);
+        var result = await _queryBusiness.Search(uid, "capt", organizationId, [pid]);
         var records = result.ToList();
 
         // Assert
@@ -535,7 +601,7 @@ public class QueryBusinessTests : IntegrationTestBase
     public async Task Search_Success_FindsRecordByOriginalId()
     {
         // Act
-        var result = await _queryBusiness.Search(uid,"CT-9901", organizationId, [pid]);
+        var result = await _queryBusiness.Search(uid, "CT-9901", organizationId, [pid]);
         var records = result.ToList();
 
         // Assert
@@ -546,7 +612,7 @@ public class QueryBusinessTests : IntegrationTestBase
     public async Task Search_Success_FindsRecordByPartialDescription()
     {
         // Act
-        var result = await _queryBusiness.Search(uid,"Omega", organizationId,[pid]);
+        var result = await _queryBusiness.Search(uid, "Omega", organizationId, [pid]);
         var records = result.ToList();
 
         // Assert
@@ -558,7 +624,7 @@ public class QueryBusinessTests : IntegrationTestBase
     public async Task Search_Success_FindsRecordByStringInProperties()
     {
         // Act
-        var result = await _queryBusiness.Search(uid,"Sith", organizationId, [pid3]);
+        var result = await _queryBusiness.Search(uid, "Sith", organizationId, [pid3]);
         var records = result.ToList();
 
         // Assert
@@ -570,7 +636,7 @@ public class QueryBusinessTests : IntegrationTestBase
     public async Task Search_Success_FindsRecordsWithSpecialCharacters()
     {
         // Act
-        var result = await _queryBusiness.Search(uid,"CT-", organizationId, [pid]);
+        var result = await _queryBusiness.Search(uid, "CT-", organizationId, [pid]);
         var records = result.ToList();
 
         // Assert
@@ -581,7 +647,7 @@ public class QueryBusinessTests : IntegrationTestBase
     public async Task Search_Success_ReturnsEmptyForNonExistentTerm()
     {
         // Act
-        var result = await _queryBusiness.Search(uid,"Wookiee", organizationId, [pid]);
+        var result = await _queryBusiness.Search(uid, "Wookiee", organizationId, [pid]);
         var records = result.ToList();
 
         // Assert
@@ -592,7 +658,7 @@ public class QueryBusinessTests : IntegrationTestBase
     public async Task Search_Success_RestrictsResultsToSpecifiedProject()
     {
         // Act
-        var result = await _queryBusiness.Search(uid,"the", organizationId, [pid2]);
+        var result = await _queryBusiness.Search(uid, "the", organizationId, [pid2]);
         var records = result.ToList();
 
         // Assert
@@ -603,7 +669,7 @@ public class QueryBusinessTests : IntegrationTestBase
     public async Task Search_Success_FindsRecordsByPartialTagName()
     {
         // Act
-        var result = await _queryBusiness.Search(uid,"Padme", organizationId, [pid]);
+        var result = await _queryBusiness.Search(uid, "Padme", organizationId, [pid]);
         var records = result.ToList();
 
         // Assert
@@ -614,7 +680,7 @@ public class QueryBusinessTests : IntegrationTestBase
     public async Task Search_Success_FindsRecordsByPartialTagNameCaseInsensitive()
     {
         // Act
-        var result = await _queryBusiness.Search(uid,"padme", organizationId, [pid]);
+        var result = await _queryBusiness.Search(uid, "padme", organizationId, [pid]);
         var records = result.ToList();
 
         // Assert
@@ -625,7 +691,7 @@ public class QueryBusinessTests : IntegrationTestBase
     public async Task Search_Success_FindsRecordsByTagAcrossMultipleProjects()
     {
         // Act
-        var result = await _queryBusiness.Search(uid,"Bounty", organizationId, pids);
+        var result = await _queryBusiness.Search(uid, "Bounty", organizationId, pids);
         var records = result.ToList();
 
         // Assert
@@ -636,7 +702,7 @@ public class QueryBusinessTests : IntegrationTestBase
     public async Task Search_Success_FindsMultipleRecordsByJsonProperties()
     {
         // Act
-        var result = await _queryBusiness.Search(uid,"99", organizationId,[pid]);
+        var result = await _queryBusiness.Search(uid, "99", organizationId, [pid]);
         var records = result.ToList();
 
         // Assert
@@ -647,7 +713,7 @@ public class QueryBusinessTests : IntegrationTestBase
     public async Task Search_Success_FindsRecordsByPartialOriginalId()
     {
         // Act
-        var result = await _queryBusiness.Search(uid,"CT-99", organizationId, [pid]);
+        var result = await _queryBusiness.Search(uid, "CT-99", organizationId, [pid]);
         var records = result.ToList();
 
         // Assert
@@ -658,7 +724,7 @@ public class QueryBusinessTests : IntegrationTestBase
     public async Task Search_Success_FindsRecordsByNumericPartialId()
     {
         // Act
-        var result = await _queryBusiness.Search(uid,"99", organizationId, [pid]);
+        var result = await _queryBusiness.Search(uid, "99", organizationId, [pid]);
         var records = result.ToList();
 
         // Assert
@@ -669,7 +735,7 @@ public class QueryBusinessTests : IntegrationTestBase
     public async Task Search_Success_FindsRecordsByPartialDataSourceName()
     {
         // Act
-        var result = await _queryBusiness.Search(uid,"Yav", organizationId, pids);
+        var result = await _queryBusiness.Search(uid, "Yav", organizationId, pids);
         var records = result.ToList();
 
         // Assert
@@ -680,7 +746,7 @@ public class QueryBusinessTests : IntegrationTestBase
     public async Task Search_Success_FindsRecordsByPartialProjectName()
     {
         // Act
-        var result = await _queryBusiness.Search(uid,"Rebel", organizationId, [pid2]);
+        var result = await _queryBusiness.Search(uid, "Rebel", organizationId, [pid2]);
         var records = result.ToList();
 
         // Assert
@@ -691,7 +757,7 @@ public class QueryBusinessTests : IntegrationTestBase
     public async Task Search_Success_FindsRecordsByShortPartialMatch()
     {
         // Act
-        var result = await _queryBusiness.Search(uid,"Bo", organizationId, [pid4]);
+        var result = await _queryBusiness.Search(uid, "Bo", organizationId, [pid4]);
         var records = result.ToList();
 
         // Assert
@@ -702,7 +768,7 @@ public class QueryBusinessTests : IntegrationTestBase
     public async Task Search_Success_FindsRecordByCaseInsensitivePartialMatch()
     {
         // Act
-        var result = await _queryBusiness.Search(uid,"CAPT", organizationId, [pid]);
+        var result = await _queryBusiness.Search(uid, "CAPT", organizationId, [pid]);
         var records = result.ToList();
 
         // Assert
@@ -714,7 +780,7 @@ public class QueryBusinessTests : IntegrationTestBase
     public async Task Search_Success_FindsRecordByMultipleWordPartialMatch()
     {
         // Act
-        var result = await _queryBusiness.Search(uid,"grand adm", organizationId, [pid3]);
+        var result = await _queryBusiness.Search(uid, "grand adm", organizationId, [pid3]);
         var records = result.ToList();
 
         // Assert
@@ -726,7 +792,7 @@ public class QueryBusinessTests : IntegrationTestBase
     public async Task Search_Success_FindsRecordByMiddleOfWordPartialMatch()
     {
         // Act
-        var result = await _queryBusiness.Search(uid,"eck", organizationId, [pid]);
+        var result = await _queryBusiness.Search(uid, "eck", organizationId, [pid]);
         var records = result.ToList();
 
         // Assert
@@ -738,7 +804,7 @@ public class QueryBusinessTests : IntegrationTestBase
     public async Task Search_Success_FindsRecordsByUriPartialMatch()
     {
         // Act
-        var result = await _queryBusiness.Search(uid,"8090", organizationId, [pid]);
+        var result = await _queryBusiness.Search(uid, "8090", organizationId, [pid]);
         var records = result.ToList();
 
         // Assert
@@ -749,7 +815,7 @@ public class QueryBusinessTests : IntegrationTestBase
     public async Task Search_Success_FindsRecordByBeginningOfWordPartialMatch()
     {
         // Act
-        var result = await _queryBusiness.Search(uid,"Wre", organizationId, [pid]);
+        var result = await _queryBusiness.Search(uid, "Wre", organizationId, [pid]);
         var records = result.ToList();
 
         // Assert
@@ -761,7 +827,7 @@ public class QueryBusinessTests : IntegrationTestBase
     public async Task Search_Success_FindsRecordsAcrossAllAccessibleProjects()
     {
         // Act
-        var result = await _queryBusiness.Search(uid,"Captain", organizationId, pids);
+        var result = await _queryBusiness.Search(uid, "Captain", organizationId, pids);
         var records = result.ToList();
 
         // Assert
@@ -772,7 +838,7 @@ public class QueryBusinessTests : IntegrationTestBase
     public async Task Search_Success_FindsRecordUsingCrossProjectResources()
     {
         // Act
-        var result = await _queryBusiness.Search(uid,"Death Star", organizationId, [pid]);
+        var result = await _queryBusiness.Search(uid, "Death Star", organizationId, [pid]);
         var records = result.ToList();
 
         // Assert
@@ -786,7 +852,7 @@ public class QueryBusinessTests : IntegrationTestBase
     {
         // Act & Assert
         var exception = await Assert.ThrowsAsync<Exception>(() =>
-            _queryBusiness.Search(uid,"", organizationId, [pid]));
+            _queryBusiness.Search(uid, "", organizationId, [pid]));
 
         Assert.Contains("Search query is required", exception.Message);
     }
@@ -796,7 +862,7 @@ public class QueryBusinessTests : IntegrationTestBase
     {
         // Act & Assert
         var exception = await Assert.ThrowsAsync<Exception>(() =>
-            _queryBusiness.Search(uid,null, organizationId, [pid]));
+            _queryBusiness.Search(uid, null, organizationId, [pid]));
 
         Assert.Contains("Search query is required", exception.Message);
     }
@@ -806,7 +872,7 @@ public class QueryBusinessTests : IntegrationTestBase
     {
         // Act & Assert
         var exception = await Assert.ThrowsAsync<Exception>(() =>
-            _queryBusiness.Search(uid,"     ", organizationId, [pid]));
+            _queryBusiness.Search(uid, "     ", organizationId, [pid]));
 
         Assert.Contains("Search query is required", exception.Message);
     }
@@ -820,7 +886,7 @@ public class QueryBusinessTests : IntegrationTestBase
     {
         // Act & Assert
         var exception = await Assert.ThrowsAsync<ArgumentException>(() =>
-            _queryBusiness.QueryBuilder(uid,null, organizationId, new[] { pid }));
+            _queryBusiness.QueryBuilder(uid, null, organizationId, new[] { pid }));
 
         Assert.Contains("Custom query request dto cannot be null", exception.Message);
     }
@@ -835,7 +901,7 @@ public class QueryBusinessTests : IntegrationTestBase
         };
 
         // Act
-        var result = await _queryBusiness.QueryBuilder(uid,[dto], organizationId, [pid]);
+        var result = await _queryBusiness.QueryBuilder(uid, [dto], organizationId, [pid]);
         var records = result.ToList();
 
         // Assert
@@ -853,7 +919,7 @@ public class QueryBusinessTests : IntegrationTestBase
         };
 
         // Act
-        var result = await _queryBusiness.QueryBuilder(uid,[dto], organizationId, [pid]);
+        var result = await _queryBusiness.QueryBuilder(uid, [dto], organizationId, [pid]);
         var records = result.ToList();
 
         // Assert
@@ -874,7 +940,7 @@ public class QueryBusinessTests : IntegrationTestBase
         };
 
         // Act
-        var result = await _queryBusiness.QueryBuilder(uid,[dto], organizationId, [pid]);
+        var result = await _queryBusiness.QueryBuilder(uid, [dto], organizationId, [pid]);
         var records = result.ToList();
 
         // Assert
@@ -895,7 +961,7 @@ public class QueryBusinessTests : IntegrationTestBase
             ProjectId = pid,
             DataSourceId = did,
             ClassId = cid,
-            Uri = "localhost:8090", 
+            Uri = "localhost:8090",
             OrganizationId = organizationId
         };
         await Context.Records.AddAsync(ahsoka);
@@ -920,7 +986,7 @@ public class QueryBusinessTests : IntegrationTestBase
         };
 
         // Act
-        var result = await _queryBusiness.QueryBuilder(uid,[dto1, dto2], organizationId, [pid]);
+        var result = await _queryBusiness.QueryBuilder(uid, [dto1, dto2], organizationId, [pid]);
         var records = result.ToList();
 
         // Assert
@@ -941,7 +1007,7 @@ public class QueryBusinessTests : IntegrationTestBase
         };
 
         // Act
-        var result = await _queryBusiness.QueryBuilder(uid,[dto1, dto2], organizationId, [pid]);
+        var result = await _queryBusiness.QueryBuilder(uid, [dto1, dto2], organizationId, [pid]);
         var records = result.ToList();
 
         // Assert
@@ -962,7 +1028,7 @@ public class QueryBusinessTests : IntegrationTestBase
         };
 
         // Act
-        var result = await _queryBusiness.QueryBuilder(uid,[dto1, dto2], organizationId, [pid]);
+        var result = await _queryBusiness.QueryBuilder(uid, [dto1, dto2], organizationId, [pid]);
         var records = result.ToList();
 
         // Assert
@@ -987,7 +1053,7 @@ public class QueryBusinessTests : IntegrationTestBase
         };
 
         // Act
-        var result = await _queryBusiness.QueryBuilder(uid,[dto1, dto2, dto3], organizationId, [pid]);
+        var result = await _queryBusiness.QueryBuilder(uid, [dto1, dto2, dto3], organizationId, [pid]);
         var records = result.ToList();
 
         // Assert
@@ -1012,7 +1078,7 @@ public class QueryBusinessTests : IntegrationTestBase
         };
 
         // Act
-        var result = await _queryBusiness.QueryBuilder(uid,[dto1, dto2, dto3], organizationId, [pid]);
+        var result = await _queryBusiness.QueryBuilder(uid, [dto1, dto2, dto3], organizationId, [pid]);
         var records = result.ToList();
 
         // Assert
@@ -1029,7 +1095,7 @@ public class QueryBusinessTests : IntegrationTestBase
         };
 
         // Act
-        var result = await _queryBusiness.QueryBuilder(uid,[dto], organizationId, [pid], "Captain");
+        var result = await _queryBusiness.QueryBuilder(uid, [dto], organizationId, [pid], "Captain");
         var records = result.ToList();
 
         // Assert
@@ -1046,7 +1112,7 @@ public class QueryBusinessTests : IntegrationTestBase
         };
 
         // Act
-        var result = await _queryBusiness.QueryBuilder(uid,[dto], organizationId,  [pid]);
+        var result = await _queryBusiness.QueryBuilder(uid, [dto], organizationId, [pid]);
         var records = result.ToList();
 
         // Assert
@@ -1064,7 +1130,7 @@ public class QueryBusinessTests : IntegrationTestBase
         };
 
         // Act
-        var result = await _queryBusiness.QueryBuilder(uid,[dto], organizationId, [pid]);
+        var result = await _queryBusiness.QueryBuilder(uid, [dto], organizationId, [pid]);
         var records = result.ToList();
 
         // Assert
@@ -1081,7 +1147,7 @@ public class QueryBusinessTests : IntegrationTestBase
         };
 
         // Act
-        var result = await _queryBusiness.QueryBuilder(uid,[dto], organizationId, [pid, pid2]);
+        var result = await _queryBusiness.QueryBuilder(uid, [dto], organizationId, [pid, pid2]);
         var records = result.ToList();
 
         // Assert
@@ -1098,7 +1164,7 @@ public class QueryBusinessTests : IntegrationTestBase
         };
 
         // Act
-        var result = await _queryBusiness.QueryBuilder(uid,[dto], organizationId, [pid2]);
+        var result = await _queryBusiness.QueryBuilder(uid, [dto], organizationId, [pid2]);
         var records = result.ToList();
 
         // Assert
@@ -1115,7 +1181,7 @@ public class QueryBusinessTests : IntegrationTestBase
         };
 
         // Act
-        var result = await _queryBusiness.QueryBuilder(uid,[dto], organizationId, [pid3]);
+        var result = await _queryBusiness.QueryBuilder(uid, [dto], organizationId, [pid3]);
         var records = result.ToList();
 
         // Assert
@@ -1132,7 +1198,7 @@ public class QueryBusinessTests : IntegrationTestBase
         };
 
         // Act
-        var result = await _queryBusiness.QueryBuilder(uid,[dto], organizationId, [pid4]);
+        var result = await _queryBusiness.QueryBuilder(uid, [dto], organizationId, [pid4]);
         var records = result.ToList();
 
         // Assert
@@ -1143,7 +1209,7 @@ public class QueryBusinessTests : IntegrationTestBase
     public async Task QueryBuilder_Success_FiltersRecordsByUserAccessToSpecificProjectsOnly()
     {
         // Act
-        var result = await _queryBusiness.QueryBuilder(uid,[], organizationId, [pid, pid3]);
+        var result = await _queryBusiness.QueryBuilder(uid, [], organizationId, [pid, pid3]);
         var records = result.ToList();
 
         // Assert
@@ -1160,7 +1226,7 @@ public class QueryBusinessTests : IntegrationTestBase
         };
 
         // Act
-        var result = await _queryBusiness.QueryBuilder(uid,[dto], organizationId, [pid]);
+        var result = await _queryBusiness.QueryBuilder(uid, [dto], organizationId, [pid]);
         var records = result.ToList();
 
         // Assert
@@ -1177,7 +1243,7 @@ public class QueryBusinessTests : IntegrationTestBase
         };
 
         // Act
-        var result = await _queryBusiness.QueryBuilder(uid,[dto], organizationId, pids);
+        var result = await _queryBusiness.QueryBuilder(uid, [dto], organizationId, pids);
         var records = result.ToList();
 
         // Assert
@@ -1194,7 +1260,7 @@ public class QueryBusinessTests : IntegrationTestBase
         };
 
         // Act
-        var result = await _queryBusiness.QueryBuilder(uid,[dto], organizationId,[]);
+        var result = await _queryBusiness.QueryBuilder(uid, [dto], organizationId, []);
         var records = result.ToList();
 
         // Assert
@@ -1211,7 +1277,7 @@ public class QueryBusinessTests : IntegrationTestBase
         };
 
         // Act
-        var result = await _queryBusiness.QueryBuilder(uid,[dto], organizationId, [pid2]);
+        var result = await _queryBusiness.QueryBuilder(uid, [dto], organizationId, [pid2]);
         var records = result.ToList();
 
         // Assert
@@ -1228,7 +1294,7 @@ public class QueryBusinessTests : IntegrationTestBase
         };
 
         // Act
-        var result = await _queryBusiness.QueryBuilder(uid,[dto], organizationId, [pid, pid4]);
+        var result = await _queryBusiness.QueryBuilder(uid, [dto], organizationId, [pid, pid4]);
         var records = result.ToList();
 
         // Assert
@@ -1249,7 +1315,7 @@ public class QueryBusinessTests : IntegrationTestBase
         };
 
         // Act
-        var result = await _queryBusiness.QueryBuilder(uid,[dto1, dto2], organizationId, pids);
+        var result = await _queryBusiness.QueryBuilder(uid, [dto1, dto2], organizationId, pids);
         var records = result.ToList();
 
         // Assert
@@ -1269,7 +1335,7 @@ public class QueryBusinessTests : IntegrationTestBase
         };
 
         // Act
-        var result = await _queryBusiness.QueryBuilder(uid,[dto], organizationId, [pid]);
+        var result = await _queryBusiness.QueryBuilder(uid, [dto], organizationId, [pid]);
         var records = result.ToList();
 
         // Assert
@@ -1290,7 +1356,7 @@ public class QueryBusinessTests : IntegrationTestBase
         };
 
         // Act
-        var result = await _queryBusiness.QueryBuilder(uid,[dto], organizationId, [pid]);
+        var result = await _queryBusiness.QueryBuilder(uid, [dto], organizationId, [pid]);
         var records = result.ToList();
 
         // Assert
@@ -1310,7 +1376,7 @@ public class QueryBusinessTests : IntegrationTestBase
         };
 
         // Act
-        var result = await _queryBusiness.QueryBuilder(uid,[dto], organizationId, [pid]);
+        var result = await _queryBusiness.QueryBuilder(uid, [dto], organizationId, [pid]);
         var records = result.ToList();
 
         // Assert
@@ -1331,7 +1397,7 @@ public class QueryBusinessTests : IntegrationTestBase
         };
 
         // Act
-        var result = await _queryBusiness.QueryBuilder(uid,[dto], organizationId, [pid2]);
+        var result = await _queryBusiness.QueryBuilder(uid, [dto], organizationId, [pid2]);
         var records = result.ToList();
 
         // Assert
@@ -1352,7 +1418,7 @@ public class QueryBusinessTests : IntegrationTestBase
         };
 
         // Act
-        var result = await _queryBusiness.QueryBuilder(uid,[dto], organizationId, [pid4]);
+        var result = await _queryBusiness.QueryBuilder(uid, [dto], organizationId, [pid4]);
         var records = result.ToList();
 
         // Assert
@@ -1369,7 +1435,7 @@ public class QueryBusinessTests : IntegrationTestBase
         };
 
         // Act
-        var result = await _queryBusiness.QueryBuilder(uid,[dto], organizationId, [pid], "CT-7567");
+        var result = await _queryBusiness.QueryBuilder(uid, [dto], organizationId, [pid], "CT-7567");
         var records = result.ToList();
 
         // Assert
@@ -1387,7 +1453,7 @@ public class QueryBusinessTests : IntegrationTestBase
 
         // Act & Assert
         await Assert.ThrowsAsync<ArgumentException>(async () =>
-            await _queryBusiness.QueryBuilder(uid,[dto], organizationId, [pid]));
+            await _queryBusiness.QueryBuilder(uid, [dto], organizationId, [pid]));
     }
 
     [Fact]
@@ -1401,7 +1467,7 @@ public class QueryBusinessTests : IntegrationTestBase
 
         // Act & Assert
         await Assert.ThrowsAsync<ArgumentException>(async () =>
-            await _queryBusiness.QueryBuilder(uid,[dto], organizationId, [pid]));
+            await _queryBusiness.QueryBuilder(uid, [dto], organizationId, [pid]));
     }
 
     [Fact]
@@ -1415,7 +1481,7 @@ public class QueryBusinessTests : IntegrationTestBase
 
         // Act & Assert
         await Assert.ThrowsAsync<ArgumentException>(async () =>
-            await _queryBusiness.QueryBuilder(uid,[dto], organizationId, [pid]));
+            await _queryBusiness.QueryBuilder(uid, [dto], organizationId, [pid]));
     }
 
     [Fact]
@@ -1429,7 +1495,7 @@ public class QueryBusinessTests : IntegrationTestBase
 
         // Act & Assert
         await Assert.ThrowsAsync<ArgumentException>(async () =>
-            await _queryBusiness.QueryBuilder(uid,[dto], organizationId, [pid]));
+            await _queryBusiness.QueryBuilder(uid, [dto], organizationId, [pid]));
     }
 
     [Fact]
@@ -1443,7 +1509,7 @@ public class QueryBusinessTests : IntegrationTestBase
 
         // Act & Assert
         await Assert.ThrowsAsync<ArgumentException>(async () =>
-            await _queryBusiness.QueryBuilder(uid,[dto], organizationId, [pid]));
+            await _queryBusiness.QueryBuilder(uid, [dto], organizationId, [pid]));
     }
 
     #endregion
@@ -1457,7 +1523,7 @@ public class QueryBusinessTests : IntegrationTestBase
         var projectIds = new[] { pid, pid2 };
 
         // Act
-        var result = await _queryBusiness.GetRecentlyAddedRecords(uid,organizationId, projectIds);
+        var result = await _queryBusiness.GetRecentlyAddedRecords(uid, organizationId, projectIds);
         var records = result.ToList();
 
         // Assert
@@ -1482,7 +1548,7 @@ public class QueryBusinessTests : IntegrationTestBase
         var projectIds = new[] { pid };
 
         // Act
-        var result = await _queryBusiness.GetRecentlyAddedRecords(uid,organizationId, projectIds);
+        var result = await _queryBusiness.GetRecentlyAddedRecords(uid, organizationId, projectIds);
         var records = result.ToList();
 
         // Assert - Archived records should not appear
@@ -1496,7 +1562,7 @@ public class QueryBusinessTests : IntegrationTestBase
         var projectIds = new long[] { };
 
         // Act
-        var result = await _queryBusiness.GetRecentlyAddedRecords(uid,organizationId, projectIds);
+        var result = await _queryBusiness.GetRecentlyAddedRecords(uid, organizationId, projectIds);
         var records = result.ToList();
 
         // Assert
@@ -1510,13 +1576,522 @@ public class QueryBusinessTests : IntegrationTestBase
         var projectIds = new[] { pid };
 
         // Act
-        var result = await _queryBusiness.GetRecentlyAddedRecords(uid,organizationId, projectIds);
+        var result = await _queryBusiness.GetRecentlyAddedRecords(uid, organizationId, projectIds);
         var records = result.ToList();
 
         // Assert - Historical records should return the most recent version
         // Since the seed data creates multiple historical versions, verify we only get one per record
         var recordsByOriginalId = records.GroupBy(r => r.OriginalId);
         Assert.All(recordsByOriginalId, g => Assert.Single(g));
+    }
+
+    #endregion
+
+    #region GetRecentlyAddedRecords_SensitivityLabelsAuthorization Tests
+
+    [Fact]
+    public async Task GetRecentlyAddedRecords_FilterOutRecordWithInaccessibleLabel_ReturnsOnlyAccessibleRecords()
+    {
+        // Arrange
+        var projectIds = new[] { pid };
+
+        // Create ProjectMember to link user to project with a role
+        var projectMember = new ProjectMember
+        {
+            UserId = uid,
+            ProjectId = pid,
+            RoleId = roleId,
+        };
+        Context.ProjectMembers.Add(projectMember);
+        await Context.SaveChangesAsync();
+
+        Context.ChangeTracker.Clear();
+
+        // Create a sensitivity label
+        var labelDto = new CreateSensitivityLabelRequestDto
+        {
+            Name = "Top Secret Label",
+            Description = "Top Secret Label",
+        };
+        var label = await _sensitivityLabelBusiness.CreateSensitivityLabel(uid, labelDto, pid, organizationId);
+
+        Context.ChangeTracker.Clear();
+
+        // Give user write permission to attach the label
+        var writePermission = await Context.Permissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "write");
+
+        var role = await Context.Roles
+            .Include(r => r.Permissions)
+            .FirstOrDefaultAsync(r => r.Id == roleId);
+
+        if (role != null && writePermission != null)
+        {
+            role.Permissions.Add(writePermission);
+            await Context.SaveChangesAsync();
+        }
+
+        Context.ChangeTracker.Clear();
+
+        // Attach label to Captain Rex
+        await _recordBusiness.AttachLabel(uid, organizationId, pid, rid, label.Id);
+
+        Context.ChangeTracker.Clear();
+
+        // Remove write permission so user can't read the labeled record
+        role = await Context.Roles
+            .Include(r => r.Permissions)
+            .FirstOrDefaultAsync(r => r.Id == roleId);
+
+        if (role != null && writePermission != null)
+        {
+            var permissionToRemove = role.Permissions.FirstOrDefault(p => p.Id == writePermission.Id);
+            if (permissionToRemove != null)
+            {
+                role.Permissions.Remove(permissionToRemove);
+                await Context.SaveChangesAsync();
+            }
+        }
+
+        Context.ChangeTracker.Clear();
+
+        // Act
+        var result = await _queryBusiness.GetRecentlyAddedRecords(uid, organizationId, projectIds);
+        var records = result.ToList();
+
+        // Assert - Captain Rex should be filtered out due to lack of label access
+        Assert.Equal(4, records.Count);
+        Assert.DoesNotContain(records, r => r.Name == "Captain Rex");
+        Assert.Contains(records, r => r.Name == "Hunter");
+        Assert.Contains(records, r => r.Name == "Tech");
+        Assert.Contains(records, r => r.Name == "Wrecker");
+        Assert.Contains(records, r => r.Name == "Crosshair");
+    }
+
+    [Fact]
+    public async Task GetRecentlyAddedRecords_UserHasReadAccessToLabel_ReturnsAllRecords()
+    {
+        // Arrange
+        var projectIds = new[] { pid };
+
+        // Create ProjectMember to link user to project with a role
+        var projectMember = new ProjectMember
+        {
+            UserId = uid,
+            ProjectId = pid,
+            RoleId = roleId,
+        };
+        Context.ProjectMembers.Add(projectMember);
+        await Context.SaveChangesAsync();
+
+        Context.ChangeTracker.Clear();
+
+        // Create a sensitivity label
+        var labelDto = new CreateSensitivityLabelRequestDto
+        {
+            Name = "Confidential_" + Guid.NewGuid(),
+            Description = "Confidential Label",
+        };
+        var label = await _sensitivityLabelBusiness.CreateSensitivityLabel(uid, labelDto, pid, organizationId);
+
+        Context.ChangeTracker.Clear();
+
+        // Give user write permission to attach the label
+        var writePermission = await Context.Permissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "write");
+        
+        var readPermission = await Context.Permissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "read");
+
+        var role = await Context.Roles
+            .Include(r => r.Permissions)
+            .FirstOrDefaultAsync(r => r.Id == roleId);
+
+        if (role != null && writePermission != null && readPermission != null)
+        {
+            role.Permissions.Add(writePermission);
+            role.Permissions.Add(readPermission);
+            await Context.SaveChangesAsync();
+        }
+
+        Context.ChangeTracker.Clear();
+
+        // Attach label to Captain Rex
+        await _recordBusiness.AttachLabel(uid, organizationId, pid, rid, label.Id);
+
+        Context.ChangeTracker.Clear();
+
+        // Act - User still has write permission
+        var result = await _queryBusiness.GetRecentlyAddedRecords(uid, organizationId, projectIds);
+        var records = result.ToList();
+
+        // Assert - All records including Captain Rex should be returned
+        Assert.Equal(5, records.Count);
+        Assert.Contains(records, r => r.Name == "Captain Rex");
+        Assert.Contains(records, r => r.Name == "Hunter");
+        Assert.Contains(records, r => r.Name == "Tech");
+        Assert.Contains(records, r => r.Name == "Wrecker");
+        Assert.Contains(records, r => r.Name == "Crosshair");
+    }
+
+    [Fact]
+    public async Task GetRecentlyAddedRecords_NoLabelsAttached_ReturnsAllRecords()
+    {
+        // Arrange
+        var projectIds = new[] { pid };
+
+        // Create ProjectMember to link user to project with a role
+        var projectMember = new ProjectMember
+        {
+            UserId = uid,
+            ProjectId = pid,
+            RoleId = roleId,
+        };
+        Context.ProjectMembers.Add(projectMember);
+        await Context.SaveChangesAsync();
+
+        Context.ChangeTracker.Clear();
+
+        // Act - No labels attached to any records
+        var result = await _queryBusiness.GetRecentlyAddedRecords(uid, organizationId, projectIds);
+        var records = result.ToList();
+
+        // Assert - All records should be returned when no labels are present
+        Assert.Equal(5, records.Count);
+        Assert.Contains(records, r => r.Name == "Captain Rex");
+        Assert.Contains(records, r => r.Name == "Hunter");
+        Assert.Contains(records, r => r.Name == "Tech");
+        Assert.Contains(records, r => r.Name == "Wrecker");
+        Assert.Contains(records, r => r.Name == "Crosshair");
+    }
+
+    [Fact]
+    public async Task GetRecentlyAddedRecords_RecordWithMultipleLabels_UserHasAccessToAll_ReturnsRecord()
+    {
+        // Arrange
+        var projectIds = new[] { pid };
+
+        // Create ProjectMember to link user to project with a role
+        var projectMember = new ProjectMember
+        {
+            UserId = uid,
+            ProjectId = pid,
+            RoleId = roleId,
+        };
+        Context.ProjectMembers.Add(projectMember);
+        await Context.SaveChangesAsync();
+
+        Context.ChangeTracker.Clear();
+
+        // Create two sensitivity labels
+        var labelDto1 = new CreateSensitivityLabelRequestDto
+        {
+            Name = "Label1_" + Guid.NewGuid(),
+            Description = "First Label",
+        };
+        var label1 = await _sensitivityLabelBusiness.CreateSensitivityLabel(uid, labelDto1, pid, organizationId);
+
+        var labelDto2 = new CreateSensitivityLabelRequestDto
+        {
+            Name = "Label2_" + Guid.NewGuid(),
+            Description = "Second Label",
+        };
+        var label2 = await _sensitivityLabelBusiness.CreateSensitivityLabel(uid, labelDto2, pid, organizationId);
+
+        Context.ChangeTracker.Clear();
+
+        // Give user write permission for label1
+        var writePermission1 = await Context.Permissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label1.Id && p.Action == "write");
+        
+        var readPermission1 = await Context.Permissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label1.Id && p.Action == "read");
+
+        var role = await Context.Roles
+            .Include(r => r.Permissions)
+            .FirstOrDefaultAsync(r => r.Id == roleId);
+
+        if (role != null && writePermission1 != null && readPermission1 != null)
+        {
+            role.Permissions.Add(writePermission1);
+            role.Permissions.Add(readPermission1);
+            await Context.SaveChangesAsync();
+        }
+
+        Context.ChangeTracker.Clear();
+
+        // Attach label1 to Captain Rex
+        await _recordBusiness.AttachLabel(uid, organizationId, pid, rid, label1.Id);
+
+        Context.ChangeTracker.Clear();
+
+        // Give user write permission for label2
+        var writePermission2 = await Context.Permissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label2.Id && p.Action == "write");
+        
+        var readPermission2 = await Context.Permissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label2.Id && p.Action == "read");
+
+        role = await Context.Roles
+            .Include(r => r.Permissions)
+            .FirstOrDefaultAsync(r => r.Id == roleId);
+
+        if (role != null && writePermission2 != null && readPermission2 != null)
+        {
+            role.Permissions.Add(writePermission2);
+            role.Permissions.Add(readPermission2);
+            await Context.SaveChangesAsync();
+        }
+
+        Context.ChangeTracker.Clear();
+
+        // Attach label2 to Captain Rex
+        await _recordBusiness.AttachLabel(uid, organizationId, pid, rid, label2.Id);
+
+        Context.ChangeTracker.Clear();
+
+        // Act - User has access to both labels
+        var result = await _queryBusiness.GetRecentlyAddedRecords(uid, organizationId, projectIds);
+        var records = result.ToList();
+
+        // Assert - Captain Rex should be returned since user has access to all labels
+        Assert.Equal(5, records.Count);
+        Assert.Contains(records, r => r.Name == "Captain Rex");
+    }
+
+    [Fact]
+    public async Task GetRecentlyAddedRecords_RecordWithMultipleLabels_UserMissingAccessToOne_FiltersOutRecord()
+    {
+        // Arrange
+        var projectIds = new[] { pid };
+
+        // Create ProjectMember to link user to project with a role
+        var projectMember = new ProjectMember
+        {
+            UserId = uid,
+            ProjectId = pid,
+            RoleId = roleId,
+        };
+        Context.ProjectMembers.Add(projectMember);
+        await Context.SaveChangesAsync();
+
+        Context.ChangeTracker.Clear();
+
+        // Create two sensitivity labels
+        var labelDto1 = new CreateSensitivityLabelRequestDto
+        {
+            Name = "Label1_" + Guid.NewGuid(),
+            Description = "First Label",
+        };
+        var label1 = await _sensitivityLabelBusiness.CreateSensitivityLabel(uid, labelDto1, pid, organizationId);
+
+        var labelDto2 = new CreateSensitivityLabelRequestDto
+        {
+            Name = "Label2_" + Guid.NewGuid(),
+            Description = "Second Label",
+        };
+        var label2 = await _sensitivityLabelBusiness.CreateSensitivityLabel(uid, labelDto2, pid, organizationId);
+
+        Context.ChangeTracker.Clear();
+
+        // Give user write permission for label1
+        var writePermission1 = await Context.Permissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label1.Id && p.Action == "write");
+
+        var role = await Context.Roles
+            .Include(r => r.Permissions)
+            .FirstOrDefaultAsync(r => r.Id == roleId);
+
+        if (role != null && writePermission1 != null)
+        {
+            role.Permissions.Add(writePermission1);
+            await Context.SaveChangesAsync();
+        }
+
+        Context.ChangeTracker.Clear();
+
+        // Attach label1 to Captain Rex
+        await _recordBusiness.AttachLabel(uid, organizationId, pid, rid, label1.Id);
+
+        Context.ChangeTracker.Clear();
+
+        // Give user write permission for label2 (temporarily to attach it)
+        var writePermission2 = await Context.Permissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label2.Id && p.Action == "write");
+
+        role = await Context.Roles
+            .Include(r => r.Permissions)
+            .FirstOrDefaultAsync(r => r.Id == roleId);
+
+        if (role != null && writePermission2 != null)
+        {
+            role.Permissions.Add(writePermission2);
+            await Context.SaveChangesAsync();
+        }
+
+        Context.ChangeTracker.Clear();
+
+        // Attach label2 to Captain Rex
+        await _recordBusiness.AttachLabel(uid, organizationId, pid, rid, label2.Id);
+
+        Context.ChangeTracker.Clear();
+
+        // Remove write permission for label2 (user only has access to label1)
+        role = await Context.Roles
+            .Include(r => r.Permissions)
+            .FirstOrDefaultAsync(r => r.Id == roleId);
+
+        if (role != null && writePermission2 != null)
+        {
+            var permissionToRemove = role.Permissions.FirstOrDefault(p => p.Id == writePermission2.Id);
+            if (permissionToRemove != null)
+            {
+                role.Permissions.Remove(permissionToRemove);
+                await Context.SaveChangesAsync();
+            }
+        }
+
+        Context.ChangeTracker.Clear();
+
+        // Act - User lacks access to label2
+        var result = await _queryBusiness.GetRecentlyAddedRecords(uid, organizationId, projectIds);
+        var records = result.ToList();
+
+        // Assert - Captain Rex should be filtered out (user must have access to ALL labels)
+        Assert.Equal(4, records.Count);
+        Assert.DoesNotContain(records, r => r.Name == "Captain Rex");
+        Assert.Contains(records, r => r.Name == "Hunter");
+        Assert.Contains(records, r => r.Name == "Tech");
+        Assert.Contains(records, r => r.Name == "Wrecker");
+        Assert.Contains(records, r => r.Name == "Crosshair");
+    }
+
+    [Fact]
+    public async Task GetRecentlyAddedRecords_MultipleRecordsWithDifferentLabels_FiltersCorrectly()
+    {
+        // Arrange
+        var projectIds = new[] { pid };
+
+        // Create ProjectMember to link user to project with a role
+        var projectMember = new ProjectMember
+        {
+            UserId = uid,
+            ProjectId = pid,
+            RoleId = roleId,
+        };
+        Context.ProjectMembers.Add(projectMember);
+        await Context.SaveChangesAsync();
+
+        Context.ChangeTracker.Clear();
+
+        // Create two sensitivity labels
+        var labelDto1 = new CreateSensitivityLabelRequestDto
+        {
+            Name = "AccessibleLabel_" + Guid.NewGuid(),
+            Description = "Label user has access to",
+        };
+        var accessibleLabel =
+            await _sensitivityLabelBusiness.CreateSensitivityLabel(uid, labelDto1, pid, organizationId);
+
+        var labelDto2 = new CreateSensitivityLabelRequestDto
+        {
+            Name = "RestrictedLabel_" + Guid.NewGuid(),
+            Description = "Label user doesn't have access to",
+        };
+        var restrictedLabel =
+            await _sensitivityLabelBusiness.CreateSensitivityLabel(uid, labelDto2, pid, organizationId);
+
+        Context.ChangeTracker.Clear();
+
+        // Give user write permission for accessible label
+        var writePermission1 = await Context.Permissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == accessibleLabel.Id && p.Action == "write");
+        
+        var readPermission1 = await Context.Permissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == accessibleLabel.Id && p.Action == "read");
+
+        var role = await Context.Roles
+            .Include(r => r.Permissions)
+            .FirstOrDefaultAsync(r => r.Id == roleId);
+
+        if (role != null && writePermission1 != null && readPermission1 != null)
+        {
+            role.Permissions.Add(writePermission1);
+            role.Permissions.Add(readPermission1);
+            await Context.SaveChangesAsync();
+        }
+
+        Context.ChangeTracker.Clear();
+
+        // Attach accessible label to Captain Rex (rid)
+        await _recordBusiness.AttachLabel(uid, organizationId, pid, rid, accessibleLabel.Id);
+
+        Context.ChangeTracker.Clear();
+
+        // Give user write permission for restricted label (temporarily to attach)
+        var writePermission2 = await Context.Permissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == restrictedLabel.Id && p.Action == "write");
+
+        role = await Context.Roles
+            .Include(r => r.Permissions)
+            .FirstOrDefaultAsync(r => r.Id == roleId);
+
+        if (role != null && writePermission2 != null)
+        {
+            role.Permissions.Add(writePermission2);
+            await Context.SaveChangesAsync();
+        }
+
+        Context.ChangeTracker.Clear();
+
+        // Get Hunter's record ID and attach restricted label
+        var hunterRecord = await Context.Records
+            .FirstOrDefaultAsync(r => r.Name == "Hunter" && r.ProjectId == pid);
+
+        await _recordBusiness.AttachLabel(uid, organizationId, pid, hunterRecord.Id, restrictedLabel.Id);
+
+        Context.ChangeTracker.Clear();
+
+        // Remove write permission for restricted label
+        role = await Context.Roles
+            .Include(r => r.Permissions)
+            .FirstOrDefaultAsync(r => r.Id == roleId);
+
+        if (role != null && writePermission2 != null)
+        {
+            var permissionToRemove = role.Permissions.FirstOrDefault(p => p.Id == writePermission2.Id);
+            if (permissionToRemove != null)
+            {
+                role.Permissions.Remove(permissionToRemove);
+                await Context.SaveChangesAsync();
+            }
+        }
+
+        Context.ChangeTracker.Clear();
+
+        // Act
+        var result = await _queryBusiness.GetRecentlyAddedRecords(uid, organizationId, projectIds);
+        var records = result.ToList();
+
+        // Assert - Captain Rex (accessible) should be included, Hunter (restricted) should be filtered out
+        Assert.Equal(4, records.Count);
+        Assert.Contains(records, r => r.Name == "Captain Rex");
+        Assert.DoesNotContain(records, r => r.Name == "Hunter");
+        Assert.Contains(records, r => r.Name == "Tech");
+        Assert.Contains(records, r => r.Name == "Wrecker");
+        Assert.Contains(records, r => r.Name == "Crosshair");
     }
 
     #endregion
