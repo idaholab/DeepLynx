@@ -73,7 +73,7 @@ export const downloadFile = async (
   organizationId: number,
   projectId: number,
   recordId: number,
-  recordName?: string
+  recordName?: string | null
 ): Promise<void> => {
   let url: string | null = null;
   try {

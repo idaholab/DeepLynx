@@ -28,7 +28,7 @@ interface PropertyTableProps {
   rows: PropertyRow[];
   className?: string;
   download?: boolean;
-  recordName?: string;
+  recordName?: string | null;
 }
 
 const PropertyTable: React.FC<PropertyTableProps> = ({
@@ -81,7 +81,7 @@ const PropertyTable: React.FC<PropertyTableProps> = ({
     index: number,
     depth: number = 0,
     isLast: boolean = false,
-    parentIsLast: boolean[] = []
+    parentIsLast: boolean[] = [],
   ) => {
     const isExpanded = expandedRows.has(index);
     const hasNested =
@@ -200,8 +200,8 @@ const PropertyTable: React.FC<PropertyTableProps> = ({
                 index * 1000 + nestedIndex,
                 depth + 1,
                 nestedIndex === row.nestedRows!.length - 1,
-                [...parentIsLast, isLast]
-              )
+                [...parentIsLast, isLast],
+              ),
             )}
           </>
         )}
@@ -224,7 +224,7 @@ const PropertyTable: React.FC<PropertyTableProps> = ({
                     organization?.organizationId as number,
                     projectId,
                     recordId,
-                    recordName
+                    recordName,
                   )
                 }
                 disabled={!canDownload}
@@ -248,7 +248,7 @@ const PropertyTable: React.FC<PropertyTableProps> = ({
         <div className="card-body p-4">
           <div className="border border-base-300 rounded-lg overflow-hidden bg-base-100">
             {rows.map((row, index) =>
-              renderRow(row, index, 0, index === rows.length - 1, [])
+              renderRow(row, index, 0, index === rows.length - 1, []),
             )}
           </div>
         </div>

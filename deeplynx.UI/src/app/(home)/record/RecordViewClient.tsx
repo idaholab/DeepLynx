@@ -7,7 +7,11 @@ import Link from "next/link";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import PropertyTable from "../components/PropertyTable";
-import { RecordResponseDto, TagResponseDto } from "../types/responseDTOs";
+import {
+  HistoricalRecordResponseDto,
+  RecordResponseDto,
+  TagResponseDto,
+} from "../types/responseDTOs";
 import RecordLoading from "./loading";
 
 // Components
@@ -25,10 +29,10 @@ import {
 } from "@/app/lib/client_service/edge_services.client";
 import {
   getEdgesByRecord,
-  getRecord,
   unattachTagFromRecord,
   updateRecord,
 } from "@/app/lib/client_service/record_services.client";
+import { getHistoricalRecord } from "@/app/lib/client_service/query_services.client";
 import { getClass } from "@/app/lib/client_service/class_services.client";
 import { getAllTagsOrg } from "@/app/lib/client_service/tag_services.client";
 import GraphClientPage from "../graph/GraphClientPage";
@@ -57,7 +61,7 @@ interface PropertyRow {
  */
 function parseNestedProperties(
   obj: JSON,
-  parentKey: string = ""
+  parentKey: string = "",
 ): PropertyRow[] {
   if (!obj || typeof obj !== "object") {
     return [];
@@ -109,7 +113,7 @@ interface ModalState {
   isOpen: boolean;
   type: "relatedRecord" | null;
   nameToRemove: string;
-  recordNameToRemove?: string;
+  recordNameToRemove?: string | null;
   idToRemove: string | null;
   originId: number | null;
   destinationId: number | null;
@@ -122,7 +126,9 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
 
   // ============= STATE MANAGEMENT =============
   // Record & Tags State
-  const [record, setRecord] = useState<RecordResponseDto | null>(null);
+  const [record, setRecord] = useState<HistoricalRecordResponseDto | null>(
+    null,
+  );
   const [recordClass, setRecordClass] = useState<ClassResponseDto | null>(null);
   const [tags, setTags] = useState<TagResponseDto[]>([]);
   const [selectedTags, setSelectedTags] = useState<TagResponseDto[]>([]);
@@ -137,7 +143,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
 
   // Related Records State
   const [originRecords, setOriginRecords] = useState<RelatedRecordViewModel[]>(
-    []
+    [],
   );
   const [destinationRecords, setDestinationRecords] = useState<
     RelatedRecordViewModel[]
@@ -169,9 +175,26 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
           organization.organizationId as number,
           projectId,
           recordId,
-          { [field]: value }
+          { [field]: value },
         );
-        setRecord((prev) => (prev ? { ...prev, ...update } : update));
+        setRecord((prev) => {
+          if (!prev) return prev;
+
+          return {
+            ...prev,
+            name: update.name ?? prev.name,
+            description: update.description ?? prev.description,
+            uri: update.uri ?? prev.uri,
+            originalId: update.originalId ?? prev.originalId,
+            classId: update.classId ?? prev.classId,
+            dataSourceId: update.dataSourceId ?? prev.dataSourceId,
+            projectId: update.projectId ?? prev.projectId,
+            lastUpdatedAt: update.lastUpdatedAt ?? prev.lastUpdatedAt,
+            lastUpdatedBy: update.lastUpdatedBy ?? prev.lastUpdatedBy,
+            isArchived: update.isArchived ?? prev.isArchived,
+            objectStorageId: update.objectStorageId ?? prev.objectStorageId,
+          };
+        });
         toast.success(successMessage);
       } catch (error) {
         toast.error(`${t.translations.FAILED_TO_UPDATE} ${field}`);
@@ -182,7 +205,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
       projectId,
       recordId,
       t.translations.FAILED_TO_UPDATE,
-    ]
+    ],
   );
 
   const resetAllState = useCallback(() => {
@@ -204,7 +227,9 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
       page: number,
       setLoading: (val: boolean) => void,
       setHasMore: (val: boolean) => void,
-      setRecords: React.Dispatch<React.SetStateAction<RelatedRecordViewModel[]>>
+      setRecords: React.Dispatch<
+        React.SetStateAction<RelatedRecordViewModel[]>
+      >,
     ) => {
       if (!recordId || !projectId || !record || !organization?.organizationId)
         return;
@@ -219,7 +244,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
           isOrigin,
           page,
           true,
-          pageSize
+          pageSize,
         );
 
         if (!edges || edges.length === 0) {
@@ -237,7 +262,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
 
         const viewModels: RelatedRecordViewModel[] = edges
           .filter(
-            (edge) => edge.relatedRecordId != null && edge.relatedRecordId > 0
+            (edge) => edge.relatedRecordId != null && edge.relatedRecordId > 0,
           )
           .map((edge) => ({
             relatedRecordName: edge.relatedRecordName,
@@ -272,7 +297,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
       } catch (error) {
         console.error(
           `Error fetching ${isOrigin ? "origin" : "destination"} records:`,
-          error
+          error,
         );
         setLoading(false);
       }
@@ -284,7 +309,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
       pageSize,
       t.translations.EDGE,
       organization?.organizationId,
-    ]
+    ],
   );
 
   const handleCloseModal = () => {
@@ -308,7 +333,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
           organization.organizationId as number,
           projectId,
           originId,
-          destinationId
+          destinationId,
         );
 
         if (edgeExists) {
@@ -317,16 +342,16 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
             projectId,
             originId,
             destinationId,
-            true
+            true,
           );
 
           if (originId === recordId) {
             setOriginRecords((prev) =>
-              prev.filter((r) => r.relatedRecordId !== Number(idToRemove))
+              prev.filter((r) => r.relatedRecordId !== Number(idToRemove)),
             );
           } else {
             setDestinationRecords((prev) =>
-              prev.filter((r) => r.relatedRecordId !== Number(idToRemove))
+              prev.filter((r) => r.relatedRecordId !== Number(idToRemove)),
             );
           }
 
@@ -346,7 +371,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
       id: string,
       name: string,
       recordName: string | undefined,
-      type: "relatedRecord"
+      type: "relatedRecord",
     ) => {
       setModal({
         isOpen: true,
@@ -358,7 +383,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
         destinationId: null,
       });
     },
-    []
+    [],
   );
 
   // ============= EFFECTS =============
@@ -372,10 +397,12 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
       if (!recordId || !projectId || !organization?.organizationId) return;
 
       try {
-        const data = await getRecord(
+        const data = await getHistoricalRecord(
           organization.organizationId as number,
           projectId,
-          recordId
+          recordId,
+          null,
+          true,
         );
         setRecord(data);
         if (data.tags) {
@@ -385,7 +412,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
 
           setSelectedTags(parsedTags);
           setSelectedIds(
-            parsedTags.map((tag: { id: number | null }) => String(tag.id))
+            parsedTags.map((tag: { id: number | null }) => String(tag.id)),
           );
         }
       } catch (error) {
@@ -436,7 +463,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
       try {
         const data = await getAllTagsOrg(
           organization.organizationId as number,
-          [projectId]
+          [projectId],
         );
         setTags(data);
       } catch (error) {
@@ -454,7 +481,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
       originPage,
       setIsLoadingOrigins,
       setHasMoreOrigins,
-      setOriginRecords
+      setOriginRecords,
     );
   }, [fetchRelatedRecords, originPage]);
 
@@ -465,7 +492,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
       destinationPage,
       setIsLoadingDestinations,
       setHasMoreDestinations,
-      setDestinationRecords
+      setDestinationRecords,
     );
   }, [fetchRelatedRecords, destinationPage]);
 
@@ -473,6 +500,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
   const systemPropertiesRows = useMemo(() => {
     if (!record) return [];
     return [
+      { label: "Record ID", value: record.id },
       {
         label: t.translations.RECORD_NAME,
         value: record.name,
@@ -488,12 +516,13 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
           handleUpdateRecord(
             "description",
             value,
-            t.translations.RECORD_NAME_UPDATED
+            t.translations.RECORD_NAME_UPDATED,
           ),
       },
       { label: t.translations.URI, value: record.uri },
       { label: t.translations.ORIGINAL_ID, value: record.originalId },
       { label: t.translations.LAST_UPDATED_AT, value: record.lastUpdatedAt },
+      { label: "Data Source", value: record.dataSourceName },
     ];
   }, [record, handleUpdateRecord, t.translations]);
 
@@ -541,7 +570,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
         organization.organizationId as number,
         projectId,
         recordId,
-        tagId
+        tagId,
       );
 
       setSelectedTags((prev) => prev.filter((t) => t.id !== tagId));
