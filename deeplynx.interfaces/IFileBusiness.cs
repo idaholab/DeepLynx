@@ -7,7 +7,7 @@ namespace deeplynx.interfaces;
 public interface IFileBusiness
 {
     Task<string> UploadFile(long organizationId, long projectId, long datasourceId, ObjectStorageConfigDto objectStorageConfig, IFormFile file, Guid guid);
-    Task<string> UpdateFile(RecordResponseDto record, IFormFile file);
-    Task<FileStreamResult> DownloadFile(RecordResponseDto record);
-    Task<bool> DeleteFile(RecordResponseDto record);
+    Task<string> UpdateFile(RecordResponseDto record, ObjectStorageConfigDto objectStorageConfig,  IFormFile file, Guid guid);
+    Task<FileStreamResult> DownloadFile(RecordResponseDto record, ObjectStorageConfigDto objectStorageConfig);
+    Task<bool> DeleteFile(RecordResponseDto record,  ObjectStorageConfigDto objectStorageConfig);
 }

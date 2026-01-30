@@ -45,6 +45,37 @@ spec:
     requests:
       storage: 60Gi # Adjust size based on your timeseries data needs
   storageClassName: azurefile-duckdb
+  
+---
+  
+# Storage Class for Azure Blob (same account)
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: azureblob-nexus
+  namespace: deeplynxv3-dev
+provisioner: blob.csi.azure.com
+parameters:
+  skuName: Premium_LRS
+reclaimPolicy: Retain
+allowVolumeExpansion: true
+volumeBindingMode: Immediate
+
+---
+
+# Persistent Volume Claim for Blob storage
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: deeplynx-blob-pvc
+  namespace: deeplynxv3-dev
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 100Gi
+  storageClassName: azureblob-nexus
 
 ---
 
@@ -71,6 +102,8 @@ spec:
               value: ${AWS_S3_CONNECTION_STRING}
             - name: AZURE_OBJECT_CONNECTION_STRING
               value: ${AZURE_OBJECT_CONNECTION_STRING}
+            - name: AZURE_CONTAINER_NAME
+              value: ${AZURE_CONTAINER_NAME}
             - name: ConnectionStrings__DefaultConnection
               value: "${DATABASE_CONNECTION_STRING}"
             - name: FILE_STORAGE_METHOD
@@ -182,10 +215,15 @@ spec:
           volumeMounts:
             - name: duckdb-storage
               mountPath: /data/duckdb
+            - name: blob-storage
+              mountPath: /data/blob
       volumes:
         - name: duckdb-storage
           persistentVolumeClaim:
             claimName: deeplynx-duckdb-pvc
+        - name: blob-storage 
+          persistentVolumeClaim:
+            claimName: deeplynx-blob-pvc
 
 ---
 
@@ -212,6 +250,8 @@ spec:
               value: ${AWS_S3_CONNECTION_STRING}
             - name: AZURE_OBJECT_CONNECTION_STRING
               value: ${AZURE_OBJECT_CONNECTION_STRING}
+            - name: AZURE_CONTAINER_NAME
+              value: ${AZURE_CONTAINER_NAME}
             - name: ConnectionStrings__DefaultConnection
               value: ${DATABASE_CONNECTION_STRING}
             - name: FILE_STORAGE_METHOD
@@ -317,10 +357,15 @@ spec:
           volumeMounts:
             - name: duckdb-storage
               mountPath: /data/duckdb
+            - name: blob-storage
+              mountPath: /data/blob
       volumes:
         - name: duckdb-storage
           persistentVolumeClaim:
             claimName: deeplynx-duckdb-pvc
+        - name: blob-storage
+          persistentVolumeClaim:
+            claimName: deeplynx-blob-pvc
 
 ---
 

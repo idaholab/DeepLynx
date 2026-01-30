@@ -12,6 +12,7 @@ import {
   RoleResponseDto,
 } from "../../types/responseDTOs";
 import { PermissionCategory } from "./RolesAndPermissions";
+import { useLanguage } from "../../../contexts/Language";
 
 interface MatrixViewLayoutProps {
   roles: RoleResponseDto[];
@@ -48,24 +49,26 @@ const MatrixViewLayout: React.FC<MatrixViewLayoutProps> = ({
   matrixRoleHasPermission,
   isStandardRole,
 }) => {
-  // Determine if there is at least one non-standard role
+
+  const { t } = useLanguage();
   const hasNonStandardRoles = roles.some((role) => !isStandardRole(role));
 
-  // Optional: derive button title for UX
   const editMatrixDisabledReason = !hasNonStandardRoles
     ? "Matrix editing is only available when custom (non-standard) roles exist."
     : rolesLocked
-    ? "Roles are locked."
+    ? "Roles are locked"
     : isLoadingPermissions
-    ? "Permissions are still loading."
+    ? "Permissions are still loading"
     : "";
 
   return (
     <div style={{ height: "calc(100vh - 28rem)" }}>
-      <div className="card bg-base-100 shadow-xl h-full flex flex-col overflow-hidden">
+      <div className="card bg-base-100 shadow-xl h-full flex flex-col overflow-hidden border-2 border-primary">
         {/* Matrix Header / Controls */}
         <div className="px-6 py-3 border-b border-base-300 flex items-center justify-between">
-          <h3 className="text-sm font-semibold">Permission Matrix</h3>
+          <h3 className="text-sm font-semibold">
+            {t.translations.PERMISSION_MATRIX}
+          </h3>
 
           {/* Toggle editable matrix mode */}
           {!isEditingMatrix ? (
@@ -81,7 +84,7 @@ const MatrixViewLayout: React.FC<MatrixViewLayoutProps> = ({
               }
             >
               <PencilIcon className="w-4 h-4" />
-              Edit Matrix
+              {t.translations.EDIT_MATRIX}
             </button>
           ) : (
             <div className="flex gap-2">
@@ -89,14 +92,14 @@ const MatrixViewLayout: React.FC<MatrixViewLayoutProps> = ({
                 onClick={onCancelEditingMatrix}
                 className="btn btn-ghost btn-sm"
               >
-                Cancel
+                {t.translations.CANCEL}
               </button>
               <button
                 onClick={onSaveMatrixPermissions}
                 className="btn btn-primary btn-sm gap-2"
               >
                 <CheckIcon className="w-4 h-4" />
-                Save All Changes
+                {t.translations.SAVE_ALL_CHANGES}
               </button>
             </div>
           )}
@@ -108,7 +111,7 @@ const MatrixViewLayout: React.FC<MatrixViewLayoutProps> = ({
             <div className="text-center">
               <span className="loading loading-spinner loading-lg text-primary"></span>
               <p className="mt-4 text-base-content/60">
-                Loading permissions...
+                {t.translations.LOADING_PERMISSIONS}
               </p>
             </div>
           </div>
@@ -117,7 +120,9 @@ const MatrixViewLayout: React.FC<MatrixViewLayoutProps> = ({
             <table className="table">
               <thead className="sticky top-0 z-20 bg-base-100">
                 <tr>
-                  <th className="sticky left-0 bg-base-200 z-30">Permission</th>
+                  <th className="sticky left-0 bg-base-200 z-30">
+                    {t.translations.PERMISSION}
+                  </th>
                   {roles.map((role) => {
                     const standard = isStandardRole(role);
 
@@ -140,7 +145,7 @@ const MatrixViewLayout: React.FC<MatrixViewLayoutProps> = ({
                             <span className="font-medium">{role.name}</span>
                             {standard && (
                               <div className="badge badge-info badge-xs">
-                                STD
+                                {t.translations.STD}
                               </div>
                             )}
                             {!isEditingMatrix && (
@@ -181,7 +186,7 @@ const MatrixViewLayout: React.FC<MatrixViewLayoutProps> = ({
                     {/* Permission Rows */}
                     {category.permissions.map((perm: PermissionResponseDto) => (
                       <tr key={perm.id} className="hover">
-                        <td className="sticky left-0 z-10">
+                        <td className="sticky left-0 z-10 bg-base-100">
                           <div className="flex flex-col">
                             <span className="font-medium text-sm">
                               {perm.name}
@@ -192,7 +197,7 @@ const MatrixViewLayout: React.FC<MatrixViewLayoutProps> = ({
                               </span>
                             )}
                             <span className="text-xs text-base-content/50 mt-1">
-                              Action: {perm.action}
+                              {t.translations.ACTION} {perm.action}
                             </span>
                           </div>
                         </td>
@@ -208,8 +213,6 @@ const MatrixViewLayout: React.FC<MatrixViewLayoutProps> = ({
                             <td key={role.id} className="text-center">
                               <div
                                 onClick={(e) => {
-                                  e.preventDefault();
-                                  e.stopPropagation();
                                   if (isEditingMatrix && !standard) {
                                     onToggleMatrixPermission(
                                       role.id,

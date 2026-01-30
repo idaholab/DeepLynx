@@ -77,11 +77,10 @@ const OrganizationManagementPage = async ({
     // First, fetch roles for the organization
     roles = await getAllOrgRolesServer(Number(organizationId));
 
-    // Then, fetch permissions for the FIRST role if it exists
     if (roles.length > 0) {
       permissions = await getOrgRolePermissionsServer(
         Number(organizationId),
-        roles[0].id // ✅ Use the first role's actual ID
+        roles[0].id
       );
     } else {
       permissions = [];
