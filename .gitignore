@@ -9,7 +9,7 @@ dist
 .idea
 
 ## VS Code ##
-.vscode
+
 
 ## Web ##
 /deeplynx.api/.DS_Store
