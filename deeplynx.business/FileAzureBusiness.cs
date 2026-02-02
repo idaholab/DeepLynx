@@ -114,49 +114,6 @@ public class FileAzureBusiness: IFileBusiness
     /// <returns></returns>
     /// <exception cref="ArgumentException"></exception>
     /// <exception cref="FileNotFoundException"></exception>
-    // public async Task<FileStreamResult> DownloadFile(RecordResponseDto record, ObjectStorageConfigDto objectStorageConfig)
-    // {
-    //     if (record.Uri == null)
-    //     {
-    //         throw new ArgumentException("Record Uri is null");
-    //     }
-    //     
-    //     if (objectStorageConfig?.AzureObjectConfig == null)
-    //     {
-    //         throw new ArgumentException("Azure connection string is null");
-    //     }
-    //     
-    //     var container = new BlobContainerClient(objectStorageConfig.AzureObjectConfig.AzureConnectionString, objectStorageConfig.AzureObjectConfig.AzureContainerName);
-    //     if (!await container.ExistsAsync())
-    //     {
-    //         throw new InvalidOperationException("Azure Object Storage container does not exist");
-    //     }
-    //
-    //     var blob = container.GetBlobClient(record.Uri);
-    //
-    //     if (!await blob.ExistsAsync())
-    //     {
-    //         throw new FileNotFoundException($"File not found: {record.Uri}");
-    //     }
-    //     
-    //     // Detect file type
-    //     var provider = new FileExtensionContentTypeProvider();
-    //     if (!provider.TryGetContentType(record.Uri, out var contentType))
-    //     {
-    //         contentType = "application/octet-stream"; // Default fallback
-    //     }
-    //     
-    //     // Download the blob content as a stream
-    //     var downloadResponse = await blob.DownloadStreamingAsync();
-    //
-    //     // Return the stream directly - ASP.NET Core will handle streaming to the client
-    //     // The stream will be automatically disposed after the response is sent
-    //     return new FileStreamResult(downloadResponse.Value.Content, contentType)
-    //     {
-    //         FileDownloadName = record.Name,
-    //         EnableRangeProcessing = true // Enables support for range requests (partial downloads)
-    //     };
-    // }
     public async Task<FileStreamResult> DownloadFile(RecordResponseDto record, ObjectStorageConfigDto objectStorageConfig)
     {
         if (record.Uri == null)
@@ -190,7 +147,11 @@ public class FileAzureBusiness: IFileBusiness
         var contentLength = properties.Value.ContentLength;
     
         // Detect file type
-        var contentType = properties.Value.ContentType ?? "application/octet-stream";
+        var provider = new FileExtensionContentTypeProvider();
+        if (!provider.TryGetContentType(record.Uri, out var contentType))
+        {
+            contentType = "application/octet-stream"; // Default fallback
+        }
     
         // Download the blob content as a stream
         var downloadResponse = await blob.DownloadStreamingAsync();

@@ -1315,7 +1315,7 @@ public class FileAzureBusinessTests : IntegrationTestBase, IClassFixture<Azurite
 
 #endregion
 
-#region Chunked Upload Tests
+    #region Chunked Upload Tests
 
     [Fact]
     public async Task StartUpload_Success_ReturnsValidGuid()
