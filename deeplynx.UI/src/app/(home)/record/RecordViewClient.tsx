@@ -647,6 +647,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
                 }}
                 isLoading={isLoadingOrigins && originPage > 1}
                 hasMore={hasMoreOrigins}
+                relationship="outgoing"
               />
             )}
 
@@ -666,6 +667,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
                   }}
                   isLoading={isLoadingDestinations && destinationPage > 1}
                   hasMore={hasMoreDestinations}
+                  relationship="incoming"
                 />
               </div>
             )}

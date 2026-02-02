@@ -2,12 +2,13 @@
 
 "use client";
 
-import React, { useRef, useEffect } from "react";
+import { PlusCircleIcon } from "@heroicons/react/24/solid";
+import React, { useEffect, useRef, useState } from "react";
+import { AddEdgeModal } from "./AddEdgeModal";
 
 export interface CardColumn<T extends object> {
   key: keyof T;
   label: string;
-  /** Optional custom cell renderer */
   render?: (row: T) => React.ReactNode;
 }
 
@@ -15,14 +16,12 @@ interface RelatedRecordsCardProps<T extends object> {
   title?: string;
   columns: CardColumn<T>[];
   rows: T[];
-  /** Show leading index column like your original table */
   showIndex?: boolean;
-  /** Callback when scrolled near bottom */
   onLoadMore?: () => void;
-  /** Whether more data is currently loading */
   isLoading?: boolean;
-  /** Whether there's more data to load */
   hasMore?: boolean;
+  relationship: string;
+  relationshipDirection?: "outgoing" | "incoming";
 }
 
 function RelatedRecordsCard<T extends object>({
@@ -33,8 +32,11 @@ function RelatedRecordsCard<T extends object>({
   onLoadMore,
   isLoading = false,
   hasMore = false,
+  relationship,
+  relationshipDirection = "outgoing",
 }: RelatedRecordsCardProps<T>) {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
   useEffect(() => {
     const scrollContainer = scrollContainerRef.current;
@@ -56,7 +58,17 @@ function RelatedRecordsCard<T extends object>({
 
   return (
     <div className="card bg-base-100 shadow-md mt-4 p-2">
-      <h2 className="text-xl font-bold md-4 text-base-content">{title}</h2>
+      <div className="flex justify-between px-4">
+        <h2 className="text-xl font-bold md-4 text-base-content">{title}</h2>
+        <button
+          type="button"
+          onClick={() => setIsAddModalOpen(true)}
+          className="btn btn-ghost btn-sm"
+          title="Add relationship"
+        >
+          <PlusCircleIcon className="size-6 text-secondary" />
+        </button>
+      </div>
       <div className="card-body p-4">
         <div
           ref={scrollContainerRef}
@@ -113,6 +125,12 @@ function RelatedRecordsCard<T extends object>({
           )}
         </div>
       </div>
+      <AddEdgeModal
+        isOpen={isAddModalOpen}
+        onClose={() => setIsAddModalOpen(false)}
+        relationship={relationship}
+        direction={relationshipDirection}
+      />
     </div>
   );
 }
