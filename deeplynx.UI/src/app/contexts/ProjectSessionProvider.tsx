@@ -57,7 +57,6 @@ export const ProjectSessionProvider = ({
     if (stored) {
       try {
         const parsed: ProjectSession | null = JSON.parse(stored);
-        console.log("ProjectSessionProvider hydrate - parsed:", parsed);
         if (parsed && parsed.projectId) {
           setProjectState(parsed);
         }
