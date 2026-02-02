@@ -266,30 +266,17 @@ public class FileBusiness
         // Get the config to extract mount path
         var configData = JsonConvert.DeserializeObject<ObjectStorageConfigDto>(objectStorage.Config);
         if (configData == null) throw new InvalidOperationException("Config data for object storage is null");
-        if (configData.MountPath == null)
-            throw new InvalidOperationException("File system mount path not set in object storage");
-
-        var uploadId = Guid.NewGuid().ToString();
         
-        //TODO: FACTORY HERE
-
-        // Create directory for chunks based on storage type
-        var uploadPath = Path.Combine(
-            configData.MountPath,
-            $"org_{organizationId}",
-            $"project_{projectId}",
-            $"datasource_{realDataSourceId}",
-            "uploads",
-            uploadId
-        );
-        Directory.CreateDirectory(uploadPath);
+        var fileBusiness = _factory.CreateFileBusiness(objectStorage.Type);
+        
+        var uploadId = await fileBusiness.StartUpload(organizationId, projectId, realDataSourceId, configData);
 
         // Calculate total chunks needed
         var totalChunks = (int)Math.Ceiling((double)request.FileSize / _recommendedChunkSize);
 
         return new FileUploadSessionResponseDto
         {
-            UploadId = uploadId,
+            UploadId = uploadId.ToString(),
             ChunkSize = _recommendedChunkSize,
             TotalChunks = totalChunks
         };
@@ -349,46 +336,11 @@ public class FileBusiness
         if (objectStorage is null) throw new KeyNotFoundException("No object storage found for project");
 
         var configData = JsonConvert.DeserializeObject<ObjectStorageConfigDto>(objectStorage.Config);
-        
-        //TODO: FACTORY HERE
-        
         if (configData == null) throw new InvalidOperationException("Config data for object storage is null");
-        if (configData.MountPath == null)
-            throw new InvalidOperationException("File system mount path not set in object storage");
-
-        // Use mount path from object storage config
-        var uploadPath = Path.Combine(
-            configData.MountPath,
-            $"org_{organizationId}",
-            $"project_{projectId}",
-            $"datasource_{realDataSourceId}",
-            "uploads",
-            uploadId
-        );
-        var chunkFilePath = Path.Combine(uploadPath, $"{chunkNumber}.part");
-
-        try
-        {
-            if (chunk == null || chunk.Length == 0)
-                throw new ArgumentException("No chunk data provided");
-
-            if (!Directory.Exists(uploadPath))
-                throw new InvalidOperationException($"Upload session {uploadId} not found or expired");
-
-            // Write chunk to disk
-            await using var stream = new FileStream(chunkFilePath, FileMode.Create);
-            await chunk.CopyToAsync(stream);
-
-            return "success";
-        }
-        catch (Exception)
-        {
-            // Cleanup chunk file on failure
-            if (File.Exists(chunkFilePath))
-                File.Delete(chunkFilePath);
-
-            throw;
-        }
+        
+        var fileBusiness = _factory.CreateFileBusiness(objectStorage.Type);
+        await fileBusiness.UploadChunk(organizationId, projectId, realDataSourceId, chunkNumber, uploadId, configData, chunk);
+        return "success";
     }
 
     /// <summary>
@@ -442,102 +394,36 @@ public class FileBusiness
 
         var configData = JsonConvert.DeserializeObject<ObjectStorageConfigDto>(objectStorage.Config);
         
-        //TODO: FACTORY HERE
-        
         if (configData == null) throw new InvalidOperationException("Config data for object storage is null");
-        if (configData.MountPath == null)
-            throw new InvalidOperationException("File system mount path not set in object storage");
-
-        // Use mount path from object storage config
-        var uploadPath = Path.Combine(
-            configData.MountPath,
-            $"org_{organizationId}",
-            $"project_{projectId}",
-            $"datasource_{realDataSourceId}",
-            "uploads",
-            request.UploadId
-        );
-        var mergedFileName = $"{request.UploadId}_{request.FileName}";
-        var mergedFilePath = Path.Combine(uploadPath, mergedFileName);
-
-        try
+        
+        var fileBusiness = _factory.CreateFileBusiness(objectStorage.Type);
+        
+        var guid =  Guid.NewGuid();
+        
+        var uri = await fileBusiness.CompleteUpload(organizationId, projectId, realDataSourceId, configData, request, guid);
+        
+        // Create file record
+        var fileClass = await _classBusiness.GetOrCreateClass(currentUserId, organizationId, projectId, "File");
+        var recordRequest = new CreateRecordRequestDto
         {
-            if (!Directory.Exists(uploadPath))
-                throw new InvalidOperationException($"Upload session {request.UploadId} not found");
-
-            // Merge all chunks into final file
-            await using (var finalFileStream = new FileStream(mergedFilePath, FileMode.Create))
+            Properties = new JsonObject
             {
-                for (var i = 0; i < request.TotalChunks; i++)
-                {
-                    var chunkFilePath = Path.Combine(uploadPath, $"{i}.part");
+                ["fileType"] = Path.GetExtension(request.FileName).TrimStart('.').ToLower(),
+                ["uploadedViaChunking"] = true,
+                ["originalUploadId"] = request.UploadId
+            },
+            Name = request.FileName,
+            ObjectStorageId = objectStorage.Id,
+            Description = $"File uploaded via chunked upload (session: {request.UploadId})",
+            OriginalId = guid.ToString(),
+            Uri = uri,
+            ClassId = fileClass.Id,
+            ClassName = fileClass.Name,
+            FileType = Path.GetExtension(request.FileName).TrimStart('.').ToLower()
+        };
 
-                    if (!File.Exists(chunkFilePath))
-                        throw new InvalidOperationException($"Missing chunk {i} of {request.TotalChunks}");
-
-                    await using (var chunkStream = new FileStream(chunkFilePath, FileMode.Open))
-                    {
-                        await chunkStream.CopyToAsync(finalFileStream);
-                    }
-
-                    File.Delete(chunkFilePath); // Clean up chunk after merging
-                }
-            }
-
-            // Upload merged file to object storage using the existing file business logic
-            var fileBusiness = _factory.CreateFileBusiness(objectStorage.Type);
-            var guid = Guid.NewGuid();
-
-            // Create IFormFile from merged file for upload
-            await using var fileStream = new FileStream(mergedFilePath, FileMode.Open, FileAccess.Read);
-            var formFile = new FormFile(fileStream, 0, fileStream.Length, "file", request.FileName)
-            {
-                Headers = new HeaderDictionary(),
-                ContentType = "application/octet-stream"
-            };
-
-            var uri = await fileBusiness.UploadFile(organizationId, projectId, realDataSourceId, configData, formFile,
-                guid);
-
-            // Clean up merged file and upload directory
-            fileStream.Close();
-            File.Delete(mergedFilePath);
-            Directory.Delete(uploadPath, true);
-
-            // Create file record
-            var fileClass = await _classBusiness.GetOrCreateClass(currentUserId, organizationId, projectId, "File");
-            var recordRequest = new CreateRecordRequestDto
-            {
-                Properties = new JsonObject
-                {
-                    ["fileType"] = Path.GetExtension(request.FileName).TrimStart('.').ToLower(),
-                    ["uploadedViaChunking"] = true,
-                    ["originalUploadId"] = request.UploadId
-                },
-                Name = request.FileName,
-                ObjectStorageId = objectStorage.Id,
-                Description = $"File uploaded via chunked upload (session: {request.UploadId})",
-                OriginalId = guid.ToString(),
-                Uri = uri,
-                ClassId = fileClass.Id,
-                ClassName = fileClass.Name,
-                FileType = Path.GetExtension(request.FileName).TrimStart('.').ToLower()
-            };
-
-            return await _recordBusiness.CreateRecord(currentUserId, organizationId, projectId, realDataSourceId,
-                recordRequest);
-        }
-        catch (Exception)
-        {
-            // Cleanup on failure
-            if (File.Exists(mergedFilePath))
-                File.Delete(mergedFilePath);
-
-            if (Directory.Exists(uploadPath))
-                Directory.Delete(uploadPath, true);
-
-            throw;
-        }
+        return await _recordBusiness.CreateRecord(currentUserId, organizationId, projectId, realDataSourceId,
+            recordRequest);
     }
 
     /// <summary>
@@ -589,24 +475,10 @@ public class FileBusiness
         if (objectStorage is null) throw new KeyNotFoundException("No object storage found for project");
 
         var configData = JsonConvert.DeserializeObject<ObjectStorageConfigDto>(objectStorage.Config);
-        
-        //TODO: FACTORY HERE
-        
         if (configData == null) throw new InvalidOperationException("Config data for object storage is null");
-        if (configData.MountPath == null)
-            throw new InvalidOperationException("File system mount path not set in object storage");
-
-        var uploadPath = Path.Combine(
-            configData.MountPath,
-            $"org_{organizationId}",
-            $"project_{projectId}",
-            $"datasource_{realDataSourceId}",
-            "uploads",
-            uploadId
-        );
-
-        if (Directory.Exists(uploadPath))
-            Directory.Delete(uploadPath, true);
+        
+        var fileBusiness = _factory.CreateFileBusiness(objectStorage.Type);
+        await fileBusiness.CancelUpload(organizationId, projectId, realDataSourceId, uploadId, configData);
 
         await Task.CompletedTask;
     }

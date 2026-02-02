@@ -32,4 +32,30 @@ public class FileS3Business:  IFileBusiness
     {
         return true;
     }
+    
+    /// <summary>
+    /// 
+    /// </summary>
+    /// <param name="objectStorageConfig">Config allowing chunking to be set up and tested</param>
+    public async Task<Guid> StartUpload(long organizationId, long projectId, long datasourceId, ObjectStorageConfigDto objectStorageConfig)
+    {
+        return new Guid();
+    }
+
+    public async Task UploadChunk(long organizationId, long projectId, long datasourceId, long chunkNumber, string uploadId,
+        ObjectStorageConfigDto objectStorageConfig, IFormFile chunk)
+    {
+        
+    }
+
+    public async Task<string> CompleteUpload(long organizationId, long projectId, long datasourceId,
+        ObjectStorageConfigDto objectStorageConfig, FileUploadCompleteRequestDto request, Guid guid)
+    {
+        return "";
+    }
+
+    public async Task CancelUpload(long organizationId, long projectId, long dataSourceId, string uploadId,
+        ObjectStorageConfigDto objectStorageConfig)
+    {
+    }
 }
