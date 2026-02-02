@@ -10,6 +10,7 @@ import {
   archiveProject,
   getProjectLogoUrl,
   removeProjectLogo,
+  updateProject,
   uploadProjectLogo,
 } from "@/app/lib/client_service/projects_services.client";
 import {
@@ -30,7 +31,7 @@ import {
   CreateObjectStorageRequestDto,
   UpdateObjectStorageRequestDto,
 } from "@/app/(home)/types/requestDTOs";
-import ProjectLogoSection from "./components/ProjectLogoSection";
+import ProjectSettingsLeftColumn from "./components/ProjectSettingsLeftColumn";
 import StorageSettingsSection from "./components/StorageSettingsSection";
 import CreateStorageModal from "./components/CreateStorageModal";
 import EditStorageModal from "./components/EditStorageModal";
@@ -93,6 +94,10 @@ const ProjectSettings = ({ project }: ProjectSettingsProps) => {
   const [archiveStorageId, setArchiveStorageId] = useState<number | null>(null);
   const [archiveAction, setArchiveAction] = useState<boolean>(true);
 
+  const [bannerText, setBannerText] = useState<string>("");
+  const [originalBannerText, setOriginalBannerText] = useState<string>("");
+  const [isSavingBanner, setIsSavingBanner] = useState(false);
+
   // Load existing logo on mount
   useEffect(() => {
     const loadExistingLogo = async () => {
@@ -117,6 +122,72 @@ const ProjectSettings = ({ project }: ProjectSettingsProps) => {
 
     loadExistingLogo();
   }, [project?.id]);
+
+  useEffect(() => {
+    if (project?.banner !== undefined) {
+      const banner = project.banner || "";
+      setBannerText(banner);
+      setOriginalBannerText(banner);
+    }
+  }, [project?.banner]);
+
+  const handleSaveBanner = async () => {
+    if (!organization?.banner || !project?.id) {
+      toast.error(t.translations.NO_PROJECT_SELECTED);
+      return;
+    }
+
+    if (bannerText === originalBannerText) {
+      toast.custom(
+        <div className="text-info">
+          <ExclamationTriangleIcon className="size-4" />
+          {t.translations.NO_CHANGES_TO_SAVE}
+        </div>,
+      );
+      return;
+    }
+
+    if (bannerText.length > 50) {
+      toast.error(t.translations.BANNER_TEXT_MUST_BE_50_CHARATERS_OR_LESS);
+      return;
+    }
+
+    try {
+      setIsSavingBanner(true);
+
+      await updateProject(
+        organization.organizationId as number,
+        project.id as number,
+        {
+          organizationId: organization.organizationId as number,
+          banner: bannerText.trim() || null,
+        },
+      );
+
+      setOriginalBannerText(bannerText);
+
+      toast.success(t.translations.BANNER_UPDATED_SUCCESSFULLY);
+    } catch (error) {
+      console.error("Failed to update Project Banner: ", error);
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : t.translations.FAILED_TO_UPDATE_BANNER,
+      );
+    } finally {
+      setIsSavingBanner(false);
+    }
+  };
+
+  const handleCancelBanner = () => {
+    setBannerText(originalBannerText);
+    toast.custom(
+      <div className="text-info">
+        <ExclamationTriangleIcon className="size-4" />
+        {t.translations.CHANGES_DISCARDED}
+      </div>,
+    );
+  };
 
   // Load available storages and default storage
   const loadStorages = useCallback(async () => {
@@ -155,7 +226,11 @@ const ProjectSettings = ({ project }: ProjectSettingsProps) => {
     } finally {
       setIsLoadingStorages(false);
     }
-  }, [organization?.organizationId, project?.id]);
+  }, [
+    organization?.organizationId,
+    project?.id,
+    t.translations.FAILED_TO_LOAD_STORAGE_CONFIGURATIONS,
+  ]);
 
   useEffect(() => {
     loadStorages();
@@ -505,11 +580,17 @@ const ProjectSettings = ({ project }: ProjectSettingsProps) => {
         {/* Two-column layout for Logo and Storage */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Logo Section */}
-          <ProjectLogoSection
+          <ProjectSettingsLeftColumn
             project={project}
             logoPreview={logoPreview}
             logoFile={logoFile}
             isUploading={isUploading}
+            bannerText={bannerText}
+            setBannerText={setBannerText}
+            isSavingBanner={isSavingBanner}
+            originalBannerText={originalBannerText}
+            onSaveBanner={handleSaveBanner}
+            onCancelBanner={handleCancelBanner}
             onLogoChange={handleLogoChange}
             onUploadLogo={handleUploadLogo}
             onCancelSelection={handleCancelSelection}
@@ -518,27 +599,29 @@ const ProjectSettings = ({ project }: ProjectSettingsProps) => {
           />
 
           {/* Storage Settings Section with Tabs */}
-          <StorageSettingsSection
-            activeTab={activeTab}
-            onChangeTab={setActiveTab}
-            availableStorages={availableStorages}
-            selectedStorageId={selectedStorageId}
-            onSelectStorage={setSelectedStorageId}
-            defaultStorage={defaultStorage}
-            isSavingStorage={isSavingStorage}
-            onSaveDefaultStorage={handleSaveDefaultStorage}
-            onCreateStorage={() => {
-              resetStorageForm();
-              setIsCreateModalOpen(true);
-            }}
-            onEditStorage={openEditModal}
-            onToggleArchive={(storage) => {
-              setArchiveStorageId(storage.id as number);
-              setArchiveAction(!storage.isArchived);
-            }}
-            onDeleteStorage={(storageId) => setDeleteStorageId(storageId)}
-            t={t}
-          />
+          <div className="self-start">
+            <StorageSettingsSection
+              activeTab={activeTab}
+              onChangeTab={setActiveTab}
+              availableStorages={availableStorages}
+              selectedStorageId={selectedStorageId}
+              onSelectStorage={setSelectedStorageId}
+              defaultStorage={defaultStorage}
+              isSavingStorage={isSavingStorage}
+              onSaveDefaultStorage={handleSaveDefaultStorage}
+              onCreateStorage={() => {
+                resetStorageForm();
+                setIsCreateModalOpen(true);
+              }}
+              onEditStorage={openEditModal}
+              onToggleArchive={(storage) => {
+                setArchiveStorageId(storage.id as number);
+                setArchiveAction(!storage.isArchived);
+              }}
+              onDeleteStorage={(storageId) => setDeleteStorageId(storageId)}
+              t={t}
+            />
+          </div>
         </div>
 
         {/* Archive Project Section */}

@@ -87,28 +87,28 @@ const ProjectUsersHeader: React.FC<ProjectUsersHeaderProps> = ({
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         <div className="stat bg-base-200 rounded-lg">
-          <div className="stat-figure text-secondary">
+          <div className="stat-figure text-primary">
             <UsersIcon className="w-8 h-8" />
           </div>
-          <div className="stat-title">{t.translations.TOTAL_MEMBERS}</div>
-          <div className="stat-value text-secondary">{totalMembers}</div>
-          <div className="stat-desc">{t.translations.USERS_PLUS_GROUP}</div>
+          <div className="stat-title text-primary">{t.translations.TOTAL_MEMBERS}</div>
+          <div className="stat-value text-primary">{totalMembers}</div>
+          <div className="stat-desc text-primary">{t.translations.USERS_PLUS_GROUP}</div>
         </div>
         <div className="stat bg-base-200 rounded-lg">
           <div className="stat-figure text-primary">
             <UserIcon className="w-8 h-8" />
           </div>
-          <div className="stat-title">{t.translations.USERS}</div>
+          <div className="stat-title text-primary">{t.translations.USERS}</div>
           <div className="stat-value text-primary">{userCount}</div>
-          <div className="stat-desc">{t.translations.INDIVIDUAL_MEMBERS}</div>
+          <div className="stat-desc text-primary">{t.translations.INDIVIDUAL_MEMBERS}</div>
         </div>
         <div className="stat bg-base-200 rounded-lg">
-          <div className="stat-figure text-accent">
+          <div className="stat-figure text-primary">
             <UserGroupIcon className="w-8 h-8" />
           </div>
-          <div className="stat-title">{t.translations.GROUPS}</div>
-          <div className="stat-value text-accent">{groupCount}</div>
-          <div className="stat-desc">{t.translations.GROUP_MEMBERSHIP}</div>
+          <div className="stat-title text-primary">{t.translations.GROUPS}</div>
+          <div className="stat-value text-primary">{groupCount}</div>
+          <div className="stat-desc text-primary">{t.translations.GROUP_MEMBERSHIP}</div>
         </div>
       </div>
     </>

@@ -41,7 +41,7 @@ Once you have a `.env` file, be sure to periodically check `.env_sample` for upd
         * `POSTGRES_PASSWORD=your_password`
 
 2. .NET SDK Setup:
-    * Install the .NET SDK version 9.0.
+    * Install the .NET SDK version 10.0.
 
 3. (Optional) Entity Framework CLI to create and run migrations manually:
 

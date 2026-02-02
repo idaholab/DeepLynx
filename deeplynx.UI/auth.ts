@@ -15,12 +15,12 @@ async function refreshAccessToken(token: JWT): Promise<JWT> {
 
         // Determine the correct auth server from the access token
         let authServerPath = '/oauth2'; // default for org-level auth server
-        
+
         if (token.access_token) {
             try {
                 const decoded = jsonWebToken.decode(token.access_token as string) as any;
                 const issuer = decoded?.iss;
-                
+
                 if (issuer) {
                     // Extract auth server path from issuer
                     const match = issuer.match(/\/oauth2\/[^\/]+/);
@@ -42,7 +42,7 @@ async function refreshAccessToken(token: JWT): Promise<JWT> {
         let baseUrl = process.env.OKTA_ISSUER!;
         baseUrl = baseUrl.replace(/\/oauth2\/[^\/]*\/?$/, '').replace(/\/$/, '');
         const url = `${baseUrl}${authServerPath}/v1/token`;
-        
+
         const credentials = Buffer.from(
             `${process.env.OKTA_CLIENT_ID}:${process.env.OKTA_CLIENT_SECRET}`
         ).toString("base64");
@@ -104,20 +104,20 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             // Initial sign in
             if (account && profile) {
 
-            // Read organization from cookie during sign in
-            const cookieStore = await cookies();
-            const orgSessionCookie = cookieStore.get("organizationSession");
-            let organizationId: number | undefined;
-            
-            if (orgSessionCookie) {
-                try {
-                    const orgSession = JSON.parse(orgSessionCookie.value);
-                    organizationId = orgSession.organizationId;
-                } catch (e) {
-                    console.error("Failed to parse org cookie:", e);
+                // Read organization from cookie during sign in
+                const cookieStore = await cookies();
+                const orgSessionCookie = cookieStore.get("organizationSession");
+                let organizationId: number | undefined;
+
+                if (orgSessionCookie) {
+                    try {
+                        const orgSession = JSON.parse(orgSessionCookie.value);
+                        organizationId = orgSession.organizationId;
+                    } catch (e) {
+                        console.error("Failed to parse org cookie:", e);
+                    }
                 }
-            }
-            
+
 
                 return {
                     ...token,
@@ -139,10 +139,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             const now = Date.now();
             const expiresAt = (token.expires_at as number) * 1000;
             const timeUntilExpiry = (expiresAt - now) / 1000; // in seconds
-            
+
             // Proactive refresh: refresh 5 minutes before expiry
             const BUFFER_TIME_SECONDS = 5 * 60;
-            
+
             // Check if token is still valid but will expire soon
             if (now < expiresAt && timeUntilExpiry < BUFFER_TIME_SECONDS) {
                 if (!token.refresh_token) {
@@ -198,7 +198,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         async redirect({ url, baseUrl }) {
             // Check if authentication is disabled
             const isAuthDisabled = process.env.NEXT_PUBLIC_DISABLE_FRONTEND_AUTHENTICATION === "true";
-            
+
             // If auth is disabled, always redirect to home or the requested URL
             if (isAuthDisabled) {
                 // If redirecting to a specific URL within the app, allow it
@@ -208,32 +208,30 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                 // Otherwise go to home
                 return `${baseUrl}`;
             }
-            
-            console.log(`NextAuth redirect callback - url: ${url}, baseUrl: ${baseUrl}`);
-            
+
             // CRITICAL: Check if this is an OAuth flow redirect
             // OAuth flows will have /api/oauth/authorize in the URL
             if (url.includes('/api/oauth/authorize')) {
                 console.log(`OAuth flow detected, allowing redirect to: ${url}`);
                 return url;
             }
-            
+
             // If url starts with baseUrl, it's a relative URL on our site
             if (url.startsWith(baseUrl)) {
                 return url;
             }
-            
+
             // If url starts with /, it's a relative path
             if (url.startsWith("/")) {
                 const fullUrl = `${baseUrl}${url}`;
                 return fullUrl;
             }
-            
+
             // For default redirect after login, check if user has an organization selected
             try {
                 const cookieStore = await cookies();
                 const orgSessionCookie = cookieStore.get("organizationSession");
-                
+
                 if (orgSessionCookie) {
                     // User has an org selected, redirect to dashboard
                     return `${baseUrl}`;
@@ -241,7 +239,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             } catch (e) {
                 console.error("Failed to check organization cookie:", e);
             }
-            
+
             // No org selected, redirect to selection page
             return `${baseUrl}/select-org`;
         }
