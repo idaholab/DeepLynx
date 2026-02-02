@@ -1,7 +1,4 @@
-import type { Config } from "tailwindcss";
-
-
-const config: Config = {
+const config = {
   darkMode: "class",
   content: [
     "./src/app/**/*.{js,ts,jsx,tsx}",
@@ -18,6 +15,9 @@ const config: Config = {
       },
     },
   },
+  plugins: [
+    require("daisyui"),
+  ],
 };
 
 export default config;

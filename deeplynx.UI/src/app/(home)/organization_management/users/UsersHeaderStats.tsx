@@ -63,19 +63,19 @@ const UsersHeaderStats: React.FC<UsersHeaderStatsProps> = ({
           </div>
         </div>
         <div className="stat bg-base-200 rounded-lg">
-          <div className="stat-figure text-warning">
+          <div className="stat-figure text-primary">
             <EnvelopeIcon className="w-8 h-8" />
           </div>
           <div className="stat-title">{t.translations.PENDING_INVITES}</div>
-          <div className="stat-value text-warning">{pendingCount}</div>
+          <div className="stat-value text-primary">{pendingCount}</div>
           <div className="stat-desc">{t.translations.AWAITING_ACCEPTANCE}</div>
         </div>
         <div className="stat bg-base-200 rounded-lg">
-          <div className="stat-figure text-secondary">
+          <div className="stat-figure text-primary">
             <UserGroupIcon className="w-8 h-8" />
           </div>
           <div className="stat-title">{t.translations.TOTAL}</div>
-          <div className="stat-value text-secondary">{totalCount}</div>
+          <div className="stat-value text-primary">{totalCount}</div>
           <div className="stat-desc">{t.translations.ACTIVE_PLUS_PENDING}</div>
         </div>
       </div>

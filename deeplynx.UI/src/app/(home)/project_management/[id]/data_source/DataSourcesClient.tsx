@@ -422,17 +422,6 @@ const DataSources = ({ projectId }: Props) => {
         setError={setError}
         onDetailsSaved={fetchAll}
       />
-
-      <div className="alert alert-info mt-6">
-        <KeyIcon className="w-5 h-5" />
-        <div>
-          <h3 className="font-bold">About API Keys</h3>
-          <p className="text-sm">
-            Each data source can have API keys for integrations with tools like
-            Airflow, ETL pipelines, and automated workflows.
-          </p>
-        </div>
-      </div>
     </div>
   );
 };

@@ -68,7 +68,6 @@ export const ProjectSessionProvider = ({
   }, []);
 
   const setProject = useCallback((proj: ProjectSession) => {
-    console.log("ProjectSessionProvider setProject called with:", proj);
     setProjectState(proj);
     const serialized = JSON.stringify(proj);
 
