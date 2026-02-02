@@ -1,4 +1,4 @@
-FROM postgres:17-alpine3.20 AS deeplynx-db
+FROM postgres:16-alpine3.20 AS deeplynx-db
 
 # Temporarily switch to HTTP repos to bootstrap certificates
 RUN sed -i 's/https/http/g' /etc/apk/repositories && \
