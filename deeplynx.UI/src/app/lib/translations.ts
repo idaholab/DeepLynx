@@ -542,6 +542,7 @@ export const translations = {
             CONFIGURE_AXES: "Configure Axes",
             SELECT_X_AXIS_COLUMN: "Select an X axis column",
             SELECT_Y_AXIS_COLUMN: "Select at least one Y axis column",
+            PRIVACY: "Privacy and Accessibility"
 
 
 
@@ -1105,6 +1106,7 @@ export const translations = {
             CONFIGURE_AXES: "Configurar Ejes",
             SELECT_X_AXIS_COLUMN: "Seleccione una columna del eje X",
             SELECT_Y_AXIS_COLUMN: "Seleccione al menos una columna del eje Y",
+            PRIVACY: "Privacidad y Accesibilidad"
         }
     }
 }
