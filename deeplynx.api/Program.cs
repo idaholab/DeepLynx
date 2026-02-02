@@ -4,8 +4,8 @@ using deeplynx.business;
 using deeplynx.datalayer.MigrationRunner;
 using deeplynx.datalayer.Models;
 using deeplynx.helpers;
-using deeplynx.helpers.Hubs;
 using deeplynx.helpers.BigData;
+using deeplynx.helpers.Hubs;
 using deeplynx.interfaces;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Http.Features;
@@ -194,7 +194,7 @@ try
                 Description =
                     "DeepLynx Nexus API for managing organizational data and relationships. Endpoints are organized by Organization-level (/api/organizations/{organizationId}) and Project-level (/api/projects/{projectId}) scopes.",
                 Contact = new OpenApiContact
-                { 
+                {
                     Name = "Nexus Support",
                     Email = "Jaren.Brownlee@inl.gov"
                 }
@@ -202,6 +202,11 @@ try
 
             document.Servers = new List<OpenApiServer>
             {
+                new()
+                {
+                    Url = "http://localhost:5095/api/v1/",
+                    Description = "Local Development"
+                },
                 new()
                 {
                     Url = "http://localhost:5000/api/v1/",
@@ -244,7 +249,7 @@ try
                 new() { Name = "Group", Description = "Group management" },
 
                 // AI Services
-                new() { Name = "Lattice", Description = "Useful data views for DeepLynx Lattice use"},
+                new() { Name = "Lattice", Description = "Useful data views for DeepLynx Lattice use" },
 
                 // Authentication
                 new() { Name = "OauthHandshake", Description = "OAuth2 authorization flow" },
@@ -432,7 +437,6 @@ try
             return Task.CompletedTask;
         });
     });
- 
 
 
 /* ╔════════════════════════════╗
