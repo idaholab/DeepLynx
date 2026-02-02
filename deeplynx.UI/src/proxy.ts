@@ -1,14 +1,13 @@
-// src/middleware.ts
+// src/proxy.ts
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { auth } from "../auth";
 
-export const runtime = "nodejs";
-
-export async function middleware(request: NextRequest) {
-  const isAuthDisabled = process.env.NEXT_PUBLIC_DISABLE_FRONTEND_AUTHENTICATION === "true";
+export async function proxy(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
-  
+  const isAuthDisabled =
+    process.env.NEXT_PUBLIC_DISABLE_FRONTEND_AUTHENTICATION === "true";
+
   // ============================================================================
   // SECTION 1: Define Public Routes (no auth needed)
   // ============================================================================
@@ -20,9 +19,9 @@ export async function middleware(request: NextRequest) {
     "/assets",
     "/images"
   ];
-  
+
   const isPublicRoute = publicRoutes.some(route => pathname.startsWith(route));
-  
+
   // ============================================================================
   // SECTION 2: Handle Auth DISABLED Mode
   // ============================================================================
@@ -110,11 +109,11 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL("/select-org", request.url));
     return NextResponse.next();
   }
-  
+
   if (!hasOrgSession) {
     return NextResponse.redirect(new URL("/select-org", request.url));
   }
-  
+
   return NextResponse.next();
 }
 
