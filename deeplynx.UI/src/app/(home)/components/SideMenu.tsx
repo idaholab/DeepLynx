@@ -264,6 +264,7 @@ const SideMenu: React.FC<SideMenuProps> = ({ onToggle }) => {
                         onError={() => {
                           setProjectLogoUrl(null);
                         }}
+                        unoptimized
                       />
                     </div>
                   </div>

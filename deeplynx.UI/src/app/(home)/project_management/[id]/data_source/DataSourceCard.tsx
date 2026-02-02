@@ -62,24 +62,18 @@ const DataSourceCard = ({
 
   return (
     <div
-      className={`card bg-base-100 shadow-xl border-l-4 ${
-        source.isArchived ? "border-l-warning" : "border-l-success"
-      }`}
+      className={`card bg-base-100 shadow-xl border-l-4"
+        }`}
     >
       <div className="card-body">
         {/* Header row */}
-        <div className="flex justify-between items-start mb-4">
+        <div className="flex justify-between items-center mb-4">
           <div className="flex-1">
             <div className="flex items-center gap-3 mb-2">
-              <span className="text-3xl">{source.icon ?? "🗄️"}</span>
               <div>
                 <div className="flex items-center gap-2">
                   <h3 className="text-xl font-bold">{source.name}</h3>
-                  {isDefault && (
-                    <div className="tooltip" data-tip="Default data source">
-                      <StarIconSolid className="size-6 text-warning" />
-                    </div>
-                  )}
+                  {isDefault}
                   {source.isArchived && (
                     <div className="badge badge-warning">Archived</div>
                   )}
@@ -116,15 +110,14 @@ const DataSourceCard = ({
               <div className="bg-base-200 rounded-lg p-2 text-center">
                 <div className="text-xs text-base-content/60">Health</div>
                 <div
-                  className={`text-lg font-bold ${
-                    Number.isFinite(health)
-                      ? health > 80
-                        ? "text-success"
-                        : health > 50
+                  className={`text-lg font-bold ${Number.isFinite(health)
+                    ? health > 80
+                      ? "text-success"
+                      : health > 50
                         ? ""
                         : "text-error"
-                      : ""
-                  }`}
+                    : ""
+                    }`}
                 >
                   {Number.isFinite(health) ? `${health}%` : "—"}
                 </div>
@@ -145,7 +138,7 @@ const DataSourceCard = ({
           </div>
 
           {/* Actions */}
-          <div className="flex flex-col gap-2 ml-2">
+          <div className="flex flex-col gap-2 ml-2 mt-10">
             <button
               className="btn btn-ghost btn-sm gap-2"
               onClick={() => hasId && onToggleExpand(idNum!)}
@@ -154,17 +147,6 @@ const DataSourceCard = ({
               <PencilIcon className="w-4 h-4" />
               Details
             </button>
-            {/* {!isDefault && !source.isArchived && (
-              <button
-                className="btn btn-ghost btn-sm gap-2"
-                onClick={() => hasId && onSetDefault(idNum!)}
-                disabled={saving || !hasId}
-                title="Set as default"
-              >
-                <StarIcon className="w-4 h-4" />
-                Default
-              </button>
-            )} */}
             <button
               className="btn btn-ghost btn-sm gap-2"
               onClick={() => hasId && onArchiveToggle(source)}
@@ -212,9 +194,8 @@ const DataSourceCard = ({
                   <div>
                     <span className="text-base-content/60">Expires:</span>
                     <span
-                      className={`ml-2 font-semibold ${
-                        apiKey.expiresIn === "Expired" ? "text-error" : ""
-                      }`}
+                      className={`ml-2 font-semibold ${apiKey.expiresIn === "Expired" ? "text-error" : ""
+                        }`}
                     >
                       {apiKey.expiresIn}
                     </span>
