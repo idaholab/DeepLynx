@@ -4,11 +4,11 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useOrganizationSession } from "@/app/contexts/OrganizationSessionProvider";
 import { useProjectSession } from "@/app/contexts/ProjectSessionProvider";
 import {
-  archiveRole,
-  createRole,
+  archiveOrgRole,
+  createOrgRole,
   getOrgRolePermissions,
-  setPermissionsForRole,
-  updateRole,
+  setPermissionsForOrgRole,
+  updateOrgRole,
 } from "@/app/lib/client_service/role_services.client";
 import { ExclamationCircleIcon } from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
@@ -63,8 +63,8 @@ const RolesAndPermissions = ({
     initialRoles[0]?.id || null
   );
 
-  const [roles, setRoles] = useState(initialRoles);
-  const [permissions, setPermissions] = useState(initialPermissions);
+  const [roles, setRoles] = useState<RoleResponseDto[]>(initialRoles);
+  const [permissions, setPermissions] = useState<PermissionResponseDto[]>(initialPermissions);
 
   const [rolePermissions, setRolePermissions] = useState<
     Record<number, PermissionResponseDto[]>
@@ -99,11 +99,26 @@ const RolesAndPermissions = ({
     };
 
     try {
-      const newRole = await createRole(
+      const newRole = await createOrgRole(
         organization.organizationId as number,
-        project?.projectId as number,
         dto
       );
+
+      const userRole = roles.find((r) => r.name === "User");
+      if (userRole && rolePermissions[userRole.id]) {
+        const userPermissionIds = rolePermissions[userRole.id].map((p) => Number(p.id));
+
+        await setPermissionsForOrgRole(
+          organization.organizationId as number,
+          newRole.id,
+          userPermissionIds
+        );
+
+        setRolePermissions((prev) => ({
+          ...prev,
+          [newRole.id]: rolePermissions[userRole.id],
+        }));
+      }
 
       setRoles((prev) => [...prev, newRole]);
       setSelectedRoleId(newRole.id);
@@ -129,9 +144,8 @@ const RolesAndPermissions = ({
   ) => {
     try {
       const dto: UpdateRoleRequestDto = { name, description };
-      const updatedRole = await updateRole(
+      const updatedRole = await updateOrgRole(
         organization?.organizationId as number,
-        project?.projectId as number,
         roleId,
         dto
       );
@@ -170,9 +184,8 @@ const RolesAndPermissions = ({
     if (!roleToDelete) return;
 
     try {
-      await archiveRole(
+      await archiveOrgRole(
         organization?.organizationId as number,
-        project?.projectId as number,
         roleToDelete.id
       );
 
@@ -240,9 +253,8 @@ const RolesAndPermissions = ({
     if (!currentRole) return;
 
     try {
-      await setPermissionsForRole(
+      await setPermissionsForOrgRole(
         organization?.organizationId as number,
-        project?.projectId as number,
         currentRole.id,
         Array.from(tempPermissions)
       );
@@ -342,9 +354,8 @@ const RolesAndPermissions = ({
     try {
       const updatePromises = roles.map((role) => {
         const newPermissions = Array.from(matrixTempPermissions[role.id] || []);
-        return setPermissionsForRole(
+        return setPermissionsForOrgRole(
           organization?.organizationId as number,
-          project?.projectId as number,
           role.id,
           newPermissions
         );
@@ -584,6 +595,7 @@ const RolesAndPermissions = ({
           onRoleSelection={handleRoleSelection}
           onEditClick={handleEditClick}
           onDeleteClick={handleDeleteClick}
+          onCreateRole={() => setIsCreateModalOpen(true)}
           onStartEditingPermissions={handleStartEditingPermissions}
           onCancelEditingPermissions={handleCancelEditingPermissions}
           onSavePermissions={handleSavePermissions}

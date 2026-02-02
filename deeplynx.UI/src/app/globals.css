@@ -1,16 +1,49 @@
 @import url("https://fonts.googleapis.com/css2?family=Roboto:wght@100;300;400;500;700&display=swap");
 @import "tailwindcss";
 
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-@plugin "daisyui";
+/* DaisyUI plugin with custom themes */
+@plugin "daisyui" {
+  themes: false;
+}
 
-@plugin "daisyui/theme" {
-  name: "light";
-  default: true;
-  prefersdark: false;
-  color-scheme: "light";
+/* Custom Light Theme */
+[data-theme="light"] {
+  color-scheme: light;
+
+  /* DaisyUI base colors (abbreviated format for v5) */
+  --b1: 98% 0.003 247.858;
+  --b2: 86% 0.022 252.894;
+  --b3: 55% 0.046 257.417;
+  --bc: 13.454% 0.033 35.791;
+  --p: 33.78% 0.1 254.3;
+  --pc: 88.34% 0.019 251.473;
+  --s: 44.08% 0.141 255.19;
+  --sc: 98% 0.003 247.858;
+  --a: 75% 0.2 70.934;
+  --ac: 13.454% 0.033 35.791;
+  --n: 47.441% 0.013 253.041;
+  --nc: 85.488% 0.002 253.041;
+  --in: 86.19% 0.047 224.14;
+  --inc: 12.523% 0.028 240.033;
+  --su: 80.226% 0.15 156.596;
+  --suc: 14.045% 0.018 156.596;
+  --wa: 85.482% 0.115 81.519;
+  --wac: 15.496% 0.023 81.519;
+  --er: 70.61% 0.146 29.674;
+  --erc: 90.322% 0.029 29.674;
+
+  /* DaisyUI component settings */
+  --rounded-box: 1rem;
+  --rounded-btn: 0.5rem;
+  --rounded-badge: 1.9rem;
+  --animation-btn: 0.25s;
+  --animation-input: 0.2s;
+  --btn-focus-scale: 0.95;
+  --border-btn: 1px;
+  --tab-border: 1px;
+  --tab-radius: 0.5rem;
+
+  /* Custom color variables (full oklch format) */
   --color-base-100: oklch(98% 0.003 247.858);
   --color-base-200: oklch(86% 0.022 252.894);
   --color-base-300: oklch(55% 0.046 257.417);
@@ -33,6 +66,8 @@
   --color-warning-content: oklch(15.496% 0.023 81.519);
   --color-error: oklch(70.61% 0.146 29.674);
   --color-error-content: oklch(90.322% 0.029 29.674);
+
+  /* Additional custom variables */
   --radius-selector: 0.5rem;
   --radius-field: 0.5rem;
   --radius-box: 1rem;
@@ -48,11 +83,44 @@
   --base-600: oklch(18% 0.015 260);
 }
 
-@plugin "daisyui/theme" {
-  name: "dark";
-  default: false;
-  prefersdark: false;
-  color-scheme: "dark";
+/* Custom Dark Theme */
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  /* DaisyUI base colors (abbreviated format for v5) */
+  --b1: 18% 0.015 260;
+  --b2: 23% 0.018 258;
+  --b3: 28% 0.02 256;
+  --bc: 92% 0.004 260;
+  --p: 30% 0.17 254.3;
+  --pc: 95% 0.004 251;
+  --s: 45% 0.14 255.19;
+  --sc: 94% 0.004 255;
+  --a: 100% 0.02 70;
+  --ac: 18% 0.02 70;
+  --n: 35% 0.015 253;
+  --nc: 90% 0.004 253;
+  --in: 60% 0.12 224;
+  --inc: 95% 0.015 224;
+  --su: 55% 0.14 156;
+  --suc: 95% 0.02 156;
+  --wa: 65% 0.12 81;
+  --wac: 18% 0.02 81;
+  --er: 58% 0.18 29;
+  --erc: 95% 0.02 29;
+
+  /* DaisyUI component settings */
+  --rounded-box: 1rem;
+  --rounded-btn: 0.5rem;
+  --rounded-badge: 1.9rem;
+  --animation-btn: 0.25s;
+  --animation-input: 0.2s;
+  --btn-focus-scale: 0.95;
+  --border-btn: 1px;
+  --tab-border: 1px;
+  --tab-radius: 0.5rem;
+
+  /* Custom color variables (full oklch format) */
   --color-base-100: oklch(18% 0.015 260);
   --color-base-200: oklch(23% 0.018 258);
   --color-base-300: oklch(28% 0.02 256);
@@ -62,7 +130,7 @@
   --color-primary-content: oklch(95% 0.004 251);
   --color-secondary: oklch(45% 0.14 255.19);
   --color-secondary-content: oklch(94% 0.004 255);
-  --color-accent: oklch(1 0.02 70);
+  --color-accent: oklch(100% 0.02 70);
   --color-accent-content: oklch(18% 0.02 70);
   --color-dynamic-shadow: oklch(50% 0 0);
   --color-neutral: oklch(35% 0.015 253);
@@ -75,6 +143,8 @@
   --color-warning-content: oklch(18% 0.02 81);
   --color-error: oklch(58% 0.18 29);
   --color-error-content: oklch(95% 0.02 29);
+
+  /* Additional custom variables */
   --radius-selector: 0.5rem;
   --radius-field: 0.5rem;
   --radius-box: 1rem;
@@ -90,24 +160,23 @@
   --base-600: oklch(18% 0.015 260);
 }
 
-/* :root {
-  --background: #ffffff;
-  --foreground: #171717;
-} */
+/* Root theme variables */
+:root {
+  --background: oklch(98% 0.003 247.858);
+  --foreground: oklch(13.454% 0.033 35.791);
+}
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: "Roboto", sans-serif;
   --font-mono: var(--font-geist-mono);
-  --color-dynamic-blue: var(--color-dynamic-blue);
-  --color-dynamic-shadow: var(--color-dynamic-shadow);
 }
 
-/* @media (prefers-color-scheme: dark) {
+@media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: oklch(18% 0.015 260);
+    --foreground: oklch(92% 0.004 260);
   }
 }
 
@@ -116,7 +185,7 @@ body {
   color: var(--foreground);
   font-family: var(--font-sans);
   font-weight: 500;
-} */
+}
 
 .login {
   background: #152230;
@@ -153,19 +222,21 @@ body {
 
 .table-bordered th,
 .table-bordered td {
-  border: 1px solid #ccc; /* Set border color */
-  padding: 8px; /* Padding for table cells */
-  text-align: left; /* Align text to the left */
+  border: 1px solid #ccc;
+  padding: 8px;
+  text-align: left;
 }
 
 .table-bordered th {
-  background-color: #f2f2f2; /* Background color for header */
-  font-weight: bold; /* Bold for header */
+  background-color: #f2f2f2;
+  font-weight: bold;
 }
+
 .btn btn-primary[disabled] {
   opacity: 0.6;
   cursor: not-allowed;
 }
+
 .spinner {
   display: inline-block;
   width: 1rem;

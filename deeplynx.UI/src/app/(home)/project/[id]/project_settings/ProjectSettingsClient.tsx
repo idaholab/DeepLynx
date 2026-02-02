@@ -96,24 +96,7 @@ export default function ProjectSettingsClient({
     {
       label: "Roles",
       content: <div></div>,
-    },
-    //  TODO POST FY: ADD BACK DATA SOURCE / OBJ STORAGE
-    // {
-    //   label: "Data Source",
-    //   content: (
-    //     <DataSourceTable
-    //       data={mySavedSearches}
-    //     />
-    //   ),
-    // },
-    // {
-    //   label: "Object Storage",
-    //   content: (
-    //     <ObjectStorageTable
-    //       data={mySavedSearches}
-    //     />
-    //   ),
-    // },
+    }
   ];
 
   const handleTabChange = (label: string) => {

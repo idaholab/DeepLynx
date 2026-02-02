@@ -56,7 +56,6 @@ export const ProjectSessionProvider = ({
     if (stored) {
       try {
         const parsed: ProjectSession | null = JSON.parse(stored);
-        console.log("ProjectSessionProvider hydrate - parsed:", parsed);
         if (parsed && parsed.projectId) {
           setProjectState(parsed);
         }
@@ -69,7 +68,6 @@ export const ProjectSessionProvider = ({
   }, []);
 
   const setProject = useCallback((proj: ProjectSession) => {
-    console.log("ProjectSessionProvider setProject called with:", proj);
     setProjectState(proj);
     const serialized = JSON.stringify(proj);
 

@@ -76,6 +76,7 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
     {
         // Arrange
         Directory.CreateDirectory(_testDirectory);
+        var config = new ObjectStorageConfigDto { MountPath = _testDirectory };
         var originalFilePath = Path.Combine(_testDirectory, "original.txt");
         await File.WriteAllTextAsync(originalFilePath, "Old content");
 
@@ -91,11 +92,13 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
         fileMock.Setup(f => f.FileName).Returns("new.txt");
         fileMock.Setup(f => f.CopyToAsync(It.IsAny<Stream>(), default))
             .Returns((Stream stream, CancellationToken token) => ms.CopyToAsync(stream));
+        
+        var guid = Guid.NewGuid();
 
         try
         {
             // Act
-            var updatedPath = await _fileBusiness.UpdateFile(record, fileMock.Object);
+            var updatedPath = await _fileBusiness.UpdateFile(record, config, fileMock.Object, guid);
 
             // Assert
             Assert.True(File.Exists(updatedPath));
@@ -116,6 +119,7 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
     {
         // Arrange
         Directory.CreateDirectory(_testDirectory);
+        var config = new ObjectStorageConfigDto { MountPath = _testDirectory };
         var filePath = Path.Combine(_testDirectory, "download.txt");
         var content = "Downloadable content";
         await File.WriteAllTextAsync(filePath, content);
@@ -129,7 +133,7 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
         try
         {
             // Act
-            var result = await _fileBusiness.DownloadFile(record);
+            var result = await _fileBusiness.DownloadFile(record, config);
 
             // Assert
             Assert.NotNull(result);
@@ -177,7 +181,7 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
             };
 
             // Act
-            var delete = await _fileBusiness.DeleteFile(record);
+            var delete = await _fileBusiness.DeleteFile(record, config);
 
             // Assert
             Assert.True(delete);

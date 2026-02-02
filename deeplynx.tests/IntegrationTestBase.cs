@@ -5,6 +5,7 @@ using deeplynx.interfaces;
 using deeplynx.tests;
 using DotNetEnv;
 using Microsoft.EntityFrameworkCore;
+using Testcontainers.Azurite;
 using Testcontainers.PostgreSql;
 using Testcontainers.Redis;
 
@@ -27,6 +28,7 @@ public class TestSuiteFixture : IAsyncLifetime
 
     public string PostgresConnectionString { get; private set; }
     public string RedisConnectionString { get; private set; }
+    
     public DeeplynxContext Context { get; private set; }
 
     // Runs at the beginning of every test suite
@@ -101,7 +103,7 @@ public class IntegrationTestBase : IAsyncLifetime
     }
 
     // Runs after every test in the test suite
-    public async Task DisposeAsync()
+    public virtual async Task DisposeAsync()
     {
         Environment.SetEnvironmentVariable("CACHE_PROVIDER_TYPE", null);
         await Context.DisposeAsync();
