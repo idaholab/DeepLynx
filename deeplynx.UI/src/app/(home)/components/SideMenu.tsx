@@ -26,6 +26,7 @@ import {
   ChevronRightIcon,
   ChevronUpIcon,
   FolderIcon,
+  PresentationChartLineIcon,
   RectangleGroupIcon,
 } from "@heroicons/react/24/outline";
 
@@ -238,9 +239,8 @@ const SideMenu: React.FC<SideMenuProps> = ({ onToggle }) => {
   return (
     <div className="fixed top-18 bottom-0 left-18 flex z-30">
       <aside
-        className={`h-full shadow-xl ${
-          isCollapsed ? "w-22" : "w-64"
-        } bg-[var(--base-400)] brightness-120 text-primary-content p-4 transition-all duration-300 flex flex-col overflow-y-auto`}
+        className={`h-full shadow-xl ${isCollapsed ? "w-22" : "w-64"
+          } bg-[var(--base-400)] brightness-120 text-primary-content p-4 transition-all duration-300 flex flex-col overflow-y-auto`}
       >
         {/* ----------------------------- Projects ---------------------------- */}
         {!isOrgPortalRoute && (
@@ -310,11 +310,10 @@ const SideMenu: React.FC<SideMenuProps> = ({ onToggle }) => {
                     <li key={proj.id}>
                       <button
                         onClick={() => handleProjectClick(proj)}
-                        className={`w-full text-left py-2 px-4 rounded transition text-sm flex items-center ${
-                          isProjectActive(proj.id)
-                            ? "bg-info/30 text-primary-content font-semibold"
-                            : "hover:bg-info/20 text-primary-content"
-                        }`}
+                        className={`w-full text-left py-2 px-4 rounded transition text-sm flex items-center ${isProjectActive(proj.id)
+                          ? "bg-info/30 text-primary-content font-semibold"
+                          : "hover:bg-info/20 text-primary-content"
+                          }`}
                       >
                         <span className="truncate">{proj.name}</span>
                         {isProjectActive(proj.id) && (
@@ -359,6 +358,18 @@ const SideMenu: React.FC<SideMenuProps> = ({ onToggle }) => {
               <ArrowUpTrayIcon className="size-6" />
               {!isCollapsed && (
                 <p className="ml-2">{t.translations.UPLOAD_CENTER}</p>
+              )}
+            </Link>
+          </li>
+          {/* TimeseriesViewer */}
+          <li className="mt-2">
+            <Link
+              href="/timeseries_viewer"
+              className={getItemClass("/timeseries_viewer")}
+            >
+              <PresentationChartLineIcon className="size-6" />
+              {!isCollapsed && (
+                <p className="ml-2">{t.translations.TIMESERIES_VIEWER}</p>
               )}
             </Link>
           </li>
