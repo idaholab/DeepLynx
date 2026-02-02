@@ -376,3 +376,492 @@ def test_upload_csv_file(client, organization, project, cleanup_file_records, te
     
     assert response.status_code == 200
     assert response.content.decode('utf-8') == content, "CSV content mismatch"
+    
+# ========== CHUNKED UPLOAD TESTS ==========
+
+def create_large_temp_file(size_mb: int, temp_files: list) -> str:
+    """Create a temporary binary file of specified size in MB."""
+    temp_file = tempfile.NamedTemporaryFile(mode='wb', delete=False, suffix='.bin')
+    
+    # Write in 1MB chunks to avoid memory issues
+    chunk_size = 1024 * 1024  # 1MB
+    for _ in range(size_mb):
+        temp_file.write(os.urandom(chunk_size))
+    
+    temp_file.close()
+    temp_files.append(temp_file.name)
+    return temp_file.name
+
+
+def test_start_chunked_upload(client, organization, project, test_datasource_project):
+    """Test starting a chunked upload session."""
+    filename = "test-large-file.bin"
+    file_size = 600 * 1024 * 1024  # 600MB
+    
+    response = client.post(
+        f"/organizations/{organization}/projects/{project}/files/upload/start",
+        json={"fileName": filename, "fileSize": file_size},
+        params={"dataSourceId": test_datasource_project}
+    )
+    
+    print(f"\nStatus Code: {response.status_code}")
+    print(f"Response Body: {response.text}")
+    
+    assert response.status_code == 200, f"Start upload failed: {response.text}"
+    
+    result = response.json()
+    assert "uploadId" in result, "Response should contain uploadId"
+    assert "chunkSize" in result, "Response should contain chunkSize"
+    assert "totalChunks" in result, "Response should contain totalChunks"
+    assert result["chunkSize"] > 0, "Chunk size should be positive"
+    assert result["totalChunks"] > 0, "Total chunks should be positive"
+    
+    upload_id = result["uploadId"]
+    
+    # Cleanup - cancel the upload session
+    cleanup_response = client.delete(
+        f"/organizations/{organization}/projects/{project}/files/upload/{upload_id}",
+        params={"dataSourceId": test_datasource_project}
+    )
+    assert cleanup_response.status_code == 200
+
+
+def test_upload_single_chunk(client, organization, project, test_datasource_project):
+    """Test uploading a single chunk to an upload session."""
+    filename = "test-chunk-upload.bin"
+    file_size = 600 * 1024 * 1024  # 600MB
+    
+    # Start upload session
+    start_response = client.post(
+        f"/organizations/{organization}/projects/{project}/files/upload/start",
+        json={"fileName": filename, "fileSize": file_size},
+        params={"dataSourceId": test_datasource_project}
+    )
+    assert start_response.status_code == 200
+    
+    session = start_response.json()
+    upload_id = session["uploadId"]
+    chunk_size = session["chunkSize"]
+    
+    try:
+        # Create a chunk of data (use smaller size for faster testing)
+        test_chunk_size = min(chunk_size, 10 * 1024 * 1024)  # 10MB max for testing
+        chunk_data = os.urandom(test_chunk_size)
+        
+        # Upload the chunk using requests directly (multipart form data)
+        url = f"{client.base_url}/organizations/{organization}/projects/{project}/files/upload/chunk"
+        files = {'chunk': ('chunk_0', chunk_data, 'application/octet-stream')}
+        data = {
+            'uploadId': upload_id,
+            'chunkNumber': '0'
+        }
+        headers = {"Authorization": f"Bearer {client.token}"}
+        
+        response = requests.post(
+            url,
+            files=files,
+            data=data,
+            params={"dataSourceId": test_datasource_project},
+            headers=headers
+        )
+        
+        print(f"\nChunk Upload Status Code: {response.status_code}")
+        print(f"Chunk Upload Response Body: {response.text}")
+        
+        assert response.status_code == 200, f"Chunk upload failed: {response.text}"
+        
+        result = response.json()
+        assert "ChunkUploadStatus" in result, "Response should contain ChunkUploadStatus"
+        assert result["ChunkUploadStatus"] == "success", "Chunk upload should succeed"
+        
+    finally:
+        # Cleanup - cancel the upload session
+        client.delete(
+            f"/organizations/{organization}/projects/{project}/files/upload/{upload_id}",
+            params={"dataSourceId": test_datasource_project}
+        )
+
+
+def test_complete_chunked_upload_small_file(client, organization, project, test_datasource_project, cleanup_file_records, temp_files):
+    """Test complete chunked upload workflow with a small file (for faster testing)."""
+    filename = "test-chunked-complete.bin"
+    
+    # Create a 20MB test file (will be split into chunks)
+    temp_file_path = create_large_temp_file(20, temp_files)
+    file_size = os.path.getsize(temp_file_path)
+    
+    # Start upload session
+    start_response = client.post(
+        f"/organizations/{organization}/projects/{project}/files/upload/start",
+        json={"fileName": filename, "fileSize": file_size},
+        params={"dataSourceId": test_datasource_project}
+    )
+    
+    assert start_response.status_code == 200, f"Start upload failed: {start_response.text}"
+    
+    session = start_response.json()
+    upload_id = session["uploadId"]
+    chunk_size = session["chunkSize"]
+    total_chunks = session["totalChunks"]
+    
+    print(f"\nUpload ID: {upload_id}")
+    print(f"Chunk Size: {chunk_size}")
+    print(f"Total Chunks: {total_chunks}")
+    print(f"File Size: {file_size}")
+    
+    try:
+        # Upload all chunks
+        url = f"{client.base_url}/organizations/{organization}/projects/{project}/files/upload/chunk"
+        headers = {"Authorization": f"Bearer {client.token}"}
+        
+        with open(temp_file_path, 'rb') as f:
+            for chunk_number in range(total_chunks):
+                chunk_data = f.read(chunk_size)
+                
+                files = {'chunk': (f'chunk_{chunk_number}', chunk_data, 'application/octet-stream')}
+                data = {
+                    'uploadId': upload_id,
+                    'chunkNumber': str(chunk_number)
+                }
+                
+                response = requests.post(
+                    url,
+                    files=files,
+                    data=data,
+                    params={"dataSourceId": test_datasource_project},
+                    headers=headers
+                )
+                
+                assert response.status_code == 200, f"Chunk {chunk_number} upload failed: {response.text}"
+                print(f"Uploaded chunk {chunk_number + 1}/{total_chunks}")
+        
+        # Complete the upload
+        complete_response = client.post(
+            f"/organizations/{organization}/projects/{project}/files/upload/complete",
+            json={
+                "uploadId": upload_id,
+                "fileName": filename,
+                "totalChunks": total_chunks
+            },
+            params={"dataSourceId": test_datasource_project}
+        )
+        
+        print(f"\nComplete Status Code: {complete_response.status_code}")
+        print(f"Complete Response Body: {complete_response.text}")
+        
+        assert complete_response.status_code == 200, f"Complete upload failed: {complete_response.text}"
+        
+        result = complete_response.json()
+        record_id = result["id"]
+        cleanup_file_records.append(record_id)
+        
+        # Verify file record
+        assert result["name"] == filename, f"Expected filename '{filename}', got '{result['name']}'"
+        assert "id" in result, "Response should contain file record ID"
+        assert "uri" in result, "Response should contain file URI"
+        
+        # Verify chunked upload metadata
+        properties = result.get("properties", {})
+        assert properties.get("uploadedViaChunking") == True, "Should be marked as chunked upload"
+        assert properties.get("originalUploadId") == upload_id, "Should contain original upload ID"
+        
+    except Exception as e:
+        # If test fails, cleanup the upload session
+        client.delete(
+            f"/organizations/{organization}/projects/{project}/files/upload/{upload_id}",
+            params={"dataSourceId": test_datasource_project}
+        )
+        raise e
+
+
+def test_cancel_chunked_upload(client, organization, project, test_datasource_project):
+    """Test canceling a chunked upload session."""
+    filename = "test-cancel.bin"
+    file_size = 600 * 1024 * 1024  # 600MB
+    
+    # Start upload session
+    start_response = client.post(
+        f"/organizations/{organization}/projects/{project}/files/upload/start",
+        json={"fileName": filename, "fileSize": file_size},
+        params={"dataSourceId": test_datasource_project}
+    )
+    
+    assert start_response.status_code == 200
+    upload_id = start_response.json()["uploadId"]
+    
+    # Cancel the upload
+    cancel_response = client.delete(
+        f"/organizations/{organization}/projects/{project}/files/upload/{upload_id}",
+        params={"dataSourceId": test_datasource_project}
+    )
+    
+    print(f"\nCancel Status Code: {cancel_response.status_code}")
+    print(f"Cancel Response Body: {cancel_response.text}")
+    
+    assert cancel_response.status_code == 200, f"Cancel upload failed: {cancel_response.text}"
+    
+    result = cancel_response.json()
+    assert "message" in result, "Response should contain message"
+    assert upload_id in result["message"], "Message should reference the upload ID"
+
+
+def test_chunked_upload_with_missing_chunks(client, organization, project, test_datasource_project, temp_files):
+    """Test that completing upload with missing chunks fails appropriately."""
+    filename = "test-missing-chunks.bin"
+    
+    # Create a 20MB test file
+    temp_file_path = create_large_temp_file(20, temp_files)
+    file_size = os.path.getsize(temp_file_path)
+    
+    # Start upload session
+    start_response = client.post(
+        f"/organizations/{organization}/projects/{project}/files/upload/start",
+        json={"fileName": filename, "fileSize": file_size},
+        params={"dataSourceId": test_datasource_project}
+    )
+    
+    assert start_response.status_code == 200
+    
+    session = start_response.json()
+    upload_id = session["uploadId"]
+    chunk_size = session["chunkSize"]
+    total_chunks = session["totalChunks"]
+    
+    try:
+        # Only upload the first chunk (intentionally skip the rest)
+        url = f"{client.base_url}/organizations/{organization}/projects/{project}/files/upload/chunk"
+        headers = {"Authorization": f"Bearer {client.token}"}
+        
+        with open(temp_file_path, 'rb') as f:
+            chunk_data = f.read(chunk_size)
+            
+            files = {'chunk': ('chunk_0', chunk_data, 'application/octet-stream')}
+            data = {
+                'uploadId': upload_id,
+                'chunkNumber': '0'
+            }
+            
+            response = requests.post(
+                url,
+                files=files,
+                data=data,
+                params={"dataSourceId": test_datasource_project},
+                headers=headers
+            )
+            
+            assert response.status_code == 200
+        
+        # Try to complete with missing chunks
+        complete_response = client.post(
+            f"/organizations/{organization}/projects/{project}/files/upload/complete",
+            json={
+                "uploadId": upload_id,
+                "fileName": filename,
+                "totalChunks": total_chunks
+            },
+            params={"dataSourceId": test_datasource_project}
+        )
+        
+        print(f"\nComplete Status Code: {complete_response.status_code}")
+        print(f"Complete Response Body: {complete_response.text}")
+        
+        # Should fail because chunks are missing
+        assert complete_response.status_code in [400, 500], "Should fail with missing chunks"
+        
+    finally:
+        # Cleanup - cancel the upload session
+        client.delete(
+            f"/organizations/{organization}/projects/{project}/files/upload/{upload_id}",
+            params={"dataSourceId": test_datasource_project}
+        )
+
+
+def test_chunked_upload_with_invalid_upload_id(client, organization, project, test_datasource_project):
+    """Test that uploading a chunk with invalid upload ID fails."""
+    chunk_data = os.urandom(1024 * 1024)  # 1MB
+    
+    url = f"{client.base_url}/organizations/{organization}/projects/{project}/files/upload/chunk"
+    files = {'chunk': ('chunk_0', chunk_data, 'application/octet-stream')}
+    data = {
+        'uploadId': 'invalid-upload-id-12345',
+        'chunkNumber': '0'
+    }
+    headers = {"Authorization": f"Bearer {client.token}"}
+    
+    response = requests.post(
+        url,
+        files=files,
+        data=data,
+        params={"dataSourceId": test_datasource_project},
+        headers=headers
+    )
+    
+    print(f"\nStatus Code: {response.status_code}")
+    print(f"Response Body: {response.text}")
+    
+    # Should fail with 400 or 500 for invalid upload ID
+    assert response.status_code in [400, 500], "Should fail with invalid upload ID"
+
+
+def test_download_chunked_uploaded_file(client, organization, project, test_datasource_project, cleanup_file_records, temp_files):
+    """Test that a file uploaded via chunking can be downloaded correctly."""
+    filename = "test-download-chunked.bin"
+    
+    # Create a 20MB test file with random data
+    temp_file_path = create_large_temp_file(20, temp_files)
+    file_size = os.path.getsize(temp_file_path)
+    
+    # Read original content for comparison
+    with open(temp_file_path, 'rb') as f:
+        original_content = f.read()
+    
+    # Start upload session
+    start_response = client.post(
+        f"/organizations/{organization}/projects/{project}/files/upload/start",
+        json={"fileName": filename, "fileSize": file_size},
+        params={"dataSourceId": test_datasource_project}
+    )
+    
+    assert start_response.status_code == 200
+    
+    session = start_response.json()
+    upload_id = session["uploadId"]
+    chunk_size = session["chunkSize"]
+    total_chunks = session["totalChunks"]
+    
+    try:
+        # Upload all chunks
+        url = f"{client.base_url}/organizations/{organization}/projects/{project}/files/upload/chunk"
+        headers = {"Authorization": f"Bearer {client.token}"}
+        
+        with open(temp_file_path, 'rb') as f:
+            for chunk_number in range(total_chunks):
+                chunk_data = f.read(chunk_size)
+                
+                files = {'chunk': (f'chunk_{chunk_number}', chunk_data, 'application/octet-stream')}
+                data = {
+                    'uploadId': upload_id,
+                    'chunkNumber': str(chunk_number)
+                }
+                
+                response = requests.post(
+                    url,
+                    files=files,
+                    data=data,
+                    params={"dataSourceId": test_datasource_project},
+                    headers=headers
+                )
+                
+                assert response.status_code == 200
+        
+        # Complete the upload
+        complete_response = client.post(
+            f"/organizations/{organization}/projects/{project}/files/upload/complete",
+            json={
+                "uploadId": upload_id,
+                "fileName": filename,
+                "totalChunks": total_chunks
+            },
+            params={"dataSourceId": test_datasource_project}
+        )
+        
+        assert complete_response.status_code == 200
+        
+        record_id = complete_response.json()["id"]
+        cleanup_file_records.append(record_id)
+        
+        # Download the file
+        download_url = f"{client.base_url}/organizations/{organization}/projects/{project}/files/{record_id}"
+        headers = {"Authorization": f"Bearer {client.token}"}
+        download_response = requests.get(download_url, headers=headers, stream=True)
+        
+        assert download_response.status_code == 200, f"Download failed: {download_response.text}"
+        
+        # Verify downloaded content matches original
+        downloaded_content = download_response.content
+        assert len(downloaded_content) == len(original_content), "Downloaded file size mismatch"
+        assert downloaded_content == original_content, "Downloaded content doesn't match original"
+        
+    except Exception as e:
+        # If test fails, cleanup the upload session
+        client.delete(
+            f"/organizations/{organization}/projects/{project}/files/upload/{upload_id}",
+            params={"dataSourceId": test_datasource_project}
+        )
+        raise e
+
+
+def test_chunked_upload_chunk_ordering(client, organization, project, test_datasource_project, cleanup_file_records, temp_files):
+    """Test that chunks can be uploaded in non-sequential order (tests backend robustness)."""
+    filename = "test-chunk-order.bin"
+    
+    # Create a small test file
+    temp_file_path = create_large_temp_file(15, temp_files)  # 15MB
+    file_size = os.path.getsize(temp_file_path)
+    
+    # Start upload session
+    start_response = client.post(
+        f"/organizations/{organization}/projects/{project}/files/upload/start",
+        json={"fileName": filename, "fileSize": file_size},
+        params={"dataSourceId": test_datasource_project}
+    )
+    
+    assert start_response.status_code == 200
+    
+    session = start_response.json()
+    upload_id = session["uploadId"]
+    chunk_size = session["chunkSize"]
+    total_chunks = session["totalChunks"]
+    
+    try:
+        # Read all chunks first
+        chunks_data = []
+        with open(temp_file_path, 'rb') as f:
+            for _ in range(total_chunks):
+                chunk_data = f.read(chunk_size)
+                chunks_data.append(chunk_data)
+        
+        # Upload chunks in reverse order
+        url = f"{client.base_url}/organizations/{organization}/projects/{project}/files/upload/chunk"
+        headers = {"Authorization": f"Bearer {client.token}"}
+        
+        for chunk_number in reversed(range(total_chunks)):
+            files = {'chunk': (f'chunk_{chunk_number}', chunks_data[chunk_number], 'application/octet-stream')}
+            data = {
+                'uploadId': upload_id,
+                'chunkNumber': str(chunk_number)
+            }
+            
+            response = requests.post(
+                url,
+                files=files,
+                data=data,
+                params={"dataSourceId": test_datasource_project},
+                headers=headers
+            )
+            
+            assert response.status_code == 200, f"Chunk {chunk_number} upload failed"
+            print(f"Uploaded chunk {chunk_number} (reverse order)")
+        
+        # Complete the upload
+        complete_response = client.post(
+            f"/organizations/{organization}/projects/{project}/files/upload/complete",
+            json={
+                "uploadId": upload_id,
+                "fileName": filename,
+                "totalChunks": total_chunks
+            },
+            params={"dataSourceId": test_datasource_project}
+        )
+        
+        assert complete_response.status_code == 200, "Complete should succeed even with non-sequential upload"
+        
+        record_id = complete_response.json()["id"]
+        cleanup_file_records.append(record_id)
+        
+    except Exception as e:
+        client.delete(
+            f"/organizations/{organization}/projects/{project}/files/upload/{upload_id}",
+            params={"dataSourceId": test_datasource_project}
+        )
+        raise e
