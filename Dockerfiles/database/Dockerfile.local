@@ -1,4 +1,4 @@
-FROM postgres:16-alpine3.20 AS deeplynx-db
+FROM postgres:18-alpine3.20 AS deeplynx-db
 
 # Temporarily switch to HTTP repos to bootstrap certificates
 RUN sed -i 's/https/http/g' /etc/apk/repositories && \
@@ -25,7 +25,7 @@ RUN apk add --no-cache --virtual .build-deps \
     llvm15
 
 # Install pgvector
-RUN git clone --branch v0.8.0 https://github.com/pgvector/pgvector.git /tmp/pgvector && \
+RUN git clone --branch v0.8.1 https://github.com/pgvector/pgvector.git /tmp/pgvector && \
     cd /tmp/pgvector && \
     make -j$(nproc) && \
     make install && \
@@ -37,40 +37,3 @@ RUN apk del .build-deps
 EXPOSE 5432
 
 CMD ["postgres"]
-
-## Below is config for hardening Postgres for production release
-
-# Update alpine package manager
-# RUN apk update && apk upgrade
-
-# # Install build dependencies
-# RUN apk add --virtual build-dependencies \
-#  git \
-#  build-base \
-#  krb5-dev \
-#  postgresql16-dev \
-#  gcc \
-#  clang15 \
-#  llvm15
-
-# # Install pgaudit
-# WORKDIR /tmp
-# RUN git clone https://github.com/pgaudit/pgaudit.git && cd pgaudit && git checkout REL_16_STABLE
-# RUN cd /tmp/pgaudit && make install USE_PGXS=1
-
-# # Install set_user
-# RUN git clone https://github.com/pgaudit/set_user && cd set_user
-# WORKDIR /tmp/set_user
-# RUN make
-# RUN make install
-
-# # Delete build dependencies
-# RUN apk del build-dependencies
-
-# COPY --from=build /usr/cert /etc/certs/
-# COPY ./data/postgresql.conf /etc/
-
-# RUN chown -R postgres /etc/certs
-# RUN chmod 740 /etc/certs
-
-# CMD ["postgres", "-c", "config_file=/etc/postgresql.conf"]
