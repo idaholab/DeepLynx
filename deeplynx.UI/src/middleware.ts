@@ -2,6 +2,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { auth } from "../auth";
+import { auth } from "../auth";
 
 export const runtime = "nodejs";
 
@@ -103,6 +104,11 @@ export async function middleware(request: NextRequest) {
     if (hasOrgSession) {
       return NextResponse.redirect(new URL("/", request.url));
     }
+    return NextResponse.next();
+  }
+  
+  if (!hasOrgSession) {
+    return NextResponse.redirect(new URL("/select-org", request.url));
     return NextResponse.next();
   }
   
