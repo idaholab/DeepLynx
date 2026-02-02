@@ -137,9 +137,10 @@ const ProjectSettingsLeftColumn = ({
       </div>
     </div>
 
-    <div className="divider px-4"></div>
+    {/* <div className="divider px-4"></div> */}
 
-    <div className="card bg-base-100 shadow-sm">
+    {/* Banner */}
+    {/* <div className="card bg-base-100 shadow-sm">
       <div className="card-body">
         <h3 className="card-title text-lg mb-4">
           {t.translations.PROJECT_WARNING_BANNER}
@@ -175,10 +176,10 @@ const ProjectSettingsLeftColumn = ({
               {bannerText.length} / 50
             </span>
           </label>
-        </div>
+        </div> */}
 
-        {/* Action Buttons */}
-        <div className="flex gap-2 mt-4">
+    {/* Action Buttons */}
+    {/* <div className="flex gap-2 mt-4">
           <button
             type="button"
             className="btn btn-primary btn-sm"
@@ -207,7 +208,7 @@ const ProjectSettingsLeftColumn = ({
           )}
         </div>
       </div>
-    </div>
+    </div> */}
   </div>
 );
 
