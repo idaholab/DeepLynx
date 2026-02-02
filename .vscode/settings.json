@@ -1,0 +1,10 @@
+{
+    "python.testing.pytestEnabled": true,
+    "python.testing.pytestArgs": [
+        "deeplynx.apitest"
+    ],
+    "python.defaultInterpreterPath": "${workspaceFolder}/deeplynx.apitest/venv/bin/python", // on MacOS or Linux
+    // "python.defaultInterpreterPath": "${workspaceFolder}/deeplynx.apitest/venv/Scripts/python" // on Windows
+    "python.testing.unittestEnabled": false,
+    "editor.formatOnSave": true
+}
