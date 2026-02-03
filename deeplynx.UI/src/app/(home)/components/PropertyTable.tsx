@@ -226,7 +226,7 @@ const PropertyTable: React.FC<PropertyTableProps> = ({
                   title="Edit properties"
                   className="p-1 transition-colors cursor-pointer hover:text-primary"
                 >
-                  <PencilIcon className="w-8 h-8" />
+                  <PencilIcon className="size-6 text-primary" />
                 </button>
               )}
 

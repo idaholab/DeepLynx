@@ -2,14 +2,13 @@
 
 "use client";
 import Tabs from "@/app/(home)/components/Tabs";
-import { XMarkIcon } from "@heroicons/react/24/outline";
+import { PencilIcon, PlusIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import Link from "next/link";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import PropertyTable from "../components/PropertyTable";
 import {
   HistoricalRecordResponseDto,
-  RecordResponseDto,
   TagResponseDto,
 } from "../types/responseDTOs";
 import RecordLoading from "./loading";
@@ -23,26 +22,32 @@ import RelatedRecordsCard, {
 // Types & Context
 import { useLanguage } from "@/app/contexts/Language";
 import { useOrganizationSession } from "@/app/contexts/OrganizationSessionProvider";
+import { getClass } from "@/app/lib/client_service/class_services.client";
 import {
   archiveEdgeByRelationship,
   getEdgeByRelationship,
 } from "@/app/lib/client_service/edge_services.client";
+import { getHistoricalRecord } from "@/app/lib/client_service/query_services.client";
 import {
   getEdgesByRecord,
   unattachTagFromRecord,
   updateRecord,
 } from "@/app/lib/client_service/record_services.client";
-import { getHistoricalRecord } from "@/app/lib/client_service/query_services.client";
-import { getClass } from "@/app/lib/client_service/class_services.client";
 import { getAllTagsOrg } from "@/app/lib/client_service/tag_services.client";
 import GraphClientPage from "../graph/GraphClientPage";
 import {
   ClassResponseDto,
   RelatedRecordsResponseDto,
 } from "../types/responseDTOs";
+import AdditionalPropertiesEditor from "./components/AdditionalPropertiesEditor";
 import RecordTagsPanel from "./components/RecordTagsPanel";
 import RelatedRecordsCardSkeleton from "./skeletons/RelatedRecordsSkeleton";
-import AdditionalPropertiesEditor from "./components/AdditionalPropertiesEditor";
+
+import {
+  createClass,
+  getAllClasses,
+} from "@/app/lib/client_service/class_services.client";
+import ClassSelectorModal from "./components/ClassSelectorModal";
 
 // ============= HELPER FUNCTIONS =============
 interface PropertyRow {
@@ -54,12 +59,6 @@ interface PropertyRow {
   nestedRows?: PropertyRow[];
 }
 
-/**
- * Converts a nested object structure into PropertyRow format
- * @param obj - The object to parse
- * @param parentKey - Optional parent key for nested properties
- * @returns Array of PropertyRow objects
- */
 function parseNestedProperties(
   obj: JSON,
   parentKey: string = "",
@@ -74,19 +73,17 @@ function parseNestedProperties(
       .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
       .join(" ");
 
-    // Check if value is an object (but not null or array)
     const isNestedObject =
       value !== null && typeof value === "object" && !Array.isArray(value);
 
     if (isNestedObject) {
       return {
         label,
-        value: "", // Won't be displayed for nested objects
+        value: "",
         isNested: true,
         nestedRows: parseNestedProperties(value, key),
       };
     } else {
-      // Handle arrays and primitive values
       const displayValue = Array.isArray(value)
         ? JSON.stringify(value)
         : String(value);
@@ -169,6 +166,12 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
   const [isPropertiesEditorOpen, setIsPropertiesEditorOpen] = useState(false);
   const [isSavingProperties, setIsSavingProperties] = useState(false);
 
+  const [isClassModalOpen, setIsClassModalOpen] = useState(false);
+  const [availableClasses, setAvailableClasses] = useState<ClassResponseDto[]>(
+    [],
+  );
+  const [isLoadingClasses, setIsLoadingClasses] = useState(false);
+
   // ============= HANDLERS =============
   const handleUpdateRecord = useCallback(
     async (field: string, value: string, successMessage: string) => {
@@ -231,15 +234,13 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
       try {
         setIsSavingProperties(true);
 
-        // Try sending as object first (most common)
         const update = await updateRecord(
           organization.organizationId as number,
           projectId,
           recordId,
-          { properties: newProperties }, // Send as object, not stringified
+          { properties: newProperties },
         );
 
-        // Update local state
         setRecord((prev) => {
           if (!prev) return prev;
           return {
@@ -263,7 +264,6 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
     [organization?.organizationId, projectId, recordId],
   );
 
-  // Create a reusable fetch function
   const fetchRelatedRecords = useCallback(
     async (
       isOrigin: boolean,
@@ -429,6 +429,54 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
     [],
   );
 
+  const handleClassUpdate = async (class_id: number) => {
+    if (!organization?.organizationId) return;
+
+    try {
+      const update = await updateRecord(
+        organization.organizationId as number,
+        projectId,
+        recordId,
+        { class_id },
+      );
+
+      setRecord((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          classId: update.classId ?? prev.classId,
+        };
+      });
+
+      toast.success("Class update sucessfully!");
+    } catch (error) {
+      console.error("Error updating class: ", error);
+      toast.error("Failed to update class");
+    }
+  };
+
+  const handleCreateClass = async (name: string, description: string) => {
+    if (!organization?.organizationId) return;
+
+    try {
+      const newClass = await createClass(projectId, {
+        name,
+        description: description,
+      });
+
+      setAvailableClasses((prev) => [...prev, newClass]);
+
+      await handleClassUpdate(newClass.id);
+
+      toast.success("Class created and applied!");
+      setIsClassModalOpen(false);
+    } catch (error) {
+      console.error("Error creating class: ", error);
+      toast.error("Failed to create class");
+      throw error;
+    }
+  };
+
   // ============= EFFECTS =============
   useEffect(() => {
     resetAllState();
@@ -538,6 +586,25 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
       setDestinationRecords,
     );
   }, [fetchRelatedRecords, destinationPage]);
+
+  useEffect(() => {
+    const fetchClass = async () => {
+      if (!projectId || !organization?.organizationId) return;
+
+      try {
+        setIsLoadingClasses(true);
+        const data = await getAllClasses(projectId, true);
+        setAvailableClasses(data);
+      } catch (error) {
+        console.error("Error fetching classes: ", error);
+        toast.error("Failed to fetch classes");
+      } finally {
+        setIsLoadingClasses(false);
+      }
+    };
+
+    fetchClass();
+  }, [projectId, organization?.organizationId]);
 
   // ============= MEMOIZED VALUES =============
   const systemPropertiesRows = useMemo(() => {
@@ -734,10 +801,27 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
     <div className="mr-4">
       <div className="bg-base-200/40 pl-12 p-4">
         <h1 className="text-2xl font-bold text-base-content">{record.name}</h1>
-        {record.classId && (
-          <span className="badge badge-primary">
-            {recordClass?.name || <div className="loading size-3" />}
-          </span>
+        {record.classId ? (
+          <div className="flex gap-2 py-auto items-center">
+            <span className="badge badge-primary">
+              {recordClass?.name || <div className="loading size-3" />}
+            </span>
+            <button
+              onClick={() => setIsClassModalOpen(true)}
+              className="btn btn-ghost btn-xs btn-circle"
+              title="Edit class"
+            >
+              <PencilIcon className="size-4" />
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={() => setIsClassModalOpen(true)}
+            className="btn btn-sm btn-outline mt-2"
+          >
+            <PlusIcon className="w-4 h-4 mr-1" />
+            Add Class
+          </button>
         )}
       </div>
 
@@ -770,6 +854,17 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
         }
         onSave={handleSaveProperties}
         isSaving={isSavingProperties}
+      />
+
+      <ClassSelectorModal
+        isOpen={isClassModalOpen}
+        onClose={() => setIsClassModalOpen(false)}
+        currentClassId={record.classId}
+        projectId={projectId}
+        onClassUpdate={handleClassUpdate}
+        availableClasses={availableClasses}
+        onCreateClass={handleCreateClass}
+        isLoading={isLoadingClasses}
       />
     </div>
   );

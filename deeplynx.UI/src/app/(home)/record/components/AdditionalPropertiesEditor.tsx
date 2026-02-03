@@ -211,7 +211,7 @@ export default function AdditionalPropertiesEditor({
   };
 
   return (
-    <dialog className="modal modal-open">
+    <dialog className="modal modal-open mt-10">
       <div className="modal-box max-w-4xl w-full h-[80vh] flex flex-col p-0">
         {/* Header */}
         <div className="p-6 border-b border-base-300 flex-shrink-0">
