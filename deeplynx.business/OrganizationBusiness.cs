@@ -156,7 +156,15 @@ public class OrganizationBusiness : IOrganizationBusiness
         };
 
         _context.Organizations.Add(organization);
+        await _context.SaveChangesAsync();
 
+        var orgUser = new OrganizationUser
+        {
+            UserId = currentUserId,
+            OrganizationId = organization.Id,
+            IsOrgAdmin = true
+        };
+        _context.OrganizationUsers.Add(orgUser);
         await _context.SaveChangesAsync();
 
         if (isDefault) await MakePreviousDefaultsFalse(organization.Id);

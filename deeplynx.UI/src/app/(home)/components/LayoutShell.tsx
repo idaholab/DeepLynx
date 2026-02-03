@@ -32,6 +32,7 @@ import {
   getOrganizationLogoUrl,
 } from "@/app/lib/client_service/organization_services.client";
 import TopBanner from "./VulnerabilityBanner";
+import { Banner } from "./Banner";
 
 const LayoutShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { t } = useLanguage();
@@ -120,12 +121,10 @@ const LayoutShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     setOrganization({
       organizationId: org.id,
       organizationName: org.name,
+      banner: org.banner ?? null,
     });
 
-    // Close dropdown
     setIsOrgDropdownOpen(false);
-
-    // Navigate to home page - this will trigger a full server-side re-render
     router.push("/");
   };
 
@@ -263,7 +262,6 @@ const LayoutShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                     <Link
                       href="/select-org"
                       className="hover:bg-base-200"
-                      onClick={() => setIsOrgDropdownOpen(false)}
                     >
                       <UserGroupIcon className="size-5" />
                       {t.translations.VIEW_ALL_ORGANIZATIONS}
@@ -381,7 +379,6 @@ const LayoutShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                           <Link
                             href="/settings"
                             className="text-base-content hover:bg-base-200"
-                            onClick={() => setIsUserDropdownOpen(false)}
                           >
                             <Cog6ToothIcon className="size-6" />
                             {t.translations.SETTINGS}
@@ -425,6 +422,12 @@ const LayoutShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             isMenuCollapsed ? "ml-40" : "ml-82"
           }`}
         >
+          {/* Organization Banne */}
+          <div className="sticky top-25 z-20">
+            <Banner />
+          </div>
+
+          {/* Page Content */}
           {children}
         </main>
       </div>

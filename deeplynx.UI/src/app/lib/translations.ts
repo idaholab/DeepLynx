@@ -542,13 +542,16 @@ export const translations = {
             CONFIGURE_AXES: "Configure Axes",
             SELECT_X_AXIS_COLUMN: "Select an X axis column",
             SELECT_Y_AXIS_COLUMN: "Select at least one Y axis column",
+            PRIVACY: "Privacy and Accessibility",
+            NO_CHANGES_TO_SAVE: "No Changes to save",
+            BANNER_TEXT_MUST_BE_50_CHARATERS_OR_LESS: "Banner text must be 50 characters or less",
+            BANNER_UPDATED_SUCCESSFULLY: "Banner updated successfully",
+            FAILED_TO_UPDATE_BANNER: "Failed to update banner",
+            CHANGES_DISCARDED: "Changes discarded",
 
-
-
-
-
-
-
+            PROJECT_WARNING_BANNER: "Project Warning Banner",
+            BANNER_TEXT: "Banner Text",
+            DISPLAY_BENEATH_THE_TOP_HEADER_FOR_ALL_PAGES_IN_PROJECT: "Display beneath the top header for all pages in this project",
         }
     },
     es: {
@@ -1105,6 +1108,18 @@ export const translations = {
             CONFIGURE_AXES: "Configurar Ejes",
             SELECT_X_AXIS_COLUMN: "Seleccione una columna del eje X",
             SELECT_Y_AXIS_COLUMN: "Seleccione al menos una columna del eje Y",
+            NO_CHANGES_TO_SAVE: "No hay cambios para guardar",
+            BANNER_TEXT_MUST_BE_50_CHARATERS_OR_LESS: "El texto del banner debe tener 50 caracteres o menos",
+            BANNER_UPDATED_SUCCESSFULLY: "El banner se actualizó correctamente",
+            FAILED_TO_UPDATE_BANNER: "No se pudo actualizar el banner",
+            CHANGES_DISCARDED: "Cambios descartados",
+
+            PROJECT_WARNING_BANNER: "Banner de advertencia del proyecto",
+            BANNER_TEXT: "Texto del banner",
+            DISPLAY_BENEATH_THE_TOP_HEADER_FOR_ALL_PAGES_IN_PROJECT: "Se muestra debajo del encabezado superior en todas las páginas de este proyecto",
+
+
+            PRIVACY: "Privacidad y Accesibilidad"
         }
     }
 }

@@ -2,7 +2,7 @@
 
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { useOrganizationSession } from "@/app/contexts/OrganizationSessionProvider";
 import { useProjectSession } from "@/app/contexts/ProjectSessionProvider";
@@ -462,7 +462,7 @@ const ProjectRolesAndPermissions = ({
   /*                       Permissions Fetching (per role)                    */
   /* ------------------------------------------------------------------------ */
 
-  const fetchRolePermissions = async (roleId: number) => {
+  const fetchRolePermissions = useCallback(async (roleId: number) => {
     if (rolePermissions[roleId]) return;
     if (!organization?.organizationId) return;
 
@@ -483,9 +483,9 @@ const ProjectRolesAndPermissions = ({
     } finally {
       setIsLoadingPermissions(false);
     }
-  };
+  }, [organization?.organizationId, projectId, rolePermissions]);
 
-  const fetchAllRolePermissions = async () => {
+  const fetchAllRolePermissions = useCallback(async () => {
     if (!organization?.organizationId) return;
 
     setIsLoadingPermissions(true);
@@ -519,7 +519,7 @@ const ProjectRolesAndPermissions = ({
     } finally {
       setIsLoadingPermissions(false);
     }
-  };
+  }, [organization?.organizationId, projectId, roles]);
 
   /* ------------------------------------------------------------------------ */
   /*                               useEffect Hooks                            */
@@ -565,7 +565,7 @@ const ProjectRolesAndPermissions = ({
   /*                          Refetch Roles on Mount                          */
   /* ------------------------------------------------------------------------ */
 
-  const refetchAllRoles = async () => {
+  const refetchAllRoles = useCallback(async () => {
     if (!organization?.organizationId || !project?.projectId) return;
 
     try {
@@ -580,12 +580,12 @@ const ProjectRolesAndPermissions = ({
       console.error("Error refetching roles:", error);
       toast.error("Failed to reload roles");
     }
-  };
+  }, [organization?.organizationId, project?.projectId]);
 
   // useEffect to refetch on mount
   useEffect(() => {
     refetchAllRoles();
-  }, [organization?.organizationId, project?.projectId]);
+  }, [refetchAllRoles]);
 
   /* ------------------------------------------------------------------------ */
   /*                                   Render                                 */
