@@ -382,6 +382,69 @@ public class RecordController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
+    
+        /// <summary>
+    ///     Attach a Sensitivity Label to a Record
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <param name="projectId">The ID of the project to which the record belongs</param>
+    /// <param name="recordId">The ID of the record</param>
+    /// <param name="labelId">The ID of the label to attach</param>
+    /// <returns>A message stating the label was successfully attached to the record.</returns>
+    [HttpPost("{recordId:long}/sensitivity-labels", Name = "api_attach_sensitivity_label")]
+    [Auth("write", "record")]
+    [Auth("read", "sensitivity_label")]
+    public async Task<IActionResult> AttachSensitivityLabel(
+        long organizationId,
+        long projectId,
+        long recordId,
+        [FromQuery] long labelId)
+    {
+        try
+        {
+            var currentUserId = UserContextStorage.UserId;
+            await _recordBusiness.AttachLabel(currentUserId, organizationId, projectId, recordId, labelId);
+            return Ok(new { message = $"label {labelId} attached to record {recordId}" });
+        }
+        catch (Exception exc)
+        {
+            var message = $"An error occurred while attaching label {labelId} to record {recordId}: {exc}";
+            _logger.LogError(message);
+            return StatusCode(StatusCodes.Status500InternalServerError, message);
+        }
+    }
+
+    /// <summary>
+    ///     Unattach a sensitivity label from a Record
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <param name="projectId">The ID of the project to which the record belongs</param>
+    /// <param name="recordId">The ID of the record</param>
+    /// <param name="labelId">The ID of the label to unattach</param>
+    /// <returns>A message stating the label was successfully unattached from the record.</returns>
+    [HttpDelete("{recordId:long}/sensitivity-labels", Name = "api_unattach_sensitivity-label")]
+    [Auth("write", "record")]
+    [Auth("read", "sensitivity_label")]
+    public async Task<IActionResult> UnattachSensitivityLabel(
+        long organizationId,
+        long projectId,
+        long recordId,
+        [FromQuery] long labelId)
+    {
+        try
+        {
+            var currentUserId = UserContextStorage.UserId;
+            await _recordBusiness.UnattachLabel(currentUserId, organizationId, projectId, recordId, labelId);
+            return Ok(new { message = $"Sensitivity label {labelId} unattached from record {recordId}" });
+        }
+        catch (Exception exc)
+        {
+            var message = $"An error occurred while unattaching sensitivity label {labelId} from record {recordId}: {exc}";
+            _logger.LogError(message);
+            return StatusCode(StatusCodes.Status500InternalServerError, message);
+        }
+    }
+
 
     /// <summary>
     ///     Get Edges by Record

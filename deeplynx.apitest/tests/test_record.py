@@ -601,7 +601,339 @@ def test_attach_and_unattach_tag_to_record(client, organization, project, origin
         tag_names = [tag.get("name") for tag in record_after["tags"]]
         assert "pytest-attach-tag" not in tag_names, "Tag should not be attached to record"
 
-
+def test_attach_and_unattach_label_to_record(
+    client, organization, project, origin_class, test_datasource_project, current_user_id,
+    cleanup_records, cleanup_project_labels):
+    """Test attaching and unattaching a sensitivity label to a record."""
+    timestamp = int(time.time() * 1000)
+    
+    # Get the current user's role from their existing project membership
+    members_response = client.get(
+        f"/organizations/{organization}/projects/{project}/members"
+    )
+    assert members_response.status_code == 200, f"Failed to get members: {members_response.text}"
+    
+    members = members_response.json()
+    print(f"\nMembers Response: {members}")
+    
+    # Find the current user's membership and get their role ID
+    user_member = None
+    for member in members:
+        if member.get('memberId') == current_user_id or member.get('userId') == current_user_id:
+            user_member = member
+            break
+    
+    assert user_member is not None, f"Current user {current_user_id} not found in project members: {members}"
+    role_id = user_member.get('roleId')
+    assert role_id is not None, f"Role ID not found for user {current_user_id} in member data: {user_member}"
+    
+    print(f"\nFound user's role ID: {role_id}")
+    
+    # Create a sensitivity label
+    label_payload = {
+        "name": "pytest-attach-label",
+        "description": "Test label for attachment"
+    }
+    
+    label_response = client.post(
+        f"/projects/{project}/labels",
+        json=label_payload
+    )
+    
+    assert label_response.status_code == 200, f"Failed to create label: {label_response.text}"
+    label_id = label_response.json()["id"]
+    cleanup_project_labels.append(label_id)
+    
+    # Get the permissions that were automatically created when the label was created
+    permissions_response = client.get(
+        f"/organizations/{organization}/projects/{project}/permissions"
+    )
+    assert permissions_response.status_code == 200, f"Failed to get permissions: {permissions_response.text}"
+    
+    permissions = permissions_response.json()
+    write_permission = None
+    read_permission = None
+    
+    # Find the read and write permissions for this specific label
+    for permission in permissions:
+        if permission.get('action') == 'write' and permission.get('labelId') == label_id:
+            write_permission = permission
+        if permission.get('action') == 'read' and permission.get('labelId') == label_id:
+            read_permission = permission
+        # Break only after finding both permissions
+        if write_permission and read_permission:
+            break
+    
+    assert write_permission is not None, f"Write permission not found for label {label_id}. Available permissions: {permissions}"
+    assert read_permission is not None, f"Read permission not found for label {label_id}. Available permissions: {permissions}"
+    
+    write_permission_id = write_permission['id']
+    read_permission_id = read_permission['id']
+    
+    print(f"\nFound write permission: {write_permission}")
+    print(f"\nFound read permission: {read_permission}")
+    
+    # Add the read permission to the user's role (required to view records with this label)
+    add_read_permission_response = client.post(
+        f"/organizations/{organization}/projects/{project}/roles/{role_id}/permissions/{read_permission_id}"
+    )
+    
+    print(f"\nAdd Read Permission Status Code: {add_read_permission_response.status_code}")
+    print(f"Add Read Permission Response Body: {add_read_permission_response.text}")
+    
+    assert add_read_permission_response.status_code == 200, f"Failed to add read permission to role: {add_read_permission_response.text}"
+    
+    # Add the write permission to the user's role (required to attach/modify labels)
+    add_write_permission_response = client.post(
+        f"/organizations/{organization}/projects/{project}/roles/{role_id}/permissions/{write_permission_id}"
+    )
+    
+    print(f"\nAdd Write Permission Status Code: {add_write_permission_response.status_code}")
+    print(f"Add Write Permission Response Body: {add_write_permission_response.text}")
+    
+    assert add_write_permission_response.status_code == 200, f"Failed to add write permission to role: {add_write_permission_response.text}"
+    
+    # Verify the role has both permissions
+    role_permissions_response = client.get(
+        f"/organizations/{organization}/projects/{project}/roles/{role_id}/permissions"
+    )
+    print(f"\nRole Permissions Check Status Code: {role_permissions_response.status_code}")
+    print(f"Role Permissions: {role_permissions_response.text}")
+    
+    assert role_permissions_response.status_code == 200, f"Failed to get role permissions: {role_permissions_response.text}"
+    role_permissions = role_permissions_response.json()
+    permission_ids_in_role = [p.get('id') for p in role_permissions]
+    assert read_permission_id in permission_ids_in_role, f"Read permission {read_permission_id} not found in role {role_id}. Role has: {permission_ids_in_role}"
+    assert write_permission_id in permission_ids_in_role, f"Write permission {write_permission_id} not found in role {role_id}. Role has: {permission_ids_in_role}"
+    
+    # Create a record without the label
+    record_payload = {
+        "name": "pytest_AttachLabelRecord",
+        "description": "Test record for label attachment",
+        "original_id": f"{timestamp}-attach-001",
+        "properties": {},
+        "class_id": origin_class
+    }
+    
+    create_response = client.post(
+        f"/organizations/{organization}/projects/{project}/records?dataSourceId={test_datasource_project}",
+        json=record_payload
+    )
+    
+    assert create_response.status_code == 200, f"Failed to create record: {create_response.text}"
+    record_id = create_response.json()["id"]
+    cleanup_records.append(record_id)
+    
+    # Attach the label
+    attach_response = client.post(
+        f"/organizations/{organization}/projects/{project}/records/{record_id}/sensitivity-labels?labelId={label_id}"
+    )
+    
+    print(f"\nAttach Status Code: {attach_response.status_code}")
+    print(f"Attach Response Body: {attach_response.text}")
+    
+    assert attach_response.status_code == 200, f"Failed to attach label: {attach_response.text}"
+    
+    # Verify the response message
+    attach_data = attach_response.json()
+    assert "message" in attach_data, "Response should contain a message"
+    assert str(label_id) in attach_data["message"], "Message should mention the label ID"
+    assert str(record_id) in attach_data["message"], "Message should mention the record ID"
+    
+    # Verify label is attached by fetching the record
+    get_response = client.get(
+        f"/organizations/{organization}/projects/{project}/records/{record_id}?hideArchived=true"
+    )
+    assert get_response.status_code == 200, f"Failed to get record: {get_response.text}"
+    record = get_response.json()
+    
+    # Check if labels field exists and contains our label
+    assert "labels" in record, "Record should have labels field"
+    assert record["labels"] is not None, "Labels should not be null after attaching a label"
+    assert isinstance(record["labels"], list), "Labels should be a list"
+    label_ids = [label.get("id") for label in record["labels"]]
+    assert label_id in label_ids, f"Label {label_id} should be attached to record"
+    
+    # Unattach the label
+    unattach_response = client.delete(
+        f"/organizations/{organization}/projects/{project}/records/{record_id}/sensitivity-labels?labelId={label_id}"
+    )
+    
+    print(f"\nUnattach Status Code: {unattach_response.status_code}")
+    print(f"Unattach Response Body: {unattach_response.text}")
+    
+    assert unattach_response.status_code == 200, f"Failed to unattach label: {unattach_response.text}"
+    
+    # Verify the response message
+    unattach_data = unattach_response.json()
+    assert "message" in unattach_data, "Response should contain a message"
+    assert str(label_id) in unattach_data["message"], "Message should mention the label ID"
+    assert str(record_id) in unattach_data["message"], "Message should mention the record ID"
+    
+    # Verify label is unattached
+    get_after_response = client.get(
+        f"/organizations/{organization}/projects/{project}/records/{record_id}?hideArchived=true"
+    )
+    assert get_after_response.status_code == 200, f"Failed to get record after unattach: {get_after_response.text}"
+    record_after = get_after_response.json()
+    
+    # Check if labels field exists and doesn't contain our label
+    # Labels can be null or an empty list when no labels are attached
+    if "labels" in record_after:
+        if record_after["labels"] is not None and isinstance(record_after["labels"], list):
+            label_ids_after = [label.get("id") for label in record_after["labels"]]
+            assert label_id not in label_ids_after, f"Label {label_id} should not be attached to record"
+        # If labels is null, that's also valid - means no labels attached
+        
+def test_attach_label_unauthorized(
+    client, organization, project, origin_class, test_datasource_project, current_user_id,
+    cleanup_records, cleanup_project_labels, cleanup_project_roles):
+    """Test that attaching a label without write permission fails."""
+    timestamp = int(time.time() * 1000)
+    
+    # Get the current user's role from their existing project membership
+    members_response = client.get(
+        f"/organizations/{organization}/projects/{project}/members"
+    )
+    assert members_response.status_code == 200, f"Failed to get members: {members_response.text}"
+    
+    members = members_response.json()
+    print(f"\nMembers Response: {members}")
+    
+    # Find the current user's membership and get their role ID
+    user_member = None
+    for member in members:
+        if member.get('memberId') == current_user_id or member.get('userId') == current_user_id:
+            user_member = member
+            break
+    
+    assert user_member is not None, f"Current user {current_user_id} not found in project members: {members}"
+    role_id = user_member.get('roleId')
+    assert role_id is not None, f"Role ID not found for user {current_user_id} in member data: {user_member}"
+    
+    print(f"\nFound user's role ID: {role_id}")
+    
+    # Create a sensitivity label (this will automatically create read/write permissions)
+    label_payload = {
+        "name": "pytest-attach-label-unauth",
+        "description": "Test label for unauthorized attachment"
+    }
+    
+    label_response = client.post(
+        f"/projects/{project}/labels",
+        json=label_payload
+    )
+    
+    assert label_response.status_code == 200, f"Failed to create label: {label_response.text}"
+    label_id = label_response.json()["id"]
+    cleanup_project_labels.append(label_id)
+    
+    # Get the permissions that were automatically created when the label was created
+    permissions_response = client.get(
+        f"/organizations/{organization}/projects/{project}/permissions"
+    )
+    assert permissions_response.status_code == 200, f"Failed to get permissions: {permissions_response.text}"
+    
+    permissions = permissions_response.json()
+    write_permission = None
+    read_permission = None
+    
+    # Find the read and write permissions for this specific label
+    for permission in permissions:
+        if permission.get('action') == 'write' and permission.get('labelId') == label_id:
+            write_permission = permission
+        if permission.get('action') == 'read' and permission.get('labelId') == label_id:
+            read_permission = permission
+        # Break only after finding both permissions
+        if write_permission and read_permission:
+            break
+    
+    assert write_permission is not None, f"Write permission not found for label {label_id}"
+    assert read_permission is not None, f"Read permission not found for label {label_id}"
+    
+    write_permission_id = write_permission['id']
+    read_permission_id = read_permission['id']
+    
+    print(f"\nFound write permission: {write_permission}")
+    print(f"\nFound read permission: {read_permission}")
+    
+    # DO NOT add write permission to the role - this is the key to testing unauthorized access
+    # We only add read permission so the user can view the record, but not modify it with labels
+    add_read_permission_response = client.post(
+        f"/organizations/{organization}/projects/{project}/roles/{role_id}/permissions/{read_permission_id}"
+    )
+    
+    print(f"\nAdd Read Permission Status Code: {add_read_permission_response.status_code}")
+    print(f"Add Read Permission Response Body: {add_read_permission_response.text}")
+    
+    assert add_read_permission_response.status_code == 200, f"Failed to add read permission to role: {add_read_permission_response.text}"
+    
+    # Verify the role has ONLY the read permission (NOT the write permission)
+    role_permissions_response = client.get(
+        f"/organizations/{organization}/projects/{project}/roles/{role_id}/permissions"
+    )
+    print(f"\nRole Permissions Check Status Code: {role_permissions_response.status_code}")
+    print(f"Role Permissions: {role_permissions_response.text}")
+    
+    assert role_permissions_response.status_code == 200, f"Failed to get role permissions: {role_permissions_response.text}"
+    role_permissions = role_permissions_response.json()
+    permission_ids_in_role = [p.get('id') for p in role_permissions]
+    assert read_permission_id in permission_ids_in_role, f"Read permission {read_permission_id} should be in role {role_id}"
+    assert write_permission_id not in permission_ids_in_role, f"Write permission {write_permission_id} should NOT be in role {role_id}"
+    
+    # Create a record without the label
+    record_payload = {
+        "name": "pytest_AttachLabelRecord_Unauth",
+        "description": "Test record for unauthorized label attachment",
+        "original_id": f"{timestamp}-attach-unauth-001",
+        "properties": {},
+        "class_id": origin_class
+    }
+    
+    create_response = client.post(
+        f"/organizations/{organization}/projects/{project}/records?dataSourceId={test_datasource_project}",
+        json=record_payload
+    )
+    
+    assert create_response.status_code == 200, f"Failed to create record: {create_response.text}"
+    record_id = create_response.json()["id"]
+    cleanup_records.append(record_id)
+    
+    # Try to attach the label - should fail with 401, 403, or 500 (UnauthorizedAccessException)
+    attach_response = client.post(
+        f"/organizations/{organization}/projects/{project}/records/{record_id}/sensitivity-labels?labelId={label_id}"
+    )
+    
+    print(f"\nUnauthorized Attach Status Code: {attach_response.status_code}")
+    print(f"Unauthorized Attach Response Body: {attach_response.text}")
+    
+    # Should fail with Unauthorized (401), Forbidden (403), or 500 (for UnauthorizedAccessException)
+    assert attach_response.status_code in [401, 403, 500], \
+        f"Should fail with unauthorized error, got: {attach_response.status_code}"
+    
+    # Verify the error message mentions permission/authorization
+    error_text = attach_response.text.lower()
+    assert any(keyword in error_text for keyword in ['unauthorized', 'permission', 'access']), \
+        f"Error message should mention authorization/permission issue: {attach_response.text}"
+    
+    # Verify label is NOT attached by fetching the record
+    get_response = client.get(
+        f"/organizations/{organization}/projects/{project}/records/{record_id}?hideArchived=true"
+    )
+    assert get_response.status_code == 200, f"Failed to get record: {get_response.text}"
+    record = get_response.json()
+    
+    print(f"\nRecord after failed attach attempt: {record}")
+    
+    # Check that the label is NOT attached
+    # Labels can be null or an empty list when no labels are attached
+    if record.get("labels") is not None and isinstance(record["labels"], list):
+        label_ids = [label.get("id") for label in record["labels"]]
+        assert label_id not in label_ids, f"Label {label_id} should NOT be attached to record (no write permission)"
+    # If labels is null, that's also valid - means no labels attached
+    
+    print(f"\nTest passed: User without write permission cannot attach label {label_id} to record {record_id}")
+        
 def test_get_edges_by_record(client, organization, project, test_records, test_relationship_project, test_datasource_project, cleanup_edges):
     """Test retrieving edges connected to a specific record."""
     

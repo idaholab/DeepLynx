@@ -647,6 +647,17 @@ def cleanup_project_tags(client, project):
             client.delete(f"/projects/{project}/tags/{tag_id}")
         except:
             pass
+            
+@pytest.fixture
+def cleanup_project_labels(client, project):
+    """Track and cleanup project-level labels."""
+    created_ids = []
+    yield created_ids
+    for label_id in created_ids:
+        try:
+            client.delete(f"/projects/{project}/labels/{label_id}")
+        except:
+            pass
 
 @pytest.fixture
 def cleanup_org_roles(client, organization):
@@ -691,6 +702,17 @@ def cleanup_timeseries(client, organization, project, test_datasource_project):
         try:
             # delete the leftovers
             pass
+        except:
+            pass
+            
+@pytest.fixture
+def cleanup_project_roles(client, organization):
+    """Track and cleanup project-level roles."""
+    created_roles = [] 
+    yield created_roles
+    for project_id, role_id in created_roles:
+        try:
+            client.delete(f"/organizations/{organization}/projects/{project_id}/roles/{role_id}")
         except:
             pass
 

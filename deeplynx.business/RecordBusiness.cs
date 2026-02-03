@@ -248,6 +248,11 @@ public class RecordBusiness : IRecordBusiness
             {
                 Id = t.Id,
                 Name = t.Name
+            }).ToList(),
+            Labels = record.Labels.Select(t => new RecordLabelDto
+            {
+                Id = t.Id,
+                Name = t.Name
             }).ToList()
         };
     }
