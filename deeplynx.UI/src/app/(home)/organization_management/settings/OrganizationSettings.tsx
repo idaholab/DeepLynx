@@ -10,11 +10,13 @@ import {
   EyeIcon,
   LockClosedIcon,
   InformationCircleIcon,
+  ExclamationTriangleIcon,
 } from "@heroicons/react/24/outline";
 import {
   getOrganizationLogoUrl,
   uploadOrganizationLogo,
   removeOrganizationLogo,
+  updateOrganization,
 } from "@/app/lib/client_service/organization_services.client";
 import { useLanguage } from "@/app/contexts/Language";
 import React from "react";
@@ -35,16 +37,22 @@ interface Service {
 const OrganizationSettings = () => {
   const { organization } = useOrganizationSession();
   const { t } = useLanguage();
+
+  // Logo states
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isCheckingLogo, setIsCheckingLogo] = useState(true);
 
-  // Placeholder states (disabled)
-  const [bannerText, setBannerText] = useState(
-    t.translations.THIS_ORG_SPACE_MAY_CONTAIN_SENSATIVE_DATA,
-  );
+  // Banner states
+  const [bannerText, setBannerText] = useState<string>("");
+  const [originalBannerText, setOriginalBannerText] = useState<string>("");
+  const [isSavingBanner, setIsSavingBanner] = useState(false);
+
+  // Storage states
   const [storageLocation, setStorageLocation] = useState<string>("org-default");
+
+  // Service states
   const [expandedService, setExpandedService] = useState<string | null>(null);
 
   // TODO: This is just place fillers for now
@@ -183,6 +191,66 @@ const OrganizationSettings = () => {
     }
   };
 
+  useEffect(() => {
+    if (organization?.banner !== undefined) {
+      const banner = organization.banner || "";
+      setBannerText(banner);
+      setOriginalBannerText(banner);
+    }
+  }, [organization?.banner]);
+
+  const handleSaveBanner = async () => {
+    if (!organization?.organizationId) {
+      toast.error(t.translations.NO_ORG_SELECTED);
+      return;
+    }
+
+    if (bannerText === originalBannerText) {
+      toast.custom(
+        <div className="text-info">
+          <ExclamationTriangleIcon className="size-4" />
+          {t.translations.NO_CHANGES_TO_SAVE}
+        </div>,
+      );
+    }
+
+    if (bannerText.length > 50) {
+      toast.error(t.translations.BANNER_TEXT_MUST_BE_50_CHARATERS_OR_LESS);
+      return;
+    }
+
+    try {
+      setIsSavingBanner(true);
+
+      await updateOrganization(organization.organizationId as number, {
+        banner: bannerText.trim() || null,
+      });
+
+      setOriginalBannerText(bannerText);
+
+      toast.success(t.translations.BANNER_UPDATED_SUCCESSFULLY);
+    } catch (error) {
+      console.error("Failed to update banner: ", error);
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : t.translations.FAILED_TO_UPDATE_BANNER,
+      );
+    } finally {
+      setIsSavingBanner(false);
+    }
+  };
+
+  const handleCancelBanner = () => {
+    setBannerText(originalBannerText);
+    toast.custom(
+      <div className="text-info">
+        <ExclamationTriangleIcon className="size-4" />
+        {t.translations.CHANGES_DISCARDED}
+      </div>,
+    );
+  };
+
   const toggleService = (serviceId: string) => {
     setExpandedService(expandedService === serviceId ? null : serviceId);
   };
@@ -302,16 +370,13 @@ const OrganizationSettings = () => {
                   </div>
                 </div>
 
-                {/* Banner Text Section - DISABLED/COMING SOON */}
+                {/* Banner Text Section */}
                 <div className="divider"></div>
-                <div className="relative opacity-50 pointer-events-none">
+                <div className="relative">
                   <div className="form-control">
-                    <label className="label">
+                    <label className="label mr-6">
                       <span className="label-text font-semibold flex items-center gap-2">
                         {t.translations.ORGANIZATION_WARNING_BANNER}
-                        <span className="badge badge-sm badge-warning">
-                          {t.translations.COMING_SOON}
-                        </span>
                       </span>
                     </label>
                     <textarea
@@ -319,7 +384,8 @@ const OrganizationSettings = () => {
                       placeholder={t.translations.BANNER_EXAMPLE_CUI}
                       value={bannerText}
                       onChange={(e) => setBannerText(e.target.value)}
-                      disabled
+                      disabled={isSavingBanner}
+                      maxLength={50}
                     />
                     <label className="label">
                       <span className="label-text-alt text-base-content/60">
@@ -328,15 +394,42 @@ const OrganizationSettings = () => {
                             .DISPLAY_BENEATH_THE_TOP_HEADER_FOR_ALL_PAGES_IN_ORG
                         }
                       </span>
-                      <span className="label-text-alt text-base-content/40">
-                        {bannerText.length} / 240
+                      <span
+                        className={`label-text-alt mt-6 ${bannerText.length > 50 ? "text-error" : "text-base-content/40"}`}
+                      >
+                        {bannerText.length} / 50
                       </span>
                     </label>
                   </div>
 
-                  {/* Lock icon overlay */}
-                  <div className="absolute top-0 right-0 mt-2 mr-2">
-                    <LockClosedIcon className="w-5 h-5 text-warning" />
+                  {/* Action Buttons */}
+                  <div className="flex gap-2 mt-4">
+                    <button
+                      type="button"
+                      className="btn btn-primary btn-sm"
+                      onClick={handleSaveBanner}
+                      disabled={
+                        isSavingBanner ||
+                        bannerText === originalBannerText ||
+                        bannerText.length > 50
+                      }
+                    >
+                      {isSavingBanner && (
+                        <span className="loading loading-spinner loading-xs" />
+                      )}
+                      {t.translations.SAVE || "Save"}
+                    </button>
+
+                    {bannerText !== originalBannerText && (
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-sm"
+                        onClick={handleCancelBanner}
+                        disabled={isSavingBanner}
+                      >
+                        {t.translations.CANCEL || "Cancel"}
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>

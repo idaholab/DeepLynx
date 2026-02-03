@@ -9,11 +9,13 @@ import React, {
   useCallback,
 } from "react";
 import type { ReactNode, Context } from "react";
+import { getOrganization } from "@/app/lib/client_service/organization_services.client";
 
 export interface OrganizationSession {
   organizationId: string | number;
   organizationName: string;
   logoUrl?: string;
+  banner?: string | null;
 }
 
 interface OrganizationSessionContextType {
@@ -31,7 +33,7 @@ export const useOrganizationSession = (): OrganizationSessionContextType => {
   const context = useContext(OrganizationSessionContext);
   if (!context) {
     throw new Error(
-      "useOrganizationSession must be used within an OrganizationSessionProvider"
+      "useOrganizationSession must be used within an OrganizationSessionProvider",
     );
   }
   return context;
@@ -68,6 +70,42 @@ export const OrganizationSessionProvider = ({
     setHasLoaded(true);
   }, []);
 
+  // Fetch full organization data when organizationId changes
+  useEffect(() => {
+    const fetchFullOrganization = async () => {
+      if (!organization?.organizationId) return;
+
+      try {
+        // Fetch the complete organization data from the backend
+        const fullOrg = await getOrganization(
+          Number(organization.organizationId),
+        );
+
+        setOrganizationState((prev) => {
+          if (!prev) return prev;
+
+          const updated = {
+            ...prev,
+            banner: fullOrg.banner ?? null,
+          };
+          const serialized = JSON.stringify(updated);
+          localStorage.setItem("organizationSession", serialized);
+
+          const maxAge = 30 * 24 * 60 * 60;
+          document.cookie = `organizationSession=${encodeURIComponent(
+            serialized,
+          )}; path=/; max-age=${maxAge}; SameSite=Lax`;
+
+          return updated;
+        });
+      } catch (error) {
+        console.error("Failed to fetch full organization data:", error);
+      }
+    };
+
+    fetchFullOrganization();
+  }, [organization?.organizationId]);
+
   // Save to BOTH localStorage and cookies
   const setOrganization = useCallback((org: OrganizationSession) => {
     setOrganizationState(org);
@@ -79,7 +117,7 @@ export const OrganizationSessionProvider = ({
     // Save to cookie (expires in 30 days, accessible by server)
     const maxAge = 30 * 24 * 60 * 60; // 30 days in seconds
     document.cookie = `organizationSession=${encodeURIComponent(
-      serialized
+      serialized,
     )}; path=/; max-age=${maxAge}; SameSite=Lax`;
   }, []);
 
