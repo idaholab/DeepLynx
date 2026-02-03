@@ -205,10 +205,11 @@ function SigninContent() {
         </main>
         <Link
           className="text-white hover:bg-[#383838] dark:hover:bg-[#ccc]"
-          href="/"
+          href="https://inl.gov/privacy-and-accessibility/"
+          target="_blank"
+          rel="noopener noreferrer"
         >
-          {" "}
-          <u>{t.translations.TROUBLE_LOGGING_IN}</u>
+          <u>{t.translations.PRIVACY}</u>
         </Link>
         <footer className="flex flex-wrap items-center justify-center gap-8 mt-16 mb-8">
           {/* {links
