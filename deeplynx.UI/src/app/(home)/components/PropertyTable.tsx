@@ -29,6 +29,7 @@ interface PropertyTableProps {
   className?: string;
   download?: boolean;
   recordName?: string | null;
+  onEditProperties?: () => void; // NEW: Handler to open properties editor
 }
 
 const PropertyTable: React.FC<PropertyTableProps> = ({
@@ -37,6 +38,7 @@ const PropertyTable: React.FC<PropertyTableProps> = ({
   className,
   download = false,
   recordName,
+  onEditProperties, // NEW
 }) => {
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [editValue, setEditValue] = useState<string>("");
@@ -216,32 +218,45 @@ const PropertyTable: React.FC<PropertyTableProps> = ({
           <div className="flex justify-between items-center m-4">
             <h2 className="text-xl font-bold text-base-content">{title}</h2>
 
-            {download && (
-              <button
-                onClick={() =>
-                  canDownload &&
-                  downloadFile(
-                    organization?.organizationId as number,
-                    projectId,
-                    recordId,
-                    recordName,
-                  )
-                }
-                disabled={!canDownload}
-                title={
-                  canDownload
-                    ? "Download file"
-                    : "Missing projectId or recordId in URL"
-                }
-                className={`p-1 transition-colors cursor-pointer ${
-                  canDownload
-                    ? "hover:text-primary"
-                    : "opacity-50 cursor-not-allowed"
-                }`}
-              >
-                <ArrowDownTrayIcon className="w-8 h-8" />
-              </button>
-            )}
+            <div className="flex gap-2">
+              {/* NEW: Edit Properties Button */}
+              {onEditProperties && (
+                <button
+                  onClick={onEditProperties}
+                  title="Edit properties"
+                  className="p-1 transition-colors cursor-pointer hover:text-primary"
+                >
+                  <PencilIcon className="w-8 h-8" />
+                </button>
+              )}
+
+              {download && (
+                <button
+                  onClick={() =>
+                    canDownload &&
+                    downloadFile(
+                      organization?.organizationId as number,
+                      projectId,
+                      recordId,
+                      recordName,
+                    )
+                  }
+                  disabled={!canDownload}
+                  title={
+                    canDownload
+                      ? "Download file"
+                      : "Missing projectId or recordId in URL"
+                  }
+                  className={`p-1 transition-colors cursor-pointer ${
+                    canDownload
+                      ? "hover:text-primary"
+                      : "opacity-50 cursor-not-allowed"
+                  }`}
+                >
+                  <ArrowDownTrayIcon className="w-8 h-8" />
+                </button>
+              )}
+            </div>
           </div>
         )}
 

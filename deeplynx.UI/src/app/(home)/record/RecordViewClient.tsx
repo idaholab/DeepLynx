@@ -42,6 +42,7 @@ import {
 } from "../types/responseDTOs";
 import RecordTagsPanel from "./components/RecordTagsPanel";
 import RelatedRecordsCardSkeleton from "./skeletons/RelatedRecordsSkeleton";
+import AdditionalPropertiesEditor from "./components/AdditionalPropertiesEditor";
 
 // ============= HELPER FUNCTIONS =============
 interface PropertyRow {
@@ -165,6 +166,9 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
   // UI State
   const [activeTab, setActiveTab] = useState(0);
 
+  const [isPropertiesEditorOpen, setIsPropertiesEditorOpen] = useState(false);
+  const [isSavingProperties, setIsSavingProperties] = useState(false);
+
   // ============= HANDLERS =============
   const handleUpdateRecord = useCallback(
     async (field: string, value: string, successMessage: string) => {
@@ -219,6 +223,45 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
     setHasMoreOrigins(true);
     setHasMoreDestinations(true);
   }, []);
+
+  const handleSaveProperties = useCallback(
+    async (newProperties: any) => {
+      if (!organization?.organizationId) return;
+
+      try {
+        setIsSavingProperties(true);
+
+        // Try sending as object first (most common)
+        const update = await updateRecord(
+          organization.organizationId as number,
+          projectId,
+          recordId,
+          { properties: newProperties }, // Send as object, not stringified
+        );
+
+        // Update local state
+        setRecord((prev) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            properties:
+              typeof update.properties === "string"
+                ? update.properties
+                : JSON.stringify(update.properties),
+          };
+        });
+
+        toast.success("Properties updated successfully!");
+        setIsPropertiesEditorOpen(false);
+      } catch (error) {
+        console.error("Error updating properties:", error);
+        toast.error("Failed to update properties");
+      } finally {
+        setIsSavingProperties(false);
+      }
+    },
+    [organization?.organizationId, projectId, recordId],
+  );
 
   // Create a reusable fetch function
   const fetchRelatedRecords = useCallback(
@@ -520,7 +563,11 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
           ),
       },
       { label: t.translations.URI, value: record.uri },
-      { label: t.translations.ORIGINAL_ID, value: record.originalId },
+      {
+        label: t.translations.ORIGINAL_ID,
+        value: record.originalId,
+        editable: true,
+      },
       { label: t.translations.LAST_UPDATED_AT, value: record.lastUpdatedAt },
       { label: "Data Source", value: record.dataSourceName },
     ];
@@ -612,6 +659,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
             <PropertyTable
               title={t.translations.ADDITIONAL_PROPERIES}
               rows={additionalPropertiesRows}
+              onEditProperties={() => setIsPropertiesEditorOpen(true)}
             />
           </div>
 
@@ -708,6 +756,20 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
         onConfirm={handleConfirmUnlink}
         tagName={modal.nameToRemove}
         recordName={modal.recordNameToRemove}
+      />
+
+      <AdditionalPropertiesEditor
+        isOpen={isPropertiesEditorOpen}
+        onClose={() => setIsPropertiesEditorOpen(false)}
+        properties={
+          record?.properties
+            ? typeof record.properties === "string"
+              ? JSON.parse(record.properties)
+              : record.properties
+            : {}
+        }
+        onSave={handleSaveProperties}
+        isSaving={isSavingProperties}
       />
     </div>
   );
