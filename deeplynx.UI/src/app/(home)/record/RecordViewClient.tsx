@@ -252,16 +252,22 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
           };
         });
 
-        toast.success("Properties updated successfully!");
+        toast.success(t.translations.PROPERTIES_UPDATED_SUCCESSFULLY);
         setIsPropertiesEditorOpen(false);
       } catch (error) {
         console.error("Error updating properties:", error);
-        toast.error("Failed to update properties");
+        toast.error(t.translations.FAILED_TO_UPDATE_PROPERTIES);
       } finally {
         setIsSavingProperties(false);
       }
     },
-    [organization?.organizationId, projectId, recordId],
+    [
+      organization?.organizationId,
+      projectId,
+      recordId,
+      t.translations.PROPERTIES_UPDATED_SUCCESSFULLY,
+      t.translations.FAILED_TO_UPDATE_PROPERTIES,
+    ],
   );
 
   const fetchRelatedRecords = useCallback(
@@ -448,31 +454,31 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
         };
       });
 
-      toast.success("Class update sucessfully!");
+      toast.success(t.translations.CLASS_UPDATED_SUCCESSFULLY);
     } catch (error) {
       console.error("Error updating class: ", error);
-      toast.error("Failed to update class");
+      toast.error(t.translations.FAILED_TO_UPDATE_CLASS);
     }
   };
 
-  const handleCreateClass = async (name: string, description: string) => {
+  const handleCreateClass = async (name: string, description?: string) => {
     if (!organization?.organizationId) return;
 
     try {
       const newClass = await createClass(projectId, {
         name,
-        description: description,
+        description: description ?? "",
       });
 
       setAvailableClasses((prev) => [...prev, newClass]);
 
       await handleClassUpdate(newClass.id);
 
-      toast.success("Class created and applied!");
+      toast.success(t.translations.CLASS_CREATED_AND_APPLIED);
       setIsClassModalOpen(false);
     } catch (error) {
       console.error("Error creating class: ", error);
-      toast.error("Failed to create class");
+      toast.error(t.translations.FAILED_TO_CREATE_CLASS);
       throw error;
     }
   };
@@ -597,20 +603,20 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
         setAvailableClasses(data);
       } catch (error) {
         console.error("Error fetching classes: ", error);
-        toast.error("Failed to fetch classes");
+        toast.error(t.translations.FAILED_TO_FETCH_CLASSES);
       } finally {
         setIsLoadingClasses(false);
       }
     };
 
     fetchClass();
-  }, [projectId, organization?.organizationId]);
+  }, [projectId, organization?.organizationId, t.translations.FAILED_TO_FETCH_CLASSES]);
 
   // ============= MEMOIZED VALUES =============
   const systemPropertiesRows = useMemo(() => {
     if (!record) return [];
     return [
-      { label: "Record ID", value: record.id },
+      { label: t.translations.RECORD_ID, value: record.id },
       {
         label: t.translations.RECORD_NAME,
         value: record.name,
@@ -636,7 +642,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
         editable: true,
       },
       { label: t.translations.LAST_UPDATED_AT, value: record.lastUpdatedAt },
-      { label: "Data Source", value: record.dataSourceName },
+      { label: t.translations.DATA_SOURCE, value: record.dataSourceName },
     ];
   }, [record, handleUpdateRecord, t.translations]);
 
@@ -690,7 +696,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
       setSelectedTags((prev) => prev.filter((t) => t.id !== tagId));
       setSelectedIds((prev) => prev.filter((id) => id !== String(tagId)));
 
-      toast.success("Tag(s) removed!");
+      toast.success(t.translations.TAGS_REMOVED);
     } catch (error) {
       console.error("Error removing tag:", error);
       toast.error(t.translations.FAILED_TO_UPDATE_TAGS);
@@ -791,7 +797,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
       ),
     },
     {
-      label: "Graph",
+      label: t.translations.GRAPH,
       content: <GraphClientPage projectId={projectId} recordId={recordId} />,
     },
   ];
@@ -809,7 +815,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
             <button
               onClick={() => setIsClassModalOpen(true)}
               className="btn btn-ghost btn-xs btn-circle"
-              title="Edit class"
+              title={t.translations.EDIT_CLASS}
             >
               <PencilIcon className="size-4" />
             </button>
@@ -820,7 +826,6 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
             className="btn btn-sm btn-outline mt-2"
           >
             <PlusIcon className="w-4 h-4 mr-1" />
-            Add Class
           </button>
         )}
       </div>
@@ -859,8 +864,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
       <ClassSelectorModal
         isOpen={isClassModalOpen}
         onClose={() => setIsClassModalOpen(false)}
-        currentClassId={record.classId}
-        projectId={projectId}
+        currentClassId={record?.classId ?? null}
         onClassUpdate={handleClassUpdate}
         availableClasses={availableClasses}
         onCreateClass={handleCreateClass}

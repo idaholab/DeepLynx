@@ -1,18 +1,14 @@
-import React, { useState, useEffect } from "react";
-import { XMarkIcon, PlusIcon } from "@heroicons/react/24/outline";
+// src/app/(home)/record/components/ClassSelectorModal.tsx
 
-interface ClassResponseDto {
-  id: number;
-  name: string;
-  description?: string;
-  projectId: number;
-}
+import { useLanguage } from "@/app/contexts/Language";
+import { ClassResponseDto } from "@/app/(home)/types/responseDTOs";
+import { PlusIcon, XMarkIcon } from "@heroicons/react/24/outline";
+import { useEffect, useState } from "react";
 
 interface ClassSelectorModalProps {
   isOpen: boolean;
   onClose: () => void;
-  currentClassId: number | null;
-  projectId: number;
+  currentClassId?: number | null;
   onClassUpdate: (classId: number) => void;
   availableClasses: ClassResponseDto[];
   onCreateClass: (name: string, description?: string) => Promise<void>;
@@ -23,15 +19,15 @@ export default function ClassSelectorModal({
   isOpen,
   onClose,
   currentClassId,
-  projectId,
   onClassUpdate,
   availableClasses,
   onCreateClass,
   isLoading = false,
 }: ClassSelectorModalProps) {
-  const [selectedClassId, setSelectedClassId] = useState<number | null>(
-    currentClassId,
-  );
+  const { t } = useLanguage();
+  const [selectedClassId, setSelectedClassId] = useState<
+    number | null | undefined
+  >(currentClassId);
   const [isCreatingNew, setIsCreatingNew] = useState(false);
   const [newClassName, setNewClassName] = useState("");
   const [newClassDescription, setNewClassDescription] = useState("");
@@ -51,11 +47,6 @@ export default function ClassSelectorModal({
 
   const handleSave = async () => {
     if (isCreatingNew) {
-      if (!newClassName.trim()) {
-        alert("Please enter a class name");
-        return;
-      }
-
       setIsSaving(true);
       try {
         await onCreateClass(newClassName, newClassDescription);
@@ -87,7 +78,9 @@ export default function ClassSelectorModal({
         {/* Header */}
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold">
-            {isCreatingNew ? "Create New Class" : "Select Class"}
+            {isCreatingNew
+              ? t.translations.CREATE_NEW_CLASS
+              : t.translations.SELECT_CLASS}
           </h3>
           <button onClick={onClose} className="btn btn-ghost btn-sm btn-circle">
             <XMarkIcon className="w-5 h-5" />
@@ -101,7 +94,9 @@ export default function ClassSelectorModal({
               {/* Class Selector */}
               <div className="form-control">
                 <label className="label">
-                  <span className="label-text">Choose a class</span>
+                  <span className="label-text">
+                    {t.translations.CHOOSE_A_CLASS}
+                  </span>
                 </label>
                 <select
                   className="select select-bordered w-full"
@@ -109,7 +104,7 @@ export default function ClassSelectorModal({
                   onChange={(e) => setSelectedClassId(Number(e.target.value))}
                   disabled={isLoading}
                 >
-                  <option value="">No class</option>
+                  <option value="">{t.translations.NO_CLASS}</option>
                   {availableClasses.map((cls) => (
                     <option key={cls.id} value={cls.id}>
                       {cls.name}
@@ -125,7 +120,7 @@ export default function ClassSelectorModal({
                 disabled={isLoading}
               >
                 <PlusIcon className="w-4 h-4 mr-2" />
-                Create New Class
+                {t.translations.CREATE_NEW_CLASS}
               </button>
             </>
           ) : (
@@ -133,27 +128,31 @@ export default function ClassSelectorModal({
               {/* New Class Form */}
               <div className="form-control">
                 <label className="label">
-                  <span className="label-text">Class Name *</span>
+                  <span className="label-text">
+                    {t.translations.CLASS_NAME_REQUIRED}
+                  </span>
                 </label>
                 <input
                   type="text"
                   className="input input-bordered w-full"
                   value={newClassName}
                   onChange={(e) => setNewClassName(e.target.value)}
-                  placeholder="Enter class name"
+                  placeholder={t.translations.ENTER_CLASS_NAME}
                   disabled={isSaving}
                 />
               </div>
 
               <div className="form-control">
                 <label className="label">
-                  <span className="label-text">Description</span>
+                  <span className="label-text">
+                    {t.translations.DESCRIPTION}
+                  </span>
                 </label>
                 <textarea
                   className="textarea textarea-bordered w-full"
                   value={newClassDescription}
                   onChange={(e) => setNewClassDescription(e.target.value)}
-                  placeholder="Enter class description (optional)"
+                  placeholder={t.translations.ENTER_CLASS_DESCRIPTION_OPTIONAL}
                   rows={3}
                   disabled={isSaving}
                 />
@@ -164,7 +163,7 @@ export default function ClassSelectorModal({
                 className="btn btn-ghost btn-sm w-full"
                 disabled={isSaving}
               >
-                ← Back to class selection
+                {t.translations.BACK_TO_CLASS_SELECTION}
               </button>
             </>
           )}
@@ -177,7 +176,7 @@ export default function ClassSelectorModal({
             className="btn btn-ghost flex-1"
             disabled={isSaving}
           >
-            Cancel
+            {t.translations.CANCEL}
           </button>
           <button
             onClick={handleSave}
@@ -187,12 +186,12 @@ export default function ClassSelectorModal({
             {isSaving ? (
               <>
                 <span className="loading loading-spinner loading-sm" />
-                Saving...
+                {t.translations.SAVING}
               </>
             ) : isCreatingNew ? (
-              "Create & Apply"
+              t.translations.CREATE_AND_APPLY
             ) : (
-              "Update"
+              t.translations.UPDATE
             )}
           </button>
         </div>
