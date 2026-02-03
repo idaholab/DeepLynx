@@ -22,29 +22,6 @@ export default async function Page() {
     },
   ];
 
-  const initialRecentUploads: RecentUpload[] = [
-    {
-      id: "1",
-      name: "Peter Suyderhoud",
-      avatar: "/images/peter.png",
-      file: "weather_data_updated.csv",
-      icon: "arrows",
-    },
-    {
-      id: "2",
-      name: "Victor Walker",
-      avatar: "/images/victor.png",
-      file: "weather_data.csv",
-      icon: "link",
-    },
-    {
-      id: "3",
-      name: "John Deer",
-      avatar: "/images/johnD.png",
-      file: "weather_data.csv",
-      icon: "link",
-    },
-  ];
 
   return <UploadCenterClient initialAvailableFiles={initialAvailableFiles} />;
 }
