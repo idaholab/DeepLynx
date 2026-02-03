@@ -4,7 +4,7 @@
 
 import { PlusCircleIcon } from "@heroicons/react/24/solid";
 import React, { useEffect, useRef, useState } from "react";
-import { AddEdgeModal } from "./AddEdgeModal";
+import App from "./AddEdgeModal";
 
 export interface CardColumn<T extends object> {
   key: keyof T;
@@ -125,12 +125,7 @@ function RelatedRecordsCard<T extends object>({
           )}
         </div>
       </div>
-      <AddEdgeModal
-        isOpen={isAddModalOpen}
-        onClose={() => setIsAddModalOpen(false)}
-        relationship={relationship}
-        direction={relationshipDirection}
-      />
+      <App />
     </div>
   );
 }
