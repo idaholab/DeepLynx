@@ -13,6 +13,7 @@ import type { ReactNode, Context } from "react";
 export interface ProjectSession {
   projectId: string | number;
   projectName: string;
+  banner?: string | null;
 }
 
 interface ProjectSessionContextType {
@@ -29,7 +30,7 @@ export const useProjectSession = (): ProjectSessionContextType => {
   const context = useContext(ProjectSessionContext);
   if (!context) {
     throw new Error(
-      "useProjectSession must be used within a ProjectSessionProvider"
+      "useProjectSession must be used within a ProjectSessionProvider",
     );
   }
   return context;
@@ -56,7 +57,6 @@ export const ProjectSessionProvider = ({
     if (stored) {
       try {
         const parsed: ProjectSession | null = JSON.parse(stored);
-        console.log("ProjectSessionProvider hydrate - parsed:", parsed);
         if (parsed && parsed.projectId) {
           setProjectState(parsed);
         }
@@ -69,7 +69,6 @@ export const ProjectSessionProvider = ({
   }, []);
 
   const setProject = useCallback((proj: ProjectSession) => {
-    console.log("ProjectSessionProvider setProject called with:", proj);
     setProjectState(proj);
     const serialized = JSON.stringify(proj);
 
@@ -77,7 +76,7 @@ export const ProjectSessionProvider = ({
 
     const maxAge = 30 * 24 * 60 * 60;
     document.cookie = `projectSession=${encodeURIComponent(
-      serialized
+      serialized,
     )}; path=/; max-age=${maxAge}; SameSite=Lax`;
   }, []);
 

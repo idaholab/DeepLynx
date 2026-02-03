@@ -1,7 +1,7 @@
 // src/app/api/project/[projectId]/logo/route.ts
 
 import { NextRequest, NextResponse } from "next/server";
-import { writeFile, unlink, access } from "fs/promises";
+import { writeFile, unlink, access, mkdir } from "fs/promises";
 import path from "path";
 import { constants } from "fs";
 
@@ -27,6 +27,18 @@ const getExtensionFromMimeType = (mimeType: string): string => {
     "image/webp": "webp",
   };
   return mimeToExt[mimeType] || "png";
+};
+
+const getLogoDir = (): string => {
+  if (process.env.LOGO_STORAGE_DIRECTORY) {
+    return process.env.LOGO_STORAGE_DIRECTORY;
+  }
+
+  if (process.env.STORAGE_DIRECTORY) {
+    return path.join(process.env.STORAGE_DIRECTORY, "images");
+  }
+
+  return path.join(process.cwd(), "public", "images");
 };
 
 /**
@@ -90,14 +102,18 @@ export async function POST(
 
     // Define file path in public/images directory
     const fileName = `project-${projectId}-logo.${extension}`;
-    const publicDir = path.join(process.cwd(), "public", "images");
-    const filePath = path.join(publicDir, fileName);
+    const logoDir = getLogoDir();
+    await mkdir(logoDir, { recursive: true });
+    const filePath = path.join(logoDir, fileName);
 
     // Remove old logo files with different extensions (if any)
     const possibleExtensions = ["png", "jpg", "jpeg", "svg", "webp"];
     for (const ext of possibleExtensions) {
       if (ext !== extension) {
-        const oldFilePath = path.join(publicDir, `project-${projectId}-logo.${ext}`);
+        const oldFilePath = path.join(
+          logoDir,
+          `project-${projectId}-logo.${ext}`
+        );
         try {
           await unlink(oldFilePath);
         } catch (error) {
@@ -109,7 +125,7 @@ export async function POST(
     // Write the new file
     await writeFile(filePath, buffer);
 
-    const logoUrl = `/images/${fileName}`;
+    const logoUrl = `/api/project/${projectId}/logo/file`;
 
     return NextResponse.json(
       {
@@ -150,14 +166,17 @@ export async function DELETE(
       );
     }
 
-    const publicDir = path.join(process.cwd(), "public", "images");
+    const logoDir = getLogoDir();
 
     // Try to delete all possible logo file extensions
     const possibleExtensions = ["png", "jpg", "jpeg", "svg", "webp"];
     let fileDeleted = false;
 
     for (const ext of possibleExtensions) {
-      const filePath = path.join(publicDir, `project-${projectId}-logo.${ext}`);
+      const filePath = path.join(
+        logoDir,
+        `project-${projectId}-logo.${ext}`
+      );
       try {
         await unlink(filePath);
         fileDeleted = true;
@@ -212,18 +231,21 @@ export async function GET(
       );
     }
 
-    const publicDir = path.join(process.cwd(), "public", "images");
+    const logoDir = getLogoDir();
     const possibleExtensions = ["png", "jpg", "jpeg", "svg", "webp"];
 
     // Check if any logo file exists
     for (const ext of possibleExtensions) {
-      const filePath = path.join(publicDir, `project-${projectId}-logo.${ext}`);
+      const filePath = path.join(
+        logoDir,
+        `project-${projectId}-logo.${ext}`
+      );
       try {
         await access(filePath, constants.F_OK);
         return NextResponse.json(
           {
             exists: true,
-            logoUrl: `/images/project-${projectId}-logo.${ext}`,
+            logoUrl: `/api/project/${projectId}/logo/file`,
           },
           { status: 200 }
         );

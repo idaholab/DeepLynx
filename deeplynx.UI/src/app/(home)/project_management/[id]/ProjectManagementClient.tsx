@@ -86,7 +86,7 @@ const ProjectManagementClient = ({
     <>
       <div className="bg-base-200/40 pl-12 p-6">
         <h1 className="text-2xl font-bold text-base-content">
-          {t.translations.PROJECT_MANAGEMENT || "Project Management"}
+          {t.translations.PROJECT_MANAGEMENT}
         </h1>
         {(project || sessionProject) && (
           <p className="text-sm text-base-content/70 mt-1">
