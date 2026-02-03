@@ -262,7 +262,6 @@ const LayoutShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                     <Link
                       href="/select-org"
                       className="hover:bg-base-200"
-                      onClick={() => setIsOrgDropdownOpen(false)}
                     >
                       <UserGroupIcon className="size-5" />
                       {t.translations.VIEW_ALL_ORGANIZATIONS}
@@ -380,7 +379,6 @@ const LayoutShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                           <Link
                             href="/settings"
                             className="text-base-content hover:bg-base-200"
-                            onClick={() => setIsUserDropdownOpen(false)}
                           >
                             <Cog6ToothIcon className="size-6" />
                             {t.translations.SETTINGS}

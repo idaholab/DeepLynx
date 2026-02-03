@@ -97,19 +97,14 @@ export async function proxy(request: NextRequest) {
   // STEP 2: User is authenticated, NOW check org selection
   const orgSessionCookie = request.cookies.get("organizationSession");
   const hasOrgSession = !!orgSessionCookie?.value;
-  
+
+  // Allow access to select-org page regardless of org session
+  // Users should be able to view and switch organizations at any time
   if (pathname.startsWith("/select-org")) {
-    if (hasOrgSession) {
-      return NextResponse.redirect(new URL("/", request.url));
-    }
-    return NextResponse.next();
-  }
-  
-  if (!hasOrgSession) {
-    return NextResponse.redirect(new URL("/select-org", request.url));
     return NextResponse.next();
   }
 
+  // For all other routes, require org selection
   if (!hasOrgSession) {
     return NextResponse.redirect(new URL("/select-org", request.url));
   }
