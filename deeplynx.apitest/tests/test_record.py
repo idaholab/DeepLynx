@@ -18,8 +18,7 @@ def test_create_record(client, organization, project, origin_class, test_datasou
         "properties": {"key1": "value1", "key2": "value2"},
         "class_id": origin_class,
         "file_type": "pdf",
-        "tags": ["test-tag"],
-        "sensitivity_labels": ["public"]
+        "tags": ["test-tag"]
     }
     
     response = client.post(

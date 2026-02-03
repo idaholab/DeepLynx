@@ -563,8 +563,12 @@ def test_parse_metadata_with_edges_same_origin_destination_fails(client, organiz
         f"Expected 400, 422, or 500 for same origin/destination, got {response.status_code}: {response.text}"
     
     response_text = response.text.lower()
-    assert "destination and origin" in response_text or "cannot be the same" in response_text or "validation" in response_text, \
-        "Error message should mention validation issue with origin/destination"
+    assert (
+        "ck_edges_origin_destination_different" in response_text.lower() or 
+        "destination and origin" in response_text or 
+        "cannot be the same" in response_text or 
+        "check constraint" in response_text.lower()
+    ), f"Error message should mention validation issue with origin/destination. Got: {response_text}"
     
     if response.status_code == 500:
         print("WARNING: API returns 500 for validation error (should be 400/422)")
