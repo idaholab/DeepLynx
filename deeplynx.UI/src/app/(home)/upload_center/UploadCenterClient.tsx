@@ -8,6 +8,7 @@ import {
   cancelChunkedUpload,
   cancelCurrentUpload
 } from "@/app/lib/client_service/file_upload_services.client";
+import { uploadTimeseriesFile } from "@/app/lib/client_service/timeseries_services.client";
 import { uploadBulkMetadata } from "@/app/lib/client_service/metadata_service.client";
 import { useEffect, useMemo } from "react";
 import toast from "react-hot-toast";
@@ -128,20 +129,32 @@ export default function UploadCenterClient({ initialAvailableFiles }: Props) {
         const file = fileUploadState.selectedFiles[0];
         const metadata = fileUploadState.filesMetadata[0] ?? {};
 
-        await uploadFile({
-          organizationId: organization?.organizationId as number,
-          projectId: projectResources.projectId,
-          dataSourceId: projectResources.dataSourceId,
-          objectStorageId: projectResources.objectStorageId,
-          file,
-          name: metadata.name || file.name,
-          description: metadata.description || "",
-          onProgress: (progress) => {
-            fileUploadState.setUploadProgress(progress);
-          },
-        });
-
-        toast.success("File uploaded successfully!");
+        // Check if this is a timeseries file
+        if (metadata.isTimeSeries) {
+          // Use timeseries upload endpoint
+          await uploadTimeseriesFile(
+            organization?.organizationId as number,
+            Number(projectResources.projectId),
+            Number(projectResources.dataSourceId),
+            file
+          );
+          toast.success("Timeseries file uploaded successfully!");
+        } else {
+          // Use regular file upload
+          await uploadFile({
+            organizationId: organization?.organizationId as number,
+            projectId: projectResources.projectId,
+            dataSourceId: projectResources.dataSourceId,
+            objectStorageId: projectResources.objectStorageId,
+            file,
+            name: metadata.name || file.name,
+            description: metadata.description || "",
+            onProgress: (progress) => {
+              fileUploadState.setUploadProgress(progress);
+            },
+          });
+          toast.success("File uploaded successfully!");
+        }
       } else {
         const results = await uploadFilesBatch({
           organizationId: organization?.organizationId as number,
