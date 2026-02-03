@@ -542,8 +542,7 @@ export const translations = {
             CONFIGURE_AXES: "Configure Axes",
             SELECT_X_AXIS_COLUMN: "Select an X axis column",
             SELECT_Y_AXIS_COLUMN: "Select at least one Y axis column",
-            PRIVACY: "Privacy and Accessibility"
-
+            PRIVACY: "Privacy and Accessibility",
             NO_CHANGES_TO_SAVE: "No Changes to save",
             BANNER_TEXT_MUST_BE_50_CHARATERS_OR_LESS: "Banner text must be 50 characters or less",
             BANNER_UPDATED_SUCCESSFULLY: "Banner updated successfully",
