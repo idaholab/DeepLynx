@@ -233,9 +233,9 @@ public class QueryBusiness : IQueryBusiness
             sql += " ORDER BY hr.record_id, hr.last_updated_at DESC";
 
             // Execute the query with parameters
-            var historicalRecords = _context.HistoricalRecords.FromSqlRaw(sql, parameters.ToArray());
+            var historicalRecordResults = _context.HistoricalRecords.FromSqlRaw(sql, parameters.ToArray());
 
-            return await historicalRecords
+            return await historicalRecordResults
                 .Select(r => new HistoricalRecordResponseDto
                 {
                     Id = r.RecordId,
@@ -373,9 +373,9 @@ public class QueryBusiness : IQueryBusiness
             Value = authorizedLabelIds.ToArray()
         };
 
-        var results = _context.HistoricalRecords.FromSqlRaw(sql, param1, param2, param3, param4, param5);
+        var historicalRecordsResults = _context.HistoricalRecords.FromSqlRaw(sql, param1, param2, param3, param4, param5);
 
-        return await results
+        return await historicalRecordsResults
             .Select(r => new HistoricalRecordResponseDto
             {
                 Id = r.RecordId,
