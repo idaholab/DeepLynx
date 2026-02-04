@@ -194,6 +194,22 @@ public class InvitationBusinessTests : IntegrationTestBase
         Assert.True(await Context.OrganizationUsers.AnyAsync(
             ou => ou.UserId == uid2 && ou.OrganizationId == oid2));
     }
+    
+    [Fact]
+    public async Task InviteAndAddUserToHierarchy_Success_WhenEmailIsDifferentCase()
+    {
+        // Arrange
+        var userEmail = "ExistIng.User2@test.com";
+
+        // Act
+        var result = await _invitationBusiness.InviteAndAddUserToHierarchy(
+            oid2, null, null, userEmail, null);
+
+        // Assert
+        Assert.True(result);
+        Assert.True(await Context.OrganizationUsers.AnyAsync(
+            ou => ou.UserId == uid2 && ou.OrganizationId == oid2));
+    }
 
     [Fact]
     public async Task InviteAndAddUserToHierarchy_Success_WhenUserExistsAndAlreadyInOrg()
