@@ -195,7 +195,6 @@ export default function AddEdgeModal({
 
     try {
       const results = await onSearchRecords(query, option);
-      // Filter out the current record to prevent self-linking
       const filteredResults = results.filter((r) => r.id !== currentRecord.id);
       setSearchResults(filteredResults);
     } catch (error) {

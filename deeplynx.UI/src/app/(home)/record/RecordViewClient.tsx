@@ -428,26 +428,6 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
     handleCloseModal();
   };
 
-  const handleOpenModal = useCallback(
-    (
-      id: string,
-      name: string,
-      recordName: string | undefined,
-      type: "relatedRecord",
-    ) => {
-      setModal({
-        isOpen: true,
-        type,
-        nameToRemove: name,
-        recordNameToRemove: recordName,
-        idToRemove: id,
-        originId: null,
-        destinationId: null,
-      });
-    },
-    [],
-  );
-
   const handleClassUpdate = async (class_id: number) => {
     if (!organization?.organizationId) return;
 
@@ -496,7 +476,6 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
     }
   };
 
-  // Handler to search records for AddEdgeModal
   const handleSearchRecords = async (
     query: string,
     option?: string,
@@ -528,7 +507,6 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
     }
   };
 
-  // Handler to create relationships from AddEdgeModal
   const handleCreateRelationships = async (data: {
     records: any[];
     relationship: string;
@@ -590,7 +568,6 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
         }),
       );
 
-      // Add to the appropriate list based on direction
       if (data.direction === "outgoing") {
         setOriginRecords((prev) => [...newRelationships, ...prev]);
       } else {
@@ -611,7 +588,6 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
     resetAllState();
   }, [recordId, resetAllState]);
 
-  // Fetch main record data
   useEffect(() => {
     const fetchRecord = async () => {
       if (!recordId || !projectId || !organization?.organizationId) return;
@@ -648,7 +624,6 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
     t.translations.FAILED_TO_FETCH_RECORD,
   ]);
 
-  // Fetch class info for the record (if present)
   useEffect(() => {
     if (!record?.classId || !projectId) {
       setRecordClass(null);
@@ -674,7 +649,6 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
     };
   }, [record?.classId, projectId]);
 
-  // Fetch available tags
   useEffect(() => {
     const fetchTags = async () => {
       if (!projectId || !organization?.organizationId) return;
@@ -693,7 +667,6 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
     fetchTags();
   }, [projectId, organization?.organizationId]);
 
-  // Fetch origin records
   useEffect(() => {
     fetchRelatedRecords(
       true,
@@ -704,7 +677,6 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
     );
   }, [fetchRelatedRecords, originPage]);
 
-  // Fetch destination records
   useEffect(() => {
     fetchRelatedRecords(
       false,
@@ -894,7 +866,6 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
                 }}
                 isLoading={isLoadingOrigins && originPage > 1}
                 hasMore={hasMoreOrigins}
-                relationship="outgoing"
                 onAddRelationship={() => {
                   setEdgeDirection("outgoing");
                   setIsAddEdgeModalOpen(true);
@@ -918,7 +889,6 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
                   }}
                   isLoading={isLoadingDestinations && destinationPage > 1}
                   hasMore={hasMoreDestinations}
-                  relationship="incoming"
                   onAddRelationship={() => {
                     setEdgeDirection("incoming");
                     setIsAddEdgeModalOpen(true);

@@ -2,6 +2,7 @@
 
 "use client";
 
+import { useLanguage } from "@/app/contexts/Language";
 import { PlusIcon } from "@heroicons/react/24/outline";
 import React, { useEffect, useRef } from "react";
 
@@ -15,28 +16,24 @@ interface RelatedRecordsCardProps<T extends object> {
   title?: string;
   columns: CardColumn<T>[];
   rows: T[];
-  showIndex?: boolean;
   onLoadMore?: () => void;
   isLoading?: boolean;
   hasMore?: boolean;
-  relationship: string;
-  relationshipDirection?: "outgoing" | "incoming";
   onAddRelationship?: () => void;
 }
 
 function RelatedRecordsCard<T extends object>({
-  title = "Related Records:",
+  title,
   columns,
   rows,
-  showIndex = true,
   onLoadMore,
   isLoading = false,
   hasMore = false,
-  relationship,
-  relationshipDirection = "outgoing",
   onAddRelationship,
 }: RelatedRecordsCardProps<T>) {
+  const { t } = useLanguage();
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const cardTitle = title ?? `${t.translations.RELATIONSHIPS}:`;
 
   useEffect(() => {
     const scrollContainer = scrollContainerRef.current;
@@ -46,7 +43,6 @@ function RelatedRecordsCard<T extends object>({
       if (isLoading) return;
 
       const { scrollTop, scrollHeight, clientHeight } = scrollContainer;
-      // Trigger when user scrolls to within 100px of the bottom
       if (scrollHeight - scrollTop <= clientHeight + 100) {
         onLoadMore();
       }
@@ -59,7 +55,9 @@ function RelatedRecordsCard<T extends object>({
   return (
     <div className="card bg-base-100 shadow-md mt-4 p-2">
       <div className="flex justify-between px-4">
-        <h2 className="text-xl font-bold md-4 text-base-content">{title}</h2>
+        <h2 className="text-xl font-bold md-4 text-base-content">
+          {cardTitle}
+        </h2>
         {onAddRelationship && (
           <button
             className="flex items-center justify-center w-8 h-7 rounded-full bg-primary text-white cursor-pointer"
@@ -100,7 +98,7 @@ function RelatedRecordsCard<T extends object>({
                 <tr>
                   <td colSpan={columns.length} className="text-center py-4">
                     <span className="loading loading-spinner loading-sm"></span>
-                    <span className="ml-2">Loading more...</span>
+                    <span className="ml-2">{t.translations.LOADING}</span>
                   </td>
                 </tr>
               )}
@@ -111,7 +109,7 @@ function RelatedRecordsCard<T extends object>({
                     colSpan={columns.length}
                     className="text-center py-2 text-base-content/50"
                   >
-                    No more records
+                    {t.translations.NO_MORE_RECORDS}
                   </td>
                 </tr>
               )}
@@ -120,7 +118,7 @@ function RelatedRecordsCard<T extends object>({
           {/* Empty state */}
           {rows.length === 0 && !isLoading && (
             <div className="text-center text-base-content/60 py-8">
-              No relations found
+              {t.translations.NO_RECORDS_FOUND}
             </div>
           )}
         </div>

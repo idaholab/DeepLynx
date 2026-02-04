@@ -29,7 +29,7 @@ interface PropertyTableProps {
   className?: string;
   download?: boolean;
   recordName?: string | null;
-  onEditProperties?: () => void; // NEW: Handler to open properties editor
+  onEditProperties?: () => void;
 }
 
 const PropertyTable: React.FC<PropertyTableProps> = ({
@@ -38,7 +38,7 @@ const PropertyTable: React.FC<PropertyTableProps> = ({
   className,
   download = false,
   recordName,
-  onEditProperties, // NEW
+  onEditProperties,
 }) => {
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [editValue, setEditValue] = useState<string>("");
@@ -219,7 +219,7 @@ const PropertyTable: React.FC<PropertyTableProps> = ({
             <h2 className="text-xl font-bold text-base-content">{title}</h2>
 
             <div className="flex gap-2">
-              {/* NEW: Edit Properties Button */}
+              {/* Edit Properties Button */}
               {onEditProperties && (
                 <button
                   onClick={onEditProperties}
