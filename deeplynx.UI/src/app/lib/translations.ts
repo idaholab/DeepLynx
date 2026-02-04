@@ -582,6 +582,11 @@ export const translations = {
             BANNER_TEXT: "Banner Text",
             DISPLAY_BENEATH_THE_TOP_HEADER_FOR_ALL_PAGES_IN_PROJECT: "Display beneath the top header for all pages in this project",
             UPDATE: "Update",
+
+            FAILED_TO_SEARCH_RECORDS: "Failed to search records",
+            FAILED_TO_CREATE_RELATIONSHIPS: "Failed to create relationships",
+            ADD_CLASS: "Add Class",
+
         }
     },
     es: {
@@ -1181,6 +1186,12 @@ export const translations = {
             PRIVACY: "Privacidad y Accesibilidad",
 
             UPDATE: "Actualizar",
+
+            FAILED_TO_SEARCH_RECORDS: "No se pudo realizar la búsqueda de registros",
+            FAILED_TO_CREATE_RELATIONSHIPS: "No se pudieron crear las relaciones",
+            ADD_CLASS: "Agregar clase",
+
+
         }
     }
 }

@@ -25,9 +25,13 @@ import { useOrganizationSession } from "@/app/contexts/OrganizationSessionProvid
 import { getClass } from "@/app/lib/client_service/class_services.client";
 import {
   archiveEdgeByRelationship,
+  createEdge,
   getEdgeByRelationship,
 } from "@/app/lib/client_service/edge_services.client";
-import { getHistoricalRecord } from "@/app/lib/client_service/query_services.client";
+import {
+  fullTextSearch,
+  getHistoricalRecord,
+} from "@/app/lib/client_service/query_services.client";
 import {
   getEdgesByRecord,
   unattachTagFromRecord,
@@ -48,6 +52,8 @@ import {
   getAllClasses,
 } from "@/app/lib/client_service/class_services.client";
 import ClassSelectorModal from "./components/ClassSelectorModal";
+import type { RecordSearchResult } from "./components/AddEdgeModal";
+import AddEdgeModal from "./components/AddEdgeModal";
 
 // ============= HELPER FUNCTIONS =============
 interface PropertyRow {
@@ -171,6 +177,13 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
     [],
   );
   const [isLoadingClasses, setIsLoadingClasses] = useState(false);
+
+  // Add Edge Modal State
+  const [isAddEdgeModalOpen, setIsAddEdgeModalOpen] = useState(false);
+  const [edgeDirection, setEdgeDirection] = useState<"outgoing" | "incoming">(
+    "outgoing",
+  );
+  const [edgeRelationship, setEdgeRelationship] = useState("RELATED_TO");
 
   // ============= HANDLERS =============
   const handleUpdateRecord = useCallback(
@@ -483,6 +496,90 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
     }
   };
 
+  // Handler to search records for AddEdgeModal
+  const handleSearchRecords = async (
+    query: string,
+    option?: string,
+  ): Promise<RecordSearchResult[]> => {
+    if (!organization?.organizationId) return [];
+
+    try {
+      const results = await fullTextSearch(
+        organization.organizationId as number,
+        query,
+        [projectId],
+      );
+
+      return results.map((record) => ({
+        id: Number(record.id),
+        name: record.name ?? String(record.id),
+        description: record.description ?? undefined,
+        className: record.className ?? undefined,
+        dataSourceName: record.dataSourceName ?? undefined,
+        originalId: record.originalId ?? undefined,
+        uri: record.uri ?? undefined,
+      }));
+    } catch (error) {
+      console.error("Error searching records:", error);
+      toast.error(
+        t.translations.FAILED_TO_SEARCH_RECORDS || "Failed to search records",
+      );
+      return [];
+    }
+  };
+
+  // Handler to create relationships from AddEdgeModal
+  const handleCreateRelationships = async (data: {
+    records: any[];
+    relationship: string;
+    direction: "outgoing" | "incoming";
+  }) => {
+    if (!organization?.organizationId) return;
+
+    try {
+      const promises = data.records.map(async (targetRecord) => {
+        const origin_id =
+          data.direction === "outgoing" ? recordId : targetRecord.id;
+        const destination_id =
+          data.direction === "outgoing" ? targetRecord.id : recordId;
+
+        return createEdge(
+          organization.organizationId as number,
+          projectId,
+          record?.dataSourceId as number,
+          {
+            origin_id,
+            destination_id,
+            relationship_name: data.relationship,
+          },
+        );
+      });
+
+      await Promise.all(promises);
+
+      toast.success(
+        `${t.translations.CREATED || "Created"} ${data.records.length} ${
+          t.translations.RELATIONSHIP || "relationship"
+        }${data.records.length > 1 ? "s" : ""}!`,
+      );
+
+      // Refresh the related records
+      setOriginPage(1);
+      setDestinationPage(1);
+      setOriginRecords([]);
+      setDestinationRecords([]);
+      setHasMoreOrigins(true);
+      setHasMoreDestinations(true);
+    } catch (error) {
+      console.error("Error creating relationships:", error);
+      toast.error(
+        t.translations.FAILED_TO_CREATE_RELATIONSHIPS ||
+          "Failed to create relationships",
+      );
+      throw error;
+    }
+  };
+
   // ============= EFFECTS =============
   useEffect(() => {
     resetAllState();
@@ -503,7 +600,6 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
         );
         setRecord(data);
         if (data.tags) {
-          // Check if tags is a string (JSON) or already an array
           const parsedTags =
             typeof data.tags === "string" ? JSON.parse(data.tags) : data.tags;
 
@@ -610,7 +706,11 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
     };
 
     fetchClass();
-  }, [projectId, organization?.organizationId, t.translations.FAILED_TO_FETCH_CLASSES]);
+  }, [
+    projectId,
+    organization?.organizationId,
+    t.translations.FAILED_TO_FETCH_CLASSES,
+  ]);
 
   // ============= MEMOIZED VALUES =============
   const systemPropertiesRows = useMemo(() => {
@@ -769,6 +869,9 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
                 isLoading={isLoadingOrigins && originPage > 1}
                 hasMore={hasMoreOrigins}
                 relationship="outgoing"
+                onAddRelationship={() => {
+                  setIsAddEdgeModalOpen(true);
+                }}
               />
             )}
 
@@ -789,6 +892,9 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
                   isLoading={isLoadingDestinations && destinationPage > 1}
                   hasMore={hasMoreDestinations}
                   relationship="incoming"
+                  onAddRelationship={() => {
+                    setIsAddEdgeModalOpen(true);
+                  }}
                 />
               </div>
             )}
@@ -826,6 +932,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
             className="btn btn-sm btn-outline mt-2"
           >
             <PlusIcon className="w-4 h-4 mr-1" />
+            {t.translations.ADD_CLASS || "Add Class"}
           </button>
         )}
       </div>
@@ -869,6 +976,24 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
         availableClasses={availableClasses}
         onCreateClass={handleCreateClass}
         isLoading={isLoadingClasses}
+      />
+
+      <AddEdgeModal
+        isOpen={isAddEdgeModalOpen}
+        onClose={() => setIsAddEdgeModalOpen(false)}
+        currentRecord={{
+          id: record.id,
+          name: record.name,
+          description: record.description,
+          dataSourceName: record.dataSourceName,
+        }}
+        relationship={edgeRelationship}
+        direction={edgeDirection}
+        projectId={projectId}
+        organizationId={organization?.organizationId as number}
+        onSearchRecords={handleSearchRecords}
+        onCreateRelationships={handleCreateRelationships}
+        dataSourceId={record?.dataSourceId}
       />
     </div>
   );

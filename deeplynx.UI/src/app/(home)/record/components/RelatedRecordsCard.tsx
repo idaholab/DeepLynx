@@ -2,9 +2,8 @@
 
 "use client";
 
-import { PlusCircleIcon } from "@heroicons/react/24/solid";
-import React, { useEffect, useRef, useState } from "react";
-import App from "./AddEdgeModal";
+import { PlusIcon } from "@heroicons/react/24/outline";
+import React, { useEffect, useRef } from "react";
 
 export interface CardColumn<T extends object> {
   key: keyof T;
@@ -22,6 +21,7 @@ interface RelatedRecordsCardProps<T extends object> {
   hasMore?: boolean;
   relationship: string;
   relationshipDirection?: "outgoing" | "incoming";
+  onAddRelationship?: () => void;
 }
 
 function RelatedRecordsCard<T extends object>({
@@ -34,9 +34,9 @@ function RelatedRecordsCard<T extends object>({
   hasMore = false,
   relationship,
   relationshipDirection = "outgoing",
+  onAddRelationship,
 }: RelatedRecordsCardProps<T>) {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
   useEffect(() => {
     const scrollContainer = scrollContainerRef.current;
@@ -60,20 +60,20 @@ function RelatedRecordsCard<T extends object>({
     <div className="card bg-base-100 shadow-md mt-4 p-2">
       <div className="flex justify-between px-4">
         <h2 className="text-xl font-bold md-4 text-base-content">{title}</h2>
-        <button
-          type="button"
-          onClick={() => setIsAddModalOpen(true)}
-          className="btn btn-ghost btn-sm"
-          title="Add relationship"
-        >
-          <PlusCircleIcon className="size-6 text-secondary" />
-        </button>
+        {onAddRelationship && (
+          <button
+            className="flex items-center justify-center w-8 h-7 rounded-full bg-primary text-white cursor-pointer"
+            onClick={onAddRelationship}
+          >
+            <PlusIcon className="size-6" />
+          </button>
+        )}
       </div>
       <div className="card-body p-4">
         <div
           ref={scrollContainerRef}
           className="overflow-auto rounded-box border border-base-300 bg-base-100"
-          style={{ maxHeight: "320px" }} // ~6 rows with headers
+          style={{ maxHeight: "320px" }}
         >
           <table className="table">
             <thead className="sticky top-0 bg-base-200 z-10">
@@ -125,7 +125,6 @@ function RelatedRecordsCard<T extends object>({
           )}
         </div>
       </div>
-      <App />
     </div>
   );
 }
