@@ -161,7 +161,7 @@ export default function AddEdgeModal({
   // ============================================================================
 
   /**
-   * Reset modal state when it closes
+   * Reset modal state when it closes or opens
    */
   useEffect(() => {
     if (!isOpen) {
@@ -169,8 +169,10 @@ export default function AddEdgeModal({
       setSearchResults([]);
       setSelectedRecords([]);
       setHasSearched(false);
+    } else {
+      setSelectedDirection(direction);
     }
-  }, [isOpen]);
+  }, [isOpen, direction]);
 
   // ============================================================================
   // HANDLERS
