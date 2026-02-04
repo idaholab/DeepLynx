@@ -2,9 +2,24 @@
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: deeplynx-test
+  name: deeplynxv3-dev
   labels:
-    name: deeplynx-test
+    name: deeplynxv3-dev
+
+---
+# Secret for Azure Storage Account with SAS Token
+apiVersion: v1
+kind: Secret
+metadata:
+  name: azure-storage-secret
+  namespace: deeplynxv3-dev
+type: Opaque
+stringData:
+  azurestorageaccountname: ${AZURE_STORAGE_ACCOUNT_NAME}
+  # Store the full connection string
+  azurestorageconnectionstring: ${AZURE_OBJECT_CONNECTION_STRING}
+  # Store the SAS token separately
+  azurestorageaccountsastoken: ${AZURE_STORAGE_ACCOUNT_SAS_TOKEN}
 
 ---
 # Storage Class for DuckDB Azure Files
@@ -12,10 +27,13 @@ apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
   name: azurefile-duckdb
-  namespace: deeplynx-test
 provisioner: file.csi.azure.com
 parameters:
   skuName: Premium_LRS
+  storageAccount: ${AZURE_STORAGE_ACCOUNT_NAME}
+  server: ${AZURE_STORAGE_ACCOUNT_NAME}.file.core.usgovcloudapi.net
+  secretName: azure-storage-secret
+  secretNamespace: deeplynxv3-dev
 reclaimPolicy: Retain
 allowVolumeExpansion: true
 mountOptions:
@@ -35,7 +53,7 @@ apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: deeplynx-duckdb-pvc
-  namespace: deeplynx-test
+  namespace: deeplynxv3-dev
 spec:
   accessModes:
     - ReadWriteMany # Allows multiple pods to access the same volume
@@ -45,29 +63,64 @@ spec:
   storageClassName: azurefile-duckdb
 
 ---
+# Storage Class for Azure Blob (same account)
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: azureblob-nexus
+provisioner: blob.csi.azure.com
+parameters:
+  skuName: Premium_LRS
+  storageAccount: ${AZURE_STORAGE_ACCOUNT_NAME}
+  storageEndpointSuffix: core.usgovcloudapi.net
+  secretName: azure-storage-secret
+  secretNamespace: deeplynxv3-dev
+  containerName: ${AZURE_CONTAINER_NAME}
+reclaimPolicy: Retain
+allowVolumeExpansion: true
+volumeBindingMode: Immediate
+---
+# Persistent Volume Claim for Blob storage
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: deeplynx-blob-pvc
+  namespace: deeplynxv3-dev
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 100Gi
+  storageClassName: azureblob-nexus
+
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: deeplynx-test
-  namespace: deeplynx-test
+  name: deeplynxv3
+  namespace: deeplynxv3-dev
 spec:
   selector:
     matchLabels:
-      app: deeplynx-test
+      app: deeplynxv3
   template:
     metadata:
       labels:
-        app: deeplynx-test
+        app: deeplynxv3
     spec:
       containers:
-        - name: deeplynx-test
-          image: ${CI_REGISTRY}/${CI_REGISTRY_PATH}:deeplynx-ui-${GITHUB_RUN_NUMBER}
+        - name: deeplynxv3
+          image: ${CI_REGISTRY}/${CI_REGISTRY_PATH}:deeplynxv3-ui-${GITHUB_RUN_NUMBER}
           imagePullPolicy: Always
           env:
             - name: AWS_S3_CONNECTION_STRING
               value: ${AWS_S3_CONNECTION_STRING}
             - name: AZURE_OBJECT_CONNECTION_STRING
-              value: ${AZURE_OBJECT_CONNECTION_STRING}
+              valueFrom:
+                secretKeyRef:
+                  name: azure-storage-secret
+                  key: azurestorageconnectionstring
             - name: AZURE_CONTAINER_NAME
               value: ${AZURE_CONTAINER_NAME}
             - name: ConnectionStrings__DefaultConnection
@@ -183,17 +236,22 @@ spec:
           volumeMounts:
             - name: duckdb-storage
               mountPath: /data/duckdb
+            - name: blob-storage
+              mountPath: /data/blob
       volumes:
         - name: duckdb-storage
           persistentVolumeClaim:
             claimName: deeplynx-duckdb-pvc
+        - name: blob-storage
+          persistentVolumeClaim:
+            claimName: deeplynx-blob-pvc
 
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: deeplynxbackend
-  namespace: deeplynx-test
+  namespace: deeplynxv3-dev
 spec:
   selector:
     matchLabels:
@@ -204,14 +262,17 @@ spec:
         app: deeplynxbackend
     spec:
       containers:
-        - name: deeplynx-test
-          image: ${CI_REGISTRY}/${CI_REGISTRY_PATH}:deeplynx-server-${GITHUB_RUN_NUMBER}
+        - name: deeplynxv3
+          image: ${CI_REGISTRY}/${CI_REGISTRY_PATH}:deeplynxv3-server-${GITHUB_RUN_NUMBER}
           imagePullPolicy: Always
           env:
             - name: AWS_S3_CONNECTION_STRING
               value: ${AWS_S3_CONNECTION_STRING}
             - name: AZURE_OBJECT_CONNECTION_STRING
-              value: ${AZURE_OBJECT_CONNECTION_STRING}
+              valueFrom:
+                secretKeyRef:
+                  name: azure-storage-secret
+                  key: azurestorageconnectionstring
             - name: AZURE_CONTAINER_NAME
               value: ${AZURE_CONTAINER_NAME}
             - name: ConnectionStrings__DefaultConnection
@@ -319,10 +380,15 @@ spec:
           volumeMounts:
             - name: duckdb-storage
               mountPath: /data/duckdb
+            - name: blob-storage
+              mountPath: /data/blob
       volumes:
         - name: duckdb-storage
           persistentVolumeClaim:
             claimName: deeplynx-duckdb-pvc
+        - name: blob-storage
+          persistentVolumeClaim:
+            claimName: deeplynx-blob-pvc
 
 ---
 #docs
@@ -330,7 +396,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: deeplynx-docs
-  namespace: deeplynx-test
+  namespace: deeplynxv3-dev
 spec:
   selector:
     matchLabels:
@@ -341,8 +407,8 @@ spec:
         app: deeplynx-docs
     spec:
       containers:
-        - name: deeplynx-test
-          image: ${CI_REGISTRY}/${CI_REGISTRY_PATH}:deeplynx-docs-${GITHUB_RUN_NUMBER}
+        - name: deeplynxv3
+          image: ${CI_REGISTRY}/${CI_REGISTRY_PATH}:deeplynxv3-docs-${GITHUB_RUN_NUMBER}
           imagePullPolicy: Always
           env:
             - name: HOSTED_LINK
@@ -363,7 +429,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: deeplynx-mcp
-  namespace: deeplynx-test
+  namespace: deeplynxv3-dev
 spec:
   selector:
     matchLabels:
@@ -374,8 +440,8 @@ spec:
         app: deeplynx-mcp
     spec:
       containers:
-        - name: deeplynx-test
-          image: ${CI_REGISTRY}/${CI_REGISTRY_PATH}:deeplynx-mcp-${GITHUB_RUN_NUMBER}
+        - name: deeplynxv3
+          image: ${CI_REGISTRY}/${CI_REGISTRY_PATH}:deeplynxv3-mcp-${GITHUB_RUN_NUMBER}
           imagePullPolicy: Always
           env:
             - name: NEXUS_API_URL
@@ -397,8 +463,8 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: deeplynx-service
-  namespace: deeplynx-test
+  name: deeplynxv3-service
+  namespace: deeplynxv3-dev
 spec:
   type: ClusterIP
   ports:
@@ -406,14 +472,14 @@ spec:
       port: 80
       targetPort: 3000
   selector:
-    app: deeplynx-test
+    app: deeplynxv3
 
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: deeplynx-backend-service
-  namespace: deeplynx-test
+  name: deeplynxv3-backend-service
+  namespace: deeplynxv3-dev
 spec:
   type: ClusterIP
   ports:
@@ -427,8 +493,8 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: deeplynx-docs-service
-  namespace: deeplynx-test
+  name: deeplynxv3-docs-service
+  namespace: deeplynxv3-dev
 spec:
   type: ClusterIP
   ports:
@@ -442,8 +508,8 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: deeplynx-mcp-service
-  namespace: deeplynx-test
+  name: deeplynxv3-mcp-service
+  namespace: deeplynxv3-dev
 spec:
   type: ClusterIP
   ports:
@@ -457,8 +523,8 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: deeplynx-ingress
-  namespace: deeplynx-test
+  name: deeplynxv3-ingress
+  namespace: deeplynxv3-dev
   annotations:
     kubernetes.io/ingress.class: nginx
     nginx.ingress.kubernetes.io/configuration-snippet: |
@@ -466,47 +532,53 @@ metadata:
       more_clear_headers "x-content-type-options";
       more_clear_headers "x-frame-options";
       more_clear_headers "content-security-policy";
-      more_set_headers "cache-Control: no-cache, no-store";
     nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
     nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
 spec:
   rules:
-    - host: deeplynx-test.dev.inl.gov
+    - host: deeplynx.dev.inl.gov
       http:
         paths:
+          - path: /_next/static
+            pathType: Prefix
+            backend:
+              service:
+                name: deeplynxv3-service
+                port:
+                  number: 80
           - path: /
             pathType: Prefix
             backend:
               service:
-                name: deeplynx-service
+                name: deeplynxv3-service
                 port:
                   number: 80
           - path: /api/v1
             pathType: Prefix
             backend:
               service:
-                name: deeplynx-backend-service
+                name: deeplynxv3-backend-service
                 port:
                   number: 80
           - path: /api/auth
             pathType: Prefix
             backend:
               service:
-                name: deeplynx-service
+                name: deeplynxv3-service
                 port:
                   number: 80
           - path: /docs
             pathType: Prefix
             backend:
               service:
-                name: deeplynx-docs-service
+                name: deeplynxv3-docs-service
                 port:
                   number: 80
           - path: /mcp
             pathType: Prefix
             backend:
               service:
-                name: deeplynx-mcp-service
+                name: deeplynxv3-mcp-service
                 port:
                   number: 80
 
@@ -516,56 +588,56 @@ spec:
 # apiVersion: apps/v1
 # kind: Deployment
 # metadata:
-#   namespace: deeplynx-dev
+#   namespace: deeplynxv3-dev
 #   labels:
-#     app: deeplynx-db
-#   name: deeplynx-db
+#     app: deeplynxv3-db
+#   name: deeplynxv3-db
 # spec:
 #   replicas: 1
 #   selector:
 #     matchLabels:
-#       app: deeplynx-db
+#       app: deeplynxv3-db
 #   strategy:
 #     type: Recreate
 #   template:
 #     metadata:
 #       labels:
-#         app: deeplynx-db
+#         app: deeplynxv3-db
 #     spec:
 #       containers:
 #         - env:
 #             - name: POSTGRES_PASSWORD
 #               valueFrom:
 #                 secretKeyRef:
-#                   name: deeplynx-secrets
+#                   name: deeplynxv3-secrets
 #                   key: POSTGRES_PASSWORD
 #             - name: POSTGRES_USER
 #               value: ${POSTGRES_USER}
 #             - name: POSTGRES_DB_NAME
 #               value: ${POSTGRES_DB_NAME}
-#           image: ${CI_REGISTRY}/${CI_REGISTRY_PATH}:deeplynx-db-${GITHUB_RUN_NUMBER}
-#           name: deeplynx-db
+#           image: ${CI_REGISTRY}/${CI_REGISTRY_PATH}:deeplynxv3-db-${GITHUB_RUN_NUMBER}
+#           name: deeplynxv3-db
 #           ports:
 #             - containerPort: 5432
 #           volumeMounts:
 #             - mountPath: "/var/lib/postgresql/data"
-#               subPath: deeplynx
-#               name: deeplynx-db-pvc
+#               subPath: deeplynxv3
+#               name: deeplynxv3-db-pvc
 #           resources:
 #             limits:
 #               cpu: "250m"
 #               memory: "1024M"
 #       restartPolicy: Always
 #       volumes:
-#         - name: deeplynx-db-pvc
+#         - name: deeplynxv3-db-pvc
 #           persistentVolumeClaim:
-#             claimName: deeplynx-db-pvc
+#             claimName: deeplynxv3-db-pvc
 # ---
 # apiVersion: v1
 # kind: Service
 # metadata:
-#   name: deeplynx-db-service
-#   namespace: deeplynx-dev
+#   name: deeplynxv3-db-service
+#   namespace: deeplynxv3-dev
 # spec:
 #   type: ClusterIP
 #   ports:
@@ -573,7 +645,7 @@ spec:
 #       port: 5432
 #       targetPort: 5432
 #   selector:
-#     app: deeplynx-db
+#     app: deeplynxv3-db
 # ---
 
 # # Storage
@@ -581,10 +653,10 @@ spec:
 # apiVersion: v1
 # kind: PersistentVolumeClaim
 # metadata:
-#   namespace: deeplynx-dev
+#   namespace: deeplynxv3-dev
 #   labels:
-#     app: deeplynx-db
-#   name: deeplynx-db-pvc
+#     app: deeplynxv3-db
+#   name: deeplynxv3-db-pvc
 # spec:
 #   accessModes:
 #     - ReadWriteOnce
