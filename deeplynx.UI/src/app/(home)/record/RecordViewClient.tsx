@@ -183,7 +183,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
   const [edgeDirection, setEdgeDirection] = useState<"outgoing" | "incoming">(
     "outgoing",
   );
-  const [edgeRelationship, setEdgeRelationship] = useState("RELATED_TO");
+  const [edgeRelationship, setEdgeRelationship] = useState("");
 
   // ============= HANDLERS =============
   const handleUpdateRecord = useCallback(
@@ -563,13 +563,39 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
         }${data.records.length > 1 ? "s" : ""}!`,
       );
 
-      // Refresh the related records
-      setOriginPage(1);
-      setDestinationPage(1);
-      setOriginRecords([]);
-      setDestinationRecords([]);
-      setHasMoreOrigins(true);
-      setHasMoreDestinations(true);
+      const newRelationships: RelatedRecordViewModel[] = data.records.map(
+        (targetRecord) => ({
+          relatedRecordName: targetRecord.name,
+          relatedRecordId: targetRecord.id,
+          relatedRecordProjectId: projectId,
+          relationshipName: data.relationship,
+          actions: (
+            <XMarkIcon
+              className="w-5 h-5 cursor-pointer text-error hover:text-error-content"
+              onClick={() => {
+                setModal({
+                  isOpen: true,
+                  type: "relatedRecord",
+                  nameToRemove: data.relationship || t.translations.EDGE,
+                  recordNameToRemove: record?.name,
+                  idToRemove: targetRecord.id.toString(),
+                  originId:
+                    data.direction === "outgoing" ? recordId : targetRecord.id,
+                  destinationId:
+                    data.direction === "outgoing" ? targetRecord.id : recordId,
+                });
+              }}
+            />
+          ),
+        }),
+      );
+
+      // Add to the appropriate list based on direction
+      if (data.direction === "outgoing") {
+        setOriginRecords((prev) => [...newRelationships, ...prev]);
+      } else {
+        setDestinationRecords((prev) => [...newRelationships, ...prev]);
+      }
     } catch (error) {
       console.error("Error creating relationships:", error);
       toast.error(
