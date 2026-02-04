@@ -858,7 +858,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
               <RelatedRecordsCardSkeleton rows={6} columns={3} />
             ) : (
               <RelatedRecordsCard
-                title={`${t.translations.OUTGOING}${record.name}${t.translations.OUTGOING_ARROW}`}
+                title={`${t.translations.OUTGOING_}${record.name}${t.translations.OUTGOING_ARROW}`}
                 columns={relatedRecordsColumns}
                 rows={originRecords}
                 onLoadMore={() => {
@@ -870,6 +870,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
                 hasMore={hasMoreOrigins}
                 relationship="outgoing"
                 onAddRelationship={() => {
+                  setEdgeDirection("outgoing");
                   setIsAddEdgeModalOpen(true);
                 }}
               />
@@ -881,7 +882,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
             ) : (
               <div className="mt-4">
                 <RelatedRecordsCard
-                  title={`${t.translations.INCOMING}${record.name}${t.translations.INCOMING_ARROW}`}
+                  title={`${t.translations.INCOMING_}${record.name}${t.translations.INCOMING_ARROW}`}
                   columns={relatedRecordsColumns}
                   rows={destinationRecords}
                   onLoadMore={() => {
@@ -893,6 +894,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
                   hasMore={hasMoreDestinations}
                   relationship="incoming"
                   onAddRelationship={() => {
+                    setEdgeDirection("incoming");
                     setIsAddEdgeModalOpen(true);
                   }}
                 />

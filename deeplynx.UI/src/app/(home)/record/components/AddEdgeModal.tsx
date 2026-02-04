@@ -2,71 +2,13 @@
 
 import React, { useState, useEffect } from "react";
 import SearchBar from "../../components/SearchBar";
-
-// SVG Icons (keep your existing icon components)
-const MagnifyingGlassIcon = ({ className }: { className?: string }) => (
-  <svg
-    className={className}
-    fill="none"
-    viewBox="0 0 24 24"
-    strokeWidth={1.5}
-    stroke="currentColor"
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"
-    />
-  </svg>
-);
-
-const XMarkIcon = ({ className }: { className?: string }) => (
-  <svg
-    className={className}
-    fill="none"
-    viewBox="0 0 24 24"
-    strokeWidth={1.5}
-    stroke="currentColor"
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      d="M6 18L18 6M6 6l12 12"
-    />
-  </svg>
-);
-
-const ArrowRightIcon = ({ className }: { className?: string }) => (
-  <svg
-    className={className}
-    fill="none"
-    viewBox="0 0 24 24"
-    strokeWidth={1.5}
-    stroke="currentColor"
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3"
-    />
-  </svg>
-);
-
-const ArrowLeftIcon = ({ className }: { className?: string }) => (
-  <svg
-    className={className}
-    fill="none"
-    viewBox="0 0 24 24"
-    strokeWidth={1.5}
-    stroke="currentColor"
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18"
-    />
-  </svg>
-);
+import { useLanguage } from "@/app/contexts/Language";
+import {
+  ArrowLeftIcon,
+  ArrowRightIcon,
+  MagnifyingGlassIcon,
+  XMarkIcon,
+} from "@heroicons/react/24/outline";
 
 // Types
 export interface RecordSearchResult {
@@ -104,24 +46,29 @@ interface AddEdgeModalProps {
   dataSourceId?: number;
 }
 
-const relationshipTypes = [
-  "MANAGES",
-  "OWNS",
-  "REPORTS_TO",
-  "DEPENDS_ON",
-  "RELATED_TO",
-  "CONTAINS",
-  "ASSIGNED_TO",
-];
+type RecordCardRecord = {
+  id: number;
+  name?: string | null;
+  description?: string | null;
+  dataSourceName?: string;
+};
 
 // Record Detail Card Component
-const RecordCard = ({ record, isPlaceholder = false }: any) => {
+const RecordCard = ({
+  record,
+  isPlaceholder = false,
+  t,
+}: {
+  record: RecordCardRecord | null;
+  isPlaceholder?: boolean;
+  t: { translations: Record<string, string> };
+}) => {
   if (isPlaceholder) {
     return (
       <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 bg-gray-50">
         <div className="text-center py-8 text-gray-400">
           <MagnifyingGlassIcon className="h-12 w-12 mx-auto mb-2 opacity-30" />
-          <p className="text-sm">Search and select records</p>
+          <p className="text-sm">{t.translations.SEARCH_AND_SELECT_RECORDS}</p>
         </div>
       </div>
     );
@@ -131,22 +78,30 @@ const RecordCard = ({ record, isPlaceholder = false }: any) => {
     <div className="border-2 border-blue-500 rounded-lg p-4 bg-blue-50">
       <div className="space-y-2">
         <div>
-          <div className="text-xs text-gray-500">Record ID</div>
-          <div className="font-mono text-sm">{record.id}</div>
+          <div className="text-xs text-gray-500">
+            {t.translations.RECORD_ID}
+          </div>
+          <div className="font-mono text-sm">{record?.id}</div>
         </div>
         <div>
-          <div className="text-xs text-gray-500">Name</div>
-          <div className="font-semibold">{record.name}</div>
+          <div className="text-xs text-gray-500">{t.translations.NAME}</div>
+          <div className="font-semibold">
+            {record?.name ?? t.translations.UNKOWN}
+          </div>
         </div>
-        {record.description && (
+        {record?.description && (
           <div>
-            <div className="text-xs text-gray-500">Description</div>
+            <div className="text-xs text-gray-500">
+              {t.translations.DESCRIPTION}
+            </div>
             <div className="text-sm">{record.description}</div>
           </div>
         )}
-        {record.dataSourceName && (
+        {record?.dataSourceName && (
           <div>
-            <div className="text-xs text-gray-500">Data Source</div>
+            <div className="text-xs text-gray-500">
+              {t.translations.DATA_SOURCE}
+            </div>
             <div className="inline-block px-2 py-1 text-xs border border-gray-300 rounded">
               {record.dataSourceName}
             </div>
@@ -169,6 +124,7 @@ export default function AddEdgeModal({
   onSearchRecords,
   onCreateRelationships,
 }: AddEdgeModalProps) {
+  const { t } = useLanguage();
   const [searchTerm, setSearchTerm] = useState("");
   const [searchResults, setSearchResults] = useState<RecordSearchResult[]>([]);
   const [selectedRecords, setSelectedRecords] = useState<RecordSearchResult[]>(
@@ -180,6 +136,7 @@ export default function AddEdgeModal({
   const [isSearching, setIsSearching] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
+  const [directionSwitch, setDirectionSwitch] = useState(direction);
 
   // Reset state when modal opens/closes
   useEffect(() => {
@@ -254,7 +211,9 @@ export default function AddEdgeModal({
         {/* Header */}
         <div className="p-6 border-b border-gray-200">
           <div className="flex justify-between items-center">
-            <h3 className="text-2xl font-bold">Create Relationship</h3>
+            <h3 className="text-2xl font-bold">
+              {t.translations.CREATE_RELATIONSHIP}
+            </h3>
             <button
               onClick={onClose}
               className="p-2 hover:bg-gray-100 rounded-full transition-colors"
@@ -270,43 +229,51 @@ export default function AddEdgeModal({
             {/* Left: Current Record + Metadata */}
             <div className="space-y-4">
               <p className="text-sm font-medium text-gray-600">
-                {selectedDirection === "outgoing" ? "From" : "To"}
+                {selectedDirection === "outgoing"
+                  ? t.translations.FROM_
+                  : t.translations.TO}
               </p>
-              <RecordCard record={currentRecord} />
+              <RecordCard record={currentRecord} t={t} />
 
               {/* Relationship Metadata Panel */}
               <div className="border border-gray-300 rounded-lg p-4 bg-gray-50">
                 <h4 className="font-semibold text-sm mb-3">
-                  Relationship Details
+                  {t.translations.RELATIONSHIP_DETAILS}
                 </h4>
 
                 {/* Direction Selector */}
                 <div className="mb-3">
                   <label className="block text-xs text-gray-600 mb-1">
-                    Direction
+                    {t.translations.DIRECTION}
                   </label>
                   <div className="flex gap-2">
                     <button
-                      onClick={() => setSelectedDirection("outgoing")}
+                      onClick={() => {
+                        setSelectedDirection("outgoing");
+                        setDirectionSwitch(selectedDirection);
+                      }}
                       className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                        selectedDirection === "outgoing"
+                        selectedDirection && directionSwitch === "outgoing"
                           ? "bg-blue-600 text-white"
                           : "bg-white border border-gray-300 text-gray-700 hover:bg-gray-50"
                       }`}
                     >
                       <ArrowRightIcon className="h-4 w-4 inline mr-1" />
-                      Outgoing
+                      {t.translations.OUTGOING}
                     </button>
                     <button
-                      onClick={() => setSelectedDirection("incoming")}
+                      onClick={() => {
+                        setSelectedDirection("incoming");
+                        setDirectionSwitch(selectedDirection);
+                      }}
                       className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                        selectedDirection === "incoming"
+                        selectedDirection && directionSwitch === "incoming"
                           ? "bg-blue-600 text-white"
                           : "bg-white border border-gray-300 text-gray-700 hover:bg-gray-50"
                       }`}
                     >
                       <ArrowLeftIcon className="h-4 w-4 inline mr-1" />
-                      Incoming
+                      {t.translations.INCOMING}
                     </button>
                   </div>
                 </div>
@@ -321,7 +288,9 @@ export default function AddEdgeModal({
                 <ArrowLeftIcon className="h-10 w-10 text-blue-600" />
               )}
               <div className="mt-3 px-4 py-2 bg-blue-100 rounded-lg border border-blue-300 text-center">
-                <div className="text-xs text-gray-600 mb-1">Relationship</div>
+                <div className="text-xs text-gray-600 mb-1">
+                  {t.translations.RELATIONSHIP}
+                </div>
                 <span className="font-semibold text-sm">
                   {selectedRelationship}
                 </span>
@@ -331,10 +300,12 @@ export default function AddEdgeModal({
             {/* Right: Selection Area */}
             <div>
               <div className="text-sm font-medium text-gray-600 mb-3">
-                {selectedDirection === "outgoing" ? "To" : "From"}{" "}
+                {selectedDirection === "outgoing"
+                  ? t.translations.TO
+                  : t.translations.FROM}{" "}
                 {selectedRecords.length > 0 && (
                   <span className="text-blue-600">
-                    ({selectedRecords.length} selected)
+                    ({selectedRecords.length} {t.translations.SELECTED})
                   </span>
                 )}
               </div>
@@ -345,13 +316,13 @@ export default function AddEdgeModal({
                   <div className="border-2 border-blue-500 rounded-lg p-3 bg-blue-50 max-h-64 overflow-y-auto">
                     <div className="flex justify-between items-center mb-2">
                       <div className="text-xs font-semibold text-gray-600">
-                        Selected Records
+                        {t.translations.SELECTED_RECORDS}
                       </div>
                       <button
                         onClick={() => setSelectedRecords([])}
                         className="text-xs text-red-600 hover:underline"
                       >
-                        Clear All
+                        {t.translations.CLEAR_ALL}
                       </button>
                     </div>
                     <div className="space-y-2">
@@ -383,13 +354,13 @@ export default function AddEdgeModal({
 
                 {/* Placeholder when nothing selected */}
                 {selectedRecords.length === 0 && (
-                  <RecordCard record={null} isPlaceholder />
+                  <RecordCard record={null} isPlaceholder t={t} />
                 )}
 
                 {/* Search Section */}
                 <div>
                   <SearchBar
-                    placeholder="Search for records..."
+                    placeholder={t.translations.SEARCH_FOR_RECORDS}
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     onSubmit={handleSearch}
@@ -400,7 +371,9 @@ export default function AddEdgeModal({
                   {isSearching && (
                     <div className="border border-gray-300 rounded-lg p-4 text-center">
                       <div className="loading loading-spinner loading-md"></div>
-                      <p className="text-sm text-gray-500 mt-2">Searching...</p>
+                      <p className="text-sm text-gray-500 mt-2">
+                        {t.translations.SEARCHING}
+                      </p>
                     </div>
                   )}
 
@@ -409,7 +382,7 @@ export default function AddEdgeModal({
                     searchResults.length === 0 && (
                       <div className="border border-gray-300 rounded-lg p-4 text-center">
                         <p className="text-sm text-gray-500">
-                          No records found
+                          {t.translations.NO_RECORDS_FOUND}
                         </p>
                       </div>
                     )}
@@ -433,7 +406,8 @@ export default function AddEdgeModal({
                                 </div>
                                 <div className="text-xs text-gray-500">
                                   {record.className && `${record.className} • `}
-                                  {record.dataSourceName || `ID: ${record.id}`}
+                                  {record.dataSourceName ||
+                                    `${t.translations.ID_LABEL} ${record.id}`}
                                 </div>
                                 {record.description && (
                                   <div className="text-xs text-gray-400 mt-1 line-clamp-1">
@@ -465,7 +439,7 @@ export default function AddEdgeModal({
             disabled={isCreating}
             className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50"
           >
-            Cancel
+            {t.translations.CANCEL}
           </button>
           <button
             disabled={selectedRecords.length === 0 || isCreating}
@@ -475,13 +449,15 @@ export default function AddEdgeModal({
             {isCreating ? (
               <>
                 <span className="loading loading-spinner loading-sm mr-2"></span>
-                Creating...
+                {t.translations.CREATING}
               </>
             ) : (
               <>
-                Create{" "}
+                {t.translations.CREATE}{" "}
                 {selectedRecords.length > 1 ? `${selectedRecords.length} ` : ""}
-                Relationship{selectedRecords.length > 1 ? "s" : ""}
+                {selectedRecords.length > 1
+                  ? t.translations.RELATIONSHIPS
+                  : t.translations.RELATIONSHIP}
               </>
             )}
           </button>
