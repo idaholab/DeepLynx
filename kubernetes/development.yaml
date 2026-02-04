@@ -7,15 +7,33 @@ metadata:
     name: deeplynxv3-dev
 
 ---
+# Secret for Azure Storage Account with SAS Token
+apiVersion: v1
+kind: Secret
+metadata:
+  name: azure-storage-secret
+  namespace: deeplynxv3-dev
+type: Opaque
+stringData:
+  azurestorageaccountname: ${AZURE_STORAGE_ACCOUNT_NAME}
+  # Store the full connection string
+  azurestorageconnectionstring: ${AZURE_OBJECT_CONNECTION_STRING}
+  # Store the SAS token separately
+  azurestorageaccountsastoken: ${AZURE_STORAGE_ACCOUNT_SAS_TOKEN}
+
+---
 # Storage Class for DuckDB Azure Files
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
   name: azurefile-duckdb
-  namespace: deeplynxv3-dev
 provisioner: file.csi.azure.com
 parameters:
   skuName: Premium_LRS
+  storageAccount: ${AZURE_STORAGE_ACCOUNT_NAME}
+  server: ${AZURE_STORAGE_ACCOUNT_NAME}.file.core.usgovcloudapi.net
+  secretName: azure-storage-secret
+  secretNamespace: deeplynxv3-dev
 reclaimPolicy: Retain
 allowVolumeExpansion: true
 mountOptions:
@@ -50,14 +68,17 @@ apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
   name: azureblob-nexus
-  namespace: deeplynxv3-dev
 provisioner: blob.csi.azure.com
 parameters:
   skuName: Premium_LRS
+  storageAccount: ${AZURE_STORAGE_ACCOUNT_NAME}
+  storageEndpointSuffix: core.usgovcloudapi.net
+  secretName: azure-storage-secret
+  secretNamespace: deeplynxv3-dev
+  containerName: ${AZURE_CONTAINER_NAME}
 reclaimPolicy: Retain
 allowVolumeExpansion: true
 volumeBindingMode: Immediate
-
 ---
 # Persistent Volume Claim for Blob storage
 apiVersion: v1
@@ -96,7 +117,10 @@ spec:
             - name: AWS_S3_CONNECTION_STRING
               value: ${AWS_S3_CONNECTION_STRING}
             - name: AZURE_OBJECT_CONNECTION_STRING
-              value: ${AZURE_OBJECT_CONNECTION_STRING}
+              valueFrom:
+                secretKeyRef:
+                  name: azure-storage-secret
+                  key: azurestorageconnectionstring
             - name: AZURE_CONTAINER_NAME
               value: ${AZURE_CONTAINER_NAME}
             - name: ConnectionStrings__DefaultConnection
@@ -245,7 +269,10 @@ spec:
             - name: AWS_S3_CONNECTION_STRING
               value: ${AWS_S3_CONNECTION_STRING}
             - name: AZURE_OBJECT_CONNECTION_STRING
-              value: ${AZURE_OBJECT_CONNECTION_STRING}
+              valueFrom:
+                secretKeyRef:
+                  name: azure-storage-secret
+                  key: azurestorageconnectionstring
             - name: AZURE_CONTAINER_NAME
               value: ${AZURE_CONTAINER_NAME}
             - name: ConnectionStrings__DefaultConnection
