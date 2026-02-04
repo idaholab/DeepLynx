@@ -61,26 +61,6 @@ public class QueryBusinessTests : IntegrationTestBase
         _queryBusiness = new QueryBusiness(Context);
     }
 
-    #region GetMultiProjectRecords Tests
-
-    [Fact]
-    public async Task GetMultiProjectRecords_Success_ReturnsRecordsFromMultipleProjects()
-    {
-        // Arrange
-        var projectIds = new[] { pid, pid2 };
-
-        // Act
-        var result = await _queryBusiness.GetMultiProjectRecords(uid, organizationId, projectIds, true);
-        var records = result.ToList();
-
-        // Assert
-        Assert.NotEmpty(records);
-        Assert.Contains(records, r => r.ProjectId == pid);
-        Assert.Contains(records, r => r.ProjectId == pid2);
-    }
-
-    #endregion
-
     protected override async Task SeedTestDataAsync()
     {
         await base.SeedTestDataAsync();
@@ -568,7 +548,277 @@ public class QueryBusinessTests : IntegrationTestBase
         };
         await Context.Records.AddAsync(pazVizsla);
         await Context.SaveChangesAsync();
+        
+        var projectMember = new ProjectMember
+        {
+            UserId = uid,
+            ProjectId = pid,
+            RoleId = roleId,
+        };
+        Context.ProjectMembers.Add(projectMember);
+        await Context.SaveChangesAsync();
     }
+    
+    #region GetMultiProjectRecords Tests
+
+    [Fact]
+    public async Task GetMultiProjectRecords_Success_ReturnsRecordsFromMultipleProjects()
+    {
+        // Arrange
+        var projectIds = new[] { pid, pid2 };
+
+        // Act
+        var result = await _queryBusiness.GetMultiProjectRecords(uid, organizationId, projectIds, true);
+        var records = result.ToList();
+
+        // Assert
+        Assert.NotEmpty(records);
+        Assert.Contains(records, r => r.ProjectId == pid);
+        Assert.Contains(records, r => r.ProjectId == pid2);
+    }
+
+    #endregion
+
+    #region GetMultiProjectRecords_SensitivityLabel_Authorization Tests
+
+    [Fact]
+    public async Task GetMultiProjectRecords_Success_FiltersUnauthorizedRecords()
+    {
+        // Arrange
+        var projectIds = new[] { pid, pid2 };
+        
+        // Create a sensitivity label
+        var labelDto = new CreateSensitivityLabelRequestDto
+        {
+            Name = "Top Secret Label",
+            Description = "Top Secret Label",
+        };
+        var label = await _sensitivityLabelBusiness.CreateSensitivityLabel(uid, labelDto, pid, organizationId);
+    
+        Context.ChangeTracker.Clear();
+    
+        // Give user write permission to attach the label
+        var writePermission = await Context.Permissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "write");
+    
+        var role = await Context.Roles
+            .Include(r => r.Permissions)
+            .FirstOrDefaultAsync(r => r.Id == roleId);
+    
+        if (role != null && writePermission != null)
+        {
+            role.Permissions.Add(writePermission);
+            await Context.SaveChangesAsync();
+        }
+    
+        Context.ChangeTracker.Clear();
+    
+        // Attach label to Captain Rex
+        await _recordBusiness.AttachLabel(uid, organizationId, pid, rid, label.Id);
+    
+        Context.ChangeTracker.Clear();
+
+        // Act
+        var result = await _queryBusiness.GetMultiProjectRecords(uid, organizationId, projectIds, true);
+        var records = result.ToList();
+
+        // Assert
+        Assert.NotEmpty(records);
+        Assert.Contains(records, r => r.ProjectId == pid);
+        Assert.Contains(records, r => r.ProjectId == pid2);
+        Assert.DoesNotContain(records, r => r.Name == "Captain Rex");
+    }
+    
+    [Fact]
+    public async Task GetMultiProjectRecords_ReturnsAuthorizedRecords()
+    {
+        // Arrange
+        var projectIds = new[] { pid, pid2 };
+        
+        // Create a sensitivity label
+        var labelDto = new CreateSensitivityLabelRequestDto
+        {
+            Name = "Top Secret Label",
+            Description = "Top Secret Label",
+        };
+        var label = await _sensitivityLabelBusiness.CreateSensitivityLabel(uid, labelDto, pid, organizationId);
+    
+        Context.ChangeTracker.Clear();
+    
+        // Give user write permission to attach the label
+        var writePermission = await Context.Permissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "write");
+        
+        var readPermission = await Context.Permissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "read");
+    
+        var role = await Context.Roles
+            .Include(r => r.Permissions)
+            .FirstOrDefaultAsync(r => r.Id == roleId);
+
+        if (role != null && writePermission != null && readPermission != null)
+        {
+            role.Permissions.Add(writePermission);
+            role.Permissions.Add(readPermission);
+            await Context.SaveChangesAsync();
+        }
+    
+        Context.ChangeTracker.Clear();
+    
+        // Attach label to Captain Rex
+        await _recordBusiness.AttachLabel(uid, organizationId, pid, rid, label.Id);
+    
+        Context.ChangeTracker.Clear();
+
+        // Act
+        var result = await _queryBusiness.GetMultiProjectRecords(uid, organizationId, projectIds, true);
+        var records = result.ToList();
+
+        // Assert
+        Assert.NotEmpty(records);
+        Assert.Contains(records, r => r.ProjectId == pid);
+        Assert.Contains(records, r => r.ProjectId == pid2);
+        Assert.Contains(records, r => r.Name == "Captain Rex");
+    }
+    
+    [Fact]
+    public async Task GetMultiProjectRecords_MultipleLabels_FiltersUnauthorizedRecords()
+    {
+        // Arrange
+        var projectIds = new[] { pid, pid2 };
+        
+        var labelDto = new CreateSensitivityLabelRequestDto
+        {
+            Name = "Top Secret Label",
+            Description = "Top Secret Label",
+        };
+        var labelDto2 = new CreateSensitivityLabelRequestDto
+        {
+            Name = "Very Confidential",
+            Description = "Very Confidential Label",
+        };
+        var label = await _sensitivityLabelBusiness.CreateSensitivityLabel(uid, labelDto, pid, organizationId);
+        var label2 = await _sensitivityLabelBusiness.CreateSensitivityLabel(uid, labelDto2, pid, organizationId);
+        Context.ChangeTracker.Clear();
+    
+        // Give user read and write permission to attach and retrieve label
+        var writePermission = await Context.Permissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "write");
+        
+        var writePermission2 = await Context.Permissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label2.Id && p.Action == "write");
+        
+        var readPermission = await Context.Permissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "read");
+    
+        var role = await Context.Roles
+            .Include(r => r.Permissions)
+            .FirstOrDefaultAsync(r => r.Id == roleId);
+    
+        if (role != null && writePermission != null && writePermission2 != null && readPermission != null)
+        {
+            role.Permissions.Add(writePermission);
+            role.Permissions.Add(writePermission2);
+            role.Permissions.Add(readPermission);
+            await Context.SaveChangesAsync();
+        }
+    
+        Context.ChangeTracker.Clear();
+    
+        // Attach label to Captain Rex
+        await _recordBusiness.AttachLabel(uid, organizationId, pid, rid, label.Id);
+        await _recordBusiness.AttachLabel(uid, organizationId, pid, rid, label2.Id);
+    
+        Context.ChangeTracker.Clear();
+
+        // Act
+        var result = await _queryBusiness.GetMultiProjectRecords(uid, organizationId, projectIds, true);
+        var records = result.ToList();
+
+        // Assert
+        Assert.NotEmpty(records);
+        Assert.Contains(records, r => r.ProjectId == pid);
+        Assert.Contains(records, r => r.ProjectId == pid2);
+        Assert.DoesNotContain(records, r => r.Name == "Captain Rex");
+    }
+    
+    [Fact]
+    public async Task GetMultiProjectRecords_MultipleLabels_ReturnsAuthorizedRecords()
+    {
+        // Arrange
+        var projectIds = new[] { pid, pid2 };
+        
+        var labelDto = new CreateSensitivityLabelRequestDto
+        {
+            Name = "Top Secret Label",
+            Description = "Top Secret Label",
+        };
+        var labelDto2 = new CreateSensitivityLabelRequestDto
+        {
+            Name = "Very Confidential",
+            Description = "Very Confidential Label",
+        };
+        var label = await _sensitivityLabelBusiness.CreateSensitivityLabel(uid, labelDto, pid, organizationId);
+        var label2 = await _sensitivityLabelBusiness.CreateSensitivityLabel(uid, labelDto2, pid, organizationId);
+        Context.ChangeTracker.Clear();
+    
+        // Give user read and write permission to attach and retrieve label
+        var writePermission = await Context.Permissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "write");
+        
+        var writePermission2 = await Context.Permissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label2.Id && p.Action == "write");
+        
+        var readPermission = await Context.Permissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "read");
+        
+        var readPermission2 = await Context.Permissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label2.Id && p.Action == "read");
+    
+        var role = await Context.Roles
+            .Include(r => r.Permissions)
+            .FirstOrDefaultAsync(r => r.Id == roleId);
+    
+        if (role != null && writePermission != null && writePermission2 != null 
+            && readPermission != null && readPermission2 != null)
+        {
+            role.Permissions.Add(writePermission);
+            role.Permissions.Add(writePermission2);
+            role.Permissions.Add(readPermission);
+            role.Permissions.Add(readPermission2);
+            await Context.SaveChangesAsync();
+        }
+    
+        Context.ChangeTracker.Clear();
+    
+        // Attach label to Captain Rex
+        await _recordBusiness.AttachLabel(uid, organizationId, pid, rid, label.Id);
+        await _recordBusiness.AttachLabel(uid, organizationId, pid, rid, label2.Id);
+    
+        Context.ChangeTracker.Clear();
+
+        // Act
+        var result = await _queryBusiness.GetMultiProjectRecords(uid, organizationId, projectIds, true);
+        var records = result.ToList();
+
+        // Assert
+        Assert.NotEmpty(records);
+        Assert.Contains(records, r => r.ProjectId == pid);
+        Assert.Contains(records, r => r.ProjectId == pid2);
+        Assert.Contains(records, r => r.Name == "Captain Rex");
+    }
+
+    #endregion
 
     #region Search Tests
 
@@ -877,6 +1127,227 @@ public class QueryBusinessTests : IntegrationTestBase
         Assert.Contains("Search query is required", exception.Message);
     }
 
+    #endregion
+
+    #region Search_SensitivityLabelsAuthorization Tests
+    
+    [Fact]
+    public async Task Search_FiltersRecord_UserUnauthorized()
+    {
+        // Create a sensitivity label
+        var labelDto = new CreateSensitivityLabelRequestDto
+        {
+            Name = "Top Secret Label",
+            Description = "Top Secret Label",
+        };
+        var label = await _sensitivityLabelBusiness.CreateSensitivityLabel(uid, labelDto, pid, organizationId);
+    
+        Context.ChangeTracker.Clear();
+    
+        // Give user write permission to attach the label
+        var writePermission = await Context.Permissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "write");
+    
+        var role = await Context.Roles
+            .Include(r => r.Permissions)
+            .FirstOrDefaultAsync(r => r.Id == roleId);
+    
+        if (role != null && writePermission != null)
+        {
+            role.Permissions.Add(writePermission);
+            await Context.SaveChangesAsync();
+        }
+    
+        Context.ChangeTracker.Clear();
+    
+        // Attach label to Captain Rex
+        await _recordBusiness.AttachLabel(uid, organizationId, pid, rid, label.Id);
+    
+        Context.ChangeTracker.Clear();
+        
+        // Act
+        var result = await _queryBusiness.Search(uid, "Captain Rex", organizationId, [pid]);
+        var records = result.ToList();
+    
+        // Assert
+        Assert.Empty(records);
+    }
+    
+    [Fact]
+    public async Task Search_RecordHasLabel_UserAuthorized()
+    {
+        // Create a sensitivity label
+        var labelDto = new CreateSensitivityLabelRequestDto
+        {
+            Name = "Top Secret Label",
+            Description = "Top Secret Label",
+        };
+        var label = await _sensitivityLabelBusiness.CreateSensitivityLabel(uid, labelDto, pid, organizationId);
+    
+        Context.ChangeTracker.Clear();
+    
+        // Give user write permission to attach the label
+        var writePermission = await Context.Permissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "write");
+        
+        var readPermission = await Context.Permissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "read");
+    
+        var role = await Context.Roles
+            .Include(r => r.Permissions)
+            .FirstOrDefaultAsync(r => r.Id == roleId);
+    
+        if (role != null && writePermission != null && readPermission != null)
+        {
+            role.Permissions.Add(writePermission);
+            role.Permissions.Add(readPermission);
+            await Context.SaveChangesAsync();
+        }
+    
+        Context.ChangeTracker.Clear();
+    
+        // Attach label to Captain Rex
+        await _recordBusiness.AttachLabel(uid, organizationId, pid, rid, label.Id);
+    
+        Context.ChangeTracker.Clear();
+        
+        // Act
+        var result = await _queryBusiness.Search(uid, "Captain Rex", organizationId, [pid]);
+        var records = result.ToList();
+    
+        // Assert
+        Assert.NotEmpty(records);
+        Assert.Contains(records, r => r.Name == "Captain Rex");
+    }
+    
+    [Fact]
+    public async Task Search_RecordHasMultipleLabels_UserUnauthorized()
+    {
+        // Create a sensitivity label
+        var labelDto = new CreateSensitivityLabelRequestDto
+        {
+            Name = "Top Secret Label",
+            Description = "Top Secret Label",
+        };
+        var labelDto2 = new CreateSensitivityLabelRequestDto
+        {
+            Name = "Very Confidential",
+            Description = "Very Confidential Label",
+        };
+        var label = await _sensitivityLabelBusiness.CreateSensitivityLabel(uid, labelDto, pid, organizationId);
+        var label2 = await _sensitivityLabelBusiness.CreateSensitivityLabel(uid, labelDto2, pid, organizationId);
+        Context.ChangeTracker.Clear();
+    
+        // Give user read and write permission to attach and retrieve label
+        var writePermission = await Context.Permissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "write");
+        
+        var writePermission2 = await Context.Permissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label2.Id && p.Action == "write");
+        
+        var readPermission = await Context.Permissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "read");
+    
+        var role = await Context.Roles
+            .Include(r => r.Permissions)
+            .FirstOrDefaultAsync(r => r.Id == roleId);
+    
+        if (role != null && writePermission != null && writePermission2 != null && readPermission != null)
+        {
+            role.Permissions.Add(writePermission);
+            role.Permissions.Add(writePermission2);
+            role.Permissions.Add(readPermission);
+            await Context.SaveChangesAsync();
+        }
+    
+        Context.ChangeTracker.Clear();
+    
+        // Attach label to Captain Rex
+        await _recordBusiness.AttachLabel(uid, organizationId, pid, rid, label.Id);
+        await _recordBusiness.AttachLabel(uid, organizationId, pid, rid, label2.Id);
+    
+        Context.ChangeTracker.Clear();
+        
+        // Act
+        var result = await _queryBusiness.Search(uid, "Captain Rex", organizationId, [pid]);
+        var records = result.ToList();
+    
+        // Assert
+        Assert.Empty(records);
+    }
+    
+       [Fact]
+    public async Task Search_RecordHasMultipleLabels_UserAuthorized()
+    {
+        // Create a sensitivity label
+        var labelDto = new CreateSensitivityLabelRequestDto
+        {
+            Name = "Top Secret Label",
+            Description = "Top Secret Label",
+        };
+        var labelDto2 = new CreateSensitivityLabelRequestDto
+        {
+            Name = "Very Confidential",
+            Description = "Very Confidential Label",
+        };
+        var label = await _sensitivityLabelBusiness.CreateSensitivityLabel(uid, labelDto, pid, organizationId);
+        var label2 = await _sensitivityLabelBusiness.CreateSensitivityLabel(uid, labelDto2, pid, organizationId);
+        Context.ChangeTracker.Clear();
+    
+        // Give user read and write permission to attach and retrieve label
+        var writePermission = await Context.Permissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "write");
+        
+        var writePermission2 = await Context.Permissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label2.Id && p.Action == "write");
+        
+        var readPermission = await Context.Permissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "read");
+        
+        var readPermission2 = await Context.Permissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label2.Id && p.Action == "read");
+    
+        var role = await Context.Roles
+            .Include(r => r.Permissions)
+            .FirstOrDefaultAsync(r => r.Id == roleId);
+    
+        if (role != null && writePermission != null && writePermission2 != null 
+            && readPermission != null && readPermission2 != null)
+        {
+            role.Permissions.Add(writePermission);
+            role.Permissions.Add(writePermission2);
+            role.Permissions.Add(readPermission);
+            role.Permissions.Add(readPermission2);
+            await Context.SaveChangesAsync();
+        }
+    
+        Context.ChangeTracker.Clear();
+    
+        // Attach label to Captain Rex
+        await _recordBusiness.AttachLabel(uid, organizationId, pid, rid, label.Id);
+        await _recordBusiness.AttachLabel(uid, organizationId, pid, rid, label2.Id);
+    
+        Context.ChangeTracker.Clear();
+        
+        // Act
+        var result = await _queryBusiness.Search(uid, "Captain Rex", organizationId, [pid]);
+        var records = result.ToList();
+    
+        // Assert
+        Assert.NotEmpty(records);
+        Assert.Contains(records, r => r.Name == "Captain Rex");
+    }
+    
     #endregion
 
     #region QueryBuilder Tests
@@ -1513,6 +1984,288 @@ public class QueryBusinessTests : IntegrationTestBase
     }
 
     #endregion
+    
+    #region QueryBuilder_SensitivityLabelsAuthorization Tests
+
+    [Fact]
+    public async Task QueryBuilder_FilterOutRecordWithInaccessibleLabel_ReturnsOnlyAccessibleRecords()
+    {
+        // Create a sensitivity label
+        var labelDto = new CreateSensitivityLabelRequestDto
+        {
+            Name = "Top Secret Label",
+            Description = "Top Secret Label",
+        };
+        var label = await _sensitivityLabelBusiness.CreateSensitivityLabel(uid, labelDto, pid, organizationId);
+    
+        Context.ChangeTracker.Clear();
+    
+        // Give user write permission to attach the label
+        var writePermission = await Context.Permissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "write");
+    
+        var role = await Context.Roles
+            .Include(r => r.Permissions)
+            .FirstOrDefaultAsync(r => r.Id == roleId);
+    
+        if (role != null && writePermission != null)
+        {
+            role.Permissions.Add(writePermission);
+            await Context.SaveChangesAsync();
+        }
+    
+        Context.ChangeTracker.Clear();
+    
+        // Attach label to Captain Rex
+        await _recordBusiness.AttachLabel(uid, organizationId, pid, rid, label.Id);
+    
+        Context.ChangeTracker.Clear();
+        
+        var dto1 = new CustomQueryDtos.CustomQueryRequestDto
+        {
+            Connector = null, Filter = "name", Operator = "LIKE", Value = "rex"
+        };
+        var dto2 = new CustomQueryDtos.CustomQueryRequestDto
+        {
+            Connector = "OR", Filter = "name", Operator = "=", Value = "Tech"
+        };
+        var dto3 = new CustomQueryDtos.CustomQueryRequestDto
+        {
+            Connector = "OR", Filter = "name", Operator = "=", Value = "Hunter"
+        };
+    
+        // Act
+        var result = await _queryBusiness.QueryBuilder(uid, [dto1, dto2, dto3], organizationId, [pid]);
+        var records = result.ToList();
+    
+        // Assert
+        Assert.Equal(2, records.Count);
+        Assert.DoesNotContain(records, r => r.Name == "Captain Rex");
+    }
+    
+    [Fact]
+    public async Task QueryBuilder_RecordHasLabel_UserAuthorized_RetrievesRecord()
+    {
+        // Create a sensitivity label
+        var labelDto = new CreateSensitivityLabelRequestDto
+        {
+            Name = "Top Secret Label",
+            Description = "Top Secret Label",
+        };
+        var label = await _sensitivityLabelBusiness.CreateSensitivityLabel(uid, labelDto, pid, organizationId);
+    
+        Context.ChangeTracker.Clear();
+    
+        // Give user read and write permission to attach and retrieve label
+        var writePermission = await Context.Permissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "write");
+        
+        var readPermission = await Context.Permissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "read");
+    
+        var role = await Context.Roles
+            .Include(r => r.Permissions)
+            .FirstOrDefaultAsync(r => r.Id == roleId);
+    
+        if (role != null && writePermission != null && readPermission != null)
+        {
+            role.Permissions.Add(writePermission);
+            role.Permissions.Add(readPermission);
+            await Context.SaveChangesAsync();
+        }
+    
+        Context.ChangeTracker.Clear();
+    
+        // Attach label to Captain Rex
+        await _recordBusiness.AttachLabel(uid, organizationId, pid, rid, label.Id);
+    
+        Context.ChangeTracker.Clear();
+        
+        var dto1 = new CustomQueryDtos.CustomQueryRequestDto
+        {
+            Connector = null, Filter = "name", Operator = "LIKE", Value = "rex"
+        };
+        var dto2 = new CustomQueryDtos.CustomQueryRequestDto
+        {
+            Connector = "OR", Filter = "name", Operator = "=", Value = "Tech"
+        };
+        var dto3 = new CustomQueryDtos.CustomQueryRequestDto
+        {
+            Connector = "OR", Filter = "name", Operator = "=", Value = "Hunter"
+        };
+    
+        // Act
+        var result = await _queryBusiness.QueryBuilder(uid, [dto1, dto2, dto3], organizationId, [pid]);
+        var records = result.ToList();
+    
+        // Assert
+        Assert.Equal(3, records.Count);
+        Assert.Contains(records, r => r.Name == "Captain Rex");
+    }
+    
+    [Fact]
+    public async Task QueryBuilder_RecordHasMultipleLabels_UserAuthorizedSingleLabel_FiltersRecord()
+    {
+        // Create a sensitivity label
+        var labelDto = new CreateSensitivityLabelRequestDto
+        {
+            Name = "Top Secret Label",
+            Description = "Top Secret Label",
+        };
+        var labelDto2 = new CreateSensitivityLabelRequestDto
+        {
+            Name = "Very Confidential",
+            Description = "Very Confidential Label",
+        };
+        var label = await _sensitivityLabelBusiness.CreateSensitivityLabel(uid, labelDto, pid, organizationId);
+        var label2 = await _sensitivityLabelBusiness.CreateSensitivityLabel(uid, labelDto2, pid, organizationId);
+        Context.ChangeTracker.Clear();
+    
+        // Give user read and write permission to attach and retrieve label
+        var writePermission = await Context.Permissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "write");
+        
+        var writePermission2 = await Context.Permissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label2.Id && p.Action == "write");
+        
+        var readPermission = await Context.Permissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "read");
+    
+        var role = await Context.Roles
+            .Include(r => r.Permissions)
+            .FirstOrDefaultAsync(r => r.Id == roleId);
+    
+        if (role != null && writePermission != null && writePermission2 != null && readPermission != null)
+        {
+            role.Permissions.Add(writePermission);
+            role.Permissions.Add(writePermission2);
+            role.Permissions.Add(readPermission);
+            await Context.SaveChangesAsync();
+        }
+    
+        Context.ChangeTracker.Clear();
+    
+        // Attach label to Captain Rex
+        await _recordBusiness.AttachLabel(uid, organizationId, pid, rid, label.Id);
+        await _recordBusiness.AttachLabel(uid, organizationId, pid, rid, label2.Id);
+    
+        Context.ChangeTracker.Clear();
+        
+        var dto1 = new CustomQueryDtos.CustomQueryRequestDto
+        {
+            Connector = null, Filter = "name", Operator = "LIKE", Value = "rex"
+        };
+        var dto2 = new CustomQueryDtos.CustomQueryRequestDto
+        {
+            Connector = "OR", Filter = "name", Operator = "=", Value = "Tech"
+        };
+        var dto3 = new CustomQueryDtos.CustomQueryRequestDto
+        {
+            Connector = "OR", Filter = "name", Operator = "=", Value = "Hunter"
+        };
+    
+        // Act
+        var result = await _queryBusiness.QueryBuilder(uid, [dto1, dto2, dto3], organizationId, [pid]);
+        var records = result.ToList();
+    
+        // Assert
+        Assert.Equal(2, records.Count);
+        Assert.DoesNotContain(records, r => r.Name == "Captain Rex");
+    }
+    
+    [Fact]
+    public async Task QueryBuilder_RecordHasMultipleLabels_UserAuthorizedAllLabels_ReturnsRecord()
+    {
+        // Create a sensitivity label
+        var labelDto = new CreateSensitivityLabelRequestDto
+        {
+            Name = "Top Secret Label",
+            Description = "Top Secret Label",
+        };
+        var labelDto2 = new CreateSensitivityLabelRequestDto
+        {
+            Name = "Very Confidential",
+            Description = "Very Confidential Label",
+        };
+        var label = await _sensitivityLabelBusiness.CreateSensitivityLabel(uid, labelDto, pid, organizationId);
+        var label2 = await _sensitivityLabelBusiness.CreateSensitivityLabel(uid, labelDto2, pid, organizationId);
+        Context.ChangeTracker.Clear();
+    
+        // Give user read and write permission to attach and retrieve label
+        var writePermission = await Context.Permissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "write");
+        
+        var writePermission2 = await Context.Permissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label2.Id && p.Action == "write");
+        
+        var readPermission = await Context.Permissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "read");
+        
+        var readPermission2 = await Context.Permissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label2.Id && p.Action == "read");
+    
+        if (writePermission != null && writePermission2 != null && readPermission != null && readPermission2 != null)
+        {
+            var role = await Context.Roles
+                .Include(r => r.Permissions)
+                .FirstOrDefaultAsync(r => r.Id == roleId);
+    
+            if (role != null)
+            {
+                // Attach the permissions first
+                Context.Attach(writePermission);
+                Context.Attach(writePermission2);
+                Context.Attach(readPermission);
+                Context.Attach(readPermission2);
+        
+                role.Permissions.Add(writePermission);
+                role.Permissions.Add(writePermission2);
+                role.Permissions.Add(readPermission);
+                role.Permissions.Add(readPermission2);
+                await Context.SaveChangesAsync();
+            }
+        }
+    
+        Context.ChangeTracker.Clear();
+    
+        // Attach label to Captain Rex
+        await _recordBusiness.AttachLabel(uid, organizationId, pid, rid, label.Id);
+        await _recordBusiness.AttachLabel(uid, organizationId, pid, rid, label2.Id);
+        
+        Context.ChangeTracker.Clear();
+        
+        var dto1 = new CustomQueryDtos.CustomQueryRequestDto
+        {
+            Connector = null, Filter = "name", Operator = "LIKE", Value = "rex"
+        };
+        var dto2 = new CustomQueryDtos.CustomQueryRequestDto
+        {
+            Connector = "OR", Filter = "name", Operator = "=", Value = "Tech"
+        };
+        var dto3 = new CustomQueryDtos.CustomQueryRequestDto
+        {
+            Connector = "OR", Filter = "name", Operator = "=", Value = "Hunter"
+        };
+    
+        // Act
+        var result = await _queryBusiness.QueryBuilder(uid, [dto1, dto2, dto3], organizationId, [pid]);
+        var records = result.ToList();
+    
+        // Assert
+        Assert.Equal(3, records.Count);
+        Assert.Contains(records, r => r.Name == "Captain Rex");
+    }
+    #endregion
 
     #region GetRecentlyAddedRecords Tests
 
@@ -1595,18 +2348,6 @@ public class QueryBusinessTests : IntegrationTestBase
         // Arrange
         var projectIds = new[] { pid };
 
-        // Create ProjectMember to link user to project with a role
-        var projectMember = new ProjectMember
-        {
-            UserId = uid,
-            ProjectId = pid,
-            RoleId = roleId,
-        };
-        Context.ProjectMembers.Add(projectMember);
-        await Context.SaveChangesAsync();
-
-        Context.ChangeTracker.Clear();
-
         // Create a sensitivity label
         var labelDto = new CreateSensitivityLabelRequestDto
         {
@@ -1638,12 +2379,7 @@ public class QueryBusinessTests : IntegrationTestBase
         await _recordBusiness.AttachLabel(uid, organizationId, pid, rid, label.Id);
 
         Context.ChangeTracker.Clear();
-
-        // Remove write permission so user can't read the labeled record
-        role = await Context.Roles
-            .Include(r => r.Permissions)
-            .FirstOrDefaultAsync(r => r.Id == roleId);
-
+        
         if (role != null && writePermission != null)
         {
             var permissionToRemove = role.Permissions.FirstOrDefault(p => p.Id == writePermission.Id);
@@ -1674,18 +2410,6 @@ public class QueryBusinessTests : IntegrationTestBase
     {
         // Arrange
         var projectIds = new[] { pid };
-
-        // Create ProjectMember to link user to project with a role
-        var projectMember = new ProjectMember
-        {
-            UserId = uid,
-            ProjectId = pid,
-            RoleId = roleId,
-        };
-        Context.ProjectMembers.Add(projectMember);
-        await Context.SaveChangesAsync();
-
-        Context.ChangeTracker.Clear();
 
         // Create a sensitivity label
         var labelDto = new CreateSensitivityLabelRequestDto
@@ -1742,18 +2466,6 @@ public class QueryBusinessTests : IntegrationTestBase
     {
         // Arrange
         var projectIds = new[] { pid };
-
-        // Create ProjectMember to link user to project with a role
-        var projectMember = new ProjectMember
-        {
-            UserId = uid,
-            ProjectId = pid,
-            RoleId = roleId,
-        };
-        Context.ProjectMembers.Add(projectMember);
-        await Context.SaveChangesAsync();
-
-        Context.ChangeTracker.Clear();
 
         // Act - No labels attached to any records
         var result = await _queryBusiness.GetRecentlyAddedRecords(uid, organizationId, projectIds);

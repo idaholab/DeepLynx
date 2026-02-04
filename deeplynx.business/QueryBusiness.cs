@@ -73,8 +73,12 @@ public class QueryBusiness : IQueryBusiness
                     WHERE record_id = hr.record_id
                 )
                 OR
-                -- Or the user has permission for at least one of the record's labels
-                rl.label_id = ANY(@authorizedLabelIds)
+                NOT EXISTS (
+                    SELECT 1
+                    FROM deeplynx.record_labels rl2
+                    WHERE rl2.record_id = hr.record_id
+                    AND rl2.label_id != ALL(@authorizedLabelIds)
+                )
             )";
 
             var parameters = new List<NpgsqlParameter>();
@@ -328,8 +332,13 @@ public class QueryBusiness : IQueryBusiness
             WHERE record_id = hr.record_id
         )
         OR
-        rl.label_id = ANY(@authorized_label_ids)
-    )
+        NOT EXISTS (
+            SELECT 1
+            FROM deeplynx.record_labels rl2
+            WHERE rl2.record_id = hr.record_id
+            AND rl2.label_id != ALL(@authorized_label_ids)
+                )
+    ) 
     AND (
         -- Search conditions
         to_tsvector('english',
@@ -417,8 +426,8 @@ public class QueryBusiness : IQueryBusiness
                 // Either the record has no labels
                 !rec.Labels.Any()
                 ||
-                // Or the record has at least one authorized label
-                rec.Labels.Any(label => authorizedLabelIds.Contains(label.Id))
+                // Or the user is authorized to access All of the records labels
+                rec.Labels.All(label => authorizedLabelIds.Contains(label.Id))
             )
             .Select(rec => rec.Id)
             .ToListAsync();
@@ -476,8 +485,8 @@ public class QueryBusiness : IQueryBusiness
                 // Either the record has no labels
                 !rec.Labels.Any()
                 ||
-                // Or the record has at least one authorized label
-                rec.Labels.Any(label => authorizedLabelIds.Contains(label.Id))
+                // Or the user is authorized to access all the records labels
+                rec.Labels.All(label => authorizedLabelIds.Contains(label.Id))
             )
             .Select(rec => rec.Id)
             .ToListAsync();
