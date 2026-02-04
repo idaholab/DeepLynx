@@ -1,16 +1,19 @@
 // src/app/(home)/record/components/AddEdgeModal.tsx
 
 import React, { useState, useEffect } from "react";
-import SearchBar from "../../components/SearchBar";
-import { useLanguage } from "@/app/contexts/Language";
 import {
   ArrowLeftIcon,
   ArrowRightIcon,
   MagnifyingGlassIcon,
   XMarkIcon,
 } from "@heroicons/react/24/outline";
+import SearchBar from "../../components/SearchBar";
+import { useLanguage } from "@/app/contexts/Language";
 
-// Types
+// ============================================================================
+// TYPE DEFINITIONS
+// ============================================================================
+
 export interface RecordSearchResult {
   id: number;
   name: string;
@@ -43,7 +46,6 @@ interface AddEdgeModalProps {
     relationship: string;
     direction: "outgoing" | "incoming";
   }) => Promise<void>;
-  dataSourceId?: number;
 }
 
 type RecordCardRecord = {
@@ -53,7 +55,14 @@ type RecordCardRecord = {
   dataSourceName?: string;
 };
 
-// Record Detail Card Component
+// ============================================================================
+// SUB-COMPONENTS
+// ============================================================================
+
+/**
+ * RecordCard - Displays a record's basic information in a card format
+ * Can be shown as a placeholder when no record is selected
+ */
 const RecordCard = ({
   record,
   isPlaceholder = false,
@@ -112,33 +121,48 @@ const RecordCard = ({
   );
 };
 
-// Main Modal Component
+// ============================================================================
+// MAIN COMPONENT
+// ============================================================================
+
 export default function AddEdgeModal({
   isOpen,
   onClose,
   currentRecord,
   relationship,
   direction,
-  projectId,
-  organizationId,
   onSearchRecords,
   onCreateRelationships,
 }: AddEdgeModalProps) {
   const { t } = useLanguage();
+
+  // ============================================================================
+  // STATE MANAGEMENT
+  // ============================================================================
+
+  // Search state
   const [searchTerm, setSearchTerm] = useState("");
   const [searchResults, setSearchResults] = useState<RecordSearchResult[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [hasSearched, setHasSearched] = useState(false);
+
+  // Selection state
   const [selectedRecords, setSelectedRecords] = useState<RecordSearchResult[]>(
     [],
   );
-  const [selectedRelationship, setSelectedRelationship] =
-    useState(relationship);
   const [selectedDirection, setSelectedDirection] = useState(direction);
-  const [isSearching, setIsSearching] = useState(false);
-  const [isCreating, setIsCreating] = useState(false);
-  const [hasSearched, setHasSearched] = useState(false);
-  const [directionSwitch, setDirectionSwitch] = useState(direction);
+  const [selectedRelationship] = useState(relationship);
 
-  // Reset state when modal opens/closes
+  // UI state
+  const [isCreating, setIsCreating] = useState(false);
+
+  // ============================================================================
+  // EFFECTS
+  // ============================================================================
+
+  /**
+   * Reset modal state when it closes
+   */
   useEffect(() => {
     if (!isOpen) {
       setSearchTerm("");
@@ -148,6 +172,13 @@ export default function AddEdgeModal({
     }
   }, [isOpen]);
 
+  // ============================================================================
+  // HANDLERS
+  // ============================================================================
+
+  /**
+   * Handles search submission from SearchBar
+   */
   const handleSearch = async (payload: { query: string; option?: string }) => {
     const { query, option } = payload;
 
@@ -162,7 +193,7 @@ export default function AddEdgeModal({
 
     try {
       const results = await onSearchRecords(query, option);
-      // Filter out the current record from results
+      // Filter out the current record to prevent self-linking
       const filteredResults = results.filter((r) => r.id !== currentRecord.id);
       setSearchResults(filteredResults);
     } catch (error) {
@@ -173,6 +204,9 @@ export default function AddEdgeModal({
     }
   };
 
+  /**
+   * Toggles a record's selection state
+   */
   const handleToggleRecord = (record: RecordSearchResult) => {
     setSelectedRecords((prev) => {
       const isSelected = prev.some((r) => r.id === record.id);
@@ -183,10 +217,16 @@ export default function AddEdgeModal({
     });
   };
 
+  /**
+   * Checks if a record is currently selected
+   */
   const isRecordSelected = (recordId: number) => {
     return selectedRecords.some((r) => r.id === recordId);
   };
 
+  /**
+   * Creates relationships for all selected records
+   */
   const handleCreate = async () => {
     setIsCreating(true);
     try {
@@ -203,12 +243,16 @@ export default function AddEdgeModal({
     }
   };
 
+  // ============================================================================
+  // RENDER
+  // ============================================================================
+
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-lg shadow-xl max-w-6xl w-full max-h-[90vh] overflow-hidden flex flex-col">
-        {/* Header */}
+        {/* ===== HEADER ===== */}
         <div className="p-6 border-b border-gray-200">
           <div className="flex justify-between items-center">
             <h3 className="text-2xl font-bold">
@@ -223,16 +267,17 @@ export default function AddEdgeModal({
           </div>
         </div>
 
-        {/* Content */}
+        {/* ===== CONTENT ===== */}
         <div className="flex-1 overflow-y-auto p-6">
           <div className="grid grid-cols-[1fr_auto_1fr] gap-6 items-start">
-            {/* Left: Current Record + Metadata */}
+            {/* ----- LEFT COLUMN: Current Record + Direction Control ----- */}
             <div className="space-y-4">
               <p className="text-sm font-medium text-gray-600">
                 {selectedDirection === "outgoing"
                   ? t.translations.FROM_
                   : t.translations.TO}
               </p>
+
               <RecordCard record={currentRecord} t={t} />
 
               {/* Relationship Metadata Panel */}
@@ -248,12 +293,9 @@ export default function AddEdgeModal({
                   </label>
                   <div className="flex gap-2">
                     <button
-                      onClick={() => {
-                        setSelectedDirection("outgoing");
-                        setDirectionSwitch(selectedDirection);
-                      }}
+                      onClick={() => setSelectedDirection("outgoing")}
                       className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                        selectedDirection && directionSwitch === "outgoing"
+                        selectedDirection === "outgoing"
                           ? "bg-blue-600 text-white"
                           : "bg-white border border-gray-300 text-gray-700 hover:bg-gray-50"
                       }`}
@@ -262,12 +304,9 @@ export default function AddEdgeModal({
                       {t.translations.OUTGOING}
                     </button>
                     <button
-                      onClick={() => {
-                        setSelectedDirection("incoming");
-                        setDirectionSwitch(selectedDirection);
-                      }}
+                      onClick={() => setSelectedDirection("incoming")}
                       className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                        selectedDirection && directionSwitch === "incoming"
+                        selectedDirection === "incoming"
                           ? "bg-blue-600 text-white"
                           : "bg-white border border-gray-300 text-gray-700 hover:bg-gray-50"
                       }`}
@@ -280,24 +319,17 @@ export default function AddEdgeModal({
               </div>
             </div>
 
-            {/* Middle: Relationship Arrow */}
+            {/* ----- MIDDLE COLUMN: Relationship Arrow ----- */}
             <div className="flex flex-col items-center justify-center pt-12">
               {selectedDirection === "outgoing" ? (
                 <ArrowRightIcon className="h-10 w-10 text-blue-600" />
               ) : (
                 <ArrowLeftIcon className="h-10 w-10 text-blue-600" />
               )}
-              <div className="mt-3 px-4 py-2 bg-blue-100 rounded-lg border border-blue-300 text-center">
-                <div className="text-xs text-gray-600 mb-1">
-                  {t.translations.RELATIONSHIP}
-                </div>
-                <span className="font-semibold text-sm">
-                  {selectedRelationship}
-                </span>
-              </div>
+              {/* TODO: Add relationship type selector when backend supports filtering by direction */}
             </div>
 
-            {/* Right: Selection Area */}
+            {/* ----- RIGHT COLUMN: Record Search & Selection ----- */}
             <div>
               <div className="text-sm font-medium text-gray-600 mb-3">
                 {selectedDirection === "outgoing"
@@ -367,9 +399,9 @@ export default function AddEdgeModal({
                     aditionalFilters={false}
                   />
 
-                  {/* Search Results */}
+                  {/* Loading State */}
                   {isSearching && (
-                    <div className="border border-gray-300 rounded-lg p-4 text-center">
+                    <div className="border border-gray-300 rounded-lg p-4 text-center mt-2">
                       <div className="loading loading-spinner loading-md"></div>
                       <p className="text-sm text-gray-500 mt-2">
                         {t.translations.SEARCHING}
@@ -377,18 +409,20 @@ export default function AddEdgeModal({
                     </div>
                   )}
 
+                  {/* No Results State */}
                   {!isSearching &&
                     hasSearched &&
                     searchResults.length === 0 && (
-                      <div className="border border-gray-300 rounded-lg p-4 text-center">
+                      <div className="border border-gray-300 rounded-lg p-4 text-center mt-2">
                         <p className="text-sm text-gray-500">
                           {t.translations.NO_RECORDS_FOUND}
                         </p>
                       </div>
                     )}
 
+                  {/* Search Results List */}
                   {!isSearching && searchResults.length > 0 && (
-                    <div className="border border-gray-300 rounded-lg max-h-64 overflow-y-auto">
+                    <div className="border border-gray-300 rounded-lg max-h-64 overflow-y-auto mt-2">
                       {searchResults.map((record) => {
                         const selected = isRecordSelected(record.id);
                         return (
@@ -432,7 +466,7 @@ export default function AddEdgeModal({
           </div>
         </div>
 
-        {/* Footer */}
+        {/* ===== FOOTER ===== */}
         <div className="p-6 border-t border-gray-200 flex justify-end gap-3">
           <button
             onClick={onClose}

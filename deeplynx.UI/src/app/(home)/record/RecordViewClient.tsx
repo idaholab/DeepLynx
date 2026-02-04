@@ -995,7 +995,6 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
         organizationId={organization?.organizationId as number}
         onSearchRecords={handleSearchRecords}
         onCreateRelationships={handleCreateRelationships}
-        dataSourceId={record?.dataSourceId}
       />
     </div>
   );
