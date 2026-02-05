@@ -28,12 +28,10 @@ import {
   createEdge,
   getEdgeByRelationship,
 } from "@/app/lib/client_service/edge_services.client";
-import {
-  fullTextSearch,
-  getHistoricalRecord,
-} from "@/app/lib/client_service/query_services.client";
+import { fullTextSearch } from "@/app/lib/client_service/query_services.client";
 import {
   getEdgesByRecord,
+  getHistoricalRecord,
   unattachTagFromRecord,
   updateRecord,
 } from "@/app/lib/client_service/record_services.client";
