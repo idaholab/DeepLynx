@@ -33,7 +33,13 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
             .Where(os => os.OrganizationId == organizationId);
 
         if (projectId.HasValue)
-            query = query.Where(os => os.ProjectId == projectId);
+        {
+            query = query.Where(os => os.ProjectId == projectId || os.ProjectId == null);
+        }
+        else
+        {
+            query = query.Where(os => os.ProjectId == null);
+        }
 
         if (hideArchived)
             query = query.Where(os => !os.IsArchived);
@@ -72,8 +78,14 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
             .Where(os => os.Id == objectStorageId && os.OrganizationId == organizationId);
 
         if (projectId.HasValue)
-            query = query.Where(os => os.ProjectId == projectId);
-        
+        {
+            query = query.Where(os => os.ProjectId == projectId || os.ProjectId == null);
+        }
+        else
+        {
+            query = query.Where(os => os.ProjectId == null);
+        }
+
         var returnedObjectStorage = await query.FirstOrDefaultAsync();
 
         if (returnedObjectStorage is null)
@@ -226,14 +238,26 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
         ValidationHelper.ValidateModel(dto);
 
         var query = _context.ObjectStorages
-            .Where(os => os.Id == objectStorageId && os.OrganizationId == organizationId);
+            .Where(os => os.Id == objectStorageId && os.OrganizationId == organizationId || os.ProjectId == null);
 
         if (projectId.HasValue)
+        {
             query = query.Where(os => os.ProjectId == projectId);
+        }
+        else
+        {
+            query = query.Where(os => os.ProjectId == null);
+        }
 
         var returnedObjectStorage = await query.FirstOrDefaultAsync();
         if (returnedObjectStorage is null || returnedObjectStorage.IsArchived)
             throw new KeyNotFoundException($"Object storage with id {objectStorageId} not found");
+        
+        // Organization os cannot be updated from a project level
+        if (projectId.HasValue && returnedObjectStorage.ProjectId == null)
+        {
+            throw new InvalidOperationException("Organization object storages cannot be updated from the child projects.");
+        }
 
         using var transaction = await _context.Database.BeginTransactionAsync();
 
@@ -294,7 +318,14 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
             .Where(os => os.Id == objectStorageId && os.OrganizationId == organizationId);
 
         if (projectId.HasValue)
-            query = query.Where(os => os.ProjectId == projectId);
+        {
+            query = query.Where(os => os.ProjectId == projectId || os.ProjectId == null);
+        }
+        else
+        {
+            query = query.Where(os => os.ProjectId == null);
+        }
+
 
         var returnedObjectStorage = await query.FirstOrDefaultAsync();
         if (returnedObjectStorage is null || returnedObjectStorage.IsArchived)
@@ -303,6 +334,12 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
         if (returnedObjectStorage.Default)
             throw new InvalidOperationException("Default object storage cannot be deleted." +
                                                 " Please assign new default storage before deleting.");
+        
+        // Organization os cannot be updated from a project level
+        if (projectId.HasValue && returnedObjectStorage.ProjectId == null)
+        {
+            throw new InvalidOperationException("Organization object storages cannot be updated from the child projects.");
+        }
 
         _context.ObjectStorages.Remove(returnedObjectStorage);
         await _context.SaveChangesAsync();
@@ -327,7 +364,13 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
             .Where(os => os.Id == objectStorageId && os.OrganizationId == organizationId);
 
         if (projectId.HasValue)
-            query = query.Where(os => os.ProjectId == projectId);
+        {
+            query = query.Where(os => os.ProjectId == projectId || os.ProjectId == null);
+        }
+        else
+        {
+            query = query.Where(os => os.ProjectId == null);
+        }
 
         var returnedObjectStorage = await query.FirstOrDefaultAsync();
         if (returnedObjectStorage is null)
@@ -339,6 +382,12 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
         if (returnedObjectStorage.Default)
             throw new InvalidOperationException("Default object storage cannot be archived." +
                                                 " Please assign new default storage before archiving.");
+        
+        // Organization os cannot be updated from a project level
+        if (projectId.HasValue && returnedObjectStorage.ProjectId == null)
+        {
+            throw new InvalidOperationException("Organization object storages cannot be updated from the child projects.");
+        }
 
         returnedObjectStorage.IsArchived = true;
         returnedObjectStorage.LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
@@ -365,7 +414,13 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
             .Where(os => os.Id == objectStorageId && os.OrganizationId == organizationId);
 
         if (projectId.HasValue)
-            query = query.Where(os => os.ProjectId == projectId);
+        {
+            query = query.Where(os => os.ProjectId == projectId || os.ProjectId == null);
+        }
+        else
+        {
+            query = query.Where(os => os.ProjectId == null);
+        }
 
         var returnedObjectStorage = await query.FirstOrDefaultAsync();
         if (returnedObjectStorage is null)
@@ -377,6 +432,11 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
         if (returnedObjectStorage.Default)
             throw new InvalidOperationException("Default object storage cannot be archived." +
                                                 " Please assign new default storage before archiving.");
+        // Organization os cannot be updated from a project level
+        if (projectId.HasValue && returnedObjectStorage.ProjectId == null)
+        {
+            throw new InvalidOperationException("Organization object storages cannot be updated from the child projects.");
+        }
 
         returnedObjectStorage.IsArchived = false;
         returnedObjectStorage.LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
