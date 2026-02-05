@@ -433,6 +433,53 @@ public class OrganizationBusiness : IOrganizationBusiness
 
         return true;
     }
+    
+        /// <summary>
+    ///     Makes Sensitivity Labels required for all records in the organization
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization sensitivity labels for all records will be required for.</param>
+    public async Task<bool> RequireSensitivityLabels(long organizationId)
+    {
+        var organization = await _context.Organizations
+            .FirstOrDefaultAsync(o => o.Id == organizationId);
+    
+        if (organization.RequireSensitivityLabel)
+            throw new InvalidOperationException("Sensitivity labels are already required for this organization");
+        
+        var hasUnlabeledRecords = await _context.Records
+            .Include(r => r.Labels)
+            .Where(r => r.OrganizationId == organizationId)
+            .AnyAsync(r => !r.Labels.Any());
+        
+        if (hasUnlabeledRecords) 
+            throw new InvalidOperationException("There are records without sensitivity labels in this organization. Ensure that all records are labeled before requiring sensitivity labels");
+    
+        organization.RequireSensitivityLabel = true;
+        await _context.SaveChangesAsync();
+        
+        return true;
+    }
+    
+    /// <summary>
+    ///     Makes sensitivity labels optional for records in the organization
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization sensitivity labels for all records will NOT be required for.</param>
+    public async Task<bool> UnrequireSensitivityLabels(long organizationId)
+    {
+        var organization = await _context.Organizations
+            .FirstOrDefaultAsync(p => p.Id == organizationId);
+
+        if (organization == null)
+            throw new ArgumentException("Organization not found");
+
+        if (!organization.RequireSensitivityLabel)
+            throw new InvalidOperationException("Sensitivity labels are already optional for this organization");
+
+        organization.RequireSensitivityLabel = false;
+        await _context.SaveChangesAsync();
+        
+        return true;
+    }
 
     private async Task MakePreviousDefaultsFalse(long defaultOrganizationId)
     {

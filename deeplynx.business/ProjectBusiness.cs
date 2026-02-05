@@ -758,6 +758,58 @@ public class ProjectBusiness : IProjectBusiness
             });
     }
 
+    /// <summary>
+    ///     Makes Sensitivity Labels required for all records in the project
+    /// </summary>
+    /// <param name="organizationId">Array of project ids whose records are to be retrieved</param>
+    /// <param name="projectId">The ID of the project sensitivity labels for all records will NOT be required for.</param>
+    public async Task<bool> RequireSensitivityLabels(long organizationId, long projectId)
+    {
+        var project = await _context.Projects
+            .FirstOrDefaultAsync(p => p.OrganizationId == organizationId && p.Id == projectId);
+    
+        if (project == null)
+            throw new ArgumentException("Project not found");
+    
+        if (project.RequireSensitivityLabel)
+            throw new InvalidOperationException("Sensitivity labels are already required for this project");
+        
+        var hasUnlabeledRecords = await _context.Records
+            .Include(r => r.Labels)
+            .Where(r => r.ProjectId == projectId)
+            .AnyAsync(r => !r.Labels.Any());
+        
+        if (hasUnlabeledRecords) 
+            throw new InvalidOperationException("There are records without sensitivity labels in this project. Ensure that all records are labeled before requiring sensitivity labels");
+    
+        project.RequireSensitivityLabel = true;
+        await _context.SaveChangesAsync();
+        
+        return true;
+    }
+    
+    /// <summary>
+    ///     Makes sensitivity labels optional for records in the project
+    /// </summary>
+    /// <param name="organizationId">Organization ID that owns the project</param>
+    /// <param name="projectId">The ID of the project sensitivity labels for all records will NOT be required for.</param>
+    public async Task<bool> UnrequireSensitivityLabels(long organizationId, long projectId)
+    {
+        var project = await _context.Projects
+            .FirstOrDefaultAsync(p => p.OrganizationId == organizationId && p.Id == projectId);
+
+        if (project == null)
+            throw new ArgumentException("Project not found");
+
+        if (!project.RequireSensitivityLabel)
+            throw new InvalidOperationException("Sensitivity labels are already optional for this project");
+
+        project.RequireSensitivityLabel = false;
+        await _context.SaveChangesAsync();
+        
+        return true;
+    }
+
     private async Task<bool> RefreshProjectsCache()
     {
         var dbProjects = await _context.Projects.ToListAsync();

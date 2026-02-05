@@ -1039,6 +1039,52 @@ public class OrganizationBusinessTests : IntegrationTestBase
     }
 
     #endregion
+
+    #region Require/Unrequire Sensitivity Labels Tests
+    
+    [Fact]
+    public async Task RequireSensitivityLabels_Success()
+    {
+        var testOrg = new Organization
+        {
+            Name = "New Test Organization 1",
+            Description = "Test org for unit tests",
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            IsArchived = false
+        };
+        Context.Organizations.Add(testOrg);
+        await Context.SaveChangesAsync();
+        
+        await _organizationBusiness.RequireSensitivityLabels(testOrg.Id);
+        
+        Assert.Equal(true, testOrg.RequireSensitivityLabel);
+    }
+    
+    [Fact]
+    public async Task UnrequireSensitivityLabels_Success()
+    {
+        var testOrg = new Organization
+        {
+            Name = "New Test Organization 2",
+            Description = "Test org for unit tests",
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            IsArchived = false
+        };
+        Context.Organizations.Add(testOrg);
+        await Context.SaveChangesAsync();
+        
+        await _organizationBusiness.RequireSensitivityLabels(testOrg.Id);
+        
+        Assert.Equal(true, testOrg.RequireSensitivityLabel);
+        
+        await _organizationBusiness.UnrequireSensitivityLabels(testOrg.Id);
+        
+        Assert.Equal(false, testOrg.RequireSensitivityLabel);
+    }
+    
+    #endregion
     
     private void AssertRolePermissions(
         Role role, 

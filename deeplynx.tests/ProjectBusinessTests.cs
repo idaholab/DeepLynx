@@ -1588,4 +1588,52 @@ public class ProjectBusinessTests : IntegrationTestBase
     }
 
     #endregion
+
+    #region Require/Unrequire Sensitivity Labels
+
+    [Fact]
+    public async Task RequireSensitivityLabels_Success()
+    {
+        var testProject = new Project
+        {
+            Name = $"Original Project {DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}",
+            Description = "Original Description",
+            Abbreviation = "ORI",
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = null,
+            OrganizationId = oid
+        };
+        Context.Projects.Add(testProject);
+        await Context.SaveChangesAsync();
+        
+        await _projectBusiness.RequireSensitivityLabels(oid, testProject.Id);
+        
+        Assert.Equal(true, testProject.RequireSensitivityLabel);
+    }
+    
+    [Fact]
+    public async Task UnrequireSensitivityLabels_Success()
+    {
+        var testProject = new Project
+        {
+            Name = $"Original Project {DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}",
+            Description = "Original Description",
+            Abbreviation = "ORI",
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = null,
+            OrganizationId = oid
+        };
+        Context.Projects.Add(testProject);
+        await Context.SaveChangesAsync();
+        
+        await _projectBusiness.RequireSensitivityLabels(oid, testProject.Id);
+        
+        Assert.Equal(true, testProject.RequireSensitivityLabel);
+        
+        await _projectBusiness.UnrequireSensitivityLabels(oid, testProject.Id);
+        
+        Assert.Equal(false, testProject.RequireSensitivityLabel);
+    }
+    
+    #endregion
 }
