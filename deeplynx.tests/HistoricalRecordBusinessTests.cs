@@ -18,6 +18,7 @@ namespace deeplynx.tests;
 public class HistoricalRecordBusinessTests : IntegrationTestBase
 {
     private EventBusiness _eventBusiness;
+    private SensitivityLabelBusiness _sensitivityLabelBusiness = null!;
     private HistoricalRecordBusiness _historicalRecordBusiness = null!;
     private Mock<IHubContext<EventNotificationHub>> _mockHubContext = null!;
     private Mock<ILogger<NotificationBusiness>> _mockNotificationLogger = null!;
@@ -36,6 +37,13 @@ public class HistoricalRecordBusinessTests : IntegrationTestBase
     public long rid;
     public long rid2;
     public long uid;
+    public long roleId;
+    protected long defaultLabelId;
+    protected long defaultLabelId2;
+    protected long readPermissionId;
+    protected long writePermissionId;
+    protected long readPermissionId2;
+    protected long writePermissionId2;
 
     public HistoricalRecordBusinessTests(TestSuiteFixture fixture) : base(fixture)
     {
@@ -52,7 +60,9 @@ public class HistoricalRecordBusinessTests : IntegrationTestBase
         _bulkCopyUpsertExecutor = new BulkCopyUpsertExecutor();
         _eventBusiness = new EventBusiness(Context, _notificationBusiness, _bulkCopyUpsertExecutor);
         _tagBusiness = new TagBusiness(Context, _eventBusiness);
-        _recordBusiness = new RecordBusiness(Context, _eventBusiness, _bulkCopyUpsertExecutor, _tagBusiness);
+        _sensitivityLabelBusiness = new SensitivityLabelBusiness(Context, _eventBusiness);
+        _recordBusiness = new RecordBusiness(Context, _eventBusiness, _bulkCopyUpsertExecutor, _tagBusiness,
+            _sensitivityLabelBusiness);
     }
 
     protected override async Task SeedTestDataAsync()
@@ -253,6 +263,148 @@ public class HistoricalRecordBusinessTests : IntegrationTestBase
 
         rid = testRecord.Id;
         rid2 = testRecord2.Id;
+
+        var testRole = new Role
+        {
+            Name = "Test Role",
+            Description = "Test role for unit tests",
+            ProjectId = pid,
+            OrganizationId = organizationId,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid
+        };
+        Context.Roles.Add(testRole);
+        await Context.SaveChangesAsync();
+
+        roleId = testRole.Id;
+
+        var projectMember = new ProjectMember
+        {
+            ProjectId = pid,
+            UserId = uid,
+            RoleId = testRole.Id
+        };
+        Context.ProjectMembers.Add(projectMember);
+        await Context.SaveChangesAsync();
+
+        var defaultLabel = new SensitivityLabel
+        {
+            Name = "Default Test Label",
+            Description = "Default test sensitivity label",
+            ProjectId = pid,
+            OrganizationId = organizationId,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            IsArchived = false
+        };
+        Context.SensitivityLabels.Add(defaultLabel);
+        await Context.SaveChangesAsync();
+        defaultLabelId = defaultLabel.Id;
+
+        // Create read permission for the label
+        var readPermission = new Permission
+        {
+            Name = "Read Default Label",
+            Description = "Read permission for default test label",
+            Action = "read",
+            IsDefault = false,
+            LabelId = defaultLabelId,
+            ProjectId = pid,
+            OrganizationId = organizationId,
+            LastUpdatedBy = uid,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            IsArchived = false
+        };
+
+        // Create write permission for the label
+        var writePermission = new Permission
+        {
+            Name = "Write Default Label",
+            Description = "Write permission for default test label",
+            Action = "write",
+            IsDefault = false,
+            LabelId = defaultLabelId,
+            ProjectId = pid,
+            OrganizationId = organizationId,
+            LastUpdatedBy = uid,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            IsArchived = false
+        };
+
+        Context.Permissions.Add(readPermission);
+        Context.Permissions.Add(writePermission);
+        await Context.SaveChangesAsync();
+
+        readPermissionId = readPermission.Id;
+        writePermissionId = writePermission.Id;
+
+        // Create second default sensitivity label
+        var defaultLabel2 = new SensitivityLabel
+        {
+            Name = "Default Test Label 2",
+            Description = "Second default test sensitivity label",
+            ProjectId = pid,
+            OrganizationId = organizationId,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            IsArchived = false
+        };
+        Context.SensitivityLabels.Add(defaultLabel2);
+        await Context.SaveChangesAsync();
+        defaultLabelId2 = defaultLabel2.Id;
+
+        // Create read permission for the second label
+        var readPermission2 = new Permission
+        {
+            Name = "Read Default Label 2",
+            Description = "Read permission for second default test label",
+            Action = "read",
+            Resource = "sensitivity_label",
+            IsDefault = false,
+            LabelId = defaultLabelId2,
+            ProjectId = pid,
+            OrganizationId = organizationId,
+            LastUpdatedBy = uid,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            IsArchived = false
+        };
+
+        // Create write permission for the second label
+        var writePermission2 = new Permission
+        {
+            Name = "Write Default Label 2",
+            Description = "Write permission for second default test label",
+            Action = "write",
+            Resource = "sensitivity_label",
+            IsDefault = false,
+            LabelId = defaultLabelId2,
+            ProjectId = pid,
+            OrganizationId = organizationId,
+            LastUpdatedBy = uid,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            IsArchived = false
+        };
+
+        Context.Permissions.Add(readPermission2);
+        Context.Permissions.Add(writePermission2);
+        await Context.SaveChangesAsync();
+
+        readPermissionId2 = readPermission2.Id;
+        writePermissionId2 = writePermission2.Id;
+
+        // Attach all permissions to the test role
+        var role = await Context.Roles
+            .Include(r => r.Permissions)
+            .FirstOrDefaultAsync(r => r.Id == roleId);
+
+        if (role != null)
+        {
+            role.Permissions.Add(readPermission);
+            role.Permissions.Add(writePermission);
+            role.Permissions.Add(readPermission2);
+            role.Permissions.Add(writePermission2);
+            await Context.SaveChangesAsync();
+        }
     }
 
     #region GetHistoricalRecords Tests
@@ -261,7 +413,7 @@ public class HistoricalRecordBusinessTests : IntegrationTestBase
     public async Task GetHistoricalRecords_ReturnsListOfCurrentHistoricalRecordsForProject()
     {
         // Act
-        var historicalRecords = await _historicalRecordBusiness.GetAllHistoricalRecords(pid, organizationId);
+        var historicalRecords = await _historicalRecordBusiness.GetAllHistoricalRecords(uid, pid, organizationId);
 
         // Assert
         Assert.NotNull(historicalRecords);
@@ -300,7 +452,7 @@ public class HistoricalRecordBusinessTests : IntegrationTestBase
         await _recordBusiness.UpdateRecord(uid, organizationId, pid, rid2, dto2);
 
         // Act
-        var historicalRecords = await _historicalRecordBusiness.GetAllHistoricalRecords(pid, organizationId);
+        var historicalRecords = await _historicalRecordBusiness.GetAllHistoricalRecords(uid, pid, organizationId);
 
         // Assert
         Assert.NotNull(historicalRecords);
@@ -317,7 +469,7 @@ public class HistoricalRecordBusinessTests : IntegrationTestBase
 
         // Act
         var historicalRecords =
-            await _historicalRecordBusiness.GetAllHistoricalRecords(pid, organizationId, null, null, false);
+            await _historicalRecordBusiness.GetAllHistoricalRecords(uid, pid, organizationId, null, null, false);
 
         // Assert
         Assert.NotNull(historicalRecords);
@@ -330,14 +482,14 @@ public class HistoricalRecordBusinessTests : IntegrationTestBase
     public async Task GetHistoricalRecords_DoesNotContainArchivedHistoricalRecords()
     {
         // Arrange
-        var historicalRecords = await _historicalRecordBusiness.GetAllHistoricalRecords(pid, organizationId);
+        var historicalRecords = await _historicalRecordBusiness.GetAllHistoricalRecords(uid, pid, organizationId);
 
         Assert.NotNull(historicalRecords);
         Assert.Equal(2, historicalRecords.Count());
 
         // Act
         await _recordBusiness.ArchiveRecord(uid, organizationId, pid, rid);
-        var arcHistoricalRecords = await _historicalRecordBusiness.GetAllHistoricalRecords(pid, organizationId);
+        var arcHistoricalRecords = await _historicalRecordBusiness.GetAllHistoricalRecords(uid, pid, organizationId);
 
         // Assert
         Assert.NotNull(arcHistoricalRecords);
@@ -354,7 +506,7 @@ public class HistoricalRecordBusinessTests : IntegrationTestBase
         await _recordBusiness.DeleteRecord(uid, organizationId, pid, rid2);
 
         // Act
-        var historicalRecords = await _historicalRecordBusiness.GetAllHistoricalRecords(pid, organizationId);
+        var historicalRecords = await _historicalRecordBusiness.GetAllHistoricalRecords(uid, pid, organizationId);
 
         // Assert
         Assert.NotNull(historicalRecords);
@@ -365,7 +517,8 @@ public class HistoricalRecordBusinessTests : IntegrationTestBase
     public async Task GetHistoricalRecords_FiltersByDataSource()
     {
         // Act
-        var historicalRecords = await _historicalRecordBusiness.GetAllHistoricalRecords(pid2, organizationId, did2);
+        var historicalRecords =
+            await _historicalRecordBusiness.GetAllHistoricalRecords(uid, pid2, organizationId, did2);
 
         // Assert
         Assert.NotNull(historicalRecords);
@@ -398,13 +551,171 @@ public class HistoricalRecordBusinessTests : IntegrationTestBase
 
         // Act
         var historicalRecords =
-            await _historicalRecordBusiness.GetAllHistoricalRecords(pid, organizationId, null, pointInTime, false);
+            await _historicalRecordBusiness.GetAllHistoricalRecords(uid, pid, organizationId, null, pointInTime, false);
 
         // Assert
         Assert.NotNull(historicalRecords);
         Assert.Equal(2, historicalRecords.Count());
         Assert.Contains(historicalRecords, x => x.Name == "Test Record");
         Assert.Contains(historicalRecords, x => x.Name == "Test Record 2");
+    }
+
+    #endregion
+
+    #region GetHistoricalRecords_SensitivityLabelAuthorization Tests
+
+    [Fact]
+    public async Task GetHistoricalRecords_FilterOutUnauthorizedRecordsBySensitivityLabels_ReturnsFilteredRecords()
+    {
+        // Remove read permission for defaultLabelId2 from the role
+        Context.ChangeTracker.Clear();
+
+        var role = await Context.Roles
+            .Include(r => r.Permissions)
+            .FirstOrDefaultAsync(r => r.Id == roleId);
+
+        var permissionToRemove = role?.Permissions.FirstOrDefault(p => p.Id == readPermissionId2);
+        if (permissionToRemove != null)
+        {
+            role!.Permissions.Remove(permissionToRemove);
+            await Context.SaveChangesAsync();
+        }
+
+        await _recordBusiness.AttachLabel(uid, organizationId, pid, rid2, defaultLabelId2);
+
+        // Record with sensitivity label should not be returned because user does not have access
+        var records = await _historicalRecordBusiness.GetAllHistoricalRecords(
+            uid, pid, organizationId, null, null);
+
+        Assert.NotNull(records);
+        Assert.DoesNotContain(records, r => r.Id == rid2);
+    }
+
+    [Fact]
+    public async Task GetHistoricalRecords_UserHasAccessToAllLabels_ReturnsRecords()
+    {
+        // User already has read and write permissions for defaultLabelId from seed data
+        await _recordBusiness.AttachLabel(uid, organizationId, pid, rid2, defaultLabelId);
+
+        // Verify the record IS returned
+        var records = await _historicalRecordBusiness.GetAllHistoricalRecords(
+            uid, pid, organizationId, null, null);
+
+        Assert.NotNull(records);
+        Assert.Contains(records, r => r.Id == rid2);
+    }
+
+    [Fact]
+    public async Task GetHistoricalRecords_MultipleRecordsMixedAccess_ReturnsOnlyAuthorized()
+    {
+        // Record 1: No labels (should be returned) - using the seeded record
+        var record1Id = rid;
+
+        // Remove read permission for defaultLabelId2 from the role
+        Context.ChangeTracker.Clear();
+
+        var role = await Context.Roles
+            .Include(r => r.Permissions)
+            .FirstOrDefaultAsync(r => r.Id == roleId);
+
+        var permissionToRemove = role?.Permissions.FirstOrDefault(p => p.Id == readPermissionId2);
+        if (permissionToRemove != null)
+        {
+            role!.Permissions.Remove(permissionToRemove);
+            await Context.SaveChangesAsync();
+        }
+
+        // Attach labels: user has access to defaultLabelId but not defaultLabelId2
+        await _recordBusiness.AttachLabel(uid, organizationId, pid, rid, defaultLabelId);
+        await _recordBusiness.AttachLabel(uid, organizationId, pid, rid2, defaultLabelId2);
+
+        // Act
+        var records = await _historicalRecordBusiness.GetAllHistoricalRecords(
+            uid, pid, organizationId, null, null);
+
+        // Assert
+        Assert.NotNull(records);
+        Assert.Contains(records, r => r.Id == record1Id); // User has access
+        Assert.DoesNotContain(records, r => r.Id == rid2); // User lacks access
+    }
+
+    [Fact]
+    public async Task GetHistoricalRecords_RecordWithMultipleLabels_UserHasAll_ReturnsRecord()
+    {
+        // User already has read and write permissions for both defaultLabelId and defaultLabelId2 from seed data
+
+        // Attach both labels to the record
+        await _recordBusiness.AttachLabel(uid, organizationId, pid, rid2, defaultLabelId);
+        await _recordBusiness.AttachLabel(uid, organizationId, pid, rid2, defaultLabelId2);
+
+        // Act
+        var records = await _historicalRecordBusiness.GetAllHistoricalRecords(
+            uid, pid, organizationId, null, null);
+
+        // Assert
+        Assert.NotNull(records);
+        Assert.Contains(records, r => r.Id == rid2);
+    }
+
+    [Fact]
+    public async Task GetHistoricalRecords_RecordWithMultipleLabels_UserMissingOne_FiltersRecord()
+    {
+        // Remove read permission for defaultLabelId2 from the role
+        Context.ChangeTracker.Clear();
+
+        var role = await Context.Roles
+            .Include(r => r.Permissions)
+            .FirstOrDefaultAsync(r => r.Id == roleId);
+
+        var permissionToRemove = role?.Permissions.FirstOrDefault(p => p.Id == readPermissionId2);
+        if (permissionToRemove != null)
+        {
+            role!.Permissions.Remove(permissionToRemove);
+            await Context.SaveChangesAsync();
+        }
+
+        // Attach both labels to the record
+        await _recordBusiness.AttachLabel(uid, organizationId, pid, rid2, defaultLabelId);
+        await _recordBusiness.AttachLabel(uid, organizationId, pid, rid2, defaultLabelId2);
+
+        // Act
+        var records = await _historicalRecordBusiness.GetAllHistoricalRecords(
+            uid, pid, organizationId, null, null);
+
+        // Assert - record should NOT be returned because user lacks access to defaultLabelId2
+        Assert.NotNull(records);
+        Assert.DoesNotContain(records, r => r.Id == rid2);
+    }
+
+    [Fact]
+    public async Task GetHistoricalRecords_WithDataSourceFilter_AndLabelAuth_ReturnsBothFiltered()
+    {
+        // Remove read permission for defaultLabelId2 from the role
+        Context.ChangeTracker.Clear();
+
+        var role = await Context.Roles
+            .Include(r => r.Permissions)
+            .FirstOrDefaultAsync(r => r.Id == roleId);
+
+        var permissionToRemove = role?.Permissions.FirstOrDefault(p => p.Id == readPermissionId2);
+        if (permissionToRemove != null)
+        {
+            role!.Permissions.Remove(permissionToRemove);
+            await Context.SaveChangesAsync();
+        }
+
+        // Attach labels to records
+        await _recordBusiness.AttachLabel(uid, organizationId, pid, rid2, defaultLabelId);
+        await _recordBusiness.AttachLabel(uid, organizationId, pid, rid, defaultLabelId2);
+
+        // Act - filter by datasource
+        var records = await _historicalRecordBusiness.GetAllHistoricalRecords(
+            uid, pid, organizationId, did, null);
+
+        // Assert
+        Assert.NotNull(records);
+        Assert.Contains(records, r => r.Id == rid2); // Correct datasource, user has access
+        Assert.DoesNotContain(records, r => r.Id == rid); // Correct datasource, but no label access
     }
 
     #endregion
@@ -428,7 +739,7 @@ public class HistoricalRecordBusinessTests : IntegrationTestBase
         // Act
         await _recordBusiness.UpdateRecord(uid, organizationId, pid, rid, dto);
         await _recordBusiness.ArchiveRecord(uid, organizationId, pid, rid);
-        var recordHistory = await _historicalRecordBusiness.GetHistoryForRecord(rid, organizationId);
+        var recordHistory = await _historicalRecordBusiness.GetHistoryForRecord(uid, rid, organizationId);
 
 
         // Assert
@@ -445,7 +756,108 @@ public class HistoricalRecordBusinessTests : IntegrationTestBase
     {
         // Act & Assert
         await Assert.ThrowsAsync<KeyNotFoundException>(() =>
-            _historicalRecordBusiness.GetHistoryForRecord(rid + 100000, organizationId));
+            _historicalRecordBusiness.GetHistoryForRecord(uid, rid + 100000, organizationId));
+    }
+
+    #endregion
+
+    #region GetHistoryForRecord_SensitivityLabelAuthorization Tests
+
+    [Fact]
+    public async Task GetHistoryForRecord_UserLacksLabelAccess_ThrowsUnauthorizedAccessException()
+    {
+        // Remove read permission for defaultLabelId from the role
+        Context.ChangeTracker.Clear();
+
+        var role = await Context.Roles
+            .Include(r => r.Permissions)
+            .FirstOrDefaultAsync(r => r.Id == roleId);
+
+        var permissionToRemove = role?.Permissions.FirstOrDefault(p => p.Id == readPermissionId);
+        if (permissionToRemove != null)
+        {
+            role!.Permissions.Remove(permissionToRemove);
+            await Context.SaveChangesAsync();
+        }
+
+        // Attach label to the record
+        await _recordBusiness.AttachLabel(uid, organizationId, pid, rid, defaultLabelId);
+
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            _historicalRecordBusiness.GetHistoryForRecord(uid, rid, organizationId));
+
+        Assert.Contains($"You do not have access to all required sensitivity labels for record {rid}",
+            exception.Message);
+    }
+
+    [Fact]
+    public async Task GetHistoryForRecord_UserHasAllLabelAccess_ReturnsHistory()
+    {
+        // User already has read and write permissions for defaultLabelId from seed data
+        await _recordBusiness.AttachLabel(uid, organizationId, pid, rid, defaultLabelId);
+
+        // Act
+        var history = await _historicalRecordBusiness.GetHistoryForRecord(uid, rid, organizationId);
+
+        // Assert
+        Assert.NotNull(history);
+        Assert.NotEmpty(history);
+    }
+
+    [Fact]
+    public async Task GetHistoryForRecord_RecordWithMultipleLabels_UserHasAll_ReturnsHistory()
+    {
+        // User already has read and write permissions for both labels from seed data
+        await _recordBusiness.AttachLabel(uid, organizationId, pid, rid, defaultLabelId);
+        await _recordBusiness.AttachLabel(uid, organizationId, pid, rid, defaultLabelId2);
+
+        // Act
+        var history = await _historicalRecordBusiness.GetHistoryForRecord(uid, rid, organizationId);
+
+        // Assert
+        Assert.NotNull(history);
+        Assert.NotEmpty(history);
+    }
+
+    [Fact]
+    public async Task GetHistoryForRecord_RecordWithMultipleLabels_UserMissingOne_ThrowsUnauthorizedAccessException()
+    {
+        // Remove read permission for defaultLabelId2 from the role
+        Context.ChangeTracker.Clear();
+
+        var role = await Context.Roles
+            .Include(r => r.Permissions)
+            .FirstOrDefaultAsync(r => r.Id == roleId);
+
+        var permissionToRemove = role?.Permissions.FirstOrDefault(p => p.Id == readPermissionId2);
+        if (permissionToRemove != null)
+        {
+            role!.Permissions.Remove(permissionToRemove);
+            await Context.SaveChangesAsync();
+        }
+
+        // Attach both labels to the record
+        await _recordBusiness.AttachLabel(uid, organizationId, pid, rid, defaultLabelId);
+        await _recordBusiness.AttachLabel(uid, organizationId, pid, rid, defaultLabelId2);
+
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            _historicalRecordBusiness.GetHistoryForRecord(uid, rid, organizationId));
+
+        Assert.Contains($"You do not have access to all required sensitivity labels for record {rid}",
+            exception.Message);
+    }
+
+    [Fact]
+    public async Task GetHistoryForRecord_RecordWithNoLabels_ReturnsHistory()
+    {
+        // Act - record has no labels attached
+        var history = await _historicalRecordBusiness.GetHistoryForRecord(uid, rid, organizationId);
+
+        // Assert
+        Assert.NotNull(history);
+        Assert.NotEmpty(history);
     }
 
     #endregion
@@ -455,13 +867,15 @@ public class HistoricalRecordBusinessTests : IntegrationTestBase
     [Fact]
     public async Task GetHistoricalRecord_ReturnsAllCorrectFields()
     {
+        Context.ChangeTracker.Clear();
+        
         // Arrange
         // TODO: insert tags after record to avoid race condition
         var record = await Context.Records.Where(r => r.ProjectId == pid && r.Id == rid).FirstOrDefaultAsync();
         Assert.NotNull(record);
 
         // Act
-        var historicalRecord = await _historicalRecordBusiness.GetHistoricalRecord(rid, organizationId, null);
+        var historicalRecord = await _historicalRecordBusiness.GetHistoricalRecord(uid, rid, organizationId, null);
 
         // Assert
         Assert.NotNull(historicalRecord);
@@ -499,7 +913,7 @@ public class HistoricalRecordBusinessTests : IntegrationTestBase
         Assert.NotNull(updatedRecord);
 
         // Act
-        var historicalRecord = await _historicalRecordBusiness.GetHistoricalRecord(rid, organizationId, null);
+        var historicalRecord = await _historicalRecordBusiness.GetHistoricalRecord(uid, rid, organizationId, null);
 
         // Assert
         Assert.NotNull(historicalRecord);
@@ -526,11 +940,12 @@ public class HistoricalRecordBusinessTests : IntegrationTestBase
         var archived = await _recordBusiness.ArchiveRecord(uid, organizationId, pid, rid);
         Assert.True(archived);
 
-        var archivedRecord = await _recordBusiness.GetRecord(organizationId, pid, rid, false);
+        var archivedRecord = await _recordBusiness.GetRecord(uid, organizationId, pid, rid, false);
         Assert.NotNull(archivedRecord);
 
         // Act
-        var historicalRecord = await _historicalRecordBusiness.GetHistoricalRecord(rid, organizationId, null, false);
+        var historicalRecord =
+            await _historicalRecordBusiness.GetHistoricalRecord(uid, rid, organizationId, null, false);
 
         // Assert
         Assert.NotNull(historicalRecord);
@@ -568,7 +983,7 @@ public class HistoricalRecordBusinessTests : IntegrationTestBase
 
 
         // Act
-        var historicalRecord = await _historicalRecordBusiness.GetHistoricalRecord(rid, organizationId, null);
+        var historicalRecord = await _historicalRecordBusiness.GetHistoricalRecord(uid, rid, organizationId, null);
 
         // Assert
         Assert.NotNull(historicalRecord);
@@ -591,7 +1006,7 @@ public class HistoricalRecordBusinessTests : IntegrationTestBase
 
         // Act
         await _recordBusiness.UpdateRecord(uid, organizationId, pid, rid, dto);
-        var historicalRecord = await _historicalRecordBusiness.GetHistoricalRecord(rid, organizationId, null);
+        var historicalRecord = await _historicalRecordBusiness.GetHistoricalRecord(uid, rid, organizationId, null);
 
         // Assert
         Assert.NotNull(historicalRecord);
@@ -615,7 +1030,8 @@ public class HistoricalRecordBusinessTests : IntegrationTestBase
         // Act
         await _recordBusiness.UpdateRecord(uid, organizationId, pid, rid, dto);
         await _recordBusiness.ArchiveRecord(uid, organizationId, pid, rid);
-        var historicalRecord = await _historicalRecordBusiness.GetHistoricalRecord(rid, organizationId, null, false);
+        var historicalRecord =
+            await _historicalRecordBusiness.GetHistoricalRecord(uid, rid, organizationId, null, false);
 
         // Assert
         Assert.NotNull(historicalRecord);
@@ -644,7 +1060,7 @@ public class HistoricalRecordBusinessTests : IntegrationTestBase
         // Act & Assert
         var exception =
             await Assert.ThrowsAsync<KeyNotFoundException>(() =>
-                _historicalRecordBusiness.GetHistoricalRecord(rid, organizationId, null));
+                _historicalRecordBusiness.GetHistoricalRecord(uid, rid, organizationId, null));
         Assert.Contains($"Historical record with id {rid} not found or is archived", exception.Message);
     }
 
@@ -654,6 +1070,10 @@ public class HistoricalRecordBusinessTests : IntegrationTestBase
     {
         // Arrange
         var pointInTime = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
+        
+        // Ensure temporal separation (prevents same-millisecond issues when tests are run in parallel)
+        await Task.Delay(10);
+        
         var dto = new UpdateRecordRequestDto
         {
             Name = "Updated Test Record",
@@ -666,7 +1086,8 @@ public class HistoricalRecordBusinessTests : IntegrationTestBase
 
         // Act
         await _recordBusiness.UpdateRecord(uid, organizationId, pid, rid, dto);
-        var historicalRecord = await _historicalRecordBusiness.GetHistoricalRecord(rid, organizationId, pointInTime);
+        var historicalRecord =
+            await _historicalRecordBusiness.GetHistoricalRecord(uid, rid, organizationId, pointInTime);
 
         // Assert
         Assert.NotNull(historicalRecord);
@@ -678,8 +1099,160 @@ public class HistoricalRecordBusinessTests : IntegrationTestBase
     {
         // Act & Assert
         var exception = await Assert.ThrowsAsync<KeyNotFoundException>(() =>
-            _historicalRecordBusiness.GetHistoricalRecord(rid + 100000, organizationId, null));
-        Assert.Contains($"Historical record with id {rid + 100000} not found", exception.Message);
+            _historicalRecordBusiness.GetHistoricalRecord(uid, rid + 100000, organizationId, null));
+        Assert.Contains($"Record with id {rid + 100000} not found", exception.Message);
+    }
+
+    #endregion
+
+    #region GetHistoricalRecord_SensitivityLabelAuthorization Tests
+
+    [Fact]
+    public async Task GetHistoricalRecord_UserLacksLabelAccess_ThrowsUnauthorizedAccessException()
+    {
+        // Attach label to the record
+        await _recordBusiness.AttachLabel(uid, organizationId, pid, rid, defaultLabelId);
+        
+        // Remove write permission for defaultLabelId from the role
+        var role = await Context.Roles
+            .Include(r => r.Permissions)
+            .FirstOrDefaultAsync(r => r.Id == roleId);
+
+        var permissionToRemove = role?.Permissions.FirstOrDefault(p => p.Id == writePermissionId);
+        if (permissionToRemove != null)
+        {
+            role!.Permissions.Remove(permissionToRemove);
+            await Context.SaveChangesAsync();
+        }
+        
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            _historicalRecordBusiness.GetHistoricalRecord(uid, rid, organizationId, null));
+
+        Assert.Contains($"You do not have access to all required sensitivity labels for record {rid}",
+            exception.Message);
+    }
+
+    [Fact]
+    public async Task GetHistoricalRecord_UserHasAllLabelAccess_ReturnsRecord()
+    {
+        // User already has read and write permissions for defaultLabelId from seed data
+        await _recordBusiness.AttachLabel(uid, organizationId, pid, rid, defaultLabelId);
+
+        // Act
+        var historicalRecord = await _historicalRecordBusiness.GetHistoricalRecord(uid, rid, organizationId, null);
+
+        // Assert
+        Assert.NotNull(historicalRecord);
+        Assert.Equal(rid, historicalRecord.Id);
+    }
+
+    [Fact]
+    public async Task GetHistoricalRecord_RecordWithMultipleLabels_UserHasAll_ReturnsRecord()
+    {
+        // User already has read and write permissions for both labels from seed data
+        await _recordBusiness.AttachLabel(uid, organizationId, pid, rid, defaultLabelId);
+        await _recordBusiness.AttachLabel(uid, organizationId, pid, rid, defaultLabelId2);
+
+        // Act
+        var historicalRecord = await _historicalRecordBusiness.GetHistoricalRecord(uid, rid, organizationId, null);
+
+        // Assert
+        Assert.NotNull(historicalRecord);
+        Assert.Equal(rid, historicalRecord.Id);
+    }
+
+    [Fact]
+    public async Task GetHistoricalRecord_RecordWithMultipleLabels_UserMissingOne_ThrowsUnauthorizedAccessException()
+    {
+        // Attach both labels to the record
+        await _recordBusiness.AttachLabel(uid, organizationId, pid, rid, defaultLabelId);
+        await _recordBusiness.AttachLabel(uid, organizationId, pid, rid, defaultLabelId2);
+        
+        // Remove write permission for defaultLabelId2 from the role
+        var role = await Context.Roles
+            .Include(r => r.Permissions)
+            .FirstOrDefaultAsync(r => r.Id == roleId);
+
+        var permissionToRemove = role?.Permissions.FirstOrDefault(p => p.Id == writePermissionId2);
+        if (permissionToRemove != null)
+        {
+            role!.Permissions.Remove(permissionToRemove);
+            await Context.SaveChangesAsync();
+        }
+
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            _historicalRecordBusiness.GetHistoricalRecord(uid, rid, organizationId, null));
+
+        Assert.Contains($"You do not have access to all required sensitivity labels for record {rid}",
+            exception.Message);
+    }
+
+    [Fact]
+    public async Task GetHistoricalRecord_RecordWithNoLabels_ReturnsRecord()
+    {
+        // Act - record has no labels attached
+        var historicalRecord = await _historicalRecordBusiness.GetHistoricalRecord(uid, rid, organizationId, null);
+
+        // Assert
+        Assert.NotNull(historicalRecord);
+        Assert.Equal(rid, historicalRecord.Id);
+    }
+
+    [Fact]
+    public async Task GetHistoricalRecord_WithPointInTime_UserLacksLabelAccess_ThrowsUnauthorizedAccessException()
+    {
+        // Attach label to the record
+        await _recordBusiness.AttachLabel(uid, organizationId, pid, rid, defaultLabelId);
+        
+        // Remove write permission for defaultLabelId from the role
+        var role = await Context.Roles
+            .Include(r => r.Permissions)
+            .FirstOrDefaultAsync(r => r.Id == roleId);
+
+        var permissionToRemove = role?.Permissions.FirstOrDefault(p => p.Id == writePermissionId);
+        if (permissionToRemove != null)
+        {
+            role!.Permissions.Remove(permissionToRemove);
+            await Context.SaveChangesAsync();
+        }
+
+        var pointInTime = DateTime.SpecifyKind(DateTime.UtcNow.AddMinutes(5), DateTimeKind.Unspecified);
+
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            _historicalRecordBusiness.GetHistoricalRecord(uid, rid, organizationId, pointInTime));
+
+        Assert.Contains($"You do not have access to all required sensitivity labels for record {rid}",
+            exception.Message);
+    }
+
+    [Fact]
+    public async Task GetHistoricalRecord_ArchivedRecord_UserLacksLabelAccess_ThrowsUnauthorizedAccessException()
+    {
+        // Attach label and archive the record
+        await _recordBusiness.AttachLabel(uid, organizationId, pid, rid, defaultLabelId);
+        await _recordBusiness.ArchiveRecord(uid, organizationId, pid, rid);
+        
+        // Remove write permission for defaultLabelId from the role
+        var role = await Context.Roles
+            .Include(r => r.Permissions)
+            .FirstOrDefaultAsync(r => r.Id == roleId);
+
+        var permissionToRemove = role?.Permissions.FirstOrDefault(p => p.Id == writePermissionId);
+        if (permissionToRemove != null)
+        {
+            role!.Permissions.Remove(permissionToRemove);
+            await Context.SaveChangesAsync();
+        }
+
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            _historicalRecordBusiness.GetHistoricalRecord(uid, rid, organizationId, null, false));
+
+        Assert.Contains($"You do not have access to all required sensitivity labels for record {rid}",
+            exception.Message);
     }
 
     #endregion

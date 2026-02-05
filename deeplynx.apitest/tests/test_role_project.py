@@ -24,7 +24,7 @@ def test_create_project_role(client, organization, project, cleanup_project_role
 
     # Register for cleanup IMMEDIATELY, before assertions
     if response.status_code == 200:
-        cleanup_project_roles.append(response.json()["id"])
+        cleanup_project_roles.append((project, response.json()["id"]))
 
     # DEBUG: Print the actual response
     print(f"\nStatus Code: {response.status_code}")
@@ -53,7 +53,7 @@ def test_get_all_project_roles(client, organization, project, cleanup_project_ro
     )
 
     if create_response.status_code == 200:
-        cleanup_project_roles.append(create_response.json()["id"])
+        cleanup_project_roles.append((project, create_response.json()["id"]))
 
     # Verify creation succeeded
     assert create_response.status_code == 200, f"Failed to create role: {create_response.text}"
@@ -97,7 +97,7 @@ def test_get_project_role(client, organization, project, cleanup_project_roles):
     )
 
     if create_response.status_code == 200:
-        cleanup_project_roles.append(create_response.json()["id"])
+        cleanup_project_roles.append((project, create_response.json()["id"]))
 
     assert create_response.status_code == 200, f"Failed to create role: {create_response.text}"
     created_id = create_response.json()["id"]
@@ -135,7 +135,7 @@ def test_update_project_role(client, organization, project, cleanup_project_role
     )
 
     if create_response.status_code == 200:
-        cleanup_project_roles.append(create_response.json()["id"])
+        cleanup_project_roles.append((project, create_response.json()["id"]))
 
     assert create_response.status_code == 200, f"Failed to create role: {create_response.text}"
     created_id = create_response.json()["id"]
@@ -179,7 +179,7 @@ def test_archive_and_unarchive_project_role(client, organization, project, clean
     )
 
     if create_response.status_code == 200:
-        cleanup_project_roles.append(create_response.json()["id"])
+        cleanup_project_roles.append((project, create_response.json()["id"]))
 
     assert create_response.status_code == 200, f"Failed to create role: {create_response.text}"
     created_id = create_response.json()["id"]
@@ -240,7 +240,7 @@ def test_delete_project_role(client, organization, project, cleanup_project_role
 
     # Note: We still register for cleanup in case deletion fails
     if create_response.status_code == 200:
-        cleanup_project_roles.append(create_response.json()["id"])
+        cleanup_project_roles.append((project, create_response.json()["id"]))
 
     assert create_response.status_code == 200, f"Failed to create role: {create_response.text}"
     created_id = create_response.json()["id"]
@@ -287,7 +287,7 @@ def test_get_permissions_for_project_role(client, organization, project, cleanup
     )
 
     if role_response.status_code == 200:
-        cleanup_project_roles.append(role_response.json()["id"])
+        cleanup_project_roles.append((project, role_response.json()["id"]))
 
     assert role_response.status_code == 200, f"Failed to create role: {role_response.text}"
     role_id = role_response.json()["id"]
@@ -322,7 +322,7 @@ def test_add_permission_to_project_role(client, organization, project, cleanup_p
     )
 
     if role_response.status_code == 200:
-        cleanup_project_roles.append(role_response.json()["id"])
+       cleanup_project_roles.append((project, role_response.json()["id"]))
 
     assert role_response.status_code == 200, f"Failed to create role: {role_response.text}"
     role_id = role_response.json()["id"]
@@ -373,7 +373,7 @@ def test_set_permissions_for_project_role(client, organization, project, cleanup
     )
 
     if role_response.status_code == 200:
-        cleanup_project_roles.append(role_response.json()["id"])
+        cleanup_project_roles.append((project, role_response.json()["id"]))
 
     assert role_response.status_code == 200, f"Failed to create role: {role_response.text}"
     role_id = role_response.json()["id"]
@@ -439,7 +439,7 @@ def test_remove_permission_from_project_role(client, organization, project, clea
     )
 
     if role_response.status_code == 200:
-        cleanup_project_roles.append(role_response.json()["id"])
+        cleanup_project_roles.append((project, role_response.json()["id"]))
 
     assert role_response.status_code == 200, f"Failed to create role: {role_response.text}"
     role_id = role_response.json()["id"]

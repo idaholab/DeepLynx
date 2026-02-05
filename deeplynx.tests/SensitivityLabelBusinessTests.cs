@@ -248,6 +248,28 @@ public class SensitivityLabelBusinessTests : IntegrationTestBase
         Assert.NotNull(createdLabel);
         Assert.Equal(dto.Name, createdLabel.Name);
 
+        // Verify read permission was created
+        var readPermission = await Context.Permissions
+            .FirstOrDefaultAsync(p => p.LabelId == result.Id && p.Action == "read");
+        Assert.NotNull(readPermission);
+        Assert.Equal("Read " + dto.Name, readPermission.Name);
+        Assert.Equal("Permission to read " + dto.Name + " labeled records", readPermission.Description);
+        Assert.Equal(pid, readPermission.ProjectId);
+        Assert.Equal(oid, readPermission.OrganizationId);
+        Assert.False(readPermission.IsDefault);
+        Assert.Equal(uid, readPermission.LastUpdatedBy);
+
+        // Verify write permission was created
+        var writePermission = await Context.Permissions
+            .FirstOrDefaultAsync(p => p.LabelId == result.Id && p.Action == "write");
+        Assert.NotNull(writePermission);
+        Assert.Equal("Write " + dto.Name, writePermission.Name);
+        Assert.Equal("Permission to modify " + dto.Name + " labeled records", writePermission.Description);
+        Assert.Equal(pid, writePermission.ProjectId);
+        Assert.Equal(oid, writePermission.OrganizationId);
+        Assert.False(writePermission.IsDefault);
+        Assert.Equal(uid, writePermission.LastUpdatedBy);
+
         // Ensure that the SensitivityLabel create event was logged
         var eventList = await Context.Events.ToListAsync();
         Assert.Single(eventList);
@@ -285,6 +307,15 @@ public class SensitivityLabelBusinessTests : IntegrationTestBase
         Assert.NotNull(createdLabel);
         Assert.Equal(dto.Name, createdLabel.Name);
 
+        // Verify both read and write permissions were created
+        var permissions = await Context.Permissions
+            .Where(p => p.LabelId == result.Id)
+            .ToListAsync();
+        Assert.Equal(2, permissions.Count);
+
+        Assert.Contains(permissions, p => p.Action == "read");
+        Assert.Contains(permissions, p => p.Action == "write");
+
         // Ensure that the SensitivityLabel create event was logged
         var eventList = await Context.Events.ToListAsync();
         Assert.Single(eventList);
@@ -313,6 +344,15 @@ public class SensitivityLabelBusinessTests : IntegrationTestBase
         Assert.NotNull(result);
         Assert.Equal("Event Test Label", result.Name);
 
+        // Verify that read and write permissions were created
+        var readPermission = await Context.Permissions
+            .FirstOrDefaultAsync(p => p.LabelId == result.Id && p.Action == "read");
+        Assert.NotNull(readPermission);
+
+        var writePermission = await Context.Permissions
+            .FirstOrDefaultAsync(p => p.LabelId == result.Id && p.Action == "write");
+        Assert.NotNull(writePermission);
+
         // Ensure that the SensitivityLabel create event was logged
         var eventList = await Context.Events.ToListAsync();
         Assert.Single(eventList);
@@ -340,6 +380,10 @@ public class SensitivityLabelBusinessTests : IntegrationTestBase
         // Ensure that no event was logged
         var eventList = await Context.Events.ToListAsync();
         Assert.Empty(eventList);
+
+        // Ensure that no permissions were created
+        var permissions = await Context.Permissions.ToListAsync();
+        Assert.Empty(permissions);
     }
 
     [Fact]
@@ -358,6 +402,48 @@ public class SensitivityLabelBusinessTests : IntegrationTestBase
         // Ensure that no event was logged
         var eventList = await Context.Events.ToListAsync();
         Assert.Empty(eventList);
+
+        // Ensure that no permissions were created
+        var permissions = await Context.Permissions.ToListAsync();
+        Assert.Empty(permissions);
+    }
+
+    [Fact]
+    public async Task CreateSensitivityLabel_Success_CreatesCorrectPermissionStructure()
+    {
+        // Arrange
+        var dto = new CreateSensitivityLabelRequestDto
+        {
+            Name = "Permission Structure Test",
+            Description = "Testing permission structure"
+        };
+
+        // Act
+        var result = await _labelBusiness.CreateSensitivityLabel(uid, dto, pid, oid);
+
+        // Assert
+        var permissions = await Context.Permissions
+            .Where(p => p.LabelId == result.Id)
+            .ToListAsync();
+
+        // Verify exactly 2 permissions were created
+        Assert.Equal(2, permissions.Count);
+
+        // Verify read permission details
+        var readPermission = permissions.FirstOrDefault(p => p.Action == "read");
+        Assert.NotNull(readPermission);
+        Assert.Equal("Read Permission Structure Test", readPermission.Name);
+        Assert.Contains("read", readPermission.Description.ToLower());
+        Assert.Equal(result.Id, readPermission.LabelId);
+        Assert.False(readPermission.IsDefault);
+
+        // Verify write permission details
+        var writePermission = permissions.FirstOrDefault(p => p.Action == "write");
+        Assert.NotNull(writePermission);
+        Assert.Equal("Write Permission Structure Test", writePermission.Name);
+        Assert.Contains("modify", writePermission.Description.ToLower());
+        Assert.Equal(result.Id, writePermission.LabelId);
+        Assert.False(writePermission.IsDefault);
     }
 
     #endregion

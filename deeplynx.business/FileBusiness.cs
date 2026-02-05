@@ -140,7 +140,7 @@ public class FileBusiness
     public async Task<RecordResponseDto> UpdateFile(long currentUserId, long organizationId, long projectId,
         long recordId, IFormFile file)
     {
-        var record = await _recordBusiness.GetRecord(organizationId, projectId, recordId, true);
+        var record = await _recordBusiness.GetRecord(currentUserId, organizationId, projectId, recordId, true);
         if (file == null || file.Length == 0) throw new ArgumentException("File is required and cannot be empty.");
 
         if (record.ObjectStorageId == null) throw new KeyNotFoundException("Record needs an object storage id");
@@ -174,12 +174,13 @@ public class FileBusiness
     /// <summary>
     ///     Downloads file
     /// </summary>
+    /// <param name="currentUserId">ID of current user making the request</param>
     /// <param name="organizationId">ID of the organization to which the project belongs</param>
     /// <param name="projectId">ID of the project to which the file belongs</param>
     /// <param name="recordId">ID of record that contains the info of the file to download</param>
-    public async Task<FileStreamResult> DownloadFile(long organizationId, long projectId, long recordId)
+    public async Task<FileStreamResult> DownloadFile(long currentUserId, long organizationId, long projectId, long recordId)
     {
-        var record = await _recordBusiness.GetRecord(organizationId, projectId, recordId, true);
+        var record = await _recordBusiness.GetRecord(currentUserId, organizationId, projectId, recordId, true);
         if (record.ObjectStorageId == null) throw new KeyNotFoundException("Record needs an object storage id");
         
         var objectStorage = await GetObjectStorageWithConfig(organizationId, projectId, record.ObjectStorageId.Value);
@@ -200,7 +201,7 @@ public class FileBusiness
     /// <param name="recordId">ID of record that contains the info of the file to delete</param>
     public async Task<bool> DeleteFile(long currentUserId, long organizationId, long projectId, long recordId)
     {
-        var record = await _recordBusiness.GetRecord(organizationId, projectId, recordId, true);
+        var record = await _recordBusiness.GetRecord(currentUserId, organizationId, projectId, recordId, true);
         if (record == null) throw new KeyNotFoundException("Record not found");
         if (record.ObjectStorageId == null) throw new KeyNotFoundException("Record needs an object storage id");
         
