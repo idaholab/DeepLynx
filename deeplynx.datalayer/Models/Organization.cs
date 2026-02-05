@@ -31,6 +31,9 @@ public partial class Organization
     [Column("banner")]
     [MaxLength(50)]
     public string? Banner { get; set; }
+    
+    [Column("require_sensitivity_label")]
+    public bool RequireSensitivityLabel { get; set; } = false;
 
     [InverseProperty("Organization")]
     public virtual ICollection<Group> Groups { get; set; } = new List<Group>();
