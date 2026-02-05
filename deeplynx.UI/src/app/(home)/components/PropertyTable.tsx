@@ -28,7 +28,8 @@ interface PropertyTableProps {
   rows: PropertyRow[];
   className?: string;
   download?: boolean;
-  recordName?: string;
+  recordName?: string | null;
+  onEditProperties?: () => void;
 }
 
 const PropertyTable: React.FC<PropertyTableProps> = ({
@@ -37,6 +38,7 @@ const PropertyTable: React.FC<PropertyTableProps> = ({
   className,
   download = false,
   recordName,
+  onEditProperties,
 }) => {
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [editValue, setEditValue] = useState<string>("");
@@ -81,7 +83,7 @@ const PropertyTable: React.FC<PropertyTableProps> = ({
     index: number,
     depth: number = 0,
     isLast: boolean = false,
-    parentIsLast: boolean[] = []
+    parentIsLast: boolean[] = [],
   ) => {
     const isExpanded = expandedRows.has(index);
     const hasNested =
@@ -200,8 +202,8 @@ const PropertyTable: React.FC<PropertyTableProps> = ({
                 index * 1000 + nestedIndex,
                 depth + 1,
                 nestedIndex === row.nestedRows!.length - 1,
-                [...parentIsLast, isLast]
-              )
+                [...parentIsLast, isLast],
+              ),
             )}
           </>
         )}
@@ -216,39 +218,52 @@ const PropertyTable: React.FC<PropertyTableProps> = ({
           <div className="flex justify-between items-center m-4">
             <h2 className="text-xl font-bold text-base-content">{title}</h2>
 
-            {download && (
-              <button
-                onClick={() =>
-                  canDownload &&
-                  downloadFile(
-                    organization?.organizationId as number,
-                    projectId,
-                    recordId,
-                    recordName
-                  )
-                }
-                disabled={!canDownload}
-                title={
-                  canDownload
-                    ? "Download file"
-                    : "Missing projectId or recordId in URL"
-                }
-                className={`p-1 transition-colors cursor-pointer ${
-                  canDownload
-                    ? "hover:text-primary"
-                    : "opacity-50 cursor-not-allowed"
-                }`}
-              >
-                <ArrowDownTrayIcon className="w-8 h-8" />
-              </button>
-            )}
+            <div className="flex gap-2">
+              {/* Edit Properties Button */}
+              {onEditProperties && (
+                <button
+                  onClick={onEditProperties}
+                  title="Edit properties"
+                  className="p-1 transition-colors cursor-pointer hover:text-primary"
+                >
+                  <PencilIcon className="size-6 text-primary" />
+                </button>
+              )}
+
+              {download && (
+                <button
+                  onClick={() =>
+                    canDownload &&
+                    downloadFile(
+                      organization?.organizationId as number,
+                      projectId,
+                      recordId,
+                      recordName,
+                    )
+                  }
+                  disabled={!canDownload}
+                  title={
+                    canDownload
+                      ? "Download file"
+                      : "Missing projectId or recordId in URL"
+                  }
+                  className={`p-1 transition-colors cursor-pointer ${
+                    canDownload
+                      ? "hover:text-primary"
+                      : "opacity-50 cursor-not-allowed"
+                  }`}
+                >
+                  <ArrowDownTrayIcon className="w-8 h-8" />
+                </button>
+              )}
+            </div>
           </div>
         )}
 
         <div className="card-body p-4">
           <div className="border border-base-300 rounded-lg overflow-hidden bg-base-100">
             {rows.map((row, index) =>
-              renderRow(row, index, 0, index === rows.length - 1, [])
+              renderRow(row, index, 0, index === rows.length - 1, []),
             )}
           </div>
         </div>
