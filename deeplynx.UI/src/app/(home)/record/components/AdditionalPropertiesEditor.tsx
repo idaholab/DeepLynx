@@ -212,7 +212,7 @@ export default function AdditionalPropertiesEditor({
 
   return (
     <dialog className="modal modal-open mt-10">
-      <div className="modal-box max-w-4xl w-full h-[80vh] flex flex-col p-0">
+      <div className="modal-box max-w-4xl w-full max-h-[80vh] flex flex-col p-0">
         {/* Header */}
         <div className="p-6 border-b border-base-300 flex-shrink-0">
           <div className="flex justify-between items-center">
@@ -236,7 +236,7 @@ export default function AdditionalPropertiesEditor({
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto p-6">
+        <div className="flex-1 min-h-0 overflow-y-auto p-6">
           {/* Existing Properties */}
           <div className="card bg-base-100 border border-base-300 mb-4">
             <div className="card-body p-0">
