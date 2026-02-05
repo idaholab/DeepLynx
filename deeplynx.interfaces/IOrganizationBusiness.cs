@@ -20,4 +20,6 @@ public interface IOrganizationBusiness
     Task<bool> AddUserToOrganization(long organizationId, long userId, bool isAdmin = false);
     Task<bool> SetOrganizationAdminStatus(long organizationId, long userId, bool isAdmin = false);
     Task<bool> RemoveUserFromOrganization(long organizationId, long userId);
+    Task<bool> RequireSensitivityLabels(long organizationId);
+    Task<bool> UnrequireSensitivityLabels(long organizationId);
 }
