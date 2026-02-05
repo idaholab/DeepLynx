@@ -1,28 +1,31 @@
-FROM postgres:18-alpine3.20 AS deeplynx-db
+FROM postgres:18-alpine3.23 AS deeplynx-db
 
-# Temporarily switch to HTTP repos to bootstrap certificates
-RUN sed -i 's/https/http/g' /etc/apk/repositories && \
-    apk --no-cache add ca-certificates wget && \
-    wget -q --no-check-certificate -P /usr/local/share/ca-certificates/ http://certstore.inl.gov/pki/CAINLROOT_B64.crt && \
-    update-ca-certificates && \
-    sed -i 's/http/https/g' /etc/apk/repositories
+# Set working directory
+WORKDIR /var/lib/postgresql/data
 
 # Configure INL certs and environment variables
+RUN apk --no-check-certificate add wget ca-certificates
+RUN wget -q -P /usr/local/share/ca-certificates/ http://certstore.inl.gov/pki/CAINLROOT_B64.crt
+RUN /usr/sbin/update-ca-certificates
 ENV NODE_EXTRA_CA_CERTS=/etc/ssl/certs/ca-certificates.crt
 ENV REQUESTS_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt
 ENV CURL_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt
 ENV SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
 ENV SSL_CERT_DIR=/etc/ssl/certs/
 
-# Set working directory
-WORKDIR /var/lib/postgresql/data
+## Below is config for hardening Postgres for production release
 
-# Install build dependencies for pgvector
-RUN apk add --no-cache --virtual .build-deps \
+# Update alpine package manager
+RUN apk update && apk upgrade
+
+# # Install build dependencies
+RUN apk add --virtual .build-deps \
     git \
     build-base \
-    clang15 \
-    llvm15
+    postgresql18-dev \
+    clang19 \
+    llvm19 \
+    make
 
 # Install pgvector
 RUN git clone --branch v0.8.1 https://github.com/pgvector/pgvector.git /tmp/pgvector && \
