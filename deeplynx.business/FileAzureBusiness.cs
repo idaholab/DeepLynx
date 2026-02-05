@@ -32,7 +32,7 @@ public class FileAzureBusiness: IFileBusiness
 
         // Get a reference to the container
         var container = new BlobContainerClient(objectStorageConfig.AzureObjectConfig.AzureConnectionString, objectStorageConfig.AzureObjectConfig.AzureContainerName);
-        await container.CreateIfNotExistsAsync();
+        // await container.CreateIfNotExistsAsync();
 
         // Get a reference to a blob (using the original filename from the uploaded file)
         var blob = container.GetBlobClient(fileName);
