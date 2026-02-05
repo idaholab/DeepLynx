@@ -287,7 +287,7 @@ public class TimeseriesController : ControllerBase
         try
         {
             var currentUserId = UserContextStorage.UserId;
-            var timeseriesPlotData = await _timeseriesBusiness.GetPlotData(organizationId, projectId, dataSourceId, recordId, limit, rowStride);
+            var timeseriesPlotData = await _timeseriesBusiness.GetPlotData(currentUserId, organizationId, projectId, dataSourceId, recordId, limit, rowStride);
             return Ok(new { TimeseriesPlotData = timeseriesPlotData });
         }
         catch (ArgumentException e)
@@ -317,7 +317,7 @@ public class TimeseriesController : ControllerBase
         try
         {
             var currentUserId = UserContextStorage.UserId;
-            var latestRow = await _timeseriesBusiness.GetLatestRow(organizationId, projectId, dataSourceId, recordId);
+            var latestRow = await _timeseriesBusiness.GetLatestRow(currentUserId, organizationId, projectId, dataSourceId, recordId);
             return Ok(new { LatestRowData = latestRow });
         }
         catch (ArgumentException e)

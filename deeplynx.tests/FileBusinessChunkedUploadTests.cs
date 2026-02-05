@@ -22,6 +22,7 @@ public class FileBusinessChunkedUploadTests : IntegrationTestBase
     private DataSourceBusiness _dataSourceBusiness = null!;
     private Mock<IEdgeBusiness> _edgeBusiness = null!;
     private EventBusiness _eventBusiness = null!;
+    private SensitivityLabelBusiness _sensitivityLabelBusiness = null!;
     private FileBusiness _fileBusiness = null!;
     private Mock<IFileBusinessFactory> _fileBusinessFactory = null!;
     private Mock<IHubContext<EventNotificationHub>> _mockHubContext = null!;
@@ -65,7 +66,9 @@ public class FileBusinessChunkedUploadTests : IntegrationTestBase
         _objectStorageBusiness = new ObjectStorageBusiness(Context);
 
         _tagBusiness = new TagBusiness(Context, _eventBusiness);
-        _recordBusiness = new RecordBusiness(Context, _eventBusiness, _mockBulkCopyExecutor,_tagBusiness);
+        _sensitivityLabelBusiness = new SensitivityLabelBusiness(Context, _eventBusiness);
+        
+        _recordBusiness = new RecordBusiness(Context, _eventBusiness, _mockBulkCopyExecutor,_tagBusiness, _sensitivityLabelBusiness);
         _classBusiness = new ClassBusiness(Context, _recordBusiness, _relationshipBusiness.Object, _eventBusiness);
 
         var realFileFilesystemBusiness =
