@@ -738,6 +738,12 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
         label: t.translations.ORIGINAL_ID,
         value: record.originalId,
         editable: true,
+        onEdit: (value: string) =>
+          handleUpdateRecord(
+            "original_id",
+            value,
+            t.translations.ORIGINAL_ID_UPDATED,
+          ),
       },
       { label: t.translations.LAST_UPDATED_AT, value: record.lastUpdatedAt },
       { label: t.translations.DATA_SOURCE, value: record.dataSourceName },

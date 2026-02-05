@@ -238,6 +238,7 @@ export const translations = {
             API_KEYPAIRS: "API Keys",
             NO_RECENT_RECORDS: "No recent records found",
             ORIGINAL_ID: "Original ID",
+            ORIGINAL_ID_UPDATED: "Original ID updated",
             PROPERTIES_EXAMPLE: `Properties.\nExample:\n  { "key1": "value1" },\n OR \n { "key2": { "subKey2": "subValue2" } } \n(single JSON object only)`,
             ADD_A_RECORD: "Add a record",
             SELECT_PROJECT: "Select project",
@@ -848,6 +849,7 @@ export const translations = {
             API_KEYPAIRS: "Claves API",
             NO_RECENT_RECORDS: "No se encontraron registros recientes",
             ORIGINAL_ID: "ID original",
+            ORIGINAL_ID_UPDATED: "ID original actaulizado",
             PROPERTIES_EXAMPLE:
                 `Propiedades.\nEjemplo:\n  { "key1": "value1" },\n O \n { "key2": { "subKey2": "subValue2" } } \n(solo un objeto JSON)`,
             ADD_A_RECORD: "Agregar un registro",
