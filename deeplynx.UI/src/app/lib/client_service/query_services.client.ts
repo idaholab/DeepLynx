@@ -2,7 +2,7 @@
 "use client";
 
 import { CustomQueryRequestDto } from "@/app/(home)/types/requestDTOs";
-import { HistoricalRecordResponseDto, RecordResponseDto } from "@/app/(home)/types/responseDTOs";
+import { HistoricalRecordResponseDto } from "@/app/(home)/types/responseDTOs";
 import api from "./api";
 
 

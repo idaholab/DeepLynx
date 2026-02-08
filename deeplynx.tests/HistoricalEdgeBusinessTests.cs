@@ -567,15 +567,20 @@ public class HistoricalEdgeBusinessTests : IntegrationTestBase
     [Fact]
     public async Task GetHistoricalEdge_FiltersByTime()
     {
-        // Arrange
+        // Arrange - capture time BEFORE any updates
         var pointInTime = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
+    
+        // Ensure temporal separation (prevents same-millisecond issues when all tests are run in parallel)
+        await Task.Delay(10);
+    
         var dto = new UpdateEdgeRequestDto
         {
             OriginId = (int)destinationRecordId,
             DestinationId = (int)destinationRecordId2,
             RelationshipId = (int)relationshipId
         };
-        await _edgeBusiness.UpdateEdge(uid, organizationId, pid,dto, eid, null, null);
+    
+        await _edgeBusiness.UpdateEdge(uid, organizationId, pid, dto, eid, null, null);
 
         // Act
         var historicalEdge =
@@ -587,7 +592,7 @@ public class HistoricalEdgeBusinessTests : IntegrationTestBase
         Assert.Equal(originRecordId, historicalEdge.OriginId);
         Assert.Equal(destinationRecordId, historicalEdge.DestinationId);
     }
-
+    
     [Fact]
     public async Task GetHistoricalEdge_ReturnsArchivedHistoricalEdge_WhenEdgeIsArchived()
     {

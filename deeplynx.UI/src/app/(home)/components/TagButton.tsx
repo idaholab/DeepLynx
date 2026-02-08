@@ -76,7 +76,7 @@ const TagButton: React.FC<TagButtonProps> = ({
         organization?.organizationId as number,
         projectId,
         recordId,
-        Number(id)
+        Number(id),
       );
     } else {
       newSelectionIds = [...tempSelectedIds.map(String), id];
@@ -85,7 +85,7 @@ const TagButton: React.FC<TagButtonProps> = ({
           organization?.organizationId as number,
           projectId,
           recordId,
-          Number(id)
+          Number(id),
         );
       } catch (error) {
         console.error("Error attaching tag to record:", error);
@@ -108,7 +108,7 @@ const TagButton: React.FC<TagButtonProps> = ({
         organization?.organizationId as number,
         projectId,
         recordId,
-        Number(newTag.id)
+        Number(newTag.id),
       );
 
       // Update selection state
@@ -122,18 +122,18 @@ const TagButton: React.FC<TagButtonProps> = ({
       setSelectedTags((prevSelectedTags) => [...prevSelectedTags, newTag]);
 
       toast.success(
-        `${t.translations.TAG_} "${newTag.name}" ${t.translations.CREATED_AND_ATTACHED}`
+        `${t.translations.TAG_} "${newTag.name}" ${t.translations.CREATED_AND_ATTACHED}`,
       );
     } catch (error) {
       console.error("Error attaching new tag:", error);
       toast.error(
-        `${t.translations.TAG_} ${t.translations.CREATED_BUT_FAILED_TO_ATTACH}`
+        `${t.translations.TAG_} ${t.translations.CREATED_BUT_FAILED_TO_ATTACH}`,
       );
     }
   };
 
   const filteredTags = tags.filter((t) =>
-    t.name.toLowerCase().includes(searchTerm.toLowerCase())
+    t.name.toLowerCase().includes(searchTerm.toLowerCase()),
   );
 
   return (
@@ -142,7 +142,7 @@ const TagButton: React.FC<TagButtonProps> = ({
         className="flex items-center justify-center w-7 h-7 rounded-full bg-primary text-white cursor-pointer"
         onClick={() => setIsOpen(!isOpen)}
       >
-        <PlusIcon className="w-6 h-5" />
+        <PlusIcon className="size-6" />
       </button>
 
       {isOpen && (

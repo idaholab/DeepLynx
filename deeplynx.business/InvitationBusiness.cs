@@ -41,7 +41,7 @@ public class InvitationBusiness: IInvitationBusiness
     /// <exception cref="NotImplementedException"></exception>
     public async Task<bool> InviteAndAddUserToHierarchy(long organizationId, long? projectId, long? roleId, string userEmail, string? userName)
     {
-        var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == userEmail);
+        var user = await _context.Users.FirstOrDefaultAsync(u => u.Email.ToLower() == userEmail.ToLower());
     
         if (user != null)
         {

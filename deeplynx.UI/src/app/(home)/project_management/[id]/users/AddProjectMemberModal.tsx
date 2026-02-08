@@ -7,6 +7,7 @@ import {
   RoleResponseDto,
 } from "@/app/(home)/types/responseDTOs";
 import { AddMemberModalState, MemberType } from "../../types/projectUsersTypes";
+import { useLanguage } from "@/app/contexts/Language";
 
 /* -------------------------------------------------------------------------- */
 /*                           Add Member Modal Component                       */
@@ -39,77 +40,140 @@ const AddProjectMemberModal: React.FC<AddProjectMemberModalProps> = ({
   onChangeRole,
   onConfirm,
 }) => {
+  const { t } = useLanguage();
   if (!addModal.isOpen) return null;
 
   const labelForType: Record<MemberType, string> = {
-    user: "user",
-    group: "group",
+    user: t.translations.USER,
+    group: t.translations.GROUP,
+  };
+
+  // Get selected member display text
+  const getSelectedMemberDisplay = () => {
+    if (!selectedMemberId) {
+      return addModal.memberType === "user"
+        ? t.translations.SELECT_A_USER
+        : t.translations.SELECT_A_GROUP;
+    }
+
+    if (addModal.memberType === "user") {
+      const user = availableUsers.find(
+        (u) => u.id === Number(selectedMemberId),
+      );
+      return user
+        ? `${user.name}${user.email ? ` (${user.email})` : ""}`
+        : t.translations.SELECT_A_USER;
+    } else {
+      const group = availableGroups.find(
+        (g) => g.id === Number(selectedMemberId),
+      );
+      return group ? group.name : t.translations.SELECT_A_GROUP;
+    }
   };
 
   return (
     <dialog className="modal modal-open">
-      <div className="modal-box">
+      <div className="modal-box overflow-visible">
         <h3 className="font-bold text-lg">
           {addModal.memberType === "user"
-            ? "Add User to Project"
-            : "Add Group to Project"}
+            ? t.translations.ADD_USER_TO_PROJECT
+            : t.translations.ADD_GROUP_TO_PROJECT}
         </h3>
         <p className="py-2 text-sm text-base-content/70">
-          Select an existing {addModal.memberType} and assign a role. A role is
-          required to add them to the project.
+          {addModal.memberType === "user"
+            ? t.translations.ADD_USER_TO_PROJECT_DESCRIPTION
+            : t.translations.ADD_GROUP_TO_PROJECT_DESCRIPTION}
         </p>
 
-        {/* Member select */}
+        {/* Member select - Custom Dropdown */}
         <div className="form-control mt-4">
           <label className="label">
             <span className="label-text capitalize">
               {labelForType[addModal.memberType]}
             </span>
           </label>
-          <select
-            className="select select-bordered w-full"
-            value={selectedMemberId}
-            onChange={(e) => onChangeMember(e.target.value)}
-            disabled={modalLoading}
-          >
-            <option value="">
+          <div className="dropdown dropdown-bottom w-full">
+            <div
+              tabIndex={0}
+              role="button"
+              className={`select select-bordered w-full flex items-center justify-between ${modalLoading ? "select-disabled" : ""}`}
+            >
+              <span className={selectedMemberId ? "" : "text-base-content/50"}>
+                {getSelectedMemberDisplay()}
+              </span>
+            </div>
+            <ul
+              tabIndex={0}
+              className="dropdown-content menu bg-base-100 rounded-box z-[100] w-full p-2 shadow-lg border border-base-300 max-h-60 overflow-y-auto mt-1"
+            >
               {addModal.memberType === "user"
-                ? "Select a user"
-                : "Select a group"}
-            </option>
-
-            {addModal.memberType === "user"
-              ? availableUsers.map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.name} {u.email ? `(${u.email})` : ""}
-                  </option>
-                ))
-              : availableGroups.map((g) => (
-                  <option key={g.id} value={g.id}>
-                    {g.name}
-                  </option>
-                ))}
-          </select>
+                ? availableUsers.map((u) => (
+                    <li
+                      key={u.id}
+                      onClick={() => onChangeMember(u.id.toString())}
+                    >
+                      <a>
+                        <span>
+                          {u.name} {u.email ? `(${u.email})` : ""}
+                        </span>
+                      </a>
+                    </li>
+                  ))
+                : availableGroups.map((g) => (
+                    <li
+                      key={g.id}
+                      onClick={() => onChangeMember(g.id.toString())}
+                      className=""
+                    >
+                      <a>
+                        <span>{g.name}</span>
+                      </a>
+                    </li>
+                  ))}
+            </ul>
+          </div>
         </div>
 
-        {/* Role select */}
+        {/* Role select - Custom Dropdown */}
         <div className="form-control mt-4">
           <label className="label">
-            <span className="label-text">Role</span>
+            <span className="label-text">{t.translations.ROLE}</span>
           </label>
-          <select
-            className="select select-bordered w-full"
-            value={selectedRoleId}
-            onChange={(e) => onChangeRole(e.target.value)}
-            disabled={modalLoading}
-          >
-            <option value="">Select a role</option>
-            {roles.map((r) => (
-              <option key={r.id} value={r.id}>
-                {r.name}
-              </option>
-            ))}
-          </select>
+          <div className="dropdown dropdown-bottom w-full">
+            <div
+              tabIndex={0}
+              role="button"
+              className={`select select-bordered w-full flex items-center justify-between ${modalLoading ? "select-disabled" : ""}`}
+            >
+              <span className={selectedRoleId ? "" : "text-base-content/50"}>
+                {selectedRoleId
+                  ? roles.find((r) => r.id === Number(selectedRoleId))?.name ||
+                    t.translations.SELECT_A_ROLE
+                  : t.translations.SELECT_A_ROLE}
+              </span>
+            </div>
+            <ul
+              tabIndex={0}
+              className="dropdown-content menu bg-base-100 rounded-box z-[100] w-full p-2 shadow-lg border border-base-300 max-h-60 overflow-y-auto mt-1"
+            >
+              {roles.map((r) => (
+                <li
+                  key={r.id}
+                  onClick={() => onChangeRole(r.id.toString())}
+                  className=""
+                >
+                  <a>
+                    <span>{r.name}</span>
+                    {!r.projectId && (
+                      <span className="badge badge-primary badge-sm">
+                        {t.translations.ORG}
+                      </span>
+                    )}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </div>
         </div>
 
         <div className="modal-action">
@@ -118,14 +182,16 @@ const AddProjectMemberModal: React.FC<AddProjectMemberModalProps> = ({
             onClick={onClose}
             disabled={modalLoading}
           >
-            Cancel
+            {t.translations.CANCEL}
           </button>
           <button
             className="btn btn-primary"
             onClick={onConfirm}
             disabled={modalLoading}
           >
-            {modalLoading ? "Adding..." : "Add to Project"}
+            {modalLoading
+              ? t.translations.ADDING
+              : t.translations.ADD_TO_PROJECT}
           </button>
         </div>
       </div>

@@ -647,7 +647,7 @@ public class TimeseriesBusiness(
     /// <param name="limit">Maximum number of data points to include</param>
     /// <param name="rowStride">every nth row to get (row number 4 = every 4th row)</param>
     /// <returns>A json array of plot data</returns>
-    public async Task<PlotDataDto> GetPlotData(long organizationId, long projectId,
+    public async Task<PlotDataDto> GetPlotData(long currentUserId, long organizationId, long projectId,
         long dataSourceId, long recordId, long limit, long rowStride)
     {
         await ExistenceHelper.EnsureDataSourceExistsForProjectAsync(_context, dataSourceId, projectId);
@@ -668,7 +668,7 @@ public class TimeseriesBusiness(
             _tableCache.Set(cacheKey, validTables, TimeSpan.FromSeconds(120));
         }
 
-        var record = await _recordBusiness.GetRecord(organizationId, projectId, recordId, true);
+        var record = await _recordBusiness.GetRecord(currentUserId, organizationId, projectId, recordId, true);
 
         if (string.IsNullOrEmpty(record.Uri))
             throw new ArgumentException($"Record {recordId} does not have a URI");
@@ -710,7 +710,7 @@ public class TimeseriesBusiness(
     /// <param name="dataSourceId">ID of data source that timeseries data is associated with</param>
     /// <param name="recordId">Name of the duckDB table on which the timeseries data is encoded</param>
     /// <returns>The most recently inserted row as json</returns>
-    public async Task<Dictionary<string, object?>> GetLatestRow(long organizationId, long projectId,
+    public async Task<Dictionary<string, object?>> GetLatestRow(long currentUserId, long organizationId, long projectId,
         long dataSourceId, long recordId)
     {
         await ExistenceHelper.EnsureDataSourceExistsForProjectAsync(_context, dataSourceId, projectId);
@@ -731,7 +731,7 @@ public class TimeseriesBusiness(
             _tableCache.Set(cacheKey, validTables, TimeSpan.FromSeconds(120));
         }
 
-        var record = await _recordBusiness.GetRecord(organizationId, projectId, recordId, true);
+        var record = await _recordBusiness.GetRecord(currentUserId, organizationId, projectId, recordId, true);
 
         if (string.IsNullOrEmpty(record.Uri))
             throw new ArgumentException($"Record {recordId} does not have a URI");

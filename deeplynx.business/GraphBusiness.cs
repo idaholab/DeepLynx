@@ -53,7 +53,8 @@ public class GraphBusiness : IGraphBusiness
         if (!recordExists) throw new KeyNotFoundException($"Record with id {recordId} not found");
 
         IQueryable<Edge> edgeQuery = _context.Edges
-            .Include(e => e.Relationship);
+            .Include(e => e.Relationship)
+            .Where(e => !e.IsArchived);
 
         if (isOrigin)
             edgeQuery = edgeQuery
