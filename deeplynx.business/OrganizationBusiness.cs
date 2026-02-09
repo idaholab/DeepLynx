@@ -152,7 +152,8 @@ public class OrganizationBusiness : IOrganizationBusiness
             DefaultOrg = isDefault,
             LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
             LastUpdatedBy = currentUserId,
-            Banner = dto.Banner
+            Banner = dto.Banner,
+            RequireSensitivityLabel = dto.RequireSensitivityLabel ?? false
         };
 
         _context.Organizations.Add(organization);
@@ -194,7 +195,8 @@ public class OrganizationBusiness : IOrganizationBusiness
             LastUpdatedBy = organization.LastUpdatedBy,
             IsArchived = organization.IsArchived,
             DefaultOrg = organization.DefaultOrg,
-            Banner = organization.Banner
+            Banner = organization.Banner,
+            RequireSensitivityLabel = organization.RequireSensitivityLabel
         };
     }
 
@@ -213,6 +215,23 @@ public class OrganizationBusiness : IOrganizationBusiness
 
         if (organization == null || organization.IsArchived)
             throw new KeyNotFoundException($"Organization with id {organizationId} does not exist");
+
+        // Validate that if the RequireSensitivityLabel is enabled all existing records have labels
+        if (!organization.RequireSensitivityLabel && dto.RequireSensitivityLabel == true)
+        {
+            var hasUnlabeledRecords = await _context.Records
+                .Include(r => r.Labels)
+                .Where(r => r.OrganizationId == organizationId)
+                .AnyAsync(r => !r.Labels.Any());
+        
+            if (hasUnlabeledRecords)
+                throw new InvalidOperationException(
+                    "Cannot require sensitivity labels: organization contains records without labels. " +
+                    "Please label all existing records before enabling this requirement.");
+        }
+        
+        if (dto.RequireSensitivityLabel != null)
+            organization.RequireSensitivityLabel = dto.RequireSensitivityLabel.Value;
 
         organization.Name = dto.Name ?? organization.Name;
         organization.Description = dto.Description ?? organization.Description;
@@ -250,7 +269,8 @@ public class OrganizationBusiness : IOrganizationBusiness
             LastUpdatedBy = organization.LastUpdatedBy,
             IsArchived = organization.IsArchived,
             DefaultOrg = organization.DefaultOrg,
-            Banner = organization.Banner
+            Banner = organization.Banner,
+            RequireSensitivityLabel = organization.RequireSensitivityLabel
         };
     }
 
@@ -431,53 +451,6 @@ public class OrganizationBusiness : IOrganizationBusiness
         _context.OrganizationUsers.Remove(existingOrgUser);
         await _context.SaveChangesAsync();
 
-        return true;
-    }
-    
-        /// <summary>
-    ///     Makes Sensitivity Labels required for all records in the organization
-    /// </summary>
-    /// <param name="organizationId">The ID of the organization sensitivity labels for all records will be required for.</param>
-    public async Task<bool> RequireSensitivityLabels(long organizationId)
-    {
-        var organization = await _context.Organizations
-            .FirstOrDefaultAsync(o => o.Id == organizationId);
-    
-        if (organization.RequireSensitivityLabel)
-            throw new InvalidOperationException("Sensitivity labels are already required for this organization");
-        
-        var hasUnlabeledRecords = await _context.Records
-            .Include(r => r.Labels)
-            .Where(r => r.OrganizationId == organizationId)
-            .AnyAsync(r => !r.Labels.Any());
-        
-        if (hasUnlabeledRecords) 
-            throw new InvalidOperationException("There are records without sensitivity labels in this organization. Ensure that all records are labeled before requiring sensitivity labels");
-    
-        organization.RequireSensitivityLabel = true;
-        await _context.SaveChangesAsync();
-        
-        return true;
-    }
-    
-    /// <summary>
-    ///     Makes sensitivity labels optional for records in the organization
-    /// </summary>
-    /// <param name="organizationId">The ID of the organization sensitivity labels for all records will NOT be required for.</param>
-    public async Task<bool> UnrequireSensitivityLabels(long organizationId)
-    {
-        var organization = await _context.Organizations
-            .FirstOrDefaultAsync(p => p.Id == organizationId);
-
-        if (organization == null)
-            throw new ArgumentException("Organization not found");
-
-        if (!organization.RequireSensitivityLabel)
-            throw new InvalidOperationException("Sensitivity labels are already optional for this organization");
-
-        organization.RequireSensitivityLabel = false;
-        await _context.SaveChangesAsync();
-        
         return true;
     }
 

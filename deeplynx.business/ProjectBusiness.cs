@@ -122,7 +122,8 @@ public class ProjectBusiness : IProjectBusiness
             OrganizationId = organizationId,
             LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
             LastUpdatedBy = userId,
-            Banner = dto.Banner
+            Banner = dto.Banner,
+            RequireSensitivityLabel = dto.RequireSensitivityLabel ?? false
         };
 
         _context.Projects.Add(project);
@@ -139,7 +140,8 @@ public class ProjectBusiness : IProjectBusiness
             LastUpdatedBy = project.LastUpdatedBy,
             LastUpdatedAt = project.LastUpdatedAt,
             OrganizationId = project.OrganizationId,
-            Banner = project.Banner
+            Banner = project.Banner,
+            RequireSensitivityLabel = dto.RequireSensitivityLabel
         };
 
         // Update the Project Cache List
@@ -154,7 +156,6 @@ public class ProjectBusiness : IProjectBusiness
         // If project cache count differs from the database refresh it to match the database and return
         if (cachedProjectList.Count != _context.Projects.Count()) await RefreshProjectsCache();
 
-        // Log create Project event
         // Log create Project event
         var eventLog = new CreateEventRequestDto
         {
@@ -230,6 +231,23 @@ public class ProjectBusiness : IProjectBusiness
             throw new KeyNotFoundException(
                 $"Project with id {projectId} not found or does not belong to the specified organization context");
 
+        // Validate that if the RequireSensitivityLabel is enabled all existing records have labels
+        if (!project.RequireSensitivityLabel && dto.RequireSensitivityLabel == true)
+        {
+            var hasUnlabeledRecords = await _context.Records
+                .Include(r => r.Labels)
+                .Where(r => r.ProjectId == projectId)
+                .AnyAsync(r => !r.Labels.Any());
+        
+            if (hasUnlabeledRecords)
+                throw new InvalidOperationException(
+                    "Cannot require sensitivity labels: project contains records without labels. " +
+                    "Please label all existing records before enabling this requirement.");
+        }
+
+        if (dto.RequireSensitivityLabel != null)
+            project.RequireSensitivityLabel = dto.RequireSensitivityLabel.Value;
+
         project.Name = dto.Name ?? project.Name;
         project.Description = dto.Description ?? project.Description;
         project.Abbreviation = dto.Abbreviation ?? project.Abbreviation;
@@ -261,7 +279,8 @@ public class ProjectBusiness : IProjectBusiness
             LastUpdatedAt = project.LastUpdatedAt,
             LastUpdatedBy = project.LastUpdatedBy,
             OrganizationId = project.OrganizationId,
-            Banner = project.Banner
+            Banner = project.Banner,
+            RequireSensitivityLabel = project.RequireSensitivityLabel
         };
 
         // Update the Project Cache List
@@ -756,58 +775,6 @@ public class ProjectBusiness : IProjectBusiness
                 IsArchived = r.IsArchived,
                 Tags = r.Tags
             });
-    }
-
-    /// <summary>
-    ///     Makes Sensitivity Labels required for all records in the project
-    /// </summary>
-    /// <param name="organizationId">Array of project ids whose records are to be retrieved</param>
-    /// <param name="projectId">The ID of the project sensitivity labels for all records will NOT be required for.</param>
-    public async Task<bool> RequireSensitivityLabels(long organizationId, long projectId)
-    {
-        var project = await _context.Projects
-            .FirstOrDefaultAsync(p => p.OrganizationId == organizationId && p.Id == projectId);
-    
-        if (project == null)
-            throw new ArgumentException("Project not found");
-    
-        if (project.RequireSensitivityLabel)
-            throw new InvalidOperationException("Sensitivity labels are already required for this project");
-        
-        var hasUnlabeledRecords = await _context.Records
-            .Include(r => r.Labels)
-            .Where(r => r.ProjectId == projectId)
-            .AnyAsync(r => !r.Labels.Any());
-        
-        if (hasUnlabeledRecords) 
-            throw new InvalidOperationException("There are records without sensitivity labels in this project. Ensure that all records are labeled before requiring sensitivity labels");
-    
-        project.RequireSensitivityLabel = true;
-        await _context.SaveChangesAsync();
-        
-        return true;
-    }
-    
-    /// <summary>
-    ///     Makes sensitivity labels optional for records in the project
-    /// </summary>
-    /// <param name="organizationId">Organization ID that owns the project</param>
-    /// <param name="projectId">The ID of the project sensitivity labels for all records will NOT be required for.</param>
-    public async Task<bool> UnrequireSensitivityLabels(long organizationId, long projectId)
-    {
-        var project = await _context.Projects
-            .FirstOrDefaultAsync(p => p.OrganizationId == organizationId && p.Id == projectId);
-
-        if (project == null)
-            throw new ArgumentException("Project not found");
-
-        if (!project.RequireSensitivityLabel)
-            throw new InvalidOperationException("Sensitivity labels are already optional for this project");
-
-        project.RequireSensitivityLabel = false;
-        await _context.SaveChangesAsync();
-        
-        return true;
     }
 
     private async Task<bool> RefreshProjectsCache()

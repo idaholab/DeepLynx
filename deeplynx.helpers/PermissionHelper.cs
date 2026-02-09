@@ -73,4 +73,32 @@ public class PermissionHelper
 
         return authorizedLabelIds;
     }
+
+    public static async Task<bool> SensitivityLabelRequired(
+        DeeplynxContext _context,
+        long organizationId,
+        long? projectId
+    )
+    {
+        // if org level check the organization
+        var orgLevel = _context.Organizations
+            .Where(o => o.Id == organizationId)
+            .Select(o => o.RequireSensitivityLabel)
+            .FirstOrDefault();
+        
+        if (orgLevel) return true;
+        
+        // if no project ID is provided and orgLevel is false, return false
+        if (projectId == null && !orgLevel) return false;
+        
+        // if project ID is provided and org level is false
+        // check the project's "require_sensitivity_level" column value
+        var projectLevel = _context.Projects
+            .Where(p => p.Id == organizationId)
+            .Select(p => p.RequireSensitivityLabel)
+            .FirstOrDefault();
+        
+        // return result
+        return projectLevel;
+    }
 }

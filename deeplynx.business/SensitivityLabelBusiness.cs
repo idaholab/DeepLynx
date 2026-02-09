@@ -375,19 +375,21 @@ public class SensitivityLabelBusiness : ISensitivityLabelBusiness
     /// <returns>The newly created label</returns>
     /// <exception cref="ArgumentException">Returned if project/org both supplied or no project/org supplied</exception>
     public async Task<SensitivityLabelResponseDto> CreateSensitivityLabel(
-        long currentUserId, CreateSensitivityLabelRequestDto dto, long? projectId, long organizationId)
+    long currentUserId, CreateSensitivityLabelRequestDto dto, long? projectId, long organizationId)
     {
         ValidationHelper.ValidateModel(dto);
 
-        var transaction = await _context.Database.BeginTransactionAsync();
+        await using var transaction = await _context.Database.BeginTransactionAsync();
 
         try
         {
+            var now = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
+            
             var label = new SensitivityLabel
             {
                 Name = dto.Name,
                 Description = dto.Description,
-                LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+                LastUpdatedAt = now,
                 LastUpdatedBy = currentUserId,
                 ProjectId = projectId,
                 OrganizationId = organizationId
@@ -396,37 +398,37 @@ public class SensitivityLabelBusiness : ISensitivityLabelBusiness
             _context.SensitivityLabels.Add(label);
             await _context.SaveChangesAsync();
 
-            // Create permissions associated with the new Sensitivity Label
-            var readPermission = new Permission
+            var permissionActions = new[]
             {
-                Name = "Read " + dto.Name,
-                Description = "Permission to read " + dto.Name + " labeled records",
-                Action = "read",
-                LabelId = label.Id,
-                IsDefault = false,
-                ProjectId = projectId.HasValue ? projectId : null,
-                OrganizationId = organizationId,
-                LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
-                LastUpdatedBy = currentUserId,
+                ("read", "record", "Permission to read {0} labeled records"),
+                ("write", "record", "Permission to add records with label {0}"),
+                ("update", "record", "Permission to update {0} labeled records"),
+                ("delete", "record", "Permission to delete {0} labeled records"),
+                ("download", "file", "Permission to download {0} labeled files"),
+                ("upload", "file", "Permission to upload {0} labeled files"),
+                ("update", "file", "Permission to update {0} labeled files"),
+                ("delete", "file", "Permission to delete {0} labeled files")
             };
-            _context.Permissions.Add(readPermission);
 
-            var writePermission = new Permission
+            var permissions = permissionActions.Select(p => new Permission
             {
-                Name = "Write " + dto.Name,
-                Description = "Permission to modify " + dto.Name + " labeled records",
-                Action = "write",
+                Name = $"{char.ToUpper(p.Item1[0])}{p.Item1.Substring(1)} {dto.Name} {p.Item2}",
+                Description = string.Format(p.Item3, dto.Name),
+                Action = $"{p.Item1} {p.Item2}",
                 LabelId = label.Id,
                 IsDefault = false,
-                ProjectId = projectId.HasValue ? projectId : null,
+                ProjectId = projectId,
                 OrganizationId = organizationId,
-                LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
-                LastUpdatedBy = currentUserId,
-            };
-            _context.Permissions.Add(writePermission);
+                LastUpdatedAt = now,
+                LastUpdatedBy = currentUserId
+            }).ToList();
+
+            await _context.AddRangeAsync(permissions);
+            
             await _context.SaveChangesAsync();
-
-            // Log create SensitivityLabel event
+            await transaction.CommitAsync();
+            
+            // Log create SensitivityLabel event (outside transaction)
             var eventLog = new CreateEventRequestDto
             {
                 Operation = "create",
@@ -436,16 +438,7 @@ public class SensitivityLabelBusiness : ISensitivityLabelBusiness
                 Properties = JsonSerializer.Serialize(new { label.Name })
             };
 
-            if (label.ProjectId != null)
-            {
-                await _eventBusiness.CreateEvent(currentUserId, organizationId, label.ProjectId, eventLog);
-            }
-            else
-            {
-                await _eventBusiness.CreateEvent(currentUserId, organizationId, null, eventLog);
-            }
-
-            await transaction.CommitAsync();
+            await _eventBusiness.CreateEvent(currentUserId, organizationId, label.ProjectId, eventLog);
 
             return new SensitivityLabelResponseDto
             {
@@ -461,6 +454,7 @@ public class SensitivityLabelBusiness : ISensitivityLabelBusiness
         }
         catch (Exception)
         {
+            // Only rollback if transaction hasn't been committed
             await transaction.RollbackAsync();
             throw;
         }

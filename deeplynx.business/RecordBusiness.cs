@@ -455,6 +455,9 @@ public class RecordBusiness : IRecordBusiness
     public async Task<bool> UnattachLabel(long currentUserId, long organizationId, long projectId, long recordId,
         long labelId)
     {
+        var sensitivityLabelRequired =
+            await PermissionHelper.SensitivityLabelRequired(_context, organizationId, projectId);
+        
         var record = await _context.Records
             .Where(r => r.ProjectId == projectId
                         && r.Id == recordId
@@ -465,36 +468,37 @@ public class RecordBusiness : IRecordBusiness
 
         if (record == null)
             throw new KeyNotFoundException($"Record with id {recordId} not found or is archived.");
-
-        // If record has sensitivity labels then make sure the user is authorized to modify the record
-        if (record.Labels.Count > 0)
-        {
-            var userAuthorizedLabels = await PermissionHelper.GetAuthorizedSensitivityLabels(
-                _context, currentUserId, organizationId, projectId, "write");
-
-            var recordLabelIds = record.Labels.Select(l => l.Id).ToList();
-            var hasAllRequiredLabels = recordLabelIds.All(lId =>
-                userAuthorizedLabels.Contains(lId));
-
-            if (!hasAllRequiredLabels)
-            {
-                throw new UnauthorizedAccessException(
-                    $"You do not have access to all required sensitivity labels for record {recordId}");
-            }
-        }
-
-        // Find the label
+        
         var label = record.Labels.FirstOrDefault(t => t.Id == labelId);
 
         if (label == null)
             throw new KeyNotFoundException($"Label with id {labelId} is not attached to record {recordId}");
-
+        
         if (label.IsArchived ||
             label.OrganizationId != organizationId ||
             (label.ProjectId.HasValue && label.ProjectId != projectId))
         {
             throw new InvalidOperationException(
                 $"Label with id {labelId} is archived or does not belong to this organization/project.");
+        }
+
+        if (sensitivityLabelRequired && record.Labels.Count == 1)
+        {
+            throw new InvalidOperationException($"Sensitivity labels are required on all records. Add a new label first to remove this one");
+        }
+
+        // If record has sensitivity labels then make sure the user is authorized to modify the record
+        var userAuthorizedLabels = await PermissionHelper.GetAuthorizedSensitivityLabels(
+            _context, currentUserId, organizationId, projectId, "write");
+
+        var recordLabelIds = record.Labels.Select(l => l.Id).ToList();
+        var hasAllRequiredLabels = recordLabelIds.All(lId =>
+            userAuthorizedLabels.Contains(lId));
+
+        if (!hasAllRequiredLabels)
+        {
+            throw new UnauthorizedAccessException(
+                $"You do not have access to all required sensitivity labels for record {recordId}");
         }
 
         record.Labels.Remove(label);
@@ -671,6 +675,14 @@ public class RecordBusiness : IRecordBusiness
 
         if (dto.Properties == null)
             throw new ArgumentNullException(nameof(dto.Properties), "Properties cannot be null");
+
+        var sensitivityLabelsRequired =
+            await PermissionHelper.SensitivityLabelRequired(_context, organizationId, projectId);
+
+        if (sensitivityLabelsRequired && dto.SensitivityLabelIds == null)
+        {
+            throw new InvalidOperationException("Sensitivity Labels are required");
+        }
 
         var maxDepth = CalculateJsonMaxDepth(dto.Properties);
         if (maxDepth > 3)

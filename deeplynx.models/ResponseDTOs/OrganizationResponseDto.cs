@@ -9,6 +9,6 @@ public class OrganizationResponseDto
     public long? LastUpdatedBy { get; set; }
     public bool IsArchived { get; set; }
     public bool DefaultOrg { get; set; } = false;
-    
     public string? Banner { get; set; }
+    public bool? RequireSensitivityLabel { get; set; }
 }

@@ -19,6 +19,4 @@ public interface IProjectBusiness
     Task<bool> AddMemberToProject(long projectId, long? roleId, long? userId, long? groupId);
     Task<bool> UpdateProjectMemberRole(long projectId, long roleId, long? userId, long? groupId);
     Task<bool> RemoveMemberFromProject(long projectId, long? userId, long? groupId);
-    Task<bool> RequireSensitivityLabels(long organizationId, long projectId);
-    Task<bool> UnrequireSensitivityLabels(long organizationId, long projectId);
 }

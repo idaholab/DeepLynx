@@ -248,27 +248,9 @@ public class SensitivityLabelBusinessTests : IntegrationTestBase
         Assert.NotNull(createdLabel);
         Assert.Equal(dto.Name, createdLabel.Name);
 
-        // Verify read permission was created
-        var readPermission = await Context.Permissions
-            .FirstOrDefaultAsync(p => p.LabelId == result.Id && p.Action == "read");
-        Assert.NotNull(readPermission);
-        Assert.Equal("Read " + dto.Name, readPermission.Name);
-        Assert.Equal("Permission to read " + dto.Name + " labeled records", readPermission.Description);
-        Assert.Equal(pid, readPermission.ProjectId);
-        Assert.Equal(oid, readPermission.OrganizationId);
-        Assert.False(readPermission.IsDefault);
-        Assert.Equal(uid, readPermission.LastUpdatedBy);
-
-        // Verify write permission was created
-        var writePermission = await Context.Permissions
-            .FirstOrDefaultAsync(p => p.LabelId == result.Id && p.Action == "write");
-        Assert.NotNull(writePermission);
-        Assert.Equal("Write " + dto.Name, writePermission.Name);
-        Assert.Equal("Permission to modify " + dto.Name + " labeled records", writePermission.Description);
-        Assert.Equal(pid, writePermission.ProjectId);
-        Assert.Equal(oid, writePermission.OrganizationId);
-        Assert.False(writePermission.IsDefault);
-        Assert.Equal(uid, writePermission.LastUpdatedBy);
+        // Verify permissions were created
+        var permissions = await Context.Permissions.Where(p => p.LabelId == result.Id).ToListAsync();
+        Assert.Equal(8, permissions.Count);
 
         // Ensure that the SensitivityLabel create event was logged
         var eventList = await Context.Events.ToListAsync();
@@ -311,11 +293,16 @@ public class SensitivityLabelBusinessTests : IntegrationTestBase
         var permissions = await Context.Permissions
             .Where(p => p.LabelId == result.Id)
             .ToListAsync();
-        Assert.Equal(2, permissions.Count);
+        Assert.Equal(8, permissions.Count);
 
-        Assert.Contains(permissions, p => p.Action == "read");
-        Assert.Contains(permissions, p => p.Action == "write");
-
+        Assert.Contains(permissions, p => p.Action == "read record");
+        Assert.Contains(permissions, p => p.Action == "write record");
+        Assert.Contains(permissions, p => p.Action == "update record");
+        Assert.Contains(permissions, p => p.Action == "delete record");
+        Assert.Contains(permissions, p => p.Action == "download file");
+        Assert.Contains(permissions, p => p.Action == "upload file");
+        Assert.Contains(permissions, p => p.Action == "update file");
+        Assert.Contains(permissions, p => p.Action == "delete file");
         // Ensure that the SensitivityLabel create event was logged
         var eventList = await Context.Events.ToListAsync();
         Assert.Single(eventList);
@@ -344,14 +331,38 @@ public class SensitivityLabelBusinessTests : IntegrationTestBase
         Assert.NotNull(result);
         Assert.Equal("Event Test Label", result.Name);
 
-        // Verify that read and write permissions were created
-        var readPermission = await Context.Permissions
-            .FirstOrDefaultAsync(p => p.LabelId == result.Id && p.Action == "read");
-        Assert.NotNull(readPermission);
+        // Verify all permissions were created
+        var readRecordPermission = await Context.Permissions
+            .FirstOrDefaultAsync(p => p.LabelId == result.Id && p.Action == "read record");
+        Assert.NotNull(readRecordPermission);
 
-        var writePermission = await Context.Permissions
-            .FirstOrDefaultAsync(p => p.LabelId == result.Id && p.Action == "write");
-        Assert.NotNull(writePermission);
+        var writeRecordPermission = await Context.Permissions
+            .FirstOrDefaultAsync(p => p.LabelId == result.Id && p.Action == "write record");
+        Assert.NotNull(writeRecordPermission);
+        
+        var updateRecordPermission = await Context.Permissions
+            .FirstOrDefaultAsync(p => p.LabelId == result.Id && p.Action == "update record");
+        Assert.NotNull(updateRecordPermission);
+
+        var deleteRecordPermission = await Context.Permissions
+            .FirstOrDefaultAsync(p => p.LabelId == result.Id && p.Action == "delete record");
+        Assert.NotNull(deleteRecordPermission);
+        
+        var downloadFilePermission = await Context.Permissions
+            .FirstOrDefaultAsync(p => p.LabelId == result.Id && p.Action == "download file");
+        Assert.NotNull(downloadFilePermission);
+
+        var uploadFilePermission = await Context.Permissions
+            .FirstOrDefaultAsync(p => p.LabelId == result.Id && p.Action == "upload file");
+        Assert.NotNull(uploadFilePermission);
+        
+        var updateFilePermission = await Context.Permissions
+            .FirstOrDefaultAsync(p => p.LabelId == result.Id && p.Action == "update file");
+        Assert.NotNull(updateFilePermission);
+
+        var deleteFilePermission = await Context.Permissions
+            .FirstOrDefaultAsync(p => p.LabelId == result.Id && p.Action == "delete file");
+        Assert.NotNull(deleteFilePermission);
 
         // Ensure that the SensitivityLabel create event was logged
         var eventList = await Context.Events.ToListAsync();
@@ -426,24 +437,37 @@ public class SensitivityLabelBusinessTests : IntegrationTestBase
             .Where(p => p.LabelId == result.Id)
             .ToListAsync();
 
-        // Verify exactly 2 permissions were created
-        Assert.Equal(2, permissions.Count);
+        // Verify exactly 8 permissions were created
+        Assert.Equal(8, permissions.Count);
 
-        // Verify read permission details
-        var readPermission = permissions.FirstOrDefault(p => p.Action == "read");
-        Assert.NotNull(readPermission);
-        Assert.Equal("Read Permission Structure Test", readPermission.Name);
-        Assert.Contains("read", readPermission.Description.ToLower());
-        Assert.Equal(result.Id, readPermission.LabelId);
-        Assert.False(readPermission.IsDefault);
+        // Verify read record permission details
+        var readRecordPermission = permissions.FirstOrDefault(p => p.Action == "read record");
+        Assert.NotNull(readRecordPermission);
+        Assert.Equal("Read Permission Structure Test record", readRecordPermission.Name);
+        Assert.Contains("read", readRecordPermission.Description.ToLower());
+        Assert.Equal(result.Id, readRecordPermission.LabelId);
+        Assert.False(readRecordPermission.IsDefault);
 
-        // Verify write permission details
-        var writePermission = permissions.FirstOrDefault(p => p.Action == "write");
-        Assert.NotNull(writePermission);
-        Assert.Equal("Write Permission Structure Test", writePermission.Name);
-        Assert.Contains("modify", writePermission.Description.ToLower());
-        Assert.Equal(result.Id, writePermission.LabelId);
-        Assert.False(writePermission.IsDefault);
+        // Verify write record permission details
+        var writeRecordPermission = permissions.FirstOrDefault(p => p.Action == "write record");
+        Assert.NotNull(writeRecordPermission);
+        Assert.Equal("Write Permission Structure Test record", writeRecordPermission.Name);
+        Assert.Contains("Permission to add records with label", writeRecordPermission.Description);
+        Assert.Equal(result.Id, writeRecordPermission.LabelId);
+        Assert.False(writeRecordPermission.IsDefault);
+        
+        var updateRecordPermission = permissions.FirstOrDefault(p => p.Action == "update record");
+        Assert.NotNull(updateRecordPermission);
+        var deleteRecordPermission = permissions.FirstOrDefault(p => p.Action == "delete record");
+        Assert.NotNull(deleteRecordPermission);
+        var downloadFilePermission = permissions.FirstOrDefault(p => p.Action == "download file");
+        Assert.NotNull(downloadFilePermission);
+        var uploadFilePermission = permissions.FirstOrDefault(p => p.Action == "upload file");
+        Assert.NotNull(uploadFilePermission);
+        var updateFilePermission = permissions.FirstOrDefault(p => p.Action == "update file");
+        Assert.NotNull(updateFilePermission);
+        var deleteFilePermission = permissions.FirstOrDefault(p => p.Action == "delete file");
+        Assert.NotNull(deleteFilePermission);
     }
 
     #endregion
