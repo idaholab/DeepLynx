@@ -21,6 +21,7 @@ public class MetadataBusinessTests : IntegrationTestBase
     private ClassBusiness _classBusiness = null!;
     private EdgeBusiness _edgeBusiness = null!;
     private EventBusiness _eventBusiness = null!;
+    private SensitivityLabelBusiness _sensitivityLabelBusiness = null!;
     private MetadataBusiness _metadataBusiness = null!;
     private Mock<IEdgeBusiness> _mockEdgeBusiness = null!;
     private Mock<IHubContext<EventNotificationHub>> _mockHubContext = null!;
@@ -67,7 +68,8 @@ public class MetadataBusinessTests : IntegrationTestBase
             Context, _mockEdgeBusiness.Object, _eventBusiness);
 
         _tagBusiness = new TagBusiness(Context, _eventBusiness);
-        _recordBusiness = new RecordBusiness(Context, _eventBusiness, _mockBulkCopyUpsertExecutor, _tagBusiness);
+        _sensitivityLabelBusiness = new SensitivityLabelBusiness(Context, _eventBusiness);
+        _recordBusiness = new RecordBusiness(Context, _eventBusiness, _mockBulkCopyUpsertExecutor, _tagBusiness, _sensitivityLabelBusiness);
         _edgeBusiness = new EdgeBusiness(Context, _eventBusiness, _mockBulkCopyUpsertExecutor);
 
         _metadataBusiness = new MetadataBusiness(

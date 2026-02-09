@@ -1,31 +1,32 @@
 using System.Net;
 using System.Net.Mail;
+using System.Text.Json;
 using deeplynx.datalayer.Models;
-using deeplynx.helpers;
-using deeplynx.interfaces;
-using Microsoft.Extensions.Logging;
 using deeplynx.helpers.Hubs;
+using deeplynx.interfaces;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace deeplynx.business;
+
 /// <summary>
-/// Handles all notification operations including SignalR real-time notifications
+///     Handles all notification operations including SignalR real-time notifications
 /// </summary>
 public class NotificationBusiness : INotificationBusiness
 {
     private readonly DeeplynxContext _context;
-    private readonly ILogger<NotificationBusiness> _logger;
     private readonly IHubContext<EventNotificationHub> _hubContext;
-    
+    private readonly ILogger<NotificationBusiness> _logger;
+
     /// <summary>
-    /// Initializes a new instance of the <see cref="NotificationBusiness"/> class.
+    ///     Initializes a new instance of the <see cref="NotificationBusiness" /> class.
     /// </summary>
     /// <param name="context">The database context to be used for class operations</param>
     /// <param name="logger">Logging</param>
     /// <param name="hubContext">SignalR hub context for sending notifications</param>
     public NotificationBusiness(
-        DeeplynxContext context, 
+        DeeplynxContext context,
         ILogger<NotificationBusiness> logger,
         IHubContext<EventNotificationHub> hubContext
     )
@@ -36,7 +37,7 @@ public class NotificationBusiness : INotificationBusiness
     }
 
     /// <summary>
-    /// Sends event notification to all users subscribed to this specific event
+    ///     Sends event notification to all users subscribed to this specific event
     /// </summary>
     /// <param name="eventDto">The event to send notifications for</param>
     public async Task SendEventNotification(EventResponseDto eventDto)
@@ -51,27 +52,27 @@ public class NotificationBusiness : INotificationBusiness
         {
             // Get all users subscribed to this event
             var subscribedUserIds = await GetSubscribedUserIdsForEvent(eventDto);
-            
+
             if (!subscribedUserIds.Any())
             {
-                _logger.LogDebug("No users subscribed to event {EventId} for project {ProjectId}", 
+                _logger.LogDebug("No users subscribed to event {EventId} for project {ProjectId}",
                     eventDto.Id, eventDto.ProjectId);
                 return;
             }
 
             // Serialize the event to JSON
-            var jsonResponse = System.Text.Json.JsonSerializer.Serialize(eventDto);
+            var jsonResponse = JsonSerializer.Serialize(eventDto);
 
             // Send notification to each subscribed user's group
-            var notificationTasks = subscribedUserIds.Select(userId => 
+            var notificationTasks = subscribedUserIds.Select(userId =>
                 SendToUserGroup(userId, jsonResponse, eventDto.Id)
             );
 
             await Task.WhenAll(notificationTasks);
-            
+
             _logger.LogInformation(
-                "Successfully sent notifications for event {EventId} to {UserCount} users", 
-                eventDto.Id, 
+                "Successfully sent notifications for event {EventId} to {UserCount} users",
+                eventDto.Id,
                 subscribedUserIds.Count
             );
         }
@@ -83,7 +84,7 @@ public class NotificationBusiness : INotificationBusiness
     }
 
     /// <summary>
-    /// Sends bulk event notifications to subscribed users
+    ///     Sends bulk event notifications to subscribed users
     /// </summary>
     /// <param name="eventDtos">List of events to send notifications for</param>
     public async Task SendBulkEventNotifications(List<EventResponseDto> eventDtos)
@@ -99,7 +100,7 @@ public class NotificationBusiness : INotificationBusiness
             // Serialize each event ONCE
             var eventJsonCache = eventDtos.ToDictionary(
                 e => e,
-                e => System.Text.Json.JsonSerializer.Serialize(e)
+                e => JsonSerializer.Serialize(e)
             );
 
             // Single database query for all subscriptions
@@ -111,13 +112,10 @@ public class NotificationBusiness : INotificationBusiness
             foreach (var eventDto in eventDtos)
             {
                 var subscribedUserIds = eventSubscriptionsMap[eventDto.Id];
-            
+
                 foreach (var userId in subscribedUserIds)
                 {
-                    if (!userEventMap.ContainsKey(userId))
-                    {
-                        userEventMap[userId] = new List<EventResponseDto>();
-                    }
+                    if (!userEventMap.ContainsKey(userId)) userEventMap[userId] = new List<EventResponseDto>();
                     userEventMap[userId].Add(eventDto);
                 }
             }
@@ -129,15 +127,15 @@ public class NotificationBusiness : INotificationBusiness
             }
 
             // Send all notifications
-            var notificationTasks = userEventMap.Select(kvp => 
+            var notificationTasks = userEventMap.Select(kvp =>
                 SendEventsToUser(kvp.Key, kvp.Value, eventJsonCache)
             );
 
             await Task.WhenAll(notificationTasks);
-        
+
             _logger.LogInformation(
-                "Successfully sent bulk notifications for {EventCount} events to {UserCount} users", 
-                eventDtos.Count, 
+                "Successfully sent bulk notifications for {EventCount} events to {UserCount} users",
+                eventDtos.Count,
                 userEventMap.Count
             );
         }
@@ -148,160 +146,31 @@ public class NotificationBusiness : INotificationBusiness
         }
     }
 
-    private async Task SendEventsToUser(
-        long userId, 
-        List<EventResponseDto> events, 
-        Dictionary<EventResponseDto, string> eventJsonCache)
-    {
-        try
-        {
-            // Send all events to this user in parallel using cached JSON
-            var notificationTasks = events.Select(eventDto =>
-                SendToUserGroup(userId, eventJsonCache[eventDto], eventDto.Id)
-            );
-
-            await Task.WhenAll(notificationTasks);
-            
-            _logger.LogDebug("Sent {EventCount} notifications to user {UserId}", events.Count, userId);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error sending events to user {UserId}", userId);
-        }
-    }
-
     /// <summary>
-    /// Sends a notification message to a specific user's SignalR group
-    /// </summary>
-    /// <param name="userId">The user ID to send to</param>
-    /// <param name="message">The serialized JSON message</param>
-    /// <param name="eventId">The event ID for logging purposes</param>
-    private async Task SendToUserGroup(long userId, string message, long eventId)
-    {
-        try
-        {
-            await _hubContext.Clients
-                .Group($"user_{userId}")
-                .SendAsync("ReceiveNotification", message);
-            
-            _logger.LogTrace("Sent notification for event {EventId} to user {UserId}", eventId, userId);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, 
-                "Failed to send notification for event {EventId} to user {UserId}", 
-                eventId, userId);
-            // Don't throw - allow other notifications to continue
-        }
-    }
-
-    /// <summary>
-    /// Gets all user IDs that are subscribed to a specific event based on subscription rules
-    /// </summary>
-    /// <param name="eventDto">The event to check subscriptions for</param>
-    /// <returns>List of user IDs subscribed to this event</returns>
-    private async Task<List<long>> GetSubscribedUserIdsForEvent(EventResponseDto eventDto)
-    {
-        try
-        {
-            var subscribedUserIds = await _context.Set<Subscription>()
-                .Where(s => s.ProjectId == eventDto.ProjectId)
-                .Where(s => 
-                    (s.EntityId == eventDto.EntityId || s.EntityId == null) &&
-                    (s.EntityType == eventDto.EntityType || s.EntityType == null) &&
-                    (s.DataSourceId == eventDto.DataSourceId || s.DataSourceId == null) &&
-                    (s.Operation == eventDto.Operation || s.Operation == null)
-                )
-                .Select(s => s.UserId)
-                .Distinct()
-                .ToListAsync();
-
-            return subscribedUserIds;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, 
-                "Error retrieving subscribed users for event {EventId} in project {ProjectId}", 
-                eventDto.Id, eventDto.ProjectId);
-            return new List<long>();
-        }
-    }
-    
-    /// <summary>
-    /// Gets all user IDs subscribed to any of the provided events (optimized for bulk)
-    /// </summary>
-    /// <param name="eventDtos">Events to check subscriptions for</param>
-    /// <returns>Dictionary mapping each event ID to its list of subscribed user IDs</returns>
-    private async Task<Dictionary<long, List<long>>> GetSubscribedUserIdsForManyEvents(
-        List<EventResponseDto> eventDtos)
-    {
-        if (!eventDtos.Any())
-        {
-            return new Dictionary<long, List<long>>();
-        }
-
-        var projectIds = eventDtos.Select(e => e.ProjectId).Distinct().ToList();
-
-        // Fetch ALL relevant subscriptions in ONE query
-        var allSubscriptions = await _context.Set<Subscription>()
-            .Where(s => projectIds.Contains(s.ProjectId))
-            .ToListAsync();
-
-        // Match subscriptions to events in memory
-        var result = new Dictionary<long, List<long>>();
-
-        foreach (var eventDto in eventDtos)
-        {
-            var matchingUserIds = allSubscriptions
-                .Where(s => s.ProjectId == eventDto.ProjectId)
-                .Where(s => 
-                    (s.EntityId == eventDto.EntityId || s.EntityId == null) &&
-                    (s.EntityType == eventDto.EntityType || s.EntityType == null) &&
-                    (s.DataSourceId == eventDto.DataSourceId || s.DataSourceId == null) &&
-                    (s.Operation == eventDto.Operation || s.Operation == null)
-                )
-                .Select(s => s.UserId)
-                .Distinct()
-                .ToList();
-
-            result[eventDto.Id] = matchingUserIds;
-        }
-
-        return result;
-    }
-
-    /// <summary>
-    /// Sends an email notification
+    ///     Sends an email notification
     /// </summary>
     /// <param name="toEmail">Recipient email address</param>
     /// <param name="name">Recipient name (optional, defaults to "User")</param>
     /// <returns>True if email was sent successfully, false otherwise</returns>
     public async Task<bool> SendEmail(string toEmail, string? name)
     {
-       try
-       {
-        var smtpServer = Environment.GetEnvironmentVariable("SMTP_SERVER") ?? throw new InvalidOperationException("SMTP_SERVER environment variable is not set");
-
-        var smtpPortStr = Environment.GetEnvironmentVariable("SMTP_PORT");
-        if (!int.TryParse(smtpPortStr, out int smtpPort))
+        try
         {
-            smtpPort = 587; //default
-        }
+            var smtpServer = GetRequiredEnvironmentVariable("SMTP_SERVER");
+            var fromEmail = GetRequiredEnvironmentVariable("FROM_EMAIL");
+            var support = GetRequiredEnvironmentVariable("SUPPORT_EMAIL");
+            var fromName = GetRequiredEnvironmentVariable("FROM_NAME");
+            var url = GetRequiredEnvironmentVariable("INVITE_URL");
+            var enableSslStr = GetRequiredEnvironmentVariable("SMTP_ENABLE_SSL");
+            bool.TryParse(enableSslStr, out var enableSsl);
 
-        var fromEmail = Environment.GetEnvironmentVariable("FROM_EMAIL") ?? throw new InvalidOperationException("FROM_EMAIL environment variable is not set");
+            var smtpPortStr = Environment.GetEnvironmentVariable("SMTP_PORT");
+            if (!int.TryParse(smtpPortStr, out var smtpPort)) smtpPort = 587; //default
 
-        var support = Environment.GetEnvironmentVariable("SUPPORT_EMAIL") ?? throw new InvalidOperationException("SUPPORT_EMAIL environment variable is not set");
+            var emailPassword = "";
 
-        var emailPassword = "";
-
-        var fromName = Environment.GetEnvironmentVariable("FROM_NAME");
-
-        var url = Environment.GetEnvironmentVariable("INVITE_URL") ?? throw new InvalidOperationException("Invite URL environment variable is not set");;
-
-        var enableSslStr = Environment.GetEnvironmentVariable("SMTP_ENABLE_SSL");
-        bool.TryParse(enableSslStr, out bool enableSsl);
-
-        string templateContent = @"<!DOCTYPE html PUBLIC ""-//W3C//DTD XHTML 1.0 Transitional//EN"" ""http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"">
+            var templateContent =
+                @"<!DOCTYPE html PUBLIC ""-//W3C//DTD XHTML 1.0 Transitional//EN"" ""http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"">
         <html xmlns=""http://www.w3.org/1999/xhtml"">
         <head>
             <meta name=""viewport"" content=""width=device-width, initial-scale=1.0"" />
@@ -358,43 +227,169 @@ public class NotificationBusiness : INotificationBusiness
         </body>
         </html>";
 
-        templateContent = templateContent.Replace("{{name}}", name);
-        templateContent = templateContent.Replace("{{email}}", toEmail);
-        templateContent = templateContent.Replace("{{url}}", url);
-        templateContent = templateContent.Replace("{{support}}", support);
+            templateContent = templateContent.Replace("{{name}}", name);
+            templateContent = templateContent.Replace("{{email}}", toEmail);
+            templateContent = templateContent.Replace("{{url}}", url);
+            templateContent = templateContent.Replace("{{support}}", support);
 
 
+            // Create message
+            using var mailMessage = new MailMessage();
+            mailMessage.From = new MailAddress(fromEmail, fromName);
+            mailMessage.To.Add(toEmail);
+            mailMessage.Subject = "DeepLynx Nexus Notification";
+            mailMessage.Body = templateContent;
+            mailMessage.IsBodyHtml = true;
 
+            // Configure SMTP client
+            using var smtpClient = new SmtpClient(smtpServer, smtpPort);
+            smtpClient.EnableSsl = enableSsl;
+            smtpClient.UseDefaultCredentials = false;
+            smtpClient.Credentials = new NetworkCredential(fromEmail, emailPassword);
 
-        // Create message
-        using var mailMessage = new MailMessage();
-        mailMessage.From = new MailAddress(fromEmail, fromName);
-        mailMessage.To.Add(toEmail);
-        mailMessage.Subject = "DeepLynx Nexus Notification";
-        mailMessage.Body = templateContent;
-        mailMessage.IsBodyHtml = true;
+            // Send the email
+            await smtpClient.SendMailAsync(mailMessage);
 
-        // Configure SMTP client
-        using var smtpClient = new SmtpClient(smtpServer, smtpPort);
-        smtpClient.EnableSsl = enableSsl;
-        smtpClient.UseDefaultCredentials = false;
-        smtpClient.Credentials = new NetworkCredential(fromEmail, emailPassword);
-
-        // Send the email
-        await smtpClient.SendMailAsync(mailMessage);
-
-        return true;
-       }
-       catch (SmtpException smtpEx)
-       {
-           _logger.LogError(smtpEx, "SMTP error occurred while sending email to {ToEmail}: {ErrorMessage}", toEmail, smtpEx.Message);
-           return false;
-       }
-       catch (Exception ex)
-       {
-           _logger.LogError(ex, "Unexpected error occurred while sending email to {ToEmail}: {ErrorMessage}", toEmail, ex.Message);
-           return false;
-       }
+            return true;
+        }
+        catch (SmtpException smtpEx)
+        {
+            _logger.LogError(smtpEx, "SMTP error occurred while sending email to {ToEmail}: {ErrorMessage}", toEmail,
+                smtpEx.Message);
+            return false;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unexpected error occurred while sending email to {ToEmail}: {ErrorMessage}", toEmail,
+                ex.Message);
+            return false;
+        }
     }
 
+    private async Task SendEventsToUser(
+        long userId,
+        List<EventResponseDto> events,
+        Dictionary<EventResponseDto, string> eventJsonCache)
+    {
+        try
+        {
+            // Send all events to this user in parallel using cached JSON
+            var notificationTasks = events.Select(eventDto =>
+                SendToUserGroup(userId, eventJsonCache[eventDto], eventDto.Id)
+            );
+
+            await Task.WhenAll(notificationTasks);
+
+            _logger.LogDebug("Sent {EventCount} notifications to user {UserId}", events.Count, userId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error sending events to user {UserId}", userId);
+        }
+    }
+
+    /// <summary>
+    ///     Sends a notification message to a specific user's SignalR group
+    /// </summary>
+    /// <param name="userId">The user ID to send to</param>
+    /// <param name="message">The serialized JSON message</param>
+    /// <param name="eventId">The event ID for logging purposes</param>
+    private async Task SendToUserGroup(long userId, string message, long eventId)
+    {
+        try
+        {
+            await _hubContext.Clients
+                .Group($"user_{userId}")
+                .SendAsync("ReceiveNotification", message);
+
+            _logger.LogTrace("Sent notification for event {EventId} to user {UserId}", eventId, userId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex,
+                "Failed to send notification for event {EventId} to user {UserId}",
+                eventId, userId);
+            // Don't throw - allow other notifications to continue
+        }
+    }
+
+    /// <summary>
+    ///     Gets all user IDs that are subscribed to a specific event based on subscription rules
+    /// </summary>
+    /// <param name="eventDto">The event to check subscriptions for</param>
+    /// <returns>List of user IDs subscribed to this event</returns>
+    private async Task<List<long>> GetSubscribedUserIdsForEvent(EventResponseDto eventDto)
+    {
+        try
+        {
+            var subscribedUserIds = await _context.Set<Subscription>()
+                .Where(s => s.ProjectId == eventDto.ProjectId)
+                .Where(s =>
+                    (s.EntityId == eventDto.EntityId || s.EntityId == null) &&
+                    (s.EntityType == eventDto.EntityType || s.EntityType == null) &&
+                    (s.DataSourceId == eventDto.DataSourceId || s.DataSourceId == null) &&
+                    (s.Operation == eventDto.Operation || s.Operation == null)
+                )
+                .Select(s => s.UserId)
+                .Distinct()
+                .ToListAsync();
+
+            return subscribedUserIds;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex,
+                "Error retrieving subscribed users for event {EventId} in project {ProjectId}",
+                eventDto.Id, eventDto.ProjectId);
+            return new List<long>();
+        }
+    }
+
+    /// <summary>
+    ///     Gets all user IDs subscribed to any of the provided events (optimized for bulk)
+    /// </summary>
+    /// <param name="eventDtos">Events to check subscriptions for</param>
+    /// <returns>Dictionary mapping each event ID to its list of subscribed user IDs</returns>
+    private async Task<Dictionary<long, List<long>>> GetSubscribedUserIdsForManyEvents(
+        List<EventResponseDto> eventDtos)
+    {
+        if (!eventDtos.Any()) return new Dictionary<long, List<long>>();
+
+        var projectIds = eventDtos.Select(e => e.ProjectId).Distinct().ToList();
+
+        // Fetch ALL relevant subscriptions in ONE query
+        var allSubscriptions = await _context.Set<Subscription>()
+            .Where(s => projectIds.Contains(s.ProjectId))
+            .ToListAsync();
+
+        // Match subscriptions to events in memory
+        var result = new Dictionary<long, List<long>>();
+
+        foreach (var eventDto in eventDtos)
+        {
+            var matchingUserIds = allSubscriptions
+                .Where(s => s.ProjectId == eventDto.ProjectId)
+                .Where(s =>
+                    (s.EntityId == eventDto.EntityId || s.EntityId == null) &&
+                    (s.EntityType == eventDto.EntityType || s.EntityType == null) &&
+                    (s.DataSourceId == eventDto.DataSourceId || s.DataSourceId == null) &&
+                    (s.Operation == eventDto.Operation || s.Operation == null)
+                )
+                .Select(s => s.UserId)
+                .Distinct()
+                .ToList();
+
+            result[eventDto.Id] = matchingUserIds;
+        }
+
+        return result;
+    }
+
+    private static string GetRequiredEnvironmentVariable(string variableName)
+    {
+        var value = Environment.GetEnvironmentVariable(variableName);
+        if (string.IsNullOrWhiteSpace(value))
+            throw new InvalidOperationException($"{variableName} environment variable is not set or is empty");
+        return value;
+    }
 }

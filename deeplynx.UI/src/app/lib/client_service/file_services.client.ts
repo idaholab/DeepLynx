@@ -75,7 +75,7 @@ export const downloadFile = async (
   organizationId: number,
   projectId: number,
   recordId: number,
-  recordName?: string,
+  recordName?: string | null,
   onProgress?: (progress: { loaded: number; total: number; percentage: number }) => void,
   abortController?: AbortController
 ): Promise<void> => {

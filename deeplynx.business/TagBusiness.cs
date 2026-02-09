@@ -36,25 +36,37 @@ public class TagBusiness : ITagBusiness
     {
         var tagQuery = _context.Tags
             .Where(t => t.OrganizationId == organizationId
-                && (!hideArchived || !t.IsArchived));
+                        && (!hideArchived || !t.IsArchived));
 
         // Filter by projectIds if provided and not empty
         if (projectIds is { Length: > 0 })
-            tagQuery = tagQuery.Where(c => c.ProjectId.HasValue && projectIds.Contains(c.ProjectId.Value));
-
-         if (tagQuery == null)
-            throw new KeyNotFoundException($"Tags not found or do not belong to the specified organization/project context");
-
-        return await tagQuery.Select(t => new TagResponseDto()
         {
-            Id = t.Id,
-            Name = t.Name,
-            ProjectId = t.ProjectId,
-            LastUpdatedBy = t.LastUpdatedBy,
-            LastUpdatedAt = t.LastUpdatedAt,
-            OrganizationId = t.OrganizationId,
-        })
+            //grab project tags and inherit org tags
+            tagQuery = tagQuery.Where(c =>
+                (c.ProjectId.HasValue && projectIds.Contains(c.ProjectId.Value)) || c.ProjectId == null);
+        }
+        else
+        {   // only return org level tags
+            tagQuery = tagQuery.Where(c => c.ProjectId == null);
+        }
+
+        var tags = await tagQuery.Select(t => new TagResponseDto
+            {
+                Id = t.Id,
+                Name = t.Name,
+                ProjectId = t.ProjectId,
+                LastUpdatedBy = t.LastUpdatedBy,
+                LastUpdatedAt = t.LastUpdatedAt,
+                OrganizationId = t.OrganizationId,
+            })
             .ToListAsync();
+        
+        if (!tags.Any())
+            throw new KeyNotFoundException(
+                "Tags not found or do not belong to the specified organization/project context");
+
+        return tags;
+        
     }
 
     /// <summary>
@@ -68,14 +80,23 @@ public class TagBusiness : ITagBusiness
     /// <exception cref="KeyNotFoundException">Returned if tag not found or is archived</exception>
     public async Task<TagResponseDto> GetTag(long organizationId, long? projectId, long tagId, bool hideArchived)
     {
-        var tag = await _context.Tags
+        var tagQuery = _context.Tags
             .Where(t => t.Id == tagId
-                && t.OrganizationId == organizationId
-                && (!projectId.HasValue || t.ProjectId == projectId.Value))
-            .FirstOrDefaultAsync();
+                        && t.OrganizationId == organizationId);
+        if (projectId.HasValue)
+        {
+            // project tags and org tags
+            tagQuery = tagQuery.Where(t => t.ProjectId == projectId || t.ProjectId == null);
+        }
+        else
+        {   // just org tags
+            tagQuery = tagQuery.Where(t => t.ProjectId == null);
+        }
 
+        var tag = await tagQuery.FirstOrDefaultAsync();
+        
         if (tag == null) throw new KeyNotFoundException($"Tag with id {tagId} not found");
-
+        
         if (hideArchived && tag.IsArchived)
             throw new KeyNotFoundException($"Tag with id {tagId} is archived");
 
@@ -100,7 +121,8 @@ public class TagBusiness : ITagBusiness
     /// <param name="organizationId">The ID of the organization to which the tag belongs.</param>
     /// <param name="dto">The tag request data transfer object containing tag details.</param>
     /// <returns>The created tag response DTO with saved details.</returns>
-    public async Task<TagResponseDto> CreateTag(long organizationId, long currentUserId, long? projectId, CreateTagRequestDto dto)
+    public async Task<TagResponseDto> CreateTag(long organizationId, long currentUserId, long? projectId,
+        CreateTagRequestDto dto)
     {
         ValidationHelper.ValidateModel(dto);
 
@@ -140,7 +162,7 @@ public class TagBusiness : ITagBusiness
 
         // Log Tag Create Event
         await _eventBusiness.CreateEvent(
-            currentUserId, 
+            currentUserId,
             organizationId,
             projectId,
             new CreateEventRequestDto
@@ -149,7 +171,7 @@ public class TagBusiness : ITagBusiness
                 EntityType = "tag",
                 EntityId = tag.Id,
                 EntityName = tag.Name,
-                Properties = JsonSerializer.Serialize(new {tag.Name}),
+                Properties = JsonSerializer.Serialize(new { tag.Name }),
                 DataSourceId = null,
             }
         );
@@ -186,7 +208,8 @@ public class TagBusiness : ITagBusiness
         }
 
         // Bulk insert into classes; if there is a name collision, update the description and uuid if present
-        var sql = projectId.HasValue ? @"
+        var sql = projectId.HasValue
+            ? @"
             INSERT INTO deeplynx.tags (project_id, organization_id, name, last_updated_at, is_archived, last_updated_by)
                 VALUES {0}
                 ON CONFLICT (organization_id, project_id, name) WHERE project_id IS NOT NULL
@@ -194,7 +217,7 @@ public class TagBusiness : ITagBusiness
                     last_updated_at = @now,
                     last_updated_by = @lastUpdatedBy
                 RETURNING id, project_id, organization_id, name, last_updated_at, is_archived, last_updated_by;"
-                    : @"
+            : @"
             INSERT INTO deeplynx.tags (project_id, organization_id, name, last_updated_at, is_archived, last_updated_by)
                 VALUES {0}
                 ON CONFLICT (organization_id, name) WHERE project_id IS NULL
@@ -229,7 +252,7 @@ public class TagBusiness : ITagBusiness
         var result = await _context.Database
             .SqlQueryRaw<TagResponseDto>(sql, parameters.ToArray())
             .ToListAsync();
-        
+
         var createEvent = new CreateEventRequestDto
         {
             Operation = "create",
@@ -251,20 +274,38 @@ public class TagBusiness : ITagBusiness
     /// <param name="tagRequestDto">The tag request data transfer object containing updated tag details.</param>
     /// <returns>The updated tag response DTO with its details.</returns>
     /// <exception cref="KeyNotFoundException">Thrown when the tag is not found.</exception>
-    public async Task<TagResponseDto> UpdateTag(long organizationId, long currentUserId, long? projectId, long tagId, UpdateTagRequestDto tagRequestDto)
+    public async Task<TagResponseDto> UpdateTag(long organizationId, long currentUserId, long? projectId, long tagId,
+        UpdateTagRequestDto tagRequestDto)
     {
         ValidationHelper.ValidateModel(tagRequestDto);
 
-        var tag = await _context.Tags
+        var tagQuery = _context.Tags
             .Where(t => t.Id == tagId
                         && t.OrganizationId == organizationId
-                        && !t.IsArchived
-                        && (!projectId.HasValue || t.ProjectId == projectId.Value))
-            .FirstOrDefaultAsync();
+                        && !t.IsArchived);
+        
+        //if project id supplied, inherit org level roles 
+        if (projectId.HasValue)
+        {
+            tagQuery = tagQuery.Where( r => r.ProjectId == projectId.Value || r.ProjectId == null);
+        }
+        else
+        {
+            tagQuery = tagQuery.Where(t => t.ProjectId == null);
+        }
 
+        var tag = await tagQuery.FirstOrDefaultAsync();
+        
         if (tag == null)
-            throw new KeyNotFoundException($"Tag with id {tagId} not found or does not belong to the specified organization/project context");
-
+            throw new KeyNotFoundException(
+                $"Tag with id {tagId} not found or does not belong to the specified organization/project context");
+        
+        // Organization roles cannot be updated from a project level
+        if (projectId.HasValue && tag.ProjectId == null)
+        {
+            throw new InvalidOperationException("Organization tags cannot be updated from the child projects.");
+        }
+        
         // Validate 'Name' field
         if (string.IsNullOrWhiteSpace(tagRequestDto.Name))
             throw new ArgumentException("Name is required and cannot be empty.");
@@ -282,7 +323,8 @@ public class TagBusiness : ITagBusiness
         {
             // Unique constraint violation - name conflict
             var scope = tag.ProjectId.HasValue ? "project" : "organization";
-            throw new InvalidOperationException($"A tag with the name '{tagRequestDto.Name ?? tagRequestDto.Name}' already exists in this {scope}");
+            throw new InvalidOperationException(
+                $"A tag with the name '{tagRequestDto.Name ?? tagRequestDto.Name}' already exists in this {scope}");
         }
         catch (Exception ex)
         {
@@ -322,15 +364,32 @@ public class TagBusiness : ITagBusiness
     /// <exception cref="KeyNotFoundException">Thrown when the tag is not found.</exception>
     public async Task<bool> DeleteTag(long organizationId, long? projectId, long tagId)
     {
-        var tag = await _context.Tags
+        var tagQuery = _context.Tags
             .Where(t => t.Id == tagId
                         && t.OrganizationId == organizationId
-                        && !t.IsArchived
-                        && (!projectId.HasValue || t.ProjectId == projectId.Value))
-            .FirstOrDefaultAsync();
+                        && !t.IsArchived);
+        
+        //if project id supplied, inherit org level roles 
+        if (projectId.HasValue)
+        {
+            tagQuery = tagQuery.Where(r => r.ProjectId == projectId.Value || r.ProjectId == null);
+        }
+        else
+        {
+            tagQuery = tagQuery.Where(t => t.ProjectId == null);
+        }
+
+        var tag = await tagQuery.FirstOrDefaultAsync();
 
         if (tag == null)
-            throw new KeyNotFoundException($"Tag with id {tagId} not found or does not belong to the specified organization/project context");
+            throw new KeyNotFoundException(
+                $"Tag with id {tagId} not found or does not belong to the specified organization/project context");
+        
+        // Organization tags cannot be updated from a project level
+        if (projectId.HasValue && tag.ProjectId == null)
+        {
+            throw new InvalidOperationException("Organization tags cannot be updated from the child projects.");
+        }
 
         _context.Tags.Remove(tag);
         await _context.SaveChangesAsync();
@@ -348,15 +407,32 @@ public class TagBusiness : ITagBusiness
     /// <exception cref="KeyNotFoundException">Thrown when the tag is not found.</exception>
     public async Task<bool> ArchiveTag(long organizationId, long currentUserId, long? projectId, long tagId)
     {
-        var tag = await _context.Tags
+        var tagQuery = _context.Tags
             .Where(t => t.Id == tagId
                         && t.OrganizationId == organizationId
-                        && !t.IsArchived
-                        && (!projectId.HasValue || t.ProjectId == projectId.Value))
-            .FirstOrDefaultAsync();
+                        && !t.IsArchived);
+        
+        //if project id supplied, inherit org level tags 
+        if (projectId.HasValue)
+        {
+            tagQuery = tagQuery.Where( r => r.ProjectId == projectId.Value || r.ProjectId == null);
+        }
+        else
+        {
+            tagQuery = tagQuery.Where( r => r.ProjectId == null);
+        }
+
+        var tag = await tagQuery.FirstOrDefaultAsync();
 
         if (tag == null)
-            throw new KeyNotFoundException($"Tag with id {tagId} not found or does not belong to the specified organization/project context");
+            throw new KeyNotFoundException(
+                $"Tag with id {tagId} not found or does not belong to the specified organization/project context");
+        
+        // Organization tags cannot be updated from a project level
+        if (projectId.HasValue && tag.ProjectId == null)
+        {
+            throw new InvalidOperationException("Organization tags cannot be updated from the child projects.");
+        }
 
         tag.IsArchived = true;
         tag.LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
@@ -391,15 +467,31 @@ public class TagBusiness : ITagBusiness
         long? projectId,
         long tagId)
     {
-        var tag = await _context.Tags
+        var tagQuery = _context.Tags
             .Where(t => t.Id == tagId
                         && t.OrganizationId == organizationId
-                        && t.IsArchived
-                        && (!projectId.HasValue || t.ProjectId == projectId.Value))
-            .FirstOrDefaultAsync();
+                        && t.IsArchived); 
+        //if project id supplied, inherit org level roles 
+        if (projectId.HasValue)
+        {
+            tagQuery = tagQuery.Where( r => r.ProjectId == projectId.Value || r.ProjectId == null);
+        }
+        else
+        {
+            tagQuery = tagQuery.Where( r => r.ProjectId == null);
+        }
 
+        var tag = await tagQuery.FirstOrDefaultAsync();
+        
         if (tag == null)
-            throw new KeyNotFoundException($"Tag with id {tagId} not found or does not belong to the specified organization/project context");
+            throw new KeyNotFoundException(
+                $"Tag with id {tagId} not found or does not belong to the specified organization/project context");
+        
+        // Organization tags cannot be updated from a project level
+        if (projectId.HasValue && tag.ProjectId == null)
+        {
+            throw new InvalidOperationException("Organization tags cannot be updated from the child projects.");
+        }
 
         tag.IsArchived = false;
         tag.LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);

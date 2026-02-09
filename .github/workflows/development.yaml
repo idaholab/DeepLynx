@@ -139,6 +139,13 @@ jobs:
           AWS_S3_CONNECTION_STRING: ${{ secrets.AWS_S3_CONNECTION_STRING }}
           AZURE_OBJECT_CONNECTION_STRING: ${{ secrets.AZURE_OBJECT_CONNECTION_STRING }}
           AZURE_CONTAINER_NAME: ${{ vars.AZURE_CONTAINER_NAME }}
+          FROM_NAME: ${{vars.FROM_NAME}}
+          FROM_EMAIL: ${{vars.FROM_EMAIL}}
+          SUPPORT_EMAIL: ${{vars.SUPPORT_EMAIL}}
+          SMTP_ENABLE_SSL: ${{vars.SMTP_ENABLE_SSL}}
+          SMTP_PORT: ${{vars.SMTP_PORT}}
+          INVITE_URL: ${{vars.INVITE_URL}}
+          SMTP_SERVER: ${{vars.SMTP_SERVER}}
           CI_REGISTRY: ${{ secrets.CI_REGISTRY }}
           CI_REGISTRY_PATH: ${{ secrets.CI_REGISTRY_PATH }}
           GITHUB_RUN_NUMBER: ${{ github.RUN_NUMBER }}

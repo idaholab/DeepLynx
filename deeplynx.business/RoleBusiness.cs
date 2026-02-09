@@ -51,19 +51,15 @@ public class RoleBusiness : IRoleBusiness
         //if project id supplied, inherit org level roles 
         if (projectId.HasValue)
         {
-             roleQuery = roleQuery.Where( r => r.ProjectId == projectId.Value || r.ProjectId == null);
+             roleQuery = roleQuery.Where( r => r.ProjectId == projectId || r.ProjectId == null);
         }
         else
         {
             // Only return org-level roles when no project specified
             roleQuery = roleQuery.Where(r => r.ProjectId == null);
         }
-
-        if (roleQuery == null)
-            throw new KeyNotFoundException(
-                "Roles not found or do not belong to the specified organization/project context");
-
-        return await roleQuery.Select(r => new RoleResponseDto
+        
+        var roles = await roleQuery.Select(r => new RoleResponseDto
             {
                 Id = r.Id,
                 Name = r.Name,
@@ -75,6 +71,12 @@ public class RoleBusiness : IRoleBusiness
                 OrganizationId = r.OrganizationId
             })
             .ToListAsync();
+
+        if (!roles.Any())
+            throw new KeyNotFoundException(
+                "Roles not found or do not belong to the specified organization/project context");
+
+        return roles;
     }
 
     /// <summary>
@@ -105,7 +107,7 @@ public class RoleBusiness : IRoleBusiness
         //if project id supplied, inherit org level roles 
         if (projectId.HasValue)
         {
-            roleQuery = roleQuery.Where( r => r.ProjectId == projectId.Value || r.ProjectId == null);
+            roleQuery = roleQuery.Where( r => r.ProjectId == projectId || r.ProjectId == null);
         } 
         else
         {
@@ -331,6 +333,10 @@ public class RoleBusiness : IRoleBusiness
         {
             roleQuery = roleQuery.Where( r => r.ProjectId == projectId.Value || r.ProjectId == null);
         }
+        else
+        {
+            roleQuery = roleQuery.Where( r => r.ProjectId == null);
+        }
 
         var role = await roleQuery.FirstOrDefaultAsync();
         
@@ -421,6 +427,10 @@ public class RoleBusiness : IRoleBusiness
         {
             roleQuery = roleQuery.Where( r => r.ProjectId == projectId.Value || r.ProjectId == null);
         }
+        else
+        {
+            roleQuery = roleQuery.Where( r => r.ProjectId == null);
+        }
 
         var role = await roleQuery.FirstOrDefaultAsync();
         
@@ -506,6 +516,10 @@ public class RoleBusiness : IRoleBusiness
         {
             roleQuery = roleQuery.Where( r => r.ProjectId == projectId.Value || r.ProjectId == null);
         }
+        else
+        {
+            roleQuery = roleQuery.Where( r => r.ProjectId == null);
+        }
 
         var role = await roleQuery.FirstOrDefaultAsync();
         
@@ -568,6 +582,10 @@ public class RoleBusiness : IRoleBusiness
         {
             roleQuery = roleQuery.Where( r => r.ProjectId == projectId.Value || r.ProjectId == null);
         }
+        else
+        {
+            roleQuery = roleQuery.Where( r => r.ProjectId == null);
+        }
 
         var role = await roleQuery.FirstOrDefaultAsync();
         
@@ -580,8 +598,6 @@ public class RoleBusiness : IRoleBusiness
         {
             throw new InvalidOperationException("Organization roles cannot be updated from the child projects.");
         }
-
-        var roleName = role.Name;
 
         _context.Roles.Remove(role);
         await _context.SaveChangesAsync();
