@@ -7,7 +7,6 @@ metadata:
     name: deeplynx-test
 
 ---
-
 # Storage Class for DuckDB Azure Files
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
@@ -31,7 +30,6 @@ mountOptions:
 volumeBindingMode: Immediate
 
 ---
-
 # Persistent Volume Claim for DuckDB storage
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -47,7 +45,6 @@ spec:
   storageClassName: azurefile-duckdb
 
 ---
-
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -79,6 +76,8 @@ spec:
               value: ${FILE_STORAGE_METHOD}
             - name: STORAGE_DIRECTORY
               value: ${STORAGE_DIRECTORY}
+            - name: LOGO_STORAGE_DIRECTORY
+              value: /data/blob/images
             - name: RECOMMENDED_CHUNK_SIZE
               value: ${RECOMMENDED_CHUNK_SIZE}
             - name: POSTGRES_DB_HOST
@@ -126,8 +125,8 @@ spec:
               valueFrom:
                 secretKeyRef:
                   name: app-secrets
-                  key: jwt-secret-key      
-            - name: AUTH_TRUST_HOST          
+                  key: jwt-secret-key
+            - name: AUTH_TRUST_HOST
               value: "true"
             - name: AUTH_SECRET
               valueFrom:
@@ -190,7 +189,6 @@ spec:
             claimName: deeplynx-duckdb-pvc
 
 ---
-
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -327,7 +325,6 @@ spec:
             claimName: deeplynx-duckdb-pvc
 
 ---
-
 #docs
 apiVersion: apps/v1
 kind: Deployment
@@ -361,7 +358,6 @@ spec:
             - containerPort: 3001
 
 ---
-
 #mcp
 apiVersion: apps/v1
 kind: Deployment
@@ -398,7 +394,6 @@ spec:
             - containerPort: 43656
 
 ---
-
 apiVersion: v1
 kind: Service
 metadata:
@@ -414,7 +409,6 @@ spec:
     app: deeplynx-test
 
 ---
-
 apiVersion: v1
 kind: Service
 metadata:
@@ -430,7 +424,6 @@ spec:
     app: deeplynxbackend
 
 ---
-
 apiVersion: v1
 kind: Service
 metadata:
@@ -446,7 +439,6 @@ spec:
     app: deeplynx-docs
 
 ---
-
 apiVersion: v1
 kind: Service
 metadata:
@@ -462,7 +454,6 @@ spec:
     app: deeplynx-mcp
 
 ---
-
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -500,27 +491,26 @@ spec:
           - path: /api/auth
             pathType: Prefix
             backend:
-              service:  
+              service:
                 name: deeplynx-service
-                port:  
-                  number: 80 
+                port:
+                  number: 80
           - path: /docs
             pathType: Prefix
             backend:
-              service:  
+              service:
                 name: deeplynx-docs-service
-                port:  
-                  number: 80 
+                port:
+                  number: 80
           - path: /mcp
             pathType: Prefix
             backend:
-              service:  
+              service:
                 name: deeplynx-mcp-service
-                port:  
-                  number: 80 
+                port:
+                  number: 80
 
 ---
-
 # # Database if needed for deployment
 # Dummy change to force build.
 # apiVersion: apps/v1

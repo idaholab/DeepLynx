@@ -3,8 +3,39 @@
 
 import { LatestRowResponse, TimeseriesPlotData, TimeseriesPlotResponse } from "@/app/(home)/types/timeseries_types";
 import api from "./api";
+import { RecordResponseDto } from "@/app/(home)/types/responseDTOs";
 
 
+
+/**
+ * Upload timeseries file
+ * @param organizationId - ID of organization that timeseries data is associated with
+ * @param projectId - ID of project that timeseries data is associated with
+ * @param datasourceId - ID of data source that timeseries data is associated with
+ * @param file - The timeseries file to upload
+ * @returns Promise with record response containing upload information
+ */
+export async function uploadTimeseriesFile(
+    organizationId: number,
+    projectId: number,
+    datasourceId: number,
+    file: File
+): Promise<RecordResponseDto> {
+    try {
+        const form = new FormData();
+        form.append("file", file, file.name);
+
+        const res = await api.post<RecordResponseDto>(
+            `/organizations/${organizationId}/projects/${projectId}/datasources/${datasourceId}/timeseries/upload`,
+            form
+        );
+
+        return res.data;
+    } catch (error) {
+        console.error("Error uploading timeseries file:", error);
+        throw error;
+    }
+}
 
 /**
  * Get timeseries plot data

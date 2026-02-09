@@ -8,6 +8,7 @@ import {
   cancelChunkedUpload,
   cancelCurrentUpload
 } from "@/app/lib/client_service/file_upload_services.client";
+import { uploadTimeseriesFile } from "@/app/lib/client_service/timeseries_services.client";
 import { uploadBulkMetadata } from "@/app/lib/client_service/metadata_service.client";
 import { useEffect, useMemo } from "react";
 import toast from "react-hot-toast";
@@ -128,20 +129,32 @@ export default function UploadCenterClient({ initialAvailableFiles }: Props) {
         const file = fileUploadState.selectedFiles[0];
         const metadata = fileUploadState.filesMetadata[0] ?? {};
 
-        await uploadFile({
-          organizationId: organization?.organizationId as number,
-          projectId: projectResources.projectId,
-          dataSourceId: projectResources.dataSourceId,
-          objectStorageId: projectResources.objectStorageId,
-          file,
-          name: metadata.name || file.name,
-          description: metadata.description || "",
-          onProgress: (progress) => {
-            fileUploadState.setUploadProgress(progress);
-          },
-        });
-
-        toast.success("File uploaded successfully!");
+        // Check if this is a timeseries file
+        if (metadata.isTimeSeries) {
+          // Use timeseries upload endpoint
+          await uploadTimeseriesFile(
+            organization?.organizationId as number,
+            Number(projectResources.projectId),
+            Number(projectResources.dataSourceId),
+            file
+          );
+          toast.success("Timeseries file uploaded successfully!");
+        } else {
+          // Use regular file upload
+          await uploadFile({
+            organizationId: organization?.organizationId as number,
+            projectId: projectResources.projectId,
+            dataSourceId: projectResources.dataSourceId,
+            objectStorageId: projectResources.objectStorageId,
+            file,
+            name: metadata.name || file.name,
+            description: metadata.description || "",
+            onProgress: (progress) => {
+              fileUploadState.setUploadProgress(progress);
+            },
+          });
+          toast.success("File uploaded successfully!");
+        }
       } else {
         const results = await uploadFilesBatch({
           organizationId: organization?.organizationId as number,
@@ -161,8 +174,13 @@ export default function UploadCenterClient({ initialAvailableFiles }: Props) {
 
       fileUploadState.resetFileUpload();
     } catch (err) {
-      console.error("Upload error:", err);
-      toast.error("Upload failed. See console for details.");
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        toast("Upload cancelled.")
+
+      } else {
+        console.error("Upload error:", err);
+        toast.error("Upload failed. See console for details.");
+      }
       fileUploadState.setUploadProgress(null);
     } finally {
       fileUploadState.setIsUploading(false);
@@ -274,15 +292,13 @@ export default function UploadCenterClient({ initialAvailableFiles }: Props) {
       </div>
 
       <div
-        className={`flex gap-8 p-10 lg:p-20 ${
-          showRightPanel ? "justify-between" : "justify-center"
-        }`}
+        className={`flex gap-8 p-10 lg:p-20 ${showRightPanel ? "justify-between" : "justify-center"
+          }`}
       >
         {/* LEFT PANEL */}
         <div
-          className={`w-full lg:w-3/5 ${
-            showRightPanel ? "" : "max-w-5xl mx-auto"
-          }`}
+          className={`w-full lg:w-3/5 ${showRightPanel ? "" : "max-w-5xl mx-auto"
+            }`}
         >
           {/* UPLOAD MODE TOGGLE */}
           <div className="mb-6">
@@ -294,11 +310,10 @@ export default function UploadCenterClient({ initialAvailableFiles }: Props) {
             <div className="btn-group">
               <button
                 type="button"
-                className={`btn btn-sm mr-5 ${
-                  fileUploadState.uploadMode === "file"
-                    ? "btn-primary"
-                    : "btn-ghost"
-                }`}
+                className={`btn btn-sm mr-5 ${fileUploadState.uploadMode === "file"
+                  ? "btn-primary"
+                  : "btn-ghost"
+                  }`}
                 onClick={() => {
                   fileUploadState.setUploadMode("file");
                   bulkUploadState.setCsvFile(null);
@@ -309,11 +324,10 @@ export default function UploadCenterClient({ initialAvailableFiles }: Props) {
               </button>
               <button
                 type="button"
-                className={`btn btn-sm ${
-                  fileUploadState.uploadMode === "bulk"
-                    ? "btn-primary"
-                    : "btn-ghost"
-                }`}
+                className={`btn btn-sm ${fileUploadState.uploadMode === "bulk"
+                  ? "btn-primary"
+                  : "btn-ghost"
+                  }`}
                 onClick={() => {
                   fileUploadState.setUploadMode("bulk");
                   fileUploadState.setSelectedFiles([]);
@@ -389,47 +403,47 @@ export default function UploadCenterClient({ initialAvailableFiles }: Props) {
               <>
                 {/* Show spinner while waiting for progress to start */}
                 {!fileUploadState.uploadProgress && (
-                    <div className="mt-4 p-4 bg-base-200 rounded-lg flex flex-col items-center justify-center space-y-3">
-                      <span className="loading loading-spinner loading-lg text-primary"></span>
-                      <p className="text-sm text-base-content/70 text-center">
-                        Preparing upload...
-                      </p>
-                    </div>
+                  <div className="mt-4 p-4 bg-base-200 rounded-lg flex flex-col items-center justify-center space-y-3">
+                    <span className="loading loading-spinner loading-lg text-primary"></span>
+                    <p className="text-sm text-base-content/70 text-center">
+                      Preparing upload...
+                    </p>
+                  </div>
                 )}
 
-              {/* Show progress bar once chunked upload starts */}
-              {fileUploadState.uploadProgress && (
-                <div className="mt-4 p-4 bg-base-200 rounded-lg">
-                  <div className="flex justify-between items-center mb-2">
-                    <span className="text-sm font-medium">
-                      {fileUploadState.uploadProgress.chunksCompleted} / {fileUploadState.uploadProgress.totalChunks} chunks
-                    </span>
-                    <span className="text-sm font-bold text-base-content">
-                      {Math.round(fileUploadState.uploadProgress.percentComplete)}%
-                    </span>
-                  </div>
-                  <progress
+                {/* Show progress bar once chunked upload starts */}
+                {fileUploadState.uploadProgress && (
+                  <div className="mt-4 p-4 bg-base-200 rounded-lg">
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="text-sm font-medium">
+                        {fileUploadState.uploadProgress.chunksCompleted} / {fileUploadState.uploadProgress.totalChunks} chunks
+                      </span>
+                      <span className="text-sm font-bold text-base-content">
+                        {Math.round(fileUploadState.uploadProgress.percentComplete)}%
+                      </span>
+                    </div>
+                    <progress
                       className="progress progress-success w-full"
                       value={fileUploadState.uploadProgress.percentComplete}
                       max="100"
-                  ></progress>
-                  <button
+                    ></progress>
+                    <button
                       className="btn btn-sm btn-outline btn-error w-full mt-3"
                       onClick={handleCancel}
                       disabled={fileUploadState.isCancelling}
-                  >
-                    {fileUploadState.isCancelling ? (
+                    >
+                      {fileUploadState.isCancelling ? (
                         <>
                           <span className="loading loading-spinner loading-xs"></span>
                           Cancelling and cleaning up...
                         </>
-                    ) : (
+                      ) : (
                         'Cancel Upload'
-                    )}
-                  </button>
-                </div>
+                      )}
+                    </button>
+                  </div>
                 )}
-            </>
+              </>
             )}
           </div>
         )}

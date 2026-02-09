@@ -2,7 +2,7 @@
 "use client";
 
 import { CreateRecordRequestDto, UpdateRecordRequestDto } from "@/app/(home)/types/requestDTOs";
-import { RecordResponseDto, RelatedRecordsResponseDto } from "@/app/(home)/types/responseDTOs";
+import { HistoricalRecordResponseDto, RecordResponseDto, RelatedRecordsResponseDto } from "@/app/(home)/types/responseDTOs";
 import { GraphResponse } from "@/app/(home)/types/types";
 import api from "./api";
 
@@ -336,4 +336,45 @@ export async function getGraphDataForRecord(
     console.error(`Error getting graph data for record ${recordId}:`, error);
     throw error;
   }
+}
+
+/**
+ * Get a historical record at a specific point in time
+ * This allows you to see what a record looked like in the past
+ * 
+ * @param organizationId - The ID of the organization
+ * @param projectId - The ID of the project containing the record
+ * @param recordId - The ID of the specific record to retrieve
+ * @param pointInTime - Optional ISO 8601 timestamp to get record state at that moment
+ * @param hideArchived - Whether to exclude archived records (default: true)
+ * @returns Promise with a single HistoricalRecordResponseDto
+ */
+export async function getHistoricalRecord(
+    organizationId: number,
+    projectId: number,
+    recordId: number,
+    pointInTime?: string | null,
+    hideArchived: boolean = true
+): Promise<HistoricalRecordResponseDto> {
+    try {
+        const baseUrl = `/organizations/${organizationId}/projects/${projectId}/records/historical/${recordId}`;
+        
+        const queryParams: string[] = [];
+        
+        queryParams.push(`hideArchived=${hideArchived}`);
+        
+        if (pointInTime) {
+            queryParams.push(`pointInTime=${encodeURIComponent(pointInTime)}`);
+        }
+        
+        const queryString = queryParams.length > 0 ? `?${queryParams.join('&')}` : '';
+        const fullUrl = `${baseUrl}${queryString}`;
+        
+        const res = await api.get<HistoricalRecordResponseDto>(fullUrl);
+        
+        return res.data;
+    } catch (error) {
+        console.error("Error getting historical record:", error);
+        throw error;
+    }
 }

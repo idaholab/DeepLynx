@@ -13,6 +13,9 @@ public interface ISensitivityLabelBusiness
 
     Task<SensitivityLabelResponseDto> CreateSensitivityLabel(
         long currentUserId, CreateSensitivityLabelRequestDto dto, long? projectId, long organizationId);
+    
+    Task<List<SensitivityLabelResponseDto>> BulkCreateSensitivityLabels(
+        long organizationId, long currentUserId, long? projectId, List<CreateSensitivityLabelRequestDto> labels);
 
     Task<IEnumerable<SensitivityLabelResponseDto>> GetAllSensitivityLabels(
         long[]? projectIds, long organizationId, bool hideArchived = true);

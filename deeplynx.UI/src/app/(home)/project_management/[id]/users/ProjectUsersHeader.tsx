@@ -61,7 +61,7 @@ const ProjectUsersHeader: React.FC<ProjectUsersHeaderProps> = ({
               disabled={loading}
             >
               <UserIcon className="w-5 h-5" />
-              {t.translations.ADD_MEMBER}
+              {t.translations.ADD_MEMBER_OR_GROUP}
             </button>
             <ul
               tabIndex={0}
@@ -90,9 +90,13 @@ const ProjectUsersHeader: React.FC<ProjectUsersHeaderProps> = ({
           <div className="stat-figure text-primary">
             <UsersIcon className="w-8 h-8" />
           </div>
-          <div className="stat-title text-primary">{t.translations.TOTAL_MEMBERS}</div>
+          <div className="stat-title text-primary">
+            {t.translations.TOTAL_MEMBERS}
+          </div>
           <div className="stat-value text-primary">{totalMembers}</div>
-          <div className="stat-desc text-primary">{t.translations.USERS_PLUS_GROUP}</div>
+          <div className="stat-desc text-primary">
+            {t.translations.USERS_PLUS_GROUP}
+          </div>
         </div>
         <div className="stat bg-base-200 rounded-lg">
           <div className="stat-figure text-primary">
@@ -100,7 +104,9 @@ const ProjectUsersHeader: React.FC<ProjectUsersHeaderProps> = ({
           </div>
           <div className="stat-title text-primary">{t.translations.USERS}</div>
           <div className="stat-value text-primary">{userCount}</div>
-          <div className="stat-desc text-primary">{t.translations.INDIVIDUAL_MEMBERS}</div>
+          <div className="stat-desc text-primary">
+            {t.translations.INDIVIDUAL_MEMBERS}
+          </div>
         </div>
         <div className="stat bg-base-200 rounded-lg">
           <div className="stat-figure text-primary">
@@ -108,7 +114,9 @@ const ProjectUsersHeader: React.FC<ProjectUsersHeaderProps> = ({
           </div>
           <div className="stat-title text-primary">{t.translations.GROUPS}</div>
           <div className="stat-value text-primary">{groupCount}</div>
-          <div className="stat-desc text-primary">{t.translations.GROUP_MEMBERSHIP}</div>
+          <div className="stat-desc text-primary">
+            {t.translations.GROUP_MEMBERSHIP}
+          </div>
         </div>
       </div>
     </>
