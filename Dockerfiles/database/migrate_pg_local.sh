@@ -2,9 +2,7 @@
 
 set -e
 
-CONTAINER_NAME="DL17"
-# OLD_CONTAINER_NAME="DL17"
-# NEW_CONTAINER_NAME="${OLD_CONTAINER_NAME}_new"
+CONTAINER_NAME="DeepLynx"
 DOCKER_IMAGE_TAG="deeplynx-db"
 NEW_VOLUME_NAME="deeplynx_pgdata"
 OLD_VOLUME_NAME=""  # Will be set dynamically
@@ -94,7 +92,7 @@ echo ""
 echo "Step 3: Building new Docker image with Postgres 18..."
 docker build \
     -t ${DOCKER_IMAGE_TAG} \
-    -f ./Dockerfiles/database/Dockerfile.local .
+    -f ./Dockerfile.local .
 echo "New docker image created: ${DOCKER_IMAGE_TAG}"
 echo ""
 
