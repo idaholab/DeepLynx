@@ -50,7 +50,7 @@ public class TagBusiness : ITagBusiness
             tagQuery = tagQuery.Where(c => c.ProjectId == null);
         }
 
-        var tags = await tagQuery.Select(t => new TagResponseDto
+        return await tagQuery.Select(t => new TagResponseDto
             {
                 Id = t.Id,
                 Name = t.Name,
@@ -60,13 +60,6 @@ public class TagBusiness : ITagBusiness
                 OrganizationId = t.OrganizationId,
             })
             .ToListAsync();
-        
-        if (!tags.Any())
-            throw new KeyNotFoundException(
-                "Tags not found or do not belong to the specified organization/project context");
-
-        return tags;
-        
     }
 
     /// <summary>

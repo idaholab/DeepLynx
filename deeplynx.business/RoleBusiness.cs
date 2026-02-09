@@ -59,7 +59,7 @@ public class RoleBusiness : IRoleBusiness
             roleQuery = roleQuery.Where(r => r.ProjectId == null);
         }
         
-        var roles = await roleQuery.Select(r => new RoleResponseDto
+        return await roleQuery.Select(r => new RoleResponseDto
             {
                 Id = r.Id,
                 Name = r.Name,
@@ -71,12 +71,6 @@ public class RoleBusiness : IRoleBusiness
                 OrganizationId = r.OrganizationId
             })
             .ToListAsync();
-
-        if (!roles.Any())
-            throw new KeyNotFoundException(
-                "Roles not found or do not belong to the specified organization/project context");
-
-        return roles;
     }
 
     /// <summary>
