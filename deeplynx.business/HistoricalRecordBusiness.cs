@@ -62,7 +62,7 @@ public class HistoricalRecordBusiness : IHistoricalRecordBusiness
         // Get user's authorized labels
         var userAuthorizedLabels =
             await PermissionHelper.GetAuthorizedSensitivityLabels(
-                _context, currentUserId, organizationId, projectId, "read");
+                _context, currentUserId, organizationId, projectId, "read record");
 
         // need to check for archived at after DB retrieval since filtering archived results before querying could
         // result in inaccurate "most recent" results if a record has been archived
@@ -128,7 +128,7 @@ public class HistoricalRecordBusiness : IHistoricalRecordBusiness
         if (record.Labels.Count > 0)
         {
             var userAuthorizedLabels = await PermissionHelper.GetAuthorizedSensitivityLabels(
-                _context, currentUserId, organizationId, record.ProjectId, "read");
+                _context, currentUserId, organizationId, record.ProjectId, "read record");
             
             var recordLabelIds = record.Labels.Select(l => l.Id).ToList();
             var hasAllRequiredLabels = recordLabelIds.All(labelId =>
@@ -196,7 +196,7 @@ public class HistoricalRecordBusiness : IHistoricalRecordBusiness
         if (liveRecord.Labels.Count > 0)
         {
             var userAuthorizedLabels = await PermissionHelper.GetAuthorizedSensitivityLabels(
-                _context, currentUserId, organizationId, liveRecord.ProjectId, "write");
+                _context, currentUserId, organizationId, liveRecord.ProjectId, "write record");
 
             var recordLabelIds = liveRecord.Labels.Select(l => l.Id).ToList();
             var hasAllRequiredLabels = recordLabelIds.All(labelId =>

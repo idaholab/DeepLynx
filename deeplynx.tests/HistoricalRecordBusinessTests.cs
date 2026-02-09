@@ -306,7 +306,7 @@ public class HistoricalRecordBusinessTests : IntegrationTestBase
         {
             Name = "Read Default Label",
             Description = "Read permission for default test label",
-            Action = "read",
+            Action = "read record",
             IsDefault = false,
             LabelId = defaultLabelId,
             ProjectId = pid,
@@ -321,7 +321,21 @@ public class HistoricalRecordBusinessTests : IntegrationTestBase
         {
             Name = "Write Default Label",
             Description = "Write permission for default test label",
-            Action = "write",
+            Action = "write record",
+            IsDefault = false,
+            LabelId = defaultLabelId,
+            ProjectId = pid,
+            OrganizationId = organizationId,
+            LastUpdatedBy = uid,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            IsArchived = false
+        };
+        
+        var updatePermission = new Permission
+        {
+            Name = "Update Default Label",
+            Description = "update permission for default test label",
+            Action = "update record",
             IsDefault = false,
             LabelId = defaultLabelId,
             ProjectId = pid,
@@ -333,6 +347,7 @@ public class HistoricalRecordBusinessTests : IntegrationTestBase
 
         Context.Permissions.Add(readPermission);
         Context.Permissions.Add(writePermission);
+        Context.Permissions.Add(updatePermission);
         await Context.SaveChangesAsync();
 
         readPermissionId = readPermission.Id;
@@ -358,7 +373,7 @@ public class HistoricalRecordBusinessTests : IntegrationTestBase
         {
             Name = "Read Default Label 2",
             Description = "Read permission for second default test label",
-            Action = "read",
+            Action = "read record",
             Resource = "sensitivity_label",
             IsDefault = false,
             LabelId = defaultLabelId2,
@@ -374,7 +389,22 @@ public class HistoricalRecordBusinessTests : IntegrationTestBase
         {
             Name = "Write Default Label 2",
             Description = "Write permission for second default test label",
-            Action = "write",
+            Action = "write record",
+            Resource = "sensitivity_label",
+            IsDefault = false,
+            LabelId = defaultLabelId2,
+            ProjectId = pid,
+            OrganizationId = organizationId,
+            LastUpdatedBy = uid,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            IsArchived = false
+        };
+        
+        var updatePermission2 = new Permission
+        {
+            Name = "update Default Label 2",
+            Description = "Update permission for second default test label",
+            Action = "update record",
             Resource = "sensitivity_label",
             IsDefault = false,
             LabelId = defaultLabelId2,
@@ -387,6 +417,7 @@ public class HistoricalRecordBusinessTests : IntegrationTestBase
 
         Context.Permissions.Add(readPermission2);
         Context.Permissions.Add(writePermission2);
+        Context.Permissions.Add(updatePermission2);
         await Context.SaveChangesAsync();
 
         readPermissionId2 = readPermission2.Id;
@@ -401,8 +432,10 @@ public class HistoricalRecordBusinessTests : IntegrationTestBase
         {
             role.Permissions.Add(readPermission);
             role.Permissions.Add(writePermission);
+            role.Permissions.Add(updatePermission);
             role.Permissions.Add(readPermission2);
             role.Permissions.Add(writePermission2);
+            role.Permissions.Add(updatePermission2);
             await Context.SaveChangesAsync();
         }
     }

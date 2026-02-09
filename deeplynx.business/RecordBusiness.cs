@@ -77,7 +77,7 @@ public class RecordBusiness : IRecordBusiness
         // Get user's authorized labels
         var userAuthorizedLabels =
             await PermissionHelper.GetAuthorizedSensitivityLabels(
-                _context, currentUserId, organizationId, projectId, "read");
+                _context, currentUserId, organizationId, projectId, "read record");
 
         // Filter records in memory based on sensitivity label access
         var authorizedRecords = records.Where(r =>
@@ -138,7 +138,7 @@ public class RecordBusiness : IRecordBusiness
         // Filtering Record By User's Sensitivity Label access
         var userAuthorizedLabels =
             await PermissionHelper.GetAuthorizedSensitivityLabels(
-                _context, currentUserId, organizationId, projectId, "read");
+                _context, currentUserId, organizationId, projectId, "read record");
 
         recordQuery = recordQuery.Where(r =>
                 !r.Labels.Any() || // If the record has no labels, allow access
@@ -211,7 +211,7 @@ public class RecordBusiness : IRecordBusiness
         if (record.Labels.Count > 0)
         {
             var userAuthorizedLabels = await PermissionHelper.GetAuthorizedSensitivityLabels(
-                _context, currentUserId, organizationId, projectId, "read");
+                _context, currentUserId, organizationId, projectId, "read record");
 
             // Check if user has access to ALL required labels on the record
             var recordLabelIds = record.Labels.Select(l => l.Id).ToList();
@@ -286,7 +286,7 @@ public class RecordBusiness : IRecordBusiness
         if (record.Labels.Count > 0)
         {
             var userAuthorizedLabels = await PermissionHelper.GetAuthorizedSensitivityLabels(
-                _context, currentUserId, organizationId, projectId, "write");
+                _context, currentUserId, organizationId, projectId, "update record");
 
             var recordLabelIds = record.Labels.Select(l => l.Id).ToList();
             var hasAllRequiredLabels = recordLabelIds.All(labelId =>
@@ -295,7 +295,7 @@ public class RecordBusiness : IRecordBusiness
             if (!hasAllRequiredLabels)
             {
                 throw new UnauthorizedAccessException(
-                    $"You do not have access to all required sensitivity labels for record {recordId}");
+                    $"You do not have update permissions for sensitivity labels on record {recordId}");
             }
         }
 
@@ -349,14 +349,14 @@ public class RecordBusiness : IRecordBusiness
         // Check sensitivity label authorization if record has labels
 
         var userAuthorizedLabels = await PermissionHelper.GetAuthorizedSensitivityLabels(
-            _context, currentUserId, organizationId, projectId, "write");
+            _context, currentUserId, organizationId, projectId, "write record");
 
         var hasAllRequiredLabel = userAuthorizedLabels.Contains(labelId);
 
         if (!hasAllRequiredLabel)
         {
             throw new UnauthorizedAccessException(
-                $"You do not have access to all required sensitivity labels for record {recordId}");
+                $"You do not have write permissions for attaching this sensitivity label to a record");
         }
 
         // Check if already attached
@@ -410,8 +410,8 @@ public class RecordBusiness : IRecordBusiness
         if (record.Labels.Count > 0)
         {
             var userAuthorizedLabels = await PermissionHelper.GetAuthorizedSensitivityLabels(
-                _context, currentUserId, organizationId, projectId, "write");
-
+                _context, currentUserId, organizationId, projectId, "update record");
+            
             var recordLabelIds = record.Labels.Select(l => l.Id).ToList();
             var hasAllRequiredLabels = recordLabelIds.All(labelId =>
                 userAuthorizedLabels.Contains(labelId));
@@ -419,7 +419,7 @@ public class RecordBusiness : IRecordBusiness
             if (!hasAllRequiredLabels)
             {
                 throw new UnauthorizedAccessException(
-                    $"You do not have access to all required sensitivity labels for record {recordId}");
+                    $"You do not have update permissions for all sensitivity labels on record {recordId}");
             }
         }
 
@@ -486,10 +486,9 @@ public class RecordBusiness : IRecordBusiness
         {
             throw new InvalidOperationException($"Sensitivity labels are required on all records. Add a new label first to remove this one");
         }
-
-        // If record has sensitivity labels then make sure the user is authorized to modify the record
+        
         var userAuthorizedLabels = await PermissionHelper.GetAuthorizedSensitivityLabels(
-            _context, currentUserId, organizationId, projectId, "write");
+            _context, currentUserId, organizationId, projectId, "write record");
 
         var recordLabelIds = record.Labels.Select(l => l.Id).ToList();
         var hasAllRequiredLabels = recordLabelIds.All(lId =>
@@ -498,7 +497,7 @@ public class RecordBusiness : IRecordBusiness
         if (!hasAllRequiredLabels)
         {
             throw new UnauthorizedAccessException(
-                $"You do not have access to all required sensitivity labels for record {recordId}");
+                $"You do not have write permissions for all sensitivity labels on record {recordId}");
         }
 
         record.Labels.Remove(label);
@@ -602,7 +601,7 @@ public class RecordBusiness : IRecordBusiness
         // Filtering Record By User's Sensitivity Label access
         var userAuthorizedLabels =
             await PermissionHelper.GetAuthorizedSensitivityLabels(
-                _context, currentUserId, organizationId, projectId, "read");
+                _context, currentUserId, organizationId, projectId, "read record");
 
 
         // Query for existing records (excluding archived)
@@ -923,7 +922,7 @@ public class RecordBusiness : IRecordBusiness
         if (returnedRecord.Labels.Count > 0)
         {
             var userAuthorizedLabels = await PermissionHelper.GetAuthorizedSensitivityLabels(
-                _context, currentUserId, organizationId, projectId, "write");
+                _context, currentUserId, organizationId, projectId, "update record");
 
             var recordLabelIds = returnedRecord.Labels.Select(l => l.Id).ToList();
             var hasAllRequiredLabels = recordLabelIds.All(labelId =>
@@ -932,7 +931,7 @@ public class RecordBusiness : IRecordBusiness
             if (!hasAllRequiredLabels)
             {
                 throw new UnauthorizedAccessException(
-                    $"You do not have access to all required sensitivity labels for record {recordId}");
+                    $"You do not have update permissions for all sensitivity labels on record {recordId}");
             }
         }
 
@@ -1004,7 +1003,7 @@ public class RecordBusiness : IRecordBusiness
         if (returnedRecord.Labels.Count > 0)
         {
             var authorizedLabels = await PermissionHelper.GetAuthorizedSensitivityLabels(
-                _context, currentUserId, organizationId, projectId, "write");
+                _context, currentUserId, organizationId, projectId, "update record");
 
             var recordLabelIds = returnedRecord.Labels.Select(l => l.Id).ToList();
             var hasAllRequiredLabels = recordLabelIds.All(labelId =>
@@ -1013,7 +1012,7 @@ public class RecordBusiness : IRecordBusiness
             if (!hasAllRequiredLabels)
             {
                 throw new UnauthorizedAccessException(
-                    $"You do not have access to all required sensitivity labels for record {recordId}");
+                    $"You do not have update permissions for all sensitivity labels on record {recordId}");
             }
         }
 
@@ -1091,7 +1090,7 @@ public class RecordBusiness : IRecordBusiness
         if (returnedRecord.Labels.Count > 0)
         {
             var authorizedLabels = await PermissionHelper.GetAuthorizedSensitivityLabels(
-                _context, currentUserId, organizationId, projectId, "write");
+                _context, currentUserId, organizationId, projectId, "delete record");
 
             var recordLabelIds = returnedRecord.Labels.Select(l => l.Id).ToList();
             var hasAllRequiredLabels = recordLabelIds.All(labelId =>
@@ -1100,7 +1099,7 @@ public class RecordBusiness : IRecordBusiness
             if (!hasAllRequiredLabels)
             {
                 throw new UnauthorizedAccessException(
-                    $"You do not have access to all required sensitivity labels for record {recordId}");
+                    $"You do not have delete permissions for all sensitivity labels on record {recordId}");
             }
         }
 
@@ -1154,13 +1153,13 @@ public class RecordBusiness : IRecordBusiness
         if (returnedRecord.Labels.Count > 0)
         {
             var authorizedLabels = await PermissionHelper.GetAuthorizedSensitivityLabels(
-                _context, currentUserId, organizationId, projectId, "write");
+                _context, currentUserId, organizationId, projectId, "update record");
             var recordLabelIds = returnedRecord.Labels.Select(l => l.Id).ToList();
             var hasAllRequiredLabels = recordLabelIds.All(labelId => authorizedLabels.Contains(labelId));
             if (!hasAllRequiredLabels)
             {
                 throw new UnauthorizedAccessException(
-                    $"You do not have access to all required sensitivity labels for record {recordId}");
+                    $"You do not have update permissions for all sensitivity labels on record {recordId}");
             }
         }
 
@@ -1375,7 +1374,7 @@ public class RecordBusiness : IRecordBusiness
             currentUserId,
             organizationId,
             new[] { projectId },
-            "write");
+            "write record");
 
         // Check for unauthorized labels first
         var unauthorizedIds = distinctLabelIds.Where(id => !authorizedLabelIds.Contains(id)).ToList();

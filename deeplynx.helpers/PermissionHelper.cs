@@ -35,8 +35,8 @@ public class PermissionHelper
         long[] projectIds, 
         string userAction)
     {
-        if (userAction != "read" && userAction != "write")
-            throw new ArgumentException("userAction must be 'read' or 'write'");
+        if (userAction != "read record" && userAction != "write record" && userAction != "update record" && userAction != "delete record")
+            throw new ArgumentException("userAction must be read, write or update record");
 
         if (projectIds == null || projectIds.Length == 0)
             return new List<long>();

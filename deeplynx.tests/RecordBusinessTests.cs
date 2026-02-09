@@ -522,7 +522,7 @@ public class RecordBusinessTests : IntegrationTestBase
         // give user write permission with this label so that it can be attached to the record (work around that does not invalidate the test)
         var permission = await Context.Permissions
             .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "write");
+            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "write record");
 
         var role = await Context.Roles
             .AsNoTracking()
@@ -561,7 +561,7 @@ public class RecordBusinessTests : IntegrationTestBase
         // Give user write permission so label can be attached (workaround that doesn't invalidate test)
         var labelWritePermission = await Context.Permissions
             .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "write");
+            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "write record");
 
         var role = await Context.Roles
             .AsNoTracking()
@@ -582,7 +582,7 @@ public class RecordBusinessTests : IntegrationTestBase
         // Get read permission without tracking
         var labelReadPermission = await Context.Permissions
             .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "read");
+            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "read record");
 
         // Get the role without tracking
         role = await Context.Roles
@@ -630,11 +630,11 @@ public class RecordBusinessTests : IntegrationTestBase
         // Give user write permissions to both labels so they can be attached (workaround that doesn't invalidate test)
         var label1WritePermission = await Context.Permissions
             .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label1.Id && p.Action == "write");
+            .FirstOrDefaultAsync(p => p.LabelId == label1.Id && p.Action == "write record");
 
         var label2WritePermission = await Context.Permissions
             .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label2.Id && p.Action == "write");
+            .FirstOrDefaultAsync(p => p.LabelId == label2.Id && p.Action == "write record");
 
         var role = await Context.Roles
             .AsNoTracking()
@@ -657,7 +657,7 @@ public class RecordBusinessTests : IntegrationTestBase
         // Get read permission without tracking (only for label1, NOT label2)
         var label1ReadPermission = await Context.Permissions
             .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label1.Id && p.Action == "read");
+            .FirstOrDefaultAsync(p => p.LabelId == label1.Id && p.Action == "read record");
 
         // Get the role without tracking
         role = await Context.Roles
@@ -705,19 +705,19 @@ public class RecordBusinessTests : IntegrationTestBase
         // Get read and write permissions for both labels
         var label1ReadPermission = await Context.Permissions
             .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label1.Id && p.Action == "read");
+            .FirstOrDefaultAsync(p => p.LabelId == label1.Id && p.Action == "read record");
 
         var label1WritePermission = await Context.Permissions
             .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label1.Id && p.Action == "write");
+            .FirstOrDefaultAsync(p => p.LabelId == label1.Id && p.Action == "write record");
 
         var label2ReadPermission = await Context.Permissions
             .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label2.Id && p.Action == "read");
+            .FirstOrDefaultAsync(p => p.LabelId == label2.Id && p.Action == "read record");
 
         var label2WritePermission = await Context.Permissions
             .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label2.Id && p.Action == "write");
+            .FirstOrDefaultAsync(p => p.LabelId == label2.Id && p.Action == "write record");
 
         Assert.NotNull(label1ReadPermission);
         Assert.NotNull(label2ReadPermission);
@@ -794,15 +794,15 @@ public class RecordBusinessTests : IntegrationTestBase
         // Get permissions for label1 only (give user access to label1 but NOT label2)
         var label1ReadPermission = await Context.Permissions
             .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label1.Id && p.Action == "read");
+            .FirstOrDefaultAsync(p => p.LabelId == label1.Id && p.Action == "read record");
 
         var label1WritePermission = await Context.Permissions
             .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label1.Id && p.Action == "write");
+            .FirstOrDefaultAsync(p => p.LabelId == label1.Id && p.Action == "write record");
 
         var label2WritePermission = await Context.Permissions
             .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label2.Id && p.Action == "write");
+            .FirstOrDefaultAsync(p => p.LabelId == label2.Id && p.Action == "write record");
 
         Assert.NotNull(label1ReadPermission);
         Assert.NotNull(label1WritePermission);
@@ -873,15 +873,15 @@ public class RecordBusinessTests : IntegrationTestBase
         // Get permissions for public label only (NOT secret label)
         var publicReadPermission = await Context.Permissions
             .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == publicLabel.Id && p.Action == "read");
+            .FirstOrDefaultAsync(p => p.LabelId == publicLabel.Id && p.Action == "read record");
 
         var publicWritePermission = await Context.Permissions
             .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == publicLabel.Id && p.Action == "write");
+            .FirstOrDefaultAsync(p => p.LabelId == publicLabel.Id && p.Action == "write record");
 
         var secretWritePermission = await Context.Permissions
             .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == secretLabel.Id && p.Action == "write");
+            .FirstOrDefaultAsync(p => p.LabelId == secretLabel.Id && p.Action == "write record");
 
         Assert.NotNull(publicReadPermission);
         Assert.NotNull(publicWritePermission);
@@ -953,15 +953,15 @@ public class RecordBusinessTests : IntegrationTestBase
         // Get permissions for public label only (NOT classified label)
         var publicReadPermission = await Context.Permissions
             .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == publicLabel.Id && p.Action == "read");
+            .FirstOrDefaultAsync(p => p.LabelId == publicLabel.Id && p.Action == "read record");
 
         var publicWritePermission = await Context.Permissions
             .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == publicLabel.Id && p.Action == "write");
+            .FirstOrDefaultAsync(p => p.LabelId == publicLabel.Id && p.Action == "write record");
 
         var classifiedWritePermission = await Context.Permissions
             .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == classifiedLabel.Id && p.Action == "write");
+            .FirstOrDefaultAsync(p => p.LabelId == classifiedLabel.Id && p.Action == "write record");
 
         Assert.NotNull(publicReadPermission);
         Assert.NotNull(publicWritePermission);
@@ -1258,7 +1258,7 @@ public class RecordBusinessTests : IntegrationTestBase
         // Give user write permission with this label so that it can be attached to the record (workaround that does not invalidate the test)
         var permission = await Context.Permissions
             .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "write");
+            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "write record");
 
         var role = await Context.Roles
             .AsNoTracking()
@@ -1302,7 +1302,7 @@ public class RecordBusinessTests : IntegrationTestBase
         // Give user write permission so label can be attached (workaround that doesn't invalidate test)
         var writePermission = await Context.Permissions
             .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "write");
+            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "write record");
 
         var role = await Context.Roles
             .AsNoTracking()
@@ -1323,7 +1323,7 @@ public class RecordBusinessTests : IntegrationTestBase
         // Give user read permission to access the label
         var readPermission = await Context.Permissions
             .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "read");
+            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "read record");
 
         role = await Context.Roles
             .AsNoTracking()
@@ -1429,7 +1429,7 @@ public class RecordBusinessTests : IntegrationTestBase
         // Give user write permission for accessible label to attach it
         var accessibleWritePermission = await Context.Permissions
             .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == accessibleLabel.Id && p.Action == "write");
+            .FirstOrDefaultAsync(p => p.LabelId == accessibleLabel.Id && p.Action == "write record");
 
         var role = await Context.Roles
             .AsNoTracking()
@@ -1450,7 +1450,7 @@ public class RecordBusinessTests : IntegrationTestBase
         // Give user write permission for restricted label to attach it
         var restrictedWritePermission = await Context.Permissions
             .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == restrictedLabel.Id && p.Action == "write");
+            .FirstOrDefaultAsync(p => p.LabelId == restrictedLabel.Id && p.Action == "write record");
 
         role = await Context.Roles
             .AsNoTracking()
@@ -1471,7 +1471,7 @@ public class RecordBusinessTests : IntegrationTestBase
         // Give user read permission to accessible label only
         var accessibleReadPermission = await Context.Permissions
             .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == accessibleLabel.Id && p.Action == "read");
+            .FirstOrDefaultAsync(p => p.LabelId == accessibleLabel.Id && p.Action == "read record");
 
         role = await Context.Roles
             .AsNoTracking()
@@ -1542,7 +1542,7 @@ public class RecordBusinessTests : IntegrationTestBase
         // Give user write permission for label1
         var writePermission1 = await Context.Permissions
             .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label1.Id && p.Action == "write");
+            .FirstOrDefaultAsync(p => p.LabelId == label1.Id && p.Action == "write record");
 
         var role = await Context.Roles
             .AsNoTracking()
@@ -1563,7 +1563,7 @@ public class RecordBusinessTests : IntegrationTestBase
         // Give user write permission for label2
         var writePermission2 = await Context.Permissions
             .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label2.Id && p.Action == "write");
+            .FirstOrDefaultAsync(p => p.LabelId == label2.Id && p.Action == "write record");
 
         role = await Context.Roles
             .AsNoTracking()
@@ -1584,7 +1584,7 @@ public class RecordBusinessTests : IntegrationTestBase
         // Give user read permission to BOTH labels
         var readPermission1 = await Context.Permissions
             .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label1.Id && p.Action == "read");
+            .FirstOrDefaultAsync(p => p.LabelId == label1.Id && p.Action == "read record");
 
         role = await Context.Roles
             .AsNoTracking()
@@ -1602,7 +1602,7 @@ public class RecordBusinessTests : IntegrationTestBase
 
         var readPermission2 = await Context.Permissions
             .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label2.Id && p.Action == "read");
+            .FirstOrDefaultAsync(p => p.LabelId == label2.Id && p.Action == "read record");
 
         role = await Context.Roles
             .AsNoTracking()
@@ -1673,7 +1673,7 @@ public class RecordBusinessTests : IntegrationTestBase
         // Give user write permission for label1
         var writePermission1 = await Context.Permissions
             .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label1.Id && p.Action == "write");
+            .FirstOrDefaultAsync(p => p.LabelId == label1.Id && p.Action == "write record");
 
         var role = await Context.Roles
             .AsNoTracking()
@@ -1694,7 +1694,7 @@ public class RecordBusinessTests : IntegrationTestBase
         // Give user write permission for label2
         var writePermission2 = await Context.Permissions
             .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label2.Id && p.Action == "write");
+            .FirstOrDefaultAsync(p => p.LabelId == label2.Id && p.Action == "write record");
 
         role = await Context.Roles
             .AsNoTracking()
@@ -1715,7 +1715,7 @@ public class RecordBusinessTests : IntegrationTestBase
         // Give user read permission to only ONE label (label1)
         var readPermission1 = await Context.Permissions
             .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label1.Id && p.Action == "read");
+            .FirstOrDefaultAsync(p => p.LabelId == label1.Id && p.Action == "read record");
 
         role = await Context.Roles
             .AsNoTracking()
@@ -1850,7 +1850,7 @@ public class RecordBusinessTests : IntegrationTestBase
         // Give user write permission for accessible label
         var accessibleWritePermission = await Context.Permissions
             .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == accessibleLabel.Id && p.Action == "write");
+            .FirstOrDefaultAsync(p => p.LabelId == accessibleLabel.Id && p.Action == "write record");
 
         var role = await Context.Roles
             .AsNoTracking()
@@ -1872,7 +1872,7 @@ public class RecordBusinessTests : IntegrationTestBase
         // Give user write permission for restricted label
         var restrictedWritePermission = await Context.Permissions
             .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == restrictedLabel.Id && p.Action == "write");
+            .FirstOrDefaultAsync(p => p.LabelId == restrictedLabel.Id && p.Action == "write record");
 
         role = await Context.Roles
             .AsNoTracking()
@@ -1893,7 +1893,7 @@ public class RecordBusinessTests : IntegrationTestBase
         // Give user read permission to accessible label only
         var accessibleReadPermission = await Context.Permissions
             .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == accessibleLabel.Id && p.Action == "read");
+            .FirstOrDefaultAsync(p => p.LabelId == accessibleLabel.Id && p.Action == "read record");
 
         role = await Context.Roles
             .AsNoTracking()
@@ -1965,7 +1965,7 @@ public class RecordBusinessTests : IntegrationTestBase
         // Give user write permission to attach the label
         var writePermission = await Context.Permissions
             .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "write");
+            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "write record");
 
         var role = await Context.Roles
             .AsNoTracking()
@@ -2005,7 +2005,7 @@ public class RecordBusinessTests : IntegrationTestBase
         // Give user write permission to attach the label
         var writePermission = await Context.Permissions
             .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "write");
+            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "write record");
 
         var role = await Context.Roles
             .AsNoTracking()
@@ -2026,7 +2026,7 @@ public class RecordBusinessTests : IntegrationTestBase
         // Give user read permission to access the label
         var readPermission = await Context.Permissions
             .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "read");
+            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "read record");
 
         role = await Context.Roles
             .AsNoTracking()
@@ -2084,7 +2084,7 @@ public class RecordBusinessTests : IntegrationTestBase
         // Give user write permission for label1
         var writePermission1 = await Context.Permissions
             .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label1.Id && p.Action == "write");
+            .FirstOrDefaultAsync(p => p.LabelId == label1.Id && p.Action == "write record");
 
         var role = await Context.Roles
             .AsNoTracking()
@@ -2105,7 +2105,7 @@ public class RecordBusinessTests : IntegrationTestBase
         // Give user write permission for label2
         var writePermission2 = await Context.Permissions
             .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label2.Id && p.Action == "write");
+            .FirstOrDefaultAsync(p => p.LabelId == label2.Id && p.Action == "write record");
 
         role = await Context.Roles
             .AsNoTracking()
@@ -2126,7 +2126,7 @@ public class RecordBusinessTests : IntegrationTestBase
         // Give user read permission to BOTH labels
         var readPermission1 = await Context.Permissions
             .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label1.Id && p.Action == "read");
+            .FirstOrDefaultAsync(p => p.LabelId == label1.Id && p.Action == "read record");
 
         role = await Context.Roles
             .AsNoTracking()
@@ -2144,7 +2144,7 @@ public class RecordBusinessTests : IntegrationTestBase
 
         var readPermission2 = await Context.Permissions
             .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label2.Id && p.Action == "read");
+            .FirstOrDefaultAsync(p => p.LabelId == label2.Id && p.Action == "read record");
 
         role = await Context.Roles
             .AsNoTracking()
@@ -2190,7 +2190,7 @@ public class RecordBusinessTests : IntegrationTestBase
         // Give user write permission for label1
         var writePermission1 = await Context.Permissions
             .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label1.Id && p.Action == "write");
+            .FirstOrDefaultAsync(p => p.LabelId == label1.Id && p.Action == "write record");
 
         var role = await Context.Roles
             .AsNoTracking()
@@ -2211,7 +2211,7 @@ public class RecordBusinessTests : IntegrationTestBase
         // Give user write permission for label2
         var writePermission2 = await Context.Permissions
             .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label2.Id && p.Action == "write");
+            .FirstOrDefaultAsync(p => p.LabelId == label2.Id && p.Action == "write record");
 
         role = await Context.Roles
             .AsNoTracking()
@@ -2232,7 +2232,7 @@ public class RecordBusinessTests : IntegrationTestBase
         // Give user read permission to only ONE label (label1)
         var readPermission1 = await Context.Permissions
             .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label1.Id && p.Action == "read");
+            .FirstOrDefaultAsync(p => p.LabelId == label1.Id && p.Action == "read record");
 
         role = await Context.Roles
             .AsNoTracking()
@@ -2279,7 +2279,7 @@ public class RecordBusinessTests : IntegrationTestBase
         // Give user write permission for accessible label
         var accessibleWritePermission = await Context.Permissions
             .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == accessibleLabel.Id && p.Action == "write");
+            .FirstOrDefaultAsync(p => p.LabelId == accessibleLabel.Id && p.Action == "write record");
 
         var role = await Context.Roles
             .AsNoTracking()
@@ -2300,7 +2300,7 @@ public class RecordBusinessTests : IntegrationTestBase
         // Give user write permission for restricted label (so that the user can attach the label to the record)
         var restrictedWritePermission = await Context.Permissions
             .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == restrictedLabel.Id && p.Action == "write");
+            .FirstOrDefaultAsync(p => p.LabelId == restrictedLabel.Id && p.Action == "write record");
 
         role = await Context.Roles
             .AsNoTracking()
@@ -2321,7 +2321,7 @@ public class RecordBusinessTests : IntegrationTestBase
         // Give user read permission to accessible label only
         var accessibleReadPermission = await Context.Permissions
             .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == accessibleLabel.Id && p.Action == "read");
+            .FirstOrDefaultAsync(p => p.LabelId == accessibleLabel.Id && p.Action == "read record");
 
         role = await Context.Roles
             .AsNoTracking()
@@ -2742,7 +2742,7 @@ public class RecordBusinessTests : IntegrationTestBase
             .Include(r => r.Permissions)
             .FirstOrDefaultAsync(r => r.Id == roleId);
 
-        var permissionToRemove = role?.Permissions.FirstOrDefault(p => p.LabelId == label.Id && p.Action == "write");
+        var permissionToRemove = role?.Permissions.FirstOrDefault(p => p.LabelId == label.Id && p.Action == "write record");
         if (role != null && permissionToRemove != null)
         {
             role.Permissions.Remove(permissionToRemove);
@@ -2785,7 +2785,7 @@ public class RecordBusinessTests : IntegrationTestBase
         // Give user write permission for the label
         var writePermission = await Context.Permissions
             .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "write");
+            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "write record");
 
         var role = await Context.Roles
             .AsNoTracking()
@@ -2850,11 +2850,11 @@ public class RecordBusinessTests : IntegrationTestBase
         // Give user write permission for both labels
         var writePermission1 = await Context.Permissions
             .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label1.Id && p.Action == "write");
+            .FirstOrDefaultAsync(p => p.LabelId == label1.Id && p.Action == "write record");
 
         var writePermission2 = await Context.Permissions
             .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label2.Id && p.Action == "write");
+            .FirstOrDefaultAsync(p => p.LabelId == label2.Id && p.Action == "write record");
 
         var role = await Context.Roles
             .AsNoTracking()
@@ -2924,7 +2924,7 @@ public class RecordBusinessTests : IntegrationTestBase
         // Give user write permission ONLY for the accessible label
         var accessibleWritePermission = await Context.Permissions
             .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == accessibleLabel.Id && p.Action == "write");
+            .FirstOrDefaultAsync(p => p.LabelId == accessibleLabel.Id && p.Action == "write record");
 
         var role = await Context.Roles
             .AsNoTracking()
@@ -2946,7 +2946,7 @@ public class RecordBusinessTests : IntegrationTestBase
             .FirstOrDefaultAsync(r => r.Id == roleId);
 
         var permissionToRemove =
-            role?.Permissions.FirstOrDefault(p => p.LabelId == restrictedLabel.Id && p.Action == "write");
+            role?.Permissions.FirstOrDefault(p => p.LabelId == restrictedLabel.Id && p.Action == "write record");
         if (role != null && permissionToRemove != null)
         {
             role.Permissions.Remove(permissionToRemove);
@@ -3298,7 +3298,7 @@ public class RecordBusinessTests : IntegrationTestBase
         // Give user write permission to attach the label
         var writePermission = await Context.Permissions
             .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "write");
+            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "write record");
 
         var role = await Context.Roles
             .AsNoTracking()
@@ -3321,7 +3321,7 @@ public class RecordBusinessTests : IntegrationTestBase
             .Include(r => r.Permissions)
             .FirstOrDefaultAsync(r => r.Id == roleId);
 
-        var permissionToRemove = role?.Permissions.FirstOrDefault(p => p.LabelId == label.Id && p.Action == "write");
+        var permissionToRemove = role?.Permissions.FirstOrDefault(p => p.LabelId == label.Id && p.Action == "write record");
         if (role != null && permissionToRemove != null)
         {
             role.Permissions.Remove(permissionToRemove);
@@ -3337,7 +3337,7 @@ public class RecordBusinessTests : IntegrationTestBase
         var exception = await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
             _recordBusiness.UpdateRecord(uid, organizationId, pid, rid2, updateDto));
 
-        Assert.Contains($"You do not have access to all required sensitivity labels for record {rid2}",
+        Assert.Contains($"You do not have update permissions",
             exception.Message);
     }
 
@@ -3357,17 +3357,22 @@ public class RecordBusinessTests : IntegrationTestBase
         // Give user write permission to attach the label
         var writePermission = await Context.Permissions
             .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "write");
+            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "write record");
+        
+        var updatePermission = await Context.Permissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "update record");
 
         var role = await Context.Roles
             .AsNoTracking()
             .Include(r => r.Permissions)
             .FirstOrDefaultAsync(r => r.Id == roleId);
 
-        if (role != null && writePermission != null)
+        if (role != null && writePermission != null && updatePermission != null)
         {
             Context.Attach(role);
             role.Permissions.Add(writePermission);
+            role.Permissions.Add(updatePermission);
             await Context.SaveChangesAsync();
         }
 
@@ -3431,17 +3436,22 @@ public class RecordBusinessTests : IntegrationTestBase
         // Give user write permission for label1
         var writePermission1 = await Context.Permissions
             .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label1.Id && p.Action == "write");
+            .FirstOrDefaultAsync(p => p.LabelId == label1.Id && p.Action == "write record");
+        
+        var updatePermission1 = await Context.Permissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label1.Id && p.Action == "update record");
 
         var role = await Context.Roles
             .AsNoTracking()
             .Include(r => r.Permissions)
             .FirstOrDefaultAsync(r => r.Id == roleId);
 
-        if (role != null && writePermission1 != null)
+        if (role != null && writePermission1 != null && updatePermission1 != null)
         {
             Context.Attach(role);
             role.Permissions.Add(writePermission1);
+            role.Permissions.Add(updatePermission1);
             await Context.SaveChangesAsync();
         }
 
@@ -3452,17 +3462,22 @@ public class RecordBusinessTests : IntegrationTestBase
         // Give user write permission for label2
         var writePermission2 = await Context.Permissions
             .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label2.Id && p.Action == "write");
+            .FirstOrDefaultAsync(p => p.LabelId == label2.Id && p.Action == "write record");
+        
+        var updatePermission2 = await Context.Permissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label2.Id && p.Action == "update record");
 
         role = await Context.Roles
             .AsNoTracking()
             .Include(r => r.Permissions)
             .FirstOrDefaultAsync(r => r.Id == roleId);
 
-        if (role != null && writePermission2 != null)
+        if (role != null && writePermission2 != null && updatePermission2 != null)
         {
             Context.Attach(role);
             role.Permissions.Add(writePermission2);
+            role.Permissions.Add(updatePermission2);
             await Context.SaveChangesAsync();
         }
 
@@ -3507,7 +3522,7 @@ public class RecordBusinessTests : IntegrationTestBase
         // Give user write permission for label1
         var writePermission1 = await Context.Permissions
             .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label1.Id && p.Action == "write");
+            .FirstOrDefaultAsync(p => p.LabelId == label1.Id && p.Action == "write record");
 
         var role = await Context.Roles
             .AsNoTracking()
@@ -3528,7 +3543,7 @@ public class RecordBusinessTests : IntegrationTestBase
         // Give user write permission for label2
         var writePermission2 = await Context.Permissions
             .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label2.Id && p.Action == "write");
+            .FirstOrDefaultAsync(p => p.LabelId == label2.Id && p.Action == "write record");
 
         role = await Context.Roles
             .AsNoTracking()
@@ -3551,7 +3566,7 @@ public class RecordBusinessTests : IntegrationTestBase
             .Include(r => r.Permissions)
             .FirstOrDefaultAsync(r => r.Id == roleId);
 
-        var permissionToRemove = role?.Permissions.FirstOrDefault(p => p.LabelId == label2.Id && p.Action == "write");
+        var permissionToRemove = role?.Permissions.FirstOrDefault(p => p.LabelId == label2.Id && p.Action == "write record");
         if (role != null && permissionToRemove != null)
         {
             role.Permissions.Remove(permissionToRemove);
@@ -3568,7 +3583,7 @@ public class RecordBusinessTests : IntegrationTestBase
         var exception = await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
             _recordBusiness.UpdateRecord(uid, organizationId, pid, rid2, updateDto));
 
-        Assert.Contains($"You do not have access to all required sensitivity labels for record {rid2}",
+        Assert.Contains($"You do not have update permissions",
             exception.Message);
     }
 
@@ -3597,17 +3612,22 @@ public class RecordBusinessTests : IntegrationTestBase
         // Give user write permission for accessible label
         var accessibleWritePermission = await Context.Permissions
             .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == accessibleLabel.Id && p.Action == "write");
+            .FirstOrDefaultAsync(p => p.LabelId == accessibleLabel.Id && p.Action == "write record");
+        
+        var accessibleUpdatePermission = await Context.Permissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == accessibleLabel.Id && p.Action == "update record");
 
         var role = await Context.Roles
             .AsNoTracking()
             .Include(r => r.Permissions)
             .FirstOrDefaultAsync(r => r.Id == roleId);
 
-        if (role != null && accessibleWritePermission != null)
+        if (role != null && accessibleWritePermission != null && accessibleUpdatePermission != null)
         {
             Context.Attach(role);
             role.Permissions.Add(accessibleWritePermission);
+            role.Permissions.Add(accessibleUpdatePermission);
             await Context.SaveChangesAsync();
         }
 
@@ -3618,17 +3638,22 @@ public class RecordBusinessTests : IntegrationTestBase
         // Give user write permission for restricted label to attach it
         var restrictedWritePermission = await Context.Permissions
             .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == restrictedLabel.Id && p.Action == "write");
+            .FirstOrDefaultAsync(p => p.LabelId == restrictedLabel.Id && p.Action == "write record");
 
+        var restrictedUpdatePermission = await Context.Permissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == restrictedLabel.Id && p.Action == "update record");
+        
         role = await Context.Roles
             .AsNoTracking()
             .Include(r => r.Permissions)
             .FirstOrDefaultAsync(r => r.Id == roleId);
 
-        if (role != null && restrictedWritePermission != null)
+        if (role != null && restrictedWritePermission != null && restrictedUpdatePermission != null)
         {
             Context.Attach(role);
             role.Permissions.Add(restrictedWritePermission);
+            role.Permissions.Add(restrictedUpdatePermission);
             await Context.SaveChangesAsync();
         }
 
@@ -3642,7 +3667,7 @@ public class RecordBusinessTests : IntegrationTestBase
             .FirstOrDefaultAsync(r => r.Id == roleId);
 
         var permissionToRemove =
-            role?.Permissions.FirstOrDefault(p => p.LabelId == restrictedLabel.Id && p.Action == "write");
+            role?.Permissions.FirstOrDefault(p => p.LabelId == restrictedLabel.Id && p.Action == "update record");
         if (role != null && permissionToRemove != null)
         {
             role.Permissions.Remove(permissionToRemove);
@@ -3669,7 +3694,7 @@ public class RecordBusinessTests : IntegrationTestBase
             _recordBusiness.UpdateRecord(uid, organizationId, pid, rid3, updateDto));
 
         Assert.Contains(
-            $"You do not have access to all required sensitivity labels for record {rid3}",
+            $"You do not have update permissions",
             exception.Message);
     }
 
@@ -3725,7 +3750,7 @@ public class RecordBusinessTests : IntegrationTestBase
         // Give user write permission to attach the label
         var writePermission = await Context.Permissions
             .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "write");
+            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "write record");
 
         var role = await Context.Roles
             .Include(r => r.Permissions)
@@ -3764,7 +3789,7 @@ public class RecordBusinessTests : IntegrationTestBase
         var exception = await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
             _recordBusiness.DeleteRecord(uid, organizationId, pid, rid2));
 
-        Assert.Contains($"You do not have access to all required sensitivity labels for record {rid2}",
+        Assert.Contains($"You do not have delete permissions",
             exception.Message);
     }
 
@@ -3784,17 +3809,22 @@ public class RecordBusinessTests : IntegrationTestBase
         // Give user write permission to attach and delete the label
         var writePermission = await Context.Permissions
             .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "write");
+            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "write record");
+        
+        var deletePermission = await Context.Permissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "delete record");
 
         var role = await Context.Roles
             .AsNoTracking()
             .Include(r => r.Permissions)
             .FirstOrDefaultAsync(r => r.Id == roleId);
 
-        if (role != null && writePermission != null)
+        if (role != null && writePermission != null && deletePermission != null)
         {
             Context.Attach(role);
             role.Permissions.Add(writePermission);
+            role.Permissions.Add(deletePermission);
             await Context.SaveChangesAsync();
         }
 
@@ -3852,17 +3882,22 @@ public class RecordBusinessTests : IntegrationTestBase
         // Give user write permission for label1
         var writePermission1 = await Context.Permissions
             .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label1.Id && p.Action == "write");
+            .FirstOrDefaultAsync(p => p.LabelId == label1.Id && p.Action == "write record");
+        
+        var deletePermission1 = await Context.Permissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label1.Id && p.Action == "delete record");
 
         var role = await Context.Roles
             .AsNoTracking()
             .Include(r => r.Permissions)
             .FirstOrDefaultAsync(r => r.Id == roleId);
 
-        if (role != null && writePermission1 != null)
+        if (role != null && writePermission1 != null && deletePermission1 != null)
         {
             Context.Attach(role);
             role.Permissions.Add(writePermission1);
+            role.Permissions.Add(deletePermission1);
             await Context.SaveChangesAsync();
         }
 
@@ -3873,17 +3908,22 @@ public class RecordBusinessTests : IntegrationTestBase
         // Give user write permission for label2
         var writePermission2 = await Context.Permissions
             .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label2.Id && p.Action == "write");
+            .FirstOrDefaultAsync(p => p.LabelId == label2.Id && p.Action == "write record");
+        
+        var deletePermission2 = await Context.Permissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label2.Id && p.Action == "delete record");
 
         role = await Context.Roles
             .AsNoTracking()
             .Include(r => r.Permissions)
             .FirstOrDefaultAsync(r => r.Id == roleId);
 
-        if (role != null && writePermission2 != null)
+        if (role != null && writePermission2 != null && deletePermission2 != null)
         {
             Context.Attach(role);
             role.Permissions.Add(writePermission2);
+            role.Permissions.Add(deletePermission2);
             await Context.SaveChangesAsync();
         }
 
@@ -3926,7 +3966,7 @@ public class RecordBusinessTests : IntegrationTestBase
         // Give user write permission for label1
         var writePermission1 = await Context.Permissions
             .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label1.Id && p.Action == "write");
+            .FirstOrDefaultAsync(p => p.LabelId == label1.Id && p.Action == "write record");
 
         var role = await Context.Roles
             .Include(r => r.Permissions)
@@ -3947,7 +3987,7 @@ public class RecordBusinessTests : IntegrationTestBase
         // Give user write permission for label2
         var writePermission2 = await Context.Permissions
             .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label2.Id && p.Action == "write");
+            .FirstOrDefaultAsync(p => p.LabelId == label2.Id && p.Action == "write record");
 
         role = await Context.Roles
             .Include(r => r.Permissions)
@@ -3986,7 +4026,7 @@ public class RecordBusinessTests : IntegrationTestBase
         var exception = await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
             _recordBusiness.DeleteRecord(uid, organizationId, pid, rid2));
 
-        Assert.Contains($"You do not have access to all required sensitivity labels for record {rid2}",
+        Assert.Contains($"You do not have delete permissions",
             exception.Message);
     }
 
@@ -4015,15 +4055,20 @@ public class RecordBusinessTests : IntegrationTestBase
         // Give user write permission for accessible label
         var accessibleWritePermission = await Context.Permissions
             .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == accessibleLabel.Id && p.Action == "write");
+            .FirstOrDefaultAsync(p => p.LabelId == accessibleLabel.Id && p.Action == "write record");
+        
+        var deletePermission = await Context.Permissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == accessibleLabel.Id && p.Action == "delete record");
 
         var role = await Context.Roles
             .Include(r => r.Permissions)
             .FirstOrDefaultAsync(r => r.Id == roleId);
 
-        if (role != null && accessibleWritePermission != null)
+        if (role != null && accessibleWritePermission != null && deletePermission != null)
         {
             role.Permissions.Add(accessibleWritePermission);
+            role.Permissions.Add(deletePermission);
             await Context.SaveChangesAsync();
         }
 
@@ -4034,17 +4079,22 @@ public class RecordBusinessTests : IntegrationTestBase
         Context.ChangeTracker.Clear();
 
         // Give user write permission for restricted label (so that the user can attach the label to the record)
-        var restrictedWritePermission = await Context.Permissions
+        var restrictedDeletePermission = await Context.Permissions
             .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == restrictedLabel.Id && p.Action == "write");
+            .FirstOrDefaultAsync(p => p.LabelId == restrictedLabel.Id && p.Action == "delete record");
+        
+        var writePermission = await Context.Permissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == restrictedLabel.Id && p.Action == "write record");
 
         role = await Context.Roles
             .Include(r => r.Permissions)
             .FirstOrDefaultAsync(r => r.Id == roleId);
 
-        if (role != null && restrictedWritePermission != null)
+        if (role != null && restrictedDeletePermission != null && writePermission != null)
         {
-            role.Permissions.Add(restrictedWritePermission);
+            role.Permissions.Add(restrictedDeletePermission);
+            role.Permissions.Add(writePermission);
             await Context.SaveChangesAsync();
         }
 
@@ -4059,9 +4109,9 @@ public class RecordBusinessTests : IntegrationTestBase
             .Include(r => r.Permissions)
             .FirstOrDefaultAsync(r => r.Id == roleId);
 
-        if (role != null && restrictedWritePermission != null)
+        if (role != null && restrictedDeletePermission != null)
         {
-            var permissionToRemove = role.Permissions.FirstOrDefault(p => p.Id == restrictedWritePermission.Id);
+            var permissionToRemove = role.Permissions.FirstOrDefault(p => p.Id == restrictedDeletePermission.Id);
             if (permissionToRemove != null)
             {
                 role.Permissions.Remove(permissionToRemove);
@@ -4087,7 +4137,7 @@ public class RecordBusinessTests : IntegrationTestBase
             _recordBusiness.DeleteRecord(uid, organizationId, pid, rid3));
 
         Assert.Contains(
-            $"You do not have access to all required sensitivity labels for record {rid3}",
+            $"You do not have delete permissions",
             exception.Message);
     }
 
@@ -4176,7 +4226,7 @@ public class RecordBusinessTests : IntegrationTestBase
         // Give user write permission to attach the label
         var writePermission = await Context.Permissions
             .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "write");
+            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "write record");
 
         var role = await Context.Roles
             .Include(r => r.Permissions)
@@ -4215,7 +4265,7 @@ public class RecordBusinessTests : IntegrationTestBase
         var exception = await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
             _recordBusiness.ArchiveRecord(uid, organizationId, pid, rid2));
 
-        Assert.Contains($"You do not have access to all required sensitivity labels for record {rid2}",
+        Assert.Contains($"You do not have update permissions",
             exception.Message);
     }
 
@@ -4233,16 +4283,21 @@ public class RecordBusinessTests : IntegrationTestBase
         Context.ChangeTracker.Clear();
 
         // Give user write permission to attach and archive the label
+        var updatePermission = await Context.Permissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "update record");
+
         var writePermission = await Context.Permissions
             .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "write");
-
+            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "write record");
+        
         var role = await Context.Roles
             .Include(r => r.Permissions)
             .FirstOrDefaultAsync(r => r.Id == roleId);
 
-        if (role != null && writePermission != null)
+        if (role != null && updatePermission != null && writePermission != null)
         {
+            role.Permissions.Add(updatePermission);
             role.Permissions.Add(writePermission);
             await Context.SaveChangesAsync();
         }
@@ -4253,7 +4308,7 @@ public class RecordBusinessTests : IntegrationTestBase
 
         Context.ChangeTracker.Clear();
 
-        // Act - Archive record (user DOES have write access to the label)
+        // Act - Archive record (user DOES have update access to the label)
         var result = await _recordBusiness.ArchiveRecord(uid, organizationId, pid, rid2);
 
         // Assert - Record with accessible label SHOULD be archived
@@ -4309,15 +4364,20 @@ public class RecordBusinessTests : IntegrationTestBase
         // Give user write permission for label1
         var writePermission1 = await Context.Permissions
             .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label1.Id && p.Action == "write");
+            .FirstOrDefaultAsync(p => p.LabelId == label1.Id && p.Action == "write record");
+        
+        var updatePermission1 = await Context.Permissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label1.Id && p.Action == "update record");
 
         var role = await Context.Roles
             .Include(r => r.Permissions)
             .FirstOrDefaultAsync(r => r.Id == roleId);
 
-        if (role != null && writePermission1 != null)
+        if (role != null && writePermission1 != null && updatePermission1 != null)
         {
             role.Permissions.Add(writePermission1);
+            role.Permissions.Add(updatePermission1);
             await Context.SaveChangesAsync();
         }
 
@@ -4330,15 +4390,20 @@ public class RecordBusinessTests : IntegrationTestBase
         // Give user write permission for label2
         var writePermission2 = await Context.Permissions
             .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label2.Id && p.Action == "write");
+            .FirstOrDefaultAsync(p => p.LabelId == label2.Id && p.Action == "write record");
+        
+        var updatePermission2 = await Context.Permissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label2.Id && p.Action == "update record");
 
         role = await Context.Roles
             .Include(r => r.Permissions)
             .FirstOrDefaultAsync(r => r.Id == roleId);
 
-        if (role != null && writePermission2 != null)
+        if (role != null && writePermission2 != null && updatePermission2 != null)
         {
             role.Permissions.Add(writePermission2);
+            role.Permissions.Add(updatePermission2);
             await Context.SaveChangesAsync();
         }
 
@@ -4386,7 +4451,7 @@ public class RecordBusinessTests : IntegrationTestBase
         // Give user write permission for label1
         var writePermission1 = await Context.Permissions
             .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label1.Id && p.Action == "write");
+            .FirstOrDefaultAsync(p => p.LabelId == label1.Id && p.Action == "write record");
 
         var role = await Context.Roles
             .Include(r => r.Permissions)
@@ -4407,7 +4472,7 @@ public class RecordBusinessTests : IntegrationTestBase
         // Give user write permission for label2
         var writePermission2 = await Context.Permissions
             .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label2.Id && p.Action == "write");
+            .FirstOrDefaultAsync(p => p.LabelId == label2.Id && p.Action == "write record");
 
         role = await Context.Roles
             .Include(r => r.Permissions)
@@ -4446,7 +4511,7 @@ public class RecordBusinessTests : IntegrationTestBase
         var exception = await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
             _recordBusiness.ArchiveRecord(uid, organizationId, pid, rid2));
 
-        Assert.Contains($"You do not have access to all required sensitivity labels for record {rid2}",
+        Assert.Contains($"You do not have update permissions",
             exception.Message);
     }
 
@@ -4708,7 +4773,7 @@ public class RecordBusinessTests : IntegrationTestBase
         // Give user write permission to attach the label
         var writePermission = await Context.Permissions
             .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "write");
+            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "write record");
 
         var role = await Context.Roles
             .Include(r => r.Permissions)
@@ -4758,7 +4823,7 @@ public class RecordBusinessTests : IntegrationTestBase
         var exception = await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
             _recordBusiness.UnarchiveRecord(uid, organizationId, pid, record.Id));
 
-        Assert.Contains($"You do not have access to all required sensitivity labels for record {record.Id}",
+        Assert.Contains($"You do not have update permissions",
             exception.Message);
     }
 
@@ -4795,17 +4860,17 @@ public class RecordBusinessTests : IntegrationTestBase
         Context.ChangeTracker.Clear();
 
         // Give user write permission
-        var writePermission = await Context.Permissions
+        var updatePermission = await Context.Permissions
             .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "write");
+            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "update record");
 
         var role = await Context.Roles
             .Include(r => r.Permissions)
             .FirstOrDefaultAsync(r => r.Id == roleId);
 
-        if (role != null && writePermission != null)
+        if (role != null && updatePermission != null)
         {
-            role.Permissions.Add(writePermission);
+            role.Permissions.Add(updatePermission);
             await Context.SaveChangesAsync();
         }
 
@@ -4919,22 +4984,22 @@ public class RecordBusinessTests : IntegrationTestBase
         Context.ChangeTracker.Clear();
 
         // Give user write permission for both labels
-        var writePermission1 = await Context.Permissions
+        var updatePermission1 = await Context.Permissions
             .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label1.Id && p.Action == "write");
+            .FirstOrDefaultAsync(p => p.LabelId == label1.Id && p.Action == "update record");
 
-        var writePermission2 = await Context.Permissions
+        var updatePermission2 = await Context.Permissions
             .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label2.Id && p.Action == "write");
+            .FirstOrDefaultAsync(p => p.LabelId == label2.Id && p.Action == "update record");
 
         var role = await Context.Roles
             .Include(r => r.Permissions)
             .FirstOrDefaultAsync(r => r.Id == roleId);
 
-        if (role != null && writePermission1 != null && writePermission2 != null)
+        if (role != null && updatePermission1 != null && updatePermission2 != null)
         {
-            role.Permissions.Add(writePermission1);
-            role.Permissions.Add(writePermission2);
+            role.Permissions.Add(updatePermission1);
+            role.Permissions.Add(updatePermission2);
             await Context.SaveChangesAsync();
         }
 
@@ -5016,7 +5081,7 @@ public class RecordBusinessTests : IntegrationTestBase
         // Give user write permission for label1 only
         var writePermission1 = await Context.Permissions
             .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label1.Id && p.Action == "write");
+            .FirstOrDefaultAsync(p => p.LabelId == label1.Id && p.Action == "write record");
 
         var role = await Context.Roles
             .Include(r => r.Permissions)
@@ -5053,7 +5118,7 @@ public class RecordBusinessTests : IntegrationTestBase
         var exception = await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
             _recordBusiness.UnarchiveRecord(uid, organizationId, pid, record.Id));
 
-        Assert.Contains($"You do not have access to all required sensitivity labels for record {record.Id}",
+        Assert.Contains($"You do not have update permissions",
             exception.Message);
     }
 
@@ -5127,17 +5192,17 @@ public class RecordBusinessTests : IntegrationTestBase
         Context.ChangeTracker.Clear();
 
         // Give user write permission for accessible label only
-        var accessibleWritePermission = await Context.Permissions
+        var accessibleUpdatePermission = await Context.Permissions
             .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == accessibleLabel.Id && p.Action == "write");
+            .FirstOrDefaultAsync(p => p.LabelId == accessibleLabel.Id && p.Action == "update record");
 
         var role = await Context.Roles
             .Include(r => r.Permissions)
             .FirstOrDefaultAsync(r => r.Id == roleId);
 
-        if (role != null && accessibleWritePermission != null)
+        if (role != null && accessibleUpdatePermission != null)
         {
-            role.Permissions.Add(accessibleWritePermission);
+            role.Permissions.Add(accessibleUpdatePermission);
             await Context.SaveChangesAsync();
         }
 
@@ -5186,7 +5251,7 @@ public class RecordBusinessTests : IntegrationTestBase
             _recordBusiness.UnarchiveRecord(uid, organizationId, pid, recordWithoutAccess.Id));
 
         Assert.Contains(
-            $"You do not have access to all required sensitivity labels for record {recordWithoutAccess.Id}",
+            $"You do not have update permissions",
             exception.Message);
     }
 
@@ -5346,7 +5411,7 @@ public class RecordBusinessTests : IntegrationTestBase
             .Where(r => r.Id == roleId).FirstOrDefaultAsync();
 
         var writePermission = await Context.Permissions
-            .Where(p => p.LabelId == newLabelResponse.Id && p.Action == "write")
+            .Where(p => p.LabelId == newLabelResponse.Id && p.Action == "write record")
             .FirstOrDefaultAsync();
 
         labelRole.Permissions.Add(writePermission);
@@ -5386,7 +5451,7 @@ public class RecordBusinessTests : IntegrationTestBase
             .Where(r => r.Id == roleId).FirstOrDefaultAsync();
 
         var writePermission = await Context.Permissions
-            .Where(p => p.LabelId == newLabelResponse.Id && p.Action == "write")
+            .Where(p => p.LabelId == newLabelResponse.Id && p.Action == "write record")
             .FirstOrDefaultAsync();
 
         labelRole.Permissions.Add(writePermission);
@@ -5427,7 +5492,7 @@ public class RecordBusinessTests : IntegrationTestBase
         var exception = await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
             _recordBusiness.AttachLabel(uid, organizationId, pid, rid, newLabelResponse.Id));
 
-        Assert.Contains($"You do not have access to all required sensitivity labels for record {rid}",
+        Assert.Contains($"You do not have write permissions",
             exception.Message);
     }
 
@@ -5450,7 +5515,7 @@ public class RecordBusinessTests : IntegrationTestBase
             .Where(r => r.Id == roleId).FirstOrDefaultAsync();
 
         var writePermission = await Context.Permissions
-            .Where(p => p.LabelId == newLabelResponse.Id && p.Action == "write")
+            .Where(p => p.LabelId == newLabelResponse.Id && p.Action == "write record")
             .FirstOrDefaultAsync();
 
         labelRole.Permissions.Add(writePermission);
@@ -5503,7 +5568,7 @@ public class RecordBusinessTests : IntegrationTestBase
         var exception = await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
             _recordBusiness.UnattachLabel(uid, organizationId, pid, rid, newLabelResponse.Id));
 
-        Assert.Contains($"You do not have access to all required sensitivity labels for record {rid}",
+        Assert.Contains($"You do not have write permissions",
             exception.Message);
     }
 
@@ -5619,7 +5684,7 @@ public class RecordBusinessTests : IntegrationTestBase
         // Give user write permission to attach the label
         var writePermission = await Context.Permissions
             .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "write");
+            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "write record");
 
         var role = await Context.Roles
             .Include(r => r.Permissions)
@@ -5702,7 +5767,7 @@ public class RecordBusinessTests : IntegrationTestBase
         // Give user write permission to attach the label
         var writePermission = await Context.Permissions
             .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "write");
+            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "write record");
 
         var role = await Context.Roles
             .Include(r => r.Permissions)
@@ -5723,7 +5788,7 @@ public class RecordBusinessTests : IntegrationTestBase
         // Give user read permission to access the label
         var readPermission = await Context.Permissions
             .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "read");
+            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "read record");
 
         role = await Context.Roles
             .Include(r => r.Permissions)
@@ -5835,7 +5900,7 @@ public class RecordBusinessTests : IntegrationTestBase
         // Give user write permission for label1
         var writePermission1 = await Context.Permissions
             .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label1.Id && p.Action == "write");
+            .FirstOrDefaultAsync(p => p.LabelId == label1.Id && p.Action == "write record");
 
         var role = await Context.Roles
             .Include(r => r.Permissions)
@@ -5856,7 +5921,7 @@ public class RecordBusinessTests : IntegrationTestBase
         // Give user write permission for label2
         var writePermission2 = await Context.Permissions
             .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label2.Id && p.Action == "write");
+            .FirstOrDefaultAsync(p => p.LabelId == label2.Id && p.Action == "write record");
 
         role = await Context.Roles
             .Include(r => r.Permissions)
@@ -5877,7 +5942,7 @@ public class RecordBusinessTests : IntegrationTestBase
         // Give user read permission to BOTH labels
         var readPermission1 = await Context.Permissions
             .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label1.Id && p.Action == "read");
+            .FirstOrDefaultAsync(p => p.LabelId == label1.Id && p.Action == "read record");
 
         role = await Context.Roles
             .Include(r => r.Permissions)
@@ -5893,7 +5958,7 @@ public class RecordBusinessTests : IntegrationTestBase
 
         var readPermission2 = await Context.Permissions
             .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label2.Id && p.Action == "read");
+            .FirstOrDefaultAsync(p => p.LabelId == label2.Id && p.Action == "read record");
 
         role = await Context.Roles
             .Include(r => r.Permissions)
@@ -5971,7 +6036,7 @@ public class RecordBusinessTests : IntegrationTestBase
         // Give user write permission for label1
         var writePermission1 = await Context.Permissions
             .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label1.Id && p.Action == "write");
+            .FirstOrDefaultAsync(p => p.LabelId == label1.Id && p.Action == "write record");
 
         var role = await Context.Roles
             .Include(r => r.Permissions)
@@ -5992,7 +6057,7 @@ public class RecordBusinessTests : IntegrationTestBase
         // Give user write permission for label2
         var writePermission2 = await Context.Permissions
             .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label2.Id && p.Action == "write");
+            .FirstOrDefaultAsync(p => p.LabelId == label2.Id && p.Action == "write record");
 
         role = await Context.Roles
             .Include(r => r.Permissions)
@@ -6013,7 +6078,7 @@ public class RecordBusinessTests : IntegrationTestBase
         // Give user read permission to only ONE label (label1)
         var readPermission1 = await Context.Permissions
             .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label1.Id && p.Action == "read");
+            .FirstOrDefaultAsync(p => p.LabelId == label1.Id && p.Action == "read record");
 
         role = await Context.Roles
             .Include(r => r.Permissions)
@@ -6107,11 +6172,11 @@ public class RecordBusinessTests : IntegrationTestBase
         // Give user write permission for both labels
         var accessibleWritePermission = await Context.Permissions
             .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == accessibleLabel.Id && p.Action == "write");
+            .FirstOrDefaultAsync(p => p.LabelId == accessibleLabel.Id && p.Action == "write record");
 
         var restrictedWritePermission = await Context.Permissions
             .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == restrictedLabel.Id && p.Action == "write");
+            .FirstOrDefaultAsync(p => p.LabelId == restrictedLabel.Id && p.Action == "write record");
 
         var role = await Context.Roles
             .Include(r => r.Permissions)
@@ -6134,7 +6199,7 @@ public class RecordBusinessTests : IntegrationTestBase
         // Give user read permission to accessible label only
         var accessibleReadPermission = await Context.Permissions
             .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == accessibleLabel.Id && p.Action == "read");
+            .FirstOrDefaultAsync(p => p.LabelId == accessibleLabel.Id && p.Action == "read record");
 
         role = await Context.Roles
             .Include(r => r.Permissions)

@@ -42,7 +42,7 @@ public class QueryBusiness : IQueryBusiness
         {
             // Get authorized sensitivity labels for the user
             var authorizedLabelIds = await PermissionHelper.GetAuthorizedSensitivityLabels(
-                _context, currentUserId, organizationId, projectIds, "read");
+                _context, currentUserId, organizationId, projectIds, "read record");
 
             var sql = @"
             SELECT DISTINCT ON (hr.record_id)
@@ -296,7 +296,7 @@ public class QueryBusiness : IQueryBusiness
 
         // Get authorized sensitivity labels for the user
         var authorizedLabelIds = await PermissionHelper.GetAuthorizedSensitivityLabels(
-            _context, currentUserId, organizationId, projectIds, "read");
+            _context, currentUserId, organizationId, projectIds, "read record");
 
         // Process query for full-text search (prefix matching)
         var processedQuery = string.Join(" & ",
@@ -409,7 +409,7 @@ public class QueryBusiness : IQueryBusiness
     {
         // Get authorized sensitivity labels for the user
         var authorizedLabelIds = await PermissionHelper.GetAuthorizedSensitivityLabels(
-            _context, currentUserId, organizationId, projectIds, "read");
+            _context, currentUserId, organizationId, projectIds, "read record");
     
         var query = _context.HistoricalRecords
             .Where(r => r.OrganizationId == organizationId && !r.IsArchived);
@@ -473,7 +473,7 @@ public class QueryBusiness : IQueryBusiness
         long currentUserId, long organizationId, long[] projects, bool hideArchived)
     {
         var authorizedLabelIds = await PermissionHelper.GetAuthorizedSensitivityLabels(
-            _context, currentUserId, organizationId, projects, "read");   
+            _context, currentUserId, organizationId, projects, "read record");   
         
         var projectSet = new HashSet<long>(projects);
 
