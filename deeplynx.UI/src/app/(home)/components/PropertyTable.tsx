@@ -342,7 +342,6 @@ const PropertyTable: React.FC<PropertyTableProps> = ({
         {title && (
           <div className="flex justify-between items-center m-4">
             <h2 className="text-xl font-bold text-base-content">{title}</h2>
-
             <div className="flex gap-2">
               {/* Edit Properties Button */}
               {onEditProperties && (
@@ -355,83 +354,74 @@ const PropertyTable: React.FC<PropertyTableProps> = ({
                 </button>
               )}
 
-              <div className="flex gap-2">
-                {/* Edit Properties Button */}
-                {onEditProperties && (
-                  <button
-                    onClick={onEditProperties}
-                    title="Edit properties"
-                    className="p-1 transition-colors cursor-pointer hover:text-primary"
-                  >
-                    <PencilIcon className="size-6 text-primary" />
-                  </button>
-                )}
-
-                {download && (
-                  <div className="flex items-center gap-3">
-                    {/* Progress bar - only show when downloading */}
-                    {downloadProgress !== null && downloading && (
-                      <div className="flex flex-col gap-1 min-w-[200px]">
-                        <div className="flex items-center gap-2">
-                          <div className="flex-1 bg-base-300 rounded-full h-2">
-                            <div
-                              className="bg-primary h-2 rounded-full transition-all duration-300"
-                              style={{ width: `${downloadProgress}%` }}
-                            />
-                          </div>
-                          <span className="text-sm font-medium text-base-content whitespace-nowrap">
-                            {downloadProgress}%
-                          </span>
+              {download && (
+                <div className="flex items-center gap-3">
+                  {/* Progress bar - only show when downloading */}
+                  {downloadProgress !== null && downloading && (
+                    <div className="flex flex-col gap-1 min-w-[200px]">
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1 bg-base-300 rounded-full h-2">
+                          <div
+                            className="bg-primary h-2 rounded-full transition-all duration-300"
+                            style={{ width: `${downloadProgress}%` }}
+                          />
                         </div>
-                        <div className="flex justify-between text-xs text-base-content/70">
-                          <span>
-                            {bytesDownloaded && `${formatBytes(bytesDownloaded.loaded)} / ${formatBytes(bytesDownloaded.total)}`}
-                          </span>
-                          {timeRemaining !== null && timeRemaining > 0 && (
-                            <span>ETA: {formatTime(timeRemaining)}</span>
-                          )}
-                        </div>
+                        <span className="text-sm font-medium text-base-content whitespace-nowrap">
+                          {downloadProgress}%
+                        </span>
                       </div>
-                    )}
+                      <div className="flex justify-between text-xs text-base-content/70">
+                        <span>
+                          {bytesDownloaded && `${formatBytes(bytesDownloaded.loaded)} / ${formatBytes(bytesDownloaded.total)}`}
+                        </span>
+                        {timeRemaining !== null && timeRemaining > 0 && (
+                          <span>ETA: {formatTime(timeRemaining)}</span>
+                        )}
+                      </div>
+                    </div>
+                  )}
 
-                    {downloading ? (
-                      <button
-                        onClick={handleCancelDownload}
-                        className="p-1 text-error hover:text-error-focus transition-colors cursor-pointer"
-                        title="Cancel download"
-                      >
-                        <XMarkIcon className="w-8 h-8" />
-                      </button>
-                    ) : (
-                      <button
-                        onClick={handleDownload}
-                        disabled={!canDownload}
-                        title={
-                          canDownload
-                            ? "Download file"
-                            : "Missing projectId or recordId in URL"
-                        }
-                        className={`p-1 transition-colors ${canDownload
-                          ? "hover:text-primary cursor-pointer"
-                          : "opacity-50 cursor-not-allowed"
-                          }`}
-                      >
-                        <ArrowDownTrayIcon className="w-8 h-8" />
-                      </button>
-                    )}
-                  </div>
-                )}
-
-                <div className="card-body p-4">
-                  <div className="border border-base-300 rounded-lg overflow-hidden bg-base-100">
-                    {rows.map((row, index) =>
-                      renderRow(row, index, 0, index === rows.length - 1, []),
-                    )}
-                  </div>
+                  {downloading ? (
+                    <button
+                      onClick={handleCancelDownload}
+                      className="p-1 text-error hover:text-error-focus transition-colors cursor-pointer"
+                      title="Cancel download"
+                    >
+                      <XMarkIcon className="w-8 h-8" />
+                    </button>
+                  ) : (
+                    <button
+                      onClick={handleDownload}
+                      disabled={!canDownload}
+                      title={
+                        canDownload
+                          ? "Download file"
+                          : "Missing projectId or recordId in URL"
+                      }
+                      className={`p-1 transition-colors ${canDownload
+                        ? "hover:text-primary cursor-pointer"
+                        : "opacity-50 cursor-not-allowed"
+                        }`}
+                    >
+                      <ArrowDownTrayIcon className="w-8 h-8" />
+                    </button>
+                  )}
                 </div>
-              </div>
+              )}
             </div>
-            );
+          </div>
+        )}
+
+        <div className="card-body p-4">
+          <div className="border border-base-300 rounded-lg overflow-hidden bg-base-100">
+            {rows.map((row, index) =>
+              renderRow(row, index, 0, index === rows.length - 1, []),
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 };
 
-            export default PropertyTable;
+export default PropertyTable;
