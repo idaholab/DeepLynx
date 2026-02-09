@@ -48,7 +48,6 @@ let currentUploadAbortController: AbortController | null = null;
 export function cancelCurrentUpload(): void {
   if (currentUploadAbortController) {
     currentUploadAbortController.abort();
-    console.log("CHUNK ABORT SIGNAL FIRED");
     // Don't set to null here - let the upload function handle cleanup
     console.log("Upload cancelled by user");
   }
@@ -143,7 +142,7 @@ async function uploadFileChunked({
         `backend expected ${session.totalChunks}. Using backend value.`
       );
     }
-    
+
     await uploadChunksInBatches(
       chunks,
       uploadId,
@@ -217,8 +216,6 @@ async function startChunkedUpload(
     { params }
   );
 
-  console.log(`Started chunked upload: ${data.uploadId} (${data.totalChunks} chunks)`);
-
   return data;
 }
 
@@ -285,10 +282,6 @@ async function uploadChunksInBatches(
       currentBatch,
       uploadId,
     });
-
-    console.log(
-      `Uploaded batch ${currentBatch}: ${chunksCompleted} / ${totalChunks} chunks (${percentComplete.toFixed(1)}%)`
-    );
   }
 }
 
@@ -360,8 +353,6 @@ async function completeChunkedUpload(options: {
     { params }
   );
 
-  console.log(`Completed chunked upload: ${uploadId}`);
-
   return data;
 }
 
@@ -382,8 +373,6 @@ export async function cancelChunkedUpload(options: {
     `/organizations/${organizationId}/projects/${projectId}/files/upload/${uploadId}`,
     { params }
   );
-
-  console.log(`Cancelled chunked upload: ${uploadId}`);
 }
 
 // ============================================================================
