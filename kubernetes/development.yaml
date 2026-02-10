@@ -17,6 +17,7 @@ type: Opaque
 stringData:
   azurestorageaccountname: ${AZURE_STORAGE_ACCOUNT_NAME}
   azurestorageaccountsastoken: ${AZURE_STORAGE_ACCOUNT_SAS_TOKEN}
+  azurestorageconnectionstring: ${AZURE_STORAGE_CONNECTION_STRING}
 
 ---
 # Storage Class for DuckDB Azure Files
