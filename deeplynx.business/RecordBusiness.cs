@@ -487,6 +487,7 @@ public class RecordBusiness : IRecordBusiness
             throw new InvalidOperationException($"Sensitivity labels are required on all records. Add a new label first to remove this one");
         }
         
+        // User must have "write record" access for the label that they are unattaching
         var userAuthorizedLabels = await PermissionHelper.GetAuthorizedSensitivityLabels(
             _context, currentUserId, organizationId, projectId, "write record");
 
