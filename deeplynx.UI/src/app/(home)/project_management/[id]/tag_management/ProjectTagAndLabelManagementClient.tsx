@@ -15,18 +15,18 @@ import type {
 } from "@/app/(home)/types/responseDTOs";
 
 import {
-  archiveTagOrg,
-  createTagOrg,
-  getAllTagsOrg,
-  updateTagOrg,
+  archiveTag,
+  createTag,
+  getAllTags,
+  updateTag,
 } from "@/app/lib/client_service/tag_services.client";
 
-import TagOverviewStrip from "@/app/(home)/organization_management/tag_management/TagOverviewStrip";
 import ConfirmArchiveTagModal from "@/app/(home)/organization_management/tag_management/ConfirmArchiveTagModal";
 import TagEditModal from "@/app/(home)/organization_management/tag_management/TagEditModal";
-import ProjectTagsPanel from "./ProjectTagsPanel";
-import ProjectLabelsComingSoonCard from "./ProjectLabelsComingSoonCard";
+import TagOverviewStrip from "@/app/(home)/organization_management/tag_management/TagOverviewStrip";
 import { useLanguage } from "@/app/contexts/Language";
+import ProjectLabelsComingSoonCard from "./ProjectLabelsComingSoonCard";
+import ProjectTagsPanel from "./ProjectTagsPanel";
 
 /* -------------------------------------------------------------------------- */
 /*                                   Types                                    */
@@ -34,7 +34,6 @@ import { useLanguage } from "@/app/contexts/Language";
 
 interface Props {
   project: ProjectResponseDto;
-
   /** From backend: whether org has locked tags */
   orgTagsLocked: boolean;
 }
@@ -49,7 +48,7 @@ const ProjectTagAndLabelManagementClient: React.FC<Props> = ({
 }) => {
   const { organization } = useOrganizationSession();
   const orgId = organization?.organizationId as number | undefined;
-  const projectId = project.id;
+  const projectId = project.id as number;
 
   /* ------------------------------------------------------------------------ */
   /*                                 Tag State                                */
@@ -129,11 +128,7 @@ const ProjectTagAndLabelManagementClient: React.FC<Props> = ({
       setTagsLoading(true);
       setTagsError(null);
 
-      const dtoList: TagResponseDto[] = await getAllTagsOrg(
-        orgId,
-        [projectId as number],
-        true, // hide archived by default
-      );
+      const dtoList: TagResponseDto[] = await getAllTags(projectId);
 
       setTags(dtoList.filter((t) => !t.isArchived));
     } catch (error) {
@@ -178,7 +173,11 @@ const ProjectTagAndLabelManagementClient: React.FC<Props> = ({
           name: nameInput.trim(),
         };
 
-        const updated = await updateTagOrg(orgId, editingTag.id, updatePayload);
+        const updated = await updateTag(
+          projectId,
+          editingTag.id,
+          updatePayload,
+        );
 
         setTags((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
         toast.success("Project tag updated.");
@@ -188,7 +187,7 @@ const ProjectTagAndLabelManagementClient: React.FC<Props> = ({
           name: nameInput.trim(),
         };
 
-        const created = await createTagOrg(orgId, createPayload);
+        const created = await createTag(projectId, createPayload);
         setTags((prev) => [...prev, created]);
         toast.success("Project tag created.");
       }
@@ -218,7 +217,7 @@ const ProjectTagAndLabelManagementClient: React.FC<Props> = ({
 
     try {
       setArchivingTagId(tagToArchive.id);
-      await archiveTagOrg(orgId, tagToArchive.id, true);
+      await archiveTag(projectId, tagToArchive.id, true);
 
       setTags((prev) => prev.filter((t) => t.id !== tagToArchive.id));
       toast.success(`Tag "${tagToArchive.name}" archived.`);
@@ -291,7 +290,7 @@ const ProjectTagAndLabelManagementClient: React.FC<Props> = ({
           setTagSearch={setTagSearch}
           filteredCount={filteredTagCount}
           tagCount={tagCount}
-          projectId={projectId as number}
+          projectId={projectId}
           archivingTagId={archivingTagId}
           onCreateTag={openCreateTagModal}
           onEditTag={openEditTagModal}

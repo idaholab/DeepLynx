@@ -247,6 +247,10 @@ export type CreateTagRequestDto = {
 export type UpdateTagRequestDto = {
   name?: string;
 }
+export type CreateSensitivityLabelDto = {
+  name: string;
+  description?: string | null;
+}
 
 export interface InviteUserToOrganizationRequestDto {
   userEmail: string;

@@ -178,6 +178,17 @@ export type TagResponseDto = {
   archivedAt?: string | null;
 };
 
+export type SensitivityLabelsDto = {
+  id: number;
+  name: string;
+  description: string | null;
+  lastUpdatedAt: string;
+  lastUpdatedBy: number | null;
+  isArchived: boolean;
+  projectId: number | null;
+  organizationId: number | null;
+}
+
 export type UserResponseDto =
   {
     id: number;
