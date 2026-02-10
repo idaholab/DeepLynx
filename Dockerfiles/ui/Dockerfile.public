@@ -39,18 +39,18 @@ FROM node:lts-alpine3.22 AS frontend-build
 # Set working directory
 WORKDIR /usr/src/app
 
+# Install versioned os packages
+RUN apk update && apk upgrade --no-cache && \
+    apk add --no-cache \
+    busybox
+
+# Install latest global npm version and packages
+RUN npm install -g npm@latest
+
 # Explicitly set user
 RUN addgroup -S nexus && adduser -S nexus -G nexus
 RUN chown -R nexus:nexus /usr/src/app
 USER nexus
-
-# Install versioned os packages
-RUN apk update && apk upgrade --no-cache && \
-    apk add --no-cache \
-    busybox=1.37.0-r20
-
-# Install latest global npm version and packages
-RUN npm install -g npm@latest
 
 # Copy package.json first
 COPY deeplynx.UI/package*.json ./
@@ -73,10 +73,15 @@ WORKDIR /usr/src/app
 # Install versioned os packages
 RUN apk update && apk upgrade --no-cache && \
     apk add --no-cache \
-    busybox=1.37.0-r20
+    busybox
 
 # Install latest global npm version and packages
 RUN npm install -g npm@latest
+
+# Explicitly set user
+RUN addgroup -S nexus && adduser -S nexus -G nexus
+RUN chown -R nexus:nexus /usr/src/app
+USER nexus
 
 # Copy package files first
 COPY --from=frontend-build /usr/src/app/package*.json ./

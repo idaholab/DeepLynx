@@ -76,12 +76,6 @@ FROM mcr.microsoft.com/dotnet/sdk:10.0 AS final
 # Set working directory
 WORKDIR /usr/src/app
 
-# Copy the published backend code
-COPY --from=publish /app/publish .
-
-# Copy additional files if needed
-COPY deeplynx.api/moon.css ./moon.css
-
 # Update package list and upgrade specified packages during build time
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
@@ -97,8 +91,19 @@ RUN apt-get update \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
+# Copy the published backend code
+COPY --from=publish /app/publish .
+
+# Copy additional files if needed
+COPY deeplynx.api/moon.css ./moon.css
+
 # Run time vars
 ENV HOSTED_LINK=${HOSTED_LINK}
+
+# Explicitly set user
+RUN groupadd -r nexus && useradd -r -g nexus -m -s /usr/sbin/nologin nexus
+RUN chown -R nexus:nexus /usr/src/app
+USER nexus
 
 # This will run the .NET application directly
 CMD ["dotnet", "deeplynx.api.dll", "--urls", "http://*:5000"]
