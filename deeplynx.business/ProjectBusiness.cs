@@ -887,24 +887,9 @@ public class ProjectBusiness : IProjectBusiness
             timeseriesObjectStorageMethod);
 
         // ===============================
-        // CREATE DEFAULT PROJECT ROLES
+        // Add current user as admin to project
         // ===============================
-        // TODO: project config should determine whether to do this (true by default)
-        var defaultRoles = new List<CreateRoleRequestDto>
-        {
-            new() { Name = "Admin", Description = "Project administrator with full permissions" },
-            new() { Name = "User", Description = "Standard project user with limited permissions" }
-        };
-        var roles = await _roleBusiness.BulkCreateRoles(currentUserId, organizationId, projectId, defaultRoles);
-        var adminRoleId = roles.Single(r => r.Name == "Admin").Id;
-        var userRoleId = roles.Single(r => r.Name == "User").Id;
-
-        // set role permissions for admin and user
-        await _roleBusiness.SetPermissionsByPattern(adminRoleId, DefaultRolePermissions.Admin.AllowedPermissions,
-            organizationId, projectId);
-        await _roleBusiness.SetPermissionsByPattern(userRoleId, DefaultRolePermissions.User.AllowedPermissions,
-            organizationId, projectId);
-
-        await AddMemberToProject(projectId, adminRoleId, currentUserId, null);
+        var adminRole = await _context.Roles.FirstOrDefaultAsync(r => r.Name == "Admin" && r.OrganizationId == organizationId);
+        await AddMemberToProject(projectId, adminRole.Id, currentUserId, null);
     }
 }
