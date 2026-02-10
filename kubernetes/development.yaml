@@ -16,9 +16,7 @@ metadata:
 type: Opaque
 stringData:
   azurestorageaccountname: ${AZURE_STORAGE_ACCOUNT_NAME}
-  # Store the full connection string
   azurestorageconnectionstring: ${AZURE_OBJECT_CONNECTION_STRING}
-  # Store the SAS token separately
   azurestorageaccountsastoken: ${AZURE_STORAGE_ACCOUNT_SAS_TOKEN}
 
 ---
