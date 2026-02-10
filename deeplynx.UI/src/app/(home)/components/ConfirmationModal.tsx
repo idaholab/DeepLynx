@@ -8,7 +8,7 @@ interface ConfirmationModalProps {
   onClose: () => void;
   onConfirm: () => void;
   tagName: string;
-  recordName: string | undefined;
+  recordName?: string | null;
 }
 
 // Main ConfirmationModal component

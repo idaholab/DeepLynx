@@ -33,7 +33,7 @@ const RecentRecordsCard: React.FC<Props> = ({
   const [error, setError] = useState<string | null>(null);
 
   type SortOption = "nameAZ" | "nameZA" | "dateNew" | "dateOld";
-  const [sortOption, setSortOption] = useState<SortOption>("nameAZ");
+  const [sortOption, setSortOption] = useState<SortOption>("dateNew");
 
   const fetchRecentRecords = useCallback(async () => {
     if (

@@ -62,24 +62,40 @@ export const updateFile = async (
 };
 
 /**
- * Download a file
+ * Download a file with progress tracking
  * @param organizationId - The ID of the organization
  * @param projectId - The ID of the project
  * @param recordId - The ID of the record containing the file
  * @param recordName - Optional name for the downloaded file
+ * @param onProgress - Optional callback for progress updates
+ * @param abortController - Optional abort controller for download cancelation
  * @returns Promise that resolves when download completes
  */
 export const downloadFile = async (
   organizationId: number,
   projectId: number,
   recordId: number,
-  recordName?: string
+  recordName?: string | null,
+  onProgress?: (progress: { loaded: number; total: number; percentage: number }) => void,
+  abortController?: AbortController
 ): Promise<void> => {
   let url: string | null = null;
   try {
     const res = await api.get(
       `/organizations/${organizationId}/projects/${projectId}/files/${recordId}`,
-      { responseType: 'blob' }
+      {
+        responseType: 'blob',
+        signal: abortController?.signal,
+        onDownloadProgress: (progressEvent) => {
+          if (onProgress && progressEvent.total) {
+            const loaded = progressEvent.loaded;
+            const total = progressEvent.total;
+            const percentage = Math.round((loaded / total) * 100);
+
+            onProgress({ loaded, total, percentage });
+          }
+        }
+      }
     );
 
     const blob = res.data as Blob;
@@ -104,6 +120,12 @@ export const downloadFile = async (
     a.click();
     a.remove();
   } catch (err: unknown) {
+    // Check if it's a cancellation (user aborted)
+    if (axios.isAxiosError(err) && err.code === 'ERR_CANCELED') {
+      console.log('Download cancelled by user');
+      // Don't log as error - this is intentional
+      throw err; // Re-throw so the calling code knows it was cancelled
+    }
     if (axios.isAxiosError(err)) {
       const { response } = err;
       if (response?.data instanceof Blob) {
