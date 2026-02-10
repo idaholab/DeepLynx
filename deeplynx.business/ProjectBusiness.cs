@@ -890,6 +890,9 @@ public class ProjectBusiness : IProjectBusiness
         // Add current user as admin to project
         // ===============================
         var adminRole = await _context.Roles.FirstOrDefaultAsync(r => r.Name == "Admin" && r.OrganizationId == organizationId);
+        if (adminRole == null)
+            throw new InvalidOperationException($"Admin role not found for organization {organizationId}");
+    
         await AddMemberToProject(projectId, adminRole.Id, currentUserId, null);
     }
 }
