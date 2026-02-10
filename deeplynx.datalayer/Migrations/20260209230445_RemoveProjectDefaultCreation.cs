@@ -11,17 +11,22 @@ namespace deeplynx.datalayer.Migrations
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             
-            // Update organization-level role descriptions
+            // Update organization-level role descriptions to be more general
             migrationBuilder.Sql(@"
-                UPDATE deeplynx.roles
-                SET description = CASE 
-                    WHEN name = 'Admin' THEN 'Administrator role with full permissions'
-                    WHEN name = 'User' THEN 'User role with limited permissions'
-                END,
+            UPDATE deeplynx.roles
+            SET description = 'Administrator role with full permissions',
                 last_updated_at = NOW()
-                WHERE project_id IS NULL
-                  AND name IN ('Admin', 'User');
-            "); 
+            WHERE project_id IS NULL
+              AND name = 'Admin';
+        ");
+            
+            migrationBuilder.Sql(@"
+            UPDATE deeplynx.roles
+            SET description = 'User role with limited permissions',
+                last_updated_at = NOW()
+            WHERE project_id IS NULL
+              AND name = 'User';
+        ");
             
             // Update project_members to use organization-level roles
             migrationBuilder.Sql(@"
