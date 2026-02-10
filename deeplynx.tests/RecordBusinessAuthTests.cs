@@ -1948,6 +1948,54 @@ public class RecordBusinessAuthTests : IntegrationTestBase
         var eventList = await Context.Events.ToListAsync();
         Assert.Empty(eventList);
     }
+    
+    [Fact]
+    public async Task CreateRecord_Fails_NoLabel_LabelsRequired()
+    {
+        // Arrange - Create a sensitivity label
+        var project = await Context.Projects.FirstOrDefaultAsync(p => p.Id == pid);
+        project.RequireSensitivityLabel = true;
+        await Context.SaveChangesAsync();
+        
+        var labelDto = new CreateSensitivityLabelRequestDto
+        {
+            Name = "Authorized_" + Guid.NewGuid(),
+            Description = "Authorized Label",
+        };
+        var label = await _sensitivityLabelBusiness.CreateSensitivityLabel(uid, labelDto, pid, organizationId);
+
+        Context.ChangeTracker.Clear();
+
+        // Give user write permission for the label
+        var writePermission = await Context.Permissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "write record");
+
+        var role = await Context.Roles
+            .AsNoTracking()
+            .Include(r => r.Permissions)
+            .FirstOrDefaultAsync(r => r.Id == roleId);
+
+        if (role != null && writePermission != null)
+        {
+            Context.Attach(role);
+            role.Permissions.Add(writePermission);
+            await Context.SaveChangesAsync();
+        }
+
+        var dto = new CreateRecordRequestDto
+        {
+            Name = "Record With Authorized Label",
+            Description = "Test Record with authorized label",
+            Properties = (JsonObject)JsonNode.Parse(JsonSerializer.Serialize(new { TestProp = "TestValue" }))!,
+            OriginalId = "original-authorized"
+            // No label provided
+        };
+
+        // Act - Create record with authorized label
+        await Assert.ThrowsAsync<InvalidOperationException>(async () => 
+            await _recordBusiness.CreateRecord(uid, organizationId, pid, did, dto));
+    }
 
     #endregion
 
@@ -2369,6 +2417,32 @@ public class RecordBusinessAuthTests : IntegrationTestBase
         Assert.Contains(
             $"You do not have update permissions",
             exception.Message);
+    }
+    
+    [Fact]
+    public async Task UpdateRecord_Fails_LabelsRequired_NoLabelProvided()
+    {
+        // Arrange - Create a sensitivity label
+        var project = await Context.Projects.FirstOrDefaultAsync(p => p.Id == pid);
+        project.RequireSensitivityLabel = true;
+        await Context.SaveChangesAsync();
+
+        Context.ChangeTracker.Clear();
+
+        var updateDto = new UpdateRecordRequestDto
+        {
+            Name = "Updated Record With Label",
+            Description = "Updated description"
+        };
+
+        // Act - Update record (user DOES have write access to the label)
+        var result = await _recordBusiness.UpdateRecord(uid, organizationId, pid, rid2, updateDto);
+
+        // Assert - Record with accessible label SHOULD be updated
+        Assert.NotNull(result);
+        Assert.Equal(rid2, result.Id);
+        Assert.Equal("Updated Record With Label", result.Name);
+        Assert.Equal("Updated description", result.Description);
     }
 
     #endregion

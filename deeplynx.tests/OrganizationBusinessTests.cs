@@ -213,7 +213,8 @@ public class OrganizationBusinessTests : IntegrationTestBase
         {
             Name = "New Test Organization",
             Description = "New Test Organization Description",
-            Banner = "Banner"
+            Banner = "Banner",
+            RequireSensitivityLabel = true
         };
         
         var now =  DateTime.UtcNow;
@@ -231,6 +232,7 @@ public class OrganizationBusinessTests : IntegrationTestBase
         Assert.True(result.LastUpdatedAt >= now);
         Assert.Equal(uid, result.LastUpdatedBy);
         Assert.Equal(dto.Banner, result.Banner);
+        Assert.True(result.RequireSensitivityLabel);
 
         // verify org was actually created in database
         var createdOrg = await Context.Organizations.FindAsync(result.Id);

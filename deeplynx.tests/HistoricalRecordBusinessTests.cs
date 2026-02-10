@@ -904,7 +904,10 @@ public class HistoricalRecordBusinessTests : IntegrationTestBase
         
         // Arrange
         // TODO: insert tags after record to avoid race condition
-        var record = await Context.Records.Where(r => r.ProjectId == pid && r.Id == rid).FirstOrDefaultAsync();
+        var record = await Context.Records
+            .AsNoTracking()
+            .Where(r => r.ProjectId == pid && r.Id == rid)
+            .FirstOrDefaultAsync();
         Assert.NotNull(record);
         
         Context.ChangeTracker.Clear();
