@@ -29,6 +29,7 @@ provisioner: file.csi.azure.com
 parameters:
   skuName: Premium_LRS
   storageAccount: ${AZURE_STORAGE_ACCOUNT_NAME}
+  shareName: duckdb-data
   server: ${AZURE_STORAGE_ACCOUNT_NAME}.file.core.usgovcloudapi.net
   secretName: azure-storage-secret
   secretNamespace: deeplynxv3-dev
