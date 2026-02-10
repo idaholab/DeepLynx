@@ -175,6 +175,9 @@ public class HistoricalRecordBusinessTests : IntegrationTestBase
             LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
             OrganizationId = organizationId
         };
+        Context.Tags.Add(testTag);
+        Context.Tags.Add(testTag2);
+        await Context.SaveChangesAsync();
 
         var config = new JsonObject();
         var objectStorage = new ObjectStorage
@@ -251,9 +254,6 @@ public class HistoricalRecordBusinessTests : IntegrationTestBase
             Uri = "localhost:8090",
             OrganizationId = organizationId
         };
-
-        Context.Tags.Add(testTag);
-        await Context.SaveChangesAsync();
 
         Context.Records.Add(testRecord);
         Context.Records.Add(testRecord2);
@@ -906,7 +906,9 @@ public class HistoricalRecordBusinessTests : IntegrationTestBase
         // TODO: insert tags after record to avoid race condition
         var record = await Context.Records.Where(r => r.ProjectId == pid && r.Id == rid).FirstOrDefaultAsync();
         Assert.NotNull(record);
-
+        
+        Context.ChangeTracker.Clear();
+        
         // Act
         var historicalRecord = await _historicalRecordBusiness.GetHistoricalRecord(uid, rid, organizationId, null);
 

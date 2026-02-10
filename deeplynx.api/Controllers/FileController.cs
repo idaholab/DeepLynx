@@ -48,14 +48,15 @@ public class FileController : ControllerBase
         long projectId,
         [FromQuery] long? dataSourceId,
         [FromQuery] long? objectStorageId,
-        IFormFile file)
+        IFormFile file,
+        [FromQuery] List<long>? sensitivityLabelIds)
     {
         try
         {
             var currentUserId = UserContextStorage.UserId;
             var fileUploadInfo =
                 await _fileBusiness.UploadFile(currentUserId, organizationId, projectId, dataSourceId, objectStorageId,
-                    file);
+                    file, sensitivityLabelIds);
             return Ok(fileUploadInfo);
         }
         catch (Exception exc)
@@ -169,13 +170,14 @@ public class FileController : ControllerBase
         long projectId,
         [FromQuery] long? dataSourceId,
         [FromQuery] long? objectStorageId,
-        [FromBody] FileUploadInitRequestDto request)
+        [FromBody] FileUploadInitRequestDto request,
+        [FromQuery] List<long>? sensitivityLabelIds)
     {
         try
         {
             var currentUserId = UserContextStorage.UserId;
             var uploadSession = await _fileBusiness.StartUpload(
-                currentUserId, organizationId, projectId, dataSourceId, objectStorageId, request);
+                currentUserId, organizationId, projectId, dataSourceId, objectStorageId, request, sensitivityLabelIds);
             return Ok(uploadSession);
         }
         catch (Exception exc)
@@ -207,13 +209,14 @@ public class FileController : ControllerBase
         [FromQuery] long? objectStorageId,
         IFormFile chunk,
         [FromForm] string uploadId,
-        [FromForm] int chunkNumber)
+        [FromForm] int chunkNumber,
+        [FromQuery] List<long>? sensitivityLabelIds)
     {
         try
         {
             var currentUserId = UserContextStorage.UserId;
             var chunkUploadStatus = await _fileBusiness.UploadChunk(
-                currentUserId, organizationId, projectId, dataSourceId, objectStorageId, chunk, uploadId, chunkNumber);
+                currentUserId, organizationId, projectId, dataSourceId, objectStorageId, chunk, uploadId, chunkNumber, sensitivityLabelIds);
             return Ok(new { ChunkUploadStatus = chunkUploadStatus });
         }
         catch (Exception exc)
@@ -240,13 +243,14 @@ public class FileController : ControllerBase
         long projectId,
         [FromQuery] long? dataSourceId,
         [FromQuery] long? objectStorageId,
-        [FromBody] FileUploadCompleteRequestDto request)
+        [FromBody] FileUploadCompleteRequestDto request,
+        [FromQuery] List<long>? sensitivityLabelIds)
     {
         try
         {
             var currentUserId = UserContextStorage.UserId;
             var fileRecord = await _fileBusiness.CompleteUpload(
-                currentUserId, organizationId, projectId, dataSourceId, objectStorageId, request);
+                currentUserId, organizationId, projectId, dataSourceId, objectStorageId, request, sensitivityLabelIds);
             return Ok(fileRecord);
         }
         catch (Exception exc)

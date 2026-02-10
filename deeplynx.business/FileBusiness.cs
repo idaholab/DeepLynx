@@ -58,14 +58,38 @@ public class FileBusiness
     /// <param name="dataSourceId">ID of the data source to which the file belongs</param>
     /// <param name="objectStorageId">ID of the object storage method to use</param>
     /// <param name="file">file to upload</param>
+    /// <param name="sensitivityLabelIds">The IDs of the Sensitivity Labels that will be attached to the record</param>
     public async Task<RecordResponseDto> UploadFile(
         long currentUserId,
         long organizationId,
         long projectId,
         long? dataSourceId,
         long? objectStorageId,
-        IFormFile file)
+        IFormFile file,
+        List<long>? sensitivityLabelIds = null)
     {
+        var sensitivityLabelsRequired =
+            await PermissionHelper.SensitivityLabelRequired(_context, organizationId, projectId);
+
+        if (sensitivityLabelsRequired && (sensitivityLabelIds == null || sensitivityLabelIds.Count == 0))
+        {
+            throw new InvalidOperationException("Sensitivity labels are required");
+        }
+        
+        // if the user provides Sensitivity Labels ensure that the user is authorized to upload files
+        if (sensitivityLabelIds?.Count > 0)
+        {
+            var authorizedLabelIds = await PermissionHelper.GetAuthorizedSensitivityLabels(
+                _context, currentUserId, organizationId, projectId,"upload file");
+            
+            var hasAuthorization = sensitivityLabelIds.All(sl => authorizedLabelIds.Contains(sl));
+
+            if (!hasAuthorization)
+            {
+                throw new UnauthorizedAccessException("You do not have upload file permissions for all provided sensitivity labels");
+            }
+        }
+        
         long realDataSourceId;
         if (file == null || file.Length == 0) throw new ArgumentException("File is required and cannot be empty.");
         if (dataSourceId.HasValue)
@@ -141,6 +165,20 @@ public class FileBusiness
         long recordId, IFormFile file)
     {
         var record = await _recordBusiness.GetRecord(currentUserId, organizationId, projectId, recordId, true);
+
+        // if record has sensitivity labels then ensure the user has update file permissions
+        if (record.Labels.Count > 0)
+        {
+            var authorizedSensitivityLabelIds = await PermissionHelper.GetAuthorizedSensitivityLabels(
+                _context, currentUserId, organizationId, projectId, "update file");
+
+            var hasUpdateFilePermissions = record.Labels.All(l => authorizedSensitivityLabelIds.Contains(l.Id));
+
+            if (!hasUpdateFilePermissions)
+                throw new UnauthorizedAccessException(
+                    $"You do not have update file permissions for all sensitivity labels on record {recordId}");
+        }
+
         if (file == null || file.Length == 0) throw new ArgumentException("File is required and cannot be empty.");
 
         if (record.ObjectStorageId == null) throw new KeyNotFoundException("Record needs an object storage id");
@@ -181,6 +219,20 @@ public class FileBusiness
     public async Task<FileStreamResult> DownloadFile(long currentUserId, long organizationId, long projectId, long recordId)
     {
         var record = await _recordBusiness.GetRecord(currentUserId, organizationId, projectId, recordId, true);
+
+        // If record has sensitivity labels then ensure the user has download file permissions
+        if (record.Labels.Count > 0)
+        {
+            var authorizedSensitivityLabelIds = await PermissionHelper.GetAuthorizedSensitivityLabels(
+                _context, currentUserId, organizationId, projectId, "download file");
+
+            var hasDownloadFilePermissions = record.Labels.All(l => authorizedSensitivityLabelIds.Contains(l.Id));
+
+            if (!hasDownloadFilePermissions)
+                throw new UnauthorizedAccessException(
+                    $"You do not have download file permissions for all sensitivity labels on record {recordId}");
+        }
+
         if (record.ObjectStorageId == null) throw new KeyNotFoundException("Record needs an object storage id");
         
         var objectStorage = await GetObjectStorageWithConfig(organizationId, projectId, record.ObjectStorageId.Value);
@@ -202,6 +254,20 @@ public class FileBusiness
     public async Task<bool> DeleteFile(long currentUserId, long organizationId, long projectId, long recordId)
     {
         var record = await _recordBusiness.GetRecord(currentUserId, organizationId, projectId, recordId, true);
+
+        // If record has sensitivity labels then ensure the user has delete file permissions
+        if (record.Labels.Count > 0)
+        {
+            var authorizedSensitivityLabelIds = await PermissionHelper.GetAuthorizedSensitivityLabels(
+                _context, currentUserId, organizationId, projectId, "delete file");
+
+            var hasDeleteFilePermissions = record.Labels.All(l => authorizedSensitivityLabelIds.Contains(l.Id));
+
+            if (!hasDeleteFilePermissions)
+                throw new UnauthorizedAccessException(
+                    $"You do not have delete file permissions for all sensitivity labels on record {recordId}");
+        }
+
         if (record == null) throw new KeyNotFoundException("Record not found");
         if (record.ObjectStorageId == null) throw new KeyNotFoundException("Record needs an object storage id");
         
@@ -226,14 +292,38 @@ public class FileBusiness
     /// <param name="dataSourceId">ID of the data source to which the file belongs</param>
     /// <param name="objectStorageId">ID of the object storage method to use</param>
     /// <param name="request">File upload initialization request</param>
+    /// <param name="sensitivityLabelIds">The IDs of the Sensitivity Labels that will be attached to the record</param>
     public async Task<FileUploadSessionResponseDto> StartUpload(
         long currentUserId,
         long organizationId,
         long projectId,
         long? dataSourceId,
         long? objectStorageId,
-        FileUploadInitRequestDto request)
+        FileUploadInitRequestDto request,
+        List<long>? sensitivityLabelIds = null)
     {
+        var sensitivityLabelsRequired =
+            await PermissionHelper.SensitivityLabelRequired(_context, organizationId, projectId);
+
+        if (sensitivityLabelsRequired && (sensitivityLabelIds == null || sensitivityLabelIds.Count == 0))
+        {
+            throw new InvalidOperationException("Sensitivity labels are required");
+        }
+        
+        // if the user provides Sensitivity Labels ensure that the user is authorized to upload files
+        if (sensitivityLabelIds?.Count > 0)
+        {
+            var authorizedLabelIds = await PermissionHelper.GetAuthorizedSensitivityLabels(
+                _context, currentUserId, organizationId, projectId,"upload file");
+            
+            var hasAuthorization = sensitivityLabelIds.All(sl => authorizedLabelIds.Contains(sl));
+
+            if (!hasAuthorization)
+            {
+                throw new UnauthorizedAccessException("You do not have upload file permissions for all provided sensitivity labels");
+            }
+        }
+        
         long realDataSourceId;
         if (dataSourceId.HasValue)
         {
@@ -305,6 +395,7 @@ public class FileBusiness
     /// <param name="chunk">File chunk from form</param>
     /// <param name="uploadId">The upload session ID from StartUpload</param>
     /// <param name="chunkNumber">The index for tracking the order to merge chunks together</param>
+    /// <param name="sensitivityLabelIds">The IDs of the Sensitivity Labels that will be attached to the record</param>
     public async Task<string> UploadChunk(
         long currentUserId,
         long organizationId,
@@ -313,8 +404,31 @@ public class FileBusiness
         long? objectStorageId,
         IFormFile chunk,
         string uploadId,
-        int chunkNumber)
+        int chunkNumber,
+        List<long>? sensitivityLabelIds = null)
     {
+        var sensitivityLabelsRequired =
+            await PermissionHelper.SensitivityLabelRequired(_context, organizationId, projectId);
+
+        if (sensitivityLabelsRequired && (sensitivityLabelIds == null || sensitivityLabelIds.Count == 0))
+        {
+            throw new InvalidOperationException("Sensitivity labels are required");
+        }
+        
+        // if the user provides Sensitivity Labels ensure that the user is authorized to upload files
+        if (sensitivityLabelIds?.Count > 0)
+        {
+            var authorizedLabelIds = await PermissionHelper.GetAuthorizedSensitivityLabels(
+                _context, currentUserId, organizationId, projectId,"upload file");
+            
+            var hasAuthorization = sensitivityLabelIds.All(sl => authorizedLabelIds.Contains(sl));
+
+            if (!hasAuthorization)
+            {
+                throw new UnauthorizedAccessException("You do not have upload file permissions for all provided sensitivity labels");
+            }
+        }
+        
         // Resolve data source
         long realDataSourceId;
         if (dataSourceId.HasValue)
@@ -396,14 +510,38 @@ public class FileBusiness
     /// <param name="dataSourceId">ID of the data source to which the file belongs</param>
     /// <param name="objectStorageId">ID of the object storage method to use</param>
     /// <param name="request">File upload completion request</param>
+    /// <param name="sensitivityLabelIds">The IDs of the Sensitivity Labels that will be attached to the record</param>
     public async Task<RecordResponseDto> CompleteUpload(
         long currentUserId,
         long organizationId,
         long projectId,
         long? dataSourceId,
         long? objectStorageId,
-        FileUploadCompleteRequestDto request)
+        FileUploadCompleteRequestDto request,
+        List<long>? sensitivityLabelIds = null)
     {
+        var sensitivityLabelsRequired =
+            await PermissionHelper.SensitivityLabelRequired(_context, organizationId, projectId);
+
+        if (sensitivityLabelsRequired && (sensitivityLabelIds == null || sensitivityLabelIds.Count == 0))
+        {
+            throw new InvalidOperationException("Sensitivity labels are required");
+        }
+        
+        // if the user provides Sensitivity Labels ensure that the user is authorized to upload files
+        if (sensitivityLabelIds?.Count > 0)
+        {
+            var authorizedLabelIds = await PermissionHelper.GetAuthorizedSensitivityLabels(
+                _context, currentUserId, organizationId, projectId,"upload file");
+            
+            var hasAuthorization = sensitivityLabelIds.All(sl => authorizedLabelIds.Contains(sl));
+
+            if (!hasAuthorization)
+            {
+                throw new UnauthorizedAccessException("You do not have upload file permissions for all provided sensitivity labels");
+            }
+        }
+        
         // Resolve data source
         long realDataSourceId;
         if (dataSourceId.HasValue)

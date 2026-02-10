@@ -10,18 +10,18 @@ public class PermissionHelper
     /// Get authorized sensitivity labels for a single project
     /// </summary>
     public static async Task<List<long>> GetAuthorizedSensitivityLabels(
-        DeeplynxContext _context, 
-        long currentUserId, 
+        DeeplynxContext _context,
+        long currentUserId,
         long organizationId,
-        long projectId, 
+        long projectId,
         string userAction)
     {
         // Delegate to the multi-project version
         return await GetAuthorizedSensitivityLabels(
-            _context, 
-            currentUserId, 
-            organizationId, 
-            new[] { projectId }, 
+            _context,
+            currentUserId,
+            organizationId,
+            new[] { projectId },
             userAction);
     }
 
@@ -29,14 +29,23 @@ public class PermissionHelper
     /// Get authorized sensitivity labels across multiple projects
     /// </summary>
     public static async Task<List<long>> GetAuthorizedSensitivityLabels(
-        DeeplynxContext _context, 
-        long currentUserId, 
+        DeeplynxContext _context,
+        long currentUserId,
         long organizationId,
-        long[] projectIds, 
+        long[] projectIds,
         string userAction)
     {
-        if (userAction != "read record" && userAction != "write record" && userAction != "update record" && userAction != "delete record")
-            throw new ArgumentException("userAction must be read, write or update record");
+        var validActions = new List<string>
+        {
+            "write record", "upload file",
+            "read record", "download file",
+            "update record", "update file",
+            "delete record", "delete file"
+        };
+
+        // if user action does not contain read, write, update, delete, upload, download, + file
+        if (!validActions.Contains(userAction))
+            throw new ArgumentException("User action must be read, write, update, delete, upload, or download");
 
         if (projectIds == null || projectIds.Length == 0)
             return new List<long>();
@@ -85,19 +94,19 @@ public class PermissionHelper
             .Where(o => o.Id == organizationId)
             .Select(o => o.RequireSensitivityLabel)
             .FirstOrDefault();
-        
+
         if (orgLevel) return true;
-        
+
         // if no project ID is provided and orgLevel is false, return false
         if (projectId == null && !orgLevel) return false;
-        
+
         // if project ID is provided and org level is false
         // check the project's "require_sensitivity_level" column value
         var projectLevel = _context.Projects
-            .Where(p => p.Id == organizationId)
+            .Where(p => p.Id == projectId)
             .Select(p => p.RequireSensitivityLabel)
             .FirstOrDefault();
-        
+
         // return result
         return projectLevel;
     }
