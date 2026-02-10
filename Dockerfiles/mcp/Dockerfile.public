@@ -18,7 +18,7 @@ COPY --from=build /app/publish .
 
 # Explicitly set user
 RUN groupadd -r nexus && useradd -r -g nexus -m -s /usr/sbin/nologin nexus
-RUN chown -R nexus:nexus /usr/src/app
+RUN chown -R nexus:nexus /app
 USER nexus
 
 EXPOSE 43656
