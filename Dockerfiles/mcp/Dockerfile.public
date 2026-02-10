@@ -2,6 +2,9 @@
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 
+# Explicitly set user
+USER nexus
+
 # Copy the solution file and restore dependencies
 COPY deeplynx.mcp/*.csproj ./deeplynx.mcp/
 RUN dotnet restore ./deeplynx.mcp/deeplynx.mcp.csproj

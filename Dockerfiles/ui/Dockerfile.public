@@ -39,10 +39,13 @@ ENV NEXT_PUBLIC_DISABLE_FRONTEND_AUTHENTICATION=${NEXT_PUBLIC_DISABLE_FRONTEND_A
 # Set working directory
 WORKDIR /usr/src/app
 
+# Explicitly set user
+USER nexus
+
 # Install versioned os packages
 RUN apk update && apk upgrade --no-cache && \
     apk add --no-cache \
-        busybox=1.37.0-r20
+    busybox=1.37.0-r20
 
 # Install latest global npm version and packages
 RUN npm install -g npm@latest
@@ -68,7 +71,7 @@ WORKDIR /usr/src/app
 # Install versioned os packages
 RUN apk update && apk upgrade --no-cache && \
     apk add --no-cache \
-        busybox=1.37.0-r20
+    busybox=1.37.0-r20
 
 # Install latest global npm version and packages
 RUN npm install -g npm@latest
