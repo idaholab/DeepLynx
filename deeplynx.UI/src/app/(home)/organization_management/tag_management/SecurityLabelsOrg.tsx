@@ -26,7 +26,7 @@ interface Props {
   onArchiveClick: (label: SensitivityLabelsDto) => void;
 }
 
-const LabelsComingSoonCard: React.FC<Props> = ({
+const SecurityLabelsOrg: React.FC<Props> = ({
   labelsLocked,
   labelsLoading,
   labelsError,
@@ -106,8 +106,8 @@ const LabelsComingSoonCard: React.FC<Props> = ({
                 !orgId
                   ? "No organization selected"
                   : labelsLocked
-                  ? "Labels are locked at the org level"
-                  : "Create new label"
+                    ? "Labels are locked at the org level"
+                    : "Create new label"
               }
             >
               + New Label
@@ -202,4 +202,4 @@ const LabelsComingSoonCard: React.FC<Props> = ({
   );
 };
 
-export default LabelsComingSoonCard;
+export default SecurityLabelsOrg;

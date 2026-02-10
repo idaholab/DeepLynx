@@ -28,7 +28,7 @@ import type {
 
 import ConfirmArchiveTagModal from "./ConfirmArchiveTagModal";
 import TagOverviewStrip from "./TagOverviewStrip";
-import LabelsComingSoonCard from "./LabelsComingSoonCard";
+import SecurityLabelsOrg from "./SecurityLabelsOrg";
 import OrgTagsPanel from "./OrgTagsPanel";
 import TagEditModal from "./TagEditModal";
 import LabelEditModal from "./LabelEditModal";
@@ -318,10 +318,14 @@ const TagManagementClient: React.FC<Props> = ({ projects }) => {
       setSavingLabel(true);
 
       if (editingLabel) {
-        const updated = await updateSensitivityLabelOrg(orgId, editingLabel.id, {
-          name: labelNameInput.trim(),
-          description: labelDescriptionInput.trim() || null,
-        });
+        const updated = await updateSensitivityLabelOrg(
+          orgId,
+          editingLabel.id,
+          {
+            name: labelNameInput.trim(),
+            description: labelDescriptionInput.trim() || null,
+          },
+        );
 
         setLabels((prev) =>
           prev.map((l) => (l.id === updated.id ? updated : l)),
@@ -425,7 +429,7 @@ const TagManagementClient: React.FC<Props> = ({ projects }) => {
       {/* Two-Column Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Labels column – Coming soon */}
-        <LabelsComingSoonCard
+        <SecurityLabelsOrg
           labels={labels}
           labelsLocked={labelsLocked}
           labelsLoading={labelsLoading}
