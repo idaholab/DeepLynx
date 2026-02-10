@@ -5,9 +5,9 @@ metadata:
   name: deeplynxv3-dev
   labels:
     name: deeplynxv3-dev
-
+    
 ---
-# Secret for Azure Storage Account with SAS Token
+# Secret containing Azure Storage Account credentials with SAS token
 apiVersion: v1
 kind: Secret
 metadata:
@@ -16,7 +16,6 @@ metadata:
 type: Opaque
 stringData:
   azurestorageaccountname: ${AZURE_STORAGE_ACCOUNT_NAME}
-  azurestorageconnectionstring: ${AZURE_OBJECT_CONNECTION_STRING}
   azurestorageaccountsastoken: ${AZURE_STORAGE_ACCOUNT_SAS_TOKEN}
 
 ---
@@ -28,9 +27,7 @@ metadata:
 provisioner: file.csi.azure.com
 parameters:
   skuName: Premium_LRS
-  storageAccount: ${AZURE_STORAGE_ACCOUNT_NAME}
   shareName: duckdb-data
-  server: ${AZURE_STORAGE_ACCOUNT_NAME}.file.core.usgovcloudapi.net
   secretName: azure-storage-secret
   secretNamespace: deeplynxv3-dev
 reclaimPolicy: Retain
@@ -43,7 +40,7 @@ mountOptions:
   - mfsymlinks
   - cache=strict
   - actimeo=30
-  - nobrl # disable sending byte range lock requests to the server and for applications which have challenges with posix locks
+  - nobrl
 volumeBindingMode: Immediate
 
 ---
@@ -55,10 +52,10 @@ metadata:
   namespace: deeplynxv3-dev
 spec:
   accessModes:
-    - ReadWriteMany # Allows multiple pods to access the same volume
+    - ReadWriteMany
   resources:
     requests:
-      storage: 60Gi # Adjust size based on your timeseries data needs
+      storage: 60Gi
   storageClassName: azurefile-duckdb
   
 ---
