@@ -14,6 +14,8 @@ ENV HOSTED_LINK=${HOSTED_LINK}
 WORKDIR /usr/src/app
 
 # Explicitly set user
+RUN addgroup -S nexus && adduser -S nexus -G nexus
+RUN chown -R nexus:nexus /usr/src/app
 USER nexus
 
 # Install versioned os packages
