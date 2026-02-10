@@ -259,10 +259,7 @@ const LayoutShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                   ))}
                   <div className="divider my-1"></div>
                   <li>
-                    <Link
-                      href="/select-org"
-                      className="hover:bg-base-200"
-                    >
+                    <Link href="/select-org" className="hover:bg-base-200">
                       <UserGroupIcon className="size-5" />
                       {t.translations.VIEW_ALL_ORGANIZATIONS}
                     </Link>
@@ -300,8 +297,10 @@ const LayoutShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
               </li>
               <li className="mt-5">
                 <Link
-                  href="/data_catalog"
-                  onClick={(e) => handleItemClick("/data_catalog", e)}
+                  href="/data_catalog/all_records"
+                  onClick={(e) =>
+                    handleItemClick("/data_catalog/all_records", e)
+                  }
                 >
                   <BookOpenIcon className="size-10" />
                 </Link>
