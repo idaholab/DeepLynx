@@ -61,39 +61,7 @@ spec:
     requests:
       storage: 60Gi # Adjust size based on your timeseries data needs
   storageClassName: azurefile-duckdb
-
----
-# Storage Class for Azure Blob (same account)
-apiVersion: storage.k8s.io/v1
-kind: StorageClass
-metadata:
-  name: azureblob-nexus
-provisioner: blob.csi.azure.com
-parameters:
-  skuName: Premium_LRS
-  storageAccount: ${AZURE_STORAGE_ACCOUNT_NAME}
-  storageEndpointSuffix: core.usgovcloudapi.net
-  secretName: azure-storage-secret
-  secretNamespace: deeplynxv3-dev
-  containerName: ${AZURE_CONTAINER_NAME}
-reclaimPolicy: Retain
-allowVolumeExpansion: true
-volumeBindingMode: Immediate
----
-# Persistent Volume Claim for Blob storage
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: deeplynx-blob-pvc
-  namespace: deeplynxv3-dev
-spec:
-  accessModes:
-    - ReadWriteMany
-  resources:
-    requests:
-      storage: 100Gi
-  storageClassName: azureblob-nexus
-
+  
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -236,15 +204,10 @@ spec:
           volumeMounts:
             - name: duckdb-storage
               mountPath: /data/duckdb
-            - name: blob-storage
-              mountPath: /data/blob
       volumes:
         - name: duckdb-storage
           persistentVolumeClaim:
             claimName: deeplynx-duckdb-pvc
-        - name: blob-storage
-          persistentVolumeClaim:
-            claimName: deeplynx-blob-pvc
 
 ---
 apiVersion: apps/v1
@@ -380,15 +343,10 @@ spec:
           volumeMounts:
             - name: duckdb-storage
               mountPath: /data/duckdb
-            - name: blob-storage
-              mountPath: /data/blob
       volumes:
         - name: duckdb-storage
           persistentVolumeClaim:
             claimName: deeplynx-duckdb-pvc
-        - name: blob-storage
-          persistentVolumeClaim:
-            claimName: deeplynx-blob-pvc
 
 ---
 #docs
