@@ -12,8 +12,8 @@ using deeplynx.datalayer.Models;
 namespace deeplynx.datalayer.Migrations
 {
     [DbContext(typeof(DeeplynxContext))]
-    [Migration("20260209230445_RemoveProjectDefaultCreationd")]
-    partial class RemoveProjectDefaultCreationd
+    [Migration("20260209230445_RemoveProjectDefaultCreation")]
+    partial class RemoveProjectDefaultCreation
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
