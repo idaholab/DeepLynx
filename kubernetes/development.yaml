@@ -5,9 +5,9 @@ metadata:
   name: deeplynxv3-dev
   labels:
     name: deeplynxv3-dev
-    
+
 ---
-# Secret containing Azure Storage Account credentials with SAS token
+# Secret for Azure Storage Account with SAS Token
 apiVersion: v1
 kind: Secret
 metadata:
@@ -27,7 +27,10 @@ metadata:
 provisioner: file.csi.azure.com
 parameters:
   skuName: Premium_LRS
+  resourceGroup: gva-deeplynxnexus-rg
+  storageAccount: ${AZURE_STORAGE_ACCOUNT_NAME}
   shareName: duckdb-data
+  server: ${AZURE_STORAGE_ACCOUNT_NAME}.file.core.usgovcloudapi.net
   secretName: azure-storage-secret
   secretNamespace: deeplynxv3-dev
 reclaimPolicy: Retain
@@ -40,7 +43,7 @@ mountOptions:
   - mfsymlinks
   - cache=strict
   - actimeo=30
-  - nobrl
+  - nobrl # disable sending byte range lock requests to the server and for applications which have challenges with posix locks
 volumeBindingMode: Immediate
 
 ---
@@ -48,14 +51,14 @@ volumeBindingMode: Immediate
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: deeplynx-duckdb-pvc
+  name: deeplynx-nexus-duckdb
   namespace: deeplynxv3-dev
 spec:
   accessModes:
-    - ReadWriteMany
+    - ReadWriteMany # Allows multiple pods to access the same volume
   resources:
     requests:
-      storage: 60Gi
+      storage: 60Gi # Adjust size based on your timeseries data needs
   storageClassName: azurefile-duckdb
   
 ---
@@ -203,7 +206,7 @@ spec:
       volumes:
         - name: duckdb-storage
           persistentVolumeClaim:
-            claimName: deeplynx-duckdb-pvc
+            claimName: deeplynx-nexus-duckdb
 
 ---
 apiVersion: apps/v1
@@ -342,7 +345,7 @@ spec:
       volumes:
         - name: duckdb-storage
           persistentVolumeClaim:
-            claimName: deeplynx-duckdb-pvc
+            claimName: deeplynx-nexus-duckdb
 
 ---
 #docs
