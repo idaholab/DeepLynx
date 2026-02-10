@@ -80,18 +80,18 @@ COPY deeplynx.api/moon.css ./moon.css
 # Update package list and upgrade specified packages during build time
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
-        libc6=2.39-0ubuntu8.6 \
-        libssl3=3.0.13-0ubuntu3.6 \
-        openssl=3.0.13-0ubuntu3.6 \
-        libpam0g=1.5.3-5ubuntu5.5 \
-        libpam-runtime=1.5.3-5ubuntu5.5 \
-        libpam-modules-bin=1.5.3-5ubuntu5.5 \
-        libpam-modules=1.5.3-5ubuntu5.5 \
-        libc-bin=2.39-0ubuntu8.6 \
-        dpkg=1.22.6ubuntu6.5 \
+    libc6=2.39-0ubuntu8.7 \
+    libssl3=3.0.13-0ubuntu3.7 \
+    openssl=3.0.13-0ubuntu3.7 \
+    libpam0g=1.5.3-5ubuntu5.5 \
+    libpam-runtime=1.5.3-5ubuntu5.5 \
+    libpam-modules-bin=1.5.3-5ubuntu5.5 \
+    libpam-modules=1.5.3-5ubuntu5.5 \
+    libc-bin=2.39-0ubuntu8.7 \
+    dpkg=1.22.6ubuntu6.5 \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
-    
+
 # Run time vars
 ENV HOSTED_LINK=${HOSTED_LINK}
 

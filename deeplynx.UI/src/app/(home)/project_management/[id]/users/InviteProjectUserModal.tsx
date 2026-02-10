@@ -40,7 +40,7 @@ const InviteProjectUserModal: React.FC<InviteProjectUserModalProps> = ({
 
   return (
     <div className="modal modal-open">
-      <div className="modal-box max-w-xl">
+      <div className="modal-box max-w-xl overflow-visible">
         {/* Header */}
         <div className="flex justify-between items-center mb-6">
           <h3 className="font-bold text-2xl">
@@ -93,18 +93,42 @@ const InviteProjectUserModal: React.FC<InviteProjectUserModalProps> = ({
                     <span className="text-error mr-2">*</span>
                   </span>
                 </label>
-                <select
-                  className="select select-bordered select-lg"
-                  value={selectedRoleId}
-                  onChange={(e) => onChangeRole(e.target.value)}
-                >
-                  <option value="">{t.translations.SELECT_A_ROLE_}</option>
-                  {roles.map((role) => (
-                    <option key={role.id} value={role.id}>
-                      {role.name}
-                    </option>
-                  ))}
-                </select>
+                <div className="dropdown dropdown-bottom w-full">
+                  <div
+                    tabIndex={0}
+                    role="button"
+                    className={`select select-bordered select-lg w-full flex items-center justify-between ${modalLoading ? "select-disabled" : ""}`}
+                  >
+                    <span
+                      className={selectedRoleId ? "" : "text-base-content/50"}
+                    >
+                      {selectedRoleId
+                        ? roles.find((r) => r.id === Number(selectedRoleId))
+                            ?.name || t.translations.SELECT_A_ROLE_
+                        : t.translations.SELECT_A_ROLE_}
+                    </span>
+                  </div>
+                  <ul
+                    tabIndex={0}
+                    className="dropdown-content menu bg-base-100 rounded-box z-[100] w-full p-2 shadow-lg border border-base-300 max-h-60 overflow-y-auto mt-1"
+                  >
+                    {roles.map((role) => (
+                      <li
+                        key={role.id}
+                        onClick={() => onChangeRole(role.id.toString())}
+                      >
+                        <a>
+                          <span>{role.name}</span>
+                          {!role.projectId && (
+                            <span className="badge badge-primary badge-sm">
+                              Org
+                            </span>
+                          )}
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               </div>
 
               {/* Info Alert */}
