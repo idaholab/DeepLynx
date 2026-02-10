@@ -5,6 +5,7 @@ set -e
 SERVICE_NAME="nx-postgres"
 DOCKER_IMAGE_TAG="deeplynx-db"
 BACKUP_FILE="storage/deeplynx_backup_$(date +%Y%m%d_%H%M%S).sql"
+NEW_VOLUME_NAME="nx_postgres_data_pg18"
 
 echo "=== DeepLynx Nexus PostgreSQL Migration Script ==="
 echo ""
@@ -25,7 +26,7 @@ fi
 echo "Found container: ${CONTAINER_NAME}"
 
 # Get the volume name
-VOLUME_NAME=$(docker inspect ${CONTAINER_NAME} --format '{{range .Mounts}}{{if eq .Destination "/var/lib/postgresql/data"}}{{.Name}}{{end}}{{end}}' 2>/dev/null)
+VOLUME_NAME=$(docker inspect ${CONTAINER_NAME} --format '{{range .Mounts}}{{if or (eq .Destination "/var/lib/postgresql/data") (eq .Destination "/var/lib/postgresql")}}{{.Name}}{{end}}{{end}}' 2>/dev/null)
 
 if [ -z "${VOLUME_NAME}" ]; then
     echo "Error: Could not find volume for container ${CONTAINER_NAME}"
@@ -103,7 +104,8 @@ echo ""
 
 # Step 4: Create new volume (PG18 uses /var/lib/postgresql instead of /var/lib/postgresql/data)
 echo "Step 4: Creating new database volume..."
-NEW_VOLUME_NAME="${VOLUME_NAME}_pg18"
+# remove the volume if exists before creating anew
+docker volume rm ${NEW_VOLUME_NAME} 2>/dev/null || true
 docker volume create ${NEW_VOLUME_NAME}
 echo "✓ New volume created: ${NEW_VOLUME_NAME}"
 echo ""
@@ -117,13 +119,14 @@ echo "✓ New docker image created: ${DOCKER_IMAGE_TAG}"
 echo ""
 
 # Step 6: Start new Postgres 18 container (note: mount at /var/lib/postgresql, not /var/lib/postgresql/data)
-echo "Step 6: Starting new PostgreSQL 18 container..."
+echo "Step 6: Starting PostgreSQL 18 container for databaase restoration..."
 docker run -d \
     --name ${CONTAINER_NAME} \
     --network ${NETWORK_NAME} \
     -e POSTGRES_USER=postgres \
     -e POSTGRES_PASSWORD=nexuscore \
     -e POSTGRES_DB=deeplynx \
+    -p 5432:5432 \
     -v ${NEW_VOLUME_NAME}:/var/lib/postgresql \
     ${DOCKER_IMAGE_TAG}
 echo "✓ New container started"
@@ -157,6 +160,16 @@ if ! cat ${BACKUP_FILE} | docker exec -i ${CONTAINER_NAME} psql -U postgres > /d
     exit 1
 fi
 echo "✓ Database restored successfully"
+echo ""
+
+# Step 10: Stop and remove the container we used for data restoration
+# The docker compose will create a new container using the new image
+# The data volume (nx_postgres_data_pg18) is what needs to be preserved
+# Which it should be as specified in docker-compose.yml
+echo "Step 10: Stopping and removing database migration container..."
+docker stop ${CONTAINER_NAME}
+docker rm ${CONTAINER_NAME}
+echo "✓ Old container removed"
 echo ""
 
 echo "=========================================="

@@ -101,7 +101,7 @@ services:
     networks:
       - nexus-network
     volumes:
-      - nx_postgres_data:/var/lib/postgresql/data
+      - nx_postgres_data_pg18:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres && psql -U postgres -d deeplynx -c 'SELECT 1;'"]
       interval: 10s
@@ -151,5 +151,5 @@ networks:
 volumes:
   object_storage:
     driver: local
-  nx_postgres_data:
-    driver: local
+  nx_postgres_data_pg18:
+    external: true
