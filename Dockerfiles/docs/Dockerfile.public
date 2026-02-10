@@ -47,16 +47,16 @@ RUN apk update && apk upgrade --no-cache && \
 # Install latest global npm version and packages
 RUN npm install -g npm@latest
 
-# Explicitly set user
-RUN addgroup -S nexus && adduser -S nexus -G nexus
-RUN chown -R nexus:nexus /usr/src/app
-USER nexus
-
 # Copy the built frontend code from the previous stage
 COPY --from=frontend-build /usr/src/app .
 
 # Install production dependencies
 RUN npm install --omit=dev
+
+# Explicitly set user
+RUN addgroup -S nexus && adduser -S nexus -G nexus
+RUN chown -R nexus:nexus /usr/src/app
+USER nexus
 
 # Expose the port the app runs on
 EXPOSE 3001

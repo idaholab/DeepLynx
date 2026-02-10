@@ -73,11 +73,6 @@ RUN apk update && apk upgrade --no-cache && \
 # Install latest global npm version and packages
 RUN npm install -g npm@latest
 
-# Explicitly set user
-RUN addgroup -S nexus && adduser -S nexus -G nexus
-RUN chown -R nexus:nexus /usr/src/app
-USER nexus
-
 # Copy package files first
 COPY --from=frontend-build /usr/src/app/package*.json ./
 
@@ -88,6 +83,11 @@ RUN npm install --omit-dev
 COPY --from=frontend-build /usr/src/app/.next ./.next
 COPY --from=frontend-build /usr/src/app/public ./public
 # COPY --from=frontend-build /usr/src/app/next.config.js ./next.config.js
+
+# Explicitly set user
+RUN addgroup -S nexus && adduser -S nexus -G nexus
+RUN chown -R nexus:nexus /usr/src/app
+USER nexus
 
 # Expose the port the app runs on
 EXPOSE 3000
