@@ -13,7 +13,7 @@ interface Props {
   tagCount: number;
   projectsWithTags: number;
   tagsLocked: boolean;
-  labelsLocked: boolean; // currently informational only
+  labelsLocked: boolean;
 }
 
 const TagOverviewStrip: React.FC<Props> = ({
@@ -22,35 +22,44 @@ const TagOverviewStrip: React.FC<Props> = ({
   tagCount,
   projectsWithTags,
   tagsLocked,
+  labelsLocked,
 }) => {
   return (
     <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-6">
-      {/* Security Labels – Coming Soon */}
-      <div className="stat bg-base-100 border border-dashed border-base-300 rounded-xl opacity-60">
+      {/* Security Labels */}
+      <div className="stat bg-base-100 border border-base-300 rounded-xl">
         <div className="stat-title flex items-center gap-1 text-xs">
-          <ShieldCheckIcon className="w-4 h-4 text-base-content/50" />
+          <ShieldCheckIcon className="w-4 h-4 text-secondary" />
           Org Security Labels
         </div>
-        <div className="stat-value text-base-content/60 text-xl">
-          {labelCount}
-        </div>
-        <div className="stat-desc text-xs flex items-center gap-1 text-base-content/60">
-          <InformationCircleIcon className="w-4 h-4" />
-          <span>Security labels coming soon</span>
+        <div className="stat-value text-secondary text-xl">{labelCount}</div>
+        <div className="stat-desc text-xs flex items-center gap-1">
+          {labelsLocked ? (
+            <>
+              <LockClosedIcon className="w-4 h-4 text-error" />
+              <span>Locked for all projects</span>
+            </>
+          ) : (
+            <>
+              <LockOpenIcon className="w-4 h-4 text-success" />
+              <span>Projects may define their own</span>
+            </>
+          )}
         </div>
       </div>
 
-      {/* Projects with Labels – Coming Soon */}
-      <div className="stat bg-base-100 border border-dashed border-base-300 rounded-xl opacity-60">
+      {/* Projects with Labels */}
+      <div className="stat bg-base-100 border border-base-300 rounded-xl">
         <div className="stat-title flex items-center gap-1 text-xs">
-          <ShieldCheckIcon className="w-4 h-4 text-base-content/50" />
+          <ShieldCheckIcon className="w-4 h-4 text-secondary" />
           Projects with Labels
         </div>
-        <div className="stat-value text-base-content/60 text-xl">
+        <div className="stat-value text-secondary text-xl">
           {projectsWithLabels}
         </div>
-        <div className="stat-desc text-xs text-base-content/60">
-          Will reflect usage once labels are enabled
+        <div className="stat-desc text-xs text-base-content/70 flex items-center gap-1">
+          <InformationCircleIcon className="w-4 h-4" />
+          <span>Project usage tracking coming soon</span>
         </div>
       </div>
 

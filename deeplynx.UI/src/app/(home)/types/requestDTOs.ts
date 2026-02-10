@@ -252,6 +252,11 @@ export type CreateSensitivityLabelDto = {
   description?: string | null;
 }
 
+export type UpdateSensitivityLabelDto = {
+  name?: string | null;
+  description?: string | null;
+}
+
 export interface InviteUserToOrganizationRequestDto {
   userEmail: string;
   userName?: string;
