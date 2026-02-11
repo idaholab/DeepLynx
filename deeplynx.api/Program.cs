@@ -438,20 +438,24 @@ try
         });
     });
 
+    /* ╔════════════════════════════╗
+       ║      Check DB Version      ║
+       ╚════════════════════════════╝ */
+    await DatabaseVersionChecker.CheckDatabaseVersion(connectionString);
 
-/* ╔════════════════════════════╗
-   ║      Apply Migrations      ║
-   ╚════════════════════════════╝ */
+    /* ╔════════════════════════════╗
+       ║      Apply Migrations      ║
+       ╚════════════════════════════╝ */
     await MigrationRunner.ApplyMigrations(connectionString);
 
-/* ╔════════════════════════════╗
-   ║      App Configurations    ║
-   ╚════════════════════════════╝ */
+    /* ╔════════════════════════════╗
+       ║      App Configurations    ║
+       ╚════════════════════════════╝ */
     var app = builder.Build();
 
-/* ╔════════════════════════════╗
-   ║      App Base Path         ║
-   ╚════════════════════════════╝ */
+    /* ╔════════════════════════════╗
+       ║      App Base Path         ║
+       ╚════════════════════════════╝ */
     PathString basePath = "/api/v1";
     app.UsePathBase(basePath);
 

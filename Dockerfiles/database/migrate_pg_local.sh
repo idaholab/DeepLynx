@@ -92,7 +92,7 @@ echo ""
 echo "Step 3: Building new Docker image with Postgres 18..."
 docker build \
     -t ${DOCKER_IMAGE_TAG} \
-    -f ./Dockerfile.local .
+    -f ./Dockerfiles/database/Dockerfile.local .
 echo "New docker image created: ${DOCKER_IMAGE_TAG}"
 echo ""
 
@@ -119,15 +119,14 @@ echo "Created clean volume: ${NEW_VOLUME_NAME}"
 docker rm -v ${NEW_CONTAINER_NAME} 2>/dev/null || true
 echo ""
 
-# 6. Start new Postgres 18 container with PGDATA set to proper location
+# 6. Start new Postgres 18 container
 echo "Step 6: Starting new Postgres 18 container..."
 docker run -d \
     --name ${NEW_CONTAINER_NAME} \
     -e POSTGRES_PASSWORD=postgres \
     -e POSTGRES_DB=deeplynx \
     -e POSTGRES_USER=postgres \
-    -e PGDATA=/var/lib/postgresql/data/pgdata \
-    -v ${NEW_VOLUME_NAME}:/var/lib/postgresql/data \
+    -v ${NEW_VOLUME_NAME}:/var/lib/postgresql \
     -p 5432:5432 \
     ${DOCKER_IMAGE_TAG}
 echo ""
@@ -145,9 +144,19 @@ for i in {1..30}; do
 done
 echo ""
 
-# Restore the dump
-echo "Step 8: Restoring database..."
-cat ${BACKUP_FILE} | docker exec -i ${NEW_CONTAINER_NAME} psql -U postgres > /dev/null 2>&1
+# Step 8: Install pgvector extension
+echo "Step 8: Installing pgvector extension..."
+docker exec ${NEW_CONTAINER_NAME} psql -U postgres -d deeplynx -c "CREATE EXTENSION IF NOT EXISTS vector;" > /dev/null 2>&1
+echo "✓ pgvector extension installed"
+echo ""
+
+# Step 9: Restore the backup
+echo "Step 9: Restoring database from backup..."
+if ! cat ${BACKUP_FILE} | docker exec -i ${NEW_CONTAINER_NAME} psql -U postgres > /dev/null 2>&1; then
+    echo "Error: Database restore failed"
+    exit 1
+fi
+echo "✓ Database restored successfully"
 echo ""
 
 echo "=== Migration Complete ==="
