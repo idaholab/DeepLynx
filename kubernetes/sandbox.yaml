@@ -1,0 +1,642 @@
+# kubernetes yaml file for development
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: deeplynx-test
+  labels:
+    name: deeplynx-test
+    
+---
+# Secret for Azure Storage Account with SAS Token
+apiVersion: v1
+kind: Secret
+metadata:
+  name: azure-storage-secret
+  namespace: deeplynxv3-dev
+type: Opaque
+stringData:
+  azurestorageaccountname: ${AZURE_STORAGE_ACCOUNT_NAME}
+  azurestorageaccountsastoken: ${AZURE_STORAGE_ACCOUNT_SAS_TOKEN}
+  azurestorageaccountkey: ${AZURE_STORAGE_ACCOUNT_KEY}
+  azurestorageconnectionstring: ${AZURE_OBJECT_CONNECTION_STRING}
+  
+---
+# Persistent Volume pointing to existing Azure File Share
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: nexus-duckdb-pv
+  namespace: deeplynxv3-dev
+spec:
+  capacity:
+    storage: 60Gi
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: azurefile-nexus-duckdb
+  mountOptions:
+    - dir_mode=0777
+    - file_mode=0777
+    - uid=0
+    - gid=0
+    - mfsymlinks
+    - cache=strict
+    - actimeo=30
+    - nobrl
+  csi:
+    driver: file.csi.azure.com
+    readOnly: false
+    volumeHandle: nexus-duckdb-volume-handle  # Unique ID for this volume
+    volumeAttributes:
+      resourceGroup: ${AZURE_ACCOUNT_RESOURCE_GROUP}
+      storageAccount: ${AZURE_STORAGE_ACCOUNT_NAME}
+      shareName: duckdb-data
+      protocol: smb
+      server: ${AZURE_STORAGE_ACCOUNT_NAME}.file.core.usgovcloudapi.net
+    nodeStageSecretRef:
+      name: azure-storage-secret
+      namespace: deeplynxv3-dev
+
+---
+# Storage Class (simplified for static provisioning)
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: azurefile-nexus-duckdb
+  namespace: deeplynxv3-dev
+provisioner: file.csi.azure.com
+parameters:
+  skuName: Premium_LRS
+reclaimPolicy: Retain
+allowVolumeExpansion: true
+volumeBindingMode: Immediate
+
+---
+# Persistent Volume Claim
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: deeplynx-nexus-duckdb
+  namespace: deeplynxv3-dev
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 60Gi
+  storageClassName: azurefile-nexus-duckdb
+  volumeName: nexus-duckdb-pv  # Bind to the specific PV
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: deeplynx-test
+  namespace: deeplynx-test
+spec:
+  selector:
+    matchLabels:
+      app: deeplynx-test
+  template:
+    metadata:
+      labels:
+        app: deeplynx-test
+    spec:
+      containers:
+        - name: deeplynx-test
+          image: ${CI_REGISTRY}/${CI_REGISTRY_PATH}:deeplynx-ui-${GITHUB_RUN_NUMBER}
+          imagePullPolicy: Always
+          env:
+            - name: AWS_S3_CONNECTION_STRING
+              value: ${AWS_S3_CONNECTION_STRING}
+            - name: AZURE_OBJECT_CONNECTION_STRING
+              valueFrom:
+                secretKeyRef:
+                  name: azure-storage-secret
+                  key: azurestorageconnectionstring
+            - name: AZURE_CONTAINER_NAME
+              value: ${AZURE_CONTAINER_NAME}
+            - name: ConnectionStrings__DefaultConnection
+              value: "${DATABASE_CONNECTION_STRING}"
+            - name: FILE_STORAGE_METHOD
+              value: ${FILE_STORAGE_METHOD}
+            - name: STORAGE_DIRECTORY
+              value: ${STORAGE_DIRECTORY}
+            - name: LOGO_STORAGE_DIRECTORY
+              value: /data/blob/images
+            - name: RECOMMENDED_CHUNK_SIZE
+              value: ${RECOMMENDED_CHUNK_SIZE}
+            - name: POSTGRES_DB_HOST
+              value: ${POSTGRES_DB_HOST}
+            - name: POSTGRES_DB_NAME
+              value: ${POSTGRES_DB_NAME}
+            - name: POSTGRES_USER
+              value: ${POSTGRES_USER}
+            - name: POSTGRES_PASSWORD
+              value: ${POSTGRES_PASSWORD}
+            - name: JWT_ISSUER
+              value: ${JWT_ISSUER}
+            - name: JWT_AUDIENCE
+              value: ${JWT_AUDIENCE}
+            # DuckDB Configuration
+            - name: DUCKDB_BASE_PATH
+              value: ${DUCKDB_BASE_PATH}
+            - name: SMTP_SERVER
+              value: ${SMTP_SERVER}
+            - name: SMTP_PORT
+              value: ${SMTP_PORT}
+            - name: SMTP_ENABLE_SSL
+              value: ${SMTP_ENABLE_SSL}
+            - name: FROM_EMAIL
+              value: ${FROM_EMAIL}
+            - name: FROM_NAME
+              value: ${FROM_NAME}
+            - name: INVITE_URL
+              value: ${INVITE_URL}
+            - name: SUPPORT_EMAIL
+              value: ${SUPPORT_EMAIL}
+            - name: DISABLE_BACKEND_AUTHENTICATION
+              value: ${DISABLE_BACKEND_AUTHENTICATION}
+            - name: SUPERUSER_EMAIL
+              value: ${SUPERUSER_EMAIL}
+            - name: TENANT_MODE
+              value: ${TENANT_MODE}
+            # Runtime environment variables from secrets (sensitive)
+            - name: OKTA_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: okta-client-secret
+            - name: JWT_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: jwt-secret-key
+            - name: AUTH_TRUST_HOST
+              value: "true"
+            - name: AUTH_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: auth-secret
+            - name: NEXTAUTH_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: next-auth-secret
+            - name: SERVICE_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: service-token
+            # Runtime environment variables from configmap (non-sensitive)
+            - name: NEXT_PUBLIC_DISABLE_FRONTEND_AUTHENTICATION
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: disabled-front-auth
+            - name: OKTA_CLIENT_ID
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: okta-client-id
+            - name: OKTA_ISSUER
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: okta-issuer
+            - name: NEXTAUTH_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: auth-url
+            - name: REDIRECT_LINK
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: redirect-link
+            - name: BACKEND_BASE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: backend-base-url
+          resources:
+            limits:
+              memory: "4Gi"
+              cpu: "1500m"
+          ports:
+            - containerPort: 3000
+          volumeMounts:
+            - name: duckdb-storage
+              mountPath: /data/duckdb
+      volumes:
+        - name: duckdb-storage
+          persistentVolumeClaim:
+            claimName: deeplynx-nexus-duckdb
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: deeplynxbackend
+  namespace: deeplynx-test
+spec:
+  selector:
+    matchLabels:
+      app: deeplynxbackend
+  template:
+    metadata:
+      labels:
+        app: deeplynxbackend
+    spec:
+      containers:
+        - name: deeplynx-test
+          image: ${CI_REGISTRY}/${CI_REGISTRY_PATH}:deeplynx-server-${GITHUB_RUN_NUMBER}
+          imagePullPolicy: Always
+          env:
+            - name: AWS_S3_CONNECTION_STRING
+              value: ${AWS_S3_CONNECTION_STRING}
+            - name: AZURE_OBJECT_CONNECTION_STRING
+              valueFrom:
+                secretKeyRef:
+                  name: azure-storage-secret
+                  key: azurestorageconnectionstring
+            - name: AZURE_CONTAINER_NAME
+              value: ${AZURE_CONTAINER_NAME}
+            - name: ConnectionStrings__DefaultConnection
+              value: ${DATABASE_CONNECTION_STRING}
+            - name: FILE_STORAGE_METHOD
+              value: ${FILE_STORAGE_METHOD}
+            - name: STORAGE_DIRECTORY
+              value: ${STORAGE_DIRECTORY}
+            - name: RECOMMENDED_CHUNK_SIZE
+              value: ${RECOMMENDED_CHUNK_SIZE}
+            - name: POSTGRES_DB_HOST
+              value: ${POSTGRES_DB_HOST}
+            - name: POSTGRES_DB_NAME
+              value: ${POSTGRES_DB_NAME}
+            - name: POSTGRES_USER
+              value: ${POSTGRES_USER}
+            - name: POSTGRES_PASSWORD
+              value: ${POSTGRES_PASSWORD}
+            - name: JWT_ISSUER
+              value: ${JWT_ISSUER}
+            - name: JWT_SECRET_KEY
+              value: ${JWT_SECRET_KEY}
+            - name: JWT_AUDIENCE
+              value: ${JWT_AUDIENCE}
+            # DuckDB Configuration (same as frontend)
+            - name: DUCKDB_BASE_PATH
+              value: ${DUCKDB_BASE_PATH}
+            - name: SMTP_SERVER
+              value: ${SMTP_SERVER}
+            - name: SMTP_PORT
+              value: ${SMTP_PORT}
+            - name: SMTP_ENABLE_SSL
+              value: ${SMTP_ENABLE_SSL}
+            - name: FROM_EMAIL
+              value: ${FROM_EMAIL}
+            - name: FROM_NAME
+              value: ${FROM_NAME}
+            - name: INVITE_URL
+              value: ${INVITE_URL}
+            - name: SUPPORT_EMAIL
+              value: ${SUPPORT_EMAIL}
+            - name: TENANT_MODE
+              value: ${TENANT_MODE}
+            - name: DISABLE_BACKEND_AUTHENTICATION
+              value: ${DISABLE_BACKEND_AUTHENTICATION}
+            - name: SUPERUSER_EMAIL
+              value: ${SUPERUSER_EMAIL}
+            # Backend may also need these environment variables
+            - name: OKTA_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: okta-client-secret
+            - name: AUTH_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: auth-secret
+            - name: SERVICE_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: service-token
+            - name: NEXT_PUBLIC_DISABLE_FRONTEND_AUTHENTICATION
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: disabled-front-auth
+            - name: OKTA_CLIENT_ID
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: okta-client-id
+            - name: OKTA_ISSUER
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: okta-issuer
+            - name: NEXTAUTH_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: auth-url
+            - name: REDIRECT_LINK
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: redirect-link
+            - name: BACKEND_BASE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: backend-base-url
+            - name: HOSTED_LINK
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: hosted-link
+          resources:
+            limits:
+              memory: "4Gi"
+              cpu: "1500m"
+          ports:
+            - containerPort: 5000
+          volumeMounts:
+            - name: duckdb-storage
+              mountPath: /data/duckdb
+      volumes:
+        - name: duckdb-storage
+          persistentVolumeClaim:
+            claimName: deeplynx-nexus-duckdb
+
+---
+#docs
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: deeplynx-docs
+  namespace: deeplynx-test
+spec:
+  selector:
+    matchLabels:
+      app: deeplynx-docs
+  template:
+    metadata:
+      labels:
+        app: deeplynx-docs
+    spec:
+      containers:
+        - name: deeplynx-test
+          image: ${CI_REGISTRY}/${CI_REGISTRY_PATH}:deeplynx-docs-${GITHUB_RUN_NUMBER}
+          imagePullPolicy: Always
+          env:
+            - name: HOSTED_LINK
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: hosted-link
+          resources:
+            limits:
+              memory: "4Gi"
+              cpu: "1500m"
+          ports:
+            - containerPort: 3001
+
+---
+#mcp
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: deeplynx-mcp
+  namespace: deeplynx-test
+spec:
+  selector:
+    matchLabels:
+      app: deeplynx-mcp
+  template:
+    metadata:
+      labels:
+        app: deeplynx-mcp
+    spec:
+      containers:
+        - name: deeplynx-test
+          image: ${CI_REGISTRY}/${CI_REGISTRY_PATH}:deeplynx-mcp-${GITHUB_RUN_NUMBER}
+          imagePullPolicy: Always
+          env:
+            - name: NEXUS_API_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: backend-base-url
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          ports:
+            - containerPort: 43656
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: deeplynx-service
+  namespace: deeplynx-test
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 80
+      targetPort: 3000
+  selector:
+    app: deeplynx-test
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: deeplynx-backend-service
+  namespace: deeplynx-test
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 80
+      targetPort: 5000
+  selector:
+    app: deeplynxbackend
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: deeplynx-docs-service
+  namespace: deeplynx-test
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 80
+      targetPort: 3001
+  selector:
+    app: deeplynx-docs
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: deeplynx-mcp-service
+  namespace: deeplynx-test
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 80
+      targetPort: 43656
+  selector:
+    app: deeplynx-mcp
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: deeplynx-ingress
+  namespace: deeplynx-test
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      more_clear_headers "strict-transport-security";
+      more_clear_headers "x-content-type-options";
+      more_clear_headers "x-frame-options";
+      more_clear_headers "content-security-policy";
+      more_set_headers "cache-Control: no-cache, no-store";
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+spec:
+  rules:
+    - host: deeplynx-test.dev.inl.gov
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: deeplynx-service
+                port:
+                  number: 80
+          - path: /api/v1
+            pathType: Prefix
+            backend:
+              service:
+                name: deeplynx-backend-service
+                port:
+                  number: 80
+          - path: /api/auth
+            pathType: Prefix
+            backend:
+              service:
+                name: deeplynx-service
+                port:
+                  number: 80
+          - path: /docs
+            pathType: Prefix
+            backend:
+              service:
+                name: deeplynx-docs-service
+                port:
+                  number: 80
+          - path: /mcp
+            pathType: Prefix
+            backend:
+              service:
+                name: deeplynx-mcp-service
+                port:
+                  number: 80
+
+---
+# # Database if needed for deployment
+# Dummy change to force build.
+# apiVersion: apps/v1
+# kind: Deployment
+# metadata:
+#   namespace: deeplynx-dev
+#   labels:
+#     app: deeplynx-db
+#   name: deeplynx-db
+# spec:
+#   replicas: 1
+#   selector:
+#     matchLabels:
+#       app: deeplynx-db
+#   strategy:
+#     type: Recreate
+#   template:
+#     metadata:
+#       labels:
+#         app: deeplynx-db
+#     spec:
+#       containers:
+#         - env:
+#             - name: POSTGRES_PASSWORD
+#               valueFrom:
+#                 secretKeyRef:
+#                   name: deeplynx-secrets
+#                   key: POSTGRES_PASSWORD
+#             - name: POSTGRES_USER
+#               value: ${POSTGRES_USER}
+#             - name: POSTGRES_DB_NAME
+#               value: ${POSTGRES_DB_NAME}
+#           image: ${CI_REGISTRY}/${CI_REGISTRY_PATH}:deeplynx-db-${GITHUB_RUN_NUMBER}
+#           name: deeplynx-db
+#           ports:
+#             - containerPort: 5432
+#           volumeMounts:
+#             - mountPath: "/var/lib/postgresql/data"
+#               subPath: deeplynx
+#               name: deeplynx-db-pvc
+#           resources:
+#             limits:
+#               cpu: "250m"
+#               memory: "1024M"
+#       restartPolicy: Always
+#       volumes:
+#         - name: deeplynx-db-pvc
+#           persistentVolumeClaim:
+#             claimName: deeplynx-db-pvc
+# ---
+# apiVersion: v1
+# kind: Service
+# metadata:
+#   name: deeplynx-db-service
+#   namespace: deeplynx-dev
+# spec:
+#   type: ClusterIP
+#   ports:
+#     - name: "5432"
+#       port: 5432
+#       targetPort: 5432
+#   selector:
+#     app: deeplynx-db
+# ---
+
+# # Storage
+
+# apiVersion: v1
+# kind: PersistentVolumeClaim
+# metadata:
+#   namespace: deeplynx-dev
+#   labels:
+#     app: deeplynx-db
+#   name: deeplynx-db-pvc
+# spec:
+#   accessModes:
+#     - ReadWriteOnce
+#   resources:
+#     requests:
+#       storage: 1Gi
