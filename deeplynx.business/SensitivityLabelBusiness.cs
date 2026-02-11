@@ -412,7 +412,7 @@ public class SensitivityLabelBusiness : ISensitivityLabelBusiness
 
             var permissions = permissionActions.Select(p => new Permission
             {
-                Name = $"{char.ToUpper(p.Item1[0])}{p.Item1.Substring(1)} {dto.Name} {p.Item2}",
+                Name = dto.Name,
                 Description = string.Format(p.Item3, dto.Name),
                 Action = $"{p.Item1} {p.Item2}",
                 LabelId = label.Id,
@@ -470,10 +470,7 @@ public class SensitivityLabelBusiness : ISensitivityLabelBusiness
     /// <param name="labels">The label request data transfer object containing label details.</param>
     /// <returns>The created label response DTO with saved details.</returns>
     public async Task<List<SensitivityLabelResponseDto>> BulkCreateSensitivityLabels(
-        long organizationId,
-        long currentUserId,
-        long? projectId,
-        List<CreateSensitivityLabelRequestDto> labels)
+    long organizationId, long currentUserId, long? projectId, List<CreateSensitivityLabelRequestDto> labels)
     {
         if (labels == null || labels.Count == 0)
         {
@@ -484,43 +481,56 @@ public class SensitivityLabelBusiness : ISensitivityLabelBusiness
 
         try
         {
-            // Bulk insert into sensitivity_labels; if there is a name collision, update the last_updated fields
+            var now = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
+            
+            // Bulk insert into sensitivity_labels; if there is a name collision, update the description and last_updated fields
             var sql = projectId.HasValue
                 ? @"
-        INSERT INTO deeplynx.sensitivity_labels (project_id, organization_id, name, last_updated_at, is_archived, last_updated_by)
-            VALUES {0}
-            ON CONFLICT (organization_id, project_id, name) WHERE project_id IS NOT NULL
-            DO UPDATE SET
-                last_updated_at = @now,
-                last_updated_by = @lastUpdatedBy
-            RETURNING id, project_id, organization_id, name, description, last_updated_at, is_archived, last_updated_by;"
+                INSERT INTO deeplynx.sensitivity_labels (
+                    organization_id, project_id, name, description,
+                    last_updated_at, is_archived, last_updated_by)
+                VALUES {0}
+                ON CONFLICT (organization_id, project_id, name) WHERE project_id IS NOT NULL
+                DO UPDATE SET
+                    description = COALESCE(EXCLUDED.description, sensitivity_labels.description),
+                    last_updated_at = @now,
+                    last_updated_by = @lastUpdatedBy,
+                    is_archived = EXCLUDED.is_archived
+                RETURNING id, project_id, organization_id, name, description,
+                    last_updated_at, last_updated_by, is_archived;"
                 : @"
-        INSERT INTO deeplynx.sensitivity_labels (project_id, organization_id, name, last_updated_at, is_archived, last_updated_by)
-            VALUES {0}
-            ON CONFLICT (organization_id, name) WHERE project_id IS NULL
-            DO UPDATE SET
-                last_updated_at = @now,
-                last_updated_by = @lastUpdatedBy
-        RETURNING id, project_id, organization_id, name, description, last_updated_at, is_archived, last_updated_by;";
+                INSERT INTO deeplynx.sensitivity_labels (
+                    organization_id, project_id, name, description,
+                    last_updated_at, is_archived, last_updated_by)
+                VALUES {0}
+                ON CONFLICT (organization_id, name) WHERE project_id IS NULL
+                DO UPDATE SET
+                    description = COALESCE(EXCLUDED.description, sensitivity_labels.description),
+                    last_updated_at = @now,
+                    last_updated_by = @lastUpdatedBy,
+                    is_archived = EXCLUDED.is_archived
+                RETURNING id, project_id, organization_id, name, description,
+                    last_updated_at, last_updated_by, is_archived;";
 
             // establish "constant" parameters
             var parameters = new List<NpgsqlParameter>
             {
-                new NpgsqlParameter("@projectId", projectId.HasValue ? (object)projectId.Value : DBNull.Value),
-                new NpgsqlParameter("@organizationId", organizationId),
-                new NpgsqlParameter("@now", DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)),
-                new NpgsqlParameter("@lastUpdatedBy", currentUserId)
+                new("@organizationId", organizationId),
+                new("@projectId", projectId.HasValue ? projectId.Value : DBNull.Value),
+                new("@now", now),
+                new("@lastUpdatedBy", currentUserId)
             };
 
             // establish "dynamic" parameters (new for each dto in the list)
             parameters.AddRange(labels.SelectMany((dto, i) => new[]
             {
-                new NpgsqlParameter($"@p{i}_name", dto.Name)
+                new NpgsqlParameter($"@p{i}_name", dto.Name),
+                new NpgsqlParameter($"@p{i}_desc", (object?)dto.Description ?? DBNull.Value)
             }));
 
             // stringify the params and comma separate them
             var valueTuples = string.Join(", ", labels.Select((dto, i) =>
-                $"(@projectId, @organizationId, @p{i}_name, @now, false, @lastUpdatedBy)"));
+                $"(@organizationId, @projectId, @p{i}_name, @p{i}_desc, @now, false, @lastUpdatedBy)"));
 
             // put everything together and execute the query
             sql = string.Format(sql, valueTuples);
@@ -530,43 +540,36 @@ public class SensitivityLabelBusiness : ISensitivityLabelBusiness
                 .SqlQueryRaw<SensitivityLabelResponseDto>(sql, parameters.ToArray())
                 .ToListAsync();
 
-            // Create read and write permissions for each sensitivity label
-            var permissions = new List<Permission>();
-
             foreach (var label in result)
             {
-                // Create read permission
-                var readPermission = new Permission
+                var permissionActions = new[]
                 {
-                    Name = "Read " + label.Name,
-                    Description = "Permission to read " + label.Name + " labeled records",
-                    Action = "read",
-                    LabelId = label.Id,
-                    IsDefault = false,
-                    ProjectId = projectId.HasValue ? projectId : null,
-                    OrganizationId = organizationId,
-                    LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
-                    LastUpdatedBy = currentUserId,
+                    ("read", "record", "Permission to read {0} labeled records"),
+                    ("write", "record", "Permission to add records with label {0}"),
+                    ("update", "record", "Permission to update {0} labeled records"),
+                    ("delete", "record", "Permission to delete {0} labeled records"),
+                    ("download", "file", "Permission to download {0} labeled files"),
+                    ("upload", "file", "Permission to upload {0} labeled files"),
+                    ("update", "file", "Permission to update {0} labeled files"),
+                    ("delete", "file", "Permission to delete {0} labeled files")
                 };
-                permissions.Add(readPermission);
 
-                // Create write permission
-                var writePermission = new Permission
+                var permissions = permissionActions.Select(p => new Permission
                 {
-                    Name = "Write " + label.Name,
-                    Description = "Permission to modify " + label.Name + " labeled records",
-                    Action = "write",
+                    Name = label.Name,
+                    Description = string.Format(p.Item3, label.Name),
+                    Action = $"{p.Item1} {p.Item2}",
                     LabelId = label.Id,
                     IsDefault = false,
-                    ProjectId = projectId.HasValue ? projectId : null,
+                    ProjectId = projectId,
                     OrganizationId = organizationId,
-                    LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
-                    LastUpdatedBy = currentUserId,
-                };
-                permissions.Add(writePermission);
+                    LastUpdatedAt = now,
+                    LastUpdatedBy = currentUserId
+                }).ToList();
+
+                await _context.AddRangeAsync(permissions);
             }
 
-            _context.Permissions.AddRange(permissions);
             await _context.SaveChangesAsync();
 
             // Log create event
