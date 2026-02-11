@@ -54,10 +54,15 @@ public class DatabaseVersionChecker
             Console.WriteLine($"✓ Database version check passed (PostgreSQL {majorVersion})");
             Console.ResetColor();
         }
-        catch (Exception ex) when (ex is not InvalidOperationException)
+        catch (InvalidOperationException)
+        {
+            throw; // Re-throw version mismatch exceptions
+        }
+        catch (Exception ex)
         {
             Console.ForegroundColor = ConsoleColor.Yellow;
             Console.WriteLine($"⚠️  Warning: Could not verify database version: {ex.Message}");
+            Console.WriteLine($"Stack trace: {ex.StackTrace}"); // Add this
             Console.ResetColor();
         }
     }
