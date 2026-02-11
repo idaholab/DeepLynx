@@ -56,7 +56,7 @@ spec:
     nodeStageSecretRef:
       name: azure-storage-secret
       namespace: deeplynxv3-dev
-      
+
 ---
 # Storage Class (simplified for static provisioning)
 apiVersion: storage.k8s.io/v1
