@@ -455,8 +455,8 @@ public class OrganizationBusiness : IOrganizationBusiness
     {
         var defaultRoles = new List<CreateRoleRequestDto>
         {
-            new() { Name = "Admin", Description = "Organization administrator with full permissions" },
-            new() { Name = "User", Description = "Standard organization user with limited permissions" }
+            new() { Name = "Admin", Description = "Administrator role with full permissions" },
+            new() { Name = "User", Description = "User role with limited permissions" }
         };
         var roles = await _roleBusiness.BulkCreateRoles(currentUserId, organizationId, null, defaultRoles);
         var adminRoleId = roles.Single(r => r.Name == "Admin").Id;
