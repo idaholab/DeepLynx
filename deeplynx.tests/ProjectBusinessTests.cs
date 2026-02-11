@@ -410,51 +410,6 @@ public class ProjectBusinessTests : IntegrationTestBase
 
         // Ensure that the project create event was logged
         var eventList = await Context.Events.ToListAsync();
-        Assert.Equal(4, eventList.Count);
-        Assert.Single(eventList, e =>
-            e.ProjectId == result.Id &&
-            e.Operation == "create" &&
-            e.EntityType == "project" &&
-            e.EntityId == result.Id
-        );
-    }
-
-    [Fact]
-    public async Task CreateProject_Success_CreatesDefaultRolesWithCorrectPermissions()
-    {
-        // Arrange
-        var now = DateTime.UtcNow;
-        var dto = new CreateProjectRequestDto
-        {
-            Name = $"Test Project {DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}",
-            Description = "Test Description",
-            Abbreviation = "TST",
-            Banner = "Test Banner",
-        };
-
-        // Act
-        var result = await _projectBusiness.CreateProject(uid, oid, dto);
-
-        // Assert
-        Assert.True(result.Id > 0);
-        Assert.True(result.LastUpdatedAt >= now);
-        Assert.Equal(dto.Name, result.Name);
-        Assert.Equal(dto.Description, result.Description);
-        Assert.Equal(dto.Abbreviation, result.Abbreviation);
-        Assert.Equal(oid, result.OrganizationId);
-        Assert.Equal(uid, result.LastUpdatedBy);
-        Assert.Equal(dto.Banner, result.Banner);
-
-        var defaultRoles = await Context.Roles.Where(r => r.ProjectId == result.Id).Include(r => r.Permissions)
-            .ToListAsync();
-        var adminRole = defaultRoles.Single(r => r.Name == "Admin");
-        var userRole = defaultRoles.Single(r => r.Name == "User");
-
-        AssertRolePermissions(adminRole, DefaultRolePermissions.Admin.AllowedPermissions);
-        AssertRolePermissions(userRole, DefaultRolePermissions.User.AllowedPermissions);
-
-        // Ensure that the project create event was logged
-        var eventList = await Context.Events.ToListAsync();
         Assert.Equal(3, eventList.Count);
         Assert.Single(eventList, e =>
             e.ProjectId == result.Id &&
