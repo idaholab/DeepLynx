@@ -17,22 +17,21 @@ type: Opaque
 stringData:
   azurestorageaccountname: gvadeeplynxnexusdevsa
   azurestorageaccountsastoken: ${AZURE_STORAGE_ACCOUNT_SAS_TOKEN}
-  azurestorageaccountkey: ""
+  azurestorageconnectionstring: ${AZURE_STORAGE_CONNECTION_STRING}
 
 ---
-# Persistent Volume pointing to existing Azure File Share
+# Persistent Volume for EXISTING Azure File Share (using azureFile with SAS token)
 apiVersion: v1
 kind: PersistentVolume
 metadata:
   name: nexus-duckdb-pv
-  namespace: deeplynxv3-dev
 spec:
   capacity:
     storage: 60Gi
   accessModes:
     - ReadWriteMany
   persistentVolumeReclaimPolicy: Retain
-  storageClassName: azurefile-nexus-duckdb
+  storageClassName: ""
   mountOptions:
     - dir_mode=0777
     - file_mode=0777
@@ -42,33 +41,11 @@ spec:
     - cache=strict
     - actimeo=30
     - nobrl
-  csi:
-    driver: file.csi.azure.com
+  azureFile:
+    secretName: azure-storage-secret
+    shareName: duckdb-data
     readOnly: false
-    volumeHandle: nexus-duckdb-volume-handle  # Unique ID for this volume
-    volumeAttributes:
-      resourceGroup: gva-deeplynxnexus-rg
-      storageAccount: gvadeeplynxnexusdevsa
-      shareName: duckdb-data
-      protocol: smb
-      server: gvadeeplynxnexusdevsa.file.core.usgovcloudapi.net
-    nodeStageSecretRef:
-      name: azure-storage-secret
-      namespace: deeplynxv3-dev
-      
----
-# Storage Class (simplified for static provisioning)
-apiVersion: storage.k8s.io/v1
-kind: StorageClass
-metadata:
-  name: azurefile-nexus-duckdb
-  namespace: deeplynxv3-dev
-provisioner: file.csi.azure.com
-parameters:
-  skuName: Premium_LRS
-reclaimPolicy: Retain
-allowVolumeExpansion: true
-volumeBindingMode: Immediate
+    secretNamespace: deeplynxv3-dev
 
 ---
 # Persistent Volume Claim
@@ -83,8 +60,8 @@ spec:
   resources:
     requests:
       storage: 60Gi
-  storageClassName: azurefile-nexus-duckdb
-  volumeName: nexus-duckdb-pv  # Bind to the specific PV
+  storageClassName: ""
+  volumeName: nexus-duckdb-pv
 
 ---
 apiVersion: apps/v1
@@ -137,7 +114,6 @@ spec:
               value: ${JWT_ISSUER}
             - name: JWT_AUDIENCE
               value: ${JWT_AUDIENCE}
-            # DuckDB Configuration
             - name: DUCKDB_BASE_PATH
               value: ${DUCKDB_BASE_PATH}
             - name: SMTP_SERVER
@@ -160,7 +136,6 @@ spec:
               value: ${SUPERUSER_EMAIL}
             - name: TENANT_MODE
               value: ${TENANT_MODE}
-            # Runtime environment variables from secrets (sensitive)
             - name: OKTA_CLIENT_SECRET
               valueFrom:
                 secretKeyRef:
@@ -188,7 +163,6 @@ spec:
                 secretKeyRef:
                   name: app-secrets
                   key: service-token
-            # Runtime environment variables from configmap (non-sensitive)
             - name: NEXT_PUBLIC_DISABLE_FRONTEND_AUTHENTICATION
               valueFrom:
                 configMapKeyRef:
@@ -284,7 +258,6 @@ spec:
               value: ${JWT_SECRET_KEY}
             - name: JWT_AUDIENCE
               value: ${JWT_AUDIENCE}
-            # DuckDB Configuration (same as frontend)
             - name: DUCKDB_BASE_PATH
               value: ${DUCKDB_BASE_PATH}
             - name: SMTP_SERVER
@@ -307,7 +280,6 @@ spec:
               value: ${DISABLE_BACKEND_AUTHENTICATION}
             - name: SUPERUSER_EMAIL
               value: ${SUPERUSER_EMAIL}
-            # Backend may also need these environment variables
             - name: OKTA_CLIENT_SECRET
               valueFrom:
                 secretKeyRef:
@@ -373,7 +345,6 @@ spec:
             claimName: deeplynx-nexus-duckdb
 
 ---
-#docs
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -406,7 +377,6 @@ spec:
             - containerPort: 3001
 
 ---
-#mcp
 apiVersion: apps/v1
 kind: Deployment
 metadata:
