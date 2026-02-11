@@ -5,7 +5,7 @@ set -e
 SERVICE_NAME="nx-postgres"
 DOCKER_IMAGE_TAG="deeplynx-db"
 BACKUP_FILE="storage/deeplynx_backup_$(date +%Y%m%d_%H%M%S).sql"
-NEW_VOLUME_NAME="nx_postgres_data_pg18"
+NEW_VOLUME_NAME="nx_postgres_data"
 
 echo "=== DeepLynx Nexus PostgreSQL Migration Script ==="
 echo ""
@@ -119,7 +119,7 @@ echo "✓ New docker image created: ${DOCKER_IMAGE_TAG}"
 echo ""
 
 # Step 6: Start new Postgres 18 container (note: mount at /var/lib/postgresql, not /var/lib/postgresql/data)
-echo "Step 6: Starting PostgreSQL 18 container for databaase restoration..."
+echo "Step 6: Starting a transient container to restore data to the volume..."
 docker run -d \
     --name ${CONTAINER_NAME} \
     --network ${NETWORK_NAME} \
@@ -166,7 +166,7 @@ echo ""
 # The docker compose will create a new container using the new image
 # The data volume (nx_postgres_data_pg18) is what needs to be preserved
 # Which it should be as specified in docker-compose.yml
-echo "Step 10: Stopping and removing database migration container..."
+echo "Step 10: Stopping and removing transient container..."
 docker stop ${CONTAINER_NAME}
 docker rm ${CONTAINER_NAME}
 echo "✓ Old container removed"
@@ -183,5 +183,5 @@ echo ""
 echo "Backup file: ${BACKUP_FILE}"
 echo ""
 echo "You can now restart your services with:"
-echo "  docker-compose up --build"
+echo "  docker compose up --build"
 echo ""
