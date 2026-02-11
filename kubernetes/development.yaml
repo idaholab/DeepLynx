@@ -17,7 +17,7 @@ type: Opaque
 stringData:
   azurestorageaccountname: gvadeeplynxnexusdevsa
   azurestorageaccountsastoken: ${AZURE_STORAGE_ACCOUNT_SAS_TOKEN}
-  azurestorageconnectionstring: ${AZURE_STORAGE_CONNECTION_STRING}
+  azurestorageaccountkey: ""
 
 ---
 # Persistent Volume pointing to existing Azure File Share
