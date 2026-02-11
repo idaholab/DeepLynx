@@ -15,7 +15,7 @@ metadata:
   namespace: deeplynxv3-dev
 type: Opaque
 stringData:
-  azurestorageaccountname: gvadeeplynxnexusdevsa
+  azurestorageaccountname: ${AZURE_STORAGE_ACCOUNT_NAME}
   azurestorageaccountsastoken: ${AZURE_STORAGE_ACCOUNT_SAS_TOKEN}
   azurestorageaccountkey: ${AZURE_STORAGE_ACCOUNT_KEY}
 
@@ -47,11 +47,11 @@ spec:
     readOnly: false
     volumeHandle: nexus-duckdb-volume-handle  # Unique ID for this volume
     volumeAttributes:
-      resourceGroup: gva-deeplynxnexus-rg
-      storageAccount: gvadeeplynxnexusdevsa
+      resourceGroup: ${AZURE_ACCOUNT_RESOURCE_GROUP}
+      storageAccount: ${AZURE_STORAGE_ACCOUNT_NAME}
       shareName: duckdb-data
       protocol: smb
-      server: gvadeeplynxnexusdevsa.file.core.usgovcloudapi.net
+      server: ${AZURE_STORAGE_ACCOUNT_NAME}.file.core.usgovcloudapi.net
     nodeStageSecretRef:
       name: azure-storage-secret
       namespace: deeplynxv3-dev
