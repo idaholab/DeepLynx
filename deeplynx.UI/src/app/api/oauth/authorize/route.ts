@@ -16,7 +16,6 @@ export async function GET(request: NextRequest) {
       const loginUrl = new URL('/login/signin', frontendUrl);
       loginUrl.searchParams.set('returnUrl', returnUrl);
 
-      console.log(`User not authenticated, redirecting to login: ${loginUrl.toString()}`);
       return NextResponse.redirect(loginUrl);
     }
 
@@ -30,8 +29,6 @@ export async function GET(request: NextRequest) {
     request.nextUrl.searchParams.forEach((value, key) => {
       targetUrl.searchParams.set(key, value);
     });
-
-    console.log(`Forwarding authenticated request to C# backend: ${targetUrl.toString()}`);
 
     // Make request to C# backend with user's Okta access token
     const backendResponse = await fetch(targetUrl.toString(), {
@@ -47,7 +44,6 @@ export async function GET(request: NextRequest) {
     if (backendResponse.status >= 300 && backendResponse.status < 400) {
       const location = backendResponse.headers.get('Location');
       if (location) {
-        console.log(`C# backend returned redirect to: ${location}`);
         // IMPORTANT: Return the redirect directly to the browser
         // NextResponse.redirect() will send a 307 redirect to the client
         return NextResponse.redirect(location, { status: 302 });

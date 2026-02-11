@@ -216,7 +216,6 @@ const ProjectSettings = ({ project }: ProjectSettingsProps) => {
         setDefaultStorage(defaultStorageData);
         setSelectedStorageId(defaultStorageData.id as number);
       } catch (error) {
-        console.log("No default storage set yet");
         setDefaultStorage(null);
         setSelectedStorageId(null);
       }
@@ -414,9 +413,6 @@ const ProjectSettings = ({ project }: ProjectSettingsProps) => {
         name: storageFormData.name,
         config: config,
       };
-
-      console.log("Creating storage with DTO:", JSON.stringify(dto, null, 2));
-      console.log("Config object:", JSON.stringify(config, null, 2));
 
       await createProjectObjectStorage(
         organization.organizationId as number,

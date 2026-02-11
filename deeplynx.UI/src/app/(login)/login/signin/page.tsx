@@ -37,7 +37,6 @@ function SigninContent() {
 
     // If user is already authenticated and there's a returnUrl, redirect to it
     if (status === "authenticated" && returnUrl) {
-      console.log(`User authenticated, redirecting to: ${returnUrl}`);
       router.push(returnUrl);
     } else if (status === "authenticated") {
       // If authenticated but no returnUrl, go home
@@ -118,8 +117,6 @@ function SigninContent() {
     // Construct the callback URL to include the returnUrl
     const callbackUrl = returnUrl || "/";
 
-    console.log(`Signing in with Okta, will redirect to: ${callbackUrl}`);
-
     await signIn("okta", {
       callbackUrl: callbackUrl,
       redirect: true,
@@ -146,16 +143,26 @@ function SigninContent() {
               </h2>
               <div className="text-gray-700 mb-6 space-y-3 text-sm max-h-96 overflow-y-auto">
                 <p>
-                  This is a DOE computer system. DOE computer systems are provided for the processing of official U.S. Government information only.
+                  This is a DOE computer system. DOE computer systems are
+                  provided for the processing of official U.S. Government
+                  information only.
                 </p>
                 <p>
-                  All data contained within DOE computer systems is owned by DOE and may be audited, intercepted, recorded, read, copied, or captured in any manner and disclosed in any manner by authorized personnel.
+                  All data contained within DOE computer systems is owned by DOE
+                  and may be audited, intercepted, recorded, read, copied, or
+                  captured in any manner and disclosed in any manner by
+                  authorized personnel.
                 </p>
                 <p>
-                  THERE IS NO RIGHT OF PRIVACY IN THIS SYSTEM. System personnel may disclose any potential evidence of crime found on DOE computer systems to appropriate authorities.
+                  THERE IS NO RIGHT OF PRIVACY IN THIS SYSTEM. System personnel
+                  may disclose any potential evidence of crime found on DOE
+                  computer systems to appropriate authorities.
                 </p>
                 <p>
-                  USE OF THIS SYSTEM BY ANY USER, AUTHORIZED OR UNAUTHORIZED, CONSTITUTES CONSENT TO THIS AUDITING, INTERCEPTION, RECORDING, READING, COPYING, CAPTURING, and DISCLOSURE OF COMPUTER ACTIVITY.
+                  USE OF THIS SYSTEM BY ANY USER, AUTHORIZED OR UNAUTHORIZED,
+                  CONSTITUTES CONSENT TO THIS AUDITING, INTERCEPTION, RECORDING,
+                  READING, COPYING, CAPTURING, and DISCLOSURE OF COMPUTER
+                  ACTIVITY.
                 </p>
                 <p className="font-bold text-red-600 text-center text-base mt-4">
                   **WARNING**WARNING**WARNING**WARNING**WARNING**
