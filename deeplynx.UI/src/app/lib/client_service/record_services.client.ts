@@ -281,6 +281,59 @@ export async function unattachTagFromRecord(
 }
 
 /**
+ * Attach a sensitivity label to a record
+ * @param organizationId - The ID of the organization
+ * @param projectId - The ID of the project
+ * @param recordId - The ID of the record
+ * @param labelId - The ID of the sensitivity label to attach
+ * @returns Promise with success message
+ */
+export async function attachSensitivityLabelToRecord(
+  organizationId: number,
+  projectId: number,
+  recordId: number,
+  labelId: number
+): Promise<{ message: string }> {
+  try {
+    const res = await api.post(
+      `/organizations/${organizationId}/projects/${projectId}/records/${recordId}/sensitivity-labels`,
+      null,
+      { params: { labelId } }
+    );
+    return res.data;
+  } catch (error) {
+    console.error(`Error attaching sensitivity label ${labelId} to record ${recordId}:`, error);
+    throw error;
+  }
+}
+
+/**
+ * Unattach a sensitivity label from a record
+ * @param organizationId - The ID of the organization
+ * @param projectId - The ID of the project
+ * @param recordId - The ID of the record
+ * @param labelId - The ID of the sensitivity label to unattach
+ * @returns Promise with success message
+ */
+export async function unattachSensitivityLabelFromRecord(
+  organizationId: number,
+  projectId: number,
+  recordId: number,
+  labelId: number
+): Promise<{ message: string }> {
+  try {
+    const res = await api.delete(
+      `/organizations/${organizationId}/projects/${projectId}/records/${recordId}/sensitivity-labels`,
+      { params: { labelId } }
+    );
+    return res.data;
+  } catch (error) {
+    console.error(`Error unattaching sensitivity label ${labelId} from record ${recordId}:`, error);
+    throw error;
+  }
+}
+
+/**
  * Get edges by record
  * @param organizationId - The ID of the organization
  * @param projectId - The ID of the project

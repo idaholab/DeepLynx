@@ -67,6 +67,7 @@ export interface HistoricalRecordResponseDto {
   projectId?: number;
   projectName: string;
   tags?: string | null;
+  labels?: string | null;
   lastUpdatedAt: string;
   lastUpdatedBy?: string | null;
   isArchived: boolean;

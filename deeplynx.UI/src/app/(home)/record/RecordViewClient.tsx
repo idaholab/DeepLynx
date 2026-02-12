@@ -9,6 +9,7 @@ import toast from "react-hot-toast";
 import PropertyTable from "../components/PropertyTable";
 import {
   HistoricalRecordResponseDto,
+  SensitivityLabelsDto,
   TagResponseDto,
 } from "../types/responseDTOs";
 import RecordLoading from "./loading";
@@ -32,9 +33,11 @@ import { fullTextSearch } from "@/app/lib/client_service/query_services.client";
 import {
   getEdgesByRecord,
   getHistoricalRecord,
+  unattachSensitivityLabelFromRecord,
   unattachTagFromRecord,
   updateRecord,
 } from "@/app/lib/client_service/record_services.client";
+import { getAllSensitivityLabelsProject } from "@/app/lib/client_service/sensitivity_labels_services.client";
 import { getAllTagsOrg } from "@/app/lib/client_service/tag_services.client";
 import GraphClientPage from "../graph/GraphClientPage";
 import {
@@ -135,6 +138,11 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
   const [tags, setTags] = useState<TagResponseDto[]>([]);
   const [selectedTags, setSelectedTags] = useState<TagResponseDto[]>([]);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [labels, setLabels] = useState<SensitivityLabelsDto[]>([]);
+  const [selectedLabels, setSelectedLabels] = useState<SensitivityLabelsDto[]>(
+    [],
+  );
+  const [selectedLabelIds, setSelectedLabelIds] = useState<string[]>([]);
 
   // Pagination State
   const [originPage, setOriginPage] = useState(1);
@@ -230,6 +238,8 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
     setRecord(null);
     setSelectedTags([]);
     setSelectedIds([]);
+    setSelectedLabels([]);
+    setSelectedLabelIds([]);
     setOriginPage(1);
     setDestinationPage(1);
     setOriginRecords([]);
@@ -380,6 +390,14 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
     const newTags = tags.filter((tag) => selected.includes(tag.id.toString()));
     setSelectedTags(newTags);
     setSelectedIds(selected);
+  };
+
+  const handleLabelSelectionChange = (selected: string[]) => {
+    const newLabels = labels.filter((label) =>
+      selected.includes(label.id.toString()),
+    );
+    setSelectedLabels(newLabels);
+    setSelectedLabelIds(selected);
   };
 
   const handleConfirmUnlink = async () => {
@@ -608,6 +626,17 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
             parsedTags.map((tag: { id: number | null }) => String(tag.id)),
           );
         }
+        if (data.labels) {
+          const parsedLabels =
+            typeof data.labels === "string"
+              ? JSON.parse(data.labels)
+              : data.labels;
+
+          setSelectedLabels(parsedLabels);
+          setSelectedLabelIds(
+            parsedLabels.map((label: { id: number | null }) => String(label.id)),
+          );
+        }
       } catch (error) {
         console.error("Error fetching record:", error);
         toast.error(t.translations.FAILED_TO_FETCH_RECORD);
@@ -663,6 +692,21 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
     };
 
     fetchTags();
+  }, [projectId, organization?.organizationId]);
+
+  useEffect(() => {
+    const fetchLabels = async () => {
+      if (!projectId || !organization?.organizationId) return;
+
+      try {
+        const data = await getAllSensitivityLabelsProject(projectId, true);
+        setLabels(data);
+      } catch (error) {
+        console.error("Error fetching labels:", error);
+      }
+    };
+
+    fetchLabels();
   }, [projectId, organization?.organizationId]);
 
   useEffect(() => {
@@ -805,6 +849,29 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
     }
   };
 
+  const handleRemoveLabel = async (labelId: number) => {
+    if (!organization?.organizationId) return;
+
+    try {
+      await unattachSensitivityLabelFromRecord(
+        organization.organizationId as number,
+        projectId,
+        recordId,
+        labelId,
+      );
+
+      setSelectedLabels((prev) => prev.filter((l) => l.id !== labelId));
+      setSelectedLabelIds((prev) =>
+        prev.filter((id) => id !== String(labelId)),
+      );
+
+      toast.success(t.translations.SENSITIVITY_LABEL_REMOVED);
+    } catch (error) {
+      console.error("Error removing sensitivity label:", error);
+      toast.error(t.translations.FAILED_TO_UPDATE_SENSITIVITY_LABELS);
+    }
+  };
+
   // ============= RENDER HELPERS =============
   if (!hasLoaded || !organization) {
     return <RecordLoading />;
@@ -845,13 +912,21 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
               tags={tags}
               selectedTags={selectedTags}
               selectedIds={selectedIds}
+              labels={labels}
+              selectedLabels={selectedLabels}
+              selectedLabelIds={selectedLabelIds}
               onSelectionChange={handleTagSelectionChange}
               onRemoveTag={handleRemoveTag}
+              onLabelSelectionChange={handleLabelSelectionChange}
+              onRemoveLabel={handleRemoveLabel}
               projectId={projectId}
               recordId={recordId}
               setTags={setTags}
               setSelectedTags={setSelectedTags}
               setSelectedIds={setSelectedIds}
+              setLabels={setLabels}
+              setSelectedLabels={setSelectedLabels}
+              setSelectedLabelIds={setSelectedLabelIds}
               title={t.translations.TAGS}
             />
 

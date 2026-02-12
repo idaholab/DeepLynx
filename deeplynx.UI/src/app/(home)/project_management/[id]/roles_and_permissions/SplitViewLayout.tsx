@@ -75,7 +75,7 @@ const SplitViewLayout: React.FC<SplitViewLayoutProps> = ({
   const canEditPermissions = canEditRole && !rolesLocked;
   const { t } = useLanguage();
   const [activePermissionTab, setActivePermissionTab] = useState(
-    "Resource Permissions",
+    t.translations.RESOURCE_PERMISSIONS,
   );
   const splitPermissionCategories = useMemo(() => {
     const withoutLabelId: PermissionCategory[] = [];
@@ -263,13 +263,13 @@ const SplitViewLayout: React.FC<SplitViewLayoutProps> = ({
   const permissionTabs = useMemo(
     () => [
       {
-        label: "Resource Permissions",
+        label: t.translations.RESOURCE_PERMISSIONS,
         content: renderPermissionsContent(
           splitPermissionCategories.withoutLabelId,
         ),
       },
       {
-        label: "Sensitivity Labels",
+        label: t.translations.SENSITIVITY_LABELS,
         content: renderPermissionsContent(
           labelPermissionCategoriesByName,
           "permission-action",
