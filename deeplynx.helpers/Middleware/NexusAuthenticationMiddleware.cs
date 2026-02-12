@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Security.Cryptography;
@@ -20,9 +21,14 @@ namespace deeplynx.helpers;
 
 public class NexusAuthenticationMiddleware : JwtBearerHandler
 {
-    private readonly IServiceScopeFactory _serviceScopeFactory;
     private static IConfigurationManager<OpenIdConnectConfiguration>? _configManager;
     private static readonly object _configManagerLock = new();
+
+    // Entra-specific cache and config manager
+    private static readonly ConcurrentDictionary<string, CachedEntraToken> _entraTokenCache = new();
+    private static IConfigurationManager<OpenIdConnectConfiguration>? _entraConfigManager;
+    private static readonly object _entraConfigManagerLock = new();
+    private readonly IServiceScopeFactory _serviceScopeFactory;
 
     public NexusAuthenticationMiddleware(
         IOptionsMonitor<JwtBearerOptions> options,
@@ -98,15 +104,11 @@ public class NexusAuthenticationMiddleware : JwtBearerHandler
 
         // Handle HS256
         if (algorithm.StartsWith("HS", StringComparison.OrdinalIgnoreCase))
-        {
             return await HandleHS256Token(token, jwtToken);
-        }
 
-        // Handle RS256 (Okta)
+        // Handle RS256 (Okta or Entra)
         if (algorithm.StartsWith("RS", StringComparison.OrdinalIgnoreCase))
-        {
-            return await HandleRS256Token(token);
-        }
+            return await HandleRS256Token(token, jwtToken);
 
         return AuthenticateResult.Fail($"Unsupported token algorithm: {algorithm}");
     }
@@ -159,16 +161,16 @@ public class NexusAuthenticationMiddleware : JwtBearerHandler
             using (var scope = _serviceScopeFactory.CreateScope())
             {
                 var dbContext = scope.ServiceProvider.GetRequiredService<DeeplynxContext>();
-    
+
                 // Hash the JTI for lookup
                 var tokenHash = HashToken(jti);
                 var tokenRecord = await dbContext.OauthTokens
                     .FirstOrDefaultAsync(t => t.TokenHash == tokenHash);
-    
+
                 if (tokenRecord == null || tokenRecord.Revoked)
                 {
-                        Log.Warning($"Token not found or revoked - JTI: {jti}");
-                        return AuthenticateResult.Fail("Token has been revoked");
+                    Log.Warning($"Token not found or revoked - JTI: {jti}");
+                    return AuthenticateResult.Fail("Token has been revoked");
                 }
             }
 
@@ -227,7 +229,33 @@ public class NexusAuthenticationMiddleware : JwtBearerHandler
         }
     }
 
-    private async Task<AuthenticateResult> HandleRS256Token(string token)
+    private async Task<AuthenticateResult> HandleRS256Token(string token, JwtSecurityToken jwtToken)
+    {
+        var issuer = jwtToken.Issuer;
+        var configuredOktaIssuer = Environment.GetEnvironmentVariable("JWT_ISSUER");
+
+        // Route based on issuer
+        // Check if it's Okta by comparing to configured issuer
+        if (!string.IsNullOrEmpty(configuredOktaIssuer) &&
+            issuer.Equals(configuredOktaIssuer, StringComparison.OrdinalIgnoreCase))
+        {
+            Log.Information("Detected Okta token");
+            return await HandleOktaToken(token);
+        }
+
+        // Check if it's Entra (Microsoft)
+        if (issuer.Contains("login.microsoftonline.com", StringComparison.OrdinalIgnoreCase) ||
+            issuer.Contains("login.microsoftonline.us", StringComparison.OrdinalIgnoreCase))
+        {
+            Log.Information("Detected Entra token");
+            return await HandleEntraToken(token, jwtToken);
+        }
+
+        Log.Warning($"Unsupported RS256 issuer: {issuer}");
+        return AuthenticateResult.Fail($"Unsupported issuer: {issuer}");
+    }
+
+    private async Task<AuthenticateResult> HandleOktaToken(string token)
     {
         try
         {
@@ -242,14 +270,12 @@ public class NexusAuthenticationMiddleware : JwtBearerHandler
 
             var metadataAddress = $"{issuer.TrimEnd('/')}/.well-known/openid-configuration";
             if (_configManager == null)
-            {
                 lock (_configManagerLock)
                 {
                     _configManager ??= new ConfigurationManager<OpenIdConnectConfiguration>(
                         metadataAddress,
                         new OpenIdConnectConfigurationRetriever());
                 }
-            }
 
             var oidcConfig = await _configManager.GetConfigurationAsync(CancellationToken.None);
 
@@ -273,12 +299,99 @@ public class NexusAuthenticationMiddleware : JwtBearerHandler
             await EnsureUserExistsAsync(principal);
 
             var ticket = new AuthenticationTicket(principal, Scheme.Name);
-            Log.Information("RS256 token validated successfully");
+            Log.Information("Okta token validated successfully");
             return AuthenticateResult.Success(ticket);
         }
         catch (Exception ex)
         {
-            Log.Error(ex, $"RS256 validation failed: {ex.Message}");
+            Log.Error(ex, $"Okta validation failed: {ex.Message}");
+            return AuthenticateResult.Fail(ex);
+        }
+    }
+
+    private async Task<AuthenticateResult> HandleEntraToken(string token, JwtSecurityToken jwtToken)
+    {
+        try
+        {
+            // Extract JTI for caching (Entra uses 'uti' or 'jti')
+            var jti = jwtToken.Claims.FirstOrDefault(c => c.Type == "jti")?.Value
+                      ?? jwtToken.Claims.FirstOrDefault(c => c.Type == "uti")?.Value;
+
+            // Check cache first
+            if (!string.IsNullOrEmpty(jti) && _entraTokenCache.TryGetValue(jti, out var cached))
+            {
+                if (cached.ExpiresAt > DateTime.UtcNow)
+                {
+                    Log.Information("Entra token cache hit for JTI: {JTI}", jti);
+                    return AuthenticateResult.Success(new AuthenticationTicket(cached.Principal, Scheme.Name));
+                }
+
+                // Expired, remove from cache
+                Log.Information("Cached Entra token expired, removing from cache");
+                _entraTokenCache.TryRemove(jti, out _);
+            }
+
+            // Cache miss - validate token
+            // Use the issuer from the token itself (supports both commercial and government clouds)
+            var issuer = jwtToken.Issuer;
+            var metadataAddress = $"{issuer.TrimEnd('/')}/.well-known/openid-configuration";
+
+            Log.Information("Validating Entra token from issuer: {Issuer}", issuer);
+
+            // Use separate config manager for Entra
+            if (_entraConfigManager == null)
+                lock (_entraConfigManagerLock)
+                {
+                    _entraConfigManager ??= new ConfigurationManager<OpenIdConnectConfiguration>(
+                        metadataAddress,
+                        new OpenIdConnectConfigurationRetriever());
+                }
+
+            var oidcConfig = await _entraConfigManager.GetConfigurationAsync(CancellationToken.None);
+
+            var tokenHandler = new JwtSecurityTokenHandler();
+            var validationParameters = new TokenValidationParameters
+            {
+                ValidIssuer = issuer,
+                ValidateIssuer = true,
+                ValidateAudience =
+                    false, // Skip audience validation - we don't control MCP Client's client ID - at some point can register our app in Azure AD
+                ValidateLifetime = true,
+                ClockSkew = TimeSpan.FromMinutes(2),
+                ValidateIssuerSigningKey = true,
+                IssuerSigningKeys = oidcConfig.SigningKeys,
+                RequireSignedTokens = true,
+                ValidAlgorithms = new[] { SecurityAlgorithms.RsaSha256 }
+            };
+
+            var principal = tokenHandler.ValidateToken(token, validationParameters, out var validatedToken);
+
+            await EnsureUserExistsAsync(principal);
+
+            // Cache the principal for future requests
+            if (!string.IsNullOrEmpty(jti))
+            {
+                var exp = jwtToken.Claims.FirstOrDefault(c => c.Type == "exp")?.Value;
+                var expiresAt = !string.IsNullOrEmpty(exp)
+                    ? DateTimeOffset.FromUnixTimeSeconds(long.Parse(exp)).DateTime
+                    : DateTime.UtcNow.AddHours(1);
+
+                _entraTokenCache.TryAdd(jti, new CachedEntraToken
+                {
+                    Principal = principal,
+                    ExpiresAt = expiresAt
+                });
+
+                Log.Information("Cached Entra token with JTI: {JTI}, expires at: {ExpiresAt}", jti, expiresAt);
+            }
+
+            var ticket = new AuthenticationTicket(principal, Scheme.Name);
+            Log.Information("Entra token validated successfully");
+            return AuthenticateResult.Success(ticket);
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, $"Entra validation failed: {ex.Message}");
             return AuthenticateResult.Fail(ex);
         }
     }
@@ -287,15 +400,10 @@ public class NexusAuthenticationMiddleware : JwtBearerHandler
     {
         var authHeader = request.Headers["Authorization"].FirstOrDefault();
         if (!string.IsNullOrEmpty(authHeader) && authHeader.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
-        {
             return authHeader["Bearer ".Length..];
-        }
 
         var tokenQuery = request.Query["token"].FirstOrDefault();
-        if (!string.IsNullOrEmpty(tokenQuery))
-        {
-            return tokenQuery;
-        }
+        if (!string.IsNullOrEmpty(tokenQuery)) return tokenQuery;
 
         var tokenCookie = request.Cookies["access_token"];
         return string.IsNullOrEmpty(tokenCookie) ? null : tokenCookie;
@@ -355,10 +463,13 @@ public class NexusAuthenticationMiddleware : JwtBearerHandler
     {
         try
         {
-            var email = principal.FindFirst("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier")
-                            ?.Value
+            // Updated email extraction - prioritize preferred_username for Entra tokens
+            var email = principal.FindFirst("preferred_username")?.Value // ← Entra email
+                        ?? principal.FindFirst("upn")?.Value // ← Entra UPN
                         ?? principal.FindFirst(ClaimTypes.Email)?.Value
                         ?? principal.FindFirst("email")?.Value
+                        ?? principal.FindFirst("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier")
+                            ?.Value
                         ?? principal.FindFirst("sub")?.Value
                         ?? principal.FindFirst("name")?.Value;
 
@@ -368,8 +479,16 @@ public class NexusAuthenticationMiddleware : JwtBearerHandler
                 return;
             }
 
-            var ssoId = principal.FindFirst("uid")?.Value;
-            var username = principal.FindFirst("preferred_username")?.Value ?? email;
+            // Normalize email - treat @azuregov.inl.gov as @inl.gov
+            var normalizedEmail = email.ToLower().Replace("@azuregov.inl.gov", "@inl.gov");
+
+            // Extract SSO ID with Entra fallback
+            var ssoId = principal.FindFirst("uid")?.Value
+                        ?? principal.FindFirst("oid")?.Value
+                        ?? principal.FindFirst("http://schemas.microsoft.com/identity/claims/objectidentifier")?.Value
+                        ?? principal.FindFirst("sub")?.Value;
+
+            var username = principal.FindFirst("preferred_username")?.Value ?? normalizedEmail;
             var name = principal.FindFirst(ClaimTypes.Name)?.Value
                        ?? principal.FindFirst("name")?.Value
                        ?? username;
@@ -378,14 +497,16 @@ public class NexusAuthenticationMiddleware : JwtBearerHandler
             var dbContext = scope.ServiceProvider.GetRequiredService<DeeplynxContext>();
 
             var isDefaultSuperUser =
-                email.ToLower() == Environment.GetEnvironmentVariable("SUPERUSER_EMAIL")?.ToLower();
-            var existingUser = await dbContext.Users.FirstOrDefaultAsync(u => u.Email.ToLower() == email.ToLower());
+                normalizedEmail == Environment.GetEnvironmentVariable("SUPERUSER_EMAIL")?.ToLower();
+
+            var existingUser = await dbContext.Users
+                .FirstOrDefaultAsync(u => u.Email.ToLower() == normalizedEmail);
 
             if (existingUser != null)
             {
-                // update if admin needs to be set or if SSO ID is improperly configured
+                // Update if admin needs to be set or if SSO ID is improperly configured
                 if ((isDefaultSuperUser && !existingUser.IsSysAdmin)
-                    || existingUser.SsoId != principal.FindFirst("uid")?.Value)
+                    || existingUser.SsoId != ssoId)
                 {
                     existingUser.SsoId = ssoId;
                     existingUser.Username = username;
@@ -394,9 +515,9 @@ public class NexusAuthenticationMiddleware : JwtBearerHandler
                     existingUser.IsArchived = false;
                     existingUser.IsSysAdmin = isDefaultSuperUser || existingUser.IsSysAdmin;
                     await dbContext.SaveChangesAsync();
-                    Log.Information($"Updated SSO ID for existing user {email}");
+                    Log.Information($"Updated SSO ID for existing user {normalizedEmail}");
                 }
-                
+
                 // Add user to the default org if not already a member
                 var defaultOrg = await dbContext.Organizations
                     .Where(o => o.DefaultOrg).FirstOrDefaultAsync();
@@ -405,15 +526,15 @@ public class NexusAuthenticationMiddleware : JwtBearerHandler
                 {
                     var isMember = await dbContext.OrganizationUsers
                         .AnyAsync(ou => ou.OrganizationId == defaultOrg.Id && ou.UserId == existingUser.Id);
-    
+
                     if (!isMember)
                     {
                         var orgUser = new OrganizationUser
                         {
                             OrganizationId = defaultOrg.Id,
-                            UserId = existingUser.Id,
+                            UserId = existingUser.Id
                         };
-        
+
                         dbContext.OrganizationUsers.Add(orgUser);
                         await dbContext.SaveChangesAsync();
                     }
@@ -424,17 +545,17 @@ public class NexusAuthenticationMiddleware : JwtBearerHandler
                 var newUser = new User
                 {
                     Name = name,
-                    Email = email,
+                    Email = normalizedEmail, // Store normalized email
                     Username = username,
                     SsoId = ssoId,
                     IsActive = true,
                     IsArchived = false,
-                    IsSysAdmin = isDefaultSuperUser,
+                    IsSysAdmin = isDefaultSuperUser
                 };
                 dbContext.Users.Add(newUser);
                 await dbContext.SaveChangesAsync();
-                Log.Information($"User with email {email} created successfully");
-                
+                Log.Information($"User with email {normalizedEmail} created successfully");
+
                 // Add user to the default org
                 var defaultOrg = await dbContext.Organizations
                     .Where(o => o.DefaultOrg).FirstOrDefaultAsync();
@@ -444,9 +565,9 @@ public class NexusAuthenticationMiddleware : JwtBearerHandler
                     var orgUser = new OrganizationUser
                     {
                         OrganizationId = defaultOrg.Id,
-                        UserId = newUser.Id,
+                        UserId = newUser.Id
                     };
-                    
+
                     dbContext.OrganizationUsers.Add(orgUser);
                     await dbContext.SaveChangesAsync();
                 }
@@ -495,7 +616,7 @@ public class NexusAuthenticationMiddleware : JwtBearerHandler
                 await dbContext.SaveChangesAsync();
                 Log.Information($"Existing user {email} promoted to sys admin for local development");
             }
-            
+
             // Add user to the default org if not already a member
             var defaultOrg = await dbContext.Organizations
                 .Where(o => o.DefaultOrg).FirstOrDefaultAsync();
@@ -504,15 +625,15 @@ public class NexusAuthenticationMiddleware : JwtBearerHandler
             {
                 var isMember = await dbContext.OrganizationUsers
                     .AnyAsync(ou => ou.OrganizationId == defaultOrg.Id && ou.UserId == existingUser.Id);
-    
+
                 if (!isMember)
                 {
                     var orgUser = new OrganizationUser
                     {
                         OrganizationId = defaultOrg.Id,
-                        UserId = existingUser.Id,
+                        UserId = existingUser.Id
                     };
-        
+
                     dbContext.OrganizationUsers.Add(orgUser);
                     await dbContext.SaveChangesAsync();
                 }
@@ -523,11 +644,17 @@ public class NexusAuthenticationMiddleware : JwtBearerHandler
             Log.Error(ex, "Error during local dev user provisioning");
         }
     }
-    
+
     private static string HashToken(string jti)
     {
         using var sha256 = SHA256.Create();
         var hashBytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(jti));
         return Convert.ToBase64String(hashBytes);
+    }
+
+    private class CachedEntraToken
+    {
+        public ClaimsPrincipal Principal { get; set; } = null!;
+        public DateTime ExpiresAt { get; set; }
     }
 }

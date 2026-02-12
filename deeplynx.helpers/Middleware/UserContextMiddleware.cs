@@ -88,40 +88,29 @@ public class UserContextMiddleware
 
     private string? ExtractEmail(ClaimsPrincipal user)
     {
-        // Try various claim types in order of preference
+        // Prefer the federated username and common Entra claims first
+        var email = user.FindFirst("preferred_username")?.Value // Entra preferred username (usually an email)
+                    ?? user.FindFirst("upn")?.Value // UPN
+                    ?? user.FindFirst(ClaimTypes.Email)?.Value // Standard email claim
+                    ?? user.FindFirst("email")?.Value // JWT "email"
+                    ?? user.FindFirst("http://schemas.microsoft.com/identity/claims/objectidentifier")
+                        ?.Value // oid fallback
+                    ?? user.FindFirst("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier")?.Value
+                    ?? user.FindFirst("sub")?.Value
+                    ?? user.FindFirst(ClaimTypes.Name)?.Value
+                    ?? user.FindFirst("name")?.Value
+                    ?? user.FindFirst("username")?.Value;
 
-        // 1. Standard email claim
-        var email = user.FindFirst(ClaimTypes.Email)?.Value;
-        if (!string.IsNullOrEmpty(email)) return email;
+        if (string.IsNullOrEmpty(email))
+            return null;
 
-        // 2. Simple "email" claim (common in JWT)
-        email = user.FindFirst("email")?.Value;
-        if (!string.IsNullOrEmpty(email)) return email;
+        // Normalize: treat @azuregov.inl.gov as @inl.gov and lower-case everything
+        email = email.Trim().ToLowerInvariant();
+        if (email.EndsWith("@azuregov.inl.gov")) email = email.Replace("@azuregov.inl.gov", "@inl.gov");
 
-        // 3. Subject claim (Okta uses this for email sometimes)
-        email = user.FindFirst("sub")?.Value;
-        if (!string.IsNullOrEmpty(email)) return email;
+        // Basic sanity: if it doesn't look like an email (no '@'), don't return the raw name
+        if (!email.Contains("@")) return null;
 
-        // 4. Name claim (your HS256 token uses this)
-        email = user.FindFirst(ClaimTypes.Name)?.Value;
-        if (!string.IsNullOrEmpty(email)) return email;
-
-        // 5. Simple "name" claim
-        email = user.FindFirst("name")?.Value;
-        if (!string.IsNullOrEmpty(email)) return email;
-
-        // 6. NameIdentifier with namespace (Okta format)
-        email = user.FindFirst("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier")?.Value;
-        if (!string.IsNullOrEmpty(email)) return email;
-
-        // 7. Preferred username
-        email = user.FindFirst("preferred_username")?.Value;
-        if (!string.IsNullOrEmpty(email)) return email;
-
-        // 8. Username
-        email = user.FindFirst("username")?.Value;
-        if (!string.IsNullOrEmpty(email)) return email;
-
-        return null;
+        return email;
     }
 }
