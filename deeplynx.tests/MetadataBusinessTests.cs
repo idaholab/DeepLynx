@@ -33,6 +33,7 @@ public class MetadataBusinessTests : IntegrationTestBase
     private RelationshipBusiness _relationshipBusiness = null!;
     private TagBusiness _tagBusiness = null!;
     private BulkCopyUpsertExecutor _mockBulkCopyUpsertExecutor = null!;
+    private ISensitivityLabelService _sensitivityLabelService = null!;
     public long cid; // origin class ID
     public long cid2; // destination class ID
     public long did;
@@ -69,7 +70,8 @@ public class MetadataBusinessTests : IntegrationTestBase
 
         _tagBusiness = new TagBusiness(Context, _eventBusiness);
         _sensitivityLabelBusiness = new SensitivityLabelBusiness(Context, _eventBusiness);
-        _recordBusiness = new RecordBusiness(Context, _eventBusiness, _mockBulkCopyUpsertExecutor, _tagBusiness, _sensitivityLabelBusiness);
+        _recordBusiness = new RecordBusiness(
+            Context, _eventBusiness, _mockBulkCopyUpsertExecutor, _tagBusiness, _sensitivityLabelBusiness, _sensitivityLabelService);
         _edgeBusiness = new EdgeBusiness(Context, _eventBusiness, _mockBulkCopyUpsertExecutor);
 
         _metadataBusiness = new MetadataBusiness(

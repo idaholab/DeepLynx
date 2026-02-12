@@ -3,6 +3,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using deeplynx.business;
 using deeplynx.datalayer.Models;
+using deeplynx.helpers;
 using deeplynx.helpers.BigData;
 using deeplynx.helpers.exceptions;
 using deeplynx.helpers.Hubs;
@@ -27,6 +28,7 @@ public class RecordBusinessTests : IntegrationTestBase
     private RecordBusiness _recordBusiness;
     private TagBusiness _tagBusiness = null!;
     private BulkCopyUpsertExecutor _mockBulkCopyUpsertExecutor = null!;
+    private SensitivityLabelService _sensitivityLabelService = null!;
     public long cid; // class ID
     public long did; // datasource ID
     public long did2;
@@ -57,6 +59,7 @@ public class RecordBusinessTests : IntegrationTestBase
         await base.InitializeAsync();
         _mockHubContext = new Mock<IHubContext<EventNotificationHub>>();
         _mockNotificationLogger = new Mock<ILogger<NotificationBusiness>>();
+        _sensitivityLabelService = new SensitivityLabelService(Context);
         _notificationBusiness =
             new NotificationBusiness(Context, _mockNotificationLogger.Object, _mockHubContext.Object);
         _mockBulkCopyUpsertExecutor = new BulkCopyUpsertExecutor();
@@ -64,7 +67,7 @@ public class RecordBusinessTests : IntegrationTestBase
         _sensitivityLabelBusiness = new SensitivityLabelBusiness(Context, _eventBusiness);
         _tagBusiness = new TagBusiness(Context, _eventBusiness);
         _recordBusiness = new RecordBusiness(Context, _eventBusiness, _mockBulkCopyUpsertExecutor, _tagBusiness,
-            _sensitivityLabelBusiness);
+            _sensitivityLabelBusiness, _sensitivityLabelService);
     }
 
     #region RecordResponseDto Tests

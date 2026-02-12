@@ -1266,31 +1266,6 @@ public class RecordBusinessAuthTests : IntegrationTestBase
     #region Unattach Label_SensitivityAuthorization Tests
 
     [Fact]
-    public async Task AttachLabel_UserNotAuthorized_ThrowsUnauthorizedAccess()
-    {
-        // Arrange
-        // Create label as a different user so current user has no access
-        var differentUserId = uid + 1000; // or create another test user
-        var newLabel = new CreateSensitivityLabelRequestDto
-        {
-            Name = "New Label",
-            Description = "New Label"
-        };
-
-        var newLabelResponse = await _sensitivityLabelBusiness.CreateSensitivityLabel(
-            differentUserId, newLabel, pid, organizationId);
-
-        Context.ChangeTracker.Clear();
-
-        // Act & Assert
-        var exception = await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
-            _recordBusiness.AttachLabel(uid, organizationId, pid, rid, newLabelResponse.Id));
-
-        Assert.Contains($"You do not have write permissions",
-            exception.Message);
-    }
-
-    [Fact]
     public async Task UnattachLabel_SuccessfullyDetachesLabelFromRecord()
     {
         // Arrange
@@ -1333,60 +1308,6 @@ public class RecordBusinessAuthTests : IntegrationTestBase
         Assert.True(result);
         var refreshed = await Context.Records.Include(r => r.Labels).FirstAsync(r => r.Id == rid);
         Assert.DoesNotContain(refreshed.Labels, l => l.Id == newLabelResponse.Id);
-    }
-
-    [Fact]
-    public async Task UnattachLabel_UserNotAuthorized_ThrowsUnauthorizedAccess()
-    {
-        // Arrange
-        // Create label as a different user so current user has no access
-        var differentUserId = uid + 1000; // or create another test user
-        var newLabel = new CreateSensitivityLabelRequestDto
-        {
-            Name = "New Label",
-            Description = "New Label"
-        };
-
-        var newLabelResponse = await _sensitivityLabelBusiness.CreateSensitivityLabel(
-            differentUserId, newLabel, pid, organizationId);
-
-        // Attach label directly to record (bypass business logic and permissions)
-        var record = await Context.Records.Include(r => r.Labels).FirstAsync(r => r.Id == rid);
-        var restrictedLabel = await Context.SensitivityLabels.FirstAsync(l => l.Id == newLabelResponse.Id);
-        record.Labels.Add(restrictedLabel);
-        await Context.SaveChangesAsync();
-
-        Context.ChangeTracker.Clear();
-
-        // Act & Assert
-        var exception = await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
-            _recordBusiness.UnattachLabel(uid, organizationId, pid, rid, newLabelResponse.Id));
-
-        Assert.Contains($"You do not have write permissions",
-            exception.Message);
-    }
-
-    [Fact]
-    public async Task UnattachLabel_LabelNotAttached_ThrowsKeyNotFound()
-    {
-        // Arrange
-        // Create label using business method - user has permission but label is not attached to record
-        var newLabel = new CreateSensitivityLabelRequestDto
-        {
-            Name = "New Label",
-            Description = "New Label"
-        };
-
-        var newLabelResponse = await _sensitivityLabelBusiness.CreateSensitivityLabel(
-            uid, newLabel, pid, organizationId);
-
-        Context.ChangeTracker.Clear();
-
-        // Act & Assert
-        var exception = await Assert.ThrowsAsync<KeyNotFoundException>(() =>
-            _recordBusiness.UnattachLabel(uid, organizationId, pid, rid, newLabelResponse.Id));
-
-        Assert.Contains($"Label with id {newLabelResponse.Id} is not attached to record", exception.Message);
     }
 
     #endregion

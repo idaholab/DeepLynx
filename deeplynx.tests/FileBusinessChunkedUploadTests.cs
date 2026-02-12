@@ -2,6 +2,7 @@ using System.Text;
 using System.Text.Json.Nodes;
 using deeplynx.business;
 using deeplynx.datalayer.Models;
+using deeplynx.helpers;
 using deeplynx.helpers.BigData;
 using deeplynx.helpers.Hubs;
 using deeplynx.interfaces;
@@ -23,6 +24,7 @@ public class FileBusinessChunkedUploadTests : IntegrationTestBase
     private Mock<IEdgeBusiness> _edgeBusiness = null!;
     private EventBusiness _eventBusiness = null!;
     private SensitivityLabelBusiness _sensitivityLabelBusiness = null!;
+    private ISensitivityLabelService _sensitivityLabelService = null!;
     private FileBusiness _fileBusiness = null!;
     private Mock<IFileBusinessFactory> _fileBusinessFactory = null!;
     private Mock<IHubContext<EventNotificationHub>> _mockHubContext = null!;
@@ -67,8 +69,8 @@ public class FileBusinessChunkedUploadTests : IntegrationTestBase
 
         _tagBusiness = new TagBusiness(Context, _eventBusiness);
         _sensitivityLabelBusiness = new SensitivityLabelBusiness(Context, _eventBusiness);
-        
-        _recordBusiness = new RecordBusiness(Context, _eventBusiness, _mockBulkCopyExecutor,_tagBusiness, _sensitivityLabelBusiness);
+        _sensitivityLabelService = new SensitivityLabelService(Context);
+        _recordBusiness = new RecordBusiness(Context, _eventBusiness, _mockBulkCopyExecutor,_tagBusiness, _sensitivityLabelBusiness, _sensitivityLabelService);
         _classBusiness = new ClassBusiness(Context, _recordBusiness, _relationshipBusiness.Object, _eventBusiness);
 
         var realFileFilesystemBusiness =
@@ -196,7 +198,6 @@ public class FileBusinessChunkedUploadTests : IntegrationTestBase
 
         // Act
         var session = await _fileBusiness.StartUpload(
-            uid,
             oid,
             pid,
             did,
@@ -233,7 +234,7 @@ public class FileBusinessChunkedUploadTests : IntegrationTestBase
         };
 
         // Act: Start upload (should create chunked upload session)
-        var session = await _fileBusiness.StartUpload(uid, oid, pid, did, osid, initRequest);
+        var session = await _fileBusiness.StartUpload( oid, pid, did, osid, initRequest);
 
         // Assert: Should use chunking
         Assert.NotNull(session);
@@ -266,7 +267,7 @@ public class FileBusinessChunkedUploadTests : IntegrationTestBase
             FileSize = 1024
         };
 
-        var session = await _fileBusiness.StartUpload(uid, oid, pid, did, osid, initRequest);
+        var session = await _fileBusiness.StartUpload( oid, pid, did, osid, initRequest);
 
         var content = "CHUNK-0-CONTENT";
         var formFile = CreateFormFile(content);
@@ -283,7 +284,6 @@ public class FileBusinessChunkedUploadTests : IntegrationTestBase
 
         // Act
         var result = await _fileBusiness.UploadChunk(
-            uid,
             oid,
             pid,
             did,
@@ -312,12 +312,12 @@ public class FileBusinessChunkedUploadTests : IntegrationTestBase
             FileSize = 3072 // 3 chunks worth
         };
 
-        var session = await _fileBusiness.StartUpload(uid, oid, pid, did, osid, initRequest);
+        var session = await _fileBusiness.StartUpload( oid, pid, did, osid, initRequest);
 
         // Act: Upload chunks OUT OF ORDER (2, 0, 1)
-        await _fileBusiness.UploadChunk(uid, oid, pid, did, osid, CreateFormFile("CHUNK-2"), session.UploadId, 2);
-        await _fileBusiness.UploadChunk(uid, oid, pid, did, osid, CreateFormFile("CHUNK-0"), session.UploadId, 0);
-        await _fileBusiness.UploadChunk(uid, oid, pid, did, osid, CreateFormFile("CHUNK-1"), session.UploadId, 1);
+        await _fileBusiness.UploadChunk( oid, pid, did, osid, CreateFormFile("CHUNK-2"), session.UploadId, 2);
+        await _fileBusiness.UploadChunk( oid, pid, did, osid, CreateFormFile("CHUNK-0"), session.UploadId, 0);
+        await _fileBusiness.UploadChunk( oid, pid, did, osid, CreateFormFile("CHUNK-1"), session.UploadId, 1);
 
         var completeRequest = new FileUploadCompleteRequestDto
         {
@@ -345,15 +345,15 @@ public class FileBusinessChunkedUploadTests : IntegrationTestBase
     {
         // Arrange
         var session = await _fileBusiness.StartUpload(
-            uid, oid, pid, did, osid,
+            oid, pid, did, osid,
             new FileUploadInitRequestDto { FileName = "duplicate.txt", FileSize = 2048 }
         );
 
         // Act: Upload chunk 0 twice with different content
-        await _fileBusiness.UploadChunk(uid, oid, pid, did, osid, CreateFormFile("FIRST"), session.UploadId, 0);
-        await _fileBusiness.UploadChunk(uid, oid, pid, did, osid, CreateFormFile("SECOND"), session.UploadId,
+        await _fileBusiness.UploadChunk( oid, pid, did, osid, CreateFormFile("FIRST"), session.UploadId, 0);
+        await _fileBusiness.UploadChunk( oid, pid, did, osid, CreateFormFile("SECOND"), session.UploadId,
             0); // Overwrites
-        await _fileBusiness.UploadChunk(uid, oid, pid, did, osid, CreateFormFile("CHUNK-1"), session.UploadId, 1);
+        await _fileBusiness.UploadChunk( oid, pid, did, osid, CreateFormFile("CHUNK-1"), session.UploadId, 1);
 
         var completeRequest = new FileUploadCompleteRequestDto
         {
@@ -376,14 +376,14 @@ public class FileBusinessChunkedUploadTests : IntegrationTestBase
     {
         // Arrange
         var session = await _fileBusiness.StartUpload(
-            uid, oid, pid, did, osid,
+            oid, pid, did, osid,
             new FileUploadInitRequestDto { FileName = "empty-chunk.txt", FileSize = 2048 }
         );
 
         // Act & Assert: Empty chunk should throw ArgumentException
         await Assert.ThrowsAsync<ArgumentException>(() =>
             _fileBusiness.UploadChunk(
-                uid, oid, pid, did, osid,
+                oid, pid, did, osid,
                 CreateFormFile(""), // Empty chunk
                 session.UploadId,
                 0
@@ -396,14 +396,14 @@ public class FileBusinessChunkedUploadTests : IntegrationTestBase
     {
         // Arrange
         var session = await _fileBusiness.StartUpload(
-            uid, oid, pid, did, osid,
+            oid, pid, did, osid,
             new FileUploadInitRequestDto { FileName = "null-chunk.txt", FileSize = 2048 }
         );
 
         // Act & Assert: Null chunk should throw ArgumentException
         await Assert.ThrowsAsync<ArgumentException>(() =>
             _fileBusiness.UploadChunk(
-                uid, oid, pid, did, osid,
+                oid, pid, did, osid,
                 null!, // Null chunk
                 session.UploadId,
                 0
@@ -419,7 +419,7 @@ public class FileBusinessChunkedUploadTests : IntegrationTestBase
         // Act & Assert: Upload chunk with non-existent uploadId
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
             _fileBusiness.UploadChunk(
-                uid, oid, pid, did, osid,
+                oid, pid, did, osid,
                 CreateFormFile("chunk"),
                 "non-existent-upload-id",
                 0
@@ -442,14 +442,14 @@ public class FileBusinessChunkedUploadTests : IntegrationTestBase
             FileSize = 2048
         };
 
-        var session = await _fileBusiness.StartUpload(uid, oid, pid, did, osid, initRequest);
+        var session = await _fileBusiness.StartUpload( oid, pid, did, osid, initRequest);
 
         // Upload two chunks
         var chunk0 = CreateFormFile("first-");
-        await _fileBusiness.UploadChunk(uid, oid, pid, did, osid, chunk0, session.UploadId, 0);
+        await _fileBusiness.UploadChunk( oid, pid, did, osid, chunk0, session.UploadId, 0);
 
         var chunk1 = CreateFormFile("second");
-        await _fileBusiness.UploadChunk(uid, oid, pid, did, osid, chunk1, session.UploadId, 1);
+        await _fileBusiness.UploadChunk( oid, pid, did, osid, chunk1, session.UploadId, 1);
 
         var completeRequest = new FileUploadCompleteRequestDto
         {
@@ -492,13 +492,13 @@ public class FileBusinessChunkedUploadTests : IntegrationTestBase
     {
         // Arrange
         var session = await _fileBusiness.StartUpload(
-            uid, oid, pid, did, osid,
+            oid, pid, did, osid,
             new FileUploadInitRequestDto { FileName = "test.txt", FileSize = 2048 }
         );
 
         // Upload only chunk 0, skip chunk 1
         await _fileBusiness.UploadChunk(
-            uid, oid, pid, did, osid,
+            oid, pid, did, osid,
             CreateFormFile("chunk0"),
             session.UploadId,
             0
@@ -532,7 +532,7 @@ public class FileBusinessChunkedUploadTests : IntegrationTestBase
     {
         // Arrange: Create known content chunks
         var session = await _fileBusiness.StartUpload(
-            uid, oid, pid, did, osid,
+            oid, pid, did, osid,
             new FileUploadInitRequestDto { FileName = "integrity-test.txt", FileSize = 3072 }
         );
 
@@ -541,9 +541,9 @@ public class FileBusinessChunkedUploadTests : IntegrationTestBase
         var chunk2Content = "CCCC";
 
         // Act: Upload chunks with known content
-        await _fileBusiness.UploadChunk(uid, oid, pid, did, osid, CreateFormFile(chunk0Content), session.UploadId, 0);
-        await _fileBusiness.UploadChunk(uid, oid, pid, did, osid, CreateFormFile(chunk1Content), session.UploadId, 1);
-        await _fileBusiness.UploadChunk(uid, oid, pid, did, osid, CreateFormFile(chunk2Content), session.UploadId, 2);
+        await _fileBusiness.UploadChunk( oid, pid, did, osid, CreateFormFile(chunk0Content), session.UploadId, 0);
+        await _fileBusiness.UploadChunk( oid, pid, did, osid, CreateFormFile(chunk1Content), session.UploadId, 1);
+        await _fileBusiness.UploadChunk( oid, pid, did, osid, CreateFormFile(chunk2Content), session.UploadId, 2);
 
         var completeRequest = new FileUploadCompleteRequestDto
         {
@@ -570,7 +570,7 @@ public class FileBusinessChunkedUploadTests : IntegrationTestBase
     {
         // Arrange: Simulate larger chunks with binary data
         var session = await _fileBusiness.StartUpload(
-            uid, oid, pid, did, osid,
+            oid, pid, did, osid,
             new FileUploadInitRequestDto { FileName = "binary-test.bin", FileSize = 1024 * 1024 }
         );
 
@@ -583,9 +583,9 @@ public class FileBusinessChunkedUploadTests : IntegrationTestBase
             chunk1Data[i] = (byte)(255 - i); // 255-0
         }
 
-        await _fileBusiness.UploadChunk(uid, oid, pid, did, osid, CreateFormFileFromBytes(chunk0Data), session.UploadId,
+        await _fileBusiness.UploadChunk( oid, pid, did, osid, CreateFormFileFromBytes(chunk0Data), session.UploadId,
             0);
-        await _fileBusiness.UploadChunk(uid, oid, pid, did, osid, CreateFormFileFromBytes(chunk1Data), session.UploadId,
+        await _fileBusiness.UploadChunk( oid, pid, did, osid, CreateFormFileFromBytes(chunk1Data), session.UploadId,
             1);
 
         var completeRequest = new FileUploadCompleteRequestDto
@@ -615,7 +615,7 @@ public class FileBusinessChunkedUploadTests : IntegrationTestBase
     {
         // Arrange: Start upload but don't upload any chunks
         var session = await _fileBusiness.StartUpload(
-            uid, oid, pid, did, osid,
+            oid, pid, did, osid,
             new FileUploadInitRequestDto { FileName = "no-chunks.txt", FileSize = 2048 }
         );
 
@@ -638,7 +638,7 @@ public class FileBusinessChunkedUploadTests : IntegrationTestBase
     {
         // Arrange
         var session = await _fileBusiness.StartUpload(
-            uid, oid, pid, did, osid,
+            oid, pid, did, osid,
             new FileUploadInitRequestDto { FileName = "cleanup-test.txt", FileSize = 2048 }
         );
 
@@ -651,8 +651,8 @@ public class FileBusinessChunkedUploadTests : IntegrationTestBase
             session.UploadId
         );
 
-        await _fileBusiness.UploadChunk(uid, oid, pid, did, osid, CreateFormFile("chunk0"), session.UploadId, 0);
-        await _fileBusiness.UploadChunk(uid, oid, pid, did, osid, CreateFormFile("chunk1"), session.UploadId, 1);
+        await _fileBusiness.UploadChunk( oid, pid, did, osid, CreateFormFile("chunk0"), session.UploadId, 0);
+        await _fileBusiness.UploadChunk( oid, pid, did, osid, CreateFormFile("chunk1"), session.UploadId, 1);
 
         // Verify upload directory exists before complete
         Assert.True(Directory.Exists(uploadPath));

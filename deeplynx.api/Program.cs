@@ -173,7 +173,7 @@ try
     builder.Services.AddTransient<IProjectRolePermissionService, ProjectRolePermissionService>();
     builder.Services.AddTransient<IOrgRolePermissionService, OrgRolePermissionService>();
     builder.Services.AddScoped<IBulkCopyUpsertExecutor, BulkCopyUpsertExecutor>();
-    builder.Services.AddTransient<ISysAdminService, SysAdminService>();
+    builder.Services.AddTransient<IAdminService, AdminService>();
     builder.Services.AddTransient<IOauthHandshakeBusiness, OauthHandshakeBusiness>();
     builder.Services.AddTransient<IOrganizationService, OrganizationService>();
     builder.Services.AddTransient<ISavedSearchBusiness, SavedSearchBusiness>();

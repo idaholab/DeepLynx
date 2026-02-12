@@ -29,7 +29,7 @@ public class AuthMiddleware
     }
 
     public async Task InvokeAsync(HttpContext context, IOrgRolePermissionService orgRolePermissionService,
-        IProjectRolePermissionService projectRolePermissionService, ISysAdminService sysAdminService,
+        IProjectRolePermissionService projectRolePermissionService, IAdminService adminService,
         IOrganizationService organizationService)
     {
         var endpoint = context.GetEndpoint();
@@ -57,7 +57,7 @@ public class AuthMiddleware
             return;
         }
 
-        var isSysAdmin = await sysAdminService.SysAdminCheck(userId);
+        var isSysAdmin = await adminService.SysAdminCheck(userId);
 
         int? organizationId = null;
         var projectIds = new List<int>();

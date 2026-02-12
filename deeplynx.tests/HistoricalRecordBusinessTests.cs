@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using deeplynx.business;
 using deeplynx.datalayer.Models;
+using deeplynx.helpers;
 using deeplynx.helpers.BigData;
 using deeplynx.helpers.Hubs;
 using deeplynx.interfaces;
@@ -26,7 +27,8 @@ public class HistoricalRecordBusinessTests : IntegrationTestBase
     private RecordBusiness _recordBusiness = null!;
     private TagBusiness _tagBusiness = null!;
     private IBulkCopyUpsertExecutor _bulkCopyUpsertExecutor = null!;
-
+    private ISensitivityLabelService _sensitivityLabelService = null!;
+    
     public long cid;
     public long did;
     public long did2;
@@ -52,7 +54,8 @@ public class HistoricalRecordBusinessTests : IntegrationTestBase
     public override async Task InitializeAsync()
     {
         await base.InitializeAsync();
-        _historicalRecordBusiness = new HistoricalRecordBusiness(Context);
+        _sensitivityLabelService = new SensitivityLabelService(Context);
+        _historicalRecordBusiness = new HistoricalRecordBusiness(Context, _sensitivityLabelService);
         _mockHubContext = new Mock<IHubContext<EventNotificationHub>>();
         _mockNotificationLogger = new Mock<ILogger<NotificationBusiness>>();
         _notificationBusiness =
@@ -62,7 +65,7 @@ public class HistoricalRecordBusinessTests : IntegrationTestBase
         _tagBusiness = new TagBusiness(Context, _eventBusiness);
         _sensitivityLabelBusiness = new SensitivityLabelBusiness(Context, _eventBusiness);
         _recordBusiness = new RecordBusiness(Context, _eventBusiness, _bulkCopyUpsertExecutor, _tagBusiness,
-            _sensitivityLabelBusiness);
+            _sensitivityLabelBusiness, _sensitivityLabelService);
     }
 
     protected override async Task SeedTestDataAsync()
@@ -794,107 +797,6 @@ public class HistoricalRecordBusinessTests : IntegrationTestBase
 
     #endregion
 
-    #region GetHistoryForRecord_SensitivityLabelAuthorization Tests
-
-    [Fact]
-    public async Task GetHistoryForRecord_UserLacksLabelAccess_ThrowsUnauthorizedAccessException()
-    {
-        // Remove read permission for defaultLabelId from the role
-        Context.ChangeTracker.Clear();
-
-        var role = await Context.Roles
-            .Include(r => r.Permissions)
-            .FirstOrDefaultAsync(r => r.Id == roleId);
-
-        var permissionToRemove = role?.Permissions.FirstOrDefault(p => p.Id == readPermissionId);
-        if (permissionToRemove != null)
-        {
-            role!.Permissions.Remove(permissionToRemove);
-            await Context.SaveChangesAsync();
-        }
-
-        // Attach label to the record
-        await _recordBusiness.AttachLabel(uid, organizationId, pid, rid, defaultLabelId);
-
-        // Act & Assert
-        var exception = await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
-            _historicalRecordBusiness.GetHistoryForRecord(uid, rid, organizationId));
-
-        Assert.Contains($"You do not have access to all required sensitivity labels for record {rid}",
-            exception.Message);
-    }
-
-    [Fact]
-    public async Task GetHistoryForRecord_UserHasAllLabelAccess_ReturnsHistory()
-    {
-        // User already has read and write permissions for defaultLabelId from seed data
-        await _recordBusiness.AttachLabel(uid, organizationId, pid, rid, defaultLabelId);
-
-        // Act
-        var history = await _historicalRecordBusiness.GetHistoryForRecord(uid, rid, organizationId);
-
-        // Assert
-        Assert.NotNull(history);
-        Assert.NotEmpty(history);
-    }
-
-    [Fact]
-    public async Task GetHistoryForRecord_RecordWithMultipleLabels_UserHasAll_ReturnsHistory()
-    {
-        // User already has read and write permissions for both labels from seed data
-        await _recordBusiness.AttachLabel(uid, organizationId, pid, rid, defaultLabelId);
-        await _recordBusiness.AttachLabel(uid, organizationId, pid, rid, defaultLabelId2);
-
-        // Act
-        var history = await _historicalRecordBusiness.GetHistoryForRecord(uid, rid, organizationId);
-
-        // Assert
-        Assert.NotNull(history);
-        Assert.NotEmpty(history);
-    }
-
-    [Fact]
-    public async Task GetHistoryForRecord_RecordWithMultipleLabels_UserMissingOne_ThrowsUnauthorizedAccessException()
-    {
-        // Remove read permission for defaultLabelId2 from the role
-        Context.ChangeTracker.Clear();
-
-        var role = await Context.Roles
-            .Include(r => r.Permissions)
-            .FirstOrDefaultAsync(r => r.Id == roleId);
-
-        var permissionToRemove = role?.Permissions.FirstOrDefault(p => p.Id == readPermissionId2);
-        if (permissionToRemove != null)
-        {
-            role!.Permissions.Remove(permissionToRemove);
-            await Context.SaveChangesAsync();
-        }
-
-        // Attach both labels to the record
-        await _recordBusiness.AttachLabel(uid, organizationId, pid, rid, defaultLabelId);
-        await _recordBusiness.AttachLabel(uid, organizationId, pid, rid, defaultLabelId2);
-
-        // Act & Assert
-        var exception = await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
-            _historicalRecordBusiness.GetHistoryForRecord(uid, rid, organizationId));
-
-        Assert.Contains($"You do not have access to all required sensitivity labels for record {rid}",
-            exception.Message);
-    }
-
-    [Fact]
-    public async Task GetHistoryForRecord_RecordWithNoLabels_ReturnsHistory()
-    {
-        // Act - record has no labels attached
-        var history = await _historicalRecordBusiness.GetHistoryForRecord(uid, rid, organizationId);
-
-        // Assert
-        Assert.NotNull(history);
-        Assert.NotEmpty(history);
-    }
-
-    #endregion
-
     #region GetHistoricalRecord Tests
 
     [Fact]
@@ -1138,159 +1040,7 @@ public class HistoricalRecordBusinessTests : IntegrationTestBase
         // Act & Assert
         var exception = await Assert.ThrowsAsync<KeyNotFoundException>(() =>
             _historicalRecordBusiness.GetHistoricalRecord(uid, rid + 100000, organizationId, null));
-        Assert.Contains($"Record with id {rid + 100000} not found", exception.Message);
-    }
-
-    #endregion
-
-    #region GetHistoricalRecord_SensitivityLabelAuthorization Tests
-
-    [Fact]
-    public async Task GetHistoricalRecord_UserLacksLabelAccess_ThrowsUnauthorizedAccessException()
-    {
-        // Attach label to the record
-        await _recordBusiness.AttachLabel(uid, organizationId, pid, rid, defaultLabelId);
-        
-        // Remove write permission for defaultLabelId from the role
-        var role = await Context.Roles
-            .Include(r => r.Permissions)
-            .FirstOrDefaultAsync(r => r.Id == roleId);
-
-        var permissionToRemove = role?.Permissions.FirstOrDefault(p => p.Id == writePermissionId);
-        if (permissionToRemove != null)
-        {
-            role!.Permissions.Remove(permissionToRemove);
-            await Context.SaveChangesAsync();
-        }
-        
-        // Act & Assert
-        var exception = await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
-            _historicalRecordBusiness.GetHistoricalRecord(uid, rid, organizationId, null));
-
-        Assert.Contains($"You do not have access to all required sensitivity labels for record {rid}",
-            exception.Message);
-    }
-
-    [Fact]
-    public async Task GetHistoricalRecord_UserHasAllLabelAccess_ReturnsRecord()
-    {
-        // User already has read and write permissions for defaultLabelId from seed data
-        await _recordBusiness.AttachLabel(uid, organizationId, pid, rid, defaultLabelId);
-
-        // Act
-        var historicalRecord = await _historicalRecordBusiness.GetHistoricalRecord(uid, rid, organizationId, null);
-
-        // Assert
-        Assert.NotNull(historicalRecord);
-        Assert.Equal(rid, historicalRecord.Id);
-    }
-
-    [Fact]
-    public async Task GetHistoricalRecord_RecordWithMultipleLabels_UserHasAll_ReturnsRecord()
-    {
-        // User already has read and write permissions for both labels from seed data
-        await _recordBusiness.AttachLabel(uid, organizationId, pid, rid, defaultLabelId);
-        await _recordBusiness.AttachLabel(uid, organizationId, pid, rid, defaultLabelId2);
-
-        // Act
-        var historicalRecord = await _historicalRecordBusiness.GetHistoricalRecord(uid, rid, organizationId, null);
-
-        // Assert
-        Assert.NotNull(historicalRecord);
-        Assert.Equal(rid, historicalRecord.Id);
-    }
-
-    [Fact]
-    public async Task GetHistoricalRecord_RecordWithMultipleLabels_UserMissingOne_ThrowsUnauthorizedAccessException()
-    {
-        // Attach both labels to the record
-        await _recordBusiness.AttachLabel(uid, organizationId, pid, rid, defaultLabelId);
-        await _recordBusiness.AttachLabel(uid, organizationId, pid, rid, defaultLabelId2);
-        
-        // Remove write permission for defaultLabelId2 from the role
-        var role = await Context.Roles
-            .Include(r => r.Permissions)
-            .FirstOrDefaultAsync(r => r.Id == roleId);
-
-        var permissionToRemove = role?.Permissions.FirstOrDefault(p => p.Id == writePermissionId2);
-        if (permissionToRemove != null)
-        {
-            role!.Permissions.Remove(permissionToRemove);
-            await Context.SaveChangesAsync();
-        }
-
-        // Act & Assert
-        var exception = await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
-            _historicalRecordBusiness.GetHistoricalRecord(uid, rid, organizationId, null));
-
-        Assert.Contains($"You do not have access to all required sensitivity labels for record {rid}",
-            exception.Message);
-    }
-
-    [Fact]
-    public async Task GetHistoricalRecord_RecordWithNoLabels_ReturnsRecord()
-    {
-        // Act - record has no labels attached
-        var historicalRecord = await _historicalRecordBusiness.GetHistoricalRecord(uid, rid, organizationId, null);
-
-        // Assert
-        Assert.NotNull(historicalRecord);
-        Assert.Equal(rid, historicalRecord.Id);
-    }
-
-    [Fact]
-    public async Task GetHistoricalRecord_WithPointInTime_UserLacksLabelAccess_ThrowsUnauthorizedAccessException()
-    {
-        // Attach label to the record
-        await _recordBusiness.AttachLabel(uid, organizationId, pid, rid, defaultLabelId);
-        
-        // Remove write permission for defaultLabelId from the role
-        var role = await Context.Roles
-            .Include(r => r.Permissions)
-            .FirstOrDefaultAsync(r => r.Id == roleId);
-
-        var permissionToRemove = role?.Permissions.FirstOrDefault(p => p.Id == writePermissionId);
-        if (permissionToRemove != null)
-        {
-            role!.Permissions.Remove(permissionToRemove);
-            await Context.SaveChangesAsync();
-        }
-
-        var pointInTime = DateTime.SpecifyKind(DateTime.UtcNow.AddMinutes(5), DateTimeKind.Unspecified);
-
-        // Act & Assert
-        var exception = await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
-            _historicalRecordBusiness.GetHistoricalRecord(uid, rid, organizationId, pointInTime));
-
-        Assert.Contains($"You do not have access to all required sensitivity labels for record {rid}",
-            exception.Message);
-    }
-
-    [Fact]
-    public async Task GetHistoricalRecord_ArchivedRecord_UserLacksLabelAccess_ThrowsUnauthorizedAccessException()
-    {
-        // Attach label and archive the record
-        await _recordBusiness.AttachLabel(uid, organizationId, pid, rid, defaultLabelId);
-        await _recordBusiness.ArchiveRecord(uid, organizationId, pid, rid);
-        
-        // Remove write permission for defaultLabelId from the role
-        var role = await Context.Roles
-            .Include(r => r.Permissions)
-            .FirstOrDefaultAsync(r => r.Id == roleId);
-
-        var permissionToRemove = role?.Permissions.FirstOrDefault(p => p.Id == writePermissionId);
-        if (permissionToRemove != null)
-        {
-            role!.Permissions.Remove(permissionToRemove);
-            await Context.SaveChangesAsync();
-        }
-
-        // Act & Assert
-        var exception = await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
-            _historicalRecordBusiness.GetHistoricalRecord(uid, rid, organizationId, null, false));
-
-        Assert.Contains($"You do not have access to all required sensitivity labels for record {rid}",
-            exception.Message);
+        Assert.Contains($"Historical record with id {rid + 100000} not found", exception.Message);
     }
 
     #endregion

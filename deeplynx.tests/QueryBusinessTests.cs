@@ -1,6 +1,7 @@
 using System.Text.Json;
 using deeplynx.business;
 using deeplynx.datalayer.Models;
+using deeplynx.helpers;
 using deeplynx.helpers.Hubs;
 using deeplynx.interfaces;
 using deeplynx.models;
@@ -25,6 +26,7 @@ public class QueryBusinessTests : IntegrationTestBase
     private TagBusiness _tagBusiness = null!;
     private BulkCopyUpsertExecutor _mockBulkCopyUpsertExecutor = null!;
     private QueryBusiness _queryBusiness = null!;
+    private ISensitivityLabelService _sensitivityLabelService = null!;
     private long uid;
     private long cid;
     private long cid2;
@@ -48,6 +50,7 @@ public class QueryBusinessTests : IntegrationTestBase
     public override async Task InitializeAsync()
     {
         await base.InitializeAsync();
+        _sensitivityLabelService = new SensitivityLabelService(Context);
         _mockHubContext = new Mock<IHubContext<EventNotificationHub>>();
         _mockNotificationLogger = new Mock<ILogger<NotificationBusiness>>();
         _notificationBusiness =
@@ -57,8 +60,8 @@ public class QueryBusinessTests : IntegrationTestBase
         _sensitivityLabelBusiness = new SensitivityLabelBusiness(Context, _eventBusiness);
         _tagBusiness = new TagBusiness(Context, _eventBusiness);
         _recordBusiness = new RecordBusiness(Context, _eventBusiness, _mockBulkCopyUpsertExecutor, _tagBusiness,
-            _sensitivityLabelBusiness);
-        _queryBusiness = new QueryBusiness(Context);
+            _sensitivityLabelBusiness, _sensitivityLabelService);
+        _queryBusiness = new QueryBusiness(Context, _sensitivityLabelService);
     }
 
     protected override async Task SeedTestDataAsync()

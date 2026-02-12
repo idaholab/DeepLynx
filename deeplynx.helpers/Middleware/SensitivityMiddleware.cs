@@ -50,7 +50,7 @@ public class SensitivityMiddleware
     public async Task InvokeAsync(
         HttpContext context,
         ISensitivityLabelService sensitivityLabelService,
-        ISysAdminService sysAdminService)
+        IAdminService adminService)
     {
         var endpoint = context.GetEndpoint();
         if (endpoint == null)
@@ -76,14 +76,21 @@ public class SensitivityMiddleware
             return;
         }
 
-        var isSysAdmin = await sysAdminService.SysAdminCheck(userId);
+        var isSysAdmin = await adminService.SysAdminCheck(userId);
         if (isSysAdmin)
         {
             await _next(context);
             return;
         }
-
+        
         var organizationId = UserContextStorage.OrganizationId;
+        
+        var isOrgAdmin = await adminService.OrgAdminCheck(userId, organizationId);
+        if (isOrgAdmin)
+        {
+            await _next(context);
+            return;
+        }
         
         var projectIds = new List<long>();
         var routeProjectId = context.GetRouteValue("projectId")?.ToString();
@@ -99,6 +106,16 @@ public class SensitivityMiddleware
                         if (long.TryParse(id.Trim(), out var parsedId) && !projectIds.Contains(parsedId))
                             projectIds.Add(parsedId);
                 }
+
+        if (projectIds.Count > 0)
+        {
+            var isProjectAdmin = await adminService.ProjectAdminCheck(userId, organizationId, projectIds);
+            if (isProjectAdmin)
+            {
+                await _next(context);
+                return;
+            }
+        }
 
         var providedLabelIds = new List<long>();
         
