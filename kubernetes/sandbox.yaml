@@ -18,13 +18,14 @@ stringData:
   azurestorageaccountname: gvadeeplynxnextstdevsa
   azurestorageaccountsastoken: ${AZURE_STORAGE_ACCOUNT_SAS_TOKEN}
   azurestorageaccountkey: ${AZURE_STORAGE_ACCOUNT_KEY}
+  azurestorageconnectionstring: ${AZURE_OBJECT_CONNECTION_STRING}
   
 ---
 # Persistent Volume pointing to existing Azure File Share
 apiVersion: v1
 kind: PersistentVolume
 metadata:
-  name: nexus-duckdb-pv
+  name: nexus-duckdb-pv-test
   namespace: deeplynx-test
 spec:
   capacity:
@@ -32,7 +33,7 @@ spec:
   accessModes:
     - ReadWriteMany
   persistentVolumeReclaimPolicy: Retain
-  storageClassName: azurefile-nexus-duckdb
+  storageClassName: azurefile-nexus-duckdb-test
   mountOptions:
     - dir_mode=0777
     - file_mode=0777
@@ -61,7 +62,7 @@ spec:
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
-  name: azurefile-nexus-duckdb
+  name: azurefile-nexus-duckdb-test
   namespace: deeplynx-test
 provisioner: file.csi.azure.com
 parameters:
@@ -75,7 +76,7 @@ volumeBindingMode: Immediate
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: deeplynx-nexus-duckdb
+  name: deeplynx-nexus-duckdb-test
   namespace: deeplynx-test
 spec:
   accessModes:
@@ -83,8 +84,8 @@ spec:
   resources:
     requests:
       storage: 60Gi
-  storageClassName: azurefile-nexus-duckdb
-  volumeName: nexus-duckdb-pv  # Bind to the specific PV
+  storageClassName: azurefile-nexus-duckdb-test
+  volumeName: nexus-duckdb-pv-test  # Bind to the specific PV
 
 ---
 apiVersion: apps/v1
@@ -231,7 +232,7 @@ spec:
       volumes:
         - name: duckdb-storage
           persistentVolumeClaim:
-            claimName: deeplynx-nexus-duckdb
+            claimName: deeplynx-nexus-duckdb-test
 
 ---
 apiVersion: apps/v1
@@ -370,7 +371,7 @@ spec:
       volumes:
         - name: duckdb-storage
           persistentVolumeClaim:
-            claimName: deeplynx-nexus-duckdb
+            claimName: deeplynx-nexus-duckdb-test
 
 ---
 #docs

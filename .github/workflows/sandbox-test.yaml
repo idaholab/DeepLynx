@@ -140,7 +140,7 @@ jobs:
             --from-literal=auth-url="${{ vars.NEXTAUTH_URL }}" \
             --from-literal=redirect-link="${{ vars.REDIRECT_LINK }}" \
             --from-literal=backend-base-url="${{ vars.BACKEND_BASE_URL }}" \
-            --from-literal=disabled-front-auth="${{ vars.DISABLNEXT_PUBLIC_DISABLE_FRONTEND_AUTHENTICATIONE_FRONTEND_AUTHENTICATION }}" \
+            --from-literal=disabled-front-auth="${{ vars.NEXT_PUBLIC_DISABLE_FRONTEND_AUTHENTICATION }}" \
             --from-literal=hosted-link="${{ vars.HOSTED_LINK }}" \
             --namespace=deeplynx-test \
             --dry-run=client -o yaml | kubectl apply -f -
