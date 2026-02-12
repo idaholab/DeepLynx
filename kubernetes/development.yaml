@@ -25,7 +25,7 @@ stringData:
 apiVersion: v1
 kind: PersistentVolume
 metadata:
-  name: nexus-duckdb-pv
+  name: ${AZURE_FILE_SHARE_PERSISTENT_VOLUME}
   namespace: deeplynxv3-dev
 spec:
   capacity:
@@ -33,7 +33,7 @@ spec:
   accessModes:
     - ReadWriteMany
   persistentVolumeReclaimPolicy: Retain
-  storageClassName: azurefile-nexus-duckdb
+  storageClassName: ${AZURE_FILE_SHARE_STORAGE_CLASS}
   mountOptions:
     - dir_mode=0777
     - file_mode=0777
@@ -46,7 +46,7 @@ spec:
   csi:
     driver: file.csi.azure.com
     readOnly: false
-    volumeHandle: nexus-duckdb-volume-handle  # Unique ID for this volume
+    volumeHandle: ${AZURE_FILE_SHARE_VOLUME_HANDLE}  # Unique ID for this volume
     volumeAttributes:
       resourceGroup: ${AZURE_ACCOUNT_RESOURCE_GROUP}
       storageAccount: ${AZURE_STORAGE_ACCOUNT_NAME}
@@ -62,7 +62,7 @@ spec:
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
-  name: azurefile-nexus-duckdb
+  name: ${AZURE_FILE_SHARE_STORAGE_CLASS}
   namespace: deeplynxv3-dev
 provisioner: file.csi.azure.com
 parameters:
@@ -76,7 +76,7 @@ volumeBindingMode: Immediate
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: deeplynx-nexus-duckdb
+  name: ${AZURE_FILE_SHARE_PVC}
   namespace: deeplynxv3-dev
 spec:
   accessModes:
@@ -84,7 +84,7 @@ spec:
   resources:
     requests:
       storage: 60Gi
-  storageClassName: azurefile-nexus-duckdb
+  storageClassName: ${AZURE_FILE_SHARE_STORAGE_CLASS}
   volumeName: nexus-duckdb-pv  # Bind to the specific PV
 
 ---
@@ -232,7 +232,7 @@ spec:
       volumes:
         - name: duckdb-storage
           persistentVolumeClaim:
-            claimName: deeplynx-nexus-duckdb
+            claimName: ${AZURE_FILE_SHARE_PVC}
 
 ---
 apiVersion: apps/v1
@@ -371,7 +371,7 @@ spec:
       volumes:
         - name: duckdb-storage
           persistentVolumeClaim:
-            claimName: deeplynx-nexus-duckdb
+            claimName: ${AZURE_FILE_SHARE_PVC}
 
 ---
 #docs
