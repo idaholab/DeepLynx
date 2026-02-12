@@ -14,8 +14,15 @@ namespace deeplynx.datalayer.Migrations
         {
             // Read mount path from environment variable
             Env.Load("../.env");
-            var mountPath = Environment.GetEnvironmentVariable("STORAGE_DIRECTORY") ?? "/data/duckdb";
-            
+            var mountPath = "";
+            if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("STORAGE_DIRECTORY")))
+            {
+                mountPath = "../data/duckdb";
+            }
+            else
+            {
+                mountPath = "/data/duckdb";
+            }
             // Escape the path for JSON
             var escapedPath = mountPath.Replace("\\", "\\\\").Replace("\"", "\\\"");
             // Step 1: Update Instance Default mount path to value from env variable
