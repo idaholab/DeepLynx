@@ -46,7 +46,7 @@ spec:
   csi:
     driver: file.csi.azure.com
     readOnly: false
-    volumeHandle: nexus-duckdb-volume-handle  # Unique ID for this volume
+    volumeHandle: nexus-duckdb-volume-handle-test  # Unique ID for this volume
     volumeAttributes:
       resourceGroup: ${AZURE_ACCOUNT_RESOURCE_GROUP}
       storageAccount: ${AZURE_STORAGE_ACCOUNT_NAME}
