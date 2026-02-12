@@ -638,52 +638,7 @@ public class NexusAuthenticationMiddleware : JwtBearerHandler
         var hashBytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(jti));
         return Convert.ToBase64String(hashBytes);
     }
-
-    private static string? ExtractEmailFromPrincipal(ClaimsPrincipal principal)
-    {
-        var candidates = new (string claimType, string? value)[]
-        {
-            // 1) Test expects nameidentifier to win over everything else
-            ("nameidentifier",
-                principal.FindFirst("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier")?.Value),
-
-            // 2) Then ClaimTypes.Email should win over "email"
-            (ClaimTypes.Email, principal.FindFirst(ClaimTypes.Email)?.Value),
-            ("email", principal.FindFirst("email")?.Value),
-
-            // 3) Then other common options
-            ("preferred_username", principal.FindFirst("preferred_username")?.Value),
-            ("upn", principal.FindFirst("upn")?.Value),
-            ("mail", principal.FindFirst("mail")?.Value),
-            ("unique_name", principal.FindFirst("unique_name")?.Value),
-            ("username", principal.FindFirst("username")?.Value),
-
-            // 4) Only accept if it looks like an email
-            ("sub", principal.FindFirst("sub")?.Value),
-            ("name", principal.FindFirst("name")?.Value)
-        };
-        foreach (var (claimType, raw) in candidates)
-        {
-            if (string.IsNullOrWhiteSpace(raw)) continue;
-
-            var candidate = raw.Trim().ToLowerInvariant();
-
-            // Normalize known internal domains
-            if (candidate.EndsWith("@azuregov.inl.gov"))
-                candidate = candidate.Replace("@azuregov.inl.gov", "@inl.gov");
-
-            // Basic sanity: must contain '@' and a '.' in the domain part
-            var atIndex = candidate.IndexOf('@');
-            if (atIndex <= 0) continue;
-            var domainPart = candidate.Substring(atIndex + 1);
-            if (string.IsNullOrWhiteSpace(domainPart) || !domainPart.Contains('.')) continue;
-
-            return candidate;
-        }
-
-        return null;
-    }
-
+    
     private class CachedEntraToken
     {
         public ClaimsPrincipal Principal { get; set; } = null!;
