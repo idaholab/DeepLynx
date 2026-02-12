@@ -22,7 +22,7 @@ fi
 
 # 1. Figure out volume name for given container and rename to ${NAME}_OLD
 echo "Step 1: Identifying current volume..."
-OLD_VOLUME_NAME=$(docker inspect ${CONTAINER_NAME} --format '{{range .Mounts}}{{if eq .Destination "/var/lib/postgresql/data"}}{{.Name}}{{end}}{{end}}')
+OLD_VOLUME_NAME=$(docker inspect ${CONTAINER_NAME} --format '{{range .Mounts}}{{if or (eq .Destination "/var/lib/postgresql/data") (eq .Destination "/var/lib/postgresql")}}{{.Name}}{{end}}{{end}}')
 
 if [ -z "$OLD_VOLUME_NAME" ]; then
     echo "Error: Could not find mounted volume for PostgreSQL data."
