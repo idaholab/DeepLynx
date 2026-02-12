@@ -463,16 +463,7 @@ public class NexusAuthenticationMiddleware : JwtBearerHandler
     {
         try
         {
-            // Updated email extraction - prioritize preferred_username for Entra tokens
-            var email = principal.FindFirst("preferred_username")?.Value // ← Entra email
-                        ?? principal.FindFirst("upn")?.Value // ← Entra UPN
-                        ?? principal.FindFirst(ClaimTypes.Email)?.Value
-                        ?? principal.FindFirst("email")?.Value
-                        ?? principal.FindFirst("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier")
-                            ?.Value
-                        ?? principal.FindFirst("sub")?.Value
-                        ?? principal.FindFirst("name")?.Value;
-
+            var email = ClaimsEmailExtractor.ExtractEmail(principal);
             if (string.IsNullOrEmpty(email))
             {
                 Log.Warning("Could not extract email from claims for user provisioning");
@@ -482,11 +473,7 @@ public class NexusAuthenticationMiddleware : JwtBearerHandler
             // Normalize email - treat @azuregov.inl.gov as @inl.gov
             var normalizedEmail = email.ToLower().Replace("@azuregov.inl.gov", "@inl.gov");
 
-            // Extract SSO ID with Entra fallback
-            var ssoId = principal.FindFirst("uid")?.Value
-                        ?? principal.FindFirst("oid")?.Value
-                        ?? principal.FindFirst("http://schemas.microsoft.com/identity/claims/objectidentifier")?.Value
-                        ?? principal.FindFirst("sub")?.Value;
+            var ssoId = ClaimsEmailExtractor.ExtractSsoId(principal);
 
             var username = principal.FindFirst("preferred_username")?.Value ?? normalizedEmail;
             var name = principal.FindFirst(ClaimTypes.Name)?.Value
@@ -650,6 +637,51 @@ public class NexusAuthenticationMiddleware : JwtBearerHandler
         using var sha256 = SHA256.Create();
         var hashBytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(jti));
         return Convert.ToBase64String(hashBytes);
+    }
+
+    private static string? ExtractEmailFromPrincipal(ClaimsPrincipal principal)
+    {
+        var candidates = new (string claimType, string? value)[]
+        {
+            // 1) Test expects nameidentifier to win over everything else
+            ("nameidentifier",
+                principal.FindFirst("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier")?.Value),
+
+            // 2) Then ClaimTypes.Email should win over "email"
+            (ClaimTypes.Email, principal.FindFirst(ClaimTypes.Email)?.Value),
+            ("email", principal.FindFirst("email")?.Value),
+
+            // 3) Then other common options
+            ("preferred_username", principal.FindFirst("preferred_username")?.Value),
+            ("upn", principal.FindFirst("upn")?.Value),
+            ("mail", principal.FindFirst("mail")?.Value),
+            ("unique_name", principal.FindFirst("unique_name")?.Value),
+            ("username", principal.FindFirst("username")?.Value),
+
+            // 4) Only accept if it looks like an email
+            ("sub", principal.FindFirst("sub")?.Value),
+            ("name", principal.FindFirst("name")?.Value)
+        };
+        foreach (var (claimType, raw) in candidates)
+        {
+            if (string.IsNullOrWhiteSpace(raw)) continue;
+
+            var candidate = raw.Trim().ToLowerInvariant();
+
+            // Normalize known internal domains
+            if (candidate.EndsWith("@azuregov.inl.gov"))
+                candidate = candidate.Replace("@azuregov.inl.gov", "@inl.gov");
+
+            // Basic sanity: must contain '@' and a '.' in the domain part
+            var atIndex = candidate.IndexOf('@');
+            if (atIndex <= 0) continue;
+            var domainPart = candidate.Substring(atIndex + 1);
+            if (string.IsNullOrWhiteSpace(domainPart) || !domainPart.Contains('.')) continue;
+
+            return candidate;
+        }
+
+        return null;
     }
 
     private class CachedEntraToken

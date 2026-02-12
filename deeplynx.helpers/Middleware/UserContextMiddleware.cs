@@ -1,4 +1,3 @@
-using System.Security.Claims;
 using deeplynx.datalayer.Models;
 using deeplynx.helpers.Context;
 using Microsoft.AspNetCore.Http;
@@ -37,7 +36,7 @@ public class UserContextMiddleware
                 _logger.LogInformation($"Available claims: {string.Join(", ", allClaims)}");
 
                 // Try to extract email from multiple possible claim types
-                var email = ExtractEmail(context.User);
+                var email = ClaimsEmailExtractor.ExtractEmail(context.User);
 
                 if (!string.IsNullOrEmpty(email))
                 {
@@ -84,33 +83,5 @@ public class UserContextMiddleware
             UserContextStorage.Email = null;
             UserContextStorage.UserId = 0;
         }
-    }
-
-    private string? ExtractEmail(ClaimsPrincipal user)
-    {
-        // Prefer the federated username and common Entra claims first
-        var email = user.FindFirst("preferred_username")?.Value // Entra preferred username (usually an email)
-                    ?? user.FindFirst("upn")?.Value // UPN
-                    ?? user.FindFirst(ClaimTypes.Email)?.Value // Standard email claim
-                    ?? user.FindFirst("email")?.Value // JWT "email"
-                    ?? user.FindFirst("http://schemas.microsoft.com/identity/claims/objectidentifier")
-                        ?.Value // oid fallback
-                    ?? user.FindFirst("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier")?.Value
-                    ?? user.FindFirst("sub")?.Value
-                    ?? user.FindFirst(ClaimTypes.Name)?.Value
-                    ?? user.FindFirst("name")?.Value
-                    ?? user.FindFirst("username")?.Value;
-
-        if (string.IsNullOrEmpty(email))
-            return null;
-
-        // Normalize: treat @azuregov.inl.gov as @inl.gov and lower-case everything
-        email = email.Trim().ToLowerInvariant();
-        if (email.EndsWith("@azuregov.inl.gov")) email = email.Replace("@azuregov.inl.gov", "@inl.gov");
-
-        // Basic sanity: if it doesn't look like an email (no '@'), don't return the raw name
-        if (!email.Contains("@")) return null;
-
-        return email;
     }
 }
