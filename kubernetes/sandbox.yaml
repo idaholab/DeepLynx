@@ -12,7 +12,7 @@ apiVersion: v1
 kind: Secret
 metadata:
   name: azure-storage-secret
-  namespace: deeplynxv3-dev
+  namespace: deeplynx-test
 type: Opaque
 stringData:
   azurestorageaccountname: ${AZURE_STORAGE_ACCOUNT_NAME}
@@ -26,7 +26,7 @@ apiVersion: v1
 kind: PersistentVolume
 metadata:
   name: nexus-duckdb-pv
-  namespace: deeplynxv3-dev
+  namespace: deeplynx-test
 spec:
   capacity:
     storage: 60Gi
@@ -55,7 +55,7 @@ spec:
       server: ${AZURE_STORAGE_ACCOUNT_NAME}.file.core.usgovcloudapi.net
     nodeStageSecretRef:
       name: azure-storage-secret
-      namespace: deeplynxv3-dev
+      namespace: deeplynx-test
 
 ---
 # Storage Class (simplified for static provisioning)
@@ -63,7 +63,7 @@ apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
   name: azurefile-nexus-duckdb
-  namespace: deeplynxv3-dev
+  namespace: deeplynx-test
 provisioner: file.csi.azure.com
 parameters:
   skuName: Premium_LRS
@@ -77,7 +77,7 @@ apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: deeplynx-nexus-duckdb
-  namespace: deeplynxv3-dev
+  namespace: deeplynx-test
 spec:
   accessModes:
     - ReadWriteMany
