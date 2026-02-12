@@ -66,16 +66,7 @@ public class SensitivityLabelBusiness : ISensitivityLabelBusiness
 
             foreach (var permission in permissions)
             {
-                if (dto.Name != null)
-                {
-                    // Update name based on action type
-                    permission.Name = permission.Action switch
-                    {
-                        "read" => "Read " + dto.Name,
-                        "write" => "Write " + dto.Name,
-                        _ => permission.Name // fallback
-                    };
-                }
+                permission.Name = dto.Name ?? permission.Name;
 
                 if (dto.Description != null)
                 {

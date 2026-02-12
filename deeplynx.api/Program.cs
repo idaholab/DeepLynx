@@ -178,6 +178,7 @@ try
     builder.Services.AddTransient<IOrganizationService, OrganizationService>();
     builder.Services.AddTransient<ISavedSearchBusiness, SavedSearchBusiness>();
     builder.Services.AddTransient<IGraphBusiness, GraphBusiness>();
+    builder.Services.AddScoped<ISensitivityLabelService, SensitivityLabelService>();
 
     //OpenApi Documentation
     builder.Services.AddOpenApi(options =>
@@ -458,6 +459,7 @@ try
     app.UseAuthentication(); // Must be first
     app.UseMiddleware<UserContextMiddleware>(); // Second - sets UserId/Email
     app.UseMiddleware<AuthMiddleware>(); // Third - sets OrganizationId
+    app.UseMiddleware<SensitivityMiddleware>();
     app.UseAuthorization(); // Fourth
     app.MapControllers(); // Last
 

@@ -1,16 +1,23 @@
 using deeplynx.datalayer.Models;
+using deeplynx.interfaces;
 using Microsoft.EntityFrameworkCore;
 
 namespace deeplynx.helpers;
 
 // Helper class for permission related logic that needs to occur in the business layer
-public class PermissionHelper
+public class SensitivityLabelService : ISensitivityLabelService
 {
+    private readonly DeeplynxContext _context;
+
+    public SensitivityLabelService(DeeplynxContext context)
+    {
+        _context = context;
+    }
+
     /// <summary>
     /// Get authorized sensitivity labels for a single project
     /// </summary>
-    public static async Task<List<long>> GetAuthorizedSensitivityLabels(
-        DeeplynxContext _context,
+    public async Task<List<long>> GetAuthorizedSensitivityLabels(
         long currentUserId,
         long organizationId,
         long projectId,
@@ -18,7 +25,6 @@ public class PermissionHelper
     {
         // Delegate to the multi-project version
         return await GetAuthorizedSensitivityLabels(
-            _context,
             currentUserId,
             organizationId,
             new[] { projectId },
@@ -28,8 +34,7 @@ public class PermissionHelper
     /// <summary>
     /// Get authorized sensitivity labels across multiple projects
     /// </summary>
-    public static async Task<List<long>> GetAuthorizedSensitivityLabels(
-        DeeplynxContext _context,
+    public async Task<List<long>> GetAuthorizedSensitivityLabels(
         long currentUserId,
         long organizationId,
         long[] projectIds,
@@ -83,17 +88,15 @@ public class PermissionHelper
         return authorizedLabelIds;
     }
 
-    public static async Task<bool> SensitivityLabelRequired(
-        DeeplynxContext _context,
+    public async Task<bool> IsSensitivityLabelRequired(
         long organizationId,
-        long? projectId
-    )
+        long? projectId)
     {
         // if org level check the organization
-        var orgLevel = _context.Organizations
+        var orgLevel = await _context.Organizations
             .Where(o => o.Id == organizationId)
             .Select(o => o.RequireSensitivityLabel)
-            .FirstOrDefault();
+            .FirstOrDefaultAsync();
 
         if (orgLevel) return true;
 
@@ -102,12 +105,25 @@ public class PermissionHelper
 
         // if project ID is provided and org level is false
         // check the project's "require_sensitivity_level" column value
-        var projectLevel = _context.Projects
+        var projectLevel = await _context.Projects
             .Where(p => p.Id == projectId)
             .Select(p => p.RequireSensitivityLabel)
-            .FirstOrDefault();
+            .FirstOrDefaultAsync();
 
         // return result
         return projectLevel;
+    }
+
+    public async Task<List<long>> GetRecordSensitivityLabels(long recordId)
+    {
+        // Implement based on your data model
+        // This is a placeholder - adjust according to your actual schema
+        var labelIds = await _context.Records
+            .Where(r => r.Id == recordId)
+            .SelectMany(r => r.Labels)
+            .Select(l => l.Id)
+            .ToListAsync();
+
+        return labelIds;
     }
 }

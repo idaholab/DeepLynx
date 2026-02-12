@@ -34,6 +34,7 @@ public class FileBusinessAuthTests : IntegrationTestBase
     private SensitivityLabelBusiness _sensitivityLabelBusiness = null!;
     private TagBusiness _tagBusiness = null!;
     private BulkCopyUpsertExecutor _mockBulkCopyExecutor = null!;
+    private ISensitivityLabelService _sensitivityLabelService = null!;
     
     private long organizationId;
     private long os1;

@@ -15,14 +15,16 @@ namespace deeplynx.business;
 public class QueryBusiness : IQueryBusiness
 {
     private readonly DeeplynxContext _context;
+    private readonly ISensitivityLabelService _sensitivityLabelService;
 
     /// <summary>
     ///     Filter record request
     /// </summary>
     /// <param name="context">The database context to be used for filter operations.</param>
-    public QueryBusiness(DeeplynxContext context)
+    public QueryBusiness(DeeplynxContext context, ISensitivityLabelService sensitivityLabelService)
     {
         _context = context;
+        _sensitivityLabelService = sensitivityLabelService;
     }
 
     /// <summary>
@@ -41,8 +43,8 @@ public class QueryBusiness : IQueryBusiness
         try
         {
             // Get authorized sensitivity labels for the user
-            var authorizedLabelIds = await PermissionHelper.GetAuthorizedSensitivityLabels(
-                _context, currentUserId, organizationId, projectIds, "read record");
+            var authorizedLabelIds = await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
+                currentUserId, organizationId, projectIds, "read record");
 
             var sql = @"
             SELECT DISTINCT ON (hr.record_id)
@@ -295,8 +297,8 @@ public class QueryBusiness : IQueryBusiness
             throw new Exception("Search query is required.");
 
         // Get authorized sensitivity labels for the user
-        var authorizedLabelIds = await PermissionHelper.GetAuthorizedSensitivityLabels(
-            _context, currentUserId, organizationId, projectIds, "read record");
+        var authorizedLabelIds = await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
+            currentUserId, organizationId, projectIds, "read record");
 
         // Process query for full-text search (prefix matching)
         var processedQuery = string.Join(" & ",
@@ -408,8 +410,8 @@ public class QueryBusiness : IQueryBusiness
         long currentUserId, long organizationId, long[] projectIds)
     {
         // Get authorized sensitivity labels for the user
-        var authorizedLabelIds = await PermissionHelper.GetAuthorizedSensitivityLabels(
-            _context, currentUserId, organizationId, projectIds, "read record");
+        var authorizedLabelIds = await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
+            currentUserId, organizationId, projectIds, "read record");
     
         var query = _context.HistoricalRecords
             .Where(r => r.OrganizationId == organizationId && !r.IsArchived);
@@ -472,8 +474,8 @@ public class QueryBusiness : IQueryBusiness
     public async Task<IEnumerable<HistoricalRecordResponseDto>> GetMultiProjectRecords(
         long currentUserId, long organizationId, long[] projects, bool hideArchived)
     {
-        var authorizedLabelIds = await PermissionHelper.GetAuthorizedSensitivityLabels(
-            _context, currentUserId, organizationId, projects, "read record");   
+        var authorizedLabelIds = await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
+            currentUserId, organizationId, projects, "read record");   
         
         var projectSet = new HashSet<long>(projects);
 
