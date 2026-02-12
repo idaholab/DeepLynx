@@ -15,7 +15,7 @@ namespace deeplynx.datalayer.Migrations
             // Read mount path from environment variable
             Env.Load("../.env");
             var mountPath = "";
-            if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("STORAGE_DIRECTORY")))
+            if (File.Exists("../.env"))
             {
                 mountPath = "../data/duckdb";
             }
