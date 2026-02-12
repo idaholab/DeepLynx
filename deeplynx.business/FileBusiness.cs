@@ -297,7 +297,6 @@ public class FileBusiness
     /// <param name="chunk">File chunk from form</param>
     /// <param name="uploadId">The upload session ID from StartUpload</param>
     /// <param name="chunkNumber">The index for tracking the order to merge chunks together</param>
-    /// <param name="sensitivityLabelIds">The IDs of the Sensitivity Labels that will be attached to the record</param>
     public async Task<string> UploadChunk(
         long organizationId,
         long projectId,
