@@ -13,32 +13,32 @@ namespace deeplynx.tests;
 [Collection("Test Suite Collection")]
 public class InvitationBusinessTests : IntegrationTestBase
 {
-    private InvitationBusiness _invitationBusiness = null!;
+    private BulkCopyUpsertExecutor _bulkCopyUpsertExecutor = null!;
     private ClassBusiness _classBusiness = null!;
     private Mock<IDataSourceBusiness> _dataSourceBusiness = null!;
     private EventBusiness _eventBusiness = null!;
+    private InvitationBusiness _invitationBusiness = null!;
     private Mock<IHubContext<EventNotificationHub>> _mockHubContext = null!;
     private Mock<ILogger<ProjectBusiness>> _mockLogger = null!;
-    private Mock<ILogger<OrganizationBusiness>> _mockOrgLogger = null!;
     private Mock<ILogger<NotificationBusiness>> _mockNotificationLogger = null!;
+    private Mock<ILogger<OrganizationBusiness>> _mockOrgLogger = null!;
     private Mock<INotificationBusiness> _notificationBusiness = null!;
     private Mock<IObjectStorageBusiness> _objectStorageBusiness = null!;
-    private UserBusiness _userBusiness = null!;
     private OrganizationBusiness _organizationBusiness = null!;
     private ProjectBusiness _projectBusiness = null!;
     private Mock<IRecordBusiness> _recordBusiness = null!;
     private Mock<IRelationshipBusiness> _relationshipBusiness = null!;
     private Mock<IRoleBusiness> _roleBusiness = null!;
-    private BulkCopyUpsertExecutor _bulkCopyUpsertExecutor = null!;
+    private UserBusiness _userBusiness = null!;
+    public long gid; // group ID
 
     public long oid; // organization ID
     public long oid2; // organization 2 ID
     public long pid; // project ID
     public long pid2; // project 2 ID
+    public long rid; // role ID
     public long uid; // existing user ID
     public long uid2; // existing user 2 ID
-    public long rid; // role ID
-    public long gid; // group ID
 
     public InvitationBusinessTests(TestSuiteFixture fixture) : base(fixture)
     {
@@ -62,7 +62,7 @@ public class InvitationBusinessTests : IntegrationTestBase
         _objectStorageBusiness = new Mock<IObjectStorageBusiness>();
         _roleBusiness = new Mock<IRoleBusiness>();
         _organizationBusiness = new OrganizationBusiness(
-            Context, _eventBusiness, _roleBusiness.Object, _mockOrgLogger.Object);
+            Context, _eventBusiness, _roleBusiness.Object, _mockOrgLogger.Object, _objectStorageBusiness.Object);
 
         _classBusiness = new ClassBusiness(
             Context, _recordBusiness.Object,
@@ -194,7 +194,7 @@ public class InvitationBusinessTests : IntegrationTestBase
         Assert.True(await Context.OrganizationUsers.AnyAsync(
             ou => ou.UserId == uid2 && ou.OrganizationId == oid2));
     }
-    
+
     [Fact]
     public async Task InviteAndAddUserToHierarchy_Success_WhenEmailIsDifferentCase()
     {
@@ -251,7 +251,7 @@ public class InvitationBusinessTests : IntegrationTestBase
     {
         // Arrange
         var userEmail = "existing.user@test.com";
-        
+
         // Add user to project first
         var projectMember = new ProjectMember
         {
@@ -278,13 +278,13 @@ public class InvitationBusinessTests : IntegrationTestBase
     {
         // Arrange
         var userEmail = "existing.user2@test.com";
-        
+
         var user = await Context.Users.FirstOrDefaultAsync(u => u.Email == userEmail);
         Assert.NotNull(user);
-        
+
         var group = await Context.Groups.FirstOrDefaultAsync(g => g.Id == gid);
         Assert.NotNull(group);
-        
+
         group.Users.Add(user);
 
         // Add group to project
@@ -327,15 +327,15 @@ public class InvitationBusinessTests : IntegrationTestBase
 
         // Assert
         Assert.True(result);
-        
+
         var newUser = await Context.Users.FirstOrDefaultAsync(u => u.Email == newUserEmail);
         Assert.NotNull(newUser);
         Assert.Equal(newUserEmail, newUser.Name); // Name should be set to email
         Assert.Equal(newUserEmail, newUser.Email);
-        
+
         Assert.True(await Context.OrganizationUsers.AnyAsync(
             ou => ou.UserId == newUser.Id && ou.OrganizationId == oid));
-        
+
         _notificationBusiness.Verify(n => n.SendEmail(newUserEmail, userName), Times.Once);
     }
 
@@ -353,15 +353,15 @@ public class InvitationBusinessTests : IntegrationTestBase
 
         // Assert
         Assert.True(result);
-        
+
         var newUser = await Context.Users.FirstOrDefaultAsync(u => u.Email == newUserEmail);
         Assert.NotNull(newUser);
-        
+
         Assert.True(await Context.OrganizationUsers.AnyAsync(
             ou => ou.UserId == newUser.Id && ou.OrganizationId == oid));
         Assert.True(await Context.ProjectMembers.AnyAsync(
             pm => pm.UserId == newUser.Id && pm.ProjectId == pid && pm.RoleId == rid));
-        
+
         _notificationBusiness.Verify(n => n.SendEmail(newUserEmail, null), Times.Once);
     }
 
@@ -374,12 +374,12 @@ public class InvitationBusinessTests : IntegrationTestBase
             .ReturnsAsync(false);
 
         // Act & Assert
-        var exception = await Assert.ThrowsAsync<Exception>(() => 
+        var exception = await Assert.ThrowsAsync<Exception>(() =>
             _invitationBusiness.InviteAndAddUserToHierarchy(oid, null, null, newUserEmail, null));
-        
+
         Assert.Contains("Email not sent", exception.Message);
         Assert.Contains(newUserEmail, exception.Message);
-        
+
         // Verify user was not created
         var user = await Context.Users.FirstOrDefaultAsync(u => u.Email == newUserEmail);
         Assert.Null(user);
@@ -399,12 +399,12 @@ public class InvitationBusinessTests : IntegrationTestBase
 
         // Assert
         Assert.True(result);
-        
+
         var newUser = await Context.Users.FirstOrDefaultAsync(u => u.Email == newUserEmail);
         Assert.NotNull(newUser);
         Assert.True(await Context.OrganizationUsers.AnyAsync(
             ou => ou.UserId == newUser.Id && ou.OrganizationId == oid));
-        
+
         // Should not be in any project
         Assert.False(await Context.ProjectMembers.AnyAsync(pm => pm.UserId == newUser.Id));
     }
@@ -423,10 +423,10 @@ public class InvitationBusinessTests : IntegrationTestBase
 
         // Assert
         Assert.True(result);
-        
+
         var newUser = await Context.Users.FirstOrDefaultAsync(u => u.Email == newUserEmail);
         Assert.NotNull(newUser);
-        
+
         var projectMember = await Context.ProjectMembers
             .FirstOrDefaultAsync(pm => pm.UserId == newUser.Id && pm.ProjectId == pid);
         Assert.NotNull(projectMember);
@@ -446,7 +446,7 @@ public class InvitationBusinessTests : IntegrationTestBase
         // Act - Add to oid
         var result1 = await _invitationBusiness.InviteAndAddUserToHierarchy(
             oid, null, null, userEmail, null);
-        
+
         // Act - Add to oid2
         var result2 = await _invitationBusiness.InviteAndAddUserToHierarchy(
             oid2, null, null, userEmail, null);
@@ -469,7 +469,7 @@ public class InvitationBusinessTests : IntegrationTestBase
         // Act - Add to pid
         var result1 = await _invitationBusiness.InviteAndAddUserToHierarchy(
             oid, pid, rid, userEmail, null);
-        
+
         // Act - Add to pid2
         var result2 = await _invitationBusiness.InviteAndAddUserToHierarchy(
             oid, pid2, rid, userEmail, null);

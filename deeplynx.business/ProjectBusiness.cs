@@ -805,20 +805,18 @@ public class ProjectBusiness : IProjectBusiness
         // ===============================
         // CREATE DEFAULT CLASSES
         // ===============================
-        // TODO: project config should determine whether to do this (true by default)
         var defaultClasses = new List<CreateClassRequestDto>
         {
             new() { Name = "Timeseries" },
             new() { Name = "Report" },
             new() { Name = "File" }
         };
-        var cls = await _classBusiness.BulkCreateClasses(
+        await _classBusiness.BulkCreateClasses(
             currentUserId, organizationId, projectId, defaultClasses);
 
         // ===============================
         // CREATE DEFAULT DATA SOURCE
         // ===============================
-        // TODO: project config should determine whether to do this (true by default)
         var defaultDataSource = new CreateDataSourceRequestDto
         {
             Name = "Default Data Source",
@@ -827,62 +825,7 @@ public class ProjectBusiness : IProjectBusiness
         };
         await _dataSourceBusiness.CreateDataSource(organizationId, projectId, currentUserId, defaultDataSource);
 
-        // ===============================
-        // CREATE DEFAULT OBJECT STORAGE
-        // ===============================
-        // TODO: project config should determine whether to do this (true by default)
-        Env.Load("../.env");
-        var defaultObjectStorageMethod = Environment.GetEnvironmentVariable("FILE_STORAGE_METHOD");
-        var configDto = new ObjectStorageConfigDto();
-        if (defaultObjectStorageMethod == "filesystem")
-        {
-            var mountPath =
-                Environment.GetEnvironmentVariable("STORAGE_DIRECTORY");
-            
-            if (string.IsNullOrWhiteSpace(mountPath))
-                throw new ArgumentException($"STORAGE_DIRECTORY is null or white space, please check your environment variables.");
-            
-            configDto.MountPath = mountPath;
-        }
-        else if (defaultObjectStorageMethod == "azure_object")
-        {
-            var azureConnectionString = Environment.GetEnvironmentVariable("AZURE_OBJECT_CONNECTION_STRING");
-            if (string.IsNullOrWhiteSpace(azureConnectionString))
-                throw new ArgumentException("AZURE_OBJECT_CONNECTION_STRING is null or white space, please check your environment variables.");
-
-            var azureContainerName = Environment.GetEnvironmentVariable("AZURE_CONTAINER_NAME");
-            if (string.IsNullOrWhiteSpace(azureContainerName))
-                throw new ArgumentException("AZURE_CONTAINER_NAME is null or white space, please check your environment variables.");
-            
-            configDto.AzureObjectConfig = new AzureObjectConfigDto()
-            {
-                AzureConnectionString = azureConnectionString,
-                AzureContainerName = azureContainerName
-            };
-        }
-        else if (defaultObjectStorageMethod == "aws_s3")
-        {
-            var awsConnectionString =
-                Environment.GetEnvironmentVariable("AWS_S3_CONNECTION_STRING");
-            if (string.IsNullOrWhiteSpace(awsConnectionString))
-                throw new ArgumentException("AWS_S3_CONNECTION_STRING is null or white space, please check your environment variables.");
-            
-            configDto.AwsConnectionString = awsConnectionString;
-        }
-        else
-        {
-            throw new NullReferenceException(
-                "Unknown object storage method, make sure your environment variables are correctly set");
-        }
-
-        var objectStorageRequestDto = new CreateObjectStorageRequestDto
-        {
-            Name = "Instance Default",
-            Config = configDto,
-            Default = true
-        };
-        await _objectStorageBusiness.CreateObjectStorage(
-            currentUserId, organizationId, projectId, objectStorageRequestDto);
+        
 
         // ===============================
         // CREATE DEFAULT TIMESERIES MOUNT
