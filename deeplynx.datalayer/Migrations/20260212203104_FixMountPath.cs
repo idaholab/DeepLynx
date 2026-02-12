@@ -61,9 +61,14 @@ namespace deeplynx.datalayer.Migrations
             // Step 3: Delete Timeseries Default storages
             migrationBuilder.Sql(@"
                 DELETE FROM deeplynx.object_storages
-                WHERE project_id IS NULL
-                    AND name = 'Timeseries Default'
-                    AND ""default"" = false;
+                WHERE name = 'Timeseries Default';
+            ");
+            
+            // Step 4: Delete Instance Default storages
+            migrationBuilder.Sql(@"
+                DELETE FROM deeplynx.object_storages
+                WHERE project_id IS NOT NULL
+                    AND name = 'Instance Default';
             ");
         }
 
