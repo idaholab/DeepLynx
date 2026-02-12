@@ -17,7 +17,14 @@ namespace deeplynx.datalayer.Migrations
             var mountPath = "";
             if (File.Exists("../.env"))
             {
-                mountPath = "../data/duckdb";
+                if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("STORAGE_DIRECTORY")))
+                {
+                    mountPath = Environment.GetEnvironmentVariable("STORAGE_DIRECTORY");
+                }
+                else
+                {
+                    mountPath = "../data/duckdb";
+                }
             }
             else
             {
