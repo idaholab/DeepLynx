@@ -26,7 +26,6 @@ type Props = {
 };
 
 export default async function ProjectManagementPage({ params }: Props) {
-  // 🔹 Match the other page: await params and validate id
   const { id } = await params;
   if (!id) {
     return notFound();
