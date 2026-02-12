@@ -69,6 +69,8 @@ if ! docker exec ${OLD_CONTAINER_NAME} psql -U postgres -c "SELECT version();" >
     exit 1
 fi
 
+mkdir -p storage
+
 # Create the dump with error checking
 echo "Creating dump..."
 if ! docker exec ${OLD_CONTAINER_NAME} pg_dumpall -U postgres > ${BACKUP_FILE} 2>&1; then
