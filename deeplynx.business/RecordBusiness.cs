@@ -677,7 +677,7 @@ public class RecordBusiness : IRecordBusiness
             throw new Exception(
                 $"The depth of the JSON structure exceeds the maximum allowed depth of 3. Current depth of properties is {maxDepth}.");
 
-        if (dto.ObjectStorageId != null) await CheckObjectStorageExists(organizationId, dto.ObjectStorageId.Value);
+        if (dto.ObjectStorageId != null) await CheckObjectStorageExists(organizationId, projectId, dto.ObjectStorageId.Value);
 
         await using var transaction = await _context.Database.BeginTransactionAsync();
 
@@ -783,7 +783,7 @@ public class RecordBusiness : IRecordBusiness
 
         if (records.Count == 0) throw new Exception("Unable to bulk create records: no records selected for creation");
 
-        await EnsureMultipleObjectStoragesExistOnce(organizationId, records);
+        await EnsureMultipleObjectStoragesExistOnce(organizationId, projectId, records);
 
         var conn = (NpgsqlConnection)_context.Database.GetDbConnection();
         if (conn.State != ConnectionState.Open) await conn.OpenAsync();
@@ -1157,7 +1157,7 @@ public class RecordBusiness : IRecordBusiness
             throw new Exception(
                 $"The depth of the JSON structure exceeds the maximum allowed depth of 3. Current depth of properties is {maxDepth}.");
 
-        if (dto.ObjectStorageId != null) await CheckObjectStorageExists(organizationId, dto.ObjectStorageId.Value);
+        if (dto.ObjectStorageId != null) await CheckObjectStorageExists(organizationId, projectId, dto.ObjectStorageId.Value);
 
         returnedRecord.Uri = dto.Uri ?? returnedRecord.Uri;
         returnedRecord.Properties = dto.Properties != null ? dto.Properties.ToString() : returnedRecord.Properties;
@@ -1277,7 +1277,7 @@ public class RecordBusiness : IRecordBusiness
     ///<param name="records"> Records with object storages to check</param>
     ///<exception cref="KeyNotFoundException">If an object storage ID is not found</exception>
     ///<returns>Exception if obj storage ID not exist</returns>
-    private async Task EnsureMultipleObjectStoragesExistOnce(long organizationId, List<CreateRecordRequestDto> records)
+    private async Task EnsureMultipleObjectStoragesExistOnce(long organizationId, long projectId, List<CreateRecordRequestDto> records)
     {
         var ids = records.Where(r => r.ObjectStorageId.HasValue)
             .Select(r => r.ObjectStorageId!.Value)
@@ -1287,7 +1287,7 @@ public class RecordBusiness : IRecordBusiness
 
         // One database round trip                                                                                                            
         var ok = await _context.ObjectStorages
-            .Where(os => os.OrganizationId == organizationId && ids.Contains(os.Id))
+            .Where(os => os.OrganizationId == organizationId && ids.Contains(os.Id) && (os.ProjectId == projectId || os.ProjectId == null))
             .Select(os => os.Id)
             .ToListAsync();
 
@@ -1299,9 +1299,9 @@ public class RecordBusiness : IRecordBusiness
         }
     }
 
-    private async Task CheckObjectStorageExists(long organizationId, long objectStorageId)
+    private async Task CheckObjectStorageExists(long organizationId, long projectId, long objectStorageId)
     {
-        var referencedObjectStorage = await _context.ObjectStorages.FirstOrDefaultAsync(o => o.OrganizationId == organizationId && o.Id == objectStorageId);
+        var referencedObjectStorage = await _context.ObjectStorages.FirstOrDefaultAsync(o => o.OrganizationId == organizationId && o.Id == objectStorageId && (o.ProjectId == projectId || o.ProjectId == null));
         
         if (referencedObjectStorage == null)
             throw new KeyNotFoundException($"Object storage with ID {objectStorageId} does not exist");
