@@ -45,6 +45,7 @@ public class ProjectBusinessTests : IntegrationTestBase
     private long pid5;
     private long rid; // role ID
     private long rid2;
+    private long rid3;
     private long uid; // user ID
     private long uid2;
     private long uid3;
@@ -244,11 +245,13 @@ public class ProjectBusinessTests : IntegrationTestBase
 
         // Add test roles
         var testRole = new Role { Name = "Test Role", OrganizationId = oid };
+        var adminRole = new Role { Name = "Admin", OrganizationId = oid };
         var missingRole = new Role { Name = "Missing Role", OrganizationId = oid };
-        Context.Roles.AddRange(testRole, missingRole);
+        Context.Roles.AddRange(testRole, missingRole, adminRole);
         await Context.SaveChangesAsync();
         rid = testRole.Id;
         rid2 = missingRole.Id;
+        rid3 = adminRole.Id;
         Context.Roles.Remove(missingRole);
         await Context.SaveChangesAsync();
 
@@ -406,52 +409,7 @@ public class ProjectBusinessTests : IntegrationTestBase
 
         // Ensure that the project create event was logged
         var eventList = await Context.Events.ToListAsync();
-        Assert.Equal(4, eventList.Count);
-        Assert.Single(eventList, e =>
-            e.ProjectId == result.Id &&
-            e.Operation == "create" &&
-            e.EntityType == "project" &&
-            e.EntityId == result.Id
-        );
-    }
-
-    [Fact]
-    public async Task CreateProject_Success_CreatesDefaultRolesWithCorrectPermissions()
-    {
-        // Arrange
-        var now = DateTime.UtcNow;
-        var dto = new CreateProjectRequestDto
-        {
-            Name = $"Test Project {DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}",
-            Description = "Test Description",
-            Abbreviation = "TST", 
-            Banner = "Test Banner",
-        };
-
-        // Act
-        var result = await _projectBusiness.CreateProject(uid, oid, dto);
-
-        // Assert
-        Assert.True(result.Id > 0);
-        Assert.True(result.LastUpdatedAt >= now);
-        Assert.Equal(dto.Name, result.Name);
-        Assert.Equal(dto.Description, result.Description);
-        Assert.Equal(dto.Abbreviation, result.Abbreviation);
-        Assert.Equal(oid, result.OrganizationId);
-        Assert.Equal(uid, result.LastUpdatedBy);
-        Assert.Equal(dto.Banner, result.Banner);
-
-        var defaultRoles = await Context.Roles.Where(r => r.ProjectId == result.Id).Include(r => r.Permissions)
-            .ToListAsync();
-        var adminRole = defaultRoles.Single(r => r.Name == "Admin");
-        var userRole = defaultRoles.Single(r => r.Name == "User");
-
-        AssertRolePermissions(adminRole, DefaultRolePermissions.Admin.AllowedPermissions);
-        AssertRolePermissions(userRole, DefaultRolePermissions.User.AllowedPermissions);
-
-        // Ensure that the project create event was logged
-        var eventList = await Context.Events.ToListAsync();
-        Assert.Equal(4, eventList.Count);
+        Assert.Equal(3, eventList.Count);
         Assert.Single(eventList, e =>
             e.ProjectId == result.Id &&
             e.Operation == "create" &&
@@ -489,7 +447,7 @@ public class ProjectBusinessTests : IntegrationTestBase
 
         // Ensure that the project create event was logged
         var eventList = await Context.Events.ToListAsync();
-        Assert.Equal(4, eventList.Count);
+        Assert.Equal(3, eventList.Count);
         Assert.Single(eventList, e =>
             e.ProjectId == project.Id &&
             e.Operation == "create" &&
@@ -523,40 +481,13 @@ public class ProjectBusinessTests : IntegrationTestBase
 
         // Ensure that the project create event was logged
         var eventList = await Context.Events.ToListAsync();
-        Assert.Equal(4, eventList.Count);
+        Assert.Equal(3, eventList.Count);
         Assert.Single(eventList, e =>
             e.ProjectId == project.Id &&
             e.Operation == "create" &&
             e.EntityType == "project" &&
             e.EntityId == project.Id
         );
-    }
-
-    [Fact]
-    public async Task CreateProject_Creates_DefaultRoles_AndPermissions()
-    {
-        // Arrange
-        var dto = new CreateProjectRequestDto
-        {
-            Name = $"Test Project {DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}",
-            Description = "Test Description",
-            Abbreviation = "TST"
-        };
-
-        // Act
-        var project = await _projectBusiness.CreateProject(uid, oid, dto);
-
-        // Assert
-        Assert.Equal(dto.Name, project.Name);
-
-        // Verify default roles were created
-        var roles = Context.Roles.Where(r => r.ProjectId == project.Id).Include(r => r.Permissions).ToList();
-        Assert.Equal(2, roles.Count);
-        var adminRole = roles.Single(r => r.Name == "Admin");
-        var userRole = roles.Single(r => r.Name == "User");
-
-        AssertRolePermissions(adminRole, DefaultRolePermissions.Admin.AllowedPermissions);
-        AssertRolePermissions(userRole, DefaultRolePermissions.User.AllowedPermissions);
     }
 
     [Fact]

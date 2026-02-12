@@ -33,7 +33,7 @@ export default function ProjectDetailClient({
 
   // State
   const [project, setProject] = useState<ProjectResponseDto | null>(
-    initialProject
+    initialProject,
   );
   const [canCustomize, setCanCustomize] = useState(false);
   const [projectWidgets, setProjectWidgets] = useState<WidgetType[]>([
@@ -63,7 +63,7 @@ export default function ProjectDetailClient({
     setProjectWidgets(newWidgets);
     localStorage.setItem(
       `projectWidgets-${projectId}`,
-      JSON.stringify(newWidgets)
+      JSON.stringify(newWidgets),
     );
   };
 
@@ -98,8 +98,9 @@ export default function ProjectDetailClient({
       <div className="flex flex-col lg:flex-row gap-6 px-4 lg:px-6 mt-6">
         {/* Left Column */}
         <div
-          className={`flex-1 lg:w-3/5 transition-opacity duration-300 ${canCustomize ? "opacity-50 pointer-events-none" : ""
-            }`}
+          className={`flex-1 lg:w-3/5 transition-opacity duration-300 ${
+            canCustomize ? "opacity-50 pointer-events-none" : ""
+          }`}
         >
           {/* Search Bar */}
           <div className="mb-6">
@@ -116,7 +117,7 @@ export default function ProjectDetailClient({
                 <Link
                   className="btn btn-secondary btn-sm"
                   href={{
-                    pathname: "/data_catalog",
+                    pathname: "/data_catalog/all_records",
                     query: {
                       fromProject: projectId,
                     },

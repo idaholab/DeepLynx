@@ -1,44 +1,6 @@
 # Stage 1: Build the C# backend
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS backend-build
 
-# Define build arguments
-ARG OKTA_CLIENT_ID
-ARG OKTA_ISSUER
-ARG REDIRECT_LINK
-ARG OKTA_CLIENT_SECRET
-ARG AUTH_SECRET
-ARG NEXTAUTH_SECRET
-ARG SERVICE_TOKEN
-ARG BACKEND_BASE_URL
-ARG NEXTAUTH_URL
-ARG NEXT_PUBLIC_DISABLE_FRONTEND_AUTHENTICATION
-ARG HOSTED_LINK
-
-# Set environment variables
-ENV OKTA_CLIENT_ID=${OKTA_CLIENT_ID}
-ENV OKTA_ISSUER=${OKTA_ISSUER}
-ENV REDIRECT_LINK=${REDIRECT_LINK}
-ENV OKTA_CLIENT_SECRET=${OKTA_CLIENT_SECRET}
-ENV AUTH_SECRET=${AUTH_SECRET}
-ENV NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
-ENV SERVICE_TOKEN=${SERVICE_TOKEN}
-ENV BACKEND_BASE_URL=${BACKEND_BASE_URL}
-ENV NEXTAUTH_URL=${NEXTAUTH_URL}
-ENV NEXT_PUBLIC_DISABLE_FRONTEND_AUTHENTICATION=${NEXT_PUBLIC_DISABLE_FRONTEND_AUTHENTICATION}
-ENV HOSTED_LINK=${HOSTED_LINK}
-
-# # Print out the value of the environment variables
-# RUN echo "OKTA_CLIENT_ID=${OKTA_CLIENT_ID}" \
-#     && echo "OKTA_ISSUER=${OKTA_ISSUER}" \
-#     && echo "REDIRECT_LINK=${REDIRECT_LINK}" \
-#     && echo "OKTA_CLIENT_SECRET=${OKTA_CLIENT_SECRET}" \
-#     && echo "AUTH_SECRET=${AUTH_SECRET}" \
-#     && echo "NEXTAUTH_SECRET=${NEXTAUTH_SECRET}" \
-#     && echo "BACKEND_BASE_URL=${BACKEND_BASE_URL}" \
-#     && echo "NEXT_PUBLIC_DISABLE_FRONTEND_AUTHENTICATION=${NEXT_PUBLIC_DISABLE_FRONTEND_AUTHENTICATION}" \
-#     && echo "NEXTAUTH_URL=${NEXTAUTH_URL}" \
-#     && echo "HOSTED_LINK=${HOSTED_LINK}"
-
 # Set working directory
 WORKDIR /usr/src/app
 
@@ -61,15 +23,25 @@ FROM backend-build AS publish
 RUN dotnet publish deeplynx.sln -c Release -o /app/publish /p:UseAppHost=false
 
 # Stage 2: Create the final image
-FROM mcr.microsoft.com/dotnet/nightly/aspnet:10.0 AS final
-
-# Install tools needed for entrypoint.sh operations
-#RUN apt-get update && apt-get install -y \
-#    postgresql-client \
-#    && apt-get clean
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
 
 # Set working directory
 WORKDIR /usr/src/app
+
+# Update package list and upgrade specified packages during build time
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+    libc6=2.39-0ubuntu8.7 \
+    libssl3=3.0.13-0ubuntu3.7 \
+    openssl=3.0.13-0ubuntu3.7 \
+    libpam0g=1.5.3-5ubuntu5.5 \
+    libpam-runtime=1.5.3-5ubuntu5.5 \
+    libpam-modules-bin=1.5.3-5ubuntu5.5 \
+    libpam-modules=1.5.3-5ubuntu5.5 \
+    libc-bin=2.39-0ubuntu8.7 \
+    dpkg=1.22.6ubuntu6.5 \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
 
 # Copy the published backend code
 COPY --from=publish /app/publish .
@@ -77,23 +49,10 @@ COPY --from=publish /app/publish .
 # Copy additional files if needed
 COPY deeplynx.api/moon.css ./moon.css
 
-# Update package list and upgrade specified packages during build time
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends \
-        libc6=2.39-0ubuntu8.6 \
-        libssl3=3.0.13-0ubuntu3.6 \
-        openssl=3.0.13-0ubuntu3.6 \
-        libpam0g=1.5.3-5ubuntu5.5 \
-        libpam-runtime=1.5.3-5ubuntu5.5 \
-        libpam-modules-bin=1.5.3-5ubuntu5.5 \
-        libpam-modules=1.5.3-5ubuntu5.5 \
-        libc-bin=2.39-0ubuntu8.6 \
-        dpkg=1.22.6ubuntu6.5 \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
-    
-# Run time vars
-ENV HOSTED_LINK=${HOSTED_LINK}
+# Explicitly set user
+RUN groupadd -r nexus && useradd -r -g nexus -m -s /usr/sbin/nologin nexus
+RUN chown -R nexus:nexus /usr/src/app
+USER nexus
 
 # This will run the .NET application directly
 CMD ["dotnet", "deeplynx.api.dll", "--urls", "http://*:5000"]

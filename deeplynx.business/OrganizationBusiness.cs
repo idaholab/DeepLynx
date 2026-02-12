@@ -6,6 +6,9 @@ using deeplynx.models;
 using deeplynx.models.Configuration;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using DotNetEnv;
+using JsonSerializer = System.Text.Json.JsonSerializer;
+
 
 namespace deeplynx.business;
 
@@ -15,6 +18,7 @@ public class OrganizationBusiness : IOrganizationBusiness
     private readonly IEventBusiness _eventBusiness;
     private readonly ILogger<OrganizationBusiness> _logger;
     private readonly IRoleBusiness _roleBusiness;
+    private readonly IObjectStorageBusiness _objectStorageBusiness;
 
     /// <summary>
     ///     Initializes a new instance of the <see cref="OrganizationBusiness" /> class.
@@ -27,13 +31,15 @@ public class OrganizationBusiness : IOrganizationBusiness
         DeeplynxContext context,
         IEventBusiness eventBusiness,
         IRoleBusiness roleBusiness,
-        ILogger<OrganizationBusiness> logger
+        ILogger<OrganizationBusiness> logger,
+        IObjectStorageBusiness objectStorageBusiness
     )
     {
         _context = context;
         _eventBusiness = eventBusiness;
         _roleBusiness = roleBusiness;
         _logger = logger;
+        _objectStorageBusiness = objectStorageBusiness;
     }
 
     /// <summary>
@@ -453,10 +459,69 @@ public class OrganizationBusiness : IOrganizationBusiness
 
     private async Task SetOrganizationDefaults(long currentUserId, long organizationId)
     {
+        // ===============================
+        // CREATE DEFAULT OBJECT STORAGE
+        // ===============================
+        Env.Load("../.env");
+        var defaultObjectStorageMethod = Environment.GetEnvironmentVariable("FILE_STORAGE_METHOD");
+        var configDto = new ObjectStorageConfigDto();
+        if (defaultObjectStorageMethod == "filesystem")
+        {
+            var mountPath =
+                Environment.GetEnvironmentVariable("STORAGE_DIRECTORY");
+            
+            if (string.IsNullOrWhiteSpace(mountPath))
+                throw new ArgumentException($"STORAGE_DIRECTORY is null or white space, please check your environment variables.");
+            
+            configDto.MountPath = mountPath;
+        }
+        else if (defaultObjectStorageMethod == "azure_object")
+        {
+            var azureConnectionString = Environment.GetEnvironmentVariable("AZURE_OBJECT_CONNECTION_STRING");
+            if (string.IsNullOrWhiteSpace(azureConnectionString))
+                throw new ArgumentException("AZURE_OBJECT_CONNECTION_STRING is null or white space, please check your environment variables.");
+
+            var azureContainerName = Environment.GetEnvironmentVariable("AZURE_CONTAINER_NAME");
+            if (string.IsNullOrWhiteSpace(azureContainerName))
+                throw new ArgumentException("AZURE_CONTAINER_NAME is null or white space, please check your environment variables.");
+            
+            configDto.AzureObjectConfig = new AzureObjectConfigDto()
+            {
+                AzureConnectionString = azureConnectionString,
+                AzureContainerName = azureContainerName
+            };
+        }
+        else if (defaultObjectStorageMethod == "aws_s3")
+        {
+            var awsConnectionString =
+                Environment.GetEnvironmentVariable("AWS_S3_CONNECTION_STRING");
+            if (string.IsNullOrWhiteSpace(awsConnectionString))
+                throw new ArgumentException("AWS_S3_CONNECTION_STRING is null or white space, please check your environment variables.");
+            
+            configDto.AwsConnectionString = awsConnectionString;
+        }
+        else
+        {
+            throw new NullReferenceException(
+                "Unknown object storage method, make sure your environment variables are correctly set");
+        }
+
+        var objectStorageRequestDto = new CreateObjectStorageRequestDto
+        {
+            Name = "Instance Default",
+            Config = configDto,
+            Default = true
+        };
+        await _objectStorageBusiness.CreateObjectStorage(
+            currentUserId, organizationId, null, objectStorageRequestDto);
+        
+        // ===============================
+        // CREATE DEFAULT ROLES
+        // ===============================
         var defaultRoles = new List<CreateRoleRequestDto>
         {
-            new() { Name = "Admin", Description = "Organization administrator with full permissions" },
-            new() { Name = "User", Description = "Standard organization user with limited permissions" }
+            new() { Name = "Admin", Description = "Administrator role with full permissions" },
+            new() { Name = "User", Description = "User role with limited permissions" }
         };
         var roles = await _roleBusiness.BulkCreateRoles(currentUserId, organizationId, null, defaultRoles);
         var adminRoleId = roles.Single(r => r.Name == "Admin").Id;

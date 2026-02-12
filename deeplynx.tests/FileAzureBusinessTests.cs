@@ -1,4 +1,5 @@
 using Azure.Storage.Blobs;
+using Azure.Storage.Blobs.Specialized;
 using deeplynx.business;
 using deeplynx.datalayer.Models;
 using deeplynx.models;
@@ -1313,4 +1314,491 @@ public class FileAzureBusinessTests : IntegrationTestBase, IClassFixture<Azurite
     }
 
 #endregion
+
+    #region Chunked Upload Tests
+
+    [Fact]
+    public async Task StartUpload_Success_ReturnsValidGuid()
+    {
+        // Act
+        var uploadId = await _fileAzureBusiness.StartUpload(
+            _oid, _pid, _dsid, _objectStorageConfig);
+
+        // Assert
+        Assert.NotEqual(Guid.Empty, uploadId);
+    }
+
+    [Fact]
+    public async Task StartUpload_Success_CreatesContainerIfNotExists()
+    {
+        // Arrange
+        var container = new BlobContainerClient(_connectionString, _containerName);
+        await container.DeleteIfExistsAsync();
+        Assert.False(await container.ExistsAsync());
+
+        // Act
+        var uploadId = await _fileAzureBusiness.StartUpload(
+            _oid, _pid, _dsid, _objectStorageConfig);
+
+        // Assert
+        Assert.NotEqual(Guid.Empty, uploadId);
+        var containerExists = await container.ExistsAsync();
+        Assert.True(containerExists);
+    }
+
+    [Fact]
+    public async Task StartUpload_Fails_WhenAzureConfigIsNull()
+    {
+        // Arrange
+        var invalidConfig = new ObjectStorageConfigDto
+        {
+            AzureObjectConfig = null
+        };
+
+        // Act & Assert
+        await Assert.ThrowsAsync<ArgumentException>(() =>
+            _fileAzureBusiness.StartUpload(_oid, _pid, _dsid, invalidConfig));
+    }
+
+    [Fact]
+    public async Task UploadChunk_Success_StagesBlockToBlob()
+    {
+        // Arrange
+        var uploadId = await _fileAzureBusiness.StartUpload(
+            _oid, _pid, _dsid, _objectStorageConfig);
+        
+        var chunkContent = "This is chunk 0";
+        var chunk = CreateMockFile("chunk0.txt", chunkContent);
+
+        // Act
+        await _fileAzureBusiness.UploadChunk(
+            _oid, _pid, _dsid, 0, uploadId.ToString(), _objectStorageConfig, chunk);
+
+        // Assert - Verify uncommitted blocks exist
+        var tempBlobName = $"organization_{_oid}/project_{_pid}/datasource_{_dsid}/uploads/{uploadId}";
+        var container = new BlobContainerClient(_connectionString, _containerName);
+        var blockBlobClient = container.GetBlockBlobClient(tempBlobName);
+        
+        var blockList = await blockBlobClient.GetBlockListAsync(Azure.Storage.Blobs.Models.BlockListTypes.Uncommitted);
+        var uncommittedBlocks = blockList.Value.UncommittedBlocks.ToList();
+        
+        Assert.Single(uncommittedBlocks);
+    }
+
+    [Fact]
+    public async Task UploadChunk_Success_UploadsMultipleChunks()
+    {
+        // Arrange
+        var uploadId = await _fileAzureBusiness.StartUpload(
+            _oid, _pid, _dsid, _objectStorageConfig);
+
+        var chunk0 = CreateMockFile("chunk0.txt", "Chunk 0 content");
+        var chunk1 = CreateMockFile("chunk1.txt", "Chunk 1 content");
+        var chunk2 = CreateMockFile("chunk2.txt", "Chunk 2 content");
+
+        // Act
+        await _fileAzureBusiness.UploadChunk(_oid, _pid, _dsid, 0, uploadId.ToString(), _objectStorageConfig, chunk0);
+        await _fileAzureBusiness.UploadChunk(_oid, _pid, _dsid, 1, uploadId.ToString(), _objectStorageConfig, chunk1);
+        await _fileAzureBusiness.UploadChunk(_oid, _pid, _dsid, 2, uploadId.ToString(), _objectStorageConfig, chunk2);
+
+        // Assert
+        var tempBlobName = $"organization_{_oid}/project_{_pid}/datasource_{_dsid}/uploads/{uploadId}";
+        var container = new BlobContainerClient(_connectionString, _containerName);
+        var blockBlobClient = container.GetBlockBlobClient(tempBlobName);
+        
+        var blockList = await blockBlobClient.GetBlockListAsync(Azure.Storage.Blobs.Models.BlockListTypes.Uncommitted);
+        var uncommittedBlocks = blockList.Value.UncommittedBlocks.ToList();
+        
+        Assert.Equal(3, uncommittedBlocks.Count);
+    }
+
+    [Fact]
+    public async Task UploadChunk_Fails_WhenAzureConfigIsNull()
+    {
+        // Arrange
+        var uploadId = Guid.NewGuid();
+        var chunk = CreateMockFile("chunk.txt", "content");
+        var invalidConfig = new ObjectStorageConfigDto
+        {
+            AzureObjectConfig = null
+        };
+
+        // Act & Assert
+        await Assert.ThrowsAsync<ArgumentException>(() =>
+            _fileAzureBusiness.UploadChunk(_oid, _pid, _dsid, 0, uploadId.ToString(), invalidConfig, chunk));
+    }
+
+    [Fact]
+    public async Task UploadChunk_Fails_WhenChunkIsNull()
+    {
+        // Arrange
+        var uploadId = await _fileAzureBusiness.StartUpload(_oid, _pid, _dsid, _objectStorageConfig);
+
+        // Act & Assert
+        await Assert.ThrowsAsync<ArgumentException>(() =>
+            _fileAzureBusiness.UploadChunk(_oid, _pid, _dsid, 0, uploadId.ToString(), _objectStorageConfig, null));
+    }
+
+    [Fact]
+    public async Task UploadChunk_Fails_WhenContainerDoesNotExist()
+    {
+        // Arrange
+        var uploadId = Guid.NewGuid();
+        var chunk = CreateMockFile("chunk.txt", "content");
+        var invalidConfig = new ObjectStorageConfigDto
+        {
+            AzureObjectConfig = new AzureObjectConfigDto
+            {
+                AzureConnectionString = _connectionString,
+                AzureContainerName = "non-existent-container"
+            }
+        };
+
+        // Act & Assert
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            _fileAzureBusiness.UploadChunk(_oid, _pid, _dsid, 0, uploadId.ToString(), invalidConfig, chunk));
+    }
+
+    [Fact]
+    public async Task CompleteUpload_Success_CombinesChunksIntoSingleFile()
+    {
+        // Arrange
+        var uploadId = await _fileAzureBusiness.StartUpload(_oid, _pid, _dsid, _objectStorageConfig);
+        var guid = Guid.NewGuid();
+        var fileName = "complete-test.txt";
+
+        // Upload 3 chunks
+        var chunk0 = CreateMockFile("chunk0", "Part 1 ");
+        var chunk1 = CreateMockFile("chunk1", "Part 2 ");
+        var chunk2 = CreateMockFile("chunk2", "Part 3");
+
+        await _fileAzureBusiness.UploadChunk(_oid, _pid, _dsid, 0, uploadId.ToString(), _objectStorageConfig, chunk0);
+        await _fileAzureBusiness.UploadChunk(_oid, _pid, _dsid, 1, uploadId.ToString(), _objectStorageConfig, chunk1);
+        await _fileAzureBusiness.UploadChunk(_oid, _pid, _dsid, 2, uploadId.ToString(), _objectStorageConfig, chunk2);
+
+        var completeRequest = new FileUploadCompleteRequestDto
+        {
+            UploadId = uploadId.ToString(),
+            FileName = fileName,
+            TotalChunks = 3
+        };
+
+        // Act
+        var result = await _fileAzureBusiness.CompleteUpload(
+            _oid, _pid, _dsid, _objectStorageConfig, completeRequest, guid);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Contains(fileName, result);
+        Assert.Contains(guid.ToString(), result);
+
+        // Verify the final file exists
+        var exists = await BlobExistsAsync(result);
+        Assert.True(exists);
+
+        // Verify the content is correct (chunks combined in order)
+        var content = await GetBlobContentAsync(result);
+        Assert.Equal("Part 1 Part 2 Part 3", content);
+    }
+
+    [Fact]
+    public async Task CompleteUpload_Success_DeletesTemporaryBlob()
+    {
+        // Arrange
+        var uploadId = await _fileAzureBusiness.StartUpload(_oid, _pid, _dsid, _objectStorageConfig);
+        var guid = Guid.NewGuid();
+
+        var chunk = CreateMockFile("chunk", "content");
+        await _fileAzureBusiness.UploadChunk(_oid, _pid, _dsid, 0, uploadId.ToString(), _objectStorageConfig, chunk);
+
+        var completeRequest = new FileUploadCompleteRequestDto
+        {
+            UploadId = uploadId.ToString(),
+            FileName = "test.txt",
+            TotalChunks = 1
+        };
+
+        // Act
+        await _fileAzureBusiness.CompleteUpload(_oid, _pid, _dsid, _objectStorageConfig, completeRequest, guid);
+
+        // Assert - Verify temp blob is deleted
+        var tempBlobName = $"organization_{_oid}/project_{_pid}/datasource_{_dsid}/uploads/{uploadId}";
+        var tempExists = await BlobExistsAsync(tempBlobName);
+        Assert.False(tempExists);
+    }
+
+    [Fact]
+    public async Task CompleteUpload_Fails_WhenChunksAreMissing()
+    {
+        // Arrange
+        var uploadId = await _fileAzureBusiness.StartUpload(_oid, _pid, _dsid, _objectStorageConfig);
+        var guid = Guid.NewGuid();
+
+        // Upload only 2 chunks but claim there should be 3
+        var chunk0 = CreateMockFile("chunk0", "Part 1");
+        var chunk1 = CreateMockFile("chunk1", "Part 2");
+
+        await _fileAzureBusiness.UploadChunk(_oid, _pid, _dsid, 0, uploadId.ToString(), _objectStorageConfig, chunk0);
+        await _fileAzureBusiness.UploadChunk(_oid, _pid, _dsid, 1, uploadId.ToString(), _objectStorageConfig, chunk1);
+
+        var completeRequest = new FileUploadCompleteRequestDto
+        {
+            UploadId = uploadId.ToString(),
+            FileName = "test.txt",
+            TotalChunks = 3 // Expecting 3 but only uploaded 2
+        };
+
+        // Act & Assert
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            _fileAzureBusiness.CompleteUpload(_oid, _pid, _dsid, _objectStorageConfig, completeRequest, guid));
+    }
+
+    [Fact]
+    public async Task CompleteUpload_Fails_WhenAzureConfigIsNull()
+    {
+        // Arrange
+        var completeRequest = new FileUploadCompleteRequestDto
+        {
+            UploadId = Guid.NewGuid().ToString(),
+            FileName = "test.txt",
+            TotalChunks = 1
+        };
+
+        var invalidConfig = new ObjectStorageConfigDto
+        {
+            AzureObjectConfig = null
+        };
+
+        // Act & Assert
+        await Assert.ThrowsAsync<ArgumentException>(() =>
+            _fileAzureBusiness.CompleteUpload(_oid, _pid, _dsid, invalidConfig, completeRequest, Guid.NewGuid()));
+    }
+
+    [Fact]
+    public async Task CompleteUpload_Fails_WhenContainerDoesNotExist()
+    {
+        // Arrange
+        var completeRequest = new FileUploadCompleteRequestDto
+        {
+            UploadId = Guid.NewGuid().ToString(),
+            FileName = "test.txt",
+            TotalChunks = 1
+        };
+
+        var invalidConfig = new ObjectStorageConfigDto
+        {
+            AzureObjectConfig = new AzureObjectConfigDto
+            {
+                AzureConnectionString = _connectionString,
+                AzureContainerName = "non-existent-container"
+            }
+        };
+
+        // Act & Assert
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            _fileAzureBusiness.CompleteUpload(_oid, _pid, _dsid, invalidConfig, completeRequest, Guid.NewGuid()));
+    }
+
+    [Fact]
+    public async Task CancelUpload_Success_DeletesUncommittedBlocks()
+    {
+        // Arrange
+        var uploadId = await _fileAzureBusiness.StartUpload(_oid, _pid, _dsid, _objectStorageConfig);
+
+        // Upload some chunks
+        var chunk0 = CreateMockFile("chunk0", "content 0");
+        var chunk1 = CreateMockFile("chunk1", "content 1");
+
+        await _fileAzureBusiness.UploadChunk(_oid, _pid, _dsid, 0, uploadId.ToString(), _objectStorageConfig, chunk0);
+        await _fileAzureBusiness.UploadChunk(_oid, _pid, _dsid, 1, uploadId.ToString(), _objectStorageConfig, chunk1);
+
+        // Verify blocks exist before cancel
+        var tempBlobName = $"organization_{_oid}/project_{_pid}/datasource_{_dsid}/uploads/{uploadId}";
+        var container = new BlobContainerClient(_connectionString, _containerName);
+        var blockBlobClient = container.GetBlockBlobClient(tempBlobName);
+        
+        var blockListBefore = await blockBlobClient.GetBlockListAsync(Azure.Storage.Blobs.Models.BlockListTypes.Uncommitted);
+        Assert.Equal(2, blockListBefore.Value.UncommittedBlocks.Count());
+
+        // Act
+        await _fileAzureBusiness.CancelUpload(_oid, _pid, _dsid, uploadId.ToString(), _objectStorageConfig);
+
+        // Assert - Verify temp blob no longer exists
+        var exists = await blockBlobClient.ExistsAsync();
+        Assert.False(exists);
+    }
+
+    [Fact]
+    public async Task CancelUpload_Success_DoesNotThrowWhenNoBlobExists()
+    {
+        // Arrange
+        var uploadId = Guid.NewGuid();
+
+        // Act & Assert - Should not throw
+        await _fileAzureBusiness.CancelUpload(_oid, _pid, _dsid, uploadId.ToString(), _objectStorageConfig);
+    }
+
+    [Fact]
+    public async Task CancelUpload_Success_DoesNotThrowWhenContainerDoesNotExist()
+    {
+        // Arrange
+        var uploadId = Guid.NewGuid();
+        var invalidConfig = new ObjectStorageConfigDto
+        {
+            AzureObjectConfig = new AzureObjectConfigDto
+            {
+                AzureConnectionString = _connectionString,
+                AzureContainerName = "non-existent-container"
+            }
+        };
+
+        // Act & Assert - Should not throw, just return
+        await _fileAzureBusiness.CancelUpload(_oid, _pid, _dsid, uploadId.ToString(), invalidConfig);
+    }
+
+    [Fact]
+    public async Task CancelUpload_Fails_WhenAzureConfigIsNull()
+    {
+        // Arrange
+        var uploadId = Guid.NewGuid();
+        var invalidConfig = new ObjectStorageConfigDto
+        {
+            AzureObjectConfig = null
+        };
+
+        // Act & Assert
+        await Assert.ThrowsAsync<ArgumentException>(() =>
+            _fileAzureBusiness.CancelUpload(_oid, _pid, _dsid, uploadId.ToString(), invalidConfig));
+    }
+
+    [Fact]
+    public async Task ChunkedUploadWorkflow_FullLifecycle_WorksCorrectly()
+    {
+        // Start upload
+        var uploadId = await _fileAzureBusiness.StartUpload(_oid, _pid, _dsid, _objectStorageConfig);
+        Assert.NotEqual(Guid.Empty, uploadId);
+
+        // Upload chunks
+        var chunk0 = CreateMockFile("chunk0", "First chunk. ");
+        var chunk1 = CreateMockFile("chunk1", "Second chunk. ");
+        var chunk2 = CreateMockFile("chunk2", "Third chunk.");
+
+        await _fileAzureBusiness.UploadChunk(_oid, _pid, _dsid, 0, uploadId.ToString(), _objectStorageConfig, chunk0);
+        await _fileAzureBusiness.UploadChunk(_oid, _pid, _dsid, 1, uploadId.ToString(), _objectStorageConfig, chunk1);
+        await _fileAzureBusiness.UploadChunk(_oid, _pid, _dsid, 2, uploadId.ToString(), _objectStorageConfig, chunk2);
+
+        // Complete upload
+        var guid = Guid.NewGuid();
+        var fileName = "workflow-test.txt";
+        var completeRequest = new FileUploadCompleteRequestDto
+        {
+            UploadId = uploadId.ToString(),
+            FileName = fileName,
+            TotalChunks = 3
+        };
+
+        var result = await _fileAzureBusiness.CompleteUpload(
+            _oid, _pid, _dsid, _objectStorageConfig, completeRequest, guid);
+
+        // Verify final file
+        Assert.NotNull(result);
+        Assert.True(await BlobExistsAsync(result));
+        var content = await GetBlobContentAsync(result);
+        Assert.Equal("First chunk. Second chunk. Third chunk.", content);
+
+        // Verify temp blob was cleaned up
+        var tempBlobName = $"organization_{_oid}/project_{_pid}/datasource_{_dsid}/uploads/{uploadId}";
+        Assert.False(await BlobExistsAsync(tempBlobName));
+
+        // Verify we can download the completed file
+        var record = await Context.Records.FindAsync(_recordId);
+        record!.Uri = result;
+        record.Name = fileName;
+        await Context.SaveChangesAsync();
+
+        var recordDto = new RecordResponseDto
+        {
+            Id = record.Id,
+            Name = record.Name,
+            Uri = record.Uri,
+            OrganizationId = _oid,
+            ProjectId = _pid,
+            DataSourceId = _dsid
+        };
+
+        var downloadResult = await _fileAzureBusiness.DownloadFile(recordDto, _objectStorageConfig);
+        using var reader = new StreamReader(downloadResult.FileStream);
+        var downloadedContent = await reader.ReadToEndAsync();
+        Assert.Equal("First chunk. Second chunk. Third chunk.", downloadedContent);
+    }
+
+    [Fact]
+    public async Task ChunkedUpload_Success_HandlesLargeNumberOfChunks()
+    {
+        // Arrange
+        var uploadId = await _fileAzureBusiness.StartUpload(_oid, _pid, _dsid, _objectStorageConfig);
+        var numberOfChunks = 10;
+
+        // Upload 10 chunks
+        for (int i = 0; i < numberOfChunks; i++)
+        {
+            var chunk = CreateMockFile($"chunk{i}", $"Chunk {i} content. ");
+            await _fileAzureBusiness.UploadChunk(_oid, _pid, _dsid, i, uploadId.ToString(), _objectStorageConfig, chunk);
+        }
+
+        // Complete upload
+        var guid = Guid.NewGuid();
+        var completeRequest = new FileUploadCompleteRequestDto
+        {
+            UploadId = uploadId.ToString(),
+            FileName = "large-chunk-test.txt",
+            TotalChunks = numberOfChunks
+        };
+
+        // Act
+        var result = await _fileAzureBusiness.CompleteUpload(
+            _oid, _pid, _dsid, _objectStorageConfig, completeRequest, guid);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.True(await BlobExistsAsync(result));
+
+        var content = await GetBlobContentAsync(result);
+        var expectedContent = string.Join("", Enumerable.Range(0, numberOfChunks).Select(i => $"Chunk {i} content. "));
+        Assert.Equal(expectedContent, content);
+    }
+
+    [Fact]
+    public async Task ChunkedUpload_CancelAfterSomeChunks_CleansUpCorrectly()
+    {
+        // Arrange
+        var uploadId = await _fileAzureBusiness.StartUpload(_oid, _pid, _dsid, _objectStorageConfig);
+
+        // Upload some chunks
+        await _fileAzureBusiness.UploadChunk(_oid, _pid, _dsid, 0, uploadId.ToString(), _objectStorageConfig, 
+            CreateMockFile("chunk0", "content 0"));
+        await _fileAzureBusiness.UploadChunk(_oid, _pid, _dsid, 1, uploadId.ToString(), _objectStorageConfig, 
+            CreateMockFile("chunk1", "content 1"));
+        await _fileAzureBusiness.UploadChunk(_oid, _pid, _dsid, 2, uploadId.ToString(), _objectStorageConfig, 
+            CreateMockFile("chunk2", "content 2"));
+
+        // Cancel
+        await _fileAzureBusiness.CancelUpload(_oid, _pid, _dsid, uploadId.ToString(), _objectStorageConfig);
+
+        // Try to complete (should fail because chunks are gone)
+        var completeRequest = new FileUploadCompleteRequestDto
+        {
+            UploadId = uploadId.ToString(),
+            FileName = "test.txt",
+            TotalChunks = 3
+        };
+
+        // Assert - Complete should fail because blocks were cleaned up
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            _fileAzureBusiness.CompleteUpload(_oid, _pid, _dsid, _objectStorageConfig, completeRequest, Guid.NewGuid()));
+    }
+
+    #endregion
+    
+    
 }
