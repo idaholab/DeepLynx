@@ -8,10 +8,10 @@ import { RecordTableRow } from "@/app/(home)/types/types";
 import { useProjectSession } from "@/app/contexts/ProjectSessionProvider";
 import { useOrganizationSession } from "@/app/contexts/OrganizationSessionProvider";
 import { getMultiProjectRecords } from "@/app/lib/client_service/query_services.client";
-import GridView from "../../components/GridView";
-import ListView from "../../components/ListView";
-import { HistoricalRecordResponseDto } from "../../types/responseDTOs";
-import ProjectDropdown from "../../components/ProjectDropdown";
+import GridView from "@/app/(home)/components/GridView";
+import ListView from "@/app/(home)/components/ListView";
+import { HistoricalRecordResponseDto } from "@/app/(home)/types/responseDTOs";
+import ProjectDropdown from "@/app/(home)/components/ProjectDropdown";
 
 import { useLanguage } from "@/app/contexts/Language";
 import {
@@ -20,7 +20,7 @@ import {
   QueueListIcon,
   TableCellsIcon,
 } from "@heroicons/react/24/outline";
-import { TagResponseDto } from "../../types/responseDTOs";
+import { TagResponseDto } from "@/app/(home)/types/responseDTOs";
 import { fullTextSearch } from "@/app/lib/client_service/query_services.client";
 
 /* ----------------------------- Types & utils ----------------------------- */

@@ -52,7 +52,7 @@ const RecentRecordsCard: React.FC<Props> = ({
       const projectIds = selectedProjects.map((id) => Number(id));
       const data = await getRecentlyAddedRecords(
         organization.organizationId as number,
-        projectIds
+        projectIds,
       );
       setRecords(Array.isArray(data) ? data : []);
       setCurrentPage(1);
@@ -64,7 +64,7 @@ const RecentRecordsCard: React.FC<Props> = ({
       setIsLoading(false);
     }
   }, [organization?.organizationId, selectedProjects]);
-
+  console.log("Records: ", records);
   useEffect(() => {
     fetchRecentRecords();
   }, [fetchRecentRecords]);
@@ -103,14 +103,21 @@ const RecentRecordsCard: React.FC<Props> = ({
   const startIndex = (currentPage - 1) * RECORDS_PER_PAGE;
   const paginatedRecords = sorted.slice(
     startIndex,
-    startIndex + RECORDS_PER_PAGE
+    startIndex + RECORDS_PER_PAGE,
   );
 
   const handleSortChange = (val: SortOption) => setSortOption(val);
 
+  const toUtcIsoIfNaive = (input: string) => {
+    if (/([zZ]|[+-]\d{2}:\d{2})$/.test(input)) return input;
+    return `${input}Z`;
+  };
+
   const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    const options: Intl.DateTimeFormatOptions = {
+    const normalized = toUtcIsoIfNaive(dateString);
+    const date = new Date(normalized);
+
+    return date.toLocaleString(undefined, {
       month: "long",
       day: "numeric",
       year: "numeric",
@@ -118,8 +125,7 @@ const RecentRecordsCard: React.FC<Props> = ({
       minute: "numeric",
       hour12: true,
       timeZoneName: "short",
-    };
-    return date.toLocaleString("en-US", options);
+    });
   };
 
   if (isLoading) return <CatalogViewSkeleton />;
@@ -180,7 +186,7 @@ const RecentRecordsCard: React.FC<Props> = ({
             className="border-b border-base-content/40 cursor-pointer hover:bg-base-100/40 p-3 -mx-1 transition-colors"
             onClick={() =>
               router.push(
-                `/record?recordId=${record.id}&projectId=${record.projectId}`
+                `/record?recordId=${record.id}&projectId=${record.projectId}`,
               )
             }
           >
