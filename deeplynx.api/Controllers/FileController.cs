@@ -44,19 +44,21 @@ public class FileController : ControllerBase
     [HttpPost(Name = "api_upload_file")]
     [Auth("write", "file")]
     [Auth("write", "record")]
+    [Sensitivity("write file")]
     public async Task<ActionResult<RecordResponseDto>> UploadFile(
         long organizationId,
         long projectId,
         [FromQuery] long? dataSourceId,
         [FromQuery] long? objectStorageId,
-        IFormFile file)
+        IFormFile file,
+        [FromQuery] List<long>? sensitivityLabelIds)
     {
         try
         {
             var currentUserId = UserContextStorage.UserId;
             var fileUploadInfo =
                 await _fileBusiness.UploadFile(currentUserId, organizationId, projectId, dataSourceId, objectStorageId,
-                    file);
+                    file, sensitivityLabelIds);
             return Ok(fileUploadInfo);
         }
         catch (Exception exc)
@@ -77,6 +79,7 @@ public class FileController : ControllerBase
     /// <returns>Record response DTO containing updated file information</returns>
     [HttpPut("{recordId:long}", Name = "api_update_file")]
     [Auth("update", "file")]
+    [Sensitivity("update file")]
     public async Task<ActionResult<RecordResponseDto>> UpdateFile(
         long organizationId,
         long projectId,
@@ -107,6 +110,7 @@ public class FileController : ControllerBase
     /// <returns>The file stream for download</returns>
     [HttpGet("{recordId:long}", Name = "api_download_file")]
     [Auth("read", "file")]
+    [Sensitivity("download file")]
     public async Task<IActionResult> DownloadFile(
         long organizationId,
         long projectId,
@@ -135,6 +139,7 @@ public class FileController : ControllerBase
     /// <returns>A message stating the file was successfully deleted.</returns>
     [HttpDelete("{recordId:long}", Name = "api_delete_file")]
     [Auth("write", "file")]
+    [Sensitivity("delete file")]
     public async Task<IActionResult> DeleteFile(
         long organizationId,
         long projectId,
@@ -174,9 +179,8 @@ public class FileController : ControllerBase
     {
         try
         {
-            var currentUserId = UserContextStorage.UserId;
             var uploadSession = await _fileBusiness.StartUpload(
-                currentUserId, organizationId, projectId, dataSourceId, objectStorageId, request);
+                organizationId, projectId, dataSourceId, objectStorageId, request);
             return Ok(uploadSession);
         }
         catch (Exception exc)
@@ -212,9 +216,8 @@ public class FileController : ControllerBase
     {
         try
         {
-            var currentUserId = UserContextStorage.UserId;
             var chunkUploadStatus = await _fileBusiness.UploadChunk(
-                currentUserId, organizationId, projectId, dataSourceId, objectStorageId, chunk, uploadId, chunkNumber);
+                organizationId, projectId, dataSourceId, objectStorageId, chunk, uploadId, chunkNumber);
             return Ok(new { ChunkUploadStatus = chunkUploadStatus });
         }
         catch (Exception exc)
@@ -236,18 +239,20 @@ public class FileController : ControllerBase
     /// <returns>Record response DTO containing file information</returns>
     [HttpPost("upload/complete", Name = "api_complete_file_upload")]
     [Auth("write", "file")]
+    [Sensitivity("write file")]
     public async Task<ActionResult<RecordResponseDto>> CompleteUpload(
         long organizationId,
         long projectId,
         [FromQuery] long? dataSourceId,
         [FromQuery] long? objectStorageId,
-        [FromBody] FileUploadCompleteRequestDto request)
+        [FromBody] FileUploadCompleteRequestDto request,
+        [FromQuery] List<long>? sensitivityLabelIds)
     {
         try
         {
             var currentUserId = UserContextStorage.UserId;
             var fileRecord = await _fileBusiness.CompleteUpload(
-                currentUserId, organizationId, projectId, dataSourceId, objectStorageId, request);
+                currentUserId, organizationId, projectId, dataSourceId, objectStorageId, request, sensitivityLabelIds);
             return Ok(fileRecord);
         }
         catch (Exception exc)

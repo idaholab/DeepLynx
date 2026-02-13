@@ -19,6 +19,7 @@ public class FileBusiness
     private readonly IObjectStorageBusiness _objectStorageBusiness;
     private readonly long _recommendedChunkSize;
     private readonly IRecordBusiness _recordBusiness;
+    private readonly ISensitivityLabelService _sensitivityLabelService;
 
     // NOTE: Chunked upload methods currently only support filesystem storage.
     // When Azure/S3 chunked uploads are needed, refactor these methods to 
@@ -58,13 +59,15 @@ public class FileBusiness
     /// <param name="dataSourceId">ID of the data source to which the file belongs</param>
     /// <param name="objectStorageId">ID of the object storage method to use</param>
     /// <param name="file">file to upload</param>
+    /// <param name="sensitivityLabelIds">The IDs of the Sensitivity Labels that will be attached to the record</param>
     public async Task<RecordResponseDto> UploadFile(
         long currentUserId,
         long organizationId,
         long projectId,
         long? dataSourceId,
         long? objectStorageId,
-        IFormFile file)
+        IFormFile file,
+        List<long>? sensitivityLabelIds = null)
     {
         long realDataSourceId;
         if (file == null || file.Length == 0) throw new ArgumentException("File is required and cannot be empty.");
@@ -126,7 +129,7 @@ public class FileBusiness
 
         // return the newly created metadata record for the file
         return await _recordBusiness.CreateRecord(currentUserId, organizationId, projectId, realDataSourceId,
-            recordRequest);
+            recordRequest, sensitivityLabelIds);
     }
 
     /// <summary>
@@ -141,6 +144,7 @@ public class FileBusiness
         long recordId, IFormFile file)
     {
         var record = await _recordBusiness.GetRecord(currentUserId, organizationId, projectId, recordId, true);
+
         if (file == null || file.Length == 0) throw new ArgumentException("File is required and cannot be empty.");
 
         if (record.ObjectStorageId == null) throw new KeyNotFoundException("Record needs an object storage id");
@@ -181,6 +185,7 @@ public class FileBusiness
     public async Task<FileStreamResult> DownloadFile(long currentUserId, long organizationId, long projectId, long recordId)
     {
         var record = await _recordBusiness.GetRecord(currentUserId, organizationId, projectId, recordId, true);
+
         if (record.ObjectStorageId == null) throw new KeyNotFoundException("Record needs an object storage id");
         
         var objectStorage = await GetObjectStorageWithConfig(organizationId, projectId, record.ObjectStorageId.Value);
@@ -202,6 +207,7 @@ public class FileBusiness
     public async Task<bool> DeleteFile(long currentUserId, long organizationId, long projectId, long recordId)
     {
         var record = await _recordBusiness.GetRecord(currentUserId, organizationId, projectId, recordId, true);
+
         if (record == null) throw new KeyNotFoundException("Record not found");
         if (record.ObjectStorageId == null) throw new KeyNotFoundException("Record needs an object storage id");
         
@@ -220,14 +226,12 @@ public class FileBusiness
     /// <summary>
     ///     Initializes a chunked upload session
     /// </summary>
-    /// <param name="currentUserId">ID of the User executing this method.</param>
     /// <param name="organizationId">ID of the Organization to which the project belongs</param>
     /// <param name="projectId">ID of the project to which the file belongs</param>
     /// <param name="dataSourceId">ID of the data source to which the file belongs</param>
     /// <param name="objectStorageId">ID of the object storage method to use</param>
     /// <param name="request">File upload initialization request</param>
     public async Task<FileUploadSessionResponseDto> StartUpload(
-        long currentUserId,
         long organizationId,
         long projectId,
         long? dataSourceId,
@@ -286,7 +290,6 @@ public class FileBusiness
     /// <summary>
     ///     Uploads a single chunk of a file
     /// </summary>
-    /// <param name="currentUserId">ID of the User executing this method.</param>
     /// <param name="organizationId">ID of the Organization to which the project belongs</param>
     /// <param name="projectId">ID of the project to which the file belongs</param>
     /// <param name="dataSourceId">ID of the data source to which the file belongs</param>
@@ -295,7 +298,6 @@ public class FileBusiness
     /// <param name="uploadId">The upload session ID from StartUpload</param>
     /// <param name="chunkNumber">The index for tracking the order to merge chunks together</param>
     public async Task<string> UploadChunk(
-        long currentUserId,
         long organizationId,
         long projectId,
         long? dataSourceId,
@@ -353,13 +355,15 @@ public class FileBusiness
     /// <param name="dataSourceId">ID of the data source to which the file belongs</param>
     /// <param name="objectStorageId">ID of the object storage method to use</param>
     /// <param name="request">File upload completion request</param>
+    /// <param name="sensitivityLabelIds">The IDs of the Sensitivity Labels that will be attached to the record</param>
     public async Task<RecordResponseDto> CompleteUpload(
         long currentUserId,
         long organizationId,
         long projectId,
         long? dataSourceId,
         long? objectStorageId,
-        FileUploadCompleteRequestDto request)
+        FileUploadCompleteRequestDto request,
+        List<long>? sensitivityLabelIds = null)
     {
         // Resolve data source
         long realDataSourceId;
@@ -424,7 +428,7 @@ public class FileBusiness
         };
 
         return await _recordBusiness.CreateRecord(currentUserId, organizationId, projectId, realDataSourceId,
-            recordRequest);
+            recordRequest, sensitivityLabelIds);
     }
 
     /// <summary>

@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.Text.Json;
 using deeplynx.business;
 using deeplynx.datalayer.Models;
 using deeplynx.helpers.Hubs;
@@ -390,7 +391,7 @@ public class ProjectBusinessTests : IntegrationTestBase
         {
             Name = $"Test Project {DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}",
             Description = "Test Description",
-            Abbreviation = "TST", 
+            Abbreviation = "TST",
             Banner = "Test Banner",
         };
 
@@ -694,7 +695,7 @@ public class ProjectBusinessTests : IntegrationTestBase
         {
             Name = $"Updated Project {DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}",
             Description = "Updated Description",
-            Abbreviation = "UPD", 
+            Abbreviation = "UPD",
             Banner = "Updated Banner"
         };
 
@@ -1518,5 +1519,127 @@ public class ProjectBusinessTests : IntegrationTestBase
         Assert.Equal("Updated Description", updatedProject.Description);
     }
 
-    #endregion
+    [Fact]
+    public async Task UpdateProject_Fails_UnlabeledRecords()
+    {
+        // add unlabeled record in project in organization
+        var project = new Project
+        {
+            Name = "Test Project",
+            Description = "Test project for unit tests",
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            OrganizationId = oid
+        };
+        Context.Projects.Add(project);
+        await Context.SaveChangesAsync();
+        var testProjectId = project.Id;
+
+        var dataSource = new DataSource
+        {
+            Name = "Test Data Source",
+            Description = "Test data source for unit tests",
+            ProjectId = testProjectId,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            OrganizationId = oid
+        };
+        Context.DataSources.Add(dataSource);
+        await Context.SaveChangesAsync();
+        var did = dataSource.Id;
+
+        var record = new Record
+        {
+            Name = "Test Record",
+            Description = "Test record for unit tests",
+            OriginalId = Guid.NewGuid().ToString(),
+            ProjectId = testProjectId,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            Uri = "localhost:8090",
+            FileType = "pdf",
+            Properties = JsonSerializer.Serialize(new { TestProperty = "TestValue" }),
+            DataSourceId = did,
+            OrganizationId = oid,
+        };
+
+        Context.Records.Add(record);
+        await Context.SaveChangesAsync();
+
+        var dto = new UpdateProjectRequestDto
+        {
+            RequireSensitivityLabel = true
+        };
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => 
+            _projectBusiness.UpdateProject(uid, oid, testProjectId, dto));
+    }
+
+    [Fact]
+    public async Task UpdateProject_RequireSensitivityLabels_Success()
+    {
+        var project = new Project
+        {
+            Name = "Test Project",
+            Description = "Test project for unit tests",
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            OrganizationId = oid
+        };
+        Context.Projects.Add(project);
+        await Context.SaveChangesAsync();
+        var testProjectId = project.Id;
+        
+        var dataSource = new DataSource
+        {
+            Name = "Test Data Source",
+            Description = "Test data source for unit tests",
+            ProjectId = testProjectId,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            OrganizationId = oid
+        };
+        Context.DataSources.Add(dataSource);
+        await Context.SaveChangesAsync();
+        var did = dataSource.Id;
+        
+        var testLabel = new SensitivityLabel
+        {
+            Name = "Test Label",
+            OrganizationId = oid,
+            ProjectId = testProjectId,
+        };
+        Context.SensitivityLabels.Add(testLabel);
+        await Context.SaveChangesAsync();
+        
+        var record = new Record
+        {
+            Name = "Test Record",
+            Description = "Test record for unit tests",
+            OriginalId = Guid.NewGuid().ToString(),
+            ProjectId = testProjectId,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            Properties = JsonSerializer.Serialize(new { TestProperty = "TestValue" }),
+            LastUpdatedBy = uid,
+            Uri = "localhost:8090",
+            FileType = "pdf",
+            DataSourceId = did,
+            OrganizationId = oid,
+            Labels = new List<SensitivityLabel>{testLabel}
+        };
+        Context.Records.Add(record);
+        await Context.SaveChangesAsync();
+        
+        var dto = new UpdateProjectRequestDto
+        {
+            RequireSensitivityLabel = true
+        };
+        
+        var updateResult = await _projectBusiness.UpdateProject(uid, oid, testProjectId, dto);
+        Assert.NotNull(updateResult);
+        Assert.NotNull(updateResult.RequireSensitivityLabel);
+        Assert.True(updateResult.RequireSensitivityLabel);
+    }
+
+#endregion
 }

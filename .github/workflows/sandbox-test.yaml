@@ -140,7 +140,7 @@ jobs:
             --from-literal=auth-url="${{ vars.NEXTAUTH_URL }}" \
             --from-literal=redirect-link="${{ vars.REDIRECT_LINK }}" \
             --from-literal=backend-base-url="${{ vars.BACKEND_BASE_URL }}" \
-            --from-literal=disabled-front-auth="${{ vars.DISABLNEXT_PUBLIC_DISABLE_FRONTEND_AUTHENTICATIONE_FRONTEND_AUTHENTICATION }}" \
+            --from-literal=disabled-front-auth="${{ vars.NEXT_PUBLIC_DISABLE_FRONTEND_AUTHENTICATION }}" \
             --from-literal=hosted-link="${{ vars.HOSTED_LINK }}" \
             --namespace=deeplynx-test \
             --dry-run=client -o yaml | kubectl apply -f -
@@ -151,6 +151,10 @@ jobs:
           AWS_S3_CONNECTION_STRING: ${{ secrets.AWS_S3_CONNECTION_STRING }}
           AZURE_OBJECT_CONNECTION_STRING: ${{ secrets.AZURE_OBJECT_CONNECTION_STRING }}
           AZURE_STORAGE_ACCOUNT_SAS_TOKEN: ${{ secrets.AZURE_STORAGE_ACCOUNT_SAS_TOKEN }}
+          AZURE_FILE_SHARE_VOLUME_HANDLE: ${{ vars.AZURE_FILE_SHARE_VOLUME_HANDLE }}
+          AZURE_FILE_SHARE_STORAGE_CLASS: ${{ vars.AZURE_FILE_SHARE_STORAGE_CLASS }}
+          AZURE_FILE_SHARE_PERSISTENT_VOLUME: ${{ vars.AZURE_FILE_SHARE_PERSISTENT_VOLUME }}
+          AZURE_FILE_SHARE_PVC: ${{ vars.AZURE_FILE_SHARE_PVC }}
           AZURE_STORAGE_ACCOUNT_KEY: ${{ secrets.AZURE_STORAGE_ACCOUNT_KEY }}
           AZURE_STORAGE_ACCOUNT_NAME: ${{ vars.AZURE_STORAGE_ACCOUNT_NAME }}
           AZURE_ACCOUNT_RESOURCE_GROUP: ${{ vars.AZURE_ACCOUNT_RESOURCE_GROUP }}

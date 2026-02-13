@@ -12,4 +12,6 @@ public class CreateProjectRequestDto
     public string? Abbreviation { get; set; }
 
     public string? Banner { get; set; }
+    
+    public bool? RequireSensitivityLabel { get; set; }
 }
