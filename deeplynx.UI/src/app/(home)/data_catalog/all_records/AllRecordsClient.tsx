@@ -338,7 +338,6 @@ export default function DataCatalogClient({
     () => ALL_COLUMNS.filter((c) => visibleCols.includes(c.key)),
     [ALL_COLUMNS, visibleCols],
   );
-  console.log("Grid view table data: ", tableData);
   // Strip "key" before passing to GridView if it doesn’t expect it
   const gridColumns = useMemo(
     () => filteredColumns.map(({ key, ...rest }) => rest),

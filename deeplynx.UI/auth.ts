@@ -212,7 +212,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             // CRITICAL: Check if this is an OAuth flow redirect
             // OAuth flows will have /api/oauth/authorize in the URL
             if (url.includes('/api/oauth/authorize')) {
-                console.log(`OAuth flow detected, allowing redirect to: ${url}`);
                 return url;
             }
 
