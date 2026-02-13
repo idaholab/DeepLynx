@@ -64,8 +64,8 @@ public class AdminService : IAdminService
             SELECT EXISTS(
                 SELECT 1
                 FROM deeplynx.organization_users ou
-                WHERE ou.id = {organizationId}
-                  AND ou.id = {userId}
+                WHERE ou.organization_id = {organizationId}
+                  AND ou.user_id = {userId}
                   AND ou.is_org_admin = true
                 ) as has_permission")
             .AsEnumerable()
