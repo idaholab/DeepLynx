@@ -64,7 +64,7 @@ const RecentRecordsCard: React.FC<Props> = ({
       setIsLoading(false);
     }
   }, [organization?.organizationId, selectedProjects]);
-  console.log("Records: ", records);
+  
   useEffect(() => {
     fetchRecentRecords();
   }, [fetchRecentRecords]);
