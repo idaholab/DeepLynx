@@ -43,6 +43,7 @@ public class FileController : ControllerBase
     /// <returns>Record response DTO containing file information</returns>
     [HttpPost(Name = "api_upload_file")]
     [Auth("write", "file")]
+    [Auth("write", "record")]
     public async Task<ActionResult<RecordResponseDto>> UploadFile(
         long organizationId,
         long projectId,
@@ -75,7 +76,7 @@ public class FileController : ControllerBase
     /// <param name="file">The file to replace the old one</param>
     /// <returns>Record response DTO containing updated file information</returns>
     [HttpPut("{recordId:long}", Name = "api_update_file")]
-    [Auth("write", "file")]
+    [Auth("update", "file")]
     public async Task<ActionResult<RecordResponseDto>> UpdateFile(
         long organizationId,
         long projectId,

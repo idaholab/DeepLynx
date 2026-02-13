@@ -235,7 +235,7 @@ public class RecordController : ControllerBase
     /// <param name="dto">The record request data transfer object containing updated record details</param>
     /// <returns>The updated record</returns>
     [HttpPut("{recordId:long}", Name = "api_update_a_record")]
-    [Auth("write", "record")]
+    [Auth("update", "record")]
     public async Task<ActionResult<RecordResponseDto>> UpdateRecord(
         long organizationId,
         long projectId,
@@ -293,7 +293,7 @@ public class RecordController : ControllerBase
     /// <param name="archive">True to archive the record, false to unarchive it.</param>
     /// <returns>A message stating the record was successfully archived or unarchived.</returns>
     [HttpPatch("{recordId:long}", Name = "api_archive_record")]
-    [Auth("write", "record")]
+    [Auth("update", "record")]
     public async Task<IActionResult> ArchiveRecord(
         long organizationId,
         long projectId,
@@ -330,7 +330,7 @@ public class RecordController : ControllerBase
     /// <param name="tagId">The ID of the tag to attach</param>
     /// <returns>A message stating the tag was successfully attached to the record.</returns>
     [HttpPost("{recordId:long}/tags", Name = "api_attach_a_tag")]
-    [Auth("write", "record")]
+    [Auth("update", "record")]
     [Auth("read", "tag")]
     public async Task<IActionResult> AttachTag(
         long organizationId,
@@ -361,7 +361,7 @@ public class RecordController : ControllerBase
     /// <param name="tagId">The ID of the tag to unattach</param>
     /// <returns>A message stating the tag was successfully unattached from the record.</returns>
     [HttpDelete("{recordId:long}/tags", Name = "api_unattach_a_tag")]
-    [Auth("write", "record")]
+    [Auth("update", "record")]
     [Auth("read", "tag")]
     public async Task<IActionResult> UnattachTag(
         long organizationId,
@@ -392,7 +392,7 @@ public class RecordController : ControllerBase
     /// <param name="labelId">The ID of the label to attach</param>
     /// <returns>A message stating the label was successfully attached to the record.</returns>
     [HttpPost("{recordId:long}/sensitivity-labels", Name = "api_attach_sensitivity_label")]
-    [Auth("write", "record")]
+    [Auth("update", "record")]
     [Auth("read", "sensitivity_label")]
     public async Task<IActionResult> AttachSensitivityLabel(
         long organizationId,
@@ -423,7 +423,7 @@ public class RecordController : ControllerBase
     /// <param name="labelId">The ID of the label to unattach</param>
     /// <returns>A message stating the label was successfully unattached from the record.</returns>
     [HttpDelete("{recordId:long}/sensitivity-labels", Name = "api_unattach_sensitivity-label")]
-    [Auth("write", "record")]
+    [Auth("update", "record")]
     [Auth("read", "sensitivity_label")]
     public async Task<IActionResult> UnattachSensitivityLabel(
         long organizationId,
@@ -458,6 +458,7 @@ public class RecordController : ControllerBase
     /// <returns>A list of related records based on edges.</returns>
     [HttpGet("{recordId:long}/edges", Name = "api_get_edges_by_record")]
     [Auth("read", "record")]
+    [Auth("read", "edge")]
     public async Task<ActionResult<IEnumerable<RelatedRecordsResponseDto>>> GetEdgesByRecord(
         long organizationId,
         long projectId,

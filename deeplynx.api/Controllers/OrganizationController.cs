@@ -135,7 +135,7 @@ public class OrganizationController : ControllerBase
     /// <param name="dto">Fields to update</param>
     /// <returns></returns>
     [HttpPut("{organizationId:long}", Name = "api_update_organization")]
-    [Auth("write", "organization")]
+    [Auth("update", "organization")]
     public async Task<ActionResult<OrganizationResponseDto>> UpdateOrganization(
         long organizationId,
         [FromBody] UpdateOrganizationRequestDto dto)
@@ -183,7 +183,7 @@ public class OrganizationController : ControllerBase
     /// <param name="archive">True to archive the organization, false to unarchive it.</param>
     /// <returns>A message stating the organization was successfully archived or unarchived.</returns>
     [HttpPatch("{organizationId:long}", Name = "api_archive_organization")]
-    [Auth("write", "organization", includeArchived: true)]
+    [Auth("update", "organization", includeArchived: true)]
     public async Task<IActionResult> ArchiveOrganization(
         long organizationId,
         [FromQuery] bool archive)
@@ -217,7 +217,7 @@ public class OrganizationController : ControllerBase
     /// <param name="isAdmin"></param>
     /// <returns></returns>
     [HttpPost("{organizationId:long}/user", Name = "api_add_user_to_organization")]
-    [Auth("write", "organization")]
+    [Auth("update", "organization")]
     public async Task<ActionResult> AddUserToOrganization(
         long organizationId,
         [FromQuery] long userId,
@@ -244,7 +244,7 @@ public class OrganizationController : ControllerBase
     /// <param name="isAdmin">isAdmin status</param>
     /// <returns></returns>
     [HttpPut("{organizationId:long}/admin", Name = "api_update_organization_admin_status")]
-    [Auth("write", "organization")]
+    [Auth("update", "organization")]
     public async Task<ActionResult> SetOrganizationAdminStatus(
         long organizationId,
         [FromQuery] long userId,
@@ -271,7 +271,7 @@ public class OrganizationController : ControllerBase
     /// <param name="userId">ID of user to be removed</param>
     /// <returns></returns>
     [HttpDelete("{organizationId:long}/user", Name = "api_remove_user_from_organization")]
-    [Auth("write", "organization")]
+    [Auth("update", "organization")]
     public async Task<ActionResult> RemoveUserFromOrganization(
         long organizationId,
         [FromQuery] long userId)
@@ -298,6 +298,7 @@ public class OrganizationController : ControllerBase
     /// <returns></returns>
     [HttpPost("{organizationId:long}/invite", Name = "api_invite_user_to_organization")]
     [Auth("write", "user")]
+    [Auth("update", "organization")]
     public async Task<ActionResult> InviteUserToOrganization(
         long organizationId,
         [FromQuery] string userEmail,

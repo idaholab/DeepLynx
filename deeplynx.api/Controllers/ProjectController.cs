@@ -148,7 +148,7 @@ public class ProjectController : ControllerBase
     /// <param name="dto">A data transfer object with details on the project to be updated.</param>
     /// <returns>The project which was just updated.</returns>
     [HttpPut("{projectId:long}", Name = "api_update_a_project")]
-    [Auth("write", "project")]
+    [Auth("update", "project")]
     public async Task<ActionResult<ProjectResponseDto>> UpdateProject(
         long organizationId,
         long projectId,
@@ -200,7 +200,7 @@ public class ProjectController : ControllerBase
     /// <param name="archive">True to archive the project, false to unarchive it.</param>
     /// <returns>A message stating the project was successfully archived or unarchived.</returns>
     [HttpPatch("{projectId:long}", Name = "api_archive_project")]
-    [Auth("write", "project", includeArchived: true)]
+    [Auth("update", "project", includeArchived: true)]
     public async Task<IActionResult> ArchiveProject(
         long organizationId,
         long projectId,
@@ -283,7 +283,7 @@ public class ProjectController : ControllerBase
     /// <param name="groupId">ID of group if group is member</param>
     /// <returns></returns>
     [HttpPost("{projectId:long}/members", Name = "api_add_member_to_project")]
-    [Auth("write", "project")]
+    [Auth("update", "project")]
     public async Task<ActionResult> AddMemberToProject(
         long organizationId, long projectId,
         [FromQuery] long? roleId, [FromQuery] long? userId, [FromQuery] long? groupId)
@@ -311,7 +311,7 @@ public class ProjectController : ControllerBase
     /// <param name="groupId">ID of group if group is member</param>
     /// <returns></returns>
     [HttpPut("{projectId:long}/members", Name = "api_update_project_member_role")]
-    [Auth("write", "project")]
+    [Auth("update", "project")]
     public async Task<ActionResult> UpdateProjectMemberRole(
         long organizationId, long projectId,
         [FromQuery] long roleId, [FromQuery] long? userId, [FromQuery] long? groupId)
@@ -338,7 +338,7 @@ public class ProjectController : ControllerBase
     /// <param name="groupId">ID of the group if group is member</param>
     /// <returns></returns>
     [HttpDelete("{projectId:long}/members", Name = "api_remove_member_from_project")]
-    [Auth("write", "project")]
+    [Auth("update", "project")]
     public async Task<ActionResult> RemoveMemberFromProject(
         long organizationId,
         long projectId,
@@ -368,7 +368,8 @@ public class ProjectController : ControllerBase
     /// <param name="roleId"></param>
     /// <returns></returns>
     [HttpPost("{projectId:long}/invite", Name = "api_invite_user_to_project")]
-    [Auth("write", "user")]
+    [Auth("update", "user")]
+    [Auth("update", "project")]
     public async Task<ActionResult> InviteUserToProject(
         long organizationId,
         long projectId,
