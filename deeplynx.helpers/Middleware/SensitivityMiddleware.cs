@@ -22,13 +22,16 @@ public class SensitivityMiddleware
     
     // Sensitivity Labels on records can only be added during record creation
     // or updated through the "attach/unattach label" endpoints
-    private static readonly HashSet<string> _createActions = new()
+    
+    // Actions that require checking new labels
+    private static readonly HashSet<string> _checkNewLabels = new()
     {
         "write record",
         "upload file",
     };
-
-    private static readonly HashSet<string> _readDeleteActions = new()
+    
+    // Actions that require checking existing labels
+    private static readonly HashSet<string> _checkExistingLables = new()
     {
         "read record",
         "download file",
@@ -36,7 +39,8 @@ public class SensitivityMiddleware
         "delete file"
     };
     
-    private static readonly HashSet<string> _updateActions = new()
+    // Actions that require checking existing and new labels
+    private static readonly HashSet<string> _checkNewAndExistingLabels = new()
     {
         "update record",
         "update file"
@@ -152,7 +156,7 @@ public class SensitivityMiddleware
 
         // CREATE ACTIONS
         // Check if labels are required and if provided labels are authorized
-        if (_createActions.Contains(sensitivityAttr.Action))
+        if (_checkNewLabels.Contains(sensitivityAttr.Action))
         {
             var projectId = projectIds.FirstOrDefault();
             var isLabelRequired = await sensitivityLabelService.IsSensitivityLabelRequired(
@@ -189,7 +193,7 @@ public class SensitivityMiddleware
         
         // READ & DELETE ACTIONS
         // Check if user has permission for existing labels on the record
-        if (_readDeleteActions.Contains(sensitivityAttr.Action) && recordId != null)
+        if (_checkExistingLables.Contains(sensitivityAttr.Action) && recordId != null)
         {
             var existingLabelIds = await sensitivityLabelService.GetRecordSensitivityLabels(recordId.Value);
             
@@ -212,7 +216,7 @@ public class SensitivityMiddleware
       
         // UPDATE ACTIONS
         // Check both existing labels and any new labels being added
-        if (_updateActions.Contains(sensitivityAttr.Action) && recordId != null)
+        if (_checkNewAndExistingLabels.Contains(sensitivityAttr.Action) && recordId != null)
         {
             var existingLabelIds = await sensitivityLabelService.GetRecordSensitivityLabels(recordId.Value);
             
