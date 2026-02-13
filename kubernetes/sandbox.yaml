@@ -5,7 +5,7 @@ metadata:
   name: deeplynx-test
   labels:
     name: deeplynx-test
-
+    
 ---
 # Secret for Azure Storage Account with SAS Token
 apiVersion: v1
@@ -19,7 +19,7 @@ stringData:
   azurestorageaccountsastoken: ${AZURE_STORAGE_ACCOUNT_SAS_TOKEN}
   azurestorageaccountkey: ${AZURE_STORAGE_ACCOUNT_KEY}
   azurestorageconnectionstring: ${AZURE_OBJECT_CONNECTION_STRING}
-
+  
 ---
 # Persistent Volume pointing to existing Azure File Share
 apiVersion: v1
