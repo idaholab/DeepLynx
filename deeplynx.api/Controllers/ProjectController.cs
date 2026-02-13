@@ -258,6 +258,7 @@ public class ProjectController : ControllerBase
     /// <returns>A list of groups and users in the project, along with their roles</returns>
     [HttpGet("{projectId:long}/members", Name = "api_get_project_members")]
     [Auth("read", "project")]
+    [Auth("read", "user")]
     public async Task<ActionResult<ProjectMemberResponseDto>> GetProjectMembers(long organizationId, long projectId)
     {
         try
@@ -284,6 +285,7 @@ public class ProjectController : ControllerBase
     /// <returns></returns>
     [HttpPost("{projectId:long}/members", Name = "api_add_member_to_project")]
     [Auth("update", "project")]
+    [Auth("update", "user")]
     public async Task<ActionResult> AddMemberToProject(
         long organizationId, long projectId,
         [FromQuery] long? roleId, [FromQuery] long? userId, [FromQuery] long? groupId)
@@ -312,6 +314,7 @@ public class ProjectController : ControllerBase
     /// <returns></returns>
     [HttpPut("{projectId:long}/members", Name = "api_update_project_member_role")]
     [Auth("update", "project")]
+    [Auth("update", "user")]
     public async Task<ActionResult> UpdateProjectMemberRole(
         long organizationId, long projectId,
         [FromQuery] long roleId, [FromQuery] long? userId, [FromQuery] long? groupId)
@@ -339,6 +342,7 @@ public class ProjectController : ControllerBase
     /// <returns></returns>
     [HttpDelete("{projectId:long}/members", Name = "api_remove_member_from_project")]
     [Auth("update", "project")]
+    [Auth("update", "user")]
     public async Task<ActionResult> RemoveMemberFromProject(
         long organizationId,
         long projectId,
