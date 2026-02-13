@@ -85,7 +85,7 @@ spec:
     requests:
       storage: 60Gi
   storageClassName: ${AZURE_FILE_SHARE_STORAGE_CLASS}
-  volumeName: nexus-duckdb-pv  # Bind to the specific PV
+  volumeName: ${AZURE_FILE_SHARE_PERSISTENT_VOLUME} # Bind to the specific PV
 
 ---
 apiVersion: apps/v1
