@@ -34,6 +34,7 @@ public static class ClaimsEmailExtractor
 
             var candidate = raw.Trim().ToLowerInvariant();
 
+            // Let's treat these as the same
             if (candidate.EndsWith("@azuregov.inl.gov", StringComparison.OrdinalIgnoreCase))
                 candidate = candidate.Replace("@azuregov.inl.gov", "@inl.gov");
 
