@@ -79,6 +79,7 @@ public class FileController : ControllerBase
     /// <returns>Record response DTO containing updated file information</returns>
     [HttpPut("{recordId:long}", Name = "api_update_file")]
     [Auth("update", "file")]
+    [Auth("update", "record")]
     [Sensitivity("update file")]
     public async Task<ActionResult<RecordResponseDto>> UpdateFile(
         long organizationId,
