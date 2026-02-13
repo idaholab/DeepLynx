@@ -4,6 +4,7 @@ import { useLanguage } from "@/app/contexts/Language";
 import { ChevronLeftIcon, ChevronRightIcon } from "@heroicons/react/24/outline";
 import { useRouter } from "next/navigation";
 import React, { useState } from "react";
+import { formatLocalDateTime } from "@/app/lib/date_time";
 import { RecordTableRow } from "../types/types";
 import { TagResponseDto } from "../types/responseDTOs";
 
@@ -97,26 +98,6 @@ const ListView: React.FC<ListViewProps> = ({
           selectedProjects.includes(record.projectId),
       );
 
-  const toUtcIsoIfNaive = (input: string) => {
-    if (/([zZ]|[+-]\d{2}:\d{2})$/.test(input)) return input;
-    return `${input}Z`;
-  };
-
-  const formatDate = (dateString: string) => {
-    const normalized = toUtcIsoIfNaive(dateString);
-    const date = new Date(normalized);
-
-    return date.toLocaleString(undefined, {
-      month: "long",
-      day: "numeric",
-      year: "numeric",
-      hour: "numeric",
-      minute: "numeric",
-      hour12: true,
-      timeZoneName: "short",
-    });
-  };
-
   return (
     <div className="bg-base-100 px-10 w-full mx-auto text-info-content">
       <ul className="list">
@@ -131,7 +112,7 @@ const ListView: React.FC<ListViewProps> = ({
             activeSearchTerms,
           );
           // const time = getHighlightedCell(record.timeseries, activeSearchTerms);
-          const formattedDate = formatDate(record.lastUpdatedAt);
+          const formattedDate = formatLocalDateTime(record.lastUpdatedAt);
           const date = getHighlightedCell(formattedDate, activeSearchTerms);
           return (
             <li

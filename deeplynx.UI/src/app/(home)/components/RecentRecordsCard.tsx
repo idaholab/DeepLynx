@@ -11,6 +11,7 @@ import React, { useEffect, useState, useCallback, useMemo } from "react";
 import CatalogViewSkeleton from "./skeletons/catalogviewskeleton";
 import { HistoricalRecordResponseDto } from "../types/responseDTOs";
 import { getRecentlyAddedRecords } from "@/app/lib/client_service/query_services.client";
+import { formatLocalDateTime } from "@/app/lib/date_time";
 
 interface Props {
   selectedProjects: string[];
@@ -108,26 +109,6 @@ const RecentRecordsCard: React.FC<Props> = ({
 
   const handleSortChange = (val: SortOption) => setSortOption(val);
 
-  const toUtcIsoIfNaive = (input: string) => {
-    if (/([zZ]|[+-]\d{2}:\d{2})$/.test(input)) return input;
-    return `${input}Z`;
-  };
-
-  const formatDate = (dateString: string) => {
-    const normalized = toUtcIsoIfNaive(dateString);
-    const date = new Date(normalized);
-
-    return date.toLocaleString(undefined, {
-      month: "long",
-      day: "numeric",
-      year: "numeric",
-      hour: "numeric",
-      minute: "numeric",
-      hour12: true,
-      timeZoneName: "short",
-    });
-  };
-
   if (isLoading) return <CatalogViewSkeleton />;
 
   return (
@@ -206,7 +187,7 @@ const RecentRecordsCard: React.FC<Props> = ({
                 <span className="text-base-content/50">
                   {t.translations.LAST_EDIT}:
                 </span>{" "}
-                {formatDate(record.lastUpdatedAt)}
+                {formatLocalDateTime(record.lastUpdatedAt)}
               </span>
 
               <span>
