@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.Text.Json;
 using deeplynx.business;
 using deeplynx.datalayer.Models;
 using deeplynx.helpers.Hubs;
@@ -9,6 +10,8 @@ using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Moq;
+using Xunit.Sdk;
+using Record = deeplynx.datalayer.Models.Record;
 
 namespace deeplynx.tests;
 
@@ -241,7 +244,8 @@ public class OrganizationBusinessTests : IntegrationTestBase
         {
             Name = "New Test Organization",
             Description = "New Test Organization Description",
-            Banner = "Banner"
+            Banner = "Banner",
+            RequireSensitivityLabel = true
         };
 
         var now = DateTime.UtcNow;
@@ -259,6 +263,7 @@ public class OrganizationBusinessTests : IntegrationTestBase
         Assert.True(result.LastUpdatedAt >= now);
         Assert.Equal(uid, result.LastUpdatedBy);
         Assert.Equal(dto.Banner, result.Banner);
+        Assert.True(result.RequireSensitivityLabel);
 
         // verify org was actually created in database
         var createdOrg = await Context.Organizations.FindAsync(result.Id);
@@ -699,6 +704,140 @@ public class OrganizationBusinessTests : IntegrationTestBase
 
         // All other orgs should be non-default
         foreach (var o in all.Where(o => o.Id != oid)) Assert.False(o.DefaultOrg);
+    }
+
+    [Fact]
+    public async Task UpdateOrganization_Fails_RequireSensitivityLabels_UnlabeledRecords()
+    {
+        // add unlabeled record in project in organization
+        var project = new Project
+        {
+            Name = "Test Project",
+            Description = "Test project for unit tests",
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            OrganizationId = oid
+        };
+        Context.Projects.Add(project);
+        await Context.SaveChangesAsync();
+        var pid = project.Id;
+
+        var dataSource = new DataSource
+        {
+            Name = "Test Data Source",
+            Description = "Test data source for unit tests",
+            ProjectId = pid,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            OrganizationId = oid
+        };
+        Context.DataSources.Add(dataSource);
+        await Context.SaveChangesAsync();
+        var did = dataSource.Id;
+        
+        var record = new Record
+        {
+            Name = "Test Record",
+            Description = "Test record for unit tests",
+            OriginalId = Guid.NewGuid().ToString(),
+            Properties = JsonSerializer.Serialize(new { TestProperty = "TestValue" }),
+            ProjectId = pid,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            Uri = "localhost:8090",
+            FileType = "pdf",
+            DataSourceId = did,
+            OrganizationId = oid,
+        };
+        
+        Context.Records.Add(record);
+        await Context.SaveChangesAsync();
+        
+        
+        var dto = new UpdateOrganizationRequestDto
+        {
+            RequireSensitivityLabel = true
+        };
+        
+        await Assert.ThrowsAsync<InvalidOperationException>(() => _organizationBusiness.UpdateOrganization(uid, oid, dto));
+    }
+    
+    [Fact]
+    public async Task UpdateOrganization_Success_RequireSensitivityLabels()
+    {
+        var otherOrg = new Organization
+        {
+            Name = "New Default Org",
+            Description = "New Default Org",
+            DefaultOrg = true,
+            IsArchived = false,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid
+        };
+        Context.Organizations.Add(otherOrg);
+        await Context.SaveChangesAsync();
+        
+        var project = new Project
+        {
+            Name = "Test Project",
+            Description = "Test project for unit tests",
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            OrganizationId = otherOrg.Id
+        };
+        Context.Projects.Add(project);
+        await Context.SaveChangesAsync();
+        var pid = project.Id;
+
+        var dataSource = new DataSource
+        {
+            Name = "Test Data Source",
+            Description = "Test data source for unit tests",
+            ProjectId = pid,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            OrganizationId = otherOrg.Id
+        };
+        Context.DataSources.Add(dataSource);
+        await Context.SaveChangesAsync();
+        var did = dataSource.Id;
+        
+        var testLabel = new SensitivityLabel
+        {
+            Name = "Test Label",
+            OrganizationId = otherOrg.Id,
+            ProjectId = pid,
+        };
+        Context.SensitivityLabels.Add(testLabel);
+        await Context.SaveChangesAsync();
+        
+        var record = new Record
+        {
+            Name = "Test Record",
+            Description = "Test record for unit tests",
+            OriginalId = Guid.NewGuid().ToString(),
+            Properties = JsonSerializer.Serialize(new { TestProperty = "TestValue" }),
+            ProjectId = pid,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            Uri = "localhost:8090",
+            FileType = "pdf",
+            DataSourceId = did,
+            OrganizationId = otherOrg.Id,
+            Labels = new List<SensitivityLabel>{testLabel}
+        };
+        Context.Records.Add(record);
+        await Context.SaveChangesAsync();
+        
+        var dto = new UpdateOrganizationRequestDto
+        {
+            RequireSensitivityLabel = true
+        };
+        
+        var updateResult = await _organizationBusiness.UpdateOrganization(uid, oid, dto);
+        Assert.NotNull(updateResult);
+        Assert.NotNull(updateResult.RequireSensitivityLabel);
+        Assert.True(updateResult.RequireSensitivityLabel);
     }
 
     #endregion

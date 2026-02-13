@@ -17,7 +17,7 @@ public interface IRecordBusiness
         long organizationId, long projectId, long dataSourceId, bool hideArchived);
 
     Task<RecordResponseDto> CreateRecord(
-        long currentUserId, long organizationId, long projectId, long dataSourceId, CreateRecordRequestDto dto);
+        long currentUserId, long organizationId, long projectId, long dataSourceId, CreateRecordRequestDto dto, List<long>? sensitivityLabelIds = null);
 
     Task<List<RecordResponseDto>> BulkCreateRecords(
         long currentUserId, long organizationId, long projectId, long dataSourceId, List<CreateRecordRequestDto> dtos);

@@ -158,7 +158,8 @@ public class OrganizationBusiness : IOrganizationBusiness
             DefaultOrg = isDefault,
             LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
             LastUpdatedBy = currentUserId,
-            Banner = dto.Banner
+            Banner = dto.Banner,
+            RequireSensitivityLabel = dto.RequireSensitivityLabel ?? false
         };
 
         _context.Organizations.Add(organization);
@@ -200,7 +201,8 @@ public class OrganizationBusiness : IOrganizationBusiness
             LastUpdatedBy = organization.LastUpdatedBy,
             IsArchived = organization.IsArchived,
             DefaultOrg = organization.DefaultOrg,
-            Banner = organization.Banner
+            Banner = organization.Banner,
+            RequireSensitivityLabel = organization.RequireSensitivityLabel
         };
     }
 
@@ -219,6 +221,23 @@ public class OrganizationBusiness : IOrganizationBusiness
 
         if (organization == null || organization.IsArchived)
             throw new KeyNotFoundException($"Organization with id {organizationId} does not exist");
+
+        // Validate that if the RequireSensitivityLabel is enabled all existing records have labels
+        if (!organization.RequireSensitivityLabel && dto.RequireSensitivityLabel == true)
+        {
+            var hasUnlabeledRecords = await _context.Records
+                .Include(r => r.Labels)
+                .Where(r => r.OrganizationId == organizationId)
+                .AnyAsync(r => !r.Labels.Any());
+        
+            if (hasUnlabeledRecords)
+                throw new InvalidOperationException(
+                    "Cannot require sensitivity labels: organization contains records without labels. " +
+                    "Please label all existing records before enabling this requirement.");
+        }
+        
+        if (dto.RequireSensitivityLabel != null)
+            organization.RequireSensitivityLabel = dto.RequireSensitivityLabel.Value;
 
         organization.Name = dto.Name ?? organization.Name;
         organization.Description = dto.Description ?? organization.Description;
@@ -256,7 +275,8 @@ public class OrganizationBusiness : IOrganizationBusiness
             LastUpdatedBy = organization.LastUpdatedBy,
             IsArchived = organization.IsArchived,
             DefaultOrg = organization.DefaultOrg,
-            Banner = organization.Banner
+            Banner = organization.Banner,
+            RequireSensitivityLabel = organization.RequireSensitivityLabel
         };
     }
 
