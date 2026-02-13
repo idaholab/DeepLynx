@@ -218,6 +218,7 @@ public class OrganizationController : ControllerBase
     /// <returns></returns>
     [HttpPost("{organizationId:long}/user", Name = "api_add_user_to_organization")]
     [Auth("update", "organization")]
+    [Auth("update", "user")]
     public async Task<ActionResult> AddUserToOrganization(
         long organizationId,
         [FromQuery] long userId,
@@ -245,6 +246,7 @@ public class OrganizationController : ControllerBase
     /// <returns></returns>
     [HttpPut("{organizationId:long}/admin", Name = "api_update_organization_admin_status")]
     [Auth("update", "organization")]
+    [Auth("update", "user")]
     public async Task<ActionResult> SetOrganizationAdminStatus(
         long organizationId,
         [FromQuery] long userId,
@@ -272,6 +274,7 @@ public class OrganizationController : ControllerBase
     /// <returns></returns>
     [HttpDelete("{organizationId:long}/user", Name = "api_remove_user_from_organization")]
     [Auth("update", "organization")]
+    [Auth("update", "user")]
     public async Task<ActionResult> RemoveUserFromOrganization(
         long organizationId,
         [FromQuery] long userId)
