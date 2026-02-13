@@ -137,7 +137,7 @@ export default function DataCatalogClient({
             : JSON.stringify(record.properties),
         originalId: record.originalId ?? undefined,
         classId: record.classId ?? undefined,
-        className: undefined,
+        className: record.className ?? undefined,
         dataSourceId: record.dataSourceId ?? undefined,
         dataSourceName: "",
         projectId: record.projectId ?? undefined,
@@ -267,7 +267,10 @@ export default function DataCatalogClient({
       return (
         <span className="inline-flex flex-wrap gap-2">
           {values.map((v, i) => (
-            <span key={`${v}-${i}`} className="badge badge-sm">
+            <span
+              key={`${v}-${i}`}
+              className="badge badge-sm badge-outline badge-secondary"
+            >
               {v}
             </span>
           ))}
@@ -282,6 +285,26 @@ export default function DataCatalogClient({
     () => selectedProjects.map((id) => Number(id)),
     [selectedProjects],
   );
+
+  const toUtcIsoIfNaive = (input: string) => {
+    if (/([zZ]|[+-]\d{2}:\d{2})$/.test(input)) return input;
+    return `${input}Z`;
+  };
+
+  const formatDate = (dateString: string) => {
+    const normalized = toUtcIsoIfNaive(dateString);
+    const date = new Date(normalized);
+
+    return date.toLocaleString(undefined, {
+      month: "long",
+      day: "numeric",
+      year: "numeric",
+      hour: "numeric",
+      minute: "numeric",
+      hour12: true,
+      timeZoneName: "short",
+    });
+  };
 
   /* ------------------------ Column visibility wiring ------------------------ */
 
@@ -306,7 +329,9 @@ export default function DataCatalogClient({
         header: t.translations.CLASS,
         cell: (row) =>
           row.className ? (
-            <span className="badge text-sm">{row.className}</span>
+            <span className="badge text-sm bg-secondary text-secondary-content">
+              {row.className}
+            </span>
           ) : null,
       },
       {
@@ -317,7 +342,7 @@ export default function DataCatalogClient({
       {
         key: "lastEdit",
         header: t.translations.LAST_EDIT,
-        cell: (row) => row.lastUpdatedAt,
+        cell: (row) => formatDate(row.lastUpdatedAt),
       },
     ],
     [t.translations, renderTags],
@@ -332,7 +357,7 @@ export default function DataCatalogClient({
     () => ALL_COLUMNS.filter((c) => visibleCols.includes(c.key)),
     [ALL_COLUMNS, visibleCols],
   );
-
+  console.log("Grid view table data: ", tableData);
   // Strip "key" before passing to GridView if it doesn’t expect it
   const gridColumns = useMemo(
     () => filteredColumns.map(({ key, ...rest }) => rest),
