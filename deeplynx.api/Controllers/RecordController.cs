@@ -174,6 +174,7 @@ public class RecordController : ControllerBase
     /// <param name="projectId">The ID of the project to which the record belongs</param>
     /// <param name="dataSourceId">The ID of the data source to which the record belongs</param>
     /// <param name="dto">The record request data transfer object containing record details</param>
+    /// <param name="sensitivityLabelIds">The IDs of the labels to attach</param>
     /// <returns>The created record</returns>
     [HttpPost(Name = "api_create_a_record")]
     [Auth("write", "record")]
@@ -400,7 +401,7 @@ public class RecordController : ControllerBase
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
     /// <param name="projectId">The ID of the project to which the record belongs</param>
     /// <param name="recordId">The ID of the record</param>
-    /// <param name="labelId">The ID of the label to attach</param>
+    /// <param name="sensitivityLabelId">The ID of the label to attach</param>
     /// <returns>A message stating the label was successfully attached to the record.</returns>
     [HttpPost("{recordId:long}/sensitivity-labels", Name = "api_attach_sensitivity_label")]
     [Auth("write", "record")]

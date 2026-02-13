@@ -48,6 +48,7 @@ public class RecordBusiness : IRecordBusiness
     /// <summary>
     ///     Retrieves all records for a specific project and datasource.
     /// </summary>
+    /// <param name="currentUserId">The ID of current user</param>
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
     /// <param name="projectId">The ID of the project whose records are to be retrieved</param>
     /// <param name="dataSourceId">(Optional) The ID of the datasource by which to filter records</param>
@@ -121,6 +122,7 @@ public class RecordBusiness : IRecordBusiness
     /// <summary>
     ///     Get all records that contain all given tags
     /// </summary>
+    /// <param name="currentUserId">The ID of current user</param>
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
     /// <param name="projectId">The ID of the project whose records are to be retrieved</param>
     /// <param name="tagIds">List of tag IDs - returned records must contain every given ID</param>
@@ -189,6 +191,7 @@ public class RecordBusiness : IRecordBusiness
     /// <summary>
     ///     Retrieves a specific record by its ID
     /// </summary>
+    /// <param name="currentUserId">The ID of current user</param>
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
     /// <param name="projectId">The project of the record to retrieve</param>
     /// <param name="recordId">The ID of the record to retrieve</param>
@@ -245,6 +248,7 @@ public class RecordBusiness : IRecordBusiness
     /// <summary>
     ///     Attaches a tag to a record
     /// </summary>
+    /// <param name="currentUserId">The ID of current user</param>
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
     /// <param name="projectId">Project ID for the record and tag</param>
     /// <param name="recordId">The ID of the record</param>
@@ -293,6 +297,7 @@ public class RecordBusiness : IRecordBusiness
     /// <summary>
     ///     Attaches a sensitivity label to a record
     /// </summary>
+    /// <param name="currentUserId">The ID of current user</param>
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
     /// <param name="projectId">Project ID for the record and label</param>
     /// <param name="recordId">The ID of the record</param>
@@ -340,6 +345,7 @@ public class RecordBusiness : IRecordBusiness
     /// <summary>
     ///     Unattach a tag from a record
     /// </summary>
+    /// <param name="currentUserId">The ID of current user</param>
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
     /// <param name="projectId">Project ID for the record and tag</param>
     /// <param name="recordId">The ID of the record</param>
@@ -384,6 +390,7 @@ public class RecordBusiness : IRecordBusiness
     /// <summary>
     ///     Unattach a sensitivity label from a record
     /// </summary>
+    /// <param name="currentUserId">The ID of current user</param>
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
     /// <param name="projectId">Project ID for the record and sensitivity label</param>
     /// <param name="recordId">The ID of the record</param>
@@ -587,6 +594,7 @@ public class RecordBusiness : IRecordBusiness
     /// <param name="projectId">The ID of the project under which to create the record</param>
     /// <param name="dataSourceId">The ID of the data source under which to create the record</param>
     /// <param name="dto">The data transfer object containing details on the record to be created</param>
+    /// <param name="sensitivityLabelIds">The IDs of the labels to attach</param>
     /// <returns>The newly created metadata record</returns>
     /// <exception cref="KeyNotFoundException">Returned if the project or datasource are not found</exception>
     /// <exception cref="Exception">Returned if the metadata is too deeply nested</exception>

@@ -197,7 +197,8 @@ public class SensitivityMiddlewareTests : IntegrationTestBase
             Name = "Test Project 2",
             Description = "Test Description 2",
             OrganizationId = organizationId1,
-            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            RequireSensitivityLabel = true
         };
         Context.Projects.Add(project2);
 
@@ -1473,6 +1474,132 @@ public class SensitivityMiddlewareTests : IntegrationTestBase
 
         // Assert
         Assert.True(nextCalled);
+    }
+
+    #endregion
+    
+    #region Sensitivity Label Service Method Tests
+
+    [Fact]
+    public async Task SensitivityLabelService_GetAuthorizedLabels_ReturnsCorrectLabels()
+    {
+        // Arrange
+        var service = new SensitivityLabelService(Context);
+    
+        // Act
+        var result = await service.GetAuthorizedSensitivityLabels(
+            userId1,
+            organizationId1,
+            new[] { projectId1 },
+            "write record");
+    
+        // Assert
+        Assert.NotNull(result);
+    }
+
+    [Fact]
+    public async Task SensitivityLabelService_IsSensitivityLabelRequired_ChecksOrgLevel()
+    {
+        // Arrange
+        var service = new SensitivityLabelService(Context);
+    
+        // Act
+        var result = await service.IsSensitivityLabelRequired(organizationId1, null);
+    
+        // Assert
+        Assert.False(result); // org1 doesn't require labels
+    }
+
+    [Fact]
+    public async Task SensitivityLabelService_IsSensitivityLabelRequired_ChecksProjectLevel()
+    {
+        // Arrange
+        var service = new SensitivityLabelService(Context);
+    
+        // Act
+        var result = await service.IsSensitivityLabelRequired(organizationId1, projectId2);
+    
+        // Assert
+        Assert.True(result); // project2 requires labels
+    }
+
+    [Fact]
+    public async Task SensitivityLabelService_GetRecordSensitivityLabels_ReturnsLabels()
+    {
+        // Arrange
+        var service = new SensitivityLabelService(Context);
+    
+        // Act
+        var result = await service.GetRecordSensitivityLabels(recordId1);
+    
+        // Assert
+        Assert.NotNull(result);
+    }
+
+    [Fact]
+    public async Task SensitivityLabelService_GetAuthorizedLabels_ThrowsOnInvalidAction()
+    {
+        // Arrange
+        var service = new SensitivityLabelService(Context);
+    
+        // Act & Assert
+        await Assert.ThrowsAsync<ArgumentException>(async () =>
+            await service.GetAuthorizedSensitivityLabels(
+                userId1,
+                organizationId1,
+                new[] { projectId1 },
+                "invalid action"));
+    }
+    
+    [Fact]
+    public async Task SensitivityLabelService_GetAuthorizedLabels_ReturnsEmptyForNullProjects()
+    {
+        // Arrange
+        var service = new SensitivityLabelService(Context);
+    
+        // Act
+        var result = await service.GetAuthorizedSensitivityLabels(
+            userId1,
+            organizationId1,
+            null,
+            "write record");
+    
+        // Assert
+        Assert.Empty(result);
+    }
+
+    [Fact]
+    public async Task SensitivityLabelService_GetAuthorizedLabels_ReturnsEmptyForEmptyProjectArray()
+    {
+        // Arrange
+        var service = new SensitivityLabelService(Context);
+    
+        // Act
+        var result = await service.GetAuthorizedSensitivityLabels(
+            userId1,
+            organizationId1,
+            new long[] { },
+            "write record");
+    
+        // Assert
+        Assert.Empty(result);
+    }
+
+    [Fact]
+    public async Task SensitivityLabelService_GetAuthorizedLabels_WorksWithMultipleProjects()
+    {
+        // Arrange
+        var service = new SensitivityLabelService(Context);
+    
+        // Act
+        var result = await service.GetAuthorizedSensitivityLabels(
+            userId1,
+            organizationId1,
+            new[] { projectId1, projectId2 },
+            "write record");
+    
+        // Assert
+        Assert.NotNull(result);
     }
 
     #endregion
