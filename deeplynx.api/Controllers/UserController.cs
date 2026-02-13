@@ -199,7 +199,7 @@ public class UserController : ControllerBase
     /// <param name="userId">ID of user to grant the sysadmin rights to </param>
     /// <returns>User response DTO</returns>
     [HttpPatch("{userId:long}/admin", Name = "api_set_sys_admin")]
-    [Auth("update", "user")]
+    [Auth("write", "organization")]
     public async Task<ActionResult<UserResponseDto>> SetSysAdmin(long userId)
     {
         try

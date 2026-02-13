@@ -236,6 +236,7 @@ public class RoleOrganizationController : ControllerBase
     [HttpPost("{roleId:long}/permissions/{permissionId:long}", Name = "api_add_permission_to_role_organization")]
     [Auth("update", "role")]
     [Auth("read", "permission")]
+    [Auth("update", "user")]
     public async Task<ActionResult> AddPermissionToRole(
         long organizationId,
         long roleId,
