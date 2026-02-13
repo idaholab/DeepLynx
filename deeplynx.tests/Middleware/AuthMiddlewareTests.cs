@@ -2451,4 +2451,183 @@ public async Task InvokeAsync_WithProjectIdInRouteAndProjectIdsInQuery_Prioritiz
         Times.Once);
 }
     #endregion
+    
+    #region Middleware Tests - Update Action
+
+    [Fact]
+    public async Task InvokeAsync_PassesWithUpdatePermission_OnOrganization()
+    {
+        // Arrange
+        var context = CreateHttpContextWithAuth("update", "organization");
+        SetAuthenticatedUser(context, userId1);
+        context.Request.RouteValues["organizationId"] = organizationId1.ToString();
+
+        _sysAdminServiceMock
+            .Setup(x => x.SysAdminCheck(userId1))
+            .ReturnsAsync(false);
+        _orgRolePermissionServiceMock
+            .Setup(x => x.PermissionInOrg(userId1, organizationId1, "update", "organization"))
+            .ReturnsAsync(true);
+
+        var nextCalled = false;
+        RequestDelegate next = ctx =>
+        {
+            nextCalled = true;
+            return Task.CompletedTask;
+        };
+
+        var middleware = new AuthMiddleware(next);
+
+        // Act
+        await middleware.InvokeAsync(context, _orgRolePermissionServiceMock.Object,
+            _projectRolePermissionServiceMock.Object, _sysAdminServiceMock.Object, _organizationServiceMock.Object);
+
+        // Assert
+        Assert.True(nextCalled);
+        _orgRolePermissionServiceMock.Verify(
+            x => x.PermissionInOrg(userId1, organizationId1, "update", "organization"),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task InvokeAsync_Returns403_WhenUserLacksUpdatePermissionOnProject()
+    {
+        // Arrange
+        var context = CreateHttpContextWithAuth("update", "project");
+        SetAuthenticatedUser(context, userId1);
+        context.Request.RouteValues["projectId"] = projectId1.ToString();
+
+        _sysAdminServiceMock
+            .Setup(x => x.SysAdminCheck(userId1))
+            .ReturnsAsync(false);
+        _projectRolePermissionServiceMock
+            .Setup(x => x.PermissionInProject(userId1, projectId1, "update", "project"))
+            .ReturnsAsync(false);
+
+        RequestDelegate next = ctx => Task.CompletedTask;
+        var middleware = new AuthMiddleware(next);
+
+        // Act
+        await middleware.InvokeAsync(context, _orgRolePermissionServiceMock.Object,
+            _projectRolePermissionServiceMock.Object, _sysAdminServiceMock.Object, _organizationServiceMock.Object);
+
+        // Assert
+        Assert.Equal(StatusCodes.Status403Forbidden, context.Response.StatusCode);
+    }
+
+    [Fact]
+    public async Task InvokeAsync_PassesWithUpdatePermission_OnDataResource()
+    {
+        // Arrange
+        var context = CreateHttpContextWithAuth("update", "data");
+        SetAuthenticatedUser(context, userId1);
+        context.Request.RouteValues["projectId"] = projectId1.ToString();
+
+        _sysAdminServiceMock
+            .Setup(x => x.SysAdminCheck(userId1))
+            .ReturnsAsync(false);
+        _projectRolePermissionServiceMock
+            .Setup(x => x.PermissionInProject(userId1, projectId1, "update", "data"))
+            .ReturnsAsync(true);
+
+        var nextCalled = false;
+        RequestDelegate next = ctx =>
+        {
+            nextCalled = true;
+            return Task.CompletedTask;
+        };
+
+        var middleware = new AuthMiddleware(next);
+
+        // Act
+        await middleware.InvokeAsync(context, _orgRolePermissionServiceMock.Object,
+            _projectRolePermissionServiceMock.Object, _sysAdminServiceMock.Object, _organizationServiceMock.Object);
+
+        // Assert
+        Assert.True(nextCalled);
+        _projectRolePermissionServiceMock.Verify(
+            x => x.PermissionInProject(userId1, projectId1, "update", "data"),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task InvokeAsync_SysAdminBypassesUpdatePermissionChecks()
+    {
+        // Arrange
+        var context = CreateHttpContextWithAuth("update", "data");
+        SetAuthenticatedUser(context, userId2); // sysadmin
+        context.Request.RouteValues["organizationId"] = organizationId1.ToString();
+        context.Request.RouteValues["projectId"] = projectId1.ToString();
+
+        _sysAdminServiceMock
+            .Setup(x => x.SysAdminCheck(userId2))
+            .ReturnsAsync(true);
+
+        var nextCalled = false;
+        RequestDelegate next = ctx =>
+        {
+            nextCalled = true;
+            return Task.CompletedTask;
+        };
+
+        var middleware = new AuthMiddleware(next);
+
+        // Act
+        await middleware.InvokeAsync(context, _orgRolePermissionServiceMock.Object,
+            _projectRolePermissionServiceMock.Object, _sysAdminServiceMock.Object, _organizationServiceMock.Object);
+
+        // Assert
+        Assert.True(nextCalled);
+        _sysAdminServiceMock.Verify(x => x.SysAdminCheck(userId2), Times.Once);
+        // Verify update permission checks were NOT called
+        _orgRolePermissionServiceMock.Verify(
+            x => x.PermissionInOrg(It.IsAny<long>(), It.IsAny<long>(), "update", It.IsAny<string>()),
+            Times.Never);
+        _projectRolePermissionServiceMock.Verify(
+            x => x.PermissionInProject(It.IsAny<long>(), It.IsAny<long>(), "update", It.IsAny<string>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task InvokeAsync_PassesWithUpdatePermission_WhenBothIdsPresent()
+    {
+        // Arrange
+        var context = CreateHttpContextWithAuth("update", "record");
+        SetAuthenticatedUser(context, userId1);
+        context.Request.RouteValues["organizationId"] = organizationId1.ToString();
+        context.Request.RouteValues["projectId"] = projectId1.ToString();
+
+        _sysAdminServiceMock
+            .Setup(x => x.SysAdminCheck(userId1))
+            .ReturnsAsync(false);
+        
+        // User has project update permission but NOT org permission
+        _orgRolePermissionServiceMock
+            .Setup(x => x.PermissionInOrg(userId1, organizationId1, "update", "record"))
+            .ReturnsAsync(false);
+        _projectRolePermissionServiceMock
+            .Setup(x => x.PermissionInProject(userId1, projectId1, "update", "record"))
+            .ReturnsAsync(true);
+
+        var nextCalled = false;
+        RequestDelegate next = ctx =>
+        {
+            nextCalled = true;
+            return Task.CompletedTask;
+        };
+
+        var middleware = new AuthMiddleware(next);
+
+        // Act
+        await middleware.InvokeAsync(context, _orgRolePermissionServiceMock.Object,
+            _projectRolePermissionServiceMock.Object, _sysAdminServiceMock.Object, _organizationServiceMock.Object);
+
+        // Assert
+        Assert.True(nextCalled);
+        _projectRolePermissionServiceMock.Verify(
+            x => x.PermissionInProject(userId1, projectId1, "update", "record"),
+            Times.Once);
+    }
+
+    #endregion
 }
