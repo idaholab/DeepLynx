@@ -33,7 +33,6 @@ public class UserController : ControllerBase
     /// <param name="organizationId">(Optional) ID of organization that users are associated with</param>
     /// <returns>List of user response DTOs</returns>
     [HttpGet(Name = "api_get_all_users")]
-    [Auth("read", "user")]
     public async Task<ActionResult<IEnumerable<UserResponseDto>>> GetAllUsers(
         [FromQuery] long? projectId,
         [FromQuery] long? organizationId)
@@ -57,7 +56,6 @@ public class UserController : ControllerBase
     /// <param name="userId">ID of user</param>
     /// <returns>User response DTO</returns>
     [HttpGet("{userId:long}", Name = "api_get_a_user")]
-    [Auth("read", "user")]
     public async Task<ActionResult<UserResponseDto>> GetUser(long userId)
     {
         try
@@ -99,7 +97,6 @@ public class UserController : ControllerBase
     /// <param name="dto">User request DTO</param>
     /// <returns>User response DTO</returns>
     [HttpPost(Name = "api_create_a_user")]
-    [Auth("write", "user")]
     public async Task<ActionResult<UserResponseDto>> CreateUser([FromBody] CreateUserRequestDto dto)
     {
         try
@@ -123,7 +120,6 @@ public class UserController : ControllerBase
     /// <param name="dto">User request DTO</param>
     /// <returns>User response DTO</returns>
     [HttpPut("{userId:long}", Name = "api_update_a_user")]
-    [Auth("update", "user")]
     public async Task<ActionResult<UserResponseDto>> UpdateUser(long userId, [FromBody] UpdateUserRequestDto dto)
     {
         try
@@ -145,7 +141,6 @@ public class UserController : ControllerBase
     /// <param name="userId">The ID of the user to delete.</param>
     /// <returns>A message stating the user was successfully deleted.</returns>
     [HttpDelete("{userId:long}", Name = "api_delete_a_user")]
-    [Auth("write", "user")]
     public async Task<IActionResult> DeleteUser(long userId)
     {
         try
@@ -168,7 +163,6 @@ public class UserController : ControllerBase
     /// <param name="archive">True to archive the user, false to unarchive it.</param>
     /// <returns>A message stating the user was successfully archived or unarchived.</returns>
     [HttpPatch("{userId:long}", Name = "api_archive_user")]
-    [Auth("update", "user")]
     public async Task<IActionResult> ArchiveUser(
         long userId,
         [FromQuery] bool archive)
@@ -199,7 +193,6 @@ public class UserController : ControllerBase
     /// <param name="userId">ID of user to grant the sysadmin rights to </param>
     /// <returns>User response DTO</returns>
     [HttpPatch("{userId:long}/admin", Name = "api_set_sys_admin")]
-    [Auth("write", "organization")]
     public async Task<ActionResult<UserResponseDto>> SetSysAdmin(long userId)
     {
         try
@@ -223,7 +216,6 @@ public class UserController : ControllerBase
     /// <param name="userId">ID of user</param>
     /// <returns>Data overview DTO</returns>
     [HttpGet("{userId:long}/overview", Name = "api_get_a_user_overview")]
-    [Auth("read", "user")]
     public async Task<ActionResult<DataOverviewDto>> GetDataOverview(long userId)
     {
         try
