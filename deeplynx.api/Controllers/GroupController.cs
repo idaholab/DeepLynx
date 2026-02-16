@@ -137,7 +137,7 @@ public class GroupController : ControllerBase
     /// <param name="dto">Fields to update</param>
     /// <returns></returns>
     [HttpPut("{groupId:long}", Name = "api_update_group")]
-    [Auth("write", "group")]
+    [Auth("update", "group")]
     public async Task<ActionResult<GroupResponseDto>> UpdateGroup(
         long organizationId,
         long groupId,
@@ -191,7 +191,7 @@ public class GroupController : ControllerBase
     /// <param name="archive">True to archive the group, false to unarchive it.</param>
     /// <returns>A message stating the group was successfully archived or unarchived.</returns>
     [HttpPatch("{groupId:long}", Name = "api_archive_group")]
-    [Auth("write", "group")]
+    [Auth("update", "group")]
     public async Task<IActionResult> ArchiveGroup(
         long organizationId,
         long groupId,
@@ -225,7 +225,7 @@ public class GroupController : ControllerBase
     /// <param name="groupId">ID of the group</param>
     /// <param name="userId">ID of the user to be added</param>
     [HttpPost("{groupId:long}/users", Name = "api_add_user_to_group")]
-    [Auth("write", "group")]
+    [Auth("update", "group")]
     public async Task<ActionResult> AddUserToGroup(
         long organizationId,
         long groupId,
@@ -253,7 +253,7 @@ public class GroupController : ControllerBase
     /// <param name="userId">ID of user to be removed</param>
     /// <returns></returns>
     [HttpDelete("{groupId:long}/users/{userId:long}", Name = "api_remove_user_from_group")]
-    [Auth("write", "group")]
+    [Auth("update", "group")]
     public async Task<ActionResult> RemoveUserFromGroup(
         long organizationId,
         long groupId,
