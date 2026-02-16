@@ -24,338 +24,91 @@ public class SensitivityLabelBusiness : ISensitivityLabelBusiness
         _context = context;
         _eventBusiness = eventBusiness;
     }
-
-    /// <summary>
-    ///     Update sensitivity label information
+    
+     /// <summary>
+    ///     Get all sensitivity labels for a given project and/or organization
     /// </summary>
-    /// <param name="currentUserId">ID of the User executing this method.</param>
-    /// <param name="labelId">ID of the label to be updated</param>
-    /// <param name="projectId">ID of the project label belongs</param>
-    /// <param name="organizationId">ID of the organization the label belongs</param>
-    /// <param name="dto">Data Transfer Object containing new label information</param>
-    /// <returns>The newly updated label</returns>
-    /// <exception cref="KeyNotFoundException">Returned if label not found</exception>
-    public async Task<SensitivityLabelResponseDto> UpdateSensitivityLabel(
-        long currentUserId, long labelId, long? projectId, long organizationId, UpdateSensitivityLabelRequestDto dto)
+    /// <param name="projectIds">ID of the project across which to search</param>
+    /// <param name="organizationId">ID of the organization across which to search</param>
+    /// <param name="hideArchived">Flag indicating whether to search on archived labels</param>
+    /// <returns>A list of labels</returns>
+    public async Task<IEnumerable<SensitivityLabelResponseDto>> GetAllSensitivityLabels(
+        long[]? projectIds, long organizationId, bool hideArchived = true)
     {
-        var transaction = await _context.Database.BeginTransactionAsync();
-        try
+        var query = _context.SensitivityLabels
+            .Where(t => t.OrganizationId == organizationId
+                        && (!hideArchived || !t.IsArchived));
+        
+        if (projectIds is { Length: > 0 })
         {
-            var query = _context.SensitivityLabels
-                .Where(l => l.Id == labelId && l.OrganizationId == organizationId);
-
-            if (projectId.HasValue)
-                query = query.Where(l => l.ProjectId == projectId);
-
-            var label = await query.FirstOrDefaultAsync();
-
-            if (label == null || label.IsArchived)
-                throw new KeyNotFoundException($"Sensitivity label with id {labelId} not found");
-
-            label.Name = dto.Name ?? label.Name;
-            label.Description = dto.Description ?? label.Description;
-            label.LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
-            label.LastUpdatedBy = currentUserId;
-
-            _context.SensitivityLabels.Update(label);
-
-            // Update Permissions Associated with Label
-            var permissions = await _context.Permissions
-                .Where(p => p.LabelId == labelId)
-                .ToListAsync();
-
-            foreach (var permission in permissions)
-            {
-                permission.Name = dto.Name ?? permission.Name;
-
-                if (dto.Description != null)
-                {
-                    // Update description based on action type
-                    permission.Description = permission.Action switch
-                    {
-                        "read" => "Permission to read " + dto.Name + " labeled records",
-                        "write" => "Permission to modify " + dto.Name + " labeled records",
-                        _ => permission.Description // fallback
-                    };
-                }
-
-                permission.LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
-                permission.LastUpdatedBy = currentUserId;
-            }
-
-            _context.Permissions.UpdateRange(permissions);
-
-            // Log update SensitivityLabel event
-            var eventLog = new CreateEventRequestDto
-            {
-                Operation = "update",
-                EntityType = "sensitivity_label",
-                EntityId = label.Id,
-                EntityName = label.Name,
-                Properties = JsonSerializer.Serialize(new { label.Name }),
-            };
-
-            if (label.ProjectId != null)
-            {
-                await _eventBusiness.CreateEvent(currentUserId, organizationId, label.ProjectId, eventLog);
-            }
-            else
-            {
-                await _eventBusiness.CreateEvent(currentUserId, organizationId, null, eventLog);
-            }
-
-            await _context.SaveChangesAsync();
-
-            await transaction.CommitAsync();
-
-            return new SensitivityLabelResponseDto
-            {
-                Id = label.Id,
-                Name = label.Name,
-                Description = label.Description,
-                LastUpdatedAt = label.LastUpdatedAt,
-                LastUpdatedBy = label.LastUpdatedBy,
-                IsArchived = label.IsArchived,
-                ProjectId = label.ProjectId,
-                OrganizationId = label.OrganizationId
-            };
+            
+            query = query.Where(c =>
+                (c.ProjectId.HasValue && projectIds.Contains(c.ProjectId.Value)) || c.ProjectId == null);
         }
-        catch (Exception)
-        {
-            await transaction.RollbackAsync();
-            throw;
+        else
+        {  
+            query = query.Where(c => c.ProjectId == null);
         }
+
+        return await query.Select(l => new SensitivityLabelResponseDto
+            {
+                Id = l.Id,
+                Name = l.Name,
+                Description = l.Description,
+                LastUpdatedAt = l.LastUpdatedAt,
+                LastUpdatedBy = l.LastUpdatedBy,
+                ProjectId = l.ProjectId,
+                OrganizationId = l.OrganizationId,
+                IsArchived = l.IsArchived
+            })
+            .ToListAsync();
     }
 
     /// <summary>
-    ///     Archive a sensitivity label by ID.
+    ///     Get a sensitivity label by ID
     /// </summary>
-    /// <param name="currentUserId">ID of the User executing this method.</param>
-    /// <param name="labelId">ID of label to archive</param>
-    /// <param name="projectId">ID of the project label belongs</param>
-    /// <param name="organizationId">ID of the organization the label belongs</param>
-    /// <returns>Boolean true if executed successfully</returns>
-    /// <exception cref="KeyNotFoundException">Returned if label not found or is already archived</exception>
-    public async Task<bool> ArchiveSensitivityLabel(long currentUserId, long labelId, long? projectId,
-        long organizationId)
+    /// <param name="labelId">ID of the label to retrieve</param>
+    /// <param name="hideArchived">Flag indicating whether to search archived labels</param>
+    /// <param name="projectId">ID of the project across which to search</param>
+    /// <param name="organizationId">ID of the organization across which to search</param>
+    /// <returns>The requested label</returns>
+    /// <exception cref="KeyNotFoundException">Thrown if label not found</exception>
+    public async Task<SensitivityLabelResponseDto> GetSensitivityLabel(long labelId, long? projectId,
+        long organizationId, bool hideArchived = true)
     {
-        var transaction = await _context.Database.BeginTransactionAsync();
-        try
+        var query = _context.SensitivityLabels
+            .Where(t => t.Id == labelId
+                        && t.OrganizationId == organizationId);
+        if (projectId.HasValue)
         {
-            var query = _context.SensitivityLabels
-                .Where(l => l.Id == labelId && l.OrganizationId == organizationId && l.IsArchived == false);
-
-            if (projectId.HasValue)
-                query = query.Where(l => l.ProjectId == projectId);
-
-            var label = await query.FirstOrDefaultAsync();
-
-            if (label == null || label.IsArchived)
-                throw new KeyNotFoundException($"Sensitivity label with id {labelId} not found or is archived");
-
-            // If there are records that are currently using this label do not archive
-            var recordCount = await _context.Records
-                .Where(r => r.Labels.Any(l => l.Id == labelId))
-                .CountAsync();
-
-            if (recordCount > 0)
-            {
-                throw new Exception(
-                    $"Cannot archive. Sensitivity label with id {labelId} is used on {recordCount} records.");
-            }
-
-            // Archive permissions for this sensitivity label 
-            await _context.Permissions
-                .Where(p => p.LabelId == labelId)
-                .ExecuteUpdateAsync(setters => setters
-                    .SetProperty(p => p.IsArchived, true)
-                    .SetProperty(p => p.LastUpdatedAt, DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified))
-                    .SetProperty(p => p.LastUpdatedBy, currentUserId));
-
-            // Archive label by ID
-            label.IsArchived = true;
-            label.LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
-            label.LastUpdatedBy = currentUserId;
-
-            await _context.SaveChangesAsync();
-
-            // Log archive SensitivityLabel event
-            var eventLog = new CreateEventRequestDto
-            {
-                Operation = "archive",
-                EntityType = "sensitivity_label",
-                EntityId = label.Id,
-                EntityName = label.Name,
-                Properties = JsonSerializer.Serialize(new { label.Name }),
-            };
-
-            if (label.ProjectId != null)
-            {
-                await _eventBusiness.CreateEvent(currentUserId, organizationId, label.ProjectId, eventLog);
-            }
-            else
-            {
-                await _eventBusiness.CreateEvent(currentUserId, organizationId, null, eventLog);
-            }
-
-            await transaction.CommitAsync();
-
-            return true;
+            query = query.Where(t => t.ProjectId == projectId || t.ProjectId == null);
         }
-        catch (Exception)
+        else
+        {   
+            query = query.Where(t => t.ProjectId == null);
+        }
+
+        var label = await query.FirstOrDefaultAsync();
+        
+        if (label == null)
+            throw new KeyNotFoundException($"Sensitivity label with id {labelId} not found");
+
+        if (hideArchived && label.IsArchived)
+            throw new KeyNotFoundException($"Sensitivity label with id {labelId} is archived");
+
+        return new SensitivityLabelResponseDto
         {
-            await transaction.RollbackAsync();
-            throw;
-        }
+            Id = label.Id,
+            Name = label.Name,
+            Description = label.Description,
+            LastUpdatedAt = label.LastUpdatedAt,
+            LastUpdatedBy = label.LastUpdatedBy,
+            IsArchived = label.IsArchived,
+            ProjectId = label.ProjectId,
+            OrganizationId = label.OrganizationId
+        };
     }
-
-    /// <summary>
-    ///     Unarchive a sensitivity label by ID
-    /// </summary>
-    /// <param name="currentUserId">ID of the User executing this method.</param>
-    /// <param name="labelId">ID of label to unarchive</param>
-    /// <param name="projectId">ID of the project label belongs</param>
-    /// <param name="organizationId">ID of the organization the label belongs</param>
-    /// <returns>Boolean true if executed successfully</returns>
-    /// <exception cref="KeyNotFoundException">Returned if label not found or is not archived</exception>
-    public async Task<bool> UnarchiveSensitivityLabel(long currentUserId, long labelId, long? projectId,
-        long organizationId)
-    {
-        var transaction = await _context.Database.BeginTransactionAsync();
-        try
-        {
-            var query = _context.SensitivityLabels
-                .Where(l => l.Id == labelId && l.OrganizationId == organizationId && l.IsArchived == true);
-
-            if (projectId.HasValue)
-                query = query.Where(l => l.ProjectId == projectId);
-
-            var label = await query.FirstOrDefaultAsync();
-
-            if (label == null || !label.IsArchived)
-                throw new KeyNotFoundException($"Sensitivity label with id {labelId} not found or is not archived");
-
-            // Unarchive the Label
-            label.IsArchived = false;
-            label.LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
-            label.LastUpdatedBy = currentUserId;
-
-            // Unarchive Permissions associated with the label
-            await _context.Permissions
-                .Where(p => p.LabelId == labelId)
-                .ExecuteUpdateAsync(setters => setters
-                    .SetProperty(p => p.IsArchived, false)
-                    .SetProperty(p => p.LastUpdatedAt, DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified))
-                    .SetProperty(p => p.LastUpdatedBy, currentUserId));
-
-            await _context.SaveChangesAsync();
-
-            // Log unarchive SensitivityLabel event
-            var eventLog = new CreateEventRequestDto
-            {
-                Operation = "unarchive",
-                EntityType = "sensitivity_label",
-                EntityId = label.Id,
-                EntityName = label.Name,
-                Properties = JsonSerializer.Serialize(new { label.Name }),
-            };
-
-            if (label.ProjectId != null)
-            {
-                await _eventBusiness.CreateEvent(currentUserId, organizationId, label.ProjectId, eventLog);
-            }
-            else
-            {
-                await _eventBusiness.CreateEvent(currentUserId, organizationId, null, eventLog);
-            }
-
-            await transaction.CommitAsync();
-
-            return true;
-        }
-        catch (Exception)
-        {
-            await transaction.RollbackAsync();
-            throw;
-        }
-    }
-
-    /// <summary>
-    ///     Delete a sensitivity label by ID
-    /// </summary>
-    /// <param name="currentUserId">ID of the User executing this method.</param>
-    /// <param name="labelId">ID of label to delete</param>
-    /// <param name="projectId">ID of the project label belongs</param>
-    /// <param name="organizationId">ID of the organization the label belongs</param>
-    /// <returns>Boolean true if executed successfully</returns>
-    /// <exception cref="KeyNotFoundException">Returned if label not found</exception>
-    public async Task<bool> DeleteSensitivityLabel(long currentUserId, long labelId, long? projectId,
-        long organizationId)
-    {
-        var transaction = await _context.Database.BeginTransactionAsync();
-        try
-        {
-            var query = _context.SensitivityLabels
-                .Where(l => l.Id == labelId && l.OrganizationId == organizationId && l.IsArchived == false);
-
-            if (projectId.HasValue)
-                query = query.Where(l => l.ProjectId == projectId);
-
-            var label = await query.FirstOrDefaultAsync();
-
-            if (label == null || label.IsArchived)
-                throw new KeyNotFoundException($"Sensitivity label with id {labelId} not found or is archived");
-
-            // Do not delete if there are records currently using this Label
-            var recordCount = await _context.Records
-                .Where(r => r.Labels.Any(l => l.Id == labelId))
-                .CountAsync();
-
-            if (recordCount > 0)
-            {
-                throw new Exception(
-                    $"Cannot delete. Sensitivity label with id {labelId} is used on {recordCount} records.");
-            }
-
-            // Remove the permissions associated with the label
-            await _context.Permissions
-                .Where(p => p.LabelId == labelId)
-                .ExecuteDeleteAsync();
-
-            // Remove the label
-            _context.SensitivityLabels.Remove(label);
-            await _context.SaveChangesAsync();
-
-            // Log delete SensitivityLabel event
-            var eventLog = new CreateEventRequestDto
-            {
-                Operation = "delete",
-                EntityType = "sensitivity_label",
-                EntityId = label.Id,
-                EntityName = label.Name,
-                Properties = JsonSerializer.Serialize(new { label.Name }),
-            };
-
-            if (label.ProjectId != null)
-            {
-                await _eventBusiness.CreateEvent(currentUserId, organizationId, label.ProjectId, eventLog);
-            }
-            else
-            {
-                await _eventBusiness.CreateEvent(currentUserId, organizationId, null, eventLog);
-            }
-
-            await transaction.CommitAsync();
-
-            return true;
-        }
-        catch (Exception)
-        {
-            await transaction.RollbackAsync();
-            throw;
-        }
-    }
-
+    
     /// <summary>
     ///     Create a new sensitivity label
     /// </summary>
@@ -584,78 +337,378 @@ public class SensitivityLabelBusiness : ISensitivityLabelBusiness
     }
 
     /// <summary>
-    ///     Get all sensitivity labels for a given project and/or organization
+    ///     Update sensitivity label information
     /// </summary>
-    /// <param name="projectIds">ID of the project across which to search</param>
-    /// <param name="organizationId">ID of the organization across which to search</param>
-    /// <param name="hideArchived">Flag indicating whether to search on archived labels</param>
-    /// <returns>A list of labels</returns>
-    public async Task<IEnumerable<SensitivityLabelResponseDto>> GetAllSensitivityLabels(
-        long[]? projectIds, long organizationId, bool hideArchived = true)
+    /// <param name="currentUserId">ID of the User executing this method.</param>
+    /// <param name="labelId">ID of the label to be updated</param>
+    /// <param name="projectId">ID of the project label belongs</param>
+    /// <param name="organizationId">ID of the organization the label belongs</param>
+    /// <param name="dto">Data Transfer Object containing new label information</param>
+    /// <returns>The newly updated label</returns>
+    /// <exception cref="KeyNotFoundException">Returned if label not found</exception>
+    public async Task<SensitivityLabelResponseDto> UpdateSensitivityLabel(
+        long currentUserId, long labelId, long? projectId, long organizationId, UpdateSensitivityLabelRequestDto dto)
     {
-        // Start with base query
-        var query = _context.SensitivityLabels
-            .Where(l => l.OrganizationId == organizationId)
-            .AsQueryable();
-
-        // Filter by projectIds if provided and not empty
-        if (projectIds is { Length: > 0 })
-            query = query.Where(l => !l.ProjectId.HasValue || projectIds.AsEnumerable().Contains(l.ProjectId.Value));
-
-        // Optionally hide archived classes
-        if (hideArchived)
-            query = query.Where(l => !l.IsArchived);
-
-        return await query.Select(l => new SensitivityLabelResponseDto
+        var transaction = await _context.Database.BeginTransactionAsync();
+        try
+        {
+            var query = _context.SensitivityLabels
+                .Where(l => l.Id == labelId && l.OrganizationId == organizationId && !l.IsArchived);
+            
+            if (projectId.HasValue)
             {
-                Id = l.Id,
-                Name = l.Name,
-                Description = l.Description,
-                LastUpdatedAt = l.LastUpdatedAt,
-                LastUpdatedBy = l.LastUpdatedBy,
-                ProjectId = l.ProjectId,
-                OrganizationId = l.OrganizationId,
-                IsArchived = l.IsArchived
-            })
-            .ToListAsync();
+                query = query.Where( r => r.ProjectId == projectId.Value || r.ProjectId == null);
+            }
+            else
+            {
+                query = query.Where(t => t.ProjectId == null);
+            }
+
+            var label = await query.FirstOrDefaultAsync();
+
+            if (label == null)
+                throw new KeyNotFoundException($"Sensitivity label with id {labelId} not found");
+            
+            if (projectId.HasValue && label.ProjectId == null)
+            {
+                throw new InvalidOperationException("Organization sensitivity labels cannot be updated from the child projects.");
+            }
+
+            label.Name = dto.Name ?? label.Name;
+            label.Description = dto.Description ?? label.Description;
+            label.LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
+            label.LastUpdatedBy = currentUserId;
+
+            _context.SensitivityLabels.Update(label);
+
+            // Update Permissions Associated with Label
+            var permissions = await _context.Permissions
+                .Where(p => p.LabelId == labelId)
+                .ToListAsync();
+
+            foreach (var permission in permissions)
+            {
+                permission.Name = dto.Name ?? permission.Name;
+
+                if (dto.Description != null)
+                {
+                    // Update description based on action type
+                    permission.Description = permission.Action switch
+                    {
+                        "read" => "Permission to read " + dto.Name + " labeled records",
+                        "write" => "Permission to modify " + dto.Name + " labeled records",
+                        _ => permission.Description // fallback
+                    };
+                }
+
+                permission.LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
+                permission.LastUpdatedBy = currentUserId;
+            }
+
+            _context.Permissions.UpdateRange(permissions);
+
+            // Log update SensitivityLabel event
+            var eventLog = new CreateEventRequestDto
+            {
+                Operation = "update",
+                EntityType = "sensitivity_label",
+                EntityId = label.Id,
+                EntityName = label.Name,
+                Properties = JsonSerializer.Serialize(new { label.Name }),
+            };
+
+            if (label.ProjectId != null)
+            {
+                await _eventBusiness.CreateEvent(currentUserId, organizationId, label.ProjectId, eventLog);
+            }
+            else
+            {
+                await _eventBusiness.CreateEvent(currentUserId, organizationId, null, eventLog);
+            }
+
+            await _context.SaveChangesAsync();
+
+            await transaction.CommitAsync();
+
+            return new SensitivityLabelResponseDto
+            {
+                Id = label.Id,
+                Name = label.Name,
+                Description = label.Description,
+                LastUpdatedAt = label.LastUpdatedAt,
+                LastUpdatedBy = label.LastUpdatedBy,
+                IsArchived = label.IsArchived,
+                ProjectId = label.ProjectId,
+                OrganizationId = label.OrganizationId
+            };
+        }
+        catch (Exception)
+        {
+            await transaction.RollbackAsync();
+            throw;
+        }
+    }
+    
+    /// <summary>
+    ///     Delete a sensitivity label by ID
+    /// </summary>
+    /// <param name="currentUserId">ID of the User executing this method.</param>
+    /// <param name="labelId">ID of label to delete</param>
+    /// <param name="projectId">ID of the project label belongs</param>
+    /// <param name="organizationId">ID of the organization the label belongs</param>
+    /// <returns>Boolean true if executed successfully</returns>
+    /// <exception cref="KeyNotFoundException">Returned if label not found</exception>
+    public async Task<bool> DeleteSensitivityLabel(long currentUserId, long labelId, long? projectId,
+        long organizationId)
+    {
+        var transaction = await _context.Database.BeginTransactionAsync();
+        try
+        {
+            var query = _context.SensitivityLabels
+                .Where(l => l.Id == labelId && l.OrganizationId == organizationId && !l.IsArchived);
+
+            if (projectId.HasValue)
+            {
+                query = query.Where( r => r.ProjectId == projectId.Value || r.ProjectId == null);
+            }
+            else
+            {
+                query = query.Where(t => t.ProjectId == null);
+            }
+
+            var label = await query.FirstOrDefaultAsync();
+
+            if (label == null)
+                throw new KeyNotFoundException($"Sensitivity label with id {labelId} not found or is archived");
+            
+            if (projectId.HasValue && label.ProjectId == null)
+            {
+                throw new InvalidOperationException("Organization sensitivity labels cannot be updated from the child projects.");
+            }
+
+            // Do not delete if there are records currently using this Label
+            var recordCount = await _context.Records
+                .Where(r => r.Labels.Any(l => l.Id == labelId))
+                .CountAsync();
+
+            if (recordCount > 0)
+            {
+                throw new Exception(
+                    $"Cannot delete. Sensitivity label with id {labelId} is used on {recordCount} records.");
+            }
+
+            // Remove the permissions associated with the label
+            await _context.Permissions
+                .Where(p => p.LabelId == labelId)
+                .ExecuteDeleteAsync();
+
+            // Remove the label
+            _context.SensitivityLabels.Remove(label);
+            await _context.SaveChangesAsync();
+
+            // Log delete SensitivityLabel event
+            var eventLog = new CreateEventRequestDto
+            {
+                Operation = "delete",
+                EntityType = "sensitivity_label",
+                EntityId = label.Id,
+                EntityName = label.Name,
+                Properties = JsonSerializer.Serialize(new { label.Name }),
+            };
+
+            if (label.ProjectId != null)
+            {
+                await _eventBusiness.CreateEvent(currentUserId, organizationId, label.ProjectId, eventLog);
+            }
+            else
+            {
+                await _eventBusiness.CreateEvent(currentUserId, organizationId, null, eventLog);
+            }
+
+            await transaction.CommitAsync();
+
+            return true;
+        }
+        catch (Exception)
+        {
+            await transaction.RollbackAsync();
+            throw;
+        }
     }
 
     /// <summary>
-    ///     Get a sensitivity label by ID
+    ///     Archive a sensitivity label by ID.
     /// </summary>
-    /// <param name="labelId">ID of the label to retrieve</param>
-    /// <param name="hideArchived">Flag indicating whether to search archived labels</param>
-    /// <param name="projectId">ID of the project across which to search</param>
-    /// <param name="organizationId">ID of the organization across which to search</param>
-    /// <returns>The requested label</returns>
-    /// <exception cref="KeyNotFoundException">Thrown if label not found</exception>
-    public async Task<SensitivityLabelResponseDto> GetSensitivityLabel(long labelId, long? projectId,
-        long organizationId, bool hideArchived = true)
+    /// <param name="currentUserId">ID of the User executing this method.</param>
+    /// <param name="labelId">ID of label to archive</param>
+    /// <param name="projectId">ID of the project label belongs</param>
+    /// <param name="organizationId">ID of the organization the label belongs</param>
+    /// <returns>Boolean true if executed successfully</returns>
+    /// <exception cref="KeyNotFoundException">Returned if label not found or is already archived</exception>
+    public async Task<bool> ArchiveSensitivityLabel(long currentUserId, long labelId, long? projectId,
+        long organizationId)
     {
-        var query = _context.SensitivityLabels
-            .Where(l => l.Id == labelId && l.OrganizationId == organizationId);
-
-        if (projectId.HasValue)
-            query = query.Where(l => !l.ProjectId.HasValue || l.ProjectId == projectId);
-
-        var label = await query.FirstOrDefaultAsync();
-
-        if (label == null)
-            throw new KeyNotFoundException($"Sensitivity label with id {labelId} not found");
-
-        if (hideArchived && label.IsArchived)
-            throw new KeyNotFoundException($"Sensitivity label with id {labelId} is archived");
-
-        return new SensitivityLabelResponseDto
+        var transaction = await _context.Database.BeginTransactionAsync();
+        try
         {
-            Id = label.Id,
-            Name = label.Name,
-            Description = label.Description,
-            LastUpdatedAt = label.LastUpdatedAt,
-            LastUpdatedBy = label.LastUpdatedBy,
-            IsArchived = label.IsArchived,
-            ProjectId = label.ProjectId,
-            OrganizationId = label.OrganizationId
-        };
+            var query = _context.SensitivityLabels
+                .Where(l => l.Id == labelId && l.OrganizationId == organizationId && !l.IsArchived);
+
+            if (projectId.HasValue)
+            {
+                query = query.Where( r => r.ProjectId == projectId.Value || r.ProjectId == null);
+            }
+            else
+            {
+                query = query.Where(t => t.ProjectId == null);
+            }
+
+            var label = await query.FirstOrDefaultAsync();
+
+            if (label == null)
+                throw new KeyNotFoundException($"Sensitivity label with id {labelId} not found or is archived");
+            
+            if (projectId.HasValue && label.ProjectId == null)
+            {
+                throw new InvalidOperationException("Organization sensitivity labels cannot be updated from the child projects.");
+            }
+
+            // If there are records that are currently using this label do not archive
+            var recordCount = await _context.Records
+                .Where(r => r.Labels.Any(l => l.Id == labelId))
+                .CountAsync();
+
+            if (recordCount > 0)
+            {
+                throw new Exception(
+                    $"Cannot archive. Sensitivity label with id {labelId} is used on {recordCount} records.");
+            }
+
+            // Archive permissions for this sensitivity label 
+            await _context.Permissions
+                .Where(p => p.LabelId == labelId)
+                .ExecuteUpdateAsync(setters => setters
+                    .SetProperty(p => p.IsArchived, true)
+                    .SetProperty(p => p.LastUpdatedAt, DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified))
+                    .SetProperty(p => p.LastUpdatedBy, currentUserId));
+
+            // Archive label by ID
+            label.IsArchived = true;
+            label.LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
+            label.LastUpdatedBy = currentUserId;
+
+            await _context.SaveChangesAsync();
+
+            // Log archive SensitivityLabel event
+            var eventLog = new CreateEventRequestDto
+            {
+                Operation = "archive",
+                EntityType = "sensitivity_label",
+                EntityId = label.Id,
+                EntityName = label.Name,
+                Properties = JsonSerializer.Serialize(new { label.Name }),
+            };
+
+            if (label.ProjectId != null)
+            {
+                await _eventBusiness.CreateEvent(currentUserId, organizationId, label.ProjectId, eventLog);
+            }
+            else
+            {
+                await _eventBusiness.CreateEvent(currentUserId, organizationId, null, eventLog);
+            }
+
+            await transaction.CommitAsync();
+
+            return true;
+        }
+        catch (Exception)
+        {
+            await transaction.RollbackAsync();
+            throw;
+        }
     }
+
+    /// <summary>
+    ///     Unarchive a sensitivity label by ID
+    /// </summary>
+    /// <param name="currentUserId">ID of the User executing this method.</param>
+    /// <param name="labelId">ID of label to unarchive</param>
+    /// <param name="projectId">ID of the project label belongs</param>
+    /// <param name="organizationId">ID of the organization the label belongs</param>
+    /// <returns>Boolean true if executed successfully</returns>
+    /// <exception cref="KeyNotFoundException">Returned if label not found or is not archived</exception>
+    public async Task<bool> UnarchiveSensitivityLabel(long currentUserId, long labelId, long? projectId,
+        long organizationId)
+    {
+        var transaction = await _context.Database.BeginTransactionAsync();
+        try
+        {
+            var query = _context.SensitivityLabels
+                .Where(l => l.Id == labelId && l.OrganizationId == organizationId && l.IsArchived == true);
+
+            if (projectId.HasValue)
+            {
+                query = query.Where( r => r.ProjectId == projectId.Value || r.ProjectId == null);
+            }
+            else
+            {
+                query = query.Where(t => t.ProjectId == null);
+            }
+
+            var label = await query.FirstOrDefaultAsync();
+
+            if (label == null || !label.IsArchived)
+                throw new KeyNotFoundException($"Sensitivity label with id {labelId} not found or is not archived");
+            
+            if (projectId.HasValue && label.ProjectId == null)
+            {
+                throw new InvalidOperationException("Organization sensitivity labels cannot be updated from the child projects.");
+            }
+
+            // Unarchive the Label
+            label.IsArchived = false;
+            label.LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
+            label.LastUpdatedBy = currentUserId;
+
+            // Unarchive Permissions associated with the label
+            await _context.Permissions
+                .Where(p => p.LabelId == labelId)
+                .ExecuteUpdateAsync(setters => setters
+                    .SetProperty(p => p.IsArchived, false)
+                    .SetProperty(p => p.LastUpdatedAt, DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified))
+                    .SetProperty(p => p.LastUpdatedBy, currentUserId));
+
+            await _context.SaveChangesAsync();
+
+            // Log unarchive SensitivityLabel event
+            var eventLog = new CreateEventRequestDto
+            {
+                Operation = "unarchive",
+                EntityType = "sensitivity_label",
+                EntityId = label.Id,
+                EntityName = label.Name,
+                Properties = JsonSerializer.Serialize(new { label.Name }),
+            };
+
+            if (label.ProjectId != null)
+            {
+                await _eventBusiness.CreateEvent(currentUserId, organizationId, label.ProjectId, eventLog);
+            }
+            else
+            {
+                await _eventBusiness.CreateEvent(currentUserId, organizationId, null, eventLog);
+            }
+
+            await transaction.CommitAsync();
+
+            return true;
+        }
+        catch (Exception)
+        {
+            await transaction.RollbackAsync();
+            throw;
+        }
+    }
+    
 }
