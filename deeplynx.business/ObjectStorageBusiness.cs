@@ -434,7 +434,8 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
             .Where(os => os.Default && os.OrganizationId == organizationId);
 
         if (projectId.HasValue)
-            query = query.Where(os => os.ProjectId == projectId);
+            query = query.Where(os => os.ProjectId == projectId || os.ProjectId == null)
+                .OrderByDescending(os => os.ProjectId.HasValue);
         else
             query = query.Where(os => os.ProjectId == null);
 
