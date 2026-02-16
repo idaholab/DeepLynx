@@ -265,6 +265,7 @@ public class RoleOrganizationController : ControllerBase
     [HttpDelete("{roleId:long}/permissions/{permissionId:long}", Name = "api_remove_permission_from_role_organization")]
     [Auth("update", "role")]
     [Auth("read", "permission")]
+    [Auth("update", "user")]
     public async Task<ActionResult> RemovePermissionFromRole(
         long organizationId,
         long roleId,
