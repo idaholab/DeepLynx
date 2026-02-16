@@ -825,29 +825,6 @@ public class ProjectBusiness : IProjectBusiness
         };
         await _dataSourceBusiness.CreateDataSource(organizationId, projectId, currentUserId, defaultDataSource);
 
-        
-
-        // ===============================
-        // CREATE DEFAULT TIMESERIES MOUNT
-        // ===============================
-        // TODO: project config should determine whether to do this (true by default)
-        
-        var duckdbMountPath = Environment.GetEnvironmentVariable("DUCKDB_BASE_PATH");
-        if (string.IsNullOrWhiteSpace(duckdbMountPath))
-            throw new ArgumentException("Duckdb mount path not set or is white space, check your environment variables.");
-        
-        var timeseriesObjectStorageMethod = new CreateObjectStorageRequestDto
-        {
-            Name = "Timeseries Default",
-            Config = new ObjectStorageConfigDto()
-            {
-                MountPath = duckdbMountPath
-            }
-        };
-        
-        await _objectStorageBusiness.CreateObjectStorage(currentUserId, organizationId, projectId,
-            timeseriesObjectStorageMethod);
-
         // ===============================
         // Add current user as admin to project
         // ===============================
