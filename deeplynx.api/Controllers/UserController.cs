@@ -246,7 +246,6 @@ public class UserController : ControllerBase
     /// <param name="projectId">If specified, return boolean if user is admin of this project</param>
     /// <returns>User response DTO</returns>
     [HttpGet("current", Name = "api_get_current_user")]
-    [Auth("read", "user")]
     public async Task<ActionResult<UserAdminInfoDto>> GetCurrentUser(
         [FromQuery] long? organizationId,
         [FromQuery] long? projectId)
