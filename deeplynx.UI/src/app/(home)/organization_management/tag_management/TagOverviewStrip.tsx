@@ -27,7 +27,7 @@ const TagOverviewStrip: React.FC<Props> = ({
   return (
     <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-6">
       {/* Security Labels */}
-      <div className="stat bg-base-100 border border-base-300 rounded-xl">
+      <div className="stat bg-base-100 shadow-lg rounded-xl">
         <div className="stat-title flex items-center gap-1 text-xs">
           <ShieldCheckIcon className="w-4 h-4 text-secondary" />
           Org Security Labels
@@ -49,7 +49,7 @@ const TagOverviewStrip: React.FC<Props> = ({
       </div>
 
       {/* Projects with Labels */}
-      <div className="stat bg-base-100 border border-base-300 rounded-xl">
+      <div className="stat bg-base-100 shadow-lg rounded-xl">
         <div className="stat-title flex items-center gap-1 text-xs">
           <ShieldCheckIcon className="w-4 h-4 text-secondary" />
           Projects with Labels
@@ -64,7 +64,7 @@ const TagOverviewStrip: React.FC<Props> = ({
       </div>
 
       {/* Org Tags */}
-      <div className="stat bg-base-100 border border-base-300 rounded-xl">
+      <div className="stat bg-base-100 shadow-lg rounded-xl">
         <div className="stat-title flex items-center gap-1 text-xs">
           <TagIcon className="w-4 h-4 text-primary" />
           Org Tags
@@ -86,7 +86,7 @@ const TagOverviewStrip: React.FC<Props> = ({
       </div>
 
       {/* Projects with Tags */}
-      <div className="stat bg-base-100 border border-base-300 rounded-xl">
+      <div className="stat bg-base-100 shadow-lg rounded-xl">
         <div className="stat-title flex items-center gap-1 text-xs">
           <TagIcon className="w-4 h-4 text-secondary" />
           Projects with Tags

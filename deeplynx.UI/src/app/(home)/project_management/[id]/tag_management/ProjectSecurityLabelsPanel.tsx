@@ -51,7 +51,7 @@ const ProjectSecurityLabelsPanel: React.FC<Props> = ({
   onArchiveClick,
 }) => {
   return (
-    <div className="card bg-base-100 border border-secondary/60 shadow-sm">
+    <div className="card bg-base-100 shadow-lg">
       <div className="card-body">
         {/* Header + Controls */}
         <div className="flex items-start justify-between gap-4 mb-3">
@@ -115,8 +115,8 @@ const ProjectSecurityLabelsPanel: React.FC<Props> = ({
                 !projectId
                   ? "No project selected"
                   : labelsLockedByOrg
-                  ? "Security labels are locked at the organization level"
-                  : "Create new security label"
+                    ? "Security labels are locked at the organization level"
+                    : "Create new security label"
               }
             >
               + New Label

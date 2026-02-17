@@ -40,8 +40,9 @@ const ProjectsSecurityLabels: React.FC<Props> = ({
   onEditLabel,
   onArchiveClick,
 }) => {
+  console.log("Filtered Labels: ", filteredLabels);
   return (
-    <div className="card bg-base-100 border border-secondary/60 shadow-sm">
+    <div className="card bg-base-100 shadow-lg">
       <div className="card-body">
         {/* Header + Controls */}
         <div className="flex items-start justify-between gap-4 mb-3">
@@ -170,9 +171,11 @@ const ProjectsSecurityLabels: React.FC<Props> = ({
                   <span className="badge badge-secondary badge-outline badge-sm">
                     {label.name}
                   </span>
-                  <span className="text-[0.7rem] text-base-content/70">
-                    Project-level label (org labels are inherited)
-                  </span>
+                  {!label.projectId && (
+                    <span className="text-[0.7rem] text-base-content/70">
+                      (Organization Label)
+                    </span>
+                  )}
                 </div>
                 <div className="flex items-center gap-1">
                   <button

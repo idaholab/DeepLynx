@@ -41,7 +41,7 @@ const ProjectTagsPanel: React.FC<Props> = ({
   onArchiveClick,
 }) => {
   return (
-    <div className="card bg-base-100 border border-secondary/60 shadow-sm">
+    <div className="card bg-base-100 shadow-lg">
       <div className="card-body">
         {/* Header + Controls */}
         <div className="flex items-start justify-between gap-4 mb-3">
@@ -103,8 +103,8 @@ const ProjectTagsPanel: React.FC<Props> = ({
                 !projectId
                   ? "No project selected"
                   : orgTagsLocked
-                  ? "Tags are locked at the organization level"
-                  : "Create new project tag"
+                    ? "Tags are locked at the organization level"
+                    : "Create new project tag"
               }
             >
               + New Tag
@@ -168,9 +168,11 @@ const ProjectTagsPanel: React.FC<Props> = ({
                   <span className="badge badge-secondary badge-outline badge-sm">
                     {tag.name}
                   </span>
-                  <span className="text-[0.7rem] text-base-content/70">
-                    Project-level tag (org tags are inherited)
-                  </span>
+                  {!tag.projectId && (
+                    <span className="text-[0.7rem] text-base-content/70">
+                      (Organization Tag)
+                    </span>
+                  )}
                 </div>
                 <div className="flex items-center gap-1">
                   <button
