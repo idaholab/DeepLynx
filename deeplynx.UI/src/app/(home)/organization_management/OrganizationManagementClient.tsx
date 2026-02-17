@@ -4,14 +4,14 @@
 import { useLanguage } from "@/app/contexts/Language";
 import { useOrganizationSession } from "@/app/contexts/OrganizationSessionProvider";
 import { useState } from "react";
-import Tabs from "../components/Tabs";
+import Tabs from "@/app/(home)/components/Tabs";
 import {
   GroupResponseDto,
   PermissionResponseDto,
   ProjectResponseDto,
   RoleResponseDto,
   UserResponseDto,
-} from "../types/responseDTOs";
+} from "@/app/(home)/types/responseDTOs";
 import InlineGroupsTable from "./groups/InlineGroupsTable";
 import RolesAndPermissions from "./roles_and_permissions/RolesAndPermissions";
 import OrganizationSettings from "./settings/OrganizationSettings";

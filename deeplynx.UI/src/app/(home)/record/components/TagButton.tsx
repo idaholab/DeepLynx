@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { PlusIcon } from "@heroicons/react/24/outline";
-import { TagResponseDto } from "../types/responseDTOs";
-import AddTagModal from "./AddTagModal";
+import { TagResponseDto } from "../../types/responseDTOs";
+import AddTagModal from "@/app/(home)/components/AddTagModal";
 import { useLanguage } from "@/app/contexts/Language";
 import toast from "react-hot-toast";
 import { useOrganizationSession } from "@/app/contexts/OrganizationSessionProvider";
@@ -37,7 +37,7 @@ const TagButton: React.FC<TagButtonProps> = ({
   const longestNameRef = useRef<HTMLSpanElement>(null);
   const [isTagModalOpen, setIsTagModalOpen] = useState(false);
   const { t } = useLanguage();
-  const { organization, hasLoaded } = useOrganizationSession();
+  const { organization } = useOrganizationSession();
 
   useEffect(() => {
     setTempSelectedIds(selectedIds);
