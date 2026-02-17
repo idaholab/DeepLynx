@@ -299,3 +299,62 @@ export const archiveSensitivityLabelProject = async (
         throw error;
     }
 }
+
+// ============================================================================
+// RECORD LEVEL API CALLS
+// ============================================================================
+
+/**
+ * Attach a sensitivity label to a record
+ * @param organizationId - The ID of the organization
+ * @param projectId - The ID of the project
+ * @param recordId - The ID of the record
+ * @param sensitivityLabelId - The ID of the sensitivity label to attach
+ * @returns Promise with success message
+ */
+export const attachSensitivityLabelToRecord = async (
+    organizationId: number,
+    projectId: number,
+    recordId: number,
+    sensitivityLabelId: number
+): Promise<{ message: string }> => {
+    try {
+        const res = await api.post(
+            `/organizations/${organizationId}/projects/${projectId}/records/${recordId}/sensitivity-labels`,
+            null,
+            { params: { sensitivityLabelId } }
+        );
+
+        return res.data;
+    } catch (error) {
+        console.error(`Error attaching sensitivity label ${sensitivityLabelId} to record ${recordId}:`, error);
+        throw error;
+    }
+}
+
+/**
+ * Unattach a sensitivity label from a record
+ * @param organizationId - The ID of the organization
+ * @param projectId - The ID of the project
+ * @param recordId - The ID of the record
+ * @param sensitivityLabelId - The ID of the sensitivity label to unattach
+ * @returns Promise with success message
+ */
+export const unattachSensitivityLabelFromRecord = async (
+    organizationId: number,
+    projectId: number,
+    recordId: number,
+    sensitivityLabelId: number
+): Promise<{ message: string }> => {
+    try {
+        const res = await api.delete(
+            `/organizations/${organizationId}/projects/${projectId}/records/${recordId}/sensitivity-labels`,
+            { params: { sensitivityLabelId } }
+        );
+
+        return res.data;
+    } catch (error) {
+        console.error(`Error unattaching sensitivity label ${sensitivityLabelId} from record ${recordId}:`, error);
+        throw error;
+    }
+}

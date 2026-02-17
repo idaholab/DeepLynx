@@ -298,7 +298,7 @@ export async function attachSensitivityLabelToRecord(
     const res = await api.post(
       `/organizations/${organizationId}/projects/${projectId}/records/${recordId}/sensitivity-labels`,
       null,
-      { params: { labelId } }
+      { params: { sensitivityLabelId: labelId } }
     );
     return res.data;
   } catch (error) {
@@ -324,7 +324,7 @@ export async function unattachSensitivityLabelFromRecord(
   try {
     const res = await api.delete(
       `/organizations/${organizationId}/projects/${projectId}/records/${recordId}/sensitivity-labels`,
-      { params: { labelId } }
+      { params: { sensitivityLabelId: labelId } }
     );
     return res.data;
   } catch (error) {

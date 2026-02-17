@@ -91,6 +91,7 @@ export type RecordResponseDto = {
   isArchived?: boolean;
   fileType?: string | null;
   tags?: { id: number | null; name: string }[];
+  labels?: { id: number | null; name: string }[];
 };
 
 export type ObjectStorageResponseDto = {

@@ -3,6 +3,7 @@ import { PlusIcon } from "@heroicons/react/24/outline";
 import { SensitivityLabelsDto } from "../types/responseDTOs";
 import AddLabelModal from "./AddLabelModal";
 import toast from "react-hot-toast";
+import axios from "axios";
 import { useOrganizationSession } from "@/app/contexts/OrganizationSessionProvider";
 import { useLanguage } from "@/app/contexts/Language";
 import {
@@ -29,6 +30,7 @@ const LabelButton: React.FC<LabelButtonProps> = ({
   projectId,
   recordId,
   selectedIds,
+  setSelectedIds,
   setLabels,
   setSelectedLabels,
 }) => {
@@ -67,33 +69,53 @@ const LabelButton: React.FC<LabelButtonProps> = ({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const toggleLabel = async (id: string) => {
-    let newSelectionIds: string[];
+  const getApiErrorMessage = (error: unknown): string => {
+    if (axios.isAxiosError(error)) {
+      const data = error.response?.data as
+        | { error?: string; message?: string }
+        | string
+        | undefined;
 
-    if (tempSelectedIds.map(String).includes(id)) {
-      newSelectionIds = tempSelectedIds
-        .map(String)
-        .filter((selectedId) => selectedId !== id);
-      await unattachSensitivityLabelFromRecord(
-        organization?.organizationId as number,
-        projectId,
-        recordId,
-        Number(id),
-      );
-    } else {
-      newSelectionIds = [...tempSelectedIds.map(String), id];
-      try {
-        await attachSensitivityLabelToRecord(
-          organization?.organizationId as number,
+      if (typeof data === "string") return data;
+      if (data?.error) return data.error;
+      if (data?.message) return data.message;
+    }
+
+    return t.translations.FAILED_TO_UPDATE_SENSITIVITY_LABELS;
+  };
+
+  const toggleLabel = async (id: string) => {
+    if (!organization?.organizationId) return;
+
+    const isSelected = tempSelectedIds.map(String).includes(id);
+    const newSelectionIds = isSelected
+      ? tempSelectedIds.map(String).filter((selectedId) => selectedId !== id)
+      : [...tempSelectedIds.map(String), id];
+
+    try {
+      if (isSelected) {
+        await unattachSensitivityLabelFromRecord(
+          organization.organizationId,
           projectId,
           recordId,
           Number(id),
         );
-      } catch (error) {
-        console.error("Error attaching label to record:", error);
+      } else {
+        await attachSensitivityLabelToRecord(
+          organization.organizationId,
+          projectId,
+          recordId,
+          Number(id),
+        );
       }
+    } catch (error) {
+      console.error("Error updating sensitivity labels on record:", error);
+      toast.error(getApiErrorMessage(error));
+      return;
     }
+
     setTempSelectedIds(newSelectionIds);
+    setSelectedIds(newSelectionIds);
 
     if (onSelectionChange) {
       onSelectionChange(newSelectionIds);
@@ -116,16 +138,16 @@ const LabelButton: React.FC<LabelButtonProps> = ({
         newLabel.id.toString(),
       ];
       setTempSelectedIds(newSelectionIds);
+      setSelectedIds(newSelectionIds);
       setSelectedLabels((prevSelectedLabels) => [...prevSelectedLabels, newLabel]);
+      if (onSelectionChange) onSelectionChange(newSelectionIds);
 
       toast.success(
         `${t.translations.LABEL} "${newLabel.name}" ${t.translations.LABEL_CREATED_AND_ATTACHED}`,
       );
     } catch (error) {
       console.error("Error attaching new label:", error);
-      toast.error(
-        `${t.translations.LABEL} ${t.translations.LABEL_CREATED_BUT_FAILED_TO_ATTACH}`,
-      );
+      toast.error(getApiErrorMessage(error));
     }
   };
 
