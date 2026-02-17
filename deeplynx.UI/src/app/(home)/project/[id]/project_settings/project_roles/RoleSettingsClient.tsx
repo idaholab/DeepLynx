@@ -3,7 +3,7 @@
 import React from "react";
 import { useLanguage } from "@/app/contexts/Language";
 import { ArrowLeftIcon } from '@heroicons/react/24/outline';
-import RoleSettings from "../../../../components/ProjectSettingsTable/ProjectTables/RoleSettings";
+import RoleSettings from "@/app/(home)/components/ProjectSettingsTable/ProjectTables/RoleSettings";
 import { useRouter } from "next/navigation";
 
 type Props = {

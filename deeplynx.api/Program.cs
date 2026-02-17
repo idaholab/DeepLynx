@@ -154,9 +154,6 @@ try
     builder.Services.AddTransient<ITokenBusiness, TokenBusiness>();
     builder.Services.AddTransient<IOauthApplicationBusiness, OauthApplicationBusiness>();
 
-
-    Console.WriteLine("Program cs: " + connectionString);
-
     builder.Services.AddTransient<IQueryBusiness, QueryBusiness>();
     builder.Services.AddTransient<IMetadataBusiness, MetadataBusiness>();
     builder.Services.AddTransient<IHistoricalRecordBusiness, HistoricalRecordBusiness>();
@@ -176,11 +173,12 @@ try
     builder.Services.AddTransient<IProjectRolePermissionService, ProjectRolePermissionService>();
     builder.Services.AddTransient<IOrgRolePermissionService, OrgRolePermissionService>();
     builder.Services.AddScoped<IBulkCopyUpsertExecutor, BulkCopyUpsertExecutor>();
-    builder.Services.AddTransient<ISysAdminService, SysAdminService>();
+    builder.Services.AddTransient<IAdminService, AdminService>();
     builder.Services.AddTransient<IOauthHandshakeBusiness, OauthHandshakeBusiness>();
     builder.Services.AddTransient<IOrganizationService, OrganizationService>();
     builder.Services.AddTransient<ISavedSearchBusiness, SavedSearchBusiness>();
     builder.Services.AddTransient<IGraphBusiness, GraphBusiness>();
+    builder.Services.AddScoped<ISensitivityLabelService, SensitivityLabelService>();
 
     //OpenApi Documentation
     builder.Services.AddOpenApi(options =>
@@ -465,6 +463,7 @@ try
     app.UseAuthentication(); // Must be first
     app.UseMiddleware<UserContextMiddleware>(); // Second - sets UserId/Email
     app.UseMiddleware<AuthMiddleware>(); // Third - sets OrganizationId
+    app.UseMiddleware<SensitivityMiddleware>();
     app.UseAuthorization(); // Fourth
     app.MapControllers(); // Last
 

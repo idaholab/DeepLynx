@@ -8,13 +8,13 @@ import GenericTableSkeleton from "@/app/(home)/components/skeletons/generictable
 import {
   EventResponseDto,
   PaginatedEventsResponseDto,
-} from "../types/responseDTOs";
+} from "@/app/(home)/types/responseDTOs";
 import { useOrganizationSession } from "@/app/contexts/OrganizationSessionProvider";
 import {
   EventFilterParams,
   queryAuthorizedEvents,
 } from "@/app/lib/client_service/event_services.client";
-import ProjectDropdown from "../components/ProjectDropdown";
+import ProjectDropdown from "@/app/(home)/components/ProjectDropdown";
 
 type Props = {
   initialProjects: { id: string; name: string }[];

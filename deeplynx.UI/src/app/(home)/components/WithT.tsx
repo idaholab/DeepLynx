@@ -1,9 +1,7 @@
 // app/components/WithT.tsx
 "use client";
 import { useLanguage } from "@/app/contexts/Language";
-import { translations } from "@/app/lib/translations";
-
-type Translation = (typeof translations)["en"];
+type Translation = { translations: Record<string, string> };
 
 export default function WithT({
   children,

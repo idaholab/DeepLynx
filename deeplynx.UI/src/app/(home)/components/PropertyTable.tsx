@@ -14,7 +14,7 @@ import React, { useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { downloadFile } from "@/app/lib/client_service/file_services.client";
 import { useOrganizationSession } from "@/app/contexts/OrganizationSessionProvider";
-import axios from 'axios';
+import axios from "axios";
 
 interface PropertyRow {
   label: string;
@@ -45,11 +45,15 @@ const PropertyTable: React.FC<PropertyTableProps> = ({
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [editValue, setEditValue] = useState<string>("");
   const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
-  const [abortController, setAbortController] = useState<AbortController | null>(null);
+  const [abortController, setAbortController] =
+    useState<AbortController | null>(null);
   const [downloadProgress, setDownloadProgress] = useState<number | null>(null);
   const [downloading, setDownloading] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
-  const [bytesDownloaded, setBytesDownloaded] = useState<{ loaded: number; total: number } | null>(null);
+  const [bytesDownloaded, setBytesDownloaded] = useState<{
+    loaded: number;
+    total: number;
+  } | null>(null);
   const searchParams = useSearchParams();
   const projectIdParam = searchParams.get("projectId");
   const recordIdParam = searchParams.get("recordId");
@@ -63,7 +67,6 @@ const PropertyTable: React.FC<PropertyTableProps> = ({
 
     const controller = new AbortController();
     setAbortController(controller);
-
 
     setDownloading(true);
     setDownloadProgress(0);
@@ -86,17 +89,22 @@ const PropertyTable: React.FC<PropertyTableProps> = ({
 
           // Always update progress percentage and bytes (for accurate display)
           setDownloadProgress(progressInfo.percentage);
-          setBytesDownloaded({ loaded: progressInfo.loaded, total: progressInfo.total });
+          setBytesDownloaded({
+            loaded: progressInfo.loaded,
+            total: progressInfo.total,
+          });
 
           // Only update speed and ETA every 2 seconds
           if (timeSinceLastDisplay >= 2) {
             const elapsed = (now - startTime) / 1000;
 
             // Calculate instantaneous speed based on bytes since last display update
-            const bytesDownloadedSinceLastDisplay = progressInfo.loaded - lastDisplayLoaded;
-            const instantSpeed = timeSinceLastDisplay > 0
-              ? bytesDownloadedSinceLastDisplay / timeSinceLastDisplay
-              : 0;
+            const bytesDownloadedSinceLastDisplay =
+              progressInfo.loaded - lastDisplayLoaded;
+            const instantSpeed =
+              timeSinceLastDisplay > 0
+                ? bytesDownloadedSinceLastDisplay / timeSinceLastDisplay
+                : 0;
 
             // Calculate average speed
             const avgSpeed = elapsed > 0 ? progressInfo.loaded / elapsed : 0;
@@ -115,7 +123,7 @@ const PropertyTable: React.FC<PropertyTableProps> = ({
             lastDisplayLoaded = progressInfo.loaded;
           }
         },
-        controller
+        controller,
       );
 
       // Clear progress after 2 seconds
@@ -126,11 +134,11 @@ const PropertyTable: React.FC<PropertyTableProps> = ({
       }, 2000);
     } catch (error) {
       // Check if it's an abort error (user cancelled)
-      if (axios.isAxiosError(error) && error.code === 'ERR_CANCELED') {
-        console.log('Download cancelled by user');
+      if (axios.isAxiosError(error) && error.code === "ERR_CANCELED") {
         // Don't treat this as an error - it's intentional
+        return;
       } else {
-        console.error('Download error:', error);
+        console.error("Download error:", error);
       }
       // Clear progress states for any error (including cancellation)
       setDownloadProgress(null);
@@ -156,12 +164,12 @@ const PropertyTable: React.FC<PropertyTableProps> = ({
   };
 
   const formatBytes = (bytes: number, decimals = 2): string => {
-    if (bytes === 0) return '0 Bytes';
+    if (bytes === 0) return "0 Bytes";
     const k = 1000;
     const dm = decimals < 0 ? 0 : decimals;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+    const sizes = ["Bytes", "KB", "MB", "GB", "TB"];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + " " + sizes[i];
   };
 
   const formatTime = (seconds: number): string => {
@@ -372,7 +380,8 @@ const PropertyTable: React.FC<PropertyTableProps> = ({
                       </div>
                       <div className="flex justify-between text-xs text-base-content/70">
                         <span>
-                          {bytesDownloaded && `${formatBytes(bytesDownloaded.loaded)} / ${formatBytes(bytesDownloaded.total)}`}
+                          {bytesDownloaded &&
+                            `${formatBytes(bytesDownloaded.loaded)} / ${formatBytes(bytesDownloaded.total)}`}
                         </span>
                         {timeRemaining !== null && timeRemaining > 0 && (
                           <span>ETA: {formatTime(timeRemaining)}</span>
@@ -398,10 +407,11 @@ const PropertyTable: React.FC<PropertyTableProps> = ({
                           ? "Download file"
                           : "Missing projectId or recordId in URL"
                       }
-                      className={`p-1 transition-colors ${canDownload
-                        ? "hover:text-primary cursor-pointer"
-                        : "opacity-50 cursor-not-allowed"
-                        }`}
+                      className={`p-1 transition-colors ${
+                        canDownload
+                          ? "hover:text-primary cursor-pointer"
+                          : "opacity-50 cursor-not-allowed"
+                      }`}
                     >
                       <ArrowDownTrayIcon className="w-8 h-8" />
                     </button>

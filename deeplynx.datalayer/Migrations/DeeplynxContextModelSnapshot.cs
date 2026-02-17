@@ -1072,6 +1072,10 @@ namespace deeplynx.datalayer.Migrations
                         .HasColumnType("text")
                         .HasColumnName("name");
 
+                    b.Property<bool>("RequireSensitivityLabel")
+                        .HasColumnType("boolean")
+                        .HasColumnName("require_sensitivity_label");
+
                     b.HasKey("Id")
                         .HasName("organization_pkey");
 
@@ -1278,6 +1282,10 @@ namespace deeplynx.datalayer.Migrations
                     b.Property<long>("OrganizationId")
                         .HasColumnType("bigint")
                         .HasColumnName("organization_id");
+
+                    b.Property<bool>("RequireSensitivityLabel")
+                        .HasColumnType("boolean")
+                        .HasColumnName("require_sensitivity_label");
 
                     b.HasKey("Id")
                         .HasName("projects_pkey");

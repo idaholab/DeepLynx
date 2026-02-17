@@ -122,7 +122,8 @@ public class ProjectBusiness : IProjectBusiness
             OrganizationId = organizationId,
             LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
             LastUpdatedBy = userId,
-            Banner = dto.Banner
+            Banner = dto.Banner,
+            RequireSensitivityLabel = dto.RequireSensitivityLabel ?? false
         };
 
         _context.Projects.Add(project);
@@ -139,7 +140,8 @@ public class ProjectBusiness : IProjectBusiness
             LastUpdatedBy = project.LastUpdatedBy,
             LastUpdatedAt = project.LastUpdatedAt,
             OrganizationId = project.OrganizationId,
-            Banner = project.Banner
+            Banner = project.Banner,
+            RequireSensitivityLabel = dto.RequireSensitivityLabel
         };
 
         // Update the Project Cache List
@@ -154,7 +156,6 @@ public class ProjectBusiness : IProjectBusiness
         // If project cache count differs from the database refresh it to match the database and return
         if (cachedProjectList.Count != _context.Projects.Count()) await RefreshProjectsCache();
 
-        // Log create Project event
         // Log create Project event
         var eventLog = new CreateEventRequestDto
         {
@@ -230,6 +231,23 @@ public class ProjectBusiness : IProjectBusiness
             throw new KeyNotFoundException(
                 $"Project with id {projectId} not found or does not belong to the specified organization context");
 
+        // Validate that if the RequireSensitivityLabel is enabled all existing records have labels
+        if (!project.RequireSensitivityLabel && dto.RequireSensitivityLabel == true)
+        {
+            var hasUnlabeledRecords = await _context.Records
+                .Include(r => r.Labels)
+                .Where(r => r.ProjectId == projectId)
+                .AnyAsync(r => !r.Labels.Any());
+        
+            if (hasUnlabeledRecords)
+                throw new InvalidOperationException(
+                    "Cannot require sensitivity labels: project contains records without labels. " +
+                    "Please label all existing records before enabling this requirement.");
+        }
+
+        if (dto.RequireSensitivityLabel != null)
+            project.RequireSensitivityLabel = dto.RequireSensitivityLabel.Value;
+
         project.Name = dto.Name ?? project.Name;
         project.Description = dto.Description ?? project.Description;
         project.Abbreviation = dto.Abbreviation ?? project.Abbreviation;
@@ -261,7 +279,8 @@ public class ProjectBusiness : IProjectBusiness
             LastUpdatedAt = project.LastUpdatedAt,
             LastUpdatedBy = project.LastUpdatedBy,
             OrganizationId = project.OrganizationId,
-            Banner = project.Banner
+            Banner = project.Banner,
+            RequireSensitivityLabel = project.RequireSensitivityLabel
         };
 
         // Update the Project Cache List
@@ -786,20 +805,18 @@ public class ProjectBusiness : IProjectBusiness
         // ===============================
         // CREATE DEFAULT CLASSES
         // ===============================
-        // TODO: project config should determine whether to do this (true by default)
         var defaultClasses = new List<CreateClassRequestDto>
         {
             new() { Name = "Timeseries" },
             new() { Name = "Report" },
             new() { Name = "File" }
         };
-        var cls = await _classBusiness.BulkCreateClasses(
+        await _classBusiness.BulkCreateClasses(
             currentUserId, organizationId, projectId, defaultClasses);
 
         // ===============================
         // CREATE DEFAULT DATA SOURCE
         // ===============================
-        // TODO: project config should determine whether to do this (true by default)
         var defaultDataSource = new CreateDataSourceRequestDto
         {
             Name = "Default Data Source",
@@ -809,102 +826,12 @@ public class ProjectBusiness : IProjectBusiness
         await _dataSourceBusiness.CreateDataSource(organizationId, projectId, currentUserId, defaultDataSource);
 
         // ===============================
-        // CREATE DEFAULT OBJECT STORAGE
+        // Add current user as admin to project
         // ===============================
-        // TODO: project config should determine whether to do this (true by default)
-        Env.Load("../.env");
-        var defaultObjectStorageMethod = Environment.GetEnvironmentVariable("FILE_STORAGE_METHOD");
-        var configDto = new ObjectStorageConfigDto();
-        if (defaultObjectStorageMethod == "filesystem")
-        {
-            var mountPath =
-                Environment.GetEnvironmentVariable("STORAGE_DIRECTORY");
-            
-            if (string.IsNullOrWhiteSpace(mountPath))
-                throw new ArgumentException($"STORAGE_DIRECTORY is null or white space, please check your environment variables.");
-            
-            configDto.MountPath = mountPath;
-        }
-        else if (defaultObjectStorageMethod == "azure_object")
-        {
-            var azureConnectionString = Environment.GetEnvironmentVariable("AZURE_OBJECT_CONNECTION_STRING");
-            if (string.IsNullOrWhiteSpace(azureConnectionString))
-                throw new ArgumentException("AZURE_OBJECT_CONNECTION_STRING is null or white space, please check your environment variables.");
-
-            var azureContainerName = Environment.GetEnvironmentVariable("AZURE_CONTAINER_NAME");
-            if (string.IsNullOrWhiteSpace(azureContainerName))
-                throw new ArgumentException("AZURE_CONTAINER_NAME is null or white space, please check your environment variables.");
-            
-            configDto.AzureObjectConfig = new AzureObjectConfigDto()
-            {
-                AzureConnectionString = azureConnectionString,
-                AzureContainerName = azureContainerName
-            };
-        }
-        else if (defaultObjectStorageMethod == "aws_s3")
-        {
-            var awsConnectionString =
-                Environment.GetEnvironmentVariable("AWS_S3_CONNECTION_STRING");
-            if (string.IsNullOrWhiteSpace(awsConnectionString))
-                throw new ArgumentException("AWS_S3_CONNECTION_STRING is null or white space, please check your environment variables.");
-            
-            configDto.AwsConnectionString = awsConnectionString;
-        }
-        else
-        {
-            throw new NullReferenceException(
-                "Unknown object storage method, make sure your environment variables are correctly set");
-        }
-
-        var objectStorageRequestDto = new CreateObjectStorageRequestDto
-        {
-            Name = "Instance Default",
-            Config = configDto,
-            Default = true
-        };
-        await _objectStorageBusiness.CreateObjectStorage(
-            currentUserId, organizationId, projectId, objectStorageRequestDto);
-
-        // ===============================
-        // CREATE DEFAULT TIMESERIES MOUNT
-        // ===============================
-        // TODO: project config should determine whether to do this (true by default)
-        
-        var duckdbMountPath = Environment.GetEnvironmentVariable("DUCKDB_BASE_PATH");
-        if (string.IsNullOrWhiteSpace(duckdbMountPath))
-            throw new ArgumentException("Duckdb mount path not set or is white space, check your environment variables.");
-        
-        var timeseriesObjectStorageMethod = new CreateObjectStorageRequestDto
-        {
-            Name = "Timeseries Default",
-            Config = new ObjectStorageConfigDto()
-            {
-                MountPath = duckdbMountPath
-            }
-        };
-        
-        await _objectStorageBusiness.CreateObjectStorage(currentUserId, organizationId, projectId,
-            timeseriesObjectStorageMethod);
-
-        // ===============================
-        // CREATE DEFAULT PROJECT ROLES
-        // ===============================
-        // TODO: project config should determine whether to do this (true by default)
-        var defaultRoles = new List<CreateRoleRequestDto>
-        {
-            new() { Name = "Admin", Description = "Project administrator with full permissions" },
-            new() { Name = "User", Description = "Standard project user with limited permissions" }
-        };
-        var roles = await _roleBusiness.BulkCreateRoles(currentUserId, organizationId, projectId, defaultRoles);
-        var adminRoleId = roles.Single(r => r.Name == "Admin").Id;
-        var userRoleId = roles.Single(r => r.Name == "User").Id;
-
-        // set role permissions for admin and user
-        await _roleBusiness.SetPermissionsByPattern(adminRoleId, DefaultRolePermissions.Admin.AllowedPermissions,
-            organizationId, projectId);
-        await _roleBusiness.SetPermissionsByPattern(userRoleId, DefaultRolePermissions.User.AllowedPermissions,
-            organizationId, projectId);
-
-        await AddMemberToProject(projectId, adminRoleId, currentUserId, null);
+        var adminRole = await _context.Roles.FirstOrDefaultAsync(r => r.Name == "Admin" && r.OrganizationId == organizationId);
+        if (adminRole == null)
+            throw new InvalidOperationException($"Admin role not found for organization {organizationId}");
+    
+        await AddMemberToProject(projectId, adminRole.Id, currentUserId, null);
     }
 }

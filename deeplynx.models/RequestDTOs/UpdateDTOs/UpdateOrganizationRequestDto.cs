@@ -9,4 +9,6 @@ public class UpdateOrganizationRequestDto
     public bool? DefaultOrg { get; set; }
     
     public string? Banner { get; set; }
+    
+    public bool? RequireSensitivityLabel {get; set;}
 }

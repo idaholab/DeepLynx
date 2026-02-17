@@ -8,21 +8,21 @@ import { RecordTableRow } from "@/app/(home)/types/types";
 import { useProjectSession } from "@/app/contexts/ProjectSessionProvider";
 import { useOrganizationSession } from "@/app/contexts/OrganizationSessionProvider";
 import { getMultiProjectRecords } from "@/app/lib/client_service/query_services.client";
-import GridView from "../../components/GridView";
-import ListView from "../../components/ListView";
-import { HistoricalRecordResponseDto } from "../../types/responseDTOs";
-import ProjectDropdown from "../../components/ProjectDropdown";
+import GridView from "@/app/(home)/components/GridView";
+import ListView from "@/app/(home)/components/ListView";
+import { HistoricalRecordResponseDto } from "@/app/(home)/types/responseDTOs";
+import ProjectDropdown from "@/app/(home)/components/ProjectDropdown";
 
 import { useLanguage } from "@/app/contexts/Language";
 import {
-  ArrowUturnLeftIcon,
   ChevronDownIcon,
   EyeIcon,
   QueueListIcon,
   TableCellsIcon,
 } from "@heroicons/react/24/outline";
-import { TagResponseDto } from "../../types/responseDTOs";
+import { TagResponseDto } from "@/app/(home)/types/responseDTOs";
 import { fullTextSearch } from "@/app/lib/client_service/query_services.client";
+import { formatLocalDateTime } from "@/app/lib/date_time";
 
 /* ----------------------------- Types & utils ----------------------------- */
 
@@ -44,7 +44,7 @@ type ColumnDef<Row> = {
 
 function useClickOutside(
   ref: React.RefObject<HTMLElement | null>,
-  onAway: () => void
+  onAway: () => void,
 ) {
   useEffect(() => {
     const h = (e: MouseEvent) => {
@@ -78,10 +78,10 @@ export default function DataCatalogClient({
   const [projects] = useState(initialProjects);
 
   const [selectedProjects, setSelectedProjects] = useState<string[]>(
-    initialSelectedProjects
+    initialSelectedProjects,
   );
   const [tableData, setTableData] = useState<RecordTableRow[]>(
-    initialRecords ?? []
+    initialRecords ?? [],
   );
   const [searchTerm, setSearchTerm] = useState(initialSearchTerm ?? "");
   const [activeFilters, setActiveFilters] = useState<
@@ -92,13 +92,13 @@ export default function DataCatalogClient({
 
   const activeSearchTerms = useMemo(
     () => activeFilters.map((f) => f.term.toLowerCase()),
-    [activeFilters]
+    [activeFilters],
   );
 
   // === memoized “complex” deps ===
   const selectedProjectsToken = useMemo(
     () => selectedProjects.join("|"),
-    [selectedProjects]
+    [selectedProjects],
   );
 
   // Treat ALL / empty as "all projects"
@@ -122,30 +122,41 @@ export default function DataCatalogClient({
         setTableData([]);
         return;
       }
-      const data = await getMultiProjectRecords(organization?.organizationId as number, idsNum, true);
+      const data = await getMultiProjectRecords(
+        organization?.organizationId as number,
+        idsNum,
+        true,
+      );
       const transformedData: RecordTableRow[] = data.map((record) => ({
         id: record.id || 0,
         name: record.name,
         description: record.description ?? undefined,
         uri: record.uri ?? undefined,
-        properties: typeof record.properties === 'string' ? record.properties : JSON.stringify(record.properties),
+        properties:
+          typeof record.properties === "string"
+            ? record.properties
+            : JSON.stringify(record.properties),
         originalId: record.originalId ?? undefined,
         classId: record.classId ?? undefined,
-        className: undefined,
+        className: record.className ?? undefined,
         dataSourceId: record.dataSourceId ?? undefined,
-        dataSourceName: '',
+        dataSourceName: "",
         projectId: record.projectId ?? undefined,
-        projectName: projects.find((p) => Number(p.id) === record.projectId)?.name || '',
-        tags: typeof record.tags === 'string' ? record.tags : JSON.stringify(record.tags),
-        lastUpdatedAt: record.lastUpdatedAt || '',
+        projectName:
+          projects.find((p) => Number(p.id) === record.projectId)?.name || "",
+        tags:
+          typeof record.tags === "string"
+            ? record.tags
+            : JSON.stringify(record.tags),
+        lastUpdatedAt: record.lastUpdatedAt || "",
         lastUpdatedBy: record.lastUpdatedBy ?? undefined,
         isArchived: record.isArchived || false,
-        fileType: '',
+        fileType: "",
       }));
       setTableData(transformedData);
       setViewMode("list");
     },
-    [effectiveProjectIds, organization?.organizationId, projects]
+    [effectiveProjectIds, organization?.organizationId, projects],
   );
 
   // Clear all now fetches from API for the current scope (not local filtering)
@@ -168,26 +179,32 @@ export default function DataCatalogClient({
       if (!trimmed || activeFilters.some((f) => f.term === trimmed)) return;
 
       const newFilter = { id: nextFilterId, term: trimmed };
-      const results = await fullTextSearch(organization?.organizationId as number, trimmed, projects.map((p) => Number(p.id)));
+      const results = await fullTextSearch(
+        organization?.organizationId as number,
+        trimmed,
+        projects.map((p) => Number(p.id)),
+      );
 
       // Convert HistoricalRecordResponseDto[] to RecordTableRow[]
-      const convertedResults: RecordTableRow[] = results.map((dto: HistoricalRecordResponseDto) => ({
-        ...dto,
-        fileType: '', // TODO: Determine file type from uri/name
-        timeseries: undefined,
-        fileSize: undefined,
-        select: false,
-        associatedRecords: undefined,
-        archivedAt: dto.isArchived ? dto.lastUpdatedAt : null
-      }));
+      const convertedResults: RecordTableRow[] = results.map(
+        (dto: HistoricalRecordResponseDto) => ({
+          ...dto,
+          fileType: "", // TODO: Determine file type from uri/name
+          timeseries: undefined,
+          fileSize: undefined,
+          select: false,
+          associatedRecords: undefined,
+          archivedAt: dto.isArchived ? dto.lastUpdatedAt : null,
+        }),
+      );
 
       const selectedNums = effectiveProjectIds.map(Number);
       const scoped =
         selectedNums.length === projects.length
           ? convertedResults
           : convertedResults.filter((r: RecordTableRow) =>
-            selectedNums.includes(Number(r.projectId))
-          );
+              selectedNums.includes(Number(r.projectId)),
+            );
 
       setTableData(scoped);
       setActiveFilters((prev) => [...prev, newFilter]);
@@ -201,7 +218,7 @@ export default function DataCatalogClient({
       effectiveProjectIds,
       projects,
       organization?.organizationId,
-    ]
+    ],
   );
 
   // If we arrive with a search term, run it once after session is ready
@@ -251,7 +268,10 @@ export default function DataCatalogClient({
       return (
         <span className="inline-flex flex-wrap gap-2">
           {values.map((v, i) => (
-            <span key={`${v}-${i}`} className="badge badge-sm">
+            <span
+              key={`${v}-${i}`}
+              className="badge badge-sm badge-outline badge-secondary"
+            >
               {v}
             </span>
           ))}
@@ -264,7 +284,7 @@ export default function DataCatalogClient({
 
   const selectedProjectIdsNum = useMemo(
     () => selectedProjects.map((id) => Number(id)),
-    [selectedProjects]
+    [selectedProjects],
   );
 
   /* ------------------------ Column visibility wiring ------------------------ */
@@ -290,7 +310,9 @@ export default function DataCatalogClient({
         header: t.translations.CLASS,
         cell: (row) =>
           row.className ? (
-            <span className="badge text-sm">{row.className}</span>
+            <span className="badge text-sm bg-secondary text-secondary-content">
+              {row.className}
+            </span>
           ) : null,
       },
       {
@@ -301,26 +323,25 @@ export default function DataCatalogClient({
       {
         key: "lastEdit",
         header: t.translations.LAST_EDIT,
-        cell: (row) => row.lastUpdatedAt,
+        cell: (row) => formatLocalDateTime(row.lastUpdatedAt),
       },
     ],
-    [t.translations, renderTags]
+    [t.translations, renderTags],
   );
 
   // Visible column keys
   const [visibleCols, setVisibleCols] = useState<ColumnKey[]>(
-    ALL_COLUMNS.map((c) => c.key) // default: all visible
+    ALL_COLUMNS.map((c) => c.key), // default: all visible
   );
 
   const filteredColumns = useMemo(
     () => ALL_COLUMNS.filter((c) => visibleCols.includes(c.key)),
-    [ALL_COLUMNS, visibleCols]
+    [ALL_COLUMNS, visibleCols],
   );
-
   // Strip "key" before passing to GridView if it doesn’t expect it
   const gridColumns = useMemo(
     () => filteredColumns.map(({ key, ...rest }) => rest),
-    [filteredColumns]
+    [filteredColumns],
   );
 
   // Dropdown UI state
@@ -342,7 +363,7 @@ export default function DataCatalogClient({
     setVisibleCols((prev) =>
       prev.length === ALL_COLUMNS.length
         ? [ALL_COLUMNS[0].key]
-        : ALL_COLUMNS.map((c) => c.key)
+        : ALL_COLUMNS.map((c) => c.key),
     );
 
   /* --------------------------------- Search -------------------------------- */
@@ -404,23 +425,10 @@ export default function DataCatalogClient({
           <div className="text-info-content px-4 text-lg">All Records</div>
 
           <div className="flex gap-2 pr-10 items-center">
-            <div className="pr-2">
-              <Link
-                href="/data_catalog"
-                className="btn btn-sm btn-outline btn-primary"
-                onClick={() => {
-                  setViewMode("list");
-                  clearAllFilters();
-                }}
-              >
-                <ArrowUturnLeftIcon className="h-7 w-6" />
-                {t.translations.DATA_CATALOG}
-              </Link>
-            </div>
-
             <button
-              className={`btn btn-sm ${viewMode === "list" ? "btn-primary" : "btn-ghost"
-                }`}
+              className={`btn btn-sm ${
+                viewMode === "list" ? "btn-primary" : "btn-ghost"
+              }`}
               onClick={() => setViewMode("list")}
               title="List view"
             >
@@ -428,8 +436,9 @@ export default function DataCatalogClient({
             </button>
 
             <button
-              className={`btn btn-sm ${viewMode === "table" ? "btn-primary" : "btn-ghost"
-                }`}
+              className={`btn btn-sm ${
+                viewMode === "table" ? "btn-primary" : "btn-ghost"
+              }`}
               onClick={() => setViewMode("table")}
               title="Table view"
             >
@@ -452,8 +461,9 @@ export default function DataCatalogClient({
                     {visibleCols.length - 1}/{ALL_COLUMNS.length - 1}
                   </span>
                   <ChevronDownIcon
-                    className={`h-4 w-4 transition-transform ${open ? "rotate-180" : ""
-                      }`}
+                    className={`h-4 w-4 transition-transform ${
+                      open ? "rotate-180" : ""
+                    }`}
                   />
                 </button>
 

@@ -154,7 +154,7 @@ public class ClassProjectController : ControllerBase
     /// <param name="dto">The request DTO for the class</param>
     /// <returns>Class response DTO</returns>
     [HttpPut("{classId:long}", Name = "api_update_a_class_project")]
-    [Auth("write", "class")]
+    [Auth("update", "class")]
     public async Task<ActionResult<ClassResponseDto>> UpdateClass(
         long projectId,
         long classId,
@@ -212,7 +212,7 @@ public class ClassProjectController : ControllerBase
     /// <param name="archive">True to archive the class, false to unarchive it.</param>
     /// <returns>A message stating the class was successfully archived or unarchived.</returns>
     [HttpPatch("{classId:long}", Name = "api_archive_class_project")]
-    [Auth("write", "class")]
+    [Auth("update", "class")]
     public async Task<IActionResult> ArchiveClass(
         long projectId,
         long classId,

@@ -158,7 +158,7 @@ public class RelationshipProjectController : ControllerBase
     /// <param name="dto">The relationship request data transfer object containing updated relationship details</param>
     /// <returns>The updated relationship</returns>
     [HttpPut("{relationshipId:long}", Name = "api_update_a_relationship_project")]
-    [Auth("write", "relationship")]
+    [Auth("update", "relationship")]
     public async Task<ActionResult<RelationshipResponseDto>> UpdateRelationship(
         long projectId,
         long relationshipId,
@@ -216,7 +216,7 @@ public class RelationshipProjectController : ControllerBase
     /// <param name="archive">True to archive the relationship, false to unarchive it.</param>
     /// <returns>A message stating the relationship was successfully archived or unarchived.</returns>
     [HttpPatch("{relationshipId:long}", Name = "api_archive_relationship_project")]
-    [Auth("write", "relationship")]
+    [Auth("update", "relationship")]
     public async Task<IActionResult> ArchiveRelationship(
         long projectId,
         long relationshipId,

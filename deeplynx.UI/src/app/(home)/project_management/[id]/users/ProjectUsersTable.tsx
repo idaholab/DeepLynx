@@ -57,7 +57,6 @@ const ProjectUsersTable = ({ members, roles, project }: Props) => {
   );
   const [loading, setLoading] = useState(false);
   const { t } = useLanguage();
-  console.log("Roles: ", roles);
 
   /* ------------------------------------------------------------------------ */
   /*                           Invite Modal State                             */

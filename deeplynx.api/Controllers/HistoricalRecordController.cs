@@ -79,6 +79,7 @@ public class HistoricalRecordController : ControllerBase
     /// <returns>The historical record at the specified point in time</returns>
     [HttpGet("{recordId:long}", Name = "api_get_a_historical_record")]
     [Auth("read", "record")]
+    [Sensitivity("read record")]
     public async Task<ActionResult<HistoricalRecordResponseDto>> GetHistoricalRecord(
         long organizationId,
         long projectId,
@@ -111,6 +112,7 @@ public class HistoricalRecordController : ControllerBase
     /// <returns>A list of all previous versions of the record</returns>
     [HttpGet("{recordId:long}/history", Name = "api_get_record_history")]
     [Auth("read", "record")]
+    [Sensitivity("read record")]
     public async Task<ActionResult<IEnumerable<HistoricalRecordResponseDto>>> GetRecordHistory(
         long organizationId,
         long projectId,
