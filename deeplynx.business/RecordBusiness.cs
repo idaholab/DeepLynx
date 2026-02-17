@@ -487,7 +487,6 @@ public class RecordBusiness : IRecordBusiness
         long currentUserId, long organizationId, long projectId,
         List<long> recordIds, List<long> sensitivityLabelIds)
     {
-        // Validate inputs
         if (recordIds == null || !recordIds.Any())
             throw new ArgumentException("Record IDs list cannot be null or empty", nameof(recordIds));
 
@@ -495,7 +494,7 @@ public class RecordBusiness : IRecordBusiness
             throw new ArgumentException("Sensitivity label IDs list cannot be null or empty",
                 nameof(sensitivityLabelIds));
 
-        // Create cartesian product of record IDs and label IDs
+        // Create list of record and label ID pairs
         var recordLabelPairs = new List<(long recordId, long labelId)>();
         foreach (var recordId in recordIds.Distinct())
         {
@@ -516,11 +515,9 @@ public class RecordBusiness : IRecordBusiness
             new NpgsqlParameter($"@record{i}_id", pair.recordId),
             new NpgsqlParameter($"@label{i}_id", pair.labelId)
         }));
-
-        // Stringify params and comma separate them
+        
         var valueTuples = string.Join(", ", recordLabelPairs.Select((_, i) => $"(@record{i}_id, @label{i}_id)"));
-
-        // Put everything together and execute the query
+        
         sql = string.Format(sql, valueTuples);
 
         await _context.Database.ExecuteSqlRawAsync(sql, parameters.ToArray());
@@ -881,7 +878,6 @@ public class RecordBusiness : IRecordBusiness
         );
 
         // if sensitivityLabelIds are provided, Bulk insert record-label relationships
-        // Bulk insert record-label relationships
         if (sensitivityLabelIds != null && sensitivityLabelIds.Count > 0)
         {
             const string createTempLabelsSql = @"
