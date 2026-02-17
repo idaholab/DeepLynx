@@ -24,7 +24,7 @@ const ProjectDropdown: React.FC<ProjectDropdownProps> = ({
   const allIds = useMemo(() => projects.map((p) => p.id), [projects]);
   const defaultToken = useMemo(
     () => (defaultSelected ?? []).map(String).join("|"),
-    [defaultSelected]
+    [defaultSelected],
   );
 
   // Apply defaultSelected when loaded / when it changes
@@ -75,9 +75,9 @@ const ProjectDropdown: React.FC<ProjectDropdownProps> = ({
   const filteredProjects = useMemo(
     () =>
       projects.filter((p) =>
-        p.name.toLowerCase().includes(searchTerm.toLowerCase())
+        p.name.toLowerCase().includes(searchTerm.toLowerCase()),
       ),
-    [projects, searchTerm]
+    [projects, searchTerm],
   );
 
   const selectedLabel = useMemo(() => {
@@ -122,7 +122,7 @@ const ProjectDropdown: React.FC<ProjectDropdownProps> = ({
             <label className="label cursor-pointer justify-start gap-2">
               <input
                 type="checkbox"
-                className="checkbox text-white checked:bg-dynamic-blue border-dynamic-blue"
+                className="checkbox checked:checkbox-secondary"
                 checked={selectedIds.includes("ALL")}
                 onChange={() => toggleProject("ALL")}
               />
@@ -140,7 +140,7 @@ const ProjectDropdown: React.FC<ProjectDropdownProps> = ({
               >
                 <input
                   type="checkbox"
-                  className="checkbox text-white checked:bg-dynamic-blue border-dynamic-blue"
+                  className="checkbox checked:checkbox-secondary"
                   checked={selectedIds.includes(project.id)}
                   onChange={() => toggleProject(project.id)}
                 />

@@ -14,7 +14,7 @@ interface LocalDevUser extends UserResponseDto {
 }
 
 export function mapToProjectResponseDtos(
-  p: ProjectResponseDto
+  p: ProjectResponseDto,
 ): ProjectResponseDto {
   return {
     id: String(p.id),
@@ -29,7 +29,7 @@ export function mapToProjectResponseDtos(
 }
 
 export default async function Page() {
-  const isAuthDisabled = 
+  const isAuthDisabled =
     process.env.NEXT_PUBLIC_DISABLE_FRONTEND_AUTHENTICATION === "true";
 
   // Get organization from cookies
@@ -37,7 +37,7 @@ export default async function Page() {
   const orgSessionCookie = cookieStore.get("organizationSession");
 
   let organizationId: string | number | undefined;
-  
+
   if (orgSessionCookie) {
     try {
       const orgSession = JSON.parse(orgSessionCookie.value);
@@ -53,9 +53,8 @@ export default async function Page() {
   // When auth is disabled and no org cookie, fetch from local dev user
   if (isAuthDisabled && !organizationId) {
     try {
-      const localUser = await getLocalDevUserServer() as LocalDevUser;
+      const localUser = (await getLocalDevUserServer()) as LocalDevUser;
       organizationId = localUser.organizationId;
-      console.log("[Home Page] Using organizationId from local dev user:", organizationId);
     } catch (e) {
       console.error("Failed to get local dev user organization:", e);
       // Fallback to org ID 1
@@ -73,7 +72,7 @@ export default async function Page() {
   try {
     const apiProjects = await getAllProjectsServer(
       organizationId as number,
-      true
+      true,
     );
     projects = apiProjects.map(mapToProjectResponseDtos);
   } catch (e) {
