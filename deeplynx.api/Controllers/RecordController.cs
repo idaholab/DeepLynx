@@ -430,7 +430,7 @@ public class RecordController : ControllerBase
     }
 
     /// <summary>
-    ///     Bulk attach sensitivity labels to records
+    ///     Bulk attach sensitivity label(s) to records
     /// </summary>
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
     /// <param name="projectId">The ID of the project to which the records belong</param>
