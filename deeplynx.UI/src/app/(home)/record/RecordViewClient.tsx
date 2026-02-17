@@ -42,6 +42,7 @@ import {
   RelatedRecordsResponseDto,
 } from "../types/responseDTOs";
 import AdditionalPropertiesEditor from "./components/AdditionalPropertiesEditor";
+import RecordHistoryTab from "./components/RecordHistoryTab";
 import RecordTagsPanel from "./components/RecordTagsPanel";
 import RelatedRecordsCardSkeleton from "./skeletons/RelatedRecordsSkeleton";
 
@@ -907,6 +908,18 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
     {
       label: t.translations.GRAPH,
       content: <GraphClientPage projectId={projectId} recordId={recordId} />,
+    },
+    {
+      label:
+        (t.translations as Record<string, string>).RECORD_HISTORY ||
+        "Record History",
+      content: (
+        <RecordHistoryTab
+          organizationId={organization.organizationId as number}
+          projectId={projectId}
+          recordId={recordId}
+        />
+      ),
     },
   ];
 
