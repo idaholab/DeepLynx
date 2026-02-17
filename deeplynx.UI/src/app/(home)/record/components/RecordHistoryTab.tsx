@@ -291,7 +291,7 @@ function SnapshotMeta({
   placeholder: string;
 }) {
   return (
-    <div className="card bg-base-100 border border-base-300 shadow-sm">
+    <div className="card bg-base-100 shadow-lg">
       <div className="card-body p-4">
         <h3 className="text-sm font-semibold uppercase tracking-wide opacity-70 mr-4">
           {title}
@@ -695,7 +695,7 @@ export default function RecordHistoryTab({
 
   if (isLoadingHistory) {
     return (
-      <div className="mt-4 card bg-base-100 border border-base-300 shadow-sm">
+      <div className="mt-4 card bg-base-100 shadow-lg">
         <div className="card-body">
           <div className="flex items-center gap-3">
             <span className="loading loading-spinner loading-md" />
@@ -716,7 +716,7 @@ export default function RecordHistoryTab({
 
   if (history.length === 0) {
     return (
-      <div className="mt-4 card bg-base-100 border border-base-300 shadow-sm">
+      <div className="mt-4 card bg-base-100 shadow-lg">
         <div className="card-body">
           <h3 className="card-title">{t.translations.RECORD_HISTORY}</h3>
           <p className="opacity-80">
@@ -729,7 +729,7 @@ export default function RecordHistoryTab({
 
   return (
     <div className="mt-4 space-y-4">
-      <div className="card bg-base-100 border border-base-300 shadow-sm">
+      <div className="card bg-base-100 shadow-lg">
         <div className="card-body gap-4">
           <div className="flex flex-wrap items-end gap-4">
             <div className="form-control min-w-[280px] flex-1">
@@ -868,7 +868,7 @@ export default function RecordHistoryTab({
         />
       </div>
 
-      <div className="card bg-base-100 border border-base-300 shadow-sm">
+      <div className="card bg-base-100 shadow-lg">
         <div className="card-body p-0">
           <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-b border-base-300">
             <div>
