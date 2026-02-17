@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import { HistoricalRecordResponseDto } from "@/app/(home)/types/responseDTOs";
 import { ChevronDownIcon, ChevronRightIcon } from "@heroicons/react/24/outline";
+import { useLanguage } from "@/app/contexts/Language";
 import {
   getHistoricalRecord,
   getRecordHistory,
@@ -15,7 +16,7 @@ interface Props {
   recordId: number;
 }
 
-type CompareMode = "none" | "previous" | "latest";
+type CompareMode = "previous" | "latest" | "manual";
 
 interface DiffRow {
   field: string;
@@ -35,24 +36,14 @@ interface DiffTreeNode {
   isLeaf: boolean;
 }
 
-const PLACEHOLDER = "N/A";
-
-function formatDateTime(value?: string | null): string {
-  if (!value) return PLACEHOLDER;
+function formatDateTime(
+  value?: string | null,
+  placeholder: string = "N/A",
+): string {
+  if (!value) return placeholder;
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
   return date.toLocaleString();
-}
-
-function toDateTimeInputValue(value?: string | null): string {
-  if (!value) return "";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
-
-  const pad = (n: number) => n.toString().padStart(2, "0");
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(
-    date.getHours(),
-  )}:${pad(date.getMinutes())}`;
 }
 
 function parseMaybeJson(value: unknown): unknown {
@@ -291,34 +282,46 @@ function filterTreeForChanges(nodes: DiffTreeNode[]): DiffTreeNode[] {
 function SnapshotMeta({
   title,
   snapshot,
+  t,
+  placeholder,
 }: {
   title: string;
   snapshot: HistoricalRecordResponseDto | null;
+  t: { translations: Record<string, string> };
+  placeholder: string;
 }) {
   return (
     <div className="card bg-base-100 border border-base-300 shadow-sm">
       <div className="card-body p-4">
-        <h3 className="text-sm font-semibold uppercase tracking-wide opacity-70">
+        <h3 className="text-sm font-semibold uppercase tracking-wide opacity-70 mr-4">
           {title}
         </h3>
         {!snapshot ? (
-          <p className="text-sm opacity-70">No comparison version selected.</p>
+          <p className="text-sm opacity-70">
+            {t.translations.RECORD_HISTORY_NO_COMPARISON_VERSION_SELECTED}
+          </p>
         ) : (
           <div className="space-y-2 text-sm">
             <div>
-              <span className="font-medium">Name: </span>
-              <span>{snapshot.name || PLACEHOLDER}</span>
+              <span className="font-medium">
+                {t.translations.RECORD_HISTORY_NAME_LABEL}{" "}
+              </span>
+              <span>{snapshot.name || placeholder}</span>
             </div>
             <div>
-              <span className="font-medium">Updated: </span>
-              <span>{formatDateTime(snapshot.lastUpdatedAt)}</span>
+              <span className="font-medium">
+                {t.translations.RECORD_HISTORY_UPDATED_LABEL}{" "}
+              </span>
+              <span>{formatDateTime(snapshot.lastUpdatedAt, placeholder)}</span>
             </div>
             <div className="flex flex-wrap gap-2 pt-1">
               <span className="badge badge-outline">
-                Data Source: {snapshot.dataSourceName || PLACEHOLDER}
+                {t.translations.RECORD_HISTORY_DATA_SOURCE_LABEL}{" "}
+                {snapshot.dataSourceName || placeholder}
               </span>
               <span className="badge badge-outline">
-                Archived: {snapshot.isArchived ? "Yes" : "No"}
+                {t.translations.RECORD_HISTORY_ARCHIVED_LABEL}{" "}
+                {snapshot.isArchived ? t.translations.YES : t.translations.NO}
               </span>
             </div>
           </div>
@@ -333,23 +336,26 @@ export default function RecordHistoryTab({
   projectId,
   recordId,
 }: Props) {
+  const { t } = useLanguage();
+  const placeholderValue = t.translations.RECORD_HISTORY_NOT_AVAILABLE || "N/A";
   const [history, setHistory] = useState<HistoricalRecordResponseDto[]>([]);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [selectedSnapshot, setSelectedSnapshot] =
     useState<HistoricalRecordResponseDto | null>(null);
   const [compareMode, setCompareMode] = useState<CompareMode>("previous");
+  const [manualCompareIndex, setManualCompareIndex] = useState(0);
+  const [comparisonSnapshotData, setComparisonSnapshotData] =
+    useState<HistoricalRecordResponseDto | null>(null);
+  const [comparisonSnapshotIndex, setComparisonSnapshotIndex] = useState<
+    number | null
+  >(null);
   const [showOnlyChanges, setShowOnlyChanges] = useState(false);
-  const [selectedDateInput, setSelectedDateInput] = useState("");
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
   const [isLoadingSnapshot, setIsLoadingSnapshot] = useState(false);
+  const [isLoadingComparisonSnapshot, setIsLoadingComparisonSnapshot] =
+    useState(false);
   const [historyError, setHistoryError] = useState<string | null>(null);
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
-
-  useEffect(() => {
-    if (compareMode === "none") {
-      setShowOnlyChanges(false);
-    }
-  }, [compareMode]);
 
   useEffect(() => {
     let cancelled = false;
@@ -377,20 +383,21 @@ export default function RecordHistoryTab({
         if (sorted.length > 0) {
           const latestIndex = sorted.length - 1;
           setSelectedIndex(latestIndex);
-          setSelectedDateInput(
-            toDateTimeInputValue(sorted[latestIndex].lastUpdatedAt),
-          );
+          const defaultManualIndex = latestIndex > 0 ? latestIndex - 1 : 0;
+          setManualCompareIndex(defaultManualIndex);
         } else {
           setSelectedIndex(0);
-          setSelectedDateInput("");
+          setManualCompareIndex(0);
           setSelectedSnapshot(null);
+          setComparisonSnapshotData(null);
+          setComparisonSnapshotIndex(null);
         }
       } catch (error) {
         if (cancelled) return;
         console.error("Error fetching record history:", error);
         setHistory([]);
-        setHistoryError("Failed to load record history.");
-        toast.error("Failed to load record history.");
+        setHistoryError(t.translations.FAILED_TO_LOAD_RECORD_HISTORY);
+        toast.error(t.translations.FAILED_TO_LOAD_RECORD_HISTORY);
       } finally {
         if (!cancelled) {
           setIsLoadingHistory(false);
@@ -403,7 +410,12 @@ export default function RecordHistoryTab({
     return () => {
       cancelled = true;
     };
-  }, [organizationId, projectId, recordId]);
+  }, [
+    organizationId,
+    projectId,
+    recordId,
+    t.translations.FAILED_TO_LOAD_RECORD_HISTORY,
+  ]);
 
   useEffect(() => {
     if (history.length === 0) return;
@@ -412,7 +424,6 @@ export default function RecordHistoryTab({
     const selectedVersion = history[selectedIndex];
     if (!selectedVersion?.lastUpdatedAt) return;
 
-    setSelectedDateInput(toDateTimeInputValue(selectedVersion.lastUpdatedAt));
     setSelectedSnapshot(selectedVersion);
 
     let cancelled = false;
@@ -435,7 +446,9 @@ export default function RecordHistoryTab({
           error,
         );
         setSelectedSnapshot(selectedVersion);
-        toast.error("Failed to load selected point-in-time snapshot.");
+        toast.error(
+          t.translations.FAILED_TO_LOAD_SELECTED_POINT_IN_TIME_SNAPSHOT,
+        );
       } finally {
         if (!cancelled) setIsLoadingSnapshot(false);
       }
@@ -446,7 +459,66 @@ export default function RecordHistoryTab({
     return () => {
       cancelled = true;
     };
-  }, [history, selectedIndex, organizationId, projectId, recordId]);
+  }, [
+    history,
+    selectedIndex,
+    organizationId,
+    projectId,
+    recordId,
+    t.translations.FAILED_TO_LOAD_SELECTED_POINT_IN_TIME_SNAPSHOT,
+  ]);
+
+  useEffect(() => {
+    if (history.length === 0) return;
+    if (manualCompareIndex < 0 || manualCompareIndex > history.length - 1)
+      return;
+
+    const compareVersion = history[manualCompareIndex];
+    if (!compareVersion?.lastUpdatedAt) return;
+
+    setComparisonSnapshotData(compareVersion);
+    setComparisonSnapshotIndex(manualCompareIndex);
+
+    let cancelled = false;
+
+    const fetchComparisonSnapshot = async () => {
+      setIsLoadingComparisonSnapshot(true);
+      try {
+        const snapshot = await getHistoricalRecord(
+          organizationId,
+          projectId,
+          recordId,
+          compareVersion.lastUpdatedAt,
+          false,
+        );
+        if (!cancelled) {
+          setComparisonSnapshotData(snapshot);
+          setComparisonSnapshotIndex(manualCompareIndex);
+        }
+      } catch (error) {
+        if (cancelled) return;
+        console.error("Error fetching comparison snapshot:", error);
+        setComparisonSnapshotData(compareVersion);
+        setComparisonSnapshotIndex(manualCompareIndex);
+        toast.error(t.translations.FAILED_TO_LOAD_COMPARISON_SNAPSHOT);
+      } finally {
+        if (!cancelled) setIsLoadingComparisonSnapshot(false);
+      }
+    };
+
+    fetchComparisonSnapshot();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    history,
+    manualCompareIndex,
+    organizationId,
+    projectId,
+    recordId,
+    t.translations.FAILED_TO_LOAD_COMPARISON_SNAPSHOT,
+  ]);
 
   const compareIndex = useMemo(() => {
     if (history.length === 0) return null;
@@ -460,13 +532,19 @@ export default function RecordHistoryTab({
       return selectedIndex === latestIndex ? null : latestIndex;
     }
 
+    if (compareMode === "manual") {
+      return manualCompareIndex === selectedIndex ? null : manualCompareIndex;
+    }
+
     return null;
-  }, [history.length, compareMode, selectedIndex]);
+  }, [history.length, compareMode, selectedIndex, manualCompareIndex]);
 
   const activeSnapshot = selectedSnapshot || history[selectedIndex] || null;
   const comparisonSnapshot =
     compareIndex !== null && compareIndex >= 0 && compareIndex < history.length
-      ? history[compareIndex]
+      ? comparisonSnapshotIndex === compareIndex
+        ? comparisonSnapshotData || history[compareIndex]
+        : history[compareIndex]
       : null;
 
   const selectedMap = useMemo(
@@ -484,9 +562,9 @@ export default function RecordHistoryTab({
     ).sort((a, b) => a.localeCompare(b));
 
     return keys.map((key) => {
-      const current = selectedMap[key] ?? PLACEHOLDER;
-      const compare = comparisonMap[key] ?? PLACEHOLDER;
-      const changed = compareMode === "none" ? false : current !== compare;
+      const current = selectedMap[key] ?? placeholderValue;
+      const compare = comparisonMap[key] ?? placeholderValue;
+      const changed = current !== compare;
 
       return {
         field: key,
@@ -495,7 +573,7 @@ export default function RecordHistoryTab({
         changed,
       };
     });
-  }, [selectedMap, comparisonMap, compareMode]);
+  }, [selectedMap, comparisonMap, compareMode, placeholderValue]);
 
   const diffTree = useMemo(() => buildDiffTree(diffRows), [diffRows]);
   const treeToRender = useMemo(
@@ -560,8 +638,10 @@ export default function RecordHistoryTab({
                 <div className="font-medium">{node.label}</div>
                 {hasChildren && (
                   <div className="text-xs opacity-70">
-                    {isExpanded ? "Expanded" : "Collapsed"} ({node.leafCount}{" "}
-                    fields)
+                    {isExpanded
+                      ? t.translations.RECORD_HISTORY_EXPANDED
+                      : t.translations.RECORD_HISTORY_COLLAPSED}{" "}
+                    ({node.leafCount} {t.translations.RECORD_HISTORY_FIELDS})
                   </div>
                 )}
               </div>
@@ -569,30 +649,36 @@ export default function RecordHistoryTab({
           </td>
           <td className={node.changed ? "bg-warning/5 align-top" : "align-top"}>
             {hasChildren ? (
-              <span className="text-xs opacity-70">Nested group</span>
+              <span className="text-xs opacity-70">
+                {t.translations.RECORD_HISTORY_NESTED_GROUP}
+              </span>
             ) : (
               <div className="whitespace-pre-wrap break-all text-xs">
-                {node.current ?? PLACEHOLDER}
+                {node.current ?? placeholderValue}
               </div>
             )}
           </td>
           <td className={node.changed ? "bg-warning/5 align-top" : "align-top"}>
             {hasChildren ? (
-              <span className="text-xs opacity-70">Nested group</span>
+              <span className="text-xs opacity-70">
+                {t.translations.RECORD_HISTORY_NESTED_GROUP}
+              </span>
             ) : (
               <div className="whitespace-pre-wrap break-all text-xs">
-                {node.compare ?? PLACEHOLDER}
+                {node.compare ?? placeholderValue}
               </div>
             )}
           </td>
           <td className="align-top">
             {node.changed ? (
               <span className="badge badge-warning badge-sm whitespace-nowrap leading-none">
-                {hasChildren ? "Changed subtree" : "Changed"}
+                {hasChildren
+                  ? t.translations.RECORD_HISTORY_CHANGED_SUBTREE
+                  : t.translations.RECORD_HISTORY_CHANGED}
               </span>
             ) : (
               <span className="badge badge-ghost badge-sm whitespace-nowrap leading-none">
-                Same
+                {t.translations.RECORD_HISTORY_SAME}
               </span>
             )}
           </td>
@@ -607,35 +693,13 @@ export default function RecordHistoryTab({
     });
   };
 
-  const handleDateInputChange = (value: string) => {
-    setSelectedDateInput(value);
-    if (!value || history.length === 0) return;
-
-    const targetTime = new Date(value).getTime();
-    if (Number.isNaN(targetTime)) return;
-
-    let nearestIndex = 0;
-    let nearestDiff = Number.POSITIVE_INFINITY;
-
-    history.forEach((item, index) => {
-      const itemTime = new Date(item.lastUpdatedAt).getTime();
-      const diff = Math.abs(itemTime - targetTime);
-      if (diff < nearestDiff) {
-        nearestDiff = diff;
-        nearestIndex = index;
-      }
-    });
-
-    setSelectedIndex(nearestIndex);
-  };
-
   if (isLoadingHistory) {
     return (
       <div className="mt-4 card bg-base-100 border border-base-300 shadow-sm">
         <div className="card-body">
           <div className="flex items-center gap-3">
             <span className="loading loading-spinner loading-md" />
-            <p>Loading record history...</p>
+            <p>{t.translations.LOADING_RECORD_HISTORY}</p>
           </div>
         </div>
       </div>
@@ -654,9 +718,9 @@ export default function RecordHistoryTab({
     return (
       <div className="mt-4 card bg-base-100 border border-base-300 shadow-sm">
         <div className="card-body">
-          <h3 className="card-title">Record History</h3>
+          <h3 className="card-title">{t.translations.RECORD_HISTORY}</h3>
           <p className="opacity-80">
-            No historical versions were found for this record.
+            {t.translations.NO_HISTORICAL_VERSIONS_FOUND_FOR_RECORD}
           </p>
         </div>
       </div>
@@ -669,8 +733,10 @@ export default function RecordHistoryTab({
         <div className="card-body gap-4">
           <div className="flex flex-wrap items-end gap-4">
             <div className="form-control min-w-[280px] flex-1">
-              <label className="label py-1">
-                <span className="label-text font-medium">Select Version</span>
+              <label className="label py-1 mr-2">
+                <span className="label-text font-medium">
+                  {t.translations.RECORD_HISTORY_SELECT_VERSION}
+                </span>
               </label>
               <select
                 className="select select-bordered"
@@ -682,67 +748,56 @@ export default function RecordHistoryTab({
                     key={`${version.id}-${version.lastUpdatedAt}-${index}`}
                     value={index}
                   >
-                    {index + 1}. {formatDateTime(version.lastUpdatedAt)}
+                    {index + 1}.{" "}
+                    {formatDateTime(version.lastUpdatedAt, placeholderValue)}
                   </option>
                 ))}
               </select>
             </div>
 
-            {/* <div className="form-control min-w-[260px]">
-              <label className="label py-1">
-                <span className="label-text font-medium">Jump to Time</span>
-              </label>
-              <input
-                type="datetime-local"
-                className="input input-bordered"
-                value={selectedDateInput}
-                onChange={(e) => handleDateInputChange(e.target.value)}
-              />
-              <span className="text-xs mt-1 opacity-70">
-                Snaps to nearest saved version.
-              </span>
-            </div> */}
-
             <div className="form-control">
               <label className="label py-1">
                 <span className="label-text font-medium mr-2">
-                  Compare Against
+                  {t.translations.RECORD_HISTORY_COMPARE_AGAINST}
                 </span>
               </label>
               <div className="join">
-                {/* <button
-                  type="button"
-                  className={`btn btn-sm join-item ${compareMode === "none" ? "btn-primary" : "btn-outline"}`}
-                  onClick={() => setCompareMode("none")}
-                >
-                  None
-                </button> */}
                 <button
                   type="button"
                   className={`btn btn-sm join-item ${compareMode === "previous" ? "btn-primary" : "btn-outline"}`}
                   onClick={() => setCompareMode("previous")}
                 >
-                  Previous
+                  {t.translations.RECORD_HISTORY_PREVIOUS}
                 </button>
                 <button
                   type="button"
                   className={`btn btn-sm join-item ${compareMode === "latest" ? "btn-primary" : "btn-outline"}`}
                   onClick={() => setCompareMode("latest")}
                 >
-                  Latest
+                  {t.translations.RECORD_HISTORY_LATEST}
+                </button>
+                <button
+                  type="button"
+                  className={`btn btn-sm join-item ${compareMode === "manual" ? "btn-primary" : "btn-outline"}`}
+                  onClick={() => setCompareMode("manual")}
+                >
+                  {t.translations.RECORD_HISTORY_MANUAL}
                 </button>
               </div>
             </div>
 
             <div className="ml-auto text-right text-sm">
-              <p className="font-medium">Versions: {history.length}</p>
+              <p className="font-medium">
+                {t.translations.RECORD_HISTORY_VERSIONS}: {history.length}
+              </p>
               <p className="opacity-70">
-                Changes highlighted: {compareMode === "none" ? 0 : changedCount}
+                {t.translations.RECORD_HISTORY_CHANGES_HIGHLIGHTED}:{" "}
+                {changedCount}
               </p>
             </div>
           </div>
 
-          <div>
+          <div className="flex justify-between">
             <input
               type="range"
               min={0}
@@ -752,21 +807,64 @@ export default function RecordHistoryTab({
               onChange={(e) => setSelectedIndex(Number(e.target.value))}
               className="range range-primary range-sm"
             />
-            <div className="mt-2 flex justify-between text-xs opacity-70">
-              <span>{formatDateTime(history[0]?.lastUpdatedAt)}</span>
-              <span>
-                {formatDateTime(history[history.length - 1]?.lastUpdatedAt)}
-              </span>
-            </div>
+
+            {compareMode === "manual" && (
+              <div className="flex justify-end">
+                <div className="form-control flex mr-4">
+                  <label className="label py-1 mr-4">
+                    <span className="label-text font-medium">
+                      {t.translations.RECORD_HISTORY_MANUAL_COMPARE_VERSION}
+                    </span>
+                  </label>
+                  <select
+                    className="select select-bordered"
+                    value={manualCompareIndex}
+                    onChange={(e) => {
+                      const nextIndex = Number(e.target.value);
+                      if (history.length > 1 && nextIndex === selectedIndex) {
+                        const fallbackIndex =
+                          nextIndex > 0 ? nextIndex - 1 : nextIndex + 1;
+                        setManualCompareIndex(fallbackIndex);
+                        return;
+                      }
+                      setManualCompareIndex(nextIndex);
+                    }}
+                  >
+                    {history.map((version, index) => (
+                      <option
+                        key={`manual-${version.id}-${version.lastUpdatedAt}-${index}`}
+                        value={index}
+                      >
+                        {index + 1}.{" "}
+                        {formatDateTime(
+                          version.lastUpdatedAt,
+                          placeholderValue,
+                        )}
+                        {index === selectedIndex
+                          ? ` (${t.translations.RECORD_HISTORY_CURRENTLY_SELECTED})`
+                          : ""}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-        <SnapshotMeta title="Selected Snapshot" snapshot={activeSnapshot} />
         <SnapshotMeta
-          title="Comparison Snapshot"
+          title={t.translations.RECORD_HISTORY_SELECTED_SNAPSHOT}
+          snapshot={activeSnapshot}
+          t={t}
+          placeholder={placeholderValue}
+        />
+        <SnapshotMeta
+          title={t.translations.RECORD_HISTORY_COMPARISON_SNAPSHOT}
           snapshot={comparisonSnapshot}
+          t={t}
+          placeholder={placeholderValue}
         />
       </div>
 
@@ -774,27 +872,33 @@ export default function RecordHistoryTab({
         <div className="card-body p-0">
           <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-b border-base-300">
             <div>
-              <h3 className="font-semibold">Version Difference</h3>
-              <p className="text-sm opacity-70">
-                Changed fields are highlighted so differences stand out.
-              </p>
+              <h3 className="font-semibold">
+                {t.translations.RECORD_HISTORY_VERSION_DIFFERENCE}
+              </h3>
             </div>
             <label className="label cursor-pointer gap-2">
               <input
                 type="checkbox"
                 className="checkbox checkbox-sm"
                 checked={showOnlyChanges}
-                disabled={compareMode === "none"}
                 onChange={(e) => setShowOnlyChanges(e.target.checked)}
               />
-              <span className="label-text">Show only changes</span>
+              <span className="label-text">
+                {t.translations.RECORD_HISTORY_SHOW_ONLY_CHANGES}
+              </span>
             </label>
           </div>
 
           {isLoadingSnapshot && (
             <div className="px-4 py-2 text-sm opacity-75">
               <span className="loading loading-spinner loading-xs mr-2" />
-              Loading selected snapshot...
+              {t.translations.RECORD_HISTORY_LOADING_SELECTED_SNAPSHOT}
+            </div>
+          )}
+          {isLoadingComparisonSnapshot && compareMode === "manual" && (
+            <div className="px-4 py-2 text-sm opacity-75">
+              <span className="loading loading-spinner loading-xs mr-2" />
+              {t.translations.RECORD_HISTORY_LOADING_COMPARISON_SNAPSHOT}
             </div>
           )}
 
@@ -802,17 +906,26 @@ export default function RecordHistoryTab({
             <table className="table table-zebra table-sm">
               <thead>
                 <tr>
-                  <th className="min-w-[200px]">Field</th>
-                  <th className="min-w-[300px]">Selected</th>
-                  <th className="min-w-[300px]">Compare</th>
-                  <th>Status</th>
+                  <th className="min-w-[200px]">
+                    {t.translations.RECORD_HISTORY_FIELD}
+                  </th>
+                  <th className="min-w-[300px]">
+                    {t.translations.RECORD_HISTORY_SELECTED}
+                  </th>
+                  <th className="min-w-[300px]">
+                    {t.translations.RECORD_HISTORY_COMPARE}
+                  </th>
+                  <th>{t.translations.RECORD_HISTORY_STATUS}</th>
                 </tr>
               </thead>
               <tbody>
                 {treeToRender.length === 0 ? (
                   <tr>
                     <td colSpan={4} className="text-center py-8 opacity-70">
-                      No differences for the selected comparison.
+                      {
+                        t.translations
+                          .RECORD_HISTORY_NO_DIFFERENCES_FOR_SELECTED_COMPARISON
+                      }
                     </td>
                   </tr>
                 ) : (
