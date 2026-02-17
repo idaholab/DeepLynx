@@ -8,10 +8,10 @@ import { RecordTableRow } from "@/app/(home)/types/types";
 import { useProjectSession } from "@/app/contexts/ProjectSessionProvider";
 import { useOrganizationSession } from "@/app/contexts/OrganizationSessionProvider";
 import { getMultiProjectRecords } from "@/app/lib/client_service/query_services.client";
-import GridView from "../../components/GridView";
-import ListView from "../../components/ListView";
-import { HistoricalRecordResponseDto } from "../../types/responseDTOs";
-import ProjectDropdown from "../../components/ProjectDropdown";
+import GridView from "@/app/(home)/components/GridView";
+import ListView from "@/app/(home)/components/ListView";
+import { HistoricalRecordResponseDto } from "@/app/(home)/types/responseDTOs";
+import ProjectDropdown from "@/app/(home)/components/ProjectDropdown";
 
 import { useLanguage } from "@/app/contexts/Language";
 import {
@@ -20,8 +20,9 @@ import {
   QueueListIcon,
   TableCellsIcon,
 } from "@heroicons/react/24/outline";
-import { TagResponseDto } from "../../types/responseDTOs";
+import { TagResponseDto } from "@/app/(home)/types/responseDTOs";
 import { fullTextSearch } from "@/app/lib/client_service/query_services.client";
+import { formatLocalDateTime } from "@/app/lib/date_time";
 
 /* ----------------------------- Types & utils ----------------------------- */
 
@@ -137,7 +138,7 @@ export default function DataCatalogClient({
             : JSON.stringify(record.properties),
         originalId: record.originalId ?? undefined,
         classId: record.classId ?? undefined,
-        className: undefined,
+        className: record.className ?? undefined,
         dataSourceId: record.dataSourceId ?? undefined,
         dataSourceName: "",
         projectId: record.projectId ?? undefined,
@@ -267,7 +268,10 @@ export default function DataCatalogClient({
       return (
         <span className="inline-flex flex-wrap gap-2">
           {values.map((v, i) => (
-            <span key={`${v}-${i}`} className="badge badge-sm">
+            <span
+              key={`${v}-${i}`}
+              className="badge badge-sm badge-outline badge-secondary"
+            >
               {v}
             </span>
           ))}
@@ -306,7 +310,9 @@ export default function DataCatalogClient({
         header: t.translations.CLASS,
         cell: (row) =>
           row.className ? (
-            <span className="badge text-sm">{row.className}</span>
+            <span className="badge text-sm bg-secondary text-secondary-content">
+              {row.className}
+            </span>
           ) : null,
       },
       {
@@ -317,7 +323,7 @@ export default function DataCatalogClient({
       {
         key: "lastEdit",
         header: t.translations.LAST_EDIT,
-        cell: (row) => row.lastUpdatedAt,
+        cell: (row) => formatLocalDateTime(row.lastUpdatedAt),
       },
     ],
     [t.translations, renderTags],
@@ -332,7 +338,6 @@ export default function DataCatalogClient({
     () => ALL_COLUMNS.filter((c) => visibleCols.includes(c.key)),
     [ALL_COLUMNS, visibleCols],
   );
-
   // Strip "key" before passing to GridView if it doesn’t expect it
   const gridColumns = useMemo(
     () => filteredColumns.map(({ key, ...rest }) => rest),

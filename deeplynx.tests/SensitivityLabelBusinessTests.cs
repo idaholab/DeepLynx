@@ -23,6 +23,9 @@ public class SensitivityLabelBusinessTests : IntegrationTestBase
     private Mock<IBulkCopyUpsertExecutor> _mockBulkCopyUpsertExecutor = null!;
     public long lid; // label ID
     public long lid2; // archived label ID
+    public long lid3;
+    public long lid4;
+    public long lid5; 
 
     public long oid; // organization ID
     public long pid; // project ID
@@ -107,10 +110,40 @@ public class SensitivityLabelBusinessTests : IntegrationTestBase
             IsArchived = true,
             OrganizationId = oid
         };
-        Context.SensitivityLabels.AddRange(testLabel, archivedLabel);
+
+        var label1 = new SensitivityLabel
+        {
+            Name = "Label 1",
+            Description = "Label 1 for unit tests",
+            OrganizationId = oid, 
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            IsArchived = false
+        }; 
+        
+        var label2 = new SensitivityLabel
+        {
+            Name = "Label 2",
+            Description = "Label 1 for unit tests",
+            OrganizationId = oid, 
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            IsArchived = false
+        }; 
+        var label3 = new SensitivityLabel
+        {
+            Name = "Label 3",
+            Description = "Label 1 for unit tests",
+            OrganizationId = oid, 
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            IsArchived = true
+        }; 
+        
+        Context.SensitivityLabels.AddRange(testLabel, archivedLabel, label1, label2, label3);
         await Context.SaveChangesAsync();
         lid = testLabel.Id;
         lid2 = archivedLabel.Id;
+        lid3 = label1.Id;
+        lid4 = label2.Id;
+        lid5 = label3.Id;
     }
 
     #region GetAllSensitivityLabels Tests
@@ -142,15 +175,15 @@ public class SensitivityLabelBusinessTests : IntegrationTestBase
     }
 
     [Fact]
-    public async Task GetAllSensitivityLabels_FiltersOnProjectId()
+    public async Task GetAllSensitivityLabels_InheritsOrganizationLabels()
     {
         // Act
         var result = await _labelBusiness.GetAllSensitivityLabels([pid], oid);
         var labels = result.ToList();
 
         // Assert
-        Assert.All(labels, l => Assert.Equal(pid, l.ProjectId));
-        Assert.Contains(labels, l => l.Id == lid);
+        Assert.All(labels, l => Assert.Equal(oid, l.OrganizationId));
+        Assert.Equal(3, labels.Count);
     }
 
     [Fact]
@@ -163,13 +196,12 @@ public class SensitivityLabelBusinessTests : IntegrationTestBase
             Description = "Organization level label",
             OrganizationId = oid,
             IsArchived = false,
-            ProjectId = pid
         };
         Context.SensitivityLabels.Add(orgLabel);
         await Context.SaveChangesAsync();
 
         // Act
-        var result = await _labelBusiness.GetAllSensitivityLabels([pid], oid);
+        var result = await _labelBusiness.GetAllSensitivityLabels(null, oid);
         var labels = result.ToList();
 
         // Assert
@@ -193,6 +225,17 @@ public class SensitivityLabelBusinessTests : IntegrationTestBase
         Assert.Equal("Test Label", result.Name);
         Assert.Equal("Test label for unit tests", result.Description);
         Assert.False(result.IsArchived);
+    }
+    
+    [Fact]
+    public async Task GetSensitivityLabel_InheritOrganizationLabels()
+    {
+        // Act
+        var result = await _labelBusiness.GetSensitivityLabel(lid4, pid, oid);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(lid4, result.Id);
     }
 
     [Fact]
@@ -953,6 +996,27 @@ public class SensitivityLabelBusinessTests : IntegrationTestBase
         Assert.Equal("sensitivity_label", actualEvent.EntityType);
         Assert.Equal(result.Id, actualEvent.EntityId);
     }
+    
+    [Fact]
+    public async Task UpdateSensitivityLabel_Fails_IfOrganizationLabel()
+    {
+        // Arrange
+        var dto = new UpdateSensitivityLabelRequestDto
+        {
+            Name = "Updated Label"
+        };
+
+        // Act & Assert
+        var exception =
+            await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                _labelBusiness.UpdateSensitivityLabel(uid, lid4, pid, oid, dto));
+
+        Assert.Contains("Organization sensitivity labels cannot be updated from the child projects.", exception.Message);
+
+        // Ensure that no event was logged
+        var eventList = await Context.Events.ToListAsync();
+        Assert.Empty(eventList);
+    }
 
     [Fact]
     public async Task UpdateSensitivityLabel_Fails_IfNotFound()
@@ -1049,6 +1113,21 @@ public class SensitivityLabelBusinessTests : IntegrationTestBase
         var eventList = await Context.Events.ToListAsync();
         Assert.Empty(eventList);
     }
+    
+    [Fact]
+    public async Task ArchiveSensitivityLabel_Fails_IfOrganizationLabel()
+    {
+        // Act & Assert
+        var exception =
+            await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                _labelBusiness.ArchiveSensitivityLabel(uid, lid3, pid, oid));
+
+        Assert.Contains($"Organization sensitivity labels cannot be updated from the child projects.", exception.Message);
+
+        // Ensure that no event was logged
+        var eventList = await Context.Events.ToListAsync();
+        Assert.Empty(eventList);
+    }
 
     [Fact]
     public async Task ArchiveSensitivityLabel_Fails_IfNotFound()
@@ -1132,6 +1211,23 @@ public class SensitivityLabelBusinessTests : IntegrationTestBase
         var eventList = await Context.Events.ToListAsync();
         Assert.Empty(eventList);
     }
+    
+    [Fact]
+    public async Task UnarchiveSensitivityLabel_Fails_IfOrganizationLabel()
+    {
+        
+        // Act & Assert
+        var exception =
+            await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                _labelBusiness.UnarchiveSensitivityLabel(uid, lid5, pid, oid));
+
+        Assert.Contains($"Organization sensitivity labels cannot be updated from the child projects.", exception.Message);
+
+        // Ensure that no event was logged
+        var eventList = await Context.Events.ToListAsync();
+        Assert.Empty(eventList);
+    }
+
 
     #endregion
 
@@ -1186,6 +1282,21 @@ public class SensitivityLabelBusinessTests : IntegrationTestBase
                 _labelBusiness.DeleteSensitivityLabel(uid, lid2, pid, oid)); // archived label
 
         Assert.Contains($"Sensitivity label with id {lid2} not found or is archived", exception.Message);
+
+        // Ensure that no event was logged
+        var eventList = await Context.Events.ToListAsync();
+        Assert.Empty(eventList);
+    }
+    
+    [Fact]
+    public async Task DeleteSensitivityLabel_Fails_IfOrganizationLabel()
+    {
+        // Act & Assert
+        var exception =
+            await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                _labelBusiness.DeleteSensitivityLabel(uid, lid4, pid, oid));
+
+        Assert.Contains("Organization sensitivity labels cannot be updated from the child projects.", exception.Message);
 
         // Ensure that no event was logged
         var eventList = await Context.Events.ToListAsync();

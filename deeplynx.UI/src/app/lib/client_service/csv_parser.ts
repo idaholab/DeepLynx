@@ -41,10 +41,6 @@ export async function parseCsvFile(file: File): Promise<CsvParseResult> {
         },
       complete: (results) => {
         try {
-            // DEBUG: Log the headers we're receiving
-            console.log("CSV Headers:", Object.keys(results.data[0] || {}));
-            console.log("First row:", results.data[0]);
-
             // Filter out instruction rows (rows that start with #)
             const dataRows = results.data.filter((row) => {
             const firstValue = Object.values(row)[0];

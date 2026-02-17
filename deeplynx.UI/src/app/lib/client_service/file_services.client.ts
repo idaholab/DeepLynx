@@ -122,7 +122,6 @@ export const downloadFile = async (
   } catch (err: unknown) {
     // Check if it's a cancellation (user aborted)
     if (axios.isAxiosError(err) && err.code === 'ERR_CANCELED') {
-      console.log('Download cancelled by user');
       // Don't log as error - this is intentional
       throw err; // Re-throw so the calling code knows it was cancelled
     }

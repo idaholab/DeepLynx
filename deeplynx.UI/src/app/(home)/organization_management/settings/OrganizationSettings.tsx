@@ -170,7 +170,7 @@ const OrganizationSettings = () => {
 
       setLogoFile(null);
       setLogoPreview(null);
-      toast.success(t.translations.LOGO_REMOVED_SECCESSFULLY);
+      toast.success(t.translations.LOGO_REMOVED_SUCCESSFULLY);
     } catch (error) {
       console.error("Failed to remove logo:", error);
       toast.error(t.translations.FAILED_TO_REMOVE_LOGO);
@@ -215,7 +215,7 @@ const OrganizationSettings = () => {
     }
 
     if (bannerText.length > 50) {
-      toast.error(t.translations.BANNER_TEXT_MUST_BE_50_CHARATERS_OR_LESS);
+      toast.error(t.translations.BANNER_TEXT_MUST_BE_50_CHARACTERS_OR_LESS);
       return;
     }
 

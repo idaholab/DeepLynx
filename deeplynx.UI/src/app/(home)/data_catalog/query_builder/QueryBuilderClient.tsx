@@ -18,19 +18,19 @@ import {
   BoltIcon
 } from "@heroicons/react/24/outline";
 import { useEffect, useMemo, useState } from "react";
-import { DatePicker } from "../../components/DatePicker";
-import ProjectDropdown from "../../components/ProjectDropdown";
+import { DatePicker } from "@/app/(home)/components/DatePicker";
+import ProjectDropdown from "@/app/(home)/components/ProjectDropdown";
 import {
   ClassResponseDto,
   DataSourceResponseDto,
   HistoricalRecordResponseDto,
   TagResponseDto,
-} from "../../types/responseDTOs";
+} from "@/app/(home)/types/responseDTOs";
 import { getAllClassesOrg } from "@/app/lib/client_service/class_services.client";
 import { getAllDataSourcesOrg } from "@/app/lib/client_service/data_source_services.client";
 import { getAllTagsOrg } from "@/app/lib/client_service/tag_services.client";
 import { fullTextSearch, queryBuilder } from "@/app/lib/client_service/query_services.client";
-import RecordSearchList from "../../components/RecordSearchList";
+import RecordSearchList from "@/app/(home)/components/RecordSearchList";
 import { useLanguage } from "@/app/contexts/Language";
 
 // ============================================================================

@@ -46,7 +46,7 @@ const AddRecordModal: React.FC<Props> = ({
 
   const initialProjectId = useMemo(
     () => (initialProjects.length ? Number(initialProjects[0].id) : undefined),
-    [initialProjects]
+    [initialProjects],
   );
 
   /* ------------------------------------------------------------------------ */
@@ -89,7 +89,7 @@ const AddRecordModal: React.FC<Props> = ({
 
   // Tabs for optional fields: IDs / Metadata / Tags & Labels
   const [optionalTab, setOptionalTab] = useState<"ids" | "meta" | "tags">(
-    "ids"
+    "ids",
   );
 
   /* ------------------------------------------------------------------------ */
@@ -235,13 +235,13 @@ const AddRecordModal: React.FC<Props> = ({
         organization!.organizationId as number,
         selectedProjectId,
         selectedDataSourceId,
-        dto
+        dto,
       );
 
       // Future: tags / sensitivity_labels could be sent via a separate
       // endpoint if backend supports it.
 
-      toast.success(t.translations.RECORD_CREATED_SECCESSFULLY);
+      toast.success(t.translations.RECORD_CREATED_SUCCESSFULLY);
       resetForm();
       onClose();
     } catch (error) {
@@ -274,7 +274,7 @@ const AddRecordModal: React.FC<Props> = ({
 
         const list = await getAllDataSourcesOrg(
           organization?.organizationId as number,
-          [selectedProjectId]
+          [selectedProjectId],
         );
 
         if (!cancelled) setDataSources(list ?? []);
@@ -327,7 +327,7 @@ const AddRecordModal: React.FC<Props> = ({
                 value={selectedProjectId ?? ""}
                 onChange={(e) =>
                   setSelectedProjectId(
-                    e.target.value === "" ? undefined : Number(e.target.value)
+                    e.target.value === "" ? undefined : Number(e.target.value),
                   )
                 }
                 required
@@ -355,7 +355,7 @@ const AddRecordModal: React.FC<Props> = ({
                 value={selectedDataSourceId ?? ""}
                 onChange={(e) =>
                   setSelectedDataSourceId(
-                    e.target.value === "" ? undefined : Number(e.target.value)
+                    e.target.value === "" ? undefined : Number(e.target.value),
                   )
                 }
                 disabled={
@@ -482,7 +482,7 @@ const AddRecordModal: React.FC<Props> = ({
                       setClassId(
                         e.target.value === ""
                           ? undefined
-                          : Number(e.target.value)
+                          : Number(e.target.value),
                       )
                     }
                   />
