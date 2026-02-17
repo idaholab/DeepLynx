@@ -753,6 +753,14 @@ public class RecordBusiness : IRecordBusiness
         if (records.Count == 0) throw new Exception("Unable to bulk create records: no records selected for creation");
 
         await EnsureMultipleObjectStoragesExistOnce(organizationId, projectId, records);
+        
+        var sensitivityLabelsRequired = await _sensitivityLabelService.IsSensitivityLabelRequired(organizationId, projectId);
+
+        if (sensitivityLabelsRequired && (sensitivityLabelIds == null || sensitivityLabelIds.Count == 0))
+        {
+            throw new InvalidOperationException(
+                $"Sensitivity labels are required on all records. Add a new label first to remove this one");
+        }
 
         // If Sensitivity Labels are provided Ensure the user has Write Record Permissions
         if (sensitivityLabelIds != null || sensitivityLabelIds?.Count > 0)
