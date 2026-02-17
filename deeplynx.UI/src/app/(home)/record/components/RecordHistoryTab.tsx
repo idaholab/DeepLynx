@@ -2,13 +2,15 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
-import { HistoricalRecordResponseDto } from "@/app/(home)/types/responseDTOs";
 import { ChevronDownIcon, ChevronRightIcon } from "@heroicons/react/24/outline";
+import { HistoricalRecordResponseDto } from "@/app/(home)/types/responseDTOs";
 import { useLanguage } from "@/app/contexts/Language";
 import {
   getHistoricalRecord,
   getRecordHistory,
 } from "@/app/lib/client_service/historical_record_services.client";
+import { formatRecordHistoryDate } from "./RecordHistoryDate";
+import RecordHistorySnapshotMeta from "./RecordHistorySnapshotMeta";
 
 interface Props {
   organizationId: number;
@@ -34,16 +36,6 @@ interface DiffTreeNode {
   children: DiffTreeNode[];
   leafCount: number;
   isLeaf: boolean;
-}
-
-function formatDateTime(
-  value?: string | null,
-  placeholder: string = "N/A",
-): string {
-  if (!value) return placeholder;
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString();
 }
 
 function parseMaybeJson(value: unknown): unknown {
@@ -74,9 +66,7 @@ function flattenObject(
     return;
   }
 
-  if (typeof value === "undefined") {
-    return;
-  }
+  if (typeof value === "undefined") return;
 
   if (Array.isArray(value)) {
     if (value.length === 0) {
@@ -279,58 +269,6 @@ function filterTreeForChanges(nodes: DiffTreeNode[]): DiffTreeNode[] {
     .filter((node): node is DiffTreeNode => node !== null);
 }
 
-function SnapshotMeta({
-  title,
-  snapshot,
-  t,
-  placeholder,
-}: {
-  title: string;
-  snapshot: HistoricalRecordResponseDto | null;
-  t: { translations: Record<string, string> };
-  placeholder: string;
-}) {
-  return (
-    <div className="card bg-base-100 shadow-lg">
-      <div className="card-body p-4">
-        <h3 className="text-sm font-semibold uppercase tracking-wide opacity-70 mr-4">
-          {title}
-        </h3>
-        {!snapshot ? (
-          <p className="text-sm opacity-70">
-            {t.translations.RECORD_HISTORY_NO_COMPARISON_VERSION_SELECTED}
-          </p>
-        ) : (
-          <div className="space-y-2 text-sm">
-            <div>
-              <span className="font-medium">
-                {t.translations.RECORD_HISTORY_NAME_LABEL}{" "}
-              </span>
-              <span>{snapshot.name || placeholder}</span>
-            </div>
-            <div>
-              <span className="font-medium">
-                {t.translations.RECORD_HISTORY_UPDATED_LABEL}{" "}
-              </span>
-              <span>{formatDateTime(snapshot.lastUpdatedAt, placeholder)}</span>
-            </div>
-            <div className="flex flex-wrap gap-2 pt-1">
-              <span className="badge badge-outline">
-                {t.translations.RECORD_HISTORY_DATA_SOURCE_LABEL}{" "}
-                {snapshot.dataSourceName || placeholder}
-              </span>
-              <span className="badge badge-outline">
-                {t.translations.RECORD_HISTORY_ARCHIVED_LABEL}{" "}
-                {snapshot.isArchived ? t.translations.YES : t.translations.NO}
-              </span>
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
 export default function RecordHistoryTab({
   organizationId,
   projectId,
@@ -338,6 +276,7 @@ export default function RecordHistoryTab({
 }: Props) {
   const { t } = useLanguage();
   const placeholderValue = t.translations.RECORD_HISTORY_NOT_AVAILABLE || "N/A";
+
   const [history, setHistory] = useState<HistoricalRecordResponseDto[]>([]);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [selectedSnapshot, setSelectedSnapshot] =
@@ -399,9 +338,7 @@ export default function RecordHistoryTab({
         setHistoryError(t.translations.FAILED_TO_LOAD_RECORD_HISTORY);
         toast.error(t.translations.FAILED_TO_LOAD_RECORD_HISTORY);
       } finally {
-        if (!cancelled) {
-          setIsLoadingHistory(false);
-        }
+        if (!cancelled) setIsLoadingHistory(false);
       }
     };
 
@@ -532,11 +469,7 @@ export default function RecordHistoryTab({
       return selectedIndex === latestIndex ? null : latestIndex;
     }
 
-    if (compareMode === "manual") {
-      return manualCompareIndex === selectedIndex ? null : manualCompareIndex;
-    }
-
-    return null;
+    return manualCompareIndex === selectedIndex ? null : manualCompareIndex;
   }, [history.length, compareMode, selectedIndex, manualCompareIndex]);
 
   const activeSnapshot = selectedSnapshot || history[selectedIndex] || null;
@@ -564,16 +497,15 @@ export default function RecordHistoryTab({
     return keys.map((key) => {
       const current = selectedMap[key] ?? placeholderValue;
       const compare = comparisonMap[key] ?? placeholderValue;
-      const changed = current !== compare;
 
       return {
         field: key,
         current,
         compare,
-        changed,
+        changed: current !== compare,
       };
     });
-  }, [selectedMap, comparisonMap, compareMode, placeholderValue]);
+  }, [selectedMap, comparisonMap, placeholderValue]);
 
   const diffTree = useMemo(() => buildDiffTree(diffRows), [diffRows]);
   const treeToRender = useMemo(
@@ -586,9 +518,7 @@ export default function RecordHistoryTab({
     setExpandedRows((prev) => {
       if (prev.size > 0) return prev;
       const defaults = new Set<string>();
-      diffTree.forEach((node) => {
-        defaults.add(node.id);
-      });
+      diffTree.forEach((node) => defaults.add(node.id));
       return defaults;
     });
   }, [diffTree]);
@@ -596,11 +526,8 @@ export default function RecordHistoryTab({
   const toggleExpand = (id: string) => {
     setExpandedRows((prev) => {
       const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
       return next;
     });
   };
@@ -749,7 +676,10 @@ export default function RecordHistoryTab({
                     value={index}
                   >
                     {index + 1}.{" "}
-                    {formatDateTime(version.lastUpdatedAt, placeholderValue)}
+                    {formatRecordHistoryDate(
+                      version.lastUpdatedAt,
+                      placeholderValue,
+                    )}
                   </option>
                 ))}
               </select>
@@ -836,7 +766,7 @@ export default function RecordHistoryTab({
                         value={index}
                       >
                         {index + 1}.{" "}
-                        {formatDateTime(
+                        {formatRecordHistoryDate(
                           version.lastUpdatedAt,
                           placeholderValue,
                         )}
@@ -854,17 +784,35 @@ export default function RecordHistoryTab({
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-        <SnapshotMeta
+        <RecordHistorySnapshotMeta
           title={t.translations.RECORD_HISTORY_SELECTED_SNAPSHOT}
           snapshot={activeSnapshot}
-          t={t}
           placeholder={placeholderValue}
+          labels={{
+            noSelection:
+              t.translations.RECORD_HISTORY_NO_COMPARISON_VERSION_SELECTED,
+            name: t.translations.RECORD_HISTORY_NAME_LABEL,
+            updated: t.translations.RECORD_HISTORY_UPDATED_LABEL,
+            dataSource: t.translations.RECORD_HISTORY_DATA_SOURCE_LABEL,
+            archived: t.translations.RECORD_HISTORY_ARCHIVED_LABEL,
+            yes: t.translations.YES,
+            no: t.translations.NO,
+          }}
         />
-        <SnapshotMeta
+        <RecordHistorySnapshotMeta
           title={t.translations.RECORD_HISTORY_COMPARISON_SNAPSHOT}
           snapshot={comparisonSnapshot}
-          t={t}
           placeholder={placeholderValue}
+          labels={{
+            noSelection:
+              t.translations.RECORD_HISTORY_NO_COMPARISON_VERSION_SELECTED,
+            name: t.translations.RECORD_HISTORY_NAME_LABEL,
+            updated: t.translations.RECORD_HISTORY_UPDATED_LABEL,
+            dataSource: t.translations.RECORD_HISTORY_DATA_SOURCE_LABEL,
+            archived: t.translations.RECORD_HISTORY_ARCHIVED_LABEL,
+            yes: t.translations.YES,
+            no: t.translations.NO,
+          }}
         />
       </div>
 
@@ -939,3 +887,4 @@ export default function RecordHistoryTab({
     </div>
   );
 }
+
