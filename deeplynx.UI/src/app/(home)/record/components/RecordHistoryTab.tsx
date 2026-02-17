@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import { HistoricalRecordResponseDto } from "@/app/(home)/types/responseDTOs";
+import { ChevronDownIcon, ChevronRightIcon } from "@heroicons/react/24/outline";
 import {
   getHistoricalRecord,
   getRecordHistory,
@@ -21,6 +22,17 @@ interface DiffRow {
   current: string;
   compare: string;
   changed: boolean;
+}
+
+interface DiffTreeNode {
+  id: string;
+  label: string;
+  changed: boolean;
+  current?: string;
+  compare?: string;
+  children: DiffTreeNode[];
+  leafCount: number;
+  isLeaf: boolean;
 }
 
 const PLACEHOLDER = "N/A";
@@ -158,6 +170,124 @@ function prettifyField(field: string): string {
     .replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
+function parseFieldSegments(field: string): string[] {
+  const matches = field.match(/([^[.\]]+)|(\[\d+\])/g);
+  return matches ?? [field];
+}
+
+function prettifySegment(segment: string): string {
+  if (segment.startsWith("[") && segment.endsWith("]")) return segment;
+  return prettifyField(segment);
+}
+
+function buildDiffTree(rows: DiffRow[]): DiffTreeNode[] {
+  const roots = new Map<string, DiffTreeNode>();
+
+  const ensureChild = (
+    container: Map<string, DiffTreeNode> | DiffTreeNode,
+    segment: string,
+    id: string,
+  ) => {
+    if (container instanceof Map) {
+      if (!container.has(id)) {
+        container.set(id, {
+          id,
+          label: prettifySegment(segment),
+          changed: false,
+          children: [],
+          leafCount: 0,
+          isLeaf: false,
+        });
+      }
+      return container.get(id)!;
+    }
+
+    let child = container.children.find((c) => c.id === id);
+    if (!child) {
+      child = {
+        id,
+        label: prettifySegment(segment),
+        changed: false,
+        children: [],
+        leafCount: 0,
+        isLeaf: false,
+      };
+      container.children.push(child);
+    }
+    return child;
+  };
+
+  rows.forEach((row) => {
+    const segments = parseFieldSegments(row.field);
+    let currentPath = "";
+    let currentNode: DiffTreeNode | null = null;
+
+    segments.forEach((segment, index) => {
+      currentPath = currentPath ? `${currentPath}.${segment}` : segment;
+
+      if (index === 0) {
+        currentNode = ensureChild(roots, segment, currentPath);
+      } else if (currentNode) {
+        currentNode = ensureChild(currentNode, segment, currentPath);
+      }
+
+      if (index === segments.length - 1 && currentNode) {
+        currentNode.current = row.current;
+        currentNode.compare = row.compare;
+        currentNode.changed = row.changed;
+        currentNode.isLeaf = true;
+      }
+    });
+  });
+
+  const finalize = (node: DiffTreeNode): DiffTreeNode => {
+    if (node.children.length === 0) {
+      return {
+        ...node,
+        leafCount: 1,
+        isLeaf: true,
+      };
+    }
+
+    const finalizedChildren = node.children
+      .map(finalize)
+      .sort((a, b) => a.label.localeCompare(b.label));
+    const leafCount = finalizedChildren.reduce(
+      (sum, child) => sum + child.leafCount,
+      0,
+    );
+    const changed = finalizedChildren.some((child) => child.changed);
+
+    return {
+      ...node,
+      children: finalizedChildren,
+      changed,
+      leafCount,
+      isLeaf: false,
+    };
+  };
+
+  return Array.from(roots.values())
+    .map(finalize)
+    .sort((a, b) => a.label.localeCompare(b.label));
+}
+
+function filterTreeForChanges(nodes: DiffTreeNode[]): DiffTreeNode[] {
+  return nodes
+    .map((node) => {
+      if (node.isLeaf) return node.changed ? node : null;
+
+      const filteredChildren = filterTreeForChanges(node.children);
+      if (filteredChildren.length === 0 && !node.changed) return null;
+
+      return {
+        ...node,
+        children: filteredChildren,
+      };
+    })
+    .filter((node): node is DiffTreeNode => node !== null);
+}
+
 function SnapshotMeta({
   title,
   snapshot,
@@ -188,9 +318,6 @@ function SnapshotMeta({
                 Data Source: {snapshot.dataSourceName || PLACEHOLDER}
               </span>
               <span className="badge badge-outline">
-                Class: {snapshot.className || PLACEHOLDER}
-              </span>
-              <span className="badge badge-outline">
                 Archived: {snapshot.isArchived ? "Yes" : "No"}
               </span>
             </div>
@@ -216,6 +343,7 @@ export default function RecordHistoryTab({
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
   const [isLoadingSnapshot, setIsLoadingSnapshot] = useState(false);
   const [historyError, setHistoryError] = useState<string | null>(null);
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (compareMode === "none") {
@@ -231,7 +359,11 @@ export default function RecordHistoryTab({
       setHistoryError(null);
 
       try {
-        const versions = await getRecordHistory(organizationId, projectId, recordId);
+        const versions = await getRecordHistory(
+          organizationId,
+          projectId,
+          recordId,
+        );
         const sorted = [...versions].sort(
           (a, b) =>
             new Date(a.lastUpdatedAt).getTime() -
@@ -245,7 +377,9 @@ export default function RecordHistoryTab({
         if (sorted.length > 0) {
           const latestIndex = sorted.length - 1;
           setSelectedIndex(latestIndex);
-          setSelectedDateInput(toDateTimeInputValue(sorted[latestIndex].lastUpdatedAt));
+          setSelectedDateInput(
+            toDateTimeInputValue(sorted[latestIndex].lastUpdatedAt),
+          );
         } else {
           setSelectedIndex(0);
           setSelectedDateInput("");
@@ -296,7 +430,10 @@ export default function RecordHistoryTab({
         if (!cancelled) setSelectedSnapshot(snapshot);
       } catch (error) {
         if (cancelled) return;
-        console.error("Error fetching snapshot for selected point-in-time:", error);
+        console.error(
+          "Error fetching snapshot for selected point-in-time:",
+          error,
+        );
         setSelectedSnapshot(selectedVersion);
         toast.error("Failed to load selected point-in-time snapshot.");
       } finally {
@@ -360,10 +497,115 @@ export default function RecordHistoryTab({
     });
   }, [selectedMap, comparisonMap, compareMode]);
 
-  const rowsToRender = showOnlyChanges
-    ? diffRows.filter((row) => row.changed)
-    : diffRows;
+  const diffTree = useMemo(() => buildDiffTree(diffRows), [diffRows]);
+  const treeToRender = useMemo(
+    () => (showOnlyChanges ? filterTreeForChanges(diffTree) : diffTree),
+    [showOnlyChanges, diffTree],
+  );
   const changedCount = diffRows.filter((row) => row.changed).length;
+
+  useEffect(() => {
+    setExpandedRows((prev) => {
+      if (prev.size > 0) return prev;
+      const defaults = new Set<string>();
+      diffTree.forEach((node) => {
+        defaults.add(node.id);
+      });
+      return defaults;
+    });
+  }, [diffTree]);
+
+  const toggleExpand = (id: string) => {
+    setExpandedRows((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  const renderTreeRows = (
+    nodes: DiffTreeNode[],
+    depth = 0,
+  ): React.ReactNode[] => {
+    return nodes.flatMap((node) => {
+      const hasChildren = node.children.length > 0;
+      const isExpanded = expandedRows.has(node.id);
+      const row = (
+        <tr key={node.id} className={node.changed ? "bg-warning/10" : ""}>
+          <td className="align-top">
+            <div
+              className="flex items-start gap-2"
+              style={{ paddingLeft: `${depth * 1.25}rem` }}
+            >
+              {hasChildren ? (
+                <button
+                  type="button"
+                  className="mt-0.5 rounded p-0.5 hover:bg-base-200"
+                  onClick={() => toggleExpand(node.id)}
+                >
+                  {isExpanded ? (
+                    <ChevronDownIcon className="h-4 w-4" />
+                  ) : (
+                    <ChevronRightIcon className="h-4 w-4" />
+                  )}
+                </button>
+              ) : (
+                <span className="inline-block w-5" />
+              )}
+              <div>
+                <div className="font-medium">{node.label}</div>
+                {hasChildren && (
+                  <div className="text-xs opacity-70">
+                    {isExpanded ? "Expanded" : "Collapsed"} ({node.leafCount}{" "}
+                    fields)
+                  </div>
+                )}
+              </div>
+            </div>
+          </td>
+          <td className={node.changed ? "bg-warning/5 align-top" : "align-top"}>
+            {hasChildren ? (
+              <span className="text-xs opacity-70">Nested group</span>
+            ) : (
+              <div className="whitespace-pre-wrap break-all text-xs">
+                {node.current ?? PLACEHOLDER}
+              </div>
+            )}
+          </td>
+          <td className={node.changed ? "bg-warning/5 align-top" : "align-top"}>
+            {hasChildren ? (
+              <span className="text-xs opacity-70">Nested group</span>
+            ) : (
+              <div className="whitespace-pre-wrap break-all text-xs">
+                {node.compare ?? PLACEHOLDER}
+              </div>
+            )}
+          </td>
+          <td className="align-top">
+            {node.changed ? (
+              <span className="badge badge-warning badge-sm whitespace-nowrap leading-none">
+                {hasChildren ? "Changed subtree" : "Changed"}
+              </span>
+            ) : (
+              <span className="badge badge-ghost badge-sm whitespace-nowrap leading-none">
+                Same
+              </span>
+            )}
+          </td>
+        </tr>
+      );
+
+      if (hasChildren && isExpanded) {
+        return [row, ...renderTreeRows(node.children, depth + 1)];
+      }
+
+      return [row];
+    });
+  };
 
   const handleDateInputChange = (value: string) => {
     setSelectedDateInput(value);
@@ -436,14 +678,17 @@ export default function RecordHistoryTab({
                 onChange={(e) => setSelectedIndex(Number(e.target.value))}
               >
                 {history.map((version, index) => (
-                  <option key={`${version.id}-${version.lastUpdatedAt}-${index}`} value={index}>
+                  <option
+                    key={`${version.id}-${version.lastUpdatedAt}-${index}`}
+                    value={index}
+                  >
                     {index + 1}. {formatDateTime(version.lastUpdatedAt)}
                   </option>
                 ))}
               </select>
             </div>
 
-            <div className="form-control min-w-[260px]">
+            {/* <div className="form-control min-w-[260px]">
               <label className="label py-1">
                 <span className="label-text font-medium">Jump to Time</span>
               </label>
@@ -456,20 +701,22 @@ export default function RecordHistoryTab({
               <span className="text-xs mt-1 opacity-70">
                 Snaps to nearest saved version.
               </span>
-            </div>
+            </div> */}
 
             <div className="form-control">
               <label className="label py-1">
-                <span className="label-text font-medium">Compare Against</span>
+                <span className="label-text font-medium mr-2">
+                  Compare Against
+                </span>
               </label>
               <div className="join">
-                <button
+                {/* <button
                   type="button"
                   className={`btn btn-sm join-item ${compareMode === "none" ? "btn-primary" : "btn-outline"}`}
                   onClick={() => setCompareMode("none")}
                 >
                   None
-                </button>
+                </button> */}
                 <button
                   type="button"
                   className={`btn btn-sm join-item ${compareMode === "previous" ? "btn-primary" : "btn-outline"}`}
@@ -507,7 +754,9 @@ export default function RecordHistoryTab({
             />
             <div className="mt-2 flex justify-between text-xs opacity-70">
               <span>{formatDateTime(history[0]?.lastUpdatedAt)}</span>
-              <span>{formatDateTime(history[history.length - 1]?.lastUpdatedAt)}</span>
+              <span>
+                {formatDateTime(history[history.length - 1]?.lastUpdatedAt)}
+              </span>
             </div>
           </div>
         </div>
@@ -515,7 +764,10 @@ export default function RecordHistoryTab({
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
         <SnapshotMeta title="Selected Snapshot" snapshot={activeSnapshot} />
-        <SnapshotMeta title="Comparison Snapshot" snapshot={comparisonSnapshot} />
+        <SnapshotMeta
+          title="Comparison Snapshot"
+          snapshot={comparisonSnapshot}
+        />
       </div>
 
       <div className="card bg-base-100 border border-base-300 shadow-sm">
@@ -557,37 +809,14 @@ export default function RecordHistoryTab({
                 </tr>
               </thead>
               <tbody>
-                {rowsToRender.length === 0 ? (
+                {treeToRender.length === 0 ? (
                   <tr>
                     <td colSpan={4} className="text-center py-8 opacity-70">
                       No differences for the selected comparison.
                     </td>
                   </tr>
                 ) : (
-                  rowsToRender.map((row) => (
-                    <tr key={row.field} className={row.changed ? "bg-warning/10" : ""}>
-                      <td className="font-medium align-top">{prettifyField(row.field)}</td>
-                      <td className={row.changed ? "bg-warning/5" : ""}>
-                        <div className="whitespace-pre-wrap break-all text-xs">
-                          {row.current}
-                        </div>
-                      </td>
-                      <td className={row.changed ? "bg-warning/5" : ""}>
-                        <div className="whitespace-pre-wrap break-all text-xs">
-                          {row.compare}
-                        </div>
-                      </td>
-                      <td className="align-top">
-                        {row.changed ? (
-                          <span className="badge badge-warning badge-sm">
-                            Changed
-                          </span>
-                        ) : (
-                          <span className="badge badge-ghost badge-sm">Same</span>
-                        )}
-                      </td>
-                    </tr>
-                  ))
+                  renderTreeRows(treeToRender)
                 )}
               </tbody>
             </table>
