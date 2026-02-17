@@ -212,8 +212,8 @@ const ProjectTagAndLabelManagementClient: React.FC<Props> = ({
       setTags(dtoList.filter((t) => !t.isArchived));
     } catch (error) {
       console.error("Failed to load project tags:", error);
-      setTagsError("Failed to load project tags.");
-      toast.error("Failed to load project tags.");
+      setTagsError(t.translations.FAILED_TO_LOAD_PROJECT_TAGS);
+      toast.error(t.translations.FAILED_TO_LOAD_PROJECT_TAGS);
     } finally {
       setTagsLoading(false);
     }
@@ -241,8 +241,8 @@ const ProjectTagAndLabelManagementClient: React.FC<Props> = ({
       setLabels(dtoList.filter((l) => !l.isArchived));
     } catch (error) {
       console.error("Failed to load project labels:", error);
-      setLabelsError("Failed to load project labels.");
-      toast.error("Failed to load project labels.");
+      setLabelsError(t.translations.FAILED_TO_LOAD_PROJECT_LABELS);
+      toast.error(t.translations.FAILED_TO_LOAD_PROJECT_LABELS);
     } finally {
       setLabelsLoading(false);
     }
@@ -261,14 +261,14 @@ const ProjectTagAndLabelManagementClient: React.FC<Props> = ({
     if (!nameInput.trim()) return;
 
     if (!orgId || !projectId) {
-      toast.error("Missing organization or project context. Unable to save.");
+      toast.error(
+        t.translations.MISSING_ORG_OR_PROJECT_CONTEXT_UNABLE_TO_SAVE,
+      );
       return;
     }
 
     if (orgTagsLocked) {
-      toast.error(
-        "Tags are locked at the organization level. Cannot create or edit project tags.",
-      );
+      toast.error(t.translations.TAGS_LOCKED_CANNOT_CREATE_OR_EDIT_PROJECT);
       return;
     }
 
@@ -288,7 +288,7 @@ const ProjectTagAndLabelManagementClient: React.FC<Props> = ({
         );
 
         setTags((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
-        toast.success("Project tag updated.");
+        toast.success(t.translations.PROJECT_TAG_UPDATED);
       } else {
         // Create new project tag
         const createPayload = {
@@ -297,13 +297,13 @@ const ProjectTagAndLabelManagementClient: React.FC<Props> = ({
 
         const created = await createTag(projectId, createPayload);
         setTags((prev) => [...prev, created]);
-        toast.success("Project tag created.");
+        toast.success(t.translations.PROJECT_TAG_CREATED);
       }
 
       closeEditCreateModal();
     } catch (error) {
       console.error("Failed to save project tag:", error);
-      toast.error("Failed to save project tag.");
+      toast.error(t.translations.FAILED_TO_SAVE_PROJECT_TAG);
     } finally {
       setSavingTag(false);
     }
@@ -317,13 +317,15 @@ const ProjectTagAndLabelManagementClient: React.FC<Props> = ({
     if (!labelNameInput.trim()) return;
 
     if (!orgId || !projectId) {
-      toast.error("Missing organization or project context. Unable to save.");
+      toast.error(
+        t.translations.MISSING_ORG_OR_PROJECT_CONTEXT_UNABLE_TO_SAVE,
+      );
       return;
     }
 
     if (orgLabelsLocked) {
       toast.error(
-        "Labels are locked at the organization level. Cannot create or edit project labels.",
+        t.translations.LABELS_LOCKED_CANNOT_CREATE_OR_EDIT_PROJECT,
       );
       return;
     }
@@ -344,7 +346,7 @@ const ProjectTagAndLabelManagementClient: React.FC<Props> = ({
         setLabels((prev) =>
           prev.map((l) => (l.id === updated.id ? updated : l)),
         );
-        toast.success("Project label updated.");
+        toast.success(t.translations.PROJECT_LABEL_UPDATED);
       } else {
         const created = await createSensitivityLabelProject(projectId, {
           name: labelNameInput.trim(),
@@ -352,13 +354,13 @@ const ProjectTagAndLabelManagementClient: React.FC<Props> = ({
         });
 
         setLabels((prev) => [...prev, created]);
-        toast.success("Project label created.");
+        toast.success(t.translations.PROJECT_LABEL_CREATED);
       }
 
       closeEditCreateLabelModal();
     } catch (error) {
       console.error("Failed to save project label:", error);
-      toast.error("Failed to save project label.");
+      toast.error(t.translations.FAILED_TO_SAVE_PROJECT_LABEL);
     } finally {
       setSavingLabel(false);
     }
@@ -372,9 +374,7 @@ const ProjectTagAndLabelManagementClient: React.FC<Props> = ({
     if (!tagToArchive || !orgId || !projectId) return;
 
     if (orgTagsLocked) {
-      toast.error(
-        "Tags are locked at the organization level. Cannot archive project tags.",
-      );
+      toast.error(t.translations.TAGS_LOCKED_CANNOT_ARCHIVE_PROJECT);
       return;
     }
 
@@ -383,10 +383,12 @@ const ProjectTagAndLabelManagementClient: React.FC<Props> = ({
       await archiveTag(projectId, tagToArchive.id, true);
 
       setTags((prev) => prev.filter((t) => t.id !== tagToArchive.id));
-      toast.success(`Tag "${tagToArchive.name}" archived.`);
+      toast.success(
+        `${t.translations.TAG} "${tagToArchive.name}" ${t.translations.ARCHIVED}.`,
+      );
     } catch (error) {
       console.error("Failed to archive tag:", error);
-      toast.error("Failed to archive tag.");
+      toast.error(t.translations.FAILED_TO_ARCHIVE_TAG);
     } finally {
       setArchivingTagId(null);
       setShowArchiveModal(false);
@@ -402,9 +404,7 @@ const ProjectTagAndLabelManagementClient: React.FC<Props> = ({
     if (!labelToArchive || !orgId || !projectId) return;
 
     if (orgLabelsLocked) {
-      toast.error(
-        "Labels are locked at the organization level. Cannot archive project labels.",
-      );
+      toast.error(t.translations.LABELS_LOCKED_CANNOT_ARCHIVE_PROJECT);
       return;
     }
 
@@ -413,10 +413,12 @@ const ProjectTagAndLabelManagementClient: React.FC<Props> = ({
       await archiveSensitivityLabelProject(projectId, labelToArchive.id, true);
 
       setLabels((prev) => prev.filter((l) => l.id !== labelToArchive.id));
-      toast.success(`Label "${labelToArchive.name}" archived.`);
+      toast.success(
+        `${t.translations.LABEL} "${labelToArchive.name}" ${t.translations.ARCHIVED}.`,
+      );
     } catch (error) {
       console.error("Failed to archive label:", error);
-      toast.error("Failed to archive label.");
+      toast.error(t.translations.FAILED_TO_ARCHIVE_LABEL);
     } finally {
       setArchivingLabelId(null);
       setShowArchiveLabelModal(false);
@@ -452,8 +454,7 @@ const ProjectTagAndLabelManagementClient: React.FC<Props> = ({
           {t.translations.PROJECT_TAG_MANAGEMENT}
         </h2>
         <p className="text-base-content/70 mt-1 max-w-3xl">
-          Define project tags and security labels for classification, workflows,
-          and access control.
+          {t.translations.DEFINE_PROJECT_TAGS_AND_LABELS_DESCRIPTION}
         </p>
       </div>
 

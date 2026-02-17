@@ -7,6 +7,7 @@ import {
   InformationCircleIcon,
 } from "@heroicons/react/24/outline";
 import type { SensitivityLabelsDto } from "@/app/(home)/types/responseDTOs";
+import { useLanguage } from "@/app/contexts/Language";
 
 interface Props {
   labels: SensitivityLabelsDto[];
@@ -42,6 +43,7 @@ const SecurityLabelsOrg: React.FC<Props> = ({
   onEditLabel,
   onArchiveClick,
 }) => {
+  const { t } = useLanguage();
   return (
     <div className="card bg-base-100 shadow-lg">
       <div className="card-body">
@@ -51,37 +53,15 @@ const SecurityLabelsOrg: React.FC<Props> = ({
             <div className="flex items-center gap-2">
               <ShieldCheckIcon className="w-5 h-5 text-secondary" />
               <h3 className="font-semibold text-base">
-                Organization Security Labels
+                {t.translations.ORGANIZATION_SECURITY_LABELS}
               </h3>
             </div>
             <p className="text-xs text-base-content/70 mt-1 max-w-md">
-              Security labels for attribute-based access control. All projects
-              inherit these and can optionally add their own.
+              {t.translations.ORGANIZATION_SECURITY_LABELS_DESCRIPTION}
             </p>
           </div>
 
           <div className="flex flex-col items-end gap-2">
-            {/* Lock toggle */}
-            <button
-              type="button"
-              className={`btn btn-xs gap-1 ${
-                labelsLocked ? "btn-error" : "btn-ghost"
-              }`}
-              onClick={onToggleLock}
-            >
-              {labelsLocked ? (
-                <>
-                  <LockClosedIcon className="w-4 h-4" />
-                  Locked
-                </>
-              ) : (
-                <>
-                  <LockOpenIcon className="w-4 h-4" />
-                  Unlocked
-                </>
-              )}
-            </button>
-
             {/* Search input */}
             <div className="form-control w-40">
               <div className="input input-xs input-bordered flex items-center gap-1 px-2">
@@ -89,7 +69,7 @@ const SecurityLabelsOrg: React.FC<Props> = ({
                 <input
                   type="text"
                   className="grow text-[0.7rem] bg-transparent focus:outline-none"
-                  placeholder="Search labels..."
+                  placeholder={t.translations.SEARCH_LABELS}
                   value={labelSearch}
                   onChange={(e) => setLabelSearch(e.target.value)}
                 />
@@ -104,13 +84,13 @@ const SecurityLabelsOrg: React.FC<Props> = ({
               disabled={labelsLocked || !orgId}
               title={
                 !orgId
-                  ? "No organization selected"
+                  ? t.translations.NO_ORG_SELECTED
                   : labelsLocked
-                    ? "Labels are locked at the org level"
-                    : "Create new label"
+                    ? t.translations.LABELS_LOCKED_AT_ORG_LEVEL_SHORT
+                    : t.translations.CREATE_NEW_LABEL
               }
             >
-              + New Label
+              + {t.translations.NEW_LABEL}
             </button>
           </div>
         </div>
@@ -118,32 +98,25 @@ const SecurityLabelsOrg: React.FC<Props> = ({
         {/* n of m line */}
         <div className="flex justify-between items-center mb-3 text-[0.7rem] text-base-content/60">
           <span>
-            Showing <span className="font-semibold">{filteredCount}</span> of{" "}
-            <span className="font-semibold">{labelCount}</span> labels
+            {t.translations.SHOWING}{" "}
+            <span className="font-semibold">{filteredCount}</span>{" "}
+            {t.translations.OF}{" "}
+            <span className="font-semibold">{labelCount}</span>{" "}
+            {t.translations.LABELS_LOWER}
           </span>
           {labelSearch.trim() && (
             <span className="italic">
-              Filtered by:{" "}
+              {t.translations.FILTERED_BY}
               <span className="font-medium break-all">{labelSearch}</span>
             </span>
           )}
-        </div>
-
-        {/* Info text */}
-        <div className="flex items-start gap-2 mb-3 text-xs text-base-content/70">
-          <InformationCircleIcon className="w-4 h-4" />
-          <p>
-            When locked, projects{" "}
-            <span className="font-semibold">cannot define new labels</span> and
-            must use only the labels defined at the organization level.
-          </p>
         </div>
 
         {/* Labels list */}
         <div className="space-y-2 max-h-72 overflow-y-auto">
           {labelsLoading ? (
             <div className="py-6 text-center text-xs text-base-content/60">
-              Loading organization labels…
+              {t.translations.LOADING_ORGANIZATION_LABELS}
             </div>
           ) : labelsError ? (
             <div className="py-6 text-center text-xs text-error">
@@ -152,8 +125,8 @@ const SecurityLabelsOrg: React.FC<Props> = ({
           ) : filteredLabels.length === 0 ? (
             <div className="py-6 text-center text-xs text-base-content/60 border border-dashed border-base-300 rounded-lg">
               {labelSearch.trim()
-                ? "No labels match your search."
-                : "No labels defined. Create labels to standardize access control across all projects."}
+                ? t.translations.NO_LABELS_MATCH_SEARCH
+                : t.translations.NO_LABELS_DEFINED_HELP}
             </div>
           ) : (
             filteredLabels.map((label) => (
@@ -172,9 +145,13 @@ const SecurityLabelsOrg: React.FC<Props> = ({
                     className="btn btn-ghost btn-xs"
                     onClick={() => onEditLabel(label.id)}
                     disabled={labelsLocked}
-                    title={labelsLocked ? "Labels are locked" : "Edit"}
+                    title={
+                      labelsLocked
+                        ? t.translations.LABELS_ARE_LOCKED
+                        : t.translations.EDIT
+                    }
                   >
-                    Edit
+                    {t.translations.EDIT}
                   </button>
                   <button
                     type="button"
@@ -183,11 +160,13 @@ const SecurityLabelsOrg: React.FC<Props> = ({
                     disabled={labelsLocked || archivingLabelId === label.id}
                     title={
                       labelsLocked
-                        ? "Labels are locked"
-                        : "Archive (soft delete) label"
+                        ? t.translations.LABELS_ARE_LOCKED
+                        : t.translations.ARCHIVE_SOFT_DELETE_LABEL
                     }
                   >
-                    {archivingLabelId === label.id ? "Archiving..." : "Delete"}
+                    {archivingLabelId === label.id
+                      ? t.translations.ARCHIVING
+                      : t.translations.DELETE}
                   </button>
                 </div>
               </div>

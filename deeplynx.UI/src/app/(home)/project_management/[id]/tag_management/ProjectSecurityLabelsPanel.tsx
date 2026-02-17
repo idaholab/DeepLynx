@@ -6,6 +6,7 @@ import {
   MagnifyingGlassIcon,
   InformationCircleIcon,
 } from "@heroicons/react/24/outline";
+import { useLanguage } from "@/app/contexts/Language";
 
 type SecurityLabelDto = {
   id: number;
@@ -50,6 +51,7 @@ const ProjectSecurityLabelsPanel: React.FC<Props> = ({
   onEditLabel,
   onArchiveClick,
 }) => {
+  const { t } = useLanguage();
   return (
     <div className="card bg-base-100 shadow-lg">
       <div className="card-body">
@@ -59,13 +61,11 @@ const ProjectSecurityLabelsPanel: React.FC<Props> = ({
             <div className="flex items-center gap-2">
               <ShieldCheckIcon className="w-5 h-5 text-secondary" />
               <h3 className="font-semibold text-base">
-                Project Security Labels
+                {t.translations.PROJECT_SECURITY_LABELS}
               </h3>
             </div>
             <p className="text-xs text-base-content/70 mt-1 max-w-md">
-              Security labels (e.g., CUI) for attribute-based access control at
-              the project level. This project also inherits any labels defined
-              at the organization level.
+              {t.translations.PROJECT_SECURITY_LABELS_DESCRIPTION_WITH_CUI}
             </p>
           </div>
 
@@ -81,12 +81,12 @@ const ProjectSecurityLabelsPanel: React.FC<Props> = ({
               {labelsLockedByOrg ? (
                 <>
                   <LockClosedIcon className="w-4 h-4" />
-                  Locked by Org
+                  {t.translations.LOCKED_BY_ORG}
                 </>
               ) : (
                 <>
                   <LockOpenIcon className="w-4 h-4" />
-                  Project-managed
+                  {t.translations.PROJECT_MANAGED}
                 </>
               )}
             </button>
@@ -98,7 +98,7 @@ const ProjectSecurityLabelsPanel: React.FC<Props> = ({
                 <input
                   type="text"
                   className="grow text-[0.7rem] bg-transparent focus:outline-none"
-                  placeholder="Search labels..."
+                  placeholder={t.translations.SEARCH_LABELS}
                   value={labelSearch}
                   onChange={(e) => setLabelSearch(e.target.value)}
                 />
@@ -113,13 +113,13 @@ const ProjectSecurityLabelsPanel: React.FC<Props> = ({
               disabled={labelsLockedByOrg || !projectId}
               title={
                 !projectId
-                  ? "No project selected"
+                  ? t.translations.NO_PROJECT_SELECTED
                   : labelsLockedByOrg
-                    ? "Security labels are locked at the organization level"
-                    : "Create new security label"
+                    ? t.translations.SECURITY_LABELS_LOCKED_AT_ORG_LEVEL
+                    : t.translations.CREATE_NEW_SECURITY_LABEL
               }
             >
-              + New Label
+              + {t.translations.NEW_LABEL}
             </button>
           </div>
         </div>
@@ -127,12 +127,14 @@ const ProjectSecurityLabelsPanel: React.FC<Props> = ({
         {/* n of m line */}
         <div className="flex justify-between items-center mb-3 text-[0.7rem] text-base-content/60">
           <span>
-            Showing <span className="font-semibold">{filteredCount}</span> of{" "}
-            <span className="font-semibold">{labelCount}</span> labels
+            {t.translations.SHOWING}{" "}
+            <span className="font-semibold">{filteredCount}</span>{" "}
+            {t.translations.OF} <span className="font-semibold">{labelCount}</span>{" "}
+            {t.translations.LABELS_LOWER}
           </span>
           {labelSearch.trim() && (
             <span className="italic">
-              Filtered by:{" "}
+              {t.translations.FILTERED_BY}
               <span className="font-medium break-all">{labelSearch}</span>
             </span>
           )}
@@ -142,11 +144,11 @@ const ProjectSecurityLabelsPanel: React.FC<Props> = ({
         <div className="flex items-start gap-2 mb-3 text-xs text-base-content/70">
           <InformationCircleIcon className="w-4 h-4" />
           <p>
-            When locked at the organization level, project administrators{" "}
+            {t.translations.WHEN_LOCKED_AT_ORG_LEVEL_PROJECT_ADMINS}{" "}
             <span className="font-semibold">
-              cannot define additional security labels
+              {t.translations.CANNOT_DEFINE_ADDITIONAL_SECURITY_LABELS}
             </span>{" "}
-            and must use only labels defined at the organization level.
+            {t.translations.MUST_USE_ORG_DEFINED_LABELS_ONLY}
           </p>
         </div>
 
@@ -154,7 +156,7 @@ const ProjectSecurityLabelsPanel: React.FC<Props> = ({
         <div className="space-y-2 max-h-72 overflow-y-auto">
           {labelsLoading ? (
             <div className="py-6 text-center text-xs text-base-content/60">
-              Loading project security labels…
+              {t.translations.LOADING_PROJECT_SECURITY_LABELS}
             </div>
           ) : labelsError ? (
             <div className="py-6 text-center text-xs text-error">
@@ -163,8 +165,8 @@ const ProjectSecurityLabelsPanel: React.FC<Props> = ({
           ) : filteredLabels.length === 0 ? (
             <div className="py-6 text-center text-xs text-base-content/60 border border-dashed border-base-300 rounded-lg">
               {labelSearch.trim()
-                ? "No security labels match your search."
-                : "No project labels defined. When unlocked, you can define project-specific security labels in addition to any organization-level labels."}
+                ? t.translations.NO_SECURITY_LABELS_MATCH_SEARCH
+                : t.translations.NO_PROJECT_SECURITY_LABELS_DEFINED_WHEN_UNLOCKED}
             </div>
           ) : (
             filteredLabels.map((label) => (
@@ -178,7 +180,7 @@ const ProjectSecurityLabelsPanel: React.FC<Props> = ({
                       {label.name}
                     </span>
                     <span className="text-[0.7rem] text-base-content/70">
-                      Project-level security label
+                      {t.translations.PROJECT_LEVEL_SECURITY_LABEL}
                     </span>
                   </div>
                   {label.description && (
@@ -195,11 +197,11 @@ const ProjectSecurityLabelsPanel: React.FC<Props> = ({
                     disabled={labelsLockedByOrg}
                     title={
                       labelsLockedByOrg
-                        ? "Security labels are locked by the organization"
-                        : "Edit"
+                        ? t.translations.SECURITY_LABELS_LOCKED_BY_ORGANIZATION
+                        : t.translations.EDIT
                     }
                   >
-                    Edit
+                    {t.translations.EDIT}
                   </button>
                   <button
                     type="button"
@@ -210,11 +212,13 @@ const ProjectSecurityLabelsPanel: React.FC<Props> = ({
                     }
                     title={
                       labelsLockedByOrg
-                        ? "Security labels are locked by the organization"
-                        : "Archive (soft delete) label"
+                        ? t.translations.SECURITY_LABELS_LOCKED_BY_ORGANIZATION
+                        : t.translations.ARCHIVE_SOFT_DELETE_LABEL
                     }
                   >
-                    {archivingLabelId === label.id ? "Archiving..." : "Delete"}
+                    {archivingLabelId === label.id
+                      ? t.translations.ARCHIVING
+                      : t.translations.DELETE}
                   </button>
                 </div>
               </div>
