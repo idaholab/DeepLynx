@@ -1843,7 +1843,7 @@ public class RecordBusinessTests : IntegrationTestBase
 
     #endregion
 
-    #region Attach/Unattach Label Tests
+    #region Attach/Unattach Labels Tests
 
     [Fact]
     public async Task AttachLabel_SuccessfullyAttachesLabelToRecord()
@@ -1863,18 +1863,6 @@ public class RecordBusinessTests : IntegrationTestBase
         record.Labels.Clear(); // ensure label not already attached
         await Context.SaveChangesAsync();
         Context.ChangeTracker.Clear();
-
-        var labelRole = await Context.Roles
-            .Include(r => r.Permissions)
-            .Where(r => r.Id == roleId).FirstOrDefaultAsync();
-
-        var writePermission = await Context.Permissions
-            .Where(p => p.LabelId == newLabelResponse.Id && p.Action == "write record")
-            .FirstOrDefaultAsync();
-
-        labelRole.Permissions.Add(writePermission);
-
-        await Context.SaveChangesAsync();
 
         // Act
         var result = await _recordBusiness.AttachLabel(uid, organizationId, pid, record.Id, newLabelResponse.Id);
@@ -1904,16 +1892,6 @@ public class RecordBusinessTests : IntegrationTestBase
         await Context.SaveChangesAsync();
         Context.ChangeTracker.Clear();
 
-        var labelRole = await Context.Roles
-            .Include(r => r.Permissions)
-            .Where(r => r.Id == roleId).FirstOrDefaultAsync();
-
-        var writePermission = await Context.Permissions
-            .Where(p => p.LabelId == newLabelResponse.Id && p.Action == "write record")
-            .FirstOrDefaultAsync();
-
-        labelRole.Permissions.Add(writePermission);
-
         await Context.SaveChangesAsync();
 
         // Act
@@ -1923,6 +1901,62 @@ public class RecordBusinessTests : IntegrationTestBase
         Assert.True(result);
         var updatedRecord = await Context.Records.Include(r => r.Labels).FirstAsync(r => r.Id == record.Id);
         Assert.Contains(updatedRecord.Labels, l => l.Id == newLabelResponse.Id);
+    }
+
+    [Fact]
+    public async Task BulkAttachLabelsToRecords_SuccessfullyAttachesLabelsToRecord()
+    {
+        // create two new labels that will be attached to record 1 and record 2
+        var newLabel1 = new CreateSensitivityLabelRequestDto
+        {
+            Name = "Very Top Secret",
+            Description = "Very Top Secret Description"
+        };
+        
+        var newLabel2 = new CreateSensitivityLabelRequestDto
+        {
+            Name = "Confidential",
+            Description = "Very Confidential Description"
+        };
+        
+        var newLabel1Response = await _sensitivityLabelBusiness.CreateSensitivityLabel(
+            uid, newLabel1, null, organizationId);
+        
+        var newLabel2Response = await _sensitivityLabelBusiness.CreateSensitivityLabel(
+            uid, newLabel2, null, organizationId);
+        
+        Context.ChangeTracker.Clear();
+        
+        var record1 = await Context.Records.Include(r => r.Labels).FirstAsync(r => r.Id == rid);
+        record1.Labels.Clear();
+        
+        var record2 = await Context.Records.Include(r => r.Labels).FirstAsync(r => r.Id == rid2);
+        record2.Labels.Clear();
+        
+        await Context.SaveChangesAsync();
+        Context.ChangeTracker.Clear();
+
+        // perform the action
+        await _recordBusiness.BulkAttachLabels(uid, organizationId, pid, 
+            new List<long>{rid, rid2}, 
+            new List<long>{newLabel1Response.Id, newLabel2Response.Id});
+        
+        // ensure that the records have those labels
+        var record1Updated = await Context.Records
+            .Include(r => r.Labels)
+            .FirstAsync(r => r.Id == rid);
+        
+        Assert.Equal(2, record1Updated.Labels.Count);
+        Assert.Contains(record1Updated.Labels, l => l.Name == newLabel1.Name);
+        Assert.Contains(record1Updated.Labels, l => l.Name == newLabel2.Name);
+        
+        var record2Updated = await Context.Records
+            .Include(r => r.Labels)
+            .FirstAsync(r => r.Id == rid2);
+        
+        Assert.Equal(2, record2Updated.Labels.Count);
+        Assert.Contains(record2Updated.Labels, l => l.Name == newLabel1.Name);
+        Assert.Contains(record2Updated.Labels, l => l.Name == newLabel2.Name);
     }
 
     #endregion

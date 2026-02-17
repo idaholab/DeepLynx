@@ -208,6 +208,7 @@ public class RecordController : ControllerBase
     /// <param name="projectId">The ID of the project to which the records belong</param>
     /// <param name="dataSourceId">The ID of the data source to which the records belong</param>
     /// <param name="records">List of record request data transfer objects containing record details</param>
+    /// <param name="sensitivityLabelIds">List of sensitivity labels that will be attached to created records</param>
     /// <returns>The created records</returns>
     [HttpPost("bulk", Name = "api_create_many_records")]
     [Auth("write", "record")]
@@ -215,14 +216,15 @@ public class RecordController : ControllerBase
         long organizationId,
         long projectId,
         [FromQuery] long dataSourceId,
-        [FromBody] List<CreateRecordRequestDto> records)
+        [FromBody] List<CreateRecordRequestDto> records,
+        [FromQuery] List<long>? sensitivityLabelIds = null)
     {
         try
         {
             var currentUserId = UserContextStorage.UserId;
             var newRecords =
                 await _recordBusiness.BulkCreateRecords(currentUserId, organizationId, projectId, dataSourceId,
-                    records);
+                    records, sensitivityLabelIds);
             return Ok(newRecords);
         }
         catch (Exception exc)
@@ -422,6 +424,43 @@ public class RecordController : ControllerBase
         catch (Exception exc)
         {
             var message = $"An error occurred while attaching label {sensitivityLabelId} to record {recordId}: {exc}";
+            _logger.LogError(message);
+            return StatusCode(StatusCodes.Status500InternalServerError, message);
+        }
+    }
+
+    /// <summary>
+    ///     Bulk attach sensitivity labels to records
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <param name="projectId">The ID of the project to which the records belong</param>
+    /// <param name="recordIds">The IDs of the records that the sensitivity labels will be attached to</param>
+    /// <param name="sensitivityLabelIds">The ID of the labels that will be attached to all provided records by ID</param>
+    /// <returns>Boolean value defining if the operation was successful.</returns>
+    [HttpPost("bulk-attach-sensitivity-labels", Name = "api_bulk_attach_sensitivity_labels")]
+    [Auth("update", "record")]
+    [Auth("read", "sensitivity_label")]
+    [Sensitivity("update record")]
+    public async Task<IActionResult> BulkAttachSensitivityLabels(
+        long organizationId,
+        long projectId,
+        [FromQuery] List<long> recordIds,
+        [FromQuery] List<long> sensitivityLabelIds)
+    {
+        try
+        {
+            var currentUserId = UserContextStorage.UserId;
+            await _recordBusiness.BulkAttachLabels(currentUserId, organizationId, projectId, recordIds,
+                sensitivityLabelIds);
+            return Ok(new
+            {
+                message =
+                    $"Successfully bulk attached labels: {string.Join(", ", sensitivityLabelIds)} on records: {string.Join(", ", recordIds)}"
+            });
+        }
+        catch (Exception exc)
+        {
+            var message = $"An error occurred while bulk attaching sensitivity labels to records: {exc}";
             _logger.LogError(message);
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
