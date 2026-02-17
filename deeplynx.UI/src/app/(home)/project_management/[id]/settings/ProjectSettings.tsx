@@ -148,7 +148,7 @@ const ProjectSettings = ({ project }: ProjectSettingsProps) => {
     }
 
     if (bannerText.length > 50) {
-      toast.error(t.translations.BANNER_TEXT_MUST_BE_50_CHARATERS_OR_LESS);
+      toast.error(t.translations.BANNER_TEXT_MUST_BE_50_CHARACTERS_OR_LESS);
       return;
     }
 
@@ -300,7 +300,7 @@ const ProjectSettings = ({ project }: ProjectSettingsProps) => {
 
       setLogoFile(null);
       setLogoPreview(null);
-      toast.success(t.translations.LOGO_REMOVED_SECCESSFULLY);
+      toast.success(t.translations.LOGO_REMOVED_SUCCESSFULLY);
     } catch (error) {
       console.error("Failed to remove logo:", error);
       toast.error(t.translations.FAILED_TO_REMOVE_LOGO);
@@ -356,7 +356,7 @@ const ProjectSettings = ({ project }: ProjectSettingsProps) => {
       toast.error(
         error instanceof Error
           ? error.message
-          : t.translations.FALIED_TO_UPDATE_DEFAULT_STORAGE,
+          : t.translations.FAILED_TO_UPDATE_DEFAULT_STORAGE,
       );
     } finally {
       setIsSavingStorage(false);
@@ -462,7 +462,7 @@ const ProjectSettings = ({ project }: ProjectSettingsProps) => {
         dto,
       );
 
-      toast.success(t.translations.STORAGE_UPADTED_SUCCESSFULLY);
+      toast.success(t.translations.STORAGE_UPDATED_SUCCESSFULLY);
       setIsEditModalOpen(false);
       setEditingStorage(null);
       setStorageFormData({ name: "", config: {}, default: false });

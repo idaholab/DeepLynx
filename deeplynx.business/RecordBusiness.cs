@@ -20,6 +20,7 @@ public class RecordBusiness : IRecordBusiness
     private readonly IEventBusiness _eventBusiness;
     private readonly ITagBusiness _tagBusiness;
     private readonly ISensitivityLabelBusiness _labelBusiness;
+    private readonly ISensitivityLabelService _sensitivityLabelService;
 
     /// <summary>
     ///     Initializes a new instance of the <see cref="RecordBusiness" /> class.
@@ -33,18 +34,21 @@ public class RecordBusiness : IRecordBusiness
         IEventBusiness eventBusiness,
         IBulkCopyUpsertExecutor bulkCopyUpsertExecutor,
         ITagBusiness tagBusiness,
-        ISensitivityLabelBusiness labelBusiness)
+        ISensitivityLabelBusiness labelBusiness,
+        ISensitivityLabelService sensitivityLabelService)
     {
         _context = context;
         _eventBusiness = eventBusiness;
         _tagBusiness = tagBusiness;
         _bulkCopyUpsertExecutor = bulkCopyUpsertExecutor;
         _labelBusiness = labelBusiness;
+        _sensitivityLabelService = sensitivityLabelService;
     }
 
     /// <summary>
     ///     Retrieves all records for a specific project and datasource.
     /// </summary>
+    /// <param name="currentUserId">The ID of current user</param>
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
     /// <param name="projectId">The ID of the project whose records are to be retrieved</param>
     /// <param name="dataSourceId">(Optional) The ID of the datasource by which to filter records</param>
@@ -76,8 +80,8 @@ public class RecordBusiness : IRecordBusiness
 
         // Get user's authorized labels
         var userAuthorizedLabels =
-            await PermissionHelper.GetAuthorizedSensitivityLabels(
-                _context, currentUserId, organizationId, projectId, "read");
+            await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
+                currentUserId, organizationId, projectId, "read record");
 
         // Filter records in memory based on sensitivity label access
         var authorizedRecords = records.Where(r =>
@@ -118,6 +122,7 @@ public class RecordBusiness : IRecordBusiness
     /// <summary>
     ///     Get all records that contain all given tags
     /// </summary>
+    /// <param name="currentUserId">The ID of current user</param>
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
     /// <param name="projectId">The ID of the project whose records are to be retrieved</param>
     /// <param name="tagIds">List of tag IDs - returned records must contain every given ID</param>
@@ -137,8 +142,8 @@ public class RecordBusiness : IRecordBusiness
 
         // Filtering Record By User's Sensitivity Label access
         var userAuthorizedLabels =
-            await PermissionHelper.GetAuthorizedSensitivityLabels(
-                _context, currentUserId, organizationId, projectId, "read");
+            await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
+                currentUserId, organizationId, projectId, "read record");
 
         recordQuery = recordQuery.Where(r =>
                 !r.Labels.Any() || // If the record has no labels, allow access
@@ -186,6 +191,7 @@ public class RecordBusiness : IRecordBusiness
     /// <summary>
     ///     Retrieves a specific record by its ID
     /// </summary>
+    /// <param name="currentUserId">The ID of current user</param>
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
     /// <param name="projectId">The project of the record to retrieve</param>
     /// <param name="recordId">The ID of the record to retrieve</param>
@@ -206,24 +212,6 @@ public class RecordBusiness : IRecordBusiness
 
         if (record == null)
             throw new KeyNotFoundException($"Record with id {recordId} not found");
-
-        // Check sensitivity label authorization if record has labels
-        if (record.Labels.Count > 0)
-        {
-            var userAuthorizedLabels = await PermissionHelper.GetAuthorizedSensitivityLabels(
-                _context, currentUserId, organizationId, projectId, "read");
-
-            // Check if user has access to ALL required labels on the record
-            var recordLabelIds = record.Labels.Select(l => l.Id).ToList();
-            var hasAllRequiredLabels = recordLabelIds.All(labelId =>
-                userAuthorizedLabels.Contains(labelId));
-
-            if (!hasAllRequiredLabels)
-            {
-                throw new UnauthorizedAccessException(
-                    $"You do not have access to all required sensitivity labels for record {recordId}");
-            }
-        }
 
         if (hideArchived && record.IsArchived) throw new KeyNotFoundException($"Record with id {recordId} is archived");
 
@@ -260,6 +248,7 @@ public class RecordBusiness : IRecordBusiness
     /// <summary>
     ///     Attaches a tag to a record
     /// </summary>
+    /// <param name="currentUserId">The ID of current user</param>
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
     /// <param name="projectId">Project ID for the record and tag</param>
     /// <param name="recordId">The ID of the record</param>
@@ -281,23 +270,6 @@ public class RecordBusiness : IRecordBusiness
 
         if (record == null)
             throw new KeyNotFoundException($"Record with id {recordId} not found or is archived.");
-
-        // Check sensitivity label authorization if record has labels
-        if (record.Labels.Count > 0)
-        {
-            var userAuthorizedLabels = await PermissionHelper.GetAuthorizedSensitivityLabels(
-                _context, currentUserId, organizationId, projectId, "write");
-
-            var recordLabelIds = record.Labels.Select(l => l.Id).ToList();
-            var hasAllRequiredLabels = recordLabelIds.All(labelId =>
-                userAuthorizedLabels.Contains(labelId));
-
-            if (!hasAllRequiredLabels)
-            {
-                throw new UnauthorizedAccessException(
-                    $"You do not have access to all required sensitivity labels for record {recordId}");
-            }
-        }
 
         // Check if already attached
         var alreadyAttached = record.Tags.Any(t => t.Id == tagId);
@@ -325,6 +297,7 @@ public class RecordBusiness : IRecordBusiness
     /// <summary>
     ///     Attaches a sensitivity label to a record
     /// </summary>
+    /// <param name="currentUserId">The ID of current user</param>
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
     /// <param name="projectId">Project ID for the record and label</param>
     /// <param name="recordId">The ID of the record</param>
@@ -345,19 +318,6 @@ public class RecordBusiness : IRecordBusiness
 
         if (record == null)
             throw new KeyNotFoundException($"Record with id {recordId} not found or is archived.");
-
-        // Check sensitivity label authorization if record has labels
-
-        var userAuthorizedLabels = await PermissionHelper.GetAuthorizedSensitivityLabels(
-            _context, currentUserId, organizationId, projectId, "write");
-
-        var hasAllRequiredLabel = userAuthorizedLabels.Contains(labelId);
-
-        if (!hasAllRequiredLabel)
-        {
-            throw new UnauthorizedAccessException(
-                $"You do not have access to all required sensitivity labels for record {recordId}");
-        }
 
         // Check if already attached
         var alreadyAttached = record.Labels.Any(t => t.Id == labelId);
@@ -385,6 +345,7 @@ public class RecordBusiness : IRecordBusiness
     /// <summary>
     ///     Unattach a tag from a record
     /// </summary>
+    /// <param name="currentUserId">The ID of current user</param>
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
     /// <param name="projectId">Project ID for the record and tag</param>
     /// <param name="recordId">The ID of the record</param>
@@ -405,23 +366,6 @@ public class RecordBusiness : IRecordBusiness
 
         if (record == null)
             throw new KeyNotFoundException($"Record with id {recordId} not found or is archived.");
-
-        // Check sensitivity label authorization if record has labels
-        if (record.Labels.Count > 0)
-        {
-            var userAuthorizedLabels = await PermissionHelper.GetAuthorizedSensitivityLabels(
-                _context, currentUserId, organizationId, projectId, "write");
-
-            var recordLabelIds = record.Labels.Select(l => l.Id).ToList();
-            var hasAllRequiredLabels = recordLabelIds.All(labelId =>
-                userAuthorizedLabels.Contains(labelId));
-
-            if (!hasAllRequiredLabels)
-            {
-                throw new UnauthorizedAccessException(
-                    $"You do not have access to all required sensitivity labels for record {recordId}");
-            }
-        }
 
         // Find the tag
         var tag = record.Tags.FirstOrDefault(t => t.Id == tagId);
@@ -446,6 +390,7 @@ public class RecordBusiness : IRecordBusiness
     /// <summary>
     ///     Unattach a sensitivity label from a record
     /// </summary>
+    /// <param name="currentUserId">The ID of current user</param>
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
     /// <param name="projectId">Project ID for the record and sensitivity label</param>
     /// <param name="recordId">The ID of the record</param>
@@ -455,6 +400,9 @@ public class RecordBusiness : IRecordBusiness
     public async Task<bool> UnattachLabel(long currentUserId, long organizationId, long projectId, long recordId,
         long labelId)
     {
+        var sensitivityLabelRequired =
+            await _sensitivityLabelService.IsSensitivityLabelRequired(organizationId, projectId);
+        
         var record = await _context.Records
             .Where(r => r.ProjectId == projectId
                         && r.Id == recordId
@@ -465,36 +413,23 @@ public class RecordBusiness : IRecordBusiness
 
         if (record == null)
             throw new KeyNotFoundException($"Record with id {recordId} not found or is archived.");
-
-        // If record has sensitivity labels then make sure the user is authorized to modify the record
-        if (record.Labels.Count > 0)
-        {
-            var userAuthorizedLabels = await PermissionHelper.GetAuthorizedSensitivityLabels(
-                _context, currentUserId, organizationId, projectId, "write");
-
-            var recordLabelIds = record.Labels.Select(l => l.Id).ToList();
-            var hasAllRequiredLabels = recordLabelIds.All(lId =>
-                userAuthorizedLabels.Contains(lId));
-
-            if (!hasAllRequiredLabels)
-            {
-                throw new UnauthorizedAccessException(
-                    $"You do not have access to all required sensitivity labels for record {recordId}");
-            }
-        }
-
-        // Find the label
+        
         var label = record.Labels.FirstOrDefault(t => t.Id == labelId);
 
         if (label == null)
             throw new KeyNotFoundException($"Label with id {labelId} is not attached to record {recordId}");
-
+        
         if (label.IsArchived ||
             label.OrganizationId != organizationId ||
             (label.ProjectId.HasValue && label.ProjectId != projectId))
         {
             throw new InvalidOperationException(
                 $"Label with id {labelId} is archived or does not belong to this organization/project.");
+        }
+
+        if (sensitivityLabelRequired && record.Labels.Count == 1)
+        {
+            throw new InvalidOperationException($"Sensitivity labels are required on all records. Add a new label first to remove this one");
         }
 
         record.Labels.Remove(label);
@@ -597,8 +532,8 @@ public class RecordBusiness : IRecordBusiness
 
         // Filtering Record By User's Sensitivity Label access
         var userAuthorizedLabels =
-            await PermissionHelper.GetAuthorizedSensitivityLabels(
-                _context, currentUserId, organizationId, projectId, "read");
+            await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
+                currentUserId, organizationId, projectId, "read record");
 
 
         // Query for existing records (excluding archived)
@@ -659,12 +594,12 @@ public class RecordBusiness : IRecordBusiness
     /// <param name="projectId">The ID of the project under which to create the record</param>
     /// <param name="dataSourceId">The ID of the data source under which to create the record</param>
     /// <param name="dto">The data transfer object containing details on the record to be created</param>
+    /// <param name="sensitivityLabelIds">The IDs of the labels to attach</param>
     /// <returns>The newly created metadata record</returns>
     /// <exception cref="KeyNotFoundException">Returned if the project or datasource are not found</exception>
     /// <exception cref="Exception">Returned if the metadata is too deeply nested</exception>
     public async Task<RecordResponseDto> CreateRecord(long currentUserId, long organizationId, long projectId,
-        long dataSourceId,
-        CreateRecordRequestDto dto)
+        long dataSourceId, CreateRecordRequestDto dto, List<long>? sensitivityLabelIds = null)
     {
         ValidationHelper.ValidateModel(dto);
         await ExistenceHelper.EnsureDataSourceExistsForProjectAsync(_context, dataSourceId, projectId);
@@ -677,7 +612,7 @@ public class RecordBusiness : IRecordBusiness
             throw new Exception(
                 $"The depth of the JSON structure exceeds the maximum allowed depth of 3. Current depth of properties is {maxDepth}.");
 
-        if (dto.ObjectStorageId != null) await CheckObjectStorageExists(projectId, dto.ObjectStorageId.Value);
+        if (dto.ObjectStorageId != null) await CheckObjectStorageExists(organizationId, projectId, dto.ObjectStorageId.Value);
 
         await using var transaction = await _context.Database.BeginTransactionAsync();
 
@@ -697,23 +632,29 @@ public class RecordBusiness : IRecordBusiness
                 LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
                 LastUpdatedBy = currentUserId,
                 FileType = dto.FileType,
-                OrganizationId = organizationId
+                OrganizationId = organizationId,
             };
 
             _context.Records.Add(record);
             await _context.SaveChangesAsync();
-
+            
             // Process tags (can be created on-the-fly)
             var tags = await ProcessTags(
                 currentUserId, organizationId, projectId, record.Id, dto.Tags);
+            
+            if (sensitivityLabelIds?.Count > 0)
+            {
+                var labels = await _context.SensitivityLabels
+                    .Where(l => sensitivityLabelIds.Contains(l.Id))
+                    .ToListAsync();
 
-            // Process sensitivity labels (must exist and user must have write permission)
-            var labels = await ProcessSensitivityLabels(
-                currentUserId,
-                organizationId,
-                projectId,
-                record.Id,
-                dto.SensitivityLabelIds);
+                foreach (var label in labels)
+                {
+                    record.Labels.Add(label);
+                }
+
+                await _context.SaveChangesAsync();
+            }
 
             // Log Record Create Event
             await _eventBusiness.CreateEvent(
@@ -750,7 +691,11 @@ public class RecordBusiness : IRecordBusiness
                 IsArchived = record.IsArchived,
                 FileType = record.FileType,
                 Tags = tags,
-                Labels = labels,
+                Labels = record.Labels.Select(l => new RecordLabelDto()
+                {
+                    Id = l.Id,
+                    Name = l.Name
+                }).ToList(),
             };
         }
         catch (Exception exc)
@@ -783,7 +728,7 @@ public class RecordBusiness : IRecordBusiness
 
         if (records.Count == 0) throw new Exception("Unable to bulk create records: no records selected for creation");
 
-        await EnsureMultipleObjectStoragesExistOnce(projectId, records);
+        await EnsureMultipleObjectStoragesExistOnce(organizationId, projectId, records);
 
         var conn = (NpgsqlConnection)_context.Database.GetDbConnection();
         if (conn.State != ConnectionState.Open) await conn.OpenAsync();
@@ -907,23 +852,6 @@ public class RecordBusiness : IRecordBusiness
         if (returnedRecord is null)
             throw new KeyNotFoundException($"Record with id {recordId} not found or is archived.");
 
-        // Check user Authorized Sensitivity Label access
-        if (returnedRecord.Labels.Count > 0)
-        {
-            var userAuthorizedLabels = await PermissionHelper.GetAuthorizedSensitivityLabels(
-                _context, currentUserId, organizationId, projectId, "write");
-
-            var recordLabelIds = returnedRecord.Labels.Select(l => l.Id).ToList();
-            var hasAllRequiredLabels = recordLabelIds.All(labelId =>
-                userAuthorizedLabels.Contains(labelId));
-
-            if (!hasAllRequiredLabels)
-            {
-                throw new UnauthorizedAccessException(
-                    $"You do not have access to all required sensitivity labels for record {recordId}");
-            }
-        }
-
         // set lastUpdatedAt timestamp
         var lastUpdatedAt = DateTime.UtcNow;
 
@@ -987,23 +915,6 @@ public class RecordBusiness : IRecordBusiness
 
         if (returnedRecord is null)
             throw new KeyNotFoundException($"Record with id {recordId} not found or is not archived.");
-
-        // Check sensitivity label authorization if record has labels
-        if (returnedRecord.Labels.Count > 0)
-        {
-            var authorizedLabels = await PermissionHelper.GetAuthorizedSensitivityLabels(
-                _context, currentUserId, organizationId, projectId, "write");
-
-            var recordLabelIds = returnedRecord.Labels.Select(l => l.Id).ToList();
-            var hasAllRequiredLabels = recordLabelIds.All(labelId =>
-                authorizedLabels.Contains(labelId));
-
-            if (!hasAllRequiredLabels)
-            {
-                throw new UnauthorizedAccessException(
-                    $"You do not have access to all required sensitivity labels for record {recordId}");
-            }
-        }
 
         // set lastUpdatedAt timestamp
         var lastUpdatedAt = DateTime.UtcNow;
@@ -1075,23 +986,6 @@ public class RecordBusiness : IRecordBusiness
         if (returnedRecord is null)
             throw new KeyNotFoundException($"Record with id {recordId} is archived or not found");
 
-        // Check sensitivity label authorization if record has labels
-        if (returnedRecord.Labels.Count > 0)
-        {
-            var authorizedLabels = await PermissionHelper.GetAuthorizedSensitivityLabels(
-                _context, currentUserId, organizationId, projectId, "write");
-
-            var recordLabelIds = returnedRecord.Labels.Select(l => l.Id).ToList();
-            var hasAllRequiredLabels = recordLabelIds.All(labelId =>
-                authorizedLabels.Contains(labelId));
-
-            if (!hasAllRequiredLabels)
-            {
-                throw new UnauthorizedAccessException(
-                    $"You do not have access to all required sensitivity labels for record {recordId}");
-            }
-        }
-
         var recordName = returnedRecord.Name;
         var recordDataSourceId = returnedRecord.DataSourceId;
 
@@ -1138,26 +1032,12 @@ public class RecordBusiness : IRecordBusiness
         if (returnedRecord is null)
             throw new KeyNotFoundException($"Record with id {recordId} not found");
 
-        // Check Access by user sensitivity Label Permissions
-        if (returnedRecord.Labels.Count > 0)
-        {
-            var authorizedLabels = await PermissionHelper.GetAuthorizedSensitivityLabels(
-                _context, currentUserId, organizationId, projectId, "write");
-            var recordLabelIds = returnedRecord.Labels.Select(l => l.Id).ToList();
-            var hasAllRequiredLabels = recordLabelIds.All(labelId => authorizedLabels.Contains(labelId));
-            if (!hasAllRequiredLabels)
-            {
-                throw new UnauthorizedAccessException(
-                    $"You do not have access to all required sensitivity labels for record {recordId}");
-            }
-        }
-
         var maxDepth = CalculateJsonMaxDepth(dto.Properties);
         if (maxDepth > 3)
             throw new Exception(
                 $"The depth of the JSON structure exceeds the maximum allowed depth of 3. Current depth of properties is {maxDepth}.");
 
-        if (dto.ObjectStorageId != null) await CheckObjectStorageExists(projectId, dto.ObjectStorageId.Value);
+        if (dto.ObjectStorageId != null) await CheckObjectStorageExists(organizationId, projectId, dto.ObjectStorageId.Value);
 
         returnedRecord.Uri = dto.Uri ?? returnedRecord.Uri;
         returnedRecord.Properties = dto.Properties != null ? dto.Properties.ToString() : returnedRecord.Properties;
@@ -1277,7 +1157,7 @@ public class RecordBusiness : IRecordBusiness
     ///<param name="records"> Records with object storages to check</param>
     ///<exception cref="KeyNotFoundException">If an object storage ID is not found</exception>
     ///<returns>Exception if obj storage ID not exist</returns>
-    private async Task EnsureMultipleObjectStoragesExistOnce(long projectId, List<CreateRecordRequestDto> records)
+    private async Task EnsureMultipleObjectStoragesExistOnce(long organizationId, long projectId, List<CreateRecordRequestDto> records)
     {
         var ids = records.Where(r => r.ObjectStorageId.HasValue)
             .Select(r => r.ObjectStorageId!.Value)
@@ -1287,7 +1167,7 @@ public class RecordBusiness : IRecordBusiness
 
         // One database round trip                                                                                                            
         var ok = await _context.ObjectStorages
-            .Where(os => os.ProjectId == projectId && ids.Contains(os.Id))
+            .Where(os => os.OrganizationId == organizationId && ids.Contains(os.Id) && (os.ProjectId == projectId || os.ProjectId == null))
             .Select(os => os.Id)
             .ToListAsync();
 
@@ -1295,14 +1175,14 @@ public class RecordBusiness : IRecordBusiness
         {
             var missing = ids.Except(ok).Take(5);
             throw new KeyNotFoundException(
-                $"One or more object storage IDs do not exist in project {projectId} (e.g., {string.Join(",", missing)}).");
+                $"One or more object storage IDs do not exist in organization {organizationId} (e.g., {string.Join(",", missing)}).");
         }
     }
 
-    private async Task CheckObjectStorageExists(long projectId, long objectStorageId)
+    private async Task CheckObjectStorageExists(long organizationId, long projectId, long objectStorageId)
     {
-        var referencedObjectStorage =
-            await _context.ObjectStorages.FirstOrDefaultAsync(o => o.ProjectId == projectId && o.Id == objectStorageId);
+        var referencedObjectStorage = await _context.ObjectStorages.FirstOrDefaultAsync(o => o.OrganizationId == organizationId && o.Id == objectStorageId && (o.ProjectId == projectId || o.ProjectId == null));
+        
         if (referencedObjectStorage == null)
             throw new KeyNotFoundException($"Object storage with ID {objectStorageId} does not exist");
     }
@@ -1341,76 +1221,6 @@ public class RecordBusiness : IRecordBusiness
                 Name = tagMap[tag].Name
             })
             .ToList();
-    }
-
-    private async Task<ICollection<RecordLabelDto>> ProcessSensitivityLabels(
-        long currentUserId,
-        long organizationId,
-        long projectId,
-        long recordId,
-        List<long>? labelIds)
-    {
-        // Handle labels if provided
-        if (labelIds == null || !labelIds.Any())
-            return new List<RecordLabelDto>();
-
-        // Deduplicate label IDs
-        var distinctLabelIds = labelIds.Distinct().ToList();
-
-        // Get labels user has write permission for
-        var authorizedLabelIds = await PermissionHelper.GetAuthorizedSensitivityLabels(
-            _context,
-            currentUserId,
-            organizationId,
-            new[] { projectId },
-            "write");
-
-        // Check for unauthorized labels first
-        var unauthorizedIds = distinctLabelIds.Where(id => !authorizedLabelIds.Contains(id)).ToList();
-        if (unauthorizedIds.Any())
-        {
-            throw new UnauthorizedAccessException(
-                $"You do not have write permission for the following sensitivity label IDs: {string.Join(", ", unauthorizedIds)}");
-        }
-
-        // Verify all sensitivity labels exist and belong to the correct organization/project
-        var existingLabels = await _context.SensitivityLabels
-            .Where(l => distinctLabelIds.Contains(l.Id)
-                        && l.OrganizationId == organizationId
-                        && (l.ProjectId == projectId || l.ProjectId == null)
-                        && !l.IsArchived)
-            .Select(l => new RecordLabelDto
-            {
-                Id = l.Id,
-                Name = l.Name
-            })
-            .ToListAsync();
-
-        // Check if any requested labels don't exist
-        var foundIds = existingLabels.Select(l => l.Id).ToHashSet();
-        var missingIds = distinctLabelIds.Where(id => !foundIds.Contains(id)).ToList();
-
-        if (missingIds.Any())
-        {
-            throw new ArgumentException(
-                $"The following sensitivity label IDs do not exist, are archived, or are not accessible: {string.Join(", ", missingIds)}");
-        }
-
-        // Attach labels to record
-        var recordLabels = existingLabels
-            .Select(label => new RecordLabelLinkDto
-            {
-                RecordId = recordId,
-                LabelId = label.Id
-            })
-            .ToList();
-
-        if (recordLabels.Any())
-        {
-            await BulkAttachLabels(recordLabels);
-        }
-
-        return existingLabels;
     }
 
     private async Task<Dictionary<string, TagResponseDto>> BulkUpsertTags(

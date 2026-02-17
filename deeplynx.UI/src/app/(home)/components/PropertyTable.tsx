@@ -136,6 +136,7 @@ const PropertyTable: React.FC<PropertyTableProps> = ({
       // Check if it's an abort error (user cancelled)
       if (axios.isAxiosError(error) && error.code === "ERR_CANCELED") {
         // Don't treat this as an error - it's intentional
+        return;
       } else {
         console.error("Download error:", error);
       }

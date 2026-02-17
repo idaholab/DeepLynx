@@ -1,48 +1,13 @@
 # Stage 1: Build the frontend
 FROM node:lts-alpine3.22 AS frontend-build
 
-# Define build arguments
-ARG OKTA_CLIENT_ID
-ARG OKTA_ISSUER
-ARG REDIRECT_LINK
-ARG OKTA_CLIENT_SECRET
-ARG AUTH_SECRET
-ARG NEXTAUTH_SECRET
-ARG SERVICE_TOKEN
-ARG BACKEND_BASE_URL
-ARG NEXTAUTH_URL
-ARG NEXT_PUBLIC_DISABLE_FRONTEND_AUTHENTICATION
-
-# Set environment variables
-ENV OKTA_CLIENT_ID=${OKTA_CLIENT_ID}
-ENV OKTA_ISSUER=${OKTA_ISSUER}
-ENV REDIRECT_LINK=${REDIRECT_LINK}
-ENV OKTA_CLIENT_SECRET=${OKTA_CLIENT_SECRET}
-ENV AUTH_SECRET=${AUTH_SECRET}
-ENV NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
-ENV SERVICE_TOKEN=${SERVICE_TOKEN}
-ENV BACKEND_BASE_URL=${BACKEND_BASE_URL}
-ENV NEXTAUTH_URL=${NEXTAUTH_URL}
-ENV NEXT_PUBLIC_DISABLE_FRONTEND_AUTHENTICATION=${NEXT_PUBLIC_DISABLE_FRONTEND_AUTHENTICATION}
-
-# # Print out the value of the environment variables
-# RUN echo "OKTA_CLIENT_ID=${OKTA_CLIENT_ID}" \
-#     && echo "OKTA_ISSUER=${OKTA_ISSUER}" \
-#     && echo "REDIRECT_LINK=${REDIRECT_LINK}" \
-#     && echo "OKTA_CLIENT_SECRET=${OKTA_CLIENT_SECRET}" \
-#     && echo "AUTH_SECRET=${AUTH_SECRET}" \
-#     && echo "NEXTAUTH_SECRET=${NEXTAUTH_SECRET}" \
-#     && echo "BACKEND_BASE_URL=${BACKEND_BASE_URL}" \
-#     && echo "NEXT_PUBLIC_DISABLE_FRONTEND_AUTHENTICATION=${NEXT_PUBLIC_DISABLE_FRONTEND_AUTHENTICATION}" \
-#     && echo "NEXTAUTH_URL=${NEXTAUTH_URL}"
-
 # Set working directory
 WORKDIR /usr/src/app
 
 # Install versioned os packages
 RUN apk update && apk upgrade --no-cache && \
     apk add --no-cache \
-        busybox=1.37.0-r20
+    busybox
 
 # Install latest global npm version and packages
 RUN npm install -g npm@latest
@@ -68,7 +33,7 @@ WORKDIR /usr/src/app
 # Install versioned os packages
 RUN apk update && apk upgrade --no-cache && \
     apk add --no-cache \
-        busybox=1.37.0-r20
+    busybox
 
 # Install latest global npm version and packages
 RUN npm install -g npm@latest
@@ -83,6 +48,11 @@ RUN npm install --omit-dev
 COPY --from=frontend-build /usr/src/app/.next ./.next
 COPY --from=frontend-build /usr/src/app/public ./public
 # COPY --from=frontend-build /usr/src/app/next.config.js ./next.config.js
+
+# Explicitly set user
+RUN addgroup -S nexus && adduser -S nexus -G nexus
+RUN chown -R nexus:nexus /usr/src/app
+USER nexus
 
 # Expose the port the app runs on
 EXPOSE 3000

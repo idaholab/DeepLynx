@@ -15,7 +15,6 @@ export async function GET(request: NextRequest) {
       const frontendUrl = process.env.NEXTAUTH_URL || request.nextUrl.origin;
       const loginUrl = new URL('/login/signin', frontendUrl);
       loginUrl.searchParams.set('returnUrl', returnUrl);
-
       return NextResponse.redirect(loginUrl);
     }
 

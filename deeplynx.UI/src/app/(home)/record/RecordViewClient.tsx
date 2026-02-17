@@ -2,7 +2,7 @@
 
 "use client";
 import Tabs from "@/app/(home)/components/Tabs";
-import { PencilIcon, PlusIcon, XMarkIcon } from "@heroicons/react/24/outline";
+import { PencilIcon, PlusIcon } from "@heroicons/react/24/outline";
 import Link from "next/link";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
@@ -25,25 +25,17 @@ import { useLanguage } from "@/app/contexts/Language";
 import { useOrganizationSession } from "@/app/contexts/OrganizationSessionProvider";
 import { getClass } from "@/app/lib/client_service/class_services.client";
 import {
-  archiveEdgeByRelationship,
-  createEdge,
-  getEdgeByRelationship,
-} from "@/app/lib/client_service/edge_services.client";
-import { fullTextSearch } from "@/app/lib/client_service/query_services.client";
-import {
-  getEdgesByRecord,
   getHistoricalRecord,
   unattachSensitivityLabelFromRecord,
   unattachTagFromRecord,
   updateRecord,
 } from "@/app/lib/client_service/record_services.client";
-import { getAllSensitivityLabelsProject } from "@/app/lib/client_service/sensitivity_labels_services.client";
-import { getAllTagsOrg } from "@/app/lib/client_service/tag_services.client";
-import GraphClientPage from "../graph/GraphClientPage";
 import {
-  ClassResponseDto,
-  RelatedRecordsResponseDto,
-} from "../types/responseDTOs";
+  getAllTags,
+  getAllTagsOrg,
+} from "@/app/lib/client_service/tag_services.client";
+import GraphClientPage from "../graph/components/GraphClientPage";
+import { ClassResponseDto } from "../types/responseDTOs";
 import AdditionalPropertiesEditor from "./components/AdditionalPropertiesEditor";
 import RecordTagsPanel from "./components/RecordTagsPanel";
 import RelatedRecordsCardSkeleton from "./skeletons/RelatedRecordsSkeleton";
@@ -53,8 +45,11 @@ import {
   getAllClasses,
 } from "@/app/lib/client_service/class_services.client";
 import ClassSelectorModal from "./components/ClassSelectorModal";
-import type { RecordSearchResult } from "./components/AddEdgeModal";
 import AddEdgeModal from "./components/AddEdgeModal";
+import {
+  RelatedRecordViewModel,
+  useRecordRelationships,
+} from "./hooks/useRecordRelationships";
 
 // ============= HELPER FUNCTIONS =============
 interface PropertyRow {
@@ -110,20 +105,6 @@ interface Props {
   recordId: number;
 }
 
-interface RelatedRecordViewModel extends RelatedRecordsResponseDto {
-  actions: React.JSX.Element;
-}
-
-interface ModalState {
-  isOpen: boolean;
-  type: "relatedRecord" | null;
-  nameToRemove: string;
-  recordNameToRemove?: string | null;
-  idToRemove: string | null;
-  originId: number | null;
-  destinationId: number | null;
-}
-
 // ============= MAIN COMPONENT =============
 export default function RecordViewClient({ projectId, recordId }: Props) {
   const { t } = useLanguage();
@@ -144,34 +125,6 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
   );
   const [selectedLabelIds, setSelectedLabelIds] = useState<string[]>([]);
 
-  // Pagination State
-  const [originPage, setOriginPage] = useState(1);
-  const [destinationPage, setDestinationPage] = useState(1);
-  const [pageSize] = useState(20);
-  const [hasMoreOrigins, setHasMoreOrigins] = useState(true);
-  const [hasMoreDestinations, setHasMoreDestinations] = useState(true);
-
-  // Related Records State
-  const [originRecords, setOriginRecords] = useState<RelatedRecordViewModel[]>(
-    [],
-  );
-  const [destinationRecords, setDestinationRecords] = useState<
-    RelatedRecordViewModel[]
-  >([]);
-  const [isLoadingOrigins, setIsLoadingOrigins] = useState(false);
-  const [isLoadingDestinations, setIsLoadingDestinations] = useState(false);
-
-  // Modal State
-  const [modal, setModal] = useState<ModalState>({
-    isOpen: false,
-    type: null,
-    nameToRemove: "",
-    recordNameToRemove: "",
-    idToRemove: null,
-    originId: null,
-    destinationId: null,
-  });
-
   // UI State
   const [activeTab, setActiveTab] = useState(0);
 
@@ -184,12 +137,36 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
   );
   const [isLoadingClasses, setIsLoadingClasses] = useState(false);
 
-  // Add Edge Modal State
-  const [isAddEdgeModalOpen, setIsAddEdgeModalOpen] = useState(false);
-  const [edgeDirection, setEdgeDirection] = useState<"outgoing" | "incoming">(
-    "outgoing",
-  );
-  const [edgeRelationship, setEdgeRelationship] = useState("");
+  const {
+    originPage,
+    destinationPage,
+    hasMoreOrigins,
+    hasMoreDestinations,
+    originRecords,
+    destinationRecords,
+    isLoadingOrigins,
+    isLoadingDestinations,
+    modal,
+    handleCloseModal,
+    handleConfirmUnlink,
+    isAddEdgeModalOpen,
+    setIsAddEdgeModalOpen,
+    edgeDirection,
+    edgeRelationship,
+    handleSearchRecords,
+    handleCreateRelationships,
+    resetRelationshipState,
+    loadMoreOrigins,
+    loadMoreDestinations,
+    openAddEdgeModal,
+  } = useRecordRelationships({
+    organizationId: organization?.organizationId,
+    projectId,
+    recordId,
+    recordName: record?.name,
+    recordDataSourceId: record?.dataSourceId,
+    translations: t.translations,
+  });
 
   // ============= HANDLERS =============
   const handleUpdateRecord = useCallback(
@@ -240,13 +217,8 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
     setSelectedIds([]);
     setSelectedLabels([]);
     setSelectedLabelIds([]);
-    setOriginPage(1);
-    setDestinationPage(1);
-    setOriginRecords([]);
-    setDestinationRecords([]);
-    setHasMoreOrigins(true);
-    setHasMoreDestinations(true);
-  }, []);
+    resetRelationshipState();
+  }, [resetRelationshipState]);
 
   const handleSaveProperties = useCallback(
     async (newProperties: any) => {
@@ -291,101 +263,6 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
     ],
   );
 
-  const fetchRelatedRecords = useCallback(
-    async (
-      isOrigin: boolean,
-      page: number,
-      setLoading: (val: boolean) => void,
-      setHasMore: (val: boolean) => void,
-      setRecords: React.Dispatch<
-        React.SetStateAction<RelatedRecordViewModel[]>
-      >,
-    ) => {
-      if (!recordId || !projectId || !record || !organization?.organizationId)
-        return;
-
-      try {
-        setLoading(true);
-
-        const edges = await getEdgesByRecord(
-          organization.organizationId as number,
-          projectId,
-          recordId,
-          isOrigin,
-          page,
-          true,
-          pageSize,
-        );
-
-        if (!edges || edges.length === 0) {
-          setHasMore(false);
-          if (page === 1) {
-            setRecords([]);
-          }
-          setLoading(false);
-          return;
-        }
-
-        if (edges.length < pageSize) {
-          setHasMore(false);
-        }
-
-        const viewModels: RelatedRecordViewModel[] = edges
-          .filter(
-            (edge) => edge.relatedRecordId != null && edge.relatedRecordId > 0,
-          )
-          .map((edge) => ({
-            relatedRecordName: edge.relatedRecordName,
-            relatedRecordId: edge.relatedRecordId,
-            relatedRecordProjectId: edge.relatedRecordProjectId,
-            relationshipName: edge.relationshipName,
-            actions: (
-              <XMarkIcon
-                className="w-5 h-5 cursor-pointer text-error hover:text-error-content"
-                onClick={() => {
-                  setModal({
-                    isOpen: true,
-                    type: "relatedRecord",
-                    nameToRemove: edge.relationshipName || t.translations.EDGE,
-                    recordNameToRemove: record?.name,
-                    idToRemove: edge.relatedRecordId!.toString(),
-                    originId: isOrigin ? recordId : edge.relatedRecordId!,
-                    destinationId: isOrigin ? edge.relatedRecordId! : recordId,
-                  });
-                }}
-              />
-            ),
-          }));
-
-        if (page === 1) {
-          setRecords(viewModels);
-        } else {
-          setRecords((prev) => [...prev, ...viewModels]);
-        }
-
-        setLoading(false);
-      } catch (error) {
-        console.error(
-          `Error fetching ${isOrigin ? "origin" : "destination"} records:`,
-          error,
-        );
-        setLoading(false);
-      }
-    },
-    [
-      recordId,
-      projectId,
-      record,
-      pageSize,
-      t.translations.EDGE,
-      organization?.organizationId,
-    ],
-  );
-
-  const handleCloseModal = () => {
-    setModal((prev) => ({ ...prev, isOpen: false }));
-  };
-
   const handleTagSelectionChange = (selected: string[]) => {
     const newTags = tags.filter((tag) => selected.includes(tag.id.toString()));
     setSelectedTags(newTags);
@@ -398,50 +275,6 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
     );
     setSelectedLabels(newLabels);
     setSelectedLabelIds(selected);
-  };
-
-  const handleConfirmUnlink = async () => {
-    if (!organization?.organizationId) return;
-
-    const { type, idToRemove, originId, destinationId } = modal;
-
-    if (type === "relatedRecord" && originId && destinationId) {
-      try {
-        const edgeExists = await getEdgeByRelationship(
-          organization.organizationId as number,
-          projectId,
-          originId,
-          destinationId,
-        );
-
-        if (edgeExists) {
-          await archiveEdgeByRelationship(
-            organization.organizationId as number,
-            projectId,
-            originId,
-            destinationId,
-            true,
-          );
-
-          if (originId === recordId) {
-            setOriginRecords((prev) =>
-              prev.filter((r) => r.relatedRecordId !== Number(idToRemove)),
-            );
-          } else {
-            setDestinationRecords((prev) =>
-              prev.filter((r) => r.relatedRecordId !== Number(idToRemove)),
-            );
-          }
-
-          toast.success(t.translations.LINK_ARCHIVED_SUCCESS);
-        }
-      } catch (error) {
-        console.error("Error archiving link:", error);
-        toast.error(t.translations.FAILED_TO_ARCHIVE_LINK);
-      }
-    }
-
-    handleCloseModal();
   };
 
   const handleClassUpdate = async (class_id: number) => {
@@ -492,113 +325,6 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
     }
   };
 
-  const handleSearchRecords = async (
-    query: string,
-    option?: string,
-  ): Promise<RecordSearchResult[]> => {
-    if (!organization?.organizationId) return [];
-
-    try {
-      const results = await fullTextSearch(
-        organization.organizationId as number,
-        query,
-        [projectId],
-      );
-
-      return results.map((record) => ({
-        id: Number(record.id),
-        name: record.name ?? String(record.id),
-        description: record.description ?? undefined,
-        className: record.className ?? undefined,
-        dataSourceName: record.dataSourceName ?? undefined,
-        originalId: record.originalId ?? undefined,
-        uri: record.uri ?? undefined,
-      }));
-    } catch (error) {
-      console.error("Error searching records:", error);
-      toast.error(
-        t.translations.FAILED_TO_SEARCH_RECORDS || "Failed to search records",
-      );
-      return [];
-    }
-  };
-
-  const handleCreateRelationships = async (data: {
-    records: any[];
-    relationship: string;
-    direction: "outgoing" | "incoming";
-  }) => {
-    if (!organization?.organizationId) return;
-
-    try {
-      const promises = data.records.map(async (targetRecord) => {
-        const origin_id =
-          data.direction === "outgoing" ? recordId : targetRecord.id;
-        const destination_id =
-          data.direction === "outgoing" ? targetRecord.id : recordId;
-
-        return createEdge(
-          organization.organizationId as number,
-          projectId,
-          record?.dataSourceId as number,
-          {
-            origin_id,
-            destination_id,
-            relationship_name: data.relationship,
-          },
-        );
-      });
-
-      await Promise.all(promises);
-
-      toast.success(
-        `${t.translations.CREATED || "Created"} ${data.records.length} ${
-          t.translations.RELATIONSHIP || "relationship"
-        }${data.records.length > 1 ? "s" : ""}!`,
-      );
-
-      const newRelationships: RelatedRecordViewModel[] = data.records.map(
-        (targetRecord) => ({
-          relatedRecordName: targetRecord.name,
-          relatedRecordId: targetRecord.id,
-          relatedRecordProjectId: projectId,
-          relationshipName: data.relationship,
-          actions: (
-            <XMarkIcon
-              className="w-5 h-5 cursor-pointer text-error hover:text-error-content"
-              onClick={() => {
-                setModal({
-                  isOpen: true,
-                  type: "relatedRecord",
-                  nameToRemove: data.relationship || t.translations.EDGE,
-                  recordNameToRemove: record?.name,
-                  idToRemove: targetRecord.id.toString(),
-                  originId:
-                    data.direction === "outgoing" ? recordId : targetRecord.id,
-                  destinationId:
-                    data.direction === "outgoing" ? targetRecord.id : recordId,
-                });
-              }}
-            />
-          ),
-        }),
-      );
-
-      if (data.direction === "outgoing") {
-        setOriginRecords((prev) => [...newRelationships, ...prev]);
-      } else {
-        setDestinationRecords((prev) => [...newRelationships, ...prev]);
-      }
-    } catch (error) {
-      console.error("Error creating relationships:", error);
-      toast.error(
-        t.translations.FAILED_TO_CREATE_RELATIONSHIPS ||
-          "Failed to create relationships",
-      );
-      throw error;
-    }
-  };
-
   // ============= EFFECTS =============
   useEffect(() => {
     resetAllState();
@@ -634,7 +360,9 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
 
           setSelectedLabels(parsedLabels);
           setSelectedLabelIds(
-            parsedLabels.map((label: { id: number | null }) => String(label.id)),
+            parsedLabels.map((label: { id: number | null }) =>
+              String(label.id),
+            ),
           );
         }
       } catch (error) {
@@ -681,10 +409,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
       if (!projectId || !organization?.organizationId) return;
 
       try {
-        const data = await getAllTagsOrg(
-          organization.organizationId as number,
-          [projectId],
-        );
+        const data = await getAllTags(projectId);
         setTags(data);
       } catch (error) {
         console.error("Error fetching tags:", error);
@@ -708,26 +433,6 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
 
     fetchLabels();
   }, [projectId, organization?.organizationId]);
-
-  useEffect(() => {
-    fetchRelatedRecords(
-      true,
-      originPage,
-      setIsLoadingOrigins,
-      setHasMoreOrigins,
-      setOriginRecords,
-    );
-  }, [fetchRelatedRecords, originPage]);
-
-  useEffect(() => {
-    fetchRelatedRecords(
-      false,
-      destinationPage,
-      setIsLoadingDestinations,
-      setHasMoreDestinations,
-      setDestinationRecords,
-    );
-  }, [fetchRelatedRecords, destinationPage]);
 
   useEffect(() => {
     const fetchClass = async () => {
@@ -822,7 +527,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
               `${t.translations.RECORD_} ${row.relatedRecordId}`}
           </Link>
         ) : (
-          <span>{row.relatedRecordName || t.translations.UNKOWN}</span>
+          <span>{row.relatedRecordName || t.translations.UNKNOWN}</span>
         ),
     },
     { key: "actions", label: t.translations.ACTIONS },
@@ -899,7 +604,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
               recordName={record.name}
             />
             <PropertyTable
-              title={t.translations.ADDITIONAL_PROPERIES}
+              title={t.translations.ADDITIONAL_PROPERTIES}
               rows={additionalPropertiesRows}
               onEditProperties={() => setIsPropertiesEditorOpen(true)}
             />
@@ -938,17 +643,10 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
                 title={`${t.translations.OUTGOING_}${record.name}${t.translations.OUTGOING_ARROW}`}
                 columns={relatedRecordsColumns}
                 rows={originRecords}
-                onLoadMore={() => {
-                  if (!isLoadingOrigins && hasMoreOrigins) {
-                    setOriginPage((prev) => prev + 1);
-                  }
-                }}
+                onLoadMore={loadMoreOrigins}
                 isLoading={isLoadingOrigins && originPage > 1}
                 hasMore={hasMoreOrigins}
-                onAddRelationship={() => {
-                  setEdgeDirection("outgoing");
-                  setIsAddEdgeModalOpen(true);
-                }}
+                onAddRelationship={() => openAddEdgeModal("outgoing")}
               />
             )}
 
@@ -961,17 +659,10 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
                   title={`${t.translations.INCOMING_}${record.name}${t.translations.INCOMING_ARROW}`}
                   columns={relatedRecordsColumns}
                   rows={destinationRecords}
-                  onLoadMore={() => {
-                    if (!isLoadingDestinations && hasMoreDestinations) {
-                      setDestinationPage((prev) => prev + 1);
-                    }
-                  }}
+                  onLoadMore={loadMoreDestinations}
                   isLoading={isLoadingDestinations && destinationPage > 1}
                   hasMore={hasMoreDestinations}
-                  onAddRelationship={() => {
-                    setEdgeDirection("incoming");
-                    setIsAddEdgeModalOpen(true);
-                  }}
+                  onAddRelationship={() => openAddEdgeModal("incoming")}
                 />
               </div>
             )}

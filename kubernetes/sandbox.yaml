@@ -5,44 +5,87 @@ metadata:
   name: deeplynx-test
   labels:
     name: deeplynx-test
+    
+---
+# Secret for Azure Storage Account with SAS Token
+apiVersion: v1
+kind: Secret
+metadata:
+  name: azure-storage-secret
+  namespace: deeplynx-test
+type: Opaque
+stringData:
+  azurestorageaccountname: ${AZURE_STORAGE_ACCOUNT_NAME}
+  azurestorageaccountsastoken: ${AZURE_STORAGE_ACCOUNT_SAS_TOKEN}
+  azurestorageaccountkey: ${AZURE_STORAGE_ACCOUNT_KEY}
+  azurestorageconnectionstring: ${AZURE_OBJECT_CONNECTION_STRING}
+  
+---
+# Persistent Volume pointing to existing Azure File Share
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: ${AZURE_FILE_SHARE_PERSISTENT_VOLUME}
+  namespace: deeplynx-test
+spec:
+  capacity:
+    storage: 60Gi
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: ${AZURE_FILE_SHARE_STORAGE_CLASS}
+  mountOptions:
+    - dir_mode=0777
+    - file_mode=0777
+    - uid=0
+    - gid=0
+    - mfsymlinks
+    - cache=strict
+    - actimeo=30
+    - nobrl
+  csi:
+    driver: file.csi.azure.com
+    readOnly: false
+    volumeHandle: ${AZURE_FILE_SHARE_VOLUME_HANDLE}  # Unique ID for this volume
+    volumeAttributes:
+      resourceGroup: ${AZURE_ACCOUNT_RESOURCE_GROUP}
+      storageAccount: ${AZURE_STORAGE_ACCOUNT_NAME}
+      shareName: duckdb-data
+      protocol: smb
+      server: ${AZURE_STORAGE_ACCOUNT_NAME}.file.core.usgovcloudapi.net
+    nodeStageSecretRef:
+      name: azure-storage-secret
+      namespace: deeplynx-test
 
 ---
-# Storage Class for DuckDB Azure Files
+# Storage Class (simplified for static provisioning)
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
-  name: azurefile-duckdb
+  name: ${AZURE_FILE_SHARE_STORAGE_CLASS}
   namespace: deeplynx-test
 provisioner: file.csi.azure.com
 parameters:
   skuName: Premium_LRS
 reclaimPolicy: Retain
 allowVolumeExpansion: true
-mountOptions:
-  - dir_mode=0777
-  - file_mode=0777
-  - uid=0
-  - gid=0
-  - mfsymlinks
-  - cache=strict
-  - actimeo=30
-  - nobrl # disable sending byte range lock requests to the server and for applications which have challenges with posix locks
 volumeBindingMode: Immediate
 
 ---
-# Persistent Volume Claim for DuckDB storage
+# Persistent Volume Claim
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: deeplynx-duckdb-pvc
+  name: ${AZURE_FILE_SHARE_PVC}
   namespace: deeplynx-test
 spec:
   accessModes:
-    - ReadWriteMany # Allows multiple pods to access the same volume
+    - ReadWriteMany
   resources:
     requests:
-      storage: 60Gi # Adjust size based on your timeseries data needs
-  storageClassName: azurefile-duckdb
+      storage: 60Gi
+  storageClassName: ${AZURE_FILE_SHARE_STORAGE_CLASS}
+  volumeName: ${AZURE_FILE_SHARE_PERSISTENT_VOLUME} # Bind to the specific PV
 
 ---
 apiVersion: apps/v1
@@ -67,7 +110,10 @@ spec:
             - name: AWS_S3_CONNECTION_STRING
               value: ${AWS_S3_CONNECTION_STRING}
             - name: AZURE_OBJECT_CONNECTION_STRING
-              value: ${AZURE_OBJECT_CONNECTION_STRING}
+              valueFrom:
+                secretKeyRef:
+                  name: azure-storage-secret
+                  key: azurestorageconnectionstring
             - name: AZURE_CONTAINER_NAME
               value: ${AZURE_CONTAINER_NAME}
             - name: ConnectionStrings__DefaultConnection
@@ -186,7 +232,7 @@ spec:
       volumes:
         - name: duckdb-storage
           persistentVolumeClaim:
-            claimName: deeplynx-duckdb-pvc
+            claimName: ${AZURE_FILE_SHARE_PVC}
 
 ---
 apiVersion: apps/v1
@@ -211,7 +257,10 @@ spec:
             - name: AWS_S3_CONNECTION_STRING
               value: ${AWS_S3_CONNECTION_STRING}
             - name: AZURE_OBJECT_CONNECTION_STRING
-              value: ${AZURE_OBJECT_CONNECTION_STRING}
+              valueFrom:
+                secretKeyRef:
+                  name: azure-storage-secret
+                  key: azurestorageconnectionstring
             - name: AZURE_CONTAINER_NAME
               value: ${AZURE_CONTAINER_NAME}
             - name: ConnectionStrings__DefaultConnection
@@ -322,7 +371,7 @@ spec:
       volumes:
         - name: duckdb-storage
           persistentVolumeClaim:
-            claimName: deeplynx-duckdb-pvc
+            claimName: ${AZURE_FILE_SHARE_PVC}
 
 ---
 #docs

@@ -5,7 +5,7 @@
 import React, { useState } from "react";
 import { TagIcon, XMarkIcon } from "@heroicons/react/24/outline";
 
-import TagButton from "@/app/(home)/components/TagButton";
+import TagButton from "./TagButton";
 import LabelButton from "@/app/(home)/components/LabelButton";
 import Tabs from "@/app/(home)/components/Tabs";
 import type {
@@ -108,7 +108,9 @@ const RecordTagsPanel: React.FC<Props> = ({
                   onClick={() => onRemoveTag(tag.id as number)}
                 >
                   <XMarkIcon className="w-3 h-3" />
-                  <span className="hidden sm:inline">{t.translations.REMOVE}</span>
+                  <span className="hidden sm:inline">
+                    {t.translations.REMOVE}
+                  </span>
                 </button>
               )}
             </div>
@@ -157,7 +159,9 @@ const RecordTagsPanel: React.FC<Props> = ({
                   onClick={() => onRemoveLabel(label.id as number)}
                 >
                   <XMarkIcon className="w-3 h-3" />
-                  <span className="hidden sm:inline">{t.translations.REMOVE}</span>
+                  <span className="hidden sm:inline">
+                    {t.translations.REMOVE}
+                  </span>
                 </button>
               )}
             </div>

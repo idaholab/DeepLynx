@@ -10,14 +10,16 @@ namespace deeplynx.business;
 public class HistoricalRecordBusiness : IHistoricalRecordBusiness
 {
     private readonly DeeplynxContext _context;
+    private readonly ISensitivityLabelService _sensitivityLabelService;
 
     /// <summary>
     ///     Initializes a new instance of the <see cref="HistoricalRecordBusiness" /> class.
     /// </summary>
     /// <param name="context">The database context used for the record operations.</param>
-    public HistoricalRecordBusiness(DeeplynxContext context)
+    public HistoricalRecordBusiness(DeeplynxContext context, ISensitivityLabelService sensitivityLabelService)
     {
         _context = context;
+        _sensitivityLabelService = sensitivityLabelService;
     }
 
     /// <summary>
@@ -61,8 +63,8 @@ public class HistoricalRecordBusiness : IHistoricalRecordBusiness
         
         // Get user's authorized labels
         var userAuthorizedLabels =
-            await PermissionHelper.GetAuthorizedSensitivityLabels(
-                _context, currentUserId, organizationId, projectId, "read");
+            await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
+                currentUserId, organizationId, projectId, "read record");
 
         // need to check for archived at after DB retrieval since filtering archived results before querying could
         // result in inaccurate "most recent" results if a record has been archived
@@ -125,22 +127,6 @@ public class HistoricalRecordBusiness : IHistoricalRecordBusiness
             .FirstOrDefaultAsync(r => r.Id == recordId && r.OrganizationId == organizationId);
         if (record == null) throw new KeyNotFoundException($"Record with id {recordId} not found");
 
-        if (record.Labels.Count > 0)
-        {
-            var userAuthorizedLabels = await PermissionHelper.GetAuthorizedSensitivityLabels(
-                _context, currentUserId, organizationId, record.ProjectId, "read");
-            
-            var recordLabelIds = record.Labels.Select(l => l.Id).ToList();
-            var hasAllRequiredLabels = recordLabelIds.All(labelId =>
-                userAuthorizedLabels.Contains(labelId));
-
-            if (!hasAllRequiredLabels)
-            {
-                throw new UnauthorizedAccessException(
-                    $"You do not have access to all required sensitivity labels for record {recordId}");
-            }
-        }
-
         var historicalRecord = await _context.HistoricalRecords
             .Where(r => r.RecordId == recordId && r.OrganizationId == organizationId)
             .OrderByDescending(r => r.LastUpdatedAt)
@@ -187,28 +173,6 @@ public class HistoricalRecordBusiness : IHistoricalRecordBusiness
         DateTime? pointInTime,
         bool hideArchived = true)
     {
-        var liveRecord = await _context.Records
-            .Include(r => r.Labels)
-            .FirstOrDefaultAsync(r => r.Id == recordId && r.OrganizationId == organizationId);
-        
-        if (liveRecord == null) throw new KeyNotFoundException($"Record with id {recordId} not found");
-        
-        if (liveRecord.Labels.Count > 0)
-        {
-            var userAuthorizedLabels = await PermissionHelper.GetAuthorizedSensitivityLabels(
-                _context, currentUserId, organizationId, liveRecord.ProjectId, "write");
-
-            var recordLabelIds = liveRecord.Labels.Select(l => l.Id).ToList();
-            var hasAllRequiredLabels = recordLabelIds.All(labelId =>
-                userAuthorizedLabels.Contains(labelId));
-
-            if (!hasAllRequiredLabels)
-            {
-                throw new UnauthorizedAccessException(
-                    $"You do not have access to all required sensitivity labels for record {recordId}");
-            }
-        }
-        
         var recordQuery = _context.HistoricalRecords
             .Where(r => r.RecordId == recordId && r.OrganizationId == organizationId)
             .OrderByDescending(r => r.LastUpdatedAt);
