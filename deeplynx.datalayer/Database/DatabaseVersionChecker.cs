@@ -28,40 +28,16 @@ public class DatabaseVersionChecker
 
             var pgvectorAvailable = (long)await pgvectorCommand.ExecuteScalarAsync() > 0;
 
-            // Determine if upgrade is needed
-            bool versionMismatch = majorVersion < RequiredPostgresVersion;
             bool pgvectorMissing = !pgvectorAvailable;
 
-            if (versionMismatch || pgvectorMissing)
+            if (pgvectorMissing)
             {
                 Console.ForegroundColor = ConsoleColor.Red;
                 Console.WriteLine("\n==========================================");
                 Console.WriteLine("❌ DATABASE REQUIREMENTS NOT MET");
                 Console.WriteLine("==========================================\n");
                 Console.ResetColor();
-
-                if (versionMismatch)
-                {
-                    Console.WriteLine($"❌ PostgreSQL version: {majorVersion} (Required: {RequiredPostgresVersion}+)");
-                }
-                else
-                {
-                    Console.ForegroundColor = ConsoleColor.Green;
-                    Console.WriteLine($"✓ PostgreSQL version: {majorVersion}");
-                    Console.ResetColor();
-                }
-
-                if (pgvectorMissing)
-                {
-                    Console.WriteLine($"❌ pgvector extension: Not available");
-                }
-                else
-                {
-                    Console.ForegroundColor = ConsoleColor.Green;
-                    Console.WriteLine($"✓ pgvector extension: Available");
-                    Console.ResetColor();
-                }
-
+                Console.WriteLine($"❌ pgvector extension: Not available");
                 Console.WriteLine();
                 Console.ForegroundColor = ConsoleColor.Yellow;
                 Console.WriteLine("ACTION REQUIRED:");
@@ -80,7 +56,6 @@ public class DatabaseVersionChecker
                 Console.WriteLine("==========================================\n");
 
                 var issues = new List<string>();
-                if (versionMismatch) issues.Add($"PostgreSQL {majorVersion} (requires {RequiredPostgresVersion}+)");
                 if (pgvectorMissing) issues.Add("pgvector extension not available");
 
                 throw new InvalidOperationException(

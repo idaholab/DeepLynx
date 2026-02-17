@@ -13,20 +13,32 @@ echo ""
 # Create storage directory if it doesn't exist
 mkdir -p storage
 
-# Find the actual container name (handles docker-compose prefixes)
-CONTAINER_NAME=$(docker ps -a --format '{{.Names}}' | grep -E ".*-${SERVICE_NAME}-[0-9]+$" | head -n 1)
+# Get the current directory name and convert to lowercase for docker-compose prefix
+CURRENT_DIR=$(basename "$(pwd)")
+COMPOSE_PREFIX=$(echo "${CURRENT_DIR}" | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')
+
+echo "Detected docker-compose prefix: ${COMPOSE_PREFIX}"
+echo ""
+
+# Find the actual container name using the detected prefix
+CONTAINER_NAME=$(docker ps -a --format '{{.Names}}' | grep -E "^${COMPOSE_PREFIX}-${SERVICE_NAME}-[0-9]+$" | head -n 1)
 
 if [ -z "${CONTAINER_NAME}" ]; then
-    echo "Error: Could not find container matching pattern '*-${SERVICE_NAME}-*'"
+    echo "Error: Could not find container matching pattern '${COMPOSE_PREFIX}-${SERVICE_NAME}-*'"
+    echo ""
     echo "Available containers:"
     docker ps -a --format '{{.Names}}'
+    echo ""
+    echo "Current directory: ${CURRENT_DIR}"
+    echo "Expected prefix: ${COMPOSE_PREFIX}"
     exit 1
 fi
 
 echo "Found container: ${CONTAINER_NAME}"
 
 # Get the volume name
-VOLUME_NAME=$(docker inspect ${CONTAINER_NAME} --format '{{range .Mounts}}{{if or (eq .Destination "/var/lib/postgresql/data") (eq .Destination "/var/lib/postgresql")}}{{.Name}}{{end}}{{end}}' 2>/dev/null)
+VOLUME_NAME=$(docker inspect ${CONTAINER_NAME} --format '{{range .Mounts}}{{if or (eq .Destination "/var/lib/postgresql/data") (eq .Destination "/var/lib/postgresql")}}{{.Name}}
+{{end}}{{end}}' 2>/dev/null | head -n 1 | tr -d '\n')
 
 if [ -z "${VOLUME_NAME}" ]; then
     echo "Error: Could not find volume for container ${CONTAINER_NAME}"
@@ -34,13 +46,23 @@ if [ -z "${VOLUME_NAME}" ]; then
 fi
 
 echo "Found volume: ${VOLUME_NAME}"
+echo ""
+
+# Verify the volume exists
+if ! docker volume inspect "${VOLUME_NAME}" > /dev/null 2>&1; then
+    echo "Warning: Volume ${VOLUME_NAME} doesn't appear to be valid"
+    echo "Listing all volumes for this container:"
+    docker inspect ${CONTAINER_NAME} --format '{{json .Mounts}}' | jq -r '.[] | "  - Name: \(.Name), Destination: \(.Destination), Type: \(.Type)"' 2>/dev/null || docker inspect ${CONTAINER_NAME} --format '{{range .Mounts}}  - {{.Name}} -> {{.Destination}}{{"\n"}}{{end}}'
+    echo ""
+    read -p "Enter the correct volume name (or press Ctrl+C to abort): " VOLUME_NAME
+fi
 
 # Get the container's network
 NETWORK_NAME=$(docker inspect ${CONTAINER_NAME} --format '{{range $key, $value := .NetworkSettings.Networks}}{{$key}}{{end}}' 2>/dev/null)
 
 if [ -z "${NETWORK_NAME}" ]; then
-    # Fallback to detecting network from docker-compose
-    NETWORK_NAME=$(docker network ls --format '{{.Name}}' | grep -E ".*-network$" | head -n 1)
+    # Fallback to detecting network from docker-compose using the prefix
+    NETWORK_NAME=$(docker network ls --format '{{.Name}}' | grep -E "^${COMPOSE_PREFIX}.*-network$" | head -n 1)
 fi
 
 if [ -z "${NETWORK_NAME}" ]; then
@@ -121,14 +143,14 @@ echo ""
 # Step 6: Start new Postgres 18 container (note: mount at /var/lib/postgresql, not /var/lib/postgresql/data)
 echo "Step 6: Starting a transient container to restore data to the volume..."
 docker run -d \
-    --name ${CONTAINER_NAME} \
-    --network ${NETWORK_NAME} \
-    -e POSTGRES_USER=postgres \
-    -e POSTGRES_PASSWORD=nexuscore \
-    -e POSTGRES_DB=deeplynx \
+    --name "${CONTAINER_NAME}" \
+    --network "${NETWORK_NAME}" \
+    -e "POSTGRES_USER=postgres" \
+    -e "POSTGRES_PASSWORD=nexuscore" \
+    -e "POSTGRES_DB=deeplynx" \
     -p 5432:5432 \
-    -v ${NEW_VOLUME_NAME}:/var/lib/postgresql \
-    ${DOCKER_IMAGE_TAG}
+    -v "${NEW_VOLUME_NAME}:/var/lib/postgresql" \
+    "${DOCKER_IMAGE_TAG}"
 echo "✓ New container started"
 echo ""
 
