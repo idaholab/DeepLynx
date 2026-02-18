@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Security.Cryptography;
@@ -23,11 +22,6 @@ public class NexusAuthenticationMiddleware : JwtBearerHandler
 {
     private static IConfigurationManager<OpenIdConnectConfiguration>? _configManager;
     private static readonly object _configManagerLock = new();
-
-    // Entra-specific cache and config manager
-    private static readonly ConcurrentDictionary<string, CachedEntraToken> _entraTokenCache = new();
-    private static IConfigurationManager<OpenIdConnectConfiguration>? _entraConfigManager;
-    private static readonly object _entraConfigManagerLock = new();
     private readonly IServiceScopeFactory _serviceScopeFactory;
 
     public NexusAuthenticationMiddleware(
@@ -313,49 +307,24 @@ public class NexusAuthenticationMiddleware : JwtBearerHandler
     {
         try
         {
-            // Extract JTI for caching (Entra uses 'uti' or 'jti')
-            var jti = jwtToken.Claims.FirstOrDefault(c => c.Type == "jti")?.Value
-                      ?? jwtToken.Claims.FirstOrDefault(c => c.Type == "uti")?.Value;
-
-            // Check cache first
-            if (!string.IsNullOrEmpty(jti) && _entraTokenCache.TryGetValue(jti, out var cached))
-            {
-                if (cached.ExpiresAt > DateTime.UtcNow)
-                {
-                    Log.Information("Entra token cache hit for JTI: {JTI}", jti);
-                    return AuthenticateResult.Success(new AuthenticationTicket(cached.Principal, Scheme.Name));
-                }
-
-                // Expired, remove from cache
-                Log.Information("Cached Entra token expired, removing from cache");
-                _entraTokenCache.TryRemove(jti, out _);
-            }
-
-            // Cache miss - validate token
-            // Use the issuer from the token itself (supports both commercial and government clouds)
             var issuer = jwtToken.Issuer;
             var metadataAddress = $"{issuer.TrimEnd('/')}/.well-known/openid-configuration";
 
             Log.Information("Validating Entra token from issuer: {Issuer}", issuer);
 
-            // Use separate config manager for Entra
-            if (_entraConfigManager == null)
-                lock (_entraConfigManagerLock)
-                {
-                    _entraConfigManager ??= new ConfigurationManager<OpenIdConnectConfiguration>(
-                        metadataAddress,
-                        new OpenIdConnectConfigurationRetriever());
-                }
+            // Create config manager dynamically per issuer (safer for multi-tenant)
+            var configManager = new ConfigurationManager<OpenIdConnectConfiguration>(
+                metadataAddress,
+                new OpenIdConnectConfigurationRetriever());
 
-            var oidcConfig = await _entraConfigManager.GetConfigurationAsync(CancellationToken.None);
+            var oidcConfig = await configManager.GetConfigurationAsync(CancellationToken.None);
 
             var tokenHandler = new JwtSecurityTokenHandler();
             var validationParameters = new TokenValidationParameters
             {
                 ValidIssuer = issuer,
                 ValidateIssuer = true,
-                ValidateAudience =
-                    false, // Skip audience validation - we don't control MCP Client's client ID - at some point can register our app in Azure AD
+                ValidateAudience = false, // Skip audience validation - token is from MCP Client
                 ValidateLifetime = true,
                 ClockSkew = TimeSpan.FromMinutes(2),
                 ValidateIssuerSigningKey = true,
@@ -367,23 +336,6 @@ public class NexusAuthenticationMiddleware : JwtBearerHandler
             var principal = tokenHandler.ValidateToken(token, validationParameters, out var validatedToken);
 
             await EnsureUserExistsAsync(principal);
-
-            // Cache the principal for future requests
-            if (!string.IsNullOrEmpty(jti))
-            {
-                var exp = jwtToken.Claims.FirstOrDefault(c => c.Type == "exp")?.Value;
-                var expiresAt = !string.IsNullOrEmpty(exp)
-                    ? DateTimeOffset.FromUnixTimeSeconds(long.Parse(exp)).DateTime
-                    : DateTime.UtcNow.AddHours(1);
-
-                _entraTokenCache.TryAdd(jti, new CachedEntraToken
-                {
-                    Principal = principal,
-                    ExpiresAt = expiresAt
-                });
-
-                Log.Information("Cached Entra token with JTI: {JTI}, expires at: {ExpiresAt}", jti, expiresAt);
-            }
 
             var ticket = new AuthenticationTicket(principal, Scheme.Name);
             Log.Information("Entra token validated successfully");
@@ -637,11 +589,5 @@ public class NexusAuthenticationMiddleware : JwtBearerHandler
         using var sha256 = SHA256.Create();
         var hashBytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(jti));
         return Convert.ToBase64String(hashBytes);
-    }
-    
-    private class CachedEntraToken
-    {
-        public ClaimsPrincipal Principal { get; set; } = null!;
-        public DateTime ExpiresAt { get; set; }
     }
 }

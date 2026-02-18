@@ -35,7 +35,6 @@ public class AuthenticatedHttpClientFactory : IAuthenticatedHttpClientFactory
 
         // Get Bearer token from Authorization header
         var authHeader = context.Request.Headers["Authorization"].FirstOrDefault();
-        Console.WriteLine("=== BEARER TOKEN DEBUG ===");
         Console.WriteLine($"Raw Authorization Header: '{authHeader}'");
         
         if (string.IsNullOrEmpty(authHeader))
@@ -45,11 +44,6 @@ public class AuthenticatedHttpClientFactory : IAuthenticatedHttpClientFactory
             throw new UnauthorizedAccessException("Invalid auth format. Expected: Bearer <your-token>");
 
         var token = authHeader.Substring(7).Trim(); // 7 = "Bearer ".Length
-        
-        Console.WriteLine($"Extracted Token: '{token}'");
-        Console.WriteLine($"Token Length: {token.Length}");
-        Console.WriteLine($"Token First 20 chars: '{(token.Length > 20 ? token.Substring(0, 20) : token)}...'");
-        Console.WriteLine("=========================");
         
         if (string.IsNullOrEmpty(token))
             throw new UnauthorizedAccessException("Empty Bearer token");
