@@ -23,11 +23,9 @@ public class MetadataBusinessTests : IntegrationTestBase
     private EventBusiness _eventBusiness = null!;
     private SensitivityLabelBusiness _sensitivityLabelBusiness = null!;
     private MetadataBusiness _metadataBusiness = null!;
-    private Mock<IEdgeBusiness> _mockEdgeBusiness = null!;
+    private EdgeBusiness _mockEdgeBusiness = null!;
     private Mock<IHubContext<EventNotificationHub>> _mockHubContext = null!;
     private Mock<ILogger<NotificationBusiness>> _mockNotificationLogger = null!;
-    private Mock<IRecordBusiness> _mockRecordBusiness = null!;
-    private Mock<IRelationshipBusiness> _mockRelationshipBusiness = null!;
     private INotificationBusiness _notificationBusiness = null!;
     private RecordBusiness _recordBusiness = null!;
     private RelationshipBusiness _relationshipBusiness = null!;
@@ -50,38 +48,29 @@ public class MetadataBusinessTests : IntegrationTestBase
     {
         await base.InitializeAsync();
 
-        _mockRecordBusiness = new Mock<IRecordBusiness>();
-        _mockRelationshipBusiness = new Mock<IRelationshipBusiness>();
-        _mockEdgeBusiness = new Mock<IEdgeBusiness>();
-
         _mockHubContext = new Mock<IHubContext<EventNotificationHub>>();
         _mockNotificationLogger = new Mock<ILogger<NotificationBusiness>>();
-        _notificationBusiness =
-            new NotificationBusiness(Context, _mockNotificationLogger.Object, _mockHubContext.Object);
+        _notificationBusiness = new NotificationBusiness(Context, _mockNotificationLogger.Object, _mockHubContext.Object);
         _mockBulkCopyUpsertExecutor = new BulkCopyUpsertExecutor();
         _eventBusiness = new EventBusiness(Context, _notificationBusiness, _mockBulkCopyUpsertExecutor);
 
-        _classBusiness = new ClassBusiness(
-            Context, _mockRecordBusiness.Object,
-            _mockRelationshipBusiness.Object, _eventBusiness);
-
-        _relationshipBusiness = new RelationshipBusiness(
-            Context, _mockEdgeBusiness.Object, _eventBusiness);
-
+        // Build leaf dependencies first
         _tagBusiness = new TagBusiness(Context, _eventBusiness);
         _sensitivityLabelBusiness = new SensitivityLabelBusiness(Context, _eventBusiness);
+    
+        // Mock the interface that was never assigned
+        _sensitivityLabelService = new Mock<ISensitivityLabelService>().Object;
+
+        _edgeBusiness = new EdgeBusiness(Context, _eventBusiness, _mockBulkCopyUpsertExecutor);
         _recordBusiness = new RecordBusiness(
             Context, _eventBusiness, _mockBulkCopyUpsertExecutor, _tagBusiness, _sensitivityLabelBusiness, _sensitivityLabelService);
-        _edgeBusiness = new EdgeBusiness(Context, _eventBusiness, _mockBulkCopyUpsertExecutor);
+        _relationshipBusiness = new RelationshipBusiness(Context, _edgeBusiness, _eventBusiness);
+
+        // Now classBusiness gets valid dependencies
+        _classBusiness = new ClassBusiness(Context, _recordBusiness, _relationshipBusiness, _eventBusiness);
 
         _metadataBusiness = new MetadataBusiness(
-            Context,
-            _classBusiness,
-            _relationshipBusiness,
-            _tagBusiness,
-            _recordBusiness,
-            _edgeBusiness
-        );
+            Context, _classBusiness, _relationshipBusiness, _tagBusiness, _recordBusiness, _edgeBusiness);
     }
 
     # region Helper methods
