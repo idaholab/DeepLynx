@@ -502,6 +502,62 @@ public class FileBusinessTests : IntegrationTestBase
         Assert.True(result2.Uri.Contains(_orgDefaultDirectory));
         Assert.True(File.Exists(result2.Uri));
     }
+    
+    [Fact]
+    public async Task UploadFile_CustomMetadata_WorksCorrectly()
+    {
+        // Arrange: Create org storage
+        var orgOsConfig = new JsonObject
+        {
+            ["mountPath"] = _orgDefaultDirectory
+        };
+
+        var orgObjectStorage = new ObjectStorage
+        {
+            Name = "Org Storage",
+            ProjectId = null,
+            OrganizationId = oid,
+            Type = "filesystem",
+            Config = orgOsConfig.ToString(),
+            Default = false
+        };
+
+        Context.ObjectStorages.Add(orgObjectStorage);
+        await Context.SaveChangesAsync();
+        var orgOsId = orgObjectStorage.Id;
+
+        // Upload file 1 to project storage
+        var content1 = "File in project storage";
+        var ms1 = new MemoryStream(Encoding.UTF8.GetBytes(content1));
+        var file1 = new FormFile(ms1, 0, ms1.Length, "file", "file1.txt")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "text/plain"
+        };
+
+        var metadata = new CreateRecordFileUploadRequestDto
+        {
+            Name = "Metadata",
+            Description = "Description",
+            Properties = new JsonObject
+            {
+                ["Name"] = "Name",
+            }, 
+            OriginalId = "OriginalId"
+        };
+
+        var result1 = await _fileBusiness.UploadFile(uid, oid, pid, did, osid, file1, null, metadata);
+        
+        // Assert: Both files should be in their respective storages
+        Assert.NotNull(result1);
+        Assert.Equal(osid, result1.ObjectStorageId);
+        Assert.True(result1.Uri.Contains(_testDirectory));
+        Assert.True(File.Exists(result1.Uri));
+        Assert.Equal(result1.Name, metadata.Name);
+        Assert.Equal(result1.Description, metadata.Description);
+        Assert.Equal(result1.OriginalId, metadata.OriginalId);        
+
+    }
 
 #endregion
     
@@ -1684,6 +1740,49 @@ public class FileBusinessTests : IntegrationTestBase
         Assert.Equal(osid, result.ObjectStorageId); // Should use project default
         Assert.True(File.Exists(result.Uri));
         Assert.True(result.Uri.Contains(_testDirectory), "File should be in project directory");
+    }
+    
+    [Fact]
+    public async Task CompleteUpload_CustomMetadata_WorksCorrectly()
+    {
+        
+        // Arrange
+        var session = await _fileBusiness.StartUpload(
+            oid, pid, did, null,
+            new FileUploadInitRequestDto { FileName = "complete-default.txt", FileSize = 2048 }
+        );
+
+        await _fileBusiness.UploadChunk(oid, pid, did, null, CreateFormFile("chunk0"), session.UploadId, 0);
+        await _fileBusiness.UploadChunk(oid, pid, did, null, CreateFormFile("chunk1"), session.UploadId, 1);
+
+        var completeRequest = new FileUploadCompleteRequestDto
+        {
+            UploadId = session.UploadId,
+            FileName = "complete-default.txt",
+            TotalChunks = 2
+        };
+        
+        var metadata = new CreateRecordFileUploadRequestDto
+        {
+            Name = "Metadata",
+            Description = "Description",
+            Properties = new JsonObject
+            {
+                ["Name"] = "Name",
+            }, 
+            OriginalId = "OriginalId"
+        };
+
+        // Act
+        var result1 = await _fileBusiness.CompleteUpload(uid, oid, pid, did, null, completeRequest, null, metadata);
+        
+        // Assert: Both files should be in their respective storages
+        Assert.NotNull(result1);
+        Assert.True(File.Exists(result1.Uri));
+        Assert.Equal(result1.Name, metadata.Name);
+        Assert.Equal(result1.Description, metadata.Description);
+        Assert.Equal(result1.OriginalId, metadata.OriginalId);        
+
     }
 
     [Fact]
