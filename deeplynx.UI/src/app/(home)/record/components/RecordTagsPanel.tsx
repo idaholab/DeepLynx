@@ -2,17 +2,17 @@
 
 "use client";
 
+import { XMarkIcon } from "@heroicons/react/24/outline";
 import React, { useState } from "react";
-import { TagIcon, XMarkIcon } from "@heroicons/react/24/outline";
 
-import TagButton from "./TagButton";
-import LabelButton from "@/app/(home)/components/LabelButton";
+import LabelButton from "@/app/(home)/record/components/LabelButton";
 import Tabs from "@/app/(home)/components/Tabs";
 import type {
   SensitivityLabelsDto,
   TagResponseDto,
 } from "@/app/(home)/types/responseDTOs";
 import { useLanguage } from "@/app/contexts/Language";
+import TagButton from "./TagButton";
 
 interface Props {
   // Data

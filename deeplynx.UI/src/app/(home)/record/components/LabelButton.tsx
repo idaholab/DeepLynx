@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { PlusIcon } from "@heroicons/react/24/outline";
-import { SensitivityLabelsDto } from "../types/responseDTOs";
-import AddLabelModal from "./AddLabelModal";
+import { SensitivityLabelsDto } from "../../types/responseDTOs";
+import AddLabelModal from "../../components/AddLabelModal";
 import toast from "react-hot-toast";
 import axios from "axios";
 import { useOrganizationSession } from "@/app/contexts/OrganizationSessionProvider";
@@ -95,14 +95,14 @@ const LabelButton: React.FC<LabelButtonProps> = ({
     try {
       if (isSelected) {
         await unattachSensitivityLabelFromRecord(
-          organization.organizationId,
+          organization.organizationId as number,
           projectId,
           recordId,
           Number(id),
         );
       } else {
         await attachSensitivityLabelToRecord(
-          organization.organizationId,
+          organization.organizationId as number,
           projectId,
           recordId,
           Number(id),
@@ -139,7 +139,10 @@ const LabelButton: React.FC<LabelButtonProps> = ({
       ];
       setTempSelectedIds(newSelectionIds);
       setSelectedIds(newSelectionIds);
-      setSelectedLabels((prevSelectedLabels) => [...prevSelectedLabels, newLabel]);
+      setSelectedLabels((prevSelectedLabels) => [
+        ...prevSelectedLabels,
+        newLabel,
+      ]);
       if (onSelectionChange) onSelectionChange(newSelectionIds);
 
       toast.success(
@@ -193,7 +196,9 @@ const LabelButton: React.FC<LabelButtonProps> = ({
                 />
                 <span
                   className="label-text whitespace-nowrap"
-                  ref={label.id === filteredLabels[0]?.id ? longestNameRef : null}
+                  ref={
+                    label.id === filteredLabels[0]?.id ? longestNameRef : null
+                  }
                 >
                   {label.name}
                 </span>
