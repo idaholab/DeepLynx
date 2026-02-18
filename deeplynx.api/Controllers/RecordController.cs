@@ -455,7 +455,7 @@ public class RecordController : ControllerBase
             return Ok(new
             {
                 message =
-                    $"Successfully bulk attached labels: {string.Join(", ", sensitivityLabelIds)} on records: {string.Join(", ", recordIds)}"
+                    $"Successfully bulk attached all labels to all records"
             });
         }
         catch (Exception exc)
