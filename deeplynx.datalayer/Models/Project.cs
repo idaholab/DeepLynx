@@ -34,6 +34,9 @@ public partial class Project
     [Column("banner")]
     [MaxLength(50)]
     public string? Banner { get; set; }
+    
+    [Column("require_sensitivity_label")]
+    public bool RequireSensitivityLabel { get; set; } = false;
 
     [InverseProperty("Project")]
     public virtual ICollection<Action> Actions { get; set; } = new List<Action>();

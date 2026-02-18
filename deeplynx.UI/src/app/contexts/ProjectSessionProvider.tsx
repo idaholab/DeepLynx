@@ -81,7 +81,6 @@ export const ProjectSessionProvider = ({
   }, []);
 
   const clearProject = useCallback(() => {
-    console.log("ProjectSessionProvider clearProject called");
     setProjectState(null);
     localStorage.removeItem("projectSession");
     document.cookie = "projectSession=; path=/; max-age=0";

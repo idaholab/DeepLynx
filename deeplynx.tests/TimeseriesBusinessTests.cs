@@ -2,6 +2,7 @@ using System.Text;
 using System.Text.Json.Nodes;
 using deeplynx.business;
 using deeplynx.datalayer.Models;
+using deeplynx.helpers;
 using deeplynx.helpers.BigData;
 using deeplynx.helpers.Hubs;
 using deeplynx.interfaces;
@@ -39,6 +40,7 @@ public class TimeseriesBusinessTests : IntegrationTestBase, IAsyncLifetime
     private RelationshipBusiness _relationshipBusiness = null!;
     private TagBusiness _tagBusiness = null!;
     private TimeseriesBusiness _timeseriesBusiness = null!;
+    private ISensitivityLabelService _sensitivityLabelService = null!;
 
     private long _organizationId;
     private long _projectId;
@@ -70,13 +72,14 @@ public class TimeseriesBusinessTests : IntegrationTestBase, IAsyncLifetime
         mockScope.Setup(s => s.ServiceProvider).Returns(mockServiceProvider.Object);
         _mockServiceScopeFactory.Setup(f => f.CreateScope()).Returns(mockScope.Object);
         _mockBulkCopyUpsertExecutor = new BulkCopyUpsertExecutor();
+        _sensitivityLabelService = new SensitivityLabelService(Context);
 
         // Set up business layer dependencies
         _notificationBusiness = new NotificationBusiness(Context, _mockNotificationLogger.Object, _mockHubContext.Object);
         _eventBusiness = new EventBusiness(Context, _notificationBusiness, _mockBulkCopyUpsertExecutor);
         _tagBusiness = new TagBusiness(Context, _eventBusiness);
         _sensitivityLabelBusiness = new SensitivityLabelBusiness(Context, _eventBusiness);
-        _recordBusiness = new RecordBusiness(Context, _eventBusiness, _mockBulkCopyUpsertExecutor, _tagBusiness, _sensitivityLabelBusiness);
+        _recordBusiness = new RecordBusiness(Context, _eventBusiness, _mockBulkCopyUpsertExecutor, _tagBusiness, _sensitivityLabelBusiness, _sensitivityLabelService);
         _classBusiness = new ClassBusiness(Context, _recordBusiness, _relationshipBusiness, _eventBusiness);
 
         _timeseriesBusiness = new TimeseriesBusiness(

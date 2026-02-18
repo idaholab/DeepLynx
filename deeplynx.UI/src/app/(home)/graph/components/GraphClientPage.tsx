@@ -4,7 +4,7 @@ import React, { useEffect, useRef, useState } from "react";
 import Graph from "graphology";
 // Remove this line: import Sigma from "sigma";
 import { Attributes } from "graphology-types";
-import { GraphResponseDto } from "../types/responseDTOs";
+import { GraphResponseDto } from "@/app/(home)/types/responseDTOs";
 import { useOrganizationSession } from "@/app/contexts/OrganizationSessionProvider";
 import { getGraphDataForRecord } from "@/app/lib/client_service/record_services.client";
 // Remove this line: import FA2Layout from "graphology-layout-forceatlas2/worker";

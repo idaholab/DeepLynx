@@ -5,7 +5,7 @@
 import React from "react";
 import { TagIcon, XMarkIcon } from "@heroicons/react/24/outline";
 
-import TagButton from "@/app/(home)/components/TagButton";
+import TagButton from "./TagButton";
 import type { TagResponseDto } from "@/app/(home)/types/responseDTOs";
 
 interface Props {

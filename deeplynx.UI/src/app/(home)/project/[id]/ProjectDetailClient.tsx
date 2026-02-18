@@ -8,8 +8,8 @@ import { format } from "date-fns";
 
 import SearchBar from "@/app/(home)/components/SearchBar";
 import WidgetCard from "@/app/(home)/components/Widgets";
-import { WidgetType } from "../../types/types";
-import RecentRecordsCard from "../../components/RecentRecordsCard";
+import { WidgetType } from "@/app/(home)/types/types";
+import RecentRecordsCard from "@/app/(home)/components/RecentRecordsCard";
 import { ProjectResponseDto } from "@/app/(home)/types/responseDTOs";
 import { useLanguage } from "@/app/contexts/Language";
 import { useProjectSession } from "@/app/contexts/ProjectSessionProvider";

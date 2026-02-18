@@ -120,7 +120,7 @@ public class SensitivityLabelProjectController : ControllerBase
     /// <param name="dto">Fields to update</param>
     /// <returns></returns>
     [HttpPut("{labelId:long}", Name = "api_update_sensitivity_label_project")]
-    [Auth("write", "sensitivity_label")]
+    [Auth("update", "sensitivity_label")]
     public async Task<ActionResult<SensitivityLabelResponseDto>> UpdateSensitivityLabel(
         long projectId,
         long labelId,
@@ -177,7 +177,7 @@ public class SensitivityLabelProjectController : ControllerBase
     /// <param name="archive">True to archive the label, false to unarchive it.</param>
     /// <returns>A message stating the label was successfully archived or unarchived.</returns>
     [HttpPatch("{labelId:long}", Name = "api_archive_sensitivity_label_project")]
-    [Auth("write", "sensitivity_label")]
+    [Auth("update", "sensitivity_label")]
     public async Task<IActionResult> ArchiveSensitivityLabel(
         long projectId,
         long labelId,
