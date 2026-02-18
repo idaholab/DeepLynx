@@ -463,7 +463,7 @@ export const translations = {
             ORG: "ORG",
             PRJ: "PRJ",
 
-            INVITE_USER_TO_ORG: "Invite User to Organization",
+            INVITE_USERS_TO_ORG: "Invite Users to this Organization",
             EMAIL_ADDRESS: "Email Address",
             EMAIL_INVITATION_DESCRIPTION: "An invitation email will be sent with instructions to join the organization. The user will be able to access all organization resources once they accept the invitation.",
             SEND_INVITATION: "Send Invitation",
@@ -1086,7 +1086,7 @@ export const translations = {
             PRJ: "PRJ",
 
 
-            INVITE_USER_TO_ORG: "Invitar usuario a la organización",
+            INVITE_USERS_TO_ORG: "Invitar a usuarios a la organización",
             EMAIL_ADDRESS: "Correo electrónico",
             EMAIL_INVITATION_DESCRIPTION: "Se enviará un correo de invitación con instrucciones para unirse a la organización. El usuario podrá acceder a todos los recursos de la organización una vez que acepte la invitación.",
             SEND_INVITATION: "Enviar invitación",
