@@ -18,7 +18,7 @@ interface Props {
   };
 }
 
-export default function RecordHistorySnapshotMeta({
+export default function RecordHistorySnapshotPropertiesCard({
   title,
   snapshot,
   placeholder,

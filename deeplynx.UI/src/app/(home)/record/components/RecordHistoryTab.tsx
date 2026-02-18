@@ -1,6 +1,12 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useTransition,
+} from "react";
 import toast from "react-hot-toast";
 import { ChevronDownIcon, ChevronRightIcon } from "@heroicons/react/24/outline";
 import { HistoricalRecordResponseDto } from "@/app/(home)/types/responseDTOs";
@@ -10,7 +16,7 @@ import {
   getRecordHistory,
 } from "@/app/lib/client_service/historical_record_services.client";
 import { formatRecordHistoryDate } from "./RecordHistoryDate";
-import RecordHistorySnapshotMeta from "./RecordHistorySnapshotMeta";
+import RecordHistorySnapshotPropertiesCard from "./RecordHistorySnapshotPropertiesCard";
 
 interface Props {
   organizationId: number;
@@ -38,16 +44,21 @@ interface DiffTreeNode {
   isLeaf: boolean;
 }
 
-function parseMaybeJson(value: unknown): unknown {
+interface FlatDiffRow {
+  node: DiffTreeNode;
+  depth: number;
+}
+
+function parseJsonProperties(value: unknown): unknown {
   if (typeof value !== "string") return value;
   const trimmed = value.trim();
   if (!trimmed) return value;
 
-  const looksLikeJson =
+  const JsonCheck =
     (trimmed.startsWith("{") && trimmed.endsWith("}")) ||
     (trimmed.startsWith("[") && trimmed.endsWith("]"));
 
-  if (!looksLikeJson) return value;
+  if (!JsonCheck) return value;
 
   try {
     return JSON.parse(trimmed);
@@ -101,6 +112,8 @@ function normalizeRecord(
 ): Record<string, string> {
   if (!record) return {};
 
+  // Build a flat key/value shape so arbitrary nested values can be diffed
+  // with simple string comparisons and grouped later into a tree.
   const normalized: Record<string, string> = {};
 
   const set = (key: string, value: unknown) => {
@@ -127,14 +140,14 @@ function normalizeRecord(
   set("record.lastUpdatedBy", record.lastUpdatedBy);
   set("record.isArchived", record.isArchived);
 
-  const parsedProperties = parseMaybeJson(record.properties);
+  const parsedProperties = parseJsonProperties(record.properties);
   if (parsedProperties && typeof parsedProperties === "object") {
     flattenObject(parsedProperties, "properties", normalized);
   } else {
     set("properties", parsedProperties);
   }
 
-  const parsedTags = parseMaybeJson(record.tags);
+  const parsedTags = parseJsonProperties(record.tags);
   if (parsedTags && typeof parsedTags === "object") {
     flattenObject(parsedTags, "tags", normalized);
   } else {
@@ -269,6 +282,23 @@ function filterTreeForChanges(nodes: DiffTreeNode[]): DiffTreeNode[] {
     .filter((node): node is DiffTreeNode => node !== null);
 }
 
+function flattenVisibleTree(
+  nodes: DiffTreeNode[],
+  expandedRows: Set<string>,
+  depth = 0,
+): FlatDiffRow[] {
+  const rows: FlatDiffRow[] = [];
+
+  nodes.forEach((node) => {
+    rows.push({ node, depth });
+    if (node.children.length > 0 && expandedRows.has(node.id)) {
+      rows.push(...flattenVisibleTree(node.children, expandedRows, depth + 1));
+    }
+  });
+
+  return rows;
+}
+
 export default function RecordHistoryTab({
   organizationId,
   projectId,
@@ -283,6 +313,7 @@ export default function RecordHistoryTab({
     useState<HistoricalRecordResponseDto | null>(null);
   const [compareMode, setCompareMode] = useState<CompareMode>("previous");
   const [manualCompareIndex, setManualCompareIndex] = useState(0);
+  const [manualCompareUiIndex, setManualCompareUiIndex] = useState(0);
   const [comparisonSnapshotData, setComparisonSnapshotData] =
     useState<HistoricalRecordResponseDto | null>(null);
   const [comparisonSnapshotIndex, setComparisonSnapshotIndex] = useState<
@@ -295,6 +326,39 @@ export default function RecordHistoryTab({
     useState(false);
   const [historyError, setHistoryError] = useState<string | null>(null);
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+  const [sliderIndex, setSliderIndex] = useState(0);
+  const [maxRenderedRows, setMaxRenderedRows] = useState(300);
+  const [isUiPending, startUiTransition] = useTransition();
+
+  // Cache snapshots by point-in-time to avoid refetching versions users revisit.
+  const snapshotCacheRef = useRef<Map<string, HistoricalRecordResponseDto>>(
+    new Map(),
+  );
+  const sliderCommitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
+  const manualCompareCommitTimerRef = useRef<ReturnType<
+    typeof setTimeout
+  > | null>(null);
+
+  const clearSliderCommitTimer = () => {
+    if (!sliderCommitTimerRef.current) return;
+    clearTimeout(sliderCommitTimerRef.current);
+    sliderCommitTimerRef.current = null;
+  };
+
+  const clearManualCompareCommitTimer = () => {
+    if (!manualCompareCommitTimerRef.current) return;
+    clearTimeout(manualCompareCommitTimerRef.current);
+    manualCompareCommitTimerRef.current = null;
+  };
+
+  const resolveManualCompareIndex = (nextIndex: number): number => {
+    if (history.length > 1 && nextIndex === selectedIndex) {
+      return nextIndex > 0 ? nextIndex - 1 : nextIndex + 1;
+    }
+    return nextIndex;
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -309,6 +373,7 @@ export default function RecordHistoryTab({
           projectId,
           recordId,
         );
+        // History is shown chronologically; newest entry is selected by default.
         const sorted = [...versions].sort(
           (a, b) =>
             new Date(a.lastUpdatedAt).getTime() -
@@ -322,11 +387,15 @@ export default function RecordHistoryTab({
         if (sorted.length > 0) {
           const latestIndex = sorted.length - 1;
           setSelectedIndex(latestIndex);
+          setSliderIndex(latestIndex);
           const defaultManualIndex = latestIndex > 0 ? latestIndex - 1 : 0;
           setManualCompareIndex(defaultManualIndex);
+          setManualCompareUiIndex(defaultManualIndex);
         } else {
           setSelectedIndex(0);
+          setSliderIndex(0);
           setManualCompareIndex(0);
+          setManualCompareUiIndex(0);
           setSelectedSnapshot(null);
           setComparisonSnapshotData(null);
           setComparisonSnapshotIndex(null);
@@ -355,13 +424,37 @@ export default function RecordHistoryTab({
   ]);
 
   useEffect(() => {
+    setSliderIndex(selectedIndex);
+  }, [selectedIndex]);
+
+  useEffect(() => {
+    setManualCompareUiIndex(manualCompareIndex);
+  }, [manualCompareIndex]);
+
+  useEffect(() => {
+    return () => {
+      clearSliderCommitTimer();
+      clearManualCompareCommitTimer();
+    };
+  }, []);
+
+  useEffect(() => {
     if (history.length === 0) return;
     if (selectedIndex < 0 || selectedIndex > history.length - 1) return;
 
     const selectedVersion = history[selectedIndex];
     if (!selectedVersion?.lastUpdatedAt) return;
 
+    // Use list payload immediately for responsive UI, then hydrate with the
+    // point-in-time record endpoint (includes full snapshot details).
     setSelectedSnapshot(selectedVersion);
+
+    const snapshotCacheKey = selectedVersion.lastUpdatedAt;
+    const cachedSnapshot = snapshotCacheRef.current.get(snapshotCacheKey);
+    if (cachedSnapshot) {
+      setSelectedSnapshot(cachedSnapshot);
+      return;
+    }
 
     let cancelled = false;
 
@@ -375,7 +468,10 @@ export default function RecordHistoryTab({
           selectedVersion.lastUpdatedAt,
           false,
         );
-        if (!cancelled) setSelectedSnapshot(snapshot);
+        if (!cancelled) {
+          snapshotCacheRef.current.set(snapshotCacheKey, snapshot);
+          setSelectedSnapshot(snapshot);
+        }
       } catch (error) {
         if (cancelled) return;
         console.error(
@@ -413,8 +509,17 @@ export default function RecordHistoryTab({
     const compareVersion = history[manualCompareIndex];
     if (!compareVersion?.lastUpdatedAt) return;
 
+    // Same optimistic/hydration approach for manual comparison target.
     setComparisonSnapshotData(compareVersion);
     setComparisonSnapshotIndex(manualCompareIndex);
+
+    const snapshotCacheKey = compareVersion.lastUpdatedAt;
+    const cachedSnapshot = snapshotCacheRef.current.get(snapshotCacheKey);
+    if (cachedSnapshot) {
+      setComparisonSnapshotData(cachedSnapshot);
+      setComparisonSnapshotIndex(manualCompareIndex);
+      return;
+    }
 
     let cancelled = false;
 
@@ -429,6 +534,7 @@ export default function RecordHistoryTab({
           false,
         );
         if (!cancelled) {
+          snapshotCacheRef.current.set(snapshotCacheKey, snapshot);
           setComparisonSnapshotData(snapshot);
           setComparisonSnapshotIndex(manualCompareIndex);
         }
@@ -460,6 +566,8 @@ export default function RecordHistoryTab({
   const compareIndex = useMemo(() => {
     if (history.length === 0) return null;
 
+    // Translate compare mode into a concrete history index, or null when
+    // comparison is not meaningful (e.g. latest vs latest).
     if (compareMode === "previous") {
       return selectedIndex > 0 ? selectedIndex - 1 : null;
     }
@@ -507,12 +615,64 @@ export default function RecordHistoryTab({
     });
   }, [selectedMap, comparisonMap, placeholderValue]);
 
+  // Convert flattened rows to a nested path tree for collapsible rendering.
   const diffTree = useMemo(() => buildDiffTree(diffRows), [diffRows]);
-  const treeToRender = useMemo(
-    () => (showOnlyChanges ? filterTreeForChanges(diffTree) : diffTree),
-    [showOnlyChanges, diffTree],
+  const changedOnlyTree = useMemo(
+    () => filterTreeForChanges(diffTree),
+    [diffTree],
   );
-  const changedCount = diffRows.filter((row) => row.changed).length;
+  const treeToRender = useMemo(
+    () => (showOnlyChanges ? changedOnlyTree : diffTree),
+    [showOnlyChanges, changedOnlyTree, diffTree],
+  );
+  const changedCount = useMemo(
+    () => diffRows.filter((row) => row.changed).length,
+    [diffRows],
+  );
+  const flatRows = useMemo(
+    () => flattenVisibleTree(treeToRender, expandedRows),
+    [treeToRender, expandedRows],
+  );
+  const visibleRows = useMemo(
+    () => flatRows.slice(0, maxRenderedRows),
+    [flatRows, maxRenderedRows],
+  );
+  const hasMoreRows = visibleRows.length < flatRows.length;
+
+  const versionOptions = useMemo(
+    () =>
+      history.map((version, index) => (
+        <option
+          key={`${version.id}-${version.lastUpdatedAt}-${index}`}
+          value={index}
+        >
+          {index + 1}.{" "}
+          {formatRecordHistoryDate(version.lastUpdatedAt, placeholderValue)}
+        </option>
+      )),
+    [history, placeholderValue],
+  );
+  const manualVersionOptions = useMemo(
+    () =>
+      history.map((version, index) => (
+        <option
+          key={`manual-${version.id}-${version.lastUpdatedAt}-${index}`}
+          value={index}
+        >
+          {index + 1}.{" "}
+          {formatRecordHistoryDate(version.lastUpdatedAt, placeholderValue)}
+        </option>
+      )),
+    [history, placeholderValue],
+  );
+
+  useEffect(() => {
+    setMaxRenderedRows(300);
+  }, [
+    showOnlyChanges,
+    activeSnapshot?.lastUpdatedAt,
+    comparisonSnapshot?.lastUpdatedAt,
+  ]);
 
   useEffect(() => {
     setExpandedRows((prev) => {
@@ -529,94 +689,6 @@ export default function RecordHistoryTab({
       if (next.has(id)) next.delete(id);
       else next.add(id);
       return next;
-    });
-  };
-
-  const renderTreeRows = (
-    nodes: DiffTreeNode[],
-    depth = 0,
-  ): React.ReactNode[] => {
-    return nodes.flatMap((node) => {
-      const hasChildren = node.children.length > 0;
-      const isExpanded = expandedRows.has(node.id);
-      const row = (
-        <tr key={node.id} className={node.changed ? "bg-warning/10" : ""}>
-          <td className="align-top">
-            <div
-              className="flex items-start gap-2"
-              style={{ paddingLeft: `${depth * 1.25}rem` }}
-            >
-              {hasChildren ? (
-                <button
-                  type="button"
-                  className="mt-0.5 rounded p-0.5 hover:bg-base-200"
-                  onClick={() => toggleExpand(node.id)}
-                >
-                  {isExpanded ? (
-                    <ChevronDownIcon className="h-4 w-4" />
-                  ) : (
-                    <ChevronRightIcon className="h-4 w-4" />
-                  )}
-                </button>
-              ) : (
-                <span className="inline-block w-5" />
-              )}
-              <div>
-                <div className="font-medium">{node.label}</div>
-                {hasChildren && (
-                  <div className="text-xs opacity-70">
-                    {isExpanded
-                      ? t.translations.RECORD_HISTORY_EXPANDED
-                      : t.translations.RECORD_HISTORY_COLLAPSED}{" "}
-                    ({node.leafCount} {t.translations.RECORD_HISTORY_FIELDS})
-                  </div>
-                )}
-              </div>
-            </div>
-          </td>
-          <td className={node.changed ? "bg-warning/5 align-top" : "align-top"}>
-            {hasChildren ? (
-              <span className="text-xs opacity-70">
-                {t.translations.RECORD_HISTORY_NESTED_GROUP}
-              </span>
-            ) : (
-              <div className="whitespace-pre-wrap break-all text-xs">
-                {node.current ?? placeholderValue}
-              </div>
-            )}
-          </td>
-          <td className={node.changed ? "bg-warning/5 align-top" : "align-top"}>
-            {hasChildren ? (
-              <span className="text-xs opacity-70">
-                {t.translations.RECORD_HISTORY_NESTED_GROUP}
-              </span>
-            ) : (
-              <div className="whitespace-pre-wrap break-all text-xs">
-                {node.compare ?? placeholderValue}
-              </div>
-            )}
-          </td>
-          <td className="align-top">
-            {node.changed ? (
-              <span className="badge badge-warning badge-sm whitespace-nowrap leading-none">
-                {hasChildren
-                  ? t.translations.RECORD_HISTORY_CHANGED_SUBTREE
-                  : t.translations.RECORD_HISTORY_CHANGED}
-              </span>
-            ) : (
-              <span className="badge badge-ghost badge-sm whitespace-nowrap leading-none">
-                {t.translations.RECORD_HISTORY_SAME}
-              </span>
-            )}
-          </td>
-        </tr>
-      );
-
-      if (hasChildren && isExpanded) {
-        return [row, ...renderTreeRows(node.children, depth + 1)];
-      }
-
-      return [row];
     });
   };
 
@@ -668,20 +740,12 @@ export default function RecordHistoryTab({
               <select
                 className="select select-bordered"
                 value={selectedIndex}
-                onChange={(e) => setSelectedIndex(Number(e.target.value))}
+                onChange={(e) => {
+                  const nextIndex = Number(e.target.value);
+                  startUiTransition(() => setSelectedIndex(nextIndex));
+                }}
               >
-                {history.map((version, index) => (
-                  <option
-                    key={`${version.id}-${version.lastUpdatedAt}-${index}`}
-                    value={index}
-                  >
-                    {index + 1}.{" "}
-                    {formatRecordHistoryDate(
-                      version.lastUpdatedAt,
-                      placeholderValue,
-                    )}
-                  </option>
-                ))}
+                {versionOptions}
               </select>
             </div>
 
@@ -695,21 +759,27 @@ export default function RecordHistoryTab({
                 <button
                   type="button"
                   className={`btn btn-sm join-item ${compareMode === "previous" ? "btn-primary" : "btn-outline"}`}
-                  onClick={() => setCompareMode("previous")}
+                  onClick={() =>
+                    startUiTransition(() => setCompareMode("previous"))
+                  }
                 >
                   {t.translations.RECORD_HISTORY_PREVIOUS}
                 </button>
                 <button
                   type="button"
                   className={`btn btn-sm join-item ${compareMode === "latest" ? "btn-primary" : "btn-outline"}`}
-                  onClick={() => setCompareMode("latest")}
+                  onClick={() =>
+                    startUiTransition(() => setCompareMode("latest"))
+                  }
                 >
                   {t.translations.RECORD_HISTORY_LATEST}
                 </button>
                 <button
                   type="button"
                   className={`btn btn-sm join-item ${compareMode === "manual" ? "btn-primary" : "btn-outline"}`}
-                  onClick={() => setCompareMode("manual")}
+                  onClick={() =>
+                    startUiTransition(() => setCompareMode("manual"))
+                  }
                 >
                   {t.translations.RECORD_HISTORY_MANUAL}
                 </button>
@@ -733,8 +803,34 @@ export default function RecordHistoryTab({
               min={0}
               max={Math.max(history.length - 1, 0)}
               step={1}
-              value={selectedIndex}
-              onChange={(e) => setSelectedIndex(Number(e.target.value))}
+              value={sliderIndex}
+              onChange={(e) => {
+                const nextIndex = Number(e.target.value);
+                setSliderIndex(nextIndex);
+                clearSliderCommitTimer();
+                sliderCommitTimerRef.current = setTimeout(() => {
+                  startUiTransition(() => setSelectedIndex(nextIndex));
+                  sliderCommitTimerRef.current = null;
+                }, 180);
+              }}
+              onMouseUp={() => {
+                clearSliderCommitTimer();
+                if (sliderIndex !== selectedIndex) {
+                  startUiTransition(() => setSelectedIndex(sliderIndex));
+                }
+              }}
+              onTouchEnd={() => {
+                clearSliderCommitTimer();
+                if (sliderIndex !== selectedIndex) {
+                  startUiTransition(() => setSelectedIndex(sliderIndex));
+                }
+              }}
+              onBlur={() => {
+                clearSliderCommitTimer();
+                if (sliderIndex !== selectedIndex) {
+                  startUiTransition(() => setSelectedIndex(sliderIndex));
+                }
+              }}
               className="range range-primary range-sm"
             />
 
@@ -748,33 +844,30 @@ export default function RecordHistoryTab({
                   </label>
                   <select
                     className="select select-bordered"
-                    value={manualCompareIndex}
+                    value={manualCompareUiIndex}
                     onChange={(e) => {
                       const nextIndex = Number(e.target.value);
-                      if (history.length > 1 && nextIndex === selectedIndex) {
-                        const fallbackIndex =
-                          nextIndex > 0 ? nextIndex - 1 : nextIndex + 1;
-                        setManualCompareIndex(fallbackIndex);
-                        return;
+                      const resolvedIndex =
+                        resolveManualCompareIndex(nextIndex);
+                      setManualCompareUiIndex(resolvedIndex);
+                      clearManualCompareCommitTimer();
+                      manualCompareCommitTimerRef.current = setTimeout(() => {
+                        startUiTransition(() =>
+                          setManualCompareIndex(resolvedIndex),
+                        );
+                        manualCompareCommitTimerRef.current = null;
+                      }, 150);
+                    }}
+                    onBlur={() => {
+                      clearManualCompareCommitTimer();
+                      if (manualCompareUiIndex !== manualCompareIndex) {
+                        startUiTransition(() => {
+                          setManualCompareIndex(manualCompareUiIndex);
+                        });
                       }
-                      setManualCompareIndex(nextIndex);
                     }}
                   >
-                    {history.map((version, index) => (
-                      <option
-                        key={`manual-${version.id}-${version.lastUpdatedAt}-${index}`}
-                        value={index}
-                      >
-                        {index + 1}.{" "}
-                        {formatRecordHistoryDate(
-                          version.lastUpdatedAt,
-                          placeholderValue,
-                        )}
-                        {index === selectedIndex
-                          ? ` (${t.translations.RECORD_HISTORY_CURRENTLY_SELECTED})`
-                          : ""}
-                      </option>
-                    ))}
+                    {manualVersionOptions}
                   </select>
                 </div>
               </div>
@@ -784,7 +877,7 @@ export default function RecordHistoryTab({
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-        <RecordHistorySnapshotMeta
+        <RecordHistorySnapshotPropertiesCard
           title={t.translations.RECORD_HISTORY_SELECTED_SNAPSHOT}
           snapshot={activeSnapshot}
           placeholder={placeholderValue}
@@ -799,7 +892,7 @@ export default function RecordHistoryTab({
             no: t.translations.NO,
           }}
         />
-        <RecordHistorySnapshotMeta
+        <RecordHistorySnapshotPropertiesCard
           title={t.translations.RECORD_HISTORY_COMPARISON_SNAPSHOT}
           snapshot={comparisonSnapshot}
           placeholder={placeholderValue}
@@ -829,13 +922,20 @@ export default function RecordHistoryTab({
                 type="checkbox"
                 className="checkbox checkbox-sm"
                 checked={showOnlyChanges}
-                onChange={(e) => setShowOnlyChanges(e.target.checked)}
+                onChange={(e) =>
+                  startUiTransition(() => setShowOnlyChanges(e.target.checked))
+                }
               />
               <span className="label-text">
                 {t.translations.RECORD_HISTORY_SHOW_ONLY_CHANGES}
               </span>
             </label>
           </div>
+          {isUiPending && (
+            <div className="px-4 py-2 text-xs opacity-70">
+              {t.translations.LOADING}
+            </div>
+          )}
 
           {isLoadingSnapshot && (
             <div className="px-4 py-2 text-sm opacity-75">
@@ -867,7 +967,7 @@ export default function RecordHistoryTab({
                 </tr>
               </thead>
               <tbody>
-                {treeToRender.length === 0 ? (
+                {visibleRows.length === 0 ? (
                   <tr>
                     <td colSpan={4} className="text-center py-8 opacity-70">
                       {
@@ -877,14 +977,116 @@ export default function RecordHistoryTab({
                     </td>
                   </tr>
                 ) : (
-                  renderTreeRows(treeToRender)
+                  visibleRows.map(({ node, depth }) => {
+                    const hasChildren = node.children.length > 0;
+                    const isExpanded = expandedRows.has(node.id);
+                    return (
+                      <tr
+                        key={node.id}
+                        className={node.changed ? "bg-warning/10" : ""}
+                      >
+                        <td className="align-top">
+                          <div
+                            className="flex items-start gap-2"
+                            style={{ paddingLeft: `${depth * 1.25}rem` }}
+                          >
+                            {hasChildren ? (
+                              <button
+                                type="button"
+                                className="mt-0.5 rounded p-0.5 hover:bg-base-200"
+                                onClick={() => toggleExpand(node.id)}
+                              >
+                                {isExpanded ? (
+                                  <ChevronDownIcon className="h-4 w-4" />
+                                ) : (
+                                  <ChevronRightIcon className="h-4 w-4" />
+                                )}
+                              </button>
+                            ) : (
+                              <span className="inline-block w-5" />
+                            )}
+                            <div>
+                              <div className="font-medium">{node.label}</div>
+                              {hasChildren && (
+                                <div className="text-xs opacity-70">
+                                  {isExpanded
+                                    ? t.translations.RECORD_HISTORY_EXPANDED
+                                    : t.translations
+                                        .RECORD_HISTORY_COLLAPSED}{" "}
+                                  ({node.leafCount}{" "}
+                                  {t.translations.RECORD_HISTORY_FIELDS})
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+                        <td
+                          className={
+                            node.changed
+                              ? "bg-warning/5 align-top"
+                              : "align-top"
+                          }
+                        >
+                          {hasChildren ? (
+                            <span className="text-xs opacity-70">
+                              {t.translations.RECORD_HISTORY_NESTED_GROUP}
+                            </span>
+                          ) : (
+                            <div className="whitespace-pre-wrap break-all text-xs">
+                              {node.current ?? placeholderValue}
+                            </div>
+                          )}
+                        </td>
+                        <td
+                          className={
+                            node.changed
+                              ? "bg-warning/5 align-top"
+                              : "align-top"
+                          }
+                        >
+                          {hasChildren ? (
+                            <span className="text-xs opacity-70">
+                              {t.translations.RECORD_HISTORY_NESTED_GROUP}
+                            </span>
+                          ) : (
+                            <div className="whitespace-pre-wrap break-all text-xs">
+                              {node.compare ?? placeholderValue}
+                            </div>
+                          )}
+                        </td>
+                        <td className="align-top">
+                          {node.changed ? (
+                            <span className="badge badge-warning badge-sm whitespace-nowrap leading-none">
+                              {hasChildren
+                                ? t.translations.RECORD_HISTORY_CHANGED_SUBTREE
+                                : t.translations.RECORD_HISTORY_CHANGED}
+                            </span>
+                          ) : (
+                            <span className="badge badge-ghost badge-sm whitespace-nowrap leading-none">
+                              {t.translations.RECORD_HISTORY_SAME}
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>
           </div>
+          {hasMoreRows && (
+            <div className="px-4 py-3 border-t border-base-300">
+              <button
+                type="button"
+                className="btn btn-outline btn-sm"
+                onClick={() => setMaxRenderedRows((prev) => prev + 300)}
+              >
+                Load more ({visibleRows.length}/{flatRows.length})
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </div>
   );
 }
-
