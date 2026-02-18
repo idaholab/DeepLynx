@@ -18,7 +18,7 @@ public class TestSuiteFixture : IAsyncLifetime
     public TestSuiteFixture()
     {
         _postgresContainer = new PostgreSqlBuilder()
-            .WithImage("pgvector/pgvector:pg17") 
+            .WithImage("pgvector/pgvector:pg18") 
             .Build();
 
         _redisContainer = new RedisBuilder()
