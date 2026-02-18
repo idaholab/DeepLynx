@@ -51,14 +51,15 @@ public class FileController : ControllerBase
         [FromQuery] long? dataSourceId,
         [FromQuery] long? objectStorageId,
         IFormFile file,
-        [FromQuery] List<long>? sensitivityLabelIds)
+        [FromQuery] List<long>? sensitivityLabelIds, 
+        [FromQuery] CreateRecordFileUploadRequestDto? metadata)
     {
         try
         {
             var currentUserId = UserContextStorage.UserId;
             var fileUploadInfo =
                 await _fileBusiness.UploadFile(currentUserId, organizationId, projectId, dataSourceId, objectStorageId,
-                    file, sensitivityLabelIds);
+                    file, sensitivityLabelIds, metadata);
             return Ok(fileUploadInfo);
         }
         catch (Exception exc)
@@ -276,13 +277,14 @@ public class FileController : ControllerBase
         [FromQuery] long? dataSourceId,
         [FromQuery] long? objectStorageId,
         [FromBody] FileUploadCompleteRequestDto request,
-        [FromQuery] List<long>? sensitivityLabelIds)
+        [FromQuery] List<long>? sensitivityLabelIds, 
+        [FromQuery] CreateRecordFileUploadRequestDto? metadata)
     {
         try
         {
             var currentUserId = UserContextStorage.UserId;
             var fileRecord = await _fileBusiness.CompleteUpload(
-                currentUserId, organizationId, projectId, dataSourceId, objectStorageId, request, sensitivityLabelIds);
+                currentUserId, organizationId, projectId, dataSourceId, objectStorageId, request, sensitivityLabelIds, metadata);
             return Ok(fileRecord);
         }
         catch (Exception exc)

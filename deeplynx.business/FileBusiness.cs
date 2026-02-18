@@ -63,7 +63,8 @@ public class FileBusiness
         long? dataSourceId,
         long? objectStorageId,
         IFormFile file,
-        List<long>? sensitivityLabelIds = null)
+        List<long>? sensitivityLabelIds = null, 
+        CreateRecordFileUploadRequestDto? metadata = null)
     {
         long realDataSourceId;
         if (file == null || file.Length == 0) throw new ArgumentException("File is required and cannot be empty.");
@@ -93,20 +94,21 @@ public class FileBusiness
         var uri = await fileBusiness.UploadFile(organizationId, projectId, realDataSourceId, configData, file, guid);
 
         var fileClass = await _classBusiness.GetOrCreateClass(currentUserId, organizationId, projectId, "File");
-        var recordRequest = new CreateRecordRequestDto
+        
+        var recordRequest = new CreateRecordRequestDto()
         {
-            Properties = new JsonObject
+            Properties = metadata?.Properties ?? new JsonObject
             {
                 ["fileType"] = Path.GetExtension(file.FileName).TrimStart('.').ToLower()
             },
-            Name = file.FileName,
+            Name = metadata?.Name ?? file.FileName,
             ObjectStorageId = objectStorage.Id,
-            Description = file.FileName,
-            OriginalId = guid.ToString(),
-            Uri = uri,
-            ClassId = fileClass.Id,
-            ClassName = fileClass.Name,
-            FileType = Path.GetExtension(file.FileName).TrimStart('.').ToLower()
+            Description = metadata?.Description ?? file.FileName,
+            OriginalId = metadata?.OriginalId ?? guid.ToString(),
+            ClassId = metadata?.ClassId ?? fileClass.Id,
+            ClassName = metadata?.ClassName ?? fileClass.Name,
+            FileType = Path.GetExtension(file.FileName).TrimStart('.').ToLower(), 
+            Uri = uri
         };
 
         // return the newly created metadata record for the file
@@ -139,7 +141,7 @@ public class FileBusiness
             throw new InvalidOperationException("Config data for object storage is null or invalid");
 
         var fileBusiness = _factory.CreateFileBusiness(objectStorage.Type);
-
+        
         var guid = Guid.NewGuid();
 
         var uri = await fileBusiness.UpdateFile(record, configData, file, guid);
@@ -150,7 +152,6 @@ public class FileBusiness
             {
                 ["fileType"] = Path.GetExtension(file.FileName).TrimStart('.').ToLower()
             },
-            OriginalId = guid.ToString(),
             Name = file.FileName,
             Uri = uri,
             FileType = Path.GetExtension(file.FileName).TrimStart('.').ToLower()
@@ -349,7 +350,8 @@ public class FileBusiness
         long? dataSourceId,
         long? objectStorageId,
         FileUploadCompleteRequestDto request,
-        List<long>? sensitivityLabelIds = null)
+        List<long>? sensitivityLabelIds = null, 
+        CreateRecordFileUploadRequestDto? metadata = null)
     {
         // Resolve data source
         long realDataSourceId;
@@ -385,19 +387,19 @@ public class FileBusiness
         var fileClass = await _classBusiness.GetOrCreateClass(currentUserId, organizationId, projectId, "File");
         var recordRequest = new CreateRecordRequestDto
         {
-            Properties = new JsonObject
+            Properties = metadata?.Properties ?? new JsonObject
             {
                 ["fileType"] = Path.GetExtension(request.FileName).TrimStart('.').ToLower(),
                 ["uploadedViaChunking"] = true,
                 ["originalUploadId"] = request.UploadId
             },
-            Name = request.FileName,
+            Name = metadata?.Name ?? request.FileName,
             ObjectStorageId = objectStorage.Id,
-            Description = $"File uploaded via chunked upload (session: {request.UploadId})",
-            OriginalId = guid.ToString(),
+            Description = metadata?.Description ?? $"File uploaded via chunked upload (session: {request.UploadId})",
+            OriginalId = metadata?.OriginalId ?? guid.ToString(),
             Uri = uri,
-            ClassId = fileClass.Id,
-            ClassName = fileClass.Name,
+            ClassId = metadata?.ClassId ?? fileClass.Id,
+            ClassName = metadata?.ClassName ?? fileClass.Name,
             FileType = Path.GetExtension(request.FileName).TrimStart('.').ToLower()
         };
 
