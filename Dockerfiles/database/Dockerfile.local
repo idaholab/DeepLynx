@@ -1,4 +1,4 @@
-FROM postgres:18-alpine3.23 AS deeplynx-db
+FROM pgvector/pgvector:pg18-alpine AS deeplynx-db
 
 # Set working directory
 WORKDIR /var/lib/postgresql/data
@@ -26,13 +26,6 @@ RUN apk add --virtual .build-deps \
     clang19 \
     llvm19 \
     make
-
-# Install pgvector
-RUN git clone --branch v0.8.1 https://github.com/pgvector/pgvector.git /tmp/pgvector && \
-    cd /tmp/pgvector && \
-    make -j$(nproc) && \
-    make install && \
-    rm -rf /tmp/pgvector
 
 # Remove build dependencies to reduce image size
 RUN apk del .build-deps
