@@ -62,20 +62,11 @@ const PropertyTable: React.FC<PropertyTableProps> = ({
   const canDownload = Number.isFinite(projectId) && Number.isFinite(recordId);
   const { organization, hasLoaded } = useOrganizationSession();
 
+
   const handleDownload = async () => {
     if (!canDownload) return;
 
-    const controller = new AbortController();
-    setAbortController(controller);
-
     setDownloading(true);
-    setDownloadProgress(0);
-    setTimeRemaining(null);
-    setBytesDownloaded(null);
-
-    const startTime = Date.now();
-    let lastDisplayUpdateTime = startTime;
-    let lastDisplayLoaded = 0; // Track loaded bytes at last display update
 
     try {
       await downloadFile(
@@ -83,72 +74,108 @@ const PropertyTable: React.FC<PropertyTableProps> = ({
         projectId,
         recordId,
         recordName,
-        (progressInfo) => {
-          const now = Date.now();
-          const timeSinceLastDisplay = (now - lastDisplayUpdateTime) / 1000;
-
-          // Always update progress percentage and bytes (for accurate display)
-          setDownloadProgress(progressInfo.percentage);
-          setBytesDownloaded({
-            loaded: progressInfo.loaded,
-            total: progressInfo.total,
-          });
-
-          // Only update speed and ETA every 2 seconds
-          if (timeSinceLastDisplay >= 2) {
-            const elapsed = (now - startTime) / 1000;
-
-            // Calculate instantaneous speed based on bytes since last display update
-            const bytesDownloadedSinceLastDisplay =
-              progressInfo.loaded - lastDisplayLoaded;
-            const instantSpeed =
-              timeSinceLastDisplay > 0
-                ? bytesDownloadedSinceLastDisplay / timeSinceLastDisplay
-                : 0;
-
-            // Calculate average speed
-            const avgSpeed = elapsed > 0 ? progressInfo.loaded / elapsed : 0;
-
-            // Weighted average for smoother display
-            const speed = instantSpeed * 0.7 + avgSpeed * 0.3;
-
-            // Calculate time remaining
-            const remaining = progressInfo.total - progressInfo.loaded;
-            const eta = speed > 0 ? remaining / speed : null;
-
-            setTimeRemaining(eta);
-
-            // Update tracking variables for next display update
-            lastDisplayUpdateTime = now;
-            lastDisplayLoaded = progressInfo.loaded;
-          }
-        },
-        controller,
       );
 
-      // Clear progress after 2 seconds
-      setTimeout(() => {
-        setDownloadProgress(null);
-        setTimeRemaining(null);
-        setBytesDownloaded(null);
-      }, 2000);
-    } catch (error) {
-      // Check if it's an abort error (user cancelled)
-      if (axios.isAxiosError(error) && error.code === "ERR_CANCELED") {
-        // Don't treat this as an error - it's intentional
-        return;
-      } else {
-        console.error("Download error:", error);
-      }
-      // Clear progress states for any error (including cancellation)
-      setDownloadProgress(null);
-      setTimeRemaining(null);
-      setBytesDownloaded(null);
-    } finally {
+      // Download has been initiated (browser handles the rest)
+      // Show a brief success message
       setDownloading(false);
-      setAbortController(null);
+
+    } catch (error) {
+      if (axios.isAxiosError(error) && error.code === "ERR_CANCELED") {
+        return;
+      }
+      console.error("Download error:", error);
+      setDownloading(false);
     }
   };
+
+  // const handleDownload = async () => {
+  //   if (!canDownload) return;
+
+  //   const controller = new AbortController();
+  //   setAbortController(controller);
+
+  //   setDownloading(true);
+  //   setDownloadProgress(0);
+  //   setTimeRemaining(null);
+  //   setBytesDownloaded(null);
+
+  //   const startTime = Date.now();
+  //   let lastDisplayUpdateTime = startTime;
+  //   let lastDisplayLoaded = 0; // Track loaded bytes at last display update
+
+  //   try {
+  //     await downloadFile(
+  //       organization?.organizationId as number,
+  //       projectId,
+  //       recordId,
+  //       recordName,
+  //       (progressInfo) => {
+  //         const now = Date.now();
+  //         const timeSinceLastDisplay = (now - lastDisplayUpdateTime) / 1000;
+
+  //         // Always update progress percentage and bytes (for accurate display)
+  //         setDownloadProgress(progressInfo.percentage);
+  //         setBytesDownloaded({
+  //           loaded: progressInfo.loaded,
+  //           total: progressInfo.total,
+  //         });
+
+  //         // Only update speed and ETA every 2 seconds
+  //         if (timeSinceLastDisplay >= 2) {
+  //           const elapsed = (now - startTime) / 1000;
+
+  //           // Calculate instantaneous speed based on bytes since last display update
+  //           const bytesDownloadedSinceLastDisplay =
+  //             progressInfo.loaded - lastDisplayLoaded;
+  //           const instantSpeed =
+  //             timeSinceLastDisplay > 0
+  //               ? bytesDownloadedSinceLastDisplay / timeSinceLastDisplay
+  //               : 0;
+
+  //           // Calculate average speed
+  //           const avgSpeed = elapsed > 0 ? progressInfo.loaded / elapsed : 0;
+
+  //           // Weighted average for smoother display
+  //           const speed = instantSpeed * 0.7 + avgSpeed * 0.3;
+
+  //           // Calculate time remaining
+  //           const remaining = progressInfo.total - progressInfo.loaded;
+  //           const eta = speed > 0 ? remaining / speed : null;
+
+  //           setTimeRemaining(eta);
+
+  //           // Update tracking variables for next display update
+  //           lastDisplayUpdateTime = now;
+  //           lastDisplayLoaded = progressInfo.loaded;
+  //         }
+  //       },
+  //       controller,
+  //     );
+
+  //     // Clear progress after 2 seconds
+  //     setTimeout(() => {
+  //       setDownloadProgress(null);
+  //       setTimeRemaining(null);
+  //       setBytesDownloaded(null);
+  //     }, 2000);
+  //   } catch (error) {
+  //     // Check if it's an abort error (user cancelled)
+  //     if (axios.isAxiosError(error) && error.code === "ERR_CANCELED") {
+  //       // Don't treat this as an error - it's intentional
+  //       return;
+  //     } else {
+  //       console.error("Download error:", error);
+  //     }
+  //     // Clear progress states for any error (including cancellation)
+  //     setDownloadProgress(null);
+  //     setTimeRemaining(null);
+  //     setBytesDownloaded(null);
+  //   } finally {
+  //     setDownloading(false);
+  //     setAbortController(null);
+  //   }
+  // };
 
   const handleCancelDownload = () => {
     if (abortController) {
@@ -364,57 +391,25 @@ const PropertyTable: React.FC<PropertyTableProps> = ({
 
               {download && (
                 <div className="flex items-center gap-3">
-                  {/* Progress bar - only show when downloading */}
-                  {downloadProgress !== null && downloading && (
-                    <div className="flex flex-col gap-1 min-w-[200px]">
-                      <div className="flex items-center gap-2">
-                        <div className="flex-1 bg-base-300 rounded-full h-2">
-                          <div
-                            className="bg-primary h-2 rounded-full transition-all duration-300"
-                            style={{ width: `${downloadProgress}%` }}
-                          />
-                        </div>
-                        <span className="text-sm font-medium text-base-content whitespace-nowrap">
-                          {downloadProgress}%
-                        </span>
-                      </div>
-                      <div className="flex justify-between text-xs text-base-content/70">
-                        <span>
-                          {bytesDownloaded &&
-                            `${formatBytes(bytesDownloaded.loaded)} / ${formatBytes(bytesDownloaded.total)}`}
-                        </span>
-                        {timeRemaining !== null && timeRemaining > 0 && (
-                          <span>ETA: {formatTime(timeRemaining)}</span>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  {downloading ? (
-                    <button
-                      onClick={handleCancelDownload}
-                      className="p-1 text-error hover:text-error-focus transition-colors cursor-pointer"
-                      title="Cancel download"
-                    >
-                      <XMarkIcon className="w-8 h-8" />
-                    </button>
-                  ) : (
-                    <button
-                      onClick={handleDownload}
-                      disabled={!canDownload}
-                      title={
-                        canDownload
-                          ? "Download file"
-                          : "Missing projectId or recordId in URL"
-                      }
-                      className={`p-1 transition-colors ${
-                        canDownload
-                          ? "hover:text-primary cursor-pointer"
-                          : "opacity-50 cursor-not-allowed"
+                  <button
+                    onClick={handleDownload}
+                    disabled={!canDownload || downloading}
+                    title={
+                      canDownload
+                        ? "Download file"
+                        : "Missing projectId or recordId in URL"
+                    }
+                    className={`p-1 transition-colors ${canDownload && !downloading
+                        ? "hover:text-primary cursor-pointer"
+                        : "opacity-50 cursor-not-allowed"
                       }`}
-                    >
-                      <ArrowDownTrayIcon className="w-8 h-8" />
-                    </button>
+                  >
+                    <ArrowDownTrayIcon className="w-8 h-8" />
+                  </button>
+                  {downloading && (
+                    <span className="text-sm text-base-content/70">
+                      Starting download...
+                    </span>
                   )}
                 </div>
               )}
