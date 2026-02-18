@@ -1,13 +1,7 @@
-import React from "react";
-import {
-  TagIcon,
-  LockClosedIcon,
-  LockOpenIcon,
-  MagnifyingGlassIcon,
-  InformationCircleIcon,
-} from "@heroicons/react/24/outline";
 import type { TagResponseDto } from "@/app/(home)/types/responseDTOs";
 import { useLanguage } from "@/app/contexts/Language";
+import { MagnifyingGlassIcon, TagIcon } from "@heroicons/react/24/outline";
+import React from "react";
 
 interface Props {
   tags: TagResponseDto[];
@@ -142,7 +136,7 @@ const ProjectTagsPanel: React.FC<Props> = ({
                     </span>
                   )}
                 </div>
-                <div className="flex items-center gap-1">
+                <div className="grid grid-cols-[auto_3rem] items-center gap-1">
                   <button
                     type="button"
                     className="btn btn-ghost btn-xs"
@@ -156,21 +150,23 @@ const ProjectTagsPanel: React.FC<Props> = ({
                   >
                     {t.translations.EDIT}
                   </button>
-                  <button
-                    type="button"
-                    className="btn btn-ghost btn-xs text-error"
-                    onClick={() => onArchiveClick(tag)}
-                    disabled={orgTagsLocked || archivingTagId === tag.id}
-                    title={
-                      orgTagsLocked
-                        ? t.translations.TAGS_LOCKED_BY_ORGANIZATION
-                        : t.translations.ARCHIVE_SOFT_DELETE_TAG
-                    }
-                  >
-                    {archivingTagId === tag.id
-                      ? t.translations.ARCHIVING
-                      : t.translations.DELETE}
-                  </button>
+                  {tag.projectId && (
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-xs text-error w-full"
+                      onClick={() => onArchiveClick(tag)}
+                      disabled={orgTagsLocked || archivingTagId === tag.id}
+                      title={
+                        orgTagsLocked
+                          ? t.translations.TAGS_LOCKED_BY_ORGANIZATION
+                          : t.translations.ARCHIVE_SOFT_DELETE_TAG
+                      }
+                    >
+                      {archivingTagId === tag.id
+                        ? t.translations.ARCHIVING
+                        : t.translations.DELETE}
+                    </button>
+                  )}
                 </div>
               </div>
             ))

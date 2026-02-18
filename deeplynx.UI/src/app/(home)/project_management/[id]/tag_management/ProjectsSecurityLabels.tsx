@@ -142,7 +142,7 @@ const ProjectsSecurityLabels: React.FC<Props> = ({
                     </span>
                   )}
                 </div>
-                <div className="flex items-center gap-1">
+                <div className="grid grid-cols-[auto_3rem] items-center gap-1">
                   <button
                     type="button"
                     className="btn btn-ghost btn-xs"
@@ -156,21 +156,25 @@ const ProjectsSecurityLabels: React.FC<Props> = ({
                   >
                     {t.translations.EDIT}
                   </button>
-                  <button
-                    type="button"
-                    className="btn btn-ghost btn-xs text-error"
-                    onClick={() => onArchiveClick(label)}
-                    disabled={orgLabelsLocked || archivingLabelId === label.id}
-                    title={
-                      orgLabelsLocked
-                        ? t.translations.LABELS_LOCKED_BY_ORGANIZATION
-                        : t.translations.ARCHIVE_SOFT_DELETE_LABEL
-                    }
-                  >
-                    {archivingLabelId === label.id
-                      ? t.translations.ARCHIVING
-                      : t.translations.DELETE}
-                  </button>
+                  {label.projectId && (
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-xs text-error w-full"
+                      onClick={() => onArchiveClick(label)}
+                      disabled={
+                        orgLabelsLocked || archivingLabelId === label.id
+                      }
+                      title={
+                        orgLabelsLocked
+                          ? t.translations.LABELS_LOCKED_BY_ORGANIZATION
+                          : t.translations.ARCHIVE_SOFT_DELETE_LABEL
+                      }
+                    >
+                      {archivingLabelId === label.id
+                        ? t.translations.ARCHIVING
+                        : t.translations.DELETE}
+                    </button>
+                  )}
                 </div>
               </div>
             ))
