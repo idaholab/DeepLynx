@@ -1,4 +1,7 @@
+"use client";
+
 import React from "react";
+import { useLanguage } from "@/app/contexts/Language";
 
 interface Props {
   isOpen: boolean;
@@ -19,6 +22,8 @@ const TagEditModal: React.FC<Props> = ({
   onCancel,
   onSave,
 }) => {
+  const { t } = useLanguage();
+
   if (!isOpen) return null;
 
   const disabled = !nameInput.trim() || isSaving;
@@ -27,24 +32,23 @@ const TagEditModal: React.FC<Props> = ({
     <div className="modal modal-open">
       <div className="modal-box max-w-md">
         <h3 className="font-bold text-lg mb-2">
-          {editingTag ? "Edit Tag" : "Create Tag"}
+          {editingTag ? t.translations.EDIT_TAG : t.translations.CREATE_TAG}
         </h3>
         <p className="text-xs text-base-content/70 mb-4">
-          Define an organization-level tag. Projects inherit this tag and can
-          use it across their assets.
+          {t.translations.DEFINE_ORGANIZATION_LEVEL_TAG_DESCRIPTION}
         </p>
 
         <div className="space-y-4">
           <div className="form-control">
             <label className="label">
               <span className="label-text font-semibold">
-                Tag Name <span className="text-error">*</span>
+                {t.translations.TAG_NAME} <span className="text-error">*</span>
               </span>
             </label>
             <input
               type="text"
               className="input input-bordered input-sm"
-              placeholder="e.g., PII, QA, Archive"
+              placeholder={t.translations.TAG_NAME_PLACEHOLDER}
               value={nameInput}
               onChange={(e) => onNameChange(e.target.value)}
             />
@@ -57,7 +61,7 @@ const TagEditModal: React.FC<Props> = ({
             className="btn btn-ghost btn-sm"
             onClick={onCancel}
           >
-            Cancel
+            {t.translations.CANCEL}
           </button>
           <button
             type="button"
@@ -65,7 +69,11 @@ const TagEditModal: React.FC<Props> = ({
             disabled={disabled}
             onClick={onSave}
           >
-            {isSaving ? "Saving..." : editingTag ? "Save Tag" : "Create Tag"}
+            {isSaving
+              ? t.translations.SAVING
+              : editingTag
+                ? t.translations.SAVE_TAG
+                : t.translations.CREATE_TAG}
           </button>
         </div>
       </div>

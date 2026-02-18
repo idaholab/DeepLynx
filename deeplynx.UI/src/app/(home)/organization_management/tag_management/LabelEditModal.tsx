@@ -1,4 +1,7 @@
+"use client";
+
 import React from "react";
+import { useLanguage } from "@/app/contexts/Language";
 
 interface Props {
   isOpen: boolean;
@@ -23,6 +26,8 @@ const LabelEditModal: React.FC<Props> = ({
   onCancel,
   onSave,
 }) => {
+  const { t } = useLanguage();
+
   if (!isOpen) return null;
 
   const disabled = !nameInput.trim() || isSaving;
@@ -31,24 +36,23 @@ const LabelEditModal: React.FC<Props> = ({
     <div className="modal modal-open">
       <div className="modal-box max-w-md">
         <h3 className="font-bold text-lg mb-2">
-          {editingLabel ? "Edit Label" : "Create Label"}
+          {editingLabel ? t.translations.EDIT_LABEL : t.translations.CREATE_LABEL}
         </h3>
         <p className="text-xs text-base-content/70 mb-4">
-          Define an organization-level security label. Projects inherit this
-          label and can use it across their assets.
+          {t.translations.DEFINE_ORGANIZATION_LEVEL_SENSITIVATY_LABEL_DESCRIPTION}
         </p>
 
         <div className="space-y-4">
           <div className="form-control">
             <label className="label">
               <span className="label-text font-semibold">
-                Label Name <span className="text-error">*</span>
+                {t.translations.LABEL_NAME} <span className="text-error">*</span>
               </span>
             </label>
             <input
               type="text"
               className="input input-bordered input-sm"
-              placeholder="e.g., CUI, ITAR, Public"
+              placeholder={t.translations.LABEL_NAME_PLACEHOLDER}
               value={nameInput}
               onChange={(e) => onNameChange(e.target.value)}
             />
@@ -56,11 +60,11 @@ const LabelEditModal: React.FC<Props> = ({
 
           <div className="form-control">
             <label className="label">
-              <span className="label-text font-semibold">Description</span>
+              <span className="label-text font-semibold">{t.translations.DESCRIPTION}</span>
             </label>
             <textarea
               className="textarea textarea-bordered textarea-sm"
-              placeholder="Optional description for this label"
+              placeholder={t.translations.OPTIONAL_DESCRIPTION_FOR_THIS_LABEL}
               rows={3}
               value={descriptionInput}
               onChange={(e) => onDescriptionChange(e.target.value)}
@@ -74,7 +78,7 @@ const LabelEditModal: React.FC<Props> = ({
             className="btn btn-ghost btn-sm"
             onClick={onCancel}
           >
-            Cancel
+            {t.translations.CANCEL}
           </button>
           <button
             type="button"
@@ -83,10 +87,10 @@ const LabelEditModal: React.FC<Props> = ({
             onClick={onSave}
           >
             {isSaving
-              ? "Saving..."
+              ? t.translations.SAVING
               : editingLabel
-              ? "Save Label"
-              : "Create Label"}
+                ? t.translations.SAVE_LABEL
+                : t.translations.CREATE_LABEL}
           </button>
         </div>
       </div>

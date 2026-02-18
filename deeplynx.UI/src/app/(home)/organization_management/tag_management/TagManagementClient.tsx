@@ -8,6 +8,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 
 import { useOrganizationSession } from "@/app/contexts/OrganizationSessionProvider";
+import { useLanguage } from "@/app/contexts/Language";
 import {
   getAllTagsOrg,
   createTagOrg,
@@ -54,6 +55,7 @@ const TagManagementClient: React.FC<Props> = ({ projects }) => {
   /* ------------------------------------------------------------------------ */
 
   const { organization } = useOrganizationSession();
+  const { t } = useLanguage();
   const orgId = organization?.organizationId as number | undefined;
 
   // Tags loaded from backend
@@ -216,8 +218,8 @@ const TagManagementClient: React.FC<Props> = ({ projects }) => {
       setTags(dtoList.filter((t) => !t.isArchived));
     } catch (error) {
       console.error("Failed to load organization tags:", error);
-      setTagsError("Failed to load organization tags.");
-      toast.error("Failed to load organization tags.");
+      setTagsError(t.translations.FAILED_TO_LOAD_ORGANIZATION_TAGS);
+      toast.error(t.translations.FAILED_TO_LOAD_ORGANIZATION_TAGS);
     } finally {
       setTagsLoading(false);
     }
@@ -239,8 +241,8 @@ const TagManagementClient: React.FC<Props> = ({ projects }) => {
       setLabels(dtoList.filter((l) => !l.isArchived));
     } catch (error) {
       console.error("Failed to load organization labels:", error);
-      setLabelsError("Failed to load organization labels.");
-      toast.error("Failed to load organization labels.");
+      setLabelsError(t.translations.FAILED_TO_LOAD_ORGANIZATION_LABELS);
+      toast.error(t.translations.FAILED_TO_LOAD_ORGANIZATION_LABELS);
     } finally {
       setLabelsLoading(false);
     }
@@ -260,7 +262,7 @@ const TagManagementClient: React.FC<Props> = ({ projects }) => {
     if (!nameInput.trim()) return;
 
     if (!orgId) {
-      toast.error("No organization selected. Unable to save tag.");
+      toast.error(t.translations.NO_ORGANIZATION_SELECTED_UNABLE_TO_SAVE_TAG);
       return;
     }
 
@@ -279,7 +281,7 @@ const TagManagementClient: React.FC<Props> = ({ projects }) => {
         const updated = await updateTagOrg(orgId, editingTag.id, updatePayload);
 
         setTags((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
-        toast.success("Organization tag updated.");
+        toast.success(t.translations.ORGANIZATION_TAG_UPDATED);
       } else {
         // Create new tag
         const createPayload: TagResponseDto = {
@@ -294,13 +296,13 @@ const TagManagementClient: React.FC<Props> = ({ projects }) => {
 
         const created = await createTagOrg(orgId, createPayload);
         setTags((prev) => [...prev, created]);
-        toast.success("Organization tag created.");
+        toast.success(t.translations.ORGANIZATION_TAG_CREATED);
       }
 
       closeEditCreateModal();
     } catch (error) {
       console.error("Failed to save organization tag:", error);
-      toast.error("Failed to save organization tag.");
+      toast.error(t.translations.FAILED_TO_SAVE_ORGANIZATION_TAG);
     } finally {
       setSavingTag(false);
     }
@@ -310,7 +312,7 @@ const TagManagementClient: React.FC<Props> = ({ projects }) => {
     if (!labelNameInput.trim()) return;
 
     if (!orgId) {
-      toast.error("No organization selected. Unable to save label.");
+      toast.error(t.translations.NO_ORGANIZATION_SELECTED_UNABLE_TO_SAVE_LABEL);
       return;
     }
 
@@ -330,7 +332,7 @@ const TagManagementClient: React.FC<Props> = ({ projects }) => {
         setLabels((prev) =>
           prev.map((l) => (l.id === updated.id ? updated : l)),
         );
-        toast.success("Organization label updated.");
+        toast.success(t.translations.ORGANIZATION_LABEL_UPDATED);
       } else {
         const created = await createSensitivityLabelsOrg(orgId, {
           name: labelNameInput.trim(),
@@ -338,13 +340,13 @@ const TagManagementClient: React.FC<Props> = ({ projects }) => {
         });
 
         setLabels((prev) => [...prev, created]);
-        toast.success("Organization label created.");
+        toast.success(t.translations.ORGANIZATION_LABEL_CREATED);
       }
 
       closeLabelModal();
     } catch (error) {
       console.error("Failed to save organization label:", error);
-      toast.error("Failed to save organization label.");
+      toast.error(t.translations.FAILED_TO_SAVE_ORGANIZATION_LABEL);
     } finally {
       setSavingLabel(false);
     }
@@ -358,10 +360,12 @@ const TagManagementClient: React.FC<Props> = ({ projects }) => {
       await archiveTagOrg(orgId, tagToArchive.id, true);
 
       setTags((prev) => prev.filter((t) => t.id !== tagToArchive.id));
-      toast.success(`Tag "${tagToArchive.name}" archived.`);
+      toast.success(
+        t.translations.TAG_ARCHIVED_WITH_NAME.replace("{name}", tagToArchive.name),
+      );
     } catch (error) {
       console.error("Failed to archive tag:", error);
-      toast.error("Failed to archive tag.");
+      toast.error(t.translations.FAILED_TO_ARCHIVE_TAG);
     } finally {
       setArchivingTagId(null);
       setShowArchiveModal(false);
@@ -377,10 +381,12 @@ const TagManagementClient: React.FC<Props> = ({ projects }) => {
       await archiveSensitivityLabelOrg(orgId, labelToArchive.id, true);
 
       setLabels((prev) => prev.filter((l) => l.id !== labelToArchive.id));
-      toast.success(`Label "${labelToArchive.name}" archived.`);
+      toast.success(
+        t.translations.LABEL_ARCHIVED_WITH_NAME.replace("{name}", labelToArchive.name),
+      );
     } catch (error) {
       console.error("Failed to archive label:", error);
-      toast.error("Failed to archive label.");
+      toast.error(t.translations.FAILED_TO_ARCHIVE_LABEL);
     } finally {
       setArchivingLabelId(null);
       setShowArchiveLabelModal(false);
@@ -409,10 +415,11 @@ const TagManagementClient: React.FC<Props> = ({ projects }) => {
     <div className="p-6">
       {/* Page Header */}
       <div className="mb-4">
-        <h2 className="text-2xl font-bold text-base-content">Tag Management</h2>
+        <h2 className="text-2xl font-bold text-base-content">
+          {t.translations.ORGANIZATION_TAG_MANAGEMENT}
+        </h2>
         <p className="text-base-content/70 mt-1 max-w-3xl text-sm">
-          Define organization-wide tags and security labels. Projects inherit
-          these and can optionally add their own.
+          {t.translations.DEFINE_ORGANIZATION_TAGS_AND_SENSITIVITY_LABELS_DESCRIPTION}
         </p>
       </div>
 
