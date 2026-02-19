@@ -60,7 +60,7 @@ function RelatedRecordsCard<T extends object>({
         </h2>
         {onAddRelationship && (
           <button
-            className="flex items-center justify-center w-8 h-7 rounded-full bg-primary text-white cursor-pointer"
+            className="flex items-center justify-center w-7 h-7 rounded-full bg-primary text-white cursor-pointer"
             onClick={onAddRelationship}
           >
             <PlusIcon className="size-6" />

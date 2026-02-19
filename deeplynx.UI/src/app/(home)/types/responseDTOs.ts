@@ -67,6 +67,7 @@ export interface HistoricalRecordResponseDto {
   projectId?: number;
   projectName: string;
   tags?: string | null;
+  labels?: string | null;
   lastUpdatedAt: string;
   lastUpdatedBy?: string | null;
   isArchived: boolean;
@@ -90,6 +91,7 @@ export type RecordResponseDto = {
   isArchived?: boolean;
   fileType?: string | null;
   tags?: { id: number | null; name: string }[];
+  labels?: { id: number | null; name: string }[];
 };
 
 export type ObjectStorageResponseDto = {
@@ -177,6 +179,17 @@ export type TagResponseDto = {
   isArchived: boolean;
   archivedAt?: string | null;
 };
+
+export type SensitivityLabelsDto = {
+  id: number;
+  name: string;
+  description: string | null;
+  lastUpdatedAt: string;
+  lastUpdatedBy: number | null;
+  isArchived: boolean;
+  projectId: number | null;
+  organizationId: number | null;
+}
 
 export type UserResponseDto =
   {

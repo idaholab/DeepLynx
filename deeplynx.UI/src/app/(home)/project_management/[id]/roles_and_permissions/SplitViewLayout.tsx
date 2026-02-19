@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useMemo, useState } from "react";
 import {
   BuildingOfficeIcon,
   ExclamationCircleIcon,
@@ -14,6 +14,7 @@ import {
   PermissionResponseDto,
   RoleResponseDto,
 } from "@/app/(home)/types/responseDTOs";
+import Tabs from "@/app/(home)/components/Tabs";
 import { PermissionCategory } from "./ProjectRolesAndPermissions";
 import { useLanguage } from "../../../../contexts/Language";
 
@@ -67,9 +68,224 @@ const SplitViewLayout: React.FC<SplitViewLayoutProps> = ({
   onTogglePermission,
 }) => {
   // Determine if current role can be edited
-  const canEditRole = currentRole && !isStandardRole(currentRole) && !isOrganizationRole(currentRole);
+  const canEditRole =
+    currentRole &&
+    !isStandardRole(currentRole) &&
+    !isOrganizationRole(currentRole);
   const canEditPermissions = canEditRole && !rolesLocked;
   const { t } = useLanguage();
+  const [activePermissionTab, setActivePermissionTab] = useState(
+    t.translations.RESOURCE_PERMISSIONS,
+  );
+  const splitPermissionCategories = useMemo(() => {
+    const withoutLabelId: PermissionCategory[] = [];
+    const withLabelId: PermissionCategory[] = [];
+
+    permissionCategories.forEach((category) => {
+      const categoryWithoutLabel = category.permissions.filter(
+        (perm) => perm.labelId == null,
+      );
+      const categoryWithLabel = category.permissions.filter(
+        (perm) => perm.labelId != null,
+      );
+
+      if (categoryWithoutLabel.length > 0) {
+        withoutLabelId.push({
+          ...category,
+          permissions: categoryWithoutLabel,
+        });
+      }
+
+      if (categoryWithLabel.length > 0) {
+        withLabelId.push({
+          ...category,
+          permissions: categoryWithLabel,
+        });
+      }
+    });
+
+    return { withoutLabelId, withLabelId };
+  }, [permissionCategories]);
+  const labelPermissionCategoriesByName = useMemo(() => {
+    const labelPermissions = splitPermissionCategories.withLabelId.flatMap(
+      (category) => category.permissions,
+    );
+
+    const groupedByName = labelPermissions.reduce(
+      (acc, perm) => {
+        const key = (perm.name || "Unnamed Label Permission").trim();
+        if (!acc[key]) acc[key] = [];
+        acc[key].push(perm);
+        return acc;
+      },
+      {} as Record<string, PermissionResponseDto[]>,
+    );
+
+    return Object.entries(groupedByName).map(([name, perms]) => ({
+      id: `label-${name.toLowerCase().replace(/\s+/g, "-")}`,
+      label: name,
+      permissions: perms.sort((a, b) =>
+        String(a.action || "").localeCompare(String(b.action || "")),
+      ),
+    }));
+  }, [splitPermissionCategories.withLabelId]);
+
+  const renderPermissionsContent = (
+    categories: PermissionCategory[],
+    displayMode: "permission-name" | "permission-action" = "permission-name",
+  ): React.ReactNode => {
+    if (!currentRole) return null;
+
+    return (
+      <div className="pt-4">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-sm font-semibold">
+            {t.translations.PERMISSIONS}
+          </h3>
+          {!isEditingPermissions ? (
+            <button
+              disabled={!canEditPermissions || isLoadingPermissions}
+              onClick={onStartEditingPermissions}
+              className="btn btn-primary btn-sm gap-2"
+              title={
+                isStandardRole(currentRole)
+                  ? "Standard role permissions cannot be modified"
+                  : isOrganizationRole(currentRole)
+                    ? "Organization role permissions cannot be modified at project level"
+                    : rolesLocked
+                      ? "Roles are locked"
+                      : "Edit Permissions"
+              }
+            >
+              <PencilIcon className="w-4 h-4" />
+              {t.translations.EDIT_PERMISSIONS}
+            </button>
+          ) : (
+            <div className="flex gap-2">
+              <button
+                onClick={onCancelEditingPermissions}
+                className="btn btn-ghost btn-sm"
+              >
+                {t.translations.CANCEL}
+              </button>
+              <button
+                onClick={onSavePermissions}
+                className="btn btn-primary btn-sm gap-2"
+              >
+                <CheckIcon className="w-4 h-4" />
+                {t.translations.SAVE_CHANGES}
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Info alerts for read-only roles */}
+        {isStandardRole(currentRole) && (
+          <div className="alert alert-info mb-4">
+            <ExclamationCircleIcon className="w-5 h-5 flex-shrink-0" />
+            <span className="text-sm">
+              {t.translations.THIS_IS_A_STANDARD_ROLE}
+            </span>
+          </div>
+        )}
+
+        {isOrganizationRole(currentRole) && (
+          <div className="alert alert-warning mb-4">
+            <ExclamationCircleIcon className="w-5 h-5 flex-shrink-0" />
+            <span className="text-sm">
+              {t.translations.THIS_ROLE_IS_INHERITED}
+            </span>
+          </div>
+        )}
+
+        {/* Permission Content */}
+        {isLoadingPermissions ? (
+          <div className="flex items-center justify-center py-12">
+            <span className="loading loading-spinner loading-lg text-primary"></span>
+          </div>
+        ) : categories.length === 0 ? (
+          <div className="alert">
+            <span>{t.translations.NO_PERMISSIONS_AVAILABLE}</span>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {categories.map((category) => (
+              <div key={category.id} className="card bg-base-200/25">
+                <div className="card-body p-4">
+                  <h4 className="card-title text-sm mb-3">{category.label}</h4>
+                  <div className="grid grid-cols-2 gap-3">
+                    {category.permissions.map((perm: PermissionResponseDto) => {
+                      const hasPermission = isEditingPermissions
+                        ? tempPermissions.has(Number(perm.id))
+                        : roleHasPermission(currentRole.id, Number(perm.id));
+
+                      return (
+                        <label
+                          key={perm.id}
+                          className={`label justify-start gap-2 ${
+                            isEditingPermissions
+                              ? "cursor-pointer"
+                              : "cursor-default"
+                          }`}
+                          title={
+                            displayMode === "permission-action"
+                              ? perm.description || perm.action || perm.name
+                              : perm.description || perm.name
+                          }
+                        >
+                          <input
+                            type="checkbox"
+                            checked={hasPermission}
+                            onChange={() => onTogglePermission(Number(perm.id))}
+                            disabled={!isEditingPermissions}
+                            className="checkbox checkbox-primary checkbox-sm"
+                          />
+                          <span className="label-text">
+                            {displayMode === "permission-action"
+                              ? perm.action
+                              : perm.name}
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const permissionTabs = useMemo(
+    () => [
+      {
+        label: t.translations.RESOURCE_PERMISSIONS,
+        content: renderPermissionsContent(
+          splitPermissionCategories.withoutLabelId,
+        ),
+      },
+      {
+        label: t.translations.SENSITIVITY_LABELS,
+        content: renderPermissionsContent(
+          labelPermissionCategoriesByName,
+          "permission-action",
+        ),
+      },
+    ],
+    [
+      splitPermissionCategories,
+      isEditingPermissions,
+      isLoadingPermissions,
+      tempPermissions,
+      currentRole,
+      rolesLocked,
+      canEditPermissions,
+      labelPermissionCategoriesByName,
+      t,
+    ],
+  );
 
   return (
     <div className="flex gap-6" style={{ height: "calc(100vh - 28rem)" }}>
@@ -127,7 +343,7 @@ const SplitViewLayout: React.FC<SplitViewLayoutProps> = ({
                     </div>
                     {isStandardRole(role) && (
                       <div className="badge badge-info badge-sm">
-                      {t.translations.STD}
+                        {t.translations.STD}
                       </div>
                     )}
                     {isOrganizationRole(role) && (
@@ -191,7 +407,7 @@ const SplitViewLayout: React.FC<SplitViewLayoutProps> = ({
                   )}
                   <p className="text-xs text-base-content/60 mt-2">
                     {t.translations.SOURCE}
-                    {getRoleSource(currentRole)} • {t.translations.LAST_UPDATED} {" "}
+                    {getRoleSource(currentRole)} • {t.translations.LAST_UPDATED}{" "}
                     {new Date(currentRole.lastUpdatedAt).toLocaleDateString()}
                   </p>
                 </div>
@@ -204,8 +420,8 @@ const SplitViewLayout: React.FC<SplitViewLayoutProps> = ({
                       isStandardRole(currentRole)
                         ? "Standard roles cannot be edited"
                         : isOrganizationRole(currentRole)
-                        ? "Organization roles cannot be edited at project level"
-                        : "Edit Role"
+                          ? "Organization roles cannot be edited at project level"
+                          : "Edit Role"
                     }
                   >
                     <PencilIcon className="size-6" />
@@ -224,131 +440,13 @@ const SplitViewLayout: React.FC<SplitViewLayoutProps> = ({
               </div>
             </div>
 
-            <div className="divider px-3"></div>
-
             {/* Permissions Section */}
             <div className="flex-1 overflow-y-auto p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-sm font-semibold">
-                  {t.translations.PERMISSIONS}
-                </h3>
-                {!isEditingPermissions ? (
-                  <button
-                    disabled={!canEditPermissions || isLoadingPermissions}
-                    onClick={onStartEditingPermissions}
-                    className="btn btn-primary btn-sm gap-2"
-                    title={
-                      isStandardRole(currentRole)
-                        ? "Standard role permissions cannot be modified"
-                        : isOrganizationRole(currentRole)
-                        ? "Organization role permissions cannot be modified at project level"
-                        : rolesLocked
-                        ? "Roles are locked"
-                        : "Edit Permissions"
-                    }
-                  >
-                    <PencilIcon className="w-4 h-4" />
-                    {t.translations.EDIT_PERMISSIONS}
-                  </button>
-                ) : (
-                  <div className="flex gap-2">
-                    <button
-                      onClick={onCancelEditingPermissions}
-                      className="btn btn-ghost btn-sm"
-                    >
-                      {t.translations.CANCEL}
-                    </button>
-                    <button
-                      onClick={onSavePermissions}
-                      className="btn btn-primary btn-sm gap-2"
-                    >
-                      <CheckIcon className="w-4 h-4" />
-                      {t.translations.SAVE_CHANGES}
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              {/* Info alerts for read-only roles */}
-              {isStandardRole(currentRole) && (
-                <div className="alert alert-info mb-4">
-                  <ExclamationCircleIcon className="w-5 h-5 flex-shrink-0" />
-                  <span className="text-sm">
-                    {t.translations.THIS_IS_A_STANDARD_ROLE}
-                  </span>
-                </div>
-              )}
-
-              {isOrganizationRole(currentRole) && (
-                <div className="alert alert-warning mb-4">
-                  <ExclamationCircleIcon className="w-5 h-5 flex-shrink-0" />
-                  <span className="text-sm">
-                    {t.translations.THIS_ROLE_IS_INHERITED}
-                  </span>
-                </div>
-              )}
-
-              {/* Permission Content */}
-              {isLoadingPermissions ? (
-                <div className="flex items-center justify-center py-12">
-                  <span className="loading loading-spinner loading-lg text-primary"></span>
-                </div>
-              ) : permissionCategories.length === 0 ? (
-                <div className="alert">
-                  <span>
-                    {t.translations.NO_PERMISSIONS_AVAILABLE}
-                  </span>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {permissionCategories.map((category) => (
-                    <div key={category.id} className="card bg-base-200/25">
-                      <div className="card-body p-4">
-                        <h4 className="card-title text-sm mb-3">
-                          {category.label}
-                        </h4>
-                        <div className="grid grid-cols-2 gap-3">
-                          {category.permissions.map(
-                            (perm: PermissionResponseDto) => {
-                              const hasPermission = isEditingPermissions
-                                ? tempPermissions.has(Number(perm.id))
-                                : roleHasPermission(
-                                    currentRole.id,
-                                    Number(perm.id)
-                                  );
-
-                              return (
-                                <label
-                                  key={perm.id}
-                                  className={`label justify-start gap-2 ${
-                                    isEditingPermissions
-                                      ? "cursor-pointer"
-                                      : "cursor-default"
-                                  }`}
-                                  title={perm.description || perm.name}
-                                >
-                                  <input
-                                    type="checkbox"
-                                    checked={hasPermission}
-                                    onChange={() =>
-                                      onTogglePermission(Number(perm.id))
-                                    }
-                                    disabled={!isEditingPermissions}
-                                    className="checkbox checkbox-primary checkbox-sm"
-                                  />
-                                  <span className="label-text">
-                                    {perm.name}
-                                  </span>
-                                </label>
-                              );
-                            }
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+              <Tabs
+                tabs={permissionTabs}
+                activeTab={activePermissionTab}
+                onTabChange={setActivePermissionTab}
+              />
             </div>
           </>
         ) : (
