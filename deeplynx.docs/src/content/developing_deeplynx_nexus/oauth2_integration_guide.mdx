@@ -140,7 +140,7 @@ def oauth_callback():
     code = request.args.get('code')
     state = request.args.get('state')
 
-    # Any additonal validation should occur here, such as
+    # Any additional validation should occur here, such as
     # comparing state or checking for errors from Nexus.
 
     # Proceed to token exchange...
@@ -214,7 +214,7 @@ Now that you have your access token, you can include it in the Authorization hea
 ```python
 def get_nexus_api(token, endpoint):
     headers = {
-        'Authorizaton': f'Bearer {token}',
+        'Authorization': f'Bearer {token}',
         'Content-Type': 'application/json'
     }
 
@@ -227,7 +227,7 @@ def get_nexus_api(token, endpoint):
 
 ## Complete Example Implementation
 
-Here's a miminal Flask application demonstrating the complete Oauth flow:
+Here's a minimal Flask application demonstrating the complete Oauth flow:
 
 ```python
 import secrets

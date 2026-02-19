@@ -4,6 +4,8 @@ This is a [Nextra](https://nextra.site/) documentation site. Nextra is a static 
 
 To run this application, in the `deeplynx.docs` directory, run `npm install`, then `npm run dev`. Navigate to `http://localhost:3001`.
 
+Because the focus of this application is plaintext documentation for Nexus, before committing changes, please use an AI tool like Claude Code or Codex to review for language constructs like grammar and typos.
+
 ### How Nextra Works
 
 The Nextra application takes content from the `/content` directory. In each content subdirectory, a `_meta.ts` tells Nextra what lives there. The meta object should point to lower subdirectories, or `.mdx` files. The MDX files are JavaScript enabled markdown files that you can use to write documentation.
