@@ -6,25 +6,15 @@ import {
   MagnifyingGlassIcon,
   InformationCircleIcon,
 } from "@heroicons/react/24/outline";
+import type { SensitivityLabelsDto } from "@/app/(home)/types/responseDTOs";
 import { useLanguage } from "@/app/contexts/Language";
 
-type SecurityLabelDto = {
-  id: number;
-  name: string;
-  description?: string | null;
-  projectId: number;
-  isArchived: boolean;
-  lastUpdatedAt: string | null;
-  lastUpdatedBy: string | null;
-  archivedAt: string | null;
-};
-
 interface Props {
-  labels: SecurityLabelDto[];
-  labelsLockedByOrg: boolean;
+  labels: SensitivityLabelsDto[];
+  orgLabelsLocked: boolean;
   labelsLoading: boolean;
   labelsError: string | null;
-  filteredLabels: SecurityLabelDto[];
+  filteredLabels: SensitivityLabelsDto[];
   labelSearch: string;
   setLabelSearch: (value: string) => void;
   filteredCount: number;
@@ -33,11 +23,11 @@ interface Props {
   archivingLabelId: number | null;
   onCreateLabel: () => void;
   onEditLabel: (id: number) => void;
-  onArchiveClick: (label: SecurityLabelDto) => void;
+  onArchiveClick: (label: SensitivityLabelsDto) => void;
 }
 
-const ProjectSecurityLabelsPanel: React.FC<Props> = ({
-  labelsLockedByOrg,
+const ProjectsSecurityLabels: React.FC<Props> = ({
+  orgLabelsLocked,
   labelsLoading,
   labelsError,
   filteredLabels,
@@ -65,32 +55,11 @@ const ProjectSecurityLabelsPanel: React.FC<Props> = ({
               </h3>
             </div>
             <p className="text-xs text-base-content/70 mt-1 max-w-md">
-              {t.translations.PROJECT_SECURITY_LABELS_DESCRIPTION_WITH_CUI}
+              {t.translations.PROJECT_SECURITY_LABELS_DESCRIPTION}
             </p>
           </div>
 
           <div className="flex flex-col items-end gap-2">
-            {/* Lock indicator (read-only, controlled by org) */}
-            <button
-              type="button"
-              className={`btn btn-xs gap-1 ${
-                labelsLockedByOrg ? "btn-error" : "btn-ghost"
-              }`}
-              disabled
-            >
-              {labelsLockedByOrg ? (
-                <>
-                  <LockClosedIcon className="w-4 h-4" />
-                  {t.translations.LOCKED_BY_ORG}
-                </>
-              ) : (
-                <>
-                  <LockOpenIcon className="w-4 h-4" />
-                  {t.translations.PROJECT_MANAGED}
-                </>
-              )}
-            </button>
-
             {/* Search input */}
             <div className="form-control w-40">
               <div className="input input-xs input-bordered flex items-center gap-1 px-2">
@@ -110,13 +79,13 @@ const ProjectSecurityLabelsPanel: React.FC<Props> = ({
               type="button"
               className="btn btn-primary btn-xs gap-1"
               onClick={onCreateLabel}
-              disabled={labelsLockedByOrg || !projectId}
+              disabled={orgLabelsLocked || !projectId}
               title={
                 !projectId
                   ? t.translations.NO_PROJECT_SELECTED
-                  : labelsLockedByOrg
-                    ? t.translations.SECURITY_LABELS_LOCKED_AT_ORG_LEVEL
-                    : t.translations.CREATE_NEW_SECURITY_LABEL
+                  : orgLabelsLocked
+                    ? t.translations.LABELS_LOCKED_AT_ORG_LEVEL
+                    : t.translations.CREATE_NEW_PROJECT_LABEL
               }
             >
               + {t.translations.NEW_LABEL}
@@ -129,8 +98,9 @@ const ProjectSecurityLabelsPanel: React.FC<Props> = ({
           <span>
             {t.translations.SHOWING}{" "}
             <span className="font-semibold">{filteredCount}</span>{" "}
-            {t.translations.OF} <span className="font-semibold">{labelCount}</span>{" "}
-            {t.translations.LABELS_LOWER}
+            {t.translations.OF}{" "}
+            <span className="font-semibold">{labelCount}</span>{" "}
+            {t.translations.PROJECT_LABELS_LOWER}
           </span>
           {labelSearch.trim() && (
             <span className="italic">
@@ -140,23 +110,11 @@ const ProjectSecurityLabelsPanel: React.FC<Props> = ({
           )}
         </div>
 
-        {/* Info text */}
-        <div className="flex items-start gap-2 mb-3 text-xs text-base-content/70">
-          <InformationCircleIcon className="w-4 h-4" />
-          <p>
-            {t.translations.WHEN_LOCKED_AT_ORG_LEVEL_PROJECT_ADMINS}{" "}
-            <span className="font-semibold">
-              {t.translations.CANNOT_DEFINE_ADDITIONAL_SECURITY_LABELS}
-            </span>{" "}
-            {t.translations.MUST_USE_ORG_DEFINED_LABELS_ONLY}
-          </p>
-        </div>
-
         {/* Label list */}
         <div className="space-y-2 max-h-72 overflow-y-auto">
           {labelsLoading ? (
             <div className="py-6 text-center text-xs text-base-content/60">
-              {t.translations.LOADING_PROJECT_SECURITY_LABELS}
+              {t.translations.LOADING_PROJECT_LABELS}
             </div>
           ) : labelsError ? (
             <div className="py-6 text-center text-xs text-error">
@@ -165,8 +123,8 @@ const ProjectSecurityLabelsPanel: React.FC<Props> = ({
           ) : filteredLabels.length === 0 ? (
             <div className="py-6 text-center text-xs text-base-content/60 border border-dashed border-base-300 rounded-lg">
               {labelSearch.trim()
-                ? t.translations.NO_SECURITY_LABELS_MATCH_SEARCH
-                : t.translations.NO_PROJECT_SECURITY_LABELS_DEFINED_WHEN_UNLOCKED}
+                ? t.translations.NO_PROJECT_LABELS_MATCH_SEARCH
+                : t.translations.NO_PROJECT_LABELS_DEFINED_WHEN_UNLOCKED}
             </div>
           ) : (
             filteredLabels.map((label) => (
@@ -174,52 +132,49 @@ const ProjectSecurityLabelsPanel: React.FC<Props> = ({
                 key={label.id}
                 className="flex items-center justify-between bg-base-200/70 hover:bg-base-300/80 transition rounded-lg px-3 py-2"
               >
-                <div className="flex flex-col gap-0.5">
-                  <div className="flex items-center gap-2">
-                    <span className="badge badge-secondary badge-outline badge-sm">
-                      {label.name}
-                    </span>
+                <div className="flex items-center gap-2">
+                  <span className="badge badge-secondary badge-outline badge-sm">
+                    {label.name}
+                  </span>
+                  {!label.projectId && (
                     <span className="text-[0.7rem] text-base-content/70">
-                      {t.translations.PROJECT_LEVEL_SECURITY_LABEL}
-                    </span>
-                  </div>
-                  {label.description && (
-                    <span className="text-[0.65rem] text-base-content/60 line-clamp-2">
-                      {label.description}
+                      ({t.translations.ORGANIZATION_LABEL})
                     </span>
                   )}
                 </div>
-                <div className="flex items-center gap-1">
+                <div className="grid grid-cols-[auto_3rem] items-center gap-1">
                   <button
                     type="button"
                     className="btn btn-ghost btn-xs"
                     onClick={() => onEditLabel(label.id)}
-                    disabled={labelsLockedByOrg}
+                    disabled={orgLabelsLocked}
                     title={
-                      labelsLockedByOrg
-                        ? t.translations.SECURITY_LABELS_LOCKED_BY_ORGANIZATION
+                      orgLabelsLocked
+                        ? t.translations.LABELS_LOCKED_BY_ORGANIZATION
                         : t.translations.EDIT
                     }
                   >
                     {t.translations.EDIT}
                   </button>
-                  <button
-                    type="button"
-                    className="btn btn-ghost btn-xs text-error"
-                    onClick={() => onArchiveClick(label)}
-                    disabled={
-                      labelsLockedByOrg || archivingLabelId === label.id
-                    }
-                    title={
-                      labelsLockedByOrg
-                        ? t.translations.SECURITY_LABELS_LOCKED_BY_ORGANIZATION
-                        : t.translations.ARCHIVE_SOFT_DELETE_LABEL
-                    }
-                  >
-                    {archivingLabelId === label.id
-                      ? t.translations.ARCHIVING
-                      : t.translations.DELETE}
-                  </button>
+                  {label.projectId && (
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-xs text-error w-full"
+                      onClick={() => onArchiveClick(label)}
+                      disabled={
+                        orgLabelsLocked || archivingLabelId === label.id
+                      }
+                      title={
+                        orgLabelsLocked
+                          ? t.translations.LABELS_LOCKED_BY_ORGANIZATION
+                          : t.translations.ARCHIVE_SOFT_DELETE_LABEL
+                      }
+                    >
+                      {archivingLabelId === label.id
+                        ? t.translations.ARCHIVING
+                        : t.translations.DELETE}
+                    </button>
+                  )}
                 </div>
               </div>
             ))
@@ -230,4 +185,4 @@ const ProjectSecurityLabelsPanel: React.FC<Props> = ({
   );
 };
 
-export default ProjectSecurityLabelsPanel;
+export default ProjectsSecurityLabels;

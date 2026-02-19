@@ -48,6 +48,7 @@ let currentUploadAbortController: AbortController | null = null;
 export function cancelCurrentUpload(): void {
   if (currentUploadAbortController) {
     currentUploadAbortController.abort();
+    // Don't set to null here - let the upload function handle cleanup
   }
 }
 
@@ -174,6 +175,10 @@ async function uploadFileChunked({
 
     return result;
   } catch (error) {
+    // Check if this is an abort error
+    if (error instanceof DOMException && error.name === 'AbortError') {
+    }
+
     if (uploadId) {
       await cancelChunkedUpload({
         organizationId,

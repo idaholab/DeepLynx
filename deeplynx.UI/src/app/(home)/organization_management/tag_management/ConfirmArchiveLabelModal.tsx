@@ -6,15 +6,15 @@ import { useLanguage } from "@/app/contexts/Language";
 
 type Props = {
   isOpen: boolean;
-  tagName: string;
+  labelName: string;
   onClose: () => void;
   onConfirm: () => void;
   loading?: boolean;
 };
 
-const ConfirmArchiveTagModal: React.FC<Props> = ({
+const ConfirmArchiveLabelModal: React.FC<Props> = ({
   isOpen,
-  tagName,
+  labelName,
   onClose,
   onConfirm,
   loading = false,
@@ -27,11 +27,11 @@ const ConfirmArchiveTagModal: React.FC<Props> = ({
         <div className="flex items-start gap-3">
           <ExclamationTriangleIcon className="w-8 h-8 text-warning" />
           <div>
-            <h3 className="font-bold text-lg">{t.translations.ARCHIVE_TAG}</h3>
+            <h3 className="font-bold text-lg">{t.translations.ARCHIVE_LABEL}</h3>
             <p className="text-sm text-base-content/70 mt-1">
               {t.translations.ARE_YOU_SURE_YOU_WANT_TO_ARCHIVE}{" "}
-              <span className="font-semibold">{tagName}</span>?<br />
-              {t.translations.ARCHIVED_TAG_RESTORED_LATER}
+              <span className="font-semibold">{labelName}</span>?<br />
+              {t.translations.ARCHIVED_LABEL_RESTORED_LATER}
             </p>
           </div>
         </div>
@@ -64,4 +64,4 @@ const ConfirmArchiveTagModal: React.FC<Props> = ({
   );
 };
 
-export default ConfirmArchiveTagModal;
+export default ConfirmArchiveLabelModal;

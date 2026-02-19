@@ -55,8 +55,16 @@ const MatrixViewLayout: React.FC<MatrixViewLayoutProps> = ({
   isProjectRole,
   getRoleSource,
 }) => {
-
   const { t } = useLanguage();
+  const matrixPermissionCategories = React.useMemo(() => {
+    // Matrix view intentionally excludes sensitivity-label permissions.
+    return permissionCategories
+      .map((category) => ({
+        ...category,
+        permissions: category.permissions.filter((perm) => perm.labelId == null),
+      }))
+      .filter((category) => category.permissions.length > 0);
+  }, [permissionCategories]);
 
   // Determine if there are editable (project-only) roles
   const hasEditableRoles = roles.some(
@@ -69,11 +77,11 @@ const MatrixViewLayout: React.FC<MatrixViewLayoutProps> = ({
   };
 
   const editMatrixDisabledReason = !hasEditableRoles
-    ? "Matrix editing is only available when custom project roles exist."
+    ? t.translations.MATRIX_EDIT_REQUIRES_CUSTOM_PROJECT_ROLES
     : rolesLocked
-    ? "Roles are locked."
+    ? t.translations.ROLES_ARE_LOCKED
     : isLoadingPermissions
-    ? "Permissions are still loading."
+    ? t.translations.PERMISSIONS_STILL_LOADING
     : "";
 
   return (
@@ -95,7 +103,7 @@ const MatrixViewLayout: React.FC<MatrixViewLayoutProps> = ({
               className="btn btn-primary btn-sm gap-2"
               title={
                 editMatrixDisabledReason ||
-                "Edit permissions for project roles in matrix view"
+                t.translations.EDIT_PERMISSIONS_FOR_PROJECT_ROLES_MATRIX_VIEW
               }
             >
               <PencilIcon className="w-4 h-4" />
@@ -146,10 +154,10 @@ const MatrixViewLayout: React.FC<MatrixViewLayoutProps> = ({
 
                     const editDisabled = !editable;
                     const editTitle = isStd
-                      ? "Standard roles cannot be edited"
+                      ? t.translations.STANDARD_ROLES_CANNOT_BE_EDITED
                       : isOrg
-                      ? "Organization roles cannot be edited at project level"
-                      : "Edit Role";
+                      ? t.translations.ORGANIZATION_ROLES_CANNOT_BE_EDITED_AT_PROJECT_LEVEL
+                      : t.translations.EDIT_ROLE;
 
                     return (
                       <th key={role.id} className="text-center">
@@ -199,12 +207,12 @@ const MatrixViewLayout: React.FC<MatrixViewLayoutProps> = ({
                 </tr>
               </thead>
               <tbody>
-                {permissionCategories.map((category) => (
+                {matrixPermissionCategories.map((category) => (
                   <React.Fragment key={category.id}>
                     {/* Category Row */}
                     <tr className="bg-base-200">
                       <td
-                        colSpan={roles.length + 2}
+                        colSpan={roles.length + 1}
                         className="font-semibold text-sm sticky left-0"
                       >
                         {category.label}
@@ -225,7 +233,7 @@ const MatrixViewLayout: React.FC<MatrixViewLayoutProps> = ({
                               </span>
                             )}
                             <span className="text-xs text-base-content/50 mt-1">
-                              {t.translations.ACTION}{perm.action}
+                              {t.translations.ACTION} {perm.action}
                             </span>
                           </div>
                         </td>
@@ -241,7 +249,7 @@ const MatrixViewLayout: React.FC<MatrixViewLayoutProps> = ({
                           return (
                             <td key={role.id} className="text-center">
                               <div
-                                onClick={(e) => {
+                                onClick={() => {
                                   if (isEditingMatrix && editable) {
                                     onToggleMatrixPermission(
                                       role.id,
@@ -260,14 +268,14 @@ const MatrixViewLayout: React.FC<MatrixViewLayoutProps> = ({
                                 }`}
                                 title={
                                   isStandardRole(role) && isEditingMatrix
-                                    ? "Standard role permissions cannot be modified"
+                                    ? t.translations.STANDARD_ROLE_PERMISSIONS_CANNOT_BE_MODIFIED
                                     : isOrganizationRole(role) && isEditingMatrix
-                                    ? "Organization role permissions cannot be modified at project level"
+                                    ? t.translations.ORGANIZATION_ROLE_PERMISSIONS_CANNOT_BE_MODIFIED_AT_PROJECT_LEVEL
                                     : isEditingMatrix
-                                    ? "Click to toggle"
+                                    ? t.translations.CLICK_TO_TOGGLE
                                     : hasPermission
-                                    ? "Has permission"
-                                    : "No permission"
+                                    ? t.translations.HAS_PERMISSION
+                                    : t.translations.NO_PERMISSION
                                 }
                               >
                                 {hasPermission ? (

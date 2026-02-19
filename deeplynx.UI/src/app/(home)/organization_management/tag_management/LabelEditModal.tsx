@@ -6,19 +6,23 @@ import { useLanguage } from "@/app/contexts/Language";
 interface Props {
   isOpen: boolean;
   isSaving: boolean;
-  editingTag: boolean;
+  editingLabel: boolean;
   nameInput: string;
+  descriptionInput: string;
   onNameChange: (value: string) => void;
+  onDescriptionChange: (value: string) => void;
   onCancel: () => void;
   onSave: () => void;
 }
 
-const TagEditModal: React.FC<Props> = ({
+const LabelEditModal: React.FC<Props> = ({
   isOpen,
   isSaving,
-  editingTag,
+  editingLabel,
   nameInput,
+  descriptionInput,
   onNameChange,
+  onDescriptionChange,
   onCancel,
   onSave,
 }) => {
@@ -32,25 +36,38 @@ const TagEditModal: React.FC<Props> = ({
     <div className="modal modal-open">
       <div className="modal-box max-w-md">
         <h3 className="font-bold text-lg mb-2">
-          {editingTag ? t.translations.EDIT_TAG : t.translations.CREATE_TAG}
+          {editingLabel ? t.translations.EDIT_LABEL : t.translations.CREATE_LABEL}
         </h3>
         <p className="text-xs text-base-content/70 mb-4">
-          {t.translations.DEFINE_ORGANIZATION_LEVEL_TAG_DESCRIPTION}
+          {t.translations.DEFINE_ORGANIZATION_LEVEL_SENSITIVATY_LABEL_DESCRIPTION}
         </p>
 
         <div className="space-y-4">
           <div className="form-control">
             <label className="label">
               <span className="label-text font-semibold">
-                {t.translations.TAG_NAME} <span className="text-error">*</span>
+                {t.translations.LABEL_NAME} <span className="text-error">*</span>
               </span>
             </label>
             <input
               type="text"
               className="input input-bordered input-sm"
-              placeholder={t.translations.TAG_NAME_PLACEHOLDER}
+              placeholder={t.translations.LABEL_NAME_PLACEHOLDER}
               value={nameInput}
               onChange={(e) => onNameChange(e.target.value)}
+            />
+          </div>
+
+          <div className="form-control">
+            <label className="label">
+              <span className="label-text font-semibold">{t.translations.DESCRIPTION}</span>
+            </label>
+            <textarea
+              className="textarea textarea-bordered textarea-sm"
+              placeholder={t.translations.OPTIONAL_DESCRIPTION_FOR_THIS_LABEL}
+              rows={3}
+              value={descriptionInput}
+              onChange={(e) => onDescriptionChange(e.target.value)}
             />
           </div>
         </div>
@@ -71,9 +88,9 @@ const TagEditModal: React.FC<Props> = ({
           >
             {isSaving
               ? t.translations.SAVING
-              : editingTag
-                ? t.translations.SAVE_TAG
-                : t.translations.CREATE_TAG}
+              : editingLabel
+                ? t.translations.SAVE_LABEL
+                : t.translations.CREATE_LABEL}
           </button>
         </div>
       </div>
@@ -82,4 +99,4 @@ const TagEditModal: React.FC<Props> = ({
   );
 };
 
-export default TagEditModal;
+export default LabelEditModal;
