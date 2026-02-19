@@ -1,8 +1,5 @@
-// src/app/(home)/organization_management/users/InviteUserModal.tsx
-
 import React, { useState, KeyboardEvent } from "react";
 import { EnvelopeIcon, XMarkIcon } from "@heroicons/react/24/outline";
-import { useLanguage } from "@/app/contexts/Language";
 
 /* -------------------------------------------------------------------------- */
 /*                     Invite User to Organization Dialog                     */
@@ -11,7 +8,6 @@ import { useLanguage } from "@/app/contexts/Language";
 interface InviteUserModalProps {
   isOpen: boolean;
   modalLoading: boolean;
-
   onClose: () => void;
   onInvite: (emails: string[]) => void;
 }
@@ -22,7 +18,6 @@ const InviteUserModal: React.FC<InviteUserModalProps> = ({
   onClose,
   onInvite,
 }) => {
-  const { t } = useLanguage();
   const [emails, setEmails] = useState<string[]>([]);
   const [inputValue, setInputValue] = useState("");
 
@@ -67,7 +62,6 @@ const InviteUserModal: React.FC<InviteUserModalProps> = ({
   };
 
   const handleInvite = () => {
-    // Add any remaining text in input
     if (inputValue.trim()) {
       addEmail(inputValue);
     }
@@ -78,8 +72,7 @@ const InviteUserModal: React.FC<InviteUserModalProps> = ({
     
     if (finalEmails.length > 0) {
       onInvite(finalEmails);
-      setEmails([]);
-      setInputValue("");
+      handleClose();
     }
   };
 
@@ -97,7 +90,7 @@ const InviteUserModal: React.FC<InviteUserModalProps> = ({
         {/* Header */}
         <div className="flex justify-between items-center mb-6">
           <h3 className="font-bold text-2xl">
-            {t.translations.INVITE_USERS_TO_ORG}
+            Invite Users to Organization
           </h3>
           <button
             className="btn btn-sm btn-circle btn-ghost"
@@ -119,8 +112,7 @@ const InviteUserModal: React.FC<InviteUserModalProps> = ({
               <div className="form-control">
                 <label className="label">
                   <span className="label-text font-semibold">
-                    {t.translations.EMAIL_ADDRESS || "Names or emails"}{" "}
-                    <span className="text-error mr-2">*</span>
+                    Email addresses <span className="text-error">*</span>
                   </span>
                 </label>
                 <div className="input input-bordered input-lg min-h-[3rem] h-auto flex flex-wrap gap-2 items-center p-2">
@@ -141,7 +133,7 @@ const InviteUserModal: React.FC<InviteUserModalProps> = ({
                   ))}
                   <input
                     type="text"
-                    placeholder={emails.length === 0 ? "user@example.com" : "add more people..."}
+                    placeholder={emails.length === 0 ? "user@example.com" : "add more..."}
                     className="flex-1 min-w-[200px] outline-none bg-transparent"
                     value={inputValue}
                     onChange={(e) => setInputValue(e.target.value)}
@@ -156,7 +148,7 @@ const InviteUserModal: React.FC<InviteUserModalProps> = ({
                   />
                 </div>
                 <label className="label">
-                  <span className="label-text-alt text-base-content/60">
+                  <span className="mt-1 label-text-alt text-base-content/60">
                     Press Enter, comma, or space to add multiple emails
                   </span>
                 </label>
@@ -166,12 +158,9 @@ const InviteUserModal: React.FC<InviteUserModalProps> = ({
               <div className="alert alert-info">
                 <EnvelopeIcon className="w-6 h-6" />
                 <div>
-                  <h4 className="font-semibold">
-                    {t.translations.EMAIL_NOTIFICATIONS || "Email Notifications"}
-                  </h4>
+                  <h4 className="font-semibold">Email Notifications</h4>
                   <p className="text-sm">
-                    {t.translations.EMAIL_INVITATION_DESCRIPTION || 
-                      "Invitations will be sent to all added email addresses."}
+                    Invitations will be sent to all added email addresses.
                   </p>
                 </div>
               </div>
@@ -184,7 +173,7 @@ const InviteUserModal: React.FC<InviteUserModalProps> = ({
                 onClick={handleClose}
                 disabled={modalLoading}
               >
-                {t.translations.CANCEL}
+                Cancel
               </button>
               <button
                 className={`btn btn-primary gap-2 ${
@@ -198,7 +187,7 @@ const InviteUserModal: React.FC<InviteUserModalProps> = ({
                 ) : (
                   <EnvelopeIcon className="w-5 h-5" />
                 )}
-                {t.translations.SEND_INVITATION || "Send Invitation"}
+                Send Invitation
                 {emails.length > 0 && ` (${emails.length})`}
               </button>
             </div>

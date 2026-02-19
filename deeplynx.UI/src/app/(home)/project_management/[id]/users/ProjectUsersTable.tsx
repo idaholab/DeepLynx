@@ -23,15 +23,14 @@ import {
 } from "@/app/(home)/types/responseDTOs";
 import ProjectUsersHeader from "./ProjectUsersHeader";
 import ProjectUsersListTable from "./ProjectUsersListTable";
-import AddProjectMemberModal from "./AddProjectMemberModal";
+import AddUsersToProjectModal from "./AddUsersToProjectModal";
+import AddGroupToProjectModal from "./AddGroupToProjectModal";
 import RemoveProjectMemberModal from "./RemoveProjectMemberModal";
 import EditProjectMemberRoleModal from "./EditProjectMemberRoleModal";
-import InviteProjectUserModal from "./InviteProjectUserModal";
+
 import {
-  AddMemberModalState,
   ConfirmModalState,
   EditRoleModalState,
-  MemberType,
   ProjectMemberTableRow,
   buildTableData,
 } from "../../types/projectUsersTypes";
@@ -59,30 +58,22 @@ const ProjectUsersTable = ({ members, roles, project }: Props) => {
   const { t } = useLanguage();
 
   /* ------------------------------------------------------------------------ */
-  /*                           Invite Modal State                             */
+  /*                           Add User Modal State                           */
   /* ------------------------------------------------------------------------ */
 
-  const [showInviteModal, setShowInviteModal] = useState(false);
-  const [inviteEmail, setInviteEmail] = useState("");
-  const [inviteRoleId, setInviteRoleId] = useState("");
-  const [inviteModalLoading, setInviteModalLoading] = useState(false);
-
-  /* ------------------------------------------------------------------------ */
-  /*                           Add Member Modal State                         */
-  /* ------------------------------------------------------------------------ */
-
-  const [addModal, setAddModal] = useState<AddMemberModalState>({
-    isOpen: false,
-    memberType: "user",
-  });
-  const [selectedMemberId, setSelectedMemberId] = useState<string>("");
-  const [selectedRoleId, setSelectedRoleId] = useState<string>("");
-
+  const [showAddUserModal, setShowAddUserModal] = useState(false);
   const [availableUsers, setAvailableUsers] = useState<UserResponseDto[]>([]);
-  const [availableGroups, setAvailableGroups] = useState<GroupResponseDto[]>(
-    [],
-  );
-  const [modalLoading, setModalLoading] = useState(false);
+  const [userModalLoading, setUserModalLoading] = useState(false);
+
+  /* ------------------------------------------------------------------------ */
+  /*                           Add Group Modal State                          */
+  /* ------------------------------------------------------------------------ */
+
+  const [showAddGroupModal, setShowAddGroupModal] = useState(false);
+  const [availableGroups, setAvailableGroups] = useState<GroupResponseDto[]>([]);
+  const [groupModalLoading, setGroupModalLoading] = useState(false);
+  const [selectedGroupId, setSelectedGroupId] = useState<string>("");
+  const [selectedGroupRoleId, setSelectedGroupRoleId] = useState<string>("");
 
   /* ------------------------------------------------------------------------ */
   /*                        Confirm Remove / Future Use                       */
@@ -143,71 +134,150 @@ const ProjectUsersTable = ({ members, roles, project }: Props) => {
   );
 
   /* ------------------------------------------------------------------------ */
-  /*                     Invite User: Open Modal & Send                       */
+  /*                     Add Users Modal: Open & Handler                      */
   /* ------------------------------------------------------------------------ */
 
-  const handleOpenInviteModal = () => {
-    setShowInviteModal(true);
+  const handleOpenAddUsersModal = async () => {
+    if (!organizationId) {
+      toast.error(t.translations.NO_ORG_SELECTED);
+      return;
+    }
+
+    setShowAddUserModal(true);
+    setUserModalLoading(true);
+
+    try {
+      const users = await getAllUsers(organizationId);
+      setAvailableUsers(users);
+    } catch (error) {
+      console.error("Failed to load users:", error);
+      toast.error(t.translations.UNABLE_TO_LOAD_USERS_OR_GROUPS);
+    } finally {
+      setUserModalLoading(false);
+    }
   };
 
-  const handleInviteUser = async () => {
-    if (!inviteEmail) {
-      toast.error(t.translations.PLEASE_ENTER_EMAIL_ADDRESS);
+  const handleInviteExternalUser = async (email: string, roleId: number) => {
+    if (!organizationId || !projectId) {
+      throw new Error(t.translations.MISSING_ORG_OR_PROJECT);
+    }
+
+    const inviteData: InviteUserToProjectRequestDto = {
+      userEmail: email,
+      userName: email.split("@")[0],
+      roleId: roleId,
+    };
+
+    await inviteUserToProject(organizationId, projectId, inviteData);
+
+    // Refresh the members list
+    try {
+      const updatedMembers = await getProjectMembers(organizationId, projectId);
+      setTableData(buildTableData(updatedMembers));
+    } catch (refreshError) {
+      console.error("Failed to refresh members list:", refreshError);
+    }
+  };
+
+  const handleAddOrgUser = async (userId: number, roleId: number) => {
+    if (!organizationId || !projectId) {
+      throw new Error(t.translations.MISSING_ORG_OR_PROJECT);
+    }
+
+    await addMemberToProject(organizationId, projectId, {
+      roleId,
+      userId,
+    });
+
+    const user = availableUsers.find((u) => u.id === userId);
+    if (user?.email) {
+      try {
+        await sendEmail(
+          user.email,
+          t.translations.YOUVE_BEEN_ADDED_TO_A_PROJECT_IN_DEEPLYNX_NEXUS,
+        );
+      } catch (emailError) {
+        console.error("Failed to send notification email:", emailError);
+      }
+    }
+
+    // Refresh the members list
+    try {
+      const updatedMembers = await getProjectMembers(organizationId, projectId);
+      setTableData(buildTableData(updatedMembers));
+    } catch (refreshError) {
+      console.error("Failed to refresh members list:", refreshError);
+    }
+  };
+
+  /* ------------------------------------------------------------------------ */
+  /*                     Add Group Modal: Open & Handler                      */
+  /* ------------------------------------------------------------------------ */
+
+  const handleOpenAddGroupModal = async () => {
+    if (!organizationId) {
+      toast.error(t.translations.NO_ORG_SELECTED);
       return;
     }
 
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(inviteEmail)) {
-      toast.error(t.translations.PLEASE_ENTER_VALID_EMAIL_ADDRESS);
-      return;
-    }
+    setShowAddGroupModal(true);
+    setGroupModalLoading(true);
 
-    if (!inviteRoleId) {
-      toast.error(t.translations.PLEASE_SELECT_A_ROLE);
-      return;
+    try {
+      const groups = await getAllGroups(organizationId);
+      setAvailableGroups(groups);
+    } catch (error) {
+      console.error("Failed to load groups:", error);
+      toast.error(t.translations.UNABLE_TO_LOAD_USERS_OR_GROUPS);
+    } finally {
+      setGroupModalLoading(false);
     }
+  };
 
+  const handleAddGroup = async () => {
     if (!organizationId || !projectId) {
       toast.error(t.translations.MISSING_ORG_OR_PROJECT);
       return;
     }
 
+    if (!selectedGroupId) {
+      toast.error(t.translations.PLEASE_SELECT_A_GROUP);
+      return;
+    }
+
+    if (!selectedGroupRoleId) {
+      toast.error(t.translations.PLEASE_SELECT_A_ROLE_FOR_MEMBER);
+      return;
+    }
+
     try {
-      setInviteModalLoading(true);
+      setGroupModalLoading(true);
 
-      const inviteData: InviteUserToProjectRequestDto = {
-        userEmail: inviteEmail,
-        userName: inviteEmail.split("@")[0],
-        roleId: Number(inviteRoleId),
-      };
+      const roleId = Number(selectedGroupRoleId);
+      const groupId = Number(selectedGroupId);
 
-      await inviteUserToProject(organizationId, projectId, inviteData);
+      await addMemberToProject(organizationId, projectId, {
+        roleId,
+        groupId,
+      });
 
-      toast.success(`${t.translations.INVITATION_SENT_TO_} ${inviteEmail}`);
+      toast.success(t.translations.MEMBER_ADDED_TO_PROJECT);
 
       // Refresh the members list
-      try {
-        const updatedMembers = await getProjectMembers(
-          organizationId,
-          projectId,
-        );
+      const updatedMembers = await getProjectMembers(organizationId, projectId);
+      setTableData(buildTableData(updatedMembers));
 
-        setTableData(buildTableData(updatedMembers));
-      } catch (refreshError) {
-        console.error("Failed to refresh members list:", refreshError);
-        // Don't show error to user - invite was successful
-      }
-
-      setShowInviteModal(false);
-      setInviteEmail("");
-      setInviteRoleId("");
+      setShowAddGroupModal(false);
+      setSelectedGroupId("");
+      setSelectedGroupRoleId("");
     } catch (error) {
-      console.error("Error inviting user to project:", error);
-      toast.error(t.translations.FAILED_TO_SEND_INVITATION);
+      console.error("Failed to add group to project:", error);
+      toast.error(t.translations.FAILED_TO_ADD_MEMBER);
     } finally {
-      setInviteModalLoading(false);
+      setGroupModalLoading(false);
     }
   };
+
   /* ------------------------------------------------------------------------ */
   /*                     Edit Role: open & save handlers                      */
   /* ------------------------------------------------------------------------ */
@@ -290,126 +360,6 @@ const ProjectUsersTable = ({ members, roles, project }: Props) => {
   };
 
   /* ------------------------------------------------------------------------ */
-  /*                          Add Member: Open Modal                          */
-  /* ------------------------------------------------------------------------ */
-
-  const handleOpenAddMemberModal = async (memberType: MemberType = "user") => {
-    if (!organizationId) {
-      toast.error(t.translations.NO_ORG_SELECTED);
-      return;
-    }
-
-    setAddModal({ isOpen: true, memberType });
-    setModalLoading(true);
-
-    try {
-      const [users, groups] = await Promise.all([
-        getAllUsers(organizationId),
-        getAllGroups(organizationId),
-      ]);
-      setAvailableUsers(users);
-      setAvailableGroups(groups);
-    } catch (error) {
-      console.error("Failed to load options for Add Member:", error);
-      toast.error(t.translations.UNABLE_TO_LOAD_USERS_OR_GROUPS);
-    } finally {
-      setModalLoading(false);
-    }
-  };
-
-  /* ------------------------------------------------------------------------ */
-  /*                        Add Member: Confirm Action                        */
-  /* ------------------------------------------------------------------------ */
-
-  const handleAddMember = async () => {
-    if (!organizationId || !projectId) {
-      toast.error(t.translations.MISSING_ORG_OR_PROJECT);
-      return;
-    }
-
-    if (!selectedMemberId) {
-      toast.error(
-        addModal.memberType === "user"
-          ? t.translations.PLEASE_SELECT_A_USER
-          : t.translations.PLEASE_SELECT_A_GROUP,
-      );
-      return;
-    }
-
-    if (!selectedRoleId) {
-      toast.error(t.translations.PLEASE_SELECT_A_ROLE_FOR_MEMBER);
-      return;
-    }
-
-    try {
-      setModalLoading(true);
-
-      const roleId = Number(selectedRoleId);
-      const memberId = Number(selectedMemberId);
-
-      if (addModal.memberType === "user") {
-        await addMemberToProject(organizationId, projectId, {
-          roleId,
-          userId: memberId,
-        });
-      } else {
-        await addMemberToProject(organizationId, projectId, {
-          roleId,
-          groupId: memberId,
-        });
-      }
-
-      if (addModal.memberType === "user") {
-        const user = availableUsers.find((u) => u.id === memberId);
-        if (user?.email) {
-          try {
-            await sendEmail(
-              user.email,
-              t.translations.YOUVE_BEEN_ADDED_TO_A_PROJECT_IN_DEEPLYNX_NEXUS,
-            );
-          } catch (emailError) {
-            console.error("Failed to send notification email:", emailError);
-          }
-        }
-      }
-
-      toast.success(t.translations.MEMBER_ADDED_TO_PROJECT);
-
-      const selectedRole = roles.find((r) => r.id === roleId);
-      const nameSource =
-        addModal.memberType === "user"
-          ? (availableUsers.find((u) => u.id === memberId)?.name ?? "")
-          : (availableGroups.find((g) => g.id === memberId)?.name ?? "");
-
-      const emailSource =
-        addModal.memberType === "user"
-          ? (availableUsers.find((u) => u.id === memberId)?.email ?? null)
-          : null;
-
-      setTableData((prev) => [
-        ...prev,
-        {
-          memberId,
-          name: nameSource,
-          email: emailSource,
-          role: selectedRole?.name ?? null,
-          roleId,
-          memberType: addModal.memberType,
-        },
-      ]);
-
-      setAddModal((prev) => ({ ...prev, isOpen: false }));
-      setSelectedMemberId("");
-      setSelectedRoleId("");
-    } catch (error) {
-      console.error("Failed to add member to project:", error);
-      toast.error(t.translations.FAILED_TO_ADD_MEMBER);
-    } finally {
-      setModalLoading(false);
-    }
-  };
-
-  /* ------------------------------------------------------------------------ */
   /*                        Remove Member: Confirm Action                     */
   /* ------------------------------------------------------------------------ */
 
@@ -476,9 +426,8 @@ const ProjectUsersTable = ({ members, roles, project }: Props) => {
             userCount={userCount}
             groupCount={groupCount}
             loading={loading}
-            onAddUser={() => handleOpenAddMemberModal("user")}
-            onAddGroup={() => handleOpenAddMemberModal("group")}
-            onInviteUser={handleOpenInviteModal}
+            onInviteUser={handleOpenAddUsersModal}
+            onAddGroup={handleOpenAddGroupModal}
           />
 
           <ProjectUsersListTable
@@ -494,23 +443,6 @@ const ProjectUsersTable = ({ members, roles, project }: Props) => {
                 isPending: false,
               })
             }
-          />
-
-          {/* Invite User Modal */}
-          <InviteProjectUserModal
-            isOpen={showInviteModal}
-            inviteEmail={inviteEmail}
-            selectedRoleId={inviteRoleId}
-            roles={roles}
-            modalLoading={inviteModalLoading}
-            onClose={() => {
-              setShowInviteModal(false);
-              setInviteEmail("");
-              setInviteRoleId("");
-            }}
-            onInvite={handleInviteUser}
-            onChangeEmail={setInviteEmail}
-            onChangeRole={setInviteRoleId}
           />
 
           {/* Remove Member Modal */}
@@ -529,23 +461,33 @@ const ProjectUsersTable = ({ members, roles, project }: Props) => {
             onConfirm={handleRemoveMember}
           />
 
-          {/* Add Member Modal */}
-          <AddProjectMemberModal
-            addModal={addModal}
+          {/* Add Users Modal - handles both org users and external invites */}
+          <AddUsersToProjectModal
+            isOpen={showAddUserModal}
             roles={roles}
-            availableUsers={availableUsers}
+            availableOrgUsers={availableUsers}
+            modalLoading={userModalLoading}
+            onClose={() => setShowAddUserModal(false)}
+            onInviteExternalUser={handleInviteExternalUser}
+            onAddOrgUser={handleAddOrgUser}
+          />
+
+          {/* Add Group Modal */}
+          <AddGroupToProjectModal
+            isOpen={showAddGroupModal}
+            roles={roles}
             availableGroups={availableGroups}
-            selectedMemberId={selectedMemberId}
-            selectedRoleId={selectedRoleId}
-            modalLoading={modalLoading}
+            selectedGroupId={selectedGroupId}
+            selectedRoleId={selectedGroupRoleId}
+            modalLoading={groupModalLoading}
             onClose={() => {
-              setAddModal((prev) => ({ ...prev, isOpen: false }));
-              setSelectedMemberId("");
-              setSelectedRoleId("");
+              setShowAddGroupModal(false);
+              setSelectedGroupId("");
+              setSelectedGroupRoleId("");
             }}
-            onChangeMember={setSelectedMemberId}
-            onChangeRole={setSelectedRoleId}
-            onConfirm={handleAddMember}
+            onChangeGroup={setSelectedGroupId}
+            onChangeRole={setSelectedGroupRoleId}
+            onConfirm={handleAddGroup}
           />
 
           {/* Edit Role Modal */}
