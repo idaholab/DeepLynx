@@ -461,7 +461,6 @@ const ProjectRolesAndPermissions = ({
     }
     return roleHasPermission(roleId, permissionId);
   };
-  console.log("Permissions: ", initialPermissions);
   /* ------------------------------------------------------------------------ */
   /*                 Permission Grouping / Helpers                            */
   /* ------------------------------------------------------------------------ */
@@ -628,7 +627,7 @@ const ProjectRolesAndPermissions = ({
       <div className="mb-6 border-b border-base-300 pb-4">
         <div className="flex items-center justify-between mb-2">
           <h1 className="text-2xl font-bold">
-            {t.translations.PROJECT_ROLES_AND_PERMISSIONS} knadvjn
+            {t.translations.PROJECT_ROLES_AND_PERMISSIONS}
           </h1>
         </div>
         <p className="text-base-content/70">

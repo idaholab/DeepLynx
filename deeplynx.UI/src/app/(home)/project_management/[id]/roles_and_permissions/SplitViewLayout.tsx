@@ -106,8 +106,6 @@ const SplitViewLayout: React.FC<SplitViewLayoutProps> = ({
 
     return { withoutLabelId, withLabelId };
   }, [permissionCategories]);
-  console.log("splitPermissionCategories", splitPermissionCategories);
-  console.log("Categories Permissions: ", permissionCategories);
   const labelPermissionCategoriesByName = useMemo(() => {
     const labelPermissions = splitPermissionCategories.withLabelId.flatMap(
       (category) => category.permissions,

@@ -42,8 +42,6 @@ const ProjectManagementClient = ({
     setActiveTab(label);
   };
 
-  console.log("Project Permissions: ", projectPermissions);
-
   const tabData = [
     {
       label: t.translations.USERS,
