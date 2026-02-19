@@ -24,7 +24,10 @@ import {
 } from "@/app/(home)/types/responseDTOs";
 
 import { LockClosedIcon } from "@heroicons/react/24/outline";
-import { getPermissionsForRole } from "@/app/lib/client_service/permission_services.client";
+import {
+  getAllPermissions,
+  getPermissionsForRole,
+} from "@/app/lib/client_service/permission_services.client";
 import ProjectCreateRoleModal from "./ProjectCreateRoleModal";
 import ProjectDeleteRoleModal from "./ProjectDeleteRoleModal";
 import ProjectEditRoleModal from "./ProjectEditRoleModal";
@@ -75,7 +78,8 @@ const ProjectRolesAndPermissions = ({
     standardInitialRoles[0]?.id || null,
   );
   const [roles, setRoles] = useState<RoleResponseDto[]>(initialRoles);
-  const [permissions, setPermissions] = useState<PermissionResponseDto[]>(initialPermissions);
+  const [permissions, setPermissions] =
+    useState<PermissionResponseDto[]>(initialPermissions);
 
   const [rolePermissions, setRolePermissions] = useState<
     Record<number, PermissionResponseDto[]>
@@ -91,7 +95,28 @@ const ProjectRolesAndPermissions = ({
   /*                           Context: Project                               */
   /* ------------------------------------------------------------------------ */
 
-    const { project } = useProjectSession();
+  const { project } = useProjectSession();
+
+  /* ------------------------------------------------------------------------ */
+  /*                        Permissions Refetch Helper                        */
+  /* ------------------------------------------------------------------------ */
+
+  const refetchAllPermissions = useCallback(async () => {
+    if (!organization?.organizationId || !project?.projectId) return;
+
+    try {
+      const latestPermissions = await getAllPermissions(
+        organization.organizationId as number,
+        project.projectId as number,
+        undefined,
+        true,
+      );
+      setPermissions(latestPermissions);
+    } catch (error) {
+      console.error("Error refetching permissions:", error);
+      toast.error("Failed to reload permissions");
+    }
+  }, [organization?.organizationId, project?.projectId]);
 
   /* ------------------------------------------------------------------------ */
   /*                             Create Role Modal                            */
@@ -116,18 +141,22 @@ const ProjectRolesAndPermissions = ({
       const newRole = await createRole(
         organization.organizationId as number,
         project?.projectId as number,
-        dto
+        dto,
       );
+
+      await refetchAllPermissions();
 
       const userRole = roles.find((r) => r.name === "User");
       if (userRole && rolePermissions[userRole.id]) {
-        const userPermissionIds = rolePermissions[userRole.id].map((p) => Number(p.id));
+        const userPermissionIds = rolePermissions[userRole.id].map((p) =>
+          Number(p.id),
+        );
 
         await setPermissionsForRole(
           organization.organizationId as number,
           project?.projectId as number,
           newRole.id,
-          userPermissionIds
+          userPermissionIds,
         );
 
         setRolePermissions((prev) => ({
@@ -156,7 +185,7 @@ const ProjectRolesAndPermissions = ({
   const handleUpdateRole = async (
     roleId: number,
     name?: string | null,
-    description?: string | null
+    description?: string | null,
   ) => {
     try {
       const dto: UpdateRoleRequestDto = { name, description };
@@ -164,11 +193,11 @@ const ProjectRolesAndPermissions = ({
         organization?.organizationId as number,
         project?.projectId as number,
         roleId,
-        dto
+        dto,
       );
 
       setRoles((prev) =>
-        prev.map((role) => (role.id === roleId ? updatedRole : role))
+        prev.map((role) => (role.id === roleId ? updatedRole : role)),
       );
       toast.success("Role updated successfully");
     } catch (error) {
@@ -194,7 +223,7 @@ const ProjectRolesAndPermissions = ({
 
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [roleToDelete, setRoleToDelete] = useState<RoleResponseDto | null>(
-    null
+    null,
   );
 
   const handleDeleteRole = async () => {
@@ -204,7 +233,7 @@ const ProjectRolesAndPermissions = ({
       await archiveRole(
         organization?.organizationId as number,
         project?.projectId as number,
-        roleToDelete.id
+        roleToDelete.id,
       );
 
       // Remove archived role from UI
@@ -213,7 +242,7 @@ const ProjectRolesAndPermissions = ({
       // Re-select a fallback role if needed
       if (selectedRoleId === roleToDelete.id) {
         const remainingRoles = roles.filter(
-          (role) => role.id !== roleToDelete.id
+          (role) => role.id !== roleToDelete.id,
         );
         setSelectedRoleId(remainingRoles[0]?.id || null);
       }
@@ -240,199 +269,198 @@ const ProjectRolesAndPermissions = ({
   /*                    Single-Role Permission Editing State                  */
   /* ------------------------------------------------------------------------ */
 
-    const [isEditingPermissions, setIsEditingPermissions] = useState(false);
-    const [tempPermissions, setTempPermissions] = useState<Set<number>>(
-      new Set()
-    );
+  const [isEditingPermissions, setIsEditingPermissions] = useState(false);
+  const [tempPermissions, setTempPermissions] = useState<Set<number>>(
+    new Set(),
+  );
 
-    const handleStartEditingPermissions = () => {
-      if (!currentRole) return;
+  const handleStartEditingPermissions = () => {
+    if (!currentRole) return;
 
-      // Only allow editing for project-specific roles
-      if (isStandardRole(currentRole) || isOrganizationRole(currentRole)) {
-        toast.error("Cannot edit permissions for inherited roles");
-        return;
+    // Only allow editing for project-specific roles
+    if (isStandardRole(currentRole) || isOrganizationRole(currentRole)) {
+      toast.error("Cannot edit permissions for inherited roles");
+      return;
+    }
+
+    const currentPermissionIds =
+      rolePermissions[currentRole.id]?.map((p) => Number(p.id)) || [];
+
+    setTempPermissions(new Set(currentPermissionIds));
+    setIsEditingPermissions(true);
+  };
+
+  const handleTogglePermission = (permissionId: number) => {
+    setTempPermissions((prev) => {
+      const next = new Set(prev);
+      if (next.has(permissionId)) {
+        next.delete(permissionId);
+      } else {
+        next.add(permissionId);
       }
+      return next;
+    });
+  };
 
-      const currentPermissionIds =
-        rolePermissions[currentRole.id]?.map((p) => Number(p.id)) || [];
+  const handleSavePermissions = async () => {
+    if (!currentRole) return;
 
-      setTempPermissions(new Set(currentPermissionIds));
-      setIsEditingPermissions(true);
-    };
+    try {
+      await setPermissionsForRole(
+        organization?.organizationId as number,
+        project?.projectId as number,
+        currentRole.id,
+        Array.from(tempPermissions),
+      );
 
-    const handleTogglePermission = (permissionId: number) => {
-      setTempPermissions((prev) => {
-        const next = new Set(prev);
-        if (next.has(permissionId)) {
-          next.delete(permissionId);
-        } else {
-          next.add(permissionId);
-        }
-        return next;
-      });
-    };
+      const updatedPerms = permissions.filter((p) =>
+        tempPermissions.has(Number(p.id)),
+      );
 
-    const handleSavePermissions = async () => {
-      if (!currentRole) return;
+      setRolePermissions((prev) => ({
+        ...prev,
+        [currentRole.id]: updatedPerms,
+      }));
 
-      try {
-        await setPermissionsForRole(
-          organization?.organizationId as number,
-          project?.projectId as number,
-          currentRole.id,
-          Array.from(tempPermissions)
-        );
-
-        const updatedPerms = permissions.filter((p) =>
-          tempPermissions.has(Number(p.id))
-        );
-
-        setRolePermissions((prev) => ({
-          ...prev,
-          [currentRole.id]: updatedPerms,
-        }));
-
-        setIsEditingPermissions(false);
-        toast.success("Permissions updated successfully");
-      } catch (error) {
-        console.error("Error updating permissions:", error);
-        toast.error("Failed to update permissions");
-        throw error;
-      }
-    };
-
-    const handleCancelEditingPermissions = () => {
       setIsEditingPermissions(false);
-      setTempPermissions(new Set());
-    };
+      toast.success("Permissions updated successfully");
+    } catch (error) {
+      console.error("Error updating permissions:", error);
+      toast.error("Failed to update permissions");
+      throw error;
+    }
+  };
+
+  const handleCancelEditingPermissions = () => {
+    setIsEditingPermissions(false);
+    setTempPermissions(new Set());
+  };
 
   /* ------------------------------------------------------------------------ */
   /*                             Role Selection                               */
   /* ------------------------------------------------------------------------ */
 
-    const handleRoleSelection = (roleId: number) => {
-      if (isEditingPermissions) {
-        toast.error("Please save or cancel your changes before switching roles");
-        return;
+  const handleRoleSelection = (roleId: number) => {
+    if (isEditingPermissions) {
+      toast.error("Please save or cancel your changes before switching roles");
+      return;
+    }
+    setSelectedRoleId(roleId);
+  };
+
+  /* ------------------------------------------------------------------------ */
+  /*                      Matrix (All Roles/Perms) Editing                    */
+  /* ------------------------------------------------------------------------ */
+
+  const tableContainerRef = useRef<HTMLDivElement | null>(null);
+  const [isEditingMatrix, setIsEditingMatrix] = useState(false);
+  const [matrixTempPermissions, setMatrixTempPermissions] = useState<
+    Record<number, Set<number>>
+  >({});
+
+  const handleStartEditingMatrix = () => {
+    const initialMatrix: Record<number, Set<number>> = {};
+
+    roles.forEach((role) => {
+      const rolePerms =
+        rolePermissions[role.id]?.map((p) => Number(p.id)) || [];
+      initialMatrix[role.id] = new Set(rolePerms);
+    });
+
+    setMatrixTempPermissions(initialMatrix);
+    setIsEditingMatrix(true);
+  };
+
+  const handleToggleMatrixPermission = (
+    roleId: number,
+    permissionId: number,
+  ) => {
+    const scrollTop = tableContainerRef.current?.scrollTop || 0;
+    const scrollLeft = tableContainerRef.current?.scrollLeft || 0;
+
+    setMatrixTempPermissions((prev) => {
+      const updated = { ...prev };
+      if (!updated[roleId]) {
+        updated[roleId] = new Set();
       }
-      setSelectedRoleId(roleId);
-    };
 
-    /* ------------------------------------------------------------------------ */
-    /*                      Matrix (All Roles/Perms) Editing                    */
-    /* ------------------------------------------------------------------------ */
+      const roleSet = new Set(updated[roleId]);
+      if (roleSet.has(permissionId)) {
+        roleSet.delete(permissionId);
+      } else {
+        roleSet.add(permissionId);
+      }
 
-    const tableContainerRef = useRef<HTMLDivElement | null>(null);
-    const [isEditingMatrix, setIsEditingMatrix] = useState(false);
-    const [matrixTempPermissions, setMatrixTempPermissions] = useState<
-      Record<number, Set<number>>
-    >({});
+      updated[roleId] = roleSet;
+      return updated;
+    });
 
-    const handleStartEditingMatrix = () => {
-      const initialMatrix: Record<number, Set<number>> = {};
+    // Preserve scroll after re-render
+    requestAnimationFrame(() => {
+      if (tableContainerRef.current) {
+        tableContainerRef.current.scrollTop = scrollTop;
+        tableContainerRef.current.scrollLeft = scrollLeft;
+      }
+    });
+  };
 
-      roles.forEach((role) => {
-        const rolePerms =
-          rolePermissions[role.id]?.map((p) => Number(p.id)) || [];
-        initialMatrix[role.id] = new Set(rolePerms);
-      });
+  const handleSaveMatrixPermissions = async () => {
+    try {
+      // Only update project-specific roles
+      const projectRolesToUpdate = roles.filter(
+        (role) => isProjectRole(role) && !isStandardRole(role),
+      );
 
-      setMatrixTempPermissions(initialMatrix);
-      setIsEditingMatrix(true);
-    };
-
-    const handleToggleMatrixPermission = (
-      roleId: number,
-      permissionId: number
-    ) => {
-      const scrollTop = tableContainerRef.current?.scrollTop || 0;
-      const scrollLeft = tableContainerRef.current?.scrollLeft || 0;
-
-      setMatrixTempPermissions((prev) => {
-        const updated = { ...prev };
-        if (!updated[roleId]) {
-          updated[roleId] = new Set();
-        }
-
-        const roleSet = new Set(updated[roleId]);
-        if (roleSet.has(permissionId)) {
-          roleSet.delete(permissionId);
-        } else {
-          roleSet.add(permissionId);
-        }
-
-        updated[roleId] = roleSet;
-        return updated;
-      });
-
-      // Preserve scroll after re-render
-      requestAnimationFrame(() => {
-        if (tableContainerRef.current) {
-          tableContainerRef.current.scrollTop = scrollTop;
-          tableContainerRef.current.scrollLeft = scrollLeft;
-        }
-      });
-    };
-
-    const handleSaveMatrixPermissions = async () => {
-      try {
-        // Only update project-specific roles
-        const projectRolesToUpdate = roles.filter(
-          (role) => isProjectRole(role) && !isStandardRole(role)
+      const updatePromises = projectRolesToUpdate.map((role) => {
+        const newPermissions = Array.from(matrixTempPermissions[role.id] || []);
+        return setPermissionsForRole(
+          organization?.organizationId as number,
+          project?.projectId as number,
+          role.id,
+          newPermissions,
         );
+      });
 
-        const updatePromises = projectRolesToUpdate.map((role) => {
-          const newPermissions = Array.from(matrixTempPermissions[role.id] || []);
-          return setPermissionsForRole(
-            organization?.organizationId as number,
-            project?.projectId as number,
-            role.id,
-            newPermissions
-          );
-        });
+      await Promise.all(updatePromises);
 
-        await Promise.all(updatePromises);
+      const updatedRolePermissions: Record<number, PermissionResponseDto[]> =
+        {};
+      projectRolesToUpdate.forEach((role) => {
+        const permIds = matrixTempPermissions[role.id] || new Set();
+        updatedRolePermissions[role.id] = permissions.filter((p) =>
+          permIds.has(Number(p.id)),
+        );
+      });
 
-        const updatedRolePermissions: Record<number, PermissionResponseDto[]> =
-          {};
-        projectRolesToUpdate.forEach((role) => {
-          const permIds = matrixTempPermissions[role.id] || new Set();
-          updatedRolePermissions[role.id] = permissions.filter((p) =>
-            permIds.has(Number(p.id))
-          );
-        });
+      setRolePermissions((prev) => ({
+        ...prev,
+        ...updatedRolePermissions,
+      }));
 
-        setRolePermissions((prev) => ({
-          ...prev,
-          ...updatedRolePermissions,
-        }));
-
-        setIsEditingMatrix(false);
-        setMatrixTempPermissions({});
-        toast.success("All permissions updated successfully");
-      } catch (error) {
-        console.error("Error updating matrix permissions:", error);
-        toast.error("Failed to update permissions");
-        throw error;
-      }
-    };
-
-    const handleCancelEditingMatrix = () => {
       setIsEditingMatrix(false);
       setMatrixTempPermissions({});
-    };
+      toast.success("All permissions updated successfully");
+    } catch (error) {
+      console.error("Error updating matrix permissions:", error);
+      toast.error("Failed to update permissions");
+      throw error;
+    }
+  };
 
-    const matrixRoleHasPermission = (
-      roleId: number,
-      permissionId: number
-    ): boolean => {
-      if (isEditingMatrix) {
-        return matrixTempPermissions[roleId]?.has(permissionId) || false;
-      }
-      return roleHasPermission(roleId, permissionId);
-    };
+  const handleCancelEditingMatrix = () => {
+    setIsEditingMatrix(false);
+    setMatrixTempPermissions({});
+  };
 
+  const matrixRoleHasPermission = (
+    roleId: number,
+    permissionId: number,
+  ): boolean => {
+    if (isEditingMatrix) {
+      return matrixTempPermissions[roleId]?.has(permissionId) || false;
+    }
+    return roleHasPermission(roleId, permissionId);
+  };
   /* ------------------------------------------------------------------------ */
   /*                 Permission Grouping / Helpers                            */
   /* ------------------------------------------------------------------------ */
@@ -440,7 +468,7 @@ const ProjectRolesAndPermissions = ({
   const groupPermissionsByResource = (): PermissionCategory[] => {
     const grouped = permissions.reduce(
       (acc, perm) => {
-        const resource = perm.resource || "General";
+        const resource = perm.resource || "Security Label";
         if (!acc[resource]) acc[resource] = [];
         acc[resource].push(perm);
         return acc;
@@ -462,28 +490,31 @@ const ProjectRolesAndPermissions = ({
   /*                       Permissions Fetching (per role)                    */
   /* ------------------------------------------------------------------------ */
 
-  const fetchRolePermissions = useCallback(async (roleId: number) => {
-    if (rolePermissions[roleId]) return;
-    if (!organization?.organizationId) return;
+  const fetchRolePermissions = useCallback(
+    async (roleId: number) => {
+      if (rolePermissions[roleId]) return;
+      if (!organization?.organizationId) return;
 
-    setIsLoadingPermissions(true);
-    try {
-      const perms = await getPermissionsForRole(
-        Number(organization.organizationId),
-        projectId,
-        roleId,
-      );
-      setRolePermissions((prev) => ({
-        ...prev,
-        [roleId]: perms,
-      }));
-    } catch (error) {
-      console.error(`Error fetching permissions for role ${roleId}:`, error);
-      toast.error("Failed to load role permissions");
-    } finally {
-      setIsLoadingPermissions(false);
-    }
-  }, [organization?.organizationId, projectId, rolePermissions]);
+      setIsLoadingPermissions(true);
+      try {
+        const perms = await getPermissionsForRole(
+          Number(organization.organizationId),
+          projectId,
+          roleId,
+        );
+        setRolePermissions((prev) => ({
+          ...prev,
+          [roleId]: perms,
+        }));
+      } catch (error) {
+        console.error(`Error fetching permissions for role ${roleId}:`, error);
+        toast.error("Failed to load role permissions");
+      } finally {
+        setIsLoadingPermissions(false);
+      }
+    },
+    [organization?.organizationId, projectId, rolePermissions],
+  );
 
   const fetchAllRolePermissions = useCallback(async () => {
     if (!organization?.organizationId) return;
@@ -529,7 +560,6 @@ const ProjectRolesAndPermissions = ({
     if (!initialLoadComplete && roles.length > 0) {
       fetchAllRolePermissions();
     }
-
   }, [roles, initialLoadComplete, fetchAllRolePermissions]);
 
   useEffect(() => {
@@ -538,28 +568,28 @@ const ProjectRolesAndPermissions = ({
     }
   }, [selectedRoleId, initialLoadComplete, fetchRolePermissions]);
 
-    /* ------------------------------------------------------------------------ */
-    /*                          Permission Check Helper                         */
-    /* ------------------------------------------------------------------------ */
+  /* ------------------------------------------------------------------------ */
+  /*                          Permission Check Helper                         */
+  /* ------------------------------------------------------------------------ */
 
-    const roleHasPermission = (roleId: number, permissionId: number): boolean =>
-      rolePermissions[roleId]?.some((p) => p.id === permissionId) || false;
+  const roleHasPermission = (roleId: number, permissionId: number): boolean =>
+    rolePermissions[roleId]?.some((p) => p.id === permissionId) || false;
 
-    const isStandardRole = (role: RoleResponseDto): boolean =>
-      role.name === "Admin" || role.name === "User" || role.name === "Viewer";
+  const isStandardRole = (role: RoleResponseDto): boolean =>
+    role.name === "Admin" || role.name === "User" || role.name === "Viewer";
 
-    const isOrganizationRole = (role: RoleResponseDto): boolean =>
-      role.organizationId != null && role.projectId == null;
+  const isOrganizationRole = (role: RoleResponseDto): boolean =>
+    role.organizationId != null && role.projectId == null;
 
-    const isProjectRole = (role: RoleResponseDto): boolean =>
-      role.projectId != null && role.projectId === projectId;
+  const isProjectRole = (role: RoleResponseDto): boolean =>
+    role.projectId != null && role.projectId === projectId;
 
-    const getRoleSource = (role: RoleResponseDto): string => {
-      if (isStandardRole(role)) return "System";
-      if (isOrganizationRole(role)) return "Organization";
-      if (isProjectRole(role)) return "Project";
-      return "Unknown";
-    };
+  const getRoleSource = (role: RoleResponseDto): string => {
+    if (isStandardRole(role)) return "System";
+    if (isOrganizationRole(role)) return "Organization";
+    if (isProjectRole(role)) return "Project";
+    return "Unknown";
+  };
 
   /* ------------------------------------------------------------------------ */
   /*                          Refetch Roles on Mount                          */
@@ -572,7 +602,7 @@ const ProjectRolesAndPermissions = ({
       const updatedRoles = await getAllRoles(
         organization.organizationId as number,
         project.projectId as number,
-        true
+        true,
       );
 
       setRoles(updatedRoles);

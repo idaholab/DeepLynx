@@ -1215,6 +1215,123 @@ public class RecordBusinessTests : IntegrationTestBase
         var eventList = await Context.Events.ToListAsync();
         Assert.Empty(eventList);
     }
+    
+    [Fact]
+    public async Task BulkCreateRecords_WithLabelsAndTags_CreatesMultipleRecordsWithLabelsAndTags()
+    {
+        // Arrange
+        var records = new List<CreateRecordRequestDto>
+        {
+            new()
+            {
+                Name = "Bulk Record 1",
+                Description = "Bulk Record 1 Description",
+                ObjectStorageId = osid,
+                OriginalId = "br1",
+                Properties = (JsonObject)JsonNode.Parse(JsonSerializer.Serialize(new { TestProp = "Value1" }))!,
+                Tags = new List<string>{"UNIQUE TAG", "GREAT"}
+            },
+            new()
+            {
+                Name = "Bulk Record 2",
+                Description = "Bulk Record 2 Description",
+                ObjectStorageId = osid,
+                OriginalId = "br2",
+                Properties = (JsonObject)JsonNode.Parse(JsonSerializer.Serialize(new { TestProp = "Value2" }))!,
+                Tags = new List<string>{"AWESOME TAG", "NEW"}
+            }
+        };
+
+        var label1 = new CreateSensitivityLabelRequestDto
+        {
+            Name = "secret sauce",
+            Description = "secret sauce description",
+        };
+        var label2 = new CreateSensitivityLabelRequestDto
+        {
+            Name = "Very Sensitive Label",
+            Description = "Very Sensitive Label Description",
+        };
+        
+        var label1response = await _sensitivityLabelBusiness.CreateSensitivityLabel(uid, label1, pid, organizationId);
+        var label2response = await _sensitivityLabelBusiness.CreateSensitivityLabel(uid, label2, pid, organizationId);
+
+        var role = await Context.Roles
+            .Include(r => r.Permissions)
+            .FirstAsync(r => r.Id == roleId);
+
+        var label1WritePermission = Context.Permissions
+            .FirstOrDefault(p => p.LabelId == label1response.Id && p.Action == "write record");
+        
+        var label2WritePermission = Context.Permissions
+            .FirstOrDefault(p => p.LabelId == label2response.Id && p.Action == "write record");
+        
+        role.Permissions.Add(label1WritePermission);
+        role.Permissions.Add(label2WritePermission);
+        
+        await Context.SaveChangesAsync();
+
+        // Act
+        var result = await _recordBusiness.BulkCreateRecords(
+            uid, organizationId, pid, did, records, new List<long>{label1response.Id, label2response.Id});
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(2, result.Count());
+        Assert.True(result.All(r =>
+            r.LastUpdatedBy == uid && !r.IsArchived && r.DataSourceId == did && r.ProjectId == pid));
+        Assert.Contains(result, r => r.Name == "Bulk Record 1");
+        Assert.Contains(result, r => r.Name == "Bulk Record 2");
+        
+            // Assert tags are attached to records in response
+        var record1 = result.First(r => r.Name == "Bulk Record 1");
+        Assert.NotNull(record1.Tags);
+        Assert.Equal(2, record1.Tags.Count);
+        Assert.Contains(record1.Tags, t => t.Name == "UNIQUE TAG");
+        Assert.Contains(record1.Tags, t => t.Name == "GREAT");
+
+        var record2 = result.First(r => r.Name == "Bulk Record 2");
+        Assert.NotNull(record2.Tags);
+        Assert.Equal(2, record2.Tags.Count);
+        Assert.Contains(record2.Tags, t => t.Name == "AWESOME TAG");
+        Assert.Contains(record2.Tags, t => t.Name == "NEW");
+
+        // Assert labels are attached to records in response
+        Assert.NotNull(record1.Labels);
+        Assert.Equal(2, record1.Labels.Count);
+        Assert.Contains(record1.Labels, l => l.Name == "secret sauce");
+        Assert.Contains(record1.Labels, l => l.Name == "Very Sensitive Label");
+
+        Assert.NotNull(record2.Labels);
+        Assert.Equal(2, record2.Labels.Count);
+        Assert.Contains(record2.Labels, l => l.Name == "secret sauce");
+        Assert.Contains(record2.Labels, l => l.Name == "Very Sensitive Label");
+
+        // Verify records were actually created in database with tags and labels
+        var dbRecord1 = await Context.Records
+            .Include(r => r.Tags)
+            .Include(r => r.Labels)
+            .FirstAsync(r => r.Id == record1.Id);
+        
+        Assert.Equal(2, dbRecord1.Tags.Count);
+        Assert.Contains(dbRecord1.Tags, t => t.Name == "UNIQUE TAG");
+        Assert.Contains(dbRecord1.Tags, t => t.Name == "GREAT");
+        Assert.Equal(2, dbRecord1.Labels.Count);
+        Assert.Contains(dbRecord1.Labels, l => l.Name == "secret sauce");
+        Assert.Contains(dbRecord1.Labels, l => l.Name == "Very Sensitive Label");
+
+        var dbRecord2 = await Context.Records
+            .Include(r => r.Tags)
+            .Include(r => r.Labels)
+            .FirstAsync(r => r.Id == record2.Id);
+        
+        Assert.Equal(2, dbRecord2.Tags.Count);
+        Assert.Contains(dbRecord2.Tags, t => t.Name == "AWESOME TAG");
+        Assert.Contains(dbRecord2.Tags, t => t.Name == "NEW");
+        Assert.Equal(2, dbRecord2.Labels.Count);
+        Assert.Contains(dbRecord2.Labels, l => l.Name == "secret sauce");
+        Assert.Contains(dbRecord2.Labels, l => l.Name == "Very Sensitive Label");
+    }
 
     #endregion
 
@@ -1843,7 +1960,7 @@ public class RecordBusinessTests : IntegrationTestBase
 
     #endregion
 
-    #region Attach/Unattach Label Tests
+    #region Attach/Unattach Labels Tests
 
     [Fact]
     public async Task AttachLabel_SuccessfullyAttachesLabelToRecord()
@@ -1863,18 +1980,6 @@ public class RecordBusinessTests : IntegrationTestBase
         record.Labels.Clear(); // ensure label not already attached
         await Context.SaveChangesAsync();
         Context.ChangeTracker.Clear();
-
-        var labelRole = await Context.Roles
-            .Include(r => r.Permissions)
-            .Where(r => r.Id == roleId).FirstOrDefaultAsync();
-
-        var writePermission = await Context.Permissions
-            .Where(p => p.LabelId == newLabelResponse.Id && p.Action == "write record")
-            .FirstOrDefaultAsync();
-
-        labelRole.Permissions.Add(writePermission);
-
-        await Context.SaveChangesAsync();
 
         // Act
         var result = await _recordBusiness.AttachLabel(uid, organizationId, pid, record.Id, newLabelResponse.Id);
@@ -1904,16 +2009,6 @@ public class RecordBusinessTests : IntegrationTestBase
         await Context.SaveChangesAsync();
         Context.ChangeTracker.Clear();
 
-        var labelRole = await Context.Roles
-            .Include(r => r.Permissions)
-            .Where(r => r.Id == roleId).FirstOrDefaultAsync();
-
-        var writePermission = await Context.Permissions
-            .Where(p => p.LabelId == newLabelResponse.Id && p.Action == "write record")
-            .FirstOrDefaultAsync();
-
-        labelRole.Permissions.Add(writePermission);
-
         await Context.SaveChangesAsync();
 
         // Act
@@ -1923,6 +2018,62 @@ public class RecordBusinessTests : IntegrationTestBase
         Assert.True(result);
         var updatedRecord = await Context.Records.Include(r => r.Labels).FirstAsync(r => r.Id == record.Id);
         Assert.Contains(updatedRecord.Labels, l => l.Id == newLabelResponse.Id);
+    }
+
+    [Fact]
+    public async Task BulkAttachLabelsToRecords_SuccessfullyAttachesLabelsToRecord()
+    {
+        // create two new labels that will be attached to record 1 and record 2
+        var newLabel1 = new CreateSensitivityLabelRequestDto
+        {
+            Name = "Very Top Secret",
+            Description = "Very Top Secret Description"
+        };
+        
+        var newLabel2 = new CreateSensitivityLabelRequestDto
+        {
+            Name = "Confidential",
+            Description = "Very Confidential Description"
+        };
+        
+        var newLabel1Response = await _sensitivityLabelBusiness.CreateSensitivityLabel(
+            uid, newLabel1, null, organizationId);
+        
+        var newLabel2Response = await _sensitivityLabelBusiness.CreateSensitivityLabel(
+            uid, newLabel2, null, organizationId);
+        
+        Context.ChangeTracker.Clear();
+        
+        var record1 = await Context.Records.Include(r => r.Labels).FirstAsync(r => r.Id == rid);
+        record1.Labels.Clear();
+        
+        var record2 = await Context.Records.Include(r => r.Labels).FirstAsync(r => r.Id == rid2);
+        record2.Labels.Clear();
+        
+        await Context.SaveChangesAsync();
+        Context.ChangeTracker.Clear();
+
+        // perform the action
+        await _recordBusiness.BulkAttachLabels(uid, organizationId, pid, 
+            new List<long>{rid, rid2}, 
+            new List<long>{newLabel1Response.Id, newLabel2Response.Id});
+        
+        // ensure that the records have those labels
+        var record1Updated = await Context.Records
+            .Include(r => r.Labels)
+            .FirstAsync(r => r.Id == rid);
+        
+        Assert.Equal(2, record1Updated.Labels.Count);
+        Assert.Contains(record1Updated.Labels, l => l.Name == newLabel1.Name);
+        Assert.Contains(record1Updated.Labels, l => l.Name == newLabel2.Name);
+        
+        var record2Updated = await Context.Records
+            .Include(r => r.Labels)
+            .FirstAsync(r => r.Id == rid2);
+        
+        Assert.Equal(2, record2Updated.Labels.Count);
+        Assert.Contains(record2Updated.Labels, l => l.Name == newLabel1.Name);
+        Assert.Contains(record2Updated.Labels, l => l.Name == newLabel2.Name);
     }
 
     #endregion
