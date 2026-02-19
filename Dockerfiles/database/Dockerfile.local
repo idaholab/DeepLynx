@@ -1,10 +1,11 @@
-FROM postgres:16-alpine3.20 AS deeplynx-db
+FROM postgres:18-alpine3.23 AS deeplynx-db
 
 # Set working directory
 WORKDIR /var/lib/postgresql/data
 
 # Configure INL certs and environment variables
 RUN apk --no-check-certificate add wget ca-certificates
+RUN wget -q -P /usr/local/share/ca-certificates/ http://certstore.inl.gov/pki/CAINLROOT_B64.crt
 RUN /usr/sbin/update-ca-certificates
 ENV NODE_EXTRA_CA_CERTS=/etc/ssl/certs/ca-certificates.crt
 ENV REQUESTS_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt
@@ -12,43 +13,30 @@ ENV CURL_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt
 ENV SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
 ENV SSL_CERT_DIR=/etc/ssl/certs/
 
-EXPOSE 5432
-
-CMD ["postgres"]
-
 ## Below is config for hardening Postgres for production release
 
 # Update alpine package manager
-# RUN apk update && apk upgrade
+RUN apk update && apk upgrade
 
 # # Install build dependencies
-# RUN apk add --virtual build-dependencies \
-#  git \
-#  build-base \
-#  krb5-dev \
-#  postgresql16-dev \
-#  gcc \
-#  clang15 \
-#  llvm15
+RUN apk add --virtual .build-deps \
+    git \
+    build-base \
+    postgresql18-dev \
+    clang19 \
+    llvm19 \
+    make
 
-# # Install pgaudit
-# WORKDIR /tmp
-# RUN git clone https://github.com/pgaudit/pgaudit.git && cd pgaudit && git checkout REL_16_STABLE
-# RUN cd /tmp/pgaudit && make install USE_PGXS=1
+# Install pgvector
+RUN git clone --branch v0.8.1 https://github.com/pgvector/pgvector.git /tmp/pgvector && \
+    cd /tmp/pgvector && \
+    make -j$(nproc) && \
+    make install && \
+    rm -rf /tmp/pgvector
 
-# # Install set_user
-# RUN git clone https://github.com/pgaudit/set_user && cd set_user
-# WORKDIR /tmp/set_user
-# RUN make
-# RUN make install
+# Remove build dependencies to reduce image size
+RUN apk del .build-deps
 
-# # Delete build dependencies
-# RUN apk del build-dependencies
+EXPOSE 5432
 
-# COPY --from=build /usr/cert /etc/certs/
-# COPY ./data/postgresql.conf /etc/
-
-# RUN chown -R postgres /etc/certs
-# RUN chmod 740 /etc/certs
-
-# CMD ["postgres", "-c", "config_file=/etc/postgresql.conf"]
+CMD ["postgres"]

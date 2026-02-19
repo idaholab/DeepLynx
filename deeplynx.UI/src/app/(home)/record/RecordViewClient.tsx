@@ -9,6 +9,7 @@ import toast from "react-hot-toast";
 import PropertyTable from "../components/PropertyTable";
 import {
   HistoricalRecordResponseDto,
+  SensitivityLabelsDto,
   TagResponseDto,
 } from "../types/responseDTOs";
 import RecordLoading from "./loading";
@@ -22,29 +23,28 @@ import RelatedRecordsCard, {
 // Types & Context
 import { useLanguage } from "@/app/contexts/Language";
 import { useOrganizationSession } from "@/app/contexts/OrganizationSessionProvider";
-import { getClass } from "@/app/lib/client_service/class_services.client";
+import {
+  createClass,
+  getAllClasses,
+  getClass,
+} from "@/app/lib/client_service/class_services.client";
 import {
   getHistoricalRecord,
+  getRecord,
+  unattachSensitivityLabelFromRecord,
   unattachTagFromRecord,
   updateRecord,
 } from "@/app/lib/client_service/record_services.client";
-import {
-  getAllTags,
-  getAllTagsOrg,
-} from "@/app/lib/client_service/tag_services.client";
+import { getAllTags } from "@/app/lib/client_service/tag_services.client";
 import GraphClientPage from "../graph/components/GraphClientPage";
 import { ClassResponseDto } from "../types/responseDTOs";
 import AdditionalPropertiesEditor from "./components/AdditionalPropertiesEditor";
 import RecordHistoryTab from "./components/RecordHistoryTab";
 import RecordTagsPanel from "./components/RecordTagsPanel";
 import RelatedRecordsCardSkeleton from "./skeletons/RelatedRecordsSkeleton";
-
-import {
-  createClass,
-  getAllClasses,
-} from "@/app/lib/client_service/class_services.client";
-import ClassSelectorModal from "./components/ClassSelectorModal";
+import { getAllSensitivityLabelsProject } from "@/app/lib/client_service/sensitivity_labels_services.client";
 import AddEdgeModal from "./components/AddEdgeModal";
+import ClassSelectorModal from "./components/ClassSelectorModal";
 import {
   RelatedRecordViewModel,
   useRecordRelationships,
@@ -60,10 +60,20 @@ interface PropertyRow {
   nestedRows?: PropertyRow[];
 }
 
-function parseNestedProperties(
-  obj: JSON,
-  parentKey: string = "",
-): PropertyRow[] {
+type MinimalSelectionItem = { id: number | null };
+
+function parseMaybeJsonArray<T>(value?: string | T[] | null): T[] {
+  if (!value) return [];
+  return typeof value === "string" ? JSON.parse(value) : value;
+}
+
+function mapSelectedIds(items: MinimalSelectionItem[]): string[] {
+  return items
+    .filter((item) => item.id != null)
+    .map((item) => String(item.id));
+}
+
+function parseNestedProperties(obj: JSON): PropertyRow[] {
   if (!obj || typeof obj !== "object") {
     return [];
   }
@@ -82,7 +92,7 @@ function parseNestedProperties(
         label,
         value: "",
         isNested: true,
-        nestedRows: parseNestedProperties(value, key),
+        nestedRows: parseNestedProperties(value),
       };
     } else {
       const displayValue = Array.isArray(value)
@@ -118,6 +128,11 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
   const [tags, setTags] = useState<TagResponseDto[]>([]);
   const [selectedTags, setSelectedTags] = useState<TagResponseDto[]>([]);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [labels, setLabels] = useState<SensitivityLabelsDto[]>([]);
+  const [selectedLabels, setSelectedLabels] = useState<SensitivityLabelsDto[]>(
+    [],
+  );
+  const [selectedLabelIds, setSelectedLabelIds] = useState<string[]>([]);
 
   // UI State
   const [activeTab, setActiveTab] = useState(0);
@@ -162,7 +177,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
     translations: t.translations,
   });
 
-  // ============= HANDLERS =============
+  // ============= RECORD UPDATE HANDLERS =============
   const handleUpdateRecord = useCallback(
     async (field: string, value: string, successMessage: string) => {
       if (!organization?.organizationId) return;
@@ -209,6 +224,8 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
     setRecord(null);
     setSelectedTags([]);
     setSelectedIds([]);
+    setSelectedLabels([]);
+    setSelectedLabelIds([]);
     resetRelationshipState();
   }, [resetRelationshipState]);
 
@@ -255,12 +272,22 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
     ],
   );
 
+  // ============= TAG/LABEL SELECTION HANDLERS =============
   const handleTagSelectionChange = (selected: string[]) => {
     const newTags = tags.filter((tag) => selected.includes(tag.id.toString()));
     setSelectedTags(newTags);
     setSelectedIds(selected);
   };
 
+  const handleLabelSelectionChange = (selected: string[]) => {
+    const newLabels = labels.filter((label) =>
+      selected.includes(label.id.toString()),
+    );
+    setSelectedLabels(newLabels);
+    setSelectedLabelIds(selected);
+  };
+
+  // ============= CLASS HANDLERS =============
   const handleClassUpdate = async (class_id: number) => {
     if (!organization?.organizationId) return;
 
@@ -309,11 +336,12 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
     }
   };
 
-  // ============= EFFECTS =============
+  // ============= INITIAL/RESET EFFECTS =============
   useEffect(() => {
     resetAllState();
   }, [recordId, resetAllState]);
 
+  // ============= DATA LOADING EFFECTS =============
   useEffect(() => {
     const fetchRecord = async () => {
       if (!recordId || !projectId || !organization?.organizationId) return;
@@ -327,15 +355,23 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
           true,
         );
         setRecord(data);
-        if (data.tags) {
-          const parsedTags =
-            typeof data.tags === "string" ? JSON.parse(data.tags) : data.tags;
+        const historicalTags =
+          parseMaybeJsonArray<{ id: number | null; name: string }>(data.tags);
+        const historicalLabels =
+          parseMaybeJsonArray<{ id: number | null; name: string }>(data.labels);
+        setSelectedIds(mapSelectedIds(historicalTags));
+        setSelectedLabelIds(mapSelectedIds(historicalLabels));
 
-          setSelectedTags(parsedTags);
-          setSelectedIds(
-            parsedTags.map((tag: { id: number | null }) => String(tag.id)),
-          );
-        }
+        // Pull live record attachments as source of truth for current tag/label links.
+        const liveRecord = await getRecord(
+          organization.organizationId as number,
+          projectId,
+          recordId,
+          true,
+        );
+
+        setSelectedIds(mapSelectedIds(liveRecord.tags ?? []));
+        setSelectedLabelIds(mapSelectedIds(liveRecord.labels ?? []));
       } catch (error) {
         console.error("Error fetching record:", error);
         toast.error(t.translations.FAILED_TO_FETCH_RECORD);
@@ -389,6 +425,34 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
 
     fetchTags();
   }, [projectId, organization?.organizationId]);
+
+  // ============= DERIVED SELECTION STATE =============
+  useEffect(() => {
+    setSelectedTags(
+      tags.filter((tag) => selectedIds.includes(tag.id.toString())),
+    );
+  }, [tags, selectedIds]);
+
+  useEffect(() => {
+    const fetchLabels = async () => {
+      if (!projectId || !organization?.organizationId) return;
+
+      try {
+        const data = await getAllSensitivityLabelsProject(projectId, true);
+        setLabels(data);
+      } catch (error) {
+        console.error("Error fetching labels:", error);
+      }
+    };
+
+    fetchLabels();
+  }, [projectId, organization?.organizationId]);
+
+  useEffect(() => {
+    setSelectedLabels(
+      labels.filter((label) => selectedLabelIds.includes(label.id.toString())),
+    );
+  }, [labels, selectedLabelIds]);
 
   useEffect(() => {
     const fetchClass = async () => {
@@ -510,6 +574,29 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
     }
   };
 
+  const handleRemoveLabel = async (labelId: number) => {
+    if (!organization?.organizationId) return;
+
+    try {
+      await unattachSensitivityLabelFromRecord(
+        organization.organizationId as number,
+        projectId,
+        recordId,
+        labelId,
+      );
+
+      setSelectedLabels((prev) => prev.filter((l) => l.id !== labelId));
+      setSelectedLabelIds((prev) =>
+        prev.filter((id) => id !== String(labelId)),
+      );
+
+      toast.success(t.translations.SENSITIVITY_LABEL_REMOVED);
+    } catch (error) {
+      console.error("Error removing sensitivity label:", error);
+      toast.error(t.translations.FAILED_TO_UPDATE_SENSITIVITY_LABELS);
+    }
+  };
+
   // ============= RENDER HELPERS =============
   if (!hasLoaded || !organization) {
     return <RecordLoading />;
@@ -550,13 +637,21 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
               tags={tags}
               selectedTags={selectedTags}
               selectedIds={selectedIds}
+              labels={labels}
+              selectedLabels={selectedLabels}
+              selectedLabelIds={selectedLabelIds}
               onSelectionChange={handleTagSelectionChange}
               onRemoveTag={handleRemoveTag}
+              onLabelSelectionChange={handleLabelSelectionChange}
+              onRemoveLabel={handleRemoveLabel}
               projectId={projectId}
               recordId={recordId}
               setTags={setTags}
               setSelectedTags={setSelectedTags}
               setSelectedIds={setSelectedIds}
+              setLabels={setLabels}
+              setSelectedLabels={setSelectedLabels}
+              setSelectedLabelIds={setSelectedLabelIds}
               title={t.translations.TAGS}
             />
 

@@ -1,46 +1,46 @@
 import React from "react";
 import {
-  TagIcon,
+  ShieldCheckIcon,
   LockClosedIcon,
   LockOpenIcon,
   MagnifyingGlassIcon,
   InformationCircleIcon,
 } from "@heroicons/react/24/outline";
-import type { TagResponseDto } from "@/app/(home)/types/responseDTOs";
+import type { SensitivityLabelsDto } from "@/app/(home)/types/responseDTOs";
 import { useLanguage } from "@/app/contexts/Language";
 
 interface Props {
-  tags: TagResponseDto[];
-  tagsLocked: boolean;
-  tagsLoading: boolean;
-  tagsError: string | null;
-  filteredTags: TagResponseDto[];
-  tagSearch: string;
-  setTagSearch: (value: string) => void;
+  labels: SensitivityLabelsDto[];
+  labelsLocked: boolean;
+  labelsLoading: boolean;
+  labelsError: string | null;
+  filteredLabels: SensitivityLabelsDto[];
+  labelSearch: string;
+  setLabelSearch: (value: string) => void;
   filteredCount: number;
-  tagCount: number;
+  labelCount: number;
   orgId?: number;
-  archivingTagId: number | null;
+  archivingLabelId: number | null;
   onToggleLock: () => void;
-  onCreateTag: () => void;
-  onEditTag: (id: number) => void;
-  onArchiveClick: (tag: TagResponseDto) => void;
+  onCreateLabel: () => void;
+  onEditLabel: (id: number) => void;
+  onArchiveClick: (label: SensitivityLabelsDto) => void;
 }
 
-const OrgTagsPanel: React.FC<Props> = ({
-  tagsLocked,
-  tagsLoading,
-  tagsError,
-  filteredTags,
-  tagSearch,
-  setTagSearch,
+const SecurityLabelsOrg: React.FC<Props> = ({
+  labelsLocked,
+  labelsLoading,
+  labelsError,
+  filteredLabels,
+  labelSearch,
+  setLabelSearch,
   filteredCount,
-  tagCount,
+  labelCount,
   orgId,
-  archivingTagId,
+  archivingLabelId,
   onToggleLock,
-  onCreateTag,
-  onEditTag,
+  onCreateLabel,
+  onEditLabel,
   onArchiveClick,
 }) => {
   const { t } = useLanguage();
@@ -51,13 +51,13 @@ const OrgTagsPanel: React.FC<Props> = ({
         <div className="flex items-start justify-between gap-4 mb-3">
           <div className="flex-1">
             <div className="flex items-center gap-2">
-              <TagIcon className="w-5 h-5 text-secondary" />
+              <ShieldCheckIcon className="w-5 h-5 text-secondary" />
               <h3 className="font-semibold text-base">
-                {t.translations.ORGANIZATION_TAGS}
+                {t.translations.ORGANIZATION_SECURITY_LABELS}
               </h3>
             </div>
             <p className="text-xs text-base-content/70 mt-1 max-w-md">
-              {t.translations.ORGANIZATION_TAGS_DESCRIPTION}
+              {t.translations.ORGANIZATION_SECURITY_LABELS_DESCRIPTION}
             </p>
           </div>
 
@@ -69,9 +69,9 @@ const OrgTagsPanel: React.FC<Props> = ({
                 <input
                   type="text"
                   className="grow text-[0.7rem] bg-transparent focus:outline-none"
-                  placeholder={t.translations.SEARCH_TAGS}
-                  value={tagSearch}
-                  onChange={(e) => setTagSearch(e.target.value)}
+                  placeholder={t.translations.SEARCH_LABELS}
+                  value={labelSearch}
+                  onChange={(e) => setLabelSearch(e.target.value)}
                 />
               </div>
             </div>
@@ -80,17 +80,17 @@ const OrgTagsPanel: React.FC<Props> = ({
             <button
               type="button"
               className="btn btn-primary btn-xs gap-1"
-              onClick={onCreateTag}
-              disabled={tagsLocked || !orgId}
+              onClick={onCreateLabel}
+              disabled={labelsLocked || !orgId}
               title={
                 !orgId
                   ? t.translations.NO_ORG_SELECTED
-                  : tagsLocked
-                    ? t.translations.TAGS_LOCKED_AT_ORG_LEVEL_SHORT
-                    : t.translations.CREATE_NEW_TAG
+                  : labelsLocked
+                    ? t.translations.LABELS_LOCKED_AT_ORG_LEVEL_SHORT
+                    : t.translations.CREATE_NEW_LABEL
               }
             >
-              + {t.translations.NEW_TAG}
+              + {t.translations.NEW_LABEL}
             </button>
           </div>
         </div>
@@ -101,53 +101,53 @@ const OrgTagsPanel: React.FC<Props> = ({
             {t.translations.SHOWING}{" "}
             <span className="font-semibold">{filteredCount}</span>{" "}
             {t.translations.OF}{" "}
-            <span className="font-semibold">{tagCount}</span>{" "}
-            {t.translations.TAGS_LOWER}
+            <span className="font-semibold">{labelCount}</span>{" "}
+            {t.translations.LABELS_LOWER}
           </span>
-          {tagSearch.trim() && (
+          {labelSearch.trim() && (
             <span className="italic">
               {t.translations.FILTERED_BY}
-              <span className="font-medium break-all">{tagSearch}</span>
+              <span className="font-medium break-all">{labelSearch}</span>
             </span>
           )}
         </div>
 
-        {/* Tag list */}
+        {/* Labels list */}
         <div className="space-y-2 max-h-72 overflow-y-auto">
-          {tagsLoading ? (
+          {labelsLoading ? (
             <div className="py-6 text-center text-xs text-base-content/60">
-              {t.translations.LOADING_ORGANIZATION_TAGS}
+              {t.translations.LOADING_ORGANIZATION_LABELS}
             </div>
-          ) : tagsError ? (
+          ) : labelsError ? (
             <div className="py-6 text-center text-xs text-error">
-              {tagsError}
+              {labelsError}
             </div>
-          ) : filteredTags.length === 0 ? (
+          ) : filteredLabels.length === 0 ? (
             <div className="py-6 text-center text-xs text-base-content/60 border border-dashed border-base-300 rounded-lg">
-              {tagSearch.trim()
-                ? t.translations.NO_TAGS_MATCH_SEARCH
-                : t.translations.NO_TAGS_DEFINED_HELP}
+              {labelSearch.trim()
+                ? t.translations.NO_LABELS_MATCH_SEARCH
+                : t.translations.NO_LABELS_DEFINED_HELP}
             </div>
           ) : (
-            filteredTags.map((tag) => (
+            filteredLabels.map((label) => (
               <div
-                key={tag.id}
+                key={label.id}
                 className="flex items-center justify-between bg-base-200/70 hover:bg-base-300/80 transition rounded-lg px-3 py-2"
               >
                 <div className="flex items-center gap-2">
                   <span className="badge badge-secondary badge-outline badge-sm">
-                    {tag.name}
+                    {label.name}
                   </span>
                 </div>
                 <div className="flex items-center gap-1">
                   <button
                     type="button"
                     className="btn btn-ghost btn-xs"
-                    onClick={() => onEditTag(tag.id)}
-                    disabled={tagsLocked}
+                    onClick={() => onEditLabel(label.id)}
+                    disabled={labelsLocked}
                     title={
-                      tagsLocked
-                        ? t.translations.TAGS_ARE_LOCKED
+                      labelsLocked
+                        ? t.translations.LABELS_ARE_LOCKED
                         : t.translations.EDIT
                     }
                   >
@@ -156,15 +156,15 @@ const OrgTagsPanel: React.FC<Props> = ({
                   <button
                     type="button"
                     className="btn btn-ghost btn-xs text-error"
-                    onClick={() => onArchiveClick(tag)}
-                    disabled={tagsLocked || archivingTagId === tag.id}
+                    onClick={() => onArchiveClick(label)}
+                    disabled={labelsLocked || archivingLabelId === label.id}
                     title={
-                      tagsLocked
-                        ? t.translations.TAGS_ARE_LOCKED
-                        : t.translations.ARCHIVE_SOFT_DELETE_TAG
+                      labelsLocked
+                        ? t.translations.LABELS_ARE_LOCKED
+                        : t.translations.ARCHIVE_SOFT_DELETE_LABEL
                     }
                   >
-                    {archivingTagId === tag.id
+                    {archivingLabelId === label.id
                       ? t.translations.ARCHIVING
                       : t.translations.DELETE}
                   </button>
@@ -178,4 +178,4 @@ const OrgTagsPanel: React.FC<Props> = ({
   );
 };
 
-export default OrgTagsPanel;
+export default SecurityLabelsOrg;

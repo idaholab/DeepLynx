@@ -20,7 +20,7 @@ public interface IRecordBusiness
         long currentUserId, long organizationId, long projectId, long dataSourceId, CreateRecordRequestDto dto, List<long>? sensitivityLabelIds = null);
 
     Task<List<RecordResponseDto>> BulkCreateRecords(
-        long currentUserId, long organizationId, long projectId, long dataSourceId, List<CreateRecordRequestDto> dtos);
+        long currentUserId, long organizationId, long projectId, long dataSourceId, List<CreateRecordRequestDto> dtos, List<long>? sensitivityLabelIds = null);
 
     Task<RecordResponseDto> UpdateRecord(
         long currentUserId, long organizationId, long projectId, long recordId, UpdateRecordRequestDto dto);
@@ -33,7 +33,8 @@ public interface IRecordBusiness
     Task<bool> UnattachTag(long currentUserId, long organizationId, long projectId, long recordId, long tagId);
     Task<bool> UnattachLabel(long currentUserId, long organizationId, long projectId, long recordId, long labelId);
     Task<bool> BulkAttachTags(List<RecordTagLinkDto> dtos);
-    Task<bool> BulkAttachLabels(List<RecordLabelLinkDto> dtos);
+    Task<bool> BulkAttachLabels(
+        long currentUserId, long organizationId, long projectId, List<long> recordIds, List<long> sensitiityLabelIds);
     Task<List<RecordResponseDto>> GetRecordsByOriginalId(long currentUserId, long organizationId, long projectId, List<string> originalIds);
     Task<List<LatticeRecordDto>> GetLatticeRecords(long organizationId, long projectId);
 }

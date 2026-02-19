@@ -1,43 +1,47 @@
 import React, { useEffect, useRef, useState } from "react";
 import { PlusIcon } from "@heroicons/react/24/outline";
-import { TagResponseDto } from "../../types/responseDTOs";
-import AddTagModal from "@/app/(home)/components/AddTagModal";
-import { useLanguage } from "@/app/contexts/Language";
+import { SensitivityLabelsDto } from "../../types/responseDTOs";
+import AddLabelModal from "../../components/AddLabelModal";
 import toast from "react-hot-toast";
+import axios from "axios";
 import { useOrganizationSession } from "@/app/contexts/OrganizationSessionProvider";
+import { useLanguage } from "@/app/contexts/Language";
 import {
-  unattachTagFromRecord,
-  attachTagToRecord,
+  attachSensitivityLabelToRecord,
+  unattachSensitivityLabelFromRecord,
 } from "@/app/lib/client_service/record_services.client";
 
-interface TagButtonProps {
-  tags: TagResponseDto[];
+interface LabelButtonProps {
+  labels: SensitivityLabelsDto[];
   onSelectionChange?: (selected: string[]) => void;
   projectId: number;
   recordId: number;
   selectedIds: string[];
   setSelectedIds: (ids: string[]) => void;
-  setTags: React.Dispatch<React.SetStateAction<TagResponseDto[]>>;
-  setSelectedTags: React.Dispatch<React.SetStateAction<TagResponseDto[]>>;
+  setLabels: React.Dispatch<React.SetStateAction<SensitivityLabelsDto[]>>;
+  setSelectedLabels: React.Dispatch<
+    React.SetStateAction<SensitivityLabelsDto[]>
+  >;
 }
 
-const TagButton: React.FC<TagButtonProps> = ({
-  tags,
+const LabelButton: React.FC<LabelButtonProps> = ({
+  labels,
   onSelectionChange,
   projectId,
   recordId,
   selectedIds,
-  setTags,
-  setSelectedTags,
+  setSelectedIds,
+  setLabels,
+  setSelectedLabels,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [tempSelectedIds, setTempSelectedIds] = useState<string[]>(selectedIds);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const longestNameRef = useRef<HTMLSpanElement>(null);
-  const [isTagModalOpen, setIsTagModalOpen] = useState(false);
-  const { t } = useLanguage();
+  const [isLabelModalOpen, setIsLabelModalOpen] = useState(false);
   const { organization } = useOrganizationSession();
+  const { t } = useLanguage();
 
   useEffect(() => {
     setTempSelectedIds(selectedIds);
@@ -65,75 +69,93 @@ const TagButton: React.FC<TagButtonProps> = ({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const toggleTag = async (id: string) => {
-    let newSelectionIds: string[];
+  const getApiErrorMessage = (error: unknown): string => {
+    if (axios.isAxiosError(error)) {
+      const data = error.response?.data as
+        | { error?: string; message?: string }
+        | string
+        | undefined;
 
-    if (tempSelectedIds.map(String).includes(id)) {
-      newSelectionIds = tempSelectedIds
-        .map(String)
-        .filter((selectedId) => selectedId !== id);
-      await unattachTagFromRecord(
-        organization?.organizationId as number,
-        projectId,
-        recordId,
-        Number(id),
-      );
-    } else {
-      newSelectionIds = [...tempSelectedIds.map(String), id];
-      try {
-        await attachTagToRecord(
-          organization?.organizationId as number,
+      if (typeof data === "string") return data;
+      if (data?.error) return data.error;
+      if (data?.message) return data.message;
+    }
+
+    return t.translations.FAILED_TO_UPDATE_SENSITIVITY_LABELS;
+  };
+
+  const toggleLabel = async (id: string) => {
+    if (!organization?.organizationId) return;
+
+    const isSelected = tempSelectedIds.map(String).includes(id);
+    const newSelectionIds = isSelected
+      ? tempSelectedIds.map(String).filter((selectedId) => selectedId !== id)
+      : [...tempSelectedIds.map(String), id];
+
+    try {
+      if (isSelected) {
+        await unattachSensitivityLabelFromRecord(
+          organization.organizationId as number,
           projectId,
           recordId,
           Number(id),
         );
-      } catch (error) {
-        console.error("Error attaching tag to record:", error);
+      } else {
+        await attachSensitivityLabelToRecord(
+          organization.organizationId as number,
+          projectId,
+          recordId,
+          Number(id),
+        );
       }
+    } catch (error) {
+      console.error("Error updating sensitivity labels on record:", error);
+      toast.error(getApiErrorMessage(error));
+      return;
     }
+
     setTempSelectedIds(newSelectionIds);
+    setSelectedIds(newSelectionIds);
 
     if (onSelectionChange) {
       onSelectionChange(newSelectionIds);
     }
   };
 
-  const handleTagCreated = async (newTag: TagResponseDto) => {
-    // Add the new tag to the tags list
-    setTags((prevTags) => [...prevTags, newTag]);
+  const handleLabelCreated = async (newLabel: SensitivityLabelsDto) => {
+    setLabels((prevLabels) => [...prevLabels, newLabel]);
 
-    // Automatically attach it to the record
     try {
-      await attachTagToRecord(
+      await attachSensitivityLabelToRecord(
         organization?.organizationId as number,
         projectId,
         recordId,
-        Number(newTag.id),
+        Number(newLabel.id),
       );
 
-      // Update selection state
       const newSelectionIds = [
         ...tempSelectedIds.map(String),
-        newTag.id.toString(),
+        newLabel.id.toString(),
       ];
       setTempSelectedIds(newSelectionIds);
-
-      // Directly update selectedTags in parent
-      setSelectedTags((prevSelectedTags) => [...prevSelectedTags, newTag]);
+      setSelectedIds(newSelectionIds);
+      setSelectedLabels((prevSelectedLabels) => [
+        ...prevSelectedLabels,
+        newLabel,
+      ]);
+      if (onSelectionChange) onSelectionChange(newSelectionIds);
 
       toast.success(
-        `${t.translations.TAG_} "${newTag.name}" ${t.translations.CREATED_AND_ATTACHED}`,
+        `${t.translations.LABEL} "${newLabel.name}" ${t.translations.LABEL_CREATED_AND_ATTACHED}`,
       );
     } catch (error) {
-      console.error("Error attaching new tag:", error);
-      toast.error(
-        `${t.translations.TAG_} ${t.translations.CREATED_BUT_FAILED_TO_ATTACH}`,
-      );
+      console.error("Error attaching new label:", error);
+      toast.error(getApiErrorMessage(error));
     }
   };
 
-  const filteredTags = tags.filter((t) =>
-    t.name.toLowerCase().includes(searchTerm.toLowerCase()),
+  const filteredLabels = labels.filter((l) =>
+    l.name.toLowerCase().includes(searchTerm.toLowerCase()),
   );
 
   return (
@@ -159,9 +181,9 @@ const TagButton: React.FC<TagButtonProps> = ({
             onChange={(e) => setSearchTerm(e.target.value)}
           />
           <div className="flex flex-col gap-2 overflow-y-auto max-h-48">
-            {filteredTags.map((tag) => (
+            {filteredLabels.map((label) => (
               <label
-                key={tag.id}
+                key={label.id}
                 className="label cursor-pointer justify-start gap-2"
               >
                 <input
@@ -169,39 +191,41 @@ const TagButton: React.FC<TagButtonProps> = ({
                   className="checkbox checkbox-primary"
                   checked={tempSelectedIds
                     .map(String)
-                    .includes(tag.id.toString())}
-                  onChange={() => toggleTag(tag.id.toString())}
+                    .includes(label.id.toString())}
+                  onChange={() => toggleLabel(label.id.toString())}
                 />
                 <span
                   className="label-text whitespace-nowrap"
-                  ref={tag.id === filteredTags[0]?.id ? longestNameRef : null}
+                  ref={
+                    label.id === filteredLabels[0]?.id ? longestNameRef : null
+                  }
                 >
-                  {tag.name}
+                  {label.name}
                 </span>
               </label>
             ))}
           </div>
           <div className="flex flex-row items-center gap-2 my-4">
             <button
-              onClick={() => setIsTagModalOpen(true)}
+              onClick={() => setIsLabelModalOpen(true)}
               className="btn btn-primary btn-sm flex-1 sm:flex-initial"
             >
               <PlusIcon className="size-5" />
-              <span>{t.translations.TAG}</span>
+              <span>{t.translations.LABEL}</span>
             </button>
           </div>
         </div>
       )}
-      <AddTagModal
+      <AddLabelModal
         projectId={projectId}
-        isOpen={isTagModalOpen}
+        isOpen={isLabelModalOpen}
         onClose={() => {
-          setIsTagModalOpen(false);
+          setIsLabelModalOpen(false);
         }}
-        onTagCreated={handleTagCreated}
+        onLabelCreated={handleLabelCreated}
       />
     </div>
   );
 };
 
-export default TagButton;
+export default LabelButton;
