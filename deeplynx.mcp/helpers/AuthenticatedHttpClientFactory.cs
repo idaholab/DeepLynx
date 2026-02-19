@@ -35,7 +35,6 @@ public class AuthenticatedHttpClientFactory : IAuthenticatedHttpClientFactory
 
         // Get Bearer token from Authorization header
         var authHeader = context.Request.Headers["Authorization"].FirstOrDefault();
-        Console.WriteLine($"Raw Authorization Header: '{authHeader}'");
         
         if (string.IsNullOrEmpty(authHeader))
             throw new UnauthorizedAccessException("Missing Authorization header. Send: Authorization: Bearer <your-token>");
