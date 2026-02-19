@@ -74,7 +74,7 @@ export default function ProjectDetailClient({
       search: searchTerm,
     }).toString();
 
-    router.push(`/data_catalog?${query}`);
+    router.push(`/data_catalog/all_records?${query}`);
   };
 
   // Loading states
