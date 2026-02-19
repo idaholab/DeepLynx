@@ -14,16 +14,16 @@
   "license": "ISC",
   "type": "module",
   "devDependencies": {
-    "@types/node": "24.5.0",
+    "@types/node": "25.2.3",
     "@types/react": "19.1.13",
-    "pagefind": "^1.4.0",
-    "typescript": "^5.9.2"
+    "pagefind": "^1.4.0"
   },
   "dependencies": {
     "next": "^15.5.3",
     "nextra": "^4.4.0",
     "nextra-theme-docs": "^4.4.0",
     "react": "^19.1.1",
-    "react-dom": "^19.1.1"
+    "react-dom": "^19.1.1",
+    "typescript": "^5.9.2"
   }
 }

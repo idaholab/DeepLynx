@@ -1,0 +1,61 @@
+---
+title: User Management
+description: Organization level user management
+---
+
+import { Footer, Layout, Navbar } from "nextra-theme-docs";
+import { Banner, Head } from "nextra/components";
+import { getPageMap } from "nextra/page-map";
+import { Steps } from "nextra/components";
+import Image from "next/image";
+
+# User Management
+
+The Users tab of the Organization Management page has a table containing all active and pending users.
+Organization admins have the ability to add, edit, and remove users from organizations.
+
+## Adding Users to Organizations
+
+<Steps>
+### Navigate to the Organization Management page by clicking the slider bar icon on the outtermost toolbar.
+### On the Users tab of the Organization Management page, click the "Invite User" button.
+### Enter the user's email address and hit "Send Invitation".
+### The user will receive an email containing a link to join the organization!
+
+**Note:** Once a user accepts an email invitation their status will be switched to "Active".
+
+<Image
+  src="/docs/images/add-user-orgs.png"
+  alt="Invite User UI"
+  width={800}
+  height={600}
+/>
+</Steps>
+
+## Editing Users in Organizations
+
+<Steps>
+### Click the pencil icon in the action column of the user management table.
+### Update the user's information in the Edit User modal and hit save.
+
+<Image
+  src="/docs/images/edit-user-org.png"
+  alt="Edit User UI"
+  width={800}
+  height={400}
+/>
+</Steps>
+## Removing Users from Organizations
+<Steps>
+### Click the trashcan icon in the action column of the user management table.
+### This will remove the user from the organization.
+
+**Note:** Once a user is removed from the organization, a new invitation is required to regain access.
+
+<Image
+  src="/docs/images/delete-user-org.png"
+  alt="Delete User UI"
+  width={800}
+  height={400}
+/>
+</Steps>
