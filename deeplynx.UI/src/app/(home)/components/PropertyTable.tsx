@@ -50,6 +50,7 @@ const PropertyTable: React.FC<PropertyTableProps> = ({
     useState<AbortController | null>(null);
   const [downloadProgress, setDownloadProgress] = useState<number | null>(null);
   const [downloading, setDownloading] = useState(false);
+  const [progressCallbackFired, setProgressCallbackFired] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
   const [bytesDownloaded, setBytesDownloaded] = useState<{
     loaded: number;
@@ -70,7 +71,8 @@ const PropertyTable: React.FC<PropertyTableProps> = ({
     setAbortController(controller);
 
     setDownloading(true);
-    setDownloadProgress(null); // Start as null to distinguish from 0%
+    setDownloadProgress(0); // Start at 0 to show progress bar for blob downloads
+    setProgressCallbackFired(false); // Reset flag
     setTimeRemaining(null);
     setBytesDownloaded(null);
 
@@ -86,6 +88,8 @@ const PropertyTable: React.FC<PropertyTableProps> = ({
         recordName,
         (progressInfo) => {
           // This callback only fires for blob downloads
+          setProgressCallbackFired(true); // Mark that this is a blob download
+
           const now = Date.now();
           const timeSinceLastDisplay = (now - lastDisplayUpdateTime) / 1000;
 
@@ -128,15 +132,15 @@ const PropertyTable: React.FC<PropertyTableProps> = ({
         controller,
       );
 
-      // If downloadProgress is still null, it was a pre-signed URL download
-      // Show a toast to inform the user the browser is handling it
-      if (downloadProgress === null) {
+      // Check flag to determine download type
+      if (!progressCallbackFired) {
+        // Was a pre-signed URL download - show toast
         toast.success("Download started in browser", {
           icon: "📥",
           duration: 3000,
         });
       } else {
-        // For blob downloads, clear progress after 2 seconds
+        // Was a blob download - clear progress after 2 seconds
         setTimeout(() => {
           setDownloadProgress(null);
           setTimeRemaining(null);
@@ -156,6 +160,7 @@ const PropertyTable: React.FC<PropertyTableProps> = ({
     } finally {
       setDownloading(false);
       setAbortController(null);
+      setProgressCallbackFired(false); // Reset for next download
     }
   };
 
@@ -354,7 +359,7 @@ const PropertyTable: React.FC<PropertyTableProps> = ({
   };
 
   // Check if we should show progress bar (only for blob downloads with progress tracking)
-  const showProgressBar = downloadProgress !== null && bytesDownloaded !== null;
+  const showProgressBar = progressCallbackFired && downloadProgress !== null && bytesDownloaded !== null;
 
   return (
     <div className={`${className}`}>
@@ -400,13 +405,6 @@ const PropertyTable: React.FC<PropertyTableProps> = ({
                         )}
                       </div>
                     </div>
-                  )}
-
-                  {/* Simple message for pre-signed URL downloads */}
-                  {!showProgressBar && downloading && (
-                    <span className="text-sm text-base-content/70">
-                      Starting download...
-                    </span>
                   )}
 
                   {/* Download or Cancel button */}
