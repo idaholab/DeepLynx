@@ -34,6 +34,50 @@ function sanitizeFilename(name: string): string {
 
 
 /**
+ * Check if storage type uses pre-signed URL download method
+ */
+export const isPresignedUrlStorage = (storageType: string): boolean => {
+  return storageType === 'azure_object' || storageType === 'aws_s3';
+};
+
+
+/**
+ * Get the storage type for a given record
+ * @param organizationId - The ID of the organization
+ * @param projectId - The ID of the project
+ * @param recordId - The ID of the record containing the file
+ * @returns Promise with the storage type string
+ */
+export const getStorageType = async (
+  organizationId: number,
+  projectId: number,
+  recordId: number
+): Promise<string> => {
+  // Fetch the record to get the objectStorageId
+  const record = await getRecord(
+    organizationId,
+    projectId,
+    recordId,
+    true // hideArchived
+  );
+
+  if (!record.objectStorageId) {
+    throw new Error('Record does not have an associated object storage');
+  }
+
+  // Fetch the object storage to get its type
+  const objectStorage = await getProjectObjectStorage(
+    organizationId,
+    projectId,
+    record.objectStorageId,
+    true // hideArchived
+  );
+
+  return objectStorage.type;
+};
+
+
+/**
  * Download a file via pre-signed URL (browser native download - no memory constraints)
  * Used for Azure and AWS S3 storage types
  */
@@ -209,7 +253,7 @@ export const downloadFile = async (
     );
 
     // Step 3: Route to appropriate download method based on storage type
-    if (objectStorage.type === 'azure_object' || objectStorage.type === 'aws_s3') {
+    if (isPresignedUrlStorage(objectStorage.type)) {
       // Use pre-signed URL method (no progress tracking)
       await downloadViaPresignedUrl(
         organizationId,
