@@ -119,10 +119,10 @@ def main():
     rec = json.loads(rec_text)
     
     if not rec:
-        print("No recects found. Terminating...")
+        print("No records found. Terminating...")
         sys.exit(0)
     
-    # Get the first recect's ID
+    # Get the first record's ID
     rec_id = rec[0]["Id"]
     rec_name = rec[0]["Name"]
     print(f"\n===\nUsing first project found:\n{rec_name} (ID: {rec_id}) to list graph\n===")

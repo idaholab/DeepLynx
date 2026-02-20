@@ -133,3 +133,25 @@ export async function getPermissionsForRoleServer(
   const res = await apiFetch(path);
   return asJson<PermissionResponseDto[]>(res);
 }
+
+/**
+ * Get permissions for all including sensitivity labels (server-side)
+ * @param organizationId - The ID of the organization
+ * @returns Promise with array of PermissionResponseDto
+ */
+export async function getAllOrgPermissionsServer(
+  organizationId: number,
+  hideArchived: boolean = true,
+): Promise<PermissionResponseDto[]> {
+  const searchParams = new URLSearchParams();
+  searchParams.append("hideArchived", hideArchived.toString());
+
+  const queryString = searchParams.toString();
+  const path = `/organizations/${organizationId}/permissions${
+    queryString ? `?${queryString}` : ""
+  }`;
+
+  const res = await apiFetch(path);
+
+  return asJson<PermissionResponseDto[]>(res);
+}

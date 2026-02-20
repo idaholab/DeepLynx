@@ -43,6 +43,7 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
     public long pid3;
     public long uid;
     public long oid2;
+    public long oid3;
 
     public ObjectStorageBusinessTests(TestSuiteFixture fixture) : base(fixture)
     {
@@ -123,11 +124,14 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
 
         var organization = new Organization { Name = "Test Organization" };
         var organization2 = new Organization { Name = "Test Organization 2" };
+        var organization3 = new Organization { Name = "Test Organization 3 No Default" };
         Context.Organizations.Add(organization);
         Context.Organizations.Add(organization2);
+        Context.Organizations.Add(organization3);
         await Context.SaveChangesAsync();
         organizationId = organization.Id;
         oid2 = organization2.Id;
+        oid3 = organization3.Id;
 
         var project = new Project { Name = "Test Project 1", OrganizationId = organizationId };
         var project2 = new Project { Name = "Test Project 2", OrganizationId = organizationId };
@@ -890,7 +894,7 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
         // Act & Assert
         var exception =
             await Assert.ThrowsAsync<KeyNotFoundException>(() =>
-                _objectStorageBusiness.GetDefaultObjectStorage(organizationId, pid2));
+                _objectStorageBusiness.GetDefaultObjectStorage(oid3, null));
         Assert.Contains("Default object storage not found", exception.Message);
     }
     
