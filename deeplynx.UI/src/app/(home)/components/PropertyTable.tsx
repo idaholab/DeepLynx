@@ -50,7 +50,6 @@ const PropertyTable: React.FC<PropertyTableProps> = ({
     useState<AbortController | null>(null);
   const [downloadProgress, setDownloadProgress] = useState<number | null>(null);
   const [downloading, setDownloading] = useState(false);
-  const [progressCallbackFired, setProgressCallbackFired] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
   const [bytesDownloaded, setBytesDownloaded] = useState<{
     loaded: number;
@@ -71,14 +70,14 @@ const PropertyTable: React.FC<PropertyTableProps> = ({
     setAbortController(controller);
 
     setDownloading(true);
-    setDownloadProgress(0); // Start at 0 to show progress bar for blob downloads
-    setProgressCallbackFired(false); // Reset flag
+    setDownloadProgress(null);
     setTimeRemaining(null);
     setBytesDownloaded(null);
 
     const startTime = Date.now();
     let lastDisplayUpdateTime = startTime;
     let lastDisplayLoaded = 0;
+    let progressWasReported = false; // Track if onProgress was called
 
     try {
       await downloadFile(
@@ -87,24 +86,19 @@ const PropertyTable: React.FC<PropertyTableProps> = ({
         recordId,
         recordName,
         (progressInfo) => {
-          // This callback only fires for blob downloads
-          setProgressCallbackFired(true); // Mark that this is a blob download
-
+          progressWasReported = true; // Mark that we received progress updates
           const now = Date.now();
           const timeSinceLastDisplay = (now - lastDisplayUpdateTime) / 1000;
 
-          // Always update progress percentage and bytes
           setDownloadProgress(progressInfo.percentage);
           setBytesDownloaded({
             loaded: progressInfo.loaded,
             total: progressInfo.total,
           });
 
-          // Only update speed and ETA every 2 seconds
           if (timeSinceLastDisplay >= 2) {
             const elapsed = (now - startTime) / 1000;
 
-            // Calculate instantaneous speed
             const bytesDownloadedSinceLastDisplay =
               progressInfo.loaded - lastDisplayLoaded;
             const instantSpeed =
@@ -112,19 +106,14 @@ const PropertyTable: React.FC<PropertyTableProps> = ({
                 ? bytesDownloadedSinceLastDisplay / timeSinceLastDisplay
                 : 0;
 
-            // Calculate average speed
             const avgSpeed = elapsed > 0 ? progressInfo.loaded / elapsed : 0;
-
-            // Weighted average for smoother display
             const speed = instantSpeed * 0.7 + avgSpeed * 0.3;
 
-            // Calculate time remaining
             const remaining = progressInfo.total - progressInfo.loaded;
             const eta = speed > 0 ? remaining / speed : null;
 
             setTimeRemaining(eta);
 
-            // Update tracking variables
             lastDisplayUpdateTime = now;
             lastDisplayLoaded = progressInfo.loaded;
           }
@@ -132,15 +121,14 @@ const PropertyTable: React.FC<PropertyTableProps> = ({
         controller,
       );
 
-      // Check flag to determine download type
-      if (!progressCallbackFired) {
-        // Was a pre-signed URL download - show toast
+      // If progress was never reported, it was a pre-signed URL download
+      if (!progressWasReported) {
         toast.success("Download started in browser", {
           icon: "📥",
           duration: 3000,
         });
       } else {
-        // Was a blob download - clear progress after 2 seconds
+        // For blob downloads, clear progress after 2 seconds
         setTimeout(() => {
           setDownloadProgress(null);
           setTimeRemaining(null);
@@ -149,18 +137,15 @@ const PropertyTable: React.FC<PropertyTableProps> = ({
       }
     } catch (error) {
       if (axios.isAxiosError(error) && error.code === "ERR_CANCELED") {
-        // User cancelled - don't treat as error
         return;
       }
       console.error("Download error:", error);
-      // Clear progress states on error
       setDownloadProgress(null);
       setTimeRemaining(null);
       setBytesDownloaded(null);
     } finally {
       setDownloading(false);
       setAbortController(null);
-      setProgressCallbackFired(false); // Reset for next download
     }
   };
 
@@ -359,7 +344,7 @@ const PropertyTable: React.FC<PropertyTableProps> = ({
   };
 
   // Check if we should show progress bar (only for blob downloads with progress tracking)
-  const showProgressBar = progressCallbackFired && downloadProgress !== null && bytesDownloaded !== null;
+  const showProgressBar = downloadProgress !== null && bytesDownloaded !== null;
 
   return (
     <div className={`${className}`}>
@@ -426,8 +411,8 @@ const PropertyTable: React.FC<PropertyTableProps> = ({
                           : "Missing projectId or recordId in URL"
                       }
                       className={`p-1 transition-colors ${canDownload
-                          ? "hover:text-primary cursor-pointer"
-                          : "opacity-50 cursor-not-allowed"
+                        ? "hover:text-primary cursor-pointer"
+                        : "opacity-50 cursor-not-allowed"
                         }`}
                     >
                       <ArrowDownTrayIcon className="w-8 h-8" />
