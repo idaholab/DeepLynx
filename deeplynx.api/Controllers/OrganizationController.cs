@@ -304,7 +304,6 @@ public class OrganizationController : ControllerBase
     [Auth("write", "user")]
     [Auth("update", "user")]
     [Auth("update", "organization")]
-    [Auth("update", "project")]
     public async Task<ActionResult> InviteUserToOrganization(
         long organizationId,
         [FromQuery] string userEmail)

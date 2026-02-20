@@ -42,7 +42,6 @@ public class InvitationBusiness : IInvitationBusiness
     public async Task<bool> InviteAndAddUserToHierarchy(long organizationId, long? projectId, long? groupId,
         long? roleId, long? userId, string? userEmail)
     {
-
         var suppliedCount = (groupId.HasValue ? 1 : 0) +
                             (userId.HasValue ? 1 : 0) +
                             (!string.IsNullOrWhiteSpace(userEmail) ? 1 : 0);
@@ -71,11 +70,12 @@ public class InvitationBusiness : IInvitationBusiness
             var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId);
             if (user == null) throw new ArgumentException($"User with id '{userId}' not found.");
 
-            await AddUserToHierarchyWithoutEmail(organizationId, projectId, roleId, user);
-            
-            // Best-effort email - don't fail if email doesn't send
-            await _notificationBusiness.SendEmail(user.Email, user.Name);
-            
+            var wasAdded = await AddUserToHierarchyWithoutEmail(organizationId, projectId, roleId, user);
+
+            // Only send email if user was actually added to org/project
+            if (wasAdded)
+                await _notificationBusiness.SendEmail(user.Email, user.Name, false, organizationId, projectId);
+
             return true;
         }
 
@@ -87,13 +87,15 @@ public class InvitationBusiness : IInvitationBusiness
             if (user != null)
             {
                 // Existing user - no transaction, best-effort email
-                await AddUserToHierarchyWithoutEmail(organizationId, projectId, roleId, user);
-                
-                // Best-effort email - don't fail if email doesn't send
-                await _notificationBusiness.SendEmail(userEmail, user.Name);
-                
+                var wasAdded = await AddUserToHierarchyWithoutEmail(organizationId, projectId, roleId, user);
+
+                // Only send email if user was actually added to org/project
+                if (wasAdded)
+                    await _notificationBusiness.SendEmail(user.Email, user.Name, false, organizationId, projectId);
+
                 return true;
             }
+
             // New user - use transaction and rollback if email fails
             using var transaction = await _context.Database.BeginTransactionAsync();
             try
@@ -109,16 +111,15 @@ public class InvitationBusiness : IInvitationBusiness
 
                 if (projectId != null)
                     await _projectBusiness.AddMemberToProject(projectId.Value, roleId, createdUserResponseDto.Id, null);
-            
+
                 user = await _context.Users.FirstOrDefaultAsync(u => u.Id == createdUserResponseDto.Id);
 
-                // Send email - if this fails, rollback everything
-                var emailResult = await _notificationBusiness.SendEmail(userEmail, user?.Name);
+                // Send email - if this fails, rollback everything (new users always get email)
+                var emailResult =
+                    await _notificationBusiness.SendEmail(user.Email, user.Name, true, organizationId, projectId);
                 if (!emailResult)
-                {
-                    await transaction.RollbackAsync();
-                    throw new Exception($"Failed to send invitation email to {userEmail}. User was not created.");
-                }
+                    throw new InvalidOperationException(
+                        $"Failed to send invitation email to {userEmail}. User was not created.");
 
                 await transaction.CommitAsync();
                 return true;
@@ -142,26 +143,51 @@ public class InvitationBusiness : IInvitationBusiness
 
             if (!groupInProject)
             {
-                await _projectBusiness.AddMemberToProject(projectId.Value, roleId, null, groupId);
-            
-                // Best-effort email sending - don't fail if some emails don't send
+                // IMPORTANT: Check which users were already in project BEFORE adding the group
+                var usersAlreadyInProject = new HashSet<long>();
                 foreach (var user in group.Users)
                 {
-                    await _notificationBusiness.SendEmail(user.Email, user.Name);
+                    var userInProject = await _context.ProjectMembers
+                        .Include(pm => pm.Group)
+                        .AnyAsync(pm => pm.ProjectId == projectId &&
+                                        (pm.UserId == user.Id || (pm.GroupId != null && pm.Group.Users.Any(u => u.Id == user.Id))));
+            
+                    if (userInProject)
+                    {
+                        usersAlreadyInProject.Add(user.Id);
+                    }
+                }
+        
+                // Now add the group to the project
+                await _projectBusiness.AddMemberToProject(projectId.Value, roleId, null, groupId);
+    
+                // Best-effort email sending - only send to users who weren't already in the project
+                foreach (var user in group.Users)
+                {
+                    if (!usersAlreadyInProject.Contains(user.Id))
+                    {
+                        await _notificationBusiness.SendEmail(user.Email, user.Name, false, organizationId, projectId);
+                    }
                 }
             }
         }
 
         return true;
     }
-    
-    private async Task AddUserToHierarchyWithoutEmail(long organizationId, long? projectId, long? roleId, User user)
+
+    private async Task<bool> AddUserToHierarchyWithoutEmail(long organizationId, long? projectId, long? roleId, User user)
     {
+        var addedToOrg = false;
+        var addedToProject = false;
+    
         var userInOrg = await _context.OrganizationUsers
             .AnyAsync(ou => ou.OrganizationId == organizationId && ou.UserId == user.Id);
 
         if (!userInOrg)
+        {
             await _organizationBusiness.AddUserToOrganization(organizationId, user.Id);
+            addedToOrg = true;
+        }
 
         if (projectId != null)
         {
@@ -171,7 +197,14 @@ public class InvitationBusiness : IInvitationBusiness
                                 (pm.UserId == user.Id || pm.Group.Users.Any(u => u.Id == user.Id)));
 
             if (!userInProject)
+            {
                 await _projectBusiness.AddMemberToProject(projectId.Value, roleId, user.Id, null);
+                addedToProject = true;
+            }
         }
+    
+        // For project invites, only return true if added to project
+        // For org invites, return true if added to org
+        return projectId != null ? addedToProject : addedToOrg;
     }
 }
