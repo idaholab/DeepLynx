@@ -33,6 +33,12 @@ public class FileS3Business:  IFileBusiness
         return true;
     }
     
+    public async Task<string> GenerateDownloadUrl(RecordResponseDto record, ObjectStorageConfigDto objectStorageConfig,
+        int expirationHours = 1)
+    {
+        throw new NotImplementedException("Generate download urls is not implemented for filesystem");
+    }
+    
     /// <summary>
     /// 
     /// </summary>
