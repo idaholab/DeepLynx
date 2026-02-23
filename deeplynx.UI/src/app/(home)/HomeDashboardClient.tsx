@@ -164,9 +164,9 @@ export default function HomeDashboardClient({ initialProjects }: Props) {
   return (
     <div className="min-h-screen bg-base-100">
       <header className="bg-base-200/50 border-b border-base-300/30 sticky z-10 backdrop-blur-sm">
-        <div className="flex justify-between items-center px-4 sm:px-6 lg:px-12 py-4">
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold text-base-content">
+        <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-3 px-3 sm:px-6 lg:px-12 py-4">
+          <div className="flex items-center gap-3 min-w-0">
+            <h1 className="text-lg sm:text-2xl font-bold text-base-content truncate">
               {`${t.translations.WELECOME}, ${formatUserName(displayName)}`}
             </h1>
             <button
@@ -177,27 +177,28 @@ export default function HomeDashboardClient({ initialProjects }: Props) {
               <QuestionMarkCircleIcon className="w-5 h-5" />
             </button>
           </div>
-          <div data-tour="search-input">
+          <div data-tour="search-input" className="w-full lg:w-auto">
             <SearchInput
               placeholder="Search Projects"
+              className="w-full lg:min-w-[18rem]"
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
         </div>
       </header>
 
-      <div className="p-6">
-        <div className="w-4/5 mx-auto">
+      <div className="p-3 sm:p-6">
+        <div className="w-full xl:w-4/5 mx-auto">
           <div
             className="card card-border shadow-md shadow-dynamic-shadow p-4"
             data-tour="projects-section"
           >
-            <div className="flex justify-between items-center mb-4">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4">
               <h3 className="text-info-content text-lg font-semibold">
                 {t.translations.YOUR_PROJECTS}
               </h3>
 
-              <div className="flex gap-2 w-full sm:w-auto">
+              <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
                 <button
                   onClick={() => setIsRecordModalOpen(true)}
                   className="btn btn-outline btn-secondary btn-sm flex-1 sm:flex-initial"

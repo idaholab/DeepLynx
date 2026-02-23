@@ -610,9 +610,9 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
     {
       label: t.translations.RECORD_INFORMATION,
       content: (
-        <div className="flex gap-6 mt-4">
+        <div className="flex flex-col xl:flex-row gap-6 mt-4">
           {/* Left Column - Properties */}
-          <div className="w-full md:w-1/2 space-y-4">
+          <div className="w-full xl:w-1/2 space-y-4">
             <PropertyTable
               title={t.translations.SYSTEM_PROPERTIES}
               rows={systemPropertiesRows}
@@ -631,7 +631,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
           </div>
 
           {/* Right Column - Tags & Relations */}
-          <div className="flex-1 space-y-4">
+          <div className="w-full xl:flex-1 space-y-4">
             {/* Tags Card */}
             <RecordTagsPanel
               tags={tags}
@@ -710,11 +710,13 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
 
   // ============= MAIN RENDER =============
   return (
-    <div className="mr-4">
-      <div className="bg-base-200/40 pl-12 p-4">
-        <h1 className="text-2xl font-bold text-base-content">{record.name}</h1>
+    <div className="mx-3 sm:mx-4 lg:mr-4 lg:ml-0">
+      <div className="bg-base-200/40 px-3 sm:px-6 lg:px-12 p-4 rounded-lg">
+        <h1 className="text-xl sm:text-2xl font-bold text-base-content break-words">
+          {record.name}
+        </h1>
         {record.classId ? (
-          <div className="flex gap-2 py-auto items-center">
+          <div className="flex flex-wrap gap-2 py-auto items-center">
             <span className="badge badge-primary">
               {recordClass?.name || <div className="loading size-3" />}
             </span>
@@ -739,7 +741,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
 
       <Tabs
         tabs={tabs}
-        className="ml-6 pt-6"
+        className="pt-6"
         activeTab={tabs[activeTab].label}
         onTabChange={(label) =>
           setActiveTab(tabs.findIndex((tab) => tab.label === label))

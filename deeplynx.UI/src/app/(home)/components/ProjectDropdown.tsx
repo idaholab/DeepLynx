@@ -91,16 +91,16 @@ const ProjectDropdown: React.FC<ProjectDropdownProps> = ({
 
   return (
     <div
-      className="relative inline-block text-left min-w-sm text-base-content/80"
+      className="relative inline-block text-left w-full sm:min-w-[18rem] max-w-full text-base-content/80"
       ref={dropdownRef}
     >
       <button
-        className="flex items-center gap-1 text-md"
+        className="flex items-center gap-1 text-md max-w-full"
         onClick={() => setIsOpen((o) => !o)}
         type="button"
       >
-        {selectedLabel}{" "}
-        {selectedLabel === "All your Projects" && `(${projects.length})`}
+        <span className="truncate">{selectedLabel}</span>
+        {selectedLabel === "All Your Projects" && `(${projects.length})`}
         {isOpen ? (
           <ChevronUpIcon className="w-5 h-5 ml-1" />
         ) : (
