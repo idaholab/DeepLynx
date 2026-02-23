@@ -130,6 +130,35 @@ public class FileController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
+    
+    /// <summary>
+    ///     Generate Download URL
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <param name="projectId">The ID of the project to which the file belongs</param>
+    /// <param name="recordId">The ID of the record that contains file information</param>
+    /// <returns>The file stream for download</returns>
+    [HttpGet("{recordId:long}/url", Name = "api_download_url")]
+    [Auth("read", "file")]
+    [Sensitivity("download file")]
+    public async Task<ActionResult<string>> GenerateDownloadUrl(
+        long organizationId,
+        long projectId,
+        long recordId)
+    {
+        try
+        {
+            var currentUserId = UserContextStorage.UserId;
+            var fileStreamResult = await _fileBusiness.GenerateDownloadURL(currentUserId, organizationId, projectId, recordId);
+            return fileStreamResult;
+        }
+        catch (Exception exc)
+        {
+            var message = $"An error occurred while downloading file in record {recordId}: {exc}";
+            _logger.LogError(message);
+            return StatusCode(StatusCodes.Status500InternalServerError, message);
+        }
+    }
 
     /// <summary>
     ///     Delete a File
