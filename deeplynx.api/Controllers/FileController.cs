@@ -52,7 +52,7 @@ public class FileController : ControllerBase
         [FromQuery] long? objectStorageId,
         IFormFile file,
         [FromQuery] List<long>? sensitivityLabelIds, 
-        [FromQuery] CreateRecordFileUploadRequestDto? metadata)
+        [FromForm] CreateRecordFileUploadRequestDto? metadata)
     {
         try
         {
@@ -277,14 +277,13 @@ public class FileController : ControllerBase
         [FromQuery] long? dataSourceId,
         [FromQuery] long? objectStorageId,
         [FromBody] FileUploadCompleteRequestDto request,
-        [FromQuery] List<long>? sensitivityLabelIds, 
-        [FromQuery] CreateRecordFileUploadRequestDto? metadata)
+        [FromQuery] List<long>? sensitivityLabelIds)
     {
         try
         {
             var currentUserId = UserContextStorage.UserId;
             var fileRecord = await _fileBusiness.CompleteUpload(
-                currentUserId, organizationId, projectId, dataSourceId, objectStorageId, request, sensitivityLabelIds, metadata);
+                currentUserId, organizationId, projectId, dataSourceId, objectStorageId, request, sensitivityLabelIds, request.Metadata);
             return Ok(fileRecord);
         }
         catch (Exception exc)
