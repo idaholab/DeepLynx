@@ -309,7 +309,7 @@ public class InvitationBusinessTests : IntegrationTestBase
     }
 
     [Fact]
-    public async Task InviteByEmail_Success_WhenUserInGroupAlreadyInProject_NoEmailSent()
+    public async Task InviteByEmail_Success_WhenUserInGroupAlreadyInProject_AddsDirectMembershipAndSendsEmail()
     {
         // Arrange
         var userEmail = "existing.user2@test.com";
@@ -320,36 +320,53 @@ public class InvitationBusinessTests : IntegrationTestBase
         var user = await Context.Users.FirstOrDefaultAsync(u => u.Email == userEmail);
         Assert.NotNull(user);
 
+        // Add user to group
         var group = await Context.Groups.FirstOrDefaultAsync(g => g.Id == gid);
         Assert.NotNull(group);
-
         group.Users.Add(user);
 
-        // Add group to project
-        var projectMember = new ProjectMember
+        // Add group to project with one role
+        var groupProjectMember = new ProjectMember
         {
             ProjectId = pid,
             GroupId = gid,
-            RoleId = rid
+            RoleId = rid // Group has role 'rid'
         };
-        Context.ProjectMembers.Add(projectMember);
+        Context.ProjectMembers.Add(groupProjectMember);
         await Context.SaveChangesAsync();
 
-        // Act
+        // Create a second role for direct assignment
+        var directRole = new Role
+        {
+            Name = "Direct Role",
+            OrganizationId = oid,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid
+        };
+        Context.Roles.Add(directRole);
+        await Context.SaveChangesAsync();
+        var directRoleId = directRole.Id;
+
+        // Act - Invite user directly with different role
         var result = await _invitationBusiness.InviteAndAddUserToHierarchy(
-            oid, pid, null, rid, null, userEmail);
+            oid, pid, null, directRoleId, null, userEmail);
 
         // Assert
         Assert.True(result);
-        var directProjectMemberCount = await Context.ProjectMembers
-            .CountAsync(pm => pm.UserId == uid2 && pm.ProjectId == pid);
-        Assert.Equal(0, directProjectMemberCount); // Should not create duplicate membership
 
-        // CRITICAL: No email should be sent when user is already in project via group
+        // CRITICAL: User should now have BOTH memberships
+        var groupMembership = await Context.ProjectMembers
+            .FirstOrDefaultAsync(pm => pm.GroupId == gid && pm.ProjectId == pid && pm.RoleId == rid);
+        Assert.NotNull(groupMembership); // Group membership still exists
+
+        var directMembership = await Context.ProjectMembers
+            .FirstOrDefaultAsync(pm => pm.UserId == uid2 && pm.ProjectId == pid && pm.RoleId == directRoleId);
+        Assert.NotNull(directMembership); // Direct membership now exists
+
+        // CRITICAL: Email should be sent about the direct role assignment
         _notificationBusiness.Verify(
-            n => n.SendEmail(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<bool>(), It.IsAny<long?>(),
-                It.IsAny<long?>()),
-            Times.Never);
+            n => n.SendEmail(userEmail, "Existing User 2", false, oid, pid),
+            Times.Once);
     }
 
     [Fact]
