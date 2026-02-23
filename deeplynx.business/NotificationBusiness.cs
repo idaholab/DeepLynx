@@ -303,7 +303,7 @@ public class NotificationBusiness : INotificationBusiness
 
         if (!string.IsNullOrEmpty(projectName) && !string.IsNullOrEmpty(orgName))
             return
-                $"You have been {action} to the DeepLynx Nexus project <strong>{projectName}</strong> in the <strong>{orgName}</strong> organization. Click the button below to get started.";
+                $"You have been {action} the DeepLynx Nexus project <strong>{projectName}</strong> in the <strong>{orgName}</strong> organization. Click the button below to get started.";
 
         if (!string.IsNullOrEmpty(orgName))
             return

@@ -150,36 +150,31 @@ public class InvitationBusiness : IInvitationBusiness
                     var userInProject = await _context.ProjectMembers
                         .Include(pm => pm.Group)
                         .AnyAsync(pm => pm.ProjectId == projectId &&
-                                        (pm.UserId == user.Id || (pm.GroupId != null && pm.Group.Users.Any(u => u.Id == user.Id))));
-            
-                    if (userInProject)
-                    {
-                        usersAlreadyInProject.Add(user.Id);
-                    }
+                                        (pm.UserId == user.Id ||
+                                         (pm.GroupId != null && pm.Group.Users.Any(u => u.Id == user.Id))));
+
+                    if (userInProject) usersAlreadyInProject.Add(user.Id);
                 }
-        
+
                 // Now add the group to the project
                 await _projectBusiness.AddMemberToProject(projectId.Value, roleId, null, groupId);
-    
+
                 // Best-effort email sending - only send to users who weren't already in the project
                 foreach (var user in group.Users)
-                {
                     if (!usersAlreadyInProject.Contains(user.Id))
-                    {
                         await _notificationBusiness.SendEmail(user.Email, user.Name, false, organizationId, projectId);
-                    }
-                }
             }
         }
 
         return true;
     }
 
-    private async Task<bool> AddUserToHierarchyWithoutEmail(long organizationId, long? projectId, long? roleId, User user)
+    private async Task<bool> AddUserToHierarchyWithoutEmail(long organizationId, long? projectId, long? roleId,
+        User user)
     {
         var addedToOrg = false;
         var addedToProject = false;
-    
+
         var userInOrg = await _context.OrganizationUsers
             .AnyAsync(ou => ou.OrganizationId == organizationId && ou.UserId == user.Id);
 
@@ -192,9 +187,7 @@ public class InvitationBusiness : IInvitationBusiness
         if (projectId != null)
         {
             var userInProject = await _context.ProjectMembers
-                .Include(pm => pm.Group)
-                .AnyAsync(pm => pm.ProjectId == projectId &&
-                                (pm.UserId == user.Id || pm.Group.Users.Any(u => u.Id == user.Id)));
+                .AnyAsync(pm => pm.ProjectId == projectId && pm.UserId == user.Id);
 
             if (!userInProject)
             {
@@ -202,7 +195,7 @@ public class InvitationBusiness : IInvitationBusiness
                 addedToProject = true;
             }
         }
-    
+
         // For project invites, only return true if added to project
         // For org invites, return true if added to org
         return projectId != null ? addedToProject : addedToOrg;
