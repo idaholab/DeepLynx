@@ -50,6 +50,18 @@ public class RecordBusinessAuthTests : IntegrationTestBase
     public long uid;
     public long roleId;
 
+    public JsonObject validDepthJson =
+        (JsonObject)JsonNode.Parse(JsonSerializer.Serialize(new
+        {
+            Level1 = new
+            {
+                Level2 = new
+                {
+                    Level3 = "Valid depth"
+                }
+            }
+        }))!;
+
     public RecordBusinessAuthTests(TestSuiteFixture fixture) : base(fixture)
     {
     }
@@ -1260,8 +1272,406 @@ public class RecordBusinessAuthTests : IntegrationTestBase
     }
 
     #endregion
-    
-    // TODO: add label authorization in bulk create method 
+
+    #region BulkCreateRecords_SensitivityLabelsAuthorization Tests
+
+    [Fact]
+    public async Task BulkCreateRecords_WithoutRequiredLabel_ThrowsInvalidOperationException()
+    {
+        // Arrange - Enable sensitivity label requirement for the project
+        var project = await Context.Projects
+            .FirstOrDefaultAsync(p => p.Id == pid && p.OrganizationId == organizationId);
+
+        if (project != null)
+        {
+            project.RequireSensitivityLabel = true;
+            await Context.SaveChangesAsync();
+        }
+
+        Context.ChangeTracker.Clear();
+
+        var recordsToCreate = new List<CreateRecordRequestDto>
+        {
+            new CreateRecordRequestDto
+            {
+                Name = "Test Record Without Label",
+                Description = "Should fail",
+                OriginalId = Guid.NewGuid().ToString(),
+                Properties = validDepthJson
+            }
+        };
+
+        // Act & Assert - Should throw because labels are required but none provided
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            _recordBusiness.BulkCreateRecords(
+                uid, organizationId, pid, did, recordsToCreate, sensitivityLabelIds: null));
+
+        Assert.Contains("Sensitivity labels are required on all records", exception.Message);
+    }
+
+    [Fact]
+    public async Task BulkCreateRecords_WithEmptyLabelList_WhenRequired_ThrowsInvalidOperationException()
+    {
+        // Arrange - Enable sensitivity label requirement for the project
+        var project = await Context.Projects
+            .FirstOrDefaultAsync(p => p.Id == pid && p.OrganizationId == organizationId);
+
+        if (project != null)
+        {
+            project.RequireSensitivityLabel = true;
+            await Context.SaveChangesAsync();
+        }
+
+        Context.ChangeTracker.Clear();
+
+        var recordsToCreate = new List<CreateRecordRequestDto>
+        {
+            new CreateRecordRequestDto
+            {
+                Name = "Test Record Without Label",
+                Description = "Should fail",
+                OriginalId = Guid.NewGuid().ToString(),
+                Properties = validDepthJson
+            }
+        };
+
+        // Act & Assert - Should throw because labels are required but empty list provided
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            _recordBusiness.BulkCreateRecords(
+                uid, organizationId, pid, did, recordsToCreate, sensitivityLabelIds: new List<long>()));
+
+        Assert.Contains("Sensitivity labels are required on all records", exception.Message);
+    }
+
+    [Fact]
+    public async Task BulkCreateRecords_WithUnauthorizedLabel_ThrowsUnauthorizedAccessException()
+    {
+        // Arrange - Create a sensitivity label
+        var labelDto = new CreateSensitivityLabelRequestDto
+        {
+            Name = "Restricted Label_" + Guid.NewGuid(),
+            Description = "Label without write access",
+        };
+        var label = await _sensitivityLabelBusiness.CreateSensitivityLabel(uid, labelDto, pid, organizationId);
+
+        Context.ChangeTracker.Clear();
+
+        // Do NOT give user write permission for this label
+
+        var recordsToCreate = new List<CreateRecordRequestDto>
+        {
+            new CreateRecordRequestDto
+            {
+                Name = "Test Record With Unauthorized Label",
+                Description = "Should fail",
+                OriginalId = Guid.NewGuid().ToString(),
+                Properties = validDepthJson
+            }
+        };
+
+        // Act & Assert - Should throw because user lacks write permission for the label
+        var exception = await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            _recordBusiness.BulkCreateRecords(
+                uid, organizationId, pid, did, recordsToCreate, sensitivityLabelIds: new List<long> { label.Id }));
+
+        Assert.Contains("You do not have write record access with at least one of the provided sensitivity Labels",
+            exception.Message);
+    }
+
+    [Fact]
+    public async Task BulkCreateRecords_WithAuthorizedLabel_SuccessfullyCreatesRecords()
+    {
+        // Arrange - Create a sensitivity label
+        var labelDto = new CreateSensitivityLabelRequestDto
+        {
+            Name = "Authorized Label_" + Guid.NewGuid(),
+            Description = "Label with write access",
+        };
+        var label = await _sensitivityLabelBusiness.CreateSensitivityLabel(uid, labelDto, pid, organizationId);
+
+        Context.ChangeTracker.Clear();
+
+        // Give user write permission for this label
+        var writePermission = await Context.Permissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "write record");
+
+        var role = await Context.Roles
+            .Include(r => r.Permissions)
+            .FirstOrDefaultAsync(r => r.Id == roleId);
+
+        if (role != null && writePermission != null)
+        {
+            role.Permissions.Add(writePermission);
+            await Context.SaveChangesAsync();
+        }
+
+        Context.ChangeTracker.Clear();
+
+        var recordsToCreate = new List<CreateRecordRequestDto>
+        {
+            new CreateRecordRequestDto
+            {
+                Name = "Test Record With Authorized Label",
+                Description = "Should succeed",
+                OriginalId = Guid.NewGuid().ToString(),
+                Properties = validDepthJson
+            }
+        };
+
+        // Act
+        var result = await _recordBusiness.BulkCreateRecords(
+            uid, organizationId, pid, did, recordsToCreate, sensitivityLabelIds: new List<long> { label.Id });
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Single(result);
+        Assert.Equal("Test Record With Authorized Label", result[0].Name);
+        Assert.Single(result[0].Labels);
+        Assert.Equal(label.Id, result[0].Labels.First().Id);
+    }
+
+    [Fact]
+    public async Task BulkCreateRecords_WithMultipleLabels_UserHasAllPermissions_SuccessfullyCreatesRecords()
+    {
+        // Arrange - Create two sensitivity labels
+        var labelDto1 = new CreateSensitivityLabelRequestDto
+        {
+            Name = "Label1_" + Guid.NewGuid(),
+            Description = "First label",
+        };
+        var label1 = await _sensitivityLabelBusiness.CreateSensitivityLabel(uid, labelDto1, pid, organizationId);
+
+        var labelDto2 = new CreateSensitivityLabelRequestDto
+        {
+            Name = "Label2_" + Guid.NewGuid(),
+            Description = "Second label",
+        };
+        var label2 = await _sensitivityLabelBusiness.CreateSensitivityLabel(uid, labelDto2, pid, organizationId);
+
+        Context.ChangeTracker.Clear();
+
+        // Give user write permission for both labels
+        var writePermission1 = await Context.Permissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label1.Id && p.Action == "write record");
+
+        var writePermission2 = await Context.Permissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label2.Id && p.Action == "write record");
+
+        var role = await Context.Roles
+            .Include(r => r.Permissions)
+            .FirstOrDefaultAsync(r => r.Id == roleId);
+
+        if (role != null && writePermission1 != null && writePermission2 != null)
+        {
+            role.Permissions.Add(writePermission1);
+            role.Permissions.Add(writePermission2);
+            await Context.SaveChangesAsync();
+        }
+
+        Context.ChangeTracker.Clear();
+
+        var recordsToCreate = new List<CreateRecordRequestDto>
+        {
+            new CreateRecordRequestDto
+            {
+                Name = "Test Record With Multiple Labels",
+                Description = "Should succeed with both labels",
+                OriginalId = Guid.NewGuid().ToString(),
+                Properties = validDepthJson
+            }
+        };
+
+        // Act
+        var result = await _recordBusiness.BulkCreateRecords(
+            uid, organizationId, pid, did, recordsToCreate,
+            sensitivityLabelIds: new List<long> { label1.Id, label2.Id });
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Single(result);
+        Assert.Equal("Test Record With Multiple Labels", result[0].Name);
+        Assert.Equal(2, result[0].Labels.Count);
+        Assert.Contains(result[0].Labels, l => l.Id == label1.Id);
+        Assert.Contains(result[0].Labels, l => l.Id == label2.Id);
+    }
+
+    [Fact]
+    public async Task BulkCreateRecords_WithMultipleLabels_UserMissingOnePermission_ThrowsUnauthorizedAccessException()
+    {
+        // Arrange - Create two sensitivity labels
+        var labelDto1 = new CreateSensitivityLabelRequestDto
+        {
+            Name = "Accessible_" + Guid.NewGuid(),
+            Description = "Label with access",
+        };
+        var accessibleLabel =
+            await _sensitivityLabelBusiness.CreateSensitivityLabel(uid, labelDto1, pid, organizationId);
+
+        var labelDto2 = new CreateSensitivityLabelRequestDto
+        {
+            Name = "Restricted_" + Guid.NewGuid(),
+            Description = "Label without access",
+        };
+        var restrictedLabel =
+            await _sensitivityLabelBusiness.CreateSensitivityLabel(uid, labelDto2, pid, organizationId);
+
+        Context.ChangeTracker.Clear();
+
+        // Give user write permission for only the first label
+        var writePermission1 = await Context.Permissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == accessibleLabel.Id && p.Action == "write record");
+
+        var role = await Context.Roles
+            .Include(r => r.Permissions)
+            .FirstOrDefaultAsync(r => r.Id == roleId);
+
+        if (role != null && writePermission1 != null)
+        {
+            role.Permissions.Add(writePermission1);
+            await Context.SaveChangesAsync();
+        }
+
+        Context.ChangeTracker.Clear();
+
+        var recordsToCreate = new List<CreateRecordRequestDto>
+        {
+            new CreateRecordRequestDto
+            {
+                Name = "Test Record With Mixed Permissions",
+                Description = "Should fail - missing permission for one label",
+                OriginalId = Guid.NewGuid().ToString(),
+                Properties = validDepthJson
+            }
+        };
+
+        // Act & Assert - Should throw because user lacks write permission for restrictedLabel
+        var exception = await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            _recordBusiness.BulkCreateRecords(
+                uid, organizationId, pid, did, recordsToCreate,
+                sensitivityLabelIds: new List<long> { accessibleLabel.Id, restrictedLabel.Id }));
+
+        Assert.Contains("You do not have write record access with at least one of the provided sensitivity Labels",
+            exception.Message);
+    }
+
+    [Fact]
+    public async Task BulkCreateRecords_MultipleRecords_WithAuthorizedLabel_SuccessfullyCreatesAllRecords()
+    {
+        // Arrange - Create a sensitivity label
+        var labelDto = new CreateSensitivityLabelRequestDto
+        {
+            Name = "Bulk Label_" + Guid.NewGuid(),
+            Description = "Label for bulk creation",
+        };
+        var label = await _sensitivityLabelBusiness.CreateSensitivityLabel(uid, labelDto, pid, organizationId);
+
+        Context.ChangeTracker.Clear();
+
+        // Give user write permission for this label
+        var writePermission = await Context.Permissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "write record");
+
+        var role = await Context.Roles
+            .Include(r => r.Permissions)
+            .FirstOrDefaultAsync(r => r.Id == roleId);
+
+        if (role != null && writePermission != null)
+        {
+            role.Permissions.Add(writePermission);
+            await Context.SaveChangesAsync();
+        }
+
+        Context.ChangeTracker.Clear();
+
+        var recordsToCreate = new List<CreateRecordRequestDto>
+        {
+            new CreateRecordRequestDto
+            {
+                Name = "Bulk Record 1",
+                Description = "First bulk record",
+                OriginalId = Guid.NewGuid().ToString(),
+                Properties = validDepthJson
+            },
+            new CreateRecordRequestDto
+            {
+                Name = "Bulk Record 2",
+                Description = "Second bulk record",
+                OriginalId = Guid.NewGuid().ToString(),
+                Properties = validDepthJson
+            },
+            new CreateRecordRequestDto
+            {
+                Name = "Bulk Record 3",
+                Description = "Third bulk record",
+                OriginalId = Guid.NewGuid().ToString(),
+                Properties = validDepthJson
+            }
+        };
+
+        // Act
+        var result = await _recordBusiness.BulkCreateRecords(
+            uid, organizationId, pid, did, recordsToCreate, sensitivityLabelIds: new List<long> { label.Id });
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(3, result.Count);
+
+        // Verify all records have the label
+        foreach (var record in result)
+        {
+            Assert.Single(record.Labels);
+            Assert.Equal(label.Id, record.Labels.First().Id);
+        }
+
+        // Verify specific record properties
+        Assert.Contains(result, r => r.Name == "Bulk Record 1");
+        Assert.Contains(result, r => r.Name == "Bulk Record 2");
+        Assert.Contains(result, r => r.Name == "Bulk Record 3");
+    }
+
+    [Fact]
+    public async Task BulkCreateRecords_WithoutLabel_WhenNotRequired_SuccessfullyCreatesRecords()
+    {
+        // Arrange - Ensure sensitivity labels are NOT required
+        var project = await Context.Projects
+            .FirstOrDefaultAsync(p => p.Id == pid && p.OrganizationId == organizationId);
+
+        if (project != null)
+        {
+            project.RequireSensitivityLabel = false;
+            await Context.SaveChangesAsync();
+        }
+
+        Context.ChangeTracker.Clear();
+
+        var recordsToCreate = new List<CreateRecordRequestDto>
+        {
+            new CreateRecordRequestDto
+            {
+                Name = "Test Record Without Label",
+                Description = "Should succeed - labels not required",
+                OriginalId = Guid.NewGuid().ToString(),
+                Properties = validDepthJson
+            }
+        };
+
+        // Act - No labels provided and none required
+        var result = await _recordBusiness.BulkCreateRecords(
+            uid, organizationId, pid, did, recordsToCreate, sensitivityLabelIds: null);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Single(result);
+        Assert.Equal("Test Record Without Label", result[0].Name);
+        Assert.Empty(result[0].Labels);
+    }
+
+    #endregion
 
     #region Unattach Label_SensitivityAuthorization Tests
 

@@ -1,9 +1,9 @@
+using deeplynx.helpers;
 using deeplynx.helpers.Context;
 using deeplynx.interfaces;
 using deeplynx.models;
-using Microsoft.AspNetCore.Mvc;
-using deeplynx.helpers;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 
 namespace deeplynx.api.Controllers;
 
@@ -12,9 +12,9 @@ namespace deeplynx.api.Controllers;
 [Authorize]
 public class OrganizationController : ControllerBase
 {
+    private readonly IInvitationBusiness _invitationBusiness;
     private readonly ILogger<OrganizationController> _logger;
     private readonly IOrganizationBusiness _organizationBusiness;
-    private readonly IInvitationBusiness _invitationBusiness;
 
     /// <summary>
     ///     Initializes a new instance of the <see cref="OrganizationController" /> class
@@ -32,7 +32,7 @@ public class OrganizationController : ControllerBase
     }
 
     /// <summary>
-    ///  Get All Organizations
+    ///     Get All Organizations
     /// </summary>
     /// <param name="hideArchived">Flag indicating whether to hide or show archived orgs</param>
     /// <returns></returns>
@@ -56,7 +56,7 @@ public class OrganizationController : ControllerBase
     }
 
     /// <summary>
-    ///  Get Organizations for User
+    ///     Get Organizations for User
     /// </summary>
     /// <param name="hideArchived">Flag indicating whether to hide or show archived orgs</param>
     /// <returns></returns>
@@ -183,7 +183,7 @@ public class OrganizationController : ControllerBase
     /// <param name="archive">True to archive the organization, false to unarchive it.</param>
     /// <returns>A message stating the organization was successfully archived or unarchived.</returns>
     [HttpPatch("{organizationId:long}", Name = "api_archive_organization")]
-    [Auth("update", "organization", includeArchived: true)]
+    [Auth("update", "organization", true)]
     public async Task<IActionResult> ArchiveOrganization(
         long organizationId,
         [FromQuery] bool archive)
@@ -291,34 +291,37 @@ public class OrganizationController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
-    
+
     /// <summary>
-    /// Invite/Add User to Organization
+    ///     Invite/Add User to Organization
     /// </summary>
     /// <param name="organizationId"></param>
     /// <param name="userEmail"></param>
     /// <param name="userName"></param>
     /// <returns></returns>
     [HttpPost("{organizationId:long}/invite", Name = "api_invite_user_to_organization")]
+    [OrgAdmin] // skip permission checks for org admins
     [Auth("write", "user")]
     [Auth("update", "user")]
     [Auth("update", "organization")]
     public async Task<ActionResult> InviteUserToOrganization(
         long organizationId,
-        [FromQuery] string userEmail,
-        [FromQuery] string? userName)
+        [FromQuery] string userEmail)
     {
         try
         {
-            await _invitationBusiness.InviteAndAddUserToHierarchy(organizationId, null, null, userEmail, userName);
-            return Ok(new { message = $"Invited and added inactive user with email {userEmail} to organization {organizationId}" });
+            await _invitationBusiness.InviteAndAddUserToHierarchy(organizationId, null, null, null, null, userEmail);
+            return Ok(new
+            {
+                message = $"Invited and added inactive user with email {userEmail} to organization {organizationId}"
+            });
         }
         catch (Exception exc)
         {
-            var message = $"An error occurred while adding user with email {userEmail} to organization {organizationId}: {exc}";
+            var message =
+                $"An error occurred while adding user with email {userEmail} to organization {organizationId}: {exc}";
             _logger.LogError(message);
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
-    
 }

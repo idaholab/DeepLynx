@@ -77,9 +77,6 @@ RUN npm install -g npm@latest
 # Copy the built frontend code from the previous stage
 COPY --from=frontend-build /usr/src/app .
 
-# Install production dependencies
-RUN npm install --omit=dev
-
 # Expose the port the app runs on
 EXPOSE 3000
 

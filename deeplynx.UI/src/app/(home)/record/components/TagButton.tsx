@@ -153,7 +153,7 @@ const TagButton: React.FC<TagButtonProps> = ({
         >
           <input
             type="text"
-            placeholder="Search"
+            placeholder={t.translations.SEARCH}
             className="input input-bordered w-full mb-4"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
