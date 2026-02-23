@@ -58,10 +58,7 @@ export function useDashboardTour({
           {
             text: "Skip",
             classes: "shepherd-button-secondary",
-            action: () => {
-                localStorage.setItem("dashboard-tour-completed", "true");
-                tour.cancel();
-            }
+            action: () => tour.cancel(),
           },
           { text: "Next", action: () => tour.next() },
         ],
@@ -178,12 +175,7 @@ export function useDashboardTour({
     ];
 
     // Add steps in sequence with expanded row step inserted after toggle
-      if(filteredProjects.length > 0){
-          steps.slice(0, 4).forEach(step => tour.addStep(step));
-      }
-      else{
-          steps.slice(0,3).forEach(step => tour.addStep(step));
-      }
+    steps.slice(0, 4).forEach(step => tour.addStep(step));
 
     // Add expanded project step if projects exist - this goes right after project-row-toggle
     if (filteredProjects.length > 0) {
