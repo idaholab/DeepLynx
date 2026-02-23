@@ -68,9 +68,7 @@ function parseMaybeJsonArray<T>(value?: string | T[] | null): T[] {
 }
 
 function mapSelectedIds(items: MinimalSelectionItem[]): string[] {
-  return items
-    .filter((item) => item.id != null)
-    .map((item) => String(item.id));
+  return items.filter((item) => item.id != null).map((item) => String(item.id));
 }
 
 function parseNestedProperties(obj: JSON): PropertyRow[] {
@@ -355,10 +353,14 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
           true,
         );
         setRecord(data);
-        const historicalTags =
-          parseMaybeJsonArray<{ id: number | null; name: string }>(data.tags);
-        const historicalLabels =
-          parseMaybeJsonArray<{ id: number | null; name: string }>(data.labels);
+        const historicalTags = parseMaybeJsonArray<{
+          id: number | null;
+          name: string;
+        }>(data.tags);
+        const historicalLabels = parseMaybeJsonArray<{
+          id: number | null;
+          name: string;
+        }>(data.labels);
         setSelectedIds(mapSelectedIds(historicalTags));
         setSelectedLabelIds(mapSelectedIds(historicalLabels));
 
@@ -710,8 +712,8 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
 
   // ============= MAIN RENDER =============
   return (
-    <div className="mx-3 sm:mx-4 lg:mr-4 lg:ml-0">
-      <div className="bg-base-200/40 px-3 sm:px-6 lg:px-12 p-4 rounded-lg">
+    <div className="mx-3 sm:mx-4 lg:mr-0 lg:ml-0">
+      <div className="bg-base-200/40 px-3 sm:px-6 lg:px-12 p-4">
         <h1 className="text-xl sm:text-2xl font-bold text-base-content break-words">
           {record.name}
         </h1>
