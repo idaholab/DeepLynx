@@ -5,7 +5,7 @@ import toast from "react-hot-toast";
 import { useOrganizationSession } from "@/app/contexts/OrganizationSessionProvider";
 import { sendEmail } from "@/app/lib/client_service/notification_services.client";
 import { getAllUsers } from "@/app/lib/client_service/user_services.client";
-import { getAllGroups } from "@/app/lib/client_service/group_services.client";
+import { getAllGroups, getGroupMembers } from "@/app/lib/client_service/group_services.client";
 import {
   addMemberToProject,
   removeMemberFromProject,
@@ -74,6 +74,7 @@ const ProjectUsersTable = ({ members, roles, project }: Props) => {
   const [groupModalLoading, setGroupModalLoading] = useState(false);
   const [selectedGroupId, setSelectedGroupId] = useState<string>("");
   const [selectedGroupRoleId, setSelectedGroupRoleId] = useState<string>("");
+  const [groupMembersCache, setGroupMembersCache] = useState<Map<number, UserResponseDto[]>>(new Map());
 
   /* ------------------------------------------------------------------------ */
   /*                        Confirm Remove / Future Use                       */
@@ -232,6 +233,26 @@ const ProjectUsersTable = ({ members, roles, project }: Props) => {
     } finally {
       setGroupModalLoading(false);
     }
+  };
+
+  const handleGetGroupMembers = (groupId: number): UserResponseDto[] => {
+    if (!organizationId) return [];
+
+    // Return cached if available
+    if (groupMembersCache.has(groupId)) {
+      return groupMembersCache.get(groupId)!;
+    }
+
+    // Fetch asynchronously and cache
+    getGroupMembers(organizationId, groupId)
+      .then((groupMembers) => {
+        setGroupMembersCache((prev) => new Map(prev).set(groupId, groupMembers));
+      })
+      .catch((error) => {
+        console.error(`Failed to load members for group ${groupId}:`, error);
+      });
+
+    return []; // Return empty while loading
   };
 
   const handleAddGroup = async () => {
@@ -466,6 +487,7 @@ const ProjectUsersTable = ({ members, roles, project }: Props) => {
             isOpen={showAddUserModal}
             roles={roles}
             availableOrgUsers={availableUsers}
+            projectMembers={members}
             modalLoading={userModalLoading}
             onClose={() => setShowAddUserModal(false)}
             onInviteExternalUser={handleInviteExternalUser}
@@ -477,6 +499,7 @@ const ProjectUsersTable = ({ members, roles, project }: Props) => {
             isOpen={showAddGroupModal}
             roles={roles}
             availableGroups={availableGroups}
+            projectMembers={members}
             selectedGroupId={selectedGroupId}
             selectedRoleId={selectedGroupRoleId}
             modalLoading={groupModalLoading}
@@ -488,6 +511,7 @@ const ProjectUsersTable = ({ members, roles, project }: Props) => {
             onChangeGroup={setSelectedGroupId}
             onChangeRole={setSelectedGroupRoleId}
             onConfirm={handleAddGroup}
+            getGroupMembers={handleGetGroupMembers}
           />
 
           {/* Edit Role Modal */}

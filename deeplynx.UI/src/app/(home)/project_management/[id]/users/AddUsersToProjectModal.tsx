@@ -1,10 +1,9 @@
-"use client";
-
-import React, { useState, useEffect } from "react";
-import { EnvelopeIcon, XMarkIcon, UserGroupIcon, UserIcon, MagnifyingGlassIcon } from "@heroicons/react/24/outline";
+import React, { useState, useEffect, useMemo } from "react";
+import { XMarkIcon, MagnifyingGlassIcon } from "@heroicons/react/24/outline";
 import {
   UserResponseDto,
   RoleResponseDto,
+  ProjectMemberResponseDto,
 } from "@/app/(home)/types/responseDTOs";
 import { useLanguage } from "@/app/contexts/Language";
 
@@ -16,6 +15,7 @@ interface AddUsersToProjectModalProps {
   isOpen: boolean;
   roles: RoleResponseDto[];
   availableOrgUsers: UserResponseDto[];
+  projectMembers: ProjectMemberResponseDto[];
   modalLoading?: boolean;
   onClose: () => void;
   onInviteExternalUser: (email: string, roleId: number) => Promise<void>;
@@ -31,6 +31,7 @@ const AddUsersToProjectModal: React.FC<AddUsersToProjectModalProps> = ({
   isOpen,
   roles,
   availableOrgUsers,
+  projectMembers,
   modalLoading = false,
   onClose,
   onInviteExternalUser,
@@ -45,6 +46,27 @@ const AddUsersToProjectModal: React.FC<AddUsersToProjectModalProps> = ({
   const [isProcessing, setIsProcessing] = useState(false);
   const [emailErrors, setEmailErrors] = useState<EmailError[]>([]);
   const [searchQuery, setSearchQuery] = useState<string>("");
+
+  // Filter out users who are already in the project
+  const usersNotInProject = useMemo(() => {
+    // Get IDs and names of users already in the project (those with emails)
+    const existingUserIds = new Set(
+      projectMembers
+        .filter(member => member.email !== "" && member.memberId !== undefined) // Users have emails
+        .map(member => member.memberId!)
+    );
+    
+    const existingUserNames = new Set(
+      projectMembers
+        .filter(member => member.email !== "")
+        .map(member => member.name.toLowerCase())
+    );
+
+    return availableOrgUsers.filter(user => 
+      !existingUserIds.has(user.id) && 
+      !existingUserNames.has(user.name.toLowerCase())
+    );
+  }, [availableOrgUsers, projectMembers]);
 
   // Reset state when modal opens
   useEffect(() => {
@@ -117,7 +139,7 @@ const AddUsersToProjectModal: React.FC<AddUsersToProjectModalProps> = ({
       try {
         await onAddOrgUser(userId, roleId);
       } catch (error: any) {
-        const user = availableOrgUsers.find((u) => u.id === userId);
+        const user = usersNotInProject.find((u) => u.id === userId);
         errors.push({
           email: user?.email || user?.name || `User ${userId}`,
           error: error?.message || "Failed to add user",
@@ -150,12 +172,12 @@ const AddUsersToProjectModal: React.FC<AddUsersToProjectModalProps> = ({
     const failedOrgUserEmails = errors
       .map((e) => e.email)
       .filter((email) =>
-        availableOrgUsers.some((u) => u.email === email || u.name === email)
+        usersNotInProject.some((u) => u.email === email || u.name === email)
       );
     
     setSelectedOrgUserIds((prev) =>
       prev.filter((id) => {
-        const user = availableOrgUsers.find((u) => u.id === id);
+        const user = usersNotInProject.find((u) => u.id === id);
         return failedOrgUserEmails.includes(user?.email || user?.name || "");
       })
     );
@@ -177,7 +199,7 @@ const AddUsersToProjectModal: React.FC<AddUsersToProjectModalProps> = ({
   const hasErrors = emailErrors.length > 0;
 
   // Filter users based on search query
-  const filteredOrgUsers = availableOrgUsers.filter((user) => {
+  const filteredOrgUsers = usersNotInProject.filter((user) => {
     const searchLower = searchQuery.toLowerCase();
     return (
       user.name.toLowerCase().includes(searchLower) ||
@@ -186,7 +208,7 @@ const AddUsersToProjectModal: React.FC<AddUsersToProjectModalProps> = ({
   });
 
   // Get selected users for display
-  const selectedUsers = availableOrgUsers.filter((user) =>
+  const selectedUsers = usersNotInProject.filter((user) =>
     selectedOrgUserIds.includes(user.id)
   );
 
@@ -368,7 +390,7 @@ const AddUsersToProjectModal: React.FC<AddUsersToProjectModalProps> = ({
                     Select Organization Users
                   </span>
                   <span className="label-text-alt text-base-content/60">
-                    {availableOrgUsers.length} available
+                    {usersNotInProject.length} available
                   </span>
                 </label>
 
@@ -391,6 +413,8 @@ const AddUsersToProjectModal: React.FC<AddUsersToProjectModalProps> = ({
                     <div className="flex items-center justify-center h-full text-base-content/50 text-sm">
                       {searchQuery
                         ? "No users match your search"
+                        : usersNotInProject.length === 0
+                        ? "All organization users are already in this project"
                         : "No available users"}
                     </div>
                   ) : (

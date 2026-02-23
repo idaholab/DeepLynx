@@ -1,10 +1,9 @@
-"use client";
-
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import {
   GroupResponseDto,
   RoleResponseDto,
   UserResponseDto,
+  ProjectMemberResponseDto,
 } from "@/app/(home)/types/responseDTOs";
 import { useLanguage } from "@/app/contexts/Language";
 import { UserIcon, MagnifyingGlassIcon } from "@heroicons/react/24/outline";
@@ -13,24 +12,11 @@ import { UserIcon, MagnifyingGlassIcon } from "@heroicons/react/24/outline";
 /*                        Add Group To Project Modal                          */
 /* -------------------------------------------------------------------------- */
 
-// Temporary dummy data for group members
-const DUMMY_GROUP_MEMBERS: UserResponseDto[] = [
-  { id: 1, name: "Alice Johnson", email: "alice.johnson@example.com" },
-  { id: 2, name: "Bob Smith", email: "bob.smith@example.com" },
-  { id: 3, name: "Carol Williams", email: "carol.williams@example.com" },
-  { id: 4, name: "David Brown", email: "david.brown@example.com" },
-  { id: 5, name: "Emma Davis", email: "emma.davis@example.com" },
-  { id: 6, name: "Frank Miller", email: "frank.miller@example.com" },
-  { id: 7, name: "Grace Wilson", email: "grace.wilson@example.com" },
-  { id: 8, name: "Henry Moore", email: "henry.moore@example.com" },
-  { id: 9, name: "Iris Taylor", email: "iris.taylor@example.com" },
-  { id: 10, name: "Jack Anderson", email: "jack.anderson@example.com" },
-] as UserResponseDto[];
-
 interface AddGroupToProjectModalProps {
   isOpen: boolean;
   roles: RoleResponseDto[];
   availableGroups: GroupResponseDto[];
+  projectMembers: ProjectMemberResponseDto[];
   selectedGroupId: string;
   selectedRoleId: string;
   modalLoading: boolean;
@@ -38,12 +24,14 @@ interface AddGroupToProjectModalProps {
   onChangeGroup: (value: string) => void;
   onChangeRole: (value: string) => void;
   onConfirm: () => void;
+  getGroupMembers: (groupId: number) => UserResponseDto[]; // Function to get group members
 }
 
 const AddGroupToProjectModal: React.FC<AddGroupToProjectModalProps> = ({
   isOpen,
   roles,
   availableGroups,
+  projectMembers,
   selectedGroupId,
   selectedRoleId,
   modalLoading,
@@ -51,30 +39,49 @@ const AddGroupToProjectModal: React.FC<AddGroupToProjectModalProps> = ({
   onChangeGroup,
   onChangeRole,
   onConfirm,
+  getGroupMembers,
 }) => {
   const { t } = useLanguage();
   const [memberSearchQuery, setMemberSearchQuery] = useState<string>("");
   
-  if (!isOpen) return null;
+  const groupsNotInProject = useMemo(() => {
+    const existingGroupIds = new Set<number | string>(
+      projectMembers
+        .filter((member) => member.email === "" && member.memberId !== undefined)
+        .map((member) => member.memberId!)
+    );
 
-  // TODO: Replace with actual API call to get group members
-  const groupMembers = selectedGroupId ? DUMMY_GROUP_MEMBERS : [];
+    const existingGroupNames = new Set(
+      projectMembers
+        .filter((member) => member.email === "")
+        .map((member) => member.name.toLowerCase())
+    );
 
-  // Filter group members based on search query
-  const filteredGroupMembers = groupMembers.filter((member) => {
+    return availableGroups.filter(
+      (group) =>
+        !existingGroupIds.has(group.id) &&
+        !existingGroupNames.has(group.name.toLowerCase())
+    );
+  }, [availableGroups, projectMembers]);
+
+  const groupMembers = selectedGroupId ? getGroupMembers(Number(selectedGroupId)) : [];
+
+  const filteredGroupMembers = useMemo(() => {
     const searchLower = memberSearchQuery.toLowerCase();
-    return (
+    return groupMembers.filter((member) => (
       member.name.toLowerCase().includes(searchLower) ||
       member.email?.toLowerCase().includes(searchLower)
-    );
-  });
+    ));
+  }, [groupMembers, memberSearchQuery]);
+
+  if (!isOpen) return null;
 
   // Get selected group display text
   const getSelectedGroupDisplay = () => {
     if (!selectedGroupId) {
       return t.translations.SELECT_A_GROUP;
     }
-    const group = availableGroups.find((g) => g.id === Number(selectedGroupId));
+    const group = groupsNotInProject.find((g) => g.id === Number(selectedGroupId));
     return group ? group.name : t.translations.SELECT_A_GROUP;
   };
 
@@ -123,16 +130,22 @@ const AddGroupToProjectModal: React.FC<AddGroupToProjectModalProps> = ({
                   tabIndex={0}
                   className="dropdown-content menu bg-base-100 rounded-box z-[100] w-full p-2 shadow-lg border border-base-300 max-h-60 overflow-y-auto mt-1"
                 >
-                  {availableGroups.map((g) => (
-                    <li
-                      key={g.id}
-                      onClick={() => onChangeGroup(g.id.toString())}
-                    >
-                      <a>
-                        <span>{g.name}</span>
-                      </a>
+                  {groupsNotInProject.length === 0 ? (
+                    <li className="text-center text-base-content/50 text-sm p-4">
+                      All groups are already in this project
                     </li>
-                  ))}
+                  ) : (
+                    groupsNotInProject.map((g) => (
+                      <li
+                        key={g.id}
+                        onClick={() => onChangeGroup(g.id.toString())}
+                      >
+                        <a>
+                          <span>{g.name}</span>
+                        </a>
+                      </li>
+                    ))
+                  )}
                 </ul>
               </div>
             </div>

@@ -1,5 +1,5 @@
 import React, { useState, KeyboardEvent } from "react";
-import { EnvelopeIcon, XMarkIcon } from "@heroicons/react/24/outline";
+import { EnvelopeIcon, XMarkIcon, ExclamationCircleIcon } from "@heroicons/react/24/outline";
 
 /* -------------------------------------------------------------------------- */
 /*                     Invite User to Organization Dialog                     */
@@ -9,7 +9,7 @@ interface InviteUserModalProps {
   isOpen: boolean;
   modalLoading: boolean;
   onClose: () => void;
-  onInvite: (emails: string[]) => void;
+  onInvite: (emails: string[]) => Promise<{ successful: string[]; failed: { email: string; error: string }[] }>;
 }
 
 const InviteUserModal: React.FC<InviteUserModalProps> = ({
@@ -20,6 +20,7 @@ const InviteUserModal: React.FC<InviteUserModalProps> = ({
 }) => {
   const [emails, setEmails] = useState<string[]>([]);
   const [inputValue, setInputValue] = useState("");
+  const [emailErrors, setEmailErrors] = useState<Map<string, string>>(new Map());
 
   if (!isOpen) return null;
 
@@ -33,11 +34,18 @@ const InviteUserModal: React.FC<InviteUserModalProps> = ({
     if (trimmedEmail && isValidEmail(trimmedEmail) && !emails.includes(trimmedEmail)) {
       setEmails([...emails, trimmedEmail]);
       setInputValue("");
+      // Clear any previous error for this email
+      const newErrors = new Map(emailErrors);
+      newErrors.delete(trimmedEmail);
+      setEmailErrors(newErrors);
     }
   };
 
   const removeEmail = (emailToRemove: string) => {
     setEmails(emails.filter(email => email !== emailToRemove));
+    const newErrors = new Map(emailErrors);
+    newErrors.delete(emailToRemove);
+    setEmailErrors(newErrors);
   };
 
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
@@ -61,7 +69,7 @@ const InviteUserModal: React.FC<InviteUserModalProps> = ({
     setEmails([...emails, ...validEmails.map(e => e.trim())]);
   };
 
-  const handleInvite = () => {
+  const handleInvite = async () => {
     if (inputValue.trim()) {
       addEmail(inputValue);
     }
@@ -71,18 +79,37 @@ const InviteUserModal: React.FC<InviteUserModalProps> = ({
       : emails;
     
     if (finalEmails.length > 0) {
-      onInvite(finalEmails);
-      handleClose();
+      const results = await onInvite(finalEmails);
+      
+      // Handle results
+      if (results.failed.length > 0) {
+        // Keep only failed emails in the list
+        setEmails(results.failed.map(f => f.email));
+        
+        // Store error messages
+        const newErrors = new Map<string, string>();
+        results.failed.forEach(failure => {
+          newErrors.set(failure.email, failure.error);
+        });
+        setEmailErrors(newErrors);
+        
+        // Don't close the modal if there are failures
+      } else {
+        // All succeeded, close the modal
+        handleClose();
+      }
     }
   };
 
   const handleClose = () => {
     setEmails([]);
     setInputValue("");
+    setEmailErrors(new Map());
     onClose();
   };
 
   const inviteDisabled = emails.length === 0 && !inputValue.trim();
+  const hasErrors = emailErrors.size > 0;
 
   return (
     <div className="modal modal-open">
@@ -115,22 +142,30 @@ const InviteUserModal: React.FC<InviteUserModalProps> = ({
                     Email addresses <span className="text-error">*</span>
                   </span>
                 </label>
-                <div className="input input-bordered input-lg min-h-[3rem] h-auto flex flex-wrap gap-2 items-center p-2">
-                  {emails.map((email) => (
-                    <div
-                      key={email}
-                      className="badge badge-lg gap-2 bg-base-200 px-3 py-3"
-                    >
-                      <span className="text-sm">{email}</span>
-                      <button
-                        type="button"
-                        onClick={() => removeEmail(email)}
-                        className="btn btn-ghost btn-xs btn-circle"
+                <div className={`input input-bordered input-lg min-h-[3rem] h-auto flex flex-wrap gap-2 items-center p-2 ${
+                  hasErrors ? 'border-error border-2' : ''
+                }`}>
+                  {emails.map((email) => {
+                    const hasError = emailErrors.has(email);
+                    return (
+                      <div
+                        key={email}
+                        className={`badge badge-lg gap-2 px-3 py-3 ${
+                          hasError ? 'bg-error/10 border-error border' : 'bg-base-200'
+                        }`}
                       >
-                        <XMarkIcon className="w-4 h-4" />
-                      </button>
-                    </div>
-                  ))}
+                        {hasError && <ExclamationCircleIcon className="w-4 h-4 text-error" />}
+                        <span className={`text-sm ${hasError ? 'text-error' : ''}`}>{email}</span>
+                        <button
+                          type="button"
+                          onClick={() => removeEmail(email)}
+                          className="btn btn-ghost btn-xs btn-circle"
+                        >
+                          <XMarkIcon className="w-4 h-4" />
+                        </button>
+                      </div>
+                    );
+                  })}
                   <input
                     type="text"
                     placeholder={emails.length === 0 ? "user@example.com" : "add more..."}
@@ -154,16 +189,35 @@ const InviteUserModal: React.FC<InviteUserModalProps> = ({
                 </label>
               </div>
 
-              {/* Info Alert */}
-              <div className="alert alert-info">
-                <EnvelopeIcon className="w-6 h-6" />
-                <div>
-                  <h4 className="font-semibold">Email Notifications</h4>
-                  <p className="text-sm">
-                    Invitations will be sent to all added email addresses.
-                  </p>
+              {/* Error Messages */}
+              {hasErrors && (
+                <div className="alert alert-error">
+                  <ExclamationCircleIcon className="w-6 h-6" />
+                  <div className="flex-1">
+                    <h4 className="font-semibold">Invitation Errors</h4>
+                    <div className="text-sm mt-1 space-y-1">
+                      {Array.from(emailErrors.entries()).map(([email, error]) => (
+                        <div key={email}>
+                          <span className="font-semibold">{email}:</span> {error}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 </div>
-              </div>
+              )}
+
+              {/* Info Alert */}
+              {!hasErrors && (
+                <div className="alert alert-info">
+                  <EnvelopeIcon className="w-6 h-6" />
+                  <div>
+                    <h4 className="font-semibold">Email Notifications</h4>
+                    <p className="text-sm">
+                      Invitations will be sent to all added email addresses.
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Modal Actions */}
@@ -187,7 +241,7 @@ const InviteUserModal: React.FC<InviteUserModalProps> = ({
                 ) : (
                   <EnvelopeIcon className="w-5 h-5" />
                 )}
-                Send Invitation
+                {hasErrors ? 'Retry Failed Invitations' : 'Send Invitation'}
                 {emails.length > 0 && ` (${emails.length})`}
               </button>
             </div>
