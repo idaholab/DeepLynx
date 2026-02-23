@@ -49,7 +49,7 @@ export function ExpandableTable<T>({
   }, [currentPage]);
 
   return (
-    <div className="overflow-x-auto">
+    <div>
       <table className="table w-full">
         {expandedIndex === null && (
           <thead>
