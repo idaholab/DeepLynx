@@ -6,6 +6,7 @@ public static class ClaimsEmailExtractor
 {
     public static string? ExtractEmail(ClaimsPrincipal principal)
     {
+        var disableAuth = Environment.GetEnvironmentVariable("DISABLE_BACKEND_AUTHENTICATION");
         var candidates = new (string claimType, string? value)[]
         {
             // Tests expect this to win if it's an email-like value
@@ -28,17 +29,34 @@ public static class ClaimsEmailExtractor
             ("name", principal.FindFirst("name")?.Value)
         };
 
+        if (disableAuth == "true")
+        {
+            // Prioritize actual email claims first
+            var emailClaim = principal.FindFirst(ClaimTypes.Email)?.Value
+                             ?? principal.FindFirst("email")?.Value;
+
+            if (!string.IsNullOrWhiteSpace(emailClaim))
+                return emailClaim.Trim().ToLowerInvariant();
+
+            // Then fall back to any non-empty claim
+            foreach (var (_, raw) in candidates)
+                if (!string.IsNullOrWhiteSpace(raw))
+                    return raw.Trim().ToLowerInvariant();
+            return null;
+        }
+
+        // Auth enabled - validate email format
         foreach (var (_, raw) in candidates)
         {
             if (string.IsNullOrWhiteSpace(raw)) continue;
 
             var candidate = raw.Trim().ToLowerInvariant();
 
-            // Let's treat these as the same
+            // Normalize domain
             if (candidate.EndsWith("@azuregov.inl.gov", StringComparison.OrdinalIgnoreCase))
                 candidate = candidate.Replace("@azuregov.inl.gov", "@inl.gov");
 
-            // sanity: must contain '@' and '.' in domain
+            // Validate email format
             var atIndex = candidate.IndexOf('@');
             if (atIndex <= 0) continue;
 
