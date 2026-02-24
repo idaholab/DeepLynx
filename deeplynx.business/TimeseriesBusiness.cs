@@ -385,7 +385,6 @@ public class TimeseriesBusiness(
         string tableName)
     {
         file = new SanitizedFormFile(file);
-        tableName = SanitizedFormFile.SanitizeFileName(tableName);
         var fileType = Path.GetExtension(file.FileName);
         if (fileType != ".csv" && fileType != ".parquet")
             throw new ArgumentException("Only CSV and Parquet files are supported.");
