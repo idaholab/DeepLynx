@@ -3,7 +3,6 @@ import { XMarkIcon, EnvelopeIcon, ExclamationCircleIcon } from "@heroicons/react
 
 /* -------------------------------------------------------------------------- */
 /*                     Invite Users to Organization Modal                     */
-/*                (Mirrors "AddUsersToProjectModal" UI pattern)               */
 /* -------------------------------------------------------------------------- */
 
 interface InviteUserModalProps {
