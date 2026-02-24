@@ -27,7 +27,7 @@ const AddProjectMember = ({
   const [roles, setRoles] = useState<RoleResponseDto[]>([]);
   const [selectedUser, setSelectedUser] = useState<number | null>(null);
   const [selectedRole, setSelectedRole] = useState<number | null>(null);
-  const { organization, hasLoaded } = useOrganizationSession();
+  const { organization } = useOrganizationSession();
 
   useEffect(() => {
     if (isOpen && organization?.organizationId) {

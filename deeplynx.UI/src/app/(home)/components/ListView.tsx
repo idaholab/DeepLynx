@@ -90,14 +90,6 @@ const ListView: React.FC<ListViewProps> = ({
     }
   };
 
-  const filteredRecords = !selectedProjects?.length
-    ? data
-    : data.filter(
-        (record) =>
-          record.projectId !== undefined &&
-          selectedProjects.includes(record.projectId),
-      );
-
   return (
     <div className="bg-base-100 px-10 w-full mx-auto text-info-content">
       <ul className="list">

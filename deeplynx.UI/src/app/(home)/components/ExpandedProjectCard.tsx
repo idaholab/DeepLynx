@@ -24,7 +24,7 @@ interface Props {
 const ExpandedProjectCard: React.FC<Props> = ({ project, onClose }) => {
   const router = useRouter();
   const { t } = useLanguage();
-  const { organization, hasLoaded } = useOrganizationSession();
+  const { organization } = useOrganizationSession();
 
   const [stats, setStats] = useState<{
     classes: number;

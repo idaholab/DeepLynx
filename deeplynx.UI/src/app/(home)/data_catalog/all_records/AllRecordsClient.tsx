@@ -370,8 +370,6 @@ export default function DataCatalogClient({
 
   const handleSubmit = async () => {
     try {
-      // const data = await fullTextSearch(searchTerm, selectedProjects);
-      // if (data) setTableData(data);
     } catch (error) {
       console.error("Failed to send query", error);
     }
