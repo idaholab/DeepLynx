@@ -40,6 +40,7 @@ public class TimeseriesBusiness(
         string fileType)
     {
         filePath = SanitizedFormFile.SanitizeFileName(filePath);
+        tableName = SanitizedFormFile.SanitizeFileName(tableName);
         using var duckDbConnection = await GetDuckDbConnection(organizationId, projectId, dataSourceId);
 
         await using var command = duckDbConnection.CreateCommand();
@@ -375,7 +376,6 @@ public class TimeseriesBusiness(
     public async Task AppendTimeseriesTable(long organizationId, long projectId, long dataSourceId, IFormFile file, string tableName)
     {
         file = new SanitizedFormFile(file);
-        tableName = SanitizedFormFile.SanitizeFileName(tableName);
         var fileType = Path.GetExtension(file.FileName);
         if (fileType != ".csv" && fileType != ".parquet")
             throw new ArgumentException("Only CSV and Parquet files are supported.");
