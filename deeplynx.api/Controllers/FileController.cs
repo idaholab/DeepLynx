@@ -40,6 +40,10 @@ public class FileController : ControllerBase
     /// <param name="dataSourceId">The ID of the data source to which the file belongs</param>
     /// <param name="objectStorageId">The ID of the object storage method</param>
     /// <param name="file">The file to upload</param>
+    /// <param name="metadata">
+    ///     Both file to upload and *optional metadata file to associate with the file to upload. Metadata
+    ///     file must follow the CreateRecordFileUploadRequestDto that can be found in Models.
+    /// </param>
     /// <returns>Record response DTO containing file information</returns>
     [HttpPost(Name = "api_upload_file")]
     [Auth("write", "file")]
@@ -51,8 +55,8 @@ public class FileController : ControllerBase
         [FromQuery] long? dataSourceId,
         [FromQuery] long? objectStorageId,
         IFormFile file,
-        [FromQuery] List<long>? sensitivityLabelIds, 
-        [FromForm] CreateRecordFileUploadRequestDto? metadata)
+        [FromQuery] List<long>? sensitivityLabelIds,
+        IFormFile? metadata)
     {
         try
         {
@@ -237,7 +241,7 @@ public class FileController : ControllerBase
     /// <param name="projectId">The ID of the project to which the file belongs</param>
     /// <param name="dataSourceId">The ID of the data source to which the file belongs</param>
     /// <param name="objectStorageId">The ID of the object storage method</param>
-    /// <param name="request">File upload completion request DTO</param>
+    /// <param name="request">File upload completion request DTO with optional metadata DTO</param>
     /// <returns>Record response DTO containing file information</returns>
     [HttpPost("upload/complete", Name = "api_complete_file_upload")]
     [Auth("write", "file")]
@@ -254,7 +258,8 @@ public class FileController : ControllerBase
         {
             var currentUserId = UserContextStorage.UserId;
             var fileRecord = await _fileBusiness.CompleteUpload(
-                currentUserId, organizationId, projectId, dataSourceId, objectStorageId, request, sensitivityLabelIds, request.Metadata);
+                currentUserId, organizationId, projectId, dataSourceId, objectStorageId, request, sensitivityLabelIds,
+                request.Metadata);
             return Ok(fileRecord);
         }
         catch (Exception exc)

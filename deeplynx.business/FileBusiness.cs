@@ -6,6 +6,7 @@ using deeplynx.models;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Newtonsoft.Json;
+using JsonSerializer = System.Text.Json.JsonSerializer;
 
 namespace deeplynx.business;
 
@@ -56,6 +57,7 @@ public class FileBusiness
     /// <param name="objectStorageId">ID of the object storage method to use</param>
     /// <param name="file">file to upload</param>
     /// <param name="sensitivityLabelIds">The IDs of the Sensitivity Labels that will be attached to the record</param>
+    /// <param name="metadataFile">(Optional) Metadata file to associate with the file upload</param>
     public async Task<RecordResponseDto> UploadFile(
         long currentUserId,
         long organizationId,
@@ -63,8 +65,8 @@ public class FileBusiness
         long? dataSourceId,
         long? objectStorageId,
         IFormFile file,
-        List<long>? sensitivityLabelIds = null, 
-        CreateRecordFileUploadRequestDto? metadata = null)
+        List<long>? sensitivityLabelIds = null,
+        IFormFile? metadataFile = null)
     {
         long realDataSourceId;
         if (file == null || file.Length == 0) throw new ArgumentException("File is required and cannot be empty.");
@@ -93,8 +95,26 @@ public class FileBusiness
         var uri = await fileBusiness.UploadFile(organizationId, projectId, realDataSourceId, configData, file, guid);
 
         var fileClass = await _classBusiness.GetOrCreateClass(currentUserId, organizationId, projectId, "File");
-        
-        var recordRequest = new CreateRecordRequestDto()
+
+        CreateRecordFileUploadRequestDto? metadata = null;
+
+        if (metadataFile != null)
+        {
+            using (var reader = new StreamReader(metadataFile.OpenReadStream()))
+            {
+                var metadataJson = await reader.ReadToEndAsync();
+
+                if (string.IsNullOrWhiteSpace(metadataJson))
+                    throw new ArgumentException("Metadata file is empty or contains no content.");
+
+                metadata = JsonSerializer.Deserialize<CreateRecordFileUploadRequestDto>(metadataJson)
+                           ?? throw new InvalidOperationException("Failed to deserialize metadata file.");
+            }
+
+            ValidationHelper.ValidateModel(metadata);
+        }
+
+        var recordRequest = new CreateRecordRequestDto
         {
             Properties = metadata?.Properties ?? new JsonObject
             {
@@ -106,7 +126,7 @@ public class FileBusiness
             OriginalId = metadata?.OriginalId ?? guid.ToString(),
             ClassId = metadata?.ClassId ?? fileClass.Id,
             ClassName = metadata?.ClassName ?? fileClass.Name,
-            FileType = Path.GetExtension(file.FileName).TrimStart('.').ToLower(), 
+            FileType = Path.GetExtension(file.FileName).TrimStart('.').ToLower(),
             Uri = uri
         };
 
@@ -139,7 +159,7 @@ public class FileBusiness
             throw new InvalidOperationException("Config data for object storage is null or invalid");
 
         var fileBusiness = _factory.CreateFileBusiness(objectStorage.Type);
-        
+
         var guid = Guid.NewGuid();
 
         var uri = await fileBusiness.UpdateFile(record, configData, file, guid);
@@ -312,6 +332,7 @@ public class FileBusiness
     /// <param name="objectStorageId">ID of the object storage method to use</param>
     /// <param name="request">File upload completion request</param>
     /// <param name="sensitivityLabelIds">The IDs of the Sensitivity Labels that will be attached to the record</param>
+    /// <param name="metadata">Metadata DTO for the file to be uploaded</param>
     public async Task<RecordResponseDto> CompleteUpload(
         long currentUserId,
         long organizationId,
@@ -319,7 +340,7 @@ public class FileBusiness
         long? dataSourceId,
         long? objectStorageId,
         FileUploadCompleteRequestDto request,
-        List<long>? sensitivityLabelIds = null, 
+        List<long>? sensitivityLabelIds = null,
         CreateRecordFileUploadRequestDto? metadata = null)
     {
         // Resolve data source
