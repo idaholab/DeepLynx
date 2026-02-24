@@ -194,7 +194,7 @@ const AddGroupToProjectModal: React.FC<AddGroupToProjectModalProps> = ({
           {/* Right Side - Group Members Preview */}
           <div className="form-control">
             <label className="label">
-              <span className="label-text">Group Members</span>
+              <span className="label-text">{t.translations.GROUP_MEMBERS}</span>
               <span className="label-text-alt text-base-content/60">
                 {groupMembers.length}{" "}
                 {groupMembers.length === 1
@@ -221,15 +221,15 @@ const AddGroupToProjectModal: React.FC<AddGroupToProjectModalProps> = ({
             <div className="border border-base-300 rounded-lg p-3 max-h-96 overflow-y-auto bg-base-200">
               {!selectedGroupId ? (
                 <div className="flex items-center justify-center h-full min-h-[100px] text-base-content/50 text-sm">
-                  Select a group to view members
+                  {t.translations.SELECT_GROUP_TO_VIEW_MEMBERS}
                 </div>
               ) : groupMembers.length === 0 ? (
                 <div className="flex items-center justify-center h-full min-h-[100px] text-base-content/50 text-sm">
-                  No Members
+                  {t.translations.NO_MEMBERS}
                 </div>
               ) : filteredGroupMembers.length === 0 ? (
                 <div className="flex items-center justify-center h-full min-h-[100px] text-base-content/50 text-sm">
-                  No members match your search
+                  {t.translations.NO_MEMBERS_MATCH_SEARCH}
                 </div>
               ) : (
                 <ul className="space-y-2">

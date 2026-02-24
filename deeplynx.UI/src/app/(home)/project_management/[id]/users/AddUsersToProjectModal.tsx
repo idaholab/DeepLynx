@@ -242,7 +242,7 @@ const AddUsersToProjectModal: React.FC<AddUsersToProjectModalProps> = ({
                 <div className="form-control">
                   <label className="label">
                     <span className="label-text font-semibold text-base">
-                      Invite External Users via Email
+                      {t.translations.INVITE_EXTERNAL_USERS_VIA_EMAIL}
                     </span>
                   </label>
                   <div className="border border-base-300 rounded-lg p-2 min-h-[120px] max-h-[300px] overflow-y-auto bg-base-100 focus-within:border-primary focus-within:outline-none focus-within:ring-2 focus-within:ring-primary focus-within:ring-opacity-50">
@@ -268,7 +268,7 @@ const AddUsersToProjectModal: React.FC<AddUsersToProjectModalProps> = ({
                       <input
                         type="text"
                         className="flex-1 min-w-[200px] outline-none bg-transparent p-2"
-                        placeholder={externalEmails.length === 0 ? "Enter email addresses..." : ""}
+                        placeholder={externalEmails.length === 0 ? `${t.translations.ENTER_EMAIL_ADDRESSES}` : ""}
                         value={externalEmailInput}
                         onChange={(e) => setExternalEmailInput(e.target.value)}
                         onKeyDown={handleEmailInputKeyDown}
@@ -279,7 +279,7 @@ const AddUsersToProjectModal: React.FC<AddUsersToProjectModalProps> = ({
                   </div>
                   <label className="label">
                     <span className="label-text-alt text-base-content/60">
-                      Type email addresses and press Enter, comma, or space to add
+                      {t.translations.ADD_EMAIL_ADDRESSES_HELPER_TEXT}
                     </span>
                   </label>
                 </div>
@@ -289,10 +289,10 @@ const AddUsersToProjectModal: React.FC<AddUsersToProjectModalProps> = ({
                   <div className="form-control">
                     <label className="label">
                       <span className="label-text font-semibold text-base">
-                        Selected Organization Users
+                        {t.translations.SELECTED_ORGANIZATION_USERS}
                       </span>
                       <span className="label-text-alt text-base-content/60">
-                        {selectedUsers.length} selected
+                        {selectedUsers.length} {t.translations.SELECTED}
                       </span>
                     </label>
                     <div className="border border-base-300 rounded-lg p-2 max-h-[200px] overflow-y-auto bg-base-100">
@@ -321,7 +321,7 @@ const AddUsersToProjectModal: React.FC<AddUsersToProjectModalProps> = ({
                 <div className="form-control">
                   <label className="label">
                     <span className="label-text font-medium">
-                      Role <span className="text-error">*</span>
+                      {t.translations.ROLE} <span className="text-error">*</span>
                     </span>
                   </label>
                   <div className="dropdown dropdown-bottom w-full">
@@ -337,8 +337,8 @@ const AddUsersToProjectModal: React.FC<AddUsersToProjectModalProps> = ({
                       >
                         {selectedRoleId
                           ? roles.find((r) => r.id === Number(selectedRoleId))
-                              ?.name || "Select role"
-                          : "Select role"}
+                              ?.name || `${t.translations.SELECT_ROLE}`
+                          : `${t.translations.SELECT_ROLE}`}
                       </span>
                     </div>
                     <ul
@@ -369,7 +369,7 @@ const AddUsersToProjectModal: React.FC<AddUsersToProjectModalProps> = ({
                   <div className="alert alert-error">
                     <div className="w-full">
                       <h4 className="font-semibold mb-2">
-                        {emailErrors.length} user(s) failed to add:
+                        {emailErrors.length} {t.translations.USERS_FAILED_TO_ADD}:
                       </h4>
                       <ul className="text-sm space-y-1">
                         {emailErrors.map((err, idx) => (
@@ -387,10 +387,10 @@ const AddUsersToProjectModal: React.FC<AddUsersToProjectModalProps> = ({
               <div className="form-control">
                 <label className="label">
                   <span className="label-text font-semibold text-base">
-                    Select Organization Users
+                    {t.translations.SELECT_ORGANIZATION_USERS}
                   </span>
                   <span className="label-text-alt text-base-content/60">
-                    {usersNotInProject.length} available
+                    {usersNotInProject.length} {t.translations.AVAILABLE}
                   </span>
                 </label>
 
@@ -399,7 +399,7 @@ const AddUsersToProjectModal: React.FC<AddUsersToProjectModalProps> = ({
                   <MagnifyingGlassIcon className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-base-content/60" />
                   <input
                     type="text"
-                    placeholder="Search by name or email..."
+                    placeholder={`${t.translations.SEARCH_BY_NAME_OR_EMAIL}...`}
                     className="input input-bordered w-full pl-10"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
@@ -414,8 +414,8 @@ const AddUsersToProjectModal: React.FC<AddUsersToProjectModalProps> = ({
                       {searchQuery
                         ? "No users match your search"
                         : usersNotInProject.length === 0
-                        ? "All organization users are already in this project"
-                        : "No available users"}
+                        ? `${t.translations.ALL_ORG_USERS_ALREADY_IN_PROJECT}`
+                        : `${t.translations.NO_AVAILABLE_USERS}`}
                     </div>
                   ) : (
                     <ul className="space-y-2">
@@ -474,13 +474,13 @@ const AddUsersToProjectModal: React.FC<AddUsersToProjectModalProps> = ({
                 {isProcessing ? (
                   <>
                     <span className="loading loading-spinner loading-sm" />
-                    Processing...
+                    {t.translations.PROCESSING}
                   </>
                 ) : (
                   <>
                     {totalSelectedCount > 0
-                      ? `Add ${totalSelectedCount} ${totalSelectedCount === 1 ? "person" : "people"}`
-                      : "Add people"}
+                      ? `${t.translations.ADD} ${totalSelectedCount} ${totalSelectedCount === 1 ? `${t.translations.PERSON}` : `${t.translations.PEOPLE}`}`
+                      : `${t.translations.ADD_PEOPLE}`}
                   </>
                 )}
               </button>

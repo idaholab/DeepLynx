@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { XMarkIcon, EnvelopeIcon, ExclamationCircleIcon } from "@heroicons/react/24/outline";
-
+import { useLanguage } from "@/app/contexts/Language";
 /* -------------------------------------------------------------------------- */
 /*                     Invite Users to Organization Modal                     */
 /* -------------------------------------------------------------------------- */
@@ -31,6 +31,7 @@ const InviteUserModal: React.FC<InviteUserModalProps> = ({
   const [emails, setEmails] = useState<string[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [emailErrors, setEmailErrors] = useState<EmailError[]>([]);
+  const { t } = useLanguage();
 
   // Reset state when modal opens
   useEffect(() => {
@@ -169,7 +170,7 @@ const InviteUserModal: React.FC<InviteUserModalProps> = ({
       <div className="modal-box max-w-2xl overflow-visible">
         {/* Header */}
         <div className="flex justify-between items-center mb-6">
-          <h3 className="font-bold text-2xl">Invite people</h3>
+          <h3 className="font-bold text-2xl">{t.translations.INVITE_PEOPLE}</h3>
           <button
             className="btn btn-sm btn-circle btn-ghost"
             onClick={handleClose}
@@ -191,7 +192,7 @@ const InviteUserModal: React.FC<InviteUserModalProps> = ({
               <div className="form-control">
                 <label className="label">
                   <span className="label-text font-semibold text-base">
-                    Email addresses <span className="text-error">*</span>
+                    {t.translations.EMAIL_ADDRESSES} <span className="text-error">*</span>
                   </span>
                 </label>
 
@@ -240,7 +241,7 @@ const InviteUserModal: React.FC<InviteUserModalProps> = ({
                     <input
                       type="text"
                       className="flex-1 min-w-[220px] outline-none bg-transparent p-2"
-                      placeholder={emails.length === 0 ? "Enter email addresses..." : ""}
+                      placeholder={emails.length === 0 ? `${t.translations.ENTER_EMAIL_ADDRESSES}` : ""}
                       value={emailInput}
                       onChange={(e) => setEmailInput(e.target.value)}
                       onKeyDown={handleEmailInputKeyDown}
@@ -254,7 +255,7 @@ const InviteUserModal: React.FC<InviteUserModalProps> = ({
 
                 <label className="label">
                   <span className="label-text-alt text-base-content/60">
-                    Type email addresses and press Enter, comma, or space to add
+                    {t.translations.ADD_EMAIL_ADDRESSES_HELPER_TEXT}
                   </span>
                 </label>
 
@@ -262,7 +263,7 @@ const InviteUserModal: React.FC<InviteUserModalProps> = ({
                 {normalize(emailInput) !== "" && !isValidEmail(emailInput) && (
                   <div className="mt-2 text-sm text-error flex items-center gap-2">
                     <ExclamationCircleIcon className="w-5 h-5" />
-                    <span>That doesn’t look like a valid email address.</span>
+                    <span>{t.translations.INVALID_EMAIL_ERROR}.</span>
                   </div>
                 )}
               </div>
@@ -272,7 +273,7 @@ const InviteUserModal: React.FC<InviteUserModalProps> = ({
                 <div className="alert alert-error">
                   <div className="w-full">
                     <h4 className="font-semibold mb-2">
-                      {emailErrors.length} invitation(s) failed:
+                      {emailErrors.length} {t.translations.INVITATIONS_FAILED}:
                     </h4>
                     <ul className="text-sm space-y-1">
                       {emailErrors.map((err, idx) => (
@@ -290,8 +291,8 @@ const InviteUserModal: React.FC<InviteUserModalProps> = ({
                 <div className="alert alert-info">
                   <EnvelopeIcon className="w-6 h-6" />
                   <div>
-                    <h4 className="font-semibold">Email invitations</h4>
-                    <p className="text-sm">Invitations will be sent to each address you add.</p>
+                    <h4 className="font-semibold">{t.translations.INVITATIONS_FAILED}</h4>
+                    <p className="text-sm">{t.translations.INVITATIONS_SENT_INFO}.</p>
                   </div>
                 </div>
               )}
@@ -304,7 +305,7 @@ const InviteUserModal: React.FC<InviteUserModalProps> = ({
                 onClick={handleClose}
                 disabled={isProcessing || modalLoading}
               >
-                Cancel
+                {t.translations.CANCEL}
               </button>
 
               <button
@@ -315,12 +316,12 @@ const InviteUserModal: React.FC<InviteUserModalProps> = ({
                 {isProcessing ? (
                   <>
                     <span className="loading loading-spinner loading-sm" />
-                    Processing...
+                    {t.translations.PROCESSING}
                   </>
                 ) : (
                   <>
                     <EnvelopeIcon className="w-5 h-5" />
-                    {hasErrors ? "Retry failed invitations" : "Send invitations"}
+                    {hasErrors ? "Retry failed invitations" : `${t.translations.SEND_INVITATIONS}`}
                     {emails.length > 0 && ` (${emails.length})`}
                   </>
                 )}
