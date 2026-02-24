@@ -47,7 +47,7 @@ const PropertyTable: React.FC<PropertyTableProps> = ({
   const projectId = projectIdParam ? Number(projectIdParam) : NaN;
   const recordId = recordIdParam ? Number(recordIdParam) : NaN;
   const canDownload = Number.isFinite(projectId) && Number.isFinite(recordId);
-  const { organization, hasLoaded } = useOrganizationSession();
+  const { organization } = useOrganizationSession();
 
   const handleEdit = (index: number, currentValue: string) => {
     setEditingIndex(index);
@@ -233,11 +233,10 @@ const PropertyTable: React.FC<PropertyTableProps> = ({
                     ? "Download file"
                     : "Missing projectId or recordId in URL"
                 }
-                className={`p-1 transition-colors cursor-pointer ${
-                  canDownload
+                className={`p-1 transition-colors cursor-pointer ${canDownload
                     ? "hover:text-primary"
                     : "opacity-50 cursor-not-allowed"
-                }`}
+                  }`}
               >
                 <ArrowDownTrayIcon className="w-8 h-8" />
               </button>

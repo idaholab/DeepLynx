@@ -37,7 +37,7 @@ const TagButton: React.FC<TagButtonProps> = ({
   const longestNameRef = useRef<HTMLSpanElement>(null);
   const [isTagModalOpen, setIsTagModalOpen] = useState(false);
   const { t } = useLanguage();
-  const { organization, hasLoaded } = useOrganizationSession();
+  const { organization } = useOrganizationSession();
 
   useEffect(() => {
     setTempSelectedIds(selectedIds);
