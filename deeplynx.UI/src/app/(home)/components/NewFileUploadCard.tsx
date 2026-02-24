@@ -25,7 +25,7 @@ export default function NewFileUploadCard({
   const [updateAction, setUpdateAction] = useState<"" | "merge" | "overwrite">(
     ""
   );
-  const [description, setDescription] = useState("");
+  const [description] = useState("");
   const [isTimeSeries, setIsTimeSeries] = useState(false);
   const fileBaseName = (filename: string) => filename.replace(/\.[^/.]+$/, "");
   const [name, setName] = useState(fileBaseName(defaultName));
@@ -43,8 +43,8 @@ export default function NewFileUploadCard({
       isTimeSeries,
       ...(showUpdate &&
         updateAction && {
-          updateAction: updateAction as "merge" | "overwrite",
-        }),
+        updateAction: updateAction as "merge" | "overwrite",
+      }),
     };
     onMetadataChange(fileIndex, metadata);
   }, [

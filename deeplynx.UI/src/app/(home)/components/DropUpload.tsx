@@ -80,7 +80,6 @@ export default function DropUpload({
 
   return (
     <div
-      role="button"
       tabIndex={disabled ? -1 : 0}
       aria-disabled={disabled}
       onClick={triggerPicker}
@@ -90,13 +89,13 @@ export default function DropUpload({
       onDragEnter={handleDragOver}
       onDragLeave={handleDragLeave}
       className={[
-        "rounded-xl border p-6 transition",
+        "btn rounded-xl border p-6 transition",
         "flex flex-col items-center justify-center text-center gap-2",
         disabled
           ? "opacity-30 pointer-events-none"
           : isDragging
-          ? "border-secondary/70 bg-secondary/10"
-          : "border-base-300 hover:bg-base-200/40",
+            ? "border-secondary/70 bg-secondary/10"
+            : "border-base-300 hover:bg-base-200/40",
       ].join(" ")}
     >
       {/* Hidden input that the container triggers */}

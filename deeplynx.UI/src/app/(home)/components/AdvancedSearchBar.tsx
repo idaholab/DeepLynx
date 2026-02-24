@@ -73,11 +73,6 @@ const AdvancedSearchBar: React.FC<AdvancedSearchBarProps> = ({
   const optionControlled = selectedOption !== undefined && onOptionChange !== undefined;
   const currentOption = optionControlled ? selectedOption : internalOption;
 
-  const setOption = (opt: { name: string; value: string }) => {
-    if (optionControlled && onOptionChange) onOptionChange(opt.name);
-    else setInternalOption(opt.value);
-  };
-
   const inputRef = useRef<HTMLInputElement>(null);
 
   const handleClear = () => {
@@ -123,43 +118,6 @@ const AdvancedSearchBar: React.FC<AdvancedSearchBarProps> = ({
             </button>
           )}
         </div>
-        {/* TODO: Hook up drop down search select */}
-        {/* <div className="dropdown">
-          <button
-            type="button"
-            tabIndex={0}
-            className="btn btn-ghost border border-base-300 min-w-28"
-            aria-haspopup="menu"
-            aria-expanded="false"
-          >
-            {currentOption ?? t.translations?.OPTIONS ?? "Options"}
-            <svg className="w-4 h-4 ml-1" viewBox="0 0 20 20" fill="currentColor" aria-hidden>
-              <path d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.24a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z" />
-            </svg>
-          </button>
-          <ul tabIndex={0} className="dropdown-content z-10 menu p-2 shadow bg-base-100 rounded-box w-56">
-            {options.length === 0 && (
-              <li className="menu-title opacity-60 px-2 py-1">
-                {t.translations?.NO_OPTIONS ?? "No options"}
-              </li>
-            )}
-            {options.map((opt) => (
-              <li key={opt.name}>
-                <button
-                  type="button"
-                  className={`justify-between ${opt.name === currentOption ? "active" : ""}`}
-                  onClick={() => {
-                    setOption(opt);
-                    inputRef.current?.focus();
-                  }}
-                >
-                  <span>{opt.name}</span>
-                  {opt.name === currentOption && <span className="badge badge-primary">✓</span>}
-                </button>
-              </li>
-            ))}
-          </ul>
-        </div> */}
       </div>
 
       {/* Active filters UI below stays intact (if you still want it) */}

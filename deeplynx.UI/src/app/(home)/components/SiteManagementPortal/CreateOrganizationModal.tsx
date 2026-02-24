@@ -23,7 +23,6 @@ const CreateOrganization = ({
   const [toastType, setToastType] = useState<
     "success" | "error" | "info" | null
   >(null);
-  const router = useRouter();
 
   const handleSubmit = async () => {
     let data;

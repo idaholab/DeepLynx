@@ -29,7 +29,7 @@ const CreateProject = ({
     "success" | "error" | "info" | null
   >(null);
   const router = useRouter();
-  const { organization, hasLoaded } = useOrganizationSession();
+  const { organization } = useOrganizationSession();
 
   const handleSubmit = async () => {
     let data;

@@ -22,13 +22,11 @@ const EditSysUser = ({
   const [name, setName] = useState(userName);
   const [isSaving, setIsSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  // const [isAdmin, setIsAdmin] = useState(currentAdminStatus);
 
   useEffect(() => {
     if (isOpen) {
       setName(userName);
       setErrorMsg(null);
-      // setIsAdmin(currentAdminStatus);
     }
   }, [isOpen, userName]);
 
