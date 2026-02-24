@@ -1,15 +1,15 @@
 // src/app/lib/client_service/projects_services.client.ts
 "use client";
 
-import {
-  CreateProjectRequestDto,
+import { 
+  CreateProjectRequestDto, 
   UpdateProjectRequestDto,
-  InviteUserToProjectRequestDto
+  InviteUserToProjectRequestDto 
 } from "@/app/(home)/types/requestDTOs";
-import {
-  ProjectResponseDto,
-  ProjectStatResponseDto,
-  ProjectMemberResponseDto
+import { 
+  ProjectResponseDto, 
+  ProjectStatResponseDto, 
+  ProjectMemberResponseDto 
 } from "@/app/(home)/types/responseDTOs";
 import api from "./api";
 import { UploadProjectLogoRequest, UploadProjectLogoResponse, RemoveProjectLogoRequest, RemoveProjectLogoResponse, ProjectBannerSettings, SaveProjectBannerRequest, ProjectStorageSettings, AddStorageLocationRequest, RemoveStorageLocationRequest } from "@/app/(home)/types/project_setting_types";
@@ -223,6 +223,7 @@ export async function inviteUserToProject(
       {
         params: {
           userEmail: inviteData.userEmail,
+          ...(inviteData.userName && { userName: inviteData.userName }),
           ...(inviteData.roleId && { roleId: inviteData.roleId })
         }
       }

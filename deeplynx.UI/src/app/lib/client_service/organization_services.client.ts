@@ -1,7 +1,7 @@
-import {
-    CreateOrganizationRequestDto,
-    InviteUserToOrganizationRequestDto,
-    UpdateOrganizationRequestDto
+import { 
+    CreateOrganizationRequestDto, 
+    InviteUserToOrganizationRequestDto, 
+    UpdateOrganizationRequestDto 
 } from "@/app/(home)/types/requestDTOs";
 import { OrganizationResponseDto } from "@/app/(home)/types/responseDTOs";
 import api from "./api";
@@ -238,25 +238,25 @@ export const removeUserFromOrganization = async (
  * Saves the logo to /public/images/org-{organizationId}-logo.{ext}
  */
 export const uploadOrganizationLogo = async (
-    request: UploadLogoRequest
+  request: UploadLogoRequest
 ): Promise<UploadLogoResponse> => {
-    const formData = new FormData();
-    formData.append("file", request.file);
+  const formData = new FormData();
+  formData.append("file", request.file);
 
-    const response = await fetch(
-        `/api/organization/${request.organizationId}/logo`,
-        {
-            method: "POST",
-            body: formData,
-        }
-    );
-
-    if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || "Failed to upload logo");
+  const response = await fetch(
+    `/api/organization/${request.organizationId}/logo`,
+    {
+      method: "POST",
+      body: formData,
     }
+  );
 
-    return response.json();
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message || "Failed to upload logo");
+  }
+
+  return response.json();
 };
 
 /**
@@ -264,21 +264,21 @@ export const uploadOrganizationLogo = async (
  * Deletes the logo file from /public/images
  */
 export const removeOrganizationLogo = async (
-    request: RemoveLogoRequest
+  request: RemoveLogoRequest
 ): Promise<RemoveLogoResponse> => {
-    const response = await fetch(
-        `/api/organization/${request.organizationId}/logo`,
-        {
-            method: "DELETE",
-        }
-    );
-
-    if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || "Failed to remove logo");
+  const response = await fetch(
+    `/api/organization/${request.organizationId}/logo`,
+    {
+      method: "DELETE",
     }
+  );
 
-    return response.json();
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message || "Failed to remove logo");
+  }
+
+  return response.json();
 };
 
 /**
@@ -286,23 +286,23 @@ export const removeOrganizationLogo = async (
  * Returns the logo URL if the file exists, null otherwise
  */
 export const getOrganizationLogoUrl = async (
-    organizationId: number
+  organizationId: number
 ): Promise<string | null> => {
-    try {
-        const response = await fetch(`/api/organization/${organizationId}/logo`, {
-            method: "GET",
-        });
+  try {
+    const response = await fetch(`/api/organization/${organizationId}/logo`, {
+      method: "GET",
+    });
 
-        if (!response.ok) {
-            return null;
-        }
-
-        const data = await response.json();
-        return data.exists ? data.logoUrl : null;
-    } catch (error) {
-        console.error("Error getting logo URL:", error);
-        return null;
+    if (!response.ok) {
+      return null;
     }
+
+    const data = await response.json();
+    return data.exists ? data.logoUrl : null;
+  } catch (error) {
+    console.error("Error getting logo URL:", error);
+    return null;
+  }
 };
 
 /**
@@ -310,23 +310,23 @@ export const getOrganizationLogoUrl = async (
  * Returns true if a logo file exists for the organization
  */
 export const checkLogoExists = async (
-    organizationId: number
+  organizationId: number
 ): Promise<boolean> => {
-    try {
-        const logoUrl = await getOrganizationLogoUrl(organizationId);
-        return logoUrl !== null;
-    } catch (error) {
-        console.error("Error checking logo existence:", error);
-        return false;
-    }
+  try {
+    const logoUrl = await getOrganizationLogoUrl(organizationId);
+    return logoUrl !== null;
+  } catch (error) {
+    console.error("Error checking logo existence:", error);
+    return false;
+  }
 }
 
-/*
-* Invite a user to an organization
-* @param organizationId - The ID of the organization
-* @param inviteData - The invite request data (userEmail, optional userName)
-* @returns Promise<void>
-*/
+  /*
+ * Invite a user to an organization
+ * @param organizationId - The ID of the organization
+ * @param inviteData - The invite request data (userEmail, optional userName)
+ * @returns Promise<void>
+ */
 export const inviteUserToOrganization = async (
     organizationId: number,
     inviteData: InviteUserToOrganizationRequestDto
@@ -337,7 +337,8 @@ export const inviteUserToOrganization = async (
             null,
             {
                 params: {
-                    userEmail: inviteData.userEmail
+                    userEmail: inviteData.userEmail,
+                    ...(inviteData.userName && { userName: inviteData.userName })
                 }
             }
         );
