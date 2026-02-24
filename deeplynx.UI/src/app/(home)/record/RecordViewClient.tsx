@@ -45,6 +45,7 @@ import RelatedRecordsCardSkeleton from "./skeletons/RelatedRecordsSkeleton";
 import { getAllSensitivityLabelsProject } from "@/app/lib/client_service/sensitivity_labels_services.client";
 import AddEdgeModal from "./components/AddEdgeModal";
 import ClassSelectorModal from "./components/ClassSelectorModal";
+import InsightChatMock from "./components/InsightChatMock";
 import {
   RelatedRecordViewModel,
   useRecordRelationships,
@@ -68,9 +69,7 @@ function parseMaybeJsonArray<T>(value?: string | T[] | null): T[] {
 }
 
 function mapSelectedIds(items: MinimalSelectionItem[]): string[] {
-  return items
-    .filter((item) => item.id != null)
-    .map((item) => String(item.id));
+  return items.filter((item) => item.id != null).map((item) => String(item.id));
 }
 
 function parseNestedProperties(obj: JSON): PropertyRow[] {
@@ -355,10 +354,14 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
           true,
         );
         setRecord(data);
-        const historicalTags =
-          parseMaybeJsonArray<{ id: number | null; name: string }>(data.tags);
-        const historicalLabels =
-          parseMaybeJsonArray<{ id: number | null; name: string }>(data.labels);
+        const historicalTags = parseMaybeJsonArray<{
+          id: number | null;
+          name: string;
+        }>(data.tags);
+        const historicalLabels = parseMaybeJsonArray<{
+          id: number | null;
+          name: string;
+        }>(data.labels);
         setSelectedIds(mapSelectedIds(historicalTags));
         setSelectedLabelIds(mapSelectedIds(historicalLabels));
 
@@ -632,6 +635,14 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
 
           {/* Right Column - Tags & Relations */}
           <div className="flex-1 space-y-4">
+            {/* Insight Chat */}
+            <InsightChatMock
+              recordId={record.id}
+              recordName={record.name}
+              recordDescription={record.description}
+              recordClassName={recordClass?.name}
+              dataSourceName={record.dataSourceName}
+            />
             {/* Tags Card */}
             <RecordTagsPanel
               tags={tags}
