@@ -368,7 +368,6 @@ public class ProjectController : ControllerBase
     /// <param name="organizationId"></param>
     /// <param name="projectId"></param>
     /// <param name="userEmail"></param>
-    /// <param name="userName"></param>
     /// <param name="roleId"></param>
     /// <returns></returns>
     [HttpPost("{projectId:long}/invite", Name = "api_invite_user_to_project")]
