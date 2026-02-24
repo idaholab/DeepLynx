@@ -10,10 +10,12 @@ import {
   addMemberToProject,
   removeMemberFromProject,
   updateProjectMemberRole,
-  inviteUserToProject,
+
   getProjectMembers,
 } from "@/app/lib/client_service/projects_services.client";
-import { InviteUserToProjectRequestDto } from "@/app/(home)/types/requestDTOs";
+
+import { inviteUserToOrganization } from "@/app/lib/client_service/organization_services.client"; "@/app/lib/client_service/organizations_services.client";
+import { InviteUserToProjectRequestDto, InviteUserToOrganizationRequestDto } from "@/app/(home)/types/requestDTOs";
 import {
   ProjectMemberResponseDto,
   UserResponseDto,
@@ -138,78 +140,61 @@ const ProjectUsersTable = ({ members, roles, project }: Props) => {
   /*                     Add Users Modal: Open & Handler                      */
   /* ------------------------------------------------------------------------ */
 
-  const handleOpenAddUsersModal = async () => {
+ const handleOpenAddUsersModal = async () => {
+  if (!organizationId) {
+    toast.error(t.translations.NO_ORG_SELECTED);
+    return;
+  }
+
+  setShowAddUserModal(true);
+  setUserModalLoading(true);
+
+  try {
+    const users = await getAllUsers(organizationId);
+    setAvailableUsers(users);
+  } catch (error) {
+    console.error("Failed to load users:", error);
+    toast.error(t.translations.UNABLE_TO_LOAD_USERS);
+  } finally {
+    setUserModalLoading(false);
+  }
+};
+
+  const handleAddInviteUser = async (emailOrUserId: string | number, roleId?: number) => {
     if (!organizationId) {
-      toast.error(t.translations.NO_ORG_SELECTED);
-      return;
+      throw new Error(t.translations.MISSING_ORG_ID);
     }
 
-    setShowAddUserModal(true);
-    setUserModalLoading(true);
+    // If it's a string (email), invite external user
+    if (typeof emailOrUserId === 'string') {
+      const inviteData: InviteUserToOrganizationRequestDto = {
+        userEmail: emailOrUserId,
+        userName: emailOrUserId.split("@")[0],
+      };
 
-    try {
-      const users = await getAllUsers(organizationId);
-      setAvailableUsers(users);
-    } catch (error) {
-      console.error("Failed to load users:", error);
-      toast.error(t.translations.UNABLE_TO_LOAD_USERS_OR_GROUPS);
-    } finally {
-      setUserModalLoading(false);
+      await inviteUserToOrganization(organizationId, inviteData);
+    } 
+    // If it's a number (userId), add existing org user to project
+    else if (typeof emailOrUserId === 'number' && roleId && projectId) {
+      await addMemberToProject(organizationId, projectId, {
+        roleId,
+        userId: emailOrUserId,
+      });
     }
-  };
-
-  const handleInviteExternalUser = async (email: string, roleId: number) => {
-    if (!organizationId || !projectId) {
-      throw new Error(t.translations.MISSING_ORG_OR_PROJECT);
-    }
-
-    const inviteData: InviteUserToProjectRequestDto = {
-      userEmail: email,
-      userName: email.split("@")[0],
-      roleId: roleId,
-    };
-
-    await inviteUserToProject(organizationId, projectId, inviteData);
 
     // Refresh the members list
     try {
-      const updatedMembers = await getProjectMembers(organizationId, projectId);
-      setTableData(buildTableData(updatedMembers));
-    } catch (refreshError) {
-      console.error("Failed to refresh members list:", refreshError);
-    }
-  };
-
-  const handleAddOrgUser = async (userId: number, roleId: number) => {
-    if (!organizationId || !projectId) {
-      throw new Error(t.translations.MISSING_ORG_OR_PROJECT);
-    }
-
-    await addMemberToProject(organizationId, projectId, {
-      roleId,
-      userId,
-    });
-
-    const user = availableUsers.find((u) => u.id === userId);
-    if (user?.email) {
-      try {
-        await sendEmail(
-          user.email,
-          t.translations.YOUVE_BEEN_ADDED_TO_A_PROJECT_IN_DEEPLYNX_NEXUS,
-        );
-      } catch (emailError) {
-        console.error("Failed to send notification email:", emailError);
+      if (projectId) {
+        const updatedMembers = await getProjectMembers(organizationId, projectId);
+        setTableData(buildTableData(updatedMembers));
+      } else {
+        const updatedMembers = await getAllUsers(organizationId);
+        setTableData(buildTableData(updatedMembers));
       }
-    }
-
-    // Refresh the members list
-    try {
-      const updatedMembers = await getProjectMembers(organizationId, projectId);
-      setTableData(buildTableData(updatedMembers));
     } catch (refreshError) {
       console.error("Failed to refresh members list:", refreshError);
     }
-  };
+};
 
   /* ------------------------------------------------------------------------ */
   /*                     Add Group Modal: Open & Handler                      */
@@ -490,8 +475,7 @@ const ProjectUsersTable = ({ members, roles, project }: Props) => {
             projectMembers={members}
             modalLoading={userModalLoading}
             onClose={() => setShowAddUserModal(false)}
-            onInviteExternalUser={handleInviteExternalUser}
-            onAddOrgUser={handleAddOrgUser}
+            onAddInviteUser={handleAddInviteUser}
           />
 
           {/* Add Group Modal */}

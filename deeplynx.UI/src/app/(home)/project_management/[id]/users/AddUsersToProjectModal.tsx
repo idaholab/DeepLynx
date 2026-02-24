@@ -18,8 +18,7 @@ interface AddUsersToProjectModalProps {
   projectMembers: ProjectMemberResponseDto[];
   modalLoading?: boolean;
   onClose: () => void;
-  onInviteExternalUser: (email: string, roleId: number) => Promise<void>;
-  onAddOrgUser: (userId: number, roleId: number) => Promise<void>;
+  onAddInviteUser: (emailOrUserId: string | number, roleId?: number) => Promise<void>;
 }
 
 interface EmailError {
@@ -34,8 +33,7 @@ const AddUsersToProjectModal: React.FC<AddUsersToProjectModalProps> = ({
   projectMembers,
   modalLoading = false,
   onClose,
-  onInviteExternalUser,
-  onAddOrgUser,
+  onAddInviteUser,
 }) => {
   const { t } = useLanguage();
   
@@ -134,10 +132,10 @@ const AddUsersToProjectModal: React.FC<AddUsersToProjectModalProps> = ({
 
     const roleId = Number(selectedRoleId);
 
-    // Process org users first
+    // Process org users first (pass userId and roleId)
     for (const userId of selectedOrgUserIds) {
       try {
-        await onAddOrgUser(userId, roleId);
+        await onAddInviteUser(userId, roleId);
       } catch (error: any) {
         const user = usersNotInProject.find((u) => u.id === userId);
         errors.push({
@@ -147,12 +145,12 @@ const AddUsersToProjectModal: React.FC<AddUsersToProjectModalProps> = ({
       }
     }
 
-    // Process external emails
+    // Process external emails (pass email string only, no roleId for organization invites)
     const failedEmails: string[] = [];
 
     for (const email of externalEmails) {
       try {
-        await onInviteExternalUser(email, roleId);
+        await onAddInviteUser(email);
       } catch (error: any) {
         failedEmails.push(email);
         errors.push({
