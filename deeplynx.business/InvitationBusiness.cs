@@ -59,9 +59,9 @@ public class InvitationBusiness : IInvitationBusiness
                 throw new ArgumentException(
                     "Roles do not exist for organization users, please specify a project the role will apply to.");
 
-            if (userEmail == null || userId != null || groupId != null)
+            if (groupId != null)
                 throw new ArgumentException(
-                    "Only userEmail is allowed for organization invitations. userId and groupId are not permitted.");
+                    "Only userEmail or userId is allowed for organization invitations. GroupId is not permitted.");
         }
 
         // Handle existing user by userId - no transaction, best-effort email
