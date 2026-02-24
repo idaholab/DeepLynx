@@ -292,7 +292,7 @@ const AddUsersToProjectModal: React.FC<AddUsersToProjectModalProps> = ({
                         {t.translations.SELECTED_ORGANIZATION_USERS}
                       </span>
                       <span className="label-text-alt text-base-content/60">
-                        {selectedUsers.length} {t.translations.SELECTED}
+                        ({selectedUsers.length} {t.translations.SELECTED})
                       </span>
                     </label>
                     <div className="border border-base-300 rounded-lg p-2 max-h-[200px] overflow-y-auto bg-base-100">
@@ -390,7 +390,7 @@ const AddUsersToProjectModal: React.FC<AddUsersToProjectModalProps> = ({
                     {t.translations.SELECT_ORGANIZATION_USERS}
                   </span>
                   <span className="label-text-alt text-base-content/60">
-                    {usersNotInProject.length} {t.translations.AVAILABLE}
+                    ({usersNotInProject.length} {t.translations.AVAILABLE})
                   </span>
                 </label>
 
