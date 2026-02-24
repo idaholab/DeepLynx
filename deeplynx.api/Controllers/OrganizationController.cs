@@ -306,11 +306,12 @@ public class OrganizationController : ControllerBase
     [Auth("update", "organization")]
     public async Task<ActionResult> InviteUserToOrganization(
         long organizationId,
-        [FromQuery] string userEmail)
+        [FromQuery] string userEmail,
+        [FromQuery] long? userId)
     {
         try
         {
-            await _invitationBusiness.InviteAndAddUserToHierarchy(organizationId, null, null, null, null, userEmail);
+            await _invitationBusiness.InviteAndAddUserToHierarchy(organizationId, null, null, null, userId, userEmail);
             return Ok(new
             {
                 message = $"Invited and added inactive user with email {userEmail} to organization {organizationId}"

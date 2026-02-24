@@ -401,7 +401,7 @@ public class InvitationBusinessTests : IntegrationTestBase
 
         // Act
         var result = await _invitationBusiness.InviteAndAddUserToHierarchy(
-            oid2, null, null, null, null, "existing.user2@test.com");
+            oid2, null, null, null, uid2, null);
 
         // Assert
         Assert.True(result);
@@ -819,7 +819,7 @@ public class InvitationBusinessTests : IntegrationTestBase
             _invitationBusiness.InviteAndAddUserToHierarchy(
                 oid, null, gid, null, null, null));
 
-        Assert.Contains("Only userEmail is allowed for organization invitations", exception.Message);
+        Assert.Contains("Only userEmail or userId is allowed", exception.Message);
     }
 
     #endregion
