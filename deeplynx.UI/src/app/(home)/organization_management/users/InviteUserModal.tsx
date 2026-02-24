@@ -291,7 +291,7 @@ const InviteUserModal: React.FC<InviteUserModalProps> = ({
                 <div className="alert alert-info">
                   <EnvelopeIcon className="w-6 h-6" />
                   <div>
-                    <h4 className="font-semibold">{t.translations.INVITATIONS_FAILED}</h4>
+                    <h4 className="font-semibold">{t.translations.EMAIL_INVITATIONS}</h4>
                     <p className="text-sm">{t.translations.INVITATIONS_SENT_INFO}.</p>
                   </div>
                 </div>
