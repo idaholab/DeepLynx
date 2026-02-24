@@ -4,41 +4,43 @@ title: Organization
 
 # The Final Content Organization
 
-A special file is used to esnure the desired final order of documentation.
+A special file is used to ensure the desired final order of documentation.
 
-## _meta.ts
+## \_meta.ts
 
 Every subdirectory in `content` as well as the main directory itself will include a `_meta.ts` file to maintain documentation section order.
 
 > [!IMPORTANT]
 >
-> The content level `_meta.ts` found in `src/content` is the top level organizer, responsible for altering the main sidebar order. 
+> The content level `_meta.ts` found in `src/content` is the top level organizer, responsible for altering the main sidebar order.
 
 You may alter the order, give documentation sections titles different from their directory name, [and much more](https://nextra.site/docs/file-conventions/meta-file).
 
 ```js copy filename="src/content/_meta.ts"
 export default {
-  overview: {                 // Folder name
-    title: "How it works"     // Sidebar appearance
+  overview: {
+    // Folder name
+    title: "How it works", // Sidebar appearance
   },
-  users: '',
-  developers: '',
-  documentation: '',
-  about: '',
+  users: "",
+  developers: "",
+  documentation: "",
+  about: "",
   contact: {
-    title: 'Contact us',
-    type: 'page',
-    href: 'https://github.com/idaholab/Deep-Lynx'
-  }
-}
+    title: "Contact us",
+    type: "page",
+    href: "https://github.com/idaholab/Deep-Lynx",
+  },
+};
 ```
+
 > [!NOTE]
 >
-> *contact* \{...\} in this example will instead alter the navbar contact section via the 'page' type. These are features provided by Nextra. 
+> _contact_ \{...\} in this example will instead alter the navbar contact section via the 'page' type. These are features provided by Nextra.
 
 > [!TIP]
 >
-> If no order is given, the app will default to alphabetical order. 
+> If no order is given, the app will default to alphabetical order.
 
 ### Subdirectory `_meta.ts` files
 

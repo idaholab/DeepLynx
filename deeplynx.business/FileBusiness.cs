@@ -182,6 +182,30 @@ public class FileBusiness
     }
 
     /// <summary>
+    ///     Generates a Download URL
+    /// </summary>
+    /// <param name="currentUserId">ID of current user making the request</param>
+    /// <param name="organizationId">ID of the organization to which the project belongs</param>
+    /// <param name="projectId">ID of the project to which the file belongs</param>
+    /// <param name="recordId">ID of record that contains the info of the file to download</param>
+    public async Task<string> GenerateDownloadURL(long currentUserId, long organizationId, long projectId,
+        long recordId)
+    {
+        var record = await _recordBusiness.GetRecord(currentUserId, organizationId, projectId, recordId, true);
+
+        if (record.ObjectStorageId == null) throw new KeyNotFoundException("Record needs an object storage id");
+
+        var objectStorage = await GetObjectStorageWithConfig(organizationId, projectId, record.ObjectStorageId.Value);
+
+        var configData = JsonConvert.DeserializeObject<ObjectStorageConfigDto>(objectStorage.Config);
+        if (configData == null)
+            throw new InvalidOperationException("Config data for object storage is null or invalid");
+
+        var fileBusiness = _factory.CreateFileBusiness(objectStorage.Type);
+        return await fileBusiness.GenerateDownloadUrl(record, configData);
+    }
+
+    /// <summary>
     ///     Deletes a file
     /// </summary>
     /// <param name="currentUserId">ID of the User executing this method.</param>
