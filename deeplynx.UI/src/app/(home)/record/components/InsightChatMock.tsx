@@ -1,18 +1,25 @@
 "use client";
 
-import {
-  PaperAirplaneIcon,
-  SparklesIcon,
-} from "@heroicons/react/24/outline";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   fetchInsightIngestionStatus,
   queueInsightUpload,
   streamInsightQuery,
 } from "@/app/lib/client_service/insight_services.client";
+import {
+  ArrowsPointingInIcon,
+  ArrowsPointingOutIcon,
+  ChevronDownIcon,
+  ChevronUpIcon,
+} from "@heroicons/react/24/outline";
 
 type InsightRole = "assistant" | "user";
-type IngestionState = "not_queued" | "queued" | "processing" | "ready" | "error";
+type IngestionState =
+  | "not_queued"
+  | "queued"
+  | "processing"
+  | "ready"
+  | "error";
 
 interface InsightMessage {
   id: number;
@@ -56,18 +63,17 @@ const InsightChatMock: React.FC<InsightChatMockProps> = ({
   recordDescription,
   dataSourceName,
 }) => {
-  const safeRecordName = recordName?.trim().length
-    ? recordName
-    : "this record";
+  const safeRecordName = recordName?.trim().length ? recordName : "this record";
 
   const messageIdRef = useRef(1);
   const scrollAnchorRef = useRef<HTMLDivElement>(null);
   const [draft, setDraft] = useState("");
   const [isResponding, setIsResponding] = useState(false);
   const [isQueueingUpload, setIsQueueingUpload] = useState(false);
-  const [ingestionState, setIngestionState] = useState<IngestionState>(
-    "not_queued",
-  );
+  const [isWidgetCollapsed, setIsWidgetCollapsed] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [ingestionState, setIngestionState] =
+    useState<IngestionState>("not_queued");
   const [ingestionStatus, setIngestionStatus] = useState<string>(
     "Not queued for Insight yet.",
   );
@@ -96,6 +102,8 @@ const InsightChatMock: React.FC<InsightChatMockProps> = ({
     setDraft("");
     setIsResponding(false);
     setIsQueueingUpload(false);
+    setIsWidgetCollapsed(false);
+    setIsExpanded(false);
     setIngestionState("not_queued");
     setIngestionStatus("Not queued for Insight yet.");
   }, [safeRecordName, recordId]);
@@ -195,7 +203,9 @@ const InsightChatMock: React.FC<InsightChatMockProps> = ({
         setIngestionStatus("Queued. Processing in Insight...");
       } else {
         setIngestionState("not_queued");
-        setIngestionStatus("Not indexed yet. Queue the record for Insight indexing.");
+        setIngestionStatus(
+          "Not indexed yet. Queue the record for Insight indexing.",
+        );
       }
     } catch (error) {
       const message =
@@ -215,13 +225,16 @@ const InsightChatMock: React.FC<InsightChatMockProps> = ({
     );
   }, []);
 
-  const replaceMessageContent = useCallback((messageId: number, content: string) => {
-    setMessages((prev) =>
-      prev.map((message) =>
-        message.id === messageId ? { ...message, content } : message,
-      ),
-    );
-  }, []);
+  const replaceMessageContent = useCallback(
+    (messageId: number, content: string) => {
+      setMessages((prev) =>
+        prev.map((message) =>
+          message.id === messageId ? { ...message, content } : message,
+        ),
+      );
+    },
+    [],
+  );
 
   const handleSend = useCallback(
     async (input: string) => {
@@ -309,9 +322,7 @@ const InsightChatMock: React.FC<InsightChatMockProps> = ({
 
       if (first.status === "queued") {
         setIngestionState("queued");
-        setIngestionStatus(
-          "Queued successfully. Checking indexing status...",
-        );
+        setIngestionStatus("Queued successfully. Checking indexing status...");
       } else {
         setIngestionState("error");
         setIngestionStatus(`Upload failed: ${first.error || "Unknown error"}`);
@@ -349,117 +360,115 @@ const InsightChatMock: React.FC<InsightChatMockProps> = ({
     <div className="card bg-base-100 shadow-lg">
       <div className="card-body p-4">
         <div className="flex items-center justify-between gap-3">
+          <h3 className="card-title text-base-content">Insight</h3>
           <div className="flex items-center gap-2">
-            <SparklesIcon className="size-5 text-primary" />
-            <h3 className="font-semibold text-base-content">Insight</h3>
-          </div>
-          <span className="badge badge-outline badge-success badge-sm">
-            Live
-          </span>
-        </div>
-
-        <p className="text-xs text-base-content/60">
-          Context: {recordClassName || "No class"} · {dataSourceName || "No source"} ·{" "}
-          {recordDescription?.trim().length ? "Description present" : "No description"}
-        </p>
-
-        <div className="flex items-center gap-2">
-          <span className={`badge badge-sm ${ingestionBadgeClass}`}>
-            {ingestionBadgeLabel}
-          </span>
-          <button
-            type="button"
-            className="btn btn-xs btn-secondary"
-            onClick={() => {
-              void handleQueueUpload();
-            }}
-            disabled={isQueueingUpload || isResponding}
-          >
-            {isQueueingUpload ? "Queueing..." : "Queue Record For Insight"}
-          </button>
-          <button
-            type="button"
-            className="btn btn-xs btn-ghost"
-            onClick={() => {
-              void handleCheckStatus();
-            }}
-            disabled={isQueueingUpload || isResponding || !recordId}
-          >
-            Check Status
-          </button>
-          <span className="text-xs text-base-content/60">{ingestionStatus}</span>
-        </div>
-
-        <div className="rounded-box border border-base-300 bg-base-100 mt-2">
-          <div className="h-72 overflow-y-auto px-3 py-3 space-y-3">
-            {messages.map((message) => (
-              <div
-                key={message.id}
-                className={`chat ${message.role === "user" ? "chat-end" : "chat-start"}`}
+            {!isWidgetCollapsed && (
+              <button
+                type="button"
+                className="btn btn-xs btn-ghost"
+                onClick={() => setIsExpanded((prev) => !prev)}
               >
-                <div className="chat-header text-xs text-base-content/60 mb-1">
-                  {message.role === "user" ? "You" : "Insight"}
-                  <time className="ml-2">{message.timestamp}</time>
-                </div>
-                <div
-                  className={`chat-bubble whitespace-pre-wrap ${
-                    message.role === "user"
-                      ? "chat-bubble-primary"
-                      : "chat-bubble-neutral"
-                  }`}
-                >
-                  {message.content || (
-                    <span className="loading loading-dots loading-sm" />
-                  )}
-                </div>
-              </div>
-            ))}
-            <div ref={scrollAnchorRef} />
+                {isExpanded ? (
+                  <ArrowsPointingInIcon className="size-6" />
+                ) : (
+                  <ArrowsPointingOutIcon className="size-6" />
+                )}
+              </button>
+            )}
+            <button
+              type="button"
+              className="btn btn-xs btn-ghost"
+              onClick={() => setIsWidgetCollapsed((prev) => !prev)}
+            >
+              {isWidgetCollapsed ? (
+                <ChevronDownIcon className="size-6" />
+              ) : (
+                <ChevronUpIcon className="size-6" />
+              )}
+            </button>
           </div>
         </div>
 
-        <div className="flex flex-wrap gap-2 mt-3">
-          {QUICK_PROMPTS.map((prompt) => (
-            <button
-              key={prompt}
-              type="button"
-              className="btn btn-xs btn-outline"
-              onClick={() => {
+        {!isWidgetCollapsed && (
+          <>
+            <p className="text-xs text-base-content/60">
+              Conversation will not be saved.
+            </p>
+
+            <div className="flex items-center gap-2">
+              <span className={`badge badge-sm ${ingestionBadgeClass}`}>
+                {ingestionBadgeLabel}
+              </span>
+              <button
+                type="button"
+                className="btn btn-xs btn-secondary"
+                onClick={() => {
+                  void handleQueueUpload();
+                }}
+                disabled={isQueueingUpload || isResponding}
+              >
+                {isQueueingUpload ? "Queueing..." : "Queue Record For Insight"}
+              </button>
+            </div>
+
+            <div className="rounded-box border border-base-300 bg-base-200 mt-2">
+              <div
+                className={`${isExpanded ? "h-[34rem]" : "h-72"} overflow-y-auto px-3 py-3 space-y-3`}
+              >
+                {messages.map((message) => (
+                  <div
+                    key={message.id}
+                    className={`chat ${message.role === "user" ? "chat-end" : "chat-start"}`}
+                  >
+                    <div className="chat-header text-xs text-base-content/60 mb-1">
+                      {message.role === "user" ? "You" : "Insight"}
+                      <time className="ml-2">{message.timestamp}</time>
+                    </div>
+                    <div
+                      className={`chat-bubble whitespace-pre-wrap ${
+                        message.role === "user"
+                          ? "chat-bubble-primary"
+                          : "bg-white text-black border border-base-300"
+                      }`}
+                    >
+                      {message.content || (
+                        <span className="loading loading-dots loading-sm" />
+                      )}
+                    </div>
+                  </div>
+                ))}
+                <div ref={scrollAnchorRef} />
+              </div>
+            </div>
+
+            <form
+              className="flex items-center gap-2 mt-2"
+              onSubmit={(e) => {
+                e.preventDefault();
+                const prompt = draft;
+                setDraft("");
                 void handleSend(prompt);
               }}
-              disabled={isResponding}
             >
-              {prompt}
-            </button>
-          ))}
-        </div>
-
-        <form
-          className="flex items-center gap-2 mt-2"
-          onSubmit={(e) => {
-            e.preventDefault();
-            const prompt = draft;
-            setDraft("");
-            void handleSend(prompt);
-          }}
-        >
-          <input
-            type="text"
-            className="input input-bordered w-full"
-            placeholder="Ask Insight about this record..."
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            disabled={isResponding}
-          />
-          <button
-            type="submit"
-            className="btn btn-primary btn-square"
-            disabled={!draft.trim() || isResponding}
-            aria-label="Send insight prompt"
-          >
-            <PaperAirplaneIcon className="size-4" />
-          </button>
-        </form>
+              <input
+                type="text"
+                className="input input-bordered w-full"
+                placeholder="Ask Insight about this record..."
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+                disabled={isResponding}
+              />
+              <button
+                type="submit"
+                className="btn btn-primary"
+                disabled={!draft.trim() || isResponding}
+                aria-label="Send insight prompt"
+              >
+                Send
+              </button>
+            </form>
+          </>
+        )}
       </div>
     </div>
   );
