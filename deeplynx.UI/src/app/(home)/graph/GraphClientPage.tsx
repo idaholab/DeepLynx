@@ -111,7 +111,7 @@ const MyGraph = ({
   // Reference to the layout for cleanup
   const layoutRef = useRef<unknown>(null);
 
-  const { organization, hasLoaded } = useOrganizationSession();
+  const { organization } = useOrganizationSession();
 
   // Add state to track if layout is settling
   const [isLayoutSettling, setIsLayoutSettling] = useState(true);
@@ -237,8 +237,6 @@ const MyGraph = ({
 
           // Check if both nodes exist before creating edge
           if (graph.hasNode(sourceId) && graph.hasNode(targetId)) {
-            // Use edgeId, or create a unique ID
-            const edgeId = link.edgeId ? String(link.edgeId) : `edge-${index}`;
 
             graph.addEdge(sourceId, targetId, {
               size: 2,
@@ -425,7 +423,7 @@ const MyGraph = ({
           });
 
           // Optional: Add click handler for nodes
-          sigma?.on("clickNode", ({ node }: { node: string }) => {});
+          sigma?.on("clickNode", ({ node }: { node: string }) => { });
         }
 
         onLoadingChange(false);

@@ -214,11 +214,6 @@ const AddRecordModal: React.FC<Props> = ({
       return;
     }
 
-    const tags = tagsText.trim() ? parseCommaList(tagsText) : undefined;
-    const sensitivity_labels = labelsText.trim()
-      ? parseCommaList(labelsText)
-      : undefined;
-
     const dto: CreateRecordRequestDto = {
       name,
       description,
@@ -426,33 +421,30 @@ const AddRecordModal: React.FC<Props> = ({
             <div className="flex border-b border-base-300 bg-base-200/60 rounded-t-lg">
               <button
                 type="button"
-                className={`flex-1 px-3 py-2 text-xs md:text-sm ${
-                  optionalTab === "ids"
+                className={`flex-1 px-3 py-2 text-xs md:text-sm ${optionalTab === "ids"
                     ? "bg-base-100 font-semibold border-b-2 border-primary"
                     : "text-base-content/70"
-                }`}
+                  }`}
                 onClick={() => setOptionalTab("ids")}
               >
                 IDs
               </button>
               <button
                 type="button"
-                className={`flex-1 px-3 py-2 text-xs md:text-sm ${
-                  optionalTab === "meta"
+                className={`flex-1 px-3 py-2 text-xs md:text-sm ${optionalTab === "meta"
                     ? "bg-base-100 font-semibold border-b-2 border-primary"
                     : "text-base-content/70"
-                }`}
+                  }`}
                 onClick={() => setOptionalTab("meta")}
               >
                 Metadata
               </button>
               <button
                 type="button"
-                className={`flex-1 px-3 py-2 text-xs md:text-sm ${
-                  optionalTab === "tags"
+                className={`flex-1 px-3 py-2 text-xs md:text-sm ${optionalTab === "tags"
                     ? "bg-base-100 font-semibold border-b-2 border-primary"
                     : "text-base-content/70"
-                }`}
+                  }`}
                 onClick={() => setOptionalTab("tags")}
               >
                 Tags &amp; Labels

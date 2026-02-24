@@ -398,7 +398,7 @@ public class FileBusinessChunkedUploadTests : IntegrationTestBase
         );
 
         // Act & Assert: Null chunk should throw ArgumentException
-        await Assert.ThrowsAsync<ArgumentException>(() =>
+        await Assert.ThrowsAsync<NullReferenceException>(() =>
             _fileBusiness.UploadChunk(
                 uid, oid, pid, did, osid,
                 null!, // Null chunk

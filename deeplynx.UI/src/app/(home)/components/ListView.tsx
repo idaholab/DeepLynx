@@ -85,14 +85,6 @@ const ListView: React.FC<ListViewProps> = ({
       return null;
     }
   };
-
-  const filteredRecords = !selectedProjects?.length
-    ? data
-    : data.filter(
-      (record) =>
-        record.projectId !== undefined &&
-        selectedProjects.includes(record.projectId)
-    );
   return (
     <div className="bg-base-100 px-10 w-full mx-auto text-info-content">
       <ul className="list">
@@ -106,7 +98,6 @@ const ListView: React.FC<ListViewProps> = ({
             record.className,
             activeSearchTerms
           );
-          // const time = getHighlightedCell(record.timeseries, activeSearchTerms);
           const date = getHighlightedCell(
             record.lastUpdatedAt,
             activeSearchTerms

@@ -4,7 +4,6 @@
 import { RecordTableRow } from "@/app/(home)/types/types";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-// import { getAllRecordsForMultipleProjects } from "@/app/lib/projects_services.client";
 import SearchBar from "@/app/(home)/components/SearchBar";
 import { useLanguage } from "@/app/contexts/Language";
 import {
@@ -97,14 +96,14 @@ export default function DataCatalogClient({
 
       const data = await getMultiProjectRecords(organization?.organizationId as number, idsNum, true);
       const mappedData: RecordTableRow[] = data.map((dto: HistoricalRecordResponseDto) => ({
-          ...dto,
-          fileType: '',
-          timeseries: undefined,
-          fileSize: undefined,
-          select: false,
-          associatedRecords: undefined,
-          archivedAt: dto.isArchived ? dto.lastUpdatedAt : null
-        }));
+        ...dto,
+        fileType: '',
+        timeseries: undefined,
+        fileSize: undefined,
+        select: false,
+        associatedRecords: undefined,
+        archivedAt: dto.isArchived ? dto.lastUpdatedAt : null
+      }));
       setTableData(mappedData);
       setViewMode("list");
     },
@@ -132,17 +131,17 @@ export default function DataCatalogClient({
         setIsSearching(true);
         const projects = projectIds.map(Number)
         const data = await fullTextSearch(organization?.organizationId as number, searchValue, projects);
-        
+
         if (data) {
           const mappedData: RecordTableRow[] = data.map((dto: HistoricalRecordResponseDto) => ({
-          ...dto,
-          fileType: '',
-          timeseries: undefined,
-          fileSize: undefined,
-          select: false,
-          associatedRecords: undefined,
-          archivedAt: dto.isArchived ? dto.lastUpdatedAt : null
-        }));
+            ...dto,
+            fileType: '',
+            timeseries: undefined,
+            fileSize: undefined,
+            select: false,
+            associatedRecords: undefined,
+            archivedAt: dto.isArchived ? dto.lastUpdatedAt : null
+          }));
           setQueriedRecords(mappedData);
           setTableData(mappedData);
           setSearchTerm("");
@@ -165,17 +164,6 @@ export default function DataCatalogClient({
       }
     },
     [activeFilters, nextFilterId, organization?.organizationId]
-  );
-
-  // Handle search from search bar
-  const handleSearch = useCallback(
-    async (value: string) => {
-      const trimmed = value.trim();
-      if (!trimmed || activeFilters.some((f) => f.term === trimmed)) return;
-
-      await performFullTextSearch(trimmed, selectedProjects);
-    },
-    [activeFilters, selectedProjects, performFullTextSearch]
   );
 
   // Handle submit from search bar

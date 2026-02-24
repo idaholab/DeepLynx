@@ -292,7 +292,7 @@ public class NotificationBusiness : INotificationBusiness
 
         var support = Environment.GetEnvironmentVariable("SUPPORT_EMAIL") ?? throw new InvalidOperationException("SUPPORT_EMAIL environment variable is not set");
 
-        var emailPassword = "";
+        var emailCred = "";
 
         var fromName = Environment.GetEnvironmentVariable("FROM_NAME");
 
@@ -378,7 +378,7 @@ public class NotificationBusiness : INotificationBusiness
         using var smtpClient = new SmtpClient(smtpServer, smtpPort);
         smtpClient.EnableSsl = enableSsl;
         smtpClient.UseDefaultCredentials = false;
-        smtpClient.Credentials = new NetworkCredential(fromEmail, emailPassword);
+        smtpClient.Credentials = new NetworkCredential(fromEmail, emailCred);
 
         // Send the email
         await smtpClient.SendMailAsync(mailMessage);

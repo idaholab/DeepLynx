@@ -68,6 +68,7 @@ public class FileBusiness
     {
         long realDataSourceId;
         if (file == null || file.Length == 0) throw new ArgumentException("File is required and cannot be empty.");
+        file = new SanitizedFormFile(file);
         if (dataSourceId.HasValue)
         {
             await ExistenceHelper.EnsureDataSourceExistsForProjectAsync(_context, dataSourceId.Value, projectId);
@@ -143,6 +144,7 @@ public class FileBusiness
     {
         var record = await _recordBusiness.GetRecord(organizationId, projectId, recordId, true);
         if (file == null || file.Length == 0) throw new ArgumentException("File is required and cannot be empty.");
+        file = new SanitizedFormFile(file);
 
         if (record.ObjectStorageId == null) throw new KeyNotFoundException("Record needs an object storage id");
 
@@ -235,7 +237,7 @@ public class FileBusiness
                                     throw new KeyNotFoundException("Default data source not found");
             realDataSourceId = defaultDataSource.Id;
         }
-
+        
         ObjectStorage? objectStorage;
         if (objectStorageId is not null)
         {
@@ -252,7 +254,9 @@ public class FileBusiness
         }
 
         if (objectStorage is null) throw new KeyNotFoundException("No object storage found for project");
-
+        //Sanitize filename
+        request.FileName = SanitizedFormFile.SanitizeFileName(request.FileName);
+        
         // Get the config to extract mount path
         var configData = JsonConvert.DeserializeObject<ObjectStorageConfigDto>(objectStorage.Config);
         if (configData == null) throw new InvalidOperationException("Config data for object storage is null");
@@ -317,6 +321,8 @@ public class FileBusiness
                                     throw new KeyNotFoundException("Default data source not found");
             realDataSourceId = defaultDataSource.Id;
         }
+
+        chunk = new SanitizedFormFile(chunk);
 
         // Resolve object storage to get mount path
         ObjectStorage? objectStorage;
@@ -424,6 +430,9 @@ public class FileBusiness
         }
 
         if (objectStorage is null) throw new KeyNotFoundException("No object storage found for project");
+        
+        //Sanitize filename
+        request.FileName = SanitizedFormFile.SanitizeFileName(request.FileName);
 
         var configData = JsonConvert.DeserializeObject<ObjectStorageConfigDto>(objectStorage.Config);
         if (configData == null) throw new InvalidOperationException("Config data for object storage is null");
