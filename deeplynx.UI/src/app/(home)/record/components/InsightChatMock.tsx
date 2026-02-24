@@ -67,6 +67,9 @@ const InsightChatMock: React.FC<InsightChatMockProps> = ({
 
   const messageIdRef = useRef(1);
   const scrollAnchorRef = useRef<HTMLDivElement>(null);
+  const readyAudioRef = useRef<HTMLAudioElement | null>(null);
+  const responseAudioRef = useRef<HTMLAudioElement | null>(null);
+  const previousIngestionStateRef = useRef<IngestionState>("not_queued");
   const [draft, setDraft] = useState("");
   const [isResponding, setIsResponding] = useState(false);
   const [isQueueingUpload, setIsQueueingUpload] = useState(false);
@@ -106,6 +109,7 @@ const InsightChatMock: React.FC<InsightChatMockProps> = ({
     setIsExpanded(false);
     setIngestionState("not_queued");
     setIngestionStatus("Not queued for Insight yet.");
+    previousIngestionStateRef.current = "not_queued";
   }, [safeRecordName, recordId]);
 
   useEffect(() => {
@@ -114,6 +118,49 @@ const InsightChatMock: React.FC<InsightChatMockProps> = ({
       block: "end",
     });
   }, [messages, isResponding]);
+
+  useEffect(() => {
+    readyAudioRef.current = new Audio("/assets/notification.mp3");
+    readyAudioRef.current.preload = "auto";
+
+    responseAudioRef.current = new Audio("/assets/pop.mp3");
+    responseAudioRef.current.preload = "auto";
+
+    return () => {
+      if (readyAudioRef.current) {
+        readyAudioRef.current.pause();
+        readyAudioRef.current = null;
+      }
+      if (responseAudioRef.current) {
+        responseAudioRef.current.pause();
+        responseAudioRef.current = null;
+      }
+    };
+  }, []);
+
+  const playAudio = useCallback((audioRef: React.RefObject<HTMLAudioElement | null>) => {
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    audio.currentTime = 0;
+    const playPromise = audio.play();
+    if (playPromise) {
+      void playPromise.catch(() => {
+        // Browsers may block autoplay until user interaction.
+      });
+    }
+  }, []);
+
+  useEffect(() => {
+    const previousState = previousIngestionStateRef.current;
+    if (
+      ingestionState === "ready" &&
+      (previousState === "queued" || previousState === "processing")
+    ) {
+      playAudio(readyAudioRef);
+    }
+    previousIngestionStateRef.current = ingestionState;
+  }, [ingestionState, playAudio]);
 
   useEffect(() => {
     if (!recordId) return;
@@ -272,6 +319,7 @@ const InsightChatMock: React.FC<InsightChatMockProps> = ({
             "Insight returned an empty response.",
           );
         }
+        playAudio(responseAudioRef);
       } catch (error) {
         const message =
           error instanceof Error ? error.message : "Unknown Insight error";
@@ -285,6 +333,7 @@ const InsightChatMock: React.FC<InsightChatMockProps> = ({
       createMessage,
       ingestionState,
       isResponding,
+      playAudio,
       recordId,
       replaceMessageContent,
     ],
