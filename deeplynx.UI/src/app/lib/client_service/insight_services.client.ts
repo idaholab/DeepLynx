@@ -18,6 +18,41 @@ export interface InsightQueryPayload {
   embeddingAuthToken?: string;
 }
 
+export interface InsightUploadFileInfo {
+  fileId: number;
+  fileURI: string;
+}
+
+export interface InsightUploadPayload {
+  fileInfo: InsightUploadFileInfo[];
+  llmServerUrl?: string;
+  llmModelName?: string;
+  llmAuthToken?: string;
+  embeddingServerUrl?: string;
+  embeddingModelName?: string;
+  embeddingAuthToken?: string;
+}
+
+export interface InsightUploadResultItem {
+  file_id: number;
+  status: "queued" | "error";
+  pdf_url?: string;
+  file_type?: string;
+  queue_name?: string;
+  error?: string;
+}
+
+export interface InsightUploadResponse {
+  results: InsightUploadResultItem[];
+}
+
+export interface InsightIngestionStatusResponse {
+  file_id: number;
+  indexed: boolean;
+  chunk_count: number;
+  page_count: number;
+}
+
 interface InsightQueryRequestBody {
   question: string;
   file_ids?: number[];
@@ -26,6 +61,16 @@ interface InsightQueryRequestBody {
     max_tokens: number;
     top_p: number;
   };
+  llm_server_url?: string;
+  llm_model_name?: string;
+  llm_auth_token?: string;
+  embedding_server_url?: string;
+  embedding_model_name?: string;
+  embedding_auth_token?: string;
+}
+
+interface InsightUploadRequestBody {
+  file_info: InsightUploadFileInfo[];
   llm_server_url?: string;
   llm_model_name?: string;
   llm_auth_token?: string;
@@ -59,6 +104,52 @@ function toRequestBody(payload: InsightQueryPayload): InsightQueryRequestBody {
     embedding_model_name: payload.embeddingModelName,
     embedding_auth_token: payload.embeddingAuthToken,
   };
+}
+
+function toUploadRequestBody(
+  payload: InsightUploadPayload,
+): InsightUploadRequestBody {
+  return {
+    file_info: payload.fileInfo,
+    llm_server_url: payload.llmServerUrl,
+    llm_model_name: payload.llmModelName,
+    llm_auth_token: payload.llmAuthToken,
+    embedding_server_url: payload.embeddingServerUrl,
+    embedding_model_name: payload.embeddingModelName,
+    embedding_auth_token: payload.embeddingAuthToken,
+  };
+}
+
+export async function queueInsightUpload(
+  payload: InsightUploadPayload,
+): Promise<InsightUploadResponse> {
+  const response = await fetch("/api/insight/upload", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(toUploadRequestBody(payload)),
+  });
+
+  const text = await response.text();
+  let body: InsightUploadResponse | { message?: string; details?: string } =
+    { results: [] };
+
+  if (text) {
+    try {
+      body = JSON.parse(text);
+    } catch {
+      body = { message: text };
+    }
+  }
+
+  if (!response.ok) {
+    const details =
+      typeof body === "object" && body !== null && "details" in body
+        ? String(body.details ?? "")
+        : text;
+    throw new Error(details || "Insight upload failed");
+  }
+
+  return body as InsightUploadResponse;
 }
 
 export async function streamInsightQuery(
@@ -103,4 +194,36 @@ export async function streamInsightQuery(
   }
 
   return fullText;
+}
+
+export async function fetchInsightIngestionStatus(
+  recordId: number,
+): Promise<InsightIngestionStatusResponse> {
+  const response = await fetch(`/api/insight/status/${recordId}`, {
+    method: "GET",
+    headers: { Accept: "application/json" },
+    cache: "no-store",
+  });
+
+  const text = await response.text();
+  let body: InsightIngestionStatusResponse | { message?: string; details?: string } =
+    { file_id: recordId, indexed: false, chunk_count: 0, page_count: 0 };
+
+  if (text) {
+    try {
+      body = JSON.parse(text);
+    } catch {
+      body = { message: text };
+    }
+  }
+
+  if (!response.ok) {
+    const details =
+      typeof body === "object" && body !== null && "details" in body
+        ? String(body.details ?? "")
+        : text;
+    throw new Error(details || "Insight status check failed");
+  }
+
+  return body as InsightIngestionStatusResponse;
 }

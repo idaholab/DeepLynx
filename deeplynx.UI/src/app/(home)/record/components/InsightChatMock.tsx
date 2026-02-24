@@ -5,9 +5,14 @@ import {
   SparklesIcon,
 } from "@heroicons/react/24/outline";
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { streamInsightQuery } from "@/app/lib/client_service/insight_services.client";
+import {
+  fetchInsightIngestionStatus,
+  queueInsightUpload,
+  streamInsightQuery,
+} from "@/app/lib/client_service/insight_services.client";
 
 type InsightRole = "assistant" | "user";
+type IngestionState = "not_queued" | "queued" | "processing" | "ready" | "error";
 
 interface InsightMessage {
   id: number;
@@ -18,6 +23,7 @@ interface InsightMessage {
 
 interface InsightChatMockProps {
   recordId?: number;
+  recordUri?: string | null;
   recordName?: string | null;
   recordClassName?: string | null;
   recordDescription?: string | null;
@@ -29,6 +35,7 @@ const QUICK_PROMPTS = [
   "What fields look incomplete?",
   "What should I validate next?",
 ];
+const STATUS_POLL_INTERVAL_MS = 5000;
 
 function getCurrentTimestamp(): string {
   return new Intl.DateTimeFormat(undefined, {
@@ -38,11 +45,12 @@ function getCurrentTimestamp(): string {
 }
 
 function buildIntroMessage(recordName: string): string {
-  return `I am ready to help analyze "${recordName}". Responses stream from the Insight service through a local UI proxy route.`;
+  return `I am ready to help analyze "${recordName}". First queue the record for Insight indexing, then send questions here.`;
 }
 
 const InsightChatMock: React.FC<InsightChatMockProps> = ({
   recordId,
+  recordUri,
   recordName,
   recordClassName,
   recordDescription,
@@ -56,6 +64,13 @@ const InsightChatMock: React.FC<InsightChatMockProps> = ({
   const scrollAnchorRef = useRef<HTMLDivElement>(null);
   const [draft, setDraft] = useState("");
   const [isResponding, setIsResponding] = useState(false);
+  const [isQueueingUpload, setIsQueueingUpload] = useState(false);
+  const [ingestionState, setIngestionState] = useState<IngestionState>(
+    "not_queued",
+  );
+  const [ingestionStatus, setIngestionStatus] = useState<string>(
+    "Not queued for Insight yet.",
+  );
   const [messages, setMessages] = useState<InsightMessage[]>([]);
 
   const createMessage = useCallback(
@@ -80,6 +95,9 @@ const InsightChatMock: React.FC<InsightChatMockProps> = ({
     ]);
     setDraft("");
     setIsResponding(false);
+    setIsQueueingUpload(false);
+    setIngestionState("not_queued");
+    setIngestionStatus("Not queued for Insight yet.");
   }, [safeRecordName, recordId]);
 
   useEffect(() => {
@@ -88,6 +106,104 @@ const InsightChatMock: React.FC<InsightChatMockProps> = ({
       block: "end",
     });
   }, [messages, isResponding]);
+
+  useEffect(() => {
+    if (!recordId) return;
+
+    let cancelled = false;
+
+    const checkInitialStatus = async () => {
+      try {
+        const status = await fetchInsightIngestionStatus(recordId);
+        if (cancelled || !status.indexed) return;
+
+        setIngestionState("ready");
+        setIngestionStatus(
+          `Ready: ${status.chunk_count} chunks across ${status.page_count} pages.`,
+        );
+      } catch {
+        // Keep default status text for initial load.
+      }
+    };
+
+    void checkInitialStatus();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [recordId]);
+
+  useEffect(() => {
+    if (!recordId) return;
+    if (ingestionState !== "queued" && ingestionState !== "processing") return;
+
+    let cancelled = false;
+
+    const poll = async () => {
+      try {
+        const status = await fetchInsightIngestionStatus(recordId);
+        if (cancelled) return;
+
+        if (status.indexed) {
+          setIngestionState("ready");
+          setIngestionStatus(
+            `Ready: ${status.chunk_count} chunks across ${status.page_count} pages.`,
+          );
+          return;
+        }
+
+        setIngestionState((prev) => (prev === "queued" ? "processing" : prev));
+        setIngestionStatus((prev) =>
+          prev.startsWith("Queued")
+            ? "Queued. Processing in Insight..."
+            : "Not indexed yet. Queue the record for Insight indexing.",
+        );
+      } catch (error) {
+        if (cancelled) return;
+        const message =
+          error instanceof Error ? error.message : "Unknown status error";
+        setIngestionStatus(`Status check failed, retrying: ${message}`);
+      }
+    };
+
+    void poll();
+    const interval = setInterval(() => {
+      void poll();
+    }, STATUS_POLL_INTERVAL_MS);
+
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [recordId, ingestionState]);
+
+  const handleCheckStatus = useCallback(async () => {
+    if (!recordId) return;
+
+    try {
+      const status = await fetchInsightIngestionStatus(recordId);
+      if (status.indexed) {
+        setIngestionState("ready");
+        setIngestionStatus(
+          `Ready: ${status.chunk_count} chunks across ${status.page_count} pages.`,
+        );
+        return;
+      }
+
+      if (ingestionState === "queued" || ingestionState === "processing") {
+        setIngestionState("processing");
+        setIngestionStatus("Queued. Processing in Insight...");
+      } else {
+        setIngestionState("not_queued");
+        setIngestionStatus("Not indexed yet. Queue the record for Insight indexing.");
+      }
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Unknown status error";
+      setIngestionState("error");
+      setIngestionStatus(`Status check failed: ${message}`);
+    }
+  }, [ingestionState, recordId]);
 
   const appendMessageChunk = useCallback((messageId: number, chunk: string) => {
     setMessages((prev) =>
@@ -111,6 +227,16 @@ const InsightChatMock: React.FC<InsightChatMockProps> = ({
     async (input: string) => {
       const prompt = input.trim();
       if (!prompt || isResponding) return;
+      if (ingestionState !== "ready") {
+        setMessages((prev) => [
+          ...prev,
+          createMessage(
+            "assistant",
+            "This record is not ready yet. Queue it first and wait for status to become Ready.",
+          ),
+        ]);
+        return;
+      }
 
       const userMessage = createMessage("user", prompt);
       const assistantMessage = createMessage("assistant", "");
@@ -144,11 +270,80 @@ const InsightChatMock: React.FC<InsightChatMockProps> = ({
     [
       appendMessageChunk,
       createMessage,
+      ingestionState,
       isResponding,
       recordId,
       replaceMessageContent,
     ],
   );
+
+  const handleQueueUpload = useCallback(async () => {
+    if (!recordId) {
+      setIngestionState("error");
+      setIngestionStatus("Cannot queue upload: missing record ID.");
+      return;
+    }
+
+    const uri = recordUri?.trim();
+    if (!uri) {
+      setIngestionState("error");
+      setIngestionStatus("Cannot queue upload: this record has no URI.");
+      return;
+    }
+
+    setIsQueueingUpload(true);
+    setIngestionState("queued");
+    setIngestionStatus("Queueing upload...");
+
+    try {
+      const result = await queueInsightUpload({
+        fileInfo: [{ fileId: recordId, fileURI: uri }],
+      });
+      const first = result.results[0];
+
+      if (!first) {
+        setIngestionState("error");
+        setIngestionStatus("Upload request returned no result rows.");
+        return;
+      }
+
+      if (first.status === "queued") {
+        setIngestionState("queued");
+        setIngestionStatus(
+          "Queued successfully. Checking indexing status...",
+        );
+      } else {
+        setIngestionState("error");
+        setIngestionStatus(`Upload failed: ${first.error || "Unknown error"}`);
+      }
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Unknown upload error";
+      setIngestionState("error");
+      setIngestionStatus(`Upload failed: ${message}`);
+    } finally {
+      setIsQueueingUpload(false);
+    }
+  }, [recordId, recordUri]);
+
+  const ingestionBadgeClass =
+    ingestionState === "ready"
+      ? "badge-success"
+      : ingestionState === "processing" || ingestionState === "queued"
+        ? "badge-warning"
+        : ingestionState === "error"
+          ? "badge-error"
+          : "badge-ghost";
+  const ingestionBadgeLabel =
+    ingestionState === "ready"
+      ? "Ready"
+      : ingestionState === "processing"
+        ? "Processing"
+        : ingestionState === "queued"
+          ? "Queued"
+          : ingestionState === "error"
+            ? "Error"
+            : "Not queued";
 
   return (
     <div className="card bg-base-100 shadow-lg">
@@ -167,6 +362,33 @@ const InsightChatMock: React.FC<InsightChatMockProps> = ({
           Context: {recordClassName || "No class"} · {dataSourceName || "No source"} ·{" "}
           {recordDescription?.trim().length ? "Description present" : "No description"}
         </p>
+
+        <div className="flex items-center gap-2">
+          <span className={`badge badge-sm ${ingestionBadgeClass}`}>
+            {ingestionBadgeLabel}
+          </span>
+          <button
+            type="button"
+            className="btn btn-xs btn-secondary"
+            onClick={() => {
+              void handleQueueUpload();
+            }}
+            disabled={isQueueingUpload || isResponding}
+          >
+            {isQueueingUpload ? "Queueing..." : "Queue Record For Insight"}
+          </button>
+          <button
+            type="button"
+            className="btn btn-xs btn-ghost"
+            onClick={() => {
+              void handleCheckStatus();
+            }}
+            disabled={isQueueingUpload || isResponding || !recordId}
+          >
+            Check Status
+          </button>
+          <span className="text-xs text-base-content/60">{ingestionStatus}</span>
+        </div>
 
         <div className="rounded-box border border-base-300 bg-base-100 mt-2">
           <div className="h-72 overflow-y-auto px-3 py-3 space-y-3">

@@ -638,6 +638,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
             {/* Insight Chat */}
             <InsightChatMock
               recordId={record.id}
+              recordUri={record.uri}
               recordName={record.name}
               recordDescription={record.description}
               recordClassName={recordClass?.name}
