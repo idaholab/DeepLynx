@@ -417,6 +417,8 @@ const LayoutShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         <main
           className={`transition-all duration-300 w-full mt-20 ${isMenuCollapsed ? "ml-40" : "ml-82"
             }`}
+          className={`transition-all duration-300 w-full mt-20 ${isMenuCollapsed ? "ml-40" : "ml-82"
+            }`}
         >
           {/* Organization Banne */}
           <div className="sticky top-25 z-20">

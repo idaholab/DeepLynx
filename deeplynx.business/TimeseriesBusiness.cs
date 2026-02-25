@@ -45,6 +45,8 @@ public class TimeseriesBusiness(
     {
         filePath = SanitizedFormFile.SanitizeFileName(filePath);
         tableName = SanitizedFormFile.SanitizeFileName(tableName);
+        filePath = SanitizedFormFile.SanitizeFileName(filePath);
+        tableName = SanitizedFormFile.SanitizeFileName(tableName);
         using var duckDbConnection = await GetDuckDbConnection(organizationId, projectId, dataSourceId);
 
         await using var command = duckDbConnection.CreateCommand();
@@ -79,7 +81,9 @@ public class TimeseriesBusiness(
 
         if (file == null || file.Length == 0)
             throw new ArgumentException("File is required and cannot be empty or whitespace.");
-        
+
+        file = new SanitizedFormFile(file);
+
         file = new SanitizedFormFile(file);
 
         await ExistenceHelper.EnsureDataSourceExistsForProjectAsync(_context, dataSourceId, projectId);
@@ -191,6 +195,7 @@ public class TimeseriesBusiness(
     /// <returns>The upload ID (guid format) for file chunks to go to the right directory</returns>
     public async Task<string> StartUpload(long organizationId, long projectId, long dataSourceId, string fileName)
     {
+        fileName = SanitizedFormFile.SanitizeFileName(fileName);
         fileName = SanitizedFormFile.SanitizeFileName(fileName);
         var fileType = Path.GetExtension(fileName);
         if (fileType != ".csv" && fileType != ".parquet")
@@ -384,6 +389,7 @@ public class TimeseriesBusiness(
     public async Task AppendTimeseriesTable(long organizationId, long projectId, long dataSourceId, IFormFile file,
         string tableName)
     {
+        file = new SanitizedFormFile(file);
         file = new SanitizedFormFile(file);
         var fileType = Path.GetExtension(file.FileName);
         if (fileType != ".csv" && fileType != ".parquet")

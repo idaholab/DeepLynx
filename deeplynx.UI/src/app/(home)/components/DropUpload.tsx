@@ -96,6 +96,8 @@ export default function DropUpload({
           : isDragging
             ? "border-secondary/70 bg-secondary/10"
             : "border-base-300 hover:bg-base-200/40",
+            ? "border-secondary/70 bg-secondary/10"
+            : "border-base-300 hover:bg-base-200/40",
       ].join(" ")}
     >
       {/* Hidden input that the container triggers */}
