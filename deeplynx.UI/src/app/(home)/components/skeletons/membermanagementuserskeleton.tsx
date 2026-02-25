@@ -6,7 +6,6 @@ import { useEffect, useState } from "react";
 const times = (n: number) => Array.from({ length: n }, (_, i) => i);
 
 function MemberManagementUserSkeleton() {
-  const { t } = useLanguage();
   const rows = 6;
   const totalPages = 2;
 
@@ -14,7 +13,7 @@ function MemberManagementUserSkeleton() {
     <div className="w-full">
       <div>
         <div className="flex p-4">
-          <div className="w-1/8 pl-4 pt-10">                  
+          <div className="w-1/8 pl-4 pt-10">
             <input className="checkbox" type="checkbox"></input>
           </div>
           <div className="w-1/4 pl-4 pt-10 font-bold">Name</div>
@@ -22,7 +21,7 @@ function MemberManagementUserSkeleton() {
         </div>
         {times(rows).map((i) => (
           <div key={i} className="flex p-4">
-            <div className="w-1/8 pl-4 h-4 rounded">                  
+            <div className="w-1/8 pl-4 h-4 rounded">
               <input className="checkbox" type="checkbox"></input>
             </div>
             <div className="w-1/4 pl-4 h-4">

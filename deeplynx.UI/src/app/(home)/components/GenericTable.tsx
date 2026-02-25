@@ -88,7 +88,7 @@ const GenericTable = <T extends object>({
   const [currentDisplayedRows, setCurrentDisplayedRows] = useState(rowsPerPage);
 
   const [showFilters, setShowFilters] = useState(false);
-  const [initialFilters, setInitialFilters] = useState(filterValues);
+  const [initialFilters] = useState(filterValues);
   const [tempFilters, setTempFilters] = useState<Record<string, string | number | number[] | undefined>>({});
 
   // Sync local page state with backend pagination metadata
@@ -496,11 +496,6 @@ const GenericTable = <T extends object>({
         <tbody>
           {currentData.map((row, rowIndex) => {
             const isPrivate = row["visibility" as keyof T] === "Private";
-            const rowId = row["id" as keyof T];
-            const key =
-              typeof rowId === "string" || typeof rowId === "number"
-                ? rowId
-                : rowIndex;
             return (
               <tr
                 key={rowIndex}

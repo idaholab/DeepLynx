@@ -39,25 +39,6 @@ const SavedSearches = ({ className }: SavedSearchProps) => {
     },
   ];
 
-  const popular_table_columns: Column<PopularTable>[] = [
-    {
-      header: "Created by",
-      cell: (row) => (
-        <div className="flex gap-4 items-center">
-          <AvatarCell name={row.name} image={row.image} />
-          {row.name}
-        </div>
-      ),
-    },
-    {
-      header: "Search Nickname",
-      data: "nickname",
-    },
-    {
-      header: "Visibility",
-      data: "visibility",
-    },
-  ];
 
   const tabData = [
     {

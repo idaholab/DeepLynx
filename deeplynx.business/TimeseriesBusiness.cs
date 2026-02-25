@@ -43,6 +43,8 @@ public class TimeseriesBusiness(
         string filePath,
         string fileType)
     {
+        filePath = SanitizedFormFile.SanitizeFileName(filePath);
+        tableName = SanitizedFormFile.SanitizeFileName(tableName);
         using var duckDbConnection = await GetDuckDbConnection(organizationId, projectId, dataSourceId);
 
         await using var command = duckDbConnection.CreateCommand();
@@ -77,6 +79,8 @@ public class TimeseriesBusiness(
 
         if (file == null || file.Length == 0)
             throw new ArgumentException("File is required and cannot be empty or whitespace.");
+        
+        file = new SanitizedFormFile(file);
 
         await ExistenceHelper.EnsureDataSourceExistsForProjectAsync(_context, dataSourceId, projectId);
 
@@ -187,6 +191,7 @@ public class TimeseriesBusiness(
     /// <returns>The upload ID (guid format) for file chunks to go to the right directory</returns>
     public async Task<string> StartUpload(long organizationId, long projectId, long dataSourceId, string fileName)
     {
+        fileName = SanitizedFormFile.SanitizeFileName(fileName);
         var fileType = Path.GetExtension(fileName);
         if (fileType != ".csv" && fileType != ".parquet")
             throw new ArgumentException("Only .csv and .parquet files are supported");
@@ -215,6 +220,7 @@ public class TimeseriesBusiness(
     public async Task<string> UploadChunk(long organizationId, long projectId, long dataSourceId, IFormFile chunk,
         string uploadId, int chunkNumber)
     {
+        chunk = new SanitizedFormFile(chunk);
         var baseFolderPath = Path.Combine(_duckDbBasePath, "org_" + organizationId, "project_" + projectId,
             "datasource_" + dataSourceId);
         var tempFolderPath = Path.Combine(baseFolderPath, uploadId);
@@ -258,6 +264,7 @@ public class TimeseriesBusiness(
         long dataSourceId,
         TimeseriesUploadCompleteRequestDto request)
     {
+        request.FileName = SanitizedFormFile.SanitizeFileName(request.FileName);
         var dataSourceFolderPath = Path.Combine(_duckDbBasePath, "org_" + organizationId, "project_" + projectId,
             "datasource_" + dataSourceId);
         var tempFolderPath = Path.Combine(dataSourceFolderPath, request.UploadId);
@@ -377,6 +384,7 @@ public class TimeseriesBusiness(
     public async Task AppendTimeseriesTable(long organizationId, long projectId, long dataSourceId, IFormFile file,
         string tableName)
     {
+        file = new SanitizedFormFile(file);
         var fileType = Path.GetExtension(file.FileName);
         if (fileType != ".csv" && fileType != ".parquet")
             throw new ArgumentException("Only CSV and Parquet files are supported.");
