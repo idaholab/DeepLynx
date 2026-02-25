@@ -3,11 +3,11 @@ export default {
   managing_deeplynx_nexus: { title: "Managing DeepLynx Nexus" },
   developing_deeplynx_nexus: { title: "Developing with DeepLynx Nexus" },
   about_deeplynx_nexus: { title: "About DeepLynx Nexus" },
-  deeplynx: {
+/*  deeplynx: {
     title: "Back to DeepLynx",
     type: "page",
     href: process.env.HOSTED_LINK
       ? process.env.HOSTED_LINK
       : "http://localhost:3000",
-  },
+  },*/
 };
