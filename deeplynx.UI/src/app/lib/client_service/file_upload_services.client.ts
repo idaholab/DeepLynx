@@ -68,10 +68,12 @@ async function uploadFileRegular({
   tags,
   originalId,
   classId,
+  metadataFile,
 }: UploadFileArgs) {
   const form = new FormData();
   form.append("file", file, file.name ?? "upload.bin");
 
+  if (metadataFile) form.append("metadata", metadataFile, metadataFile.name);
   if (name) form.append("name", name);
   if (description) form.append("description", description);
 
