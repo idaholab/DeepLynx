@@ -26,7 +26,6 @@ export default function NewFileUploadCard({
     ""
   );
   const [description] = useState("");
-  const [description] = useState("");
   const [isTimeSeries, setIsTimeSeries] = useState(false);
   const [metadataFile, setMetadataFile] = useState<File | undefined>(undefined);
   const fileBaseName = (filename: string) => filename.replace(/\.[^/.]+$/, "");
