@@ -45,7 +45,7 @@ import RelatedRecordsCardSkeleton from "./skeletons/RelatedRecordsSkeleton";
 import { getAllSensitivityLabelsProject } from "@/app/lib/client_service/sensitivity_labels_services.client";
 import AddEdgeModal from "./components/AddEdgeModal";
 import ClassSelectorModal from "./components/ClassSelectorModal";
-import InsightChatMock from "./components/InsightChatMock";
+import RecordInsightChat from "./components/RecordInsightChat";
 import {
   RelatedRecordViewModel,
   useRecordRelationships,
@@ -693,13 +693,10 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
           <div className="flex-1 space-y-4">
             {/* Insight Chat */}
             {showInsightChat && (
-              <InsightChatMock
+              <RecordInsightChat
                 recordId={record.id}
                 recordUri={record.uri}
                 recordName={record.name}
-                recordDescription={record.description}
-                recordClassName={recordClass?.name}
-                dataSourceName={record.dataSourceName}
               />
             )}
             {/* Tags Card */}

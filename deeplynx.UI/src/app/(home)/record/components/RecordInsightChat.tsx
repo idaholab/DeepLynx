@@ -1,11 +1,12 @@
 "use client";
 
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   fetchInsightIngestionStatus,
   queueInsightUpload,
   streamInsightQuery,
 } from "@/app/lib/client_service/insight_services.client";
+import { useLanguage } from "@/app/contexts/Language";
 import {
   ArrowsPointingInIcon,
   ArrowsPointingOutIcon,
@@ -28,16 +29,20 @@ interface InsightMessage {
   timestamp: string;
 }
 
-interface InsightChatMockProps {
+interface RecordInsightChatProps {
   recordId?: number;
   recordUri?: string | null;
   recordName?: string | null;
-  recordClassName?: string | null;
-  recordDescription?: string | null;
-  dataSourceName?: string | null;
 }
 
 const STATUS_POLL_INTERVAL_MS = 5000;
+const INGESTION_BADGE_CLASS: Record<IngestionState, string> = {
+  not_queued: "badge-ghost",
+  queued: "badge-warning",
+  processing: "badge-warning",
+  ready: "badge-success",
+  error: "badge-error",
+};
 
 function getCurrentTimestamp(): string {
   return new Intl.DateTimeFormat(undefined, {
@@ -46,23 +51,40 @@ function getCurrentTimestamp(): string {
   }).format(new Date());
 }
 
-function buildIntroMessage(recordName: string, state: IngestionState): string {
-  if (state === "ready") {
-    return `I am ready to help analyze "${recordName}". How can I help?`;
-  } else {
-    return `I am ready to help analyze "${recordName}". First queue the record for Insight indexing, then send questions here.`;
+function playAudio(audioRef: React.RefObject<HTMLAudioElement | null>) {
+  const audio = audioRef.current;
+  if (!audio) return;
+
+  audio.currentTime = 0;
+  const playPromise = audio.play();
+  if (playPromise) {
+    void playPromise.catch(() => {});
   }
 }
 
-const InsightChatMock: React.FC<InsightChatMockProps> = ({
+function withRecordName(template: string, recordName: string): string {
+  return template.replace("{recordName}", recordName);
+}
+
+function buildIntroMessage(
+  recordName: string,
+  state: IngestionState,
+  readyTemplate: string,
+  notReadyTemplate: string,
+): string {
+  return state === "ready"
+    ? withRecordName(readyTemplate, recordName)
+    : withRecordName(notReadyTemplate, recordName);
+}
+
+const RecordInsightChat: React.FC<RecordInsightChatProps> = ({
   recordId,
   recordUri,
   recordName,
-  recordClassName,
-  recordDescription,
-  dataSourceName,
 }) => {
-  const safeRecordName = recordName?.trim().length ? recordName : "this record";
+  const { t } = useLanguage();
+  const trimmedRecordName = recordName?.trim() ?? "";
+  const safeRecordName = trimmedRecordName || t.translations.INSIGHT_THIS_RECORD;
 
   const messageIdRef = useRef(1);
   const scrollAnchorRef = useRef<HTMLDivElement>(null);
@@ -76,20 +98,34 @@ const InsightChatMock: React.FC<InsightChatMockProps> = ({
   const [isExpanded, setIsExpanded] = useState(false);
   const [ingestionState, setIngestionState] =
     useState<IngestionState>("not_queued");
-  const [ingestionStatus, setIngestionStatus] = useState<string>(
-    "Not queued for Insight yet.",
-  );
   const [messages, setMessages] = useState<InsightMessage[]>([]);
 
-  const createMessage = useCallback(
-    (role: InsightRole, content: string): InsightMessage => ({
+  function createMessage(role: InsightRole, content: string): InsightMessage {
+    return {
       id: messageIdRef.current++,
       role,
       content,
       timestamp: getCurrentTimestamp(),
-    }),
-    [],
-  );
+    };
+  }
+
+  function appendMessageChunk(messageId: number, chunk: string) {
+    setMessages((prev) =>
+      prev.map((message) =>
+        message.id === messageId
+          ? { ...message, content: `${message.content}${chunk}` }
+          : message,
+      ),
+    );
+  }
+
+  function replaceMessageContent(messageId: number, content: string) {
+    setMessages((prev) =>
+      prev.map((message) =>
+        message.id === messageId ? { ...message, content } : message,
+      ),
+    );
+  }
 
   useEffect(() => {
     messageIdRef.current = 1;
@@ -97,7 +133,12 @@ const InsightChatMock: React.FC<InsightChatMockProps> = ({
       {
         id: messageIdRef.current++,
         role: "assistant",
-        content: buildIntroMessage(safeRecordName, "not_queued"),
+        content: buildIntroMessage(
+          safeRecordName,
+          "not_queued",
+          t.translations.INSIGHT_INTRO_READY,
+          t.translations.INSIGHT_INTRO_NOT_READY,
+        ),
         timestamp: getCurrentTimestamp(),
       },
     ]);
@@ -107,9 +148,13 @@ const InsightChatMock: React.FC<InsightChatMockProps> = ({
     setIsWidgetCollapsed(false);
     setIsExpanded(false);
     setIngestionState("not_queued");
-    setIngestionStatus("Not queued for Insight yet.");
     previousIngestionStateRef.current = "not_queued";
-  }, [safeRecordName, recordId]);
+  }, [
+    safeRecordName,
+    recordId,
+    t.translations.INSIGHT_INTRO_READY,
+    t.translations.INSIGHT_INTRO_NOT_READY,
+  ]);
 
   useEffect(() => {
     setMessages((prev) => {
@@ -120,11 +165,21 @@ const InsightChatMock: React.FC<InsightChatMockProps> = ({
       return [
         {
           ...prev[0],
-          content: buildIntroMessage(safeRecordName, ingestionState),
+          content: buildIntroMessage(
+            safeRecordName,
+            ingestionState,
+            t.translations.INSIGHT_INTRO_READY,
+            t.translations.INSIGHT_INTRO_NOT_READY,
+          ),
         },
       ];
     });
-  }, [ingestionState, safeRecordName]);
+  }, [
+    ingestionState,
+    safeRecordName,
+    t.translations.INSIGHT_INTRO_READY,
+    t.translations.INSIGHT_INTRO_NOT_READY,
+  ]);
 
   useEffect(() => {
     scrollAnchorRef.current?.scrollIntoView({
@@ -152,22 +207,6 @@ const InsightChatMock: React.FC<InsightChatMockProps> = ({
     };
   }, []);
 
-  const playAudio = useCallback(
-    (audioRef: React.RefObject<HTMLAudioElement | null>) => {
-      const audio = audioRef.current;
-      if (!audio) return;
-
-      audio.currentTime = 0;
-      const playPromise = audio.play();
-      if (playPromise) {
-        void playPromise.catch(() => {
-          // Browsers may block autoplay until user interaction.
-        });
-      }
-    },
-    [],
-  );
-
   useEffect(() => {
     const previousState = previousIngestionStateRef.current;
     if (
@@ -177,7 +216,7 @@ const InsightChatMock: React.FC<InsightChatMockProps> = ({
       playAudio(readyAudioRef);
     }
     previousIngestionStateRef.current = ingestionState;
-  }, [ingestionState, playAudio]);
+  }, [ingestionState]);
 
   useEffect(() => {
     if (!recordId) return;
@@ -190,9 +229,6 @@ const InsightChatMock: React.FC<InsightChatMockProps> = ({
         if (cancelled || !status.indexed) return;
 
         setIngestionState("ready");
-        setIngestionStatus(
-          `Ready: ${status.chunk_count} chunks across ${status.page_count} pages.`,
-        );
       } catch {
         // Keep default status text for initial load.
       }
@@ -218,23 +254,13 @@ const InsightChatMock: React.FC<InsightChatMockProps> = ({
 
         if (status.indexed) {
           setIngestionState("ready");
-          setIngestionStatus(
-            `Ready: ${status.chunk_count} chunks across ${status.page_count} pages.`,
-          );
           return;
         }
 
         setIngestionState((prev) => (prev === "queued" ? "processing" : prev));
-        setIngestionStatus((prev) =>
-          prev.startsWith("Queued")
-            ? "Queued. Processing in Insight..."
-            : "Not indexed yet. Queue the record for Insight indexing.",
-        );
       } catch (error) {
         if (cancelled) return;
-        const message =
-          error instanceof Error ? error.message : "Unknown status error";
-        setIngestionStatus(`Status check failed, retrying: ${message}`);
+        console.error("Insight status check failed during polling:", error);
       }
     };
 
@@ -249,130 +275,66 @@ const InsightChatMock: React.FC<InsightChatMockProps> = ({
     };
   }, [recordId, ingestionState]);
 
-  const handleCheckStatus = useCallback(async () => {
-    if (!recordId) return;
+  async function handleSend(input: string) {
+    const prompt = input.trim();
+    if (!prompt || isResponding) return;
+    if (ingestionState !== "ready") {
+      setMessages((prev) => [
+        ...prev,
+        createMessage("assistant", t.translations.INSIGHT_NOT_READY_MESSAGE),
+      ]);
+      return;
+    }
+
+    const userMessage = createMessage("user", prompt);
+    const assistantMessage = createMessage("assistant", "");
+    setMessages((prev) => [...prev, userMessage, assistantMessage]);
+    setIsResponding(true);
 
     try {
-      const status = await fetchInsightIngestionStatus(recordId);
-      if (status.indexed) {
-        setIngestionState("ready");
-        setIngestionStatus(
-          `Ready: ${status.chunk_count} chunks across ${status.page_count} pages.`,
-        );
-        return;
-      }
+      const responseText = await streamInsightQuery(
+        {
+          question: prompt,
+          fileIds: recordId ? [recordId] : undefined,
+        },
+        (chunk) => appendMessageChunk(assistantMessage.id, chunk),
+      );
 
-      if (ingestionState === "queued" || ingestionState === "processing") {
-        setIngestionState("processing");
-        setIngestionStatus("Queued. Processing in Insight...");
-      } else {
-        setIngestionState("not_queued");
-        setIngestionStatus(
-          "Not indexed yet. Queue the record for Insight indexing.",
+      if (!responseText.trim()) {
+        replaceMessageContent(
+          assistantMessage.id,
+          t.translations.INSIGHT_EMPTY_RESPONSE,
         );
       }
+      playAudio(responseAudioRef);
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : "Unknown status error";
-      setIngestionState("error");
-      setIngestionStatus(`Status check failed: ${message}`);
-    }
-  }, [ingestionState, recordId]);
-
-  const appendMessageChunk = useCallback((messageId: number, chunk: string) => {
-    setMessages((prev) =>
-      prev.map((message) =>
-        message.id === messageId
-          ? { ...message, content: `${message.content}${chunk}` }
-          : message,
-      ),
-    );
-  }, []);
-
-  const replaceMessageContent = useCallback(
-    (messageId: number, content: string) => {
-      setMessages((prev) =>
-        prev.map((message) =>
-          message.id === messageId ? { ...message, content } : message,
-        ),
+        error instanceof Error
+          ? error.message
+          : t.translations.INSIGHT_UNKNOWN_ERROR;
+      replaceMessageContent(
+        assistantMessage.id,
+        `${t.translations.INSIGHT_ERROR_PREFIX}: ${message}`,
       );
-    },
-    [],
-  );
+    } finally {
+      setIsResponding(false);
+    }
+  }
 
-  const handleSend = useCallback(
-    async (input: string) => {
-      const prompt = input.trim();
-      if (!prompt || isResponding) return;
-      if (ingestionState !== "ready") {
-        setMessages((prev) => [
-          ...prev,
-          createMessage(
-            "assistant",
-            "This record is not ready yet. Queue it first and wait for status to become Ready.",
-          ),
-        ]);
-        return;
-      }
-
-      const userMessage = createMessage("user", prompt);
-      const assistantMessage = createMessage("assistant", "");
-
-      setMessages((prev) => [...prev, userMessage, assistantMessage]);
-      setIsResponding(true);
-
-      try {
-        const responseText = await streamInsightQuery(
-          {
-            question: prompt,
-            fileIds: recordId ? [recordId] : undefined,
-          },
-          (chunk) => appendMessageChunk(assistantMessage.id, chunk),
-        );
-
-        if (!responseText.trim()) {
-          replaceMessageContent(
-            assistantMessage.id,
-            "Insight returned an empty response.",
-          );
-        }
-        playAudio(responseAudioRef);
-      } catch (error) {
-        const message =
-          error instanceof Error ? error.message : "Unknown Insight error";
-        replaceMessageContent(assistantMessage.id, `Insight error: ${message}`);
-      } finally {
-        setIsResponding(false);
-      }
-    },
-    [
-      appendMessageChunk,
-      createMessage,
-      ingestionState,
-      isResponding,
-      playAudio,
-      recordId,
-      replaceMessageContent,
-    ],
-  );
-
-  const handleQueueUpload = useCallback(async () => {
+  async function handleQueueUpload() {
     if (!recordId) {
       setIngestionState("error");
-      setIngestionStatus("Cannot queue upload: missing record ID.");
       return;
     }
 
     const uri = recordUri?.trim();
     if (!uri) {
       setIngestionState("error");
-      setIngestionStatus("Cannot queue upload: this record has no URI.");
       return;
     }
 
     setIsQueueingUpload(true);
     setIngestionState("queued");
-    setIngestionStatus("Queueing upload...");
 
     try {
       const result = await queueInsightUpload({
@@ -382,51 +344,38 @@ const InsightChatMock: React.FC<InsightChatMockProps> = ({
 
       if (!first) {
         setIngestionState("error");
-        setIngestionStatus("Upload request returned no result rows.");
         return;
       }
 
       if (first.status === "queued") {
         setIngestionState("queued");
-        setIngestionStatus("Queued successfully. Checking indexing status...");
       } else {
         setIngestionState("error");
-        setIngestionStatus(`Upload failed: ${first.error || "Unknown error"}`);
       }
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Unknown upload error";
+      console.error("Insight upload failed:", error);
       setIngestionState("error");
-      setIngestionStatus(`Upload failed: ${message}`);
     } finally {
       setIsQueueingUpload(false);
     }
-  }, [recordId, recordUri]);
+  }
 
-  const ingestionBadgeClass =
-    ingestionState === "ready"
-      ? "badge-success"
-      : ingestionState === "processing" || ingestionState === "queued"
-        ? "badge-warning"
-        : ingestionState === "error"
-          ? "badge-error"
-          : "badge-ghost";
   const ingestionBadgeLabel =
     ingestionState === "ready"
-      ? "Ready"
-      : ingestionState === "processing"
-        ? "Processing"
-        : ingestionState === "queued"
-          ? "Queued"
+      ? t.translations.READY
+      : ingestionState === "queued"
+        ? t.translations.INSIGHT_STATUS_QUEUED
+        : ingestionState === "processing"
+          ? t.translations.INSIGHT_STATUS_PROCESSING
           : ingestionState === "error"
-            ? "Error"
-            : "Not queued";
+            ? t.translations.INSIGHT_STATUS_ERROR
+            : t.translations.INSIGHT_STATUS_NOT_QUEUED;
 
   return (
     <div className="card bg-base-100 shadow-lg">
       <div className="card-body p-4">
         <div className="flex items-center justify-between gap-3">
-          <h3 className="card-title text-base-content">Insight</h3>
+          <h3 className="card-title text-base-content">{t.translations.INSIGHT}</h3>
           <div className="flex items-center gap-2">
             {!isWidgetCollapsed && (
               <button
@@ -458,11 +407,13 @@ const InsightChatMock: React.FC<InsightChatMockProps> = ({
         {!isWidgetCollapsed && (
           <>
             <p className="text-xs text-base-content/60">
-              Conversation will not be saved.
+              {t.translations.INSIGHT_CONVERSATION_NOT_SAVED}
             </p>
 
             <div className="flex items-center gap-2">
-              <span className={`badge badge-sm ${ingestionBadgeClass}`}>
+              <span
+                className={`badge badge-sm ${INGESTION_BADGE_CLASS[ingestionState]}`}
+              >
                 {ingestionBadgeLabel}
               </span>
               <button
@@ -473,7 +424,9 @@ const InsightChatMock: React.FC<InsightChatMockProps> = ({
                 }}
                 disabled={isQueueingUpload || isResponding}
               >
-                {isQueueingUpload ? "Queueing..." : "Queue Record For Insight"}
+                {isQueueingUpload
+                  ? t.translations.INSIGHT_QUEUEING
+                  : t.translations.INSIGHT_QUEUE_RECORD}
               </button>
             </div>
 
@@ -487,7 +440,9 @@ const InsightChatMock: React.FC<InsightChatMockProps> = ({
                     className={`chat ${message.role === "user" ? "chat-end" : "chat-start"}`}
                   >
                     <div className="chat-header text-xs text-base-content/60 mb-1">
-                      {message.role === "user" ? "You" : "Insight"}
+                      {message.role === "user"
+                        ? t.translations.INSIGHT_YOU
+                        : t.translations.INSIGHT}
                       <time className="ml-2">{message.timestamp}</time>
                     </div>
                     <div
@@ -516,21 +471,21 @@ const InsightChatMock: React.FC<InsightChatMockProps> = ({
                 void handleSend(prompt);
               }}
             >
-              <input
-                type="text"
-                className="input input-bordered w-full"
-                placeholder="Ask Insight about this record..."
-                value={draft}
-                onChange={(e) => setDraft(e.target.value)}
-                disabled={isResponding}
-              />
+                <input
+                  type="text"
+                  className="input input-bordered w-full"
+                  placeholder={t.translations.INSIGHT_ASK_PLACEHOLDER}
+                  value={draft}
+                  onChange={(e) => setDraft(e.target.value)}
+                  disabled={isResponding}
+                />
               <button
                 type="submit"
                 className="btn btn-primary"
                 disabled={!draft.trim() || isResponding}
-                aria-label="Send insight prompt"
+                aria-label={t.translations.INSIGHT_SEND_PROMPT_ARIA}
               >
-                Send
+                {t.translations.INSIGHT_SEND}
               </button>
             </form>
           </>
@@ -540,4 +495,4 @@ const InsightChatMock: React.FC<InsightChatMockProps> = ({
   );
 };
 
-export default InsightChatMock;
+export default RecordInsightChat;
