@@ -234,8 +234,8 @@ const LayoutShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                       <a
                         onClick={() => handleOrganizationSwitch(org)}
                         className={`flex items-center gap-2 w-full max-w-full ${organization?.organizationId === org.id
-                            ? "active bg-info/60"
-                            : ""
+                          ? "active bg-info/60"
+                          : ""
                           }`}
                       >
                         <div className="min-w-0 flex-1 overflow-hidden">
@@ -340,9 +340,9 @@ const LayoutShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                 </Link>
               </li>
               <li className="mt-5">
-                <div className="relative">
+                <div className="relative flex justify-center">
                   <div
-                    className="btn cursor-pointer"
+                    className="cursor-pointer"
                     onClick={() => setIsUserDropdownOpen(!isUserDropdownOpen)}
                   >
                     <UserCircleIcon className="size-10" />
