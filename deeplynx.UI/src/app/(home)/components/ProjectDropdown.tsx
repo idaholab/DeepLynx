@@ -84,7 +84,8 @@ const ProjectDropdown: React.FC<ProjectDropdownProps> = ({
     if (selectedIds.includes("ALL")) return "All Your Projects";
     if (selectedIds.length === 1) {
       const project = projects.find((p) => p.id === selectedIds[0]);
-      return project?.name || "1 project selected";
+      const name = project?.name || "1 project selected"
+      return  name.length >50 ? name.slice(0 ,50) + "..." : name;
     }
     return `${selectedIds.length} projects selected`;
   }, [selectedIds, projects]);
@@ -97,6 +98,7 @@ const ProjectDropdown: React.FC<ProjectDropdownProps> = ({
       <button
         className="flex items-center gap-1 text-md"
         onClick={() => setIsOpen((o) => !o)}
+        title={selectedIds.length === 1 ? projects.find((p) => p.id === selectedIds[0])?.name : undefined}
         type="button"
       >
         {selectedLabel}{" "}
