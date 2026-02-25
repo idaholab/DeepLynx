@@ -37,11 +37,6 @@ interface InsightChatMockProps {
   dataSourceName?: string | null;
 }
 
-const QUICK_PROMPTS = [
-  "Summarize this record for an engineer.",
-  "What fields look incomplete?",
-  "What should I validate next?",
-];
 const STATUS_POLL_INTERVAL_MS = 5000;
 
 function getCurrentTimestamp(): string {
@@ -51,8 +46,12 @@ function getCurrentTimestamp(): string {
   }).format(new Date());
 }
 
-function buildIntroMessage(recordName: string): string {
-  return `I am ready to help analyze "${recordName}". First queue the record for Insight indexing, then send questions here.`;
+function buildIntroMessage(recordName: string, state: IngestionState): string {
+  if (state === "ready") {
+    return `I am ready to help analyze "${recordName}". How can I help?`;
+  } else {
+    return `I am ready to help analyze "${recordName}". First queue the record for Insight indexing, then send questions here.`;
+  }
 }
 
 const InsightChatMock: React.FC<InsightChatMockProps> = ({
@@ -98,7 +97,7 @@ const InsightChatMock: React.FC<InsightChatMockProps> = ({
       {
         id: messageIdRef.current++,
         role: "assistant",
-        content: buildIntroMessage(safeRecordName),
+        content: buildIntroMessage(safeRecordName, "not_queued"),
         timestamp: getCurrentTimestamp(),
       },
     ]);
@@ -111,6 +110,21 @@ const InsightChatMock: React.FC<InsightChatMockProps> = ({
     setIngestionStatus("Not queued for Insight yet.");
     previousIngestionStateRef.current = "not_queued";
   }, [safeRecordName, recordId]);
+
+  useEffect(() => {
+    setMessages((prev) => {
+      if (prev.length !== 1 || prev[0]?.role !== "assistant") {
+        return prev;
+      }
+
+      return [
+        {
+          ...prev[0],
+          content: buildIntroMessage(safeRecordName, ingestionState),
+        },
+      ];
+    });
+  }, [ingestionState, safeRecordName]);
 
   useEffect(() => {
     scrollAnchorRef.current?.scrollIntoView({
@@ -138,18 +152,21 @@ const InsightChatMock: React.FC<InsightChatMockProps> = ({
     };
   }, []);
 
-  const playAudio = useCallback((audioRef: React.RefObject<HTMLAudioElement | null>) => {
-    const audio = audioRef.current;
-    if (!audio) return;
+  const playAudio = useCallback(
+    (audioRef: React.RefObject<HTMLAudioElement | null>) => {
+      const audio = audioRef.current;
+      if (!audio) return;
 
-    audio.currentTime = 0;
-    const playPromise = audio.play();
-    if (playPromise) {
-      void playPromise.catch(() => {
-        // Browsers may block autoplay until user interaction.
-      });
-    }
-  }, []);
+      audio.currentTime = 0;
+      const playPromise = audio.play();
+      if (playPromise) {
+        void playPromise.catch(() => {
+          // Browsers may block autoplay until user interaction.
+        });
+      }
+    },
+    [],
+  );
 
   useEffect(() => {
     const previousState = previousIngestionStateRef.current;
