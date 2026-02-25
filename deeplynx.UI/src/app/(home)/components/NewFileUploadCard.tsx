@@ -27,6 +27,7 @@ export default function NewFileUploadCard({
   );
   const [description] = useState("");
   const [isTimeSeries, setIsTimeSeries] = useState(false);
+  const [metadataFile, setMetadataFile] = useState<File | undefined>(undefined);
   const fileBaseName = (filename: string) => filename.replace(/\.[^/.]+$/, "");
   const [name, setName] = useState(fileBaseName(defaultName));
   const showUpdate = uploadType === "version" || uploadType === "properties";
@@ -45,6 +46,7 @@ export default function NewFileUploadCard({
         updateAction && {
         updateAction: updateAction as "merge" | "overwrite",
       }),
+      ...(metadataFile && { metadataFile }),
     };
     onMetadataChange(fileIndex, metadata);
   }, [
@@ -53,6 +55,7 @@ export default function NewFileUploadCard({
     isTimeSeries,
     updateAction,
     showUpdate,
+    metadataFile,
     fileIndex,
     onMetadataChange,
   ]);
@@ -89,7 +92,29 @@ export default function NewFileUploadCard({
             </div>
           </div>
 
-          {/* Row 2: Description textarea */}
+          {/* Row 2: Metadata File (optional) */}
+          <div className="flex items-center gap-3">
+            <span className="label-text shrink-0">Metadata File</span>
+            <label className="btn btn-sm btn-outline cursor-pointer">
+              {metadataFile ? metadataFile.name : "Choose file (optional)"}
+              <input
+                type="file"
+                className="hidden"
+                onChange={(e) => setMetadataFile(e.target.files?.[0])}
+              />
+            </label>
+            {metadataFile && (
+              <button
+                type="button"
+                className="btn btn-xs btn-ghost text-error"
+                onClick={() => setMetadataFile(undefined)}
+              >
+                ✕
+              </button>
+            )}
+          </div>
+
+          {/* Row 3: Description textarea */}
           {/* <div className="grid grid-cols-[auto,1fr] items-start gap-4">
             <div className="flex">
               <span className="label-text mr-2">
