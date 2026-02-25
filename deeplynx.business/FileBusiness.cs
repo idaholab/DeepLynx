@@ -6,6 +6,7 @@ using deeplynx.models;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Newtonsoft.Json;
+using JsonSerializer = System.Text.Json.JsonSerializer;
 
 namespace deeplynx.business;
 
@@ -56,6 +57,7 @@ public class FileBusiness
     /// <param name="objectStorageId">ID of the object storage method to use</param>
     /// <param name="file">file to upload</param>
     /// <param name="sensitivityLabelIds">The IDs of the Sensitivity Labels that will be attached to the record</param>
+    /// <param name="metadataFile">(Optional) Metadata file to associate with the file upload</param>
     public async Task<RecordResponseDto> UploadFile(
         long currentUserId,
         long organizationId,
@@ -63,7 +65,8 @@ public class FileBusiness
         long? dataSourceId,
         long? objectStorageId,
         IFormFile file,
-        List<long>? sensitivityLabelIds = null)
+        List<long>? sensitivityLabelIds = null,
+        IFormFile? metadataFile = null)
     {
         long realDataSourceId;
         if (file == null || file.Length == 0) throw new ArgumentException("File is required and cannot be empty.");
@@ -93,20 +96,39 @@ public class FileBusiness
         var uri = await fileBusiness.UploadFile(organizationId, projectId, realDataSourceId, configData, file, guid);
 
         var fileClass = await _classBusiness.GetOrCreateClass(currentUserId, organizationId, projectId, "File");
+
+        CreateRecordFileUploadRequestDto? metadata = null;
+
+        if (metadataFile != null)
+        {
+            using (var reader = new StreamReader(metadataFile.OpenReadStream()))
+            {
+                var metadataJson = await reader.ReadToEndAsync();
+
+                if (string.IsNullOrWhiteSpace(metadataJson))
+                    throw new ArgumentException("Metadata file is empty or contains no content.");
+
+                metadata = JsonSerializer.Deserialize<CreateRecordFileUploadRequestDto>(metadataJson)
+                           ?? throw new InvalidOperationException("Failed to deserialize metadata file.");
+            }
+
+            ValidationHelper.ValidateModel(metadata);
+        }
+
         var recordRequest = new CreateRecordRequestDto
         {
-            Properties = new JsonObject
+            Properties = metadata?.Properties ?? new JsonObject
             {
                 ["fileType"] = Path.GetExtension(file.FileName).TrimStart('.').ToLower()
             },
-            Name = file.FileName,
+            Name = metadata?.Name ?? file.FileName,
             ObjectStorageId = objectStorage.Id,
-            Description = file.FileName,
-            OriginalId = guid.ToString(),
-            Uri = uri,
-            ClassId = fileClass.Id,
-            ClassName = fileClass.Name,
-            FileType = Path.GetExtension(file.FileName).TrimStart('.').ToLower()
+            Description = metadata?.Description ?? file.FileName,
+            OriginalId = metadata?.OriginalId ?? guid.ToString(),
+            ClassId = metadata?.ClassId ?? fileClass.Id,
+            ClassName = metadata?.ClassName ?? fileClass.Name,
+            FileType = Path.GetExtension(file.FileName).TrimStart('.').ToLower(),
+            Uri = uri
         };
 
         // return the newly created metadata record for the file
@@ -150,7 +172,6 @@ public class FileBusiness
             {
                 ["fileType"] = Path.GetExtension(file.FileName).TrimStart('.').ToLower()
             },
-            OriginalId = guid.ToString(),
             Name = file.FileName,
             Uri = uri,
             FileType = Path.GetExtension(file.FileName).TrimStart('.').ToLower()
@@ -342,6 +363,7 @@ public class FileBusiness
     /// <param name="objectStorageId">ID of the object storage method to use</param>
     /// <param name="request">File upload completion request</param>
     /// <param name="sensitivityLabelIds">The IDs of the Sensitivity Labels that will be attached to the record</param>
+    /// <param name="metadata">Metadata DTO for the file to be uploaded</param>
     public async Task<RecordResponseDto> CompleteUpload(
         long currentUserId,
         long organizationId,
@@ -349,7 +371,8 @@ public class FileBusiness
         long? dataSourceId,
         long? objectStorageId,
         FileUploadCompleteRequestDto request,
-        List<long>? sensitivityLabelIds = null)
+        List<long>? sensitivityLabelIds = null,
+        CreateRecordFileUploadRequestDto? metadata = null)
     {
         // Resolve data source
         long realDataSourceId;
@@ -385,19 +408,19 @@ public class FileBusiness
         var fileClass = await _classBusiness.GetOrCreateClass(currentUserId, organizationId, projectId, "File");
         var recordRequest = new CreateRecordRequestDto
         {
-            Properties = new JsonObject
+            Properties = metadata?.Properties ?? new JsonObject
             {
                 ["fileType"] = Path.GetExtension(request.FileName).TrimStart('.').ToLower(),
                 ["uploadedViaChunking"] = true,
                 ["originalUploadId"] = request.UploadId
             },
-            Name = request.FileName,
+            Name = metadata?.Name ?? request.FileName,
             ObjectStorageId = objectStorage.Id,
-            Description = $"File uploaded via chunked upload (session: {request.UploadId})",
-            OriginalId = guid.ToString(),
+            Description = metadata?.Description ?? $"File uploaded via chunked upload (session: {request.UploadId})",
+            OriginalId = metadata?.OriginalId ?? guid.ToString(),
             Uri = uri,
-            ClassId = fileClass.Id,
-            ClassName = fileClass.Name,
+            ClassId = metadata?.ClassId ?? fileClass.Id,
+            ClassName = metadata?.ClassName ?? fileClass.Name,
             FileType = Path.GetExtension(request.FileName).TrimStart('.').ToLower()
         };
 
