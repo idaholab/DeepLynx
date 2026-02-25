@@ -233,11 +233,10 @@ const LayoutShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                     <li key={org.id} className="w-full">
                       <a
                         onClick={() => handleOrganizationSwitch(org)}
-                        className={`flex items-center gap-2 w-full max-w-full ${
-                          organization?.organizationId === org.id
-                            ? "active bg-info/60"
-                            : ""
-                        }`}
+                        className={`flex items-center gap-2 w-full max-w-full ${organization?.organizationId === org.id
+                          ? "active bg-info/60"
+                          : ""
+                          }`}
                       >
                         <div className="min-w-0 flex-1 overflow-hidden">
                           <div className=" font-medium truncate">
@@ -341,9 +340,8 @@ const LayoutShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                 </Link>
               </li>
               <li className="mt-5">
-                <div className="relative">
+                <div className="relative flex justify-center">
                   <div
-                    role="button"
                     className="cursor-pointer"
                     onClick={() => setIsUserDropdownOpen(!isUserDropdownOpen)}
                   >
@@ -411,15 +409,14 @@ const LayoutShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                   <QuestionMarkCircleIcon className="size-10" />
                 </Link>
               </li>
-              <span className="text-xs font-bold text-base-200/50">V0.3.0</span>
+              <span className="text-xs font-bold text-base-200/50">v0.4.0</span>
             </ul>
           </aside>
         </div>
         <SideMenu onToggle={handleMenuToggle} />
         <main
-          className={`transition-all duration-300 w-full mt-20 ${
-            isMenuCollapsed ? "ml-40" : "ml-82"
-          }`}
+          className={`transition-all duration-300 w-full mt-20 ${isMenuCollapsed ? "ml-40" : "ml-82"
+            }`}
         >
           {/* Organization Banne */}
           <div className="sticky top-25 z-20">

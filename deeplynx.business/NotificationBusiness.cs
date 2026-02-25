@@ -171,7 +171,7 @@ public class NotificationBusiness : INotificationBusiness
             var smtpPortStr = Environment.GetEnvironmentVariable("SMTP_PORT");
             if (!int.TryParse(smtpPortStr, out var smtpPort)) smtpPort = 587; //default
 
-            var emailPassword = "";
+            var emailCred = "";
 
             // Build the message based on context
             var message = await BuildInvitationMessage(isNewUser, organizationId, projectId);
@@ -252,7 +252,7 @@ public class NotificationBusiness : INotificationBusiness
             using var smtpClient = new SmtpClient(smtpServer, smtpPort);
             smtpClient.EnableSsl = enableSsl;
             smtpClient.UseDefaultCredentials = false;
-            smtpClient.Credentials = new NetworkCredential(fromEmail, emailPassword);
+            smtpClient.Credentials = new NetworkCredential(fromEmail, emailCred);
 
             // Send the email
             await smtpClient.SendMailAsync(mailMessage);
