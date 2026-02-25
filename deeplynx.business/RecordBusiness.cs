@@ -19,26 +19,36 @@ public class RecordBusiness : IRecordBusiness
     private readonly DeeplynxContext _context;
     private readonly IEventBusiness _eventBusiness;
     private readonly ITagBusiness _tagBusiness;
+    private readonly ISensitivityLabelBusiness _labelBusiness;
+    private readonly ISensitivityLabelService _sensitivityLabelService;
 
     /// <summary>
     ///     Initializes a new instance of the <see cref="RecordBusiness" /> class.
     /// </summary>
     /// <param name="context">The database context used for the record operations.</param>
     /// <param name="eventBusiness">Used for logging events during create, update, and delete Operations.</param>
-    /// ///
     /// <param name="tagBusiness">Used for creating tags related to a record.</param>
-    public RecordBusiness(DeeplynxContext context, IEventBusiness eventBusiness,
-        IBulkCopyUpsertExecutor bulkCopyUpsertExecutor, ITagBusiness tagBusiness)
+    /// <param name="labelBusiness">Used for creating tags related to a record.</param>
+    public RecordBusiness(
+        DeeplynxContext context,
+        IEventBusiness eventBusiness,
+        IBulkCopyUpsertExecutor bulkCopyUpsertExecutor,
+        ITagBusiness tagBusiness,
+        ISensitivityLabelBusiness labelBusiness,
+        ISensitivityLabelService sensitivityLabelService)
     {
         _context = context;
         _eventBusiness = eventBusiness;
         _tagBusiness = tagBusiness;
         _bulkCopyUpsertExecutor = bulkCopyUpsertExecutor;
+        _labelBusiness = labelBusiness;
+        _sensitivityLabelService = sensitivityLabelService;
     }
 
     /// <summary>
     ///     Retrieves all records for a specific project and datasource.
     /// </summary>
+    /// <param name="currentUserId">The ID of current user</param>
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
     /// <param name="projectId">The ID of the project whose records are to be retrieved</param>
     /// <param name="dataSourceId">(Optional) The ID of the datasource by which to filter records</param>
@@ -46,7 +56,8 @@ public class RecordBusiness : IRecordBusiness
     /// <param name="fileType">File extension to filter by (e.g., pdf, png, jpg)</param>
     /// <returns>A list of records based on the applied filters.</returns>
     public async Task<List<RecordResponseDto>> GetAllRecords(
-        long organizationId, long projectId, long? dataSourceId, bool hideArchived, string? fileType = null)
+        long currentUserId, long organizationId, long projectId, long? dataSourceId, bool hideArchived,
+        string? fileType = null)
     {
         var recordQuery = _context.Records
             .Where(r => r.ProjectId == projectId && r.OrganizationId == organizationId);
@@ -61,8 +72,90 @@ public class RecordBusiness : IRecordBusiness
             recordQuery = recordQuery.Where(r => r.FileType == formattedFileType);
         }
 
+        // Load records with their labels and tags
         var records = await recordQuery
             .Include(r => r.Tags)
+            .Include(r => r.Labels)
+            .ToListAsync();
+
+        // Get user's authorized labels
+        var userAuthorizedLabels =
+            await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
+                currentUserId, organizationId, projectId, "read record");
+
+        // Filter records in memory based on sensitivity label access
+        var authorizedRecords = records.Where(r =>
+                r.Labels.Count == 0 || // If the record has no labels, allow access
+                r.Labels.All(label => userAuthorizedLabels.Contains(label.Id)) // User must have access to all labels
+        ).ToList();
+
+        return authorizedRecords
+            .Select(r => new RecordResponseDto
+            {
+                Id = r.Id,
+                Description = r.Description,
+                Uri = r.Uri,
+                Properties = r.Properties,
+                OriginalId = r.OriginalId,
+                Name = r.Name,
+                ClassId = r.ClassId,
+                DataSourceId = r.DataSourceId,
+                ProjectId = r.ProjectId,
+                OrganizationId = r.OrganizationId,
+                LastUpdatedBy = r.LastUpdatedBy,
+                LastUpdatedAt = r.LastUpdatedAt,
+                IsArchived = r.IsArchived,
+                FileType = r.FileType,
+                Tags = r.Tags.Select(t => new RecordTagDto
+                {
+                    Id = t.Id,
+                    Name = t.Name
+                }).ToList(),
+                Labels = r.Labels.Select(l => new RecordLabelDto
+                {
+                    Id = l.Id,
+                    Name = l.Name
+                }).ToList()
+            }).ToList();
+    }
+
+    /// <summary>
+    ///     Get all records that contain all given tags
+    /// </summary>
+    /// <param name="currentUserId">The ID of current user</param>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <param name="projectId">The ID of the project whose records are to be retrieved</param>
+    /// <param name="tagIds">List of tag IDs - returned records must contain every given ID</param>
+    /// <param name="hideArchived">Flag indicating whether to hide archived records from the result</param>
+    /// <returns></returns>
+    public async Task<List<RecordResponseDto>> GetRecordsByTags(
+        long currentUserId, long organizationId, long projectId, long[] tagIds, bool hideArchived)
+    {
+        var recordQuery = _context.Records
+            .Where(r => r.ProjectId == projectId && r.OrganizationId == organizationId);
+
+        if (hideArchived) recordQuery = recordQuery.Where(r => !r.IsArchived);
+
+        // Only return records that contain ALL given IDs
+        recordQuery = recordQuery.Where(r =>
+            tagIds.All(tagId => r.Tags.Any(t => t.Id == tagId)));
+
+        // Filtering Record By User's Sensitivity Label access
+        var userAuthorizedLabels =
+            await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
+                currentUserId, organizationId, projectId, "read record");
+
+        recordQuery = recordQuery.Where(r =>
+                !r.Labels.Any() || // If the record has no labels, allow access
+                r.Labels.All(label =>
+                    userAuthorizedLabels
+                        .Contains(label
+                            .Id)) // If the record has multiple labels, the user must have access to all of them
+        );
+
+        var records = await recordQuery
+            .Include(r => r.Tags)
+            .Include(r => r.Labels)
             .ToListAsync();
 
         return records
@@ -86,53 +179,11 @@ public class RecordBusiness : IRecordBusiness
                 {
                     Id = t.Id,
                     Name = t.Name
-                }).ToList()
-            }).ToList();
-    }
-
-    /// <summary>
-    ///     Get all records that contain all given tags
-    /// </summary>
-    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
-    /// <param name="projectId">The ID of the project whose records are to be retrieved</param>
-    /// <param name="tagIds">List of tag IDs - returned records must contain every given ID</param>
-    /// <param name="hideArchived">Flag indicating whether to hide archived records from the result</param>
-    /// <returns></returns>
-    public async Task<List<RecordResponseDto>> GetRecordsByTags(
-        long organizationId, long projectId, long[] tagIds, bool hideArchived)
-    {
-        var recordQuery = _context.Records
-            .Where(r => r.ProjectId == projectId && r.OrganizationId == organizationId);
-
-        if (hideArchived) recordQuery = recordQuery.Where(r => !r.IsArchived);
-
-        // Only return records that contain ALL given IDs
-        recordQuery = recordQuery.Where(r =>
-            tagIds.All(tagId => r.Tags.Any(t => t.Id == tagId)));
-
-        var records = await recordQuery.Include(r => r.Tags).ToListAsync();
-
-        return records
-            .Select(r => new RecordResponseDto
-            {
-                Id = r.Id,
-                Description = r.Description,
-                Uri = r.Uri,
-                Properties = r.Properties,
-                OriginalId = r.OriginalId,
-                Name = r.Name,
-                ClassId = r.ClassId,
-                DataSourceId = r.DataSourceId,
-                ProjectId = r.ProjectId,
-                OrganizationId = r.OrganizationId,
-                LastUpdatedBy = r.LastUpdatedBy,
-                LastUpdatedAt = r.LastUpdatedAt,
-                IsArchived = r.IsArchived,
-                FileType = r.FileType,
-                Tags = r.Tags.Select(t => new RecordTagDto
+                }).ToList(),
+                Labels = r.Labels.Select(l => new RecordLabelDto
                 {
-                    Id = t.Id,
-                    Name = t.Name
+                    Id = l.Id,
+                    Name = l.Name
                 }).ToList()
             }).ToList();
     }
@@ -140,6 +191,7 @@ public class RecordBusiness : IRecordBusiness
     /// <summary>
     ///     Retrieves a specific record by its ID
     /// </summary>
+    /// <param name="currentUserId">The ID of current user</param>
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
     /// <param name="projectId">The project of the record to retrieve</param>
     /// <param name="recordId">The ID of the record to retrieve</param>
@@ -147,14 +199,19 @@ public class RecordBusiness : IRecordBusiness
     /// <returns>The record in question</returns>
     /// <exception cref="KeyNotFoundException">Returned if record not found</exception>
     public async Task<RecordResponseDto> GetRecord(
-        long organizationId, long projectId, long recordId, bool hideArchived)
+        long currentUserId, long organizationId, long projectId, long recordId, bool hideArchived)
     {
         var record = await _context.Records
-            .Where(r => r.ProjectId == projectId && r.Id == recordId && r.OrganizationId == organizationId)
+            .Where(r => r.ProjectId == projectId
+                        && r.Id == recordId
+                        && r.OrganizationId == organizationId
+                        && (!hideArchived || !r.IsArchived))
             .Include(r => r.Tags)
+            .Include(r => r.Labels)
             .FirstOrDefaultAsync();
 
-        if (record == null) throw new KeyNotFoundException($"Record with id {recordId} not found");
+        if (record == null)
+            throw new KeyNotFoundException($"Record with id {recordId} not found");
 
         if (hideArchived && record.IsArchived) throw new KeyNotFoundException($"Record with id {recordId} is archived");
 
@@ -179,6 +236,11 @@ public class RecordBusiness : IRecordBusiness
             {
                 Id = t.Id,
                 Name = t.Name
+            }).ToList(),
+            Labels = record.Labels.Select(t => new RecordLabelDto
+            {
+                Id = t.Id,
+                Name = t.Name
             }).ToList()
         };
     }
@@ -186,6 +248,7 @@ public class RecordBusiness : IRecordBusiness
     /// <summary>
     ///     Attaches a tag to a record
     /// </summary>
+    /// <param name="currentUserId">The ID of current user</param>
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
     /// <param name="projectId">Project ID for the record and tag</param>
     /// <param name="recordId">The ID of the record</param>
@@ -193,40 +256,37 @@ public class RecordBusiness : IRecordBusiness
     /// <returns>True if successful</returns>
     /// <exception cref="KeyNotFoundException">Thrown if the record or tag are not found</exception>
     /// <exception cref="Exception">Thrown if the tag is already attached to the record</exception>
-    public async Task<bool> AttachTag(long organizationId, long projectId, long recordId, long tagId)
+    public async Task<bool> AttachTag(long currentUserId, long organizationId, long projectId, long recordId,
+        long tagId)
     {
-        var recordExists = await _context.Records
-            .AnyAsync(r => r.Id == recordId
-                           && r.ProjectId == projectId
-                           && r.OrganizationId == organizationId
-                           && !r.IsArchived);
+        var record = await _context.Records
+            .Where(r => r.ProjectId == projectId
+                        && r.Id == recordId
+                        && r.OrganizationId == organizationId
+                        && !r.IsArchived)
+            .Include(r => r.Tags)
+            .Include(r => r.Labels)
+            .FirstOrDefaultAsync();
 
-        if (!recordExists)
+        if (record == null)
             throw new KeyNotFoundException($"Record with id {recordId} not found or is archived.");
 
-        var tagExists = await _context.Tags
-            .AnyAsync(t => t.Id == tagId
-                           && t.OrganizationId == organizationId
-                           && (t.ProjectId == projectId || t.ProjectId == null)
-                           && !t.IsArchived);
-
-        if (!tagExists)
-            throw new KeyNotFoundException($"Tag with id {tagId} not found or is archived.");
-
-        var alreadyAttached = await _context.Records
-            .Where(r => r.Id == recordId)
-            .SelectMany(r => r.Tags)
-            .AnyAsync(t => t.Id == tagId);
-
+        // Check if already attached
+        var alreadyAttached = record.Tags.Any(t => t.Id == tagId);
         if (alreadyAttached)
             throw new InvalidOperationException($"Tag with id {tagId} is already attached to record {recordId}");
 
-        // Only now load entities for modification
-        var record = await _context.Records
-            .Include(r => r.Tags)
-            .FirstOrDefaultAsync(r => r.Id == recordId);
+        // Fetch and validate tag in one query with all conditions
+        var tag = await _context.Tags
+            .Where(t => t.Id == tagId
+                        && t.OrganizationId == organizationId
+                        && (t.ProjectId == projectId || t.ProjectId == null)
+                        && !t.IsArchived)
+            .FirstOrDefaultAsync();
 
-        var tag = await _context.Tags.FindAsync(tagId);
+        if (tag == null)
+            throw new KeyNotFoundException(
+                $"Tag with id {tagId} not found, is archived, or does not belong to this organization/project.");
 
         record.Tags.Add(tag);
         await _context.SaveChangesAsync();
@@ -235,41 +295,145 @@ public class RecordBusiness : IRecordBusiness
     }
 
     /// <summary>
+    ///     Attaches a sensitivity label to a record
+    /// </summary>
+    /// <param name="currentUserId">The ID of current user</param>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <param name="projectId">Project ID for the record and label</param>
+    /// <param name="recordId">The ID of the record</param>
+    /// <param name="labelId">The ID of the label</param>
+    /// <returns>True if successful</returns>
+    /// <exception cref="KeyNotFoundException">Thrown if the record or label are not found</exception>
+    /// <exception cref="Exception">Thrown if the label is already attached to the record</exception>
+    public async Task<bool> AttachLabel(long currentUserId, long organizationId, long projectId, long recordId,
+        long labelId)
+    {
+        var record = await _context.Records
+            .Where(r => r.ProjectId == projectId
+                        && r.Id == recordId
+                        && r.OrganizationId == organizationId
+                        && !r.IsArchived)
+            .Include(r => r.Labels)
+            .FirstOrDefaultAsync();
+
+        if (record == null)
+            throw new KeyNotFoundException($"Record with id {recordId} not found or is archived.");
+
+        // Check if already attached
+        var alreadyAttached = record.Labels.Any(t => t.Id == labelId);
+        if (alreadyAttached)
+            throw new InvalidOperationException($"Label with id {labelId} is already attached to record {recordId}");
+
+        // Fetch and validate label in one query with all conditions
+        var label = await _context.SensitivityLabels
+            .Where(t => t.Id == labelId
+                        && t.OrganizationId == organizationId
+                        && (t.ProjectId == projectId || t.ProjectId == null)
+                        && !t.IsArchived)
+            .FirstOrDefaultAsync();
+
+        if (label == null)
+            throw new KeyNotFoundException(
+                $"Label with id {labelId} not found, is archived, or does not belong to this organization/project.");
+
+        record.Labels.Add(label);
+        await _context.SaveChangesAsync();
+
+        return true;
+    }
+
+    /// <summary>
     ///     Unattach a tag from a record
     /// </summary>
+    /// <param name="currentUserId">The ID of current user</param>
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
     /// <param name="projectId">Project ID for the record and tag</param>
     /// <param name="recordId">The ID of the record</param>
     /// <param name="tagId">The ID of the tag</param>
     /// <returns>True if successful</returns>
     /// <exception cref="KeyNotFoundException">Thrown if the record or tag are not found</exception>
-    public async Task<bool> UnattachTag(long organizationId, long projectId, long recordId, long tagId)
+    public async Task<bool> UnattachTag(long currentUserId, long organizationId, long projectId, long recordId,
+        long tagId)
     {
-        var recordExists = await _context.Records
-            .AnyAsync(r => r.Id == recordId
-                           && r.ProjectId == projectId
-                           && r.OrganizationId == organizationId
-                           && !r.IsArchived);
+        var record = await _context.Records
+            .Where(r => r.ProjectId == projectId
+                        && r.Id == recordId
+                        && r.OrganizationId == organizationId
+                        && !r.IsArchived)
+            .Include(r => r.Tags)
+            .Include(r => r.Labels)
+            .FirstOrDefaultAsync();
 
-        if (!recordExists)
+        if (record == null)
             throw new KeyNotFoundException($"Record with id {recordId} not found or is archived.");
 
-        var tagExists = await _context.Tags
-            .AnyAsync(t => t.Id == tagId
-                           && t.OrganizationId == organizationId
-                           && (t.ProjectId == projectId || t.ProjectId == null)
-                           && !t.IsArchived);
+        // Find the tag
+        var tag = record.Tags.FirstOrDefault(t => t.Id == tagId);
 
-        if (!tagExists)
-            throw new KeyNotFoundException($"Tag with id {tagId} not found or is archived.");
+        if (tag == null)
+            throw new KeyNotFoundException($"Tag with id {tagId} is not attached to record {recordId}");
 
-        // Only now load entities for modification
-        var record = await _context.Records
-            .Include(r => r.Tags)
-            .FirstOrDefaultAsync(r => r.Id == recordId);
-        var tag = await _context.Tags.FindAsync(tagId);
+        if (tag.IsArchived ||
+            tag.OrganizationId != organizationId ||
+            (tag.ProjectId.HasValue && tag.ProjectId != projectId))
+        {
+            throw new InvalidOperationException(
+                $"Tag with id {tagId} is archived or does not belong to this organization/project.");
+        }
 
         record.Tags.Remove(tag);
+        await _context.SaveChangesAsync();
+
+        return true;
+    }
+
+    /// <summary>
+    ///     Unattach a sensitivity label from a record
+    /// </summary>
+    /// <param name="currentUserId">The ID of current user</param>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <param name="projectId">Project ID for the record and sensitivity label</param>
+    /// <param name="recordId">The ID of the record</param>
+    /// <param name="labelId">The ID of the label</param>
+    /// <returns>True if successful</returns>
+    /// <exception cref="KeyNotFoundException">Thrown if the record or sensitivity label are not found</exception>
+    public async Task<bool> UnattachLabel(long currentUserId, long organizationId, long projectId, long recordId,
+        long labelId)
+    {
+        var sensitivityLabelRequired =
+            await _sensitivityLabelService.IsSensitivityLabelRequired(organizationId, projectId);
+
+        var record = await _context.Records
+            .Where(r => r.ProjectId == projectId
+                        && r.Id == recordId
+                        && r.OrganizationId == organizationId
+                        && !r.IsArchived)
+            .Include(r => r.Labels)
+            .FirstOrDefaultAsync();
+
+        if (record == null)
+            throw new KeyNotFoundException($"Record with id {recordId} not found or is archived.");
+
+        var label = record.Labels.FirstOrDefault(t => t.Id == labelId);
+
+        if (label == null)
+            throw new KeyNotFoundException($"Label with id {labelId} is not attached to record {recordId}");
+
+        if (label.IsArchived ||
+            label.OrganizationId != organizationId ||
+            (label.ProjectId.HasValue && label.ProjectId != projectId))
+        {
+            throw new InvalidOperationException(
+                $"Label with id {labelId} is archived or does not belong to this organization/project.");
+        }
+
+        if (sensitivityLabelRequired && record.Labels.Count == 1)
+        {
+            throw new InvalidOperationException(
+                $"Sensitivity labels are required on all records. Add a new label first to remove this one");
+        }
+
+        record.Labels.Remove(label);
         await _context.SaveChangesAsync();
 
         return true;
@@ -283,6 +447,9 @@ public class RecordBusiness : IRecordBusiness
     /// <exception cref="Exception">Thrown if tags unable to be attached</exception>
     public async Task<bool> BulkAttachTags(List<RecordTagLinkDto> dtos)
     {
+        if (!dtos.Any())
+            return true;
+
         // Bulk insert into record_tags
         var sql = @"INSERT INTO deeplynx.record_tags (record_id, tag_id) VALUES {0} ON CONFLICT DO NOTHING;";
 
@@ -295,7 +462,7 @@ public class RecordBusiness : IRecordBusiness
         }));
 
         // stringify params and comma separate them
-        var valueTuples = string.Join(", ", dtos.Select((dto, i) => $"(@record{i}_id, @tag{i}_id)"));
+        var valueTuples = string.Join(", ", dtos.Select((_, i) => $"(@record{i}_id, @tag{i}_id)"));
 
         // put everything together and execute the query
         sql = string.Format(sql, valueTuples);
@@ -306,15 +473,70 @@ public class RecordBusiness : IRecordBusiness
     }
 
     /// <summary>
+    ///     Bulk attach sensitivity labels and records
+    /// </summary>
+    /// <param name="currentUserId">The ID of the user making the request</param>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <param name="projectId">The ID of the project to which the records belong</param>
+    /// <param name="recordIds">The IDs of the records to which the labels will be attached</param>
+    /// <param name="sensitivityLabelIds">The IDs of the labels to attach</param>
+    /// <returns>True if successful</returns>
+    /// <exception cref="UnauthorizedAccessException">Thrown if user doesn't have access to the labels</exception>
+    /// <exception cref="ArgumentException">Thrown if recordIds or sensitivityLabelIds are empty</exception>
+    public async Task<bool> BulkAttachLabels(
+        long currentUserId, long organizationId, long projectId,
+        List<long> recordIds, List<long> sensitivityLabelIds)
+    {
+        if (recordIds == null || !recordIds.Any())
+            throw new ArgumentException("Record IDs list cannot be null or empty", nameof(recordIds));
+
+        if (sensitivityLabelIds == null || !sensitivityLabelIds.Any())
+            throw new ArgumentException("Sensitivity label IDs list cannot be null or empty",
+                nameof(sensitivityLabelIds));
+
+        // Create list of record and label ID pairs
+        var recordLabelPairs = new List<(long recordId, long labelId)>();
+        foreach (var recordId in recordIds.Distinct())
+        {
+            foreach (var labelId in sensitivityLabelIds.Distinct())
+            {
+                recordLabelPairs.Add((recordId, labelId));
+            }
+        }
+
+        // Bulk insert into record_labels using raw SQL
+        var sql = @"INSERT INTO deeplynx.record_labels (record_id, label_id) 
+                    VALUES {0} ON CONFLICT (record_id, label_id) DO NOTHING;";
+
+        // Establish parameters
+        var parameters = new List<NpgsqlParameter>();
+        parameters.AddRange(recordLabelPairs.SelectMany((pair, i) => new[]
+        {
+            new NpgsqlParameter($"@record{i}_id", pair.recordId),
+            new NpgsqlParameter($"@label{i}_id", pair.labelId)
+        }));
+        
+        var valueTuples = string.Join(", ", recordLabelPairs.Select((_, i) => $"(@record{i}_id, @label{i}_id)"));
+        
+        sql = string.Format(sql, valueTuples);
+
+        await _context.Database.ExecuteSqlRawAsync(sql, parameters.ToArray());
+
+        return true;
+    }
+
+    /// <summary>
     ///     Get records by their original ID
     /// </summary>
+    /// <param name="currentUserId">The ID current user making the request</param>
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
     /// <param name="projectId">The project ID to search within</param>
     /// <param name="originalIds">List of original IDs to validate</param>
     /// <returns>List of records that were found</returns>
     /// <exception cref="KeyNotFoundException">Thrown if one or more original IDs not found</exception>
     /// <exception cref="ArgumentException">Thrown if originalIds list is null or empty</exception>
-    public async Task<List<RecordResponseDto>> GetRecordsByOriginalId(long organizationId, long projectId,
+    public async Task<List<RecordResponseDto>> GetRecordsByOriginalId(long currentUserId, long organizationId,
+        long projectId,
         List<string> originalIds)
     {
         if (originalIds == null || !originalIds.Any())
@@ -329,13 +551,22 @@ public class RecordBusiness : IRecordBusiness
         if (!cleanOriginalIds.Any())
             throw new ArgumentException("No valid original IDs provided", nameof(originalIds));
 
+        // Filtering Record By User's Sensitivity Label access
+        var userAuthorizedLabels =
+            await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
+                currentUserId, organizationId, projectId, "read record");
+
+
         // Query for existing records (excluding archived)
         var existingRecords = await _context.Records
+            .Include(r => r.Labels)
+            .Include(r => r.Tags)
             .Where(r => r.ProjectId == projectId
                         && r.OrganizationId == organizationId
                         && !r.IsArchived
                         && cleanOriginalIds.Contains(r.OriginalId))
-            .Include(r => r.Tags)
+            .Where(r => !r.Labels.Any() ||
+                        r.Labels.All(label => userAuthorizedLabels.Contains(label.Id)))
             .ToListAsync();
 
         // Check for missing records
@@ -344,7 +575,7 @@ public class RecordBusiness : IRecordBusiness
 
         if (missingOriginalIds.Any())
             throw new KeyNotFoundException(
-                $"Records not found with original IDs: {string.Join(", ", missingOriginalIds)}");
+                $"Records not found or access is unauthorized with original IDs: {string.Join(", ", missingOriginalIds)}");
 
         // Convert to DTOs
         return existingRecords.Select(r => new RecordResponseDto
@@ -367,7 +598,12 @@ public class RecordBusiness : IRecordBusiness
             {
                 Id = t.Id,
                 Name = t.Name
-            }).ToList()
+            }).ToList(),
+            Labels = r.Labels.Select(l => new RecordLabelDto()
+            {
+                Id = l.Id,
+                Name = l.Name
+            }).ToList(),
         }).ToList();
     }
 
@@ -379,12 +615,12 @@ public class RecordBusiness : IRecordBusiness
     /// <param name="projectId">The ID of the project under which to create the record</param>
     /// <param name="dataSourceId">The ID of the data source under which to create the record</param>
     /// <param name="dto">The data transfer object containing details on the record to be created</param>
+    /// <param name="sensitivityLabelIds">The IDs of the labels to attach</param>
     /// <returns>The newly created metadata record</returns>
     /// <exception cref="KeyNotFoundException">Returned if the project or datasource are not found</exception>
     /// <exception cref="Exception">Returned if the metadata is too deeply nested</exception>
     public async Task<RecordResponseDto> CreateRecord(long currentUserId, long organizationId, long projectId,
-        long dataSourceId,
-        CreateRecordRequestDto dto)
+        long dataSourceId, CreateRecordRequestDto dto, List<long>? sensitivityLabelIds = null)
     {
         ValidationHelper.ValidateModel(dto);
         await ExistenceHelper.EnsureDataSourceExistsForProjectAsync(_context, dataSourceId, projectId);
@@ -397,7 +633,8 @@ public class RecordBusiness : IRecordBusiness
             throw new Exception(
                 $"The depth of the JSON structure exceeds the maximum allowed depth of 3. Current depth of properties is {maxDepth}.");
 
-        if (dto.ObjectStorageId != null) await CheckObjectStorageExists(projectId, dto.ObjectStorageId.Value);
+        if (dto.ObjectStorageId != null)
+            await CheckObjectStorageExists(organizationId, projectId, dto.ObjectStorageId.Value);
 
         await using var transaction = await _context.Database.BeginTransactionAsync();
 
@@ -417,14 +654,29 @@ public class RecordBusiness : IRecordBusiness
                 LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
                 LastUpdatedBy = currentUserId,
                 FileType = dto.FileType,
-                OrganizationId = organizationId
+                OrganizationId = organizationId,
             };
 
             _context.Records.Add(record);
             await _context.SaveChangesAsync();
 
-            // We need to handle tag creation/linking separate of record object save
-            var tags = await ProcessTags(currentUserId, organizationId, projectId, record.Id, dto.Tags);
+            // Process tags (can be created on-the-fly)
+            var tags = await ProcessTags(
+                currentUserId, organizationId, projectId, record.Id, dto.Tags);
+
+            if (sensitivityLabelIds?.Count > 0)
+            {
+                var labels = await _context.SensitivityLabels
+                    .Where(l => sensitivityLabelIds.Contains(l.Id))
+                    .ToListAsync();
+
+                foreach (var label in labels)
+                {
+                    record.Labels.Add(label);
+                }
+
+                await _context.SaveChangesAsync();
+            }
 
             // Log Record Create Event
             await _eventBusiness.CreateEvent(
@@ -460,13 +712,19 @@ public class RecordBusiness : IRecordBusiness
                 LastUpdatedAt = record.LastUpdatedAt,
                 IsArchived = record.IsArchived,
                 FileType = record.FileType,
-                Tags = tags
+                Tags = tags,
+                Labels = record.Labels.Select(l => new RecordLabelDto()
+                {
+                    Id = l.Id,
+                    Name = l.Name
+                }).ToList(),
             };
         }
-        catch
+        catch (Exception exc)
         {
             await transaction.RollbackAsync();
-            throw new Exception("Unable to create record and/or create/attach tags");
+            throw new DependencyDeletionException(
+                $"unable to create record or its downstream dependents: {exc}");
         }
     }
 
@@ -478,6 +736,7 @@ public class RecordBusiness : IRecordBusiness
     /// <param name="projectId">The ID of the project under which to create the record</param>
     /// <param name="dataSourceId">The ID of the data source under which to create the record</param>
     /// <param name="records">Enumerable list for of record transfer objects containing details on the records to be created</param>
+    /// <param name="sensitivityLabelIds">The IDs of the labels to attach</param>
     /// <returns>The newly created metadata record</returns>
     /// <exception cref="KeyNotFoundException">Returned if the project or datasource are not found</exception>
     /// <exception cref="Exception">Returned on other general errors</exception>
@@ -486,13 +745,39 @@ public class RecordBusiness : IRecordBusiness
         long organizationId,
         long projectId,
         long dataSourceId,
-        List<CreateRecordRequestDto> records)
+        List<CreateRecordRequestDto> records,
+        List<long>? sensitivityLabelIds = null)
     {
         await ExistenceHelper.EnsureDataSourceExistsForProjectAsync(_context, dataSourceId, projectId);
 
         if (records.Count == 0) throw new Exception("Unable to bulk create records: no records selected for creation");
 
-        await EnsureMultipleObjectStoragesExistOnce(projectId, records);
+        await EnsureMultipleObjectStoragesExistOnce(organizationId, projectId, records);
+        
+        var sensitivityLabelsRequired = await _sensitivityLabelService.IsSensitivityLabelRequired(organizationId, projectId);
+
+        if (sensitivityLabelsRequired && (sensitivityLabelIds == null || sensitivityLabelIds.Count == 0))
+        {
+            throw new InvalidOperationException(
+                $"Sensitivity labels are required on all records. Add a new label first to remove this one");
+        }
+
+        // If Sensitivity Labels are provided Ensure the user has Write Record Permissions
+        if (sensitivityLabelIds != null || sensitivityLabelIds?.Count > 0)
+        {
+            var userAuthorizedLabels =
+                await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
+                    currentUserId, organizationId, projectId, "write record");
+
+            // if user has no authorized labels or if one of the provided labels does not match their authorized labels 
+            if (userAuthorizedLabels.Count < 1 ||
+                (sensitivityLabelIds != null &&
+                 !sensitivityLabelIds.All(id => userAuthorizedLabels.Contains(id))))
+            {
+                throw new UnauthorizedAccessException(
+                    "Unable to bulk create records: You do not have write record access with at least one of the provided sensitivity Labels");
+            }
+        }
 
         var conn = (NpgsqlConnection)_context.Database.GetDbConnection();
         if (conn.State != ConnectionState.Open) await conn.OpenAsync();
@@ -500,6 +785,24 @@ public class RecordBusiness : IRecordBusiness
 
         var now = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
 
+        // 1. Extract all unique tag names from request DTOs
+        var allTagNames = records
+            .Where(r => r.Tags != null && r.Tags.Count > 0)
+            .SelectMany(r => r.Tags)
+            .Distinct()
+            .ToList();
+
+        Dictionary<string, long> tagNameToIdMap = new();
+
+        // 2. Bulk upsert tags (before record insertion)
+        if (allTagNames.Count > 0)
+        {
+            var tagDtos = allTagNames.Select(name => new CreateTagRequestDto { Name = name }).ToList();
+            var createdTags = await _tagBusiness.BulkCreateTags(organizationId, currentUserId, projectId, tagDtos);
+            tagNameToIdMap = createdTags.ToDictionary(t => t.Name, t => t.Id);
+        }
+
+        // 3. Bulk insert records
         const string createTempSql = @"
         CREATE TEMP TABLE tmp_records
         (
@@ -582,6 +885,163 @@ public class RecordBusiness : IRecordBusiness
             MapRecord
         );
 
+        // if sensitivityLabelIds are provided, Bulk insert record-label relationships
+        if (sensitivityLabelIds != null && sensitivityLabelIds.Count > 0)
+        {
+            const string createTempLabelsSql = @"
+                CREATE TEMP TABLE tmp_record_labels
+                (
+                    record_id BIGINT NOT NULL,
+                    label_id BIGINT NOT NULL
+                ) ON COMMIT DROP;";
+
+            await using var createTempLabelsCmd = new NpgsqlCommand(createTempLabelsSql, conn, tx);
+            await createTempLabelsCmd.ExecuteNonQueryAsync();
+
+            const string copyLabelsCmd = @"
+                COPY tmp_record_labels (record_id, label_id)
+                FROM STDIN (FORMAT BINARY)";
+
+            // Wrap the writer in its own scope
+            {
+                await using var writer = await conn.BeginBinaryImportAsync(copyLabelsCmd);
+
+                // Apply the same label(s) to all inserted records
+                foreach (var record in inserted)
+                {
+                    foreach (var labelId in sensitivityLabelIds)
+                    {
+                        await writer.StartRowAsync();
+                        await writer.WriteAsync(record.Id, NpgsqlDbType.Bigint);
+                        await writer.WriteAsync(labelId, NpgsqlDbType.Bigint);
+                    }
+                }
+
+                await writer.CompleteAsync();
+            } // Writer is disposed here
+
+            const string insertLabelsSql = @"
+                INSERT INTO deeplynx.record_labels (record_id, label_id)
+                SELECT record_id, label_id FROM tmp_record_labels
+                ON CONFLICT (record_id, label_id) DO NOTHING;";
+
+            await using var insertLabelsCmd = new NpgsqlCommand(insertLabelsSql, conn, tx);
+            await insertLabelsCmd.ExecuteNonQueryAsync();
+        }
+
+        // Bulk insert record-tag relationships
+        if (tagNameToIdMap.Count > 0)
+        {
+            const string createTempTagsSql = @"
+                CREATE TEMP TABLE tmp_record_tags
+                (
+                    record_id BIGINT NOT NULL,
+                    tag_id BIGINT NOT NULL
+                ) ON COMMIT DROP;";
+
+            await using var createTempTagsCmd = new NpgsqlCommand(createTempTagsSql, conn, tx);
+            await createTempTagsCmd.ExecuteNonQueryAsync();
+
+            const string copyTagsCmd = @"
+                COPY tmp_record_tags (record_id, tag_id)
+                FROM STDIN (FORMAT BINARY)";
+
+            // Wrap the writer in its own scope
+            {
+                await using var writer = await conn.BeginBinaryImportAsync(copyTagsCmd);
+
+                for (int i = 0; i < records.Count; i++)
+                {
+                    var dto = records[i];
+                    var record = inserted[i];
+
+                    if (dto.Tags != null && dto.Tags.Count > 0)
+                    {
+                        foreach (var tagName in dto.Tags)
+                        {
+                            if (tagNameToIdMap.TryGetValue(tagName, out var tagId))
+                            {
+                                await writer.StartRowAsync();
+                                await writer.WriteAsync(record.Id, NpgsqlDbType.Bigint);
+                                await writer.WriteAsync(tagId, NpgsqlDbType.Bigint);
+                            }
+                        }
+                    }
+                }
+
+                await writer.CompleteAsync();
+            } // Writer is disposed here
+
+            const string insertTagsSql = @"
+                INSERT INTO deeplynx.record_tags (record_id, tag_id)
+                SELECT record_id, tag_id FROM tmp_record_tags
+                ON CONFLICT (record_id, tag_id) DO NOTHING;";
+
+            await using var insertTagsCmd = new NpgsqlCommand(insertTagsSql, conn, tx);
+            await insertTagsCmd.ExecuteNonQueryAsync();
+        }
+
+        // Add the tags and labels to the Inserted records for the response 
+        // Fetch label names
+        Dictionary<long, string> labelNameMap = new();
+        if (sensitivityLabelIds != null && sensitivityLabelIds.Count > 0)
+        {
+            const string fetchLabelNamesSql = @"
+        SELECT id, name 
+        FROM deeplynx.sensitivity_labels 
+        WHERE id = ANY(@labelIds)";
+
+            await using var cmd = new NpgsqlCommand(fetchLabelNamesSql, conn, tx);
+            cmd.Parameters.AddWithValue("labelIds", sensitivityLabelIds);
+
+            await using var reader = await cmd.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+            {
+                labelNameMap[reader.GetInt64(0)] = reader.GetString(1);
+            }
+        }
+
+        // Map tags and labels to inserted records
+        for (int i = 0; i < records.Count; i++)
+        {
+            var dto = records[i];
+            var record = inserted[i];
+
+            // Map tags (we already have ID and name)
+            if (dto.Tags != null && dto.Tags.Count > 0)
+            {
+                record.Tags = dto.Tags
+                    .Where(tagName => tagNameToIdMap.TryGetValue(tagName, out _))
+                    .Select(tagName => new RecordTagDto
+                    {
+                        Id = tagNameToIdMap[tagName],
+                        Name = tagName
+                    })
+                    .ToList();
+            }
+            else
+            {
+                record.Tags = new List<RecordTagDto>();
+            }
+
+            // Map labels (same labels applied to all records)
+            if (labelNameMap.Count > 0)
+            {
+                record.Labels = sensitivityLabelIds!
+                    .Where(id => labelNameMap.ContainsKey(id))
+                    .Select(id => new RecordLabelDto
+                    {
+                        Id = id,
+                        Name = labelNameMap[id]
+                    })
+                    .ToList();
+            }
+            else
+            {
+                record.Labels = new List<RecordLabelDto>();
+            }
+        }
+
         // events logging
         var events = new CreateEventRequestDto
         {
@@ -589,7 +1049,7 @@ public class RecordBusiness : IRecordBusiness
             EntityType = "record",
             DataSourceId = dataSourceId
         };
-        await _eventBusiness.CreateEvent(currentUserId, organizationId, projectId, events, 1);
+        await _eventBusiness.CreateEvent(currentUserId, organizationId, projectId, events, records.Count);
 
         await tx.CommitAsync();
         return inserted;
@@ -598,6 +1058,8 @@ public class RecordBusiness : IRecordBusiness
     /// <summary>
     ///     Archive a metadata record.
     /// </summary>
+    /// <param name="currentUserId">ID of the User executing this method.</param>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
     /// <param name="projectId">The project to which the record belongs</param>
     /// <param name="recordId">The record to be archived</param>
     /// <returns>Boolean indicating record was archived</returns>
@@ -605,6 +1067,7 @@ public class RecordBusiness : IRecordBusiness
     public async Task<bool> ArchiveRecord(long currentUserId, long organizationId, long projectId, long recordId)
     {
         var query = _context.Records
+            .Include(r => r.Labels)
             .Where(r => r.Id == recordId && r.OrganizationId == organizationId && r.ProjectId == projectId &&
                         !r.IsArchived);
 
@@ -668,6 +1131,7 @@ public class RecordBusiness : IRecordBusiness
     public async Task<bool> UnarchiveRecord(long currentUserId, long organizationId, long projectId, long recordId)
     {
         var query = _context.Records
+            .Include(r => r.Labels)
             .Where(r => r.Id == recordId && r.OrganizationId == organizationId && r.ProjectId == projectId &&
                         r.IsArchived);
 
@@ -735,12 +1199,16 @@ public class RecordBusiness : IRecordBusiness
     public async Task<bool> DeleteRecord(long currentUserId, long organizationId, long projectId, long recordId)
     {
         var query = _context.Records
-            .Where(r => r.Id == recordId && r.OrganizationId == organizationId && r.ProjectId == projectId);
+            .Include(r => r.Labels)
+            .Where(r => r.Id == recordId
+                        && r.OrganizationId == organizationId
+                        && r.ProjectId == projectId
+                        && !r.IsArchived);
 
         var returnedRecord = await query.FirstOrDefaultAsync();
 
         if (returnedRecord is null)
-            throw new KeyNotFoundException($"Record with id {recordId} not found");
+            throw new KeyNotFoundException($"Record with id {recordId} is archived or not found");
 
         var recordName = returnedRecord.Name;
         var recordDataSourceId = returnedRecord.DataSourceId;
@@ -779,6 +1247,7 @@ public class RecordBusiness : IRecordBusiness
         ValidationHelper.ValidateModel(dto);
 
         var query = _context.Records
+            .Include(r => r.Labels)
             .Where(r => r.Id == recordId && r.OrganizationId == organizationId && r.ProjectId == projectId &&
                         !r.IsArchived);
 
@@ -792,7 +1261,8 @@ public class RecordBusiness : IRecordBusiness
             throw new Exception(
                 $"The depth of the JSON structure exceeds the maximum allowed depth of 3. Current depth of properties is {maxDepth}.");
 
-        if (dto.ObjectStorageId != null) await CheckObjectStorageExists(projectId, dto.ObjectStorageId.Value);
+        if (dto.ObjectStorageId != null)
+            await CheckObjectStorageExists(organizationId, projectId, dto.ObjectStorageId.Value);
 
         returnedRecord.Uri = dto.Uri ?? returnedRecord.Uri;
         returnedRecord.Properties = dto.Properties != null ? dto.Properties.ToString() : returnedRecord.Properties;
@@ -850,7 +1320,8 @@ public class RecordBusiness : IRecordBusiness
     public async Task<int> GetRecordsCountByDataSource(
         long organizationId, long projectId, long dataSourceId, bool hideArchived)
     {
-        await ExistenceHelper.EnsureDataSourceExistsForProjectAsync(_context, dataSourceId, projectId, hideArchived);
+        await ExistenceHelper.EnsureDataSourceExistsForProjectAsync(_context, dataSourceId, projectId,
+            hideArchived);
         var recordQuery = _context.Records
             .Where(r => r.OrganizationId == organizationId && r.ProjectId == projectId &&
                         r.DataSourceId == dataSourceId);
@@ -861,24 +1332,19 @@ public class RecordBusiness : IRecordBusiness
     }
 
     /// <summary>
-    ///     Delete a metadata record.
+    ///     Returns a list of textual descriptors for the Records table to be used by Lattice.
     /// </summary>
-    /// <param name="projectId">The project to which the record belongs</param>
-    /// <param name="recordId">The record in question</param>
-    /// <returns>Boolean indicating record was deleted</returns>
-    /// <exception cref="KeyNotFoundException">Returned if the record to delete was not found.</exception>
-    /// TODO: return warning that historical data will be entirely wiped with this action
-    public async Task<bool> DeleteRecord(long projectId, long recordId)
+    /// <param name="organizationId">The ID of the organization to which the records belong</param>
+    /// <param name="projectId">The ID of the project to which the records belong</param>
+    /// <returns>List of record textual descriptor columns, including class names</returns>
+    public async Task<List<LatticeRecordDto>> GetLatticeRecords(long organizationId, long projectId)
     {
-        var record = await _context.Records.FindAsync(recordId);
+        var classes = await _context.Database
+            .SqlQuery<LatticeRecordDto>(
+                $"SELECT * FROM deeplynx.get_lattice_records({organizationId}, {projectId})"
+            ).ToListAsync();
 
-        if (record == null || record.ProjectId != projectId)
-            throw new KeyNotFoundException($"Record with id {recordId} not found");
-
-        _context.Records.Remove(record);
-        await _context.SaveChangesAsync();
-
-        return true;
+        return classes;
     }
 
     /// <summary>
@@ -917,7 +1383,8 @@ public class RecordBusiness : IRecordBusiness
     ///<param name="records"> Records with object storages to check</param>
     ///<exception cref="KeyNotFoundException">If an object storage ID is not found</exception>
     ///<returns>Exception if obj storage ID not exist</returns>
-    private async Task EnsureMultipleObjectStoragesExistOnce(long projectId, List<CreateRecordRequestDto> records)
+    private async Task EnsureMultipleObjectStoragesExistOnce(long organizationId, long projectId,
+        List<CreateRecordRequestDto> records)
     {
         var ids = records.Where(r => r.ObjectStorageId.HasValue)
             .Select(r => r.ObjectStorageId!.Value)
@@ -927,7 +1394,9 @@ public class RecordBusiness : IRecordBusiness
 
         // One database round trip                                                                                                            
         var ok = await _context.ObjectStorages
-            .Where(os => os.ProjectId == projectId && ids.Contains(os.Id))
+            .Where(os =>
+                os.OrganizationId == organizationId && ids.Contains(os.Id) &&
+                (os.ProjectId == projectId || os.ProjectId == null))
             .Select(os => os.Id)
             .ToListAsync();
 
@@ -935,19 +1404,22 @@ public class RecordBusiness : IRecordBusiness
         {
             var missing = ids.Except(ok).Take(5);
             throw new KeyNotFoundException(
-                $"One or more object storage IDs do not exist in project {projectId} (e.g., {string.Join(",", missing)}).");
+                $"One or more object storage IDs do not exist in organization {organizationId} (e.g., {string.Join(",", missing)}).");
         }
     }
 
-    private async Task CheckObjectStorageExists(long projectId, long objectStorageId)
+    private async Task CheckObjectStorageExists(long organizationId, long projectId, long objectStorageId)
     {
-        var referencedObjectStorage =
-            await _context.ObjectStorages.FirstOrDefaultAsync(o => o.ProjectId == projectId && o.Id == objectStorageId);
+        var referencedObjectStorage = await _context.ObjectStorages.FirstOrDefaultAsync(o =>
+            o.OrganizationId == organizationId && o.Id == objectStorageId &&
+            (o.ProjectId == projectId || o.ProjectId == null));
+
         if (referencedObjectStorage == null)
             throw new KeyNotFoundException($"Object storage with ID {objectStorageId} does not exist");
     }
 
-    private async Task<ICollection<RecordTagDto>> ProcessTags(long currentUserId, long organizationId, long projectId,
+    private async Task<ICollection<RecordTagDto>> ProcessTags(long currentUserId, long organizationId,
+        long projectId,
         long recordId,
         List<string>? tags)
     {
@@ -993,6 +1465,17 @@ public class RecordBusiness : IRecordBusiness
         return inserted.ToDictionary(t => t.Name, t => t);
     }
 
+    private async Task<Dictionary<string, SensitivityLabelResponseDto>> BulkUpsertLabels(
+        long organizationId,
+        long currentUserId,
+        long projectId,
+        List<CreateSensitivityLabelRequestDto> labels)
+    {
+        var inserted =
+            await _labelBusiness.BulkCreateSensitivityLabels(organizationId, currentUserId, projectId, labels);
+        return inserted.ToDictionary(t => t.Name, t => t);
+    }
+
     /// <summary>
     ///     Map an NPGSQL data reader to a return DTO usually during high scale read operations
     /// </summary>
@@ -1021,8 +1504,8 @@ public class RecordBusiness : IRecordBusiness
             Name = r.IsDBNull(iName) ? null : r.GetString(iName),
             ClassId = r.IsDBNull(iCls) ? null : r.GetInt64(iCls),
             ObjectStorageId = r.IsDBNull(iObj) ? null : r.GetInt64(iObj),
-            FileType = r.IsDBNull(iType) ? null : r.GetString(iType), 
-            LastUpdatedBy = r.IsDBNull(iUser) ? null : r.GetInt64(iUser), 
+            FileType = r.IsDBNull(iType) ? null : r.GetString(iType),
+            LastUpdatedBy = r.IsDBNull(iUser) ? null : r.GetInt64(iUser),
             Description = r.IsDBNull(iDesc) ? null : r.GetString(iDesc),
             Properties = r.IsDBNull(iProp) ? null : r.GetString(iProp)
         };

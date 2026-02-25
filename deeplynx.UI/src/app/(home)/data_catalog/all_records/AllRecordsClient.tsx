@@ -1,28 +1,33 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import SearchBar from "@/app/(home)/components/SearchBar";
 import { RecordTableRow } from "@/app/(home)/types/types";
 import { useProjectSession } from "@/app/contexts/ProjectSessionProvider";
 import { useOrganizationSession } from "@/app/contexts/OrganizationSessionProvider";
-import { getMultiProjectRecords } from "@/app/lib/client_service/query_services.client";
-import GridView from "../../components/GridView";
-import ListView from "../../components/ListView";
-import { HistoricalRecordResponseDto } from "../../types/responseDTOs";
-import ProjectDropdown from "../../components/ProjectDropdown";
+import {
+  fullTextSearch,
+  getMultiProjectRecords,
+} from "@/app/lib/client_service/query_services.client";
+import GridView from "@/app/(home)/components/GridView";
+import ListView from "@/app/(home)/components/ListView";
+import {
+  HistoricalRecordResponseDto,
+  TagResponseDto,
+} from "@/app/(home)/types/responseDTOs";
+import ProjectDropdown from "@/app/(home)/components/ProjectDropdown";
 
 import { useLanguage } from "@/app/contexts/Language";
 import {
-  ArrowUturnLeftIcon,
   ChevronDownIcon,
   EyeIcon,
   QueueListIcon,
   TableCellsIcon,
 } from "@heroicons/react/24/outline";
-import { TagResponseDto } from "../../types/responseDTOs";
-import { fullTextSearch } from "@/app/lib/client_service/query_services.client";
+import { formatLocalDateTime } from "@/app/lib/date_time";
 
 /* ----------------------------- Types & utils ----------------------------- */
 
@@ -44,7 +49,7 @@ type ColumnDef<Row> = {
 
 function useClickOutside(
   ref: React.RefObject<HTMLElement | null>,
-  onAway: () => void
+  onAway: () => void,
 ) {
   useEffect(() => {
     const h = (e: MouseEvent) => {
@@ -69,6 +74,9 @@ export default function DataCatalogClient({
   initialRecords,
 }: Props) {
   const { t } = useLanguage();
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
 
   // Project session (client provider)
   const { hasLoaded } = useProjectSession();
@@ -78,10 +86,10 @@ export default function DataCatalogClient({
   const [projects] = useState(initialProjects);
 
   const [selectedProjects, setSelectedProjects] = useState<string[]>(
-    initialSelectedProjects
+    initialSelectedProjects,
   );
   const [tableData, setTableData] = useState<RecordTableRow[]>(
-    initialRecords ?? []
+    initialRecords ?? [],
   );
   const [searchTerm, setSearchTerm] = useState(initialSearchTerm ?? "");
   const [activeFilters, setActiveFilters] = useState<
@@ -89,16 +97,17 @@ export default function DataCatalogClient({
   >([]);
   const [nextFilterId, setNextFilterId] = useState(1);
   const [viewMode, setViewMode] = useState<"list" | "table">("list");
+  const initialSearchAppliedRef = useRef<string | null>(null);
 
   const activeSearchTerms = useMemo(
     () => activeFilters.map((f) => f.term.toLowerCase()),
-    [activeFilters]
+    [activeFilters],
   );
 
   // === memoized “complex” deps ===
   const selectedProjectsToken = useMemo(
     () => selectedProjects.join("|"),
-    [selectedProjects]
+    [selectedProjects],
   );
 
   // Treat ALL / empty as "all projects"
@@ -115,78 +124,115 @@ export default function DataCatalogClient({
   }, [projects, selectedProjects]);
 
   // Centralized fetch for dropdown-driven changes (no search term here)
-  const fetchRecordsForSelection = useCallback(
-    async (signal?: AbortSignal) => {
-      const idsNum = effectiveProjectIds.map(Number).filter(Number.isFinite);
-      if (idsNum.length === 0) {
-        setTableData([]);
-        return;
-      }
-      const data = await getMultiProjectRecords(organization?.organizationId as number, idsNum, true);
-      const transformedData: RecordTableRow[] = data.map((record) => ({
-        id: record.id || 0,
-        name: record.name,
-        description: record.description ?? undefined,
-        uri: record.uri ?? undefined,
-        properties: typeof record.properties === 'string' ? record.properties : JSON.stringify(record.properties),
-        originalId: record.originalId ?? undefined,
-        classId: record.classId ?? undefined,
-        className: undefined,
-        dataSourceId: record.dataSourceId ?? undefined,
-        dataSourceName: '',
-        projectId: record.projectId ?? undefined,
-        projectName: projects.find((p) => Number(p.id) === record.projectId)?.name || '',
-        tags: typeof record.tags === 'string' ? record.tags : JSON.stringify(record.tags),
-        lastUpdatedAt: record.lastUpdatedAt || '',
-        lastUpdatedBy: record.lastUpdatedBy ?? undefined,
-        isArchived: record.isArchived || false,
-        fileType: '',
-      }));
-      setTableData(transformedData);
-      setViewMode("list");
-    },
-    [effectiveProjectIds, organization?.organizationId, projects]
-  );
+  const fetchRecordsForSelection = useCallback(async () => {
+    const idsNum = effectiveProjectIds.map(Number).filter(Number.isFinite);
+    if (idsNum.length === 0) {
+      setTableData([]);
+      return;
+    }
+    const data = await getMultiProjectRecords(
+      organization?.organizationId as number,
+      idsNum,
+      true,
+    );
+    const transformedData: RecordTableRow[] = data.map((record) => ({
+      id: record.id || 0,
+      name: record.name,
+      description: record.description ?? undefined,
+      uri: record.uri ?? undefined,
+      properties:
+        typeof record.properties === "string"
+          ? record.properties
+          : JSON.stringify(record.properties),
+      originalId: record.originalId ?? undefined,
+      classId: record.classId ?? undefined,
+      className: record.className ?? undefined,
+      dataSourceId: record.dataSourceId ?? undefined,
+      dataSourceName: "",
+      projectId: record.projectId ?? undefined,
+      projectName:
+        projects.find((p) => Number(p.id) === record.projectId)?.name || "",
+      tags:
+        typeof record.tags === "string"
+          ? record.tags
+          : JSON.stringify(record.tags),
+      lastUpdatedAt: record.lastUpdatedAt || "",
+      lastUpdatedBy: record.lastUpdatedBy ?? undefined,
+      isArchived: record.isArchived || false,
+      fileType: "",
+    }));
+    setTableData(transformedData);
+    setViewMode("list");
+  }, [effectiveProjectIds, organization?.organizationId, projects]);
 
   // Clear all now fetches from API for the current scope (not local filtering)
+  const clearSearchQueryFromUrl = useCallback(() => {
+    const params = new URLSearchParams(searchParams?.toString());
+    params.delete("search");
+    const nextUrl = params.toString() ? `${pathname}?${params}` : pathname;
+    router.replace(nextUrl);
+  }, [pathname, router, searchParams]);
+
   const clearAllFilters = useCallback(() => {
     setActiveFilters([]);
     setSearchTerm("");
+    clearSearchQueryFromUrl();
 
-    const ctrl = new AbortController();
-    fetchRecordsForSelection(ctrl.signal).catch((e: RecordTableRow) => {
-      if (e?.name !== "CanceledError" && e?.name !== "AbortError") {
-        console.error("Clear all fetch failed:", e);
-      }
+    fetchRecordsForSelection().catch((e: unknown) => {
+      console.error("Clear all fetch failed:", e);
     });
-  }, [fetchRecordsForSelection]);
+  }, [clearSearchQueryFromUrl, fetchRecordsForSelection]);
 
-  // Search bar (unchanged) — still allowed to query by term and then locally scope
+  const handleRemoveFilter = useCallback(
+    (id: number) => {
+      const isRemovingLastFilter =
+        activeFilters.length === 1 && activeFilters[0].id === id;
+
+      setActiveFilters((prev) => prev.filter((f) => f.id !== id));
+
+      if (!isRemovingLastFilter) return;
+
+      setSearchTerm("");
+      clearSearchQueryFromUrl();
+
+      fetchRecordsForSelection().catch((e: unknown) => {
+        console.error("Fetch after filter removal failed:", e);
+      });
+    },
+    [activeFilters, clearSearchQueryFromUrl, fetchRecordsForSelection],
+  );
+
   const handleSearch = useCallback(
     async (value: string) => {
       const trimmed = value.trim();
       if (!trimmed || activeFilters.some((f) => f.term === trimmed)) return;
 
       const newFilter = { id: nextFilterId, term: trimmed };
-      const results = await fullTextSearch(organization?.organizationId as number, trimmed, projects.map((p) => Number(p.id)));
+      const results = await fullTextSearch(
+        organization?.organizationId as number,
+        trimmed,
+        projects.map((p) => Number(p.id)),
+      );
 
       // Convert HistoricalRecordResponseDto[] to RecordTableRow[]
-      const convertedResults: RecordTableRow[] = results.map((dto: HistoricalRecordResponseDto) => ({
-        ...dto,
-        fileType: '', // TODO: Determine file type from uri/name
-        timeseries: undefined,
-        fileSize: undefined,
-        select: false,
-        associatedRecords: undefined,
-        archivedAt: dto.isArchived ? dto.lastUpdatedAt : null
-      }));
+      const convertedResults: RecordTableRow[] = results.map(
+        (dto: HistoricalRecordResponseDto) => ({
+          ...dto,
+          fileType: "", // TODO: Determine file type from uri/name
+          timeseries: undefined,
+          fileSize: undefined,
+          select: false,
+          associatedRecords: undefined,
+          archivedAt: dto.isArchived ? dto.lastUpdatedAt : null,
+        }),
+      );
 
       const selectedNums = effectiveProjectIds.map(Number);
       const scoped =
         selectedNums.length === projects.length
           ? convertedResults
           : convertedResults.filter((r: RecordTableRow) =>
-            selectedNums.includes(Number(r.projectId))
+            selectedNums.includes(Number(r.projectId)),
           );
 
       setTableData(scoped);
@@ -201,15 +247,17 @@ export default function DataCatalogClient({
       effectiveProjectIds,
       projects,
       organization?.organizationId,
-    ]
+    ],
   );
 
   // If we arrive with a search term, run it once after session is ready
   useEffect(() => {
     if (!hasLoaded) return;
-    if (initialSearchTerm) {
-      handleSearch(initialSearchTerm);
-    }
+    if (!initialSearchTerm) return;
+    if (initialSearchAppliedRef.current === initialSearchTerm) return;
+
+    initialSearchAppliedRef.current = initialSearchTerm;
+    handleSearch(initialSearchTerm);
   }, [hasLoaded, initialSearchTerm, handleSearch]);
 
   // Fetch from API whenever dropdown selection changes and there are no active search filters
@@ -217,14 +265,9 @@ export default function DataCatalogClient({
     if (!hasLoaded) return;
     if (activeFilters.length > 0) return; // search takes precedence
 
-    const ctrl = new AbortController();
-    fetchRecordsForSelection(ctrl.signal).catch((e: RecordTableRow) => {
-      if (e?.name !== "CanceledError" && e?.name !== "AbortError") {
-        console.error("Fetch on selection change failed:", e);
-      }
+    fetchRecordsForSelection().catch((e: unknown) => {
+      console.error("Fetch on selection change failed:", e);
     });
-
-    return () => ctrl.abort();
   }, [
     hasLoaded,
     activeFilters.length,
@@ -232,8 +275,7 @@ export default function DataCatalogClient({
     fetchRecordsForSelection,
   ]);
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const renderTags = (tags: string | null | undefined) => {
+  const renderTags = useCallback((tags: string | null | undefined) => {
     if (!tags) return null;
 
     try {
@@ -251,7 +293,10 @@ export default function DataCatalogClient({
       return (
         <span className="inline-flex flex-wrap gap-2">
           {values.map((v, i) => (
-            <span key={`${v}-${i}`} className="badge badge-sm">
+            <span
+              key={`${v}-${i}`}
+              className="badge badge-sm badge-outline badge-secondary"
+            >
               {v}
             </span>
           ))}
@@ -260,11 +305,11 @@ export default function DataCatalogClient({
     } catch {
       return null;
     }
-  };
+  }, []);
 
   const selectedProjectIdsNum = useMemo(
     () => selectedProjects.map((id) => Number(id)),
-    [selectedProjects]
+    [selectedProjects],
   );
 
   /* ------------------------ Column visibility wiring ------------------------ */
@@ -272,7 +317,12 @@ export default function DataCatalogClient({
   // Define all possible columns with stable keys
   const ALL_COLUMNS: ColumnDef<RecordTableRow>[] = useMemo(
     () => [
-      { key: "id", header: "ID", data: "id", sortable: true },
+      {
+        key: "id",
+        header: t.translations.DATA_CATALOG_ID,
+        data: "id",
+        sortable: true,
+      },
       {
         key: "name",
         header: t.translations.RECORD_NAME,
@@ -290,37 +340,38 @@ export default function DataCatalogClient({
         header: t.translations.CLASS,
         cell: (row) =>
           row.className ? (
-            <span className="badge text-sm">{row.className}</span>
+            <span className="badge text-sm bg-secondary text-secondary-content">
+              {row.className}
+            </span>
           ) : null,
       },
       {
         key: "tags",
-        header: "Tags",
+        header: t.translations.TAGS,
         cell: (row) => renderTags(row.tags),
       },
       {
         key: "lastEdit",
         header: t.translations.LAST_EDIT,
-        cell: (row) => row.lastUpdatedAt,
+        cell: (row) => formatLocalDateTime(row.lastUpdatedAt),
       },
     ],
-    [t.translations, renderTags]
+    [t.translations, renderTags],
   );
 
   // Visible column keys
   const [visibleCols, setVisibleCols] = useState<ColumnKey[]>(
-    ALL_COLUMNS.map((c) => c.key) // default: all visible
+    ALL_COLUMNS.map((c) => c.key), // default: all visible
   );
 
   const filteredColumns = useMemo(
     () => ALL_COLUMNS.filter((c) => visibleCols.includes(c.key)),
-    [ALL_COLUMNS, visibleCols]
+    [ALL_COLUMNS, visibleCols],
   );
-
   // Strip "key" before passing to GridView if it doesn’t expect it
   const gridColumns = useMemo(
     () => filteredColumns.map(({ key, ...rest }) => rest),
-    [filteredColumns]
+    [filteredColumns],
   );
 
   // Dropdown UI state
@@ -342,17 +393,21 @@ export default function DataCatalogClient({
     setVisibleCols((prev) =>
       prev.length === ALL_COLUMNS.length
         ? [ALL_COLUMNS[0].key]
-        : ALL_COLUMNS.map((c) => c.key)
+        : ALL_COLUMNS.map((c) => c.key),
     );
 
   /* --------------------------------- Search -------------------------------- */
 
-  const handleSubmit = async () => {
-    try {
-    } catch (error) {
-      console.error("Failed to send query", error);
-    }
-  };
+  const handleSubmit = useCallback(
+    async ({ query }: { query: string }) => {
+      try {
+        await handleSearch(query);
+      } catch (error) {
+        console.error("Failed to send query", error);
+      }
+    },
+    [handleSearch],
+  );
 
   if (!hasLoaded) return null;
 
@@ -378,16 +433,14 @@ export default function DataCatalogClient({
 
       <div className="flex flex-col gap-4 mb-4 pt-4 pl-8 w-full">
         {/* Top: Search */}
-        <div className="flex justify-end pr-10">
+        <div className="flex justify-end pr-10 items-center gap-2">
           <SearchBar
-            placeholder="Search"
+            placeholder={t.translations.SEARCH}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             onSubmit={handleSubmit}
             activeFilters={activeFilters}
-            onRemoveFilter={(id) =>
-              setActiveFilters((prev) => prev.filter((f) => f.id !== id))
-            }
+            onRemoveFilter={handleRemoveFilter}
             onClearAll={clearAllFilters}
             resultCount={tableData.length}
             showResultsMessage={activeFilters.length > 0}
@@ -399,28 +452,25 @@ export default function DataCatalogClient({
 
         {/* Bottom: Actions */}
         <div className="flex items-center justify-between">
-          <div className="text-info-content px-4 text-lg">All Records</div>
+          <div className="text-info-content px-4 text-lg">
+            {t.translations.ALL_RECORDS}
+          </div>
 
           <div className="flex gap-2 pr-10 items-center">
-            <div className="pr-2">
-              <Link
-                href="/data_catalog"
-                className="btn btn-sm btn-outline btn-primary"
-                onClick={() => {
-                  setViewMode("list");
-                  clearAllFilters();
-                }}
+            {activeFilters.length > 0 && (
+              <button
+                type="button"
+                onClick={clearAllFilters}
+                className="btn btn-sm btn-ghost"
               >
-                <ArrowUturnLeftIcon className="h-7 w-6" />
-                {t.translations.DATA_CATALOG}
-              </Link>
-            </div>
-
+                {t.translations.CLEAR_SEARCH}
+              </button>
+            )}
             <button
               className={`btn btn-sm ${viewMode === "list" ? "btn-primary" : "btn-ghost"
                 }`}
               onClick={() => setViewMode("list")}
-              title="List view"
+              title={t.translations.LIST_VIEW}
             >
               <QueueListIcon className="h-7 w-7" />
             </button>
@@ -429,13 +479,13 @@ export default function DataCatalogClient({
               className={`btn btn-sm ${viewMode === "table" ? "btn-primary" : "btn-ghost"
                 }`}
               onClick={() => setViewMode("table")}
-              title="Table view"
+              title={t.translations.TABLE_VIEW}
             >
               <TableCellsIcon className="h-7 w-7" />
             </button>
 
             {/* Column visibility dropdown */}
-            {viewMode.includes("table") && (
+            {viewMode === "table" && (
               <div className="relative" ref={ddRef}>
                 <button
                   type="button"
@@ -445,7 +495,7 @@ export default function DataCatalogClient({
                   aria-expanded={open}
                 >
                   <EyeIcon className="h-5 w-5" />
-                  <span>Column Visibility</span>
+                  <span>{t.translations.COLUMN_VISIBILITY}</span>
                   <span className="hidden md:inline-block text-xs bg-base-200 px-2 py-0.5 rounded">
                     {visibleCols.length - 1}/{ALL_COLUMNS.length - 1}
                   </span>
@@ -471,7 +521,9 @@ export default function DataCatalogClient({
                         }}
                         onChange={handleToggleAll}
                       />
-                      <span className="text-sm text-gray-900">Select all</span>
+                      <span className="text-sm text-gray-900">
+                        {t.translations.SELECT_ALL}
+                      </span>
                     </label>
 
                     <div className="my-1 h-px bg-gray-200" />

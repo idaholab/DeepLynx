@@ -1,0 +1,23 @@
+# Background and Theory
+
+DeepLynx Nexus is an open-source data catalog and digital thread platform designed to provide data management, sharing, and discovery capabilities for science and engineering programs. Developed to enable frontier AI technology, Nexus operates as a central data integration capability that can function within a single organization or across multiple organizations through a federated approach. The platform uniquely enables data discovery without requiring open access to the underlying data itself, addressing critical security and privacy concerns in research environments.
+
+Built on a modern microservice architecture, Nexus represents a significant evolution from its monolithic predecessor. The platform prioritizes metadata over raw data storage, allowing connected data sources to remain as the authoritative sources of truth while Nexus aggregates and relates information about their data in a single, queryable location. This architecture supports autonomous design, autonomous operations, and autonomous laboratory environments—key capabilities for next-generation research facilities.
+
+## Understanding Data Catalogs
+
+A data catalog is essentially a metadata management system that helps organizations discover, understand, and utilize their data assets. Rather than storing the data itself, a catalog maintains detailed information about what data exists, where it resides, how it's structured, and how different datasets relate to one another. Think of it as a library card catalog system, but for data—it tells you what's available and where to find it, without necessarily housing the books themselves.
+
+DeepLynx Nexus implements this concept through metadata records (nodes) and their relationships (links), creating a knowledge graph that makes connections within and across data sources explicit and queryable. This graph structure enables what's called a "digital thread"—a comprehensive view of how data flows and relates throughout a project or organization.
+
+## Relevance to Nuclear Energy Research
+
+The development of Nexus by Idaho National Laboratory (INL) directly addresses critical gaps in nuclear energy research infrastructure. The nuclear research community faces unique challenges across different Technology Readiness Levels (TRL): from fundamental R&D (TRL 1-3) through demonstration facilities (TRL 4-7) to commercial deployment (TRL 7-9). Each stage requires different data management approaches, yet few open-source solutions adequately serve this spectrum.
+
+Nuclear research generates vast amounts of heterogeneous data—from experimental measurements and simulations to equipment telemetry and safety documentation. Nexus provides the foundational infrastructure to integrate these varied data sources, making relationships explicit and enabling researchers to discover relevant data across complex, long-running programs. The platform's emphasis on security, role-based access control, and federated operation aligns perfectly with the stringent requirements of nuclear facilities, where data sensitivity and regulatory compliance are paramount.
+
+## Connection to Ontologies and Digital Twins
+
+While the previous version of DeepLynx relied heavily on strict ontology enforcement, Nexus takes a more flexible approach. Ontologies—formal representations of knowledge that define entities and their relationships—still play a role in structuring metadata, but Nexus employs "simple and flexible property mapping" rather than rigid schema enforcement. This evolution recognizes that overly strict ontological requirements can hinder data ingestion and limit practical usability.
+
+For digital twins—virtual replicas of physical systems that update in real-time—Nexus provides critical foundational capabilities. The platform includes in-memory storage for timeseries data, enabling the rapid data transfer and low-latency queries essential for digital twin applications. By creating an explicit graph of relationships between data sources, Nexus helps construct the comprehensive data environment that digital twins require to accurately mirror their physical counterparts. The integration with orchestration tools like Apache Airflow further enables the automated data pipelines necessary for maintaining synchronized digital twins of nuclear facilities and experiments.

@@ -38,9 +38,10 @@ def test_create_project_storage_azure(client, organization, project, cleanup_pro
     """Test creating a project-level Azure storage"""
     payload = {
         "name": "pytest_ProjectStorage_Azure",
-        "description": "A test Azure object storage for project",
         "config": {
-            "azureConnectionString": "DefaultEndpointsProtocol=https;AccountName=projectaccount;AccountKey=testkey;EndpointSuffix=core.windows.net"
+            "azureObjectConfig": {
+                "azureConnectionString": "DefaultEndpointsProtocol=https;AccountName=testaccount;AccountKey=testkey;EndpointSuffix=core.windows.net",
+            }
         }
     }
     

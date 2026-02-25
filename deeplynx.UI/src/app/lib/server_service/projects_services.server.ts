@@ -18,9 +18,6 @@ export async function getAllProjectsServer(
 ): Promise<ProjectResponseDto[]> {
   // If no organizationId provided, return empty array or fetch from a different endpoint
   if (!organizationId) {
-    console.log(
-      "[getAllProjectsServer] No organizationId provided, returning empty array"
-    );
     return [];
   }
 

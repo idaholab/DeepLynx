@@ -25,14 +25,18 @@ public partial class Project
     [Column("description")]
     public string? Description { get; set; }
 
-    [Column("config", TypeName = "jsonb")]
-    public string Config { get; set; } = null!;
-
     [Column("is_archived")]
     public bool IsArchived { get; set; }
 
     [Column("organization_id")]
     public long OrganizationId { get; set; }
+    
+    [Column("banner")]
+    [MaxLength(50)]
+    public string? Banner { get; set; }
+    
+    [Column("require_sensitivity_label")]
+    public bool RequireSensitivityLabel { get; set; } = false;
 
     [InverseProperty("Project")]
     public virtual ICollection<Action> Actions { get; set; } = new List<Action>();

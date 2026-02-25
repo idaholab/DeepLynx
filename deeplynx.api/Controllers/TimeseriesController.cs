@@ -72,6 +72,7 @@ public class TimeseriesController : ControllerBase
     /// <returns>Record response DTO</returns>
     [HttpPost("upload", Name = "api_upload_timeseries_file")]
     [Auth("write", "record")]
+    [Auth("write", "file")]
     public async Task<ActionResult<RecordResponseDto>> UploadFile(
         long organizationId, long projectId, long dataSourceId, IFormFile file)
     {
@@ -100,6 +101,7 @@ public class TimeseriesController : ControllerBase
     /// <returns>{UploadId}</returns>
     [HttpPost("upload/start", Name = "api_start_timeseries_upload")]
     [Auth("write", "record")]
+    [Auth("write", "file")]
     public async Task<IActionResult> StartUpload(
         long organizationId, long projectId, long dataSourceId, [FromBody] TimeseriesUploadInitRequestDto request)
     {
@@ -129,6 +131,7 @@ public class TimeseriesController : ControllerBase
     /// <returns>{ChunkUploadStatus}</returns>
     [HttpPost("upload/chunk", Name = "api_upload_timeseries_chunk")]
     [Auth("write", "record")]
+    [Auth("write", "file")]
     public async Task<IActionResult> UploadChunk(
         long organizationId, long projectId, long dataSourceId,
         IFormFile chunk, [FromForm] string uploadId, [FromForm] int chunkNumber)
@@ -158,6 +161,7 @@ public class TimeseriesController : ControllerBase
     /// <returns>{TimeseriesUploadRecord}</returns>
     [HttpPost("upload/complete", Name = "api_complete_timeseries_upload")]
     [Auth("write", "record")]
+    [Auth("write", "file")]
     public async Task<ActionResult<RecordResponseDto>> CompleteUpload(
         long organizationId, long projectId, long dataSourceId,
         [FromBody] TimeseriesUploadCompleteRequestDto request)
@@ -189,7 +193,7 @@ public class TimeseriesController : ControllerBase
     /// <param name="tableName">Name of the duckDB table on which the timeseries data is encoded</param>
     /// <returns></returns>
     [HttpPatch("append", Name = "api_append_timeseries_file")]
-    [Auth("write", "record")]
+    [Auth("update", "file")]
     public async Task<ActionResult<string>> AppendTimeseriesTable(
         long organizationId, long projectId, long dataSourceId, IFormFile file, string tableName)
     {
@@ -218,6 +222,7 @@ public class TimeseriesController : ControllerBase
     /// <returns></returns>
     [HttpGet("interpolate", Name = "api_interpolate_timeseries_rows")]
     [Auth("read", "record")]
+    [Auth("read", "file")]
     public async Task<IActionResult> InterpolateRows(
         long organizationId, long projectId, long dataSourceId,
         [FromQuery] string tableName, [FromQuery] string rowNumber, [FromQuery] string fileType)
@@ -250,6 +255,7 @@ public class TimeseriesController : ControllerBase
     /// <returns></returns>
     [HttpGet("export", Name = "api_export_timeseries_table")]
     [Auth("read", "record")]
+    [Auth("read", "file")]
     public async Task<IActionResult> ExportTimeseriesTable(
         long organizationId, long projectId, long dataSourceId, [FromQuery] string tableName, string fileType)
     {
@@ -267,6 +273,71 @@ public class TimeseriesController : ControllerBase
             var message = $"An error occurred while querying a timeseries table {tableName}: {e}";
             _logger.LogError(message);
             return StatusCode(StatusCodes.Status500InternalServerError, message);
+        }
+    }
+
+    /// <summary>
+    ///     Get a view of data points
+    /// </summary>
+    /// <param name="organizationId">ID of organization that timeseries data is associated with</param>
+    /// <param name="projectId">ID of project that timeseries data is associated with</param>
+    /// <param name="dataSourceId">ID of data source that timeseries data is associated with</param>
+    /// <param name="recordId">Name of the duckDB table on which the timeseries data is encoded</param>
+    /// <param name="limit">Maximum number of data points to include</param>
+    /// <param name="rowStride">every nth row to get (row number 4 = every 4th row)</param>
+    /// <returns>JSON: { timeseriesPlotData: { columns: [], data: [][] } }</returns>
+    [HttpGet("plot", Name = "api_plot_data")]
+    [Auth("read", "record")]
+    [Auth("read", "file")]
+    public async Task<IActionResult> GetPlotData(long organizationId, long projectId, long dataSourceId, [FromQuery] long recordId, [FromQuery] long limit, [FromQuery] long rowStride)
+    {
+        try
+        {
+            var currentUserId = UserContextStorage.UserId;
+            var timeseriesPlotData = await _timeseriesBusiness.GetPlotData(currentUserId, organizationId, projectId, dataSourceId, recordId, limit, rowStride);
+            return Ok(new { TimeseriesPlotData = timeseriesPlotData });
+        }
+        catch (ArgumentException e)
+        {
+            _logger.LogWarning(e, "Invalid request for plot data");
+            return BadRequest(e.Message);
+        }
+        catch (Exception e)
+        {
+            _logger.LogError(e, "Error retrieving plot data for record {RecordId}", recordId);
+            return StatusCode(StatusCodes.Status500InternalServerError, e.Message);
+        }
+    }
+
+    /// <summary>
+    ///     Get the most recent row
+    /// </summary>
+    /// <param name="organizationId">ID of organization that timeseries data is associated with</param>
+    /// <param name="projectId">ID of project that timeseries data is associated with</param>
+    /// <param name="dataSourceId">ID of data source that timeseries data is associated with</param>
+    /// <param name="recordId">Name of the duckDB table on which the timeseries data is encoded</param>
+    /// <returns>JSON object with column names as keys and the latest row's values</returns>
+    [HttpGet("latest", Name = "api_latest_row")]
+    [Auth("read", "record")]
+    [Auth("read", "file")]
+    public async Task<IActionResult> GetLatestRow(long organizationId, long projectId, long dataSourceId, [FromQuery] long recordId)
+    {
+        try
+        {
+            var currentUserId = UserContextStorage.UserId;
+            var latestRow = await _timeseriesBusiness.GetLatestRow(currentUserId, organizationId, projectId, dataSourceId, recordId);
+            return Ok(new { LatestRowData = latestRow });
+        }
+        catch (ArgumentException e)
+        {
+            _logger.LogWarning(e, "Invalid request for latest row");
+            return BadRequest(e.Message);
+        }
+        catch (Exception e)
+        {
+            if (_logger.IsEnabled(LogLevel.Error))
+                _logger.LogError(e, "Error retrieving latest row for record {RecordId}", recordId);
+            return StatusCode(StatusCodes.Status500InternalServerError, e.Message);
         }
     }
 }

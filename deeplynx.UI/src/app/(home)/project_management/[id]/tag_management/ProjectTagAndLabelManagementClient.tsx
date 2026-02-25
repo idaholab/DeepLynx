@@ -12,21 +12,30 @@ import { useOrganizationSession } from "@/app/contexts/OrganizationSessionProvid
 import type {
   ProjectResponseDto,
   TagResponseDto,
+  SensitivityLabelsDto,
 } from "@/app/(home)/types/responseDTOs";
 
 import {
-  archiveTagOrg,
-  createTagOrg,
-  getAllTagsOrg,
-  updateTagOrg,
+  archiveTag,
+  createTag,
+  getAllTags,
+  updateTag,
 } from "@/app/lib/client_service/tag_services.client";
+import {
+  archiveSensitivityLabelProject,
+  createSensitivityLabelProject,
+  getAllSensitivityLabelsProject,
+  updateSensitivityLabelProject,
+} from "@/app/lib/client_service/sensitivity_labels_services.client";
 
-import TagOverviewStrip from "@/app/(home)/organization_management/tag_management/TagOverviewStrip";
 import ConfirmArchiveTagModal from "@/app/(home)/organization_management/tag_management/ConfirmArchiveTagModal";
 import TagEditModal from "@/app/(home)/organization_management/tag_management/TagEditModal";
-import ProjectTagsPanel from "./ProjectTagsPanel";
-import ProjectLabelsComingSoonCard from "./ProjectLabelsComingSoonCard";
+import TagOverviewStrip from "@/app/(home)/organization_management/tag_management/TagOverviewStrip";
+import ConfirmArchiveLabelModal from "@/app/(home)/organization_management/tag_management/ConfirmArchiveLabelModal";
+import LabelEditModal from "@/app/(home)/organization_management/tag_management/LabelEditModal";
 import { useLanguage } from "@/app/contexts/Language";
+import ProjectsSecurityLabels from "./ProjectsSecurityLabels";
+import ProjectTagsPanel from "./ProjectTagsPanel";
 
 /* -------------------------------------------------------------------------- */
 /*                                   Types                                    */
@@ -34,7 +43,6 @@ import { useLanguage } from "@/app/contexts/Language";
 
 interface Props {
   project: ProjectResponseDto;
-
   /** From backend: whether org has locked tags */
   orgTagsLocked: boolean;
 }
@@ -49,7 +57,8 @@ const ProjectTagAndLabelManagementClient: React.FC<Props> = ({
 }) => {
   const { organization } = useOrganizationSession();
   const orgId = organization?.organizationId as number | undefined;
-  const projectId = project.id;
+  const projectId = project.id as number;
+  const orgLabelsLocked = false;
 
   /* ------------------------------------------------------------------------ */
   /*                                 Tag State                                */
@@ -72,6 +81,30 @@ const ProjectTagAndLabelManagementClient: React.FC<Props> = ({
   );
 
   /* ------------------------------------------------------------------------ */
+  /*                               Label State                                */
+  /* ------------------------------------------------------------------------ */
+
+  const [labels, setLabels] = useState<SensitivityLabelsDto[]>([]);
+  const [labelsLoading, setLabelsLoading] = useState(false);
+  const [labelsError, setLabelsError] = useState<string | null>(null);
+  const [archivingLabelId, setArchivingLabelId] = useState<number | null>(null);
+
+  const [labelSearch, setLabelSearch] = useState("");
+  const normalizedLabelSearch = labelSearch.trim().toLowerCase();
+
+  const filteredLabels = useMemo(
+    () =>
+      normalizedLabelSearch
+        ? labels.filter(
+            (l) =>
+              l.name.toLowerCase().includes(normalizedLabelSearch) ||
+              l.description?.toLowerCase().includes(normalizedLabelSearch),
+          )
+        : labels,
+    [labels, normalizedLabelSearch],
+  );
+
+  /* ------------------------------------------------------------------------ */
   /*                               Modal State                                */
   /* ------------------------------------------------------------------------ */
 
@@ -83,6 +116,18 @@ const ProjectTagAndLabelManagementClient: React.FC<Props> = ({
   const [showArchiveModal, setShowArchiveModal] = useState(false);
   const [tagToArchive, setTagToArchive] = useState<TagResponseDto | null>(null);
 
+  const [isLabelModalOpen, setIsLabelModalOpen] = useState(false);
+  const [editingLabel, setEditingLabel] = useState<SensitivityLabelsDto | null>(
+    null,
+  );
+  const [labelNameInput, setLabelNameInput] = useState("");
+  const [labelDescriptionInput, setLabelDescriptionInput] = useState("");
+  const [savingLabel, setSavingLabel] = useState(false);
+
+  const [showArchiveLabelModal, setShowArchiveLabelModal] = useState(false);
+  const [labelToArchive, setLabelToArchive] =
+    useState<SensitivityLabelsDto | null>(null);
+
   /* ------------------------------------------------------------------------ */
   /*                               Modal Helpers                              */
   /* ------------------------------------------------------------------------ */
@@ -91,6 +136,13 @@ const ProjectTagAndLabelManagementClient: React.FC<Props> = ({
     setEditingTag(null);
     setNameInput("");
     setSavingTag(false);
+  };
+
+  const resetLabelModalState = () => {
+    setEditingLabel(null);
+    setLabelNameInput("");
+    setLabelDescriptionInput("");
+    setSavingLabel(false);
   };
 
   const openCreateTagModal = () => {
@@ -118,6 +170,32 @@ const ProjectTagAndLabelManagementClient: React.FC<Props> = ({
     setShowArchiveModal(true);
   };
 
+  const openCreateLabelModal = () => {
+    resetLabelModalState();
+    setIsLabelModalOpen(true);
+  };
+
+  const openEditLabelModal = (id: number) => {
+    resetLabelModalState();
+    const found = labels.find((l) => l.id === id) || null;
+    if (found) {
+      setEditingLabel(found);
+      setLabelNameInput(found.name);
+      setLabelDescriptionInput(found.description ?? "");
+      setIsLabelModalOpen(true);
+    }
+  };
+
+  const closeEditCreateLabelModal = () => {
+    setIsLabelModalOpen(false);
+    resetLabelModalState();
+  };
+
+  const openArchiveLabelModal = (label: SensitivityLabelsDto) => {
+    setLabelToArchive(label);
+    setShowArchiveLabelModal(true);
+  };
+
   /* ------------------------------------------------------------------------ */
   /*                           Load from Backend (Tags)                       */
   /* ------------------------------------------------------------------------ */
@@ -129,17 +207,13 @@ const ProjectTagAndLabelManagementClient: React.FC<Props> = ({
       setTagsLoading(true);
       setTagsError(null);
 
-      const dtoList: TagResponseDto[] = await getAllTagsOrg(
-        orgId,
-        [projectId as number],
-        true, // hide archived by default
-      );
+      const dtoList: TagResponseDto[] = await getAllTags(projectId);
 
       setTags(dtoList.filter((t) => !t.isArchived));
     } catch (error) {
       console.error("Failed to load project tags:", error);
-      setTagsError("Failed to load project tags.");
-      toast.error("Failed to load project tags.");
+      setTagsError(t.translations.FAILED_TO_LOAD_PROJECT_TAGS);
+      toast.error(t.translations.FAILED_TO_LOAD_PROJECT_TAGS);
     } finally {
       setTagsLoading(false);
     }
@@ -151,6 +225,35 @@ const ProjectTagAndLabelManagementClient: React.FC<Props> = ({
   }, [orgId, projectId]);
 
   /* ------------------------------------------------------------------------ */
+  /*                         Load from Backend (Labels)                       */
+  /* ------------------------------------------------------------------------ */
+
+  const loadProjectLabels = async () => {
+    if (!orgId || !projectId) return;
+
+    try {
+      setLabelsLoading(true);
+      setLabelsError(null);
+
+      const dtoList: SensitivityLabelsDto[] =
+        await getAllSensitivityLabelsProject(projectId);
+
+      setLabels(dtoList.filter((l) => !l.isArchived));
+    } catch (error) {
+      console.error("Failed to load project labels:", error);
+      setLabelsError(t.translations.FAILED_TO_LOAD_PROJECT_LABELS);
+      toast.error(t.translations.FAILED_TO_LOAD_PROJECT_LABELS);
+    } finally {
+      setLabelsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadProjectLabels();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orgId, projectId]);
+
+  /* ------------------------------------------------------------------------ */
   /*                         Create / Update (Tags Only)                      */
   /* ------------------------------------------------------------------------ */
 
@@ -158,14 +261,14 @@ const ProjectTagAndLabelManagementClient: React.FC<Props> = ({
     if (!nameInput.trim()) return;
 
     if (!orgId || !projectId) {
-      toast.error("Missing organization or project context. Unable to save.");
+      toast.error(
+        t.translations.MISSING_ORG_OR_PROJECT_CONTEXT_UNABLE_TO_SAVE,
+      );
       return;
     }
 
     if (orgTagsLocked) {
-      toast.error(
-        "Tags are locked at the organization level. Cannot create or edit project tags.",
-      );
+      toast.error(t.translations.TAGS_LOCKED_CANNOT_CREATE_OR_EDIT_PROJECT);
       return;
     }
 
@@ -178,27 +281,88 @@ const ProjectTagAndLabelManagementClient: React.FC<Props> = ({
           name: nameInput.trim(),
         };
 
-        const updated = await updateTagOrg(orgId, editingTag.id, updatePayload);
+        const updated = await updateTag(
+          projectId,
+          editingTag.id,
+          updatePayload,
+        );
 
         setTags((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
-        toast.success("Project tag updated.");
+        toast.success(t.translations.PROJECT_TAG_UPDATED);
       } else {
         // Create new project tag
         const createPayload = {
           name: nameInput.trim(),
         };
 
-        const created = await createTagOrg(orgId, createPayload);
+        const created = await createTag(projectId, createPayload);
         setTags((prev) => [...prev, created]);
-        toast.success("Project tag created.");
+        toast.success(t.translations.PROJECT_TAG_CREATED);
       }
 
       closeEditCreateModal();
     } catch (error) {
       console.error("Failed to save project tag:", error);
-      toast.error("Failed to save project tag.");
+      toast.error(t.translations.FAILED_TO_SAVE_PROJECT_TAG);
     } finally {
       setSavingTag(false);
+    }
+  };
+
+  /* ------------------------------------------------------------------------ */
+  /*                        Create / Update (Labels)                          */
+  /* ------------------------------------------------------------------------ */
+
+  const handleSaveLabel = async () => {
+    if (!labelNameInput.trim()) return;
+
+    if (!orgId || !projectId) {
+      toast.error(
+        t.translations.MISSING_ORG_OR_PROJECT_CONTEXT_UNABLE_TO_SAVE,
+      );
+      return;
+    }
+
+    if (orgLabelsLocked) {
+      toast.error(
+        t.translations.LABELS_LOCKED_CANNOT_CREATE_OR_EDIT_PROJECT,
+      );
+      return;
+    }
+
+    try {
+      setSavingLabel(true);
+
+      if (editingLabel) {
+        const updated = await updateSensitivityLabelProject(
+          projectId,
+          editingLabel.id,
+          {
+            name: labelNameInput.trim(),
+            description: labelDescriptionInput.trim() || null,
+          },
+        );
+
+        setLabels((prev) =>
+          prev.map((l) => (l.id === updated.id ? updated : l)),
+        );
+        toast.success(t.translations.PROJECT_LABEL_UPDATED);
+      } else {
+        const created = await createSensitivityLabelProject(projectId, {
+          name: labelNameInput.trim(),
+          description: labelDescriptionInput.trim() || null,
+        });
+
+        setLabels((prev) => [...prev, created]);
+        toast.success(t.translations.PROJECT_LABEL_CREATED);
+      }
+
+      closeEditCreateLabelModal();
+    } catch (error) {
+      console.error("Failed to save project label:", error);
+      toast.error(t.translations.FAILED_TO_SAVE_PROJECT_LABEL);
+    } finally {
+      setSavingLabel(false);
     }
   };
 
@@ -210,25 +374,55 @@ const ProjectTagAndLabelManagementClient: React.FC<Props> = ({
     if (!tagToArchive || !orgId || !projectId) return;
 
     if (orgTagsLocked) {
-      toast.error(
-        "Tags are locked at the organization level. Cannot archive project tags.",
-      );
+      toast.error(t.translations.TAGS_LOCKED_CANNOT_ARCHIVE_PROJECT);
       return;
     }
 
     try {
       setArchivingTagId(tagToArchive.id);
-      await archiveTagOrg(orgId, tagToArchive.id, true);
+      await archiveTag(projectId, tagToArchive.id, true);
 
       setTags((prev) => prev.filter((t) => t.id !== tagToArchive.id));
-      toast.success(`Tag "${tagToArchive.name}" archived.`);
+      toast.success(
+        `${t.translations.TAG} "${tagToArchive.name}" ${t.translations.ARCHIVED}.`,
+      );
     } catch (error) {
       console.error("Failed to archive tag:", error);
-      toast.error("Failed to archive tag.");
+      toast.error(t.translations.FAILED_TO_ARCHIVE_TAG);
     } finally {
       setArchivingTagId(null);
       setShowArchiveModal(false);
       setTagToArchive(null);
+    }
+  };
+
+  /* ------------------------------------------------------------------------ */
+  /*                          Confirm Archive (Labels)                        */
+  /* ------------------------------------------------------------------------ */
+
+  const confirmArchiveLabel = async () => {
+    if (!labelToArchive || !orgId || !projectId) return;
+
+    if (orgLabelsLocked) {
+      toast.error(t.translations.LABELS_LOCKED_CANNOT_ARCHIVE_PROJECT);
+      return;
+    }
+
+    try {
+      setArchivingLabelId(labelToArchive.id);
+      await archiveSensitivityLabelProject(projectId, labelToArchive.id, true);
+
+      setLabels((prev) => prev.filter((l) => l.id !== labelToArchive.id));
+      toast.success(
+        `${t.translations.LABEL} "${labelToArchive.name}" ${t.translations.ARCHIVED}.`,
+      );
+    } catch (error) {
+      console.error("Failed to archive label:", error);
+      toast.error(t.translations.FAILED_TO_ARCHIVE_LABEL);
+    } finally {
+      setArchivingLabelId(null);
+      setShowArchiveLabelModal(false);
+      setLabelToArchive(null);
     }
   };
 
@@ -239,9 +433,11 @@ const ProjectTagAndLabelManagementClient: React.FC<Props> = ({
   const tagCount = tags.length;
   const filteredTagCount = filteredTags.length;
 
-  // Labels not supported yet at the project level
-  const labelCount = 0;
-  const projectsWithLabels = 0;
+  const labelCount = labels.length;
+  const filteredLabelCount = filteredLabels.length;
+
+  // For this project context, 1 if this project has labels, else 0
+  const projectsWithLabels = labelCount > 0 ? 1 : 0;
 
   // For this project context, 1 if this project has tags, else 0
   const projectsWithTags = tagCount > 0 ? 1 : 0;
@@ -258,10 +454,7 @@ const ProjectTagAndLabelManagementClient: React.FC<Props> = ({
           {t.translations.PROJECT_TAG_MANAGEMENT}
         </h2>
         <p className="text-base-content/70 mt-1 max-w-3xl">
-          {
-            t.translations
-              .DEFINE_PROJECT_TAGS_FOR_CLASSIFICATION_WORKFLOWS_AND_SEARCH
-          }
+          {t.translations.DEFINE_PROJECT_TAGS_AND_LABELS_DESCRIPTION}
         </p>
       </div>
 
@@ -272,13 +465,28 @@ const ProjectTagAndLabelManagementClient: React.FC<Props> = ({
         tagCount={tagCount}
         projectsWithTags={projectsWithTags}
         tagsLocked={orgTagsLocked}
-        labelsLocked={false}
+        labelsLocked={orgLabelsLocked}
       />
 
       {/* Layout – Tags column only */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Left side could be empty or future "coming soon" for labels; for now, just tags */}
-        <ProjectLabelsComingSoonCard />
+        <ProjectsSecurityLabels
+          labels={labels}
+          orgLabelsLocked={orgLabelsLocked}
+          labelsLoading={labelsLoading}
+          labelsError={labelsError}
+          filteredLabels={filteredLabels}
+          labelSearch={labelSearch}
+          setLabelSearch={setLabelSearch}
+          filteredCount={filteredLabelCount}
+          labelCount={labelCount}
+          projectId={projectId}
+          archivingLabelId={archivingLabelId}
+          onCreateLabel={openCreateLabelModal}
+          onEditLabel={openEditLabelModal}
+          onArchiveClick={openArchiveLabelModal}
+        />
 
         {/* Tags column – project-scoped, respects org lock */}
         <ProjectTagsPanel
@@ -291,7 +499,7 @@ const ProjectTagAndLabelManagementClient: React.FC<Props> = ({
           setTagSearch={setTagSearch}
           filteredCount={filteredTagCount}
           tagCount={tagCount}
-          projectId={projectId as number}
+          projectId={projectId}
           archivingTagId={archivingTagId}
           onCreateTag={openCreateTagModal}
           onEditTag={openEditTagModal}
@@ -310,6 +518,19 @@ const ProjectTagAndLabelManagementClient: React.FC<Props> = ({
         onSave={handleSave}
       />
 
+      {/* Edit/Create Label Modal */}
+      <LabelEditModal
+        isOpen={isLabelModalOpen}
+        isSaving={savingLabel}
+        editingLabel={!!editingLabel}
+        nameInput={labelNameInput}
+        descriptionInput={labelDescriptionInput}
+        onNameChange={setLabelNameInput}
+        onDescriptionChange={setLabelDescriptionInput}
+        onCancel={closeEditCreateLabelModal}
+        onSave={handleSaveLabel}
+      />
+
       {/* Confirm Archive Modal */}
       <ConfirmArchiveTagModal
         isOpen={showArchiveModal}
@@ -320,6 +541,18 @@ const ProjectTagAndLabelManagementClient: React.FC<Props> = ({
         }}
         onConfirm={confirmArchive}
         loading={archivingTagId === tagToArchive?.id}
+      />
+
+      {/* Confirm Archive Label Modal */}
+      <ConfirmArchiveLabelModal
+        isOpen={showArchiveLabelModal}
+        labelName={labelToArchive?.name ?? ""}
+        onClose={() => {
+          setShowArchiveLabelModal(false);
+          setLabelToArchive(null);
+        }}
+        onConfirm={confirmArchiveLabel}
+        loading={archivingLabelId === labelToArchive?.id}
       />
     </div>
   );

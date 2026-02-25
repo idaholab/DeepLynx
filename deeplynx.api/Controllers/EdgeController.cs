@@ -136,7 +136,7 @@ public class EdgeController : ControllerBase
     /// <param name="edge">The edge request data transfer object containing edge details</param>
     [HttpPost(Name = "api_create_an_edge")]
     [Auth("write", "edge")]
-    [Auth("write", "record")]
+    [Auth("update", "record")]
     public async Task<ActionResult<EdgeResponseDto>> CreateEdge(
         long organizationId,
         long projectId,
@@ -167,7 +167,7 @@ public class EdgeController : ControllerBase
     /// <param name="edges">List of edge request data transfer objects containing edge details</param>
     [HttpPost("bulk", Name = "api_create_many_edges")]
     [Auth("write", "edge")]
-    [Auth("write", "record")]
+    [Auth("update", "record")]
     public async Task<ActionResult<List<EdgeResponseDto>>> BulkCreateEdges(
         long organizationId,
         long projectId,
@@ -198,8 +198,8 @@ public class EdgeController : ControllerBase
     /// <param name="dto">The edge request data transfer object containing updated edge details</param>
     /// <returns>The updated edge response DTO with its details</returns>
     [HttpPut("{edgeId:long}", Name = "api_update_edge_by_id")]
-    [Auth("write", "edge")]
-    [Auth("write", "record")]
+    [Auth("update", "edge")]
+    [Auth("update", "record")]
     public async Task<ActionResult<EdgeResponseDto>> UpdateEdgeById(
         long organizationId,
         long projectId,
@@ -231,8 +231,8 @@ public class EdgeController : ControllerBase
     /// <param name="dto">The edge request data transfer object containing updated edge details</param>
     /// <returns>The updated edge response DTO with its details</returns>
     [HttpPut("by-relationship", Name = "api_update_edge_by_relationship")]
-    [Auth("write", "edge")]
-    [Auth("write", "record")]
+    [Auth("update", "edge")]
+    [Auth("update", "record")]
     public async Task<ActionResult<EdgeResponseDto>> UpdateEdgeByRelationship(
         long organizationId,
         long projectId,
@@ -266,7 +266,7 @@ public class EdgeController : ControllerBase
     /// <returns>A message stating the edge was successfully deleted.</returns>
     [HttpDelete("{edgeId:long}", Name = "api_delete_edge_by_id")]
     [Auth("write", "edge")]
-    [Auth("write", "record")]
+    [Auth("update", "record")]
     public async Task<IActionResult> DeleteEdgeById(
         long organizationId,
         long projectId,
@@ -296,7 +296,7 @@ public class EdgeController : ControllerBase
     /// <returns>A message stating the edge was successfully deleted.</returns>
     [HttpDelete("by-relationship", Name = "api_delete_edge_by_relationship")]
     [Auth("write", "edge")]
-    [Auth("write", "record")]
+    [Auth("update", "record")]
     public async Task<IActionResult> DeleteEdgeByRelationship(
         long organizationId,
         long projectId,
@@ -328,8 +328,8 @@ public class EdgeController : ControllerBase
     /// <param name="archive">True to archive the edge, false to unarchive it.</param>
     /// <returns>A message stating the edge was successfully archived or unarchived.</returns>
     [HttpPatch("{edgeId:long}", Name = "api_archive_edge_by_id")]
-    [Auth("write", "edge")]
-    [Auth("write", "record")]
+    [Auth("update", "edge")]
+    [Auth("update", "record")]
     public async Task<IActionResult> ArchiveEdgeById(
         long organizationId,
         long projectId,
@@ -367,8 +367,8 @@ public class EdgeController : ControllerBase
     /// <param name="archive">True to archive the edge, false to unarchive it.</param>
     /// <returns>A message stating the edge was successfully archived or unarchived.</returns>
     [HttpPatch("by-relationship", Name = "api_archive_edge_by_relationship")]
-    [Auth("write", "edge")]
-    [Auth("write", "record")]
+    [Auth("update", "edge")]
+    [Auth("update", "record")]
     public async Task<IActionResult> ArchiveEdgeByRelationship(
         long organizationId,
         long projectId,

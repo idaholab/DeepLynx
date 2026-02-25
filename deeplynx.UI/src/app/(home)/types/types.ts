@@ -62,6 +62,7 @@ export type FileMetadata = {
   description: string;
   isTimeSeries: boolean;
   updateAction?: "merge" | "overwrite";
+  metadataFile?: File;
 };
 
 export type ChunkedUploadSession = {
@@ -151,6 +152,7 @@ export type UploadFileArgs = {
   tags?: string[];
   originalId?: string;
   classId?: number;
+  metadataFile?: File;
   onProgress?: (progress: UploadProgressEvent) => void;
 }
 

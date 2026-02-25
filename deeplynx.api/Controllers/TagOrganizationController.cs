@@ -139,7 +139,7 @@ public class TagOrganizationController : ControllerBase
     /// <param name="tagRequestDto">The tag data transfer object containing updated tag details.</param>
     /// <returns>The updated tag with its details.</returns>
     [HttpPut("{tagId:long}", Name = "api_update_a_tag_organization")]
-    [Auth("write", "tag")]
+    [Auth("update", "tag")]
     public async Task<ActionResult<TagResponseDto>> UpdateTag(
         long organizationId, long tagId,
         [FromBody] UpdateTagRequestDto tagRequestDto)
@@ -190,7 +190,7 @@ public class TagOrganizationController : ControllerBase
     /// <param name="archive">True to archive the tag, false to unarchive it.</param>
     /// <returns>A message stating the tag was successfully archived or unarchived.</returns>
     [HttpPatch("{tagId:long}", Name = "api_archive_tag_organization")]
-    [Auth("write", "tag")]
+    [Auth("update", "tag")]
     public async Task<IActionResult> ArchiveTag(
         long organizationId,
         long tagId,

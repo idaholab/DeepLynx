@@ -2,7 +2,9 @@ using deeplynx.datalayer.Models;
 using deeplynx.helpers;
 using deeplynx.interfaces;
 using deeplynx.models;
+using DotNetEnv;
 using Microsoft.EntityFrameworkCore;
+using Newtonsoft.Json;
 
 namespace deeplynx.business;
 
@@ -31,7 +33,9 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
             .Where(os => os.OrganizationId == organizationId);
 
         if (projectId.HasValue)
-            query = query.Where(os => os.ProjectId == projectId);
+            query = query.Where(os => os.ProjectId == projectId || os.ProjectId == null);
+        else
+            query = query.Where(os => os.ProjectId == null);
 
         if (hideArchived)
             query = query.Where(os => !os.IsArchived);
@@ -70,8 +74,10 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
             .Where(os => os.Id == objectStorageId && os.OrganizationId == organizationId);
 
         if (projectId.HasValue)
-            query = query.Where(os => os.ProjectId == projectId);
-        
+            query = query.Where(os => os.ProjectId == projectId || os.ProjectId == null);
+        else
+            query = query.Where(os => os.ProjectId == null);
+
         var returnedObjectStorage = await query.FirstOrDefaultAsync();
 
         if (returnedObjectStorage is null)
@@ -110,15 +116,53 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
     {
         ValidationHelper.ValidateModel(dto);
 
+        var hasFilesystem = dto.Config.MountPath is not null;
+        var hasAzure = dto.Config.AzureObjectConfig is not null;
+        var hasAws = dto.Config.AwsConnectionString is not null;
+
+
+        var populatedCount = new[]
+        {
+            hasFilesystem,
+            hasAzure,
+            hasAws
+        }.Count(x => x);
+
+        if (populatedCount != 1)
+            throw new InvalidOperationException(
+                $"Exactly one config must be provided, you provided {populatedCount}. Check for empty strings and/or objects.");
+
         string type;
-        if (dto.Config.ContainsKey("mountPath"))
+        if (hasFilesystem)
+        {
+            if (string.IsNullOrWhiteSpace(dto.Config.MountPath))
+                throw new ArgumentException("Mount path cannot be empty string");
             type = "filesystem";
-        else if (dto.Config.ContainsKey("azureConnectionString"))
+        }
+        else if (hasAzure)
+        {
+            if (string.IsNullOrWhiteSpace(dto.Config.AzureObjectConfig.AzureConnectionString))
+                throw new ArgumentException("Azure connection string is empty");
+
+            if (string.IsNullOrWhiteSpace(dto.Config.AzureObjectConfig.AzureContainerName))
+            {
+                Env.Load("../.env");
+                var azureContainerName = Environment.GetEnvironmentVariable("AZURE_CONTAINER_NAME");
+                if (string.IsNullOrWhiteSpace(azureContainerName))
+                    throw new ArgumentException(
+                        "Default Azure container name is not set or is empty, please provide a container name or set default using env variables");
+
+                dto.Config.AzureObjectConfig.AzureContainerName = azureContainerName;
+            }
+
             type = "azure_object";
-        else if (dto.Config.ContainsKey("awsConnectionString"))
+        }
+        else // hasAws
+        {
+            if (string.IsNullOrWhiteSpace(dto.Config.AwsConnectionString))
+                throw new ArgumentException("AWS connection string cannot be empty");
             type = "aws_s3";
-        else
-            throw new KeyNotFoundException("Request does not contain recognized config");
+        }
 
         using var transaction = await _context.Database.BeginTransactionAsync();
 
@@ -131,7 +175,7 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
                 Default = dto.Default,
                 ProjectId = projectId,
                 OrganizationId = organizationId,
-                Config = dto.Config.ToJsonString(),
+                Config = JsonConvert.SerializeObject(dto.Config),
                 LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
                 LastUpdatedBy = currentUserId
             };
@@ -192,11 +236,18 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
             .Where(os => os.Id == objectStorageId && os.OrganizationId == organizationId);
 
         if (projectId.HasValue)
-            query = query.Where(os => os.ProjectId == projectId);
+            query = query.Where(os => os.ProjectId == projectId || os.ProjectId == null);
+        else
+            query = query.Where(os => os.ProjectId == null);
 
         var returnedObjectStorage = await query.FirstOrDefaultAsync();
         if (returnedObjectStorage is null || returnedObjectStorage.IsArchived)
             throw new KeyNotFoundException($"Object storage with id {objectStorageId} not found");
+
+        // Organization os cannot be updated from a project level
+        if (projectId.HasValue && returnedObjectStorage.ProjectId == null)
+            throw new InvalidOperationException(
+                "Organization object storages cannot be updated from the child projects.");
 
         using var transaction = await _context.Database.BeginTransactionAsync();
 
@@ -257,7 +308,10 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
             .Where(os => os.Id == objectStorageId && os.OrganizationId == organizationId);
 
         if (projectId.HasValue)
-            query = query.Where(os => os.ProjectId == projectId);
+            query = query.Where(os => os.ProjectId == projectId || os.ProjectId == null);
+        else
+            query = query.Where(os => os.ProjectId == null);
+
 
         var returnedObjectStorage = await query.FirstOrDefaultAsync();
         if (returnedObjectStorage is null || returnedObjectStorage.IsArchived)
@@ -266,6 +320,11 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
         if (returnedObjectStorage.Default)
             throw new InvalidOperationException("Default object storage cannot be deleted." +
                                                 " Please assign new default storage before deleting.");
+
+        // Organization os cannot be updated from a project level
+        if (projectId.HasValue && returnedObjectStorage.ProjectId == null)
+            throw new InvalidOperationException(
+                "Organization object storages cannot be updated from the child projects.");
 
         _context.ObjectStorages.Remove(returnedObjectStorage);
         await _context.SaveChangesAsync();
@@ -290,7 +349,9 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
             .Where(os => os.Id == objectStorageId && os.OrganizationId == organizationId);
 
         if (projectId.HasValue)
-            query = query.Where(os => os.ProjectId == projectId);
+            query = query.Where(os => os.ProjectId == projectId || os.ProjectId == null);
+        else
+            query = query.Where(os => os.ProjectId == null);
 
         var returnedObjectStorage = await query.FirstOrDefaultAsync();
         if (returnedObjectStorage is null)
@@ -302,6 +363,11 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
         if (returnedObjectStorage.Default)
             throw new InvalidOperationException("Default object storage cannot be archived." +
                                                 " Please assign new default storage before archiving.");
+
+        // Organization os cannot be updated from a project level
+        if (projectId.HasValue && returnedObjectStorage.ProjectId == null)
+            throw new InvalidOperationException(
+                "Organization object storages cannot be updated from the child projects.");
 
         returnedObjectStorage.IsArchived = true;
         returnedObjectStorage.LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
@@ -328,7 +394,9 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
             .Where(os => os.Id == objectStorageId && os.OrganizationId == organizationId);
 
         if (projectId.HasValue)
-            query = query.Where(os => os.ProjectId == projectId);
+            query = query.Where(os => os.ProjectId == projectId || os.ProjectId == null);
+        else
+            query = query.Where(os => os.ProjectId == null);
 
         var returnedObjectStorage = await query.FirstOrDefaultAsync();
         if (returnedObjectStorage is null)
@@ -340,6 +408,10 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
         if (returnedObjectStorage.Default)
             throw new InvalidOperationException("Default object storage cannot be archived." +
                                                 " Please assign new default storage before archiving.");
+        // Organization os cannot be updated from a project level
+        if (projectId.HasValue && returnedObjectStorage.ProjectId == null)
+            throw new InvalidOperationException(
+                "Organization object storages cannot be updated from the child projects.");
 
         returnedObjectStorage.IsArchived = false;
         returnedObjectStorage.LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
@@ -362,7 +434,8 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
             .Where(os => os.Default && os.OrganizationId == organizationId);
 
         if (projectId.HasValue)
-            query = query.Where(os => os.ProjectId == projectId);
+            query = query.Where(os => os.ProjectId == projectId || os.ProjectId == null)
+                .OrderByDescending(os => os.ProjectId.HasValue);
         else
             query = query.Where(os => os.ProjectId == null);
 

@@ -63,8 +63,8 @@ const SearchBar: React.FC<SearchBarProps> = ({
   const currentValue = isControlled ? value : internalValue;
 
   // Handle controlled/uncontrolled dropdown
-  const [internalOption] = useState<string | undefined>(
-    options[0].value
+  const [internalOption, setInternalOption] = useState<string | undefined>(
+    options[0].value,
   );
   const optionControlled =
     selectedOption !== undefined && onOptionChange !== undefined;
@@ -126,7 +126,7 @@ const SearchBar: React.FC<SearchBarProps> = ({
               href="/data_catalog/query_builder"
               className="text-sm underline text-dynamic-blue hover:underline"
             >
-              {aditionalFilters && t.translations.ADITIONAL_FILTERS}
+              {aditionalFilters && t.translations.ADDITIONAL_FILTERS}
             </a>
           </div>
         </div>

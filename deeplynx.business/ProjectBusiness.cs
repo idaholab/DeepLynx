@@ -9,6 +9,7 @@ using deeplynx.models.Configuration;
 using DotNetEnv;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Newtonsoft.Json;
 using JsonSerializer = System.Text.Json.JsonSerializer;
 
 namespace deeplynx.business;
@@ -95,7 +96,8 @@ public class ProjectBusiness : IProjectBusiness
                 LastUpdatedAt = p.LastUpdatedAt,
                 LastUpdatedBy = p.LastUpdatedBy,
                 IsArchived = p.IsArchived,
-                OrganizationId = p.OrganizationId
+                OrganizationId = p.OrganizationId,
+                Banner = p.Banner  
             })
             .ToListAsync();
     }
@@ -119,7 +121,9 @@ public class ProjectBusiness : IProjectBusiness
             Abbreviation = dto.Abbreviation,
             OrganizationId = organizationId,
             LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
-            LastUpdatedBy = userId
+            LastUpdatedBy = userId,
+            Banner = dto.Banner,
+            RequireSensitivityLabel = dto.RequireSensitivityLabel ?? false
         };
 
         _context.Projects.Add(project);
@@ -135,7 +139,9 @@ public class ProjectBusiness : IProjectBusiness
             Abbreviation = project.Abbreviation,
             LastUpdatedBy = project.LastUpdatedBy,
             LastUpdatedAt = project.LastUpdatedAt,
-            OrganizationId = project.OrganizationId
+            OrganizationId = project.OrganizationId,
+            Banner = project.Banner,
+            RequireSensitivityLabel = dto.RequireSensitivityLabel
         };
 
         // Update the Project Cache List
@@ -150,7 +156,6 @@ public class ProjectBusiness : IProjectBusiness
         // If project cache count differs from the database refresh it to match the database and return
         if (cachedProjectList.Count != _context.Projects.Count()) await RefreshProjectsCache();
 
-        // Log create Project event
         // Log create Project event
         var eventLog = new CreateEventRequestDto
         {
@@ -226,11 +231,29 @@ public class ProjectBusiness : IProjectBusiness
             throw new KeyNotFoundException(
                 $"Project with id {projectId} not found or does not belong to the specified organization context");
 
+        // Validate that if the RequireSensitivityLabel is enabled all existing records have labels
+        if (!project.RequireSensitivityLabel && dto.RequireSensitivityLabel == true)
+        {
+            var hasUnlabeledRecords = await _context.Records
+                .Include(r => r.Labels)
+                .Where(r => r.ProjectId == projectId)
+                .AnyAsync(r => !r.Labels.Any());
+        
+            if (hasUnlabeledRecords)
+                throw new InvalidOperationException(
+                    "Cannot require sensitivity labels: project contains records without labels. " +
+                    "Please label all existing records before enabling this requirement.");
+        }
+
+        if (dto.RequireSensitivityLabel != null)
+            project.RequireSensitivityLabel = dto.RequireSensitivityLabel.Value;
+
         project.Name = dto.Name ?? project.Name;
         project.Description = dto.Description ?? project.Description;
         project.Abbreviation = dto.Abbreviation ?? project.Abbreviation;
         project.LastUpdatedBy = currentUserId;
         project.LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
+        project.Banner = dto.Banner; 
 
         _context.Projects.Update(project);
         await _context.SaveChangesAsync();
@@ -255,7 +278,9 @@ public class ProjectBusiness : IProjectBusiness
             IsArchived = project.IsArchived,
             LastUpdatedAt = project.LastUpdatedAt,
             LastUpdatedBy = project.LastUpdatedBy,
-            OrganizationId = project.OrganizationId
+            OrganizationId = project.OrganizationId,
+            Banner = project.Banner,
+            RequireSensitivityLabel = project.RequireSensitivityLabel
         };
 
         // Update the Project Cache List
@@ -379,7 +404,8 @@ public class ProjectBusiness : IProjectBusiness
             Abbreviation = project.Abbreviation,
             LastUpdatedAt = project.LastUpdatedAt,
             LastUpdatedBy = project.LastUpdatedBy,
-            IsArchived = project.IsArchived
+            IsArchived = project.IsArchived,
+            Banner = project.Banner
         };
 
         // Update the Project Cache List
@@ -473,7 +499,8 @@ public class ProjectBusiness : IProjectBusiness
                 Abbreviation = project.Abbreviation,
                 LastUpdatedAt = project.LastUpdatedAt,
                 LastUpdatedBy = project.LastUpdatedBy,
-                IsArchived = project.IsArchived
+                IsArchived = project.IsArchived,
+                Banner = project.Banner
             };
 
             // Update the Project Cache List
@@ -778,20 +805,18 @@ public class ProjectBusiness : IProjectBusiness
         // ===============================
         // CREATE DEFAULT CLASSES
         // ===============================
-        // TODO: project config should determine whether to do this (true by default)
         var defaultClasses = new List<CreateClassRequestDto>
         {
             new() { Name = "Timeseries" },
             new() { Name = "Report" },
             new() { Name = "File" }
         };
-        var cls = await _classBusiness.BulkCreateClasses(
+        await _classBusiness.BulkCreateClasses(
             currentUserId, organizationId, projectId, defaultClasses);
 
         // ===============================
         // CREATE DEFAULT DATA SOURCE
         // ===============================
-        // TODO: project config should determine whether to do this (true by default)
         var defaultDataSource = new CreateDataSourceRequestDto
         {
             Name = "Default Data Source",
@@ -801,83 +826,12 @@ public class ProjectBusiness : IProjectBusiness
         await _dataSourceBusiness.CreateDataSource(organizationId, projectId, currentUserId, defaultDataSource);
 
         // ===============================
-        // CREATE DEFAULT OBJECT STORAGE
+        // Add current user as admin to project
         // ===============================
-        // TODO: project config should determine whether to do this (true by default)
-        Env.Load("../.env");
-        var defaultObjectStorageMethod = Environment.GetEnvironmentVariable("FILE_STORAGE_METHOD");
-
-        var config = new JsonObject();
-        if (defaultObjectStorageMethod == "filesystem")
-        {
-            var mountPath =
-                Environment.GetEnvironmentVariable("STORAGE_DIRECTORY") ??
-                throw new NullReferenceException("Storage file path not set");
-            config["mountPath"] = mountPath;
-        }
-        else if (defaultObjectStorageMethod == "azure_object")
-        {
-            var azureConnectionString =
-                Environment.GetEnvironmentVariable("AZURE_OBJECT_CONNECTION_STRING") ??
-                throw new NullReferenceException("Azure connection string not set");
-            config["azureConnectionString"] = azureConnectionString;
-        }
-        else if (defaultObjectStorageMethod == "aws_s3")
-        {
-            var awsConnectionString =
-                Environment.GetEnvironmentVariable("AWS_S3_CONNECTION_STRING") ??
-                throw new NullReferenceException("AWS connection string not set");
-            config["awsConnectionString"] = awsConnectionString;
-        }
-        else
-        {
-            throw new NullReferenceException(
-                "Unknown object storage method, make sure your environment variables are correctly set");
-        }
-
-        var objectStorageRequestDto = new CreateObjectStorageRequestDto
-        {
-            Name = "Instance Default",
-            Config = config,
-            Default = true
-        };
-        await _objectStorageBusiness.CreateObjectStorage(
-            currentUserId, organizationId, projectId, objectStorageRequestDto);
-
-        // ===============================
-        // CREATE DEFAULT TIMESERIES MOUNT
-        // ===============================
-        // TODO: project config should determine whether to do this (true by default)
-        var timeseriesObjectStorageMethod = new CreateObjectStorageRequestDto
-        {
-            Name = "Timeseries Default",
-            Config = new JsonObject
-            {
-                ["mountPath"] = Environment.GetEnvironmentVariable("DUCKDB_BASE_PATH") ?? "/data/duckdb"
-            }
-        };
-        var obj = await _objectStorageBusiness.CreateObjectStorage(currentUserId, organizationId, projectId,
-            timeseriesObjectStorageMethod);
-
-        // ===============================
-        // CREATE DEFAULT PROJECT ROLES
-        // ===============================
-        // TODO: project config should determine whether to do this (true by default)
-        var defaultRoles = new List<CreateRoleRequestDto>
-        {
-            new() { Name = "Admin", Description = "Project administrator with full permissions" },
-            new() { Name = "User", Description = "Standard project user with limited permissions" }
-        };
-        var roles = await _roleBusiness.BulkCreateRoles(currentUserId, organizationId, projectId, defaultRoles);
-        var adminRoleId = roles.Single(r => r.Name == "Admin").Id;
-        var userRoleId = roles.Single(r => r.Name == "User").Id;
-
-        // set role permissions for admin and user
-        await _roleBusiness.SetPermissionsByPattern(adminRoleId, DefaultRolePermissions.Admin.AllowedPermissions,
-            organizationId, projectId);
-        await _roleBusiness.SetPermissionsByPattern(userRoleId, DefaultRolePermissions.User.AllowedPermissions,
-            organizationId, projectId);
-
-        await AddMemberToProject(projectId, adminRoleId, currentUserId, null);
+        var adminRole = await _context.Roles.FirstOrDefaultAsync(r => r.Name == "Admin" && r.OrganizationId == organizationId);
+        if (adminRole == null)
+            throw new InvalidOperationException($"Admin role not found for organization {organizationId}");
+    
+        await AddMemberToProject(projectId, adminRole.Id, currentUserId, null);
     }
 }

@@ -12,6 +12,7 @@ interface translationsProps<T> {
   columns: {
     header: string;
     data: (row: T) => ReactNode;
+    isExpandTrigger?: (row: T) => boolean;
   }[];
   renderExpandedContent: (row: T, onClose: () => void) => ReactNode;
   onExplore: (row: T) => void;
@@ -49,7 +50,7 @@ export function ExpandableTable<T>({
   }, [currentPage]);
 
   return (
-    <div className="overflow-x-auto">
+    <div>
       <table className="table w-full">
         {expandedIndex === null && (
           <thead>
@@ -85,14 +86,20 @@ export function ExpandableTable<T>({
                   </tr>
                 ) : (
                   <tr className="bg-base-200/30 hover:bg-base-300/60 transition-colors shadow shadow-dynamic-shadow">
-                    {columns.map((col, i) => (
-                      <td
-                        key={i}
-                        className="text-base-content first:rounded-l-lg last:rounded-r-lg border-b-4 border-base-100"
-                      >
-                        {col.data(row)}
-                      </td>
-                    ))}
+                      {columns.map((col, i) => {
+                          const shouldTrigger = col.isExpandTrigger?.(row) ?? false;
+                          return (
+
+                              <td
+                                  key={i}
+                                  className={`text-base-content first:rounded-l-lg last:rounded-r-lg border-b-4 border-base-100 ${shouldTrigger ? "cursor-pointer" : ""}`}
+                                  onClick={shouldTrigger ? () => toggleRow(globalIndex) : undefined}
+                              >
+                                  {col.data(row)}
+                              </td>
+                        );
+                    })}
+
                     <td className="border-b-4 border-base-100">
                       <button
                         className="btn btn-sm btn-outline btn-secondary hover:btn-secondary mr-3"

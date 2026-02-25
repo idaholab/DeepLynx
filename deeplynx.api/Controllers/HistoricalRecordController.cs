@@ -3,6 +3,7 @@ using deeplynx.models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using deeplynx.helpers;
+using deeplynx.helpers.Context;
 
 namespace deeplynx.api.Controllers;
 
@@ -53,10 +54,10 @@ public class HistoricalRecordController : ControllerBase
     {
         try
         {
+            var currentUserId = UserContextStorage.UserId;
             var records =
-                await _historicalRecordBusiness.GetAllHistoricalRecords(projectId, organizationId, dataSourceId,
-                    pointInTime,
-                    hideArchived);
+                await _historicalRecordBusiness.GetAllHistoricalRecords(
+                    currentUserId, projectId, organizationId, dataSourceId, pointInTime, hideArchived);
             return Ok(records);
         }
         catch (Exception exc)
@@ -78,6 +79,7 @@ public class HistoricalRecordController : ControllerBase
     /// <returns>The historical record at the specified point in time</returns>
     [HttpGet("{recordId:long}", Name = "api_get_a_historical_record")]
     [Auth("read", "record")]
+    [Sensitivity("read record")]
     public async Task<ActionResult<HistoricalRecordResponseDto>> GetHistoricalRecord(
         long organizationId,
         long projectId,
@@ -87,9 +89,10 @@ public class HistoricalRecordController : ControllerBase
     {
         try
         {
+            var currentUserId = UserContextStorage.UserId;
             var record =
-                await _historicalRecordBusiness.GetHistoricalRecord(recordId, organizationId, pointInTime,
-                    hideArchived);
+                await _historicalRecordBusiness.GetHistoricalRecord(
+                    currentUserId, recordId, organizationId, pointInTime, hideArchived);
             return Ok(record);
         }
         catch (Exception exc)
@@ -109,6 +112,7 @@ public class HistoricalRecordController : ControllerBase
     /// <returns>A list of all previous versions of the record</returns>
     [HttpGet("{recordId:long}/history", Name = "api_get_record_history")]
     [Auth("read", "record")]
+    [Sensitivity("read record")]
     public async Task<ActionResult<IEnumerable<HistoricalRecordResponseDto>>> GetRecordHistory(
         long organizationId,
         long projectId,
@@ -116,7 +120,9 @@ public class HistoricalRecordController : ControllerBase
     {
         try
         {
-            var history = await _historicalRecordBusiness.GetHistoryForRecord(recordId, organizationId);
+            var currentUserId = UserContextStorage.UserId;
+            var history = await _historicalRecordBusiness.GetHistoryForRecord(
+                currentUserId, recordId, organizationId);
             return Ok(history);
         }
         catch (Exception exc)

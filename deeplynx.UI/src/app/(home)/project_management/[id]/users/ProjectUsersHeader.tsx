@@ -3,10 +3,10 @@
 import React from "react";
 import { useLanguage } from "@/app/contexts/Language";
 import {
-  EnvelopeIcon,
+  UserPlusIcon,
   UserGroupIcon,
-  UserIcon,
   UsersIcon,
+  UserIcon,
 } from "@heroicons/react/24/outline";
 
 /* -------------------------------------------------------------------------- */
@@ -18,9 +18,8 @@ interface ProjectUsersHeaderProps {
   userCount: number;
   groupCount: number;
   loading: boolean;
-  onAddUser: () => void;
-  onAddGroup: () => void;
   onInviteUser: () => void;
+  onAddGroup: () => void;
 }
 
 const ProjectUsersHeader: React.FC<ProjectUsersHeaderProps> = ({
@@ -28,9 +27,8 @@ const ProjectUsersHeader: React.FC<ProjectUsersHeaderProps> = ({
   userCount,
   groupCount,
   loading,
-  onAddUser,
-  onAddGroup,
   onInviteUser,
+  onAddGroup,
 }) => {
   const { t } = useLanguage();
   return (
@@ -47,40 +45,21 @@ const ProjectUsersHeader: React.FC<ProjectUsersHeaderProps> = ({
         </div>
         <div className="flex gap-2">
           <button
-            className="btn btn-outline btn-primary gap-2"
+            className="btn btn-primary gap-2"
             onClick={onInviteUser}
             disabled={loading}
           >
-            <EnvelopeIcon className="w-5 h-5" />
-            {t.translations.INVITE_USER}
+            <UserPlusIcon className="w-5 h-5" />
+            {t.translations.ADD_USERS}
           </button>
-          <div className="dropdown dropdown-end">
-            <button
-              tabIndex={0}
-              className="btn btn-primary gap-2"
-              disabled={loading}
-            >
-              <UserIcon className="w-5 h-5" />
-              {t.translations.ADD_MEMBER}
-            </button>
-            <ul
-              tabIndex={0}
-              className="dropdown-content menu bg-base-100 rounded-box z-[1] w-52 p-2 shadow-lg border border-base-300"
-            >
-              <li>
-                <a onClick={onAddUser}>
-                  <UserIcon className="w-4 h-4" />
-                  {t.translations.ADD_EXISTING_USER}
-                </a>
-              </li>
-              <li>
-                <a onClick={onAddGroup}>
-                  <UserGroupIcon className="w-4 h-4" />
-                  {t.translations.ADD_GROUP}
-                </a>
-              </li>
-            </ul>
-          </div>
+          <button
+            className="btn btn-outline btn-primary gap-2"
+            onClick={onAddGroup}
+            disabled={loading}
+          >
+            <UserGroupIcon className="w-5 h-5" />
+            {t.translations.ADD_GROUPS}
+          </button>
         </div>
       </div>
 
@@ -90,9 +69,13 @@ const ProjectUsersHeader: React.FC<ProjectUsersHeaderProps> = ({
           <div className="stat-figure text-primary">
             <UsersIcon className="w-8 h-8" />
           </div>
-          <div className="stat-title text-primary">{t.translations.TOTAL_MEMBERS}</div>
+          <div className="stat-title text-primary">
+            {t.translations.TOTAL_MEMBERS}
+          </div>
           <div className="stat-value text-primary">{totalMembers}</div>
-          <div className="stat-desc text-primary">{t.translations.USERS_PLUS_GROUP}</div>
+          <div className="stat-desc text-primary">
+            {t.translations.USERS_PLUS_GROUP}
+          </div>
         </div>
         <div className="stat bg-base-200 rounded-lg">
           <div className="stat-figure text-primary">
@@ -100,7 +83,9 @@ const ProjectUsersHeader: React.FC<ProjectUsersHeaderProps> = ({
           </div>
           <div className="stat-title text-primary">{t.translations.USERS}</div>
           <div className="stat-value text-primary">{userCount}</div>
-          <div className="stat-desc text-primary">{t.translations.INDIVIDUAL_MEMBERS}</div>
+          <div className="stat-desc text-primary">
+            {t.translations.INDIVIDUAL_MEMBERS}
+          </div>
         </div>
         <div className="stat bg-base-200 rounded-lg">
           <div className="stat-figure text-primary">
@@ -108,7 +93,9 @@ const ProjectUsersHeader: React.FC<ProjectUsersHeaderProps> = ({
           </div>
           <div className="stat-title text-primary">{t.translations.GROUPS}</div>
           <div className="stat-value text-primary">{groupCount}</div>
-          <div className="stat-desc text-primary">{t.translations.GROUP_MEMBERSHIP}</div>
+          <div className="stat-desc text-primary">
+            {t.translations.GROUP_MEMBERSHIP}
+          </div>
         </div>
       </div>
     </>

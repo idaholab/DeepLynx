@@ -17,7 +17,7 @@ namespace deeplynx.datalayer.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.1")
+                .HasAnnotation("ProductVersion", "10.0.2")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -242,6 +242,10 @@ namespace deeplynx.datalayer.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("project_id");
 
+                    b.Property<string>("Properties")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("properties");
+
                     b.Property<string>("Uuid")
                         .HasColumnType("text")
                         .HasColumnName("uuid");
@@ -418,6 +422,10 @@ namespace deeplynx.datalayer.Migrations
                     b.Property<long>("ProjectId")
                         .HasColumnType("bigint")
                         .HasColumnName("project_id");
+
+                    b.Property<string>("Properties")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("properties");
 
                     b.Property<long?>("RelationshipId")
                         .HasColumnType("bigint")
@@ -728,6 +736,10 @@ namespace deeplynx.datalayer.Migrations
                         .HasDefaultValue(false)
                         .HasColumnName("is_archived");
 
+                    b.Property<string>("Labels")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("labels");
+
                     b.Property<DateTime>("LastUpdatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp without time zone")
@@ -1026,6 +1038,11 @@ namespace deeplynx.datalayer.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
 
+                    b.Property<string>("Banner")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("banner");
+
                     b.Property<bool>("DefaultOrg")
                         .HasColumnType("boolean")
                         .HasColumnName("default_org");
@@ -1054,6 +1071,10 @@ namespace deeplynx.datalayer.Migrations
                         .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("name");
+
+                    b.Property<bool>("RequireSensitivityLabel")
+                        .HasColumnType("boolean")
+                        .HasColumnName("require_sensitivity_label");
 
                     b.HasKey("Id")
                         .HasName("organization_pkey");
@@ -1228,12 +1249,10 @@ namespace deeplynx.datalayer.Migrations
                         .HasColumnType("text")
                         .HasColumnName("abbreviation");
 
-                    b.Property<string>("Config")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("jsonb")
-                        .HasColumnName("config")
-                        .HasDefaultValueSql("'{\"tagsMutable\": false, \"ontologyMutable\": false, \"edgeRecordsMutable\": false}'::jsonb");
+                    b.Property<string>("Banner")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("banner");
 
                     b.Property<string>("Description")
                         .HasColumnType("text")
@@ -1263,6 +1282,10 @@ namespace deeplynx.datalayer.Migrations
                     b.Property<long>("OrganizationId")
                         .HasColumnType("bigint")
                         .HasColumnName("organization_id");
+
+                    b.Property<bool>("RequireSensitivityLabel")
+                        .HasColumnType("boolean")
+                        .HasColumnName("require_sensitivity_label");
 
                     b.HasKey("Id")
                         .HasName("projects_pkey");
@@ -1492,6 +1515,10 @@ namespace deeplynx.datalayer.Migrations
                     b.Property<long?>("ProjectId")
                         .HasColumnType("bigint")
                         .HasColumnName("project_id");
+
+                    b.Property<string>("Properties")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("properties");
 
                     b.Property<string>("Uuid")
                         .HasColumnType("text")

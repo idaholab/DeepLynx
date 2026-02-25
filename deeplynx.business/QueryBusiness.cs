@@ -2,6 +2,7 @@ using System.Text.Json;
 using deeplynx.datalayer.Models;
 using deeplynx.interfaces;
 using deeplynx.models;
+using deeplynx.helpers;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using NpgsqlTypes;
@@ -14,14 +15,16 @@ namespace deeplynx.business;
 public class QueryBusiness : IQueryBusiness
 {
     private readonly DeeplynxContext _context;
+    private readonly ISensitivityLabelService _sensitivityLabelService;
 
     /// <summary>
     ///     Filter record request
     /// </summary>
     /// <param name="context">The database context to be used for filter operations.</param>
-    public QueryBusiness(DeeplynxContext context)
+    public QueryBusiness(DeeplynxContext context, ISensitivityLabelService sensitivityLabelService)
     {
         _context = context;
+        _sensitivityLabelService = sensitivityLabelService;
     }
 
     /// <summary>
@@ -33,43 +36,70 @@ public class QueryBusiness : IQueryBusiness
     /// <param name="projectIds">Project ids that a user has access to</param>
     /// <returns>A list of historical record response dtos that match provided filters</returns>
     public async Task<IEnumerable<HistoricalRecordResponseDto>> QueryBuilder(
-        CustomQueryDtos.CustomQueryRequestDto[] request, long organizationId, long[] projectIds,
-        string? textSearch = null)
+        long currentUserId, CustomQueryDtos.CustomQueryRequestDto[] request, long organizationId,
+        long[] projectIds, string? textSearch = null)
     {
         if (request == null) throw new ArgumentException("Custom query request dto cannot be null");
-
         try
         {
+            // Get authorized sensitivity labels for the user
+            var authorizedLabelIds = await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
+                currentUserId, organizationId, projectIds, "read record");
+
             var sql = @"
-                SELECT DISTINCT ON (hr.record_id)
-                    hr.*,
-                    hr.class_id as ClassId,
-                    hr.class_name as ClassName,
-                    hr.original_id as OriginalId,
-                    hr.data_source_name as DataSourceName,
-                    hr.data_source_id as DataSourceId,
-                    hr.project_name as ProjectName,
-                    hr.project_id as ProjectId,
-                    hr.last_updated_at as LastUpdatedAt,
-                    hr.last_updated_by as LastUpdatedBy,
-                    hr.object_storage_name as ObjectStorageName,
-                    hr.object_storage_id as ObjectStorageId,
-                    hr.record_id as RecordId,
-                    hr.is_archived as IsArchived
-                FROM deeplynx.historical_records hr
-                WHERE hr.is_archived = false
-                AND hr.project_id = ANY(@projectIds)
-                AND hr.organization_id = @organizationId";
+            SELECT DISTINCT ON (hr.record_id)
+                hr.*,
+                hr.class_id as ClassId,
+                hr.class_name as ClassName,
+                hr.original_id as OriginalId,
+                hr.data_source_name as DataSourceName,
+                hr.data_source_id as DataSourceId,
+                hr.project_name as ProjectName,
+                hr.project_id as ProjectId,
+                hr.last_updated_at as LastUpdatedAt,
+                hr.last_updated_by as LastUpdatedBy,
+                hr.object_storage_name as ObjectStorageName,
+                hr.object_storage_id as ObjectStorageId,
+                hr.record_id as RecordId,
+                hr.is_archived as IsArchived
+            FROM deeplynx.historical_records hr
+            LEFT JOIN deeplynx.record_labels rl ON hr.record_id = rl.record_id
+            WHERE hr.is_archived = false
+            AND hr.project_id = ANY(@projectIds)
+            AND hr.organization_id = @organizationId
+            AND (
+                -- Either the record has no labels (unlabeled records are accessible)
+                NOT EXISTS (
+                    SELECT 1 
+                    FROM deeplynx.record_labels 
+                    WHERE record_id = hr.record_id
+                )
+                OR
+                NOT EXISTS (
+                    SELECT 1
+                    FROM deeplynx.record_labels rl2
+                    WHERE rl2.record_id = hr.record_id
+                    AND rl2.label_id != ALL(@authorizedLabelIds)
+                )
+            )";
 
             var parameters = new List<NpgsqlParameter>();
             var conditions = new List<string>();
+
             var projectIdsParam = new NpgsqlParameter("projectIds", NpgsqlDbType.Array | NpgsqlDbType.Bigint)
             {
                 Value = projectIds
             };
             var orgIdsParam = new NpgsqlParameter("organizationId", organizationId);
+            var authorizedLabelIdsParam =
+                new NpgsqlParameter("authorizedLabelIds", NpgsqlDbType.Array | NpgsqlDbType.Bigint)
+                {
+                    Value = authorizedLabelIds.ToArray()
+                };
+
             parameters.Add(projectIdsParam);
             parameters.Add(orgIdsParam);
+            parameters.Add(authorizedLabelIdsParam);
 
             // Build individual conditions
             if (request?.Length > 0)
@@ -205,9 +235,9 @@ public class QueryBusiness : IQueryBusiness
             sql += " ORDER BY hr.record_id, hr.last_updated_at DESC";
 
             // Execute the query with parameters
-            var historicalRecords = _context.HistoricalRecords.FromSqlRaw(sql, parameters.ToArray());
+            var historicalRecordResults = _context.HistoricalRecords.FromSqlRaw(sql, parameters.ToArray());
 
-            return await historicalRecords
+            return await historicalRecordResults
                 .Select(r => new HistoricalRecordResponseDto
                 {
                     Id = r.RecordId,
@@ -260,11 +290,15 @@ public class QueryBusiness : IQueryBusiness
     /// <param name="userQuery">String query</param>
     /// <param name="projectIds">Project ids that a user has access to</param>
     /// <returns>A list of historical record response dtos that match provided query parameters</returns>
-    public async Task<IEnumerable<HistoricalRecordResponseDto>> Search(string userQuery, long organizationId,
-        long[] projectIds)
+    public async Task<IEnumerable<HistoricalRecordResponseDto>> Search(
+        long currentUserId, string userQuery, long organizationId, long[] projectIds)
     {
         if (string.IsNullOrWhiteSpace(userQuery))
             throw new Exception("Search query is required.");
+
+        // Get authorized sensitivity labels for the user
+        var authorizedLabelIds = await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
+            currentUserId, organizationId, projectIds, "read record");
 
         // Process query for full-text search (prefix matching)
         var processedQuery = string.Join(" & ",
@@ -272,45 +306,62 @@ public class QueryBusiness : IQueryBusiness
                 .Select(word => word.Trim() + ":*"));
 
         var sql = @"
-            SELECT DISTINCT ON (hr.record_id)
-            hr.*,
-            hr.class_id as ClassId,
-            hr.class_name as ClassName,
-            hr.original_id as OriginalId,
-            hr.data_source_name as DataSourceName,
-            hr.data_source_id as DataSourceId,
-            hr.project_name as ProjectName,
-            hr.project_id as ProjectId,
-            hr.last_updated_at as LastUpdatedAt,
-            hr.last_updated_by as LastUpdatedBy,
-            hr.object_storage_name as ObjectStorageName,
-            hr.object_storage_id as ObjectStorageId,
-            hr.record_id as RecordId,
-            hr.is_archived as IsArchived
-        FROM deeplynx.historical_records hr
-        WHERE hr.is_archived = false
-        AND hr.project_id = ANY(@project_ids)
-        AND hr.organization_id = @organization_id
-        AND (
-            to_tsvector('english',
-                    coalesce(name, '') || ' ' ||
-                    coalesce(description, '') || ' ' ||
-                    coalesce(class_name, '') || ' ' ||
-                    coalesce(uri, '') || ' ' ||
-                    coalesce(original_id, '') || ' ' ||
-                    coalesce(data_source_name, '') || ' ' ||
-                    coalesce(project_name, '') || ' ' ||
-                    coalesce(properties::text, '') || ' ' ||
-                    coalesce(tags::text, '')
-                )@@ to_tsquery('english', @processed_query)
-            OR hr.name ILIKE '%' || @original_query || '%'
-            OR hr.description ILIKE '%' || @original_query || '%'
-            OR hr.original_id ILIKE '%' || @original_query || '%'
-            OR hr.data_source_name ILIKE '%' || @original_query || '%'
-            OR hr.project_name ILIKE '%' || @original_query || '%'
-            OR hr.class_name ILIKE '%' || @original_query || '%'
+        SELECT DISTINCT ON (hr.record_id)
+        hr.*,
+        hr.class_id as ClassId,
+        hr.class_name as ClassName,
+        hr.original_id as OriginalId,
+        hr.data_source_name as DataSourceName,
+        hr.data_source_id as DataSourceId,
+        hr.project_name as ProjectName,
+        hr.project_id as ProjectId,
+        hr.last_updated_at as LastUpdatedAt,
+        hr.last_updated_by as LastUpdatedBy,
+        hr.object_storage_name as ObjectStorageName,
+        hr.object_storage_id as ObjectStorageId,
+        hr.record_id as RecordId,
+        hr.is_archived as IsArchived
+    FROM deeplynx.historical_records hr
+    LEFT JOIN deeplynx.record_labels rl ON hr.record_id = rl.record_id
+    WHERE hr.is_archived = false
+    AND hr.project_id = ANY(@project_ids)
+    AND hr.organization_id = @organization_id
+    AND (
+        -- Authorization: unlabeled records OR records with authorized labels
+        NOT EXISTS (
+            SELECT 1 
+            FROM deeplynx.record_labels 
+            WHERE record_id = hr.record_id
         )
-        ORDER BY hr.record_id, hr.last_updated_at DESC";
+        OR
+        NOT EXISTS (
+            SELECT 1
+            FROM deeplynx.record_labels rl2
+            WHERE rl2.record_id = hr.record_id
+            AND rl2.label_id != ALL(@authorized_label_ids)
+                )
+    ) 
+    AND (
+        -- Search conditions
+        to_tsvector('english',
+                coalesce(name, '') || ' ' ||
+                coalesce(description, '') || ' ' ||
+                coalesce(class_name, '') || ' ' ||
+                coalesce(uri, '') || ' ' ||
+                coalesce(original_id, '') || ' ' ||
+                coalesce(data_source_name, '') || ' ' ||
+                coalesce(project_name, '') || ' ' ||
+                coalesce(properties::text, '') || ' ' ||
+                coalesce(tags::text, '')
+            )@@ to_tsquery('english', @processed_query)
+        OR hr.name ILIKE '%' || @original_query || '%'
+        OR hr.description ILIKE '%' || @original_query || '%'
+        OR hr.original_id ILIKE '%' || @original_query || '%'
+        OR hr.data_source_name ILIKE '%' || @original_query || '%'
+        OR hr.project_name ILIKE '%' || @original_query || '%'
+        OR hr.class_name ILIKE '%' || @original_query || '%'
+    )
+    ORDER BY hr.record_id, hr.last_updated_at DESC";
 
         var param1 = new NpgsqlParameter("processed_query", processedQuery);
         var param2 = new NpgsqlParameter("original_query", userQuery);
@@ -319,10 +370,14 @@ public class QueryBusiness : IQueryBusiness
             Value = projectIds
         };
         var param4 = new NpgsqlParameter("organization_id", organizationId);
+        var param5 = new NpgsqlParameter("authorized_label_ids", NpgsqlDbType.Array | NpgsqlDbType.Bigint)
+        {
+            Value = authorizedLabelIds.ToArray()
+        };
 
-        var results = _context.HistoricalRecords.FromSqlRaw(sql, param1, param2, param3, param4);
+        var historicalRecordsResults = _context.HistoricalRecords.FromSqlRaw(sql, param1, param2, param3, param4, param5);
 
-        return await results
+        return await historicalRecordsResults
             .Select(r => new HistoricalRecordResponseDto
             {
                 Id = r.RecordId,
@@ -352,9 +407,12 @@ public class QueryBusiness : IQueryBusiness
     /// <param name="projectIds">An array of project ids</param>
     /// <returns>An array of records</returns>
     public async Task<IEnumerable<HistoricalRecordResponseDto>> GetRecentlyAddedRecords(
-        long organizationId,
-        long[] projectIds)
+        long currentUserId, long organizationId, long[] projectIds)
     {
+        // Get authorized sensitivity labels for the user
+        var authorizedLabelIds = await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
+            currentUserId, organizationId, projectIds, "read record");
+    
         var query = _context.HistoricalRecords
             .Where(r => r.OrganizationId == organizationId && !r.IsArchived);
 
@@ -365,6 +423,21 @@ public class QueryBusiness : IQueryBusiness
             return new List<HistoricalRecordResponseDto>();
         }
 
+        var authorizedRecordIds = await _context.Records
+            .Where(rec =>
+                // Either the record has no labels
+                !rec.Labels.Any()
+                ||
+                // Or the user is authorized to access All of the records labels
+                rec.Labels.All(label => authorizedLabelIds.Contains(label.Id))
+            )
+            .Select(rec => rec.Id)
+            .ToListAsync();
+        
+        // Filter historical records by authorized record IDs
+        query = query.Where(r => authorizedRecordIds.Contains(r.RecordId));
+
+        
         var records = await query
             .GroupBy(r => r.RecordId)
             .Select(g => g.OrderByDescending(r => r.LastUpdatedAt).First())
@@ -390,9 +463,7 @@ public class QueryBusiness : IQueryBusiness
             LastUpdatedAt = r.LastUpdatedAt
         });
     }
-
-
-
+    
     /// <summary>
     ///     Retrieves all records for multiple projects.
     /// </summary>
@@ -400,17 +471,37 @@ public class QueryBusiness : IQueryBusiness
     /// <param name="projects">Array of project ids whose records are to be retrieved</param>
     /// <param name="hideArchived">Flag indicating whether to hide archived records from the result</param>
     /// <returns>A list of records based on the applied filters.</returns>
-    public async Task<IEnumerable<HistoricalRecordResponseDto>> GetMultiProjectRecords(long organizationId,
-        long[] projects, bool hideArchived)
+    public async Task<IEnumerable<HistoricalRecordResponseDto>> GetMultiProjectRecords(
+        long currentUserId, long organizationId, long[] projects, bool hideArchived)
     {
+        var authorizedLabelIds = await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
+            currentUserId, organizationId, projects, "read record");   
+        
+        var projectSet = new HashSet<long>(projects);
+
         var recordQuery = _context.HistoricalRecords
-            .Where(r => projects.Contains(r.ProjectId) && r.OrganizationId == organizationId);
+            .Where(r => projectSet.Contains(r.ProjectId) && r.OrganizationId == organizationId);
+        
+        var authorizedRecordIds = await _context.Records
+            .Where(rec =>
+                // Either the record has no labels
+                !rec.Labels.Any()
+                ||
+                // Or the user is authorized to access all the records labels
+                rec.Labels.All(label => authorizedLabelIds.Contains(label.Id))
+            )
+            .Select(rec => rec.Id)
+            .ToListAsync();
+        
+        // Filter historical records by authorized record IDs
+        recordQuery = recordQuery.Where(r => authorizedRecordIds.Contains(r.RecordId));
 
         if (hideArchived) recordQuery = recordQuery.Where(r => !r.IsArchived);
 
         var records = await recordQuery
             .GroupBy(e => e.RecordId)
-            .Select(g => g.OrderByDescending(r => r.LastUpdatedAt).FirstOrDefault())
+            .Select(g => g
+                .OrderByDescending(r => r.LastUpdatedAt).FirstOrDefault())
             .ToListAsync();
 
         return records

@@ -2,5 +2,6 @@ namespace deeplynx.interfaces;
 
 public interface IInvitationBusiness
 {
-    Task<bool> InviteAndAddUserToHierarchy(long organizationId, long? projectId, long? roleId, string userEmail, string? userName);
+    Task<bool> InviteAndAddUserToHierarchy(long organizationId, long? projectId, long? groupId,
+        long? roleId, long? userId, string? userEmail);
 }

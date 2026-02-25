@@ -3,6 +3,7 @@ using deeplynx.models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using deeplynx.helpers;
+using deeplynx.helpers.Context;
 
 namespace deeplynx.api.Controllers;
 
@@ -44,7 +45,8 @@ public class QueryController : ControllerBase
     {
         try
         {
-            var records = await _queryBusiness.Search(userQuery,organizationId, projectIds);
+            var currentUserId = UserContextStorage.UserId;
+            var records = await _queryBusiness.Search(currentUserId, userQuery,organizationId, projectIds);
             return Ok(records);
         }
         catch (Exception exc)
@@ -71,7 +73,8 @@ public class QueryController : ControllerBase
     {
         try
         {
-            var records = await _queryBusiness.QueryBuilder(filterArray, organizationId, projectIds, textSearch);
+            var currentUserId = UserContextStorage.UserId;
+            var records = await _queryBusiness.QueryBuilder(currentUserId, filterArray, organizationId, projectIds, textSearch);
             return Ok(records);
         }
         catch (Exception exc)
@@ -95,7 +98,8 @@ public class QueryController : ControllerBase
     {
         try
         {
-            var records = await _queryBusiness.GetRecentlyAddedRecords(organizationId, projectIds);
+            var currentUserId = UserContextStorage.UserId;
+            var records = await _queryBusiness.GetRecentlyAddedRecords(currentUserId, organizationId, projectIds);
             return Ok(records);
         }
         catch (Exception exc)
@@ -123,7 +127,8 @@ public class QueryController : ControllerBase
     {
         try
         {
-            var records = await _queryBusiness.GetMultiProjectRecords(organizationId, projects, hideArchived);
+            var currentUserId = UserContextStorage.UserId;
+            var records = await _queryBusiness.GetMultiProjectRecords(currentUserId, organizationId, projects, hideArchived);
             return Ok(records);
         }
         catch (Exception exc)
