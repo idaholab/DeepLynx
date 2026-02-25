@@ -151,8 +151,12 @@ public class NotificationBusiness : INotificationBusiness
     /// </summary>
     /// <param name="toEmail">Recipient email address</param>
     /// <param name="name">Recipient name (optional, defaults to "User")</param>
+    /// <param name="isNewUser">True if this is a new user invitation, false if adding existing user</param>
+    /// <param name="organizationId">Organization ID for context (optional)</param>
+    /// <param name="projectId">Project ID for context (optional)</param>
     /// <returns>True if email was sent successfully, false otherwise</returns>
-    public async Task<bool> SendEmail(string toEmail, string? name)
+    public async Task<bool> SendEmail(string toEmail, string? name, bool isNewUser = true, long? organizationId = null,
+        long? projectId = null)
     {
         try
         {
@@ -169,69 +173,72 @@ public class NotificationBusiness : INotificationBusiness
 
             var emailPassword = "";
 
+            // Build the message based on context
+            var message = await BuildInvitationMessage(isNewUser, organizationId, projectId);
+
             var templateContent =
                 @"<!DOCTYPE html PUBLIC ""-//W3C//DTD XHTML 1.0 Transitional//EN"" ""http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"">
-        <html xmlns=""http://www.w3.org/1999/xhtml"">
-        <head>
-            <meta name=""viewport"" content=""width=device-width, initial-scale=1.0"" />
-            <meta http-equiv=""Content-Type"" content=""text/html; charset=UTF-8"" />
-            <meta name=""color-scheme"" content=""light dark"" />
-            <meta name=""supported-color-schemes"" content=""light dark"" />
-            <title>{{subject}}</title>
-            <style type=""text/css"">
-                @media (prefers-color-scheme: dark) {
-                    .dark-bg { background-color: #1a1a1a !important; }
-                    .dark-card { background-color: #2a2a2a !important; }
-                    .dark-text { color: #ffffff !important; }
-                    .dark-text-secondary { color: #cccccc !important; }
-                    .dark-border { border-color: #444444 !important; }
-                }
-            </style>
-        </head>
-        <body style=""font-family: 'Roboto', Arial, sans-serif; background-color: #f4f4f4; margin: 0; padding: 20px;"" class=""dark-bg"">
-        <table style=""width: 100%; max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);"" cellpadding=""0"" cellspacing=""0"" class=""dark-card"">
-            <tr>
-                <td style=""background-color: #07519e; padding: 40px 30px; text-align: center; border-radius: 8px 8px 0 0;"">
-                    <h1 style=""color: #ffffff; font-size: 24px; font-weight: bold; margin: 0;"">
-                        <img src=""""
-                             alt=""DeepLynx Nexus""
-                             style=""width: 50%; height: auto;""/>
-                    </h1>
-                </td>
-            </tr>
-            <tr>
-                <td style=""padding: 40px 30px;"">
-                    <h2 style=""color: #333333; font-size: 20px; margin: 0 0 20px 0;"" class=""dark-text"">Hello {{name}}!</h2>
-                    <p style=""color: #666666; font-size: 16px; line-height: 1.6; margin: 0 0 30px 0;"" class=""dark-text-secondary"">
-                        You've been invited to join DeepLynx Nexus. Click the button below to get started.
+    <html xmlns=""http://www.w3.org/1999/xhtml"">
+    <head>
+        <meta name=""viewport"" content=""width=device-width, initial-scale=1.0"" />
+        <meta http-equiv=""Content-Type"" content=""text/html; charset=UTF-8"" />
+        <meta name=""color-scheme"" content=""light dark"" />
+        <meta name=""supported-color-schemes"" content=""light dark"" />
+        <title>{{subject}}</title>
+        <style type=""text/css"">
+            @media (prefers-color-scheme: dark) {
+                .dark-bg { background-color: #1a1a1a !important; }
+                .dark-card { background-color: #2a2a2a !important; }
+                .dark-text { color: #ffffff !important; }
+                .dark-text-secondary { color: #cccccc !important; }
+                .dark-border { border-color: #444444 !important; }
+            }
+        </style>
+    </head>
+    <body style=""font-family: 'Roboto', Arial, sans-serif; background-color: #f4f4f4; margin: 0; padding: 20px;"" class=""dark-bg"">
+    <table style=""width: 100%; max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);"" cellpadding=""0"" cellspacing=""0"" class=""dark-card"">
+        <tr>
+            <td style=""background-color: #07519e; padding: 40px 30px; text-align: center; border-radius: 8px 8px 0 0;"">
+                <h1 style=""color: #ffffff; font-size: 24px; font-weight: bold; margin: 0;"">
+                    <img src=""""
+                         alt=""DeepLynx Nexus""
+                         style=""width: 50%; height: auto;""/>
+                </h1>
+            </td>
+        </tr>
+        <tr>
+            <td style=""padding: 40px 30px;"">
+                <h2 style=""color: #333333; font-size: 20px; margin: 0 0 20px 0;"" class=""dark-text"">Hello {{name}}!</h2>
+                <p style=""color: #666666; font-size: 16px; line-height: 1.6; margin: 0 0 30px 0;"" class=""dark-text-secondary"">
+                    {{message}}
+                </p>
+                <div style=""text-align: center; margin: 30px 0;"">
+                    <a href=""{{url}}"" style=""display: inline-block; background-color: #07519e; color: #ffffff; padding: 12px 30px; text-decoration: none; border-radius: 6px; font-weight: bold;"">Accept Invitation</a>
+                </div>
+                <div style=""margin-top: 30px; padding-top: 20px; border-top: 1px solid #eeeeee;"" class=""dark-border"">
+                    <p style=""color: #666666; font-size: 14px; margin: 0;"" class=""dark-text-secondary"">
+                        Best regards,<br>
+                        The DeepLynx Nexus Team
                     </p>
-                    <div style=""text-align: center; margin: 30px 0;"">
-                        <a href=""{{url}}"" style=""display: inline-block; background-color: #07519e; color: #ffffff; padding: 12px 30px; text-decoration: none; border-radius: 6px; font-weight: bold;"">Accept Invitation</a>
-                    </div>
-                    <div style=""margin-top: 30px; padding-top: 20px; border-top: 1px solid #eeeeee;"" class=""dark-border"">
-                        <p style=""color: #666666; font-size: 14px; margin: 0;"" class=""dark-text-secondary"">
-                            Best regards,<br>
-                            The DeepLynx Nexus Team
-                        </p>
-                    </div>
-                    <div style=""margin-top: 30px; padding-top: 15px; border-top: 1px solid #eeeeee;"" class=""dark-border"">
-                        <p style=""color: #999999; font-size: 12px; margin: 0; line-height: 1.4;"" class=""dark-text-secondary"">
-                            This invitation was sent to {{email}}.<br>
-                            If you believe you received this email in error, please contact our support team @
-                            {{support}}.
-                        </p>
-                    </div>
-                </td>
-            </tr>
-        </table>
-        </body>
-        </html>";
+                </div>
+                <div style=""margin-top: 30px; padding-top: 15px; border-top: 1px solid #eeeeee;"" class=""dark-border"">
+                    <p style=""color: #999999; font-size: 12px; margin: 0; line-height: 1.4;"" class=""dark-text-secondary"">
+                        This invitation was sent to {{email}}.<br>
+                        If you believe you received this email in error, please contact our support team @
+                        {{support}}.
+                    </p>
+                </div>
+            </td>
+        </tr>
+    </table>
+    </body>
+    </html>";
 
-            templateContent = templateContent.Replace("{{name}}", name);
+            templateContent = templateContent.Replace("{{name}}", name ?? "User");
             templateContent = templateContent.Replace("{{email}}", toEmail);
             templateContent = templateContent.Replace("{{url}}", url);
             templateContent = templateContent.Replace("{{support}}", support);
-
+            templateContent = templateContent.Replace("{{message}}", message);
 
             // Create message
             using var mailMessage = new MailMessage();
@@ -264,6 +271,46 @@ public class NotificationBusiness : INotificationBusiness
                 ex.Message);
             return false;
         }
+    }
+
+    private async Task<string> BuildInvitationMessage(bool isNewUser, long? organizationId, long? projectId)
+    {
+        string? orgName = null;
+        string? projectName = null;
+
+        // Fetch organization name if provided
+        if (organizationId.HasValue)
+        {
+            var org = await _context.Organizations
+                .Where(o => o.Id == organizationId.Value)
+                .Select(o => o.Name)
+                .FirstOrDefaultAsync();
+            orgName = org;
+        }
+
+        // Fetch project name if provided
+        if (projectId.HasValue)
+        {
+            var project = await _context.Projects
+                .Where(p => p.Id == projectId.Value)
+                .Select(p => p.Name)
+                .FirstOrDefaultAsync();
+            projectName = project;
+        }
+
+        // Build message based on context
+        var action = isNewUser ? "invited to join" : "added to";
+
+        if (!string.IsNullOrEmpty(projectName) && !string.IsNullOrEmpty(orgName))
+            return
+                $"You have been {action} the DeepLynx Nexus project <strong>{projectName}</strong> in the <strong>{orgName}</strong> organization. Click the button below to get started.";
+
+        if (!string.IsNullOrEmpty(orgName))
+            return
+                $"You have been {action} the DeepLynx Nexus <strong>{orgName}</strong> organization. Click the button below to get started.";
+
+        // Default message when no context is provided
+        return "You've been invited to join DeepLynx Nexus. Click the button below to get started.";
     }
 
     private async Task SendEventsToUser(
