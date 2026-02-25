@@ -89,7 +89,7 @@ export default function DropUpload({
       onDragEnter={handleDragOver}
       onDragLeave={handleDragLeave}
       className={[
-        "btn rounded-xl border p-6 transition",
+        "btn rounded-xl border p-10 transition",
         "flex flex-col items-center justify-center text-center gap-2",
         disabled
           ? "opacity-30 pointer-events-none"
