@@ -1,0 +1,3 @@
+[submodule "Insight"]
+	path = Insight
+	url = https://github.inl.gov/Digital-Engineering/Insight.git
