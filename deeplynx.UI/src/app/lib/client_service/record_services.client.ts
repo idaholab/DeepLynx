@@ -2,7 +2,7 @@
 "use client";
 
 import { CreateRecordRequestDto, UpdateRecordRequestDto } from "@/app/(home)/types/requestDTOs";
-import { RecordResponseDto, RelatedRecordsResponseDto } from "@/app/(home)/types/responseDTOs";
+import { HistoricalRecordResponseDto, RecordResponseDto, RelatedRecordsResponseDto } from "@/app/(home)/types/responseDTOs";
 import { GraphResponse } from "@/app/(home)/types/types";
 import api from "./api";
 
@@ -281,6 +281,59 @@ export async function unattachTagFromRecord(
 }
 
 /**
+ * Attach a sensitivity label to a record
+ * @param organizationId - The ID of the organization
+ * @param projectId - The ID of the project
+ * @param recordId - The ID of the record
+ * @param labelId - The ID of the sensitivity label to attach
+ * @returns Promise with success message
+ */
+export async function attachSensitivityLabelToRecord(
+  organizationId: number,
+  projectId: number,
+  recordId: number,
+  labelId: number
+): Promise<{ message: string }> {
+  try {
+    const res = await api.post(
+      `/organizations/${organizationId}/projects/${projectId}/records/${recordId}/sensitivity-labels`,
+      null,
+      { params: { sensitivityLabelId: labelId } }
+    );
+    return res.data;
+  } catch (error) {
+    console.error(`Error attaching sensitivity label ${labelId} to record ${recordId}:`, error);
+    throw error;
+  }
+}
+
+/**
+ * Unattach a sensitivity label from a record
+ * @param organizationId - The ID of the organization
+ * @param projectId - The ID of the project
+ * @param recordId - The ID of the record
+ * @param labelId - The ID of the sensitivity label to unattach
+ * @returns Promise with success message
+ */
+export async function unattachSensitivityLabelFromRecord(
+  organizationId: number,
+  projectId: number,
+  recordId: number,
+  labelId: number
+): Promise<{ message: string }> {
+  try {
+    const res = await api.delete(
+      `/organizations/${organizationId}/projects/${projectId}/records/${recordId}/sensitivity-labels`,
+      { params: { sensitivityLabelId: labelId } }
+    );
+    return res.data;
+  } catch (error) {
+    console.error(`Error unattaching sensitivity label ${labelId} from record ${recordId}:`, error);
+    throw error;
+  }
+}
+
+/**
  * Get edges by record
  * @param organizationId - The ID of the organization
  * @param projectId - The ID of the project
@@ -336,4 +389,45 @@ export async function getGraphDataForRecord(
     console.error(`Error getting graph data for record ${recordId}:`, error);
     throw error;
   }
+}
+
+/**
+ * Get a historical record at a specific point in time
+ * This allows you to see what a record looked like in the past
+ * 
+ * @param organizationId - The ID of the organization
+ * @param projectId - The ID of the project containing the record
+ * @param recordId - The ID of the specific record to retrieve
+ * @param pointInTime - Optional ISO 8601 timestamp to get record state at that moment
+ * @param hideArchived - Whether to exclude archived records (default: true)
+ * @returns Promise with a single HistoricalRecordResponseDto
+ */
+export async function getHistoricalRecord(
+    organizationId: number,
+    projectId: number,
+    recordId: number,
+    pointInTime?: string | null,
+    hideArchived: boolean = true
+): Promise<HistoricalRecordResponseDto> {
+    try {
+        const baseUrl = `/organizations/${organizationId}/projects/${projectId}/records/historical/${recordId}`;
+        
+        const queryParams: string[] = [];
+        
+        queryParams.push(`hideArchived=${hideArchived}`);
+        
+        if (pointInTime) {
+            queryParams.push(`pointInTime=${encodeURIComponent(pointInTime)}`);
+        }
+        
+        const queryString = queryParams.length > 0 ? `?${queryParams.join('&')}` : '';
+        const fullUrl = `${baseUrl}${queryString}`;
+        
+        const res = await api.get<HistoricalRecordResponseDto>(fullUrl);
+        
+        return res.data;
+    } catch (error) {
+        console.error("Error getting historical record:", error);
+        throw error;
+    }
 }

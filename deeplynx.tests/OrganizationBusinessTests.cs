@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.Text.Json;
 using deeplynx.business;
 using deeplynx.datalayer.Models;
 using deeplynx.helpers.Hubs;
@@ -9,6 +10,8 @@ using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Moq;
+using Xunit.Sdk;
+using Record = deeplynx.datalayer.Models.Record;
 
 namespace deeplynx.tests;
 
@@ -16,13 +19,14 @@ namespace deeplynx.tests;
 public class OrganizationBusinessTests : IntegrationTestBase
 {
     private EventBusiness _eventBusiness = null!;
-    private RoleBusiness _roleBusiness = null!;
+    private Mock<IBulkCopyUpsertExecutor> _mockBulkCopyUpsertExecutor = null!;
     private Mock<IHubContext<EventNotificationHub>> _mockHubContext = null!;
     private Mock<ILogger<OrganizationBusiness>> _mockLoggerOrg = null!;
     private Mock<ILogger<NotificationBusiness>> _mockNotificationLogger = null!;
+    private ObjectStorageBusiness _mockObjectStorage = null!;
     private INotificationBusiness _notificationBusiness = null!;
     private OrganizationBusiness _organizationBusiness = null!;
-    private Mock<IBulkCopyUpsertExecutor> _mockBulkCopyUpsertExecutor = null!;
+    private RoleBusiness _roleBusiness = null!;
 
     public long oid; // organization ID
     public long oid2; // second organization ID
@@ -45,11 +49,12 @@ public class OrganizationBusinessTests : IntegrationTestBase
         _mockBulkCopyUpsertExecutor = new Mock<IBulkCopyUpsertExecutor>();
         _eventBusiness = new EventBusiness(Context, _notificationBusiness, _mockBulkCopyUpsertExecutor.Object);
         _roleBusiness = new RoleBusiness(Context, _eventBusiness);
+        _mockObjectStorage = new ObjectStorageBusiness(Context);
 
         // org business and dependencies
         _mockLoggerOrg = new Mock<ILogger<OrganizationBusiness>>();
         _organizationBusiness = new OrganizationBusiness(
-            Context, _eventBusiness, _roleBusiness, _mockLoggerOrg.Object);
+            Context, _eventBusiness, _roleBusiness, _mockLoggerOrg.Object, _mockObjectStorage);
     }
 
     #region OrganizationResponseDto Tests
@@ -132,6 +137,35 @@ public class OrganizationBusinessTests : IntegrationTestBase
         await Context.SaveChangesAsync();
     }
 
+    private void AssertRolePermissions(
+        Role role,
+        Dictionary<string, string[]> expectedPermissions)
+    {
+        // All permissions should be marked as default
+        Assert.True(
+            role.Permissions.All(p => p.IsDefault),
+            $"Role '{role.Name}' has permissions not marked as default"
+        );
+
+        // Verify permission count
+        var expectedCount = expectedPermissions.Sum(kvp => kvp.Value.Length);
+        Assert.Equal(expectedCount, role.Permissions.Count);
+
+        // Verify each resource type has the correct actions
+        foreach (var (resource, expectedActions) in expectedPermissions)
+        {
+            var actualActions = role.Permissions
+                .Where(p => p.Resource == resource)
+                .Select(p => p.Action)
+                .OrderBy(a => a)
+                .ToList();
+
+            var sortedExpectedActions = expectedActions.OrderBy(a => a).ToList();
+
+            Assert.Equal(sortedExpectedActions, actualActions);
+        }
+    }
+
     #region GetAllOrganizations Tests
 
     [Fact]
@@ -210,10 +244,12 @@ public class OrganizationBusinessTests : IntegrationTestBase
         {
             Name = "New Test Organization",
             Description = "New Test Organization Description",
+            Banner = "Banner",
+            RequireSensitivityLabel = true
         };
-        
-        var now =  DateTime.UtcNow;
-        
+
+        var now = DateTime.UtcNow;
+
         // Act
         var result = await _organizationBusiness.CreateOrganization(uid, dto);
 
@@ -226,19 +262,20 @@ public class OrganizationBusinessTests : IntegrationTestBase
         Assert.False(result.IsArchived);
         Assert.True(result.LastUpdatedAt >= now);
         Assert.Equal(uid, result.LastUpdatedBy);
+        Assert.Equal(dto.Banner, result.Banner);
+        Assert.True(result.RequireSensitivityLabel);
 
         // verify org was actually created in database
         var createdOrg = await Context.Organizations.FindAsync(result.Id);
         Assert.NotNull(createdOrg);
         Assert.Equal(dto.Name, createdOrg.Name);
     }
-    
+
     [Fact]
     public async Task CreateOrganization_Success_CreatesDefaultRolesWithCorrectPermissions()
     {
-        
         var defaultPermissions = DefaultPermissions.AllDefaultPermissions;
-    
+
         foreach (var defaultPermission in defaultPermissions)
         {
             var permission = new Permission
@@ -251,18 +288,18 @@ public class OrganizationBusinessTests : IntegrationTestBase
             };
             Context.Permissions.Add(permission);
         }
-        
+
         await Context.SaveChangesAsync();
-        
+
         // Arrange
         var dto = new CreateOrganizationRequestDto
         {
             Name = "New Test Organization",
-            Description = "New Test Organization Description",
+            Description = "New Test Organization Description"
         };
-        
-        var now =  DateTime.UtcNow;
-        
+
+        var now = DateTime.UtcNow;
+
         // Act
         var result = await _organizationBusiness.CreateOrganization(uid, dto);
 
@@ -280,11 +317,12 @@ public class OrganizationBusinessTests : IntegrationTestBase
         var createdOrg = await Context.Organizations.FindAsync(result.Id);
         Assert.NotNull(createdOrg);
         Assert.Equal(dto.Name, createdOrg.Name);
-        
-        var defaultRoles = await Context.Roles.Where(r => r.OrganizationId == result.Id).Include(r => r.Permissions).ToListAsync();
+
+        var defaultRoles = await Context.Roles.Where(r => r.OrganizationId == result.Id).Include(r => r.Permissions)
+            .ToListAsync();
         var adminRole = defaultRoles.Single(r => r.Name == "Admin");
-        var userRole =  defaultRoles.Single(r => r.Name == "User");
-        
+        var userRole = defaultRoles.Single(r => r.Name == "User");
+
         AssertRolePermissions(adminRole, DefaultRolePermissions.Admin.AllowedPermissions);
         AssertRolePermissions(userRole, DefaultRolePermissions.User.AllowedPermissions);
     }
@@ -296,7 +334,8 @@ public class OrganizationBusinessTests : IntegrationTestBase
         var dto = new CreateOrganizationRequestDto
         {
             Name = "Event Test Organization",
-            Description = "A test organization for event logging"
+            Description = "A test organization for event logging",
+            Banner = "Banner"
         };
 
         // Act
@@ -305,12 +344,14 @@ public class OrganizationBusinessTests : IntegrationTestBase
         // Assert
         Assert.NotNull(result);
         Assert.Equal("Event Test Organization", result.Name);
+        Assert.Equal(dto.Banner, result.Banner);
 
         // Ensure that the Organization create event was logged
         var eventList = await Context.Events.ToListAsync();
         Assert.Equal(2, eventList.Count);
 
-        var orgEvent = eventList.Single(e => e.Operation == "create" && e.EntityType == "organization" && e.EntityId == result.Id);
+        var orgEvent = eventList.Single(e =>
+            e.Operation == "create" && e.EntityType == "organization" && e.EntityId == result.Id);
 
         Assert.NotNull(orgEvent);
     }
@@ -350,6 +391,27 @@ public class OrganizationBusinessTests : IntegrationTestBase
         // Ensure that no event was logged
         var eventList = await Context.Events.ToListAsync();
         Assert.Empty(eventList);
+    }
+
+    [Fact]
+    public async Task CreateOrganization_CreatesDefaultObjectStorages()
+    {
+        var dto = new CreateOrganizationRequestDto
+        {
+            Name = "New Org with OS Defaults",
+            Description = "Organization test"
+        };
+
+        // Act
+        var result = await _organizationBusiness.CreateOrganization(uid, dto);
+
+        var orgStorages = await Context.ObjectStorages
+            .Where(s => s.OrganizationId == result.Id)
+            .ToListAsync();
+
+        // Assert
+        var orgLevelStorages = orgStorages.Where(s => s.ProjectId == null).ToList();
+        Assert.Equal(1, orgLevelStorages.Count);
     }
 
     [Fact]
@@ -431,30 +493,32 @@ public class OrganizationBusinessTests : IntegrationTestBase
 
     #region UpdateOrganization Tests
 
-        [Fact]
-        public async Task UpdateOrganization_Success_ReturnsOrganization()
+    [Fact]
+    public async Task UpdateOrganization_Success_ReturnsOrganization()
+    {
+        // Arrange
+        var dto = new UpdateOrganizationRequestDto
         {
-            // Arrange
-            var dto = new UpdateOrganizationRequestDto
-            {
-                Name = "Updated Organization",
-                Description = "Updated description"
-            };
-            
-            var now = DateTime.UtcNow;
+            Name = "Updated Organization",
+            Description = "Updated description",
+            Banner = "Updated banner"
+        };
+
+        var now = DateTime.UtcNow;
 
         // Act
         var result = await _organizationBusiness.UpdateOrganization(uid, oid, dto);
 
-            // Assert
-            Assert.NotNull(result);
-            Assert.Equal(oid, result.Id);
-            Assert.Equal("Updated Organization", result.Name);
-            Assert.Equal("Updated description", result.Description);
-            Assert.False(result.DefaultOrg);
-            Assert.False(result.IsArchived);
-            Assert.True(result.LastUpdatedAt >= now);
-            Assert.Equal(uid, result.LastUpdatedBy);
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(oid, result.Id);
+        Assert.Equal("Updated Organization", result.Name);
+        Assert.Equal("Updated description", result.Description);
+        Assert.False(result.DefaultOrg);
+        Assert.False(result.IsArchived);
+        Assert.True(result.LastUpdatedAt >= now);
+        Assert.Equal(uid, result.LastUpdatedBy);
+        Assert.Equal(dto.Banner, result.Banner);
 
         // Verify it was actually saved to DB
         var savedOrg = await Context.Organizations.FindAsync(oid);
@@ -479,7 +543,8 @@ public class OrganizationBusinessTests : IntegrationTestBase
         // Arrange
         var dto = new UpdateOrganizationRequestDto
         {
-            Name = "Event Updated Organization"
+            Name = "Event Updated Organization",
+            Banner = "Updated banner"
         };
 
         // Act
@@ -488,6 +553,7 @@ public class OrganizationBusinessTests : IntegrationTestBase
         // Assert
         Assert.NotNull(result);
         Assert.Equal("Event Updated Organization", result.Name);
+        Assert.Equal(dto.Banner, result.Banner);
 
         // Ensure that the Organization update event was logged
         var eventList = await Context.Events.ToListAsync();
@@ -640,31 +706,165 @@ public class OrganizationBusinessTests : IntegrationTestBase
         foreach (var o in all.Where(o => o.Id != oid)) Assert.False(o.DefaultOrg);
     }
 
+    [Fact]
+    public async Task UpdateOrganization_Fails_RequireSensitivityLabels_UnlabeledRecords()
+    {
+        // add unlabeled record in project in organization
+        var project = new Project
+        {
+            Name = "Test Project",
+            Description = "Test project for unit tests",
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            OrganizationId = oid
+        };
+        Context.Projects.Add(project);
+        await Context.SaveChangesAsync();
+        var pid = project.Id;
+
+        var dataSource = new DataSource
+        {
+            Name = "Test Data Source",
+            Description = "Test data source for unit tests",
+            ProjectId = pid,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            OrganizationId = oid
+        };
+        Context.DataSources.Add(dataSource);
+        await Context.SaveChangesAsync();
+        var did = dataSource.Id;
+        
+        var record = new Record
+        {
+            Name = "Test Record",
+            Description = "Test record for unit tests",
+            OriginalId = Guid.NewGuid().ToString(),
+            Properties = JsonSerializer.Serialize(new { TestProperty = "TestValue" }),
+            ProjectId = pid,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            Uri = "localhost:8090",
+            FileType = "pdf",
+            DataSourceId = did,
+            OrganizationId = oid,
+        };
+        
+        Context.Records.Add(record);
+        await Context.SaveChangesAsync();
+        
+        
+        var dto = new UpdateOrganizationRequestDto
+        {
+            RequireSensitivityLabel = true
+        };
+        
+        await Assert.ThrowsAsync<InvalidOperationException>(() => _organizationBusiness.UpdateOrganization(uid, oid, dto));
+    }
+    
+    [Fact]
+    public async Task UpdateOrganization_Success_RequireSensitivityLabels()
+    {
+        var otherOrg = new Organization
+        {
+            Name = "New Default Org",
+            Description = "New Default Org",
+            DefaultOrg = true,
+            IsArchived = false,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid
+        };
+        Context.Organizations.Add(otherOrg);
+        await Context.SaveChangesAsync();
+        
+        var project = new Project
+        {
+            Name = "Test Project",
+            Description = "Test project for unit tests",
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            OrganizationId = otherOrg.Id
+        };
+        Context.Projects.Add(project);
+        await Context.SaveChangesAsync();
+        var pid = project.Id;
+
+        var dataSource = new DataSource
+        {
+            Name = "Test Data Source",
+            Description = "Test data source for unit tests",
+            ProjectId = pid,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            OrganizationId = otherOrg.Id
+        };
+        Context.DataSources.Add(dataSource);
+        await Context.SaveChangesAsync();
+        var did = dataSource.Id;
+        
+        var testLabel = new SensitivityLabel
+        {
+            Name = "Test Label",
+            OrganizationId = otherOrg.Id,
+            ProjectId = pid,
+        };
+        Context.SensitivityLabels.Add(testLabel);
+        await Context.SaveChangesAsync();
+        
+        var record = new Record
+        {
+            Name = "Test Record",
+            Description = "Test record for unit tests",
+            OriginalId = Guid.NewGuid().ToString(),
+            Properties = JsonSerializer.Serialize(new { TestProperty = "TestValue" }),
+            ProjectId = pid,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            Uri = "localhost:8090",
+            FileType = "pdf",
+            DataSourceId = did,
+            OrganizationId = otherOrg.Id,
+            Labels = new List<SensitivityLabel>{testLabel}
+        };
+        Context.Records.Add(record);
+        await Context.SaveChangesAsync();
+        
+        var dto = new UpdateOrganizationRequestDto
+        {
+            RequireSensitivityLabel = true
+        };
+        
+        var updateResult = await _organizationBusiness.UpdateOrganization(uid, oid, dto);
+        Assert.NotNull(updateResult);
+        Assert.NotNull(updateResult.RequireSensitivityLabel);
+        Assert.True(updateResult.RequireSensitivityLabel);
+    }
+
     #endregion
 
     #region ArchiveOrganization Tests
 
-        [Fact]
-        public async Task ArchiveOrganization_Succeeds_IfNotArchived()
-        {
-            // Arrange
-            var now = DateTime.UtcNow;
-            
-            // Act
-            var result = await _organizationBusiness.ArchiveOrganization(uid, oid);
+    [Fact]
+    public async Task ArchiveOrganization_Succeeds_IfNotArchived()
+    {
+        // Arrange
+        var now = DateTime.UtcNow;
+
+        // Act
+        var result = await _organizationBusiness.ArchiveOrganization(uid, oid);
 
         // Assert
         Assert.True(result);
 
-            // Verify it was actually saved to DB
-            var savedOrg = await Context.Organizations.FindAsync(oid);
-            Assert.NotNull(savedOrg);
-            Assert.True(savedOrg.IsArchived);
-            Assert.Equal("Test Organization",  savedOrg.Name);
-            Assert.Equal("Test org for unit tests", savedOrg.Description);
-            Assert.True(savedOrg.LastUpdatedAt >= now);
-            Assert.False(savedOrg.DefaultOrg);
-            Assert.Equal(uid, savedOrg.LastUpdatedBy);
+        // Verify it was actually saved to DB
+        var savedOrg = await Context.Organizations.FindAsync(oid);
+        Assert.NotNull(savedOrg);
+        Assert.True(savedOrg.IsArchived);
+        Assert.Equal("Test Organization", savedOrg.Name);
+        Assert.Equal("Test org for unit tests", savedOrg.Description);
+        Assert.True(savedOrg.LastUpdatedAt >= now);
+        Assert.False(savedOrg.DefaultOrg);
+        Assert.Equal(uid, savedOrg.LastUpdatedBy);
 
         // Ensure that the Organization archive event was logged
         var eventList = await Context.Events.ToListAsync();
@@ -709,26 +909,26 @@ public class OrganizationBusinessTests : IntegrationTestBase
 
     #region UnarchiveOrganization Tests
 
-        [Fact]
-        public async Task UnarchiveOrganization_Succeeds_IfArchived()
-        {
-            // Arrange
-            var now = DateTime.UtcNow;
-            
-            // Act
-            var result = await _organizationBusiness.UnarchiveOrganization(uid, oid2);
+    [Fact]
+    public async Task UnarchiveOrganization_Succeeds_IfArchived()
+    {
+        // Arrange
+        var now = DateTime.UtcNow;
 
-            // Assert
-            Assert.True(result);
-            
-            // Verify it was actually saved to DB
-            var savedOrg = await Context.Organizations.FindAsync(oid2);
-            Assert.Equal("Archived Organization", savedOrg?.Name);
-            Assert.Equal("Archived org for tests", savedOrg?.Description);
-            Assert.False(savedOrg?.DefaultOrg);
-            Assert.False(savedOrg?.IsArchived);
-            Assert.True(savedOrg?.LastUpdatedAt >= now);
-            Assert.Equal(uid, savedOrg.LastUpdatedBy);
+        // Act
+        var result = await _organizationBusiness.UnarchiveOrganization(uid, oid2);
+
+        // Assert
+        Assert.True(result);
+
+        // Verify it was actually saved to DB
+        var savedOrg = await Context.Organizations.FindAsync(oid2);
+        Assert.Equal("Archived Organization", savedOrg?.Name);
+        Assert.Equal("Archived org for tests", savedOrg?.Description);
+        Assert.False(savedOrg?.DefaultOrg);
+        Assert.False(savedOrg?.IsArchived);
+        Assert.True(savedOrg?.LastUpdatedAt >= now);
+        Assert.Equal(uid, savedOrg.LastUpdatedBy);
 
         // Ensure that the Organization unarchive event was logged
         var eventList = await Context.Events.ToListAsync();
@@ -1031,33 +1231,4 @@ public class OrganizationBusinessTests : IntegrationTestBase
     }
 
     #endregion
-    
-    private void AssertRolePermissions(
-        Role role, 
-        Dictionary<string, string[]> expectedPermissions)
-    {
-        // All permissions should be marked as default
-        Assert.True(
-            role.Permissions.All(p => p.IsDefault),
-            $"Role '{role.Name}' has permissions not marked as default"
-        );
-
-        // Verify permission count
-        var expectedCount = expectedPermissions.Sum(kvp => kvp.Value.Length);
-        Assert.Equal(expectedCount, role.Permissions.Count);
-
-        // Verify each resource type has the correct actions
-        foreach (var (resource, expectedActions) in expectedPermissions)
-        {
-            var actualActions = role.Permissions
-                .Where(p => p.Resource == resource)
-                .Select(p => p.Action)
-                .OrderBy(a => a)
-                .ToList();
-
-            var sortedExpectedActions = expectedActions.OrderBy(a => a).ToList();
-
-            Assert.Equal(sortedExpectedActions, actualActions);
-        }
-    }
 }

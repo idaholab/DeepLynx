@@ -75,7 +75,6 @@ const UsersTable = ({ members }: Props) => {
   /* ------------------------------------------------------------------------ */
 
   const [showInviteModal, setShowInviteModal] = useState(false);
-  const [inviteEmail, setInviteEmail] = useState("");
   const [modalLoading, setModalLoading] = useState(false);
 
   /* ------------------------------------------------------------------------ */
@@ -136,53 +135,79 @@ const UsersTable = ({ members }: Props) => {
   /*                          Invite Flow: Send Invitation                    */
   /* ------------------------------------------------------------------------ */
 
-  const handleInviteUser = async () => {
-    if (!inviteEmail) {
-      toast.error(t.translations.PLEASE_ENTER_EMAIL_ADDRESS);
-      return;
+  type InviteResults = {
+  successful: string[];
+  failed: { email: string; error: string }[];
+};
+
+const handleInviteUsers = async (emails: string[]): Promise<InviteResults> => {
+  if (!organization?.organizationId) {
+    toast.error(t.translations.NO_ORG_SELECTED);
+    return {
+      successful: [],
+      failed: emails.map((email) => ({
+        email,
+        error: t.translations.NO_ORG_SELECTED,
+      })),
+    };
+  }
+
+  // (InviteUserModal already validates format, but keep this as a safety net)
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+  setModalLoading(true);
+
+  const results: InviteResults = { successful: [], failed: [] };
+
+  try {
+    for (const email of emails) {
+      const trimmed = email.trim();
+
+      if (!emailRegex.test(trimmed)) {
+        results.failed.push({
+          email: trimmed,
+          error: t.translations.PLEASE_ENTER_VALID_EMAIL_ADDRESS,
+        });
+        continue;
+      }
+
+      try {
+        const inviteData: InviteUserToOrganizationRequestDto = {
+          userEmail: trimmed,
+          userName: trimmed.split("@")[0],
+        };
+
+        await inviteUserToOrganization(Number(organization.organizationId), inviteData);
+
+        results.successful.push(trimmed);
+      } catch (err: any) {
+        // Try to extract a useful message; fall back to generic translation
+        const message =
+          err?.response?.data?.message ||
+          err?.message ||
+          t.translations.FAILED_TO_SEND_INVITATION;
+
+        results.failed.push({ email: trimmed, error: String(message) });
+      }
     }
 
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(inviteEmail)) {
-      toast.error(t.translations.PLEASE_ENTER_VALID_EMAIL_ADDRESS);
-      return;
-    }
-
-    if (!organization?.organizationId) {
-      toast.error(t.translations.NO_ORG_SELECTED);
-      return;
-    }
-
-    try {
-      setModalLoading(true);
-
-      // Prepare organization invite data
-      const inviteData: InviteUserToOrganizationRequestDto = {
-        userEmail: inviteEmail,
-        userName: inviteEmail.split("@")[0], // Extract username from email
-      };
-
-      // Call organization invite API
-      await inviteUserToOrganization(
-        organization.organizationId as number,
-        inviteData
+    // Toast summary (optional but nice UX)
+    if (results.successful.length > 0) {
+      toast.success(
+        `${t.translations.INVITATION_SENT_TO_} ${results.successful.length}`,
       );
-
-      toast.success(`${t.translations.INVITATION_SENT_TO_} ${inviteEmail}`);
-
-      // Refresh the user list
-      await loadAllData();
-
-      // Close modal and reset form
-      setShowInviteModal(false);
-      setInviteEmail("");
-    } catch (error) {
-      console.error("Error inviting user:", error);
-      toast.error(t.translations.FAILED_TO_SEND_INVITATION);
-    } finally {
-      setModalLoading(false);
+      await loadAllData(); // refresh once
     }
-  };
+
+    if (results.failed.length > 0) {
+      toast.error(t.translations.FAILED_TO_SEND_INVITATION);
+    }
+
+    return results;
+  } finally {
+    setModalLoading(false);
+  }
+};
 
   const handleResendInvite = async (email: string) => {
     if (!organization?.organizationId) {
@@ -303,14 +328,9 @@ const UsersTable = ({ members }: Props) => {
       {/* Invite User Modal */}
       <InviteUserModal
         isOpen={showInviteModal}
-        inviteEmail={inviteEmail}
         modalLoading={modalLoading}
-        onClose={() => {
-          setShowInviteModal(false);
-          setInviteEmail("");
-        }}
-        onInvite={handleInviteUser}
-        onChangeEmail={setInviteEmail}
+        onClose={() => setShowInviteModal(false)}
+        onInvite={handleInviteUsers}
       />
 
       {/* Edit User Modal */}

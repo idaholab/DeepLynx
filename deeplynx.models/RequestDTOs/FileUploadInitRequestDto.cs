@@ -20,4 +20,5 @@ public class FileUploadCompleteRequestDto
     [Required] public string UploadId { get; set; }
     [Required] public string FileName { get; set; }
     public int TotalChunks { get; set; }
+    public CreateRecordFileUploadRequestDto? Metadata { get; set; }
 }

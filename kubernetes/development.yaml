@@ -7,47 +7,87 @@ metadata:
     name: deeplynxv3-dev
 
 ---
+# Secret for Azure Storage Account with SAS Token
+apiVersion: v1
+kind: Secret
+metadata:
+  name: azure-storage-secret
+  namespace: deeplynxv3-dev
+type: Opaque
+stringData:
+  azurestorageaccountname: ${AZURE_STORAGE_ACCOUNT_NAME}
+  azurestorageaccountsastoken: ${AZURE_STORAGE_ACCOUNT_SAS_TOKEN}
+  azurestorageaccountkey: ${AZURE_STORAGE_ACCOUNT_KEY}
+  azurestorageconnectionstring: ${AZURE_OBJECT_CONNECTION_STRING}
 
-# Storage Class for DuckDB Azure Files
+---
+# Persistent Volume pointing to existing Azure File Share
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: ${AZURE_FILE_SHARE_PERSISTENT_VOLUME}
+  namespace: deeplynxv3-dev
+spec:
+  capacity:
+    storage: 60Gi
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: ${AZURE_FILE_SHARE_STORAGE_CLASS}
+  mountOptions:
+    - dir_mode=0777
+    - file_mode=0777
+    - uid=0
+    - gid=0
+    - mfsymlinks
+    - cache=strict
+    - actimeo=30
+    - nobrl
+  csi:
+    driver: file.csi.azure.com
+    readOnly: false
+    volumeHandle: ${AZURE_FILE_SHARE_VOLUME_HANDLE}  # Unique ID for this volume
+    volumeAttributes:
+      resourceGroup: ${AZURE_ACCOUNT_RESOURCE_GROUP}
+      storageAccount: ${AZURE_STORAGE_ACCOUNT_NAME}
+      shareName: duckdb-data
+      protocol: smb
+      server: ${AZURE_STORAGE_ACCOUNT_NAME}.file.core.usgovcloudapi.net
+    nodeStageSecretRef:
+      name: azure-storage-secret
+      namespace: deeplynxv3-dev
+      
+---
+# Storage Class (simplified for static provisioning)
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
-  name: azurefile-duckdb
+  name: ${AZURE_FILE_SHARE_STORAGE_CLASS}
   namespace: deeplynxv3-dev
 provisioner: file.csi.azure.com
 parameters:
   skuName: Premium_LRS
 reclaimPolicy: Retain
 allowVolumeExpansion: true
-mountOptions:
-  - dir_mode=0777
-  - file_mode=0777
-  - uid=0
-  - gid=0
-  - mfsymlinks
-  - cache=strict
-  - actimeo=30
-  - nobrl # disable sending byte range lock requests to the server and for applications which have challenges with posix locks
 volumeBindingMode: Immediate
 
 ---
-
-# Persistent Volume Claim for DuckDB storage
+# Persistent Volume Claim
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: deeplynx-duckdb-pvc
+  name: ${AZURE_FILE_SHARE_PVC}
   namespace: deeplynxv3-dev
 spec:
   accessModes:
-    - ReadWriteMany # Allows multiple pods to access the same volume
+    - ReadWriteMany
   resources:
     requests:
-      storage: 60Gi # Adjust size based on your timeseries data needs
-  storageClassName: azurefile-duckdb
+      storage: 60Gi
+  storageClassName: ${AZURE_FILE_SHARE_STORAGE_CLASS}
+  volumeName: ${AZURE_FILE_SHARE_PERSISTENT_VOLUME} # Bind to the specific PV
 
 ---
-
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -70,13 +110,20 @@ spec:
             - name: AWS_S3_CONNECTION_STRING
               value: ${AWS_S3_CONNECTION_STRING}
             - name: AZURE_OBJECT_CONNECTION_STRING
-              value: ${AZURE_OBJECT_CONNECTION_STRING}
+              valueFrom:
+                secretKeyRef:
+                  name: azure-storage-secret
+                  key: azurestorageconnectionstring
+            - name: AZURE_CONTAINER_NAME
+              value: ${AZURE_CONTAINER_NAME}
             - name: ConnectionStrings__DefaultConnection
               value: "${DATABASE_CONNECTION_STRING}"
             - name: FILE_STORAGE_METHOD
               value: ${FILE_STORAGE_METHOD}
             - name: STORAGE_DIRECTORY
               value: ${STORAGE_DIRECTORY}
+            - name: LOGO_STORAGE_DIRECTORY
+              value: /data/blob/images
             - name: RECOMMENDED_CHUNK_SIZE
               value: ${RECOMMENDED_CHUNK_SIZE}
             - name: POSTGRES_DB_HOST
@@ -124,8 +171,8 @@ spec:
               valueFrom:
                 secretKeyRef:
                   name: app-secrets
-                  key: jwt-secret-key      
-            - name: AUTH_TRUST_HOST          
+                  key: jwt-secret-key
+            - name: AUTH_TRUST_HOST
               value: "true"
             - name: AUTH_SECRET
               valueFrom:
@@ -185,10 +232,9 @@ spec:
       volumes:
         - name: duckdb-storage
           persistentVolumeClaim:
-            claimName: deeplynx-duckdb-pvc
+            claimName: ${AZURE_FILE_SHARE_PVC}
 
 ---
-
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -211,7 +257,12 @@ spec:
             - name: AWS_S3_CONNECTION_STRING
               value: ${AWS_S3_CONNECTION_STRING}
             - name: AZURE_OBJECT_CONNECTION_STRING
-              value: ${AZURE_OBJECT_CONNECTION_STRING}
+              valueFrom:
+                secretKeyRef:
+                  name: azure-storage-secret
+                  key: azurestorageconnectionstring
+            - name: AZURE_CONTAINER_NAME
+              value: ${AZURE_CONTAINER_NAME}
             - name: ConnectionStrings__DefaultConnection
               value: ${DATABASE_CONNECTION_STRING}
             - name: FILE_STORAGE_METHOD
@@ -320,10 +371,9 @@ spec:
       volumes:
         - name: duckdb-storage
           persistentVolumeClaim:
-            claimName: deeplynx-duckdb-pvc
+            claimName: ${AZURE_FILE_SHARE_PVC}
 
 ---
-
 #docs
 apiVersion: apps/v1
 kind: Deployment
@@ -357,7 +407,6 @@ spec:
             - containerPort: 3001
 
 ---
-
 #mcp
 apiVersion: apps/v1
 kind: Deployment
@@ -394,7 +443,6 @@ spec:
             - containerPort: 43656
 
 ---
-
 apiVersion: v1
 kind: Service
 metadata:
@@ -410,7 +458,6 @@ spec:
     app: deeplynxv3
 
 ---
-
 apiVersion: v1
 kind: Service
 metadata:
@@ -426,7 +473,6 @@ spec:
     app: deeplynxbackend
 
 ---
-
 apiVersion: v1
 kind: Service
 metadata:
@@ -442,7 +488,6 @@ spec:
     app: deeplynx-docs
 
 ---
-
 apiVersion: v1
 kind: Service
 metadata:
@@ -458,7 +503,6 @@ spec:
     app: deeplynx-mcp
 
 ---
-
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -502,17 +546,17 @@ spec:
           - path: /api/auth
             pathType: Prefix
             backend:
-              service:  
+              service:
                 name: deeplynxv3-service
-                port:  
-                  number: 80 
+                port:
+                  number: 80
           - path: /docs
             pathType: Prefix
             backend:
-              service:  
+              service:
                 name: deeplynxv3-docs-service
-                port:  
-                  number: 80 
+                port:
+                  number: 80
           - path: /mcp
             pathType: Prefix
             backend:
@@ -520,86 +564,3 @@ spec:
                 name: deeplynxv3-mcp-service
                 port:
                   number: 80
-
----
-
-# # Database if needed for deployment
-# Dummy change to force build.
-# apiVersion: apps/v1
-# kind: Deployment
-# metadata:
-#   namespace: deeplynxv3-dev
-#   labels:
-#     app: deeplynxv3-db
-#   name: deeplynxv3-db
-# spec:
-#   replicas: 1
-#   selector:
-#     matchLabels:
-#       app: deeplynxv3-db
-#   strategy:
-#     type: Recreate
-#   template:
-#     metadata:
-#       labels:
-#         app: deeplynxv3-db
-#     spec:
-#       containers:
-#         - env:
-#             - name: POSTGRES_PASSWORD
-#               valueFrom:
-#                 secretKeyRef:
-#                   name: deeplynxv3-secrets
-#                   key: POSTGRES_PASSWORD
-#             - name: POSTGRES_USER
-#               value: ${POSTGRES_USER}
-#             - name: POSTGRES_DB_NAME
-#               value: ${POSTGRES_DB_NAME}
-#           image: ${CI_REGISTRY}/${CI_REGISTRY_PATH}:deeplynxv3-db-${GITHUB_RUN_NUMBER}
-#           name: deeplynxv3-db
-#           ports:
-#             - containerPort: 5432
-#           volumeMounts:
-#             - mountPath: "/var/lib/postgresql/data"
-#               subPath: deeplynxv3
-#               name: deeplynxv3-db-pvc
-#           resources:
-#             limits:
-#               cpu: "250m"
-#               memory: "1024M"
-#       restartPolicy: Always
-#       volumes:
-#         - name: deeplynxv3-db-pvc
-#           persistentVolumeClaim:
-#             claimName: deeplynxv3-db-pvc
-# ---
-# apiVersion: v1
-# kind: Service
-# metadata:
-#   name: deeplynxv3-db-service
-#   namespace: deeplynxv3-dev
-# spec:
-#   type: ClusterIP
-#   ports:
-#     - name: "5432"
-#       port: 5432
-#       targetPort: 5432
-#   selector:
-#     app: deeplynxv3-db
-# ---
-
-# # Storage
-
-# apiVersion: v1
-# kind: PersistentVolumeClaim
-# metadata:
-#   namespace: deeplynxv3-dev
-#   labels:
-#     app: deeplynxv3-db
-#   name: deeplynxv3-db-pvc
-# spec:
-#   accessModes:
-#     - ReadWriteOnce
-#   resources:
-#     requests:
-#       storage: 1Gi

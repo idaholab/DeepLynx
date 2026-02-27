@@ -18,6 +18,8 @@ public class EdgeResponseDto
 
     [Column("organization_id")] public long OrganizationId { get; set; }
 
+    [Column("properties")] public string? Properties { get; set; }
+
     [Column("last_updated_at", TypeName = "timestamp without time zone")]
     public DateTime LastUpdatedAt { get; set; }
 

@@ -26,6 +26,7 @@ import {
   ChevronRightIcon,
   ChevronUpIcon,
   FolderIcon,
+  PresentationChartLineIcon,
   RectangleGroupIcon,
 } from "@heroicons/react/24/outline";
 
@@ -264,6 +265,7 @@ const SideMenu: React.FC<SideMenuProps> = ({ onToggle }) => {
                         onError={() => {
                           setProjectLogoUrl(null);
                         }}
+                        unoptimized
                       />
                     </div>
                   </div>
@@ -362,6 +364,18 @@ const SideMenu: React.FC<SideMenuProps> = ({ onToggle }) => {
               )}
             </Link>
           </li>
+          {/* TimeseriesViewer */}
+          <li className="mt-2">
+            <Link
+              href="/timeseries_viewer"
+              className={getItemClass("/timeseries_viewer")}
+            >
+              <PresentationChartLineIcon className="size-6" />
+              {!isCollapsed && (
+                <p className="ml-2">{t.translations.TIMESERIES_VIEWER}</p>
+              )}
+            </Link>
+          </li>
 
           {/* Project Settings (Admin only) */}
           <ProjectAdminRoute>
@@ -380,7 +394,7 @@ const SideMenu: React.FC<SideMenuProps> = ({ onToggle }) => {
               >
                 <AdjustmentsHorizontalIcon className="size-6" />
                 {!isCollapsed && (
-                  <p className="ml-2">{t.translations.PROJECT_SETINGS}</p>
+                  <p className="ml-2">{t.translations.PROJECT_SETTINGS}</p>
                 )}
               </Link>
             </li>

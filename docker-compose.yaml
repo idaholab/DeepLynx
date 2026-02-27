@@ -60,8 +60,10 @@ services:
       POSTGRES_PORT: 5432
       FILE_STORAGE_METHOD: filesystem # values can be filesystem, azure_object, and aws_s3
       STORAGE_DIRECTORY: /data
+      DUCKDB_BASE_PATH: /data/duckdb
       RECOMMENDED_CHUNK_SIZE: 100000000
       AZURE_OBJECT_CONNECTION_STRING: azure-example-connection-string
+      AZURE_CONTAINER_NAME: nexus-files
       AWS_S3_CONNECTION_STRING: aws-example-connection-string
       JWT_SECRET_KEY: demo_ZGDcnDdkRjLcx1kty9lXzlZ9L2ywFv3rC/91I3Z6fLQ= # for your local backend and can be changed
       JWT_ISSUER: https://identity-preview.inl.gov
@@ -75,7 +77,6 @@ services:
       SUPPORT_EMAIL: jaren.brownlee@inl.gov
       DISABLE_BACKEND_AUTHENTICATION: true # change to false if supplying okta info on lines 12-13, 25-26
       SUPERUSER_EMAIL: jaren.brownlee@inl.gov
-
     entrypoint: /usr/local/bin/entrypoint.sh
     ports:
       - "5000:5000"
@@ -84,7 +85,8 @@ services:
     volumes:
       - object_storage:/data
     depends_on:
-        - nx-postgres
+      db-version-check:
+        condition: service_completed_successfully
 
   nx-postgres:
     build:
@@ -93,12 +95,40 @@ services:
     environment:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=nexuscore
+      - POSTGRES_DB=deeplynx
     ports:
-      - "5432"
+      - "5432:5432"
     networks:
       - nexus-network
     volumes:
-      - nx_postgres_data:/var/lib/postgresql/data
+      - nx_postgres_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres && psql -U postgres -d deeplynx -c 'SELECT 1;'"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  db-version-check:
+    image: postgres:18-alpine3.23
+    networks:
+      - nexus-network
+    volumes:
+      - ./Dockerfiles/database/check_db_version.sh:/scripts/check_db_version.sh
+    environment:
+      DB_HOST: nx-postgres
+      DB_USER: postgres
+      DB_PASSWORD: nexuscore
+      DB_NAME: deeplynx
+    command: >
+      sh -c "
+        apk add --no-cache bash &&
+        chmod +x /scripts/check_db_version.sh &&
+        /scripts/check_db_version.sh
+      "
+    depends_on:
+      nx-postgres:
+        condition: service_healthy
     
   mcp:
     build:
@@ -122,4 +152,4 @@ volumes:
   object_storage:
     driver: local
   nx_postgres_data:
-    driver: local
+    name: nx_postgres_data

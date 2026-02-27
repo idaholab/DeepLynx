@@ -1,22 +1,13 @@
 # Stage 1: Build the frontend
 FROM node:lts-alpine3.22 AS frontend-build
 
-# Define build arguments
-ARG HOSTED_LINK
-
-# Set environment variables
-ENV HOSTED_LINK=${HOSTED_LINK}
-
-# # Print out the value of the environment variables
-# RUN echo "HOSTED_LINK=${HOSTED_LINK}"
-
 # Set working directory
 WORKDIR /usr/src/app
 
 # Install versioned os packages
 RUN apk update && apk upgrade --no-cache && \
     apk add --no-cache \
-        busybox=1.37.0-r20
+    busybox
 
 # Install latest global npm version and packages
 RUN npm install -g npm@latest
@@ -42,7 +33,7 @@ WORKDIR /usr/src/app
 # Install versioned os packages
 RUN apk update && apk upgrade --no-cache && \
     apk add --no-cache \
-        busybox=1.37.0-r20
+    busybox
 
 # Install latest global npm version and packages
 RUN npm install -g npm@latest
@@ -52,6 +43,11 @@ COPY --from=frontend-build /usr/src/app .
 
 # Install production dependencies
 RUN npm install --omit=dev
+
+# Explicitly set user
+RUN addgroup -S nexus && adduser -S nexus -G nexus
+RUN chown -R nexus:nexus /usr/src/app
+USER nexus
 
 # Expose the port the app runs on
 EXPOSE 3001

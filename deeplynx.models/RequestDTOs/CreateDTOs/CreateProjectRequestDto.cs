@@ -10,4 +10,8 @@ public class CreateProjectRequestDto
     public string? Description { get; set; }
 
     public string? Abbreviation { get; set; }
+
+    public string? Banner { get; set; }
+    
+    public bool? RequireSensitivityLabel { get; set; }
 }

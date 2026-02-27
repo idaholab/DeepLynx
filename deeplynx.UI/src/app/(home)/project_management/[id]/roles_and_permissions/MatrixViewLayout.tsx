@@ -1,58 +1,140 @@
 "use client";
-
-import React, { useRef } from "react";
+import React from "react";
 import {
   BuildingOfficeIcon,
   CheckIcon,
+  PencilIcon,
   ShieldCheckIcon,
   XMarkIcon,
 } from "@heroicons/react/24/outline";
-
 import {
   PermissionResponseDto,
   RoleResponseDto,
 } from "@/app/(home)/types/responseDTOs";
 import { PermissionCategory } from "./ProjectRolesAndPermissions";
+import { useLanguage } from "../../../../contexts/Language";
 
 interface MatrixViewLayoutProps {
   roles: RoleResponseDto[];
+  rolesLocked: boolean;
+  isLoadingPermissions: boolean;
+  initialLoadComplete: boolean;
   permissionCategories: PermissionCategory[];
+  tableContainerRef: React.RefObject<HTMLDivElement | null>;
+  isEditingMatrix: boolean;
+
+  onStartEditingMatrix: () => void;
+  onCancelEditingMatrix: () => void;
+  onSaveMatrixPermissions: () => void;
+  onToggleMatrixPermission: (roleId: number, permissionId: number) => void;
+  onEditClick: (role: RoleResponseDto) => void;
+
   roleHasPermission: (roleId: number, permissionId: number) => boolean;
   isStandardRole: (role: RoleResponseDto) => boolean;
   isOrganizationRole: (role: RoleResponseDto) => boolean;
   isProjectRole: (role: RoleResponseDto) => boolean;
   getRoleSource: (role: RoleResponseDto) => string;
-  isLoadingPermissions: boolean;
-  initialLoadComplete: boolean;
 }
 
 const MatrixViewLayout: React.FC<MatrixViewLayoutProps> = ({
   roles,
+  rolesLocked,
   permissionCategories,
+  isLoadingPermissions,
+  initialLoadComplete,
+  tableContainerRef,
+  isEditingMatrix,
+  onStartEditingMatrix,
+  onCancelEditingMatrix,
+  onSaveMatrixPermissions,
+  onToggleMatrixPermission,
+  onEditClick,
   roleHasPermission,
   isStandardRole,
   isOrganizationRole,
   isProjectRole,
   getRoleSource,
-  isLoadingPermissions,
-  initialLoadComplete,
 }) => {
-  const tableContainerRef = useRef<HTMLDivElement>(null);
+  const { t } = useLanguage();
+  const matrixPermissionCategories = React.useMemo(() => {
+    // Matrix view intentionally excludes sensitivity-label permissions.
+    return permissionCategories
+      .map((category) => ({
+        ...category,
+        permissions: category.permissions.filter((perm) => perm.labelId == null),
+      }))
+      .filter((category) => category.permissions.length > 0);
+  }, [permissionCategories]);
+
+  // Determine if there are editable (project-only) roles
+  const hasEditableRoles = roles.some(
+    (role) => isProjectRole(role) && !isStandardRole(role)
+  );
+
+  // Determine if a role can be edited
+  const canEditRole = (role: RoleResponseDto) => {
+    return isProjectRole(role) && !isStandardRole(role);
+  };
+
+  const editMatrixDisabledReason = !hasEditableRoles
+    ? t.translations.MATRIX_EDIT_REQUIRES_CUSTOM_PROJECT_ROLES
+    : rolesLocked
+    ? t.translations.ROLES_ARE_LOCKED
+    : isLoadingPermissions
+    ? t.translations.PERMISSIONS_STILL_LOADING
+    : "";
 
   return (
     <div style={{ height: "calc(100vh - 28rem)" }}>
-      <div className="card bg-base-100 shadow-xl h-full flex flex-col overflow-hidden">
+      <div className="card bg-base-100 shadow-xl h-full flex flex-col overflow-hidden border-2 border-primary">
+        {/* Matrix Header / Controls */}
         <div className="px-6 py-3 border-b border-base-300 flex items-center justify-between">
-          <h3 className="text-sm font-semibold">Permission Matrix</h3>
-          {/* Read-only matrix in this release */}
+          <h3 className="text-sm font-semibold">
+            {t.translations.PERMISSION_MATRIX}
+          </h3>
+
+          {/* Toggle editable matrix mode */}
+          {!isEditingMatrix ? (
+            <button
+              disabled={
+                rolesLocked || isLoadingPermissions || !hasEditableRoles
+              }
+              onClick={onStartEditingMatrix}
+              className="btn btn-primary btn-sm gap-2"
+              title={
+                editMatrixDisabledReason ||
+                t.translations.EDIT_PERMISSIONS_FOR_PROJECT_ROLES_MATRIX_VIEW
+              }
+            >
+              <PencilIcon className="w-4 h-4" />
+              {t.translations.EDIT_MATRIX}
+            </button>
+          ) : (
+            <div className="flex gap-2">
+              <button
+                onClick={onCancelEditingMatrix}
+                className="btn btn-ghost btn-sm"
+              >
+                {t.translations.CANCEL}
+              </button>
+              <button
+                onClick={onSaveMatrixPermissions}
+                className="btn btn-primary btn-sm gap-2"
+              >
+                <CheckIcon className="w-4 h-4" />
+                {t.translations.SAVE_CHANGES}
+              </button>
+            </div>
+          )}
         </div>
 
+        {/* Matrix Content */}
         {isLoadingPermissions && !initialLoadComplete ? (
           <div className="flex-1 flex items-center justify-center">
             <div className="text-center">
               <span className="loading loading-spinner loading-lg text-primary"></span>
               <p className="mt-4 text-base-content/60">
-                Loading permissions...
+                {t.translations.LOADING_PERMISSIONS}
               </p>
             </div>
           </div>
@@ -61,52 +143,83 @@ const MatrixViewLayout: React.FC<MatrixViewLayoutProps> = ({
             <table className="table">
               <thead className="sticky top-0 z-20 bg-base-100">
                 <tr>
-                  <th className="sticky left-0 bg-base-200 z-30">Permission</th>
-                  {roles.map((role) => (
-                    <th key={role.id} className="text-center">
-                      <div className="flex flex-col items-center gap-1">
-                        <div className="flex items-center gap-2">
-                          <ShieldCheckIcon className="w-4 h-4 text-primary" />
-                          <span className="font-medium">{role.name}</span>
-                          {isStandardRole(role) && (
-                            <div className="badge badge-info badge-xs">STD</div>
+                  <th className="sticky left-0 bg-base-200 z-30">
+                    {t.translations.PERMISSION}
+                  </th>
+                  {roles.map((role) => {
+                    const isStd = isStandardRole(role);
+                    const isOrg = isOrganizationRole(role);
+                    const isPrj = isProjectRole(role);
+                    const editable = canEditRole(role);
+
+                    const editDisabled = !editable;
+                    const editTitle = isStd
+                      ? t.translations.STANDARD_ROLES_CANNOT_BE_EDITED
+                      : isOrg
+                      ? t.translations.ORGANIZATION_ROLES_CANNOT_BE_EDITED_AT_PROJECT_LEVEL
+                      : t.translations.EDIT_ROLE;
+
+                    return (
+                      <th key={role.id} className="text-center">
+                        <div className="flex flex-col items-center gap-1">
+                          <div className="flex items-center gap-2">
+                            <ShieldCheckIcon className="w-4 h-4 text-primary" />
+                            <span className="font-medium">{role.name}</span>
+                            {isStd && (
+                              <div className="badge badge-info badge-xs">
+                                {t.translations.STD}
+                              </div>
+                            )}
+                            {isOrg && (
+                              <div className="badge badge-secondary badge-xs flex gap-1">
+                                <BuildingOfficeIcon className="w-3 h-3" />
+                                {t.translations.ORG}
+                              </div>
+                            )}
+                            {isPrj && (
+                              <div className="badge badge-primary badge-xs">
+                                {t.translations.PRJ}
+                              </div>
+                            )}
+                            {!isEditingMatrix && (
+                              <button
+                                disabled={editDisabled}
+                                onClick={() => onEditClick(role)}
+                                className="btn btn-ghost btn-xs btn-circle"
+                                title={editTitle}
+                              >
+                                <PencilIcon className="size-4" />
+                              </button>
+                            )}
+                          </div>
+                          {role.description && (
+                            <span className="text-xs text-base-content/60 font-normal">
+                              {role.description}
+                            </span>
                           )}
-                          {isOrganizationRole(role) && (
-                            <div className="badge badge-secondary badge-xs flex gap-1">
-                              <BuildingOfficeIcon className="w-3 h-3" />
-                              ORG
-                            </div>
-                          )}
-                          {isProjectRole(role) && (
-                            <div className="badge badge-primary badge-xs">
-                              PRJ
-                            </div>
-                          )}
-                        </div>
-                        {role.description && (
-                          <span className="text-xs text-base-content/60 font-normal">
-                            {role.description}
+                          <span className="text-xs text-base-content/50 font-normal">
+                            {getRoleSource(role)}
                           </span>
-                        )}
-                        <span className="text-xs text-base-content/50 font-normal">
-                          {getRoleSource(role)}
-                        </span>
-                      </div>
-                    </th>
-                  ))}
+                        </div>
+                      </th>
+                    );
+                  })}
                 </tr>
               </thead>
               <tbody>
-                {permissionCategories.map((category) => (
+                {matrixPermissionCategories.map((category) => (
                   <React.Fragment key={category.id}>
+                    {/* Category Row */}
                     <tr className="bg-base-200">
                       <td
-                        colSpan={roles.length + 2}
+                        colSpan={roles.length + 1}
                         className="font-semibold text-sm sticky left-0"
                       >
                         {category.label}
                       </td>
                     </tr>
+
+                    {/* Permission Rows */}
                     {category.permissions.map((perm: PermissionResponseDto) => (
                       <tr key={perm.id} className="hover">
                         <td className="sticky left-0 z-10 bg-base-100">
@@ -120,30 +233,71 @@ const MatrixViewLayout: React.FC<MatrixViewLayoutProps> = ({
                               </span>
                             )}
                             <span className="text-xs text-base-content/50 mt-1">
-                              Action: {perm.action}
+                              {t.translations.ACTION} {perm.action}
                             </span>
                           </div>
                         </td>
+
                         {roles.map((role) => {
                           const hasPermission = roleHasPermission(
                             role.id,
                             Number(perm.id)
                           );
+                          const editable = canEditRole(role);
+                          const isInherited = isStandardRole(role) || isOrganizationRole(role);
 
                           return (
                             <td key={role.id} className="text-center">
                               <div
-                                className="inline-block cursor-default"
+                                onClick={() => {
+                                  if (isEditingMatrix && editable) {
+                                    onToggleMatrixPermission(
+                                      role.id,
+                                      Number(perm.id)
+                                    );
+                                  }
+                                }}
+                                className={`inline-block ${
+                                  isEditingMatrix && editable
+                                    ? "cursor-pointer hover:scale-110 transition-transform"
+                                    : "cursor-default"
+                                } ${
+                                  isInherited && isEditingMatrix
+                                    ? "opacity-60 ring-2 ring-warning rounded-lg p-1"
+                                    : ""
+                                }`}
                                 title={
-                                  hasPermission
-                                    ? "Has permission"
-                                    : "No permission"
+                                  isStandardRole(role) && isEditingMatrix
+                                    ? t.translations.STANDARD_ROLE_PERMISSIONS_CANNOT_BE_MODIFIED
+                                    : isOrganizationRole(role) && isEditingMatrix
+                                    ? t.translations.ORGANIZATION_ROLE_PERMISSIONS_CANNOT_BE_MODIFIED_AT_PROJECT_LEVEL
+                                    : isEditingMatrix
+                                    ? t.translations.CLICK_TO_TOGGLE
+                                    : hasPermission
+                                    ? t.translations.HAS_PERMISSION
+                                    : t.translations.NO_PERMISSION
                                 }
                               >
                                 {hasPermission ? (
-                                  <CheckIcon className="size-8 mx-auto text-success" />
+                                  <CheckIcon
+                                    className={`size-8 mx-auto ${
+                                      isEditingMatrix && editable
+                                        ? "text-success hover:text-success/70"
+                                        : isInherited && isEditingMatrix
+                                        ? "text-warning"
+                                        : "text-success"
+                                    }`}
+                                  />
                                 ) : (
-                                  <XMarkIcon className="size-8 mx-auto text-base-300" />
+                                  <XMarkIcon
+                                    className={`size-8 mx-auto ${
+                                      isEditingMatrix && editable
+                                        ? "text-base-300 hover:text-success/50"
+                                        : isInherited && isEditingMatrix
+                                        ? "text-warning/50"
+                                        : "text-base-300"
+                                    }`}
+                                  />
                                 )}
                               </div>
                             </td>

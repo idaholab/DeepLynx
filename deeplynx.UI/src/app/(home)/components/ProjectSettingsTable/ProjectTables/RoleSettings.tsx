@@ -19,14 +19,13 @@ interface RoleSettingsProps {
 }
 
 const RoleSettings = ({ id }: RoleSettingsProps) => {
-  const { t } = useLanguage();
   const router = useRouter();
   const searchParams = useSearchParams();
 
   const [role, setRole] = useState<RoleResponseDto | null>(null);
   const [permissions, setPermissions] = useState<PermissionResponseDto[]>([]);
-  const { organization, hasLoaded } = useOrganizationSession();
-  const { project, setProject } = useProjectSession();
+  const { organization } = useOrganizationSession();
+  const { project } = useProjectSession();
 
   // Fetch role and permissions data on component mount
   useEffect(() => {

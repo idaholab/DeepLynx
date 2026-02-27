@@ -4,6 +4,7 @@ import { useLanguage } from "@/app/contexts/Language";
 import { ChevronLeftIcon, ChevronRightIcon } from "@heroicons/react/24/outline";
 import { useRouter } from "next/navigation";
 import React, { useState } from "react";
+import { formatLocalDateTime } from "@/app/lib/date_time";
 import { RecordTableRow } from "../types/types";
 import { TagResponseDto } from "../types/responseDTOs";
 
@@ -45,7 +46,7 @@ const ListView: React.FC<ListViewProps> = ({
         </span>
       ) : (
         part
-      )
+      ),
     );
     return { content, matched: true };
   };
@@ -54,7 +55,7 @@ const ListView: React.FC<ListViewProps> = ({
   const startIndex = (currentPage - 1) * RECORDS_PER_PAGE;
   const paginatedRecords = data.slice(
     startIndex,
-    startIndex + RECORDS_PER_PAGE
+    startIndex + RECORDS_PER_PAGE,
   );
 
   const renderTags = (tags: string | null | undefined) => {
@@ -75,7 +76,10 @@ const ListView: React.FC<ListViewProps> = ({
       return (
         <span className="inline-flex flex-wrap gap-2">
           {values.map((v, i) => (
-            <span key={`${v}-${i}`} className="badge badge-sm">
+            <span
+              key={`${v}-${i}`}
+              className="badge badge-sm badge-secondary badge-outline"
+            >
               {v}
             </span>
           ))}
@@ -86,13 +90,6 @@ const ListView: React.FC<ListViewProps> = ({
     }
   };
 
-  const filteredRecords = !selectedProjects?.length
-    ? data
-    : data.filter(
-      (record) =>
-        record.projectId !== undefined &&
-        selectedProjects.includes(record.projectId)
-    );
   return (
     <div className="bg-base-100 px-10 w-full mx-auto text-info-content">
       <ul className="list">
@@ -100,24 +97,22 @@ const ListView: React.FC<ListViewProps> = ({
           const name = getHighlightedCell(record.name, activeSearchTerms);
           const desc = getHighlightedCell(
             record.description,
-            activeSearchTerms
+            activeSearchTerms,
           );
           const className = getHighlightedCell(
             record.className,
-            activeSearchTerms
+            activeSearchTerms,
           );
           // const time = getHighlightedCell(record.timeseries, activeSearchTerms);
-          const date = getHighlightedCell(
-            record.lastUpdatedAt,
-            activeSearchTerms
-          );
+          const formattedDate = formatLocalDateTime(record.lastUpdatedAt);
+          const date = getHighlightedCell(formattedDate, activeSearchTerms);
           return (
             <li
               key={index}
               className="py-4 mb-2 card cursor-pointer hover:bg-base-200/30 p-3 shadow-md rounded"
               onClick={() =>
                 router.push(
-                  `/record?recordId=${record.id}&projectId=${record.projectId}`
+                  `/record?recordId=${record.id}&projectId=${record.projectId}`,
                 )
               }
             >
@@ -126,17 +121,21 @@ const ListView: React.FC<ListViewProps> = ({
               <div className="flex pt-2">
                 {record.className && (
                   <span>
-                    {t.translations.CLASS}
-                    <div className="badge badge-sm">{className.content}</div>
+                    {t.translations.CLASS}:{" "}
+                    <div className="badge badge-sm badge-secondary">
+                      {className.content}
+                    </div>
                   </span>
                 )}
                 <div className="ml-4">
-                  <span className="font-bold">{t.translations.LAST_EDIT} </span>{" "}
+                  <span className="font-bold">
+                    {t.translations.LAST_EDIT}:{" "}
+                  </span>
                   {date.content}
                 </div>
               </div>
               <div className="pt-2">
-                <span>{t.translations.TAGS} </span>
+                <span>{t.translations.TAGS}: </span>
                 {renderTags(record.tags)}
               </div>
             </li>

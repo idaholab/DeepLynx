@@ -13,6 +13,7 @@ import type { ReactNode, Context } from "react";
 export interface ProjectSession {
   projectId: string | number;
   projectName: string;
+  banner?: string | null;
 }
 
 interface ProjectSessionContextType {
@@ -29,7 +30,7 @@ export const useProjectSession = (): ProjectSessionContextType => {
   const context = useContext(ProjectSessionContext);
   if (!context) {
     throw new Error(
-      "useProjectSession must be used within a ProjectSessionProvider"
+      "useProjectSession must be used within a ProjectSessionProvider",
     );
   }
   return context;
@@ -75,12 +76,11 @@ export const ProjectSessionProvider = ({
 
     const maxAge = 30 * 24 * 60 * 60;
     document.cookie = `projectSession=${encodeURIComponent(
-      serialized
+      serialized,
     )}; path=/; max-age=${maxAge}; SameSite=Lax`;
   }, []);
 
   const clearProject = useCallback(() => {
-    console.log("ProjectSessionProvider clearProject called");
     setProjectState(null);
     localStorage.removeItem("projectSession");
     document.cookie = "projectSession=; path=/; max-age=0";

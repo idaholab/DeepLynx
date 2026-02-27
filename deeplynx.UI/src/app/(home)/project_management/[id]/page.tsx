@@ -17,7 +17,7 @@ import {
   getProjectMembersServer,
 } from "@/app/lib/server_service/projects_services.server";
 import { getAllRolesServer } from "@/app/lib/server_service/role_services.server";
-import { getPermissionsForRoleServer } from "@/app/lib/server_service/permissions_services.server";
+import { getAllPermissionsServer } from "@/app/lib/server_service/permissions_services.server";
 
 export const dynamic = "force-dynamic";
 
@@ -26,7 +26,6 @@ type Props = {
 };
 
 export default async function ProjectManagementPage({ params }: Props) {
-  // 🔹 Match the other page: await params and validate id
   const { id } = await params;
   if (!id) {
     return notFound();
@@ -79,41 +78,25 @@ export default async function ProjectManagementPage({ params }: Props) {
     }
 
     try {
-      if (projectRoles.length > 0) {
-        const permsByRole: PermissionResponseDto[][] = await Promise.all(
-          projectRoles.map((role) =>
-            getPermissionsForRoleServer(
-              organizationId,
-              projectId,
-              role.id
-            ).catch((error) => {
-              console.error(
-                `getPermissionsForRoleServer failed for role ${role.id}:`,
-                error
-              );
-              return [] as PermissionResponseDto[];
-            })
-          )
-        );
-
-        // Flatten and dedupe by permission id
-        const permsMap = new Map<number | string, PermissionResponseDto>();
-
-        permsByRole.flat().forEach((perm: PermissionResponseDto) => {
-          const key = perm.id;
-          if (!permsMap.has(key)) {
-            permsMap.set(key, perm);
-          }
-        });
-
-        projectPermissions = Array.from(permsMap.values());
-      }
+      projectPermissions = await getAllPermissionsServer(
+        organizationId,
+        projectId,
+        undefined,
+        true,
+      );
     } catch (e) {
-      console.error("Aggregating permissions by role failed: ", e);
+      console.error("getAllPermissionsServer failed: ", e);
     }
 
-    // TODO: later: fetch real groups for this project
-    const projectGroups: GroupResponseDto[] = [];
+    // Extract groups from projectMembers (groups have empty emails)
+    const projectGroups: GroupResponseDto[] = projectMembers
+      .filter(member => member.email === "" && member.memberId !== undefined)
+      .map(member => ({
+        id: member.memberId!,
+        name: member.name,
+        isArchived: false,
+        organizationId: organizationId,
+      }));
 
     // If project isn't found, mirror behavior of the other page
     if (!project) {
@@ -131,6 +114,5 @@ export default async function ProjectManagementPage({ params }: Props) {
     );
   }
 
-  // If we somehow get here, treat as not found
   return notFound();
 }

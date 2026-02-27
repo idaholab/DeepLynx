@@ -169,7 +169,7 @@ const SelectOrgClient = ({ session }: Props) => {
             <div className="card-body p-6">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-3">
-                  <h2 className="text-xl font-semibold">
+                  <h2 className="text-xl font-semibold text-base-content">
                     Welcome back, {formatUserName(session.user.name)}
                   </h2>
                 </div>
@@ -205,7 +205,7 @@ const SelectOrgClient = ({ session }: Props) => {
                       <div className="flex items-center gap-4">
                         <AvatarCell name={org.name} />
                         <div>
-                          <h3 className="font-semibold text-lg">{org.name}</h3>
+                          <h3 className="font-semibold text-lg text-base-content">{org.name}</h3>
                           {org.description && (
                             <p className="text-xs text-base-content/50 mt-1">
                               {org.description}
@@ -268,10 +268,10 @@ const SelectOrgClient = ({ session }: Props) => {
 
       {/* Create Organization Modal */}
       {isModalOpen && (
-        <div className="modal modal-open">
-          <div className="modal-box">
+        <dialog className="modal modal-open">
+          <div className="modal-box max-w-lg">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="font-bold text-lg">Create New Organization</h3>
+              <h3 className="font-bold text-lg text-base-content">Create New Organization</h3>
               <button
                 className="btn btn-sm btn-circle btn-ghost"
                 onClick={() => {
@@ -290,40 +290,29 @@ const SelectOrgClient = ({ session }: Props) => {
               </div>
             )}
 
-            <form onSubmit={handleCreateOrganization}>
-              <div className="form-control w-full mb-4">
-                <label className="label">
-                  <span className="label-text">Organization Name *</span>
-                </label>
-                <input
-                  type="text"
-                  placeholder="Enter organization name"
-                  className="input input-bordered w-full"
-                  value={formData.name}
-                  onChange={(e) =>
-                    setFormData({ ...formData, name: e.target.value })
-                  }
-                  required
-                  disabled={isCreating}
-                />
-              </div>
+            <form onSubmit={handleCreateOrganization} className="flex flex-col gap-4">
+              <input
+                type="text"
+                placeholder="Organization Name"
+                className="input input-bordered input-primary bg-base-100 text-base-content placeholder:text-base-content/40 w-full"
+                value={formData.name}
+                onChange={(e) =>
+                  setFormData({ ...formData, name: e.target.value })
+                }
+                required
+                disabled={isCreating}
+              />
+              <textarea
+                className="textarea textarea-bordered textarea-primary bg-base-100 text-base-content placeholder:text-base-content/40 min-h-[100px] w-full"
+                placeholder="Description (Optional)"
+                value={formData.description || ""}
+                onChange={(e) =>
+                  setFormData({ ...formData, description: e.target.value })
+                }
+                disabled={isCreating}
+              />
 
-              <div className="form-control w-full mb-4">
-                <label className="label">
-                  <span className="label-text">Description (Optional)</span>
-                </label>
-                <textarea
-                  className="textarea textarea-bordered h-24 w-full"
-                  placeholder="Enter organization description"
-                  value={formData.description || ""}
-                  onChange={(e) =>
-                    setFormData({ ...formData, description: e.target.value })
-                  }
-                  disabled={isCreating}
-                />
-              </div>
-
-              <div className="modal-action">
+              <div className="modal-action mt-6">
                 <button
                   type="button"
                   className="btn btn-ghost"
@@ -353,11 +342,7 @@ const SelectOrgClient = ({ session }: Props) => {
               </div>
             </form>
           </div>
-          <div
-            className="modal-backdrop"
-            onClick={() => setIsModalOpen(false)}
-          />
-        </div>
+        </dialog>
       )}
     </>
   );

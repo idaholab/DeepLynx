@@ -148,7 +148,7 @@ public class DataSourceProjectController : ControllerBase
     /// <param name="dto">The data transfer object containing updated data source details</param>
     /// <returns>The newly updated data source</returns>
     [HttpPut("{dataSourceId:long}", Name = "api_update_a_data_source_for_project")]
-    [Auth("write", "data_source")]
+    [Auth("update", "data_source")]
     public async Task<ActionResult<DataSourceResponseDto>> UpdateDataSource(
         long projectId,
         long dataSourceId,
@@ -204,7 +204,7 @@ public class DataSourceProjectController : ControllerBase
     /// <param name="archive">True to archive the data source, false to unarchive it.</param>
     /// <returns>A message stating the data source was successfully archived or unarchived.</returns>
     [HttpPatch("{dataSourceId:long}", Name = "api_archive_data_source_for_project")]
-    [Auth("write", "data_source")]
+    [Auth("update", "data_source")]
     public async Task<IActionResult> ArchiveDataSource(
         long projectId,
         long dataSourceId,
@@ -241,7 +241,7 @@ public class DataSourceProjectController : ControllerBase
     /// <param name="isDefault">True to set as default, false to unset as default.</param>
     /// <returns>The updated data source</returns>
     [HttpPatch("{dataSourceId:long}/default", Name = "api_set_default_data_source_for_project")]
-    [Auth("write", "data_source")]
+    [Auth("update", "data_source")]
     public async Task<ActionResult<DataSourceResponseDto>> SetDefaultDataSource(
         long projectId,
         long dataSourceId,

@@ -24,7 +24,7 @@ const ProjectDropdown: React.FC<ProjectDropdownProps> = ({
   const allIds = useMemo(() => projects.map((p) => p.id), [projects]);
   const defaultToken = useMemo(
     () => (defaultSelected ?? []).map(String).join("|"),
-    [defaultSelected]
+    [defaultSelected],
   );
 
   // Apply defaultSelected when loaded / when it changes
@@ -75,9 +75,9 @@ const ProjectDropdown: React.FC<ProjectDropdownProps> = ({
   const filteredProjects = useMemo(
     () =>
       projects.filter((p) =>
-        p.name.toLowerCase().includes(searchTerm.toLowerCase())
+        p.name.toLowerCase().includes(searchTerm.toLowerCase()),
       ),
-    [projects, searchTerm]
+    [projects, searchTerm],
   );
 
   const selectedLabel = useMemo(() => {
@@ -122,7 +122,7 @@ const ProjectDropdown: React.FC<ProjectDropdownProps> = ({
             <label className="label cursor-pointer justify-start gap-2">
               <input
                 type="checkbox"
-                className="checkbox text-white checked:bg-dynamic-blue border-dynamic-blue"
+                className="checkbox checked:checkbox-secondary"
                 checked={selectedIds.includes("ALL")}
                 onChange={() => toggleProject("ALL")}
               />
@@ -136,15 +136,15 @@ const ProjectDropdown: React.FC<ProjectDropdownProps> = ({
             {filteredProjects.map((project) => (
               <label
                 key={project.id}
-                className="label cursor-pointer justify-start gap-2 text-base-content"
+                className="label cursor-pointer justify-start gap-2 text-base-content truncate"
               >
                 <input
                   type="checkbox"
-                  className="checkbox text-white checked:bg-dynamic-blue border-dynamic-blue"
+                  className="checkbox checked:checkbox-secondary"
                   checked={selectedIds.includes(project.id)}
                   onChange={() => toggleProject(project.id)}
                 />
-                <span className="label-text">{project.name}</span>
+                <span className="label-text" title={project.name}>{project.name.length> 50 ? project.name.slice(0,50) + "..." : project.name}</span>
               </label>
             ))}
           </div>

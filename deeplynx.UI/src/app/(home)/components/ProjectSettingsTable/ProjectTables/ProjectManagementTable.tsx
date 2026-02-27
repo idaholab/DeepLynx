@@ -8,18 +8,14 @@ interface RoleManagementTableProps {
   initialData: PermissionResponseDto[];
   projectData: PermissionResponseDto[];
 }
-// interface PermissionTableProps {
-//   data: PermissionResponseDto[];
-// }
 
 const RoleManagementTable: FC<RoleManagementTableProps> = ({
   initialData,
   projectData,
 }) => {
-    const { t } = useLanguage();
-    // const [data, setData] = useState<PermissionResponseDto[]>(initialData);
-    const [selectedMembers, setSelectedMembers] = useState<boolean[]>(new Array(initialData.length).fill(false));
-    const [selectAll, setSelectAll] = useState<boolean>(false);
+  const { t } = useLanguage();
+  const [selectedMembers, setSelectedMembers] = useState<boolean[]>(new Array(initialData.length).fill(false));
+  const [selectAll, setSelectAll] = useState<boolean>(false);
 
   // ===== Project Management table state =====
   const [projRows, setProjRows] = useState<PermissionResponseDto[]>(projectData);
@@ -46,13 +42,13 @@ const RoleManagementTable: FC<RoleManagementTableProps> = ({
     setSelectedMembers(newSelection);
   };
 
-  const projectColumns: Column<PermissionResponseDto>[] = [
+  const columns: Column<PermissionResponseDto>[] = [
     {
-      header: t?.translations?.PROJECT_MANAGEMENT ?? "Project Management",
-      data: "name",
+      header: "Project Management",
+      data: "action",
     },
     {
-      header: t?.translations?.DESCRIPTION ?? "Description",
+      header: "Description",
       data: "description",
       sortable: false,
     },
@@ -61,60 +57,29 @@ const RoleManagementTable: FC<RoleManagementTableProps> = ({
         <input
           type="checkbox"
           className="checkbox"
-          checked={projSelectAll}
+          checked={selectAll}
           onChange={handleSelectAll}
         />
       ),
-      cell: (_row, i) => (
+      cell: (row: PermissionResponseDto, index: number) => (
         <input
           type="checkbox"
           className="checkbox"
-          checked={projSelected[i]}
-          onChange={() => handleCheckboxChange(i)}
+          checked={selectedMembers[index]}
+          onChange={() => handleCheckboxChange(index)}
         />
       ),
       sortable: false,
     },
   ];
 
-  const columns: Column<PermissionResponseDto>[] = [
-      {
-        header: "Project Management",
-        data: "action",
-      },
-      {
-        header: "Description",
-        data: "description",
-        sortable: false,
-      },
-      {
-        header: (
-          <input
-            type="checkbox"
-            className="checkbox"
-            checked={selectAll}
-            onChange={handleSelectAll}
-          />
-        ),
-        cell: (row: PermissionResponseDto, index: number) => (
-              <input
-              type="checkbox"
-              className="checkbox"
-              checked={selectedMembers[index]}
-              onChange={() => handleCheckboxChange(index)}
-              />
-        ),
-        sortable: false,
-      },
-    ];
-
   return (
-      <div>
-          <GenericTable
-              columns={columns}
-              data={projectData}
-          />
-      </div>
+    <div>
+      <GenericTable
+        columns={columns}
+        data={projectData}
+      />
+    </div>
   );
 };
 

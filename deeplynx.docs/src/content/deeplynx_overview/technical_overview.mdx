@@ -1,0 +1,37 @@
+# Core Components Overview: Organizations, Projects, Data Sources, and Object Storage
+
+## Organizations
+
+Organizations represent the top-level entity in the DeepLynx hierarchy. They serve as the primary container for all system resources and define the broadest scope of data and user management. Each organization maintains a collection of users through the `OrganizationUsers` relationship, where users can be designated as organization administrators with elevated permissions across all organization resources.
+
+When an organization is created, the system automatically provisions essential default resources to ensure immediate usability. This includes creating default Admin and User roles with predefined permission patterns, as well as establishing a default object storage instance configured based on environment variables (supporting filesystem, Azure Blob Storage, or AWS S3). Organizations can be marked as "default," ensuring only one default organization exists across the system at any given time.
+
+Organizations own and manage a comprehensive set of resources including projects, groups, roles, permissions, classes, data sources, object storages, relationships, records, edges, tags, sensitivity labels, subscriptions, and events. This ownership model enables organizations to function as complete, isolated workspaces while maintaining the flexibility to share resources selectively through inheritance patterns. The archiving functionality allows organizations to be soft-deleted, preserving data integrity while removing them from active use.
+
+## Projects
+
+Projects exist as organizational units within an organization, providing a more granular level of resource management and access control. Each project belongs to exactly one organization and inherits certain resources from its parent while maintaining its own distinct collections of data and metadata. Projects support member-based access control, where both individual users and groups can be assigned specific roles that govern their permissions within the project scope.
+
+The project creation process includes automatic provisioning of foundational resources to accelerate development workflows. The system creates three default classes (Timeseries, Report, and File), establishes a default data source for immediate data ingestion, and configures timeseries-specific object storage for efficient time-series data management. The creating user is automatically added as an administrator with full project permissions through the organization's Admin role.
+
+Projects maintain their own collections of classes, data sources, edges, object storages, records, relationships, roles, sensitivity labels, subscriptions, permissions, tags, and events. The archiving mechanism for projects implements cascade behavior through stored procedures, ensuring that when a project is archived or unarchived, all dependent resources follow suit. This maintains referential integrity while providing clean state management. Projects also feature a caching layer to optimize retrieval performance for frequently accessed project metadata.
+
+## Data Sources
+
+Data sources represent the origin points for data entering the DeepLynx system. They implement a dual-scoping model where data sources can exist at either the organization level or the project level, with project-level queries automatically inheriting organization-level data sources. This inheritance pattern enables centralized data source management while allowing project-specific customization when needed.
+
+Each data source captures metadata about its origin, including a type designation, base URI for API or service connections, and a flexible JSON configuration object that can store connection strings, authentication credentials, and adapter-specific settings. Data sources maintain an abbreviation field for concise referencing and can be marked with a "default" flag to simplify data ingestion workflows by providing an implicit target when no explicit source is specified.
+
+The data source business logic enforces important governance rules: organization-level data sources cannot be modified or deleted from within project contexts, ensuring that shared resources remain under centralized control. When setting a new default data source, the system automatically removes the default flag from any existing defaults within the same scope (organization or project), ensuring exactly one default exists. Data sources track their relationships with records and edges, providing lineage information that answers the critical question of where specific data originated.
+
+## Object Storage
+
+Object storage configurations define how and where DeepLynx persists file data and record payloads. Like data sources, object storages implement a dual-scoping model with organization-level and project-level instances, and project-level queries inherit organization-level configurations. This architectural choice enables centralized infrastructure management while supporting project-specific storage isolation when required for security, compliance, or performance reasons.
+
+The system supports three distinct storage backends: local filesystem storage, Azure Blob Storage, and AWS S3. Each storage type requires specific configuration parameters stored in a JSON configuration object—filesystem storages require a mount path, Azure storages need connection strings and container names, and AWS storages require S3 connection strings. The business logic enforces that exactly one storage backend configuration must be provided during creation, preventing misconfiguration.
+
+Object storages utilize a default flag mechanism similar to data sources, with enforcement ensuring only one default exists per organization or project scope. The default designation cannot be removed from a storage instance through direct archiving or deletion; instead, a different storage must first be designated as default. This safeguard prevents the system from losing its default storage target for new records. Organization-level object storages cannot be modified from project contexts, maintaining administrative boundaries. Each object storage tracks its associations with records, enabling storage migration planning and capacity management based on actual usage patterns.
+
+## Hierarchical Relationships and Inheritance
+
+These four components work together to establish a flexible, hierarchical data management architecture. Organizations serve as the root, containing projects that further organize work. Both organizations and projects can define data sources and object storages, with projects inheriting parent organization resources while optionally defining their own. This inheritance model reduces configuration overhead while preserving the ability to customize at granular levels when business requirements demand it. The consistent application of archiving semantics, default resource patterns, and organizational boundaries across all four components creates a coherent and predictable system behavior that scales from small deployments to large enterprise installations.

@@ -34,4 +34,10 @@ public interface ITimeseriesBusiness
     Task<RecordResponseDto> ExportTimeseriesTable(long currentUserId, long organizationId, long projectId,
         long datasourceId,
         string tableName, string fileType);
+
+    Task<PlotDataDto> GetPlotData(long currentUserId, long organizationId, long projectId,
+        long dataSourceId, long recordId, long limit, long rowNumber);
+
+    Task<Dictionary<string, object?>> GetLatestRow(long currentUserId, long organizationId, long projectId,
+        long dataSourceId, long recordId);
 }

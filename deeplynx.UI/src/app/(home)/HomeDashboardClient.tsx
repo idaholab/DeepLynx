@@ -111,15 +111,21 @@ export default function HomeDashboardClient({ initialProjects }: Props) {
           }}
           className="font-bold text-secondary hover:text-base-content/80 underline underline-offset-2 transition-colors"
         >
-          {row.name}
+          {row.name.length > 50 ? row.name.slice(0, 50) + "..." : row.name}
         </Link>
       ),
     },
     {
       header: t.translations.DESCRIPTION,
-      data: (row: ProjectResponseDto) => (
-        <span className="text-base-content/80">{row.description || "—"}</span>
-      ),
+        isExpandTrigger: (row: ProjectResponseDto) => (row.description?.length ?? 0) > 200,
+        data: (row: ProjectResponseDto) =>{
+          const isLong = (row.description?.length ?? 0) > 200;
+          return(
+              <span className="text-base-content/80">
+        {isLong ? row.description!.slice(0, 80) + "..." : row.description || "—"}
+      </span>
+          );
+        }
     },
     {
       header: t.translations.LAST_UPDATED_AT,

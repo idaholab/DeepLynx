@@ -39,7 +39,4 @@ public class CreateRecordRequestDto
     
     [JsonPropertyName("tags")]
     public List<string>? Tags { get; set; }
-    
-    [JsonPropertyName("sensitivity_labels")]
-    public List<string>? SensitivityLabels { get; set; }
 }

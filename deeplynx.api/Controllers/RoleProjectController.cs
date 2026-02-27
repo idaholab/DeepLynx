@@ -126,7 +126,7 @@ public class RoleProjectController : ControllerBase
     /// <param name="dto">The data transfer object containing updated role details</param>
     /// <returns>The updated role</returns>
     [HttpPut("{roleId:long}", Name = "api_update_role_project")]
-    [Auth("write", "role")]
+    [Auth("update", "role")]
     public async Task<ActionResult<RoleResponseDto>> UpdateRole(
         long organizationId,
         long projectId,
@@ -184,7 +184,7 @@ public class RoleProjectController : ControllerBase
     /// <param name="archive">True to archive the role, false to unarchive it.</param>
     /// <returns>A message stating the role was successfully archived or unarchived.</returns>
     [HttpPatch("{roleId:long}", Name = "api_archive_role_project")]
-    [Auth("write", "role")]
+    [Auth("update", "role")]
     public async Task<IActionResult> ArchiveRole(
         long organizationId,
         long projectId,
@@ -221,6 +221,7 @@ public class RoleProjectController : ControllerBase
     /// <returns>A list of permissions associated with the role</returns>
     [HttpGet("{roleId:long}/permissions", Name = "api_get_permissions_by_role_project")]
     [Auth("read", "role")]
+    [Auth("read", "permission")]
     public async Task<ActionResult<IEnumerable<PermissionResponseDto>>> GetPermissionsByRole(
         long organizationId,
         long projectId,
@@ -248,7 +249,8 @@ public class RoleProjectController : ControllerBase
     /// <param name="permissionId">The ID of the permission to add</param>
     /// <returns>A message stating the permission was successfully added to the role.</returns>
     [HttpPost("{roleId:long}/permissions/{permissionId:long}", Name = "api_add_permission_to_role_project")]
-    [Auth("write", "role")]
+    [Auth("update", "role")]
+    [Auth("read", "permission")]
     public async Task<ActionResult> AddPermissionToRole(
         long organizationId,
         long projectId,
@@ -277,7 +279,8 @@ public class RoleProjectController : ControllerBase
     /// <param name="permissionId">The ID of the permission to remove</param>
     /// <returns>A message stating the permission was successfully removed from the role.</returns>
     [HttpDelete("{roleId:long}/permissions/{permissionId:long}", Name = "api_remove_permission_from_role_project")]
-    [Auth("write", "role")]
+    [Auth("update", "role")]
+    [Auth("read", "permission")]
     public async Task<ActionResult> RemovePermissionFromRole(
         long organizationId,
         long projectId,
@@ -306,7 +309,8 @@ public class RoleProjectController : ControllerBase
     /// <param name="permissionIds">Array of permission IDs to assign to the role (replaces existing permissions)</param>
     /// <returns>A message stating the permissions were successfully set for the role.</returns>
     [HttpPut("{roleId:long}/permissions", Name = "api_set_permissions_for_role_project")]
-    [Auth("write", "role")]
+    [Auth("update", "role")]
+    [Auth("read", "permission")]
     public async Task<ActionResult> SetPermissionsForRole(
         long organizationId,
         long projectId,

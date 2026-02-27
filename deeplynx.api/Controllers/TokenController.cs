@@ -1,3 +1,4 @@
+using deeplynx.helpers;
 using deeplynx.helpers.Context;
 using deeplynx.interfaces;
 using deeplynx.models;
@@ -69,6 +70,7 @@ public class TokenController : ControllerBase
     /// <param name="clientId">Optional OAuth client ID to associate with the API key</param>
     /// <returns>API key and secret (secret only returned once)</returns>
     [HttpPost("keys", Name = "api_create_api_key")]
+    [AllowAnonymous]
     public async Task<IActionResult> CreateApiKey([FromQuery] string? clientId = null)
     {
         try

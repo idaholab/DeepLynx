@@ -1,35 +1,502 @@
+using Azure.Storage.Blobs;
+using Azure.Storage.Blobs.Models;
+using Azure.Storage.Blobs.Specialized;
+using Azure.Storage.Sas;
+using deeplynx.helpers;
 using deeplynx.interfaces;
 using deeplynx.models;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.StaticFiles;
 
 namespace deeplynx.business;
 
 public class FileAzureBusiness: IFileBusiness
 {
-    public async Task<string> UploadFile(long organizationId, long projectId, long datasourceId, ObjectStorageConfigDto objectStorageId,
+    /// <summary>
+    /// Uploads a file to azure object storage instance specified in the object storage config
+    /// </summary>
+    /// <param name="organizationId"></param>
+    /// <param name="projectId"></param>
+    /// <param name="datasourceId"></param>
+    /// <param name="objectStorageConfig"></param>
+    /// <param name="file"></param>
+    /// <param name="guid"></param>
+    /// <returns></returns>
+    public async Task<string> UploadFile(long organizationId, long projectId, long datasourceId, ObjectStorageConfigDto objectStorageConfig,
         IFormFile file, Guid guid)
     {
-        return "";
-    }
-
-    public async Task<string> UpdateFile(RecordResponseDto record,  IFormFile file)
-    {
-        return "";
-    }
-
-    public async Task<FileStreamResult> DownloadFile(RecordResponseDto record)
-    {
-        // Create a simple stub with empty content
-        var emptyStream = new MemoryStream();
-        return new FileStreamResult(emptyStream, "application/octet-stream")
+        if (objectStorageConfig.AzureObjectConfig == null)
         {
-            FileDownloadName = "stub-file.txt"
+            throw new ArgumentException("Azure connection string is null");
+        }
+
+        var fileName = $"organization_{organizationId}/project_{projectId}/datasource_{datasourceId}/{guid}_{file.FileName}";
+
+        // Get a reference to the container
+        var container = new BlobContainerClient(objectStorageConfig.AzureObjectConfig.AzureConnectionString, objectStorageConfig.AzureObjectConfig.AzureContainerName);
+        await container.CreateIfNotExistsAsync();
+
+        // Get a reference to a blob (using the original filename from the uploaded file)
+        var blob = container.GetBlobClient(fileName);
+
+        // Upload the IFormFile
+        await using var stream = file.OpenReadStream(); 
+        await blob.UploadAsync(stream, overwrite: true);
+        
+        return fileName;
+    }
+
+    /// <summary>
+    /// Replaces old file with a new one in Azure Object Storage
+    /// </summary>
+    /// <param name="record"></param>
+    /// <param name="objectStorageConfig"></param>
+    /// <param name="file"></param>
+    /// <param name="guid"></param>
+    /// <returns></returns>
+    /// <exception cref="ArgumentException"></exception>
+    /// <exception cref="FileNotFoundException"></exception>
+    /// <exception cref="Exception"></exception>
+    public async Task<string> UpdateFile(RecordResponseDto record, ObjectStorageConfigDto? objectStorageConfig,  IFormFile file, Guid guid)
+    {
+        if (record.Uri == null)
+        {
+            throw new ArgumentException("Record Uri is null");
+        }
+    
+        if (objectStorageConfig?.AzureObjectConfig == null)
+        {
+            throw new ArgumentException("Azure configuration object is null");
+        }
+    
+        var container = new BlobContainerClient(objectStorageConfig.AzureObjectConfig.AzureConnectionString, objectStorageConfig.AzureObjectConfig.AzureContainerName);
+        if (!await container.ExistsAsync())
+        {
+            throw new InvalidOperationException("Azure Object Storage container does not exist");
+        }
+
+        var oldBlob = container.GetBlobClient(record.Uri);
+    
+        if (!await oldBlob.ExistsAsync())
+        {
+            throw new FileNotFoundException($"File not found: {record.Uri}");
+        }
+    
+        var newFileName = $"organization_{record.OrganizationId}/projects_{record.ProjectId}/datasource_{record.DataSourceId}/{guid}_{file.FileName}";
+        var newBlob = container.GetBlobClient(newFileName);
+        
+        // try-catch to try and revert to original state on failure
+        try
+        {
+            // Upload new file FIRST
+            await using var stream = file.OpenReadStream();
+            await newBlob.UploadAsync(stream, overwrite: true);
+
+            // Only delete old file after successful upload
+            await oldBlob.DeleteAsync();
+
+            return newFileName;
+        }
+        catch (Exception ex)
+        {
+            await newBlob.DeleteIfExistsAsync();
+
+            throw new Exception($"Failed to update file: {ex.Message}", ex);
+        }
+    }
+    
+    /// <summary>
+    /// Downloads a file from Azure Object Storage
+    /// </summary>
+    /// <param name="record"></param>
+    /// <param name="objectStorageConfig"></param>
+    /// <returns></returns>
+    /// <exception cref="ArgumentException"></exception>
+    /// <exception cref="FileNotFoundException"></exception>
+    public async Task<FileStreamResult> DownloadFile(RecordResponseDto record, ObjectStorageConfigDto objectStorageConfig)
+    {
+        if (record.Uri == null)
+        {
+            throw new ArgumentException("Record Uri is null");
+        }
+        
+        if (objectStorageConfig?.AzureObjectConfig == null)
+        {
+            throw new ArgumentException("Azure connection string is null");
+        }
+        
+        var container = new BlobContainerClient(
+            objectStorageConfig.AzureObjectConfig.AzureConnectionString, 
+            objectStorageConfig.AzureObjectConfig.AzureContainerName);
+        
+        if (!await container.ExistsAsync())
+        {
+            throw new InvalidOperationException("Azure Object Storage container does not exist");
+        }
+
+        var blob = container.GetBlobClient(record.Uri);
+
+        if (!await blob.ExistsAsync())
+        {
+            throw new FileNotFoundException($"File not found: {record.Uri}");
+        }
+        
+        // Get blob properties for content length
+        var properties = await blob.GetPropertiesAsync();
+        var contentLength = properties.Value.ContentLength;
+    
+        // Detect file type
+        var provider = new FileExtensionContentTypeProvider();
+        if (!provider.TryGetContentType(record.Uri, out var contentType))
+        {
+            contentType = "application/octet-stream"; // Default fallback
+        }
+    
+        // Download the blob content as a stream
+        var downloadResponse = await blob.DownloadStreamingAsync();
+
+        // Return with content length for progress tracking
+        return new FileStreamResultWithLength(downloadResponse.Value.Content, contentType, contentLength)
+        {
+            FileDownloadName = record.Name,
+            EnableRangeProcessing = true
         };
     }
-
-    public async Task<bool> DeleteFile(RecordResponseDto record)
+    
+    /// <summary>
+    /// Deletes a file from Azure Object Storage
+    /// </summary>
+    /// <param name="record"></param>
+    /// <param name="objectStorageConfig"></param>
+    /// <returns></returns>
+    /// <exception cref="ArgumentException"></exception>
+    /// <exception cref="FileNotFoundException"></exception>
+    public async Task<bool> DeleteFile(RecordResponseDto record, ObjectStorageConfigDto objectStorageConfig)
     {
-        return true;
+        if (objectStorageConfig.AzureObjectConfig == null)
+        {
+            throw new ArgumentException("Azure connection string is null");
+        }
+
+        // Get a reference to the container
+        var container = new BlobContainerClient(objectStorageConfig.AzureObjectConfig.AzureConnectionString, objectStorageConfig.AzureObjectConfig.AzureContainerName);
+
+        if (!await container.ExistsAsync())
+        {
+            throw new FileNotFoundException("Can not connect to container");
+        }
+
+        // Get a reference to the blob using the uri from the record
+        BlobClient blob = container.GetBlobClient(record.Uri);
+
+        // Delete the blob if it exists
+        var response = await blob.DeleteIfExistsAsync();
+    
+        // Returns true if the blob was deleted, false if it didn't exist
+        return response.Value;
+    }
+    
+    /// <summary>
+    /// Generates a pre-signed URL (SAS token) for uploading a file directly to Azure Blob Storage
+    /// </summary>
+    /// <param name="organizationId"></param>
+    /// <param name="projectId"></param>
+    /// <param name="datasourceId"></param>
+    /// <param name="objectStorageConfig"></param>
+    /// <param name="fileName">The name of the file to be uploaded</param>
+    /// <param name="guid">Unique identifier for the file</param>
+    /// <param name="expirationHours">Hours until the SAS token expires (default: 24)</param>
+    /// <returns>Pre-signed URL with SAS token for direct upload</returns>
+    /// <exception cref="ArgumentException"></exception>
+    public async Task<string> GenerateUploadUrl(
+        long organizationId, 
+        long projectId, 
+        long datasourceId, 
+        ObjectStorageConfigDto objectStorageConfig,
+        string fileName, 
+        Guid guid,
+        int expirationHours = 24)
+    {
+        if (objectStorageConfig?.AzureObjectConfig == null)
+        {
+            throw new ArgumentException("Azure configuration is null");
+        }
+
+        var blobName = $"organization_{organizationId}/project_{projectId}/datasource_{datasourceId}/{guid}_{fileName}";
+
+        // Create BlobContainerClient with connection string
+        var containerClient = new BlobContainerClient(
+            objectStorageConfig.AzureObjectConfig.AzureConnectionString, 
+            objectStorageConfig.AzureObjectConfig.AzureContainerName);
+
+        // Ensure container exists
+        await containerClient.CreateIfNotExistsAsync();
+
+        // Get blob client reference
+        var blobClient = containerClient.GetBlobClient(blobName);
+
+        // Check if the blob client can generate SAS URI (requires Shared Key authentication)
+        if (!blobClient.CanGenerateSasUri)
+        {
+            throw new InvalidOperationException("BlobClient must be authorized with Shared Key credentials to generate SAS tokens");
+        }
+
+        // Create SAS builder with write and create permissions
+        var sasBuilder = new BlobSasBuilder
+        {
+            BlobContainerName = objectStorageConfig.AzureObjectConfig.AzureContainerName,
+            BlobName = blobName,
+            Resource = "b", // "b" for blob
+            StartsOn = DateTimeOffset.UtcNow.AddMinutes(-5), // Account for clock skew
+            ExpiresOn = DateTimeOffset.UtcNow.AddHours(expirationHours)
+        };
+
+        // Set permissions for upload (Write and Create)
+        sasBuilder.SetPermissions(BlobSasPermissions.Write | BlobSasPermissions.Create);
+
+        // Generate the SAS URI
+        var sasUri = blobClient.GenerateSasUri(sasBuilder);
+
+        return sasUri.ToString();
+    }
+    
+    /// <summary>
+    /// Generates a pre-signed URL (SAS token) for downloading a file directly from Azure Blob Storage
+    /// </summary>
+    /// <param name="record"></param>
+    /// <param name="objectStorageConfig"></param>
+    /// <param name="expirationHours">Hours until the SAS token expires (default: 1)</param>
+    /// <returns>Pre-signed URL with SAS token for direct download</returns>
+    /// <exception cref="ArgumentException"></exception>
+    /// <exception cref="FileNotFoundException"></exception>
+    public async Task<string> GenerateDownloadUrl(
+        RecordResponseDto record, 
+        ObjectStorageConfigDto objectStorageConfig,
+        int expirationHours = 1)
+    {
+        if (record.Uri == null)
+        {
+            throw new ArgumentException("Record Uri is null");
+        }
+
+        if (objectStorageConfig?.AzureObjectConfig == null)
+        {
+            throw new ArgumentException("Azure configuration is null");
+        }
+
+        // Create BlobContainerClient with connection string
+        var containerClient = new BlobContainerClient(
+            objectStorageConfig.AzureObjectConfig.AzureConnectionString, 
+            objectStorageConfig.AzureObjectConfig.AzureContainerName);
+
+        // Verify container exists
+        if (!await containerClient.ExistsAsync())
+        {
+            throw new InvalidOperationException("Azure Object Storage container does not exist");
+        }
+
+        // Get blob client reference
+        var blobClient = containerClient.GetBlobClient(record.Uri);
+
+        // Verify blob exists
+        if (!await blobClient.ExistsAsync())
+        {
+            throw new FileNotFoundException($"File not found: {record.Uri}");
+        }
+
+        // Check if the blob client can generate SAS URI
+        // if (!blobClient.CanGenerateSasUri)
+        // {
+        //     throw new InvalidOperationException("BlobClient must be authorized with Shared Key credentials to generate SAS tokens");
+        // }
+
+        // Create SAS builder with read permissions
+        var sasBuilder = new BlobSasBuilder
+        {
+            BlobContainerName = objectStorageConfig.AzureObjectConfig.AzureContainerName,
+            BlobName = record.Uri,
+            Resource = "b", // "b" for blob
+            StartsOn = DateTimeOffset.UtcNow.AddMinutes(-5), // Account for clock skew
+            ExpiresOn = DateTimeOffset.UtcNow.AddHours(expirationHours)
+        };
+
+        // Set permissions for download (Read only)
+        sasBuilder.SetPermissions(BlobSasPermissions.Read);
+
+        // Generate the SAS URI
+        var sasUri = blobClient.GenerateSasUri(sasBuilder);
+
+        return sasUri.ToString();
+    }
+    
+    
+    public async Task<Guid> StartUpload(long organizationId, long projectId, long datasourceId, ObjectStorageConfigDto objectStorageConfig)
+    {
+        if (objectStorageConfig?.AzureObjectConfig == null)
+        {
+            throw new ArgumentException("Azure configuration is null");
+        }
+
+        // Generate a unique upload ID for this session
+        var uploadId = Guid.NewGuid();
+
+        // Verify container exists
+        var container = new BlobContainerClient(
+            objectStorageConfig.AzureObjectConfig.AzureConnectionString, 
+            objectStorageConfig.AzureObjectConfig.AzureContainerName);
+        
+        await container.CreateIfNotExistsAsync();
+
+        return uploadId;
+    }
+
+    /// <summary>
+    /// Uploads a single chunk directly as a block to the Block Blob
+    /// </summary>
+    public async Task UploadChunk(long organizationId, long projectId, long datasourceId, long chunkNumber,
+        string uploadId, ObjectStorageConfigDto objectStorageConfig, IFormFile chunk)
+    {
+        if (objectStorageConfig?.AzureObjectConfig == null)
+        {
+            throw new ArgumentException("Azure configuration is null");
+        }
+
+        if (chunk == null || chunk.Length == 0)
+        {
+            throw new ArgumentException("No chunk data provided");
+        }
+
+        // The blob name that will eventually hold the complete file
+        // We stage blocks to this blob without committing yet
+        var blobName = $"organization_{organizationId}/project_{projectId}/datasource_{datasourceId}/uploads/{uploadId}";
+
+        var container = new BlobContainerClient(
+            objectStorageConfig.AzureObjectConfig.AzureConnectionString, 
+            objectStorageConfig.AzureObjectConfig.AzureContainerName);
+
+        if (!await container.ExistsAsync())
+        {
+            throw new InvalidOperationException("Azure Object Storage container does not exist");
+        }
+
+        // Get BlockBlobClient for direct block operations
+        var blockBlobClient = container.GetBlockBlobClient(blobName);
+
+        try
+        {
+            // Generate a base64-encoded block ID (must be consistent and under 64 bytes)
+            // Using zero-padded chunk number to ensure proper ordering
+            var blockId = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes($"block-{chunkNumber:D10}"));
+
+            // Stage the block directly from the chunk stream
+            // This uploads the chunk as an uncommitted block
+            await using var stream = chunk.OpenReadStream();
+            await blockBlobClient.StageBlockAsync(blockId, stream);
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException($"Failed to upload chunk {chunkNumber}: {ex.Message}", ex);
+        }
+    }
+
+    /// <summary>
+    /// Completes the chunked upload by committing all staged blocks into a single Block Blob
+    /// </summary>
+    public async Task<string> CompleteUpload(long organizationId, long projectId, long datasourceId,
+        ObjectStorageConfigDto objectStorageConfig, FileUploadCompleteRequestDto request, Guid guid)
+    {
+        if (objectStorageConfig?.AzureObjectConfig == null)
+        {
+            throw new ArgumentException("Azure configuration is null");
+        }
+
+        var container = new BlobContainerClient(
+            objectStorageConfig.AzureObjectConfig.AzureConnectionString, 
+            objectStorageConfig.AzureObjectConfig.AzureContainerName);
+
+        if (!await container.ExistsAsync())
+        {
+            throw new InvalidOperationException("Azure Object Storage container does not exist");
+        }
+
+        // The temporary blob where blocks were staged
+        var tempBlobName = $"organization_{organizationId}/project_{projectId}/datasource_{datasourceId}/uploads/{request.UploadId}";
+        var tempBlockBlobClient = container.GetBlockBlobClient(tempBlobName);
+
+        // Final blob name following your naming convention
+        var finalBlobName = $"organization_{organizationId}/project_{projectId}/datasource_{datasourceId}/{guid}_{request.FileName}";
+        var finalBlockBlobClient = container.GetBlockBlobClient(finalBlobName);
+
+        try
+        {
+            // Create a list of block IDs in the correct order
+            var blockIds = new List<string>();
+            for (int i = 0; i < request.TotalChunks; i++)
+            {
+                var blockId = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes($"block-{i:D10}"));
+                blockIds.Add(blockId);
+            }
+
+            // Get the list of uncommitted blocks to verify all chunks are present
+            var blockList = await tempBlockBlobClient.GetBlockListAsync(BlockListTypes.Uncommitted);
+            var uncommittedBlocks = blockList.Value.UncommittedBlocks.ToList();
+
+            if (uncommittedBlocks.Count != request.TotalChunks)
+            {
+                throw new InvalidOperationException(
+                    $"Missing chunks. Expected {request.TotalChunks}, found {uncommittedBlocks.Count} uncommitted blocks");
+            }
+
+            // Commit all blocks to create the final blob at the temp location
+            await tempBlockBlobClient.CommitBlockListAsync(blockIds);
+
+            // Copy the committed blob to the final location with proper naming
+            var copyOperation = await finalBlockBlobClient.StartCopyFromUriAsync(tempBlockBlobClient.Uri);
+            
+            // Wait for copy to complete (usually instant for same storage account)
+            await copyOperation.WaitForCompletionAsync();
+
+            // Delete the temporary blob after successful copy
+            await tempBlockBlobClient.DeleteIfExistsAsync();
+
+            return finalBlobName;
+        }
+        catch (Exception ex)
+        {
+            // Clean up on failure
+            await finalBlockBlobClient.DeleteIfExistsAsync();
+            await tempBlockBlobClient.DeleteIfExistsAsync();
+            
+            throw new InvalidOperationException($"Failed to complete upload: {ex.Message}", ex);
+        }
+    }
+
+    /// <summary>
+    /// Cancels an in-progress chunked upload and cleans up uncommitted blocks
+    /// </summary>
+    public async Task CancelUpload(long organizationId, long projectId, long dataSourceId, string uploadId,
+        ObjectStorageConfigDto objectStorageConfig)
+    {
+        if (objectStorageConfig?.AzureObjectConfig == null)
+        {
+            throw new ArgumentException("Azure configuration is null");
+        }
+
+        var container = new BlobContainerClient(
+            objectStorageConfig.AzureObjectConfig.AzureConnectionString, 
+            objectStorageConfig.AzureObjectConfig.AzureContainerName);
+
+        if (!await container.ExistsAsync())
+        {
+            return; // Nothing to clean up if container doesn't exist
+        }
+
+        // The temporary blob where blocks were staged
+        var tempBlobName = $"organization_{organizationId}/project_{projectId}/datasource_{dataSourceId}/uploads/{uploadId}";
+        var blockBlobClient = container.GetBlockBlobClient(tempBlobName);
+
+        // Delete the blob - this automatically removes all uncommitted blocks associated with it
+        await blockBlobClient.DeleteIfExistsAsync();
     }
 }

@@ -1,4 +1,6 @@
+using System.Text.Json;
 using deeplynx.datalayer.Models;
+using deeplynx.helpers;
 using deeplynx.interfaces;
 using deeplynx.models;
 using Microsoft.EntityFrameworkCore;
@@ -8,14 +10,16 @@ namespace deeplynx.business;
 public class HistoricalRecordBusiness : IHistoricalRecordBusiness
 {
     private readonly DeeplynxContext _context;
+    private readonly ISensitivityLabelService _sensitivityLabelService;
 
     /// <summary>
     ///     Initializes a new instance of the <see cref="HistoricalRecordBusiness" /> class.
     /// </summary>
     /// <param name="context">The database context used for the record operations.</param>
-    public HistoricalRecordBusiness(DeeplynxContext context)
+    public HistoricalRecordBusiness(DeeplynxContext context, ISensitivityLabelService sensitivityLabelService)
     {
         _context = context;
+        _sensitivityLabelService = sensitivityLabelService;
     }
 
     /// <summary>
@@ -28,6 +32,7 @@ public class HistoricalRecordBusiness : IHistoricalRecordBusiness
     /// <param name="hideArchived">(Optional) Flag indicating whether to hide archived records from the result.</param>
     /// <returns>An array of records</returns>
     public async Task<IEnumerable<HistoricalRecordResponseDto>> GetAllHistoricalRecords(
+        long currentUserId,
         long projectId,
         long organizationId,
         long? dataSourceId = null,
@@ -55,12 +60,36 @@ public class HistoricalRecordBusiness : IHistoricalRecordBusiness
             .GroupBy(e => e.RecordId)
             .Select(g => g.OrderByDescending(r => r.LastUpdatedAt).FirstOrDefault())
             .ToListAsync();
+        
+        // Get user's authorized labels
+        var userAuthorizedLabels =
+            await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
+                currentUserId, organizationId, projectId, "read record");
 
         // need to check for archived at after DB retrieval since filtering archived results before querying could
         // result in inaccurate "most recent" results if a record has been archived
         if (hideArchived && records.Count > 0) records = records.Where(r => !r.IsArchived).ToList();
 
-        return records
+        var liveRecords = await _context.Records
+            .Include(r => r.Labels)
+            .Where(r => r.ProjectId == projectId && r.OrganizationId == organizationId).ToListAsync();
+    
+        var authorizedHistoricalRecords = records.Where(r => 
+        {
+            // Find the live record that matches this historical record's originalId
+            var liveRecord = liveRecords.FirstOrDefault(lr => lr.Id == r.RecordId);
+    
+            // If no live record found, exclude this historical record
+            if (liveRecord == null) return false;
+    
+            // If the live record has no labels, include this historical record
+            if (liveRecord.Labels == null || !liveRecord.Labels.Any()) return true;
+    
+            // If the live record has labels, check if ALL labels are in the authorized list
+            return liveRecord.Labels.All(label => userAuthorizedLabels.Contains(label.Id));
+        }).ToList();
+
+        return authorizedHistoricalRecords
             .Select(r => new HistoricalRecordResponseDto
             {
                 Id = r.RecordId,
@@ -78,6 +107,7 @@ public class HistoricalRecordBusiness : IHistoricalRecordBusiness
                 ProjectId = r.ProjectId,
                 ProjectName = r.ProjectName,
                 Tags = r.Tags,
+                Labels = r.Labels,
                 LastUpdatedBy = r.LastUpdatedBy,
                 IsArchived = r.IsArchived,
                 LastUpdatedAt = r.LastUpdatedAt
@@ -90,10 +120,11 @@ public class HistoricalRecordBusiness : IHistoricalRecordBusiness
     /// <param name="recordId">The ID of the record to list history for</param>
     /// <param name="organizationId">The ID of the organization under which project exists</param>
     /// <returns>An array of record instances for the given record</returns>
-    public async Task<IEnumerable<HistoricalRecordResponseDto>> GetHistoryForRecord(long recordId, long organizationId)
+    public async Task<IEnumerable<HistoricalRecordResponseDto>> GetHistoryForRecord(long currentUserId, long recordId, long organizationId)
     {
-        var record =
-            await _context.Records.FirstOrDefaultAsync(r => r.Id == recordId && r.OrganizationId == organizationId);
+        var record = await _context.Records
+            .Include(r => r.Labels)
+            .FirstOrDefaultAsync(r => r.Id == recordId && r.OrganizationId == organizationId);
         if (record == null) throw new KeyNotFoundException($"Record with id {recordId} not found");
 
         var historicalRecord = await _context.HistoricalRecords
@@ -127,7 +158,7 @@ public class HistoricalRecordBusiness : IHistoricalRecordBusiness
     }
 
     /// <summary>
-    ///     Find an record at a given point in time
+    ///     Find a record at a given point in time
     /// </summary>
     /// <param name="recordId">The ID of the record to retrieve</param>
     /// <param name="organizationId">The ID of the organization under which project exists</param>
@@ -136,6 +167,7 @@ public class HistoricalRecordBusiness : IHistoricalRecordBusiness
     /// <returns>A record that matches the applied filters.</returns>
     /// <exception cref="KeyNotFoundException">Returned if record not found</exception>
     public async Task<HistoricalRecordResponseDto> GetHistoricalRecord(
+        long currentUserId,
         long recordId,
         long organizationId,
         DateTime? pointInTime,
@@ -156,7 +188,8 @@ public class HistoricalRecordBusiness : IHistoricalRecordBusiness
                 .OrderByDescending(r => r.LastUpdatedAt);
         }
 
-        var record = await recordQuery.FirstOrDefaultAsync();
+        var record = await recordQuery
+            .FirstOrDefaultAsync();
 
         if (record == null)
             throw new KeyNotFoundException(

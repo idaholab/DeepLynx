@@ -13,11 +13,11 @@ public interface IOrganizationService
 public class OrganizationService : IOrganizationService
 {
     private readonly DeeplynxContext _dbContext;
-    private readonly ILogger<SysAdminService> _logger;
+    private readonly ILogger<AdminService> _logger;
 
     public OrganizationService(
         DeeplynxContext dbContext,
-        ILogger<SysAdminService> logger)
+        ILogger<AdminService> logger)
     {
         _dbContext = dbContext;
         _logger = logger;

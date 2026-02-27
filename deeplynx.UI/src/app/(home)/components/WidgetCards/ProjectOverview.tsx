@@ -12,8 +12,8 @@ import { useEffect, useState } from "react";
 
 const ProjectOverviewWidget = () => {
   const { t } = useLanguage();
-  const { project, hasLoaded } = useProjectSession();
-  const { organization, setOrganization } = useOrganizationSession();
+  const { project } = useProjectSession();
+  const { organization } = useOrganizationSession();
   const [stats, setStats] = useState<{
     classes: number;
     records: number;

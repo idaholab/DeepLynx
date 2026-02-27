@@ -74,7 +74,7 @@ export default function BulkUploadSection(props: BulkUploadSectionProps) {
       if (parseResult.success) {
         props.setParsedCsvData(parseResult.data);
         toast.success(
-          `${t.translations.SUCESSFULLY_PARSED} ${parseResult.data.length} ${t.translations.ROWS_FROM_CSV}`
+          `${t.translations.SUCCESSFULLY_PARSED} ${parseResult.data.length} ${t.translations.ROWS_FROM_CSV}`,
         );
 
         if (!props.projectId || !props.dataSourceId || !props.organizationId) {
@@ -90,18 +90,18 @@ export default function BulkUploadSection(props: BulkUploadSectionProps) {
             parseResult.data,
             props.projectId,
             props.dataSourceId,
-            props.organizationId
+            props.organizationId,
           );
 
           props.setValidationResult(validationResult);
 
           if (validationResult.isValid) {
             toast.success(
-              `${t.translations.ALL} ${validationResult.validCount} ${t.translations.RECORDS_VALIDATED_SUCCESSFULLY}`
+              `${t.translations.ALL} ${validationResult.validCount} ${t.translations.RECORDS_VALIDATED_SUCCESSFULLY}`,
             );
           } else {
             toast.error(
-              `${t.translations.VALIDATION_FAILED}: ${validationResult.invalidCount} ${t.translations.OF} ${validationResult.totalRows} ${t.translations.RECORDS_HAVE_ERRORS}`
+              `${t.translations.VALIDATION_FAILED}: ${validationResult.invalidCount} ${t.translations.OF} ${validationResult.totalRows} ${t.translations.RECORDS_HAVE_ERRORS}`,
             );
           }
         } catch (error) {
