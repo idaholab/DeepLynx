@@ -3,104 +3,66 @@
 import { useLanguage } from "@/app/contexts/Language";
 import { useOrganizationSession } from "@/app/contexts/OrganizationSessionProvider";
 import {
-  uploadFile,
-  uploadFilesBatch,
   cancelChunkedUpload,
   cancelCurrentUpload,
+  CHUNK_THRESHOLD,
+  uploadFile,
+  uploadFilesBatch,
 } from "@/app/lib/client_service/file_upload_services.client";
-import { uploadTimeseriesFile } from "@/app/lib/client_service/timeseries_services.client";
 import { uploadBulkMetadata } from "@/app/lib/client_service/metadata_service.client";
-import { useEffect, useMemo } from "react";
-import toast from "react-hot-toast";
+import { uploadTimeseriesFile } from "@/app/lib/client_service/timeseries_services.client";
 import { parseBackendErrors } from "@/app/lib/error_parser";
 import { createUploadToastManager } from "@/app/lib/uploadToastManager";
-
-// Components
+import { useEffect, useMemo } from "react";
+import toast from "react-hot-toast";
 import FileDetailsCard from "../components/FileDetailCard";
 import SelectedFilesCard from "../components/SelectedFilesCard";
-
-// Hooks
-import { useUploadState } from "./hooks/useUploadState";
 import { useBulkUploadState } from "./hooks/useBulkUploadState";
 import { useProjectResources } from "./hooks/useProjectResources";
-
-// Types
-import type {
-  ExistingFile,
-  RecentUpload,
-  UploadProgressEvent,
-} from "../types/types";
-import ProjectResourceSelectors from "./components/ProjectResourceSelectors";
-import BulkUploadSection from "./components/BulkUploadSection";
-import FileUploadSection from "./components/FileUploadSection";
+import { useUploadState } from "./hooks/useUploadState";
 import {
   ArrowUpOnSquareStackIcon,
   DocumentIcon,
 } from "@heroicons/react/24/outline";
-
-// ============================================================================
-// TYPES
-// ============================================================================
+import type { ExistingFile, UploadProgressEvent } from "../types/types";
+import BulkUploadSection from "./components/BulkUploadSection";
+import FileUploadSection from "./components/FileUploadSection";
+import ProjectResourceSelectors from "./components/ProjectResourceSelectors";
 
 type Props = {
   initialAvailableFiles: ExistingFile[];
 };
 
-// ============================================================================
-// MAIN COMPONENT
-// ============================================================================
-
 export default function UploadCenterClient({ initialAvailableFiles }: Props) {
   const { t } = useLanguage();
   const { organization } = useOrganizationSession();
-
-  // ============================================================================
-  // STATE MANAGEMENT (via Custom Hooks)
-  // ============================================================================
+  const organizationId = organization?.organizationId;
 
   const fileUploadState = useUploadState();
   const bulkUploadState = useBulkUploadState();
-  const projectResources = useProjectResources(
-    organization?.organizationId as number,
-  );
-
-  const { setTargetFileId, setMulti } = fileUploadState;
-  const { multi } = fileUploadState;
+  const projectResources = useProjectResources(organizationId as number);
   const uploadToastManager = useMemo(() => createUploadToastManager(), []);
-
-  // ============================================================================
-  // COMPUTED VALUES
-  // ============================================================================
+  const { setTargetFileId, setMulti, multi } = fileUploadState;
+  const { projectId, dataSourceId, objectStorageId, projects, dataSources } =
+    projectResources;
+  const selectedFiles = fileUploadState.selectedFiles;
 
   const needsTarget =
     fileUploadState.uploadType === "version" ||
     fileUploadState.uploadType === "properties";
   const isMultiAllowed = fileUploadState.uploadType === "new";
   const showRightPanel =
-    fileUploadState.selectedFiles.length > 0 &&
-    fileUploadState.uploadMode === "file";
-
-  const availableFiles = useMemo(
-    () => initialAvailableFiles,
-    [initialAvailableFiles],
-  );
-
-  const selectedTarget = useMemo(
-    () =>
-      availableFiles.find((f) => f.id === fileUploadState.targetFileId) ?? null,
-    [availableFiles, fileUploadState.targetFileId],
-  );
+    selectedFiles.length > 0 && fileUploadState.uploadMode === "file";
+  const selectedTarget =
+    initialAvailableFiles.find((f) => f.id === fileUploadState.targetFileId) ??
+    null;
 
   const canUpload =
-    fileUploadState.selectedFiles.length > 0 &&
-    !!projectResources.projectId &&
-    !!projectResources.dataSourceId &&
-    !!projectResources.objectStorageId &&
+    selectedFiles.length > 0 &&
+    !!projectId &&
+    !!dataSourceId &&
+    !!objectStorageId &&
     (!needsTarget || !!fileUploadState.targetFileId);
-
-  // ============================================================================
-  // EFFECTS
-  // ============================================================================
 
   // Clear target file when not needed
   useEffect(() => {
@@ -114,28 +76,37 @@ export default function UploadCenterClient({ initialAvailableFiles }: Props) {
     }
   }, [isMultiAllowed, multi, setMulti]);
 
-  // ============================================================================
-  // FILE UPLOAD HANDLERS
-  // ============================================================================
-
   const handleFileUpload = async () => {
-    if (
-      !projectResources.projectId ||
-      fileUploadState.selectedFiles.length === 0
-    ) {
+    if (!organizationId || !projectId || selectedFiles.length === 0) {
       toast.error("Select a project and at least one file.");
       return;
     }
 
     fileUploadState.setIsUploading(true);
     fileUploadState.setUploadProgress(null);
-    uploadToastManager.show({
-      title: "Uploading file",
-      message: "Preparing upload...",
-    });
 
     let latestProgress: UploadProgressEvent | null = null;
     let cancelling = false;
+    const selectedSingleFile = selectedFiles[0];
+    const selectedMetadata = fileUploadState.filesMetadata[0];
+    const showChunkedProgressToast =
+      selectedFiles.length === 1 &&
+      !!selectedSingleFile &&
+      !selectedMetadata?.isTimeSeries &&
+      selectedSingleFile.size > CHUNK_THRESHOLD;
+    const uploadContext = {
+      organizationId,
+      projectId,
+      dataSourceId,
+      objectStorageId,
+    };
+
+    if (showChunkedProgressToast) {
+      uploadToastManager.show({
+        title: "Uploading file",
+        message: "Preparing upload...",
+      });
+    }
 
     const showProgressToast = (progress: UploadProgressEvent) => {
       uploadToastManager.show({
@@ -153,16 +124,12 @@ export default function UploadCenterClient({ initialAvailableFiles }: Props) {
       if (!latestProgress?.uploadId) return;
 
       cancelling = true;
-      fileUploadState.setIsCancelling(true);
       showProgressToast(latestProgress);
       cancelCurrentUpload();
 
       try {
         await cancelChunkedUpload({
-          organizationId: organization?.organizationId as number,
-          projectId: projectResources.projectId,
-          dataSourceId: projectResources.dataSourceId,
-          objectStorageId: projectResources.objectStorageId,
+          ...uploadContext,
           uploadId: latestProgress.uploadId,
         });
       } catch (err) {
@@ -171,46 +138,10 @@ export default function UploadCenterClient({ initialAvailableFiles }: Props) {
     };
 
     try {
-      if (fileUploadState.selectedFiles.length === 1) {
-        const file = fileUploadState.selectedFiles[0];
-        const metadata = fileUploadState.filesMetadata[0] ?? {};
-
-        // Check if this is a timeseries file
-        if (metadata.isTimeSeries) {
-          // Use timeseries upload endpoint
-          await uploadTimeseriesFile(
-            organization?.organizationId as number,
-            Number(projectResources.projectId),
-            Number(projectResources.dataSourceId),
-            file,
-          );
-          uploadToastManager.success("Timeseries file uploaded successfully!");
-        } else {
-          // Use regular file upload
-          await uploadFile({
-            organizationId: organization?.organizationId as number,
-            projectId: projectResources.projectId,
-            dataSourceId: projectResources.dataSourceId,
-            objectStorageId: projectResources.objectStorageId,
-            file,
-            name: metadata.name || file.name,
-            description: metadata.description || "",
-            metadataFile: metadata.metadataFile,
-            onProgress: (progress) => {
-              latestProgress = progress;
-              fileUploadState.setUploadProgress(progress);
-              showProgressToast(progress);
-            },
-          });
-          uploadToastManager.success("File uploaded successfully!");
-        }
-      } else {
+      if (selectedFiles.length > 1) {
         const results = await uploadFilesBatch({
-          organizationId: organization?.organizationId as number,
-          projectId: projectResources.projectId,
-          dataSourceId: projectResources.dataSourceId,
-          objectStorageId: projectResources.objectStorageId,
-          files: fileUploadState.selectedFiles,
+          ...uploadContext,
+          files: selectedFiles,
         });
 
         const ok = results.filter((r) => r.status === "fulfilled").length;
@@ -219,6 +150,35 @@ export default function UploadCenterClient({ initialAvailableFiles }: Props) {
           `Uploaded ${ok} file(s)${fail ? ` • ${fail} failed` : ""}`,
         );
         if (fail) console.warn("Batch upload failures:", results);
+        fileUploadState.resetFileUpload();
+        return;
+      }
+
+      const file = selectedFiles[0];
+      const metadata = fileUploadState.filesMetadata[0] ?? {};
+
+      if (metadata.isTimeSeries) {
+        await uploadTimeseriesFile(
+          Number(organizationId),
+          Number(projectId),
+          Number(dataSourceId),
+          file,
+        );
+        uploadToastManager.success("Timeseries file uploaded successfully!");
+      } else {
+        await uploadFile({
+          ...uploadContext,
+          file,
+          name: metadata.name || file.name,
+          description: metadata.description || "",
+          metadataFile: metadata.metadataFile,
+          onProgress: (progress) => {
+            latestProgress = progress;
+            fileUploadState.setUploadProgress(progress);
+            if (showChunkedProgressToast) showProgressToast(progress);
+          },
+        });
+        uploadToastManager.success("File uploaded successfully!");
       }
 
       fileUploadState.resetFileUpload();
@@ -232,13 +192,8 @@ export default function UploadCenterClient({ initialAvailableFiles }: Props) {
       fileUploadState.setUploadProgress(null);
     } finally {
       fileUploadState.setIsUploading(false);
-      fileUploadState.setIsCancelling(false);
     }
   };
-
-  // ============================================================================
-  // BULK UPLOAD HANDLERS
-  // ============================================================================
 
   const handleBulkUpload = async () => {
     if (
@@ -249,12 +204,12 @@ export default function UploadCenterClient({ initialAvailableFiles }: Props) {
       return;
     }
 
-    if (!projectResources.projectId || !projectResources.dataSourceId) {
+    if (!projectId || !dataSourceId) {
       toast.error("Please select project and data source");
       return;
     }
 
-    if (!organization?.organizationId) {
+    if (!organizationId) {
       toast.error("Organization not found");
       return;
     }
@@ -262,27 +217,24 @@ export default function UploadCenterClient({ initialAvailableFiles }: Props) {
     bulkUploadState.setIsUploading(true);
     bulkUploadState.setBackendErrors([]);
     bulkUploadState.setUploadProgress(0);
+    let progressInterval: ReturnType<typeof setInterval> | null = null;
 
     try {
-      // Progress simulation
-      const progressInterval = setInterval(() => {
+      progressInterval = setInterval(() => {
         bulkUploadState.setUploadProgress((prev) => {
           if (prev >= 90) return prev;
           return prev + 10;
         });
       }, 200);
 
-      // Upload
       await uploadBulkMetadata(
-        organization.organizationId as number,
-        Number(projectResources.projectId),
-        Number(projectResources.dataSourceId),
+        Number(organizationId),
+        Number(projectId),
+        Number(dataSourceId),
         bulkUploadState.validationResult.validRecords,
       );
 
-      clearInterval(progressInterval);
       bulkUploadState.setUploadProgress(100);
-
       await new Promise((resolve) => setTimeout(resolve, 500));
 
       toast.success(
@@ -294,22 +246,18 @@ export default function UploadCenterClient({ initialAvailableFiles }: Props) {
       console.error("Upload error:", error);
 
       bulkUploadState.setUploadProgress(0);
-
-      // Extract error messages
       const errorMessages = extractErrorMessages(error);
-
       const parsedErrors = parseBackendErrors(errorMessages);
       bulkUploadState.setBackendErrors(parsedErrors);
 
       toast.error("Upload failed. Please check the error details below.");
     } finally {
+      if (progressInterval) {
+        clearInterval(progressInterval);
+      }
       bulkUploadState.setIsUploading(false);
     }
   };
-
-  // ============================================================================
-  // RENDER
-  // ============================================================================
 
   return (
     <div>
@@ -398,7 +346,7 @@ export default function UploadCenterClient({ initialAvailableFiles }: Props) {
                 handleMetadataChange={fileUploadState.handleMetadataChange}
                 targetFileId={fileUploadState.targetFileId}
                 setTargetFileId={fileUploadState.setTargetFileId}
-                availableFiles={availableFiles}
+                availableFiles={initialAvailableFiles}
                 needsTarget={needsTarget}
                 isMultiAllowed={isMultiAllowed}
                 isUploading={fileUploadState.isUploading}
@@ -406,11 +354,11 @@ export default function UploadCenterClient({ initialAvailableFiles }: Props) {
             ) : (
               <BulkUploadSection
                 {...bulkUploadState}
-                projectId={projectResources.projectId}
-                dataSourceId={projectResources.dataSourceId}
-                organizationId={organization?.organizationId as number}
-                projects={projectResources.projects}
-                dataSources={projectResources.dataSources}
+                projectId={projectId}
+                dataSourceId={dataSourceId}
+                organizationId={organizationId as number}
+                projects={projects}
+                dataSources={dataSources}
               />
             )}
           </div>
@@ -431,19 +379,13 @@ export default function UploadCenterClient({ initialAvailableFiles }: Props) {
               canUpload={canUpload}
               isUploading={fileUploadState.isUploading}
             />
-            {/* Upload Status: Spinner + Progress */}
-            {fileUploadState.isUploading && (
-              <>
-                {/* Show spinner while waiting for progress to start */}
-                {!fileUploadState.uploadProgress && (
-                  <div className="mt-4 p-4 bg-base-200 rounded-lg flex flex-col items-center justify-center space-y-3">
-                    <span className="loading loading-spinner loading-lg text-primary"></span>
-                    <p className="text-sm text-base-content/70 text-center">
-                      Preparing upload...
-                    </p>
-                  </div>
-                )}
-              </>
+            {fileUploadState.isUploading && !fileUploadState.uploadProgress && (
+              <div className="mt-4 p-4 bg-base-200 rounded-lg flex flex-col items-center justify-center space-y-3">
+                <span className="loading loading-spinner loading-lg text-primary"></span>
+                <p className="text-sm text-base-content/70 text-center">
+                  Preparing upload...
+                </p>
+              </div>
             )}
           </div>
         )}
@@ -495,17 +437,13 @@ export default function UploadCenterClient({ initialAvailableFiles }: Props) {
                 <p>
                   <strong>{t.translations.PROJECT}:</strong>{" "}
                   {
-                    projectResources.projects.find(
-                      (p) => p.id === Number(projectResources.projectId),
-                    )?.name
+                    projects.find((p) => p.id === Number(projectId))?.name
                   }
                 </p>
                 <p>
                   <strong>{t.translations.DATA_SOURCE}:</strong>{" "}
                   {
-                    projectResources.dataSources.find(
-                      (d) => d.id === Number(projectResources.dataSourceId),
-                    )?.name
+                    dataSources.find((d) => d.id === Number(dataSourceId))?.name
                   }
                 </p>
               </div>
