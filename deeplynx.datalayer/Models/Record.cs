@@ -51,9 +51,6 @@ public partial class Record
     
     [Column("file_type")]
     public string? FileType { get; set; }
-
-    [Column("embedded")] 
-    public bool Embedded { get; set; }
     
     [ForeignKey("ClassId")]
     [InverseProperty("Records")]
