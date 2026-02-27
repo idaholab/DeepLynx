@@ -84,13 +84,16 @@ const RecordInsightChat: React.FC<RecordInsightChatProps> = ({
 }) => {
   const { t } = useLanguage();
   const trimmedRecordName = recordName?.trim() ?? "";
-  const safeRecordName = trimmedRecordName || t.translations.INSIGHT_THIS_RECORD;
+  const safeRecordName =
+    trimmedRecordName || t.translations.INSIGHT_THIS_RECORD;
 
   const messageIdRef = useRef(1);
   const scrollAnchorRef = useRef<HTMLDivElement>(null);
+  const promptInputRef = useRef<HTMLInputElement>(null);
   const readyAudioRef = useRef<HTMLAudioElement | null>(null);
   const responseAudioRef = useRef<HTMLAudioElement | null>(null);
   const previousIngestionStateRef = useRef<IngestionState>("not_queued");
+  const previousIsRespondingRef = useRef(false);
   const [draft, setDraft] = useState("");
   const [isResponding, setIsResponding] = useState(false);
   const [isQueueingUpload, setIsQueueingUpload] = useState(false);
@@ -187,6 +190,15 @@ const RecordInsightChat: React.FC<RecordInsightChatProps> = ({
       block: "end",
     });
   }, [messages, isResponding]);
+
+  useEffect(() => {
+    const justFinishedResponding =
+      previousIsRespondingRef.current && !isResponding;
+    if (justFinishedResponding && !isWidgetCollapsed) {
+      promptInputRef.current?.focus();
+    }
+    previousIsRespondingRef.current = isResponding;
+  }, [isResponding, isWidgetCollapsed]);
 
   useEffect(() => {
     readyAudioRef.current = new Audio("/assets/notification.mp3");
@@ -375,7 +387,9 @@ const RecordInsightChat: React.FC<RecordInsightChatProps> = ({
     <div className="card bg-base-100 shadow-lg">
       <div className="card-body p-4">
         <div className="flex items-center justify-between gap-3">
-          <h3 className="card-title text-base-content">{t.translations.INSIGHT}</h3>
+          <h3 className="card-title text-base-content">
+            {t.translations.INSIGHT}
+          </h3>
           <div className="flex items-center gap-2">
             {!isWidgetCollapsed && (
               <button
@@ -471,14 +485,15 @@ const RecordInsightChat: React.FC<RecordInsightChatProps> = ({
                 void handleSend(prompt);
               }}
             >
-                <input
-                  type="text"
-                  className="input input-bordered w-full"
-                  placeholder={t.translations.INSIGHT_ASK_PLACEHOLDER}
-                  value={draft}
-                  onChange={(e) => setDraft(e.target.value)}
-                  disabled={isResponding}
-                />
+              <input
+                ref={promptInputRef}
+                type="text"
+                className="input input-bordered w-full"
+                placeholder={t.translations.INSIGHT_ASK_PLACEHOLDER}
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+                disabled={isResponding}
+              />
               <button
                 type="submit"
                 className="btn btn-primary"
