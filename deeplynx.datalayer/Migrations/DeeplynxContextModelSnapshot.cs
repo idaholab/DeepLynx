@@ -1374,6 +1374,10 @@ namespace deeplynx.datalayer.Migrations
                         .HasColumnType("text")
                         .HasColumnName("description");
 
+                    b.Property<bool>("Embedded")
+                        .HasColumnType("boolean")
+                        .HasColumnName("embedded");
+
                     b.Property<string>("FileType")
                         .HasColumnType("text")
                         .HasColumnName("file_type");
