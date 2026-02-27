@@ -2,6 +2,7 @@
 
 import React from "react";
 import { ExclamationTriangleIcon } from "@heroicons/react/24/outline";
+import { useLanguage } from "@/app/contexts/Language";
 
 type Props = {
   isOpen: boolean;
@@ -18,19 +19,19 @@ const ConfirmArchiveTagModal: React.FC<Props> = ({
   onConfirm,
   loading = false,
 }) => {
+  const { t } = useLanguage();
+
   return (
     <dialog className={`modal ${isOpen ? "modal-open" : ""}`}>
       <div className="modal-box max-w-sm">
         <div className="flex items-start gap-3">
           <ExclamationTriangleIcon className="w-8 h-8 text-warning" />
           <div>
-            <h3 className="font-bold text-lg">Archive Tag</h3>
+            <h3 className="font-bold text-lg">{t.translations.ARCHIVE_TAG}</h3>
             <p className="text-sm text-base-content/70 mt-1">
-              Are you sure you want to archive{" "}
-              <span className="font-semibold">{tagName}</span>?
-              <br />
-              This tag will no longer be available for new usage, but it can be
-              restored later.
+              {t.translations.ARE_YOU_SURE_YOU_WANT_TO_ARCHIVE}{" "}
+              <span className="font-semibold">{tagName}</span>?<br />
+              {t.translations.ARCHIVED_TAG_RESTORED_LATER}
             </p>
           </div>
         </div>
@@ -41,7 +42,7 @@ const ConfirmArchiveTagModal: React.FC<Props> = ({
             disabled={loading}
             onClick={onClose}
           >
-            Cancel
+            {t.translations.CANCEL}
           </button>
 
           <button
@@ -52,7 +53,7 @@ const ConfirmArchiveTagModal: React.FC<Props> = ({
             {loading ? (
               <span className="loading loading-spinner loading-sm"></span>
             ) : (
-              "Archive"
+              t.translations.ARCHIVE
             )}
           </button>
         </div>

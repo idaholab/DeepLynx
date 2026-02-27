@@ -277,7 +277,6 @@ public class TagBusiness : ITagBusiness
                         && t.OrganizationId == organizationId
                         && !t.IsArchived);
         
-        //if project id supplied, inherit org level roles 
         if (projectId.HasValue)
         {
             tagQuery = tagQuery.Where( r => r.ProjectId == projectId.Value || r.ProjectId == null);

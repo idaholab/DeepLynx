@@ -36,7 +36,7 @@ const ObjectStorageTable = ({ organization }: OrganizationManagementProps) => {
     }
   };
 
-  const handleSelectAll = () => {};
+  const handleSelectAll = () => { };
 
   const handleCheckboxChange = (index: number) => {
     const next = [...selectedOrganizations];
@@ -47,8 +47,6 @@ const ObjectStorageTable = ({ organization }: OrganizationManagementProps) => {
 
   const handleDelete = async (index: number) => {
     try {
-      // await archiveOrganization(organizationId);
-      // setData((prev) => prev.filter((_, i) => i !== index));
     } catch (err) {
       console.error("Failed to delete object storage:", err);
       setError("Failed to delete object storage.");
@@ -56,16 +54,6 @@ const ObjectStorageTable = ({ organization }: OrganizationManagementProps) => {
   };
 
   const handleDeleteSelected = async () => {
-    // const selectedOrgIds = data
-    //     .filter((_, i) => selectedOrganizations[i])
-    //     .map((org) => org.id);
-    // try {
-    //     await Promise.all(selectedOrgIds.map((orgId) => archiveOrganization(orgId as number)));
-    //     setData((prev) => prev.filter((_, i) => !selectedOrganizations[i]));
-    // } catch (err) {
-    //     console.error("Failed to delete selected organizations:", err);
-    //     setError("Failed to delete selected organizations.");
-    // }
   };
 
   const multipleSelected = () =>
@@ -81,74 +69,6 @@ const ObjectStorageTable = ({ organization }: OrganizationManagementProps) => {
     setSelectedOrganizationDescription(organizationDescription);
     setEditOrganizationModal(true);
   };
-
-  const columns: Column<OrganizationResponseDto>[] = [
-    {
-      header: (
-        <input
-          type="checkbox"
-          className="checkbox"
-          checked={selectAll}
-          onChange={handleSelectAll}
-        />
-      ),
-      cell: (_row, index) => (
-        <input
-          type="checkbox"
-          className="checkbox"
-          checked={!!selectedOrganizations[index]}
-          onChange={() => handleCheckboxChange(index)}
-        />
-      ),
-      sortable: false,
-    },
-    {
-      header: t.translations.NAME,
-      data: "name" as keyof OrganizationResponseDto,
-    },
-    {
-      header: t.translations.DESCRIPTION,
-      data: "description" as keyof OrganizationResponseDto,
-    },
-    {
-      header: "",
-      cell: (row) => (
-        <div className="flex">
-          <button
-            onClick={() =>
-              openEditModal(
-                row.id as number,
-                row.name,
-                row.description as string
-              )
-            }
-          >
-            <PencilIcon className="size-6 text-secondary" />
-          </button>
-        </div>
-      ),
-      sortable: false,
-    },
-    {
-      header: (
-        <div className="flex">
-          {multipleSelected() && (
-            <button onClick={handleDeleteSelected}>
-              <TrashIcon className="size-6 text-red-500" />
-            </button>
-          )}
-        </div>
-      ),
-      cell: (_row, index) => (
-        <div className="flex">
-          <button onClick={() => handleDelete(index)}>
-            <TrashIcon className="size-6 text-red-500" />
-          </button>
-        </div>
-      ),
-      sortable: false,
-    },
-  ];
 
   return (
     <div>

@@ -13,32 +13,32 @@ namespace deeplynx.tests;
 [Collection("Test Suite Collection")]
 public class InvitationBusinessTests : IntegrationTestBase
 {
-    private InvitationBusiness _invitationBusiness = null!;
+    private BulkCopyUpsertExecutor _bulkCopyUpsertExecutor = null!;
     private ClassBusiness _classBusiness = null!;
     private Mock<IDataSourceBusiness> _dataSourceBusiness = null!;
     private EventBusiness _eventBusiness = null!;
+    private InvitationBusiness _invitationBusiness = null!;
     private Mock<IHubContext<EventNotificationHub>> _mockHubContext = null!;
     private Mock<ILogger<ProjectBusiness>> _mockLogger = null!;
-    private Mock<ILogger<OrganizationBusiness>> _mockOrgLogger = null!;
     private Mock<ILogger<NotificationBusiness>> _mockNotificationLogger = null!;
+    private Mock<ILogger<OrganizationBusiness>> _mockOrgLogger = null!;
     private Mock<INotificationBusiness> _notificationBusiness = null!;
     private Mock<IObjectStorageBusiness> _objectStorageBusiness = null!;
-    private UserBusiness _userBusiness = null!;
     private OrganizationBusiness _organizationBusiness = null!;
     private ProjectBusiness _projectBusiness = null!;
     private Mock<IRecordBusiness> _recordBusiness = null!;
     private Mock<IRelationshipBusiness> _relationshipBusiness = null!;
     private Mock<IRoleBusiness> _roleBusiness = null!;
-    private BulkCopyUpsertExecutor _bulkCopyUpsertExecutor = null!;
+    private UserBusiness _userBusiness = null!;
+    public long gid; // group ID
 
     public long oid; // organization ID
     public long oid2; // organization 2 ID
     public long pid; // project ID
     public long pid2; // project 2 ID
+    public long rid; // role ID
     public long uid; // existing user ID
     public long uid2; // existing user 2 ID
-    public long rid; // role ID
-    public long gid; // group ID
 
     public InvitationBusinessTests(TestSuiteFixture fixture) : base(fixture)
     {
@@ -62,7 +62,7 @@ public class InvitationBusinessTests : IntegrationTestBase
         _objectStorageBusiness = new Mock<IObjectStorageBusiness>();
         _roleBusiness = new Mock<IRoleBusiness>();
         _organizationBusiness = new OrganizationBusiness(
-            Context, _eventBusiness, _roleBusiness.Object, _mockOrgLogger.Object);
+            Context, _eventBusiness, _roleBusiness.Object, _mockOrgLogger.Object, _objectStorageBusiness.Object);
 
         _classBusiness = new ClassBusiness(
             Context, _recordBusiness.Object,
@@ -177,81 +177,110 @@ public class InvitationBusinessTests : IntegrationTestBase
         await Context.SaveChangesAsync();
     }
 
-    #region InviteAndAddUserToHierarchy - Existing User Tests
+    #region Existing User by Email - Best Effort Email
 
     [Fact]
-    public async Task InviteAndAddUserToHierarchy_Success_WhenUserExistsAndNotInOrg()
+    public async Task InviteByEmail_Success_WhenUserExistsAndNotInOrg_SendsEmail()
     {
         // Arrange
         var userEmail = "existing.user2@test.com";
+        _notificationBusiness.Setup(n =>
+                n.SendEmail(userEmail, It.IsAny<string>(), It.IsAny<bool>(), It.IsAny<long?>(), It.IsAny<long?>()))
+            .ReturnsAsync(true);
 
         // Act
         var result = await _invitationBusiness.InviteAndAddUserToHierarchy(
-            oid2, null, null, userEmail, null);
+            oid2, null, null, null, null, userEmail);
 
         // Assert
         Assert.True(result);
-        Assert.True(await Context.OrganizationUsers.AnyAsync(
-            ou => ou.UserId == uid2 && ou.OrganizationId == oid2));
+        Assert.True(await Context.OrganizationUsers.AnyAsync(ou => ou.UserId == uid2 && ou.OrganizationId == oid2));
+        _notificationBusiness.Verify(
+            n => n.SendEmail(userEmail, "Existing User 2", It.IsAny<bool>(), It.IsAny<long?>(), It.IsAny<long?>()),
+            Times.Once);
     }
-    
+
     [Fact]
-    public async Task InviteAndAddUserToHierarchy_Success_WhenEmailIsDifferentCase()
+    public async Task InviteByEmail_Success_WhenEmailIsDifferentCase()
     {
         // Arrange
-        var userEmail = "ExistIng.User2@test.com";
+        var userEmail = "ExistIng.User2@TEST.com";
+        _notificationBusiness.Setup(n =>
+                n.SendEmail(userEmail, It.IsAny<string>(), It.IsAny<bool>(), It.IsAny<long?>(), It.IsAny<long?>()))
+            .ReturnsAsync(true);
 
         // Act
         var result = await _invitationBusiness.InviteAndAddUserToHierarchy(
-            oid2, null, null, userEmail, null);
+            oid2, null, null, null, null, userEmail);
 
         // Assert
         Assert.True(result);
-        Assert.True(await Context.OrganizationUsers.AnyAsync(
-            ou => ou.UserId == uid2 && ou.OrganizationId == oid2));
+        Assert.True(await Context.OrganizationUsers.AnyAsync(ou => ou.UserId == uid2 && ou.OrganizationId == oid2));
     }
 
     [Fact]
-    public async Task InviteAndAddUserToHierarchy_Success_WhenUserExistsAndAlreadyInOrg()
+    public async Task InviteByEmail_Success_WhenUserExistsAndAlreadyInOrg_NoEmailSent()
     {
         // Arrange
         var userEmail = "existing.user@test.com";
+        _notificationBusiness.Setup(n =>
+                n.SendEmail(userEmail, It.IsAny<string>(), It.IsAny<bool>(), It.IsAny<long?>(), It.IsAny<long?>()))
+            .ReturnsAsync(true);
 
         // Act
         var result = await _invitationBusiness.InviteAndAddUserToHierarchy(
-            oid, null, null, userEmail, null);
+            oid, null, null, null, null, userEmail);
 
         // Assert
         Assert.True(result);
         var orgUserCount = await Context.OrganizationUsers
             .CountAsync(ou => ou.UserId == uid && ou.OrganizationId == oid);
         Assert.Equal(1, orgUserCount); // Should still only have one entry
+
+        // CRITICAL: No email should be sent when user is already in org
+        _notificationBusiness.Verify(
+            n => n.SendEmail(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<bool>(), It.IsAny<long?>(),
+                It.IsAny<long?>()),
+            Times.Never);
     }
 
     [Fact]
-    public async Task InviteAndAddUserToHierarchy_Success_WhenUserExistsAndNotInProject()
+    public async Task InviteByEmail_Success_WhenUserExistsAndNotInProject_SendsEmail()
     {
         // Arrange
         var userEmail = "existing.user2@test.com";
+        _notificationBusiness.Setup(n =>
+                n.SendEmail(userEmail, It.IsAny<string>(), It.IsAny<bool>(), It.IsAny<long?>(), It.IsAny<long?>()))
+            .ReturnsAsync(true);
 
         // Act
         var result = await _invitationBusiness.InviteAndAddUserToHierarchy(
-            oid, pid, rid, userEmail, null);
+            oid, pid, null, rid, null, userEmail);
 
         // Assert
         Assert.True(result);
-        Assert.True(await Context.OrganizationUsers.AnyAsync(
-            ou => ou.UserId == uid2 && ou.OrganizationId == oid));
-        Assert.True(await Context.ProjectMembers.AnyAsync(
-            pm => pm.UserId == uid2 && pm.ProjectId == pid));
+        Assert.True(await Context.OrganizationUsers.AnyAsync(ou => ou.UserId == uid2 && ou.OrganizationId == oid));
+
+        var projectMember =
+            await Context.ProjectMembers.FirstOrDefaultAsync(pm => pm.UserId == uid2 && pm.ProjectId == pid);
+        Assert.NotNull(projectMember);
+        Assert.Equal(rid, projectMember.RoleId);
+
+        // Email should be sent when user is newly added to project
+        _notificationBusiness.Verify(
+            n => n.SendEmail(userEmail, "Existing User 2", It.IsAny<bool>(), It.IsAny<long?>(), It.IsAny<long?>()),
+            Times.Once);
     }
 
     [Fact]
-    public async Task InviteAndAddUserToHierarchy_Success_WhenUserExistsAndAlreadyInProject()
+    public async Task InviteByEmail_Success_WhenUserExistsAndAlreadyInProject_NoEmailSent()
     {
         // Arrange
         var userEmail = "existing.user@test.com";
-        
+        _notificationBusiness.Setup(n =>
+                n.SendEmail(userEmail, It.IsAny<string>(), It.IsAny<bool>(), It.IsAny<long?>(), It.IsAny<long?>()))
+            .ReturnsAsync(true);
+
         // Add user to project first
         var projectMember = new ProjectMember
         {
@@ -264,30 +293,403 @@ public class InvitationBusinessTests : IntegrationTestBase
 
         // Act
         var result = await _invitationBusiness.InviteAndAddUserToHierarchy(
-            oid, pid, rid, userEmail, null);
+            oid, pid, null, rid, null, userEmail);
 
         // Assert
         Assert.True(result);
         var projectMemberCount = await Context.ProjectMembers
             .CountAsync(pm => pm.UserId == uid && pm.ProjectId == pid);
         Assert.Equal(1, projectMemberCount); // Should still only have one entry
+
+        // CRITICAL: No email should be sent when user is already in project
+        _notificationBusiness.Verify(
+            n => n.SendEmail(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<bool>(), It.IsAny<long?>(),
+                It.IsAny<long?>()),
+            Times.Never);
     }
 
     [Fact]
-    public async Task InviteAndAddUserToHierarchy_Success_WhenUserInGroupAlreadyInProject()
+    public async Task InviteByEmail_Success_WhenUserInGroupAlreadyInProject_AddsDirectMembershipAndSendsEmail()
     {
         // Arrange
         var userEmail = "existing.user2@test.com";
-        
+        _notificationBusiness.Setup(n =>
+                n.SendEmail(userEmail, It.IsAny<string>(), It.IsAny<bool>(), It.IsAny<long?>(), It.IsAny<long?>()))
+            .ReturnsAsync(true);
+
         var user = await Context.Users.FirstOrDefaultAsync(u => u.Email == userEmail);
         Assert.NotNull(user);
-        
+
+        // Add user to group
         var group = await Context.Groups.FirstOrDefaultAsync(g => g.Id == gid);
         Assert.NotNull(group);
-        
         group.Users.Add(user);
 
-        // Add group to project
+        // Add group to project with one role
+        var groupProjectMember = new ProjectMember
+        {
+            ProjectId = pid,
+            GroupId = gid,
+            RoleId = rid // Group has role 'rid'
+        };
+        Context.ProjectMembers.Add(groupProjectMember);
+        await Context.SaveChangesAsync();
+
+        // Create a second role for direct assignment
+        var directRole = new Role
+        {
+            Name = "Direct Role",
+            OrganizationId = oid,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid
+        };
+        Context.Roles.Add(directRole);
+        await Context.SaveChangesAsync();
+        var directRoleId = directRole.Id;
+
+        // Act - Invite user directly with different role
+        var result = await _invitationBusiness.InviteAndAddUserToHierarchy(
+            oid, pid, null, directRoleId, null, userEmail);
+
+        // Assert
+        Assert.True(result);
+
+        // CRITICAL: User should now have BOTH memberships
+        var groupMembership = await Context.ProjectMembers
+            .FirstOrDefaultAsync(pm => pm.GroupId == gid && pm.ProjectId == pid && pm.RoleId == rid);
+        Assert.NotNull(groupMembership); // Group membership still exists
+
+        var directMembership = await Context.ProjectMembers
+            .FirstOrDefaultAsync(pm => pm.UserId == uid2 && pm.ProjectId == pid && pm.RoleId == directRoleId);
+        Assert.NotNull(directMembership); // Direct membership now exists
+
+        // CRITICAL: Email should be sent about the direct role assignment
+        _notificationBusiness.Verify(
+            n => n.SendEmail(userEmail, "Existing User 2", false, oid, pid),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task InviteByEmail_Success_WhenEmailSendFails_ExistingUser()
+    {
+        // Arrange - Email send failure should NOT cause failure for existing users
+        var userEmail = "existing.user2@test.com";
+        _notificationBusiness.Setup(n =>
+                n.SendEmail(userEmail, It.IsAny<string>(), It.IsAny<bool>(), It.IsAny<long?>(), It.IsAny<long?>()))
+            .ReturnsAsync(false);
+
+        // Act
+        var result = await _invitationBusiness.InviteAndAddUserToHierarchy(
+            oid, null, null, null, null, userEmail);
+
+        // Assert - Should still succeed (best-effort)
+        Assert.True(result);
+        Assert.True(await Context.OrganizationUsers.AnyAsync(ou => ou.UserId == uid2 && ou.OrganizationId == oid));
+    }
+
+    #endregion
+
+    #region Existing User by UserId - Best Effort Email
+
+    [Fact]
+    public async Task InviteByUserId_Success_WhenUserExistsAndNotInOrg_SendsEmail()
+    {
+        // Arrange
+        _notificationBusiness.Setup(n => n.SendEmail(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<bool>(),
+                It.IsAny<long?>(), It.IsAny<long?>()))
+            .ReturnsAsync(true);
+
+        // Act
+        var result = await _invitationBusiness.InviteAndAddUserToHierarchy(
+            oid2, null, null, null, uid2, null);
+
+        // Assert
+        Assert.True(result);
+        Assert.True(await Context.OrganizationUsers.AnyAsync(ou => ou.UserId == uid2 && ou.OrganizationId == oid2));
+        _notificationBusiness.Verify(
+            n => n.SendEmail("existing.user2@test.com", "Existing User 2", It.IsAny<bool>(), It.IsAny<long?>(),
+                It.IsAny<long?>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task InviteByUserId_Success_WhenUserExistsAndNotInProject_SendsEmail()
+    {
+        // Arrange
+        _notificationBusiness.Setup(n => n.SendEmail(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<bool>(),
+                It.IsAny<long?>(), It.IsAny<long?>()))
+            .ReturnsAsync(true);
+
+        // Act
+        var result = await _invitationBusiness.InviteAndAddUserToHierarchy(
+            oid, pid, null, rid, uid2, null);
+
+        // Assert
+        Assert.True(result);
+        Assert.True(await Context.OrganizationUsers.AnyAsync(ou => ou.UserId == uid2 && ou.OrganizationId == oid));
+
+        var projectMember =
+            await Context.ProjectMembers.FirstOrDefaultAsync(pm => pm.UserId == uid2 && pm.ProjectId == pid);
+        Assert.NotNull(projectMember);
+        Assert.Equal(rid, projectMember.RoleId);
+
+        // Email should be sent when user is newly added to project
+        _notificationBusiness.Verify(
+            n => n.SendEmail(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<bool>(), It.IsAny<long?>(),
+                It.IsAny<long?>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task InviteByUserId_Success_WhenEmailSendFails()
+    {
+        // Arrange - Email send failure should NOT cause failure for existing users
+        _notificationBusiness.Setup(n => n.SendEmail(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<bool>(),
+                It.IsAny<long?>(), It.IsAny<long?>()))
+            .ReturnsAsync(false);
+
+        // Act
+        var result = await _invitationBusiness.InviteAndAddUserToHierarchy(
+            oid2, pid, null, rid, uid2, null);
+
+        // Assert - Should still succeed (best-effort)
+        Assert.True(result);
+        Assert.True(await Context.OrganizationUsers.AnyAsync(ou => ou.UserId == uid2 && ou.OrganizationId == oid2));
+    }
+
+    [Fact]
+    public async Task InviteByUserId_Fails_WhenUserDoesNotExist()
+    {
+        // Arrange
+        var nonExistentUserId = 99999L;
+
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<ArgumentException>(() =>
+            _invitationBusiness.InviteAndAddUserToHierarchy(
+                oid, pid, null, rid, nonExistentUserId, null));
+
+        Assert.Contains("not found", exception.Message);
+    }
+
+    #endregion
+
+    #region New User by Email - Transaction with Rollback
+
+    [Fact]
+    public async Task InviteByEmail_Success_WhenUserDoesNotExist_AlwaysSendsEmail()
+    {
+        // Arrange
+        var newUserEmail = "newuser@test.com";
+        _notificationBusiness.Setup(n =>
+                n.SendEmail(newUserEmail, newUserEmail, It.IsAny<bool>(), It.IsAny<long?>(), It.IsAny<long?>()))
+            .ReturnsAsync(true);
+
+        // Act
+        var result = await _invitationBusiness.InviteAndAddUserToHierarchy(
+            oid, null, null, null, null, newUserEmail);
+
+        // Assert
+        Assert.True(result);
+
+        var newUser = await Context.Users.FirstOrDefaultAsync(u => u.Email == newUserEmail);
+        Assert.NotNull(newUser);
+        Assert.Equal(newUserEmail, newUser.Name); // Name should be set to email
+        Assert.Equal(newUserEmail, newUser.Email);
+
+        Assert.True(
+            await Context.OrganizationUsers.AnyAsync(ou => ou.UserId == newUser.Id && ou.OrganizationId == oid));
+
+        // CRITICAL: New users always get email
+        _notificationBusiness.Verify(
+            n => n.SendEmail(newUserEmail, newUserEmail, It.IsAny<bool>(), It.IsAny<long?>(), It.IsAny<long?>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task InviteByEmail_Success_WhenUserDoesNotExistAndAddedToProject_AlwaysSendsEmail()
+    {
+        // Arrange
+        var newUserEmail = "newuser@test.com";
+        _notificationBusiness.Setup(n =>
+                n.SendEmail(newUserEmail, newUserEmail, It.IsAny<bool>(), It.IsAny<long?>(), It.IsAny<long?>()))
+            .ReturnsAsync(true);
+
+        // Act
+        var result = await _invitationBusiness.InviteAndAddUserToHierarchy(
+            oid, pid, null, rid, null, newUserEmail);
+
+        // Assert
+        Assert.True(result);
+
+        var newUser = await Context.Users.FirstOrDefaultAsync(u => u.Email == newUserEmail);
+        Assert.NotNull(newUser);
+
+        Assert.True(
+            await Context.OrganizationUsers.AnyAsync(ou => ou.UserId == newUser.Id && ou.OrganizationId == oid));
+
+        var projectMember =
+            await Context.ProjectMembers.FirstOrDefaultAsync(pm => pm.UserId == newUser.Id && pm.ProjectId == pid);
+        Assert.NotNull(projectMember);
+        Assert.Equal(rid, projectMember.RoleId);
+
+        // CRITICAL: New users always get email
+        _notificationBusiness.Verify(
+            n => n.SendEmail(newUserEmail, newUserEmail, It.IsAny<bool>(), It.IsAny<long?>(), It.IsAny<long?>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task InviteByEmail_RollsBack_WhenEmailSendFailsForNewUser()
+    {
+        // Arrange - CRITICAL TEST: Email failure should rollback new user creation
+        var newUserEmail = "newuser@test.com";
+        _notificationBusiness.Setup(n =>
+                n.SendEmail(newUserEmail, newUserEmail, It.IsAny<bool>(), It.IsAny<long?>(), It.IsAny<long?>()))
+            .ReturnsAsync(false);
+
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            _invitationBusiness.InviteAndAddUserToHierarchy(
+                oid, null, null, null, null, newUserEmail));
+
+        Assert.Contains("Failed to send invitation email", exception.Message);
+        Assert.Contains(newUserEmail, exception.Message);
+        Assert.Contains("User was not created", exception.Message);
+
+        // CRITICAL: Verify user was NOT created (transaction rollback worked)
+        var user = await Context.Users.FirstOrDefaultAsync(u => u.Email == newUserEmail);
+        Assert.Null(user);
+
+        // CRITICAL: Verify no organization membership was created
+        var orgUsers = await Context.OrganizationUsers
+            .Where(ou => ou.OrganizationId == oid)
+            .ToListAsync();
+        Assert.DoesNotContain(orgUsers, ou =>
+            Context.Users.Any(u => u.Id == ou.UserId && u.Email == newUserEmail));
+    }
+
+    [Fact]
+    public async Task InviteByEmail_RollsBack_WhenEmailSendFailsForNewUserWithProject()
+    {
+        // Arrange - CRITICAL TEST: Email failure should rollback new user and project membership
+        var newUserEmail = "newuser@test.com";
+        _notificationBusiness.Setup(n =>
+                n.SendEmail(newUserEmail, newUserEmail, It.IsAny<bool>(), It.IsAny<long?>(), It.IsAny<long?>()))
+            .ReturnsAsync(false);
+
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            _invitationBusiness.InviteAndAddUserToHierarchy(
+                oid, pid, null, rid, null, newUserEmail));
+
+        Assert.Contains("Failed to send invitation email", exception.Message);
+
+        // CRITICAL: Verify user was NOT created
+        var user = await Context.Users.FirstOrDefaultAsync(u => u.Email == newUserEmail);
+        Assert.Null(user);
+
+        // CRITICAL: Verify no organization membership was created
+        var orgUsers = await Context.OrganizationUsers
+            .Where(ou => ou.OrganizationId == oid)
+            .ToListAsync();
+        Assert.DoesNotContain(orgUsers, ou =>
+            Context.Users.Any(u => u.Id == ou.UserId && u.Email == newUserEmail));
+
+        // CRITICAL: Verify no project membership was created
+        var projectMembers = await Context.ProjectMembers
+            .Where(pm => pm.ProjectId == pid)
+            .ToListAsync();
+        Assert.DoesNotContain(projectMembers, pm =>
+            Context.Users.Any(u => u.Id == pm.UserId && u.Email == newUserEmail));
+    }
+
+    #endregion
+
+    #region Group Tests
+
+    [Fact]
+    public async Task InviteByGroup_Success_WhenGroupExistsAndNotInProject_SendsEmailsToAllMembers()
+    {
+        // Arrange
+        _notificationBusiness.Setup(n => n.SendEmail(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<bool>(),
+                It.IsAny<long?>(), It.IsAny<long?>()))
+            .ReturnsAsync(true);
+
+        // Add users to group
+        var group = await Context.Groups.Include(g => g.Users).FirstOrDefaultAsync(g => g.Id == gid);
+        group!.Users.Add(await Context.Users.FindAsync(uid));
+        group.Users.Add(await Context.Users.FindAsync(uid2));
+        await Context.SaveChangesAsync();
+
+        // Act
+        var result = await _invitationBusiness.InviteAndAddUserToHierarchy(
+            oid, pid, gid, rid, null, null);
+
+        // Assert
+        Assert.True(result);
+
+        var projectMember =
+            await Context.ProjectMembers.FirstOrDefaultAsync(pm => pm.GroupId == gid && pm.ProjectId == pid);
+        Assert.NotNull(projectMember);
+        Assert.Equal(rid, projectMember.RoleId);
+
+        // CRITICAL: Verify emails sent to all group members (none were in project before)
+        _notificationBusiness.Verify(
+            n => n.SendEmail("existing.user@test.com", "Existing User", It.IsAny<bool>(), It.IsAny<long?>(),
+                It.IsAny<long?>()), Times.Once);
+        _notificationBusiness.Verify(
+            n => n.SendEmail("existing.user2@test.com", "Existing User 2", It.IsAny<bool>(), It.IsAny<long?>(),
+                It.IsAny<long?>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task InviteByGroup_Success_WhenSomeUsersAlreadyInProject_OnlySendsEmailToNewUsers()
+    {
+        // Arrange
+        _notificationBusiness.Setup(n => n.SendEmail(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<bool>(),
+                It.IsAny<long?>(), It.IsAny<long?>()))
+            .ReturnsAsync(true);
+
+        // Add user1 directly to the project first
+        var directProjectMember = new ProjectMember
+        {
+            ProjectId = pid,
+            UserId = uid,
+            RoleId = rid
+        };
+        Context.ProjectMembers.Add(directProjectMember);
+        await Context.SaveChangesAsync();
+
+        // Add both users to group
+        var group = await Context.Groups.Include(g => g.Users).FirstOrDefaultAsync(g => g.Id == gid);
+        group!.Users.Add(await Context.Users.FindAsync(uid));
+        group.Users.Add(await Context.Users.FindAsync(uid2));
+        await Context.SaveChangesAsync();
+
+        // Act
+        var result = await _invitationBusiness.InviteAndAddUserToHierarchy(
+            oid, pid, gid, rid, null, null);
+
+        // Assert
+        Assert.True(result);
+
+        // CRITICAL: Only user2 should receive email (user1 was already in project)
+        _notificationBusiness.Verify(
+            n => n.SendEmail("existing.user@test.com", "Existing User", It.IsAny<bool>(), It.IsAny<long?>(),
+                It.IsAny<long?>()), Times.Never);
+        _notificationBusiness.Verify(
+            n => n.SendEmail("existing.user2@test.com", "Existing User 2", It.IsAny<bool>(), It.IsAny<long?>(),
+                It.IsAny<long?>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task InviteByGroup_Success_WhenGroupAlreadyInProject_NoEmailsSent()
+    {
+        // Arrange
+        _notificationBusiness.Setup(n => n.SendEmail(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<bool>(),
+                It.IsAny<long?>(), It.IsAny<long?>()))
+            .ReturnsAsync(true);
+
+        // Add group to project first
         var projectMember = new ProjectMember
         {
             ProjectId = pid,
@@ -299,138 +701,125 @@ public class InvitationBusinessTests : IntegrationTestBase
 
         // Act
         var result = await _invitationBusiness.InviteAndAddUserToHierarchy(
-            oid, pid, rid, userEmail, null);
+            oid, pid, gid, rid, null, null);
 
         // Assert
         Assert.True(result);
-        var directProjectMemberCount = await Context.ProjectMembers
-            .CountAsync(pm => pm.UserId == uid2 && pm.ProjectId == pid);
-        Assert.Equal(0, directProjectMemberCount); // Should not create duplicate membership
+        var projectMemberCount = await Context.ProjectMembers
+            .CountAsync(pm => pm.GroupId == gid && pm.ProjectId == pid);
+        Assert.Equal(1, projectMemberCount); // Should not duplicate
+
+        // CRITICAL: No emails should be sent since group is already in project
+        _notificationBusiness.Verify(
+            n => n.SendEmail(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<bool>(), It.IsAny<long?>(),
+                It.IsAny<long?>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task InviteByGroup_Success_WhenEmailSendFails_BestEffort()
+    {
+        // Arrange - Email failures should NOT cause group invitation to fail
+        _notificationBusiness.Setup(n => n.SendEmail(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<bool>(),
+                It.IsAny<long?>(), It.IsAny<long?>()))
+            .ReturnsAsync(false);
+
+        // Add user to group
+        var group = await Context.Groups.Include(g => g.Users).FirstOrDefaultAsync(g => g.Id == gid);
+        group!.Users.Add(await Context.Users.FindAsync(uid));
+        await Context.SaveChangesAsync();
+
+        // Act
+        var result = await _invitationBusiness.InviteAndAddUserToHierarchy(
+            oid, pid, gid, rid, null, null);
+
+        // Assert - Should still succeed (best-effort)
+        Assert.True(result);
+        Assert.True(await Context.ProjectMembers.AnyAsync(pm => pm.GroupId == gid && pm.ProjectId == pid));
+    }
+
+    [Fact]
+    public async Task InviteByGroup_Fails_WhenGroupDoesNotExist()
+    {
+        // Arrange
+        var nonExistentGroupId = 99999L;
+
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<ArgumentException>(() =>
+            _invitationBusiness.InviteAndAddUserToHierarchy(
+                oid, pid, nonExistentGroupId, rid, null, null));
+
+        Assert.Contains("not found", exception.Message);
     }
 
     #endregion
 
-    #region InviteAndAddUserToHierarchy - New User Tests
+    #region Validation Tests
 
     [Fact]
-    public async Task InviteAndAddUserToHierarchy_Success_WhenUserDoesNotExist()
+    public async Task Invite_Fails_WhenNoIdentifierProvided()
     {
-        // Arrange
-        var newUserEmail = "newuser@test.com";
-        var userName = "New User";
-        _notificationBusiness.Setup(n => n.SendEmail(newUserEmail, userName))
-            .ReturnsAsync(true);
-
-        // Act
-        var result = await _invitationBusiness.InviteAndAddUserToHierarchy(
-            oid, null, null, newUserEmail, userName);
-
-        // Assert
-        Assert.True(result);
-        
-        var newUser = await Context.Users.FirstOrDefaultAsync(u => u.Email == newUserEmail);
-        Assert.NotNull(newUser);
-        Assert.Equal(newUserEmail, newUser.Name); // Name should be set to email
-        Assert.Equal(newUserEmail, newUser.Email);
-        
-        Assert.True(await Context.OrganizationUsers.AnyAsync(
-            ou => ou.UserId == newUser.Id && ou.OrganizationId == oid));
-        
-        _notificationBusiness.Verify(n => n.SendEmail(newUserEmail, userName), Times.Once);
-    }
-
-    [Fact]
-    public async Task InviteAndAddUserToHierarchy_Success_WhenUserDoesNotExistAndAddedToProject()
-    {
-        // Arrange
-        var newUserEmail = "newuser@test.com";
-        _notificationBusiness.Setup(n => n.SendEmail(newUserEmail, null))
-            .ReturnsAsync(true);
-
-        // Act
-        var result = await _invitationBusiness.InviteAndAddUserToHierarchy(
-            oid, pid, rid, newUserEmail, null);
-
-        // Assert
-        Assert.True(result);
-        
-        var newUser = await Context.Users.FirstOrDefaultAsync(u => u.Email == newUserEmail);
-        Assert.NotNull(newUser);
-        
-        Assert.True(await Context.OrganizationUsers.AnyAsync(
-            ou => ou.UserId == newUser.Id && ou.OrganizationId == oid));
-        Assert.True(await Context.ProjectMembers.AnyAsync(
-            pm => pm.UserId == newUser.Id && pm.ProjectId == pid && pm.RoleId == rid));
-        
-        _notificationBusiness.Verify(n => n.SendEmail(newUserEmail, null), Times.Once);
-    }
-
-    [Fact]
-    public async Task InviteAndAddUserToHierarchy_Fails_WhenEmailSendFails()
-    {
-        // Arrange
-        var newUserEmail = "newuser@test.com";
-        _notificationBusiness.Setup(n => n.SendEmail(newUserEmail, null))
-            .ReturnsAsync(false);
-
         // Act & Assert
-        var exception = await Assert.ThrowsAsync<Exception>(() => 
-            _invitationBusiness.InviteAndAddUserToHierarchy(oid, null, null, newUserEmail, null));
-        
-        Assert.Contains("Email not sent", exception.Message);
-        Assert.Contains(newUserEmail, exception.Message);
-        
-        // Verify user was not created
-        var user = await Context.Users.FirstOrDefaultAsync(u => u.Email == newUserEmail);
-        Assert.Null(user);
+        var exception = await Assert.ThrowsAsync<ArgumentException>(() =>
+            _invitationBusiness.InviteAndAddUserToHierarchy(
+                oid, null, null, null, null, null));
+
+        Assert.Contains("Exactly one of groupId, userId, or userEmail must be supplied", exception.Message);
     }
 
     [Fact]
-    public async Task InviteAndAddUserToHierarchy_Success_WithNullProjectId()
+    public async Task Invite_Fails_WhenMultipleIdentifiersProvided()
     {
-        // Arrange
-        var newUserEmail = "newuser@test.com";
-        _notificationBusiness.Setup(n => n.SendEmail(newUserEmail, null))
-            .ReturnsAsync(true);
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<ArgumentException>(() =>
+            _invitationBusiness.InviteAndAddUserToHierarchy(
+                oid, null, null, null, uid, "test@test.com"));
 
-        // Act
-        var result = await _invitationBusiness.InviteAndAddUserToHierarchy(
-            oid, null, null, newUserEmail, null);
-
-        // Assert
-        Assert.True(result);
-        
-        var newUser = await Context.Users.FirstOrDefaultAsync(u => u.Email == newUserEmail);
-        Assert.NotNull(newUser);
-        Assert.True(await Context.OrganizationUsers.AnyAsync(
-            ou => ou.UserId == newUser.Id && ou.OrganizationId == oid));
-        
-        // Should not be in any project
-        Assert.False(await Context.ProjectMembers.AnyAsync(pm => pm.UserId == newUser.Id));
+        Assert.Contains("Exactly one of groupId, userId, or userEmail must be supplied", exception.Message);
     }
 
     [Fact]
-    public async Task InviteAndAddUserToHierarchy_Success_WithNullRoleId()
+    public async Task Invite_Fails_WhenProjectProvidedWithoutRole()
     {
-        // Arrange
-        var newUserEmail = "newuser@test.com";
-        _notificationBusiness.Setup(n => n.SendEmail(newUserEmail, null))
-            .ReturnsAsync(true);
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<ArgumentException>(() =>
+            _invitationBusiness.InviteAndAddUserToHierarchy(
+                oid, pid, null, null, uid, null));
 
-        // Act
-        var result = await _invitationBusiness.InviteAndAddUserToHierarchy(
-            oid, pid, null, newUserEmail, null);
+        Assert.Contains("roleId is required", exception.Message);
+    }
 
-        // Assert
-        Assert.True(result);
-        
-        var newUser = await Context.Users.FirstOrDefaultAsync(u => u.Email == newUserEmail);
-        Assert.NotNull(newUser);
-        
-        var projectMember = await Context.ProjectMembers
-            .FirstOrDefaultAsync(pm => pm.UserId == newUser.Id && pm.ProjectId == pid);
-        Assert.NotNull(projectMember);
-        Assert.Null(projectMember.RoleId);
+    [Fact]
+    public async Task Invite_Fails_WhenRoleProvidedWithoutProject()
+    {
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<ArgumentException>(() =>
+            _invitationBusiness.InviteAndAddUserToHierarchy(
+                oid, null, null, rid, null, "test@test.com"));
+
+        Assert.Contains("Roles do not exist for organization users", exception.Message);
+    }
+
+    [Fact]
+    public async Task Invite_Fails_WhenUserIdProvidedForOrgInvitation()
+    {
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<ArgumentException>(() =>
+            _invitationBusiness.InviteAndAddUserToHierarchy(
+                oid, null, null, null, uid, null));
+
+        Assert.Contains("Only userEmail is allowed for organization invitations", exception.Message);
+    }
+
+    [Fact]
+    public async Task Invite_Fails_WhenGroupIdProvidedForOrgInvitation()
+    {
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<ArgumentException>(() =>
+            _invitationBusiness.InviteAndAddUserToHierarchy(
+                oid, null, gid, null, null, null));
+
+        Assert.Contains("Only userEmail or userId is allowed", exception.Message);
     }
 
     #endregion
@@ -438,49 +827,69 @@ public class InvitationBusinessTests : IntegrationTestBase
     #region Edge Cases
 
     [Fact]
-    public async Task InviteAndAddUserToHierarchy_Success_WithMultipleOrganizations()
+    public async Task InviteByEmail_Success_WithMultipleOrganizations()
     {
         // Arrange
         var userEmail = "existing.user2@test.com";
+        _notificationBusiness.Setup(n =>
+                n.SendEmail(userEmail, It.IsAny<string>(), It.IsAny<bool>(), It.IsAny<long?>(), It.IsAny<long?>()))
+            .ReturnsAsync(true);
 
         // Act - Add to oid
         var result1 = await _invitationBusiness.InviteAndAddUserToHierarchy(
-            oid, null, null, userEmail, null);
-        
+            oid, null, null, null, null, userEmail);
+
         // Act - Add to oid2
         var result2 = await _invitationBusiness.InviteAndAddUserToHierarchy(
-            oid2, null, null, userEmail, null);
+            oid2, null, null, null, null, userEmail);
 
         // Assert
         Assert.True(result1);
         Assert.True(result2);
-        Assert.True(await Context.OrganizationUsers.AnyAsync(
-            ou => ou.UserId == uid2 && ou.OrganizationId == oid));
-        Assert.True(await Context.OrganizationUsers.AnyAsync(
-            ou => ou.UserId == uid2 && ou.OrganizationId == oid2));
+        Assert.True(await Context.OrganizationUsers.AnyAsync(ou => ou.UserId == uid2 && ou.OrganizationId == oid));
+        Assert.True(await Context.OrganizationUsers.AnyAsync(ou => ou.UserId == uid2 && ou.OrganizationId == oid2));
+
+        // Both invitations should send emails since user is new to each org
+        _notificationBusiness.Verify(
+            n => n.SendEmail(userEmail, It.IsAny<string>(), It.IsAny<bool>(), It.IsAny<long?>(), It.IsAny<long?>()),
+            Times.Exactly(2));
     }
 
     [Fact]
-    public async Task InviteAndAddUserToHierarchy_Success_WithMultipleProjects()
+    public async Task InviteByEmail_Success_WithMultipleProjects()
     {
         // Arrange
         var userEmail = "existing.user2@test.com";
+        _notificationBusiness.Setup(n =>
+                n.SendEmail(userEmail, It.IsAny<string>(), It.IsAny<bool>(), It.IsAny<long?>(), It.IsAny<long?>()))
+            .ReturnsAsync(true);
 
         // Act - Add to pid
         var result1 = await _invitationBusiness.InviteAndAddUserToHierarchy(
-            oid, pid, rid, userEmail, null);
-        
+            oid, pid, null, rid, null, userEmail);
+
         // Act - Add to pid2
         var result2 = await _invitationBusiness.InviteAndAddUserToHierarchy(
-            oid, pid2, rid, userEmail, null);
+            oid, pid2, null, rid, null, userEmail);
 
         // Assert
         Assert.True(result1);
         Assert.True(result2);
-        Assert.True(await Context.ProjectMembers.AnyAsync(
-            pm => pm.UserId == uid2 && pm.ProjectId == pid));
-        Assert.True(await Context.ProjectMembers.AnyAsync(
-            pm => pm.UserId == uid2 && pm.ProjectId == pid2));
+
+        var projectMember1 =
+            await Context.ProjectMembers.FirstOrDefaultAsync(pm => pm.UserId == uid2 && pm.ProjectId == pid);
+        Assert.NotNull(projectMember1);
+        Assert.Equal(rid, projectMember1.RoleId);
+
+        var projectMember2 =
+            await Context.ProjectMembers.FirstOrDefaultAsync(pm => pm.UserId == uid2 && pm.ProjectId == pid2);
+        Assert.NotNull(projectMember2);
+        Assert.Equal(rid, projectMember2.RoleId);
+
+        // Both invitations should send emails since user is new to each project
+        _notificationBusiness.Verify(
+            n => n.SendEmail(userEmail, It.IsAny<string>(), It.IsAny<bool>(), It.IsAny<long?>(), It.IsAny<long?>()),
+            Times.Exactly(2));
     }
 
     #endregion

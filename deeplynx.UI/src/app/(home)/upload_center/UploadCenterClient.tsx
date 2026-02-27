@@ -10,7 +10,7 @@ import {
 } from "@/app/lib/client_service/file_upload_services.client";
 import { uploadTimeseriesFile } from "@/app/lib/client_service/timeseries_services.client";
 import { uploadBulkMetadata } from "@/app/lib/client_service/metadata_service.client";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import toast from "react-hot-toast";
 import { parseBackendErrors } from "@/app/lib/error_parser";
 
@@ -61,6 +61,44 @@ export default function UploadCenterClient({ initialAvailableFiles }: Props) {
 
   const { setTargetFileId, setMulti } = fileUploadState;
   const { multi } = fileUploadState;
+  const uploadToastIdRef = useRef<string | undefined>(undefined);
+
+  const showOrUpdateUploadToast = (args: {
+    title: string;
+    message: string;
+    percent?: number;
+    isCancelling?: boolean;
+  }) => {
+    uploadToastIdRef.current = toast.custom(
+      () => (
+        <div className="w-[320px] rounded-lg border border-base-300 bg-base-100 p-4 shadow-lg">
+          <p className="text-sm font-semibold text-base-content">{args.title}</p>
+          <p className="mt-1 text-xs text-base-content/70">{args.message}</p>
+          {typeof args.percent === "number" && (
+            <div className="mt-3">
+              <div className="mb-1 flex items-center justify-between text-xs">
+                <span className="text-base-content/70">Progress</span>
+                <span className="font-semibold text-base-content">
+                  {Math.round(args.percent)}%
+                </span>
+              </div>
+              <progress
+                className="progress progress-primary w-full"
+                value={args.percent}
+                max="100"
+              />
+            </div>
+          )}
+          {args.isCancelling && (
+            <p className="mt-2 text-xs font-medium text-warning">
+              Cancelling upload...
+            </p>
+          )}
+        </div>
+      ),
+      { id: uploadToastIdRef.current, duration: Infinity }
+    );
+  };
 
   // ============================================================================
   // COMPUTED VALUES
@@ -108,6 +146,39 @@ export default function UploadCenterClient({ initialAvailableFiles }: Props) {
     }
   }, [isMultiAllowed, multi, setMulti]);
 
+  // Keep a persistent upload toast updated during long-running uploads
+  useEffect(() => {
+    if (!fileUploadState.isUploading) return;
+
+    if (!fileUploadState.uploadProgress) {
+      showOrUpdateUploadToast({
+        title: "Uploading file",
+        message: "Preparing upload...",
+      });
+      return;
+    }
+
+    showOrUpdateUploadToast({
+      title: "Uploading file",
+      message: `${fileUploadState.uploadProgress.chunksCompleted} / ${fileUploadState.uploadProgress.totalChunks} chunks`,
+      percent: fileUploadState.uploadProgress.percentComplete,
+      isCancelling: fileUploadState.isCancelling,
+    });
+  }, [
+    fileUploadState.isUploading,
+    fileUploadState.isCancelling,
+    fileUploadState.uploadProgress,
+  ]);
+
+  // Cleanup any persistent upload toast if component unmounts mid-upload
+  useEffect(() => {
+    return () => {
+      if (uploadToastIdRef.current) {
+        toast.dismiss(uploadToastIdRef.current);
+      }
+    };
+  }, []);
+
   // ============================================================================
   // FILE UPLOAD HANDLERS
   // ============================================================================
@@ -138,7 +209,9 @@ export default function UploadCenterClient({ initialAvailableFiles }: Props) {
             Number(projectResources.dataSourceId),
             file
           );
-          toast.success("Timeseries file uploaded successfully!");
+          toast.success("Timeseries file uploaded successfully!", {
+            id: uploadToastIdRef.current,
+          });
         } else {
           // Use regular file upload
           await uploadFile({
@@ -149,11 +222,14 @@ export default function UploadCenterClient({ initialAvailableFiles }: Props) {
             file,
             name: metadata.name || file.name,
             description: metadata.description || "",
+            metadataFile: metadata.metadataFile,
             onProgress: (progress) => {
               fileUploadState.setUploadProgress(progress);
             },
           });
-          toast.success("File uploaded successfully!");
+          toast.success("File uploaded successfully!", {
+            id: uploadToastIdRef.current,
+          });
         }
       } else {
         const results = await uploadFilesBatch({
@@ -166,23 +242,28 @@ export default function UploadCenterClient({ initialAvailableFiles }: Props) {
 
         const ok = results.filter((r) => r.status === "fulfilled").length;
         const fail = results.length - ok;
-        toast.success(
-          `Uploaded ${ok} file(s)${fail ? ` • ${fail} failed` : ""}`
-        );
+        toast.success(`Uploaded ${ok} file(s)${fail ? ` • ${fail} failed` : ""}`, {
+          id: uploadToastIdRef.current,
+        });
         if (fail) console.warn("Batch upload failures:", results);
       }
 
       fileUploadState.resetFileUpload();
     } catch (err) {
       if (err instanceof DOMException && err.name === 'AbortError') {
-        toast("Upload cancelled.")
+        toast("Upload cancelled.", {
+          id: uploadToastIdRef.current,
+        });
 
       } else {
         console.error("Upload error:", err);
-        toast.error("Upload failed. See console for details.");
+        toast.error("Upload failed. See console for details.", {
+          id: uploadToastIdRef.current,
+        });
       }
       fileUploadState.setUploadProgress(null);
     } finally {
+      uploadToastIdRef.current = undefined;
       fileUploadState.setIsUploading(false);
       fileUploadState.setIsCancelling(false);
     }

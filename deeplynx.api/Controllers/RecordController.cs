@@ -49,6 +49,7 @@ public class RecordController : ControllerBase
     /// <returns>A list of records based on the applied filters.</returns>
     [HttpGet(Name = "api_get_all_records")]
     [Auth("read", "record")]
+    [Sensitivity("read record")]
     public async Task<ActionResult<IEnumerable<RecordResponseDto>>> GetAllRecords(
         long organizationId,
         long projectId,
@@ -82,6 +83,7 @@ public class RecordController : ControllerBase
     [HttpGet("by-tags", Name = "api_get_records_by_tags")]
     [Auth("read", "record")]
     [Auth("read", "tag")]
+    [Sensitivity("read record")]
     public async Task<ActionResult<IEnumerable<RecordResponseDto>>> GetRecordsByTags(
         long organizationId,
         long projectId,
@@ -112,6 +114,7 @@ public class RecordController : ControllerBase
     /// <returns>The record associated with the given ID</returns>
     [HttpGet("{recordId:long}", Name = "api_get_a_record")]
     [Auth("read", "record")]
+    [Sensitivity("read record")]
     public async Task<ActionResult<RecordResponseDto>> GetRecord(
         long organizationId,
         long projectId,
@@ -142,6 +145,7 @@ public class RecordController : ControllerBase
     /// <returns>The record count for the given data source</returns>
     [HttpGet("count", Name = "api_get_records_count_by_data_source")]
     [Auth("read", "record")]
+    [Sensitivity("read record")]
     public async Task<ActionResult<int>> GetRecordsCountByDataSource(
         long organizationId,
         long projectId,
@@ -170,20 +174,23 @@ public class RecordController : ControllerBase
     /// <param name="projectId">The ID of the project to which the record belongs</param>
     /// <param name="dataSourceId">The ID of the data source to which the record belongs</param>
     /// <param name="dto">The record request data transfer object containing record details</param>
+    /// <param name="sensitivityLabelIds">The IDs of the labels to attach</param>
     /// <returns>The created record</returns>
     [HttpPost(Name = "api_create_a_record")]
     [Auth("write", "record")]
+    [Sensitivity("write record")]
     public async Task<ActionResult<RecordResponseDto>> CreateRecord(
         long organizationId,
         long projectId,
         [FromQuery] long dataSourceId,
+        [FromQuery] List<long>? sensitivityLabelIds,
         [FromBody] CreateRecordRequestDto dto)
     {
         try
         {
             var currentUserId = UserContextStorage.UserId;
             var record =
-                await _recordBusiness.CreateRecord(currentUserId, organizationId, projectId, dataSourceId, dto);
+                await _recordBusiness.CreateRecord(currentUserId, organizationId, projectId, dataSourceId, dto, sensitivityLabelIds);
             return Ok(record);
         }
         catch (Exception exc)
@@ -201,6 +208,7 @@ public class RecordController : ControllerBase
     /// <param name="projectId">The ID of the project to which the records belong</param>
     /// <param name="dataSourceId">The ID of the data source to which the records belong</param>
     /// <param name="records">List of record request data transfer objects containing record details</param>
+    /// <param name="sensitivityLabelIds">List of sensitivity labels that will be attached to created records</param>
     /// <returns>The created records</returns>
     [HttpPost("bulk", Name = "api_create_many_records")]
     [Auth("write", "record")]
@@ -208,14 +216,15 @@ public class RecordController : ControllerBase
         long organizationId,
         long projectId,
         [FromQuery] long dataSourceId,
-        [FromBody] List<CreateRecordRequestDto> records)
+        [FromBody] List<CreateRecordRequestDto> records,
+        [FromQuery] List<long>? sensitivityLabelIds = null)
     {
         try
         {
             var currentUserId = UserContextStorage.UserId;
             var newRecords =
                 await _recordBusiness.BulkCreateRecords(currentUserId, organizationId, projectId, dataSourceId,
-                    records);
+                    records, sensitivityLabelIds);
             return Ok(newRecords);
         }
         catch (Exception exc)
@@ -235,7 +244,8 @@ public class RecordController : ControllerBase
     /// <param name="dto">The record request data transfer object containing updated record details</param>
     /// <returns>The updated record</returns>
     [HttpPut("{recordId:long}", Name = "api_update_a_record")]
-    [Auth("write", "record")]
+    [Auth("update", "record")]
+    [Sensitivity("update record")]
     public async Task<ActionResult<RecordResponseDto>> UpdateRecord(
         long organizationId,
         long projectId,
@@ -265,6 +275,7 @@ public class RecordController : ControllerBase
     /// <returns>A message stating the record was successfully deleted.</returns>
     [HttpDelete("{recordId:long}", Name = "api_delete_a_record")]
     [Auth("write", "record")]
+    [Sensitivity("delete record")]
     public async Task<IActionResult> DeleteRecord(
         long organizationId,
         long projectId,
@@ -293,7 +304,8 @@ public class RecordController : ControllerBase
     /// <param name="archive">True to archive the record, false to unarchive it.</param>
     /// <returns>A message stating the record was successfully archived or unarchived.</returns>
     [HttpPatch("{recordId:long}", Name = "api_archive_record")]
-    [Auth("write", "record")]
+    [Auth("update", "record")]
+    [Sensitivity("update record")]
     public async Task<IActionResult> ArchiveRecord(
         long organizationId,
         long projectId,
@@ -330,8 +342,9 @@ public class RecordController : ControllerBase
     /// <param name="tagId">The ID of the tag to attach</param>
     /// <returns>A message stating the tag was successfully attached to the record.</returns>
     [HttpPost("{recordId:long}/tags", Name = "api_attach_a_tag")]
-    [Auth("write", "record")]
+    [Auth("update", "record")]
     [Auth("read", "tag")]
+    [Sensitivity("update record")]
     public async Task<IActionResult> AttachTag(
         long organizationId,
         long projectId,
@@ -361,8 +374,9 @@ public class RecordController : ControllerBase
     /// <param name="tagId">The ID of the tag to unattach</param>
     /// <returns>A message stating the tag was successfully unattached from the record.</returns>
     [HttpDelete("{recordId:long}/tags", Name = "api_unattach_a_tag")]
-    [Auth("write", "record")]
+    [Auth("update", "record")]
     [Auth("read", "tag")]
+    [Sensitivity("update record")]
     public async Task<IActionResult> UnattachTag(
         long organizationId,
         long projectId,
@@ -389,26 +403,64 @@ public class RecordController : ControllerBase
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
     /// <param name="projectId">The ID of the project to which the record belongs</param>
     /// <param name="recordId">The ID of the record</param>
-    /// <param name="labelId">The ID of the label to attach</param>
+    /// <param name="sensitivityLabelId">The ID of the label to attach</param>
     /// <returns>A message stating the label was successfully attached to the record.</returns>
     [HttpPost("{recordId:long}/sensitivity-labels", Name = "api_attach_sensitivity_label")]
-    [Auth("write", "record")]
+    [Auth("update", "record")]
     [Auth("read", "sensitivity_label")]
+    [Sensitivity("update record")]
     public async Task<IActionResult> AttachSensitivityLabel(
         long organizationId,
         long projectId,
         long recordId,
-        [FromQuery] long labelId)
+        [FromQuery] long sensitivityLabelId)
     {
         try
         {
             var currentUserId = UserContextStorage.UserId;
-            await _recordBusiness.AttachLabel(currentUserId, organizationId, projectId, recordId, labelId);
-            return Ok(new { message = $"label {labelId} attached to record {recordId}" });
+            await _recordBusiness.AttachLabel(currentUserId, organizationId, projectId, recordId, sensitivityLabelId);
+            return Ok(new { message = $"label {sensitivityLabelId} attached to record {recordId}" });
         }
         catch (Exception exc)
         {
-            var message = $"An error occurred while attaching label {labelId} to record {recordId}: {exc}";
+            var message = $"An error occurred while attaching label {sensitivityLabelId} to record {recordId}: {exc}";
+            _logger.LogError(message);
+            return StatusCode(StatusCodes.Status500InternalServerError, message);
+        }
+    }
+
+    /// <summary>
+    ///     Bulk attach sensitivity label(s) to records
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <param name="projectId">The ID of the project to which the records belong</param>
+    /// <param name="recordIds">The IDs of the records that the sensitivity labels will be attached to</param>
+    /// <param name="sensitivityLabelIds">The ID of the labels that will be attached to all provided records by ID</param>
+    /// <returns>Boolean value defining if the operation was successful.</returns>
+    [HttpPost("bulk-attach-sensitivity-labels", Name = "api_bulk_attach_sensitivity_labels")]
+    [Auth("update", "record")]
+    [Auth("read", "sensitivity_label")]
+    [Sensitivity("update record")]
+    public async Task<IActionResult> BulkAttachSensitivityLabels(
+        long organizationId,
+        long projectId,
+        [FromQuery] List<long> recordIds,
+        [FromQuery] List<long> sensitivityLabelIds)
+    {
+        try
+        {
+            var currentUserId = UserContextStorage.UserId;
+            await _recordBusiness.BulkAttachLabels(currentUserId, organizationId, projectId, recordIds,
+                sensitivityLabelIds);
+            return Ok(new
+            {
+                message =
+                    $"Successfully bulk attached all labels to all records"
+            });
+        }
+        catch (Exception exc)
+        {
+            var message = $"An error occurred while bulk attaching sensitivity labels to records: {exc}";
             _logger.LogError(message);
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
@@ -420,31 +472,31 @@ public class RecordController : ControllerBase
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
     /// <param name="projectId">The ID of the project to which the record belongs</param>
     /// <param name="recordId">The ID of the record</param>
-    /// <param name="labelId">The ID of the label to unattach</param>
+    /// <param name="sensitivityLabelId">The ID of the label to unattach</param>
     /// <returns>A message stating the label was successfully unattached from the record.</returns>
     [HttpDelete("{recordId:long}/sensitivity-labels", Name = "api_unattach_sensitivity-label")]
-    [Auth("write", "record")]
+    [Auth("update", "record")]
     [Auth("read", "sensitivity_label")]
+    [Sensitivity("update record")]
     public async Task<IActionResult> UnattachSensitivityLabel(
         long organizationId,
         long projectId,
         long recordId,
-        [FromQuery] long labelId)
+        [FromQuery] long sensitivityLabelId)
     {
         try
         {
             var currentUserId = UserContextStorage.UserId;
-            await _recordBusiness.UnattachLabel(currentUserId, organizationId, projectId, recordId, labelId);
-            return Ok(new { message = $"Sensitivity label {labelId} unattached from record {recordId}" });
+            await _recordBusiness.UnattachLabel(currentUserId, organizationId, projectId, recordId, sensitivityLabelId);
+            return Ok(new { message = $"Sensitivity label {sensitivityLabelId} unattached from record {recordId}" });
         }
         catch (Exception exc)
         {
-            var message = $"An error occurred while unattaching sensitivity label {labelId} from record {recordId}: {exc}";
+            var message = $"An error occurred while unattaching sensitivity label {sensitivityLabelId} from record {recordId}: {exc}";
             _logger.LogError(message);
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
-
 
     /// <summary>
     ///     Get Edges by Record
@@ -458,6 +510,7 @@ public class RecordController : ControllerBase
     /// <returns>A list of related records based on edges.</returns>
     [HttpGet("{recordId:long}/edges", Name = "api_get_edges_by_record")]
     [Auth("read", "record")]
+    [Auth("read", "edge")]
     public async Task<ActionResult<IEnumerable<RelatedRecordsResponseDto>>> GetEdgesByRecord(
         long organizationId,
         long projectId,

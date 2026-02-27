@@ -132,7 +132,7 @@ public class PermissionProjectController : ControllerBase
     /// <param name="dto">The data transfer object containing updated permission details</param>
     /// <returns>The updated permission</returns>
     [HttpPut("{permissionId:long}", Name = "api_update_project_permission")]
-    [Auth("write", "permission")]
+    [Auth("update", "permission")]
     public async Task<ActionResult<PermissionResponseDto>> UpdatePermission(
         long organizationId,
         long projectId,
@@ -190,7 +190,7 @@ public class PermissionProjectController : ControllerBase
     /// <param name="archive">True to archive the permission, false to unarchive it.</param>
     /// <returns>A message stating the permission was successfully archived or unarchived.</returns>
     [HttpPatch("{permissionId:long}", Name = "api_archive_project_permission")]
-    [Auth("write", "permission")]
+    [Auth("update", "permission")]
     public async Task<IActionResult> ArchivePermission(
         long organizationId,
         long projectId,

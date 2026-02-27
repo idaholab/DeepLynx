@@ -6,7 +6,6 @@ import { useEffect, useState } from "react";
 const times = (n: number) => Array.from({ length: n }, (_, i) => i);
 
 function UserSettingsSkeleton() {
-  const { t } = useLanguage();
   const rows = 4;
   const totalPages = 1;
 

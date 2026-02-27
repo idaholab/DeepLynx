@@ -46,7 +46,7 @@ const AddRecordModal: React.FC<Props> = ({
 
   const initialProjectId = useMemo(
     () => (initialProjects.length ? Number(initialProjects[0].id) : undefined),
-    [initialProjects]
+    [initialProjects],
   );
 
   /* ------------------------------------------------------------------------ */
@@ -89,7 +89,7 @@ const AddRecordModal: React.FC<Props> = ({
 
   // Tabs for optional fields: IDs / Metadata / Tags & Labels
   const [optionalTab, setOptionalTab] = useState<"ids" | "meta" | "tags">(
-    "ids"
+    "ids",
   );
 
   /* ------------------------------------------------------------------------ */
@@ -214,11 +214,6 @@ const AddRecordModal: React.FC<Props> = ({
       return;
     }
 
-    const tags = tagsText.trim() ? parseCommaList(tagsText) : undefined;
-    const sensitivity_labels = labelsText.trim()
-      ? parseCommaList(labelsText)
-      : undefined;
-
     const dto: CreateRecordRequestDto = {
       name,
       description,
@@ -235,13 +230,13 @@ const AddRecordModal: React.FC<Props> = ({
         organization!.organizationId as number,
         selectedProjectId,
         selectedDataSourceId,
-        dto
+        dto,
       );
 
       // Future: tags / sensitivity_labels could be sent via a separate
       // endpoint if backend supports it.
 
-      toast.success(t.translations.RECORD_CREATED_SECCESSFULLY);
+      toast.success(t.translations.RECORD_CREATED_SUCCESSFULLY);
       resetForm();
       onClose();
     } catch (error) {
@@ -274,7 +269,7 @@ const AddRecordModal: React.FC<Props> = ({
 
         const list = await getAllDataSourcesOrg(
           organization?.organizationId as number,
-          [selectedProjectId]
+          [selectedProjectId],
         );
 
         if (!cancelled) setDataSources(list ?? []);
@@ -327,7 +322,7 @@ const AddRecordModal: React.FC<Props> = ({
                 value={selectedProjectId ?? ""}
                 onChange={(e) =>
                   setSelectedProjectId(
-                    e.target.value === "" ? undefined : Number(e.target.value)
+                    e.target.value === "" ? undefined : Number(e.target.value),
                   )
                 }
                 required
@@ -355,7 +350,7 @@ const AddRecordModal: React.FC<Props> = ({
                 value={selectedDataSourceId ?? ""}
                 onChange={(e) =>
                   setSelectedDataSourceId(
-                    e.target.value === "" ? undefined : Number(e.target.value)
+                    e.target.value === "" ? undefined : Number(e.target.value),
                   )
                 }
                 disabled={
@@ -426,33 +421,30 @@ const AddRecordModal: React.FC<Props> = ({
             <div className="flex border-b border-base-300 bg-base-200/60 rounded-t-lg">
               <button
                 type="button"
-                className={`flex-1 px-3 py-2 text-xs md:text-sm ${
-                  optionalTab === "ids"
+                className={`flex-1 px-3 py-2 text-xs md:text-sm ${optionalTab === "ids"
                     ? "bg-base-100 font-semibold border-b-2 border-primary"
                     : "text-base-content/70"
-                }`}
+                  }`}
                 onClick={() => setOptionalTab("ids")}
               >
                 IDs
               </button>
               <button
                 type="button"
-                className={`flex-1 px-3 py-2 text-xs md:text-sm ${
-                  optionalTab === "meta"
+                className={`flex-1 px-3 py-2 text-xs md:text-sm ${optionalTab === "meta"
                     ? "bg-base-100 font-semibold border-b-2 border-primary"
                     : "text-base-content/70"
-                }`}
+                  }`}
                 onClick={() => setOptionalTab("meta")}
               >
                 Metadata
               </button>
               <button
                 type="button"
-                className={`flex-1 px-3 py-2 text-xs md:text-sm ${
-                  optionalTab === "tags"
+                className={`flex-1 px-3 py-2 text-xs md:text-sm ${optionalTab === "tags"
                     ? "bg-base-100 font-semibold border-b-2 border-primary"
                     : "text-base-content/70"
-                }`}
+                  }`}
                 onClick={() => setOptionalTab("tags")}
               >
                 Tags &amp; Labels
@@ -482,7 +474,7 @@ const AddRecordModal: React.FC<Props> = ({
                       setClassId(
                         e.target.value === ""
                           ? undefined
-                          : Number(e.target.value)
+                          : Number(e.target.value),
                       )
                     }
                   />

@@ -49,7 +49,6 @@ export function cancelCurrentUpload(): void {
   if (currentUploadAbortController) {
     currentUploadAbortController.abort();
     // Don't set to null here - let the upload function handle cleanup
-    console.log("Upload cancelled by user");
   }
 }
 
@@ -69,10 +68,12 @@ async function uploadFileRegular({
   tags,
   originalId,
   classId,
+  metadataFile,
 }: UploadFileArgs) {
   const form = new FormData();
   form.append("file", file, file.name ?? "upload.bin");
 
+  if (metadataFile) form.append("metadata", metadataFile, metadataFile.name);
   if (name) form.append("name", name);
   if (description) form.append("description", description);
 
@@ -178,7 +179,6 @@ async function uploadFileChunked({
   } catch (error) {
     // Check if this is an abort error
     if (error instanceof DOMException && error.name === 'AbortError') {
-      console.log("Upload was cancelled");
     }
 
     if (uploadId) {

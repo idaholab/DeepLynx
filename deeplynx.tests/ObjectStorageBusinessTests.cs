@@ -36,10 +36,14 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
     public long os7;
     public long os8;
     public long os9;
+    public long os10;
 
     public long pid;
     public long pid2;
+    public long pid3;
     public long uid;
+    public long oid2;
+    public long oid3;
 
     public ObjectStorageBusinessTests(TestSuiteFixture fixture) : base(fixture)
     {
@@ -119,17 +123,25 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
         uid = user.Id;
 
         var organization = new Organization { Name = "Test Organization" };
+        var organization2 = new Organization { Name = "Test Organization 2" };
+        var organization3 = new Organization { Name = "Test Organization 3 No Default" };
         Context.Organizations.Add(organization);
+        Context.Organizations.Add(organization2);
+        Context.Organizations.Add(organization3);
         await Context.SaveChangesAsync();
         organizationId = organization.Id;
+        oid2 = organization2.Id;
+        oid3 = organization3.Id;
 
         var project = new Project { Name = "Test Project 1", OrganizationId = organizationId };
         var project2 = new Project { Name = "Test Project 2", OrganizationId = organizationId };
+        var project3 = new Project { Name = "Test Project 3", OrganizationId = oid2 };
         Context.Projects.Add(project);
         Context.Projects.Add(project2);
         await Context.SaveChangesAsync();
         pid = project.Id;
         pid2 = project2.Id;
+        pid3 = project3.Id;
 
         var os1Config = new JsonObject();
         os1Config["mountPath"] = "Test Project 1";
@@ -232,6 +244,18 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
             Config = os7Config.ToString(),
             IsArchived = false
         };
+        
+        var os10Config = new JsonObject();
+        os10Config["mountPath"] = "Test 10";
+        var objectStorage10 = new ObjectStorage
+        {
+            Name = "Test Object Storage 10",
+            Type = "filesystem",
+            OrganizationId = oid2,
+            Config = os7Config.ToString(),
+            IsArchived = false, 
+            Default = true
+        };
 
         Context.ObjectStorages.Add(objectStorage);
         Context.ObjectStorages.Add(objectStorage2);
@@ -242,6 +266,7 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
         Context.ObjectStorages.Add(objectStorage7);
         Context.ObjectStorages.Add(objectStorage8);
         Context.ObjectStorages.Add(objectStorage9);
+        Context.ObjectStorages.Add(objectStorage10);
 
         await Context.SaveChangesAsync();
         os1 = objectStorage.Id;
@@ -251,6 +276,7 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
         os7 = objectStorage7.Id;
         os8 = objectStorage8.Id;
         os9 = objectStorage9.Id;
+        os10 = objectStorage10.Id;
         archivedOs = objectStorage5.Id;
     }
 
@@ -868,8 +894,20 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
         // Act & Assert
         var exception =
             await Assert.ThrowsAsync<KeyNotFoundException>(() =>
-                _objectStorageBusiness.GetDefaultObjectStorage(organizationId, pid2));
+                _objectStorageBusiness.GetDefaultObjectStorage(oid3, null));
         Assert.Contains("Default object storage not found", exception.Message);
+    }
+    
+    [Fact]
+    public async Task GetDefaultObjectStorage_Success_ReturnsDefaultObjectInherited()
+    {
+        // Act
+        var defaultObjectStorage = await _objectStorageBusiness.GetDefaultObjectStorage(
+            oid2, pid3);
+
+        // Assert
+        Assert.NotNull(defaultObjectStorage);
+        Assert.Equal(os10, defaultObjectStorage.Id);
     }
 
     #endregion

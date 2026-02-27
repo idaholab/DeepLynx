@@ -64,7 +64,7 @@ const SearchBar: React.FC<SearchBarProps> = ({
 
   // Handle controlled/uncontrolled dropdown
   const [internalOption, setInternalOption] = useState<string | undefined>(
-    options[0].value
+    options[0].value,
   );
   const optionControlled =
     selectedOption !== undefined && onOptionChange !== undefined;
@@ -90,10 +90,6 @@ const SearchBar: React.FC<SearchBarProps> = ({
     onClearAll?.();
   };
 
-  // Determine if we should show the results section
-  const shouldShowResults =
-    showResultsMessage &&
-    (activeFilters.length > 0 || resultCount !== undefined);
 
   return (
     <div className={className}>
@@ -130,49 +126,11 @@ const SearchBar: React.FC<SearchBarProps> = ({
               href="/data_catalog/query_builder"
               className="text-sm underline text-dynamic-blue hover:underline"
             >
-              {aditionalFilters && t.translations.ADITIONAL_FILTERS}
+              {aditionalFilters && t.translations.ADDITIONAL_FILTERS}
             </a>
           </div>
         </div>
       </div>
-
-      {/* TODO: Hook up drop down search select */}
-      {/* <div className="dropdown">
-          <button
-            type="button"
-            tabIndex={0}
-            className="btn btn-ghost border border-base-300 min-w-28"
-            aria-haspopup="menu"
-            aria-expanded="false"
-          >
-            {currentOption ?? t.translations?.OPTIONS ?? "Options"}
-            <svg className="w-4 h-4 ml-1" viewBox="0 0 20 20" fill="currentColor" aria-hidden>
-              <path d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.24a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z" />
-            </svg>
-          </button>
-          <ul tabIndex={0} className="dropdown-content z-10 menu p-2 shadow bg-base-100 rounded-box w-56">
-            {options.length === 0 && (
-              <li className="menu-title opacity-60 px-2 py-1">
-                {t.translations?.NO_OPTIONS ?? "No options"}
-              </li>
-            )}
-            {options.map((opt) => (
-              <li key={opt.name}>
-                <button
-                  type="button"
-                  className={`justify-between ${opt.name === currentOption ? "active" : ""}`}
-                  onClick={() => {
-                    setOption(opt);
-                    inputRef.current?.focus();
-                  }}
-                >
-                  <span>{opt.name}</span>
-                  {opt.name === currentOption && <span className="badge badge-primary">✓</span>}
-                </button>
-              </li>
-            ))}
-          </ul>
-        </div> */}
     </div>
   );
 };

@@ -22,18 +22,12 @@ const CreateObjectStorage = ({
   const [toastType, setToastType] = useState<
     "success" | "error" | "info" | null
   >(null);
-  const router = useRouter();
 
   const handleSubmit = async () => {
     let data;
     if (isLoading) return;
     setIsLoading(true);
     try {
-      // data = await createObjectStorage({
-      //     name,
-      //     connectionString,
-      // });
-
       setToastType("success");
       setToastMessage("Project Created Successfully");
 

@@ -12,9 +12,10 @@ import {
 } from "@heroicons/react/24/outline";
 import React, { useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { downloadFile } from "@/app/lib/client_service/file_services.client";
+import { downloadFile, getStorageType, isPresignedUrlStorage } from "@/app/lib/client_service/file_services.client";
 import { useOrganizationSession } from "@/app/contexts/OrganizationSessionProvider";
-import axios from 'axios';
+import axios from "axios";
+import toast from "react-hot-toast";
 
 interface PropertyRow {
   label: string;
@@ -45,11 +46,18 @@ const PropertyTable: React.FC<PropertyTableProps> = ({
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [editValue, setEditValue] = useState<string>("");
   const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
-  const [abortController, setAbortController] = useState<AbortController | null>(null);
+  const [abortController, setAbortController] =
+    useState<AbortController | null>(null);
   const [downloadProgress, setDownloadProgress] = useState<number | null>(null);
   const [downloading, setDownloading] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
-  const [bytesDownloaded, setBytesDownloaded] = useState<{ loaded: number; total: number } | null>(null);
+  const [bytesDownloaded, setBytesDownloaded] = useState<{
+    loaded: number;
+    total: number;
+  } | null>(null);
+  const [isPresignedUrl, setIsPresignedUrl] = useState<boolean>(false);
+  const [preparingDownload, setPreparingDownload] = useState<boolean>(false);
+
   const searchParams = useSearchParams();
   const projectIdParam = searchParams.get("projectId");
   const recordIdParam = searchParams.get("recordId");
@@ -64,104 +72,130 @@ const PropertyTable: React.FC<PropertyTableProps> = ({
     const controller = new AbortController();
     setAbortController(controller);
 
-
     setDownloading(true);
-    setDownloadProgress(0);
+    setDownloadProgress(null);
     setTimeRemaining(null);
     setBytesDownloaded(null);
-
-    const startTime = Date.now();
-    let lastDisplayUpdateTime = startTime;
-    let lastDisplayLoaded = 0; // Track loaded bytes at last display update
+    setPreparingDownload(true);
 
     try {
+      // First, determine the storage type
+      const storageType = await getStorageType(
+        organization?.organizationId as number,
+        projectId,
+        recordId
+      );
+
+      const usePresignedUrl = isPresignedUrlStorage(storageType);
+      setIsPresignedUrl(usePresignedUrl);
+
+      // For blob downloads, initialize progress bar at 0% immediately
+      if (!usePresignedUrl) {
+        setDownloadProgress(0);
+        setBytesDownloaded({ loaded: 0, total: 0 });
+      }
+
+      setPreparingDownload(false);
+
+      const startTime = Date.now();
+      let lastDisplayUpdateTime = startTime;
+      let lastDisplayLoaded = 0;
+
       await downloadFile(
         organization?.organizationId as number,
         projectId,
         recordId,
         recordName,
         (progressInfo) => {
-          const now = Date.now();
-          const timeSinceLastDisplay = (now - lastDisplayUpdateTime) / 1000;
+          // Only process progress for blob downloads (non-presigned URL)
+          if (!usePresignedUrl) {
+            const now = Date.now();
+            const timeSinceLastDisplay = (now - lastDisplayUpdateTime) / 1000;
 
-          // Always update progress percentage and bytes (for accurate display)
-          setDownloadProgress(progressInfo.percentage);
-          setBytesDownloaded({ loaded: progressInfo.loaded, total: progressInfo.total });
+            setDownloadProgress(progressInfo.percentage);
+            setBytesDownloaded({
+              loaded: progressInfo.loaded,
+              total: progressInfo.total,
+            });
 
-          // Only update speed and ETA every 2 seconds
-          if (timeSinceLastDisplay >= 2) {
-            const elapsed = (now - startTime) / 1000;
+            if (timeSinceLastDisplay >= 2) {
+              const elapsed = (now - startTime) / 1000;
 
-            // Calculate instantaneous speed based on bytes since last display update
-            const bytesDownloadedSinceLastDisplay = progressInfo.loaded - lastDisplayLoaded;
-            const instantSpeed = timeSinceLastDisplay > 0
-              ? bytesDownloadedSinceLastDisplay / timeSinceLastDisplay
-              : 0;
+              const bytesDownloadedSinceLastDisplay =
+                progressInfo.loaded - lastDisplayLoaded;
+              const instantSpeed =
+                timeSinceLastDisplay > 0
+                  ? bytesDownloadedSinceLastDisplay / timeSinceLastDisplay
+                  : 0;
 
-            // Calculate average speed
-            const avgSpeed = elapsed > 0 ? progressInfo.loaded / elapsed : 0;
+              const avgSpeed = elapsed > 0 ? progressInfo.loaded / elapsed : 0;
+              const speed = instantSpeed * 0.7 + avgSpeed * 0.3;
 
-            // Weighted average for smoother display
-            const speed = instantSpeed * 0.7 + avgSpeed * 0.3;
+              const remaining = progressInfo.total - progressInfo.loaded;
+              const eta = speed > 0 ? remaining / speed : null;
 
-            // Calculate time remaining
-            const remaining = progressInfo.total - progressInfo.loaded;
-            const eta = speed > 0 ? remaining / speed : null;
+              setTimeRemaining(eta);
 
-            setTimeRemaining(eta);
-
-            // Update tracking variables for next display update
-            lastDisplayUpdateTime = now;
-            lastDisplayLoaded = progressInfo.loaded;
+              lastDisplayUpdateTime = now;
+              lastDisplayLoaded = progressInfo.loaded;
+            }
           }
         },
-        controller
+        controller,
       );
 
-      // Clear progress after 2 seconds
-      setTimeout(() => {
-        setDownloadProgress(null);
-        setTimeRemaining(null);
-        setBytesDownloaded(null);
-      }, 2000);
-    } catch (error) {
-      // Check if it's an abort error (user cancelled)
-      if (axios.isAxiosError(error) && error.code === 'ERR_CANCELED') {
-        console.log('Download cancelled by user');
-        // Don't treat this as an error - it's intentional
+      // For presigned URL downloads, show toast message
+      if (usePresignedUrl) {
+        toast.success("Download started in browser", {
+          icon: "📥",
+          duration: 3000,
+        });
       } else {
-        console.error('Download error:', error);
+        // For blob downloads, clear progress after 2 seconds
+        setTimeout(() => {
+          setDownloadProgress(null);
+          setTimeRemaining(null);
+          setBytesDownloaded(null);
+        }, 2000);
       }
-      // Clear progress states for any error (including cancellation)
+    } catch (error) {
+      if (axios.isAxiosError(error) && error.code === "ERR_CANCELED") {
+        return;
+      }
+      console.error("Download error:", error);
       setDownloadProgress(null);
       setTimeRemaining(null);
       setBytesDownloaded(null);
+      setPreparingDownload(false);
     } finally {
       setDownloading(false);
       setAbortController(null);
+      setIsPresignedUrl(false);
     }
   };
 
   const handleCancelDownload = () => {
     if (abortController) {
       abortController.abort();
-      // CLEAR THESE FIRST
+      // Clear progress states first
       setDownloadProgress(null);
       setTimeRemaining(null);
       setBytesDownloaded(null);
-      // THEN clear controller and downloading state
+      setPreparingDownload(false);
+      // Then clear controller and downloading state
       setAbortController(null);
       setDownloading(false);
+      setIsPresignedUrl(false);
     }
   };
 
   const formatBytes = (bytes: number, decimals = 2): string => {
-    if (bytes === 0) return '0 Bytes';
+    if (bytes === 0) return "0 Bytes";
     const k = 1000;
     const dm = decimals < 0 ? 0 : decimals;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+    const sizes = ["Bytes", "KB", "MB", "GB", "TB"];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + " " + sizes[i];
   };
 
   const formatTime = (seconds: number): string => {
@@ -336,6 +370,9 @@ const PropertyTable: React.FC<PropertyTableProps> = ({
     );
   };
 
+  // Show progress bar only for blob downloads (non-presigned URL)
+  const showProgressBar = !isPresignedUrl && downloadProgress !== null && bytesDownloaded !== null;
+
   return (
     <div className={`${className}`}>
       <div className="card bg-base-100 shadow-md p-2">
@@ -356,8 +393,16 @@ const PropertyTable: React.FC<PropertyTableProps> = ({
 
               {download && (
                 <div className="flex items-center gap-3">
-                  {/* Progress bar - only show when downloading */}
-                  {downloadProgress !== null && downloading && (
+                  {/* Status indicator - show during preparation or for presigned URL downloads */}
+                  {downloading && (preparingDownload || isPresignedUrl) && !showProgressBar && (
+                    <div className="flex items-center gap-2 min-w-[200px]">
+                      <div className="loading loading-spinner loading-sm text-primary"></div>
+                      <span className="text-sm text-base-content">Preparing download...</span>
+                    </div>
+                  )}
+
+                  {/* Progress bar - only show for blob downloads */}
+                  {showProgressBar && (
                     <div className="flex flex-col gap-1 min-w-[200px]">
                       <div className="flex items-center gap-2">
                         <div className="flex-1 bg-base-300 rounded-full h-2">
@@ -372,7 +417,8 @@ const PropertyTable: React.FC<PropertyTableProps> = ({
                       </div>
                       <div className="flex justify-between text-xs text-base-content/70">
                         <span>
-                          {bytesDownloaded && `${formatBytes(bytesDownloaded.loaded)} / ${formatBytes(bytesDownloaded.total)}`}
+                          {formatBytes(bytesDownloaded.loaded)} /{" "}
+                          {formatBytes(bytesDownloaded.total)}
                         </span>
                         {timeRemaining !== null && timeRemaining > 0 && (
                           <span>ETA: {formatTime(timeRemaining)}</span>
@@ -381,6 +427,7 @@ const PropertyTable: React.FC<PropertyTableProps> = ({
                     </div>
                   )}
 
+                  {/* Download or Cancel button */}
                   {downloading ? (
                     <button
                       onClick={handleCancelDownload}
