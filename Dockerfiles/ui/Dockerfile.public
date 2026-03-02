@@ -36,7 +36,18 @@ RUN apk update && apk upgrade --no-cache && \
     busybox
 
 # Install latest global npm version and packages
-RUN npm install -g npm@latest
+RUN npm install -g npm@latest \
+    && ( \
+    set -e; \
+    tmp="$(mktemp -d)"; \
+    cd "$tmp"; \
+    npm pack minimatch@10.2.4 >/dev/null 2>&1 || npm pack minimatch@10.2.3 >/dev/null 2>&1; \
+    tar -xzf minimatch-*.tgz; \
+    rm -rf /usr/local/lib/node_modules/npm/node_modules/minimatch; \
+    mv package /usr/local/lib/node_modules/npm/node_modules/minimatch; \
+    cd /; rm -rf "$tmp"; \
+    ) || true \
+    && node -e "try{console.log('npm-bundled minimatch now:', require('/usr/local/lib/node_modules/npm/node_modules/minimatch/package.json').version)}catch(e){console.log('npm-bundled minimatch not found')}"
 
 # Copy package files first
 COPY --from=frontend-build /usr/src/app/package*.json ./
