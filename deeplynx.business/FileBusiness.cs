@@ -356,6 +356,7 @@ public class FileBusiness
             realDataSourceId = defaultDataSource.Id;
         }
 
+        if (chunk == null) throw new ArgumentException("chunk cannot be null");
         chunk = new SanitizedFormFile(chunk);
 
 

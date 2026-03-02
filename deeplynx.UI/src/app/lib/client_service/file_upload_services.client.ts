@@ -8,7 +8,7 @@ import api from "./api";
 // CONSTANTS
 // ============================================================================
 
-const CHUNK_THRESHOLD = 500 * 1024 * 1024; // 500MB threshold to determine regular or chunked upload
+export const CHUNK_THRESHOLD = 500 * 1024 * 1024; // 500MB threshold to determine regular or chunked upload
 const MAX_CONCURRENT_CHUNKS = 4;            // Upload 4 chunks simultaneously
 const MAX_RETRIES = 3;                      // Retry failed chunks up to 3 times
 
