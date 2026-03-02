@@ -178,11 +178,6 @@ function UploadProgressToast(props: UploadProgressToastProps) {
         />
       )}
       <p className="mt-1 text-[11px] text-base-content/65">{chunkSummary}</p>
-      {hasChunkInfo && !props.isCancelling && (
-        <p className="mt-1 text-[11px] text-base-content/65">
-          {remainingChunks} {t.translations.CHUNKS_LEFT}
-        </p>
-      )}
       {props.isCancelling && (
         <p className="mt-1 text-[11px] font-medium text-warning">
           {t.translations.CANCELLING_SHORT}
