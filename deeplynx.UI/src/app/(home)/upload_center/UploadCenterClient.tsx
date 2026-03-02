@@ -222,6 +222,7 @@ export default function UploadCenterClient({ initialAvailableFiles }: Props) {
             file,
             name: metadata.name || file.name,
             description: metadata.description || "",
+            metadataFile: metadata.metadataFile,
             onProgress: (progress) => {
               fileUploadState.setUploadProgress(progress);
             },

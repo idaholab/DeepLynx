@@ -31,7 +31,6 @@ export default function RecentUploadsCard({
         <h2 className="card-title">{title}</h2>
         <ul className="list bg-base-200/20 rounded rounded-xl">
           {uploads.map((u) => {
-            const Icon = iconMap[u.icon as IconKey];
             return (
               <li className="list-row" key={u.id}>
                 <AvatarCell name={u.name} image={u.avatar} />

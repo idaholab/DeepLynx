@@ -1,4 +1,6 @@
+using System.ComponentModel.DataAnnotations;
 using System.Text;
+using System.Text.Json;
 using System.Text.Json.Nodes;
 using deeplynx.business;
 using deeplynx.datalayer.Models;
@@ -18,24 +20,24 @@ namespace deeplynx.tests;
 public class FileBusinessTests : IntegrationTestBase
 {
     private readonly Mock<IFileBusiness> _innerFileBusiness = null!;
-    private readonly string _testDirectory = Path.Combine(Path.GetTempPath(), "FileBusinessChunkedTests");
     private readonly string _orgDefaultDirectory = Path.Combine(Path.GetTempPath(), "OrgDefaultStorage");
+    private readonly string _testDirectory = Path.Combine(Path.GetTempPath(), "FileBusinessChunkedTests");
     private ClassBusiness _classBusiness = null!;
     private DataSourceBusiness _dataSourceBusiness = null!;
     private Mock<IEdgeBusiness> _edgeBusiness = null!;
     private EventBusiness _eventBusiness = null!;
-    private SensitivityLabelBusiness _sensitivityLabelBusiness = null!;
-    private ISensitivityLabelService _sensitivityLabelService = null!;
     private FileBusiness _fileBusiness = null!;
     private Mock<IFileBusinessFactory> _fileBusinessFactory = null!;
+    private BulkCopyUpsertExecutor _mockBulkCopyExecutor = null!;
     private Mock<IHubContext<EventNotificationHub>> _mockHubContext = null!;
     private Mock<ILogger<NotificationBusiness>> _mockNotificationLogger = null!;
     private INotificationBusiness _notificationBusiness = null!;
     private ObjectStorageBusiness _objectStorageBusiness = null!;
     private RecordBusiness _recordBusiness = null!;
     private Mock<IRelationshipBusiness> _relationshipBusiness = null!;
+    private SensitivityLabelBusiness _sensitivityLabelBusiness = null!;
+    private ISensitivityLabelService _sensitivityLabelService = null!;
     private TagBusiness _tagBusiness = null!;
-    private BulkCopyUpsertExecutor _mockBulkCopyExecutor = null!;
 
     public long did; // datasource ID
     public long oid; // organization ID
@@ -72,7 +74,8 @@ public class FileBusinessTests : IntegrationTestBase
         _tagBusiness = new TagBusiness(Context, _eventBusiness);
         _sensitivityLabelBusiness = new SensitivityLabelBusiness(Context, _eventBusiness);
         _sensitivityLabelService = new SensitivityLabelService(Context);
-        _recordBusiness = new RecordBusiness(Context, _eventBusiness, _mockBulkCopyExecutor,_tagBusiness, _sensitivityLabelBusiness, _sensitivityLabelService);
+        _recordBusiness = new RecordBusiness(Context, _eventBusiness, _mockBulkCopyExecutor, _tagBusiness,
+            _sensitivityLabelBusiness, _sensitivityLabelService);
         _classBusiness = new ClassBusiness(Context, _recordBusiness, _relationshipBusiness.Object, _eventBusiness);
 
         var realFileFilesystemBusiness =
@@ -161,6 +164,15 @@ public class FileBusinessTests : IntegrationTestBase
         await Context.SaveChangesAsync();
     }
 
+
+    public override Task DisposeAsync()
+    {
+        if (Directory.Exists(_testDirectory)) Directory.Delete(_testDirectory, true);
+        if (Directory.Exists(_orgDefaultDirectory)) Directory.Delete(_orgDefaultDirectory, true);
+
+        return base.DisposeAsync();
+    }
+
     #region Helpers
 
     private IFormFile CreateFormFile(string content)
@@ -184,7 +196,7 @@ public class FileBusinessTests : IntegrationTestBase
     }
 
     #endregion
-    
+
     #region UploadFile Tests
 
     [Fact]
@@ -263,9 +275,9 @@ public class FileBusinessTests : IntegrationTestBase
         Assert.Equal("org-storage-file.txt", result.Name);
         Assert.Equal(orgOsId, result.ObjectStorageId);
         Assert.True(File.Exists(result.Uri));
-        Assert.True(result.Uri.Contains(_orgDefaultDirectory), 
+        Assert.True(result.Uri.Contains(_orgDefaultDirectory),
             $"File should be in org directory. Actual: {result.Uri}");
-        Assert.False(result.Uri.Contains(_testDirectory), 
+        Assert.False(result.Uri.Contains(_testDirectory),
             $"File should NOT be in project directory. Actual: {result.Uri}");
     }
 
@@ -312,7 +324,7 @@ public class FileBusinessTests : IntegrationTestBase
         // Assert: Should use project storage, not org default
         Assert.NotNull(result);
         Assert.Equal(osid, result.ObjectStorageId);
-        Assert.True(result.Uri.Contains(_testDirectory), 
+        Assert.True(result.Uri.Contains(_testDirectory),
             "Should use specified project storage, not org default");
         Assert.False(result.Uri.Contains(_orgDefaultDirectory));
     }
@@ -367,7 +379,7 @@ public class FileBusinessTests : IntegrationTestBase
             // Assert
             Assert.NotNull(result);
             Assert.Equal(secondaryOsId, result.ObjectStorageId);
-            Assert.True(result.Uri.Contains("SecondaryStorage"), 
+            Assert.True(result.Uri.Contains("SecondaryStorage"),
                 $"Should use secondary storage. Actual: {result.Uri}");
             Assert.False(result.Uri.Contains(_testDirectory));
             Assert.False(result.Uri.Contains(_orgDefaultDirectory));
@@ -375,10 +387,7 @@ public class FileBusinessTests : IntegrationTestBase
         finally
         {
             // Cleanup secondary directory
-            if (Directory.Exists(secondaryDir))
-            {
-                Directory.Delete(secondaryDir, true);
-            }
+            if (Directory.Exists(secondaryDir)) Directory.Delete(secondaryDir, true);
         }
     }
 
@@ -503,8 +512,100 @@ public class FileBusinessTests : IntegrationTestBase
         Assert.True(File.Exists(result2.Uri));
     }
 
-#endregion
-    
+    [Fact]
+    public async Task UploadFile_CustomMetadata_WorksCorrectly()
+    {
+        // Arrange: Create org storage
+        var orgOsConfig = new JsonObject
+        {
+            ["mountPath"] = _orgDefaultDirectory
+        };
+
+        var orgObjectStorage = new ObjectStorage
+        {
+            Name = "Org Storage",
+            ProjectId = null,
+            OrganizationId = oid,
+            Type = "filesystem",
+            Config = orgOsConfig.ToString(),
+            Default = false
+        };
+
+        Context.ObjectStorages.Add(orgObjectStorage);
+        await Context.SaveChangesAsync();
+
+        // Upload file to project storage
+        var content1 = "File in project storage";
+        var ms1 = new MemoryStream(Encoding.UTF8.GetBytes(content1));
+        var file1 = new FormFile(ms1, 0, ms1.Length, "file", "file1.txt")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "text/plain"
+        };
+
+        var metadata = new CreateRecordFileUploadRequestDto
+        {
+            Name = "Metadata",
+            Description = "Description",
+            Properties = new JsonObject { ["Name"] = "Name" },
+            OriginalId = "OriginalId"
+        };
+
+        var metadataJson = JsonSerializer.Serialize(metadata);
+        var metadataBytes = Encoding.UTF8.GetBytes(metadataJson);
+        var metadataStream = new MemoryStream(metadataBytes);
+        var metadataFile = new FormFile(metadataStream, 0, metadataStream.Length, "metadataFile", "metadata.json")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "application/json"
+        };
+
+        var result1 = await _fileBusiness.UploadFile(uid, oid, pid, did, osid, file1, null, metadataFile);
+
+        // Assert
+        Assert.NotNull(result1);
+        Assert.Equal(osid, result1.ObjectStorageId);
+        Assert.True(result1.Uri.Contains(_testDirectory));
+        Assert.True(File.Exists(result1.Uri));
+        Assert.Equal(metadata.Name, result1.Name);
+        Assert.Equal(metadata.Description, result1.Description);
+        Assert.Equal(metadata.OriginalId, result1.OriginalId);
+    }
+
+    [Fact]
+    public async Task UploadFile_MetadataFileMissingRequiredFields_ThrowsValidationException()
+    {
+        // Arrange
+        var content = "File in project storage";
+        var ms = new MemoryStream(Encoding.UTF8.GetBytes(content));
+        var file = new FormFile(ms, 0, ms.Length, "file", "file1.txt")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "text/plain"
+        };
+
+        // Metadata missing required fields: Description, Properties, OriginalId
+        var incompleteMetadata = new
+        {
+            Name = "Only Name Provided"
+        };
+
+        var metadataJson = JsonSerializer.Serialize(incompleteMetadata);
+        var metadataBytes = Encoding.UTF8.GetBytes(metadataJson);
+        var metadataStream = new MemoryStream(metadataBytes);
+        var metadataFile = new FormFile(metadataStream, 0, metadataStream.Length, "metadataFile", "metadata.json")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "application/json"
+        };
+
+        // Act & Assert
+        await Assert.ThrowsAsync<ValidationException>(() =>
+            _fileBusiness.UploadFile(uid, oid, pid, did, osid, file, null, metadataFile));
+    }
+
+    #endregion
+
     #region UpdateFile Tests
 
     [Fact]
@@ -538,7 +639,7 @@ public class FileBusinessTests : IntegrationTestBase
         Assert.Equal("updated.txt", updatedRecord.Name);
         Assert.Equal(osid, updatedRecord.ObjectStorageId);
         Assert.True(File.Exists(updatedRecord.Uri));
-        
+
         var savedContent = await File.ReadAllTextAsync(updatedRecord.Uri);
         Assert.Equal(newContent, savedContent);
     }
@@ -658,7 +759,7 @@ public class FileBusinessTests : IntegrationTestBase
         // Assert
         Assert.NotNull(result);
         Assert.Equal("download-test.txt", result.FileDownloadName);
-        
+
         using var reader = new StreamReader(result.FileStream);
         var downloadedContent = await reader.ReadToEndAsync();
         Assert.Equal(content, downloadedContent);
@@ -707,7 +808,7 @@ public class FileBusinessTests : IntegrationTestBase
         // Assert
         Assert.NotNull(result);
         Assert.Equal("org-download.txt", result.FileDownloadName);
-        
+
         using var reader = new StreamReader(result.FileStream);
         var downloadedContent = await reader.ReadToEndAsync();
         Assert.Equal(content, downloadedContent);
@@ -733,7 +834,7 @@ public class FileBusinessTests : IntegrationTestBase
         // Assert
         Assert.NotNull(result);
         Assert.Equal("specific-download.txt", result.FileDownloadName);
-        
+
         using var reader = new StreamReader(result.FileStream);
         var downloadedContent = await reader.ReadToEndAsync();
         Assert.Equal(content, downloadedContent);
@@ -757,7 +858,7 @@ public class FileBusinessTests : IntegrationTestBase
 
         var record = await _fileBusiness.UploadFile(uid, oid, pid, did, null, file);
         var filePath = record.Uri;
-        
+
         Assert.True(File.Exists(filePath));
         Assert.True(filePath.Contains(_testDirectory));
 
@@ -805,9 +906,9 @@ public class FileBusinessTests : IntegrationTestBase
 
         var record = await _fileBusiness.UploadFile(uid, oid, pid, did, null, file);
         var filePath = record.Uri;
-        
+
         // Verify file is in ORG directory
-        Assert.True(filePath.Contains(_orgDefaultDirectory), 
+        Assert.True(filePath.Contains(_orgDefaultDirectory),
             $"File should be in org directory. Actual: {filePath}");
         Assert.True(File.Exists(filePath));
 
@@ -833,7 +934,7 @@ public class FileBusinessTests : IntegrationTestBase
 
         var record = await _fileBusiness.UploadFile(uid, oid, pid, did, osid, file);
         var filePath = record.Uri;
-        
+
         Assert.True(File.Exists(filePath));
 
         // Act
@@ -997,7 +1098,7 @@ public class FileBusinessTests : IntegrationTestBase
         Assert.False(Directory.Exists(uploadPath));
     }
 
-#endregion
+    #endregion
 
     #region StartUpload Tests
 
@@ -1049,7 +1150,7 @@ public class FileBusinessTests : IntegrationTestBase
         };
 
         // Act: Start upload (should create chunked upload session)
-        var session = await _fileBusiness.StartUpload( oid, pid, did, osid, initRequest);
+        var session = await _fileBusiness.StartUpload(oid, pid, did, osid, initRequest);
 
         // Assert: Should use chunking
         Assert.NotNull(session);
@@ -1082,7 +1183,7 @@ public class FileBusinessTests : IntegrationTestBase
             FileSize = 1024
         };
 
-        var session = await _fileBusiness.StartUpload( oid, pid, did, osid, initRequest);
+        var session = await _fileBusiness.StartUpload(oid, pid, did, osid, initRequest);
 
         var content = "CHUNK-0-CONTENT";
         var formFile = CreateFormFile(content);
@@ -1127,12 +1228,12 @@ public class FileBusinessTests : IntegrationTestBase
             FileSize = 3072 // 3 chunks worth
         };
 
-        var session = await _fileBusiness.StartUpload( oid, pid, did, osid, initRequest);
+        var session = await _fileBusiness.StartUpload(oid, pid, did, osid, initRequest);
 
         // Act: Upload chunks OUT OF ORDER (2, 0, 1)
-        await _fileBusiness.UploadChunk( oid, pid, did, osid, CreateFormFile("CHUNK-2"), session.UploadId, 2);
-        await _fileBusiness.UploadChunk( oid, pid, did, osid, CreateFormFile("CHUNK-0"), session.UploadId, 0);
-        await _fileBusiness.UploadChunk( oid, pid, did, osid, CreateFormFile("CHUNK-1"), session.UploadId, 1);
+        await _fileBusiness.UploadChunk(oid, pid, did, osid, CreateFormFile("CHUNK-2"), session.UploadId, 2);
+        await _fileBusiness.UploadChunk(oid, pid, did, osid, CreateFormFile("CHUNK-0"), session.UploadId, 0);
+        await _fileBusiness.UploadChunk(oid, pid, did, osid, CreateFormFile("CHUNK-1"), session.UploadId, 1);
 
         var completeRequest = new FileUploadCompleteRequestDto
         {
@@ -1165,10 +1266,10 @@ public class FileBusinessTests : IntegrationTestBase
         );
 
         // Act: Upload chunk 0 twice with different content
-        await _fileBusiness.UploadChunk( oid, pid, did, osid, CreateFormFile("FIRST"), session.UploadId, 0);
-        await _fileBusiness.UploadChunk( oid, pid, did, osid, CreateFormFile("SECOND"), session.UploadId,
+        await _fileBusiness.UploadChunk(oid, pid, did, osid, CreateFormFile("FIRST"), session.UploadId, 0);
+        await _fileBusiness.UploadChunk(oid, pid, did, osid, CreateFormFile("SECOND"), session.UploadId,
             0); // Overwrites
-        await _fileBusiness.UploadChunk( oid, pid, did, osid, CreateFormFile("CHUNK-1"), session.UploadId, 1);
+        await _fileBusiness.UploadChunk(oid, pid, did, osid, CreateFormFile("CHUNK-1"), session.UploadId, 1);
 
         var completeRequest = new FileUploadCompleteRequestDto
         {
@@ -1257,14 +1358,14 @@ public class FileBusinessTests : IntegrationTestBase
             FileSize = 2048
         };
 
-        var session = await _fileBusiness.StartUpload( oid, pid, did, osid, initRequest);
+        var session = await _fileBusiness.StartUpload(oid, pid, did, osid, initRequest);
 
         // Upload two chunks
         var chunk0 = CreateFormFile("first-");
-        await _fileBusiness.UploadChunk( oid, pid, did, osid, chunk0, session.UploadId, 0);
+        await _fileBusiness.UploadChunk(oid, pid, did, osid, chunk0, session.UploadId, 0);
 
         var chunk1 = CreateFormFile("second");
-        await _fileBusiness.UploadChunk( oid, pid, did, osid, chunk1, session.UploadId, 1);
+        await _fileBusiness.UploadChunk(oid, pid, did, osid, chunk1, session.UploadId, 1);
 
         var completeRequest = new FileUploadCompleteRequestDto
         {
@@ -1356,9 +1457,9 @@ public class FileBusinessTests : IntegrationTestBase
         var chunk2Content = "CCCC";
 
         // Act: Upload chunks with known content
-        await _fileBusiness.UploadChunk( oid, pid, did, osid, CreateFormFile(chunk0Content), session.UploadId, 0);
-        await _fileBusiness.UploadChunk( oid, pid, did, osid, CreateFormFile(chunk1Content), session.UploadId, 1);
-        await _fileBusiness.UploadChunk( oid, pid, did, osid, CreateFormFile(chunk2Content), session.UploadId, 2);
+        await _fileBusiness.UploadChunk(oid, pid, did, osid, CreateFormFile(chunk0Content), session.UploadId, 0);
+        await _fileBusiness.UploadChunk(oid, pid, did, osid, CreateFormFile(chunk1Content), session.UploadId, 1);
+        await _fileBusiness.UploadChunk(oid, pid, did, osid, CreateFormFile(chunk2Content), session.UploadId, 2);
 
         var completeRequest = new FileUploadCompleteRequestDto
         {
@@ -1398,9 +1499,9 @@ public class FileBusinessTests : IntegrationTestBase
             chunk1Data[i] = (byte)(255 - i); // 255-0
         }
 
-        await _fileBusiness.UploadChunk( oid, pid, did, osid, CreateFormFileFromBytes(chunk0Data), session.UploadId,
+        await _fileBusiness.UploadChunk(oid, pid, did, osid, CreateFormFileFromBytes(chunk0Data), session.UploadId,
             0);
-        await _fileBusiness.UploadChunk( oid, pid, did, osid, CreateFormFileFromBytes(chunk1Data), session.UploadId,
+        await _fileBusiness.UploadChunk(oid, pid, did, osid, CreateFormFileFromBytes(chunk1Data), session.UploadId,
             1);
 
         var completeRequest = new FileUploadCompleteRequestDto
@@ -1466,8 +1567,8 @@ public class FileBusinessTests : IntegrationTestBase
             session.UploadId
         );
 
-        await _fileBusiness.UploadChunk( oid, pid, did, osid, CreateFormFile("chunk0"), session.UploadId, 0);
-        await _fileBusiness.UploadChunk( oid, pid, did, osid, CreateFormFile("chunk1"), session.UploadId, 1);
+        await _fileBusiness.UploadChunk(oid, pid, did, osid, CreateFormFile("chunk0"), session.UploadId, 0);
+        await _fileBusiness.UploadChunk(oid, pid, did, osid, CreateFormFile("chunk1"), session.UploadId, 1);
 
         // Verify upload directory exists before complete
         Assert.True(Directory.Exists(uploadPath));
@@ -1489,8 +1590,8 @@ public class FileBusinessTests : IntegrationTestBase
     }
 
     #endregion
-    
-   #region Default Object Storage Tests
+
+    #region Default Object Storage Tests
 
     [Fact]
     public async Task StartUpload_NoObjectStorageId_UsesProjectDefault()
@@ -1514,7 +1615,7 @@ public class FileBusinessTests : IntegrationTestBase
         // Assert: Should use the project default (osid)
         Assert.NotNull(session);
         Assert.NotNull(session.UploadId);
-        
+
         // Verify the upload directory was created with correct project path
         var uploadPath = Path.Combine(
             _testDirectory,
@@ -1572,7 +1673,7 @@ public class FileBusinessTests : IntegrationTestBase
         // Assert: Should use org default in org directory
         Assert.NotNull(session);
         Assert.NotNull(session.UploadId);
-        
+
         var orgUploadPath = Path.Combine(
             _orgDefaultDirectory, // ← ORG directory
             $"org_{oid}",
@@ -1582,7 +1683,7 @@ public class FileBusinessTests : IntegrationTestBase
             session.UploadId
         );
         Assert.True(Directory.Exists(orgUploadPath), "Upload should be in org default directory");
-        
+
         // Verify it's NOT in project directory
         var projectUploadPath = Path.Combine(
             _testDirectory, // ← PROJECT directory
@@ -1687,6 +1788,47 @@ public class FileBusinessTests : IntegrationTestBase
     }
 
     [Fact]
+    public async Task CompleteUpload_CustomMetadata_WorksCorrectly()
+    {
+        // Arrange
+        var session = await _fileBusiness.StartUpload(
+            oid, pid, did, null,
+            new FileUploadInitRequestDto { FileName = "complete-default.txt", FileSize = 2048 }
+        );
+
+        await _fileBusiness.UploadChunk(oid, pid, did, null, CreateFormFile("chunk0"), session.UploadId, 0);
+        await _fileBusiness.UploadChunk(oid, pid, did, null, CreateFormFile("chunk1"), session.UploadId, 1);
+
+        var completeRequest = new FileUploadCompleteRequestDto
+        {
+            UploadId = session.UploadId,
+            FileName = "complete-default.txt",
+            TotalChunks = 2
+        };
+
+        var metadata = new CreateRecordFileUploadRequestDto
+        {
+            Name = "Metadata",
+            Description = "Description",
+            Properties = new JsonObject
+            {
+                ["Name"] = "Name"
+            },
+            OriginalId = "OriginalId"
+        };
+
+        // Act
+        var result1 = await _fileBusiness.CompleteUpload(uid, oid, pid, did, null, completeRequest, null, metadata);
+
+        // Assert: Both files should be in their respective storages
+        Assert.NotNull(result1);
+        Assert.True(File.Exists(result1.Uri));
+        Assert.Equal(result1.Name, metadata.Name);
+        Assert.Equal(result1.Description, metadata.Description);
+        Assert.Equal(result1.OriginalId, metadata.OriginalId);
+    }
+
+    [Fact]
     public async Task CompleteUpload_NoObjectStorageId_UsesOrgDefault()
     {
         // Arrange: Create org default, disable project default
@@ -1735,9 +1877,9 @@ public class FileBusinessTests : IntegrationTestBase
         Assert.NotNull(result);
         Assert.Equal(orgOsId, result.ObjectStorageId); // Should use org default
         Assert.True(File.Exists(result.Uri));
-        Assert.True(result.Uri.Contains(_orgDefaultDirectory), 
+        Assert.True(result.Uri.Contains(_orgDefaultDirectory),
             $"File should be in org directory. Actual: {result.Uri}");
-        Assert.False(result.Uri.Contains(_testDirectory), 
+        Assert.False(result.Uri.Contains(_testDirectory),
             $"File should NOT be in project directory. Actual: {result.Uri}");
     }
 
@@ -1821,9 +1963,9 @@ public class FileBusinessTests : IntegrationTestBase
         Assert.NotNull(result);
         Assert.Equal(orgOsId, result.ObjectStorageId); // Should use org default
         Assert.True(File.Exists(result.Uri));
-        Assert.True(result.Uri.Contains(_orgDefaultDirectory), 
+        Assert.True(result.Uri.Contains(_orgDefaultDirectory),
             $"File should be in org directory. Actual: {result.Uri}");
-        Assert.False(result.Uri.Contains(_testDirectory), 
+        Assert.False(result.Uri.Contains(_testDirectory),
             $"File should NOT be in project directory. Actual: {result.Uri}");
     }
 
@@ -1832,10 +1974,7 @@ public class FileBusinessTests : IntegrationTestBase
     {
         // Arrange: Remove all default flags
         var allStorages = Context.ObjectStorages.Where(os => os.OrganizationId == oid);
-        foreach (var storage in allStorages)
-        {
-            storage.Default = false;
-        }
+        foreach (var storage in allStorages) storage.Default = false;
         await Context.SaveChangesAsync();
 
         var request = new FileUploadInitRequestDto
@@ -1848,18 +1987,9 @@ public class FileBusinessTests : IntegrationTestBase
         var exception = await Assert.ThrowsAsync<KeyNotFoundException>(() =>
             _fileBusiness.StartUpload(oid, pid, did, null, request)
         );
-        
+
         Assert.Contains("No default object storage found", exception.Message);
     }
 
-#endregion
-
-
-    public override Task DisposeAsync()
-    {
-        if (Directory.Exists(_testDirectory)) Directory.Delete(_testDirectory, true);
-        if (Directory.Exists(_orgDefaultDirectory)) Directory.Delete(_orgDefaultDirectory, true);
-    
-        return base.DisposeAsync();
-    }
+    #endregion
 }

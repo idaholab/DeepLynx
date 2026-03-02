@@ -67,7 +67,7 @@ const RecordTagsPanel: React.FC<Props> = ({
   title,
 }) => {
   const { t } = useLanguage();
-  const [activeTab, setActiveTab] = useState(t.translations.TAGS);
+  const [activeTab, setActiveTab] = useState(t.translations.SENSITIVITY_LABELS);
 
   const tagContent = (
     <>
@@ -172,11 +172,11 @@ const RecordTagsPanel: React.FC<Props> = ({
   );
 
   const tabs = [
+    { label: t.translations.SENSITIVITY_LABELS, content: labelContent },
     {
       label: t.translations.TAGS,
       content: tagContent,
     },
-    { label: t.translations.SENSITIVITY_LABELS, content: labelContent },
   ];
 
   return (

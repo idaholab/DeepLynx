@@ -39,7 +39,7 @@ const LabelEditModal: React.FC<Props> = ({
           {editingLabel ? t.translations.EDIT_LABEL : t.translations.CREATE_LABEL}
         </h3>
         <p className="text-xs text-base-content/70 mb-4">
-          {t.translations.DEFINE_ORGANIZATION_LEVEL_SENSITIVATY_LABEL_DESCRIPTION}
+          {t.translations.DEFINE_ORGANIZATION_LEVEL_SENSITIVITY_LABEL_DESCRIPTION}
         </p>
 
         <div className="space-y-4">

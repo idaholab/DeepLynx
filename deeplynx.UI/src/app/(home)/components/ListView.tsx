@@ -83,14 +83,6 @@ const ListView: React.FC<ListViewProps> = ({
     }
   };
 
-  const filteredRecords = !selectedProjects?.length
-    ? data
-    : data.filter(
-        (record) =>
-          record.projectId !== undefined &&
-          selectedProjects.includes(record.projectId),
-      );
-
   const totalPages = Math.ceil(filteredRecords.length / RECORDS_PER_PAGE);
   const startIndex = (currentPage - 1) * RECORDS_PER_PAGE;
   const paginatedRecords = filteredRecords.slice(

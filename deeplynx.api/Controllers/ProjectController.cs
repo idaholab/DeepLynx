@@ -1,9 +1,9 @@
+using deeplynx.helpers;
 using deeplynx.helpers.Context;
 using deeplynx.interfaces;
 using deeplynx.models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using deeplynx.helpers;
 
 namespace deeplynx.api.Controllers;
 
@@ -12,9 +12,9 @@ namespace deeplynx.api.Controllers;
 [Authorize]
 public class ProjectController : ControllerBase
 {
+    private readonly IInvitationBusiness _invitationBusiness;
     private readonly ILogger<ProjectController> _logger;
     private readonly IProjectBusiness _projectBusiness;
-    private readonly IInvitationBusiness _invitationBusiness;
 
     /// <summary>
     ///     Initializes a new instance of the <see cref="ProjectController" /> class
@@ -58,7 +58,7 @@ public class ProjectController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
-    
+
     /// <summary>
     ///     Get all user projects
     /// </summary>
@@ -200,7 +200,7 @@ public class ProjectController : ControllerBase
     /// <param name="archive">True to archive the project, false to unarchive it.</param>
     /// <returns>A message stating the project was successfully archived or unarchived.</returns>
     [HttpPatch("{projectId:long}", Name = "api_archive_project")]
-    [Auth("update", "project", includeArchived: true)]
+    [Auth("update", "project", true)]
     public async Task<IActionResult> ArchiveProject(
         long organizationId,
         long projectId,
@@ -361,34 +361,40 @@ public class ProjectController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
-    
+
     /// <summary>
-    /// Invite/Add User to Project
+    ///     Invite/Add User to Project
     /// </summary>
     /// <param name="organizationId"></param>
     /// <param name="projectId"></param>
     /// <param name="userEmail"></param>
-    /// <param name="userName"></param>
     /// <param name="roleId"></param>
     /// <returns></returns>
     [HttpPost("{projectId:long}/invite", Name = "api_invite_user_to_project")]
+    [Auth("write", "user")]
     [Auth("update", "user")]
     [Auth("update", "project")]
     public async Task<ActionResult> InviteUserToProject(
         long organizationId,
         long projectId,
-        [FromQuery] string userEmail,
-        [FromQuery] string? userName,
+        [FromQuery] string? userEmail,
+        [FromQuery] long? userId,
+        [FromQuery] long? groupId,
         [FromQuery] long? roleId)
     {
         try
         {
-            await _invitationBusiness.InviteAndAddUserToHierarchy(organizationId,projectId, roleId, userEmail, userName);
-            return Ok(new { message = $"Invited and added inactive user with email {userEmail} to organization {organizationId}" });
+            await _invitationBusiness.InviteAndAddUserToHierarchy(organizationId, projectId, groupId, roleId, userId,
+                userEmail);
+            return Ok(new
+            {
+                message = $"Invited and added inactive user with email {userEmail} to organization {organizationId}"
+            });
         }
         catch (Exception exc)
         {
-            var message = $"An error occurred while adding user with email {userEmail} to organization {organizationId}: {exc}";
+            var message =
+                $"An error occurred while adding user with email {userEmail} to organization {organizationId}: {exc}";
             _logger.LogError(message);
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }

@@ -86,15 +86,6 @@ const WidgetCard: React.FC<WidgetCardProps> = ({
     <div>
       {/* Action Buttons Bar */}
       <div className="flex justify-end items-center mb-4 gap-2">
-        {/* {!canCustomize && (
-          <button
-            onClick={() => setCanCustomize(true)}
-            className="btn btn-sm btn-outline btn-secondary"
-          >
-            <Cog6ToothIcon className="h-5 w-5" />
-            <span>{t.translations.CUSTOMIZE}</span>
-          </button>
-        )} */}
         {canCustomize && (
           <>
             <button
@@ -110,13 +101,6 @@ const WidgetCard: React.FC<WidgetCardProps> = ({
             </button>
           </>
         )}
-        {/* <button
-          onClick={() => setWidgetModal(true)}
-          className="btn btn-sm btn-secondary"
-        >
-          <PlusIcon className="h-5 w-5" />
-          <span>{t.translations.WIDGET}</span>
-        </button> */}
       </div>
 
       <Reorder.Group

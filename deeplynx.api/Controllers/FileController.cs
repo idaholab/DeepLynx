@@ -40,6 +40,10 @@ public class FileController : ControllerBase
     /// <param name="dataSourceId">The ID of the data source to which the file belongs</param>
     /// <param name="objectStorageId">The ID of the object storage method</param>
     /// <param name="file">The file to upload</param>
+    /// <param name="metadata">
+    ///     Both file to upload and *optional metadata file to associate with the file to upload. Metadata
+    ///     file must follow the CreateRecordFileUploadRequestDto that can be found in Models.
+    /// </param>
     /// <returns>Record response DTO containing file information</returns>
     [HttpPost(Name = "api_upload_file")]
     [Auth("write", "file")]
@@ -51,14 +55,15 @@ public class FileController : ControllerBase
         [FromQuery] long? dataSourceId,
         [FromQuery] long? objectStorageId,
         IFormFile file,
-        [FromQuery] List<long>? sensitivityLabelIds)
+        [FromQuery] List<long>? sensitivityLabelIds,
+        IFormFile? metadata)
     {
         try
         {
             var currentUserId = UserContextStorage.UserId;
             var fileUploadInfo =
                 await _fileBusiness.UploadFile(currentUserId, organizationId, projectId, dataSourceId, objectStorageId,
-                    file, sensitivityLabelIds);
+                    file, sensitivityLabelIds, metadata);
             return Ok(fileUploadInfo);
         }
         catch (Exception exc)
@@ -121,6 +126,35 @@ public class FileController : ControllerBase
         {
             var currentUserId = UserContextStorage.UserId;
             var fileStreamResult = await _fileBusiness.DownloadFile(currentUserId, organizationId, projectId, recordId);
+            return fileStreamResult;
+        }
+        catch (Exception exc)
+        {
+            var message = $"An error occurred while downloading file in record {recordId}: {exc}";
+            _logger.LogError(message);
+            return StatusCode(StatusCodes.Status500InternalServerError, message);
+        }
+    }
+    
+    /// <summary>
+    ///     Generate Download URL
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <param name="projectId">The ID of the project to which the file belongs</param>
+    /// <param name="recordId">The ID of the record that contains file information</param>
+    /// <returns>The file stream for download</returns>
+    [HttpGet("{recordId:long}/url", Name = "api_download_url")]
+    [Auth("read", "file")]
+    [Sensitivity("download file")]
+    public async Task<ActionResult<string>> GenerateDownloadUrl(
+        long organizationId,
+        long projectId,
+        long recordId)
+    {
+        try
+        {
+            var currentUserId = UserContextStorage.UserId;
+            var fileStreamResult = await _fileBusiness.GenerateDownloadURL(currentUserId, organizationId, projectId, recordId);
             return fileStreamResult;
         }
         catch (Exception exc)
@@ -236,7 +270,7 @@ public class FileController : ControllerBase
     /// <param name="projectId">The ID of the project to which the file belongs</param>
     /// <param name="dataSourceId">The ID of the data source to which the file belongs</param>
     /// <param name="objectStorageId">The ID of the object storage method</param>
-    /// <param name="request">File upload completion request DTO</param>
+    /// <param name="request">File upload completion request DTO with optional metadata DTO</param>
     /// <returns>Record response DTO containing file information</returns>
     [HttpPost("upload/complete", Name = "api_complete_file_upload")]
     [Auth("write", "file")]
@@ -253,7 +287,8 @@ public class FileController : ControllerBase
         {
             var currentUserId = UserContextStorage.UserId;
             var fileRecord = await _fileBusiness.CompleteUpload(
-                currentUserId, organizationId, projectId, dataSourceId, objectStorageId, request, sensitivityLabelIds);
+                currentUserId, organizationId, projectId, dataSourceId, objectStorageId, request, sensitivityLabelIds,
+                request.Metadata);
             return Ok(fileRecord);
         }
         catch (Exception exc)

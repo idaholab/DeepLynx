@@ -232,8 +232,8 @@ export default function DataCatalogClient({
         selectedNums.length === projects.length
           ? convertedResults
           : convertedResults.filter((r: RecordTableRow) =>
-              selectedNums.includes(Number(r.projectId)),
-            );
+            selectedNums.includes(Number(r.projectId)),
+          );
 
       setTableData(scoped);
       setActiveFilters((prev) => [...prev, newFilter]);
@@ -467,9 +467,8 @@ export default function DataCatalogClient({
               </button>
             )}
             <button
-              className={`btn btn-sm ${
-                viewMode === "list" ? "btn-primary" : "btn-ghost"
-              }`}
+              className={`btn btn-sm ${viewMode === "list" ? "btn-primary" : "btn-ghost"
+                }`}
               onClick={() => setViewMode("list")}
               title={t.translations.LIST_VIEW}
             >
@@ -477,9 +476,8 @@ export default function DataCatalogClient({
             </button>
 
             <button
-              className={`btn btn-sm ${
-                viewMode === "table" ? "btn-primary" : "btn-ghost"
-              }`}
+              className={`btn btn-sm ${viewMode === "table" ? "btn-primary" : "btn-ghost"
+                }`}
               onClick={() => setViewMode("table")}
               title={t.translations.TABLE_VIEW}
             >
@@ -502,9 +500,8 @@ export default function DataCatalogClient({
                     {visibleCols.length - 1}/{ALL_COLUMNS.length - 1}
                   </span>
                   <ChevronDownIcon
-                    className={`h-4 w-4 transition-transform ${
-                      open ? "rotate-180" : ""
-                    }`}
+                    className={`h-4 w-4 transition-transform ${open ? "rotate-180" : ""
+                      }`}
                   />
                 </button>
 

@@ -1,0 +1,19 @@
+# Common Issues
+
+This is a document tracking problems you might encounter as a developer or user of DeepLynx Nexus
+
+## Developers
+
+### The Nexus Sandbox
+
+If you're developing an application alongside Nexus, you need to interface with the API.
+
+There are certain instances where you might want to run Nexus [locally](../developing_deeplynx_nexus/developing_locally.mdx), but if you'd like to build against a living deployment, navigate to the DeepLynx Nexus sandbox at https://deeplynx-test.dev.inl.gov and create an API key/secret pair to start working with the API. This is strongly recommended for most developers.
+
+### Docker and Containerization Software
+
+Often developers build software in Docker. If you develop a client application in Docker, and **also** want to run Nexus locally, you need to consider Docker networks.
+
+While running in Docker, Nexus listens on `http://localhost:5000`, but your client application's container thinks `localhost` is the _container_ localhost. Instead, the client container will find Nexus using Docker DNS at `http://host.docker.internal:5000`. This is a built-in DNS proxy that resolves to the host machine's `localhost` (your computer's localhost).
+
+You could also add your client container to the Nexus container network, by running `docker network connect nexus-network [client container name]`

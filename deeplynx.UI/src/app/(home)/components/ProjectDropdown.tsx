@@ -136,7 +136,7 @@ const ProjectDropdown: React.FC<ProjectDropdownProps> = ({
             {filteredProjects.map((project) => (
               <label
                 key={project.id}
-                className="label cursor-pointer justify-start gap-2 text-base-content"
+                className="label cursor-pointer justify-start gap-2 text-base-content truncate"
               >
                 <input
                   type="checkbox"
@@ -144,7 +144,7 @@ const ProjectDropdown: React.FC<ProjectDropdownProps> = ({
                   checked={selectedIds.includes(project.id)}
                   onChange={() => toggleProject(project.id)}
                 />
-                <span className="label-text">{project.name}</span>
+                <span className="label-text" title={project.name}>{project.name.length> 50 ? project.name.slice(0,50) + "..." : project.name}</span>
               </label>
             ))}
           </div>
