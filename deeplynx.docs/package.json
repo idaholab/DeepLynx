@@ -25,5 +25,8 @@
     "nextra-theme-docs": "^4.4.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1"
+  },
+  "overrides": {
+    "minimatch": "^10.2.4"
   }
 }
