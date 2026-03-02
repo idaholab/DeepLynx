@@ -17,7 +17,6 @@ public interface ITimeseriesBusiness
         TimeseriesUploadCompleteRequestDto request);
 
     Task CreateTimeseriesTable(long organizationId, long projectId, long dataSourceId, string tableName,
-        string filePath,
         string fileType);
 
     Task AppendTimeseriesTable(long organizationId, long projectId, long dataSourceId, IFormFile file,
