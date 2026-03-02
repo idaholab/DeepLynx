@@ -215,6 +215,7 @@ public class HistoricalRecordBusiness : IHistoricalRecordBusiness
             ProjectId = record.ProjectId,
             ProjectName = record.ProjectName,
             Tags = record.Tags,
+            Labels = record.Labels,
             LastUpdatedBy = record.LastUpdatedBy,
             IsArchived = record.IsArchived,
             LastUpdatedAt = record.LastUpdatedAt
