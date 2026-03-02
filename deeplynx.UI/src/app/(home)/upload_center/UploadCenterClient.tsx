@@ -78,7 +78,7 @@ export default function UploadCenterClient({ initialAvailableFiles }: Props) {
 
   const handleFileUpload = async () => {
     if (!organizationId || !projectId || selectedFiles.length === 0) {
-      toast.error("Select a project and at least one file.");
+      toast.error(t.translations.SELECT_A_PROJECT_AND_AT_LEAST_ONE_FILE);
       return;
     }
 
@@ -103,15 +103,17 @@ export default function UploadCenterClient({ initialAvailableFiles }: Props) {
 
     if (showChunkedProgressToast) {
       uploadToastManager.show({
-        title: "Uploading file",
-        message: "Preparing upload...",
+        title: t.translations.UPLOADING_FILE,
+        message: t.translations.PREPARING_UPLOAD,
       });
     }
 
     const showProgressToast = (progress: UploadProgressEvent) => {
       uploadToastManager.show({
-        title: "Uploading file",
-        message: `${progress.chunksCompleted} / ${progress.totalChunks} chunks`,
+        title: t.translations.UPLOADING_FILE,
+        message: `${progress.chunksCompleted} / ${progress.totalChunks} ${
+          t.translations.CHUNKS
+        }`,
         percent: progress.percentComplete,
         chunksCompleted: progress.chunksCompleted,
         totalChunks: progress.totalChunks,
@@ -166,7 +168,9 @@ export default function UploadCenterClient({ initialAvailableFiles }: Props) {
           Number(dataSourceId),
           file,
         );
-        uploadToastManager.success("Timeseries file uploaded successfully!");
+        uploadToastManager.success(
+          t.translations.TIMESERIES_FILE_UPLOADED_SUCCESSFULLY,
+        );
       } else {
         await uploadFile({
           ...uploadContext,
@@ -180,16 +184,18 @@ export default function UploadCenterClient({ initialAvailableFiles }: Props) {
             if (showChunkedProgressToast) showProgressToast(progress);
           },
         });
-        uploadToastManager.success("File uploaded successfully!");
+        uploadToastManager.success(t.translations.FILE_UPLOADED_SUCCESSFULLY);
       }
 
       fileUploadState.resetFileUpload();
     } catch (err) {
       if (err instanceof DOMException && err.name === "AbortError") {
-        uploadToastManager.message("Upload cancelled.");
+        uploadToastManager.message(t.translations.UPLOAD_CANCELLED);
       } else {
         console.error("Upload error:", err);
-        uploadToastManager.error("Upload failed. See console for details.");
+        uploadToastManager.error(
+          t.translations.UPLOAD_FAILED_SEE_CONSOLE_FOR_DETAILS,
+        );
       }
       fileUploadState.setUploadProgress(null);
     } finally {
@@ -202,17 +208,17 @@ export default function UploadCenterClient({ initialAvailableFiles }: Props) {
       !bulkUploadState.validationResult ||
       !bulkUploadState.validationResult.isValid
     ) {
-      toast.error("Please fix validation errors before uploading");
+      toast.error(t.translations.PLEASE_FIX_VALIDATION_ERRORS_BEFORE_UPLOADING);
       return;
     }
 
     if (!projectId || !dataSourceId) {
-      toast.error("Please select project and data source");
+      toast.error(t.translations.PLEASE_SELECT_PROJECT_AND_DATASOURCE);
       return;
     }
 
     if (!organizationId) {
-      toast.error("Organization not found");
+      toast.error(t.translations.ORGANIZATION_NOT_FOUND);
       return;
     }
 
@@ -248,11 +254,17 @@ export default function UploadCenterClient({ initialAvailableFiles }: Props) {
       console.error("Upload error:", error);
 
       bulkUploadState.setUploadProgress(0);
-      const errorMessages = extractErrorMessages(error);
+      const errorMessages = extractErrorMessages(
+        error,
+        t.translations.UNKNOWN_ERROR_OCCURRED,
+        t.translations.UNKNOWN_ERROR,
+      );
       const parsedErrors = parseBackendErrors(errorMessages);
       bulkUploadState.setBackendErrors(parsedErrors);
 
-      toast.error("Upload failed. Please check the error details below.");
+      toast.error(
+        t.translations.UPLOAD_FAILED_PLEASE_CHECK_ERROR_DETAILS_BELOW,
+      );
     } finally {
       if (progressInterval) {
         clearInterval(progressInterval);
@@ -285,7 +297,7 @@ export default function UploadCenterClient({ initialAvailableFiles }: Props) {
           <div className="mb-6">
             <label className="label">
               <span className="label-text font-bold text-base-content">
-                {t.translations.UPLOAD_MODE || "Upload Mode"}
+                {t.translations.UPLOAD_MODE}
               </span>
             </label>
             <div className="btn-group">
@@ -302,7 +314,7 @@ export default function UploadCenterClient({ initialAvailableFiles }: Props) {
                 }}
               >
                 <DocumentIcon className="size-6" />
-                {t.translations.FILE_UPLOAD || "File Upload"}
+                {t.translations.FILE_UPLOAD}
               </button>
               <button
                 type="button"
@@ -318,7 +330,7 @@ export default function UploadCenterClient({ initialAvailableFiles }: Props) {
                 }}
               >
                 <ArrowUpOnSquareStackIcon className="size-6" />
-                {t.translations.BULK_METADATA || "Bulk Metadata"}
+                {t.translations.BULK_METADATA}
               </button>
             </div>
           </div>
@@ -385,7 +397,7 @@ export default function UploadCenterClient({ initialAvailableFiles }: Props) {
               <div className="mt-4 p-4 bg-base-200 rounded-lg flex flex-col items-center justify-center space-y-3">
                 <span className="loading loading-spinner loading-lg text-primary"></span>
                 <p className="text-sm text-base-content/70 text-center">
-                  Preparing upload...
+                  {t.translations.PREPARING_UPLOAD}
                 </p>
               </div>
             )}
@@ -438,15 +450,11 @@ export default function UploadCenterClient({ initialAvailableFiles }: Props) {
               <div className="bg-base-200 p-3 rounded text-sm space-y-1">
                 <p>
                   <strong>{t.translations.PROJECT}:</strong>{" "}
-                  {
-                    projects.find((p) => p.id === Number(projectId))?.name
-                  }
+                  {projects.find((p) => p.id === Number(projectId))?.name}
                 </p>
                 <p>
                   <strong>{t.translations.DATA_SOURCE}:</strong>{" "}
-                  {
-                    dataSources.find((d) => d.id === Number(dataSourceId))?.name
-                  }
+                  {dataSources.find((d) => d.id === Number(dataSourceId))?.name}
                 </p>
               </div>
               <div className="modal-action">
@@ -471,7 +479,7 @@ export default function UploadCenterClient({ initialAvailableFiles }: Props) {
                       {t.translations.UPLOADING}
                     </>
                   ) : (
-                    "Confirm Upload"
+                    t.translations.CONFIRM_UPLOAD
                   )}
                 </button>
               </div>
@@ -495,8 +503,12 @@ type ErrorResponseData = {
   message?: unknown;
 };
 
-function extractErrorMessages(error: unknown): string[] {
-  const fallback = ["Unknown error occurred"];
+function extractErrorMessages(
+  error: unknown,
+  unknownErrorOccurred: string,
+  unknownError: string,
+): string[] {
+  const fallback = [unknownErrorOccurred];
 
   if (typeof error !== "object" || error === null) {
     return fallback;
@@ -516,11 +528,11 @@ function extractErrorMessages(error: unknown): string[] {
     const d = data as ErrorResponseData;
 
     if (Array.isArray(d.errors)) {
-      return d.errors.map((err) => toMessage(err));
+      return d.errors.map((err) => toMessage(err, unknownError));
     }
 
     if (d.error !== undefined) {
-      return [toMessage(d.error)];
+      return [toMessage(d.error, unknownError)];
     }
 
     if (typeof d.message === "string") {
@@ -537,7 +549,7 @@ function extractErrorMessages(error: unknown): string[] {
   return fallback;
 }
 
-function toMessage(value: unknown): string {
+function toMessage(value: unknown, unknownError: string): string {
   if (typeof value === "string") return value;
   if (typeof value === "object" && value !== null) {
     const maybe = value as { message?: unknown };
@@ -546,6 +558,6 @@ function toMessage(value: unknown): string {
   try {
     return JSON.stringify(value);
   } catch {
-    return "Unknown error";
+    return unknownError;
   }
 }

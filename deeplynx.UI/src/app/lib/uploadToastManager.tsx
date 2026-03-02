@@ -1,3 +1,6 @@
+"use client";
+
+import { useLanguage } from "@/app/contexts/Language";
 import { ChevronDownIcon, ChevronUpIcon } from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
 
@@ -104,6 +107,9 @@ type UploadProgressToastProps = UploadToastState & {
 };
 
 function UploadProgressToast(props: UploadProgressToastProps) {
+  const { t } = useLanguage();
+  const chunksLabel = t.translations.CHUNKS;
+  const leftLabel = t.translations.LEFT;
   const progress =
     typeof props.percent === "number"
       ? Math.max(0, Math.min(100, props.percent))
@@ -116,12 +122,12 @@ function UploadProgressToast(props: UploadProgressToastProps) {
   const totalChunks = props.totalChunks ?? 0;
   const remainingChunks = Math.max(totalChunks - completedChunks, 0);
   const chunkSummary = hasChunkInfo
-    ? `${completedChunks} / ${totalChunks} chunks`
+    ? `${completedChunks} / ${totalChunks} ${chunksLabel}`
     : props.message;
   const status = props.isCancelling
-    ? "Cancelling..."
+    ? t.translations.CANCELLING_SHORT
     : hasProgress
-      ? `Uploading ${Math.round(progress)}%`
+      ? `${t.translations.UPLOADING_PERCENT_PREFIX} ${Math.round(progress)}%`
       : props.title;
 
   if (props.minimized) {
@@ -135,14 +141,14 @@ function UploadProgressToast(props: UploadProgressToastProps) {
             type="button"
             className="btn btn-xs bg-base-100 btn-soft text-base-content"
             onClick={props.toggleMinimized}
-            aria-label="Expand upload toast"
+            aria-label={t.translations.EXPAND_UPLOAD_TOAST}
           >
             <ChevronDownIcon className="size-4" />
           </button>
         </div>
         {hasChunkInfo && (
           <p className="mt-1 text-[11px] text-base-content/65">
-            {remainingChunks} left
+            {remainingChunks} {leftLabel}
           </p>
         )}
       </div>
@@ -159,7 +165,7 @@ function UploadProgressToast(props: UploadProgressToastProps) {
           type="button"
           className="btn btn-xs bg-base-100 btn-soft text-base-content"
           onClick={props.toggleMinimized}
-          aria-label="Minimize upload toast"
+          aria-label={t.translations.MINIMIZE_UPLOAD_TOAST}
         >
           <ChevronUpIcon className="size-4" />
         </button>
@@ -174,12 +180,12 @@ function UploadProgressToast(props: UploadProgressToastProps) {
       <p className="mt-1 text-[11px] text-base-content/65">{chunkSummary}</p>
       {hasChunkInfo && !props.isCancelling && (
         <p className="mt-1 text-[11px] text-base-content/65">
-          {remainingChunks} chunks left
+          {remainingChunks} {t.translations.CHUNKS_LEFT}
         </p>
       )}
       {props.isCancelling && (
         <p className="mt-1 text-[11px] font-medium text-warning">
-          Cancelling upload...
+          {t.translations.CANCELLING_SHORT}
         </p>
       )}
       {props.onCancel && (
@@ -192,10 +198,10 @@ function UploadProgressToast(props: UploadProgressToastProps) {
           {props.cancelDisabled ? (
             <>
               <span className="loading loading-spinner loading-xs"></span>
-              Cancelling...
+              {t.translations.CANCELLING_SHORT}
             </>
           ) : (
-            "Cancel"
+            t.translations.CANCEL
           )}
         </button>
       )}
