@@ -720,6 +720,7 @@ public class RecordBusiness : IRecordBusiness
                     Id = l.Id,
                     Name = l.Name
                 }).ToList(),
+                Embedded = embedded ?? false,
             };
         }
         catch (Exception exc)
