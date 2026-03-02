@@ -113,6 +113,8 @@ export default function UploadCenterClient({ initialAvailableFiles }: Props) {
         title: "Uploading file",
         message: `${progress.chunksCompleted} / ${progress.totalChunks} chunks`,
         percent: progress.percentComplete,
+        chunksCompleted: progress.chunksCompleted,
+        totalChunks: progress.totalChunks,
         isCancelling: cancelling,
         onCancel: progress.uploadId ? cancelFromToast : undefined,
         cancelDisabled: cancelling,

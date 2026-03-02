@@ -1,11 +1,16 @@
-// app/lib/uploadToastManager.tsx
-
+import { ChevronDownIcon, ChevronUpIcon } from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
+
+const SUCCESS_DURATION_MS = 3000;
+const ERROR_DURATION_MS = 5000;
+const MESSAGE_DURATION_MS = 3000;
 
 export type UploadToastState = {
   title: string;
   message: string;
   percent?: number;
+  chunksCompleted?: number;
+  totalChunks?: number;
   isCancelling?: boolean;
   onCancel?: () => void;
   cancelDisabled?: boolean;
@@ -21,83 +26,176 @@ export type UploadToastManager = {
 
 export function createUploadToastManager(): UploadToastManager {
   let toastId: string | undefined;
+  let state: UploadToastState | null = null;
+  let minimized = false;
 
-  const dismissActiveToast = () => {
+  const dismiss = () => {
     if (toastId) {
       toast.dismiss(toastId);
       toastId = undefined;
     }
+    state = null;
+    minimized = false;
+  };
+
+  const render = () => {
+    if (!state) return;
+    const currentState = state;
+
+    toastId = toast.custom(
+      () => (
+        <UploadProgressToast
+          {...currentState}
+          minimized={minimized}
+          toggleMinimized={() => {
+            minimized = !minimized;
+            render();
+          }}
+        />
+      ),
+      {
+        id: toastId,
+        duration: Infinity,
+      },
+    );
+  };
+
+  const notify = (kind: "success" | "error" | "message", message: string) => {
+    dismiss();
+    if (kind === "success") {
+      toast.success(message, { duration: SUCCESS_DURATION_MS });
+      return;
+    }
+
+    if (kind === "error") {
+      toast.error(message, { duration: ERROR_DURATION_MS });
+      return;
+    }
+
+    toast(message, { duration: MESSAGE_DURATION_MS });
   };
 
   return {
-    show(state: UploadToastState) {
-      toastId = toast.custom(() => <UploadProgressToast {...state} />, {
-        id: toastId,
-        duration: Infinity,
-      });
+    show(nextState: UploadToastState) {
+      state = nextState;
+      if (!toastId) minimized = false;
+      render();
     },
 
-    dismiss() {
-      dismissActiveToast();
-    },
+    dismiss,
 
     success(message: string) {
-      dismissActiveToast();
-      toast.success(message, { duration: 3000 });
+      notify("success", message);
     },
 
     error(message: string) {
-      dismissActiveToast();
-      toast.error(message, { duration: 5000 });
+      notify("error", message);
     },
 
     message(message: string) {
-      dismissActiveToast();
-      toast(message, { duration: 3000 });
+      notify("message", message);
     },
   };
 }
 
-// Inline component so it can live in this file
-function UploadProgressToast(props: UploadToastState) {
-  return (
-    <div className="w-[320px] rounded-lg border border-base-300 bg-base-100 p-4 shadow-lg">
-      <p className="text-sm font-semibold text-base-content">{props.title}</p>
-      <p className="mt-1 text-xs text-base-content/70">{props.message}</p>
-      {typeof props.percent === "number" && (
-        <div className="mt-3">
-          <div className="mb-1 flex items-center justify-between text-xs">
-            <span className="text-base-content/70">Progress</span>
-            <span className="font-semibold text-base-content">
-              {Math.round(props.percent)}%
-            </span>
-          </div>
-          <progress
-            className="progress progress-primary w-full"
-            value={props.percent}
-            max="100"
-          />
+type UploadProgressToastProps = UploadToastState & {
+  minimized: boolean;
+  toggleMinimized: () => void;
+};
+
+function UploadProgressToast(props: UploadProgressToastProps) {
+  const progress =
+    typeof props.percent === "number"
+      ? Math.max(0, Math.min(100, props.percent))
+      : 0;
+  const hasProgress = typeof props.percent === "number";
+  const hasChunkInfo =
+    typeof props.chunksCompleted === "number" &&
+    typeof props.totalChunks === "number";
+  const completedChunks = props.chunksCompleted ?? 0;
+  const totalChunks = props.totalChunks ?? 0;
+  const remainingChunks = Math.max(totalChunks - completedChunks, 0);
+  const chunkSummary = hasChunkInfo
+    ? `${completedChunks} / ${totalChunks} chunks`
+    : props.message;
+  const status = props.isCancelling
+    ? "Cancelling..."
+    : hasProgress
+      ? `Uploading ${Math.round(progress)}%`
+      : props.title;
+
+  if (props.minimized) {
+    return (
+      <div className="w-[230px] rounded-lg border border-base-300 bg-base-100 p-2 shadow-lg">
+        <div className="mb-1 flex items-center justify-between gap-2">
+          <p className="truncate text-xs font-semibold text-base-content">
+            {status}
+          </p>
+          <button
+            type="button"
+            className="btn btn-xs bg-base-100 btn-soft text-base-content"
+            onClick={props.toggleMinimized}
+            aria-label="Expand upload toast"
+          >
+            <ChevronDownIcon className="size-4" />
+          </button>
         </div>
+        {hasChunkInfo && (
+          <p className="mt-1 text-[11px] text-base-content/65">
+            {remainingChunks} left
+          </p>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="w-[260px] rounded-lg border border-base-300 bg-base-100 p-3 shadow-lg">
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <p className="truncate text-xs font-semibold text-base-content">
+          {status}
+        </p>
+        <button
+          type="button"
+          className="btn btn-xs bg-base-100 btn-soft text-base-content"
+          onClick={props.toggleMinimized}
+          aria-label="Minimize upload toast"
+        >
+          <ChevronUpIcon className="size-4" />
+        </button>
+      </div>
+      {hasProgress && (
+        <progress
+          className="progress progress-primary h-1.5 w-full"
+          value={progress}
+          max="100"
+        />
+      )}
+      <p className="mt-1 text-[11px] text-base-content/65">{chunkSummary}</p>
+      {hasChunkInfo && !props.isCancelling && (
+        <p className="mt-1 text-[11px] text-base-content/65">
+          {remainingChunks} chunks left
+        </p>
       )}
       {props.isCancelling && (
-        <p className="mt-2 text-xs font-medium text-warning">
+        <p className="mt-1 text-[11px] font-medium text-warning">
           Cancelling upload...
         </p>
       )}
       {props.onCancel && (
         <button
           type="button"
-          className="btn btn-sm btn-outline btn-error w-full mt-3"
+          className="btn btn-xs btn-outline btn-error mt-2 w-full"
           onClick={props.onCancel}
           disabled={props.cancelDisabled}
         >
           {props.cancelDisabled ? (
             <>
               <span className="loading loading-spinner loading-xs"></span>
-              Cancelling and cleaning up...
+              Cancelling...
             </>
           ) : (
-            "Cancel Upload"
+            "Cancel"
           )}
         </button>
       )}
