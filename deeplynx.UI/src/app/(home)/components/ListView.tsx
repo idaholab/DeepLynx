@@ -83,6 +83,14 @@ const ListView: React.FC<ListViewProps> = ({
     }
   };
 
+  const filteredRecords = !selectedProjects?.length
+    ? data
+    : data.filter(
+        (record) =>
+          record.projectId !== undefined &&
+          selectedProjects.includes(record.projectId),
+      );
+
   const totalPages = Math.ceil(filteredRecords.length / RECORDS_PER_PAGE);
   const startIndex = (currentPage - 1) * RECORDS_PER_PAGE;
   const paginatedRecords = filteredRecords.slice(
@@ -95,13 +103,14 @@ const ListView: React.FC<ListViewProps> = ({
       setCurrentPage(1);
       return;
     }
+
     if (currentPage > totalPages) {
       setCurrentPage(totalPages);
     }
   }, [currentPage, totalPages]);
 
   return (
-    <div className="bg-base-100 px-3 sm:px-6 lg:px-10 w-full mx-auto text-info-content">
+    <div className="bg-base-100 px-10 w-full mx-auto text-info-content">
       <ul className="list">
         {paginatedRecords.map((record, index) => {
           const name = getHighlightedCell(record.name, activeSearchTerms);
@@ -126,20 +135,18 @@ const ListView: React.FC<ListViewProps> = ({
                 )
               }
             >
-              <div className="mb-1 text-base sm:text-lg break-words">
-                {name.content}
-              </div>
+              <div className="mb-1 text-lg">{name.content}</div>
               <span className="text-sm">{desc.content}</span>
-              <div className="flex flex-col sm:flex-row sm:items-center gap-2 pt-2">
+              <div className="flex pt-2">
                 {record.className && (
-                  <span className="inline-flex items-center gap-2 flex-wrap">
+                  <div className="inline-flex items-center gap-2 flex-wrap">
                     {t.translations.CLASS}:{" "}
                     <div className="badge badge-sm badge-secondary">
                       {className.content}
                     </div>
-                  </span>
+                  </div>
                 )}
-                <div className="sm:ml-4">
+                <div className="ml-4">
                   <span className="font-bold">
                     {t.translations.LAST_EDIT}:{" "}
                   </span>
@@ -156,7 +163,7 @@ const ListView: React.FC<ListViewProps> = ({
       </ul>
       {/* Pagination Controls */}
       {totalPages > 1 && (
-        <div className="flex justify-center sm:justify-end gap-2 mt-4 p-2 sm:p-4">
+        <div className="flex justify-end gap-2 mt-4 p-4">
           <button
             className="btn btn-sm btn-ghost"
             disabled={currentPage === 1}
