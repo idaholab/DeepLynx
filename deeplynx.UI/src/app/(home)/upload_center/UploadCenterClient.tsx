@@ -3,6 +3,7 @@
 import { useLanguage } from "@/app/contexts/Language";
 import { useOrganizationSession } from "@/app/contexts/OrganizationSessionProvider";
 import {
+  BatchUploadProgressEvent,
   cancelChunkedUpload,
   cancelCurrentUpload,
   CHUNK_THRESHOLD,
@@ -32,6 +33,9 @@ import ProjectResourceSelectors from "./components/ProjectResourceSelectors";
 type Props = {
   initialAvailableFiles: ExistingFile[];
 };
+
+const MAX_CONCURRENT_FILE_UPLOADS = 5;
+const MULTI_FILE_PROGRESS_TOAST_THRESHOLD = 30;
 
 export default function UploadCenterClient({ initialAvailableFiles }: Props) {
   const { t } = useLanguage();
@@ -143,9 +147,32 @@ export default function UploadCenterClient({ initialAvailableFiles }: Props) {
 
     try {
       if (selectedFiles.length > 1) {
+        const shouldShowMultiFileProgressToast =
+          selectedFiles.length >= MULTI_FILE_PROGRESS_TOAST_THRESHOLD;
+
+        const showMultiFileProgressToast = (progress: BatchUploadProgressEvent) => {
+          uploadToastManager.show({
+            title: t.translations.UPLOADING_FILES,
+            message: `${progress.completed} / ${progress.total} ${t.translations.FILES_LABEL}`,
+            percent: (progress.completed / progress.total) * 100,
+          });
+        };
+
+        if (shouldShowMultiFileProgressToast) {
+          uploadToastManager.show({
+            title: t.translations.UPLOADING_FILES,
+            message: `0 / ${selectedFiles.length} ${t.translations.FILES_LABEL}`,
+            percent: 0,
+          });
+        }
+
         const results = await uploadFilesBatch({
           ...uploadContext,
           files: selectedFiles,
+          maxConcurrentFiles: MAX_CONCURRENT_FILE_UPLOADS,
+          onProgress: shouldShowMultiFileProgressToast
+            ? showMultiFileProgressToast
+            : undefined,
         });
 
         const ok = results.filter((r) => r.status === "fulfilled").length;
