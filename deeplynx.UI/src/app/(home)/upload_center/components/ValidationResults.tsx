@@ -7,12 +7,23 @@ import {
   EyeIcon,
   XCircleIcon,
 } from "@heroicons/react/24/outline";
+import { useLanguage } from "@/app/contexts/Language";
 import RecordPreviewTable from "./RecordPreviewTable";
 import UploadProgressBar from "./UploadProgressBar";
 import type {
   ValidationError,
   ValidationResult,
 } from "../../types/bulk_upload_types";
+
+function interpolate(
+  template: string,
+  values: Record<string, string | number>,
+): string {
+  return Object.entries(values).reduce(
+    (result, [key, value]) => result.replace(`{${key}}`, String(value)),
+    template,
+  );
+}
 
 interface ValidationResultsProps {
   isParsing: boolean;
@@ -43,13 +54,15 @@ export default function ValidationResults({
   setShowUploadConfirm,
   backendErrors,
 }: ValidationResultsProps) {
+  const { t } = useLanguage();
+
   return (
     <div className="mt-4 space-y-4">
       {/* Parsing Status */}
       {isParsing && (
         <div className="alert alert-info">
           <span className="loading loading-spinner loading-sm"></span>
-          <span>Parsing CSV file...</span>
+          <span>{t.translations.PARSING_CSV_FILE}</span>
         </div>
       )}
 
@@ -58,7 +71,7 @@ export default function ValidationResults({
         <div className="alert alert-error">
           <XCircleIcon className="size-6" />
           <div>
-            <h3 className="font-bold">CSV Parsing Errors</h3>
+            <h3 className="font-bold">{t.translations.CSV_PARSING_ERRORS}</h3>
             <ul className="list-disc list-inside text-sm">
               {csvParseErrors.map((error, idx) => (
                 <li key={idx}>{error}</li>
@@ -72,7 +85,7 @@ export default function ValidationResults({
       {isValidating && (
         <div className="alert alert-info">
           <span className="loading loading-spinner loading-sm"></span>
-          <span>Validating records...</span>
+          <span>{t.translations.VALIDATING_RECORDS}</span>
         </div>
       )}
 
@@ -81,9 +94,9 @@ export default function ValidationResults({
         <div className="alert alert-error">
           <XCircleIcon className="size-6" />
           <div className="w-full">
-            <h3 className="font-bold">Upload Failed</h3>
+            <h3 className="font-bold">{t.translations.UPLOAD_FAILED_TITLE}</h3>
             <p className="text-sm mb-3">
-              The server rejected the upload. Please fix the following issues:
+              {t.translations.SERVER_REJECTED_UPLOAD_FIX_ISSUES}
             </p>
 
             <div className="space-y-3">
@@ -92,22 +105,22 @@ export default function ValidationResults({
                   <div className="flex items-start gap-2 mb-2">
                     {error.type === "not_found" && (
                       <span className="badge badge-warning badge-sm">
-                        Not Found
+                        {t.translations.NOT_FOUND}
                       </span>
                     )}
                     {error.type === "validation" && (
                       <span className="badge badge-error badge-sm">
-                        Validation
+                        {t.translations.VALIDATION}
                       </span>
                     )}
                     {error.type === "permission" && (
                       <span className="badge badge-error badge-sm">
-                        Permission
+                        {t.translations.PERMISSION}
                       </span>
                     )}
                     {error.type === "general" && (
                       <span className="badge badge-neutral badge-sm">
-                        Error
+                        {t.translations.ERROR_LABEL}
                       </span>
                     )}
                   </div>
@@ -135,10 +148,16 @@ export default function ValidationResults({
             <div className="alert alert-success">
               <CheckCircleIcon className="size-6" />
               <div className="w-full">
-                <h3 className="font-bold">Validation Successful!</h3>
+                <h3 className="font-bold">
+                  {t.translations.VALIDATION_SUCCESSFUL}
+                </h3>
                 <p className="text-sm">
-                  All {validationResult.validCount} records are valid and ready
-                  to upload.
+                  {interpolate(
+                    t.translations.ALL_RECORDS_VALID_READY_TO_UPLOAD,
+                    {
+                      count: validationResult.validCount,
+                    },
+                  )}
                 </p>
               </div>
             </div>
@@ -152,7 +171,9 @@ export default function ValidationResults({
                   type="button"
                 >
                   <EyeIcon className="size-6" />
-                  {showPreview ? "Hide Preview" : "Preview Records"}
+                  {showPreview
+                    ? t.translations.HIDE_PREVIEW
+                    : t.translations.PREVIEW_RECORDS}
                 </button>
               </div>
             )}
@@ -186,7 +207,9 @@ export default function ValidationResults({
                   type="button"
                 >
                   <ArrowUpTrayIcon className="size-6" />
-                  Upload {validationResult.validCount} Records
+                  {interpolate(t.translations.UPLOAD_RECORDS_WITH_COUNT, {
+                    count: validationResult.validCount,
+                  })}
                 </button>
               </div>
             )}
@@ -202,15 +225,20 @@ export default function ValidationResults({
             <div className="alert alert-warning">
               <ExclamationCircleIcon className="size-6" />
               <div className="w-full">
-                <h3 className="font-bold">Validation Errors Found</h3>
+                <h3 className="font-bold">
+                  {t.translations.VALIDATION_ERRORS_FOUND}
+                </h3>
                 <p className="text-sm mb-2">
-                  {validationResult.invalidCount} of{" "}
-                  {validationResult.totalRows} records have errors. Please fix
-                  the errors below and re-upload.
+                  {interpolate(t.translations.VALIDATION_ERROR_SUMMARY, {
+                    invalid: validationResult.invalidCount,
+                    total: validationResult.totalRows,
+                  })}
                 </p>
                 <div className="text-sm">
-                  <strong>Valid:</strong> {validationResult.validCount} |{" "}
-                  <strong>Invalid:</strong> {validationResult.invalidCount}
+                  <strong>{t.translations.VALID_LABEL}:</strong>{" "}
+                  {validationResult.validCount} |{" "}
+                  <strong>{t.translations.INVALID_LABEL}:</strong>{" "}
+                  {validationResult.invalidCount}
                 </div>
               </div>
             </div>
@@ -218,7 +246,7 @@ export default function ValidationResults({
             {/* Detailed Errors */}
             <div className="bg-base-200/50 rounded-lg p-4">
               <h4 className="font-semibold mb-3 text-base-content">
-                Error Details:
+                {t.translations.ERROR_DETAILS}
               </h4>
               <div className="space-y-2 max-h-96 overflow-y-auto">
                 {validationResult.errors.map((error: ValidationError, idx) => (
@@ -228,7 +256,9 @@ export default function ValidationResults({
                   >
                     <div className="flex items-start gap-2">
                       <span className="badge badge-error badge-sm">
-                        Row {error.row}
+                        {interpolate(t.translations.ROW_WITH_NUMBER, {
+                          row: error.row,
+                        })}
                       </span>
                       <div className="flex-1">
                         <p className="font-semibold text-sm text-base-content">

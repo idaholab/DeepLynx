@@ -14,6 +14,14 @@ const MAX_VISIBLE_FILES = 100;
 const toBaseName = (filename: string) => filename.replace(/\.[^/.]+$/, "");
 const initialVisibleFiles = (files: ExistingFile[]) =>
   files.slice(0, MAX_VISIBLE_FILES);
+const interpolate = (
+  template: string,
+  values: Record<string, string | number>,
+) =>
+  Object.entries(values).reduce(
+    (result, [key, value]) => result.replace(`{${key}}`, String(value)),
+    template,
+  );
 
 interface NewFileUploadCardProps {
   defaultName?: string;
@@ -128,7 +136,10 @@ export default function NewFileUploadCard({
   return (
     <div className="space-y-2">
       <div className="divider my-6 text-md  text-base-content/70">
-        {`File ${fileIndex + 1}: ${defaultName}`}
+        {interpolate(t.translations.FILE_CARD_TITLE, {
+          index: fileIndex + 1,
+          name: defaultName,
+        })}
       </div>
 
       <div className="card card-border">
@@ -136,7 +147,7 @@ export default function NewFileUploadCard({
           <div className="flex justify-between">
             <div
               role="radiogroup"
-              aria-label="Record mode"
+              aria-label={t.translations.RECORD_MODE_ARIA}
               className="inline-flex rounded-full border border-base-300/70 bg-base-200/50 p-1"
             >
               <button
@@ -150,7 +161,7 @@ export default function NewFileUploadCard({
                 }`}
                 onClick={() => setRecordMode("new")}
               >
-                New Record
+                {t.translations.NEW_RECORD}
               </button>
               <button
                 type="button"
@@ -163,7 +174,7 @@ export default function NewFileUploadCard({
                 }`}
                 onClick={() => setRecordMode("update")}
               >
-                Update Existing Record
+                {t.translations.UPDATE_EXISTING_RECORD}
               </button>
             </div>
             {onRemove && (
@@ -182,10 +193,10 @@ export default function NewFileUploadCard({
           {recordMode === "update" && (
             <div className="space-y-2">
               <label className="label-text font-semibold">
-                Select Existing Record
+                {t.translations.SELECT_EXISTING_RECORD}
               </label>
               <SearchBar
-                placeholder="Search files by name, alias, description, or ID"
+                placeholder={t.translations.SEARCH_FILES_PLACEHOLDER}
                 value={recordSearchInput}
                 onChange={(e) => setRecordSearchInput(e.target.value)}
                 onSubmit={handleSearch}
@@ -201,11 +212,13 @@ export default function NewFileUploadCard({
                 {isSearching ? (
                   <div className="p-3 text-sm text-base-content/70">
                     <span className="loading loading-spinner loading-xs mr-2"></span>
-                    Searching files...
+                    {t.translations.SEARCHING_FILES}
                   </div>
                 ) : displayedFiles.length === 0 ? (
                   <div className="p-3 text-sm text-base-content/70">
-                    {hasSearched ? "No files found." : "No files available."}
+                    {hasSearched
+                      ? t.translations.NO_FILES_FOUND
+                      : t.translations.NO_FILES_AVAILABLE}
                   </div>
                 ) : (
                   displayedFiles.map((f) => {
@@ -225,15 +238,17 @@ export default function NewFileUploadCard({
                               {f.name}
                             </p>
                             <p className="truncate text-xs text-base-content/60">
-                              ID {f.id} - Last updated:{" "}
-                              {f.lastUpdate
-                                ? formatLocalDateTime(String(f.lastUpdate))
-                                : "N/A"}
+                              {interpolate(t.translations.ID_LAST_UPDATED, {
+                                id: f.id,
+                                updated: f.lastUpdate
+                                  ? formatLocalDateTime(String(f.lastUpdate))
+                                  : t.translations.RECORD_HISTORY_NOT_AVAILABLE,
+                              })}
                             </p>
                           </div>
                           {selected && (
                             <span className="badge badge-sm badge-outline">
-                              Selected
+                              {t.translations.SELECTED}
                             </span>
                           )}
                         </div>
@@ -245,14 +260,18 @@ export default function NewFileUploadCard({
 
               {!hasSearched && availableFiles.length > MAX_VISIBLE_FILES && (
                 <p className="text-xs text-base-content/60">
-                  Showing first {MAX_VISIBLE_FILES} files. Use search to narrow
-                  results.
+                  {interpolate(
+                    t.translations.SHOWING_FIRST_FILES_USE_SEARCH,
+                    {
+                      count: MAX_VISIBLE_FILES,
+                    },
+                  )}
                 </p>
               )}
 
               {selectedRecord && (
                 <p className="text-xs text-base-content/70">
-                  Selected record:{" "}
+                  {t.translations.SELECTED_RECORD}{" "}
                   <span className="font-semibold">{selectedRecord.name}</span>
                 </p>
               )}
@@ -286,9 +305,13 @@ export default function NewFileUploadCard({
           </div>
           {/* Row 2: Metadata File (optional) */}
           <div className="flex items-center gap-3">
-            <span className="label-text shrink-0">Metadata File</span>
+            <span className="label-text shrink-0">
+              {t.translations.METADATA_FILE}
+            </span>
             <label className="btn btn-sm btn-outline cursor-pointer">
-              {metadataFile ? metadataFile.name : "Choose file (optional)"}
+              {metadataFile
+                ? metadataFile.name
+                : t.translations.CHOOSE_FILE_OPTIONAL}
               <input
                 type="file"
                 className="hidden"

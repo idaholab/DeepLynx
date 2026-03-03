@@ -60,6 +60,16 @@ function dedupeExistingFiles(files: ExistingFile[]): ExistingFile[] {
   return Array.from(map.values());
 }
 
+function interpolate(
+  template: string,
+  values: Record<string, string | number>,
+): string {
+  return Object.entries(values).reduce(
+    (result, [key, value]) => result.replace(`{${key}}`, String(value)),
+    template,
+  );
+}
+
 export default function UploadCenterClient() {
   const { t } = useLanguage();
   const { organization } = useOrganizationSession();
@@ -347,7 +357,14 @@ export default function UploadCenterClient() {
         await Promise.all(workers);
 
         uploadToastManager.success(
-          `Uploaded ${succeeded} file(s)${failed ? ` • ${failed} failed` : ""}`,
+          failed
+            ? interpolate(
+                t.translations.UPLOAD_BATCH_SUCCESS_WITH_FAILURES,
+                { success: succeeded, failed },
+              )
+            : interpolate(t.translations.UPLOAD_BATCH_SUCCESS, {
+                success: succeeded,
+              }),
         );
         if (failed) console.warn("Batch upload failures:", results);
 
@@ -361,7 +378,7 @@ export default function UploadCenterClient() {
 
       if ((metadata.recordMode ?? "new") === "update") {
         if (!metadata.targetRecordId) {
-          toast.error("Please select an existing record to update.");
+          toast.error(t.translations.PLEASE_SELECT_RECORD_TO_UPDATE);
           return;
         }
         await updateFile(
@@ -370,7 +387,9 @@ export default function UploadCenterClient() {
           Number(metadata.targetRecordId),
           file,
         );
-        uploadToastManager.success("Record file updated successfully.");
+        uploadToastManager.success(
+          t.translations.RECORD_FILE_UPDATED_SUCCESSFULLY,
+        );
       } else if (metadata.isTimeSeries) {
         await uploadTimeseriesFile(
           Number(organizationId),
@@ -456,7 +475,9 @@ export default function UploadCenterClient() {
       await new Promise((resolve) => setTimeout(resolve, 500));
 
       toast.success(
-        `Successfully uploaded ${bulkUploadState.validationResult.validCount} records!`,
+        interpolate(t.translations.BULK_UPLOAD_SUCCESS_WITH_COUNT, {
+          count: bulkUploadState.validationResult.validCount,
+        }),
       );
 
       bulkUploadState.resetBulkUpload();
@@ -493,8 +514,7 @@ export default function UploadCenterClient() {
                 {t.translations.UPLOAD_CENTER}
               </h1>
               <p className="text-sm text-base-content/70 mt-1">
-                {t.translations.START_UPLOAD_BY_CHOOSING_TYPE ||
-                  "Choose an upload mode, configure destination resources, then upload."}
+                {t.translations.UPLOAD_CENTER_DESCRIPTION}
               </p>
             </div>
 
@@ -527,7 +547,7 @@ export default function UploadCenterClient() {
 
                   <div
                     role="radiogroup"
-                    aria-label="Upload workflow view"
+                    aria-label={t.translations.UPLOAD_WORKFLOW_VIEW_ARIA}
                     className="inline-flex rounded-full border border-base-300/70 bg-base-200/50 p-1"
                   >
                     <button

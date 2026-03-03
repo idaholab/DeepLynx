@@ -1,4 +1,5 @@
 "use client";
+import { useLanguage } from "@/app/contexts/Language";
 
 interface UploadProgressBarProps {
   progress: number; // 0-100
@@ -11,10 +12,12 @@ export default function UploadProgressBar({
   current,
   total,
 }: UploadProgressBarProps) {
+  const { t } = useLanguage();
+
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between text-sm">
-        <span className="font-semibold">Uploading Records...</span>
+        <span className="font-semibold">{t.translations.UPLOADING_RECORDS}</span>
         <span className="text-base-content/70">
           {current} / {total}
         </span>
@@ -34,7 +37,7 @@ export default function UploadProgressBar({
       </div>
 
       <p className="text-xs text-center text-base-content/60">
-        Please wait, do not close this window...
+        {t.translations.PLEASE_WAIT_DO_NOT_CLOSE_WINDOW}
       </p>
     </div>
   );

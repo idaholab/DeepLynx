@@ -54,7 +54,7 @@ export default function ProjectResourceSelectors({
       {/* Project Selector */}
       <label className="label flex-col items-start text-base-content font-bold">
         <span className="label-text mb-1">
-          Select a project
+          {t.translations.PROJECT_SELECTOR_LABEL}
           {isLoadingProjects && (
             <span className="loading loading-spinner loading-xs ml-2"></span>
           )}
@@ -68,9 +68,9 @@ export default function ProjectResourceSelectors({
         >
           <option value="" disabled>
             {!hasOrganization
-              ? "Select an organization first"
+              ? t.translations.SELECT_AN_ORGANIZATION_FIRST
               : isLoadingProjects
-              ? "Loading projects..."
+              ? t.translations.LOADING_PROJECTS
               : t.translations.PROJECT}
           </option>
           {projects.map((p) => (
@@ -98,10 +98,10 @@ export default function ProjectResourceSelectors({
         >
           <option value="" disabled>
             {!projectId
-              ? "Select a project first"
+              ? t.translations.SELECT_A_PROJECT_FIRST
               : isLoadingDataSources
-              ? "Loading data sources..."
-              : "Data Sources"}
+              ? t.translations.LOADING_DATA_SOURCES
+              : t.translations.DATA_SOURCES}
           </option>
           {dataSources.map((d) => (
             <option key={d.id} value={String(d.id)}>
@@ -130,10 +130,10 @@ export default function ProjectResourceSelectors({
         >
           <option value="" disabled>
             {!projectId
-              ? "Select a project first"
+              ? t.translations.SELECT_A_PROJECT_FIRST
               : isLoadingObjectStorage
-              ? "Loading object storages..."
-              : "Object storages"}
+              ? t.translations.LOADING_OBJECT_STORAGES
+              : t.translations.OBJECT_STORAGES}
           </option>
           {objectStorage.map((object) => (
             <option key={object.id} value={String(object.id)}>
