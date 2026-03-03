@@ -15,6 +15,7 @@ interface FileUploadSectionProps {
   targetFileId: string;
   setTargetFileId: (id: string) => void;
   availableFiles: ExistingFile[];
+  onSearchFiles: (query: string) => Promise<ExistingFile[]>;
   needsTarget: boolean;
   isUploading: boolean;
   canUpload: boolean;
@@ -33,6 +34,7 @@ export default function FileUploadSection({
   targetFileId,
   setTargetFileId,
   availableFiles,
+  onSearchFiles,
   needsTarget,
   isUploading,
   canUpload,
@@ -82,10 +84,11 @@ export default function FileUploadSection({
           <NewFileUploadCard
             key={index}
             defaultName={file.name}
-            uploadType={uploadType}
             fileIndex={index}
             onMetadataChange={handleMetadataChange}
             onRemove={() => onRemoveAt(index)}
+            availableFiles={availableFiles}
+            onSearchFiles={onSearchFiles}
           />
         ))}
 

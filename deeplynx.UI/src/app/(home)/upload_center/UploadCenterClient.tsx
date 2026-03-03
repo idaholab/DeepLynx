@@ -2,17 +2,21 @@
 
 import { useLanguage } from "@/app/contexts/Language";
 import { useOrganizationSession } from "@/app/contexts/OrganizationSessionProvider";
+import { useProjectSession } from "@/app/contexts/ProjectSessionProvider";
 import {
   cancelChunkedUpload,
   cancelCurrentUpload,
   CHUNK_THRESHOLD,
   uploadFile,
 } from "@/app/lib/client_service/file_upload_services.client";
+import { updateFile } from "@/app/lib/client_service/file_services.client";
 import { uploadBulkMetadata } from "@/app/lib/client_service/metadata_service.client";
+import { fullTextSearch } from "@/app/lib/client_service/query_services.client";
+import { getAllRecords } from "@/app/lib/client_service/record_services.client";
 import { uploadTimeseriesFile } from "@/app/lib/client_service/timeseries_services.client";
 import { parseBackendErrors } from "@/app/lib/error_parser";
 import { createUploadToastManager } from "@/app/lib/uploadToastManager";
-import { useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import { useBulkUploadState } from "./hooks/useBulkUploadState";
 import { useProjectResources } from "./hooks/useProjectResources";
@@ -33,9 +37,38 @@ type Props = {
 const MAX_CONCURRENT_FILE_UPLOADS = 5;
 const MULTI_FILE_PROGRESS_TOAST_THRESHOLD = 30;
 
+function mapRecordToExistingFile(record: {
+  id?: number | string | null;
+  name?: string | null;
+  description?: string | null;
+  lastUpdatedAt?: string | null;
+  lastUpdatedBy?: string | null;
+  dataSourceName?: string | null;
+}): ExistingFile | null {
+  if (record.id == null) return null;
+  return {
+    id: String(record.id),
+    name: record.name?.trim() || String(record.id),
+    description: record.description ?? undefined,
+    lastUpdate: record.lastUpdatedAt ?? undefined,
+    updatedBy: record.lastUpdatedBy ?? undefined,
+    dataSource: record.dataSourceName ?? undefined,
+  };
+}
+
+function dedupeExistingFiles(files: ExistingFile[]): ExistingFile[] {
+  const map = new Map<string, ExistingFile>();
+  for (const file of files) {
+    map.set(String(file.id), file);
+  }
+  return Array.from(map.values());
+}
+
 export default function UploadCenterClient({ initialAvailableFiles }: Props) {
   const { t } = useLanguage();
   const { organization } = useOrganizationSession();
+  const { project: sessionProject, hasLoaded: hasLoadedProjectSession } =
+    useProjectSession();
   const organizationId = organization?.organizationId;
 
   const fileUploadState = useUploadState();
@@ -43,23 +76,125 @@ export default function UploadCenterClient({ initialAvailableFiles }: Props) {
   const projectResources = useProjectResources(organizationId as number);
   const uploadToastManager = useMemo(() => createUploadToastManager(), []);
   const { setTargetFileId } = fileUploadState;
-  const { projectId, dataSourceId, objectStorageId, projects, dataSources } =
-    projectResources;
+  const {
+    projectId,
+    dataSourceId,
+    objectStorageId,
+    projects,
+    dataSources,
+    setProjectId,
+  } = projectResources;
   const selectedFiles = fileUploadState.selectedFiles;
+  const [availableFiles, setAvailableFiles] = useState<ExistingFile[]>(
+    initialAvailableFiles,
+  );
+
+  useEffect(() => {
+    if (!organizationId || !projectId) {
+      setAvailableFiles([]);
+      return;
+    }
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const records = await getAllRecords(
+          Number(organizationId),
+          Number(projectId),
+          undefined,
+          undefined,
+          true,
+        );
+        if (cancelled) return;
+
+        const mapped = dedupeExistingFiles(
+          records
+            .map((record) => mapRecordToExistingFile(record))
+            .filter((record): record is ExistingFile => record !== null),
+        );
+        setAvailableFiles(mapped);
+      } catch (error) {
+        console.error("Error loading records for update picker:", error);
+        if (!cancelled) setAvailableFiles([]);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [organizationId, projectId]);
+
+  useEffect(() => {
+    if (projectId) return;
+    if (!hasLoadedProjectSession) return;
+
+    const sessionProjectId = sessionProject?.projectId;
+    if (!sessionProjectId) return;
+
+    const sessionProjectIdString = String(sessionProjectId);
+    const existsInProjects = projects.some(
+      (project) => String(project.id) === sessionProjectIdString,
+    );
+    if (existsInProjects) {
+      setProjectId(sessionProjectIdString);
+    }
+  }, [
+    projectId,
+    hasLoadedProjectSession,
+    sessionProject,
+    projects,
+    setProjectId,
+  ]);
+
+  const handleSearchAvailableFiles = useCallback(
+    async (query: string): Promise<ExistingFile[]> => {
+      const trimmedQuery = query.trim();
+      if (!trimmedQuery) return availableFiles;
+      if (!organizationId || !projectId) return [];
+
+      try {
+        const results = await fullTextSearch(
+          Number(organizationId),
+          trimmedQuery,
+          [Number(projectId)],
+        );
+
+        return dedupeExistingFiles(
+          results
+            .map((record) => mapRecordToExistingFile(record))
+            .filter((record): record is ExistingFile => record !== null),
+        );
+      } catch (error) {
+        console.error("Error searching records for update picker:", error);
+        return [];
+      }
+    },
+    [availableFiles, organizationId, projectId],
+  );
 
   const needsTarget =
     fileUploadState.uploadType === "version" ||
     fileUploadState.uploadType === "properties";
-  const hasAnyNonTimeseriesFiles = selectedFiles.some(
-    (_, idx) => !fileUploadState.filesMetadata[idx]?.isTimeSeries,
+  const filesWithMetadata = selectedFiles.map((file, idx) => ({
+    file,
+    metadata: fileUploadState.filesMetadata[idx] ?? {},
+  }));
+  const hasAnyNonTimeseriesNewFiles = filesWithMetadata.some(
+    ({ metadata }) =>
+      (metadata.recordMode ?? "new") === "new" && !metadata.isTimeSeries,
   );
-  const requiresObjectStorage = hasAnyNonTimeseriesFiles;
+  const hasUpdateRecordsMissingTarget = filesWithMetadata.some(
+    ({ metadata }) =>
+      (metadata.recordMode ?? "new") === "update" && !metadata.targetRecordId,
+  );
+  const requiresObjectStorage = hasAnyNonTimeseriesNewFiles;
 
   const canUpload =
     selectedFiles.length > 0 &&
     !!projectId &&
     !!dataSourceId &&
     (!requiresObjectStorage || !!objectStorageId) &&
+    !hasUpdateRecordsMissingTarget &&
     (!needsTarget || !!fileUploadState.targetFileId);
 
   // Clear target file when not needed
@@ -83,6 +218,7 @@ export default function UploadCenterClient({ initialAvailableFiles }: Props) {
     const showChunkedProgressToast =
       selectedFiles.length === 1 &&
       !!selectedSingleFile &&
+      selectedMetadata?.recordMode !== "update" &&
       !selectedMetadata?.isTimeSeries &&
       selectedSingleFile.size > CHUNK_THRESHOLD;
     const uploadContext = {
@@ -161,7 +297,18 @@ export default function UploadCenterClient({ initialAvailableFiles }: Props) {
             const metadata = fileUploadState.filesMetadata[currentIndex] ?? {};
 
             try {
-              if (metadata.isTimeSeries) {
+              if ((metadata.recordMode ?? "new") === "update") {
+                if (!metadata.targetRecordId) {
+                  throw new Error("Missing target record id for file update");
+                }
+                const value = await updateFile(
+                  Number(organizationId),
+                  Number(projectId),
+                  Number(metadata.targetRecordId),
+                  file,
+                );
+                results[currentIndex] = { status: "fulfilled", value };
+              } else if (metadata.isTimeSeries) {
                 const value = await uploadTimeseriesFile(
                   Number(organizationId),
                   Number(projectId),
@@ -217,7 +364,19 @@ export default function UploadCenterClient({ initialAvailableFiles }: Props) {
       const file = selectedFiles[0];
       const metadata = fileUploadState.filesMetadata[0] ?? {};
 
-      if (metadata.isTimeSeries) {
+      if ((metadata.recordMode ?? "new") === "update") {
+        if (!metadata.targetRecordId) {
+          toast.error("Please select an existing record to update.");
+          return;
+        }
+        await updateFile(
+          Number(organizationId),
+          Number(projectId),
+          Number(metadata.targetRecordId),
+          file,
+        );
+        uploadToastManager.success("Record file updated successfully.");
+      } else if (metadata.isTimeSeries) {
         await uploadTimeseriesFile(
           Number(organizationId),
           Number(projectId),
@@ -459,7 +618,8 @@ export default function UploadCenterClient({ initialAvailableFiles }: Props) {
                         }
                         targetFileId={fileUploadState.targetFileId}
                         setTargetFileId={fileUploadState.setTargetFileId}
-                        availableFiles={initialAvailableFiles}
+                        availableFiles={availableFiles}
+                        onSearchFiles={handleSearchAvailableFiles}
                         needsTarget={needsTarget}
                         isUploading={fileUploadState.isUploading}
                         canUpload={canUpload}
