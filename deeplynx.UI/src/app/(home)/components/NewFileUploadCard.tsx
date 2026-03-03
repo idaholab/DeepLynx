@@ -4,10 +4,16 @@
 import { FileMetadata } from "../types/types";
 import { useLanguage } from "@/app/contexts/Language";
 import { TrashIcon } from "@heroicons/react/24/outline";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { ExistingFile } from "../types/types";
 import SearchBar from "./SearchBar";
 import { formatLocalDateTime } from "@/app/lib/date_time";
+
+const MAX_VISIBLE_FILES = 100;
+
+const toBaseName = (filename: string) => filename.replace(/\.[^/.]+$/, "");
+const initialVisibleFiles = (files: ExistingFile[]) =>
+  files.slice(0, MAX_VISIBLE_FILES);
 
 interface NewFileUploadCardProps {
   defaultName?: string;
@@ -15,7 +21,7 @@ interface NewFileUploadCardProps {
   onMetadataChange: (fileIndex: number, metadata: FileMetadata) => void;
   onRemove?: () => void;
   availableFiles: ExistingFile[];
-  onSearchFiles?: (query: string) => Promise<ExistingFile[]>;
+  onSearchFiles: (query: string) => Promise<ExistingFile[]>;
 }
 
 export default function NewFileUploadCard({
@@ -30,76 +36,43 @@ export default function NewFileUploadCard({
   const [recordMode, setRecordMode] = useState<"new" | "update">("new");
   const [targetRecordId, setTargetRecordId] = useState("");
   const [recordSearchInput, setRecordSearchInput] = useState("");
-  const [recordSearchQuery, setRecordSearchQuery] = useState("");
   const [isSearching, setIsSearching] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
-  const [description] = useState("");
   const [isTimeSeries, setIsTimeSeries] = useState(false);
   const [metadataFile, setMetadataFile] = useState<File | undefined>(undefined);
-  const fileBaseName = (filename: string) => filename.replace(/\.[^/.]+$/, "");
-  const [name, setName] = useState(fileBaseName(defaultName));
-  const MAX_VISIBLE_FILES = 100;
-  const [displayedFiles, setDisplayedFiles] = useState<ExistingFile[]>([]);
-
-  const selectedRecord = useMemo(
-    () =>
-      displayedFiles.find((f) => String(f.id) === String(targetRecordId)) ??
-      availableFiles.find((f) => String(f.id) === String(targetRecordId)),
-    [displayedFiles, availableFiles, targetRecordId],
+  const [name, setName] = useState(toBaseName(defaultName));
+  const [displayedFiles, setDisplayedFiles] = useState<ExistingFile[]>(
+    initialVisibleFiles(availableFiles),
   );
 
-  const filterFilesLocally = useCallback(
-    (query: string) => {
-      const normalized = query.trim().toLowerCase();
-      if (!normalized) {
-        return availableFiles.slice(0, MAX_VISIBLE_FILES);
-      }
-
-      return availableFiles.filter((f) => {
-        const nameValue = (f.name ?? "").toLowerCase();
-        const aliasValue = (f.alias ?? "").toLowerCase();
-        const descValue = (f.description ?? "").toLowerCase();
-        const idValue = String(f.id).toLowerCase();
-        return (
-          nameValue.includes(normalized) ||
-          aliasValue.includes(normalized) ||
-          descValue.includes(normalized) ||
-          idValue.includes(normalized)
-        );
-      });
-    },
-    [availableFiles],
-  );
+  const selectedRecord =
+    displayedFiles.find((f) => String(f.id) === String(targetRecordId)) ??
+    availableFiles.find((f) => String(f.id) === String(targetRecordId));
 
   const handleSearch = useCallback(
     async ({ query }: { query: string; option?: string }) => {
       const trimmedQuery = query.trim();
-      setRecordSearchQuery(trimmedQuery);
 
       if (!trimmedQuery) {
         setHasSearched(false);
-        setDisplayedFiles(availableFiles.slice(0, MAX_VISIBLE_FILES));
+        setDisplayedFiles(initialVisibleFiles(availableFiles));
         return;
       }
 
       setHasSearched(true);
       setIsSearching(true);
       try {
-        if (onSearchFiles) {
-          const results = await onSearchFiles(trimmedQuery);
-          setDisplayedFiles(results);
-        } else {
-          setDisplayedFiles(filterFilesLocally(trimmedQuery));
-        }
+        const results = await onSearchFiles(trimmedQuery);
+        setDisplayedFiles(results);
       } finally {
         setIsSearching(false);
       }
     },
-    [availableFiles, filterFilesLocally, onSearchFiles],
+    [availableFiles, onSearchFiles],
   );
 
   useEffect(() => {
-    setName(fileBaseName(defaultName));
+    setName(toBaseName(defaultName));
   }, [defaultName]);
 
   useEffect(() => {
@@ -111,17 +84,16 @@ export default function NewFileUploadCard({
   useEffect(() => {
     if (recordMode !== "update") {
       setRecordSearchInput("");
-      setRecordSearchQuery("");
       setHasSearched(false);
-      setDisplayedFiles(availableFiles.slice(0, MAX_VISIBLE_FILES));
+      setDisplayedFiles(initialVisibleFiles(availableFiles));
     }
   }, [recordMode, availableFiles]);
 
   useEffect(() => {
-    if (!recordSearchQuery.trim()) {
-      setDisplayedFiles(availableFiles.slice(0, MAX_VISIBLE_FILES));
+    if (!hasSearched) {
+      setDisplayedFiles(initialVisibleFiles(availableFiles));
     }
-  }, [availableFiles, recordSearchQuery]);
+  }, [availableFiles, hasSearched]);
 
   useEffect(() => {
     if (
@@ -136,7 +108,7 @@ export default function NewFileUploadCard({
   useEffect(() => {
     const metadata: FileMetadata = {
       name,
-      description,
+      description: "",
       isTimeSeries: recordMode === "update" ? false : isTimeSeries,
       recordMode,
       ...(recordMode === "update" && targetRecordId ? { targetRecordId } : {}),
@@ -145,7 +117,6 @@ export default function NewFileUploadCard({
     onMetadataChange(fileIndex, metadata);
   }, [
     name,
-    description,
     recordMode,
     targetRecordId,
     isTimeSeries,
@@ -219,10 +190,9 @@ export default function NewFileUploadCard({
                 onChange={(e) => setRecordSearchInput(e.target.value)}
                 onSubmit={handleSearch}
                 onClearAll={() => {
-                  setRecordSearchQuery("");
                   setRecordSearchInput("");
                   setHasSearched(false);
-                  setDisplayedFiles(availableFiles.slice(0, MAX_VISIBLE_FILES));
+                  setDisplayedFiles(initialVisibleFiles(availableFiles));
                 }}
                 aditionalFilters={false}
               />
@@ -256,7 +226,9 @@ export default function NewFileUploadCard({
                             </p>
                             <p className="truncate text-xs text-base-content/60">
                               ID {f.id} - Last updated:{" "}
-                              {formatLocalDateTime(String(f.lastUpdate))}
+                              {f.lastUpdate
+                                ? formatLocalDateTime(String(f.lastUpdate))
+                                : "N/A"}
                             </p>
                           </div>
                           {selected && (
@@ -271,13 +243,12 @@ export default function NewFileUploadCard({
                 )}
               </div>
 
-              {!recordSearchQuery.trim() &&
-                availableFiles.length > MAX_VISIBLE_FILES && (
-                  <p className="text-xs text-base-content/60">
-                    Showing first {MAX_VISIBLE_FILES} files. Use search to
-                    narrow results.
-                  </p>
-                )}
+              {!hasSearched && availableFiles.length > MAX_VISIBLE_FILES && (
+                <p className="text-xs text-base-content/60">
+                  Showing first {MAX_VISIBLE_FILES} files. Use search to narrow
+                  results.
+                </p>
+              )}
 
               {selectedRecord && (
                 <p className="text-xs text-base-content/70">
@@ -334,44 +305,6 @@ export default function NewFileUploadCard({
               </button>
             )}
           </div>
-          {/* Row 3: Description textarea */}
-          {/* <div className="grid grid-cols-[auto,1fr] items-start gap-4">
-            <div className="flex">
-              <span className="label-text mr-2">
-                {t.translations.DESCRIPTION}
-              </span>
-              <textarea
-                className="textarea textarea-bordered w-full"
-                placeholder="Example: This file contains ..."
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-              ></textarea>
-            </div> */}
-          {/* Row 3: Update Existing */}
-          {/* {showUpdate && (
-              <fieldset>
-                <label className="label">
-                  {t.translations.UPDATE_EXISTING}
-                  <select
-                    className="select select-info select-sm mt-2"
-                    value={updateAction}
-                    onChange={(e) =>
-                      setUpdateAction(e.target.value as "merge" | "overwrite")
-                    }
-                    required
-                  >
-                    <option value="" disabled>
-                      {t.translations.CHOOSE_OPTION}
-                    </option>
-                    <option value="nexus">{t.translations.MERGE}</option>
-                    <option value="remote-db">
-                      {t.translations.OVERWRITE}
-                    </option>
-                  </select>
-                </label>
-              </fieldset>
-            )}
-          </div> */}
         </div>
       </div>
     </div>

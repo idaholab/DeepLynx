@@ -30,10 +30,6 @@ import BulkUploadSection from "./components/BulkUploadSection";
 import FileUploadSection from "./components/FileUploadSection";
 import ProjectResourceSelectors from "./components/ProjectResourceSelectors";
 
-type Props = {
-  initialAvailableFiles: ExistingFile[];
-};
-
 const MAX_CONCURRENT_FILE_UPLOADS = 5;
 const MULTI_FILE_PROGRESS_TOAST_THRESHOLD = 30;
 
@@ -64,16 +60,18 @@ function dedupeExistingFiles(files: ExistingFile[]): ExistingFile[] {
   return Array.from(map.values());
 }
 
-export default function UploadCenterClient({ initialAvailableFiles }: Props) {
+export default function UploadCenterClient() {
   const { t } = useLanguage();
   const { organization } = useOrganizationSession();
   const { project: sessionProject, hasLoaded: hasLoadedProjectSession } =
     useProjectSession();
   const organizationId = organization?.organizationId;
+  const numericOrganizationId =
+    organizationId !== undefined ? Number(organizationId) : undefined;
 
   const fileUploadState = useUploadState();
   const bulkUploadState = useBulkUploadState();
-  const projectResources = useProjectResources(organizationId as number);
+  const projectResources = useProjectResources(numericOrganizationId);
   const uploadToastManager = useMemo(() => createUploadToastManager(), []);
   const { setTargetFileId } = fileUploadState;
   const {
@@ -85,9 +83,7 @@ export default function UploadCenterClient({ initialAvailableFiles }: Props) {
     setProjectId,
   } = projectResources;
   const selectedFiles = fileUploadState.selectedFiles;
-  const [availableFiles, setAvailableFiles] = useState<ExistingFile[]>(
-    initialAvailableFiles,
-  );
+  const [availableFiles, setAvailableFiles] = useState<ExistingFile[]>([]);
 
   useEffect(() => {
     if (!organizationId || !projectId) {
@@ -175,16 +171,15 @@ export default function UploadCenterClient({ initialAvailableFiles }: Props) {
   const needsTarget =
     fileUploadState.uploadType === "version" ||
     fileUploadState.uploadType === "properties";
-  const filesWithMetadata = selectedFiles.map((file, idx) => ({
-    file,
-    metadata: fileUploadState.filesMetadata[idx] ?? {},
-  }));
-  const hasAnyNonTimeseriesNewFiles = filesWithMetadata.some(
-    ({ metadata }) =>
+  const selectedMetadata = selectedFiles.map(
+    (_, idx) => fileUploadState.filesMetadata[idx] ?? {},
+  );
+  const hasAnyNonTimeseriesNewFiles = selectedMetadata.some(
+    (metadata) =>
       (metadata.recordMode ?? "new") === "new" && !metadata.isTimeSeries,
   );
-  const hasUpdateRecordsMissingTarget = filesWithMetadata.some(
-    ({ metadata }) =>
+  const hasUpdateRecordsMissingTarget = selectedMetadata.some(
+    (metadata) =>
       (metadata.recordMode ?? "new") === "update" && !metadata.targetRecordId,
   );
   const requiresObjectStorage = hasAnyNonTimeseriesNewFiles;
@@ -288,7 +283,7 @@ export default function UploadCenterClient({ initialAvailableFiles }: Props) {
           });
         }
 
-        const regularVsTimeseriesFiles = async (): Promise<void> => {
+        const uploadWorker = async (): Promise<void> => {
           while (true) {
             const currentIndex = nextFileIndex++;
             if (currentIndex >= selectedFiles.length) return;
@@ -347,7 +342,7 @@ export default function UploadCenterClient({ initialAvailableFiles }: Props) {
           {
             length: Math.min(MAX_CONCURRENT_FILE_UPLOADS, selectedFiles.length),
           },
-          () => regularVsTimeseriesFiles(),
+          () => uploadWorker(),
         );
         await Promise.all(workers);
 
@@ -564,7 +559,6 @@ export default function UploadCenterClient({ initialAvailableFiles }: Props) {
                       }`}
                       onClick={() => {
                         fileUploadState.setUploadMode("bulk");
-                        fileUploadState.setSelectedFiles([]);
                         fileUploadState.resetFileUpload();
                       }}
                     >
@@ -608,11 +602,9 @@ export default function UploadCenterClient({ initialAvailableFiles }: Props) {
                   <div className="bg-base-100 p-4">
                     {fileUploadState.uploadMode === "file" ? (
                       <FileUploadSection
-                        uploadType={fileUploadState.uploadType}
-                        selectedFiles={fileUploadState.selectedFiles}
+                        selectedFiles={selectedFiles}
                         setSelectedFiles={fileUploadState.setSelectedFiles}
                         dropKey={fileUploadState.dropKey}
-                        filesMetadata={fileUploadState.filesMetadata}
                         handleMetadataChange={
                           fileUploadState.handleMetadataChange
                         }

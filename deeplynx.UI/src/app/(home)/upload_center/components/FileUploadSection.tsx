@@ -3,14 +3,12 @@
 import { useLanguage } from "@/app/contexts/Language";
 import DropUpload from "../../components/DropUpload";
 import NewFileUploadCard from "../../components/NewFileUploadCard";
-import { UploadType, FileMetadata, ExistingFile } from "../../types/types";
+import { FileMetadata, ExistingFile } from "../../types/types";
 
 interface FileUploadSectionProps {
-  uploadType: UploadType;
   selectedFiles: File[];
   setSelectedFiles: (files: File[]) => void;
   dropKey: number;
-  filesMetadata: Record<number, FileMetadata>;
   handleMetadataChange: (fileIndex: number, metadata: FileMetadata) => void;
   targetFileId: string;
   setTargetFileId: (id: string) => void;
@@ -25,11 +23,9 @@ interface FileUploadSectionProps {
 }
 
 export default function FileUploadSection({
-  uploadType,
   selectedFiles,
   setSelectedFiles,
   dropKey,
-  filesMetadata,
   handleMetadataChange,
   targetFileId,
   setTargetFileId,
@@ -75,11 +71,11 @@ export default function FileUploadSection({
         multiple={true}
         files={selectedFiles}
         onFilesChange={setSelectedFiles}
-        disabled={!uploadType || (needsTarget && !targetFileId) || isUploading}
+        disabled={(needsTarget && !targetFileId) || isUploading}
       />
 
       {/* File Cards */}
-      {selectedFiles.length >= 1 &&
+      {selectedFiles.length > 0 &&
         selectedFiles.map((file, index) => (
           <NewFileUploadCard
             key={index}
