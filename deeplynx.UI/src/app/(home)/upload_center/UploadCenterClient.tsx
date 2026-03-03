@@ -55,8 +55,7 @@ export default function UploadCenterClient({ initialAvailableFiles }: Props) {
     fileUploadState.uploadType === "version" ||
     fileUploadState.uploadType === "properties";
   const isMultiAllowed = fileUploadState.uploadType === "new";
-  const showRightPanel =
-    selectedFiles.length > 0 && fileUploadState.uploadMode === "file";
+  const showRightPanel = fileUploadState.uploadMode === "file";
   const selectedTarget =
     initialAvailableFiles.find((f) => f.id === fileUploadState.targetFileId) ??
     null;
@@ -150,7 +149,9 @@ export default function UploadCenterClient({ initialAvailableFiles }: Props) {
         const shouldShowMultiFileProgressToast =
           selectedFiles.length >= MULTI_FILE_PROGRESS_TOAST_THRESHOLD;
 
-        const showMultiFileProgressToast = (progress: BatchUploadProgressEvent) => {
+        const showMultiFileProgressToast = (
+          progress: BatchUploadProgressEvent,
+        ) => {
           uploadToastManager.show({
             title: t.translations.UPLOADING_FILES,
             message: `${progress.completed} / ${progress.total} ${t.translations.FILES_LABEL}`,
@@ -301,136 +302,254 @@ export default function UploadCenterClient({ initialAvailableFiles }: Props) {
   };
 
   return (
-    <div>
-      {/* HEADER */}
-      <div className="bg-base-200/40 pl-12 p-6">
-        <h1 className="text-2xl font-bold text-base-content">
-          {t.translations.UPLOAD_CENTER}
-        </h1>
-      </div>
+    <div className="min-h-screen bg-base-100">
+      <header className="bg-base-200/50 border-b border-base-300/30">
+        <div className="px-4 sm:px-6 lg:px-12 py-6">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <h1 className="text-2xl font-bold text-base-content">
+                {t.translations.UPLOAD_CENTER}
+              </h1>
+              <p className="text-sm text-base-content/70 mt-1">
+                {t.translations.START_UPLOAD_BY_CHOOSING_TYPE ||
+                  "Choose an upload mode, configure destination resources, then upload."}
+              </p>
+            </div>
 
-      <div
-        className={`flex gap-8 p-10 lg:p-20 ${
-          showRightPanel ? "justify-between" : "justify-center"
-        }`}
-      >
-        {/* LEFT PANEL */}
-        <div
-          className={`w-full lg:w-3/5 ${
-            showRightPanel ? "" : "max-w-5xl mx-auto"
-          }`}
-        >
-          {/* UPLOAD MODE TOGGLE */}
-          <div className="mb-6">
-            <label className="label">
-              <span className="label-text font-bold text-base-content">
-                {t.translations.UPLOAD_MODE}
+            <div className="flex flex-wrap gap-2">
+              <span className="badge badge-outline">
+                {fileUploadState.uploadMode === "file"
+                  ? t.translations.FILE_UPLOAD
+                  : t.translations.BULK_METADATA}
               </span>
-            </label>
-            <div className="btn-group">
-              <button
-                type="button"
-                className={`btn btn-sm mr-5 ${
-                  fileUploadState.uploadMode === "file"
-                    ? "btn-primary"
-                    : "btn-ghost"
-                }`}
-                onClick={() => {
-                  fileUploadState.setUploadMode("file");
-                  bulkUploadState.setCsvFile(null);
-                }}
-              >
-                <DocumentIcon className="size-6" />
-                {t.translations.FILE_UPLOAD}
-              </button>
-              <button
-                type="button"
-                className={`btn btn-sm ${
-                  fileUploadState.uploadMode === "bulk"
-                    ? "btn-primary"
-                    : "btn-ghost"
-                }`}
-                onClick={() => {
-                  fileUploadState.setUploadMode("bulk");
-                  fileUploadState.setSelectedFiles([]);
-                  fileUploadState.resetFileUpload();
-                }}
-              >
-                <ArrowUpOnSquareStackIcon className="size-6" />
-                {t.translations.BULK_METADATA}
-              </button>
+              <span className="badge badge-outline">
+                {selectedFiles.length} {t.translations.FILES_LABEL}
+              </span>
             </div>
           </div>
-
-          {/* PROJECT RESOURCE SELECTORS */}
-          <div className="p-4 space-y-4">
-            <ProjectResourceSelectors
-              {...projectResources}
-              hasOrganization={!!organization}
-              uploadMode={fileUploadState.uploadMode}
-            />
-
-            {/* MODE-SPECIFIC CONTENT */}
-            {fileUploadState.uploadMode === "file" ? (
-              <FileUploadSection
-                uploadType={fileUploadState.uploadType}
-                setUploadType={fileUploadState.setUploadType}
-                multi={fileUploadState.multi}
-                setMulti={fileUploadState.setMulti}
-                selectedFiles={fileUploadState.selectedFiles}
-                setSelectedFiles={fileUploadState.setSelectedFiles}
-                setShowMultiFileWarning={
-                  fileUploadState.setShowMultiFileWarning
-                }
-                dropKey={fileUploadState.dropKey}
-                filesMetadata={fileUploadState.filesMetadata}
-                handleMetadataChange={fileUploadState.handleMetadataChange}
-                targetFileId={fileUploadState.targetFileId}
-                setTargetFileId={fileUploadState.setTargetFileId}
-                availableFiles={initialAvailableFiles}
-                needsTarget={needsTarget}
-                isMultiAllowed={isMultiAllowed}
-                isUploading={fileUploadState.isUploading}
-              />
-            ) : (
-              <BulkUploadSection
-                {...bulkUploadState}
-                projectId={projectId}
-                dataSourceId={dataSourceId}
-                organizationId={organizationId as number}
-                projects={projects}
-                dataSources={dataSources}
-              />
-            )}
-          </div>
         </div>
+      </header>
 
-        {/* RIGHT PANEL */}
-        {showRightPanel && (
-          <div className="lg:w-2/5">
-            <FileDetailsCard
-              needsTarget={needsTarget}
-              selectedTarget={selectedTarget}
-            />
-            <SelectedFilesCard
-              files={fileUploadState.selectedFiles}
-              onRemoveAt={fileUploadState.removeAt}
-              onClear={fileUploadState.clearAll}
-              onUpload={handleFileUpload}
-              canUpload={canUpload}
-              isUploading={fileUploadState.isUploading}
-            />
-            {fileUploadState.isUploading && !fileUploadState.uploadProgress && (
-              <div className="mt-4 p-4 bg-base-200 rounded-lg flex flex-col items-center justify-center space-y-3">
-                <span className="loading loading-spinner loading-lg text-primary"></span>
-                <p className="text-sm text-base-content/70 text-center">
-                  {t.translations.PREPARING_UPLOAD}
-                </p>
+      <main className="px-4 sm:px-6 lg:px-12 py-6">
+        <div
+          className={`mx-auto grid w-full max-w-7xl gap-6 ${
+            showRightPanel ? "lg:grid-cols-12" : ""
+          }`}
+        >
+          <section
+            className={`w-full ${
+              showRightPanel ? "lg:col-span-8" : "max-w-5xl mx-auto"
+            }`}
+          >
+            <div className="card bg-base-100 border border-base-300/60 shadow-xl">
+              <div className="card-body space-y-6">
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <span className="badge badge-primary badge-sm">1</span>
+                    <h2 className="text-lg font-semibold text-base-content">
+                      {t.translations.UPLOAD_MODE}
+                    </h2>
+                  </div>
+
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <button
+                      type="button"
+                      className={`rounded-xl border p-4 text-left transition ${
+                        fileUploadState.uploadMode === "file"
+                          ? "border-primary bg-primary/10 shadow-sm"
+                          : "border-base-300/70 hover:bg-base-200/40"
+                      }`}
+                      onClick={() => {
+                        fileUploadState.setUploadMode("file");
+                        bulkUploadState.setCsvFile(null);
+                      }}
+                    >
+                      <div className="flex items-center gap-3">
+                        <DocumentIcon className="size-6" />
+                        <div>
+                          <p className="font-semibold text-base-content">
+                            {t.translations.FILE_UPLOAD}
+                          </p>
+                          <p className="text-xs text-base-content/70">
+                            Upload one or more files with metadata.
+                          </p>
+                        </div>
+                      </div>
+                    </button>
+
+                    <button
+                      type="button"
+                      className={`rounded-xl border p-4 text-left transition ${
+                        fileUploadState.uploadMode === "bulk"
+                          ? "border-primary bg-primary/10 shadow-sm"
+                          : "border-base-300/70 hover:bg-base-200/40"
+                      }`}
+                      onClick={() => {
+                        fileUploadState.setUploadMode("bulk");
+                        fileUploadState.setSelectedFiles([]);
+                        fileUploadState.resetFileUpload();
+                      }}
+                    >
+                      <div className="flex items-center gap-3">
+                        <ArrowUpOnSquareStackIcon className="size-6" />
+                        <div>
+                          <p className="font-semibold text-base-content">
+                            {t.translations.BULK_METADATA}
+                          </p>
+                          <p className="text-xs text-base-content/70">
+                            Create records from a CSV template.
+                          </p>
+                        </div>
+                      </div>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="divider my-0" />
+
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <span className="badge badge-primary badge-sm">2</span>
+                    <h2 className="text-lg font-semibold text-base-content">
+                      {t.translations.PROJECT} / {t.translations.DATA_SOURCE}
+                    </h2>
+                  </div>
+
+                  <div className="rounded-xl border border-base-300/60 bg-base-200/30 p-4">
+                    <ProjectResourceSelectors
+                      {...projectResources}
+                      hasOrganization={!!organization}
+                      uploadMode={fileUploadState.uploadMode}
+                    />
+                  </div>
+                </div>
+
+                <div className="divider my-0" />
+
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <span className="badge badge-primary badge-sm">3</span>
+                    <h2 className="text-lg font-semibold text-base-content">
+                      {fileUploadState.uploadMode === "file"
+                        ? t.translations.FILE_UPLOAD
+                        : t.translations.BULK_METADATA}
+                    </h2>
+                  </div>
+
+                  <div className="rounded-xl border border-base-300/60 bg-base-100 p-4">
+                    {fileUploadState.uploadMode === "file" ? (
+                      <FileUploadSection
+                        uploadType={fileUploadState.uploadType}
+                        setUploadType={fileUploadState.setUploadType}
+                        multi={fileUploadState.multi}
+                        setMulti={fileUploadState.setMulti}
+                        selectedFiles={fileUploadState.selectedFiles}
+                        setSelectedFiles={fileUploadState.setSelectedFiles}
+                        setShowMultiFileWarning={
+                          fileUploadState.setShowMultiFileWarning
+                        }
+                        dropKey={fileUploadState.dropKey}
+                        filesMetadata={fileUploadState.filesMetadata}
+                        handleMetadataChange={fileUploadState.handleMetadataChange}
+                        targetFileId={fileUploadState.targetFileId}
+                        setTargetFileId={fileUploadState.setTargetFileId}
+                        availableFiles={initialAvailableFiles}
+                        needsTarget={needsTarget}
+                        isMultiAllowed={isMultiAllowed}
+                        isUploading={fileUploadState.isUploading}
+                      />
+                    ) : (
+                      <BulkUploadSection
+                        {...bulkUploadState}
+                        projectId={projectId}
+                        dataSourceId={dataSourceId}
+                        organizationId={organizationId as number}
+                        projects={projects}
+                        dataSources={dataSources}
+                      />
+                    )}
+                  </div>
+                </div>
               </div>
-            )}
-          </div>
-        )}
-      </div>
+            </div>
+          </section>
+
+          {showRightPanel && (
+            <aside className="w-full lg:col-span-4">
+              <div className="space-y-4 lg:sticky lg:top-28">
+                <div className="card bg-base-100 border border-base-300/60 shadow-xl">
+                  <div className="card-body">
+                    <h3 className="card-title text-base-content">
+                      Upload Summary
+                    </h3>
+                    <div className="mt-1 space-y-2 text-sm">
+                      <div className="flex items-center justify-between">
+                        <span className="text-base-content/70">
+                          {t.translations.PROJECT}
+                        </span>
+                        <span className={projectId ? "" : "text-warning"}>
+                          {projectId ? "Ready" : "Required"}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-base-content/70">
+                          {t.translations.DATA_SOURCE}
+                        </span>
+                        <span className={dataSourceId ? "" : "text-warning"}>
+                          {dataSourceId ? "Ready" : "Required"}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-base-content/70">
+                          {t.translations.STORAGE_DESTINATION}
+                        </span>
+                        <span className={objectStorageId ? "" : "text-warning"}>
+                          {objectStorageId ? "Ready" : "Required"}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-base-content/70">
+                          {t.translations.SELECTED_FILES}
+                        </span>
+                        <span>{selectedFiles.length}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {selectedFiles.length === 0 && (
+                  <div className="rounded-xl border border-dashed border-base-300 p-6 text-center bg-base-100">
+                    <p className="text-sm text-base-content/70">
+                      {t.translations.NO_FILES_SELECTED_YET}
+                    </p>
+                  </div>
+                )}
+
+                <FileDetailsCard
+                  needsTarget={needsTarget}
+                  selectedTarget={selectedTarget}
+                />
+                <SelectedFilesCard
+                  files={fileUploadState.selectedFiles}
+                  onRemoveAt={fileUploadState.removeAt}
+                  onClear={fileUploadState.clearAll}
+                  onUpload={handleFileUpload}
+                  canUpload={canUpload}
+                  isUploading={fileUploadState.isUploading}
+                />
+                {fileUploadState.isUploading && !fileUploadState.uploadProgress && (
+                  <div className="p-4 bg-base-200 rounded-lg flex flex-col items-center justify-center space-y-3">
+                    <span className="loading loading-spinner loading-lg text-primary"></span>
+                    <p className="text-sm text-base-content/70 text-center">
+                      {t.translations.PREPARING_UPLOAD}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </aside>
+          )}
+        </div>
+      </main>
 
       {/* MODALS */}
 
