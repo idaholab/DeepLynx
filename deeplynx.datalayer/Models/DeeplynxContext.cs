@@ -1169,7 +1169,7 @@ public partial class DeeplynxContext : DbContext
             entity.HasOne(d => d.LastUpdatedByUser)
                 .WithMany(p => p.LastUpdatedTags)
                 .HasForeignKey(d => d.LastUpdatedBy)
-                .OnDelete(DeleteBehavior.Cascade)
+                .OnDelete(DeleteBehavior.NoAction)
                 .HasConstraintName(null);
         });
 
@@ -1210,6 +1210,59 @@ public partial class DeeplynxContext : DbContext
                 .WithMany(p => p.SavedSearches)
                 .OnDelete(DeleteBehavior.Cascade)
                 .HasConstraintName("saved_searches_user_id_fkey");
+        });
+
+        modelBuilder.Entity<AiModelConfig>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("ai_model_configs_pkey");
+
+            entity.Property(e => e.Id).UseIdentityAlwaysColumn();
+            
+            entity.Property(e => e.RequiresToken).HasDefaultValue(false);
+            
+            entity.Property(e => e.Default).HasDefaultValue(false);
+            
+            // Organization relationship
+            entity.HasOne(c => c.Organization)
+                .WithMany(o => o.AiModelConfigs)
+                .HasForeignKey(c => c.OrganizationId)
+                .IsRequired()
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("ai_model_configs_organization_id_fkey");
+
+            // Project relationship
+            entity.HasOne(c => c.Project)
+                .WithMany(p => p.AiModelConfigs)
+                .HasForeignKey(c => c.ProjectId)
+                .IsRequired(false)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("ai_model_configs_project_id_fkey");
+            
+            // last updated by user relationship
+            entity.HasOne(aimc => aimc.LastUpdatedByUser)
+                .WithMany(u => u.LastUpdatedAiModelConfigs)
+                .HasForeignKey(aimc => aimc.LastUpdatedBy)
+                .OnDelete(DeleteBehavior.NoAction)
+                .HasConstraintName(null);
+        });
+
+        modelBuilder.Entity<UserModelToken>(entity =>
+        {
+            // User Relationship
+            entity.HasOne(umt => umt.User)
+                .WithMany(u => u.UserModelTokens)
+                .HasForeignKey(umt => umt.UserId)
+                .IsRequired()
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("user_model_tokens_user_id_fkey");
+            
+            // AI Model Config Relationship
+            entity.HasOne(u => u.AiModelConfig)
+                .WithMany(a => a.UserModelTokens)
+                .HasForeignKey(u => u.AiModelConfigId)
+                .IsRequired()
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("user_model_tokens_ai_model_config_id_fkey");
         });
 
         OnModelCreatingPartial(modelBuilder);
