@@ -1169,7 +1169,7 @@ public partial class DeeplynxContext : DbContext
             entity.HasOne(d => d.LastUpdatedByUser)
                 .WithMany(p => p.LastUpdatedTags)
                 .HasForeignKey(d => d.LastUpdatedBy)
-                .OnDelete(DeleteBehavior.NoAction)
+                .OnDelete(DeleteBehavior.Cascade)
                 .HasConstraintName(null);
         });
 
@@ -1211,55 +1211,81 @@ public partial class DeeplynxContext : DbContext
                 .OnDelete(DeleteBehavior.Cascade)
                 .HasConstraintName("saved_searches_user_id_fkey");
         });
-
+        
         modelBuilder.Entity<AiModelConfig>(entity =>
         {
             entity.HasKey(e => e.Id).HasName("ai_model_configs_pkey");
 
+            entity.HasIndex(e => e.Id)
+                .HasDatabaseName("idx_ai_model_configs_id");
+
+            entity.HasIndex(e => e.OrganizationId)
+                .HasDatabaseName("idx_ai_model_configs_organization_id");
+
+            entity.HasIndex(e => e.ProjectId)
+                .HasDatabaseName("idx_ai_model_configs_project_id");
+
+            entity.HasIndex(e => e.LastUpdatedBy)
+                .HasDatabaseName("idx_ai_model_configs_last_updated_by");
+
             entity.Property(e => e.Id).UseIdentityAlwaysColumn();
-            
+
+            entity.Property(e => e.LastUpdatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+            entity.Property(e => e.IsArchived).HasDefaultValue(false);
+
             entity.Property(e => e.RequiresToken).HasDefaultValue(false);
-            
+
             entity.Property(e => e.Default).HasDefaultValue(false);
-            
-            // Organization relationship
-            entity.HasOne(c => c.Organization)
+
+            entity.HasOne(e => e.Organization)
                 .WithMany(o => o.AiModelConfigs)
-                .HasForeignKey(c => c.OrganizationId)
+                .HasForeignKey(e => e.OrganizationId)
                 .IsRequired()
                 .OnDelete(DeleteBehavior.Cascade)
                 .HasConstraintName("ai_model_configs_organization_id_fkey");
 
-            // Project relationship
-            entity.HasOne(c => c.Project)
+            entity.HasOne(e => e.Project)
                 .WithMany(p => p.AiModelConfigs)
-                .HasForeignKey(c => c.ProjectId)
+                .HasForeignKey(e => e.ProjectId)
                 .IsRequired(false)
                 .OnDelete(DeleteBehavior.Cascade)
                 .HasConstraintName("ai_model_configs_project_id_fkey");
-            
-            // last updated by user relationship
-            entity.HasOne(aimc => aimc.LastUpdatedByUser)
+
+            entity.HasOne(e => e.LastUpdatedByUser)
                 .WithMany(u => u.LastUpdatedAiModelConfigs)
-                .HasForeignKey(aimc => aimc.LastUpdatedBy)
+                .HasForeignKey(e => e.LastUpdatedBy)
                 .OnDelete(DeleteBehavior.NoAction)
                 .HasConstraintName(null);
         });
 
         modelBuilder.Entity<UserModelToken>(entity =>
         {
-            // User Relationship
-            entity.HasOne(umt => umt.User)
+            entity.HasKey(e => e.Id).HasName("user_model_tokens_pkey");
+
+            entity.HasIndex(e => e.Id)
+                .HasDatabaseName("idx_user_model_tokens_id");
+
+            entity.HasIndex(e => e.UserId)
+                .HasDatabaseName("idx_user_model_tokens_user_id");
+
+            entity.HasIndex(e => e.AiModelConfigId)
+                .HasDatabaseName("idx_user_model_tokens_ai_model_config_id");
+
+            entity.Property(e => e.Id).UseIdentityAlwaysColumn();
+
+            entity.Property(e => e.LastUpdatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+            entity.HasOne(e => e.User)
                 .WithMany(u => u.UserModelTokens)
-                .HasForeignKey(umt => umt.UserId)
+                .HasForeignKey(e => e.UserId)
                 .IsRequired()
                 .OnDelete(DeleteBehavior.Cascade)
                 .HasConstraintName("user_model_tokens_user_id_fkey");
-            
-            // AI Model Config Relationship
-            entity.HasOne(u => u.AiModelConfig)
+
+            entity.HasOne(e => e.AiModelConfig)
                 .WithMany(a => a.UserModelTokens)
-                .HasForeignKey(u => u.AiModelConfigId)
+                .HasForeignKey(e => e.AiModelConfigId)
                 .IsRequired()
                 .OnDelete(DeleteBehavior.Cascade)
                 .HasConstraintName("user_model_tokens_ai_model_config_id_fkey");
