@@ -138,7 +138,7 @@ public class FileBusiness
         return await _recordBusiness.CreateRecord(currentUserId, organizationId, projectId, realDataSourceId,
             recordRequest, sensitivityLabelIds, embedded: embed);
         
-        // TODO: If embed is true send the record ID to the CREATE Insight API
+        // TODO: If embed is true send the record ID and URI to the CREATE Insight API
     }
 
     /// <summary>
@@ -192,7 +192,7 @@ public class FileBusiness
         return await _recordBusiness.UpdateRecord(currentUserId, organizationId, projectId, recordId,
             updateRecordRequest, embedded: embed);
         
-        // TODO: If embed is true send the record ID to the UPDATE Insight API (or delete then add if no update endpoint exists)
+        // TODO: If embed is true send the record ID and URI to the UPDATE Insight API (or delete then add if no update endpoint exists)
     }
 
     /// <summary>
@@ -268,7 +268,7 @@ public class FileBusiness
 
         return await _recordBusiness.DeleteRecord(currentUserId, organizationId, projectId, recordId);
         
-        // TODO: Determine how to tell if a file is embedded and if so delete it
+        // TODO: Delete all references to this record in the pgVector embeddings table
     }
 
 
@@ -446,7 +446,7 @@ public class FileBusiness
         return await _recordBusiness.CreateRecord(currentUserId, organizationId, projectId, realDataSourceId,
             recordRequest, sensitivityLabelIds, embedded: embed);
         
-        // TODO: If embed is true then pass the record ID to INSIGHT CREATE API
+        // TODO: If embed is true then pass the record ID and URI to INSIGHT CREATE API
     }
 
     /// <summary>
