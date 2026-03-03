@@ -3,16 +3,17 @@
 "use client";
 import { FileMetadata } from "../types/types";
 import { useLanguage } from "@/app/contexts/Language";
+import { TrashIcon } from "@heroicons/react/24/outline";
 import { useEffect, useState } from "react";
 
 type UploadType = "new" | "version" | "properties" | "";
-
 
 interface NewFileUploadCardProps {
   defaultName?: string;
   uploadType: UploadType;
   fileIndex: number;
   onMetadataChange: (fileIndex: number, metadata: FileMetadata) => void;
+  onRemove?: () => void;
 }
 
 export default function NewFileUploadCard({
@@ -20,10 +21,11 @@ export default function NewFileUploadCard({
   uploadType,
   fileIndex,
   onMetadataChange,
+  onRemove,
 }: NewFileUploadCardProps) {
   const { t } = useLanguage();
   const [updateAction, setUpdateAction] = useState<"" | "merge" | "overwrite">(
-    ""
+    "",
   );
   const [description] = useState("");
   const [isTimeSeries, setIsTimeSeries] = useState(false);
@@ -44,8 +46,8 @@ export default function NewFileUploadCard({
       isTimeSeries,
       ...(showUpdate &&
         updateAction && {
-        updateAction: updateAction as "merge" | "overwrite",
-      }),
+          updateAction: updateAction as "merge" | "overwrite",
+        }),
       ...(metadataFile && { metadataFile }),
     };
     onMetadataChange(fileIndex, metadata);
@@ -61,12 +63,29 @@ export default function NewFileUploadCard({
   ]);
 
   return (
-    <div>
-      {/* Show original file name above the card */}
-      <h4 className="px-2">{defaultName}</h4>
+    <div className="space-y-">
+      <div className="divider my-6 text-md  text-base-content/70">
+        {`File ${fileIndex + 1}: ${defaultName}`}
+      </div>
 
       <div className="card card-border">
         <div className="card-body w-full space-y-4">
+          <div className="flex justify-between">
+            <div className="badge badge-soft badge-outline badge-secondary">
+              New
+            </div>
+            {onRemove && (
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-xs"
+                  onClick={onRemove}
+                >
+                  <TrashIcon className="size-6 text-error" />
+                </button>
+              </div>
+            )}
+          </div>
           {/* Row 1: Time Series toggle + Name input */}
           <div className="grid grid-cols-[auto,1fr] items-center gap-4">
             <div className="flex items-center">
@@ -91,7 +110,6 @@ export default function NewFileUploadCard({
               </label>
             </div>
           </div>
-
           {/* Row 2: Metadata File (optional) */}
           <div className="flex items-center gap-3">
             <span className="label-text shrink-0">Metadata File</span>
@@ -113,7 +131,6 @@ export default function NewFileUploadCard({
               </button>
             )}
           </div>
-
           {/* Row 3: Description textarea */}
           {/* <div className="grid grid-cols-[auto,1fr] items-start gap-4">
             <div className="flex">

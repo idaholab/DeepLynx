@@ -3,12 +3,10 @@
 import { useLanguage } from "@/app/contexts/Language";
 import { useOrganizationSession } from "@/app/contexts/OrganizationSessionProvider";
 import {
-  BatchUploadProgressEvent,
   cancelChunkedUpload,
   cancelCurrentUpload,
   CHUNK_THRESHOLD,
   uploadFile,
-  uploadFilesBatch,
 } from "@/app/lib/client_service/file_upload_services.client";
 import { uploadBulkMetadata } from "@/app/lib/client_service/metadata_service.client";
 import { uploadTimeseriesFile } from "@/app/lib/client_service/timeseries_services.client";
@@ -16,8 +14,6 @@ import { parseBackendErrors } from "@/app/lib/error_parser";
 import { createUploadToastManager } from "@/app/lib/uploadToastManager";
 import { useEffect, useMemo } from "react";
 import toast from "react-hot-toast";
-import FileDetailsCard from "../components/FileDetailCard";
-import SelectedFilesCard from "../components/SelectedFilesCard";
 import { useBulkUploadState } from "./hooks/useBulkUploadState";
 import { useProjectResources } from "./hooks/useProjectResources";
 import { useUploadState } from "./hooks/useUploadState";
@@ -46,7 +42,7 @@ export default function UploadCenterClient({ initialAvailableFiles }: Props) {
   const bulkUploadState = useBulkUploadState();
   const projectResources = useProjectResources(organizationId as number);
   const uploadToastManager = useMemo(() => createUploadToastManager(), []);
-  const { setTargetFileId, setMulti, multi } = fileUploadState;
+  const { setTargetFileId } = fileUploadState;
   const { projectId, dataSourceId, objectStorageId, projects, dataSources } =
     projectResources;
   const selectedFiles = fileUploadState.selectedFiles;
@@ -54,30 +50,22 @@ export default function UploadCenterClient({ initialAvailableFiles }: Props) {
   const needsTarget =
     fileUploadState.uploadType === "version" ||
     fileUploadState.uploadType === "properties";
-  const isMultiAllowed = fileUploadState.uploadType === "new";
-  const showRightPanel = fileUploadState.uploadMode === "file";
-  const selectedTarget =
-    initialAvailableFiles.find((f) => f.id === fileUploadState.targetFileId) ??
-    null;
+  const hasAnyNonTimeseriesFiles = selectedFiles.some(
+    (_, idx) => !fileUploadState.filesMetadata[idx]?.isTimeSeries,
+  );
+  const requiresObjectStorage = hasAnyNonTimeseriesFiles;
 
   const canUpload =
     selectedFiles.length > 0 &&
     !!projectId &&
     !!dataSourceId &&
-    !!objectStorageId &&
+    (!requiresObjectStorage || !!objectStorageId) &&
     (!needsTarget || !!fileUploadState.targetFileId);
 
   // Clear target file when not needed
   useEffect(() => {
     if (!needsTarget) setTargetFileId("");
   }, [needsTarget, setTargetFileId]);
-
-  // Manage multi toggle
-  useEffect(() => {
-    if (!isMultiAllowed && multi) {
-      setMulti(false);
-    }
-  }, [isMultiAllowed, multi, setMulti]);
 
   const handleFileUpload = async () => {
     if (!organizationId || !projectId || selectedFiles.length === 0) {
@@ -148,16 +136,13 @@ export default function UploadCenterClient({ initialAvailableFiles }: Props) {
       if (selectedFiles.length > 1) {
         const shouldShowMultiFileProgressToast =
           selectedFiles.length >= MULTI_FILE_PROGRESS_TOAST_THRESHOLD;
-
-        const showMultiFileProgressToast = (
-          progress: BatchUploadProgressEvent,
-        ) => {
-          uploadToastManager.show({
-            title: t.translations.UPLOADING_FILES,
-            message: `${progress.completed} / ${progress.total} ${t.translations.FILES_LABEL}`,
-            percent: (progress.completed / progress.total) * 100,
-          });
-        };
+        const results: PromiseSettledResult<unknown>[] = Array(
+          selectedFiles.length,
+        );
+        let completed = 0;
+        let succeeded = 0;
+        let failed = 0;
+        let nextFileIndex = 0;
 
         if (shouldShowMultiFileProgressToast) {
           uploadToastManager.show({
@@ -167,22 +152,65 @@ export default function UploadCenterClient({ initialAvailableFiles }: Props) {
           });
         }
 
-        const results = await uploadFilesBatch({
-          ...uploadContext,
-          files: selectedFiles,
-          maxConcurrentFiles: MAX_CONCURRENT_FILE_UPLOADS,
-          onProgress: shouldShowMultiFileProgressToast
-            ? showMultiFileProgressToast
-            : undefined,
-        });
+        const regularVsTimeseriesFiles = async (): Promise<void> => {
+          while (true) {
+            const currentIndex = nextFileIndex++;
+            if (currentIndex >= selectedFiles.length) return;
 
-        const ok = results.filter((r) => r.status === "fulfilled").length;
-        const fail = results.length - ok;
-        uploadToastManager.success(
-          `Uploaded ${ok} file(s)${fail ? ` • ${fail} failed` : ""}`,
+            const file = selectedFiles[currentIndex];
+            const metadata = fileUploadState.filesMetadata[currentIndex] ?? {};
+
+            try {
+              if (metadata.isTimeSeries) {
+                const value = await uploadTimeseriesFile(
+                  Number(organizationId),
+                  Number(projectId),
+                  Number(dataSourceId),
+                  file,
+                );
+                results[currentIndex] = { status: "fulfilled", value };
+              } else {
+                const value = await uploadFile({
+                  ...uploadContext,
+                  file,
+                  name: metadata.name || file.name,
+                  description: metadata.description || "",
+                  metadataFile: metadata.metadataFile,
+                });
+                results[currentIndex] = { status: "fulfilled", value };
+              }
+              succeeded += 1;
+            } catch (reason) {
+              results[currentIndex] = { status: "rejected", reason };
+              failed += 1;
+            } finally {
+              completed += 1;
+              if (shouldShowMultiFileProgressToast) {
+                uploadToastManager.show({
+                  title: t.translations.UPLOADING_FILES,
+                  message: `${completed} / ${selectedFiles.length} ${t.translations.FILES_LABEL}`,
+                  percent: (completed / selectedFiles.length) * 100,
+                });
+              }
+            }
+          }
+        };
+
+        const workers = Array.from(
+          {
+            length: Math.min(MAX_CONCURRENT_FILE_UPLOADS, selectedFiles.length),
+          },
+          () => regularVsTimeseriesFiles(),
         );
-        if (fail) console.warn("Batch upload failures:", results);
+        await Promise.all(workers);
+
+        uploadToastManager.success(
+          `Uploaded ${succeeded} file(s)${failed ? ` • ${failed} failed` : ""}`,
+        );
+        if (failed) console.warn("Batch upload failures:", results);
+
         fileUploadState.resetFileUpload();
+
         return;
       }
 
@@ -331,17 +359,9 @@ export default function UploadCenterClient({ initialAvailableFiles }: Props) {
       </header>
 
       <main className="px-4 sm:px-6 lg:px-12 py-6">
-        <div
-          className={`mx-auto grid w-full max-w-7xl gap-6 ${
-            showRightPanel ? "lg:grid-cols-12" : ""
-          }`}
-        >
-          <section
-            className={`w-full ${
-              showRightPanel ? "lg:col-span-8" : "max-w-5xl mx-auto"
-            }`}
-          >
-            <div className="card bg-base-100 border border-base-300/60 shadow-xl">
+        <div className="mx-auto w-full max-w-5xl">
+          <section className="w-full">
+            <div className="card bg-base-100 shadow-xl">
               <div className="card-body space-y-6">
                 <div className="space-y-3">
                   <div className="flex items-center gap-2">
@@ -351,38 +371,37 @@ export default function UploadCenterClient({ initialAvailableFiles }: Props) {
                     </h2>
                   </div>
 
-                  <div className="grid gap-3 md:grid-cols-2">
+                  <div
+                    role="radiogroup"
+                    aria-label="Upload workflow view"
+                    className="inline-flex rounded-full border border-base-300/70 bg-base-200/50 p-1"
+                  >
                     <button
                       type="button"
-                      className={`rounded-xl border p-4 text-left transition ${
+                      role="radio"
+                      aria-checked={fileUploadState.uploadMode === "file"}
+                      className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition ${
                         fileUploadState.uploadMode === "file"
-                          ? "border-primary bg-primary/10 shadow-sm"
-                          : "border-base-300/70 hover:bg-base-200/40"
+                          ? "bg-base-100 text-base-content shadow-sm"
+                          : "text-base-content/70 hover:text-base-content"
                       }`}
                       onClick={() => {
                         fileUploadState.setUploadMode("file");
                         bulkUploadState.setCsvFile(null);
                       }}
                     >
-                      <div className="flex items-center gap-3">
-                        <DocumentIcon className="size-6" />
-                        <div>
-                          <p className="font-semibold text-base-content">
-                            {t.translations.FILE_UPLOAD}
-                          </p>
-                          <p className="text-xs text-base-content/70">
-                            Upload one or more files with metadata.
-                          </p>
-                        </div>
-                      </div>
+                      <DocumentIcon className="size-4 opacity-80" />
+                      {t.translations.FILE_UPLOAD}
                     </button>
 
                     <button
                       type="button"
-                      className={`rounded-xl border p-4 text-left transition ${
+                      role="radio"
+                      aria-checked={fileUploadState.uploadMode === "bulk"}
+                      className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition ${
                         fileUploadState.uploadMode === "bulk"
-                          ? "border-primary bg-primary/10 shadow-sm"
-                          : "border-base-300/70 hover:bg-base-200/40"
+                          ? "bg-base-100 text-base-content shadow-sm"
+                          : "text-base-content/70 hover:text-base-content"
                       }`}
                       onClick={() => {
                         fileUploadState.setUploadMode("bulk");
@@ -390,17 +409,8 @@ export default function UploadCenterClient({ initialAvailableFiles }: Props) {
                         fileUploadState.resetFileUpload();
                       }}
                     >
-                      <div className="flex items-center gap-3">
-                        <ArrowUpOnSquareStackIcon className="size-6" />
-                        <div>
-                          <p className="font-semibold text-base-content">
-                            {t.translations.BULK_METADATA}
-                          </p>
-                          <p className="text-xs text-base-content/70">
-                            Create records from a CSV template.
-                          </p>
-                        </div>
-                      </div>
+                      <ArrowUpOnSquareStackIcon className="size-4 opacity-80" />
+                      {t.translations.BULK_METADATA}
                     </button>
                   </div>
                 </div>
@@ -436,27 +446,26 @@ export default function UploadCenterClient({ initialAvailableFiles }: Props) {
                     </h2>
                   </div>
 
-                  <div className="rounded-xl border border-base-300/60 bg-base-100 p-4">
+                  <div className="bg-base-100 p-4">
                     {fileUploadState.uploadMode === "file" ? (
                       <FileUploadSection
                         uploadType={fileUploadState.uploadType}
-                        setUploadType={fileUploadState.setUploadType}
-                        multi={fileUploadState.multi}
-                        setMulti={fileUploadState.setMulti}
                         selectedFiles={fileUploadState.selectedFiles}
                         setSelectedFiles={fileUploadState.setSelectedFiles}
-                        setShowMultiFileWarning={
-                          fileUploadState.setShowMultiFileWarning
-                        }
                         dropKey={fileUploadState.dropKey}
                         filesMetadata={fileUploadState.filesMetadata}
-                        handleMetadataChange={fileUploadState.handleMetadataChange}
+                        handleMetadataChange={
+                          fileUploadState.handleMetadataChange
+                        }
                         targetFileId={fileUploadState.targetFileId}
                         setTargetFileId={fileUploadState.setTargetFileId}
                         availableFiles={initialAvailableFiles}
                         needsTarget={needsTarget}
-                        isMultiAllowed={isMultiAllowed}
                         isUploading={fileUploadState.isUploading}
+                        canUpload={canUpload}
+                        onUpload={handleFileUpload}
+                        onClear={fileUploadState.clearAll}
+                        onRemoveAt={fileUploadState.removeAt}
                       />
                     ) : (
                       <BulkUploadSection
@@ -473,109 +482,10 @@ export default function UploadCenterClient({ initialAvailableFiles }: Props) {
               </div>
             </div>
           </section>
-
-          {showRightPanel && (
-            <aside className="w-full lg:col-span-4">
-              <div className="space-y-4 lg:sticky lg:top-28">
-                <div className="card bg-base-100 border border-base-300/60 shadow-xl">
-                  <div className="card-body">
-                    <h3 className="card-title text-base-content">
-                      Upload Summary
-                    </h3>
-                    <div className="mt-1 space-y-2 text-sm">
-                      <div className="flex items-center justify-between">
-                        <span className="text-base-content/70">
-                          {t.translations.PROJECT}
-                        </span>
-                        <span className={projectId ? "" : "text-warning"}>
-                          {projectId ? "Ready" : "Required"}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-base-content/70">
-                          {t.translations.DATA_SOURCE}
-                        </span>
-                        <span className={dataSourceId ? "" : "text-warning"}>
-                          {dataSourceId ? "Ready" : "Required"}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-base-content/70">
-                          {t.translations.STORAGE_DESTINATION}
-                        </span>
-                        <span className={objectStorageId ? "" : "text-warning"}>
-                          {objectStorageId ? "Ready" : "Required"}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-base-content/70">
-                          {t.translations.SELECTED_FILES}
-                        </span>
-                        <span>{selectedFiles.length}</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {selectedFiles.length === 0 && (
-                  <div className="rounded-xl border border-dashed border-base-300 p-6 text-center bg-base-100">
-                    <p className="text-sm text-base-content/70">
-                      {t.translations.NO_FILES_SELECTED_YET}
-                    </p>
-                  </div>
-                )}
-
-                <FileDetailsCard
-                  needsTarget={needsTarget}
-                  selectedTarget={selectedTarget}
-                />
-                <SelectedFilesCard
-                  files={fileUploadState.selectedFiles}
-                  onRemoveAt={fileUploadState.removeAt}
-                  onClear={fileUploadState.clearAll}
-                  onUpload={handleFileUpload}
-                  canUpload={canUpload}
-                  isUploading={fileUploadState.isUploading}
-                />
-                {fileUploadState.isUploading && !fileUploadState.uploadProgress && (
-                  <div className="p-4 bg-base-200 rounded-lg flex flex-col items-center justify-center space-y-3">
-                    <span className="loading loading-spinner loading-lg text-primary"></span>
-                    <p className="text-sm text-base-content/70 text-center">
-                      {t.translations.PREPARING_UPLOAD}
-                    </p>
-                  </div>
-                )}
-              </div>
-            </aside>
-          )}
         </div>
       </main>
 
       {/* MODALS */}
-
-      {/* Multi File Warning Modal */}
-      {fileUploadState.showMultiFileWarning && (
-        <div className="modal modal-open">
-          <div className="modal-box">
-            <h3 className="font-bold text-lg">
-              {t.translations.CANT_SWITCH_TO_SINGLE_FILE}
-            </h3>
-            <p className="py-2">{t.translations.MULTI_FILE_WARNING}</p>
-            <div className="modal-action">
-              <button
-                className="btn btn-secondary"
-                onClick={() => fileUploadState.setShowMultiFileWarning(false)}
-              >
-                {t.translations.OKAY}
-              </button>
-            </div>
-          </div>
-          <div
-            className="modal-backdrop"
-            onClick={() => fileUploadState.setShowMultiFileWarning(false)}
-          />
-        </div>
-      )}
 
       {/* Upload Confirmation Modal */}
       {bulkUploadState.showUploadConfirm &&

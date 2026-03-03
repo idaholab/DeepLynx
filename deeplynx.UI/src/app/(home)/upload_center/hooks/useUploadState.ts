@@ -7,8 +7,6 @@ export type UploadMode = "file" | "bulk";
 
 export function useUploadState() {
   // File Upload Mode State
-  const [multi, setMulti] = useState(false);
-  const [showMultiFileWarning, setShowMultiFileWarning] = useState(false);
   const [uploadType, setUploadType] = useState<UploadType>("new");
   const [targetFileId, setTargetFileId] = useState("");
   const [destination, setDestination] = useState("");
@@ -43,7 +41,6 @@ export function useUploadState() {
     setUploadType("new");
     setDestination("");
     setTargetFileId("");
-    setMulti(false);
     setFilesMetadata({});
     setDropKey((k) => k + 1);
     setUploadProgress(null);
@@ -52,8 +49,6 @@ export function useUploadState() {
 
   return {
     // State
-    multi,
-    showMultiFileWarning,
     uploadType,
     targetFileId,
     destination,
@@ -68,8 +63,6 @@ export function useUploadState() {
     
     
     // Setters
-    setMulti,
-    setShowMultiFileWarning,
     setUploadType,
     setTargetFileId,
     setDestination,
