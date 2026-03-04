@@ -7,8 +7,8 @@ const TEMPLATE = {
   Name: "example_file_name",
   Description: "Describe this file",
   OriginalId: "unique-original-id",
-  ClassName: null,
-  ClassId: null,
+  ClassName: "optional: Class Example",
+  ClassId: "optional: 123",
   Properties: {
     exampleKey: "exampleValue",
   },
