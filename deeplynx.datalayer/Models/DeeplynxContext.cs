@@ -62,6 +62,10 @@ public partial class DeeplynxContext : DbContext
     public virtual DbSet<User> Users { get; set; }
 
     public virtual DbSet<SavedSearch> SavedSearches { get; set; }
+    
+    public virtual DbSet<AiModelConfig> AiModelConfigs { get; set; }
+    
+    public virtual DbSet<UserModelToken> UserModelTokens { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
