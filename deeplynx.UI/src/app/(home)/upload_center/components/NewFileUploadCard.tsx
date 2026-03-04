@@ -320,10 +320,7 @@ export default function NewFileUploadCard({
           </div>
           {/* Row 2: Metadata File */}
           <div className="flex flex-col gap-1">
-            <label
-              htmlFor={metadataInputId}
-              className="flex items-center gap-2"
-            >
+            <label htmlFor={metadataInputId} className="flex items-center gap-2">
               <span className="label-text">{t.translations.METADATA_FILE}</span>
               <span className="badge badge-xs">{t.translations.OPTIONAL}</span>
             </label>

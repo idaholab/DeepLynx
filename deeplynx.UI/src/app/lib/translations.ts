@@ -514,6 +514,7 @@ export const translations = {
             SHOWING_FIRST_FILES_USE_SEARCH: "Showing first {count} files. Use search to narrow results.",
             SELECTED_RECORD: "Selected record:",
             METADATA_FILE: "Metadata File",
+            DOWNLOAD_METADATA_TEMPLATE: "Download Metadata Template",
             CHOOSE_FILE_OPTIONAL: "Choose file (optional)",
             NO_AVAILABLE_USERS: "No available users",
             PLEASE_UPLOAD_VALID_IMAGE: "Please upload a valid image file (PNG recommended).",
@@ -1445,6 +1446,7 @@ export const translations = {
             SHOWING_FIRST_FILES_USE_SEARCH: "Mostrando los primeros {count} archivos. Use la búsqueda para limitar resultados.",
             SELECTED_RECORD: "Registro seleccionado:",
             METADATA_FILE: "Archivo de metadatos",
+            DOWNLOAD_METADATA_TEMPLATE: "Descargar plantilla de metadatos",
             CHOOSE_FILE_OPTIONAL: "Elegir archivo (opcional)",
 
             PLEASE_UPLOAD_VALID_IMAGE: "Por favor, sube un archivo de imagen válido (se recomienda PNG).",

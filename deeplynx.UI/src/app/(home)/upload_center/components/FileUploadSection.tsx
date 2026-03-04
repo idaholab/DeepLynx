@@ -1,11 +1,11 @@
 "use client";
 
 import { useLanguage } from "@/app/contexts/Language";
-import DropUpload from "./DropUpload";
-import NewFileUploadCard from "./NewFileUploadCard";
-import { FileMetadata, ExistingFile } from "../../types/types";
 import { CHUNK_THRESHOLD } from "@/app/lib/client_service/file_upload_services.client";
 import toast from "react-hot-toast";
+import { ExistingFile, FileMetadata } from "../../types/types";
+import DropUpload from "./DropUpload";
+import NewFileUploadCard from "./NewFileUploadCard";
 
 interface FileUploadSectionProps {
   selectedFiles: File[];

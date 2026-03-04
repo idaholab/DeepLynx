@@ -29,6 +29,7 @@ import type { ExistingFile, UploadProgressEvent } from "../types/types";
 import BulkUploadSection from "./components/BulkUploadSection";
 import FileUploadSection from "./components/FileUploadSection";
 import ProjectResourceSelectors from "./components/ProjectResourceSelectors";
+import MetadataTemplateDownload from "./components/MetadataTemplateDownload";
 
 const MAX_CONCURRENT_FILE_UPLOADS = 5;
 const MULTI_FILE_PROGRESS_TOAST_THRESHOLD = 30;
@@ -610,13 +611,18 @@ export default function UploadCenterClient() {
                 <div className="divider my-0" />
 
                 <div className="space-y-3">
-                  <div className="flex items-center gap-2">
-                    <span className="badge badge-primary badge-sm">3</span>
-                    <h2 className="text-lg font-semibold text-base-content">
-                      {fileUploadState.uploadMode === "file"
-                        ? t.translations.FILE_UPLOAD
-                        : t.translations.BULK_METADATA}
-                    </h2>
+                  <div className="flex justify-between">
+                    <div className="flex gap-2 items-center">
+                      <span className="badge badge-primary badge-sm">3</span>
+                      <h2 className="text-lg font-semibold text-base-content">
+                        {fileUploadState.uploadMode === "file"
+                          ? t.translations.FILE_UPLOAD
+                          : t.translations.BULK_METADATA}
+                      </h2>
+                    </div>
+                    <div className="mb-2 flex justify-end">
+                      <MetadataTemplateDownload />
+                    </div>
                   </div>
 
                   <div className="bg-base-100 p-4">
