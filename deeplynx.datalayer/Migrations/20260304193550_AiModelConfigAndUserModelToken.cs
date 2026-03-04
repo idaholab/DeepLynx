@@ -7,7 +7,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace deeplynx.datalayer.Migrations
 {
     /// <inheritdoc />
-    public partial class AIModelAndUserTokenConfigTables : Migration
+    public partial class AiModelConfigAndUserModelToken : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -22,6 +22,7 @@ namespace deeplynx.datalayer.Migrations
                     organization_id = table.Column<long>(type: "bigint", nullable: false),
                     project_id = table.Column<long>(type: "bigint", nullable: true),
                     server_url = table.Column<string>(type: "text", nullable: false),
+                    model_provider = table.Column<string>(type: "text", nullable: false),
                     model_name = table.Column<string>(type: "text", nullable: false),
                     model_type = table.Column<string>(type: "text", nullable: false),
                     requires_token = table.Column<bool>(type: "boolean", nullable: false, defaultValue: false),

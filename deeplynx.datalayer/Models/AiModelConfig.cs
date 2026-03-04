@@ -18,6 +18,9 @@ public class AiModelConfig
     [Column("server_url")] 
     public string ServerUrl { get; set; } = null!;
     
+    [Column("model_provider")]
+    public string ModelProvider { get; set; }
+    
     [Column("model_name")] 
     public string ModelName { get; set; } = null!;
     

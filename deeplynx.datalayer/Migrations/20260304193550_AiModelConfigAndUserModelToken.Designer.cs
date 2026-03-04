@@ -12,8 +12,8 @@ using deeplynx.datalayer.Models;
 namespace deeplynx.datalayer.Migrations
 {
     [DbContext(typeof(DeeplynxContext))]
-    [Migration("20260303230354_AIModelAndUserTokenConfigTables")]
-    partial class AIModelAndUserTokenConfigTables
+    [Migration("20260304193550_AiModelConfigAndUserModelToken")]
+    partial class AiModelConfigAndUserModelToken
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -200,6 +200,11 @@ namespace deeplynx.datalayer.Migrations
                         .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("model_name");
+
+                    b.Property<string>("ModelProvider")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("model_provider");
 
                     b.Property<string>("ModelType")
                         .IsRequired()
