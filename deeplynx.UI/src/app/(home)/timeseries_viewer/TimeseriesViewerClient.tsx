@@ -322,8 +322,8 @@ export default function TimeseriesViewerClient({ timeseriesFiles }: Props) {
     return (
         <div>
             {/* Header */}
-            <div className="bg-base-200/40 pl-12 p-4">
-                <h1 className="text-2xl font-bold text-base-content">
+            <div className="bg-base-200/40 px-3 sm:px-6 lg:px-12 p-4">
+                <h1 className="text-xl sm:text-2xl font-bold text-base-content">
                     {t.translations.TIMESERIES_VIEWER}
                 </h1>
             </div>
@@ -344,7 +344,7 @@ export default function TimeseriesViewerClient({ timeseriesFiles }: Props) {
             </div>
 
             {/* Chart Viewer with Series Controls */}
-            <div className="px-6 pt-6">
+            <div className="px-3 sm:px-6 pt-6">
                 <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
                     {/* Chart */}
                     <div className="lg:col-span-3">
@@ -589,7 +589,7 @@ export default function TimeseriesViewerClient({ timeseriesFiles }: Props) {
             <div className="p-4">
                 <Tabs
                     tabs={tabData}
-                    className="tabs tabs-border ml-5"
+                    className="mx-1 sm:mx-3"
                     onTabChange={setActiveTab}
                     activeTab={activeTab}
                 />

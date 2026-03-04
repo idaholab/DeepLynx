@@ -106,15 +106,15 @@ const SysAdminClient = ({
 
   return (
     <div>
-      <div className="bg-base-200/40 pl-12 p-6">
-        <h1 className="text-2xl font-bold text-base-content">
+      <div className="bg-base-200/40 px-3 sm:px-6 lg:px-12 p-6">
+        <h1 className="text-xl sm:text-2xl font-bold text-base-content">
           {t.translations.SITE_MANAGEMENT}
         </h1>
       </div>
-      <div className="p-2">
+      <div className="p-2 sm:p-3">
         <Tabs
           tabs={tabData}
-          className="tabs tabs-border ml-5"
+          className="mx-1 sm:mx-3"
           onTabChange={handleTabChange}
           activeTab={activeTab}
         />

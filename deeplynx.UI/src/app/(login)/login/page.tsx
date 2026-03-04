@@ -40,7 +40,7 @@ export default function Login() {
           </div>
         </div>
       </main>
-      <Link className="text-white w-full max-w-lg px-40" href="/login/signin">
+      <Link className="text-white w-full max-w-lg px-4 sm:px-0" href="/login/signin">
         <button className="btn btn-outline w-full">
           {t.translations.SIGN_IN}
         </button>
