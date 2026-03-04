@@ -1,9 +1,11 @@
 "use client";
 
 import { useLanguage } from "@/app/contexts/Language";
-import DropUpload from "../../components/DropUpload";
-import NewFileUploadCard from "../../components/NewFileUploadCard";
+import DropUpload from "./DropUpload";
+import NewFileUploadCard from "./NewFileUploadCard";
 import { FileMetadata, ExistingFile } from "../../types/types";
+import { CHUNK_THRESHOLD } from "@/app/lib/client_service/file_upload_services.client";
+import toast from "react-hot-toast";
 
 interface FileUploadSectionProps {
   selectedFiles: File[];
@@ -39,6 +41,35 @@ export default function FileUploadSection({
   onRemoveAt,
 }: FileUploadSectionProps) {
   const { t } = useLanguage();
+  const isLargeFile = (file: File) => file.size >= CHUNK_THRESHOLD;
+  const cardKeys = (() => {
+    const occurrences = new Map<string, number>();
+    return selectedFiles.map((file) => {
+      const baseKey = `${file.name}-${file.size}-${file.lastModified}`;
+      const count = (occurrences.get(baseKey) ?? 0) + 1;
+      occurrences.set(baseKey, count);
+      return `${baseKey}-${count}`;
+    });
+  })();
+
+  const handleFilesChange = (files: File[]) => {
+    const largeCount = files.filter(isLargeFile).length;
+    if (largeCount <= 1) {
+      setSelectedFiles(files);
+      return;
+    }
+
+    let hasKeptLarge = false;
+    const filtered = files.filter((file) => {
+      if (!isLargeFile(file)) return true;
+      if (hasKeptLarge) return false;
+      hasKeptLarge = true;
+      return true;
+    });
+
+    setSelectedFiles(filtered);
+    toast.error(t.translations.ONLY_ONE_LARGE_FILE_ALLOWED);
+  };
 
   return (
     <>
@@ -70,7 +101,7 @@ export default function FileUploadSection({
         key={dropKey}
         multiple={true}
         files={selectedFiles}
-        onFilesChange={setSelectedFiles}
+        onFilesChange={handleFilesChange}
         disabled={(needsTarget && !targetFileId) || isUploading}
       />
 
@@ -78,9 +109,10 @@ export default function FileUploadSection({
       {selectedFiles.length > 0 &&
         selectedFiles.map((file, index) => (
           <NewFileUploadCard
-            key={index}
+            key={cardKeys[index]}
             defaultName={file.name}
             fileIndex={index}
+            disableMetadataFile={file.size > CHUNK_THRESHOLD}
             onMetadataChange={handleMetadataChange}
             onRemove={() => onRemoveAt(index)}
             availableFiles={availableFiles}

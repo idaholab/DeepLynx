@@ -30,10 +30,23 @@ export function useUploadState() {
   );
 
   // File management
-  const removeAt = (idx: number) =>
+  const removeAt = useCallback((idx: number) => {
     setSelectedFiles((prev) => prev.filter((_, i) => i !== idx));
-  
-  const clearAll = () => setSelectedFiles([]);
+    setFilesMetadata((prev) => {
+      const next: Record<number, FileMetadata> = {};
+      Object.entries(prev).forEach(([index, metadata]) => {
+        const numericIndex = Number(index);
+        if (numericIndex < idx) next[numericIndex] = metadata;
+        if (numericIndex > idx) next[numericIndex - 1] = metadata;
+      });
+      return next;
+    });
+  }, []);
+
+  const clearAll = useCallback(() => {
+    setSelectedFiles([]);
+    setFilesMetadata({});
+  }, []);
 
   // Reset form
   const resetFileUpload = () => {

@@ -1,12 +1,12 @@
 // src/app/(home)/components/NewFileUploadCard.tsx
 
 "use client";
-import { FileMetadata } from "../types/types";
+import { FileMetadata } from "../../types/types";
 import { useLanguage } from "@/app/contexts/Language";
-import { TrashIcon } from "@heroicons/react/24/outline";
-import { useCallback, useEffect, useState } from "react";
-import type { ExistingFile } from "../types/types";
-import SearchBar from "./SearchBar";
+import { TrashIcon, XMarkIcon } from "@heroicons/react/24/outline";
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { ExistingFile } from "../../types/types";
+import SearchBar from "../../components/SearchBar";
 import { formatLocalDateTime } from "@/app/lib/date_time";
 
 const MAX_VISIBLE_FILES = 100;
@@ -26,6 +26,7 @@ const interpolate = (
 interface NewFileUploadCardProps {
   defaultName?: string;
   fileIndex: number;
+  disableMetadataFile?: boolean;
   onMetadataChange: (fileIndex: number, metadata: FileMetadata) => void;
   onRemove?: () => void;
   availableFiles: ExistingFile[];
@@ -35,6 +36,7 @@ interface NewFileUploadCardProps {
 export default function NewFileUploadCard({
   defaultName = "",
   fileIndex,
+  disableMetadataFile = false,
   onMetadataChange,
   onRemove,
   availableFiles,
@@ -49,9 +51,19 @@ export default function NewFileUploadCard({
   const [isTimeSeries, setIsTimeSeries] = useState(false);
   const [metadataFile, setMetadataFile] = useState<File | undefined>(undefined);
   const [name, setName] = useState(toBaseName(defaultName));
+  const metadataFileInputRef = useRef<HTMLInputElement | null>(null);
   const [displayedFiles, setDisplayedFiles] = useState<ExistingFile[]>(
     initialVisibleFiles(availableFiles),
   );
+  const metadataInputId = `metadata-file-${fileIndex}`;
+  const metadataHelpId = `metadata-file-help-${fileIndex}`;
+
+  const clearMetadataFile = () => {
+    setMetadataFile(undefined);
+    if (metadataFileInputRef.current) {
+      metadataFileInputRef.current.value = "";
+    }
+  };
 
   const selectedRecord =
     displayedFiles.find((f) => String(f.id) === String(targetRecordId)) ??
@@ -112,6 +124,12 @@ export default function NewFileUploadCard({
       setTargetRecordId("");
     }
   }, [recordMode, targetRecordId, availableFiles]);
+
+  useEffect(() => {
+    if (disableMetadataFile && metadataFile) {
+      clearMetadataFile();
+    }
+  }, [disableMetadataFile, metadataFile]);
 
   useEffect(() => {
     const metadata: FileMetadata = {
@@ -260,12 +278,9 @@ export default function NewFileUploadCard({
 
               {!hasSearched && availableFiles.length > MAX_VISIBLE_FILES && (
                 <p className="text-xs text-base-content/60">
-                  {interpolate(
-                    t.translations.SHOWING_FIRST_FILES_USE_SEARCH,
-                    {
-                      count: MAX_VISIBLE_FILES,
-                    },
-                  )}
+                  {interpolate(t.translations.SHOWING_FIRST_FILES_USE_SEARCH, {
+                    count: MAX_VISIBLE_FILES,
+                  })}
                 </p>
               )}
 
@@ -303,30 +318,41 @@ export default function NewFileUploadCard({
               </label>
             </div>
           </div>
-          {/* Row 2: Metadata File (optional) */}
-          <div className="flex items-center gap-3">
-            <span className="label-text shrink-0">
-              {t.translations.METADATA_FILE}
-            </span>
-            <label className="btn btn-sm btn-outline cursor-pointer">
-              {metadataFile
-                ? metadataFile.name
-                : t.translations.CHOOSE_FILE_OPTIONAL}
-              <input
-                type="file"
-                className="hidden"
-                onChange={(e) => setMetadataFile(e.target.files?.[0])}
-              />
+          {/* Row 2: Metadata File */}
+          <div className="flex flex-col gap-1">
+            <label
+              htmlFor={metadataInputId}
+              className="flex items-center gap-2"
+            >
+              <span className="label-text">{t.translations.METADATA_FILE}</span>
+              <span className="badge badge-xs">{t.translations.OPTIONAL}</span>
             </label>
-            {metadataFile && (
-              <button
-                type="button"
-                className="btn btn-xs btn-ghost text-error"
-                onClick={() => setMetadataFile(undefined)}
-              >
-                ✕
-              </button>
-            )}
+
+            <div className="flex items-center gap-3">
+              <input
+                id={metadataInputId}
+                ref={metadataFileInputRef}
+                type="file"
+                className="file-input file-input-sm"
+                onChange={(e) => setMetadataFile(e.target.files?.[0])}
+                disabled={disableMetadataFile}
+                aria-describedby={metadataHelpId}
+              />
+              {metadataFile && !disableMetadataFile && (
+                <button
+                  type="button"
+                  className="btn btn-xs btn-ghost text-error"
+                  onClick={clearMetadataFile}
+                >
+                  <XMarkIcon className="size-6" />
+                </button>
+              )}
+            </div>
+            <p id={metadataHelpId} className="text-xs text-base-content/60">
+              {disableMetadataFile
+                ? "Metadata file is unavailable for chunked uploads."
+                : "Leave blank if you do not have a metadata file."}
+            </p>
           </div>
         </div>
       </div>

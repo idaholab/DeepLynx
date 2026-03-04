@@ -440,6 +440,7 @@ export const translations = {
             CANCELLING_SHORT: "Cancelling...",
             TIMESERIES_FILE_UPLOADED_SUCCESSFULLY: "Timeseries file uploaded successfully!",
             FILE_UPLOADED_SUCCESSFULLY: "File uploaded successfully!",
+            ONLY_ONE_LARGE_FILE_ALLOWED: "Only one file 500MB or larger can be selected at a time.",
             UPLOAD_CANCELLED: "Upload cancelled.",
             UPLOAD_FAILED_SEE_CONSOLE_FOR_DETAILS: "Upload failed. See console for details.",
             PLEASE_FIX_VALIDATION_ERRORS_BEFORE_UPLOADING: "Please fix validation errors before uploading",
@@ -913,6 +914,8 @@ export const translations = {
             FAILED_TO_CREATE_RELATIONSHIPS: "Failed to create relationships",
             ADD_CLASS: "Add Class",
 
+            OPTIONAL: "Optional",
+
         }
     },
     es: {
@@ -1369,6 +1372,7 @@ export const translations = {
             CANCELLING_SHORT: "Cancelando...",
             TIMESERIES_FILE_UPLOADED_SUCCESSFULLY: "¡Archivo de series temporales cargado correctamente!",
             FILE_UPLOADED_SUCCESSFULLY: "¡Archivo cargado correctamente!",
+            ONLY_ONE_LARGE_FILE_ALLOWED: "Solo se puede seleccionar un archivo de 500 MB o más a la vez.",
             UPLOAD_CANCELLED: "Carga cancelada.",
             UPLOAD_FAILED_SEE_CONSOLE_FOR_DETAILS: "La carga falló. Consulte la consola para más detalles.",
             PLEASE_FIX_VALIDATION_ERRORS_BEFORE_UPLOADING: "Corrija los errores de validación antes de cargar",
@@ -1844,7 +1848,7 @@ export const translations = {
             FAILED_TO_CREATE_RELATIONSHIPS: "No se pudieron crear las relaciones",
             ADD_CLASS: "Agregar clase",
 
-
+            OPTIONAL: "Opcional"
         }
     }
 }

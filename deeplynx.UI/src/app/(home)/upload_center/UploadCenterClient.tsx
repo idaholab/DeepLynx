@@ -358,10 +358,10 @@ export default function UploadCenterClient() {
 
         uploadToastManager.success(
           failed
-            ? interpolate(
-                t.translations.UPLOAD_BATCH_SUCCESS_WITH_FAILURES,
-                { success: succeeded, failed },
-              )
+            ? interpolate(t.translations.UPLOAD_BATCH_SUCCESS_WITH_FAILURES, {
+                success: succeeded,
+                failed,
+              })
             : interpolate(t.translations.UPLOAD_BATCH_SUCCESS, {
                 success: succeeded,
               }),
@@ -598,7 +598,7 @@ export default function UploadCenterClient() {
                     </h2>
                   </div>
 
-                  <div className="rounded-xl border border-base-300/60 bg-base-200/30 p-4">
+                  <div className="p-4">
                     <ProjectResourceSelectors
                       {...projectResources}
                       hasOrganization={!!organization}
