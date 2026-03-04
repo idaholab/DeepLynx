@@ -34,12 +34,6 @@ namespace deeplynx.datalayer.Migrations
                 {
                     table.PrimaryKey("ai_model_configs_pkey", x => x.id);
                     table.ForeignKey(
-                        name: "FK_ai_model_configs_users_last_updated_by",
-                        column: x => x.last_updated_by,
-                        principalSchema: "deeplynx",
-                        principalTable: "users",
-                        principalColumn: "id");
-                    table.ForeignKey(
                         name: "ai_model_configs_organization_id_fkey",
                         column: x => x.organization_id,
                         principalSchema: "deeplynx",
