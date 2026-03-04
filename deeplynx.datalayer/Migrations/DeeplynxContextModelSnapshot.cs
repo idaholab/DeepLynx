@@ -198,6 +198,11 @@ namespace deeplynx.datalayer.Migrations
                         .HasColumnType("text")
                         .HasColumnName("model_name");
 
+                    b.Property<string>("ModelProvider")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("model_provider");
+
                     b.Property<string>("ModelType")
                         .IsRequired()
                         .HasColumnType("text")
