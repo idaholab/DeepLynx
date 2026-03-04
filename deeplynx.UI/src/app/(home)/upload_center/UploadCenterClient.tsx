@@ -276,20 +276,20 @@ export default function UploadCenterClient({ initialAvailableFiles }: Props) {
   return (
     <div>
       {/* HEADER */}
-      <div className="bg-base-200/40 pl-12 p-6">
-        <h1 className="text-2xl font-bold text-base-content">
+      <div className="bg-base-200/40 px-3 sm:px-6 lg:px-12 p-6">
+        <h1 className="text-xl sm:text-2xl font-bold text-base-content">
           {t.translations.UPLOAD_CENTER}
         </h1>
       </div>
 
       <div
-        className={`flex gap-8 p-10 lg:p-20 ${
-          showRightPanel ? "justify-between" : "justify-center"
+        className={`flex flex-col xl:flex-row gap-6 xl:gap-8 p-3 sm:p-6 lg:p-10 ${
+          showRightPanel ? "xl:justify-between" : "justify-center"
         }`}
       >
         {/* LEFT PANEL */}
         <div
-          className={`w-full lg:w-3/5 ${
+          className={`w-full xl:w-3/5 ${
             showRightPanel ? "" : "max-w-5xl mx-auto"
           }`}
         >
@@ -380,7 +380,7 @@ export default function UploadCenterClient({ initialAvailableFiles }: Props) {
 
         {/* RIGHT PANEL */}
         {showRightPanel && (
-          <div className="lg:w-2/5">
+          <div className="w-full xl:w-2/5">
             <FileDetailsCard
               needsTarget={needsTarget}
               selectedTarget={selectedTarget}

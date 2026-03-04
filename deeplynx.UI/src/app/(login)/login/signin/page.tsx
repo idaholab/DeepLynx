@@ -194,7 +194,7 @@ function SigninContent() {
                 <button
                   onClick={handleOktaSignIn}
                   disabled={isSigningIn || !hasAcknowledged}
-                  className="w-70 py-4 mx-5 text-sm text-center text-gray-50 bg-gray-700 border-2 border-black rounded-xl hover:bg-gray-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  className="w-full sm:w-70 py-4 mx-0 sm:mx-5 text-sm text-center text-gray-50 bg-gray-700 border-2 border-black rounded-xl hover:bg-gray-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
                   {isSigningIn && (
                     <span className="loading loading-spinner loading-sm"></span>

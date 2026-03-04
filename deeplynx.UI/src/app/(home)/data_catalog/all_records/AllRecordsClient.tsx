@@ -413,9 +413,9 @@ export default function DataCatalogClient({
 
   return (
     <div>
-      <div className="flex justify-between items-center bg-base-200/40 pl-12 py-2 pb-4">
+      <div className="flex justify-between items-center bg-base-200/40 px-3 sm:px-6 lg:px-12 py-2 pb-4">
         <div>
-          <h1 className="text-2xl font-bold text-info-content">
+          <h1 className="text-xl sm:text-2xl font-bold text-info-content">
             {t.translations.DATA_CATALOG}
           </h1>
 
@@ -431,9 +431,9 @@ export default function DataCatalogClient({
         </div>
       </div>
 
-      <div className="flex flex-col gap-4 mb-4 pt-4 pl-8 w-full">
+      <div className="flex flex-col gap-4 mb-4 pt-4 px-3 sm:px-6 lg:px-8 w-full">
         {/* Top: Search */}
-        <div className="flex justify-end pr-10 items-center gap-2">
+        <div className="flex justify-end items-center gap-2">
           <SearchBar
             placeholder={t.translations.SEARCH}
             value={searchTerm}
@@ -444,19 +444,19 @@ export default function DataCatalogClient({
             onClearAll={clearAllFilters}
             resultCount={tableData.length}
             showResultsMessage={activeFilters.length > 0}
-            className="w-1/4"
+            className="w-full sm:max-w-md lg:max-w-lg"
           />
         </div>
 
         <div className="divider my-0"></div>
 
         {/* Bottom: Actions */}
-        <div className="flex items-center justify-between">
-          <div className="text-info-content px-4 text-lg">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+          <div className="text-info-content text-base sm:text-lg">
             {t.translations.ALL_RECORDS}
           </div>
 
-          <div className="flex gap-2 pr-10 items-center">
+          <div className="flex gap-2 items-center flex-wrap">
             {activeFilters.length > 0 && (
               <button
                 type="button"
@@ -490,7 +490,7 @@ export default function DataCatalogClient({
                 <button
                   type="button"
                   onClick={() => setOpen((o) => !o)}
-                  className="btn btn-sm btn-outline btn-primary inline-flex items-center gap-2"
+                  className="btn btn-sm btn-outline btn-primary inline-flex items-center gap-2 max-w-full"
                   aria-haspopup="menu"
                   aria-expanded={open}
                 >
