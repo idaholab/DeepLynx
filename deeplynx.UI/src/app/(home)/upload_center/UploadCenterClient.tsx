@@ -620,9 +620,11 @@ export default function UploadCenterClient() {
                           : t.translations.BULK_METADATA}
                       </h2>
                     </div>
-                    <div className="mb-2 flex justify-end">
-                      <MetadataTemplateDownload />
-                    </div>
+                    {fileUploadState.uploadMode === "file" && (
+                      <div className="mb-2 flex justify-end">
+                        <MetadataTemplateDownload />
+                      </div>
+                    )}
                   </div>
 
                   <div className="bg-base-100 p-4">
