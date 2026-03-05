@@ -36,18 +36,15 @@ public class TimeseriesController : ControllerBase
     /// <param name="request"> The request containing an sql query string</param>
     /// <param name="fileType">The type of file to convert query to</param>
     /// <returns></returns>
-    [HttpPost("query", Name = "api_query_timeseries")]
+    [HttpPost("query", Name = "api_query_timeseries_blob")]
     [Auth("read", "record")]
-    public async Task<ActionResult<RecordResponseDto>> QueryTimeseries(
-        long organizationId, long projectId, long dataSourceId,
-        [FromQuery] string fileType, [FromBody] TimeseriesQueryRequestDto request)
+    public async Task<ActionResult<PlotDataDto>> QueryTabularFile(long organizationId, long projectId, [FromQuery]long recordId, [FromQuery] string viewName, [FromBody] TimeseriesQueryRequestDto request)
     {
         try
         {
             var currentUserId = UserContextStorage.UserId;
             var reportRecordResponse =
-                await _timeseriesBusiness.QueryTimeseries(currentUserId, request, organizationId, projectId,
-                    dataSourceId, fileType);
+                await _timeseriesBusiness.QueryTabularFile(currentUserId,organizationId, projectId, recordId, request.Query, viewName);
             return Ok(reportRecordResponse);
         }
         catch (NoResultsException nrException)
@@ -57,127 +54,6 @@ public class TimeseriesController : ControllerBase
         catch (Exception e)
         {
             var message = $"An error occurred while querying timeseries table {e}";
-            _logger.LogError(message);
-            return StatusCode(StatusCodes.Status500InternalServerError, message);
-        }
-    }
-
-    /// <summary>
-    ///     Upload Timeseries File
-    /// </summary>
-    /// <param name="organizationId">ID of organization that timeseries data is associated with</param>
-    /// <param name="projectId">ID of project that timeseries data is associated with</param>
-    /// <param name="dataSourceId">ID of data source that timeseries data is associated with</param>
-    /// <param name="file">Timeseries file</param>
-    /// <returns>Record response DTO</returns>
-    [HttpPost("upload", Name = "api_upload_timeseries_file")]
-    [Auth("write", "record")]
-    [Auth("write", "file")]
-    public async Task<ActionResult<RecordResponseDto>> UploadFile(
-        long organizationId, long projectId, long dataSourceId, IFormFile file)
-    {
-        try
-        {
-            var currentUserId = UserContextStorage.UserId;
-            var timeSeriesUploadInfo =
-                await _timeseriesBusiness.UploadFile(currentUserId, organizationId, projectId, dataSourceId, file);
-            return Ok(timeSeriesUploadInfo);
-        }
-        catch (Exception e)
-        {
-            var message = $"An error occurred while uploading timeseries file {file.FileName}: {e}";
-            _logger.LogError(message);
-            return StatusCode(StatusCodes.Status500InternalServerError, message);
-        }
-    }
-
-    /// <summary>
-    ///     Start Timeseries Upload
-    /// </summary>
-    /// <param name="organizationId">ID of organization that timeseries data is associated with</param>
-    /// <param name="projectId">ID of project that timeseries data is associated with</param>
-    /// <param name="dataSourceId">ID of data source that timeseries data is associated with</param>
-    /// <param name="request">Timeseries request DTO</param>
-    /// <returns>{UploadId}</returns>
-    [HttpPost("upload/start", Name = "api_start_timeseries_upload")]
-    [Auth("write", "record")]
-    [Auth("write", "file")]
-    public async Task<IActionResult> StartUpload(
-        long organizationId, long projectId, long dataSourceId, [FromBody] TimeseriesUploadInitRequestDto request)
-    {
-        try
-        {
-            var uploadId =
-                await _timeseriesBusiness.StartUpload(organizationId, projectId, dataSourceId, request.FileName);
-            return Ok(new { UploadId = uploadId });
-        }
-        catch (Exception e)
-        {
-            var message = $"An error occurred while starting an upload for timeseries file {request.FileName}: {e}";
-            _logger.LogError(message);
-            return StatusCode(StatusCodes.Status500InternalServerError, message);
-        }
-    }
-
-    /// <summary>
-    ///     Upload Timeseries Chunk
-    /// </summary>
-    /// <param name="organizationId">ID of organization that timeseries data is associated with</param>
-    /// <param name="projectId">ID of project that timeseries data is associated with</param>
-    /// <param name="dataSourceId">ID of data source that timeseries data is associated with</param>
-    /// <param name="chunk">Chunk from form</param>
-    /// <param name="uploadId">ID of upload</param>
-    /// <param name="chunkNumber">Chunk number from form</param>
-    /// <returns>{ChunkUploadStatus}</returns>
-    [HttpPost("upload/chunk", Name = "api_upload_timeseries_chunk")]
-    [Auth("write", "record")]
-    [Auth("write", "file")]
-    public async Task<IActionResult> UploadChunk(
-        long organizationId, long projectId, long dataSourceId,
-        IFormFile chunk, [FromForm] string uploadId, [FromForm] int chunkNumber)
-    {
-        try
-        {
-            var chunkUploadStatus =
-                await _timeseriesBusiness.UploadChunk(organizationId, projectId, dataSourceId, chunk, uploadId,
-                    chunkNumber);
-            return Ok(new { ChunkUploadStatus = chunkUploadStatus });
-        }
-        catch (Exception e)
-        {
-            var message = $"An error occurred while uploading a chunk for timeseries file {uploadId}: {e}";
-            _logger.LogError(message);
-            return StatusCode(StatusCodes.Status500InternalServerError, message);
-        }
-    }
-
-    /// <summary>
-    ///     Complete Timeseries Upload
-    /// </summary>
-    /// <param name="organizationId">ID of organization that timeseries data is associated with</param>
-    /// <param name="projectId">ID of project that timeseries data is associated with</param>
-    /// <param name="dataSourceId">ID of data source that timeseries data is associated with</param>
-    /// <param name="request">Timeseries request DTO</param>
-    /// <returns>{TimeseriesUploadRecord}</returns>
-    [HttpPost("upload/complete", Name = "api_complete_timeseries_upload")]
-    [Auth("write", "record")]
-    [Auth("write", "file")]
-    public async Task<ActionResult<RecordResponseDto>> CompleteUpload(
-        long organizationId, long projectId, long dataSourceId,
-        [FromBody] TimeseriesUploadCompleteRequestDto request)
-    {
-        try
-        {
-            var currentUserId = UserContextStorage.UserId;
-            var timeseriesUploadRecord =
-                await _timeseriesBusiness.CompleteUpload(currentUserId, organizationId, projectId, dataSourceId,
-                    request);
-            return Ok(new { TimeseriesUploadRecord = timeseriesUploadRecord });
-        }
-        catch (Exception e)
-        {
-            var message =
-                $"An error occurred while completing a timeseries file upload for {request.FileName}: {e}";
             _logger.LogError(message);
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
@@ -205,40 +81,6 @@ public class TimeseriesController : ControllerBase
         catch (Exception e)
         {
             var message = $"An error occurred while appending to a timeseries file for {file.FileName}: {e}";
-            _logger.LogError(message);
-            return StatusCode(StatusCodes.Status500InternalServerError, message);
-        }
-    }
-
-    /// <summary>
-    ///     Get Every Nth Timeseries Table Row
-    /// </summary>
-    /// <param name="organizationId">ID of organization that timeseries data is associated with</param>
-    /// <param name="projectId">ID of project that timeseries data is associated with</param>
-    /// <param name="dataSourceId">ID of data source that timeseries data is associated with</param>
-    /// <param name="tableName">Name of the duckDB table on which the timeseries data is encoded</param>
-    /// <param name="rowNumber">every nth row to get (row number 4 = every 4th row)</param>
-    /// <param name="fileType">The type of file to convert query to</param>
-    /// <returns></returns>
-    [HttpGet("interpolate", Name = "api_interpolate_timeseries_rows")]
-    [Auth("read", "record")]
-    [Auth("read", "file")]
-    public async Task<IActionResult> InterpolateRows(
-        long organizationId, long projectId, long dataSourceId,
-        [FromQuery] string tableName, [FromQuery] string rowNumber, [FromQuery] string fileType)
-    {
-        try
-        {
-            var currentUserId = UserContextStorage.UserId;
-            var timeseriesUploadRecord =
-                await _timeseriesBusiness.InterpolateRows(currentUserId, organizationId, projectId, dataSourceId,
-                    rowNumber, tableName,
-                    fileType);
-            return Ok(new { TimeseriesUploadRecord = timeseriesUploadRecord });
-        }
-        catch (Exception e)
-        {
-            var message = $"An error occurred while querying a timeseries table {tableName}: {e}";
             _logger.LogError(message);
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
@@ -305,38 +147,6 @@ public class TimeseriesController : ControllerBase
         catch (Exception e)
         {
             _logger.LogError(e, "Error retrieving plot data for record {RecordId}", recordId);
-            return StatusCode(StatusCodes.Status500InternalServerError, e.Message);
-        }
-    }
-
-    /// <summary>
-    ///     Get the most recent row
-    /// </summary>
-    /// <param name="organizationId">ID of organization that timeseries data is associated with</param>
-    /// <param name="projectId">ID of project that timeseries data is associated with</param>
-    /// <param name="dataSourceId">ID of data source that timeseries data is associated with</param>
-    /// <param name="recordId">Name of the duckDB table on which the timeseries data is encoded</param>
-    /// <returns>JSON object with column names as keys and the latest row's values</returns>
-    [HttpGet("latest", Name = "api_latest_row")]
-    [Auth("read", "record")]
-    [Auth("read", "file")]
-    public async Task<IActionResult> GetLatestRow(long organizationId, long projectId, long dataSourceId, [FromQuery] long recordId)
-    {
-        try
-        {
-            var currentUserId = UserContextStorage.UserId;
-            var latestRow = await _timeseriesBusiness.GetLatestRow(currentUserId, organizationId, projectId, dataSourceId, recordId);
-            return Ok(new { LatestRowData = latestRow });
-        }
-        catch (ArgumentException e)
-        {
-            _logger.LogWarning(e, "Invalid request for latest row");
-            return BadRequest(e.Message);
-        }
-        catch (Exception e)
-        {
-            if (_logger.IsEnabled(LogLevel.Error))
-                _logger.LogError(e, "Error retrieving latest row for record {RecordId}", recordId);
             return StatusCode(StatusCodes.Status500InternalServerError, e.Message);
         }
     }

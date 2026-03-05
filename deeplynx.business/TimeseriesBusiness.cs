@@ -1,4 +1,6 @@
+using System.Data.Common;
 using System.Text.Json.Nodes;
+using System.Text.RegularExpressions;
 using deeplynx.datalayer.Models;
 using deeplynx.helpers;
 using deeplynx.interfaces;
@@ -6,10 +8,9 @@ using deeplynx.models;
 using DuckDB.NET.Data;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Caching.Memory;
+using Newtonsoft.Json;
 
 namespace deeplynx.business;
 
@@ -28,351 +29,6 @@ public class TimeseriesBusiness(
     private readonly IRecordBusiness _recordBusiness = recordBusiness;
     private readonly IServiceScopeFactory _serviceScopeFactory = serviceScopeFactory;
 
-    private readonly MemoryCache _tableCache = new(new MemoryCacheOptions());
-
-    /// <summary>
-    ///     Creates DuckDB table based on the table name and the file path
-    /// </summary>
-    /// <param name="organizationId">The organization ID</param>
-    /// <param name="projectId">The project ID</param>
-    /// <param name="dataSourceId">The data source ID</param>
-    /// <param name="tableName">Timeseries table name</param>
-    /// <param name="fileType">The Type of the file (accepts CSV or Parquet)</param>
-    public async Task CreateTimeseriesTable(long organizationId, long projectId, long dataSourceId, string tableName,
-        string fileType)
-    {
-        var folderPath = Path.Combine(_duckDbBasePath, "org_" + organizationId, "project_" + projectId,
-            "datasource_" + dataSourceId);
-
-        var filePath = Path.Combine(folderPath, tableName);
-        tableName = SanitizedFormFile.SanitizeFileName(tableName);
-
-        using var duckDbConnection = await GetDuckDbConnection(organizationId, projectId, dataSourceId);
-
-        await using var command = duckDbConnection.CreateCommand();
-        if (fileType == ".csv")
-            command.CommandText = $"CREATE TABLE '{tableName}' AS SELECT * from read_csv('{filePath}'); ";
-        else if (fileType == ".parquet")
-            command.CommandText = $"CREATE TABLE '{tableName}' AS SELECT * from read_parquet('{filePath}'); ";
-
-        await command.ExecuteNonQueryAsync();
-        await duckDbConnection.CloseAsync();
-    }
-
-    /// <summary>
-    ///     Uploads a time series file and kicks off the processing for DuckDB
-    /// </summary>
-    /// ///
-    /// <param name="currentUserId">ID of the User executing this method.</param>
-    /// <param name="organizationId">The organization ID</param>
-    /// <param name="projectId">The project ID</param>
-    /// <param name="dataSourceId">The data source ID</param>
-    /// <param name="file">This is the entire file attached as form data in the request</param>
-    /// <returns>An object of the uploaded file information</returns>
-    /// <exception cref="ArgumentException">If the file is null or has no data</exception>
-    /// <exception cref="InvalidOperationException">If the server cannot create the directory</exception>
-    public async Task<RecordResponseDto> UploadFile(long currentUserId, long organizationId, long projectId,
-        long dataSourceId,
-        IFormFile file)
-    {
-        var fileType = Path.GetExtension(file.FileName);
-        if (fileType != ".csv" && fileType != ".parquet")
-            throw new ArgumentException("Only .csv and .parquet files are supported");
-
-        if (file == null || file.Length == 0)
-            throw new ArgumentException("File is required and cannot be empty or whitespace.");
-
-        file = new SanitizedFormFile(file);
-
-        await ExistenceHelper.EnsureDataSourceExistsForProjectAsync(_context, dataSourceId, projectId);
-
-        // folder prep
-        var uploadId = Guid.NewGuid().ToString();
-        var tableName = uploadId + "_" + file.FileName;
-        var folderPath = Path.Combine(_duckDbBasePath, "org_" + organizationId, "project_" + projectId,
-            "datasource_" + dataSourceId);
-        var filePath = Path.Combine(folderPath, tableName);
-        Directory.CreateDirectory(folderPath ?? throw new InvalidOperationException("error creating upload path"));
-
-        var uri = "duckdb://" + tableName;
-
-        try
-        {
-            // copy file to path for db
-            await using (var stream = new FileStream(filePath, FileMode.Create))
-            {
-                await file.CopyToAsync(stream);
-            }
-
-            // write file as table
-            await CreateTimeseriesTable(organizationId, projectId, dataSourceId, tableName, fileType);
-
-            // delete file when its in duckdb
-            File.Delete(filePath);
-
-
-            // create record for file's db table
-            var recordClass = await _classBusiness.GetOrCreateClass(
-                currentUserId, organizationId, projectId, "Timeseries");
-            var columns = await GetColumnsFromDb(organizationId, projectId, dataSourceId, tableName);
-            var fileName = file.FileName;
-
-            var recordRequest = new CreateRecordRequestDto
-            {
-                Properties = new JsonObject
-                {
-                    ["columns"] = columns,
-                    ["timeUploaded"] = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
-                    ["fileType"] = Path.GetExtension(file.FileName).TrimStart('.').ToLower()
-                },
-                Name = fileName,
-                Description = $"Table name: {tableName}",
-                OriginalId = uploadId,
-                Uri = uri,
-                ClassId = recordClass.Id,
-                ClassName = recordClass.Name,
-                FileType = Path.GetExtension(file.FileName).TrimStart('.').ToLower()
-            };
-
-            return await _recordBusiness.CreateRecord(currentUserId, organizationId, projectId, dataSourceId,
-                recordRequest);
-        }
-        catch (Exception)
-        {
-            // delete file if file exists but fails when creating table
-            if (File.Exists(filePath)) File.Delete(filePath);
-
-            var timeseriesPath = Path.Combine(folderPath, "timeseries.duckdb");
-            var timeseriesWalPath = Path.Combine(folderPath, "timeseries.duckdb.wal");
-
-            // initial check to see if there is a timeseries db
-            if (File.Exists(timeseriesPath))
-            {
-                var connection = await GetDuckDbConnection(organizationId, projectId, dataSourceId);
-                await using var command = connection.CreateCommand();
-
-                // checks if table exists
-                command.CommandText =
-                    $" SELECT COUNT(*) FROM information_schema.tables WHERE table_name = '{tableName}'";
-                var exists = Convert.ToInt32(command.ExecuteScalar()) > 0;
-
-                // drop table if it exists after failure
-                if (exists)
-                {
-                    command.CommandText = $"DROP TABLE \"{tableName}\"";
-                    command.ExecuteNonQuery();
-                }
-
-                // check to see if db has any tables
-                command.CommandText = " SELECT COUNT(*) FROM information_schema.tables";
-                var hasTables = Convert.ToInt32(command.ExecuteScalar()) > 0;
-                if (!hasTables)
-                {
-                    // delete unneeded timeseries files if no tables
-                    File.Delete(timeseriesPath);
-                    if (File.Exists(timeseriesWalPath)) File.Delete(timeseriesWalPath);
-                }
-
-                await connection.CloseAsync();
-            }
-
-            // Clean up possible empty directories up to the base file path
-            if (Directory.Exists(folderPath)) CleanDirectoryUpToBasePath(folderPath);
-
-            throw;
-        }
-    }
-
-    /// <summary>
-    ///     Sets up the directory for file chunks to be uploaded
-    /// </summary>
-    /// <param name="organizationId">The organization ID</param>
-    /// <param name="projectId">The project ID</param>
-    /// <param name="dataSourceId">The data source ID</param>
-    /// <param name="fileName">The Data Source ID</param>
-    /// <returns>The upload ID (guid format) for file chunks to go to the right directory</returns>
-    public async Task<string> StartUpload(long organizationId, long projectId, long dataSourceId, string fileName)
-    {
-        fileName = SanitizedFormFile.SanitizeFileName(fileName);
-        var fileType = Path.GetExtension(fileName);
-        if (fileType != ".csv" && fileType != ".parquet")
-            throw new ArgumentException("Only .csv and .parquet files are supported");
-
-        await ExistenceHelper.EnsureDataSourceExistsForProjectAsync(_context, dataSourceId, projectId);
-
-        var uploadId = Guid.NewGuid().ToString();
-        var folderPath = Path.Combine(_duckDbBasePath, "org_" + organizationId, "project_" + projectId,
-            "datasource_" + dataSourceId, uploadId);
-        Directory.CreateDirectory(folderPath);
-
-        return uploadId;
-    }
-
-    /// <summary>
-    ///     Uploads a partial file to the specified directory
-    /// </summary>
-    /// <param name="organizationId">The organization ID</param>
-    /// <param name="projectId">The project ID</param>
-    /// <param name="dataSourceId">The data source ID</param>
-    /// <param name="chunk">Raw binary data, max of 30MB by default</param>
-    /// <param name="uploadId">the upload guid from StartUpload</param>
-    /// <param name="chunkNumber">the index for tracking the order to merge chunks together</param>
-    /// <returns>A string to denote the status</returns>
-    /// <exception cref="ArgumentException">If the chunk is null or has no data</exception>
-    public async Task<string> UploadChunk(long organizationId, long projectId, long dataSourceId, IFormFile chunk,
-        string uploadId, int chunkNumber)
-    {
-        chunk = new SanitizedFormFile(chunk);
-        var baseFolderPath = Path.Combine(_duckDbBasePath, "org_" + organizationId, "project_" + projectId,
-            "datasource_" + dataSourceId);
-        var tempFolderPath = Path.Combine(baseFolderPath, uploadId);
-        var tempFilePath = Path.Combine(tempFolderPath, $"{chunkNumber}.part");
-
-        try
-        {
-            var fileType = Path.GetExtension(chunk.FileName);
-            if (fileType != ".csv" && fileType != ".parquet")
-                throw new ArgumentException("Only .csv and .parquet files are supported");
-
-
-            await ExistenceHelper.EnsureDataSourceExistsForProjectAsync(_context, dataSourceId, projectId);
-            if (chunk == null || chunk.Length == 0) throw new ArgumentException("No chunk uploaded.");
-
-            await using var stream = new FileStream(tempFilePath, FileMode.Create);
-            await chunk.CopyToAsync(stream);
-
-            return "success";
-        }
-        catch (Exception)
-        {
-            if (Directory.Exists(tempFolderPath)) Directory.Delete(tempFolderPath, true);
-
-            if (Directory.Exists(baseFolderPath)) CleanDirectoryUpToBasePath(baseFolderPath);
-
-            throw;
-        }
-    }
-
-    /// <summary>
-    ///     Merges the file chunks and creates the finalized uploaded file and kicks off the processing for DuckDB
-    /// </summary>
-    /// <param name="currentUserId">ID of the User executing this method</param>
-    /// <param name="organizationId">The organization ID</param>
-    /// <param name="projectId">The project ID</param>
-    /// <param name="dataSourceId">The Data Source ID</param>
-    /// <param name="request">The request, which contains the UploadID and FileName</param>
-    /// <returns>An object of the uploaded file information</returns>
-    public async Task<RecordResponseDto> CompleteUpload(long currentUserId, long organizationId, long projectId,
-        long dataSourceId,
-        TimeseriesUploadCompleteRequestDto request)
-    {
-        request.FileName = SanitizedFormFile.SanitizeFileName(request.FileName);
-        var folderPath = Path.Combine(_duckDbBasePath, "org_" + organizationId, "project_" + projectId,
-            "datasource_" + dataSourceId);
-        var tempFolderPath = Path.Combine(folderPath, request.UploadId);
-        var tableName = request.UploadId + "_" + request.FileName;
-        var finalFilePath = Path.Combine(folderPath, request.UploadId + "_" + request.FileName);
-        var uri = "duckdb://" + tableName;
-
-        try
-        {
-            var fileType = Path.GetExtension(request.FileName);
-            if (fileType != ".csv" && fileType != ".parquet")
-                throw new ArgumentException("Only .csv and .parquet files are supported");
-
-
-            await ExistenceHelper.EnsureDataSourceExistsForProjectAsync(_context, dataSourceId, projectId);
-            await using (var finalFileStream = new FileStream(finalFilePath, FileMode.Create))
-            {
-                for (var i = 0; i < request.TotalChunks; i++)
-                {
-                    var partFilePath = Path.Combine(tempFolderPath, $"{i}.part");
-                    await using (var partStream = new FileStream(partFilePath, FileMode.Open))
-                    {
-                        await partStream.CopyToAsync(finalFileStream);
-                    }
-
-                    File.Delete(partFilePath); // Clean up the chunk file
-                }
-            }
-
-            await CreateTimeseriesTable(organizationId, projectId, dataSourceId, tableName, fileType);
-
-            Directory.Delete(tempFolderPath, true); // Clean up the datasource folder
-
-            var recordClass = await _classBusiness.GetOrCreateClass(
-                currentUserId, organizationId, projectId, "Timeseries");
-            var columns = await GetColumnsFromDb(organizationId, projectId, dataSourceId, tableName);
-            var fileName = request.FileName;
-
-            var recordRequest = new CreateRecordRequestDto
-            {
-                Properties = new JsonObject
-                {
-                    ["columns"] = columns,
-                    ["timeUploaded"] = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
-                    ["fileType"] = Path.GetExtension(request.FileName).TrimStart('.').ToLower()
-                },
-                Name = fileName,
-                Description = $"Table name: {tableName}",
-                OriginalId = request.UploadId,
-                Uri = uri,
-                ClassId = recordClass.Id,
-                ClassName = recordClass.Name,
-                FileType = Path.GetExtension(request.FileName).TrimStart('.').ToLower()
-            };
-
-            return await _recordBusiness.CreateRecord(currentUserId, organizationId, projectId, dataSourceId,
-                recordRequest);
-        }
-        catch (Exception)
-        {
-            // delete temporary folder if exists
-            if (Directory.Exists(tempFolderPath))
-                // recursive = true to delete folder contents
-                Directory.Delete(tempFolderPath, true);
-
-            var timeseriesPath = Path.Combine(folderPath, "timeseries.duckdb");
-            var timeseriesWalPath = Path.Combine(folderPath, "timeseries.duckdb.wal");
-
-            // initial check to see if db exists
-            if (File.Exists(timeseriesPath))
-            {
-                var connection = await GetDuckDbConnection(organizationId, projectId, dataSourceId);
-                await using var command = connection.CreateCommand();
-
-                //gets table from db
-                command.CommandText =
-                    $" SELECT COUNT(*) FROM information_schema.tables WHERE table_name = '{tableName}'";
-                var exists = Convert.ToInt32(command.ExecuteScalar()) > 0;
-
-                if (exists)
-                {
-                    // drop table if it still exists after failure
-                    command.CommandText = $"DROP TABLE \"{tableName}\"";
-                    command.ExecuteNonQuery();
-                }
-
-                // check if db has any other tables
-                command.CommandText = " SELECT COUNT(*) FROM information_schema.tables";
-                var hasTables = Convert.ToInt32(command.ExecuteScalar()) > 0;
-                if (!hasTables)
-                {
-                    // delete duckdb files if db is empty
-                    File.Delete(timeseriesPath);
-                    if (File.Exists(timeseriesWalPath)) File.Delete(timeseriesWalPath);
-                }
-
-                await connection.CloseAsync();
-            }
-
-            //cleans up empty folders up to base path
-            if (Directory.Exists(folderPath)) CleanDirectoryUpToBasePath(folderPath);
-
-            throw;
-        }
-    }
-
     /// <summary>
     ///     Appends file to existing table
     /// </summary>
@@ -386,73 +42,72 @@ public class TimeseriesBusiness(
     public async Task AppendTimeseriesTable(long organizationId, long projectId, long dataSourceId, IFormFile file,
         string tableName)
     {
-
-        file = new SanitizedFormFile(file);
-        tableName = SanitizedFormFile.SanitizeFileName(tableName);
-        var fileType = Path.GetExtension(file.FileName);
-        if (fileType != ".csv" && fileType != ".parquet")
-            throw new ArgumentException("Only CSV and Parquet files are supported.");
-
-        if (file.Length == 0) throw new Exception("Can not append empty file");
-
-
-        await ExistenceHelper.EnsureDataSourceExistsForProjectAsync(_context, dataSourceId, projectId);
-
-        using var duckDbConnection = await GetDuckDbConnection(organizationId, projectId, dataSourceId);
-
-        // injection protection
-        var cacheKey = $"tables_{dataSourceId}";
-        if (!_tableCache.TryGetValue(cacheKey, out HashSet<string>? validTables))
-        {
-            validTables = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            using var tableCmd = duckDbConnection.CreateCommand();
-            tableCmd.CommandText = "SELECT table_name FROM duckdb_tables()";
-            using var tableReader = await tableCmd.ExecuteReaderAsync();
-            while (await tableReader.ReadAsync())
-            {
-                validTables.Add(tableReader.GetString(0));
-            }
-            _tableCache.Set(cacheKey, validTables, TimeSpan.FromSeconds(120));
-        }
-
-        if (!validTables!.Contains(tableName))
-            throw new ArgumentException($"Invalid table name: {tableName}");
-
-        // save file to temporary directory
-        var guid = Guid.NewGuid();
-        var tempFolderPath = Path.Combine(_duckDbBasePath, "org_" + organizationId, "project_" + projectId,
-            "datasource_" + dataSourceId, guid.ToString());
-        Directory.CreateDirectory(tempFolderPath);
-
-        var tempFilePath = Path.Combine(tempFolderPath, file.FileName);
-
-        // Ensure file stream is fully closed before DuckDB access
-        // (stream disposal race condition causes misleading CSV parsing errors)
-        {
-            await using var stream = new FileStream(tempFilePath, FileMode.Create);
-            await file.CopyToAsync(stream);
-            await stream.FlushAsync();
-        }
-
-        try
-        {
-            await using var command = duckDbConnection.CreateCommand();
-
-            if (fileType == ".csv")
-                command.CommandText = $@"
-                COPY '{tableName}' FROM '{tempFilePath}' (AUTO_DETECT true)";
-            else
-                command.CommandText = $"COPY '{tableName}' FROM '{tempFilePath}'";
-
-            await command.ExecuteNonQueryAsync();
-        }
-        finally
-        {
-            await duckDbConnection.CloseAsync();
-
-            // Clean up temp file
-            if (Directory.Exists(tempFolderPath)) Directory.Delete(tempFolderPath, true);
-        }
+        // file = new SanitizedFormFile(file);
+        // tableName = SanitizedFormFile.SanitizeFileName(tableName);
+        // var fileType = Path.GetExtension(file.FileName);
+        // if (fileType != ".csv" && fileType != ".parquet")
+        //     throw new ArgumentException("Only CSV and Parquet files are supported.");
+        //
+        // if (file.Length == 0) throw new Exception("Can not append empty file");
+        //
+        //
+        // await ExistenceHelper.EnsureDataSourceExistsForProjectAsync(_context, dataSourceId, projectId);
+        //
+        // using var duckDbConnection = await GetDuckDbConnection(organizationId, projectId, dataSourceId);
+        //
+        // // injection protection
+        // var cacheKey = $"tables_{dataSourceId}";
+        // if (!_tableCache.TryGetValue(cacheKey, out HashSet<string>? validTables))
+        // {
+        //     validTables = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        //     using var tableCmd = duckDbConnection.CreateCommand();
+        //     tableCmd.CommandText = "SELECT table_name FROM duckdb_tables()";
+        //     using var tableReader = await tableCmd.ExecuteReaderAsync();
+        //     while (await tableReader.ReadAsync())
+        //     {
+        //         validTables.Add(tableReader.GetString(0));
+        //     }
+        //     _tableCache.Set(cacheKey, validTables, TimeSpan.FromSeconds(120));
+        // }
+        //
+        // if (!validTables!.Contains(tableName))
+        //     throw new ArgumentException($"Invalid table name: {tableName}");
+        //
+        // // save file to temporary directory
+        // var guid = Guid.NewGuid();
+        // var tempFolderPath = Path.Combine(_duckDbBasePath, "org_" + organizationId, "project_" + projectId,
+        //     "datasource_" + dataSourceId, guid.ToString());
+        // Directory.CreateDirectory(tempFolderPath);
+        //
+        // var tempFilePath = Path.Combine(tempFolderPath, file.FileName);
+        //
+        // // Ensure file stream is fully closed before DuckDB access
+        // // (stream disposal race condition causes misleading CSV parsing errors)
+        // {
+        //     await using var stream = new FileStream(tempFilePath, FileMode.Create);
+        //     await file.CopyToAsync(stream);
+        //     await stream.FlushAsync();
+        // }
+        //
+        // try
+        // {
+        //     await using var command = duckDbConnection.CreateCommand();
+        //
+        //     if (fileType == ".csv")
+        //         command.CommandText = $@"
+        //         COPY '{tableName}' FROM '{tempFilePath}' (AUTO_DETECT true)";
+        //     else
+        //         command.CommandText = $"COPY '{tableName}' FROM '{tempFilePath}'";
+        //
+        //     await command.ExecuteNonQueryAsync();
+        // }
+        // finally
+        // {
+        //     await duckDbConnection.CloseAsync();
+        //
+        //     // Clean up temp file
+        //     if (Directory.Exists(tempFolderPath)) Directory.Delete(tempFolderPath, true);
+        // }
     }
 
     /// <summary>
@@ -469,193 +124,195 @@ public class TimeseriesBusiness(
         long dataSourceId,
         string tableName, string fileType)
     {
-        await ExistenceHelper.EnsureDataSourceExistsForProjectAsync(_context, dataSourceId, projectId);
-        var request = new TimeseriesQueryRequestDto
-        {
-            Query = $"SELECT * FROM '{tableName}'"
-        };
-
-        var queryId = Guid.NewGuid().ToString();
-        string fileName;
-
-        if (fileType == "csv")
-            fileName = queryId + "_record.csv";
-        else if (fileType == "parquet")
-            fileName = queryId + "_record.parquet";
-        else
-            throw new NotSupportedException($"file type {fileType} not supported");
-
-        var reportClass = await _classBusiness.GetOrCreateClass(
-            currentUserId, organizationId, projectId, "Report");
-        var timeseriesObjectStorageMethod =
-            await _context.ObjectStorages.FirstOrDefaultAsync(os =>
-                os.ProjectId == projectId && os.Name == "Timeseries Default");
-        if (timeseriesObjectStorageMethod == null)
-            throw new KeyNotFoundException("Default timeseries object storage method not found");
-
-        var recordRequest = new CreateRecordRequestDto
-        {
-            Properties = new JsonObject
-            {
-                ["status"] = Status.InProgress,
-                ["query"] = request.Query
-            },
-            Name = fileName,
-            Description = $"Timeseries result report for {fileName}",
-            OriginalId = queryId,
-            ClassId = reportClass.Id,
-            ClassName = reportClass.Name,
-            ObjectStorageId = timeseriesObjectStorageMethod.Id,
-            FileType = fileType
-        };
-
-        var recordResponse =
-            await _recordBusiness.CreateRecord(currentUserId, organizationId, projectId, dataSourceId, recordRequest);
-
-        // meant to run in background so don't await!
-        RunBackgroundJob(recordResponse, request.Query, organizationId, projectId, dataSourceId, fileName, fileType);
-        return recordResponse;
+        // await ExistenceHelper.EnsureDataSourceExistsForProjectAsync(_context, dataSourceId, projectId);
+        // var request = new TimeseriesQueryRequestDto
+        // {
+        //     Query = $"SELECT * FROM '{tableName}'"
+        // };
+        //
+        // var queryId = Guid.NewGuid().ToString();
+        // string fileName;
+        //
+        // if (fileType == "csv")
+        //     fileName = queryId + "_record.csv";
+        // else if (fileType == "parquet")
+        //     fileName = queryId + "_record.parquet";
+        // else
+        //     throw new NotSupportedException($"file type {fileType} not supported");
+        //
+        // var reportClass = await _classBusiness.GetOrCreateClass(
+        //     currentUserId, organizationId, projectId, "Report");
+        // var timeseriesObjectStorageMethod =
+        //     await _context.ObjectStorages.FirstOrDefaultAsync(os =>
+        //         os.ProjectId == projectId && os.Name == "Timeseries Default");
+        // if (timeseriesObjectStorageMethod == null)
+        //     throw new KeyNotFoundException("Default timeseries object storage method not found");
+        //
+        // var recordRequest = new CreateRecordRequestDto
+        // {
+        //     Properties = new JsonObject
+        //     {
+        //         ["status"] = Status.InProgress,
+        //         ["query"] = request.Query
+        //     },
+        //     Name = fileName,
+        //     Description = $"Timeseries result report for {fileName}",
+        //     OriginalId = queryId,
+        //     ClassId = reportClass.Id,
+        //     ClassName = reportClass.Name,
+        //     ObjectStorageId = timeseriesObjectStorageMethod.Id,
+        //     FileType = fileType
+        // };
+        //
+        // var recordResponse =
+        //     await _recordBusiness.CreateRecord(currentUserId, organizationId, projectId, dataSourceId, recordRequest);
+        //
+        // // meant to run in background so don't await!
+        // RunBackgroundJob(recordResponse, request.Query, organizationId, projectId, dataSourceId, fileName, fileType);
+        return new RecordResponseDto();
     }
 
     /// <summary>
-    ///     Queries a table and retrieves every nth row
+    ///     Queries timeseries data directly from a blob
     /// </summary>
-    /// <param name="currentUserId">ID of the User executing this method.</param>
-    /// <param name="rowNumber">Which nth row to interpolate</param>
-    /// <param name="tableName">The table to query</param>
-    /// <param name="projectId">The project ID</param>
-    /// <param name="organizationId">The organization ID</param>
-    /// <param name="dataSourceId">The data source ID</param>
-    /// <param name="fileType">The type of file to convert query to</param>
-    /// <returns>Data</returns>
-    public async Task<RecordResponseDto> InterpolateRows(long currentUserId, long organizationId, long projectId,
-        long dataSourceId,
-        string rowNumber, string tableName, string fileType)
-    {
-        await ExistenceHelper.EnsureDataSourceExistsForProjectAsync(_context, dataSourceId, projectId);
-        var queryId = Guid.NewGuid().ToString();
-        string fileName;
-
-        if (fileType == "csv")
-            fileName = queryId + "_record.csv";
-        else if (fileType == "parquet")
-            fileName = queryId + "_record.parquet";
-        else
-            throw new NotSupportedException($"file type {fileType} not supported");
-
-        var request = new TimeseriesQueryRequestDto
-        {
-            Query = $"""
-
-                     SELECT * FROM
-                     (
-                         SELECT *, ROW_NUMBER() OVER() AS row_num
-                         FROM '{tableName}'
-                     ) AS numbered_table
-                     WHERE row_num % {rowNumber} = 0
-
-                     """
-        };
-
-        var reportClass = await _classBusiness.GetOrCreateClass(
-            currentUserId, organizationId, projectId, "Report");
-        var timeseriesObjectStorageMethod =
-            await _context.ObjectStorages.FirstOrDefaultAsync(os =>
-                os.ProjectId == projectId && os.Name == "Timeseries Default");
-        if (timeseriesObjectStorageMethod == null)
-            throw new KeyNotFoundException("Default timeseries object storage method not found");
-
-        var recordRequest = new CreateRecordRequestDto
-        {
-            Properties = new JsonObject
-            {
-                ["status"] = Status.InProgress,
-                ["query"] = request.Query
-            },
-            Name = fileName,
-            Description = $"Timeseries result report for {fileName}",
-            OriginalId = queryId,
-            ClassId = reportClass.Id,
-            ClassName = reportClass.Name,
-            ObjectStorageId = timeseriesObjectStorageMethod.Id,
-            FileType = fileType
-        };
-
-        var recordResponse =
-            await _recordBusiness.CreateRecord(currentUserId, organizationId, projectId, dataSourceId, recordRequest);
-
-        // meant to run in background so don't await!
-        RunBackgroundJob(recordResponse, request.Query, organizationId, projectId, dataSourceId, fileName, fileType);
-
-        return recordResponse;
-    }
-
-    /// <summary>
-    ///     This allows the user to query timeseries data in duckDb. Creates the command using an sql string
-    ///     The connection is read only so any write operations will be blocked.
-    /// </summary>
-    /// <param name="currentUserId">ID of the User executing this method.</param>
-    /// <param name="request"> The request which includes the query string</param>
-    /// <param name="projectId">The project ID</param>
-    /// <param name="organizationId">The organization ID</param>
-    /// <param name="dataSourceId">The data source ID</param>
-    /// ///
-    /// <param name="fileType">The type of file to convert query to</param>
+    /// <param name="currentUserId"></param>
+    /// <param name="organizationId"></param>
+    /// <param name="projectId"></param>
+    /// <param name="recordId"></param>
+    /// <param name="userQuery"></param>
+    /// <param name="viewName"></param>
     /// <returns></returns>
-    public async Task<RecordResponseDto> QueryTimeseries(long currentUserId, TimeseriesQueryRequestDto request,
-        long organizationId, long projectId, long dataSourceId, string fileType)
+    /// <exception cref="ArgumentException"></exception>
+    /// <exception cref="InvalidOperationException"></exception>
+    public async Task<PlotDataDto> QueryTabularFile(
+        long currentUserId,
+        long organizationId,
+        long projectId,
+        long recordId,
+        string userQuery,
+        string viewName)
     {
-        await ExistenceHelper.EnsureDataSourceExistsForProjectAsync(_context, dataSourceId, projectId);
+        if (string.IsNullOrWhiteSpace(viewName))
+            throw new ArgumentException("View name is required", nameof(viewName));
+        if (string.IsNullOrWhiteSpace(userQuery))
+            throw new ArgumentException("Query is required, must not be empty or missing");
 
-        var queryId = Guid.NewGuid().ToString();
-        string fileName;
+        // Check view is referenced
+        if (!userQuery.Contains(viewName, StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException($"Query must reference the view '{viewName}'");
 
-        if (fileType == "csv")
-            fileName = queryId + "_record.csv";
-        else if (fileType == "parquet")
-            fileName = queryId + "_record.parquet";
-        else
-            throw new NotSupportedException($"file type {fileType} not supported");
-
-        var reportClass = await _classBusiness.GetOrCreateClass(
-            currentUserId, organizationId, projectId, "Report");
-        var timeseriesObjectStorageMethod =
-            await _context.ObjectStorages.FirstOrDefaultAsync(os =>
-                os.ProjectId == projectId && os.Name == "Timeseries Default");
-        if (timeseriesObjectStorageMethod == null)
-            throw new KeyNotFoundException("Default timeseries object storage method not found");
-
-        var recordRequest = new CreateRecordRequestDto
+        // Block file access patterns only
+        var dangerousPatterns = new[]
         {
-            Properties = new JsonObject
-            {
-                ["status"] = Status.InProgress,
-                ["query"] = request.Query
-            },
-            Name = fileName,
-            Description = $"Timeseries result report for {fileName}",
-            OriginalId = queryId,
-            ClassId = reportClass.Id,
-            ClassName = reportClass.Name,
-            ObjectStorageId = timeseriesObjectStorageMethod.Id,
-            FileType = fileType
+            "COPY",             // Prevent writing files
+            "EXPORT",           // Prevent exporting database/data
+            "IMPORT",           // Prevent importing
+            "INSERT",           // Prevent inserting to other tables
+            "UPDATE",           // Prevent updates
+            "DELETE",           // Prevent deletes  
+            "DROP",             // Prevent dropping objects
+            "ALTER",            // Prevent schema changes
+            "CREATE TABLE",     // Prevent creating tables
+            "CREATE VIEW",      // Prevent creating views (besides temp view we control)
+            "az://",            // Azure blob paths
+            "read_parquet(",    // File reading functions
+            "read_csv(",
+            "read_json(",
+            "ATTACH",           // Database attachment
+            "CREATE SECRET",    // Secret manipulation
+            ".parquet'",        // File extensions in quotes
+            ".csv'",
+            ".json'"
         };
-        var recordResponse =
-            await _recordBusiness.CreateRecord(currentUserId, organizationId, projectId, dataSourceId, recordRequest);
 
-        // meant to run in background so don't await!
-        RunBackgroundJob(recordResponse, request.Query, organizationId, projectId, dataSourceId, fileName, fileType);
+        foreach (var pattern in dangerousPatterns)
+            if (userQuery.Contains(pattern, StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException($"Query contains unauthorized pattern: {pattern}");
 
-        return recordResponse;
+        // Block multi-statement queries
+        if (userQuery.Count(c => c == ';') > 0)
+            throw new InvalidOperationException("Multi-statement queries are not allowed");
+
+        var record = await _recordBusiness.GetRecord(currentUserId, organizationId, projectId, recordId, true);
+        if (record == null)
+            throw new ArgumentException($"Record with ID {recordId} does not exist");
+
+        if (string.IsNullOrWhiteSpace(record.Uri))
+            throw new ArgumentException("File path is required", nameof(record.Uri));
+
+        var objectStorage = _context.ObjectStorages.FirstOrDefault(os => os.OrganizationId == organizationId &&
+                                                                         (os.ProjectId == projectId ||
+                                                                          os.ProjectId == null) &&
+                                                                         os.Id == record.ObjectStorageId);
+
+        if (objectStorage == null)
+            throw new ArgumentException(
+                $"Object storage with ID {record.ObjectStorageId} does not exist for project with ID of {projectId}");
+
+        var objectStorageConfig = JsonConvert.DeserializeObject<ObjectStorageConfigDto>(objectStorage.Config);
+        if (objectStorageConfig == null)
+            throw new InvalidOperationException("Config data for object storage is null or invalid");
+
+        // Sanitize viewName - only allow alphanumeric and underscore
+        if (!Regex.IsMatch(viewName, @"^[a-zA-Z_][a-zA-Z0-9_]*$"))
+            throw new ArgumentException("View name contains invalid characters", nameof(viewName));
+
+        // Determine storage type and get appropriate connection
+        DuckDBConnection connection;
+        string fileUrl;
+
+        if (objectStorage.Type == "azure_object")
+        {
+            // Azure Blob Storage
+            var containerName = objectStorageConfig.AzureObjectConfig?.AzureContainerName;
+            if (string.IsNullOrWhiteSpace(containerName))
+                throw new ArgumentException("Container name is required for Azure storage");
+
+            connection = await GetAzureDuckDbConnection(objectStorageConfig);
+
+            var escapedContainer = containerName.Replace("'", "''");
+            var escapedPath = record.Uri.Replace("'", "''");
+            fileUrl = $"az://{escapedContainer}/{escapedPath}";
+        }
+        else if (objectStorage.Type == "filesystem")
+        {
+            // Local filesystem
+            connection = await GetLocalDuckDbConnection();
+
+            var escapedPath = record.Uri.Replace("'", "''");
+            fileUrl = escapedPath;
+        }
+        else
+        {
+            throw new InvalidOperationException("Object storage type is not supported for timeseries file queries");
+        }
+
+        await using (connection)
+        {
+            // Create a temporary view pointing to the file
+            await using (var createViewCmd = connection.CreateCommand())
+            {
+                createViewCmd.CommandText = $"CREATE OR REPLACE TEMP VIEW {viewName} AS SELECT * FROM '{fileUrl}';";
+                await createViewCmd.ExecuteNonQueryAsync();
+            }
+
+            // Execute the user query and read results directly
+            await using var cmd = connection.CreateCommand();
+            cmd.CommandText = userQuery;
+
+            await using var reader = await cmd.ExecuteReaderAsync();
+
+            return await ReaderToPlotData(reader);
+        }
     }
 
     /// <summary>
-    ///     Get a view of data points
+    ///     Get a view of data points from a parquet/csv file stored in Azure Blob or local filesystem
     /// </summary>
     /// <param name="organizationId">ID of organization that timeseries data is associated with</param>
     /// <param name="projectId">ID of project that timeseries data is associated with</param>
     /// <param name="dataSourceId">ID of data source that timeseries data is associated with</param>
-    /// <param name="recordId">Name of the duckDB table on which the timeseries data is encoded</param>
+    /// <param name="recordId">ID of record pointing to the parquet/csv file</param>
     /// <param name="limit">Maximum number of data points to include</param>
     /// <param name="rowStride">every nth row to get (row number 4 = every 4th row)</param>
     /// <returns>A json array of plot data</returns>
@@ -663,37 +320,185 @@ public class TimeseriesBusiness(
         long dataSourceId, long recordId, long limit, long rowStride)
     {
         await ExistenceHelper.EnsureDataSourceExistsForProjectAsync(_context, dataSourceId, projectId);
-        using var connection = await GetReadOnlyDuckDbConnection(organizationId, projectId, dataSourceId);
-
-        // injection protection (here it's for stuff like DoS inducing expensive requests)
-        var cacheKey = $"tables_{dataSourceId}";
-        if (!_tableCache.TryGetValue(cacheKey, out HashSet<string>? validTables))
-        {
-            validTables = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            using var tableCmd = connection.CreateCommand();
-            tableCmd.CommandText = "SELECT table_name FROM duckdb_tables()";
-            using var tableReader = await tableCmd.ExecuteReaderAsync();
-            while (await tableReader.ReadAsync())
-            {
-                validTables.Add(tableReader.GetString(0));
-            }
-            _tableCache.Set(cacheKey, validTables, TimeSpan.FromSeconds(120));
-        }
 
         var record = await _recordBusiness.GetRecord(currentUserId, organizationId, projectId, recordId, true);
 
-        if (string.IsNullOrEmpty(record.Uri))
+        if (string.IsNullOrWhiteSpace(record.Uri))
             throw new ArgumentException($"Record {recordId} does not have a URI");
 
-        var tableName = ExtractTableNameFromUri(record.Uri);
+        var objectStorage = _context.ObjectStorages.FirstOrDefault(os => os.OrganizationId == organizationId &&
+                                                                         (os.ProjectId == projectId ||
+                                                                          os.ProjectId == null) &&
+                                                                         os.Id == record.ObjectStorageId);
 
-        if (!validTables!.Contains(tableName))
-            throw new ArgumentException($"Invalid table name: {tableName}");
+        if (objectStorage == null)
+            throw new ArgumentException(
+                $"Object storage with ID {record.ObjectStorageId} does not exist for project with ID of {projectId}");
 
-        using var cmd = connection.CreateCommand();
-        cmd.CommandText = $"SELECT * FROM \"{tableName}\" WHERE rowid % {rowStride} = 0 ORDER BY rowid DESC LIMIT {limit}";
-        using var reader = await cmd.ExecuteReaderAsync();
+        var objectStorageConfig = JsonConvert.DeserializeObject<ObjectStorageConfigDto>(objectStorage.Config);
+        if (objectStorageConfig == null)
+            throw new InvalidOperationException("Config data for object storage is null or invalid");
 
+        // Determine storage type and get appropriate connection
+        DuckDBConnection connection;
+        string fileUrl;
+
+        if (objectStorage.Type == "azure_object")
+        {
+            // Azure Blob Storage
+            var containerName = objectStorageConfig.AzureObjectConfig?.AzureContainerName;
+            if (string.IsNullOrWhiteSpace(containerName))
+                throw new ArgumentException("Container name is required for Azure storage");
+
+            connection = await GetAzureDuckDbConnection(objectStorageConfig);
+
+            var escapedContainer = containerName.Replace("'", "''");
+            var escapedPath = record.Uri.Replace("'", "''");
+            fileUrl = $"az://{escapedContainer}/{escapedPath}";
+        }
+        else if (objectStorage.Type == "filesystem")
+        {
+            // Local filesystem
+            connection = await GetLocalDuckDbConnection();
+
+            var escapedPath = record.Uri.Replace("'", "''");
+            fileUrl = escapedPath;
+        }
+        else
+        {
+            throw new InvalidOperationException("Object storage type is not supported for timeseries file queries");
+        }
+
+        await using (connection)
+        {
+            // Query the file directly with rowStride and limit
+            await using var cmd = connection.CreateCommand();
+            cmd.CommandText = $@"
+                                WITH numbered AS (
+                                    SELECT *, row_number() OVER () as rn 
+                                    FROM '{fileUrl}'
+                                )
+                                SELECT * EXCLUDE rn
+                                FROM numbered 
+                                WHERE rn % {rowStride} = 0 
+                                ORDER BY rn DESC 
+                                LIMIT {limit}";
+
+            await using var reader = await cmd.ExecuteReaderAsync();
+
+            return await ReaderToPlotData(reader);
+        }
+    }
+
+    /// <summary>
+    ///     Creates an in-memory DuckDB connection configured with the Azure extension
+    ///     Supports both reading (read_parquet/read_csv) and writing (COPY statements) to Azure Blob Storage
+    /// </summary>
+    private static async Task<DuckDBConnection> GetAzureDuckDbConnection(ObjectStorageConfigDto objectStorageConfig)
+    {
+        if (objectStorageConfig.AzureObjectConfig == null)
+            throw new ArgumentException("Azure object config is required");
+
+        // Create in-memory connection
+        var connectionString = "Data Source=:memory:";
+        var connection = new DuckDBConnection(connectionString);
+        await connection.OpenAsync();
+
+        try
+        {
+            // Install and load the Azure extension. Should happen automatically, but this is just in case.
+            await using (var cmd = connection.CreateCommand())
+            {
+                cmd.CommandText = "INSTALL azure; LOAD azure;";
+                await cmd.ExecuteNonQueryAsync();
+            }
+
+            // Create a secret for Azure authentication
+            var secretName = $"azure_secret_{Guid.NewGuid():N}";
+
+            // Escape single quotes in connection string to prevent SQL injection
+            var escapedConnectionString = objectStorageConfig.AzureObjectConfig.AzureConnectionString
+                .Replace("'", "''");
+
+            await using (var cmd = connection.CreateCommand())
+            {
+                cmd.CommandText = $@"CREATE SECRET {secretName} (
+                TYPE azure,
+                PROVIDER config,
+                CONNECTION_STRING '{escapedConnectionString}'
+            );";
+                await cmd.ExecuteNonQueryAsync();
+            }
+
+            return connection;
+        }
+        catch
+        {
+            await connection.DisposeAsync();
+            throw;
+        }
+    }
+
+    /// <summary>
+    ///     Creates an in-memory DuckDB connection for reading local files
+    ///     No extensions or authentication needed for local filesystem access
+    /// </summary>
+    private static async Task<DuckDBConnection> GetLocalDuckDbConnection()
+    {
+        // Create in-memory connection
+        var connectionString = "Data Source=:memory:";
+        var connection = new DuckDBConnection(connectionString);
+        await connection.OpenAsync();
+
+        return connection;
+    }
+
+    /// <summary>
+    ///     Gets all the column names and types from the table
+    /// </summary>
+    /// <param name="organizationId">The organization ID</param>
+    /// <param name="projectId">The project ID</param>
+    /// <param name="dataSourceId">The data source ID</param>
+    /// <param name="tableName">Timeseries table name</param>
+    /// <returns>JSON array of columns</returns>
+    private static async Task<JsonArray> GetColumnsFromDb(long organizationId, long projectId, long dataSourceId,
+        string tableName)
+    {
+        // var columns = new JsonArray();
+        // tableName = SanitizedFormFile.SanitizeFileName(tableName);
+        // using var duckDbConnection = await GetDuckDbConnection(organizationId, projectId, dataSourceId);
+        //
+        // await using var command = duckDbConnection.CreateCommand();
+        // command.CommandText =
+        //     $"SELECT column_name, data_type FROM information_schema.columns WHERE table_name = '{tableName}';";
+        //
+        // using var reader = await command.ExecuteReaderAsync();
+        //
+        // await duckDbConnection.CloseAsync();
+        //
+        // while (reader.Read())
+        // {
+        //     var columnName = reader[0].ToString();
+        //     var columnType = reader[1].ToString();
+        //
+        //     var columnObject = new JsonObject
+        //     {
+        //         ["name"] = columnName,
+        //         ["type"] = columnType
+        //     };
+        //     columns.Add(columnObject);
+        // }
+        //
+        return new JsonArray();
+    }
+    
+    /// <summary>
+    /// Converts a DbDataReader to PlotDataDto format
+    /// </summary>
+    /// <param name="reader">The data reader to convert</param>
+    /// <returns>PlotDataDto with columns and data</returns>
+    private static async Task<PlotDataDto> ReaderToPlotData(DbDataReader reader)
+    {
         var columnCount = reader.FieldCount;
         var columns = new string[columnCount];
         for (var i = 0; i < columnCount; i++)
@@ -708,281 +513,10 @@ public class TimeseriesBusiness(
                 row[i] = reader.GetValue(i);
             points.Add(row);
         }
-
-        points.Reverse(); // back to chronological order
+        
+        points.Reverse();
 
         return new PlotDataDto { Columns = columns, Data = [.. points] };
-    }
-
-    /// <summary>
-    ///     Get the most recent row
-    /// </summary>
-    /// <param name="organizationId">ID of organization that timeseries data is associated with</param>
-    /// <param name="projectId">ID of project that timeseries data is associated with</param>
-    /// <param name="dataSourceId">ID of data source that timeseries data is associated with</param>
-    /// <param name="recordId">Name of the duckDB table on which the timeseries data is encoded</param>
-    /// <returns>The most recently inserted row as json</returns>
-    public async Task<Dictionary<string, object?>> GetLatestRow(long currentUserId, long organizationId, long projectId,
-        long dataSourceId, long recordId)
-    {
-        await ExistenceHelper.EnsureDataSourceExistsForProjectAsync(_context, dataSourceId, projectId);
-        using var connection = await GetReadOnlyDuckDbConnection(organizationId, projectId, dataSourceId);
-
-        // injection protection (here it's for stuff like DoS inducing expensive requests)
-        var cacheKey = $"tables_{dataSourceId}";
-        if (!_tableCache.TryGetValue(cacheKey, out HashSet<string>? validTables))
-        {
-            validTables = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            using var tableCmd = connection.CreateCommand();
-            tableCmd.CommandText = "SELECT table_name FROM duckdb_tables()";
-            using var tableReader = await tableCmd.ExecuteReaderAsync();
-            while (await tableReader.ReadAsync())
-            {
-                validTables.Add(tableReader.GetString(0));
-            }
-            _tableCache.Set(cacheKey, validTables, TimeSpan.FromSeconds(120));
-        }
-
-        var record = await _recordBusiness.GetRecord(currentUserId, organizationId, projectId, recordId, true);
-
-        if (string.IsNullOrEmpty(record.Uri))
-            throw new ArgumentException($"Record {recordId} does not have a URI");
-
-        var tableName = ExtractTableNameFromUri(record.Uri);
-
-        if (!validTables!.Contains(tableName))
-            throw new ArgumentException($"Invalid table name: {tableName}");
-
-        // NOTE: relies on rowid for ordering, which is safe for append-only timeseries
-        // If we ever support user-initiated deletes, revisit this
-        using var cmd = connection.CreateCommand();
-        cmd.CommandText = $"SELECT * FROM \"{tableName}\" ORDER BY rowid DESC LIMIT 1";
-        using var reader = await cmd.ExecuteReaderAsync();
-
-        if (!await reader.ReadAsync())
-            return [];
-
-        var result = new Dictionary<string, object?>(reader.FieldCount);
-        for (int i = 0; i < reader.FieldCount; i++)
-        {
-            result[reader.GetName(i)] = reader.IsDBNull(i) ? null : reader.GetValue(i);
-        }
-        return result;
-    }
-
-    private static async Task<DuckDBConnection> GetDuckDbConnection(long organizationId, long projectId,
-        long dataSourceId)
-    {
-        var baseDir = Path.Combine(_duckDbBasePath, "org_" + organizationId, "project_" + projectId,
-            "datasource_" + dataSourceId);
-        Directory.CreateDirectory(baseDir);
-
-        var dbPath = Path.Combine(baseDir, "timeseries.duckdb");
-        var connectionString = $"Data Source={dbPath}";
-
-        var connection = new DuckDBConnection(connectionString);
-        await connection.OpenAsync();
-
-        return connection;
-    }
-
-    private static async Task<DuckDBConnection> GetReadOnlyDuckDbConnection(long organizationId, long projectId,
-        long dataSourceId)
-    {
-        var baseDir = Path.Combine(_duckDbBasePath, "org_" + organizationId, "project_" + projectId,
-            "datasource_" + dataSourceId);
-        var dbPath = Path.Combine(baseDir, "timeseries.duckdb");
-
-        if (!File.Exists(dbPath))
-            throw new FileNotFoundException(
-                $"DuckDB file not found for project {projectId}, datasource {dataSourceId}: {dbPath}");
-
-        var connectionString = $"Data Source={dbPath};ACCESS_MODE=READ_ONLY";
-        var connection = new DuckDBConnection(connectionString);
-        await connection.OpenAsync();
-
-        return connection;
-    }
-
-    /// <summary>
-    ///     Runs a timeseries query to generate a csv from a DataTable
-    /// </summary>
-    /// <param name="recordResponse">The record response DTO</param>
-    /// <param name="query">The timeseries query request DTO</param>
-    /// <param name="organizationId">The organization ID</param>
-    /// <param name="projectId">The project ID</param>
-    /// <param name="dataSourceId">The data source ID</param>
-    /// <param name="fileName">The name of the file to be written</param>
-    /// <param name="fileType">The type of the file being written</param>
-    /// <exception cref="KeyNotFoundException">Thrown when the record cannot be found</exception>
-    /// <exception cref="Exception">Thrown if the report cannot be written</exception>
-    private async Task RunBackgroundJob(RecordResponseDto recordResponse, string query, long organizationId,
-        long projectId,
-        long dataSourceId, string fileName, string fileType)
-    {
-        // Runs in the background and lets the request finish
-        // https://stackoverflow.com/questions/62222712/what-is-the-simplest-way-to-run-a-single-background-task-from-a-controller-in-n
-        // todo: Write csv to object storage
-        await Task.Run(async () =>
-        {
-            // creates a background scope to create its own context so that the background task doesn't
-            // have to rely on other contexts that may be destroyed or closed.
-            using var scope = _serviceScopeFactory.CreateScope();
-            var backgroundContext = scope.ServiceProvider.GetRequiredService<DeeplynxContext>();
-            using var connection = await GetReadOnlyDuckDbConnection(organizationId, projectId, dataSourceId);
-            var folderPath = Path.Combine(_duckDbBasePath, "org_" + organizationId, "project_" + projectId,
-                "datasource_" + dataSourceId);
-            var filePath = Path.Combine(folderPath, fileName);
-
-            try
-            {
-                Directory.CreateDirectory(folderPath);
-
-                var command = connection.CreateCommand();
-
-                if (fileType == "csv")
-                    command.CommandText = $"COPY ({query}) TO '{filePath}' (HEADER, DELIMITER ',');";
-                else if (fileType == "parquet")
-                    command.CommandText = $"COPY ({query}) TO '{filePath}' (FORMAT parquet);";
-
-                await command.ExecuteNonQueryAsync();
-                await connection.CloseAsync();
-
-                var properties = new JsonObject
-                {
-                    ["status"] = Status.Completed,
-                    ["query"] = query
-                };
-                var record = await backgroundContext.Records.FindAsync(recordResponse.Id);
-                if (record == null || record.ProjectId != projectId || record.IsArchived)
-                    throw new KeyNotFoundException($"Record with id {recordResponse.Id} not found");
-
-                record.Properties = properties.ToString();
-                record.Uri = filePath;
-                record.LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
-
-                backgroundContext.Records.Update(record);
-                await backgroundContext.SaveChangesAsync();
-            }
-            catch (Exception e)
-            {
-                if (File.Exists(filePath)) File.Delete(filePath);
-
-                var properties = new JsonObject
-                {
-                    ["status"] = Status.Failed,
-                    ["error"] = e.Message,
-                    ["query"] = query
-                };
-                var record = await backgroundContext.Records.FindAsync(recordResponse.Id);
-                if (record == null || record.ProjectId != projectId || record.IsArchived)
-                    throw new KeyNotFoundException($"Record with id {recordResponse.Id} not found");
-
-                record.Properties = properties.ToString();
-
-                backgroundContext.Records.Update(record);
-                await backgroundContext.SaveChangesAsync();
-                await connection.CloseAsync();
-
-                logger.LogError(e.Message);
-                throw new Exception("Failed while writing report to csv and postgres: " + e.Message);
-            }
-        });
-    }
-
-    //todo: Determine how to structure query result depending on how UI needs it. This function will be commented out for now
-
-    /// <summary>
-    /// Makes a JSON like response from the table. This will be replaced by a link to the csv later.
-    /// </summary>
-    /// <param name="dt"> data table with response data</param>
-    /// <returns></returns>
-    // private List<Dictionary<string, object?>> DataTableToDictionary(DataTable dt)
-    // {
-    //     var preview = new List<Dictionary<string, object?>>();
-    //     foreach (DataRow row in dt.Rows)
-    //     {
-    //         var rowDict = new Dictionary<string, object?>();
-    //         foreach (DataColumn column in dt.Columns)
-    //         {
-    //             rowDict[column.ColumnName] = row.ItemArray[column.Ordinal];
-    //         }
-    //         preview.Add(rowDict);
-    //     }
-    //     return preview;
-    // }
-
-    //todo: Determine how to structure preview depending on how UI needs it. This function will be commented out for now
-
-    // private JsonObject DataTableToPreview(DataTable dt)
-    // {
-    //     var result = new JsonObject();
-    //
-    //     foreach (DataColumn column in dt.Columns)
-    //     {
-    //         result[column.ColumnName] = new JsonArray();
-    //     }
-    //
-    //     var maxRows = Math.Min(5, dt.Rows.Count);
-    //     for (var i = 0; i < maxRows; i++)
-    //     {
-    //         var row = dt.Rows[i];
-    //         foreach (DataColumn column in dt.Columns)
-    //         {
-    //             ((JsonArray)result[column.ColumnName]).Add(row[column] == DBNull.Value ? null : row[column]);
-    //         }
-    //     }
-    //
-    //     return result;
-    // }
-
-    /// <summary>
-    ///     Gets all the column names and types from the table
-    /// </summary>
-    /// <param name="organizationId">The organization ID</param>
-    /// <param name="projectId">The project ID</param>
-    /// <param name="dataSourceId">The data source ID</param>
-    /// <param name="tableName">Timeseries table name</param>
-    /// <returns>JSON array of columns</returns>
-    private static async Task<JsonArray> GetColumnsFromDb(long organizationId, long projectId, long dataSourceId,
-        string tableName)
-    {
-        var columns = new JsonArray();
-        tableName = SanitizedFormFile.SanitizeFileName(tableName);
-        using var duckDbConnection = await GetDuckDbConnection(organizationId, projectId, dataSourceId);
-
-        await using var command = duckDbConnection.CreateCommand();
-        command.CommandText =
-            $"SELECT column_name, data_type FROM information_schema.columns WHERE table_name = '{tableName}';";
-
-        using var reader = await command.ExecuteReaderAsync();
-
-        await duckDbConnection.CloseAsync();
-
-        while (reader.Read())
-        {
-            var columnName = reader[0].ToString();
-            var columnType = reader[1].ToString();
-
-            var columnObject = new JsonObject
-            {
-                ["name"] = columnName,
-                ["type"] = columnType
-            };
-            columns.Add(columnObject);
-        }
-
-        return columns;
-    }
-
-    private static string ExtractTableNameFromUri(string uri)
-    {
-        const string scheme = "duckdb://";
-
-        if (!uri.StartsWith(scheme, StringComparison.OrdinalIgnoreCase))
-            throw new ArgumentException($"Unsupported URI scheme. Expected '{scheme}', got: {uri}");
-
-        return uri[scheme.Length..];
     }
 
     private void CleanDirectoryUpToBasePath(string? startDirectoryPath)
