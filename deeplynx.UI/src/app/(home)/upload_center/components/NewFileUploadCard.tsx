@@ -311,7 +311,7 @@ export default function NewFileUploadCard({
                 <input
                   type="text"
                   className="input input-sm w-full"
-                  placeholder="metadata.a"
+                  placeholder={t.translations.METADATA_ALIAS_PLACEHOLDER}
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                 />
@@ -320,7 +320,10 @@ export default function NewFileUploadCard({
           </div>
           {/* Row 2: Metadata File */}
           <div className="flex flex-col gap-1">
-            <label htmlFor={metadataInputId} className="flex items-center gap-2">
+            <label
+              htmlFor={metadataInputId}
+              className="flex items-center gap-2"
+            >
               <span className="label-text">{t.translations.METADATA_FILE}</span>
               <span className="badge badge-xs">{t.translations.OPTIONAL}</span>
             </label>
@@ -347,8 +350,8 @@ export default function NewFileUploadCard({
             </div>
             <p id={metadataHelpId} className="text-xs text-base-content/60">
               {disableMetadataFile
-                ? "Metadata file is unavailable for chunked uploads."
-                : "Leave blank if you do not have a metadata file."}
+                ? t.translations.METADATA_FILE_UNAVAILABLE_FOR_LARGE_FILES
+                : t.translations.METADATA_FILE_HELP_OPTIONAL}
             </p>
           </div>
         </div>
