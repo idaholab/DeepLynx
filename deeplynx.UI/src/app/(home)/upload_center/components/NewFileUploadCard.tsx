@@ -68,6 +68,12 @@ export default function NewFileUploadCard({
   const selectedRecord =
     displayedFiles.find((f) => String(f.id) === String(targetRecordId)) ??
     availableFiles.find((f) => String(f.id) === String(targetRecordId));
+  const selectedDataType =
+    recordMode === "update"
+      ? "standard"
+      : isTimeSeries
+        ? "timeseries"
+        : "standard";
 
   const handleSearch = useCallback(
     async ({ query }: { query: string; option?: string }) => {
@@ -293,30 +299,61 @@ export default function NewFileUploadCard({
             </div>
           )}
 
-          {/* Row 1: Time Series toggle + Name input */}
-          <div className="grid grid-cols-[auto,1fr] items-center gap-4">
-            <div className="flex items-center">
-              <span className="label-text mr-2">
-                {t.translations.TIMESERIES}
+          {/* Row 1: Data Type + Name input */}
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-2">
+              <span className="label-text block font-semibold">
+                {t.translations.DATA_TYPE}
+              </span>
+              <div
+                role="radiogroup"
+                aria-label={t.translations.DATA_TYPE}
+                className="inline-flex rounded-full border border-base-300/70 bg-base-200/50 p-1"
+              >
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={selectedDataType === "standard"}
+                  className={`rounded-full px-3 py-1 text-xs font-medium transition ${
+                    selectedDataType === "standard"
+                      ? "bg-base-100 text-base-content shadow-sm"
+                      : "text-base-content/70"
+                  }`}
+                  onClick={() => setIsTimeSeries(false)}
+                >
+                  {t.translations.STANDARD_FILE}
+                </button>
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={selectedDataType === "timeseries"}
+                  className={`rounded-full px-3 py-1 text-xs font-medium transition ${
+                    selectedDataType === "timeseries"
+                      ? "bg-base-100 text-base-content shadow-sm"
+                      : "text-base-content/70"
+                  } ${recordMode === "update" ? "cursor-not-allowed opacity-50" : ""}`}
+                  onClick={() => {
+                    if (recordMode === "update") return;
+                    setIsTimeSeries(true);
+                  }}
+                  disabled={recordMode === "update"}
+                >
+                  {t.translations.TIMESERIES}
+                </button>
+              </div>
+            </div>
+            <label className="space-y-2">
+              <span className="label-text font-semibold">
+                {t.translations.ALIAS}
               </span>
               <input
-                type="checkbox"
-                className="toggle toggle-secondary"
-                checked={isTimeSeries}
-                disabled={recordMode === "update"}
-                onChange={(e) => setIsTimeSeries(e.target.checked)}
+                type="text"
+                className="input input-sm w-full"
+                placeholder={t.translations.METADATA_ALIAS_PLACEHOLDER}
+                value={name}
+                onChange={(e) => setName(e.target.value)}
               />
-              <label className="flex items-center gap-2 flex-1">
-                <span className="label-text ml-4">{t.translations.ALIAS}</span>
-                <input
-                  type="text"
-                  className="input input-sm w-full"
-                  placeholder={t.translations.METADATA_ALIAS_PLACEHOLDER}
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                />
-              </label>
-            </div>
+            </label>
           </div>
           {/* Row 2: Metadata File */}
           <div className="flex flex-col gap-1">
