@@ -521,6 +521,15 @@ export const translations = {
             METADATA_ALIAS_PLACEHOLDER: "metadata.a",
             METADATA_FILE_UNAVAILABLE_FOR_LARGE_FILES: "Metadata file is unavailable for large files.",
             METADATA_FILE_HELP_OPTIONAL: "Leave blank if you do not have a metadata file.",
+            METADATA_FILE_JSON_ONLY: "Only .json metadata files are allowed.",
+            METADATA_FILE_INVALID_JSON_OBJECT: "Metadata file must be a valid JSON object.",
+            METADATA_PREVIEW_TITLE: "Metadata Preview",
+            METADATA_PREVIEW_NAME: "Name",
+            METADATA_PREVIEW_DESCRIPTION: "Description",
+            METADATA_PREVIEW_ORIGINAL_ID: "Original ID",
+            METADATA_PREVIEW_CLASS: "Class",
+            METADATA_PREVIEW_PROPERTIES: "Properties",
+            METADATA_PREVIEW_SELECT_FILE: "Upload a metadata JSON file to preview key values.",
             NO_AVAILABLE_USERS: "No available users",
             PLEASE_UPLOAD_VALID_IMAGE: "Please upload a valid image file (PNG recommended).",
             FILE_SIZE_MUST_BE_5MB: "File size must be less than 5MB",
@@ -921,6 +930,7 @@ export const translations = {
             ADD_CLASS: "Add Class",
 
             OPTIONAL: "Optional",
+            CLASS_ID: "Class ID"
 
         }
     },
@@ -1458,6 +1468,15 @@ export const translations = {
             METADATA_ALIAS_PLACEHOLDER: "metadata.a",
             METADATA_FILE_UNAVAILABLE_FOR_LARGE_FILES: "El archivo de metadatos no está disponible para archivos grandes.",
             METADATA_FILE_HELP_OPTIONAL: "Déjalo en blanco si no tienes un archivo de metadatos.",
+            METADATA_FILE_JSON_ONLY: "Solo se permiten archivos de metadatos .json.",
+            METADATA_FILE_INVALID_JSON_OBJECT: "El archivo de metadatos debe ser un objeto JSON válido.",
+            METADATA_PREVIEW_TITLE: "Vista previa de metadatos",
+            METADATA_PREVIEW_NAME: "Nombre",
+            METADATA_PREVIEW_DESCRIPTION: "Descripción",
+            METADATA_PREVIEW_ORIGINAL_ID: "ID original",
+            METADATA_PREVIEW_CLASS: "Clase",
+            METADATA_PREVIEW_PROPERTIES: "Propiedades",
+            METADATA_PREVIEW_SELECT_FILE: "Sube un archivo JSON de metadatos para previsualizar valores clave.",
 
             PLEASE_UPLOAD_VALID_IMAGE: "Por favor, sube un archivo de imagen válido (se recomienda PNG).",
             FILE_SIZE_MUST_BE_5MB: "El tamaño del archivo debe ser menor a 5 MB",
@@ -1860,7 +1879,8 @@ export const translations = {
             FAILED_TO_CREATE_RELATIONSHIPS: "No se pudieron crear las relaciones",
             ADD_CLASS: "Agregar clase",
 
-            OPTIONAL: "Opcional"
+            OPTIONAL: "Opcional",
+            CLASS_ID: "ID de clase",
         }
     }
 }

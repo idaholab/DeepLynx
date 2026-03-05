@@ -4,14 +4,19 @@
 import { FileMetadata } from "../../types/types";
 import { useLanguage } from "@/app/contexts/Language";
 import { TrashIcon, XMarkIcon } from "@heroicons/react/24/outline";
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type ChangeEvent,
+} from "react";
 import type { ExistingFile } from "../../types/types";
 import SearchBar from "../../components/SearchBar";
 import { formatLocalDateTime } from "@/app/lib/date_time";
 
 const MAX_VISIBLE_FILES = 100;
 
-const toBaseName = (filename: string) => filename.replace(/\.[^/.]+$/, "");
 const initialVisibleFiles = (files: ExistingFile[]) =>
   files.slice(0, MAX_VISIBLE_FILES);
 const interpolate = (
@@ -50,7 +55,10 @@ export default function NewFileUploadCard({
   const [hasSearched, setHasSearched] = useState(false);
   const [isTimeSeries, setIsTimeSeries] = useState(false);
   const [metadataFile, setMetadataFile] = useState<File | undefined>(undefined);
-  const [name, setName] = useState(toBaseName(defaultName));
+  const [metadataPreview, setMetadataPreview] = useState<
+    Record<string, unknown> | undefined
+  >(undefined);
+  const [metadataPreviewError, setMetadataPreviewError] = useState("");
   const metadataFileInputRef = useRef<HTMLInputElement | null>(null);
   const [displayedFiles, setDisplayedFiles] = useState<ExistingFile[]>(
     initialVisibleFiles(availableFiles),
@@ -60,8 +68,51 @@ export default function NewFileUploadCard({
 
   const clearMetadataFile = () => {
     setMetadataFile(undefined);
+    setMetadataPreview(undefined);
+    setMetadataPreviewError("");
     if (metadataFileInputRef.current) {
       metadataFileInputRef.current.value = "";
+    }
+  };
+
+  const getPreviewString = (
+    source: Record<string, unknown> | undefined,
+    pascalKey: string,
+    camelKey: string,
+  ): string | undefined => {
+    if (!source) return undefined;
+    const value = source[pascalKey] ?? source[camelKey];
+    if (value === undefined || value === null) return undefined;
+    if (typeof value === "string") return value.trim() || undefined;
+    if (typeof value === "number") return String(value);
+    return undefined;
+  };
+
+  const handleMetadataFileChange = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) {
+      clearMetadataFile();
+      return;
+    }
+
+    if (!file.name.toLowerCase().endsWith(".json")) {
+      clearMetadataFile();
+      setMetadataPreviewError(t.translations.METADATA_FILE_JSON_ONLY);
+      return;
+    }
+
+    try {
+      const content = await file.text();
+      const parsed: unknown = JSON.parse(content);
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+        throw new Error("Metadata must be a JSON object");
+      }
+      setMetadataFile(file);
+      setMetadataPreview(parsed as Record<string, unknown>);
+      setMetadataPreviewError("");
+    } catch {
+      clearMetadataFile();
+      setMetadataPreviewError(t.translations.METADATA_FILE_INVALID_JSON_OBJECT);
     }
   };
 
@@ -96,10 +147,6 @@ export default function NewFileUploadCard({
     },
     [availableFiles, onSearchFiles],
   );
-
-  useEffect(() => {
-    setName(toBaseName(defaultName));
-  }, [defaultName]);
 
   useEffect(() => {
     if (recordMode === "update" && isTimeSeries) {
@@ -139,7 +186,7 @@ export default function NewFileUploadCard({
 
   useEffect(() => {
     const metadata: FileMetadata = {
-      name,
+      name: defaultName,
       description: "",
       isTimeSeries: recordMode === "update" ? false : isTimeSeries,
       recordMode,
@@ -148,7 +195,7 @@ export default function NewFileUploadCard({
     };
     onMetadataChange(fileIndex, metadata);
   }, [
-    name,
+    defaultName,
     recordMode,
     targetRecordId,
     isTimeSeries,
@@ -298,98 +345,170 @@ export default function NewFileUploadCard({
               )}
             </div>
           )}
+          <div className="flex justify-between flex-col-2">
+            <div>
+              {/* Row 1: Data Type + Metadata Preview */}
+              <div className="grid gap-4 md:grid-cols-2 md:items-start">
+                <div className="min-w-0 space-y-2">
+                  <span className="label-text block font-semibold">
+                    {t.translations.DATA_TYPE}
+                  </span>
+                  <div
+                    role="radiogroup"
+                    aria-label={t.translations.DATA_TYPE}
+                    className="inline-flex rounded-full border border-base-300/70 bg-base-200/50 p-1"
+                  >
+                    <button
+                      type="button"
+                      role="radio"
+                      aria-checked={selectedDataType === "standard"}
+                      className={`rounded-full px-3 py-1 text-xs font-medium transition ${
+                        selectedDataType === "standard"
+                          ? "bg-base-100 text-base-content shadow-sm"
+                          : "text-base-content/70"
+                      }`}
+                      onClick={() => setIsTimeSeries(false)}
+                    >
+                      {t.translations.STANDARD_FILE}
+                    </button>
+                    <button
+                      type="button"
+                      role="radio"
+                      aria-checked={selectedDataType === "timeseries"}
+                      className={`rounded-full px-3 py-1 text-xs font-medium transition ${
+                        selectedDataType === "timeseries"
+                          ? "bg-base-100 text-base-content shadow-sm"
+                          : "text-base-content/70"
+                      } ${recordMode === "update" ? "cursor-not-allowed opacity-50" : ""}`}
+                      onClick={() => {
+                        if (recordMode === "update") return;
+                        setIsTimeSeries(true);
+                      }}
+                      disabled={recordMode === "update"}
+                    >
+                      {t.translations.TIMESERIES}
+                    </button>
+                  </div>
+                </div>
+              </div>
+              {/* Row 2: Metadata File */}
+              <div className="flex flex-col gap-1 mt-4">
+                <label
+                  htmlFor={metadataInputId}
+                  className="flex items-center gap-2"
+                >
+                  <span className="label-text block font-semibold">
+                    {t.translations.METADATA_FILE}
+                  </span>
+                  <span className="badge badge-xs">
+                    {t.translations.OPTIONAL}
+                  </span>
+                </label>
 
-          {/* Row 1: Data Type + Name input */}
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-2">
-              <span className="label-text block font-semibold">
-                {t.translations.DATA_TYPE}
-              </span>
-              <div
-                role="radiogroup"
-                aria-label={t.translations.DATA_TYPE}
-                className="inline-flex rounded-full border border-base-300/70 bg-base-200/50 p-1"
-              >
-                <button
-                  type="button"
-                  role="radio"
-                  aria-checked={selectedDataType === "standard"}
-                  className={`rounded-full px-3 py-1 text-xs font-medium transition ${
-                    selectedDataType === "standard"
-                      ? "bg-base-100 text-base-content shadow-sm"
-                      : "text-base-content/70"
-                  }`}
-                  onClick={() => setIsTimeSeries(false)}
-                >
-                  {t.translations.STANDARD_FILE}
-                </button>
-                <button
-                  type="button"
-                  role="radio"
-                  aria-checked={selectedDataType === "timeseries"}
-                  className={`rounded-full px-3 py-1 text-xs font-medium transition ${
-                    selectedDataType === "timeseries"
-                      ? "bg-base-100 text-base-content shadow-sm"
-                      : "text-base-content/70"
-                  } ${recordMode === "update" ? "cursor-not-allowed opacity-50" : ""}`}
-                  onClick={() => {
-                    if (recordMode === "update") return;
-                    setIsTimeSeries(true);
-                  }}
-                  disabled={recordMode === "update"}
-                >
-                  {t.translations.TIMESERIES}
-                </button>
+                <div className="flex items-center gap-3">
+                  <input
+                    id={metadataInputId}
+                    ref={metadataFileInputRef}
+                    type="file"
+                    accept=".json,application/json"
+                    className="file-input file-input-sm"
+                    onChange={handleMetadataFileChange}
+                    disabled={disableMetadataFile}
+                    aria-describedby={metadataHelpId}
+                  />
+                  {metadataFile && !disableMetadataFile && (
+                    <button
+                      type="button"
+                      className="btn btn-xs btn-ghost text-error"
+                      onClick={clearMetadataFile}
+                    >
+                      <XMarkIcon className="size-6" />
+                    </button>
+                  )}
+                </div>
+                <p id={metadataHelpId} className="text-xs text-base-content/60">
+                  {disableMetadataFile
+                    ? t.translations.METADATA_FILE_UNAVAILABLE_FOR_LARGE_FILES
+                    : t.translations.METADATA_FILE_HELP_OPTIONAL}
+                </p>
               </div>
             </div>
-            <label className="space-y-2">
-              <span className="label-text font-semibold">
-                {t.translations.ALIAS}
-              </span>
-              <input
-                type="text"
-                className="input input-sm w-full"
-                placeholder={t.translations.METADATA_ALIAS_PLACEHOLDER}
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-              />
-            </label>
-          </div>
-          {/* Row 2: Metadata File */}
-          <div className="flex flex-col gap-1">
-            <label
-              htmlFor={metadataInputId}
-              className="flex items-center gap-2"
-            >
-              <span className="label-text">{t.translations.METADATA_FILE}</span>
-              <span className="badge badge-xs">{t.translations.OPTIONAL}</span>
-            </label>
-
-            <div className="flex items-center gap-3">
-              <input
-                id={metadataInputId}
-                ref={metadataFileInputRef}
-                type="file"
-                className="file-input file-input-sm"
-                onChange={(e) => setMetadataFile(e.target.files?.[0])}
-                disabled={disableMetadataFile}
-                aria-describedby={metadataHelpId}
-              />
-              {metadataFile && !disableMetadataFile && (
-                <button
-                  type="button"
-                  className="btn btn-xs btn-ghost text-error"
-                  onClick={clearMetadataFile}
-                >
-                  <XMarkIcon className="size-6" />
-                </button>
-              )}
+            <div className="w-full max-w-md mx-auto">
+              <div className="min-w-0 space-y-2">
+                <span className="label-text block font-semibold">
+                  {t.translations.METADATA_PREVIEW_TITLE}
+                </span>
+                <div className="h-31 max-h-36 overflow-x-hidden overflow-y-auto rounded-lg border border-base-300/60 bg-base-200/30 p-3">
+                  {metadataPreviewError ? (
+                    <p className="text-xs text-error">{metadataPreviewError}</p>
+                  ) : metadataPreview ? (
+                    <div className="grid gap-1 text-xs text-base-content/80">
+                      <p className="break-words">
+                        <span className="font-semibold">
+                          {t.translations.METADATA_PREVIEW_NAME}:
+                        </span>{" "}
+                        <span className="break-all">
+                          {getPreviewString(metadataPreview, "Name", "name") ??
+                            t.translations.NOT_AVAILABLE}
+                        </span>
+                      </p>
+                      <p className="break-words">
+                        <span className="font-semibold">
+                          {t.translations.METADATA_PREVIEW_DESCRIPTION}:
+                        </span>{" "}
+                        <span className="break-all">
+                          {getPreviewString(
+                            metadataPreview,
+                            "Description",
+                            "description",
+                          ) ?? t.translations.NOT_AVAILABLE}
+                        </span>
+                      </p>
+                      <p className="break-words">
+                        <span className="font-semibold">
+                          {t.translations.METADATA_PREVIEW_ORIGINAL_ID}:
+                        </span>{" "}
+                        <span className="break-all">
+                          {getPreviewString(
+                            metadataPreview,
+                            "OriginalId",
+                            "originalId",
+                          ) ?? t.translations.NOT_AVAILABLE}
+                        </span>
+                      </p>
+                      <p className="break-words">
+                        <span className="font-semibold">
+                          {t.translations.METADATA_PREVIEW_CLASS}:
+                        </span>{" "}
+                        <span className="break-all">
+                          {getPreviewString(
+                            metadataPreview,
+                            "ClassName",
+                            "className",
+                          ) ?? t.translations.NOT_AVAILABLE}
+                        </span>
+                      </p>
+                      <p className="break-words">
+                        <span className="font-semibold">
+                          {t.translations.CLASS_ID}:
+                        </span>{" "}
+                        <span className="break-all">
+                          {getPreviewString(
+                            metadataPreview,
+                            "ClassId",
+                            "classId",
+                          ) ?? t.translations.NOT_AVAILABLE}
+                        </span>
+                      </p>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-base-content/70">
+                      {t.translations.METADATA_PREVIEW_SELECT_FILE}
+                    </p>
+                  )}
+                </div>
+              </div>
             </div>
-            <p id={metadataHelpId} className="text-xs text-base-content/60">
-              {disableMetadataFile
-                ? t.translations.METADATA_FILE_UNAVAILABLE_FOR_LARGE_FILES
-                : t.translations.METADATA_FILE_HELP_OPTIONAL}
-            </p>
           </div>
         </div>
       </div>
