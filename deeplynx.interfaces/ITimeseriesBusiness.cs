@@ -1,3 +1,4 @@
+using deeplynx.datalayer.Models;
 using deeplynx.models;
 using Microsoft.AspNetCore.Http;
 
@@ -22,4 +23,9 @@ public interface ITimeseriesBusiness
 
     Task<PlotDataDto> GetPlotData(long currentUserId, long organizationId, long projectId,
         long dataSourceId, long recordId, long limit, long rowNumber);
+
+    Task<List<string>?> ExtractTabularColumns(
+        ObjectStorage objectStorage,
+        ObjectStorageConfigDto objectStorageConfig,
+        string fileUri);
 }

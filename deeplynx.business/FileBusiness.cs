@@ -18,7 +18,9 @@ public class FileBusiness
     private readonly IFileBusinessFactory _factory;
     private readonly long _recommendedChunkSize;
     private readonly IRecordBusiness _recordBusiness;
+    private readonly ITimeseriesBusiness _timeseriesBusiness;
     private readonly ISensitivityLabelService _sensitivityLabelService;
+    
 
     // NOTE: Chunked upload methods currently only support filesystem storage.
     // When Azure/S3 chunked uploads are needed, refactor these methods to 
@@ -28,13 +30,16 @@ public class FileBusiness
         IFileBusinessFactory factory,
         IDataSourceBusiness dataSourceBusiness,
         IClassBusiness classBusiness,
-        IRecordBusiness recordBusiness)
+        IRecordBusiness recordBusiness,
+        ITimeseriesBusiness timeseriesBusiness)
     {
         _context = context;
         _factory = factory;
         _dataSourceBusiness = dataSourceBusiness;
         _classBusiness = classBusiness;
         _recordBusiness = recordBusiness;
+        _timeseriesBusiness = timeseriesBusiness;
+        
 
         // Initialize recommended chunk size from environment variable
         var chunkSizeStr = Environment.GetEnvironmentVariable("RECOMMENDED_CHUNK_SIZE")
@@ -115,20 +120,46 @@ public class FileBusiness
 
             ValidationHelper.ValidateModel(metadata);
         }
+        
+        // Get file extension
+        var fileExtension = Path.GetExtension(file.FileName).TrimStart('.').ToLower();
+    
+        // Initialize properties
+        var properties = metadata?.Properties ?? new JsonObject();
+        
+        // Extract column names for tabular files (CSV/Parquet)
+        if (fileExtension == "csv" || fileExtension == "parquet")
+        {
+            try
+            {
+                var columns = await _timeseriesBusiness.ExtractTabularColumns(objectStorage, configData, uri);
+                if (columns != null && columns.Count > 0)
+                {
+                    // Add columns array to existing properties
+                    properties["columns"] = new JsonArray(columns.Select(c => JsonValue.Create(c)).ToArray());
+                    properties["isTabular"] = true;
+                }
+                else
+                {
+                    properties["isTabular"] = false;
+                }
+            }
+            catch (Exception ex)
+            {
+                properties["isTabular"] = false;
+            }
+        }
 
         var recordRequest = new CreateRecordRequestDto
         {
-            Properties = metadata?.Properties ?? new JsonObject
-            {
-                ["fileType"] = Path.GetExtension(file.FileName).TrimStart('.').ToLower()
-            },
+            Properties = properties,
             Name = metadata?.Name ?? file.FileName,
             ObjectStorageId = objectStorage.Id,
             Description = metadata?.Description ?? file.FileName,
             OriginalId = metadata?.OriginalId ?? guid.ToString(),
             ClassId = metadata?.ClassId ?? fileClass.Id,
             ClassName = metadata?.ClassName ?? fileClass.Name,
-            FileType = Path.GetExtension(file.FileName).TrimStart('.').ToLower(),
+            FileType = fileExtension,
             Uri = uri
         };
 

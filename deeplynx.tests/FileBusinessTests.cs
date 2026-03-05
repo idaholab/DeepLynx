@@ -11,6 +11,7 @@ using deeplynx.interfaces;
 using deeplynx.models;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.SignalR;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Moq;
 
@@ -31,9 +32,12 @@ public class FileBusinessTests : IntegrationTestBase
     private BulkCopyUpsertExecutor _mockBulkCopyExecutor = null!;
     private Mock<IHubContext<EventNotificationHub>> _mockHubContext = null!;
     private Mock<ILogger<NotificationBusiness>> _mockNotificationLogger = null!;
+    private Mock<ILogger<TimeseriesBusiness>> _mockTimeseriesLogger = null!;
+    private Mock<IServiceScopeFactory> _mockServiceScopeFactory = null!;
     private INotificationBusiness _notificationBusiness = null!;
     private ObjectStorageBusiness _objectStorageBusiness = null!;
     private RecordBusiness _recordBusiness = null!;
+    private TimeseriesBusiness _timeseriesBusiness = null!;
     private Mock<IRelationshipBusiness> _relationshipBusiness = null!;
     private SensitivityLabelBusiness _sensitivityLabelBusiness = null!;
     private ISensitivityLabelService _sensitivityLabelService = null!;
@@ -59,6 +63,8 @@ public class FileBusinessTests : IntegrationTestBase
         _edgeBusiness = new Mock<IEdgeBusiness>();
         _relationshipBusiness = new Mock<IRelationshipBusiness>();
         _mockNotificationLogger = new Mock<ILogger<NotificationBusiness>>();
+        _mockTimeseriesLogger = new Mock<ILogger<TimeseriesBusiness>>();
+        _mockServiceScopeFactory = new Mock<IServiceScopeFactory>();
         _notificationBusiness =
             new NotificationBusiness(Context, _mockNotificationLogger.Object, _mockHubContext.Object);
         _mockBulkCopyExecutor = new BulkCopyUpsertExecutor();
@@ -76,6 +82,7 @@ public class FileBusinessTests : IntegrationTestBase
         _sensitivityLabelService = new SensitivityLabelService(Context);
         _recordBusiness = new RecordBusiness(Context, _eventBusiness, _mockBulkCopyExecutor, _tagBusiness,
             _sensitivityLabelBusiness, _sensitivityLabelService);
+        _timeseriesBusiness = new TimeseriesBusiness(Context, _recordBusiness, _classBusiness, _mockTimeseriesLogger.Object, _mockServiceScopeFactory.Object);
         _classBusiness = new ClassBusiness(Context, _recordBusiness, _relationshipBusiness.Object, _eventBusiness);
 
         var realFileFilesystemBusiness =
@@ -91,7 +98,8 @@ public class FileBusinessTests : IntegrationTestBase
             _fileBusinessFactory.Object,
             _dataSourceBusiness,
             _classBusiness,
-            _recordBusiness
+            _recordBusiness,
+            _timeseriesBusiness
         );
     }
 

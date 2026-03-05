@@ -536,6 +536,79 @@ public class TimeseriesBusiness(
                 break;
             }
     }
+    
+    /// <summary>
+    /// Extracts column names from a tabular file (CSV or Parquet) stored in object storage
+    /// </summary>
+    /// <param name="organizationId">Organization ID</param>
+    /// <param name="projectId">Project ID</param>
+    /// <param name="objectStorage">Object storage entity</param>
+    /// <param name="objectStorageConfig">Object storage configuration</param>
+    /// <param name="fileUri">URI/path to the file</param>
+    /// <returns>List of column names, or null if not tabular</returns>
+    public async Task<List<string>?> ExtractTabularColumns(
+        ObjectStorage objectStorage,
+        ObjectStorageConfigDto objectStorageConfig,
+        string fileUri)
+    {
+        DuckDBConnection connection;
+        string fileUrl;
+        
+        if (objectStorage.Type == "azure_object")
+        {
+            // Azure Blob Storage
+            var containerName = objectStorageConfig.AzureObjectConfig?.AzureContainerName;
+            if (string.IsNullOrWhiteSpace(containerName))
+                return null;
+
+            connection = await GetAzureDuckDbConnection(objectStorageConfig);
+            
+            var escapedContainer = containerName.Replace("'", "''");
+            var escapedPath = fileUri.Replace("'", "''");
+            fileUrl = $"az://{escapedContainer}/{escapedPath}";
+        }
+        else if (objectStorage.Type == "filesystem")
+        {
+            // Local filesystem
+            connection = await GetLocalDuckDbConnection();
+            
+            var escapedPath = fileUri.Replace("'", "''");
+            fileUrl = escapedPath;
+        }
+        else
+        {
+            // Unsupported storage type for column extraction
+            return null;
+        }
+
+        await using (connection)
+        {
+            try
+            {
+                // Query to get column information
+                await using var cmd = connection.CreateCommand();
+                cmd.CommandText = $"DESCRIBE SELECT * FROM '{fileUrl}' LIMIT 0;";
+                
+                await using var reader = await cmd.ExecuteReaderAsync();
+                
+                var columns = new List<string>();
+                
+                // DESCRIBE returns: column_name, column_type, null, key, default, extra
+                while (await reader.ReadAsync())
+                {
+                    var columnName = reader.GetString(0); // First column is column_name
+                    columns.Add(columnName);
+                }
+                
+                return columns.Count > 0 ? columns : null;
+            }
+            catch
+            {
+                // If we can't read the file structure, it's probably not tabular
+                return null;
+            }
+        }
+    }
 
     private static class Status
     {
