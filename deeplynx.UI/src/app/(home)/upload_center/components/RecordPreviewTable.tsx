@@ -2,6 +2,17 @@
 
 import { BulkRecord } from "../../types/bulk_upload_types";
 import { useState } from "react";
+import { useLanguage } from "@/app/contexts/Language";
+
+function interpolate(
+  template: string,
+  values: Record<string, string | number>,
+): string {
+  return Object.entries(values).reduce(
+    (result, [key, value]) => result.replace(`{${key}}`, String(value)),
+    template,
+  );
+}
 
 interface RecordPreviewTableProps {
   records: BulkRecord[];
@@ -12,6 +23,7 @@ export default function RecordPreviewTable({
   records,
   maxVisible = 10,
 }: RecordPreviewTableProps) {
+  const { t } = useLanguage();
   const [showAll, setShowAll] = useState(false);
   const displayedRecords = showAll ? records : records.slice(0, maxVisible);
   const hasMore = records.length > maxVisible;
@@ -20,7 +32,9 @@ export default function RecordPreviewTable({
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <h4 className="font-semibold text-base-content">
-          Record Preview ({records.length} total)
+          {interpolate(t.translations.RECORD_PREVIEW_WITH_TOTAL, {
+            total: records.length,
+          })}
         </h4>
         {hasMore && (
           <button
@@ -28,7 +42,11 @@ export default function RecordPreviewTable({
             className="btn btn-ghost btn-xs"
             type="button"
           >
-            {showAll ? "Show Less" : `Show All (${records.length})`}
+            {showAll
+              ? t.translations.SHOW_LESS
+              : interpolate(t.translations.SHOW_ALL_WITH_COUNT, {
+                  count: records.length,
+                })}
           </button>
         )}
       </div>
@@ -38,12 +56,12 @@ export default function RecordPreviewTable({
           <thead className="sticky top-0 bg-base-200 z-10">
             <tr>
               <th className="w-12">#</th>
-              <th>Name</th>
-              <th>Description</th>
-              <th>Original ID</th>
-              <th>Class</th>
-              <th>Object Storage</th>
-              <th>Tags</th>
+              <th>{t.translations.NAME}</th>
+              <th>{t.translations.DESCRIPTION}</th>
+              <th>{t.translations.ORIGINAL_ID}</th>
+              <th>{t.translations.CLASS}</th>
+              <th>{t.translations.OBJECT_STORAGE}</th>
+              <th>{t.translations.TAGS}</th>
             </tr>
           </thead>
           <tbody>
@@ -66,7 +84,8 @@ export default function RecordPreviewTable({
                 <td className="text-sm">
                   {record.class_name || record.class_id ? (
                     <span className="badge badge-sm badge-ghost">
-                      {record.class_name || `ID: ${record.class_id}`}
+                      {record.class_name ||
+                        `${t.translations.ID_LABEL} ${record.class_id}`}
                     </span>
                   ) : (
                     <span className="text-base-content/40">-</span>
@@ -107,7 +126,10 @@ export default function RecordPreviewTable({
 
       {!showAll && hasMore && (
         <p className="text-sm text-center text-base-content/60">
-          Showing {maxVisible} of {records.length} records
+          {interpolate(t.translations.SHOWING_RECORDS_RANGE, {
+            visible: maxVisible,
+            total: records.length,
+          })}
         </p>
       )}
     </div>
