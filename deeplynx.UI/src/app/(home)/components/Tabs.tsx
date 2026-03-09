@@ -36,11 +36,11 @@ const Tabs: React.FC<TabsProps> = ({
   return (
     <div className={className}>
       {/* Tabs header */}
-      <div className="tabs tabs-border border-b border-base-200">
+      <div className="tabs tabs-border border-b border-base-200 overflow-x-auto whitespace-nowrap">
         {tabs.map((tab, index) => (
           <a
             key={index}
-            className={`tab tab-bordered mr-4 ${
+            className={`tab tab-bordered mr-2 sm:mr-4 ${
               activeIndex === index ? "tab-active text-secondary" : ""
             }`}
             onClick={() => handleTabClick(index, tab.label)}

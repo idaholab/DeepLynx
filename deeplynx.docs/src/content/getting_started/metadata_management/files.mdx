@@ -26,6 +26,7 @@ Follow these steps to upload a file through the DeepLynx interface:
 ### Uploading Files via API
 
 DeepLynx supports two methods for uploading files via API:
+
 - **Regular Upload**: For files under 500MB
 - **Chunked Upload**: For files 500MB or larger (recommended for large files)
 
@@ -40,10 +41,12 @@ To upload files using the API:
 5. Optionally add query parameters:
 
 **Query Parameters (both optional):**
+
 - `dataSourceId` (optional): The ID of the datasource the file will be associated with. If not provided, the file will use the default datasource.
 - `objectStorageId` (optional): The ID of the object storage the file should be saved to. If not provided, it will be uploaded to the default location.
 
 **Example 1: Using cURL with optional parameters**
+
 ```bash copy
 curl -X POST \
   "https://your-deeplynx-instance.com/organizations/123/projects/456/files?dataSourceId=789&objectStorageId=1" \
@@ -54,6 +57,7 @@ curl -X POST \
 This example explicitly specifies both the data source (789) and object storage (1).
 
 **Example 2: Using cURL without optional parameters**
+
 ```bash copy
 curl -X POST \
   "https://your-deeplynx-instance.com/organizations/123/projects/456/files" \
@@ -69,18 +73,18 @@ This example uses the default data source and object storage for the project.
 
 The Scalar interface example below shows a file upload without specifying the optional parameters, which will use project defaults:
 
-<Image 
-  src="/docs/images/upload-reg-scalar.png" 
-  alt="Upload Files API" 
-  width={800} 
-  height={600} 
+<Image
+  src="/docs/images/upload-reg-scalar.png"
+  alt="Upload Files API"
+  width={800}
+  height={600}
 />
 
 ---
+
 ## Chunked File Upload (≥ 500MB)
 
 For large files (500MB or greater), DeepLynx supports a chunked upload mechanism that breaks files into smaller pieces for more reliable uploads with progress tracking.
-
 
 ### Chunk Size Configuration
 
@@ -113,6 +117,7 @@ The chunked upload process follows three phases:
 ### API Endpoints
 
 All chunked upload endpoints follow the base pattern:
+
 ```
 /organizations/{organizationId}/projects/{projectId}/files/upload/...
 ```
@@ -124,10 +129,12 @@ All chunked upload endpoints follow the base pattern:
 Initializes a chunked upload session.
 
 **Query Parameters:**
+
 - `dataSourceId` (optional): ID of the datasource
 - `objectStorageId` (optional): ID of object storage method
 
 **Request Body:**
+
 ```json copy
 {
   "fileName": "large-file.zip",
@@ -136,10 +143,12 @@ Initializes a chunked upload session.
 ```
 
 **Field Types:**
+
 - `fileName` (string, required): Name of the file being uploaded
 - `fileSize` (long/number, required): Total size of the file in bytes
 
 **Response:**
+
 ```json
 {
   "uploadId": "550e8400-e29b-41d4-a716-446655440000",
@@ -157,15 +166,18 @@ The `uploadId` must be used for all subsequent chunk uploads. The `chunkSize` va
 Uploads a single chunk of the file.
 
 **Query Parameters:**
+
 - `dataSourceId` (optional): ID of the datasource
 - `objectStorageId` (optional): ID of object storage method
 
 **Form Data:**
+
 - `chunk` (File): The chunk binary data
 - `uploadId` (string): The upload session ID from start
 - `chunkNumber` (int): Zero-indexed chunk number (0, 1, 2, ...)
 
 **Response:**
+
 ```json
 {
   "ChunkUploadStatus": "success"
@@ -173,6 +185,7 @@ Uploads a single chunk of the file.
 ```
 
 **Important Notes:**
+
 - Chunks are **0-indexed** (first chunk is 0, not 1)
 - Each chunk can be up to 500MB
 - Failed chunks should be retried with exponential backoff
@@ -185,10 +198,12 @@ Uploads a single chunk of the file.
 Finalizes the upload by merging chunks and creating the file record.
 
 **Query Parameters:**
+
 - `dataSourceId` (optional): ID of the datasource
 - `objectStorageId` (optional): ID of object storage method
 
 **Request Body:**
+
 ```json copy
 {
   "uploadId": "550e8400-e29b-41d4-a716-446655440000",
@@ -198,6 +213,7 @@ Finalizes the upload by merging chunks and creating the file record.
 ```
 
 **Response:**
+
 ```json
 {
   "id": 12345,
@@ -226,10 +242,12 @@ Finalizes the upload by merging chunks and creating the file record.
 Cancels an in-progress upload and cleans up temporary files.
 
 **Query Parameters:**
+
 - `dataSourceId` (optional): ID of the datasource
 - `objectStorageId` (optional): ID of object storage method
 
 **Response:**
+
 ```json
 {
   "message": "Upload {uploadId} cancelled successfully"
@@ -240,7 +258,7 @@ Cancels an in-progress upload and cleans up temporary files.
 
 ### Python Client Implementation
 
-Below is a basic but complete Python implementation for integrating chunked uploads into your application. Note: this is a very quick implementation just to show the general flow of the API calls. Ofcourse, if a developer sees fit, make changes to match your client's needs. 
+Below is a basic but complete Python implementation for integrating chunked uploads into your application. Note: this is a very quick implementation just to show the general flow of the API calls. Ofcourse, if a developer sees fit, make changes to match your client's needs.
 
 > **Note for TypeScript/React developers**: DeepLynx is open source. For a TypeScript/React implementation example, in the near future developers should be able to refer to our implementation here [source code on GitHub](https://github.com/idaholab/Deep-Lynx).
 
@@ -277,7 +295,7 @@ class ChunkedFileUploader:
     def __init__(self, base_url: str, auth_token: str):
         """
         Initialize the chunked file uploader.
-        
+
         Args:
             base_url: Base URL of your DeepLynx instance (e.g., 'https://your-instance.com')
             auth_token: Your DeepLynx API key
@@ -369,7 +387,7 @@ class ChunkedFileUploader:
     ) -> ChunkedUploadSession:
         """Initialize chunked upload session."""
         url = f"{self.base_url}/organizations/{organization_id}/projects/{project_id}/files/upload/start"
-        
+
         params = {}
         if data_source_id is not None:
             params['dataSourceId'] = data_source_id
@@ -388,7 +406,7 @@ class ChunkedFileUploader:
             headers=headers
         )
         response.raise_for_status()
-        
+
         data = response.json()
         return ChunkedUploadSession(
             upload_id=data['uploadId'],
@@ -412,7 +430,7 @@ class ChunkedFileUploader:
 
         with open(file_path, 'rb') as f:
             chunk_number = 0
-            
+
             while chunk_number < total_chunks:
                 # Prepare batch of chunks
                 batch_tasks = []
@@ -420,7 +438,7 @@ class ChunkedFileUploader:
                     chunk_data = f.read(session.chunk_size)
                     if not chunk_data:
                         break
-                    
+
                     batch_tasks.append({
                         'chunk_number': chunk_number,
                         'chunk_data': chunk_data,
@@ -438,7 +456,7 @@ class ChunkedFileUploader:
                         executor.submit(self._upload_single_chunk, task)
                         for task in batch_tasks
                     ]
-                    
+
                     for future in as_completed(futures):
                         future.result()  # Raise exception if chunk failed
                         chunks_completed += 1
@@ -456,11 +474,11 @@ class ChunkedFileUploader:
     def _upload_single_chunk(self, task: dict):
         """Upload a single chunk with retry logic."""
         chunk_number = task['chunk_number']
-        
+
         for attempt in range(1, MAX_RETRIES + 1):
             try:
                 url = f"{self.base_url}/organizations/{task['organization_id']}/projects/{task['project_id']}/files/upload/chunk"
-                
+
                 params = {}
                 if task['data_source_id'] is not None:
                     params['dataSourceId'] = task['data_source_id']
@@ -472,7 +490,7 @@ class ChunkedFileUploader:
                     'uploadId': task['upload_id'],
                     'chunkNumber': str(chunk_number)
                 }
-                
+
                 headers = {
                     'Authorization': f'Bearer {self.auth_token}'
                 }
@@ -483,10 +501,10 @@ class ChunkedFileUploader:
 
             except Exception as e:
                 print(f"Chunk {chunk_number} failed (attempt {attempt}/{MAX_RETRIES}): {e}")
-                
+
                 if attempt == MAX_RETRIES:
                     raise Exception(f"Chunk {chunk_number} failed after {MAX_RETRIES} attempts")
-                
+
                 # Exponential backoff
                 time.sleep(1 * attempt)
 
@@ -502,7 +520,7 @@ class ChunkedFileUploader:
     ) -> dict:
         """Complete the chunked upload."""
         url = f"{self.base_url}/organizations/{organization_id}/projects/{project_id}/files/upload/complete"
-        
+
         params = {}
         if data_source_id is not None:
             params['dataSourceId'] = data_source_id
@@ -537,7 +555,7 @@ class ChunkedFileUploader:
     ):
         """Cancel an in-progress upload."""
         url = f"{self.base_url}/organizations/{organization_id}/projects/{project_id}/files/upload/{upload_id}"
-        
+
         params = {}
         if data_source_id is not None:
             params['dataSourceId'] = data_source_id
@@ -579,26 +597,31 @@ if __name__ == "__main__":
 ### Best Practices for Chunked Uploads
 
 #### 1. Chunk Size Management
+
 - Always use the `chunkSize` returned from the `/upload/start` endpoint
 - Don't hardcode chunk sizes - let the backend determine the optimal size
 - The backend configures this via the `RECOMMENDED_CHUNK_SIZE` environment variable
 
 #### 2. Error Handling & Retries
+
 - Implement exponential backoff for failed chunks (1s, 2s, 3s delays)
 - Retry individual chunks up to 3 times before failing the entire upload
 - Always call the cancel endpoint (`DELETE /upload/{uploadId}`) on failure to cleanup temporary files
 
 #### 3. Parallelization
+
 - Upload 4 chunks concurrently for optimal throughput
 - Don't exceed 4 concurrent requests to avoid overwhelming the server
 - Process chunks in sequential batches (batch 1: chunks 0-3, batch 2: chunks 4-7, etc.)
 
 #### 4. Progress Tracking
+
 - Report progress after each batch completes (not after each individual chunk)
 - Calculate percentage as: `(chunksCompleted / totalChunks) * 100`
 - Include `uploadId` in progress events for tracking multiple simultaneous uploads
 
 #### 5. Cleanup
+
 - Always cleanup temporary files on both success and failure
 - Call the cancel endpoint if the upload is interrupted or fails
 - Implement timeout handling (recommended: 30 minutes maximum for entire upload)
@@ -608,18 +631,22 @@ if __name__ == "__main__":
 ### Common Issues & Solutions
 
 **Issue: "Missing chunk X of Y"**
+
 - **Cause**: Not all chunks were successfully uploaded before calling complete
 - **Solution**: Verify all chunks uploaded successfully before finalizing
 
 **Issue: "Upload session not found"**
+
 - **Cause**: Invalid uploadId or session expired
 - **Solution**: Restart the upload process from `/upload/start`
 
 **Issue: Slow upload speeds**
+
 - **Cause**: Not using parallel chunk uploads
 - **Solution**: Implement concurrent chunk uploads (4 simultaneous)
 
 **Issue: High memory usage**
+
 - **Cause**: Loading entire file into memory before chunking
 - **Solution**: Use streaming/slicing to process chunks incrementally
 
@@ -630,3 +657,5 @@ if __name__ == "__main__":
 If you need help or have any questions, feel free to reach out to us through our [support channels](/about_deeplynx_nexus/about_digital_engineering). We're here to help!
 
 Thank you for being a part of our community. We hope you find the documentation helpful and look forward to your feedback!
+
+---

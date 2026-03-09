@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Newtonsoft.Json;
 using JsonSerializer = System.Text.Json.JsonSerializer;
+using JsonSerializer = System.Text.Json.JsonSerializer;
 
 namespace deeplynx.business;
 
@@ -70,6 +71,7 @@ public class FileBusiness
     {
         long realDataSourceId;
         if (file == null || file.Length == 0) throw new ArgumentException("File is required and cannot be empty.");
+        file = new SanitizedFormFile(file);
         file = new SanitizedFormFile(file);
         if (dataSourceId.HasValue)
         {
@@ -150,6 +152,7 @@ public class FileBusiness
         var record = await _recordBusiness.GetRecord(currentUserId, organizationId, projectId, recordId, true);
 
         if (file == null || file.Length == 0) throw new ArgumentException("File is required and cannot be empty.");
+        file = new SanitizedFormFile(file);
         file = new SanitizedFormFile(file);
 
         if (record.ObjectStorageId == null) throw new KeyNotFoundException("Record needs an object storage id");
@@ -282,11 +285,11 @@ public class FileBusiness
                                     throw new KeyNotFoundException("Default data source not found");
             realDataSourceId = defaultDataSource.Id;
         }
-        
+
         var objectStorage = await GetObjectStorageWithConfig(organizationId, projectId, objectStorageId);
         //Sanitize filename
         request.FileName = SanitizedFormFile.SanitizeFileName(request.FileName);
-        
+
         // Get the config to extract mount path
         var configData = JsonConvert.DeserializeObject<ObjectStorageConfigDto>(objectStorage.Config);
         if (configData == null) throw new InvalidOperationException("Config data for object storage is null");
@@ -339,6 +342,7 @@ public class FileBusiness
             realDataSourceId = defaultDataSource.Id;
         }
 
+        if (chunk == null) throw new ArgumentException("chunk cannot be null");
         chunk = new SanitizedFormFile(chunk);
 
 
@@ -389,7 +393,7 @@ public class FileBusiness
         }
 
         var objectStorage = await GetObjectStorageWithConfig(organizationId, projectId, objectStorageId);
-        
+
         //Sanitize filename
         request.FileName = SanitizedFormFile.SanitizeFileName(request.FileName);
 

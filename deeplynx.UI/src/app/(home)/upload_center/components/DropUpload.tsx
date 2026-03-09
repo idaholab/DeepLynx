@@ -37,7 +37,7 @@ export default function DropUpload({
       [...files, ...incoming].forEach((f) => map.set(key(f), f));
       onFilesChange([...map.values()]);
     },
-    [files, multiple, onFilesChange]
+    [files, multiple, onFilesChange],
   );
 
   const handleInput = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -90,7 +90,7 @@ export default function DropUpload({
       onDragLeave={handleDragLeave}
       className={[
         "btn rounded-xl border p-10 transition",
-        "flex flex-col items-center justify-center text-center gap-2",
+        "flex flex-col items-center justify-center bg-base-200/10 text-center gap-2",
         disabled
           ? "opacity-30 pointer-events-none"
           : isDragging
