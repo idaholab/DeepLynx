@@ -691,6 +691,11 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
 
           {/* Right Column - Tags & Relations */}
           <div className="w-full xl:flex-1 space-y-4">
+            <RecordInsightChat
+              recordId={record.id}
+              recordName={record.name}
+              recordUri={record.uri}
+            />
             {/* Tags Card */}
             <RecordTagsPanel
               tags={tags}

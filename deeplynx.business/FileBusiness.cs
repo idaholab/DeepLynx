@@ -7,7 +7,6 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Newtonsoft.Json;
 using JsonSerializer = System.Text.Json.JsonSerializer;
-using JsonSerializer = System.Text.Json.JsonSerializer;
 
 namespace deeplynx.business;
 

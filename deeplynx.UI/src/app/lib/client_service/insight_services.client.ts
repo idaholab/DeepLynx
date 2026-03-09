@@ -85,6 +85,14 @@ const DEFAULT_SAMPLING_PARAMETERS: InsightSamplingParameters = {
   topP: 0.9,
 };
 
+type InsightErrorPayload = {
+  message?: unknown;
+  details?: unknown;
+  detail?: unknown;
+  error?: unknown;
+  results?: Array<{ error?: unknown }>;
+};
+
 function toRequestBody(payload: InsightQueryPayload): InsightQueryRequestBody {
   const samplingParameters =
     payload.samplingParameters ?? DEFAULT_SAMPLING_PARAMETERS;
@@ -110,7 +118,10 @@ function toUploadRequestBody(
   payload: InsightUploadPayload,
 ): InsightUploadRequestBody {
   return {
-    file_info: payload.fileInfo,
+    file_info: payload.fileInfo.map((file) => ({
+      ...file,
+      fileURI: normalizeInsightFileUri(file.fileURI),
+    })),
     llm_server_url: payload.llmServerUrl,
     llm_model_name: payload.llmModelName,
     llm_auth_token: payload.llmAuthToken,
@@ -118,6 +129,52 @@ function toUploadRequestBody(
     embedding_model_name: payload.embeddingModelName,
     embedding_auth_token: payload.embeddingAuthToken,
   };
+}
+
+function normalizeInsightFileUri(fileUri: string): string {
+  const trimmed = fileUri.trim();
+  if (!trimmed) return trimmed;
+
+  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(trimmed)) {
+    return trimmed;
+  }
+
+  if (trimmed.startsWith("/data/")) {
+    return trimmed;
+  }
+
+  if (trimmed.startsWith("org_")) {
+    return `/data/${trimmed}`;
+  }
+
+  const orgPathIndex = trimmed.indexOf("/org_");
+  if (orgPathIndex >= 0) {
+    return `/data${trimmed.slice(orgPathIndex)}`;
+  }
+
+  return trimmed;
+}
+
+function parseInsightResponse(text: string): unknown {
+  try {
+    return text ? JSON.parse(text) : null;
+  } catch {
+    return text;
+  }
+}
+
+function extractInsightErrorMessage(value: unknown): string {
+  if (typeof value === "string") return value.trim();
+  if (!value || typeof value !== "object") return "";
+
+  const payload = value as InsightErrorPayload;
+  return (
+    extractInsightErrorMessage(payload.details) ||
+    extractInsightErrorMessage(payload.detail) ||
+    extractInsightErrorMessage(payload.error) ||
+    extractInsightErrorMessage(payload.results?.[0]?.error) ||
+    extractInsightErrorMessage(payload.message)
+  );
 }
 
 export async function queueInsightUpload(
@@ -130,23 +187,12 @@ export async function queueInsightUpload(
   });
 
   const text = await response.text();
-  let body: InsightUploadResponse | { message?: string; details?: string } =
-    { results: [] };
-
-  if (text) {
-    try {
-      body = JSON.parse(text);
-    } catch {
-      body = { message: text };
-    }
-  }
+  const body = parseInsightResponse(text);
 
   if (!response.ok) {
-    const details =
-      typeof body === "object" && body !== null && "details" in body
-        ? String(body.details ?? "")
-        : text;
-    throw new Error(details || "Insight upload failed");
+    throw new Error(
+      extractInsightErrorMessage(body) || text || "Insight upload failed",
+    );
   }
 
   return body as InsightUploadResponse;
@@ -206,23 +252,12 @@ export async function fetchInsightIngestionStatus(
   });
 
   const text = await response.text();
-  let body: InsightIngestionStatusResponse | { message?: string; details?: string } =
-    { file_id: recordId, indexed: false, chunk_count: 0, page_count: 0 };
-
-  if (text) {
-    try {
-      body = JSON.parse(text);
-    } catch {
-      body = { message: text };
-    }
-  }
+  const body = parseInsightResponse(text);
 
   if (!response.ok) {
-    const details =
-      typeof body === "object" && body !== null && "details" in body
-        ? String(body.details ?? "")
-        : text;
-    throw new Error(details || "Insight status check failed");
+    throw new Error(
+      extractInsightErrorMessage(body) || text || "Insight status check failed",
+    );
   }
 
   return body as InsightIngestionStatusResponse;
