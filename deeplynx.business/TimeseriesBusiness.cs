@@ -37,16 +37,16 @@ public class TimeseriesBusiness(
     /// <param name="projectId">The project ID</param>
     /// <param name="dataSourceId">The data source ID</param>
     /// <param name="tableName">Timeseries table name</param>
-    /// <param name="filePath">The path of the file being uploaded to DuckDB</param>
     /// <param name="fileType">The Type of the file (accepts CSV or Parquet)</param>
     public async Task CreateTimeseriesTable(long organizationId, long projectId, long dataSourceId, string tableName,
-        string filePath,
         string fileType)
     {
-        filePath = SanitizedFormFile.SanitizeFileName(filePath);
+        var folderPath = Path.Combine(_duckDbBasePath, "org_" + organizationId, "project_" + projectId,
+            "datasource_" + dataSourceId);
+
+        var filePath = Path.Combine(folderPath, tableName);
         tableName = SanitizedFormFile.SanitizeFileName(tableName);
-        filePath = SanitizedFormFile.SanitizeFileName(filePath);
-        tableName = SanitizedFormFile.SanitizeFileName(tableName);
+
         using var duckDbConnection = await GetDuckDbConnection(organizationId, projectId, dataSourceId);
 
         await using var command = duckDbConnection.CreateCommand();
@@ -84,8 +84,6 @@ public class TimeseriesBusiness(
 
         file = new SanitizedFormFile(file);
 
-        file = new SanitizedFormFile(file);
-
         await ExistenceHelper.EnsureDataSourceExistsForProjectAsync(_context, dataSourceId, projectId);
 
         // folder prep
@@ -107,7 +105,7 @@ public class TimeseriesBusiness(
             }
 
             // write file as table
-            await CreateTimeseriesTable(organizationId, projectId, dataSourceId, tableName, filePath, fileType);
+            await CreateTimeseriesTable(organizationId, projectId, dataSourceId, tableName, fileType);
 
             // delete file when its in duckdb
             File.Delete(filePath);
@@ -196,7 +194,6 @@ public class TimeseriesBusiness(
     public async Task<string> StartUpload(long organizationId, long projectId, long dataSourceId, string fileName)
     {
         fileName = SanitizedFormFile.SanitizeFileName(fileName);
-        fileName = SanitizedFormFile.SanitizeFileName(fileName);
         var fileType = Path.GetExtension(fileName);
         if (fileType != ".csv" && fileType != ".parquet")
             throw new ArgumentException("Only .csv and .parquet files are supported");
@@ -270,11 +267,11 @@ public class TimeseriesBusiness(
         TimeseriesUploadCompleteRequestDto request)
     {
         request.FileName = SanitizedFormFile.SanitizeFileName(request.FileName);
-        var dataSourceFolderPath = Path.Combine(_duckDbBasePath, "org_" + organizationId, "project_" + projectId,
+        var folderPath = Path.Combine(_duckDbBasePath, "org_" + organizationId, "project_" + projectId,
             "datasource_" + dataSourceId);
-        var tempFolderPath = Path.Combine(dataSourceFolderPath, request.UploadId);
+        var tempFolderPath = Path.Combine(folderPath, request.UploadId);
         var tableName = request.UploadId + "_" + request.FileName;
-        var finalFilePath = Path.Combine(tempFolderPath, request.UploadId + "_" + request.FileName);
+        var finalFilePath = Path.Combine(folderPath, request.UploadId + "_" + request.FileName);
         var uri = "duckdb://" + tableName;
 
         try
@@ -299,7 +296,7 @@ public class TimeseriesBusiness(
                 }
             }
 
-            await CreateTimeseriesTable(organizationId, projectId, dataSourceId, tableName, finalFilePath, fileType);
+            await CreateTimeseriesTable(organizationId, projectId, dataSourceId, tableName, fileType);
 
             Directory.Delete(tempFolderPath, true); // Clean up the datasource folder
 
@@ -335,8 +332,8 @@ public class TimeseriesBusiness(
                 // recursive = true to delete folder contents
                 Directory.Delete(tempFolderPath, true);
 
-            var timeseriesPath = Path.Combine(dataSourceFolderPath, "timeseries.duckdb");
-            var timeseriesWalPath = Path.Combine(dataSourceFolderPath, "timeseries.duckdb.wal");
+            var timeseriesPath = Path.Combine(folderPath, "timeseries.duckdb");
+            var timeseriesWalPath = Path.Combine(folderPath, "timeseries.duckdb.wal");
 
             // initial check to see if db exists
             if (File.Exists(timeseriesPath))
@@ -370,7 +367,7 @@ public class TimeseriesBusiness(
             }
 
             //cleans up empty folders up to base path
-            if (Directory.Exists(dataSourceFolderPath)) CleanDirectoryUpToBasePath(dataSourceFolderPath);
+            if (Directory.Exists(folderPath)) CleanDirectoryUpToBasePath(folderPath);
 
             throw;
         }
@@ -389,7 +386,7 @@ public class TimeseriesBusiness(
     public async Task AppendTimeseriesTable(long organizationId, long projectId, long dataSourceId, IFormFile file,
         string tableName)
     {
-        
+
         file = new SanitizedFormFile(file);
         tableName = SanitizedFormFile.SanitizeFileName(tableName);
         var fileType = Path.GetExtension(file.FileName);

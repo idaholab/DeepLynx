@@ -63,6 +63,7 @@
     "typescript": "^5"
   },
   "overrides": {
+    "minimatch": "^10.2.4",
     "broadcast-channel": {
       "@babel/runtime": "7.26.10"
     }
