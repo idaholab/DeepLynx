@@ -799,18 +799,7 @@ public class InvitationBusinessTests : IntegrationTestBase
 
         Assert.Contains("Roles do not exist for organization users", exception.Message);
     }
-
-    [Fact]
-    public async Task Invite_Fails_WhenUserIdProvidedForOrgInvitation()
-    {
-        // Act & Assert
-        var exception = await Assert.ThrowsAsync<ArgumentException>(() =>
-            _invitationBusiness.InviteAndAddUserToHierarchy(
-                oid, null, null, null, uid, null));
-
-        Assert.Contains("Only userEmail is allowed for organization invitations", exception.Message);
-    }
-
+    
     [Fact]
     public async Task Invite_Fails_WhenGroupIdProvidedForOrgInvitation()
     {

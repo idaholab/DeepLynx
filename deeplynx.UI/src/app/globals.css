@@ -185,6 +185,11 @@ body {
   color: var(--foreground);
   font-family: var(--font-sans);
   font-weight: 500;
+  overflow-x: hidden;
+}
+
+html {
+  overflow-x: hidden;
 }
 
 .login {
