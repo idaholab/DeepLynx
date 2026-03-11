@@ -9,6 +9,7 @@ import {
   CHUNK_THRESHOLD,
   uploadFile,
 } from "@/app/lib/client_service/file_upload_services.client";
+import { getAllClasses } from "@/app/lib/client_service/class_services.client";
 import { updateFile } from "@/app/lib/client_service/file_services.client";
 import { uploadBulkMetadata } from "@/app/lib/client_service/metadata_service.client";
 import { fullTextSearch } from "@/app/lib/client_service/query_services.client";
@@ -30,6 +31,7 @@ import type {
   FileMetadata,
   UploadProgressEvent,
 } from "../types/types";
+import type { ClassResponseDto } from "../types/responseDTOs";
 import BulkUploadSection from "./components/BulkUploadSection";
 import FileUploadSection from "./components/FileUploadSection";
 import ProjectResourceSelectors from "./components/ProjectResourceSelectors";
@@ -99,6 +101,10 @@ export default function UploadCenterClient() {
   } = projectResources;
   const selectedFiles = fileUploadState.selectedFiles;
   const [availableFiles, setAvailableFiles] = useState<ExistingFile[]>([]);
+  const [availableClasses, setAvailableClasses] = useState<ClassResponseDto[]>(
+    [],
+  );
+  const [isLoadingClasses, setIsLoadingClasses] = useState(false);
 
   useEffect(() => {
     if (!organizationId || !projectId) {
@@ -134,6 +140,34 @@ export default function UploadCenterClient() {
       cancelled = true;
     };
   }, [organizationId, projectId]);
+
+  useEffect(() => {
+    if (!projectId) {
+      setAvailableClasses([]);
+      setIsLoadingClasses(false);
+      return;
+    }
+
+    let cancelled = false;
+    setIsLoadingClasses(true);
+
+    (async () => {
+      try {
+        const classes = await getAllClasses(Number(projectId), true);
+        if (cancelled) return;
+        setAvailableClasses(classes);
+      } catch (error) {
+        console.error("Error loading classes for metadata helper:", error);
+        if (!cancelled) setAvailableClasses([]);
+      } finally {
+        if (!cancelled) setIsLoadingClasses(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [projectId]);
 
   useEffect(() => {
     if (projectId) return;
@@ -733,6 +767,8 @@ export default function UploadCenterClient() {
                         targetFileId={fileUploadState.targetFileId}
                         setTargetFileId={fileUploadState.setTargetFileId}
                         availableFiles={availableFiles}
+                        availableClasses={availableClasses}
+                        isLoadingClasses={isLoadingClasses}
                         onSearchFiles={handleSearchAvailableFiles}
                         needsTarget={needsTarget}
                         isUploading={fileUploadState.isUploading}

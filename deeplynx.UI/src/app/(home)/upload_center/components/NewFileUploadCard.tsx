@@ -13,6 +13,7 @@ import {
   type ChangeEvent,
 } from "react";
 import type { ExistingFile } from "../../types/types";
+import type { ClassResponseDto } from "../../types/responseDTOs";
 import SearchBar from "../../components/SearchBar";
 import { formatLocalDateTime } from "@/app/lib/date_time";
 import { createMetadataUploadSchema } from "./metadataUploadSchema";
@@ -38,6 +39,8 @@ interface NewFileUploadCardProps {
   onMetadataChange: (fileIndex: number, metadata: FileMetadata) => void;
   onRemove?: () => void;
   availableFiles: ExistingFile[];
+  availableClasses: ClassResponseDto[];
+  isLoadingClasses: boolean;
   onSearchFiles: (query: string) => Promise<ExistingFile[]>;
   projectId: number;
   uploadError?: string;
@@ -50,6 +53,8 @@ export default function NewFileUploadCard({
   onMetadataChange,
   onRemove,
   availableFiles,
+  availableClasses,
+  isLoadingClasses,
   onSearchFiles,
   projectId,
   uploadError,
@@ -80,6 +85,7 @@ export default function NewFileUploadCard({
     Record<string, unknown> | undefined
   >(undefined);
   const [metadataPreviewError, setMetadataPreviewError] = useState("");
+  const [showClassIdHelp, setShowClassIdHelp] = useState(false);
   const metadataFileInputRef = useRef<HTMLInputElement | null>(null);
   const [displayedFiles, setDisplayedFiles] = useState<ExistingFile[]>(
     initialVisibleFiles(availableFiles),
@@ -91,6 +97,7 @@ export default function NewFileUploadCard({
     setMetadataFile(undefined);
     setMetadataPreview(undefined);
     setMetadataPreviewError("");
+    setShowClassIdHelp(false);
     if (metadataFileInputRef.current) {
       metadataFileInputRef.current.value = "";
     }
@@ -138,7 +145,6 @@ export default function NewFileUploadCard({
 
         clearMetadataFile();
         setMetadataPreviewError(message);
-
         return;
       }
 
@@ -154,6 +160,7 @@ export default function NewFileUploadCard({
               id: metadata.ClassId,
             }),
           );
+          setShowClassIdHelp(true);
           return;
         }
       }
@@ -161,6 +168,7 @@ export default function NewFileUploadCard({
       setMetadataFile(file);
       setMetadataPreview(metadata as Record<string, unknown>);
       setMetadataPreviewError("");
+      setShowClassIdHelp(false);
     } catch {
       clearMetadataFile();
       setMetadataPreviewError(t.translations.METADATA_FILE_INVALID_JSON_OBJECT);
@@ -561,6 +569,45 @@ export default function NewFileUploadCard({
                 {uploadError && (
                   <div className="rounded-md border border-error/30 bg-error/10 p-3 text-sm text-error">
                     {uploadError}
+                  </div>
+                )}
+                {showClassIdHelp && (
+                  <div className="rounded-md border border-warning/30 bg-warning/10 p-3 text-sm">
+                    <div className="mb-2">
+                      <p className="font-semibold text-base-content">
+                        {t.translations.PROJECT_CLASSES_AND_IDS}
+                      </p>
+                      <p className="text-xs text-base-content/70">
+                        {t.translations.PROJECT_CLASSES_AND_IDS_HELP}
+                      </p>
+                    </div>
+                    <div className="max-h-40 overflow-y-auto rounded-md border border-warning/20 bg-base-100/80">
+                      {isLoadingClasses ? (
+                        <p className="p-3 text-xs text-base-content/70">
+                          {t.translations.LOADING_CLASSES}
+                        </p>
+                      ) : availableClasses.length > 0 ? (
+                        <ul className="divide-y divide-base-300/60">
+                          {availableClasses.map((cls) => (
+                            <li
+                              key={cls.id}
+                              className="flex items-center justify-between gap-3 px-3 py-2 text-xs"
+                            >
+                              <span className="font-mono text-base-content/70">
+                                {cls.id}
+                              </span>
+                              <span className="min-w-0 truncate text-base-content">
+                                {cls.name}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="p-3 text-xs text-base-content/70">
+                          {t.translations.NO_CLASSES_AVAILABLE}
+                        </p>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
