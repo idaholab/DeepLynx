@@ -1,6 +1,7 @@
 using deeplynx.business;
 using deeplynx.helpers;
 using deeplynx.helpers.Context;
+using deeplynx.interfaces;
 using deeplynx.models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -20,7 +21,7 @@ namespace deeplynx.api.Controllers;
 [Tags("User Model Token")]
 public class UserModelTokenController : ControllerBase
 {
-    private readonly UserModelTokenBusiness _userModelTokenBusiness;
+    private readonly IUserModelTokenBusiness _userModelTokenBusiness;
     private readonly ILogger<UserModelTokenController> _logger;
 
     /// <summary>
@@ -28,7 +29,7 @@ public class UserModelTokenController : ControllerBase
     /// </summary>
     /// <param name="userModelTokenBusiness">The business layer used for User Model Token operations.</param>
     /// <param name="logger">The logger for this controller.</param>
-    public UserModelTokenController(UserModelTokenBusiness userModelTokenBusiness,
+    public UserModelTokenController(IUserModelTokenBusiness userModelTokenBusiness,
         ILogger<UserModelTokenController> logger)
     {
         _userModelTokenBusiness = userModelTokenBusiness;
@@ -61,12 +62,10 @@ public class UserModelTokenController : ControllerBase
     /// <summary>
     ///     Get a single User Model Token by ID.
     /// </summary>
-    /// <param name="userId">The ID of the user to which the token belongs.</param>
     /// <param name="userModelTokenId">The ID of the User Model Token to retrieve.</param>
     /// <returns>The User Model Token DTO matching the specified ID.</returns>
     [HttpGet("{userModelTokenId:long}", Name = "api_get_user_model_token")]
     public async Task<ActionResult<UserModelTokenResponseDto>> GetTokenById(
-        long userId,
         long userModelTokenId)
     {
         try
@@ -96,12 +95,10 @@ public class UserModelTokenController : ControllerBase
     /// <summary>
     ///     Create a new User Model Token for a user.
     /// </summary>
-    /// <param name="userId">The ID of the user for whom the token is being created.</param>
     /// <param name="dto">The data transfer object containing the details of the User Model Token to create.</param>
     /// <returns>The newly created User Model Token DTO.</returns>
     [HttpPost(Name = "api_create_user_model_token")]
     public async Task<ActionResult<UserModelTokenResponseDto>> CreateUserModelToken(
-        long userId,
         [FromBody] CreateUserModelTokenRequestDto dto)
     {
         try
@@ -117,7 +114,7 @@ public class UserModelTokenController : ControllerBase
         }
         catch (Exception exc)
         {
-            var message = $"An unexpected error occurred while creating a User Model Token for user {userId}: {exc}";
+            var message = $"An unexpected error occurred while creating a User Model Token: {exc}";
             _logger.LogError(message);
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
@@ -126,13 +123,11 @@ public class UserModelTokenController : ControllerBase
     /// <summary>
     ///     Update the token string of an existing User Model Token.
     /// </summary>
-    /// <param name="userId">The ID of the user to which the token belongs.</param>
     /// <param name="userModelTokenId">The ID of the User Model Token to update.</param>
     /// <param name="dto">The data transfer object containing the updated token string.</param>
     /// <returns>The updated User Model Token DTO.</returns>
     [HttpPut("{userModelTokenId:long}", Name = "api_update_user_model_token")]
     public async Task<ActionResult<UserModelTokenResponseDto>> UpdateUserModelToken(
-        long userId,
         long userModelTokenId,
         [FromBody] UpdateUserModelTokenRequestDto dto)
     {
@@ -163,12 +158,10 @@ public class UserModelTokenController : ControllerBase
     /// <summary>
     ///     Permanently delete a User Model Token.
     /// </summary>
-    /// <param name="userId">The ID of the user to which the token belongs.</param>
     /// <param name="userModelTokenId">The ID of the User Model Token to delete.</param>
     /// <returns>A message confirming the User Model Token was successfully deleted.</returns>
     [HttpDelete("{userModelTokenId:long}", Name = "api_delete_user_model_token")]
     public async Task<IActionResult> DeleteUserModelToken(
-        long userId,
         long userModelTokenId)
     {
         try

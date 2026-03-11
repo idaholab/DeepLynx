@@ -159,7 +159,7 @@ public class AiModelConfigController : ControllerBase
     /// <param name="aiModelConfigId">The ID of the AI Model Configuration to archive or unarchive.</param>
     /// <param name="archive">True to archive the AI Model Configuration, false to unarchive it.</param>
     /// <returns>A message confirming the AI Model Configuration was successfully archived or unarchived.</returns>
-    [HttpPut(("{aiModelConfigId:long}/archive"), Name = "api_archive_ai_model_config_organization")] // BUG FIX: was "{}", route placeholder was empty so aiModelConfigId was never bound
+    [HttpPatch(("{aiModelConfigId:long}/archive"), Name = "api_archive_ai_model_config_organization")] // BUG FIX: was "{}", route placeholder was empty so aiModelConfigId was never bound
     public async Task<IActionResult> ArchiveAiModelConfig(
         long organizationId,
         long aiModelConfigId,

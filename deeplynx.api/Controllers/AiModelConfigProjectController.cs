@@ -165,7 +165,7 @@ public class AiModelConfigProjectController : ControllerBase
     /// <param name="aiModelConfigId">The ID of the AI Model Configuration to archive or unarchive.</param>
     /// <param name="archive">True to archive the AI Model Configuration, false to unarchive it.</param>
     /// <returns>A message confirming the AI Model Configuration was successfully archived or unarchived.</returns>
-    [HttpPut("{aiModelConfigId:long}/archive", Name = "api_archive_ai_model_config_project")]
+    [HttpPatch("{aiModelConfigId:long}/archive", Name = "api_archive_ai_model_config_project")]
     public async Task<IActionResult> ArchiveAiModelConfig(
         long organizationId,
         long projectId,

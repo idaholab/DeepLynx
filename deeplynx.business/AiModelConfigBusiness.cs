@@ -21,7 +21,7 @@ public class AiModelConfigBusiness : IAiModelConfigBusiness
 
     private static readonly List<string> ModelProviderList = new List<string>
     {
-        "open ai",
+        "openai",
         "anthropic",
         "hpc",
     };
