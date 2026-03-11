@@ -14,6 +14,8 @@ import {
 import type { ExistingFile } from "../../types/types";
 import SearchBar from "../../components/SearchBar";
 import { formatLocalDateTime } from "@/app/lib/date_time";
+import { metadataUploadSchema } from "./metadataUploadSchema";
+import { getClass } from "@/app/lib/client_service/class_services.client";
 
 const MAX_VISIBLE_FILES = 100;
 
@@ -36,6 +38,8 @@ interface NewFileUploadCardProps {
   onRemove?: () => void;
   availableFiles: ExistingFile[];
   onSearchFiles: (query: string) => Promise<ExistingFile[]>;
+  projectId: number;
+  uploadError?: string;
 }
 
 export default function NewFileUploadCard({
@@ -46,6 +50,8 @@ export default function NewFileUploadCard({
   onRemove,
   availableFiles,
   onSearchFiles,
+  projectId,
+  uploadError,
 }: NewFileUploadCardProps) {
   const { t } = useLanguage();
   const [recordMode, setRecordMode] = useState<"new" | "update">("new");
@@ -103,12 +109,40 @@ export default function NewFileUploadCard({
 
     try {
       const content = await file.text();
-      const parsed: unknown = JSON.parse(content);
-      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-        throw new Error("Metadata must be a JSON object");
+      const parsedJson: unknown = JSON.parse(content);
+
+      const result = metadataUploadSchema.safeParse(parsedJson);
+
+      if (!result.success) {
+        const message = result.error.issues
+          .map((issue) => {
+            const path = issue.path.join(".") || "metadata";
+            return `${path}: ${issue.message}`;
+          })
+          .join("\n");
+
+        clearMetadataFile();
+        setMetadataPreviewError(message);
+
+        return;
       }
+
+      const metadata = result.data;
+
+      if (metadata.ClassId != null) {
+        try {
+          await getClass(Number(projectId), metadata.ClassId, true);
+        } catch (error) {
+          clearMetadataFile();
+          setMetadataPreviewError(
+            `ClassId ${metadata.ClassId} does not exist in this project`,
+          );
+          return;
+        }
+      }
+
       setMetadataFile(file);
-      setMetadataPreview(parsed as Record<string, unknown>);
+      setMetadataPreview(metadata as Record<string, unknown>);
       setMetadataPreviewError("");
     } catch {
       clearMetadataFile();
@@ -507,6 +541,11 @@ export default function NewFileUploadCard({
                     </p>
                   )}
                 </div>
+                {uploadError && (
+                  <div className="rounded-md border border-error/30 bg-error/10 p-3 text-sm text-error">
+                    {uploadError}
+                  </div>
+                )}
               </div>
             </div>
           </div>

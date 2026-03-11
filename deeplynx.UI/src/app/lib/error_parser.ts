@@ -42,6 +42,18 @@ export function parseBackendError(error: string): {
     cleanMessage = `Object Storage ID ${id} does not exist in this project`;
     suggestion = "Check that the object_storage_id values in your CSV are valid for the selected project, or leave them empty if not needed.";
   }
+  // OriginalId uniqueness errors
+  else if (
+    /unique_record_original_id|duplicate key value violates unique constraint.*original_id|original_id/i.test(
+      cleanMessage,
+    )
+  ) {
+    type = "validation";
+    cleanMessage =
+      "OriginalId is already in use. Each uploaded file must have a unique OriginalId.";
+    suggestion =
+      "Update the metadata file with a unique OriginalId, or remove OriginalId to let the system generate one.";
+  }
   // Class errors
   else if (/class.*does not exist|class.*not found/i.test(cleanMessage)) {
     type = "not_found";

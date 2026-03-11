@@ -25,11 +25,16 @@ import {
   ArrowUpOnSquareStackIcon,
   DocumentIcon,
 } from "@heroicons/react/24/outline";
-import type { ExistingFile, UploadProgressEvent } from "../types/types";
+import type {
+  ExistingFile,
+  FileMetadata,
+  UploadProgressEvent,
+} from "../types/types";
 import BulkUploadSection from "./components/BulkUploadSection";
 import FileUploadSection from "./components/FileUploadSection";
 import ProjectResourceSelectors from "./components/ProjectResourceSelectors";
 import MetadataTemplateDownload from "./components/MetadataTemplateDownload";
+import { success } from "zod";
 
 const MAX_CONCURRENT_FILE_UPLOADS = 5;
 const MULTI_FILE_PROGRESS_TOAST_THRESHOLD = 30;
@@ -214,6 +219,7 @@ export default function UploadCenterClient() {
       return;
     }
 
+    fileUploadState.cleanUploadError(0);
     fileUploadState.setIsUploading(true);
     fileUploadState.setUploadProgress(null);
 
@@ -232,6 +238,20 @@ export default function UploadCenterClient() {
       projectId,
       dataSourceId,
       objectStorageId,
+    };
+    const getUploadErrorMessage = (error: unknown) => {
+      const errorMessages = extractErrorMessages(
+        error,
+        t.translations.UNKNOWN_ERROR_OCCURRED,
+        t.translations.UNKNOWN_ERROR,
+      );
+      const [parsedError] = parseBackendErrors(errorMessages);
+
+      return parsedError
+        ? parsedError.suggestion
+          ? `${parsedError.message} ${parsedError.suggestion}`
+          : parsedError.message
+        : t.translations.UPLOAD_FAILED_SEE_CONSOLE_FOR_DETAILS;
     };
 
     if (showChunkedProgressToast) {
@@ -301,6 +321,7 @@ export default function UploadCenterClient() {
 
             const file = selectedFiles[currentIndex];
             const metadata = fileUploadState.filesMetadata[currentIndex] ?? {};
+            fileUploadState.cleanUploadError(currentIndex);
 
             try {
               if ((metadata.recordMode ?? "new") === "update") {
@@ -334,6 +355,10 @@ export default function UploadCenterClient() {
               }
               succeeded += 1;
             } catch (reason) {
+              fileUploadState.setUploadError(
+                currentIndex,
+                getUploadErrorMessage(reason),
+              );
               results[currentIndex] = { status: "rejected", reason };
               failed += 1;
             } finally {
@@ -357,17 +382,44 @@ export default function UploadCenterClient() {
         );
         await Promise.all(workers);
 
+        if (failed) {
+          const failedFiles: File[] = [];
+          const failedMetadata: Record<number, FileMetadata> = {};
+          const failedErrors: Record<number, string> = {};
+
+          results.forEach((results, originalIndex) => {
+            if (results?.status !== "rejected") return;
+
+            const nextIndex = failedFiles.length;
+            failedFiles.push(selectedFiles[originalIndex]);
+
+            const metadata = fileUploadState.filesMetadata[originalIndex];
+            if (metadata) {
+              failedMetadata[nextIndex] = metadata;
+            }
+
+            const error = fileUploadState.uploadErrorByFileIndex[originalIndex];
+            if (error) {
+              failedErrors[nextIndex] = error;
+            }
+          });
+
+          fileUploadState.setSelectedFiles(failedFiles);
+          fileUploadState.setAllFilesMetadata(failedMetadata);
+          fileUploadState.setAllUploadErrors(failedErrors);
+
+          uploadToastManager.error(
+            "Some uploads failed. Check the file cards.",
+          );
+
+          return;
+        }
+
         uploadToastManager.success(
-          failed
-            ? interpolate(t.translations.UPLOAD_BATCH_SUCCESS_WITH_FAILURES, {
-                success: succeeded,
-                failed,
-              })
-            : interpolate(t.translations.UPLOAD_BATCH_SUCCESS, {
-                success: succeeded,
-              }),
+          interpolate(t.translations.UPLOAD_BATCH_SUCCESS, {
+            success: succeeded,
+          }),
         );
-        if (failed) console.warn("Batch upload failures:", results);
 
         fileUploadState.resetFileUpload();
 
@@ -376,6 +428,7 @@ export default function UploadCenterClient() {
 
       const file = selectedFiles[0];
       const metadata = fileUploadState.filesMetadata[0] ?? {};
+      fileUploadState.cleanUploadError(0);
 
       if ((metadata.recordMode ?? "new") === "update") {
         if (!metadata.targetRecordId) {
@@ -423,9 +476,8 @@ export default function UploadCenterClient() {
         uploadToastManager.message(t.translations.UPLOAD_CANCELLED);
       } else {
         console.error("Upload error:", err);
-        uploadToastManager.error(
-          t.translations.UPLOAD_FAILED_SEE_CONSOLE_FOR_DETAILS,
-        );
+        fileUploadState.setUploadError(0, getUploadErrorMessage(err));
+        uploadToastManager.error("Upload failed. Check the file card.");
       }
       fileUploadState.setUploadProgress(null);
     } finally {
@@ -636,6 +688,9 @@ export default function UploadCenterClient() {
                         handleMetadataChange={
                           fileUploadState.handleMetadataChange
                         }
+                        uploadErrorByFileIndex={
+                          fileUploadState.uploadErrorByFileIndex
+                        }
                         targetFileId={fileUploadState.targetFileId}
                         setTargetFileId={fileUploadState.setTargetFileId}
                         availableFiles={availableFiles}
@@ -646,6 +701,7 @@ export default function UploadCenterClient() {
                         onUpload={handleFileUpload}
                         onClear={fileUploadState.clearAll}
                         onRemoveAt={fileUploadState.removeAt}
+                        projectId={Number(projectId)}
                       />
                     ) : (
                       <BulkUploadSection
