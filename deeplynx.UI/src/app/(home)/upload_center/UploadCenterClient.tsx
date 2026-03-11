@@ -34,7 +34,6 @@ import BulkUploadSection from "./components/BulkUploadSection";
 import FileUploadSection from "./components/FileUploadSection";
 import ProjectResourceSelectors from "./components/ProjectResourceSelectors";
 import MetadataTemplateDownload from "./components/MetadataTemplateDownload";
-import { success } from "zod";
 
 const MAX_CONCURRENT_FILE_UPLOADS = 5;
 const MULTI_FILE_PROGRESS_TOAST_THRESHOLD = 30;
@@ -245,7 +244,27 @@ export default function UploadCenterClient() {
         t.translations.UNKNOWN_ERROR_OCCURRED,
         t.translations.UNKNOWN_ERROR,
       );
-      const [parsedError] = parseBackendErrors(errorMessages);
+      const [parsedError] = parseBackendErrors(errorMessages, {
+        objectStorageIdNotFoundInProject:
+          t.translations.OBJECT_STORAGE_ID_NOT_FOUND_IN_PROJECT,
+        objectStorageIdNotFoundSuggestion:
+          t.translations.OBJECT_STORAGE_ID_NOT_FOUND_IN_PROJECT_SUGGESTION,
+        originalIdAlreadyInUse: t.translations.ORIGINAL_ID_ALREADY_IN_USE,
+        originalIdAlreadyInUseSuggestion:
+          t.translations.ORIGINAL_ID_ALREADY_IN_USE_SUGGESTION,
+        classIdNotFoundInProject:
+          t.translations.CLASS_ID_DOES_NOT_EXIST_IN_PROJECT,
+        classIdNotFoundSuggestion:
+          t.translations.CLASS_ID_NOT_FOUND_IN_PROJECT_SUGGESTION,
+        duplicateSuggestion: t.translations.DUPLICATE_RECORD_SUGGESTION,
+        permissionSuggestion: t.translations.PERMISSION_REQUIRED_SUGGESTION,
+        validationSuggestion: t.translations.VALIDATION_ERROR_SUGGESTION,
+        relationshipSuggestion:
+          t.translations.RELATIONSHIP_ID_NOT_FOUND_SUGGESTION,
+        invalidSelectedDataSource: t.translations.INVALID_SELECTED_DATA_SOURCE,
+        invalidSelectedDataSourceSuggestion:
+          t.translations.INVALID_SELECTED_DATA_SOURCE_SUGGESTION,
+      });
 
       return parsedError
         ? parsedError.suggestion
@@ -326,7 +345,7 @@ export default function UploadCenterClient() {
             try {
               if ((metadata.recordMode ?? "new") === "update") {
                 if (!metadata.targetRecordId) {
-                  throw new Error("Missing target record id for file update");
+                  throw new Error(t.translations.PLEASE_SELECT_RECORD_TO_UPDATE);
                 }
                 const value = await updateFile(
                   Number(organizationId),
@@ -409,7 +428,7 @@ export default function UploadCenterClient() {
           fileUploadState.setAllUploadErrors(failedErrors);
 
           uploadToastManager.error(
-            "Some uploads failed. Check the file cards.",
+            t.translations.SOME_UPLOADS_FAILED_CHECK_FILE_CARDS,
           );
 
           return;
@@ -477,7 +496,7 @@ export default function UploadCenterClient() {
       } else {
         console.error("Upload error:", err);
         fileUploadState.setUploadError(0, getUploadErrorMessage(err));
-        uploadToastManager.error("Upload failed. Check the file card.");
+        uploadToastManager.error(t.translations.UPLOAD_FAILED_CHECK_FILE_CARD);
       }
       fileUploadState.setUploadProgress(null);
     } finally {
@@ -543,7 +562,27 @@ export default function UploadCenterClient() {
         t.translations.UNKNOWN_ERROR_OCCURRED,
         t.translations.UNKNOWN_ERROR,
       );
-      const parsedErrors = parseBackendErrors(errorMessages);
+      const parsedErrors = parseBackendErrors(errorMessages, {
+        objectStorageIdNotFoundInProject:
+          t.translations.OBJECT_STORAGE_ID_NOT_FOUND_IN_PROJECT,
+        objectStorageIdNotFoundSuggestion:
+          t.translations.OBJECT_STORAGE_ID_NOT_FOUND_IN_PROJECT_SUGGESTION,
+        originalIdAlreadyInUse: t.translations.ORIGINAL_ID_ALREADY_IN_USE,
+        originalIdAlreadyInUseSuggestion:
+          t.translations.ORIGINAL_ID_ALREADY_IN_USE_SUGGESTION,
+        classIdNotFoundInProject:
+          t.translations.CLASS_ID_DOES_NOT_EXIST_IN_PROJECT,
+        classIdNotFoundSuggestion:
+          t.translations.CLASS_ID_NOT_FOUND_IN_PROJECT_SUGGESTION,
+        duplicateSuggestion: t.translations.DUPLICATE_RECORD_SUGGESTION,
+        permissionSuggestion: t.translations.PERMISSION_REQUIRED_SUGGESTION,
+        validationSuggestion: t.translations.VALIDATION_ERROR_SUGGESTION,
+        relationshipSuggestion:
+          t.translations.RELATIONSHIP_ID_NOT_FOUND_SUGGESTION,
+        invalidSelectedDataSource: t.translations.INVALID_SELECTED_DATA_SOURCE,
+        invalidSelectedDataSourceSuggestion:
+          t.translations.INVALID_SELECTED_DATA_SOURCE_SUGGESTION,
+      });
       bulkUploadState.setBackendErrors(parsedErrors);
 
       toast.error(

@@ -1,8 +1,26 @@
+export type BackendErrorTranslationOverrides = {
+  objectStorageIdNotFoundInProject?: string;
+  objectStorageIdNotFoundSuggestion?: string;
+  originalIdAlreadyInUse?: string;
+  originalIdAlreadyInUseSuggestion?: string;
+  classIdNotFoundInProject?: string;
+  classIdNotFoundSuggestion?: string;
+  duplicateSuggestion?: string;
+  permissionSuggestion?: string;
+  validationSuggestion?: string;
+  relationshipSuggestion?: string;
+  invalidSelectedDataSource?: string;
+  invalidSelectedDataSourceSuggestion?: string;
+};
+
 /**
  * Parses backend error messages and extracts user-friendly information
  * Handles C# stack traces and various error formats
  */
-export function parseBackendError(error: string): {
+export function parseBackendError(
+  error: string,
+  translations?: BackendErrorTranslationOverrides,
+): {
   message: string;
   type: "validation" | "not_found" | "permission" | "general";
   suggestion?: string;
@@ -39,8 +57,12 @@ export function parseBackendError(error: string): {
     type = "not_found";
     const idMatch = cleanMessage.match(/ID\s+(\d+)/i);
     const id = idMatch ? idMatch[1] : "specified";
-    cleanMessage = `Object Storage ID ${id} does not exist in this project`;
-    suggestion = "Check that the object_storage_id values in your CSV are valid for the selected project, or leave them empty if not needed.";
+    cleanMessage = translations?.objectStorageIdNotFoundInProject
+      ? translations.objectStorageIdNotFoundInProject.replace("{id}", id)
+      : `Object Storage ID ${id} does not exist in this project`;
+    suggestion =
+      translations?.objectStorageIdNotFoundSuggestion ??
+      "Check that the selected object storage ID is valid for this project.";
   }
   // OriginalId uniqueness errors
   else if (
@@ -50,43 +72,61 @@ export function parseBackendError(error: string): {
   ) {
     type = "validation";
     cleanMessage =
+      translations?.originalIdAlreadyInUse ??
       "OriginalId is already in use. Each uploaded file must have a unique OriginalId.";
     suggestion =
-      "Update the metadata file with a unique OriginalId, or remove OriginalId to let the system generate one.";
+      translations?.originalIdAlreadyInUseSuggestion ??
+      "Update the metadata with a unique OriginalId, or remove OriginalId to let the system generate one.";
   }
   // Class errors
   else if (/class.*does not exist|class.*not found/i.test(cleanMessage)) {
     type = "not_found";
     const idMatch = cleanMessage.match(/ID\s+(\d+)/i);
     const id = idMatch ? idMatch[1] : "specified";
-    cleanMessage = `Class ID ${id} does not exist in this project`;
-    suggestion = "Verify that the class_id values in your CSV match existing classes in your project.";
+    cleanMessage = translations?.classIdNotFoundInProject
+      ? translations.classIdNotFoundInProject.replace("{id}", id)
+      : `Class ID ${id} does not exist in this project`;
+    suggestion =
+      translations?.classIdNotFoundSuggestion ??
+      "Verify that the class ID exists in the selected project.";
   }
   // Duplicate errors
   else if (/already exists|duplicate/i.test(cleanMessage)) {
     type = "validation";
-    suggestion = "Check your CSV for duplicate original_id values, or verify that these records don't already exist in the system.";
+    suggestion =
+      translations?.duplicateSuggestion ??
+      "Check for duplicate IDs, or verify that the record does not already exist in the system.";
   }
   // Permission errors
   else if (/permission|unauthorized|forbidden/i.test(cleanMessage)) {
     type = "permission";
-    suggestion = "Contact your project administrator to request the necessary permissions.";
+    suggestion =
+      translations?.permissionSuggestion ??
+      "Contact your project administrator to request the necessary permissions.";
   }
   // Validation errors
   else if (/invalid|required|must be|cannot be/i.test(cleanMessage)) {
     type = "validation";
-    suggestion = "Review the error message and correct the affected fields in your CSV.";
+    suggestion =
+      translations?.validationSuggestion ??
+      "Review the error message and correct the affected fields.";
   }
   // Relationship/Edge errors
   else if (/relationship.*does not exist/i.test(cleanMessage)) {
     type = "not_found";
-    suggestion = "Verify that relationship IDs in your CSV exist in the selected project.";
+    suggestion =
+      translations?.relationshipSuggestion ??
+      "Verify that the relationship IDs exist in the selected project.";
   }
   // Data source errors
   else if (/data source.*does not exist/i.test(cleanMessage)) {
     type = "not_found";
-    cleanMessage = "The selected data source is invalid";
-    suggestion = "Try selecting a different data source from the dropdown.";
+    cleanMessage =
+      translations?.invalidSelectedDataSource ??
+      "The selected data source is invalid";
+    suggestion =
+      translations?.invalidSelectedDataSourceSuggestion ??
+      "Try selecting a different data source from the dropdown.";
   }
 
   return {
@@ -99,10 +139,13 @@ export function parseBackendError(error: string): {
 /**
  * Parses multiple backend errors
  */
-export function parseBackendErrors(errors: string[]): Array<{
+export function parseBackendErrors(
+  errors: string[],
+  translations?: BackendErrorTranslationOverrides,
+): Array<{
   message: string;
   type: "validation" | "not_found" | "permission" | "general";
   suggestion?: string;
 }> {
-  return errors.map(parseBackendError);
+  return errors.map((error) => parseBackendError(error, translations));
 }
