@@ -12,6 +12,7 @@ interface FileUploadSectionProps {
   setSelectedFiles: (files: File[]) => void;
   dropKey: number;
   handleMetadataChange: (fileIndex: number, metadata: FileMetadata) => void;
+  uploadErrorByFileIndex: Record<number, string>;
   targetFileId: string;
   setTargetFileId: (id: string) => void;
   availableFiles: ExistingFile[];
@@ -22,6 +23,7 @@ interface FileUploadSectionProps {
   onUpload: () => Promise<void>;
   onClear: () => void;
   onRemoveAt: (idx: number) => void;
+  projectId: number;
 }
 
 export default function FileUploadSection({
@@ -29,6 +31,7 @@ export default function FileUploadSection({
   setSelectedFiles,
   dropKey,
   handleMetadataChange,
+  uploadErrorByFileIndex,
   targetFileId,
   setTargetFileId,
   availableFiles,
@@ -39,6 +42,7 @@ export default function FileUploadSection({
   onUpload,
   onClear,
   onRemoveAt,
+  projectId,
 }: FileUploadSectionProps) {
   const { t } = useLanguage();
   const isLargeFile = (file: File) => file.size >= CHUNK_THRESHOLD;
@@ -117,6 +121,8 @@ export default function FileUploadSection({
             onRemove={() => onRemoveAt(index)}
             availableFiles={availableFiles}
             onSearchFiles={onSearchFiles}
+            projectId={projectId}
+            uploadError={uploadErrorByFileIndex[index]}
           />
         ))}
 

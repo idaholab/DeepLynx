@@ -7,6 +7,7 @@ import { TrashIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import {
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type ChangeEvent,
@@ -14,6 +15,8 @@ import {
 import type { ExistingFile } from "../../types/types";
 import SearchBar from "../../components/SearchBar";
 import { formatLocalDateTime } from "@/app/lib/date_time";
+import { createMetadataUploadSchema } from "./metadataUploadSchema";
+import { getClass } from "@/app/lib/client_service/class_services.client";
 
 const MAX_VISIBLE_FILES = 100;
 
@@ -36,6 +39,8 @@ interface NewFileUploadCardProps {
   onRemove?: () => void;
   availableFiles: ExistingFile[];
   onSearchFiles: (query: string) => Promise<ExistingFile[]>;
+  projectId: number;
+  uploadError?: string;
 }
 
 export default function NewFileUploadCard({
@@ -46,8 +51,24 @@ export default function NewFileUploadCard({
   onRemove,
   availableFiles,
   onSearchFiles,
+  projectId,
+  uploadError,
 }: NewFileUploadCardProps) {
   const { t } = useLanguage();
+  const metadataUploadSchema = useMemo(
+    () =>
+      createMetadataUploadSchema({
+        NAME_REQUIRED: t.translations.NAME_REQUIRED,
+        DESCRIPTION_REQUIRED: t.translations.DESCRIPTION_REQUIRED,
+        ORIGINAL_ID_REQUIRED: t.translations.ORIGINAL_ID_REQUIRED,
+        CLASS_ID_MUST_BE_NUMBER_NOT_STRING:
+          t.translations.CLASS_ID_MUST_BE_NUMBER_NOT_STRING,
+        CLASS_ID_MUST_BE_INTEGER: t.translations.CLASS_ID_MUST_BE_INTEGER,
+        CLASS_ID_MUST_BE_GREATER_THAN_ZERO:
+          t.translations.CLASS_ID_MUST_BE_GREATER_THAN_ZERO,
+      }),
+    [t],
+  );
   const [recordMode, setRecordMode] = useState<"new" | "update">("new");
   const [targetRecordId, setTargetRecordId] = useState("");
   const [recordSearchInput, setRecordSearchInput] = useState("");
@@ -103,12 +124,42 @@ export default function NewFileUploadCard({
 
     try {
       const content = await file.text();
-      const parsed: unknown = JSON.parse(content);
-      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-        throw new Error("Metadata must be a JSON object");
+      const parsedJson: unknown = JSON.parse(content);
+
+      const result = metadataUploadSchema.safeParse(parsedJson);
+
+      if (!result.success) {
+        const message = result.error.issues
+          .map((issue) => {
+            const path = issue.path.join(".") || "metadata";
+            return `${path}: ${issue.message}`;
+          })
+          .join("\n");
+
+        clearMetadataFile();
+        setMetadataPreviewError(message);
+
+        return;
       }
+
+      const metadata = result.data;
+
+      if (metadata.ClassId != null) {
+        try {
+          await getClass(Number(projectId), metadata.ClassId, true);
+        } catch (error) {
+          clearMetadataFile();
+          setMetadataPreviewError(
+            interpolate(t.translations.CLASS_ID_DOES_NOT_EXIST_IN_PROJECT, {
+              id: metadata.ClassId,
+            }),
+          );
+          return;
+        }
+      }
+
       setMetadataFile(file);
-      setMetadataPreview(parsed as Record<string, unknown>);
+      setMetadataPreview(metadata as Record<string, unknown>);
       setMetadataPreviewError("");
     } catch {
       clearMetadataFile();
@@ -507,6 +558,11 @@ export default function NewFileUploadCard({
                     </p>
                   )}
                 </div>
+                {uploadError && (
+                  <div className="rounded-md border border-error/30 bg-error/10 p-3 text-sm text-error">
+                    {uploadError}
+                  </div>
+                )}
               </div>
             </div>
           </div>
