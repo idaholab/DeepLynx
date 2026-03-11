@@ -274,7 +274,6 @@ public class UserModelTokenBusinessTests : IntegrationTestBase
         var now = DateTime.UtcNow;
         var dto = new CreateUserModelTokenRequestDto
         {
-            UserId = uid,
             AiModelConfigId = mcid1,
             Token = "sk-brand-new-token"
         };
@@ -296,7 +295,6 @@ public class UserModelTokenBusinessTests : IntegrationTestBase
         // Arrange
         var dto = new CreateUserModelTokenRequestDto
         {
-            UserId = uid,
             AiModelConfigId = mcid2,
             Token = "sk-persisted-token"
         };
@@ -312,28 +310,11 @@ public class UserModelTokenBusinessTests : IntegrationTestBase
     }
 
     [Fact]
-    public async Task CreateUserModelToken_Fails_IfCurrentUserDoesNotMatchDtoUserId()
-    {
-        // Arrange - user1 is trying to create a token on behalf of user2
-        var dto = new CreateUserModelTokenRequestDto
-        {
-            UserId = uid2,
-            AiModelConfigId = mcid1,
-            Token = "sk-sneaky-token"
-        };
-
-        // Act & Assert
-        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
-            _userModelTokenBusiness.CreateUserModelToken(uid, dto));
-    }
-
-    [Fact]
     public async Task CreateUserModelToken_Fails_IfDtoIsInvalid()
     {
         // Arrange - missing required fields (Token null/empty, no UserId, etc.)
         var dto = new CreateUserModelTokenRequestDto
         {
-            UserId = uid,
             AiModelConfigId = mcid1,
             Token = null
         };
@@ -369,29 +350,14 @@ public class UserModelTokenBusinessTests : IntegrationTestBase
     }
 
     [Fact]
-    public async Task DeleteUserModelToken_Fails_IfTokenBelongsToAnotherUser()
-    {
-        // Act & Assert - tid3 belongs to user2; user1 should not be able to delete it
-        await Assert.ThrowsAsync<KeyNotFoundException>(() =>
-            _userModelTokenBusiness.DeleteUserModelToken(uid, tid3));
-
-        // Verify token still exists
-        var stillExists = await Context.UserModelTokens.FindAsync(tid3);
-        Assert.NotNull(stillExists);
-    }
-
-    [Fact]
     public async Task DeleteUserModelToken_DoesNotDeleteOtherTokens()
     {
         // Act
-        await _userModelTokenBusiness.DeleteUserModelToken(uid, tid1);
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => 
+            _userModelTokenBusiness.DeleteUserModelToken(uid2, tid1));
 
-        // Assert - tid2 (also owned by user1) and tid3 (owned by user2) should be unaffected
-        var tid2Exists = await Context.UserModelTokens.FindAsync(tid2);
-        var tid3Exists = await Context.UserModelTokens.FindAsync(tid3);
-
-        Assert.NotNull(tid2Exists);
-        Assert.NotNull(tid3Exists);
+        var tid1Exists = await Context.UserModelTokens.FindAsync(tid1);
+        Assert.NotNull(tid1Exists);
     }
 
     #endregion

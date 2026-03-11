@@ -159,8 +159,8 @@ public class AiModelConfigBusinessTests : IntegrationTestBase
         // Act
         var result = await _aiModelConfigBusiness.GetAllAiModelConfigs(oid, pid, hideArchived: true);
 
-        // Assert - should return config1 only (config3 is archived, config4 is pid2, config2 is org-level)
-        Assert.Single(result);
+        // Assert - should return config1 & config2 (Org Level) (config3 is archived, config4 is pid2)
+        Assert.Equal(2, result.Count);
         Assert.Contains(result, c => c.Id == mcid1);
     }
 
@@ -181,8 +181,8 @@ public class AiModelConfigBusinessTests : IntegrationTestBase
         // Act
         var result = await _aiModelConfigBusiness.GetAllAiModelConfigs(oid, pid, hideArchived: false);
 
-        // Assert - should include config1 and config3 (archived)
-        Assert.Equal(2, result.Count);
+        // Assert - should include config1 and config3 (archived) + config2 (Org Level) 
+        Assert.Equal(3, result.Count);
         Assert.Contains(result, c => c.Id == mcid1);
         Assert.Contains(result, c => c.Id == mcid3 && c.IsArchived);
     }

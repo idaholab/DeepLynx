@@ -1,32 +1,32 @@
 using deeplynx.datalayer.Models;
 using deeplynx.helpers;
+using deeplynx.interfaces;
 using deeplynx.models;
 using Microsoft.EntityFrameworkCore;
 
 namespace deeplynx.business;
 
-public class AiModelConfigBusiness
+public class AiModelConfigBusiness : IAiModelConfigBusiness
 {
     private readonly DeeplynxContext _context;
 
     /// <summary>
     ///     Initializes a new instance of the <see cref="AiModelConfigBusiness" /> class.
     /// </summary>
-    /// <param name="context">The database context used for the edge operations.</param>
+    /// <param name="context">The database context used for operations.</param>
     public AiModelConfigBusiness(DeeplynxContext context)
     {
         _context = context;
     }
 
-    private static readonly List<string> modelProviderList = new List<string>
+    private static readonly List<string> ModelProviderList = new List<string>
     {
         "open ai",
         "anthropic",
         "hpc",
-        "john cena"
     };
 
-    private static readonly List<string> modelTypeList = new List<string>
+    private static readonly List<string> ModelTypeList = new List<string>
     {
         "llm",
         "embedding"
@@ -49,8 +49,8 @@ public class AiModelConfigBusiness
             .AsQueryable();
 
         if (projectId.HasValue)
-            query = query.Where(x => x.ProjectId == projectId);
-        else
+            query = query.Where(x => x.ProjectId == projectId || x.ProjectId == null);
+        else 
             query = query.Where(x => x.ProjectId == null);
 
         if (hideArchived)
@@ -93,9 +93,7 @@ public class AiModelConfigBusiness
             .AsQueryable();
 
         if (projectId.HasValue)
-            query = query.Where(x => x.ProjectId == projectId);
-        else
-            query = query.Where(x => x.ProjectId == null);
+            query = query.Where(x => x.ProjectId == projectId || x.ProjectId == null);
 
         var returnedAiModelConfig = await query.FirstOrDefaultAsync();
         if (returnedAiModelConfig is null)
@@ -136,10 +134,10 @@ public class AiModelConfigBusiness
     {
         ValidationHelper.ValidateModel(dto);
 
-        if (!modelProviderList.Contains(dto.ModelProvider.ToLower()))
+        if (!ModelProviderList.Contains(dto.ModelProvider.ToLower()))
             throw new ArgumentException("Unknown ModelProvider");
 
-        if (!modelTypeList.Contains(dto.ModelType.ToLower()))
+        if (!ModelTypeList.Contains(dto.ModelType.ToLower()))
             throw new ArgumentException("Unknown ModelType");
 
         await using var transaction = await _context.Database.BeginTransactionAsync();
@@ -367,6 +365,47 @@ public class AiModelConfigBusiness
         await _context.SaveChangesAsync();
         return true;
     }
+    
+    
+    /// <summary>
+    ///     Unarchive a single AI Model Configuration
+    /// </summary>
+    /// <param name="currentUserId">The ID of user making the request</param>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <param name="projectId">The ID of the project whose AI Model Configurations will be retrieved</param>
+    /// <param name="aiModelConfigId">The ID of the AI Model Configuration that will be unarchived</param>
+    /// <returns>True if the operation was successful</returns>
+    public async Task<bool> UnarchiveAiModelConfig(long currentUserId, long organizationId, long? projectId, long aiModelConfigId)
+    {
+        var query = _context.AiModelConfigs
+            .Where(x => x.Id == aiModelConfigId && x.OrganizationId == organizationId)
+            .AsQueryable();
+
+        if (projectId.HasValue)
+        {
+            query = query.Where(x => x.ProjectId == projectId);
+        }
+        else
+        {
+            query = query.Where(x => x.ProjectId == null);
+        }
+
+        var returnedModelConfig = await query.FirstOrDefaultAsync();
+
+        if (returnedModelConfig is null)
+        {
+            throw new KeyNotFoundException($"AI Model Configuration with ID: {aiModelConfigId} is not found");
+        }
+
+        if (!returnedModelConfig.IsArchived)
+            throw new InvalidOperationException($"AI Model Configuration with id {aiModelConfigId} is not archived");
+
+        returnedModelConfig.IsArchived = false;
+        returnedModelConfig.LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
+        returnedModelConfig.LastUpdatedBy = currentUserId;
+        await _context.SaveChangesAsync();
+        return true;
+    }
 
     private async Task ResetProjectDefaults(long projectId, long newDefaultId)
     {
@@ -383,5 +422,4 @@ public class AiModelConfigBusiness
             .Where(os => os.OrganizationId == organizationId && os.ProjectId == null && os.Id != newDefaultId)
             .ExecuteUpdateAsync(s => s.SetProperty(os => os.Default, false));
     }
-
 }
