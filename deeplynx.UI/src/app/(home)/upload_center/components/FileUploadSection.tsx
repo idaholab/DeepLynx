@@ -4,6 +4,7 @@ import { useLanguage } from "@/app/contexts/Language";
 import { CHUNK_THRESHOLD } from "@/app/lib/client_service/file_upload_services.client";
 import toast from "react-hot-toast";
 import { ExistingFile, FileMetadata } from "../../types/types";
+import type { ClassResponseDto } from "../../types/responseDTOs";
 import DropUpload from "./DropUpload";
 import NewFileUploadCard from "./NewFileUploadCard";
 
@@ -16,6 +17,8 @@ interface FileUploadSectionProps {
   targetFileId: string;
   setTargetFileId: (id: string) => void;
   availableFiles: ExistingFile[];
+  availableClasses: ClassResponseDto[];
+  isLoadingClasses: boolean;
   onSearchFiles: (query: string) => Promise<ExistingFile[]>;
   needsTarget: boolean;
   isUploading: boolean;
@@ -35,6 +38,8 @@ export default function FileUploadSection({
   targetFileId,
   setTargetFileId,
   availableFiles,
+  availableClasses,
+  isLoadingClasses,
   onSearchFiles,
   needsTarget,
   isUploading,
@@ -120,6 +125,8 @@ export default function FileUploadSection({
             onMetadataChange={handleMetadataChange}
             onRemove={() => onRemoveAt(index)}
             availableFiles={availableFiles}
+            availableClasses={availableClasses}
+            isLoadingClasses={isLoadingClasses}
             onSearchFiles={onSearchFiles}
             projectId={projectId}
             uploadError={uploadErrorByFileIndex[index]}
