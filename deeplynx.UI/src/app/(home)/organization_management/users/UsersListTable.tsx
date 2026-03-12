@@ -17,9 +17,10 @@ import { UsersTableRow } from "../../types/types";
 
 interface UsersListTableProps {
   tableData: UsersTableRow[];
+  scope: "org" | "site";
   loading: boolean;
   onResendInvite: (email: string) => void;
-  onEditUser: (userId: number, userName: string) => void;
+  onEditUser: (userId: number, userName: string, isOrgAdmin: boolean) => void;
   onOpenConfirm: (payload: {
     isOpen: boolean;
     itemId: number | null;
@@ -30,6 +31,7 @@ interface UsersListTableProps {
 
 const UsersListTable: React.FC<UsersListTableProps> = ({
   tableData,
+  scope,
   loading,
   onResendInvite,
   onEditUser,
@@ -84,6 +86,11 @@ const UsersListTable: React.FC<UsersListTableProps> = ({
                           {row.isSysAdmin && (
                             <div className="badge badge-warning badge-sm">
                               Admin
+                            </div>
+                          )}
+                          {scope === "org" && row.isOrgAdmin && (
+                            <div className="badge badge-info badge-sm">
+                              Org Admin
                             </div>
                           )}
                         </>
@@ -190,7 +197,9 @@ const UsersListTable: React.FC<UsersListTableProps> = ({
                           <button
                             className="btn btn-ghost btn-sm"
                             title="Edit user"
-                            onClick={() => onEditUser(row.id, row.name)}
+                            onClick={() =>
+                              onEditUser(row.id, row.name, !!row.isOrgAdmin)
+                            }
                             disabled={loading}
                           >
                             <PencilIcon className="w-4 h-4" />

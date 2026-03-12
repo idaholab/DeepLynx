@@ -208,6 +208,7 @@ export type UsersTableRow = {
   isActive: boolean;
   isArchived: boolean;
   isSysAdmin: boolean;
+  isOrgAdmin?: boolean | null;
   isPending?: boolean;
   invitedAt?: string;
   projectName?: string;
