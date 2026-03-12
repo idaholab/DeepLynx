@@ -200,7 +200,7 @@ public class UserController : ControllerBase
     [SysAdmin]
     public async Task<ActionResult<UserResponseDto>> SetSysAdmin(
         long userId,
-        [FromQuery] bool isAdmin = true
+        [FromQuery] bool? isAdmin = true
     )
     {
         try
@@ -208,11 +208,12 @@ public class UserController : ControllerBase
             // get the authorizer ID from the middleware context
             var authorizerId = UserContextStorage.UserId;
             var granted = await _userBusiness.SetSysAdmin(authorizerId, userId, isAdmin);
+            var userIsAdmin = isAdmin ?? true;
             return Ok(new
             {
-                message = isAdmin
-                ? $"Granted sysadmin rights to user {userId}"
-                : $"Removed sysAdmin rights from user {userId}"
+                message = userIsAdmin
+                    ? $"Granted sysadmin rights to user {userId}"
+                    : $"Removed sysAdmin rights from user {userId}"
             });
         }
         catch (Exception exc)

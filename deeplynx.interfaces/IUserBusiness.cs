@@ -14,7 +14,7 @@ public interface IUserBusiness
     Task<bool> ArchiveUser(long userId);
     Task<DataOverviewDto> GetUserOverview(long userId);
     Task<bool> UnarchiveUser(long userId);
-    Task<bool> SetSysAdmin(long authorizerId, long candidateId, bool isAdmin = true);
+    Task<bool> SetSysAdmin(long authorizerId, long candidateId, bool? isAdmin = true);
     Task<UserResponseDto> GetUserBySsoId(string ssoId);
     Task<UserResponseDto> GetUserByEmail(string email);
 }

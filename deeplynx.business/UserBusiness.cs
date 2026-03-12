@@ -288,8 +288,10 @@ public class UserBusiness : IUserBusiness
     /// <param name="candidateId">ID of the user who is being granted admin privileges</param>
     /// <returns>Boolean true if successful</returns>
     /// <exception cref="KeyNotFoundException">Returned if authorizer or candidate is not found or lacks privileges</exception>
-    public async Task<bool> SetSysAdmin(long authorizerId, long candidateId, bool isAdmin = true)
+    public async Task<bool> SetSysAdmin(long authorizerId, long candidateId, bool? isAdmin = true)
     {
+        var userIsAdmin = isAdmin ?? true;
+
         var authorizer = await _context.Users
             .Where(a => a.Id == authorizerId && !a.IsArchived && a.IsSysAdmin)
             .FirstOrDefaultAsync();
@@ -302,10 +304,10 @@ public class UserBusiness : IUserBusiness
         if (candidate == null)
             throw new KeyNotFoundException($"User with ID {candidateId} not found.");
 
-        if (authorizerId == candidateId && !isAdmin)
+        if (authorizerId == candidateId && !userIsAdmin)
             throw new InvalidOperationException("You cannot remove your own system administrator access.");
 
-        candidate.IsSysAdmin = isAdmin;
+        candidate.IsSysAdmin = userIsAdmin;
 
         _context.Users.Update(candidate);
         await _context.SaveChangesAsync();
