@@ -198,6 +198,7 @@ export type UserResponseDto =
     email: string;
     username: string;
     isSysAdmin: boolean;
+    isOrgAdmin?: boolean | null;
     isArchived: boolean;
     isActive: boolean;
     role?: string;

@@ -2,6 +2,7 @@
 "use client";
 
 import React from "react";
+import { usePathname } from "next/navigation";
 import { RBACProvider } from "./RBACContext";
 import { useOrganizationSession } from "@/app/contexts/OrganizationSessionProvider";
 import { useProjectSession } from "@/app/contexts/ProjectSessionProvider";
@@ -19,11 +20,20 @@ const normalizeId = (
 };
 
 export function RBACWrapper({ children }: Props) {
-  const { organization } = useOrganizationSession();
-  const { project } = useProjectSession();
+  const pathname = usePathname();
+  const { organization, hasLoaded: hasLoadedOrganization } =
+    useOrganizationSession();
+  const { project, hasLoaded: hasLoadedProject } = useProjectSession();
 
   const orgId = normalizeId(organization?.organizationId);
-  const projectId = normalizeId(project?.projectId);
+  const routeProjectId = pathname?.match(
+    /^\/(?:project|project_management)\/(\d+)(?:\/|$)/,
+  )?.[1];
+  const projectId = normalizeId(project?.projectId ?? routeProjectId);
+
+  if (!hasLoadedOrganization || !hasLoadedProject) {
+    return null;
+  }
 
   return (
     <RBACProvider orgId={orgId} projectId={projectId}>
