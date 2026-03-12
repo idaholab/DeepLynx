@@ -232,6 +232,24 @@ const UsersListTable: React.FC<UsersListTableProps> = ({
                               <TrashIcon className="size-6" />
                             </button>
                           )}
+
+                          {scope === "site" && (
+                            <button
+                              className="btn btn-ghost btn-sm text-error"
+                              title="Archive user"
+                              onClick={() =>
+                                onOpenConfirm({
+                                  isOpen: true,
+                                  itemId: row.id,
+                                  itemName: row.name,
+                                  isPending: false,
+                                })
+                              }
+                              disabled={loading || row.isSysAdmin}
+                            >
+                              <TrashIcon className="size-6" />
+                            </button>
+                          )}
                         </>
                       )}
                     </div>

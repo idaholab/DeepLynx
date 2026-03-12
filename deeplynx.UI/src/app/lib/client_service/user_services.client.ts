@@ -103,3 +103,18 @@ export async function setSysAdmin(userId: number): Promise<{ message: string}> {
     throw error;
   }
 }
+
+export async function archiveUser(
+  userId: number,
+  archive: boolean = true,
+): Promise<{ message: string }> {
+  try {
+    const res = await api.patch(`/users/${userId}`, null, {
+      params: { archive },
+    })
+    return res.data;
+  } catch (error) {
+    console.error("API call failed archiving user:", error);
+    throw error;
+  }
+}

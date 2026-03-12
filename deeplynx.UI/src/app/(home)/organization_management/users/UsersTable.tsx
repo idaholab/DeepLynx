@@ -5,14 +5,17 @@ import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 
 import EditSysUser from "../../components/SiteManagementPortal/EditSysUser";
-import { UserResponseDto } from "../../types/responseDTOs";
+import { OrganizationResponseDto, UserResponseDto } from "../../types/responseDTOs";
 
 import { useOrganizationSession } from "@/app/contexts/OrganizationSessionProvider";
 import {
   removeUserFromOrganization,
   inviteUserToOrganization,
 } from "@/app/lib/client_service/organization_services.client";
-import { getAllUsers } from "@/app/lib/client_service/user_services.client";
+import {
+  archiveUser,
+  getAllUsers,
+} from "@/app/lib/client_service/user_services.client";
 import { InviteUserToOrganizationRequestDto } from "../../types/requestDTOs";
 import DeleteModal from "./DeleteModal";
 import InviteUserModal from "./InviteUserModal";
@@ -28,6 +31,7 @@ import { useLanguage } from "@/app/contexts/Language";
 interface Props {
   members: UserResponseDto[];
   scope?: "org" | "site";
+  availableOrganizations?: OrganizationResponseDto[];
 }
 
 type ConfirmModalState = {
@@ -61,7 +65,11 @@ const buildTableData = (users: UserResponseDto[]): UsersTableRow[] => {
 /*                           UsersTable Component                             */
 /* -------------------------------------------------------------------------- */
 
-const UsersTable = ({ members, scope = "org" }: Props) => {
+const UsersTable = ({
+  members,
+  scope = "org",
+  availableOrganizations = [],
+}: Props) => {
   /* ------------------------------------------------------------------------ */
   /*                               Core State                                */
   /* ------------------------------------------------------------------------ */
@@ -78,6 +86,8 @@ const UsersTable = ({ members, scope = "org" }: Props) => {
 
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [modalLoading, setModalLoading] = useState(false);
+  const [selectedInviteOrganizationId, setSelectedInviteOrganizationId] =
+    useState("");
 
   /* ------------------------------------------------------------------------ */
   /*                            Edit User Modal State                         */
@@ -133,6 +143,17 @@ const UsersTable = ({ members, scope = "org" }: Props) => {
   /* ------------------------------------------------------------------------ */
 
   const handleOpenInviteModal = () => {
+    if (scope === "site") {
+      if (availableOrganizations.length === 0) {
+        toast.error(t.translations.ORGANIZATION_NOT_FOUND);
+        return;
+      }
+
+      setSelectedInviteOrganizationId((current) =>
+        current || String(availableOrganizations[0].id),
+      );
+    }
+
     setShowInviteModal(true);
   };
 
@@ -148,7 +169,12 @@ const UsersTable = ({ members, scope = "org" }: Props) => {
   const handleInviteUsers = async (
     emails: string[],
   ): Promise<InviteResults> => {
-    if (!organization?.organizationId) {
+    const targetOrganizationId =
+      scope === "org"
+        ? organization?.organizationId
+        : selectedInviteOrganizationId;
+
+    if (!targetOrganizationId) {
       toast.error(t.translations.NO_ORG_SELECTED);
       return {
         successful: [],
@@ -185,7 +211,7 @@ const UsersTable = ({ members, scope = "org" }: Props) => {
           };
 
           await inviteUserToOrganization(
-            Number(organization.organizationId),
+            Number(targetOrganizationId),
             inviteData,
           );
 
@@ -260,7 +286,7 @@ const UsersTable = ({ members, scope = "org" }: Props) => {
       if (confirmModal.isPending) {
         // TODO: API call to cancel invite
         toast.success(t.translations.INVITATION_CANCELED);
-      } else {
+      } else if (scope === "org") {
         if (!organization?.organizationId) {
           throw new Error("No organization selected");
         }
@@ -271,6 +297,9 @@ const UsersTable = ({ members, scope = "org" }: Props) => {
         );
 
         toast.success(t.translations.USER_REMOVED_FROM_ORG);
+      } else if (scope === "site") {
+        await archiveUser(confirmModal.itemId, true);
+        toast.success(t.translations.USER_ARCHIVED_SUCCESSFULLY);
       }
 
       // Refresh org-scoped list
@@ -287,7 +316,9 @@ const UsersTable = ({ members, scope = "org" }: Props) => {
       toast.error(
         confirmModal.isPending
           ? t.translations.FAILED_TO_CANCEL_INVITATION
-          : t.translations.FAILED_TO_REMOVE_USER,
+          : scope === "org"
+            ? t.translations.FAILED_TO_REMOVE_USER
+            : t.translations.FAILED_TO_ARCHIVE_USER,
       );
     } finally {
       setLoading(false);
@@ -319,6 +350,7 @@ const UsersTable = ({ members, scope = "org" }: Props) => {
             totalCount={totalCount}
             loading={loading}
             onInviteClick={handleOpenInviteModal}
+            scope={scope}
           />
 
           {/* Combined Users & Pending Invites Table */}
@@ -349,6 +381,10 @@ const UsersTable = ({ members, scope = "org" }: Props) => {
         modalLoading={modalLoading}
         onClose={() => setShowInviteModal(false)}
         onInvite={handleInviteUsers}
+        scope={scope}
+        availableOrganizations={availableOrganizations}
+        selectedOrganizationId={selectedInviteOrganizationId}
+        onSelectedOrganizationChange={setSelectedInviteOrganizationId}
       />
 
       {/* Edit User Modal */}
@@ -384,17 +420,23 @@ const UsersTable = ({ members, scope = "org" }: Props) => {
         title={
           confirmModal.isPending
             ? t.translations.CANCEL_INVITATION
-            : t.translations.REMOVE_USER
+            : scope === "org"
+              ? t.translations.REMOVE_USER
+              : t.translations.ARCHIVE_USER
         }
         message={
           confirmModal.isPending
             ? `${t.translations.SURE_YOU_WANT_TO_CANCEL_INVITATION_FOR_} ${confirmModal.itemName}? ${t.translations.THEY_WILL_NOT_BE_ABLE_TO_JOIN_WITH_LINK}`
-            : `${t.translations.ARE_YOU_SURE_YOU_WANT_TO_REMOVE_} ${confirmModal.itemName} ${t.translations.THEY_WILL_LOSE_ACCESS_FROM_ALL_PROJECTS}`
+            : scope === "org"
+              ? `${t.translations.ARE_YOU_SURE_YOU_WANT_TO_REMOVE_} ${confirmModal.itemName} ${t.translations.THEY_WILL_LOSE_ACCESS_FROM_ALL_PROJECTS}`
+              : `${t.translations.ARE_YOU_SURE_YOU_WANT_TO_ARCHIVE_} ${confirmModal.itemName}? ${t.translations.THEY_WILL_NO_LONGER_BE_ABLE_TO_SIGN_IN_UNTIL_UNARCHIVED}`
         }
         confirmText={
           confirmModal.isPending
             ? t.translations.CANCEL_INVITE
-            : t.translations.REMOVE
+            : scope === "org"
+              ? t.translations.REMOVE
+              : t.translations.ARCHIVE
         }
         cancelText={
           confirmModal.isPending

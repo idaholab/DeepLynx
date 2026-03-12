@@ -87,7 +87,13 @@ const SysAdminClient = ({
     },
     {
       label: "Member Management",
-      content: <UsersTable members={members} scope="site" />,
+      content: (
+        <UsersTable
+          members={members}
+          scope="site"
+          availableOrganizations={organizations}
+        />
+      ),
     },
     {
       label: "Event History",

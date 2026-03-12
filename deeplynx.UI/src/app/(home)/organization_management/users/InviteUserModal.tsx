@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { XMarkIcon, EnvelopeIcon, ExclamationCircleIcon } from "@heroicons/react/24/outline";
 import { useLanguage } from "@/app/contexts/Language";
+import { OrganizationResponseDto } from "../../types/responseDTOs";
 /* -------------------------------------------------------------------------- */
 /*                     Invite Users to Organization Modal                     */
 /* -------------------------------------------------------------------------- */
@@ -12,6 +13,10 @@ interface InviteUserModalProps {
   onInvite: (
     emails: string[]
   ) => Promise<{ successful: string[]; failed: { email: string; error: string }[] }>;
+  scope?: "org" | "site";
+  availableOrganizations?: OrganizationResponseDto[];
+  selectedOrganizationId?: string;
+  onSelectedOrganizationChange?: (organizationId: string) => void;
 }
 
 interface EmailError {
@@ -26,6 +31,10 @@ const InviteUserModal: React.FC<InviteUserModalProps> = ({
   modalLoading,
   onClose,
   onInvite,
+  scope = "org",
+  availableOrganizations = [],
+  selectedOrganizationId = "",
+  onSelectedOrganizationChange,
 }) => {
   const [emailInput, setEmailInput] = useState<string>("");
   const [emails, setEmails] = useState<string[]>([]);
@@ -127,6 +136,8 @@ const InviteUserModal: React.FC<InviteUserModalProps> = ({
   const handleSubmit = async () => {
     if (modalLoading || isProcessing) return;
 
+    if (scope === "site" && !selectedOrganizationId) return;
+
     // Commit whatever is in the input first (if valid)
     const trimmed = normalize(emailInput);
     const shouldAdd =
@@ -162,7 +173,11 @@ const InviteUserModal: React.FC<InviteUserModalProps> = ({
   if (!isOpen) return null;
 
   const totalCount = emails.length;
-  const canSubmit = totalCount > 0 || (normalize(emailInput) !== "" && isValidEmail(emailInput));
+  const hasValidOrgSelection =
+    scope !== "site" || selectedOrganizationId !== "";
+  const canSubmit =
+    hasValidOrgSelection &&
+    (totalCount > 0 || (normalize(emailInput) !== "" && isValidEmail(emailInput)));
   const disabled = !canSubmit || isProcessing || modalLoading;
 
   return (
@@ -188,6 +203,29 @@ const InviteUserModal: React.FC<InviteUserModalProps> = ({
         ) : (
           <>
             <div className="space-y-4">
+              {scope === "site" && (
+                <div className="form-control">
+                  <label className="label">
+                    <span className="label-text font-semibold text-base">
+                      {t.translations.ORGANIZATION} <span className="text-error">*</span>
+                    </span>
+                  </label>
+                  <select
+                    className="select select-bordered w-full"
+                    value={selectedOrganizationId}
+                    onChange={(e) => onSelectedOrganizationChange?.(e.target.value)}
+                    disabled={isProcessing || modalLoading}
+                  >
+                    <option value="">{t.translations.SELECT_AN_ORGANIZATION_FIRST}</option>
+                    {availableOrganizations.map((organization) => (
+                      <option key={organization.id} value={String(organization.id)}>
+                        {organization.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
               {/* Emails Input (Project modal look & feel) */}
               <div className="form-control">
                 <label className="label">
