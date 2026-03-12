@@ -190,7 +190,7 @@ const InviteUserModal: React.FC<InviteUserModalProps> = ({
             className="btn btn-sm btn-circle btn-ghost"
             onClick={handleClose}
             disabled={isProcessing || modalLoading}
-            aria-label="Close"
+            aria-label={t.translations.CLOSE}
           >
             <XMarkIcon className="w-5 h-5" />
           </button>
@@ -266,7 +266,7 @@ const InviteUserModal: React.FC<InviteUserModalProps> = ({
                             className="btn btn-ghost btn-xs btn-circle hover:bg-base-300"
                             onClick={() => removeEmail(email)}
                             disabled={isProcessing}
-                            aria-label={`Remove ${email}`}
+                            aria-label={`${t.translations.REMOVE} ${email}`}
                             type="button"
                           >
                             <XMarkIcon className="w-3 h-3" />
@@ -359,7 +359,9 @@ const InviteUserModal: React.FC<InviteUserModalProps> = ({
                 ) : (
                   <>
                     <EnvelopeIcon className="w-5 h-5" />
-                    {hasErrors ? "Retry failed invitations" : `${t.translations.SEND_INVITATIONS}`}
+                    {hasErrors
+                      ? t.translations.RETRY_FAILED_INVITATIONS
+                      : t.translations.SEND_INVITATIONS}
                     {emails.length > 0 && ` (${emails.length})`}
                   </>
                 )}

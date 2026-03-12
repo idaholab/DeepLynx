@@ -68,7 +68,7 @@ const SysAdminClient = ({
 
   const tabData = [
     {
-      label: "Organization Management",
+      label: t.translations.ORGANIZATION_MANAGEMENT,
       content: (
         <SiteOrganizationManagement
           initialOrganizations={organizations}
@@ -77,7 +77,7 @@ const SysAdminClient = ({
       ),
     },
     {
-      label: "Oauth Application",
+      label: t.translations.OAUTH_APPLICATION,
       content: (
         <OAuthManagement
           initialApplications={applications}
@@ -86,7 +86,7 @@ const SysAdminClient = ({
       ),
     },
     {
-      label: "Member Management",
+      label: t.translations.MEMBER_MANAGEMENT,
       content: (
         <UsersTable
           members={members}
@@ -96,7 +96,7 @@ const SysAdminClient = ({
       ),
     },
     {
-      label: "Event History",
+      label: t.translations.EVENT_HISTORY,
       content: (
         <EventsHistoryClient
           initialProjects={initialProjects}

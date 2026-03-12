@@ -55,7 +55,7 @@ const EditSysUser = ({
       scope === "site" && isSysAdmin !== currentSysAdminStatus;
 
     if (!trimmedName) {
-      setErrorMsg("Name is required.");
+      setErrorMsg(t.translations.NAME_REQUIRED);
       return;
     }
 
@@ -83,15 +83,17 @@ const EditSysUser = ({
       let successMessage: string | null = null;
 
       if (nameChanged && orgAdminChanged) {
-        successMessage = "User and organization admin access updated.";
+        successMessage =
+          t.translations.USER_AND_ORG_ADMIN_ACCESS_UPDATED;
       } else if (nameChanged && sysAdminChanged) {
-        successMessage = "User and system admin access updated.";
+        successMessage =
+          t.translations.USER_AND_SYSTEM_ADMIN_ACCESS_UPDATED;
       } else if (nameChanged) {
-        successMessage = "User updated successfully.";
+        successMessage = t.translations.USER_UPDATED_SUCCESSFULLY;
       } else if (orgAdminChanged) {
-        successMessage = "Organization admin access updated.";
+        successMessage = t.translations.ORGANIZATION_ADMIN_ACCESS_UPDATED;
       } else if (sysAdminChanged) {
-        successMessage = "System admin access granted.";
+        successMessage = t.translations.SYSTEM_ADMIN_ACCESS_UPDATED;
       }
 
       if (successMessage) {
@@ -102,7 +104,7 @@ const EditSysUser = ({
       onClose();
     } catch (error) {
       console.error("Error updating user:", error);
-      setErrorMsg("An error occurred while updating the user.");
+      setErrorMsg(t.translations.ERROR_UPDATING_USER);
     } finally {
       setIsSaving(false);
     }
@@ -124,7 +126,7 @@ const EditSysUser = ({
                 </label>
                 <input
                   type="text"
-                  placeholder="Name"
+                  placeholder={t.translations.NAME}
                   className="input input-primary w-full"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
@@ -136,7 +138,7 @@ const EditSysUser = ({
               {scope === "org" && (
                 <div className="flex flex-col gap-2">
                   <label className="font-semibold text-sm text-neutral">
-                    {t.translations.ADMIN}
+                    {t.translations.ORG_ADMIN}
                   </label>
                   <select
                     className="select select-primary w-full"
@@ -144,15 +146,15 @@ const EditSysUser = ({
                     onChange={(e) => setIsOrgAdmin(e.target.value === "true")}
                     disabled={isSaving}
                   >
-                    <option value="false">No</option>
-                    <option value="true">Yes</option>
+                    <option value="false">{t.translations.NO}</option>
+                    <option value="true">{t.translations.YES}</option>
                   </select>
                 </div>
               )}
               {scope === "site" && (
                 <div className="flex flex-col gap-2">
                   <label className="font-semibold text-sm text-neutral">
-                    System Admin
+                    {t.translations.SYSTEM_ADMIN}
                   </label>
                   <select
                     className="select select-primary w-full"
@@ -160,14 +162,9 @@ const EditSysUser = ({
                     onChange={(e) => setIsSysAdmin(e.target.value === "true")}
                     disabled={isSaving}
                   >
-                    <option value="false">No</option>
-                    <option value="true">Yes</option>
+                    <option value="false">{t.translations.NO}</option>
+                    <option value="true">{t.translations.YES}</option>
                   </select>
-                  {currentSysAdminStatus && (
-                    <p className="text-xs text-base-content/60">
-                      Sys admin removal is not supported yet.
-                    </p>
-                  )}
                 </div>
               )}
 

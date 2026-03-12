@@ -9,6 +9,7 @@ import {
   TrashIcon,
   XMarkIcon,
 } from "@heroicons/react/24/outline";
+import { useLanguage } from "@/app/contexts/Language";
 import { UsersTableRow } from "../../types/types";
 
 /* -------------------------------------------------------------------------- */
@@ -42,25 +43,26 @@ const UsersListTable: React.FC<UsersListTableProps> = ({
   onEditUser,
   onOpenConfirm,
 }) => {
+  const { t } = useLanguage();
+
   return (
     <div className="overflow-x-auto">
       <table className="table">
         <thead>
           <tr>
-            <th>User</th>
-            <th>Email</th>
-            <th>Username</th>
-            <th>Status</th>
-            <th>Project Assignment</th>
-            <th>Actions</th>
+            <th>{t.translations.USER}</th>
+            <th>{t.translations.EMAIL}</th>
+            <th>{t.translations.USERNAME}</th>
+            <th>{t.translations.STATUS}</th>
+            <th>{t.translations.PROJECT_ASSIGNMENT}</th>
+            <th>{t.translations.ACTIONS}</th>
           </tr>
         </thead>
         <tbody>
           {tableData.length === 0 ? (
             <tr>
               <td colSpan={6} className="text-center py-8 text-base-content/70">
-                No users or pending invites. Click &quot;Invite User&quot; to
-                get started.
+                {t.translations.NO_USERS_OR_PENDING_INVITES_GET_STARTED}
               </td>
             </tr>
           ) : (
@@ -82,7 +84,7 @@ const UsersListTable: React.FC<UsersListTableProps> = ({
                             </div>
                           </div>
                           <div className="font-medium text-base-content/70">
-                            Pending Invite
+                            {t.translations.PENDING_INVITE}
                           </div>
                         </>
                       ) : (
@@ -90,12 +92,12 @@ const UsersListTable: React.FC<UsersListTableProps> = ({
                           <div className="font-medium">{row.name}</div>
                           {row.isSysAdmin && (
                             <div className="badge badge-warning badge-sm">
-                              Sys Admin
+                              {t.translations.SYSTEM_ADMIN}
                             </div>
                           )}
                           {scope === "org" && row.isOrgAdmin && (
                             <div className="badge badge-info badge-sm">
-                              Org Admin
+                              {t.translations.ORG_ADMIN}
                             </div>
                           )}
                         </>
@@ -116,14 +118,20 @@ const UsersListTable: React.FC<UsersListTableProps> = ({
                     {row.isPending ? (
                       <div className="badge badge-warning gap-1">
                         <EnvelopeIcon className="w-3 h-3" />
-                        Pending
+                        {t.translations.PENDING}
                       </div>
                     ) : row.isArchived ? (
-                      <div className="badge badge-error">Archived</div>
+                      <div className="badge badge-error">
+                        {t.translations.ARCHIVED_BADGE}
+                      </div>
                     ) : row.isActive ? (
-                      <div className="badge badge-success">Active</div>
+                      <div className="badge badge-success">
+                        {t.translations.ACTIVE}
+                      </div>
                     ) : (
-                      <div className="badge badge-warning">Inactive</div>
+                      <div className="badge badge-warning">
+                        {t.translations.INACTIVE}
+                      </div>
                     )}
                   </td>
 
@@ -157,13 +165,14 @@ const UsersListTable: React.FC<UsersListTableProps> = ({
                         ))}
                         {row.projects.length > 2 && (
                           <div className="badge badge-sm badge-ghost">
-                            +{row.projects.length - 2} more
+                            +{row.projects.length - 2}{" "}
+                            {t.translations.MORE}
                           </div>
                         )}
                       </div>
                     ) : (
                       <span className="text-base-content/50 text-sm">
-                        No projects
+                        {t.translations.NO_PROJECTS}
                       </span>
                     )}
                   </td>
@@ -177,7 +186,7 @@ const UsersListTable: React.FC<UsersListTableProps> = ({
                             className="btn btn-ghost btn-sm gap-1"
                             onClick={() => onResendInvite(row.email)}
                             disabled={loading}
-                            title="Resend invitation"
+                            title={t.translations.RESEND_INVITATION}
                           >
                             <ArrowPathIcon className="w-4 h-4" />
                           </button>
@@ -192,7 +201,7 @@ const UsersListTable: React.FC<UsersListTableProps> = ({
                               })
                             }
                             disabled={loading}
-                            title="Cancel invitation"
+                            title={t.translations.CANCEL_INVITATION}
                           >
                             <XMarkIcon className="w-4 h-4" />
                           </button>
@@ -201,7 +210,7 @@ const UsersListTable: React.FC<UsersListTableProps> = ({
                         <>
                           <button
                             className="btn btn-ghost btn-sm"
-                            title="Edit user"
+                            title={t.translations.EDIT_USER}
                             onClick={() =>
                               onEditUser(
                                 row.id,
@@ -218,7 +227,9 @@ const UsersListTable: React.FC<UsersListTableProps> = ({
                           {scope === "org" && (
                             <button
                               className="btn btn-ghost btn-sm text-error"
-                              title="Remove from organization"
+                              title={
+                                t.translations.REMOVE_FROM_ORGANIZATION
+                              }
                               onClick={() =>
                                 onOpenConfirm({
                                   isOpen: true,
@@ -236,7 +247,7 @@ const UsersListTable: React.FC<UsersListTableProps> = ({
                           {scope === "site" && (
                             <button
                               className="btn btn-ghost btn-sm text-error"
-                              title="Archive user"
+                              title={t.translations.ARCHIVE_USER_ACTION}
                               onClick={() =>
                                 onOpenConfirm({
                                   isOpen: true,
