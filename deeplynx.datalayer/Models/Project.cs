@@ -92,4 +92,7 @@ public partial class Project
     
     [InverseProperty("Project")]
     public virtual ICollection<HistoricalRecord> HistoricalRecords { get; set; } = new List<HistoricalRecord>();
+    
+    [InverseProperty("Project")]
+    public virtual ICollection<AiModelConfig> AiModelConfigs { get; set; } = new List<AiModelConfig>();
 }
