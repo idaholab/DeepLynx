@@ -48,6 +48,9 @@ public class UserBusiness : IUserBusiness
             Username = p.Username,
             Email = p.Email,
             IsSysAdmin = p.IsSysAdmin,
+            IsOrgAdmin = organizationId != null
+                ? p.OrganizationUsers.Any(ou => ou.OrganizationId == organizationId && ou.IsOrgAdmin)
+                : null,
             IsArchived = p.IsArchived,
             IsActive = p.IsActive
         });
@@ -108,7 +111,7 @@ public class UserBusiness : IUserBusiness
             )
             .FirstOrDefaultAsync();
 
-        if (user == null || user.IsArchived) 
+        if (user == null || user.IsArchived)
             throw new KeyNotFoundException($"User with id {userId} not found");
 
         return user;
