@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from "react";
 import toast from "react-hot-toast";
 import { useLanguage } from "@/app/contexts/Language";
-import { updateUser } from "@/app/lib/client_service/user_services.client";
+import {
+  updateUser,
+  setSysAdmin,
+} from "@/app/lib/client_service/user_services.client";
 import { setOrganizationAdminStatus } from "@/app/lib/client_service/organization_services.client";
 interface EditSysUserProps {
   isOpen: boolean;
@@ -11,6 +14,7 @@ interface EditSysUserProps {
   onUserUpdated: () => void;
   scope: "org" | "site";
   currentOrgAdminStatus: boolean;
+  currentSysAdminStatus: boolean;
   organizationId: number;
 }
 
@@ -22,11 +26,13 @@ const EditSysUser = ({
   onUserUpdated,
   scope,
   currentOrgAdminStatus,
+  currentSysAdminStatus,
   organizationId,
 }: EditSysUserProps) => {
   const { t } = useLanguage();
   const [name, setName] = useState(userName);
   const [isOrgAdmin, setIsOrgAdmin] = useState(currentOrgAdminStatus);
+  const [isSysAdmin, setIsSysAdmin] = useState(currentSysAdminStatus);
   const [isSaving, setIsSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -34,9 +40,10 @@ const EditSysUser = ({
     if (isOpen) {
       setName(userName);
       setIsOrgAdmin(currentOrgAdminStatus);
+      setIsSysAdmin(currentSysAdminStatus);
       setErrorMsg(null);
     }
-  }, [isOpen, userName, currentOrgAdminStatus]);
+  }, [isOpen, userName, currentOrgAdminStatus, currentSysAdminStatus]);
 
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -44,13 +51,15 @@ const EditSysUser = ({
     const nameChanged = trimmedName !== userName;
     const orgAdminChanged =
       scope === "org" && isOrgAdmin !== currentOrgAdminStatus;
+    const sysAdminChanged =
+      scope === "site" && !currentSysAdminStatus && isSysAdmin;
 
     if (!trimmedName) {
       setErrorMsg("Name is required.");
       return;
     }
 
-    if (!nameChanged && !orgAdminChanged) {
+    if (!nameChanged && !orgAdminChanged && !sysAdminChanged) {
       onClose();
       return;
     }
@@ -67,12 +76,26 @@ const EditSysUser = ({
         await setOrganizationAdminStatus(organizationId, userId, isOrgAdmin);
       }
 
+      if (sysAdminChanged) {
+        await setSysAdmin(userId);
+      }
+
+      let successMessage: string | null = null;
+
       if (nameChanged && orgAdminChanged) {
-        toast.success("User and organization admin access updated.");
+        successMessage = "User and organization admin access updated.";
+      } else if (nameChanged && sysAdminChanged) {
+        successMessage = "User and system admin access updated.";
       } else if (nameChanged) {
-        toast.success("User updated successfully.");
+        successMessage = "User updated successfully.";
       } else if (orgAdminChanged) {
-        toast.success("Organization admin access updated.");
+        successMessage = "Organization admin access updated.";
+      } else if (sysAdminChanged) {
+        successMessage = "System admin access granted.";
+      }
+
+      if (successMessage) {
+        toast.success(successMessage);
       }
 
       onUserUpdated();
@@ -126,6 +149,28 @@ const EditSysUser = ({
                   </select>
                 </div>
               )}
+              {scope === "site" && (
+                <div className="flex flex-col gap-2">
+                  <label className="font-semibold text-sm text-neutral">
+                    System Admin
+                  </label>
+                  <select
+                    className="select select-primary w-full"
+                    value={isSysAdmin ? "true" : "false"}
+                    onChange={(e) => setIsSysAdmin(e.target.value === "true")}
+                    disabled={isSaving || currentSysAdminStatus}
+                  >
+                    <option value="false">No</option>
+                    <option value="true">Yes</option>
+                  </select>
+                  {currentSysAdminStatus && (
+                    <p className="text-xs text-base-content/60">
+                      Sys admin removal is not supported yet.
+                    </p>
+                  )}
+                </div>
+              )}
+
               {errorMsg && (
                 <p className="text-error text-sm" role="alert">
                   {errorMsg}

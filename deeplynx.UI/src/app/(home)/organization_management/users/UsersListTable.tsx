@@ -20,7 +20,12 @@ interface UsersListTableProps {
   scope: "org" | "site";
   loading: boolean;
   onResendInvite: (email: string) => void;
-  onEditUser: (userId: number, userName: string, isOrgAdmin: boolean) => void;
+  onEditUser: (
+    userId: number,
+    userName: string,
+    isOrgAdmin: boolean,
+    isSysAdmin: boolean,
+  ) => void;
   onOpenConfirm: (payload: {
     isOpen: boolean;
     itemId: number | null;
@@ -85,7 +90,7 @@ const UsersListTable: React.FC<UsersListTableProps> = ({
                           <div className="font-medium">{row.name}</div>
                           {row.isSysAdmin && (
                             <div className="badge badge-warning badge-sm">
-                              Admin
+                              Sys Admin
                             </div>
                           )}
                           {scope === "org" && row.isOrgAdmin && (
@@ -198,27 +203,35 @@ const UsersListTable: React.FC<UsersListTableProps> = ({
                             className="btn btn-ghost btn-sm"
                             title="Edit user"
                             onClick={() =>
-                              onEditUser(row.id, row.name, !!row.isOrgAdmin)
+                              onEditUser(
+                                row.id,
+                                row.name,
+                                !!row.isOrgAdmin,
+                                !!row.isSysAdmin,
+                              )
                             }
                             disabled={loading}
                           >
-                            <PencilIcon className="w-4 h-4" />
+                            <PencilIcon className="size-6" />
                           </button>
-                          <button
-                            className="btn btn-ghost btn-sm text-error"
-                            title="Remove from organization"
-                            onClick={() =>
-                              onOpenConfirm({
-                                isOpen: true,
-                                itemId: row.id,
-                                itemName: row.name,
-                                isPending: false,
-                              })
-                            }
-                            disabled={loading || row.isSysAdmin}
-                          >
-                            <TrashIcon className="w-4 h-4" />
-                          </button>
+
+                          {scope === "org" && (
+                            <button
+                              className="btn btn-ghost btn-sm text-error"
+                              title="Remove from organization"
+                              onClick={() =>
+                                onOpenConfirm({
+                                  isOpen: true,
+                                  itemId: row.id,
+                                  itemName: row.name,
+                                  isPending: false,
+                                })
+                              }
+                              disabled={loading || row.isSysAdmin}
+                            >
+                              <TrashIcon className="size-6" />
+                            </button>
+                          )}
                         </>
                       )}
                     </div>

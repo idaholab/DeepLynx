@@ -93,3 +93,13 @@ export async function updateUser(
     throw error;
   }
 }
+
+export async function setSysAdmin(userId: number): Promise<{ message: string}> {
+  try {
+    const res = await api.patch(`/users/${userId}/admin`);
+    return res.data;
+  } catch (error) {
+    console.error("API call failed setting sys admin:", error);
+    throw error;
+  }
+}

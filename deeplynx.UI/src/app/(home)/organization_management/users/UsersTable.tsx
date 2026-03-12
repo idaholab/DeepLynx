@@ -71,7 +71,7 @@ const UsersTable = ({ members, scope = "org" }: Props) => {
   );
   const [loading, setLoading] = useState(false);
   const { t } = useLanguage();
-  console.log("Members", members);
+
   /* ------------------------------------------------------------------------ */
   /*                           Invite Modal State                             */
   /* ------------------------------------------------------------------------ */
@@ -86,6 +86,7 @@ const UsersTable = ({ members, scope = "org" }: Props) => {
   const [editingUserId, setEditingUserId] = useState<number | null>(null);
   const [editUserName, setEditUserName] = useState("");
   const [editUserIsOrgAdmin, setEditUserIsOrgAdmin] = useState(false);
+  const [editUserIsSysAdmin, setEditUserIsSysAdmin] = useState(false);
 
   /* ------------------------------------------------------------------------ */
   /*                         Confirm Remove/Cancel State                      */
@@ -326,10 +327,16 @@ const UsersTable = ({ members, scope = "org" }: Props) => {
             scope={scope}
             loading={loading}
             onResendInvite={handleResendInvite}
-            onEditUser={(id: number, name: string, isOrgAdmin: boolean) => {
+            onEditUser={(
+              id: number,
+              name: string,
+              isOrgAdmin: boolean,
+              isSysAdmin: boolean,
+            ) => {
               setEditingUserId(id);
               setEditUserName(name);
               setEditUserIsOrgAdmin(isOrgAdmin);
+              setEditUserIsSysAdmin(isSysAdmin);
             }}
             onOpenConfirm={(item: ConfirmModalState) => setConfirmModal(item)}
           />
@@ -356,6 +363,7 @@ const UsersTable = ({ members, scope = "org" }: Props) => {
           userName={editUserName}
           onUserUpdated={loadAllData}
           currentOrgAdminStatus={editUserIsOrgAdmin}
+          currentSysAdminStatus={editUserIsSysAdmin}
           scope={scope}
           organizationId={organization?.organizationId as number}
         />
