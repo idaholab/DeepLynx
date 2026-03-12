@@ -198,14 +198,22 @@ public class UserController : ControllerBase
     /// <returns>User response DTO</returns>
     [HttpPatch("{userId:long}/admin", Name = "api_set_sys_admin")]
     [SysAdmin]
-    public async Task<ActionResult<UserResponseDto>> SetSysAdmin(long userId)
+    public async Task<ActionResult<UserResponseDto>> SetSysAdmin(
+        long userId,
+        [FromQuery] bool isAdmin = true
+    )
     {
         try
         {
             // get the authorizer ID from the middleware context
             var authorizerId = UserContextStorage.UserId;
-            var granted = await _userBusiness.SetSysAdmin(authorizerId, userId);
-            return Ok(new { message = $"Granted sysadmin rights to user {userId}" });
+            var granted = await _userBusiness.SetSysAdmin(authorizerId, userId, isAdmin);
+            return Ok(new
+            {
+                message = isAdmin
+                ? $"Granted sysadmin rights to user {userId}"
+                : $"Removed sysAdmin rights from user {userId}"
+            });
         }
         catch (Exception exc)
         {

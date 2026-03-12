@@ -52,7 +52,7 @@ const EditSysUser = ({
     const orgAdminChanged =
       scope === "org" && isOrgAdmin !== currentOrgAdminStatus;
     const sysAdminChanged =
-      scope === "site" && !currentSysAdminStatus && isSysAdmin;
+      scope === "site" && isSysAdmin !== currentSysAdminStatus;
 
     if (!trimmedName) {
       setErrorMsg("Name is required.");
@@ -77,7 +77,7 @@ const EditSysUser = ({
       }
 
       if (sysAdminChanged) {
-        await setSysAdmin(userId);
+        await setSysAdmin(userId, isSysAdmin);
       }
 
       let successMessage: string | null = null;
@@ -158,7 +158,7 @@ const EditSysUser = ({
                     className="select select-primary w-full"
                     value={isSysAdmin ? "true" : "false"}
                     onChange={(e) => setIsSysAdmin(e.target.value === "true")}
-                    disabled={isSaving || currentSysAdminStatus}
+                    disabled={isSaving}
                   >
                     <option value="false">No</option>
                     <option value="true">Yes</option>

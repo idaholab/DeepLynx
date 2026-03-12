@@ -94,9 +94,14 @@ export async function updateUser(
   }
 }
 
-export async function setSysAdmin(userId: number): Promise<{ message: string}> {
+export async function setSysAdmin(
+  userId: number,
+  isAdmin: boolean
+): Promise<{ message: string}> {
   try {
-    const res = await api.patch(`/users/${userId}/admin`);
+    const res = await api.patch(`/users/${userId}/admin`, null, {
+      params: { isAdmin }
+    });
     return res.data;
   } catch (error) {
     console.error("API call failed setting sys admin:", error);
