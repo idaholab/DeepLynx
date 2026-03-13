@@ -26,6 +26,7 @@ services:
       OKTA_CLIENT_SECRET: ""
       NEXTAUTH_SECRET: "changeMe"
       BACKEND_BASE_URL: "http://server:5000/api/v1"
+      INSIGHT_API_URL: "http://insight-fastapi:5009"
       AUTH_TRUST_HOST: true
       NEXT_PUBLIC_DISABLE_FRONTEND_AUTHENTICATION: true # change to false if supplying okta info on lines 12-13, 25-26
     ports:
@@ -144,6 +145,107 @@ services:
     depends_on:
       - server
 
+  insight-rabbitmq:
+    profiles: [insight]
+    build:
+      context: ./deeplynx.insight/app/rabbitmq
+      dockerfile: Dockerfiles/Dockerfile.production
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+      - "15692:15692"
+    env_file:
+      - ./deeplynx.insight/.env.production
+    healthcheck:
+      test: [ "CMD", "rabbitmq-diagnostics", "-q", "check_port_connectivity" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - nexus-network
+
+  insight-minio:
+    profiles: [insight]
+    build:
+      context: ./deeplynx.insight/app/minio
+      dockerfile: Dockerfiles/Dockerfile.production
+    ports:
+      - "9100:9100"
+      - "9101:9101"
+    env_file:
+      - ./deeplynx.insight/.env.production
+    environment:
+      - MINIO_ENDPOINT=http://localhost:9100
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:9100/minio/health/live" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - nexus-network
+
+  insight-fastapi:
+    profiles: [insight]
+    build:
+      context: ./deeplynx.insight/app/fastapi
+      dockerfile: Dockerfiles/Dockerfile.production
+    ports:
+      - "5009:5009"
+    command: [ "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "5009" ]
+    env_file:
+      - ./deeplynx.insight/.env.production
+    environment:
+      - LITELLM_LOCAL_MODEL_COST_MAP=True
+      - RABBITMQ_HOST=insight-rabbitmq
+      - MINIO_ENDPOINT=insight-minio:9100
+      - PG_HOST=nx-postgres
+      - PG_PORT=5432
+      - PG_USER=postgres
+      - PG_PASSWORD=nexuscore
+      - PG_DBNAME=deeplynx
+    depends_on:
+      insight-rabbitmq:
+        condition: service_healthy
+      insight-minio:
+        condition: service_healthy
+      db-version-check:
+        condition: service_completed_successfully
+    volumes:
+      - object_storage:/data
+    networks:
+      - nexus-network
+
+  insight-rabbitmq-runner:
+    profiles: [insight]
+    build:
+      context: ./deeplynx.insight/app/rabbitmq
+      dockerfile: Dockerfiles/Dockerfile.runner.production
+    command: [ "python", "-m", "runner" ]
+    env_file:
+      - ./deeplynx.insight/.env.production
+    environment:
+      - LITELLM_LOCAL_MODEL_COST_MAP=True
+      - RABBITMQ_HOST=insight-rabbitmq
+      - MINIO_ENDPOINT=insight-minio:9100
+      - PG_HOST=nx-postgres
+      - PG_PORT=5432
+      - PG_USER=postgres
+      - PG_PASSWORD=nexuscore
+      - PG_DBNAME=deeplynx
+    depends_on:
+      insight-rabbitmq:
+        condition: service_healthy
+      insight-minio:
+        condition: service_healthy
+      db-version-check:
+        condition: service_completed_successfully
+    volumes:
+      - object_storage:/data
+    networks:
+      - nexus-network
+
 networks:
   nexus-network:
     driver: bridge
@@ -151,5 +253,7 @@ networks:
 volumes:
   object_storage:
     driver: local
+  
+  
   nx_postgres_data:
     name: nx_postgres_data
