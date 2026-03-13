@@ -61,6 +61,8 @@ export type FileMetadata = {
   name: string;
   description: string;
   isTimeSeries: boolean;
+  recordMode?: "new" | "update";
+  targetRecordId?: string;
   updateAction?: "merge" | "overwrite";
   metadataFile?: File;
 };
@@ -206,6 +208,7 @@ export type UsersTableRow = {
   isActive: boolean;
   isArchived: boolean;
   isSysAdmin: boolean;
+  isOrgAdmin?: boolean | null;
   isPending?: boolean;
   invitedAt?: string;
   projectName?: string;

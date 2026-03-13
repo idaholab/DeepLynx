@@ -489,7 +489,7 @@ export default function RecordHistoryTab({
 
   return (
     // Main history comparison UI.
-    <div className="mt-4 space-y-4">
+    <div className="mt-4 space-y-4 p-2">
       <RecordHistoryControls
         selectedIndex={selectedIndex}
         compareMode={compareMode}

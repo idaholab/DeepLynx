@@ -68,7 +68,7 @@ const SysAdminClient = ({
 
   const tabData = [
     {
-      label: "Organization Management",
+      label: t.translations.ORGANIZATION_MANAGEMENT,
       content: (
         <SiteOrganizationManagement
           initialOrganizations={organizations}
@@ -77,7 +77,7 @@ const SysAdminClient = ({
       ),
     },
     {
-      label: "Oauth Application",
+      label: t.translations.OAUTH_APPLICATION,
       content: (
         <OAuthManagement
           initialApplications={applications}
@@ -86,11 +86,17 @@ const SysAdminClient = ({
       ),
     },
     {
-      label: "Member Management",
-      content: <UsersTable members={members} />,
+      label: t.translations.MEMBER_MANAGEMENT,
+      content: (
+        <UsersTable
+          members={members}
+          scope="site"
+          availableOrganizations={organizations}
+        />
+      ),
     },
     {
-      label: "Event History",
+      label: t.translations.EVENT_HISTORY,
       content: (
         <EventsHistoryClient
           initialProjects={initialProjects}
@@ -106,15 +112,15 @@ const SysAdminClient = ({
 
   return (
     <div>
-      <div className="bg-base-200/40 pl-12 p-6">
-        <h1 className="text-2xl font-bold text-base-content">
+      <div className="bg-base-200/40 px-3 sm:px-6 lg:px-12 p-6">
+        <h1 className="text-xl sm:text-2xl font-bold text-base-content">
           {t.translations.SITE_MANAGEMENT}
         </h1>
       </div>
-      <div className="p-2">
+      <div className="p-2 sm:p-3">
         <Tabs
           tabs={tabData}
-          className="tabs tabs-border ml-5"
+          className="mx-1 sm:mx-3"
           onTabChange={handleTabChange}
           activeTab={activeTab}
         />

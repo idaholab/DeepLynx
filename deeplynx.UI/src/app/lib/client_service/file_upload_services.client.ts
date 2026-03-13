@@ -1,7 +1,13 @@
 // src/app/lib/file_upload_services.client.ts
 
 import { RecordResponseDto } from "@/app/(home)/types/responseDTOs";
-import { UploadFileArgs, ChunkedUploadSession, ChunkUploadOptions, ChunkedUploadOptions, UploadProgressEvent } from "@/app/(home)/types/types";
+import {
+  UploadFileArgs,
+  ChunkedUploadSession,
+  ChunkUploadOptions,
+  ChunkedUploadOptions,
+  UploadProgressEvent,
+} from "@/app/(home)/types/types";
 import api from "./api";
 
 // ============================================================================
@@ -11,6 +17,14 @@ import api from "./api";
 export const CHUNK_THRESHOLD = 500 * 1024 * 1024; // 500MB threshold to determine regular or chunked upload
 const MAX_CONCURRENT_CHUNKS = 4;            // Upload 4 chunks simultaneously
 const MAX_RETRIES = 3;                      // Retry failed chunks up to 3 times
+const DEFAULT_MAX_CONCURRENT_FILES = 5;
+
+export type BatchUploadProgressEvent = {
+  completed: number;
+  total: number;
+  succeeded: number;
+  failed: number;
+};
 
 // ============================================================================
 // PUBLIC API
@@ -33,10 +47,61 @@ export async function uploadFile(args: UploadFileArgs) {
 }
 
 export async function uploadFilesBatch(
-  args: Omit<UploadFileArgs, "file"> & { files: File[] }
+  args: Omit<UploadFileArgs, "file" | "onProgress"> & {
+    files: File[];
+    maxConcurrentFiles?: number;
+    onProgress?: (progress: BatchUploadProgressEvent) => void;
+  }
 ) {
-  const { files, ...rest } = args;
-  return Promise.allSettled(files.map((file) => uploadFile({ ...rest, file })));
+  const {
+    files,
+    maxConcurrentFiles = DEFAULT_MAX_CONCURRENT_FILES,
+    onProgress,
+    ...rest
+  } = args;
+
+  if (files.length === 0) return [];
+
+  const maxConcurrency = Math.max(
+    1,
+    Math.min(maxConcurrentFiles, files.length),
+  );
+  const results: PromiseSettledResult<RecordResponseDto>[] = Array(files.length);
+  let nextFileIndex = 0;
+  let completed = 0;
+  let succeeded = 0;
+  let failed = 0;
+
+  const runWorker = async (): Promise<void> => {
+    while (true) {
+      const currentIndex = nextFileIndex++;
+      if (currentIndex >= files.length) return;
+
+      const file = files[currentIndex];
+
+      try {
+        const value = await uploadFile({ ...rest, file });
+        results[currentIndex] = { status: "fulfilled", value };
+        succeeded += 1;
+      } catch (reason) {
+        results[currentIndex] = { status: "rejected", reason };
+        failed += 1;
+      } finally {
+        completed += 1;
+        onProgress?.({
+          completed,
+          total: files.length,
+          succeeded,
+          failed,
+        });
+      }
+    }
+  };
+
+  const workers = Array.from({ length: maxConcurrency }, () => runWorker());
+  await Promise.all(workers);
+
+  return results;
 }
 
 // Store AbortController for cancellation
