@@ -137,6 +137,11 @@ try
         ServiceLifetime.Transient
     );
 
+    builder.Services.AddDbContext<StagingContext>(
+        options => options.UseNpgsql(connectionString),
+        ServiceLifetime.Transient
+    );
+
     builder.Services.AddSignalR(); // Used for event system pub/sub and notifications
 
     builder.Services.AddTransient<IRecordBusiness, RecordBusiness>();

@@ -25,6 +25,8 @@ public partial class DeeplynxContext : DbContext
 
     public virtual DbSet<Event> Events { get; set; }
 
+    public virtual DbSet<Extraction> Extractions { get; set; }
+
     public virtual DbSet<Group> Groups { get; set; }
 
     public virtual DbSet<HistoricalEdge> HistoricalEdges { get; set; }
@@ -167,6 +169,25 @@ public partial class DeeplynxContext : DbContext
                 .WithMany(o => o.Classes)
                 .OnDelete(DeleteBehavior.Cascade)
                 .HasConstraintName("classes_organization_id_fkey");
+
+            entity.HasOne<Extraction>()
+                .WithMany()
+                .HasForeignKey(e => e.ExtractionId)
+                .OnDelete(DeleteBehavior.SetNull)
+                .HasConstraintName("classes_extraction_id_fkey");
+        });
+
+        modelBuilder.Entity<Extraction>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("extractions_pkey");
+
+            entity.Property(e => e.Id).UseIdentityAlwaysColumn();
+
+            entity.HasOne(d => d.CreatedByUser)
+                .WithMany()
+                .HasForeignKey(d => d.CreatedBy)
+                .OnDelete(DeleteBehavior.NoAction)
+                .HasConstraintName(null);
         });
 
         modelBuilder.Entity<DataSource>(entity =>
@@ -276,6 +297,12 @@ public partial class DeeplynxContext : DbContext
             entity.HasOne(d => d.Relationship).WithMany(p => p.Edges)
                 .OnDelete(DeleteBehavior.SetNull)
                 .HasConstraintName("edges_relationship_id_fkey");
+
+            entity.HasOne<Extraction>()
+                .WithMany()
+                .HasForeignKey(e => e.ExtractionId)
+                .OnDelete(DeleteBehavior.SetNull)
+                .HasConstraintName("edges_extraction_id_fkey");
         });
 
         // Org-level entity - kinda \\
@@ -831,6 +858,12 @@ public partial class DeeplynxContext : DbContext
             entity.HasOne(d => d.Organization).WithMany(p => p.Records)
                 .HasConstraintName("records_organization_id_fkey");
 
+            entity.HasOne<Extraction>()
+                .WithMany()
+                .HasForeignKey(e => e.ExtractionId)
+                .OnDelete(DeleteBehavior.SetNull)
+                .HasConstraintName("records_extraction_id_fkey");
+
             entity.HasMany(d => d.Labels).WithMany(p => p.Records)
                 .UsingEntity<Dictionary<string, object>>(
                     "RecordLabel",
@@ -936,6 +969,12 @@ public partial class DeeplynxContext : DbContext
 
             entity.HasOne(d => d.Organization).WithMany(p => p.Relationships)
                 .HasConstraintName("relationships_organization_id_fkey");
+
+            entity.HasOne<Extraction>()
+                .WithMany()
+                .HasForeignKey(e => e.ExtractionId)
+                .OnDelete(DeleteBehavior.SetNull)
+                .HasConstraintName("relationships_extraction_id_fkey");
         });
 
         // Org-level entity \\
