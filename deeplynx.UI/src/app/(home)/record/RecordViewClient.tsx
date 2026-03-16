@@ -45,6 +45,7 @@ import RelatedRecordsCardSkeleton from "./skeletons/RelatedRecordsSkeleton";
 import { getAllSensitivityLabelsProject } from "@/app/lib/client_service/sensitivity_labels_services.client";
 import AddEdgeModal from "./components/AddEdgeModal";
 import ClassSelectorModal from "./components/ClassSelectorModal";
+import RecordInsightChat from "./components/RecordInsightChat";
 import {
   RelatedRecordViewModel,
   useRecordRelationships,
@@ -106,6 +107,50 @@ function parseNestedProperties(obj: JSON): PropertyRow[] {
   });
 }
 
+const INSIGHT_SUPPORTED_FILE_TYPES = new Set(["pdf", "txt", "html"]);
+
+function normalizeFileType(value?: string | null): string | null {
+  if (!value) return null;
+  const normalized = value.trim().toLowerCase().replace(/^\./, "");
+  return normalized.length > 0 ? normalized : null;
+}
+
+function getFileExtensionFromValue(value?: string | null): string | null {
+  if (!value) return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+
+  try {
+    const url = new URL(trimmed);
+    return getFileExtensionFromValue(url.pathname);
+  } catch {
+    // Not a URL, continue parsing as a path/filename.
+  }
+
+  const withoutQueryOrHash = trimmed.split(/[?#]/, 1)[0];
+  const lastPathSegment =
+    withoutQueryOrHash.split("/").pop() ?? withoutQueryOrHash;
+  const extensionIndex = lastPathSegment.lastIndexOf(".");
+
+  if (extensionIndex <= 0 || extensionIndex === lastPathSegment.length - 1) {
+    return null;
+  }
+
+  return normalizeFileType(lastPathSegment.slice(extensionIndex + 1));
+}
+
+function resolveInsightFileType(
+  fileType?: string | null,
+  uri?: string | null,
+  name?: string | null,
+): string | null {
+  return (
+    normalizeFileType(fileType) ??
+    getFileExtensionFromValue(uri) ??
+    getFileExtensionFromValue(name)
+  );
+}
+
 // ============= TYPE DEFINITIONS =============
 interface Props {
   projectId: number;
@@ -122,6 +167,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
   const [record, setRecord] = useState<HistoricalRecordResponseDto | null>(
     null,
   );
+  const [recordFileType, setRecordFileType] = useState<string | null>(null);
   const [recordClass, setRecordClass] = useState<ClassResponseDto | null>(null);
   const [tags, setTags] = useState<TagResponseDto[]>([]);
   const [selectedTags, setSelectedTags] = useState<TagResponseDto[]>([]);
@@ -220,6 +266,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
 
   const resetAllState = useCallback(() => {
     setRecord(null);
+    setRecordFileType(null);
     setSelectedTags([]);
     setSelectedIds([]);
     setSelectedLabels([]);
@@ -372,6 +419,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
           true,
         );
 
+        setRecordFileType(liveRecord.fileType ?? null);
         setSelectedIds(mapSelectedIds(liveRecord.tags ?? []));
         setSelectedLabelIds(mapSelectedIds(liveRecord.labels ?? []));
       } catch (error) {
@@ -608,6 +656,15 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
     return <RecordLoading />;
   }
 
+  const resolvedInsightFileType = resolveInsightFileType(
+    recordFileType,
+    record.uri,
+    record.name,
+  );
+  const showInsightChat =
+    resolvedInsightFileType !== null &&
+    INSIGHT_SUPPORTED_FILE_TYPES.has(resolvedInsightFileType);
+
   const tabs = [
     {
       label: t.translations.RECORD_INFORMATION,
@@ -634,6 +691,11 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
 
           {/* Right Column - Tags & Relations */}
           <div className="w-full xl:flex-1 space-y-4">
+            <RecordInsightChat
+              recordId={record.id}
+              recordName={record.name}
+              recordUri={record.uri}
+            />
             {/* Tags Card */}
             <RecordTagsPanel
               tags={tags}
