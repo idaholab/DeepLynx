@@ -41,7 +41,7 @@ const OrganizationManagementClient = ({
   const tabData = [
     {
       label: t.translations.USERS,
-      content: <UsersTable members={members} />,
+      content: <UsersTable members={members} scope="org" />,
     },
     {
       label: t.translations.ROLES_AND_PERMISSIONS,

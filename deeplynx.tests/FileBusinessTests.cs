@@ -218,7 +218,8 @@ public class FileBusinessTests : IntegrationTestBase
             pid,
             did,
             osid, // Explicitly specify project storage
-            file
+            file,
+            embed: true
         );
 
         // Assert
@@ -227,6 +228,7 @@ public class FileBusinessTests : IntegrationTestBase
         Assert.Equal(osid, result.ObjectStorageId); // Should use specified storage
         Assert.True(File.Exists(result.Uri));
         Assert.True(result.Uri.Contains(_testDirectory), "File should be in project directory");
+        Assert.True(result.Embedded);
     }
 
     [Fact]
@@ -267,7 +269,8 @@ public class FileBusinessTests : IntegrationTestBase
             pid,
             did,
             orgOsId, // Explicitly use org storage
-            file
+            file,
+            embed: true
         );
 
         // Assert
@@ -279,6 +282,7 @@ public class FileBusinessTests : IntegrationTestBase
             $"File should be in org directory. Actual: {result.Uri}");
         Assert.False(result.Uri.Contains(_testDirectory),
             $"File should NOT be in project directory. Actual: {result.Uri}");
+        Assert.True(result.Embedded);
     }
 
     [Fact]
@@ -318,7 +322,8 @@ public class FileBusinessTests : IntegrationTestBase
             pid,
             did,
             osid, // Explicitly use project storage
-            file
+            file,
+            embed: true
         );
 
         // Assert: Should use project storage, not org default
@@ -327,6 +332,7 @@ public class FileBusinessTests : IntegrationTestBase
         Assert.True(result.Uri.Contains(_testDirectory),
             "Should use specified project storage, not org default");
         Assert.False(result.Uri.Contains(_orgDefaultDirectory));
+        Assert.True(result.Embedded);
     }
 
     [Fact]
@@ -373,7 +379,8 @@ public class FileBusinessTests : IntegrationTestBase
                 pid,
                 did,
                 secondaryOsId, // Use non-default storage
-                file
+                file,
+                embed: true
             );
 
             // Assert
@@ -383,6 +390,7 @@ public class FileBusinessTests : IntegrationTestBase
                 $"Should use secondary storage. Actual: {result.Uri}");
             Assert.False(result.Uri.Contains(_testDirectory));
             Assert.False(result.Uri.Contains(_orgDefaultDirectory));
+            Assert.True(result.Embedded);
         }
         finally
         {
@@ -407,7 +415,7 @@ public class FileBusinessTests : IntegrationTestBase
 
         // Act & Assert
         var exception = await Assert.ThrowsAsync<KeyNotFoundException>(() =>
-            _fileBusiness.UploadFile(uid, oid, pid, did, invalidStorageId, file)
+            _fileBusiness.UploadFile(uid, oid, pid, did, invalidStorageId, file, embed: true)
         );
 
         Assert.Contains("No object storage found", exception.Message);
@@ -1902,7 +1910,8 @@ public class FileBusinessTests : IntegrationTestBase
             pid,
             did,
             null, // objectStorageId is null
-            file
+            file,
+            embed: true
         );
 
         // Assert
@@ -1911,6 +1920,7 @@ public class FileBusinessTests : IntegrationTestBase
         Assert.Equal(osid, result.ObjectStorageId); // Should use project default
         Assert.True(File.Exists(result.Uri));
         Assert.True(result.Uri.Contains(_testDirectory), "File should be in project directory");
+        Assert.True(result.Embedded);
     }
 
     [Fact]

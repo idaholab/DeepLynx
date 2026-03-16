@@ -2,7 +2,7 @@
 
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import Tabs from "@/app/(home)/components/Tabs";
 import {
   GroupResponseDto,
@@ -36,7 +36,25 @@ const ProjectManagementClient = ({
 }: ProjectManagementProps) => {
   const [activeTab, setActiveTab] = useState("");
   const { t } = useLanguage();
-  const { project: sessionProject } = useProjectSession();
+  const { project: sessionProject, setProject } = useProjectSession();
+
+  useEffect(() => {
+    if (!project?.id || !project?.name) {
+      return;
+    }
+
+    if (
+      sessionProject?.projectId?.toString() === project.id.toString() &&
+      sessionProject.projectName === project.name
+    ) {
+      return;
+    }
+
+    setProject({
+      projectId: project.id.toString(),
+      projectName: project.name,
+    });
+  }, [project?.id, project?.name, sessionProject, setProject]);
 
   const handleTabChange = (label: string) => {
     setActiveTab(label);

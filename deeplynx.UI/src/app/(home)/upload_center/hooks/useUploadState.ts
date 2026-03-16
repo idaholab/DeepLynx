@@ -17,6 +17,7 @@ export function useUploadState() {
   const [uploadProgress, setUploadProgress] = useState<UploadProgressEvent | null>(null);
   const [currentUploadId, setCurrentUploadId] = useState<string | null>(null);
   const [isCancelling, setIsCancelling] = useState(false);
+  const [uploadErrorByFileIndex, setUploadErrorByFileIndex] = useState<Record<number, string>>({});
 
   // Upload Mode Toggle
   const [uploadMode, setUploadMode] = useState<UploadMode>("file");
@@ -28,6 +29,28 @@ export function useUploadState() {
     },
     []
   );
+
+  const setUploadError = useCallback((fileindex: number, message: string) =>{
+    setUploadErrorByFileIndex(prev => ({...prev, [fileindex]: message}));
+  }, []);
+
+  const cleanUploadError = useCallback((fileIndex: number) => {
+    setUploadErrorByFileIndex(prev => {
+      const next = {...prev};
+      delete next[fileIndex];
+      return next;
+    })
+  }, []);
+
+  const setAllFilesMetadata = useCallback(
+    (metadata: Record<number, FileMetadata>) => {
+      setFilesMetadata(metadata);
+    }, []);
+
+  const setAllUploadErrors = useCallback(
+    (errors: Record<number, string>) => {
+      setUploadErrorByFileIndex(errors);
+    }, []);
 
   // File management
   const removeAt = useCallback((idx: number) => {
@@ -41,11 +64,21 @@ export function useUploadState() {
       });
       return next;
     });
+    setUploadErrorByFileIndex((prev) => {
+      const next: Record<number, string> = {};
+      Object.entries(prev).forEach(([index, message]) => {
+        const numericIndex = Number(index);
+        if (numericIndex < idx) next[numericIndex] = message;
+        if (numericIndex > idx) next[numericIndex - 1] = message;
+      });
+      return next;
+    });
   }, []);
 
   const clearAll = useCallback(() => {
     setSelectedFiles([]);
     setFilesMetadata({});
+    setUploadErrorByFileIndex({});
   }, []);
 
   // Reset form
@@ -55,6 +88,7 @@ export function useUploadState() {
     setDestination("");
     setTargetFileId("");
     setFilesMetadata({});
+    setUploadErrorByFileIndex({});
     setDropKey((k) => k + 1);
     setUploadProgress(null);
     setIsCancelling(false);
@@ -67,6 +101,7 @@ export function useUploadState() {
     destination,
     selectedFiles,
     filesMetadata,
+    uploadErrorByFileIndex,
     dropKey,
     uploadMode,
     isUploading,
@@ -85,11 +120,15 @@ export function useUploadState() {
     setUploadProgress,
     setCurrentUploadId,
     setIsCancelling,
+    setUploadError,
+    setAllFilesMetadata,
+    setAllUploadErrors,
     
     // Methods
     handleMetadataChange,
     removeAt,
     clearAll,
     resetFileUpload,
+    cleanUploadError,
   };
 }

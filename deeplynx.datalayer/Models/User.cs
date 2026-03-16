@@ -109,4 +109,10 @@ public partial class User
     
     [InverseProperty("LastUpdatedByUser")]
     public virtual ICollection<OauthApplication> UpdatedOauthApplications { get; set; } = new List<OauthApplication>();
+    
+    [InverseProperty("LastUpdatedByUser")]
+    public virtual ICollection<AiModelConfig> LastUpdatedAiModelConfigs { get; set; } = new List<AiModelConfig>();
+    
+    [InverseProperty("User")]
+    public virtual ICollection<UserModelToken> UserModelTokens { get; set; } = new List<UserModelToken>();
 }

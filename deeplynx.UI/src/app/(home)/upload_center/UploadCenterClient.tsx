@@ -9,6 +9,7 @@ import {
   CHUNK_THRESHOLD,
   uploadFile,
 } from "@/app/lib/client_service/file_upload_services.client";
+import { getAllClasses } from "@/app/lib/client_service/class_services.client";
 import { updateFile } from "@/app/lib/client_service/file_services.client";
 import { uploadBulkMetadata } from "@/app/lib/client_service/metadata_service.client";
 import { fullTextSearch } from "@/app/lib/client_service/query_services.client";
@@ -25,7 +26,12 @@ import {
   ArrowUpOnSquareStackIcon,
   DocumentIcon,
 } from "@heroicons/react/24/outline";
-import type { ExistingFile, UploadProgressEvent } from "../types/types";
+import type {
+  ExistingFile,
+  FileMetadata,
+  UploadProgressEvent,
+} from "../types/types";
+import type { ClassResponseDto } from "../types/responseDTOs";
 import BulkUploadSection from "./components/BulkUploadSection";
 import FileUploadSection from "./components/FileUploadSection";
 import ProjectResourceSelectors from "./components/ProjectResourceSelectors";
@@ -95,6 +101,10 @@ export default function UploadCenterClient() {
   } = projectResources;
   const selectedFiles = fileUploadState.selectedFiles;
   const [availableFiles, setAvailableFiles] = useState<ExistingFile[]>([]);
+  const [availableClasses, setAvailableClasses] = useState<ClassResponseDto[]>(
+    [],
+  );
+  const [isLoadingClasses, setIsLoadingClasses] = useState(false);
 
   useEffect(() => {
     if (!organizationId || !projectId) {
@@ -130,6 +140,34 @@ export default function UploadCenterClient() {
       cancelled = true;
     };
   }, [organizationId, projectId]);
+
+  useEffect(() => {
+    if (!projectId) {
+      setAvailableClasses([]);
+      setIsLoadingClasses(false);
+      return;
+    }
+
+    let cancelled = false;
+    setIsLoadingClasses(true);
+
+    (async () => {
+      try {
+        const classes = await getAllClasses(Number(projectId), true);
+        if (cancelled) return;
+        setAvailableClasses(classes);
+      } catch (error) {
+        console.error("Error loading classes for metadata helper:", error);
+        if (!cancelled) setAvailableClasses([]);
+      } finally {
+        if (!cancelled) setIsLoadingClasses(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [projectId]);
 
   useEffect(() => {
     if (projectId) return;
@@ -214,6 +252,7 @@ export default function UploadCenterClient() {
       return;
     }
 
+    fileUploadState.cleanUploadError(0);
     fileUploadState.setIsUploading(true);
     fileUploadState.setUploadProgress(null);
 
@@ -232,6 +271,40 @@ export default function UploadCenterClient() {
       projectId,
       dataSourceId,
       objectStorageId,
+    };
+    const getUploadErrorMessage = (error: unknown) => {
+      const errorMessages = extractErrorMessages(
+        error,
+        t.translations.UNKNOWN_ERROR_OCCURRED,
+        t.translations.UNKNOWN_ERROR,
+      );
+      const [parsedError] = parseBackendErrors(errorMessages, {
+        objectStorageIdNotFoundInProject:
+          t.translations.OBJECT_STORAGE_ID_NOT_FOUND_IN_PROJECT,
+        objectStorageIdNotFoundSuggestion:
+          t.translations.OBJECT_STORAGE_ID_NOT_FOUND_IN_PROJECT_SUGGESTION,
+        originalIdAlreadyInUse: t.translations.ORIGINAL_ID_ALREADY_IN_USE,
+        originalIdAlreadyInUseSuggestion:
+          t.translations.ORIGINAL_ID_ALREADY_IN_USE_SUGGESTION,
+        classIdNotFoundInProject:
+          t.translations.CLASS_ID_DOES_NOT_EXIST_IN_PROJECT,
+        classIdNotFoundSuggestion:
+          t.translations.CLASS_ID_NOT_FOUND_IN_PROJECT_SUGGESTION,
+        duplicateSuggestion: t.translations.DUPLICATE_RECORD_SUGGESTION,
+        permissionSuggestion: t.translations.PERMISSION_REQUIRED_SUGGESTION,
+        validationSuggestion: t.translations.VALIDATION_ERROR_SUGGESTION,
+        relationshipSuggestion:
+          t.translations.RELATIONSHIP_ID_NOT_FOUND_SUGGESTION,
+        invalidSelectedDataSource: t.translations.INVALID_SELECTED_DATA_SOURCE,
+        invalidSelectedDataSourceSuggestion:
+          t.translations.INVALID_SELECTED_DATA_SOURCE_SUGGESTION,
+      });
+
+      return parsedError
+        ? parsedError.suggestion
+          ? `${parsedError.message} ${parsedError.suggestion}`
+          : parsedError.message
+        : t.translations.UPLOAD_FAILED_SEE_CONSOLE_FOR_DETAILS;
     };
 
     if (showChunkedProgressToast) {
@@ -301,11 +374,12 @@ export default function UploadCenterClient() {
 
             const file = selectedFiles[currentIndex];
             const metadata = fileUploadState.filesMetadata[currentIndex] ?? {};
+            fileUploadState.cleanUploadError(currentIndex);
 
             try {
               if ((metadata.recordMode ?? "new") === "update") {
                 if (!metadata.targetRecordId) {
-                  throw new Error("Missing target record id for file update");
+                  throw new Error(t.translations.PLEASE_SELECT_RECORD_TO_UPDATE);
                 }
                 const value = await updateFile(
                   Number(organizationId),
@@ -334,6 +408,10 @@ export default function UploadCenterClient() {
               }
               succeeded += 1;
             } catch (reason) {
+              fileUploadState.setUploadError(
+                currentIndex,
+                getUploadErrorMessage(reason),
+              );
               results[currentIndex] = { status: "rejected", reason };
               failed += 1;
             } finally {
@@ -357,17 +435,44 @@ export default function UploadCenterClient() {
         );
         await Promise.all(workers);
 
+        if (failed) {
+          const failedFiles: File[] = [];
+          const failedMetadata: Record<number, FileMetadata> = {};
+          const failedErrors: Record<number, string> = {};
+
+          results.forEach((results, originalIndex) => {
+            if (results?.status !== "rejected") return;
+
+            const nextIndex = failedFiles.length;
+            failedFiles.push(selectedFiles[originalIndex]);
+
+            const metadata = fileUploadState.filesMetadata[originalIndex];
+            if (metadata) {
+              failedMetadata[nextIndex] = metadata;
+            }
+
+            const error = fileUploadState.uploadErrorByFileIndex[originalIndex];
+            if (error) {
+              failedErrors[nextIndex] = error;
+            }
+          });
+
+          fileUploadState.setSelectedFiles(failedFiles);
+          fileUploadState.setAllFilesMetadata(failedMetadata);
+          fileUploadState.setAllUploadErrors(failedErrors);
+
+          uploadToastManager.error(
+            t.translations.SOME_UPLOADS_FAILED_CHECK_FILE_CARDS,
+          );
+
+          return;
+        }
+
         uploadToastManager.success(
-          failed
-            ? interpolate(t.translations.UPLOAD_BATCH_SUCCESS_WITH_FAILURES, {
-                success: succeeded,
-                failed,
-              })
-            : interpolate(t.translations.UPLOAD_BATCH_SUCCESS, {
-                success: succeeded,
-              }),
+          interpolate(t.translations.UPLOAD_BATCH_SUCCESS, {
+            success: succeeded,
+          }),
         );
-        if (failed) console.warn("Batch upload failures:", results);
 
         fileUploadState.resetFileUpload();
 
@@ -376,6 +481,7 @@ export default function UploadCenterClient() {
 
       const file = selectedFiles[0];
       const metadata = fileUploadState.filesMetadata[0] ?? {};
+      fileUploadState.cleanUploadError(0);
 
       if ((metadata.recordMode ?? "new") === "update") {
         if (!metadata.targetRecordId) {
@@ -423,9 +529,8 @@ export default function UploadCenterClient() {
         uploadToastManager.message(t.translations.UPLOAD_CANCELLED);
       } else {
         console.error("Upload error:", err);
-        uploadToastManager.error(
-          t.translations.UPLOAD_FAILED_SEE_CONSOLE_FOR_DETAILS,
-        );
+        fileUploadState.setUploadError(0, getUploadErrorMessage(err));
+        uploadToastManager.error(t.translations.UPLOAD_FAILED_CHECK_FILE_CARD);
       }
       fileUploadState.setUploadProgress(null);
     } finally {
@@ -491,7 +596,27 @@ export default function UploadCenterClient() {
         t.translations.UNKNOWN_ERROR_OCCURRED,
         t.translations.UNKNOWN_ERROR,
       );
-      const parsedErrors = parseBackendErrors(errorMessages);
+      const parsedErrors = parseBackendErrors(errorMessages, {
+        objectStorageIdNotFoundInProject:
+          t.translations.OBJECT_STORAGE_ID_NOT_FOUND_IN_PROJECT,
+        objectStorageIdNotFoundSuggestion:
+          t.translations.OBJECT_STORAGE_ID_NOT_FOUND_IN_PROJECT_SUGGESTION,
+        originalIdAlreadyInUse: t.translations.ORIGINAL_ID_ALREADY_IN_USE,
+        originalIdAlreadyInUseSuggestion:
+          t.translations.ORIGINAL_ID_ALREADY_IN_USE_SUGGESTION,
+        classIdNotFoundInProject:
+          t.translations.CLASS_ID_DOES_NOT_EXIST_IN_PROJECT,
+        classIdNotFoundSuggestion:
+          t.translations.CLASS_ID_NOT_FOUND_IN_PROJECT_SUGGESTION,
+        duplicateSuggestion: t.translations.DUPLICATE_RECORD_SUGGESTION,
+        permissionSuggestion: t.translations.PERMISSION_REQUIRED_SUGGESTION,
+        validationSuggestion: t.translations.VALIDATION_ERROR_SUGGESTION,
+        relationshipSuggestion:
+          t.translations.RELATIONSHIP_ID_NOT_FOUND_SUGGESTION,
+        invalidSelectedDataSource: t.translations.INVALID_SELECTED_DATA_SOURCE,
+        invalidSelectedDataSourceSuggestion:
+          t.translations.INVALID_SELECTED_DATA_SOURCE_SUGGESTION,
+      });
       bulkUploadState.setBackendErrors(parsedErrors);
 
       toast.error(
@@ -636,9 +761,14 @@ export default function UploadCenterClient() {
                         handleMetadataChange={
                           fileUploadState.handleMetadataChange
                         }
+                        uploadErrorByFileIndex={
+                          fileUploadState.uploadErrorByFileIndex
+                        }
                         targetFileId={fileUploadState.targetFileId}
                         setTargetFileId={fileUploadState.setTargetFileId}
                         availableFiles={availableFiles}
+                        availableClasses={availableClasses}
+                        isLoadingClasses={isLoadingClasses}
                         onSearchFiles={handleSearchAvailableFiles}
                         needsTarget={needsTarget}
                         isUploading={fileUploadState.isUploading}
@@ -646,6 +776,7 @@ export default function UploadCenterClient() {
                         onUpload={handleFileUpload}
                         onClear={fileUploadState.clearAll}
                         onRemoveAt={fileUploadState.removeAt}
+                        projectId={Number(projectId)}
                       />
                     ) : (
                       <BulkUploadSection

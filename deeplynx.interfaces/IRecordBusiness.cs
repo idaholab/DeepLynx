@@ -17,13 +17,14 @@ public interface IRecordBusiness
         long organizationId, long projectId, long dataSourceId, bool hideArchived);
 
     Task<RecordResponseDto> CreateRecord(
-        long currentUserId, long organizationId, long projectId, long dataSourceId, CreateRecordRequestDto dto, List<long>? sensitivityLabelIds = null);
+        long currentUserId, long organizationId, long projectId, long dataSourceId, CreateRecordRequestDto dto, 
+        List<long>? sensitivityLabelIds = null, bool? embedded = false);
 
     Task<List<RecordResponseDto>> BulkCreateRecords(
         long currentUserId, long organizationId, long projectId, long dataSourceId, List<CreateRecordRequestDto> dtos, List<long>? sensitivityLabelIds = null);
 
     Task<RecordResponseDto> UpdateRecord(
-        long currentUserId, long organizationId, long projectId, long recordId, UpdateRecordRequestDto dto);
+        long currentUserId, long organizationId, long projectId, long recordId, UpdateRecordRequestDto dto, bool? embedded = false);
 
     Task<bool> DeleteRecord(long currentUserId, long organizationId, long projectId, long recordId);
     Task<bool> ArchiveRecord(long currentUserId, long organizationId, long projectId, long recordId);
