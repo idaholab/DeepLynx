@@ -216,3 +216,9 @@ export type Project = {
   id: string,
   name: string
 }
+
+export type ExpandableTableColumn<T> = {
+  header: string;
+  data: (row: T) => ReactNode;
+  isExpandTrigger?: (row: T) => boolean;
+};

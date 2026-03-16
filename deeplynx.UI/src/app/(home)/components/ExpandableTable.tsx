@@ -3,12 +3,10 @@ import { ChevronDownIcon } from "@heroicons/react/24/outline";
 import React, { ReactNode, useEffect, useState } from "react";
 import PaginationControls from "./PaginationControls";
 import { useLocalPagination } from "../../hooks/useLocalPagination";
-
-type ExpandableTableColumn<T> = {
-  header: string;
-  data: (row: T) => ReactNode;
-  isExpandTrigger?: (row: T) => boolean;
-};
+import { ExpandableTableColumn } from "../types/types";
+import SortSelect from "./SortSelect";
+import { useSortedItems } from "../hooks/useSortedItems";
+import type { SortOption } from "../hooks/useSortedItems";
 
 interface ExpandableTableProps<T> {
   data: T[];
@@ -16,6 +14,8 @@ interface ExpandableTableProps<T> {
   renderExpandedContent: (row: T, onClose: () => void) => ReactNode;
   onExplore: (row: T) => void;
   getRowId: (row: T) => string | number | undefined;
+  sortOptions?: SortOption<T>[];
+  defaultSortValue?: string;
 }
 
 const DATA_CELL_CLASS =
@@ -29,39 +29,67 @@ export function ExpandableTable<T>({
   renderExpandedContent,
   onExplore,
   getRowId,
+  sortOptions,
+  defaultSortValue,
 }: ExpandableTableProps<T>) {
   const { t } = useLanguage();
 
   // View state
-  const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
+  const [expandedRowId, setExpandedRowId] = useState<string | number | null>(
+    null,
+  );
+  const { sortValue, setSortValue, sortedItems: sortedData } = useSortedItems({
+    items: data,
+    sortOptions,
+    defaultSortValue,
+  });
+
   const {
     currentPage,
     pageSize,
     paginatedItems: paginatedRows,
+    resetPagination,
     setCurrentPage,
     setPageSize,
     startIndex,
     totalPages,
   } = useLocalPagination({
-    items: data,
+    items: sortedData,
     initialPageSize: 5,
   });
 
   // Keep expansion and page state valid as the visible dataset changes.
   useEffect(() => {
-    setExpandedIndex(null);
-  }, [currentPage, pageSize]);
+    setExpandedRowId(null);
+  }, [currentPage, pageSize, sortValue]);
+
+  useEffect(() => {
+    resetPagination();
+  }, [resetPagination, sortValue]);
+
+  useEffect(() => {
+    if (expandedRowId === null) return;
+
+    const rowStillExists = sortedData.some((row, index) => {
+      const rowId = getRowId(row) ?? index;
+      return rowId === expandedRowId;
+    });
+
+    if (!rowStillExists) {
+      setExpandedRowId(null);
+    }
+  }, [expandedRowId, getRowId, sortedData]);
 
   // Row interaction handlers
-  const toggleRow = (index: number) => {
-    setExpandedIndex((currentIndex) => (currentIndex === index ? null : index));
+  const toggleRow = (rowId: string | number) => {
+    setExpandedRowId((currentRowId) => (currentRowId === rowId ? null : rowId));
   };
 
-  const closeExpanded = () => setExpandedIndex(null);
+  const closeExpanded = () => setExpandedRowId(null);
 
   // Render helpers
   const renderHeader = () => {
-    if (expandedIndex !== null) {
+    if (expandedRowId !== null) {
       return null;
     }
 
@@ -96,7 +124,6 @@ export function ExpandableTable<T>({
 
   const renderCollapsedRow = (
     row: T,
-    globalIndex: number,
     rowId: string | number,
   ) => (
     <tr className={COLLAPSED_ROW_CLASS}>
@@ -107,9 +134,7 @@ export function ExpandableTable<T>({
           <td
             key={index}
             className={`${DATA_CELL_CLASS} ${shouldTriggerExpand ? "cursor-pointer" : ""}`}
-            onClick={
-              shouldTriggerExpand ? () => toggleRow(globalIndex) : undefined
-            }
+            onClick={shouldTriggerExpand ? () => toggleRow(rowId) : undefined}
           >
             {column.data(row)}
           </td>
@@ -127,9 +152,9 @@ export function ExpandableTable<T>({
 
       <td className="rounded-r-lg border-b-4 border-base-100 text-right">
         <button
-          onClick={() => toggleRow(globalIndex)}
+          onClick={() => toggleRow(rowId)}
           aria-label="Expand row"
-          aria-expanded={expandedIndex === globalIndex}
+          aria-expanded={expandedRowId === rowId}
           className="p-1 rounded-lg hover:bg-base-300/50 transition-colors"
           data-tour={`project-row-${rowId}-toggle`}
         >
@@ -141,6 +166,14 @@ export function ExpandableTable<T>({
 
   return (
     <div>
+      {sortOptions?.length ? (
+        <SortSelect
+          value={sortValue}
+          onChange={setSortValue}
+          options={sortOptions}
+          containerClassName="flex items-center justify-end gap-1 mb-4"
+        />
+      ) : null}
       <table className="table w-full">
         {renderHeader()}
 
@@ -150,10 +183,10 @@ export function ExpandableTable<T>({
             const rowId = getRowId(row) ?? globalIndex;
 
             return (
-              <React.Fragment key={globalIndex}>
-                {expandedIndex === globalIndex
+              <React.Fragment key={rowId}>
+                {expandedRowId === rowId
                   ? renderExpandedRow(row, rowId)
-                  : renderCollapsedRow(row, globalIndex, rowId)}
+                  : renderCollapsedRow(row, rowId)}
               </React.Fragment>
             );
           })}

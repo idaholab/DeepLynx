@@ -9,13 +9,16 @@ import { getRecentlyAddedRecords } from "@/app/lib/client_service/query_services
 import { formatLocalDateTime } from "@/app/lib/date_time";
 import PaginationControls from "./PaginationControls";
 import { useLocalPagination } from "@/app/hooks/useLocalPagination";
+import SortSelect from "./SortSelect";
+import { useSortedItems } from "../hooks/useSortedItems";
+import type { SortOption } from "../hooks/useSortedItems";
 
 interface Props {
   selectedProjects: string[];
   border?: boolean;
 }
 
-type SortOption = "nameAZ" | "nameZA" | "dateNew" | "dateOld";
+type RecentRecordSortValue = "nameAZ" | "nameZA" | "dateNew" | "dateOld";
 
 const RecentRecordsCard: React.FC<Props> = ({
   selectedProjects,
@@ -29,43 +32,53 @@ const RecentRecordsCard: React.FC<Props> = ({
   const [records, setRecords] = useState<HistoricalRecordResponseDto[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [sortOption, setSortOption] = useState<SortOption>("dateNew");
   const failedToLoadRecentRecords =
     t.translations.FAILED_TO_LOAD_RECENT_RECORDS;
 
-  const sortOptions: { value: SortOption; label: string }[] = [
-    { value: "nameAZ", label: t.translations.SORT_NAME_A_TO_Z },
-    { value: "nameZA", label: t.translations.SORT_NAME_Z_TO_A },
-    { value: "dateNew", label: t.translations.SORT_DATE_NEWEST },
-    { value: "dateOld", label: t.translations.SORT_DATE_OLDEST },
-  ];
-
-  // Sort the fetched records before handing them to pagination.
-  const sorted = useMemo(() => {
-    const arr = [...records];
-    arr.sort((a, b) => {
-      const dateA = new Date(a.lastUpdatedAt).getTime();
-      const dateB = new Date(b.lastUpdatedAt).getTime();
-
-      switch (sortOption) {
-        case "nameAZ":
-          return (a.name ?? "").localeCompare(b.name ?? "", undefined, {
+  const sortOptions = useMemo<
+    SortOption<HistoricalRecordResponseDto, RecentRecordSortValue>[]
+  >(
+    () => [
+      {
+        value: "nameAZ",
+        label: t.translations.SORT_NAME_A_TO_Z,
+        compare: (a, b) =>
+          (a.name ?? "").localeCompare(b.name ?? "", undefined, {
             sensitivity: "base",
-          });
-        case "nameZA":
-          return (b.name ?? "").localeCompare(a.name ?? "", undefined, {
+          }),
+      },
+      {
+        value: "nameZA",
+        label: t.translations.SORT_NAME_Z_TO_A,
+        compare: (a, b) =>
+          (b.name ?? "").localeCompare(a.name ?? "", undefined, {
             sensitivity: "base",
-          });
-        case "dateNew":
-          return dateB - dateA;
-        case "dateOld":
-          return dateA - dateB;
-        default:
-          return 0;
-      }
+          }),
+      },
+      {
+        value: "dateNew",
+        label: t.translations.SORT_DATE_NEWEST,
+        compare: (a, b) =>
+          new Date(b.lastUpdatedAt).getTime() -
+          new Date(a.lastUpdatedAt).getTime(),
+      },
+      {
+        value: "dateOld",
+        label: t.translations.SORT_DATE_OLDEST,
+        compare: (a, b) =>
+          new Date(a.lastUpdatedAt).getTime() -
+          new Date(b.lastUpdatedAt).getTime(),
+      },
+    ],
+    [t],
+  );
+
+  const { sortValue, setSortValue, sortedItems: sortedRecords } =
+    useSortedItems({
+      items: records,
+      sortOptions,
+      defaultSortValue: "dateNew",
     });
-    return arr;
-  }, [records, sortOption]);
 
   // Local pagination state for the sorted dataset.
   const {
@@ -77,7 +90,7 @@ const RecentRecordsCard: React.FC<Props> = ({
     setPageSize,
     totalPages,
   } = useLocalPagination({
-    items: sorted,
+    items: sortedRecords,
     initialPageSize: 5,
   });
 
@@ -125,9 +138,8 @@ const RecentRecordsCard: React.FC<Props> = ({
   // Reset back to the first page whenever the sort order changes.
   useEffect(() => {
     resetPagination();
-  }, [resetPagination, sortOption]);
+  }, [resetPagination, sortValue]);
 
-  const handleSortChange = (val: SortOption) => setSortOption(val);
   const handleRecordClick = (record: HistoricalRecordResponseDto) => {
     router.push(`/record?recordId=${record.id}&projectId=${record.projectId}`);
   };
@@ -142,24 +154,11 @@ const RecentRecordsCard: React.FC<Props> = ({
           {t.translations.RECENTLY_ADDED_RECORDS}
         </h2>
 
-        <div className="flex items-center gap-1">
-          <div className="px-3 py-2 text-md font-semibold text-base-content/50">
-            {t.translations.SORT_BY}
-          </div>
-          <div className="relative inline-block">
-            <select
-              value={sortOption}
-              onChange={(e) => handleSortChange(e.target.value as SortOption)}
-              className="select"
-            >
-              {sortOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
+        <SortSelect
+          value={sortValue}
+          onChange={setSortValue}
+          options={sortOptions}
+        />
       </div>
 
       <div className="divider m-0"></div>
