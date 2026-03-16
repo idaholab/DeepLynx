@@ -1,8 +1,4 @@
 "use client";
-import {
-  ChevronLeftIcon,
-  ChevronRightIcon,
-} from "@heroicons/react/24/outline";
 import { useLanguage } from "@/app/contexts/Language";
 import { useOrganizationSession } from "@/app/contexts/OrganizationSessionProvider";
 import { useRouter } from "next/navigation";
@@ -11,13 +7,15 @@ import CatalogViewSkeleton from "./skeletons/catalogviewskeleton";
 import { HistoricalRecordResponseDto } from "../types/responseDTOs";
 import { getRecentlyAddedRecords } from "@/app/lib/client_service/query_services.client";
 import { formatLocalDateTime } from "@/app/lib/date_time";
+import PaginationControls from "./PaginationControls";
+import { useLocalPagination } from "@/app/hooks/useLocalPagination";
 
 interface Props {
   selectedProjects: string[];
   border?: boolean;
 }
 
-const PAGE_SIZE_OPTIONS = [5, 10, 25, 50];
+type SortOption = "nameAZ" | "nameZA" | "dateNew" | "dateOld";
 
 const RecentRecordsCard: React.FC<Props> = ({
   selectedProjects,
@@ -26,64 +24,23 @@ const RecentRecordsCard: React.FC<Props> = ({
   const { t } = useLanguage();
   const router = useRouter();
   const { organization } = useOrganizationSession();
-  const [recordsPerPage, setRecordsPerPage] = useState(5);
+
+  // View state
   const [records, setRecords] = useState<HistoricalRecordResponseDto[]>([]);
-  const [currentPage, setCurrentPage] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [sortOption, setSortOption] = useState<SortOption>("dateNew");
   const failedToLoadRecentRecords =
     t.translations.FAILED_TO_LOAD_RECENT_RECORDS;
 
-  type SortOption = "nameAZ" | "nameZA" | "dateNew" | "dateOld";
-  const [sortOption, setSortOption] = useState<SortOption>("dateNew");
+  const sortOptions: { value: SortOption; label: string }[] = [
+    { value: "nameAZ", label: t.translations.SORT_NAME_A_TO_Z },
+    { value: "nameZA", label: t.translations.SORT_NAME_Z_TO_A },
+    { value: "dateNew", label: t.translations.SORT_DATE_NEWEST },
+    { value: "dateOld", label: t.translations.SORT_DATE_OLDEST },
+  ];
 
-  const fetchRecentRecords = useCallback(async () => {
-    if (
-      !organization?.organizationId ||
-      !selectedProjects ||
-      selectedProjects.length === 0
-    ) {
-      setRecords([]);
-      setCurrentPage(1);
-      return;
-    }
-    setIsLoading(true);
-    setError(null);
-    try {
-      // Convert string[] to number[]
-      const projectIds = selectedProjects.map((id) => Number(id));
-      const data = await getRecentlyAddedRecords(
-        organization.organizationId as number,
-        projectIds,
-      );
-      setRecords(Array.isArray(data) ? data : []);
-      setCurrentPage(1);
-    } catch (e) {
-      console.error("Failed to fetch recent records:", e);
-      setError(failedToLoadRecentRecords);
-      setRecords([]);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [
-    failedToLoadRecentRecords,
-    organization?.organizationId,
-    selectedProjects,
-  ]);
-
-  useEffect(() => {
-    fetchRecentRecords();
-  }, [fetchRecentRecords]);
-
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [sortOption, recordsPerPage]);
-
-  const handleRecordsPerPageChange = (value: number) => {
-    setRecordsPerPage(value);
-    setCurrentPage(1);
-  };
-
+  // Sort the fetched records before handing them to pagination.
   const sorted = useMemo(() => {
     const arr = [...records];
     arr.sort((a, b) => {
@@ -110,24 +67,81 @@ const RecentRecordsCard: React.FC<Props> = ({
     return arr;
   }, [records, sortOption]);
 
-  const totalPages = Math.max(1, Math.ceil(sorted.length / recordsPerPage));
-  const startIndex = (currentPage - 1) * recordsPerPage;
-  const paginatedRecords = sorted.slice(
-    startIndex,
-    startIndex + recordsPerPage,
-  );
+  // Local pagination state for the sorted dataset.
+  const {
+    currentPage,
+    pageSize,
+    paginatedItems: paginatedRecords,
+    resetPagination,
+    setCurrentPage,
+    setPageSize,
+    totalPages,
+  } = useLocalPagination({
+    items: sorted,
+    initialPageSize: 5,
+  });
+
+  // Fetch recent records for the selected projects and organization.
+  const fetchRecentRecords = useCallback(async () => {
+    if (
+      !organization?.organizationId ||
+      !selectedProjects ||
+      selectedProjects.length === 0
+    ) {
+      setRecords([]);
+      resetPagination();
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const projectIds = selectedProjects.map((id) => Number(id));
+      const data = await getRecentlyAddedRecords(
+        organization.organizationId as number,
+        projectIds,
+      );
+      setRecords(Array.isArray(data) ? data : []);
+      resetPagination();
+    } catch (e) {
+      console.error("Failed to fetch recent records:", e);
+      setError(failedToLoadRecentRecords);
+      setRecords([]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [
+    failedToLoadRecentRecords,
+    organization?.organizationId,
+    resetPagination,
+    selectedProjects,
+  ]);
+
+  useEffect(() => {
+    fetchRecentRecords();
+  }, [fetchRecentRecords]);
+
+  // Reset back to the first page whenever the sort order changes.
+  useEffect(() => {
+    resetPagination();
+  }, [resetPagination, sortOption]);
 
   const handleSortChange = (val: SortOption) => setSortOption(val);
+  const handleRecordClick = (record: HistoricalRecordResponseDto) => {
+    router.push(`/record?recordId=${record.id}&projectId=${record.projectId}`);
+  };
 
   if (isLoading) return <CatalogViewSkeleton />;
 
   return (
     <div className={border ? "shadow-md shadow-dynamic-shadow rounded-xl" : ""}>
-      {/* Header + Sort */}
+      {/* Header and sort controls */}
       <div className="flex items-center justify-between p-4">
         <h2 className="text-lg font-semibold text-base-content">
           {t.translations.RECENTLY_ADDED_RECORDS}
         </h2>
+
         <div className="flex items-center gap-1">
           <div className="px-3 py-2 text-md font-semibold text-base-content/50">
             {t.translations.SORT_BY}
@@ -138,10 +152,11 @@ const RecentRecordsCard: React.FC<Props> = ({
               onChange={(e) => handleSortChange(e.target.value as SortOption)}
               className="select"
             >
-              <option value="nameAZ">{t.translations.SORT_NAME_A_TO_Z}</option>
-              <option value="nameZA">{t.translations.SORT_NAME_Z_TO_A}</option>
-              <option value="dateNew">{t.translations.SORT_DATE_NEWEST}</option>
-              <option value="dateOld">{t.translations.SORT_DATE_OLDEST}</option>
+              {sortOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
             </select>
           </div>
         </div>
@@ -149,7 +164,7 @@ const RecentRecordsCard: React.FC<Props> = ({
 
       <div className="divider m-0"></div>
 
-      {/* Error */}
+      {/* Error state */}
       {error && (
         <div className="p-4 text-error flex items-center justify-between">
           <span>{error}</span>
@@ -162,17 +177,13 @@ const RecentRecordsCard: React.FC<Props> = ({
         </div>
       )}
 
-      {/* List */}
+      {/* Paginated records list */}
       <ul className="space-y-1 p-2">
         {paginatedRecords.map((record) => (
           <li
             key={record.id}
             className="border-b border-base-content/40 cursor-pointer hover:bg-base-100/40 p-3 -mx-1 transition-colors"
-            onClick={() =>
-              router.push(
-                `/record?recordId=${record.id}&projectId=${record.projectId}`,
-              )
-            }
+            onClick={() => handleRecordClick(record)}
           >
             <div className="font-medium text-base-content mb-2">
               {record.name}
@@ -211,56 +222,21 @@ const RecentRecordsCard: React.FC<Props> = ({
         ))}
       </ul>
 
-      {/* Empty */}
+      {/* Empty state */}
       {!error && paginatedRecords.length === 0 && (
         <div className="text-center py-8 text-base-content/60">
           {t.translations.NO_RECENT_RECORDS}
         </div>
       )}
 
-      {/* Pagination */}
-      <div className="flex justify-between">
-        <div className="flex items-center gap-1">
-          <div className="px-3 py-2 text-md font-semibold text-base-content/50">
-            {t.translations.SHOW}
-          </div>
-          <div className="relative inline-block">
-            <select
-              className="select"
-              defaultValue={recordsPerPage}
-              onChange={(e) =>
-                handleRecordsPerPageChange(Number(e.target.value))
-              }
-            >
-              {PAGE_SIZE_OPTIONS.map((size) => (
-                <option key={size} value={size}>
-                  {size}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        <div className="items-center gap-2 p-4 border-base-300/30">
-          <button
-            className="btn btn-sm btn-ghost hover:bg-base-200"
-            disabled={currentPage === 1}
-            onClick={() => setCurrentPage((p) => p - 1)}
-          >
-            <ChevronLeftIcon className="w-5 h-5 text-base-content/70" />
-          </button>
-          <span className="px-3 text-sm text-base-content/80 font-medium">
-            {t.translations.PAGE} {currentPage} {t.translations.OF} {totalPages}
-          </span>
-          <button
-            className="btn btn-sm btn-ghost hover:bg-base-200"
-            disabled={currentPage === totalPages}
-            onClick={() => setCurrentPage((p) => p + 1)}
-          >
-            <ChevronRightIcon className="w-5 h-5 text-base-content/70" />
-          </button>
-        </div>
-      </div>
+      {/* Shared pagination controls */}
+      <PaginationControls
+        currentPage={currentPage}
+        pageSize={pageSize}
+        totalPages={totalPages}
+        onPageChange={setCurrentPage}
+        onPageSizeChange={setPageSize}
+      />
     </div>
   );
 };

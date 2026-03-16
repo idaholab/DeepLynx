@@ -19,6 +19,8 @@ type Props = {
   projectId: string;
 };
 
+const PROJECT_WIDGETS: WidgetType[] = ["ProjectOverview", "TeamMembers"];
+
 export default function ProjectDetailClient({
   initialProject,
   projectId,
@@ -26,7 +28,6 @@ export default function ProjectDetailClient({
   const { t } = useLanguage();
   const router = useRouter();
   const {
-    project: sessionProject,
     setProject: setProjectSession,
     hasLoaded,
   } = useProjectSession();
@@ -35,12 +36,6 @@ export default function ProjectDetailClient({
   const [project, setProject] = useState<ProjectResponseDto | null>(
     initialProject,
   );
-  const [canCustomize, setCanCustomize] = useState(false);
-  const [projectWidgets, setProjectWidgets] = useState<WidgetType[]>([
-    "RecentActivity",
-    "ProjectOverview",
-    "TeamMembers",
-  ]);
 
   // Memoize the sync function to prevent it from changing on every render
   const syncProjectSession = useCallback(() => {
@@ -57,15 +52,6 @@ export default function ProjectDetailClient({
   useEffect(() => {
     syncProjectSession();
   }, [syncProjectSession]);
-
-  // Save widget configuration to localStorage
-  const handleSave = (newWidgets: WidgetType[]) => {
-    setProjectWidgets(newWidgets);
-    localStorage.setItem(
-      `projectWidgets-${projectId}`,
-      JSON.stringify(newWidgets),
-    );
-  };
 
   // Navigate to data catalog with search term
   const handleSearchEnter = (searchTerm: string) => {
@@ -97,11 +83,7 @@ export default function ProjectDetailClient({
       {/* Main Content */}
       <div className="flex flex-col lg:flex-row gap-6 px-4 lg:px-6 mt-6">
         {/* Left Column */}
-        <div
-          className={`flex-1 lg:w-3/5 transition-opacity duration-300 ${
-            canCustomize ? "opacity-50 pointer-events-none" : ""
-          }`}
-        >
+        <div className="flex-1 lg:w-3/5 transition-opacity duration-300">
           {/* Search Bar */}
           <div className="mb-6">
             <SearchBar className="w-full" onEnter={handleSearchEnter} />
@@ -138,11 +120,7 @@ export default function ProjectDetailClient({
         {/* Right Column - Widgets */}
         <aside className="lg:w-2/5">
           <div className="sticky top-6">
-            <WidgetCard
-              widgets={projectWidgets}
-              onSave={handleSave}
-              onCustomizeChange={setCanCustomize}
-            />
+            <WidgetCard widgets={PROJECT_WIDGETS} />
           </div>
         </aside>
       </div>

@@ -102,10 +102,6 @@ export type UploadProgressEvent = {
 
 //Widgets
 export type WidgetType =
-  | "DataOverview"
-  | "Links"
-  | "Graph"
-  | "RecentActivity"
   | "ProjectOverview"
   | "TeamMembers";
 
