@@ -10,8 +10,11 @@ import { useLanguage } from "@/app/contexts/Language";
 import {
   ArrowsPointingInIcon,
   ArrowsPointingOutIcon,
+  ChatBubbleLeftRightIcon,
   ChevronDownIcon,
   ChevronUpIcon,
+  CloudArrowUpIcon,
+  PaperAirplaneIcon,
 } from "@heroicons/react/24/outline";
 
 type InsightRole = "assistant" | "user";
@@ -383,129 +386,161 @@ const RecordInsightChat: React.FC<RecordInsightChatProps> = ({
             ? t.translations.INSIGHT_STATUS_ERROR
             : t.translations.INSIGHT_STATUS_NOT_QUEUED;
 
+  const introMessage = buildIntroMessage(
+    safeRecordName,
+    ingestionState,
+    t.translations.INSIGHT_INTRO_READY,
+    t.translations.INSIGHT_INTRO_NOT_READY,
+  );
+  const hasStartedConversation = messages.length > 1 || isResponding;
+  const visibleMessages = hasStartedConversation ? messages.slice(1) : [];
+
   return (
-    <div className="card bg-base-100 shadow-lg">
-      <div className="card-body p-4">
-        <div className="flex items-center justify-between gap-3">
-          <h3 className="card-title text-base-content">
+    <div className="card bg-base-100 shadow-md mt-4 p-2">
+      <div className="flex items-center justify-between gap-3 px-4 py-1">
+        <div className="flex min-w-0 items-center gap-2">
+          <ChatBubbleLeftRightIcon className="size-6 text-secondary shrink-0" />
+          <h3 className="text-xl font-bold text-base-content">
             {t.translations.INSIGHT}
           </h3>
-          <div className="flex items-center gap-2">
-            {!isWidgetCollapsed && (
-              <button
-                type="button"
-                className="btn btn-xs btn-ghost"
-                onClick={() => setIsExpanded((prev) => !prev)}
-              >
-                {isExpanded ? (
-                  <ArrowsPointingInIcon className="size-6" />
-                ) : (
-                  <ArrowsPointingOutIcon className="size-6" />
-                )}
-              </button>
-            )}
-            <button
-              type="button"
-              className="btn btn-xs btn-ghost"
-              onClick={() => setIsWidgetCollapsed((prev) => !prev)}
-            >
-              {isWidgetCollapsed ? (
-                <ChevronDownIcon className="size-6" />
-              ) : (
-                <ChevronUpIcon className="size-6" />
-              )}
-            </button>
-          </div>
+          <span className="badge badge-outline badge-sm">
+            {t.translations.INSIGHT_FILE_SCOPED}
+          </span>
+          <span
+            className={`badge badge-sm ${INGESTION_BADGE_CLASS[ingestionState]}`}
+          >
+            {ingestionBadgeLabel}
+          </span>
         </div>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm gap-2"
+            onClick={() => {
+              void handleQueueUpload();
+            }}
+            disabled={isQueueingUpload || isResponding}
+          >
+            <CloudArrowUpIcon className="size-5" />
+            {isQueueingUpload
+              ? t.translations.INSIGHT_QUEUEING
+              : t.translations.INSIGHT_QUEUE_RECORD}
+          </button>
+          <button
+            type="button"
+            className="btn btn-ghost btn-xs btn-circle"
+            onClick={() => setIsExpanded((prev) => !prev)}
+            title={isExpanded ? "Collapse height" : "Expand height"}
+            disabled={isWidgetCollapsed}
+          >
+            {isExpanded ? (
+              <ArrowsPointingInIcon className="size-6" />
+            ) : (
+              <ArrowsPointingOutIcon className="size-6" />
+            )}
+          </button>
+          <button
+            type="button"
+            className="btn btn-ghost btn-xs btn-circle"
+            onClick={() => setIsWidgetCollapsed((prev) => !prev)}
+            title={isWidgetCollapsed ? "Expand widget" : "Collapse widget"}
+          >
+            {isWidgetCollapsed ? (
+              <ChevronDownIcon className="size-6" />
+            ) : (
+              <ChevronUpIcon className="size-6" />
+            )}
+          </button>
+        </div>
+      </div>
 
-        {!isWidgetCollapsed && (
-          <>
-            <p className="text-xs text-base-content/60">
-              {t.translations.INSIGHT_CONVERSATION_NOT_SAVED}
-            </p>
-
-            <div className="flex items-center gap-2">
-              <span
-                className={`badge badge-sm ${INGESTION_BADGE_CLASS[ingestionState]}`}
-              >
-                {ingestionBadgeLabel}
-              </span>
-              <button
-                type="button"
-                className="btn btn-xs btn-secondary"
-                onClick={() => {
-                  void handleQueueUpload();
-                }}
-                disabled={isQueueingUpload || isResponding}
-              >
-                {isQueueingUpload
-                  ? t.translations.INSIGHT_QUEUEING
-                  : t.translations.INSIGHT_QUEUE_RECORD}
-              </button>
-            </div>
-
-            <div className="rounded-box border border-base-300 bg-base-200 mt-2">
-              <div
-                className={`${isExpanded ? "h-[34rem]" : "h-72"} overflow-y-auto px-3 py-3 space-y-3`}
-              >
-                {messages.map((message) => (
-                  <div
-                    key={message.id}
-                    className={`chat ${message.role === "user" ? "chat-end" : "chat-start"}`}
-                  >
-                    <div className="chat-header text-xs text-base-content/60 mb-1">
-                      {message.role === "user"
-                        ? t.translations.INSIGHT_YOU
-                        : t.translations.INSIGHT}
-                      <time className="ml-2">{message.timestamp}</time>
-                    </div>
-                    <div
-                      className={`chat-bubble whitespace-pre-wrap ${
-                        message.role === "user"
-                          ? "chat-bubble-primary"
-                          : "bg-white text-black border border-base-300"
-                      }`}
-                    >
-                      {message.content || (
-                        <span className="loading loading-dots loading-sm" />
-                      )}
+      {!isWidgetCollapsed && (
+        <div
+          className={`card-body p-4 pt-2 ${isExpanded ? "h-[34rem]" : "h-[24rem]"}`}
+        >
+          <div className="h-full min-h-0">
+            <div className="flex h-full min-h-0 flex-col rounded-box border border-base-300 bg-base-100">
+              <div className="flex-1 min-h-0 overflow-y-auto bg-base-200/30 p-3">
+                {!hasStartedConversation ? (
+                  <div className="flex h-full items-center justify-center">
+                    <div className="max-w-xl text-base-content/80">
+                      <p className="text-lg">{introMessage}</p>
+                      <p className="mt-2 text-sm text-base-content/70">
+                        {t.translations.INSIGHT_CONVERSATION_NOT_SAVED}
+                      </p>
                     </div>
                   </div>
-                ))}
-                <div ref={scrollAnchorRef} />
+                ) : (
+                  <div className="space-y-3">
+                    {visibleMessages.map((message) => (
+                      <div
+                        key={message.id}
+                        className={`chat ${
+                          message.role === "user" ? "chat-end" : "chat-start"
+                        }`}
+                      >
+                        <div className="chat-header text-xs text-base-content/60 mb-1">
+                          {message.role === "user"
+                            ? t.translations.INSIGHT_YOU
+                            : t.translations.INSIGHT}
+                          <time className="ml-2">{message.timestamp}</time>
+                        </div>
+                        <div
+                          className={`chat-bubble whitespace-pre-wrap ${
+                            message.role === "user"
+                              ? "bg-primary text-primary-content"
+                              : "border border-base-300/60 bg-base-100 text-base-content"
+                          }`}
+                        >
+                          {message.content || (
+                            <span className="loading loading-dots loading-sm" />
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                    <div ref={scrollAnchorRef} />
+                  </div>
+                )}
+              </div>
+
+              <div className="border-t border-base-300 p-3">
+                <form
+                  className="flex flex-col gap-2 lg:flex-row lg:items-center"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    const prompt = draft;
+                    setDraft("");
+                    void handleSend(prompt);
+                  }}
+                >
+                  <input
+                    ref={promptInputRef}
+                    type="text"
+                    className="input input-bordered w-full bg-base-100"
+                    placeholder={t.translations.INSIGHT_ASK_PLACEHOLDER}
+                    value={draft}
+                    onChange={(e) => setDraft(e.target.value)}
+                    disabled={isResponding}
+                  />
+                  <button
+                    type="submit"
+                    className="btn btn-primary btn-sm gap-2"
+                    disabled={!draft.trim() || isResponding}
+                    aria-label={t.translations.INSIGHT_SEND_PROMPT_ARIA}
+                  >
+                    <PaperAirplaneIcon className="size-5" />
+                    {t.translations.INSIGHT_SEND}
+                  </button>
+                </form>
+
+                <p className="mt-2 text-xs text-base-content/70">
+                  {t.translations.INSIGHT_CONVERSATION_NOT_SAVED}
+                </p>
               </div>
             </div>
-
-            <form
-              className="flex items-center gap-2 mt-2"
-              onSubmit={(e) => {
-                e.preventDefault();
-                const prompt = draft;
-                setDraft("");
-                void handleSend(prompt);
-              }}
-            >
-              <input
-                ref={promptInputRef}
-                type="text"
-                className="input input-bordered w-full"
-                placeholder={t.translations.INSIGHT_ASK_PLACEHOLDER}
-                value={draft}
-                onChange={(e) => setDraft(e.target.value)}
-                disabled={isResponding}
-              />
-              <button
-                type="submit"
-                className="btn btn-primary"
-                disabled={!draft.trim() || isResponding}
-                aria-label={t.translations.INSIGHT_SEND_PROMPT_ARIA}
-              >
-                {t.translations.INSIGHT_SEND}
-              </button>
-            </form>
-          </>
-        )}
-      </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

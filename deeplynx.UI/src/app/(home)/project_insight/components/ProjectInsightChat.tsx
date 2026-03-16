@@ -159,31 +159,23 @@ export default function ProjectInsightChat({
   }
 
   return (
-    <section className="card bg-base-100 border border-base-300/60 shadow-lg">
-      <div className="card-body gap-4 p-5 lg:p-6">
+    <section className="card border border-base-300/60 bg-base-100 shadow-lg h-full min-h-0">
+      <div className="card-body flex h-full min-h-0 flex-col gap-4 p-5 lg:p-6">
         <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-          <div>
-            <h2 className="text-xl font-semibold text-base-content">
-              {t.translations.PROJECT_INSIGHT_SCOPE}
-            </h2>
-            <p className="mt-1 text-sm text-base-content/70">
-              {t.translations.PROJECT_INSIGHT_SCOPE_HINT}
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="badge badge-outline badge-secondary">
-              {withTokens(t.translations.PROJECT_INSIGHT_SCOPE_COUNT, {
-                count: scopeCount,
-              })}
-            </span>
+          <div className="flex flex-wrap items-end gap-2">
             <span className="text-xs text-base-content/60">
               {t.translations.INSIGHT_CONVERSATION_NOT_SAVED}
             </span>
           </div>
+          <span className="badge badge-outline badge-secondary">
+            {withTokens(t.translations.PROJECT_INSIGHT_SCOPE_COUNT, {
+              count: scopeCount,
+            })}
+          </span>
         </div>
 
-        <div className="rounded-box border border-base-300 bg-base-200/70">
-          <div className="h-[32rem] overflow-y-auto px-4 py-4 lg:h-[40rem]">
+        <div className="flex-1 min-h-0 rounded-box border border-base-300 bg-base-200/70">
+          <div className="h-full overflow-y-auto px-4 py-4">
             <div className="space-y-4">
               {messages.map((message) => (
                 <div
@@ -215,7 +207,7 @@ export default function ProjectInsightChat({
         </div>
 
         <form
-          className="flex flex-col gap-3"
+          className="shrink-0 flex flex-col gap-3"
           onSubmit={(event) => {
             event.preventDefault();
             const prompt = draft;
@@ -225,7 +217,7 @@ export default function ProjectInsightChat({
         >
           <textarea
             ref={promptInputRef}
-            className="textarea textarea-bordered h-28 w-full resize-none"
+            className="textarea textarea-bordered min-h-24 max-h-40 w-full resize-none"
             placeholder={t.translations.PROJECT_INSIGHT_CHAT_PLACEHOLDER}
             value={draft}
             onChange={(event) => setDraft(event.target.value)}

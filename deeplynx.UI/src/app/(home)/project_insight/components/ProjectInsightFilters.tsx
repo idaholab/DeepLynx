@@ -107,7 +107,11 @@ export default function ProjectInsightFilters({
               {t.translations.PROJECT_INSIGHT_FILTERS_DESCRIPTION}
             </p>
           </div>
-          <button type="button" className="btn btn-sm btn-ghost" onClick={onClear}>
+          <button
+            type="button"
+            className="btn btn-sm btn-ghost"
+            onClick={onClear}
+          >
             {t.translations.CLEAR_ALL}
           </button>
         </div>
