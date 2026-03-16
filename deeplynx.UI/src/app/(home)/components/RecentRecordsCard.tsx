@@ -1,6 +1,5 @@
 "use client";
 import {
-  BarsArrowDownIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
 } from "@heroicons/react/24/outline";
@@ -18,7 +17,7 @@ interface Props {
   border?: boolean;
 }
 
-const RECORDS_PER_PAGE = 5;
+const PAGE_SIZE_OPTIONS = [5, 10, 25, 50];
 
 const RecentRecordsCard: React.FC<Props> = ({
   selectedProjects,
@@ -27,11 +26,13 @@ const RecentRecordsCard: React.FC<Props> = ({
   const { t } = useLanguage();
   const router = useRouter();
   const { organization } = useOrganizationSession();
-
+  const [recordsPerPage, setRecordsPerPage] = useState(5);
   const [records, setRecords] = useState<HistoricalRecordResponseDto[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const failedToLoadRecentRecords =
+    t.translations.FAILED_TO_LOAD_RECENT_RECORDS;
 
   type SortOption = "nameAZ" | "nameZA" | "dateNew" | "dateOld";
   const [sortOption, setSortOption] = useState<SortOption>("dateNew");
@@ -59,20 +60,29 @@ const RecentRecordsCard: React.FC<Props> = ({
       setCurrentPage(1);
     } catch (e) {
       console.error("Failed to fetch recent records:", e);
-      setError("Failed to load recent records.");
+      setError(failedToLoadRecentRecords);
       setRecords([]);
     } finally {
       setIsLoading(false);
     }
-  }, [organization?.organizationId, selectedProjects]);
-  
+  }, [
+    failedToLoadRecentRecords,
+    organization?.organizationId,
+    selectedProjects,
+  ]);
+
   useEffect(() => {
     fetchRecentRecords();
   }, [fetchRecentRecords]);
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [sortOption]);
+  }, [sortOption, recordsPerPage]);
+
+  const handleRecordsPerPageChange = (value: number) => {
+    setRecordsPerPage(value);
+    setCurrentPage(1);
+  };
 
   const sorted = useMemo(() => {
     const arr = [...records];
@@ -100,11 +110,11 @@ const RecentRecordsCard: React.FC<Props> = ({
     return arr;
   }, [records, sortOption]);
 
-  const totalPages = Math.max(1, Math.ceil(sorted.length / RECORDS_PER_PAGE));
-  const startIndex = (currentPage - 1) * RECORDS_PER_PAGE;
+  const totalPages = Math.max(1, Math.ceil(sorted.length / recordsPerPage));
+  const startIndex = (currentPage - 1) * recordsPerPage;
   const paginatedRecords = sorted.slice(
     startIndex,
-    startIndex + RECORDS_PER_PAGE,
+    startIndex + recordsPerPage,
   );
 
   const handleSortChange = (val: SortOption) => setSortOption(val);
@@ -120,25 +130,18 @@ const RecentRecordsCard: React.FC<Props> = ({
         </h2>
         <div className="flex items-center gap-1">
           <div className="px-3 py-2 text-md font-semibold text-base-content/50">
-            Sort By
+            {t.translations.SORT_BY}
           </div>
           <div className="relative inline-block">
-            <BarsArrowDownIcon
-              className={`pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 h-5 w-5 transition-colors
-                          text-[var(--color-gray-400)]`}
-            />
             <select
               value={sortOption}
               onChange={(e) => handleSortChange(e.target.value as SortOption)}
-              className={`appearance-none border-2 border-gray-400 square-lg pl-3 pr-9 py-2 text-sm 
-                          bg-base-100 font-semibold text-base-content/50 cursor-pointer
-                          hover:bg-[var(--color-dynamic-blue)] hover:text-[var(--color-base-content)] focus:ring-2 focus:ring-[var(--color-secondary)]
-                          transition-all duration-200 w-44`}
+              className="select"
             >
-              <option value="nameAZ">Name: A to Z</option>
-              <option value="nameZA">Name: Z to A</option>
-              <option value="dateNew">Date: Newest</option>
-              <option value="dateOld">Date: Oldest</option>
+              <option value="nameAZ">{t.translations.SORT_NAME_A_TO_Z}</option>
+              <option value="nameZA">{t.translations.SORT_NAME_Z_TO_A}</option>
+              <option value="dateNew">{t.translations.SORT_DATE_NEWEST}</option>
+              <option value="dateOld">{t.translations.SORT_DATE_OLDEST}</option>
             </select>
           </div>
         </div>
@@ -154,7 +157,7 @@ const RecentRecordsCard: React.FC<Props> = ({
             className="btn btn-sm btn-outline"
             onClick={fetchRecentRecords}
           >
-            Retry
+            {t.translations.RETRY}
           </button>
         </div>
       )}
@@ -179,7 +182,7 @@ const RecentRecordsCard: React.FC<Props> = ({
               <span className="flex items-center gap-1">
                 <span>{t.translations.CLASS}: </span>
                 <span className="badge badge-sm badge-secondary">
-                  {record.className ?? "Unknown"}
+                  {record.className ?? t.translations.UNKNOWN}
                 </span>
               </span>
 
@@ -211,13 +214,34 @@ const RecentRecordsCard: React.FC<Props> = ({
       {/* Empty */}
       {!error && paginatedRecords.length === 0 && (
         <div className="text-center py-8 text-base-content/60">
-          {t.translations.NO_RECENT_RECORDS || "No recent records found"}
+          {t.translations.NO_RECENT_RECORDS}
         </div>
       )}
 
       {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex justify-end items-center gap-2 p-4 border-base-300/30">
+      <div className="flex justify-between">
+        <div className="flex items-center gap-1">
+          <div className="px-3 py-2 text-md font-semibold text-base-content/50">
+            {t.translations.SHOW}
+          </div>
+          <div className="relative inline-block">
+            <select
+              className="select"
+              defaultValue={recordsPerPage}
+              onChange={(e) =>
+                handleRecordsPerPageChange(Number(e.target.value))
+              }
+            >
+              {PAGE_SIZE_OPTIONS.map((size) => (
+                <option key={size} value={size}>
+                  {size}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <div className="items-center gap-2 p-4 border-base-300/30">
           <button
             className="btn btn-sm btn-ghost hover:bg-base-200"
             disabled={currentPage === 1}
@@ -236,7 +260,7 @@ const RecentRecordsCard: React.FC<Props> = ({
             <ChevronRightIcon className="w-5 h-5 text-base-content/70" />
           </button>
         </div>
-      )}
+      </div>
     </div>
   );
 };
