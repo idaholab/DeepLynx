@@ -1,42 +1,44 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import toast from "react-hot-toast";
 import { useOrganizationSession } from "@/app/contexts/OrganizationSessionProvider";
-import { sendEmail } from "@/app/lib/client_service/notification_services.client";
-import { getAllUsers } from "@/app/lib/client_service/user_services.client";
-import { getAllGroups, getGroupMembers } from "@/app/lib/client_service/group_services.client";
+import {
+  getAllGroups,
+  getGroupMembers,
+} from "@/app/lib/client_service/group_services.client";
 import {
   addMemberToProject,
+  getProjectMembers,
   removeMemberFromProject,
   updateProjectMemberRole,
-
-  getProjectMembers,
 } from "@/app/lib/client_service/projects_services.client";
+import { getAllUsers } from "@/app/lib/client_service/user_services.client";
+import { useEffect, useMemo, useState } from "react";
+import toast from "react-hot-toast";
 
-import { inviteUserToOrganization } from "@/app/lib/client_service/organization_services.client"; "@/app/lib/client_service/organizations_services.client";
-import { InviteUserToProjectRequestDto, InviteUserToOrganizationRequestDto } from "@/app/(home)/types/requestDTOs";
+import { InviteUserToOrganizationRequestDto } from "@/app/(home)/types/requestDTOs";
 import {
-  ProjectMemberResponseDto,
-  UserResponseDto,
   GroupResponseDto,
-  RoleResponseDto,
+  ProjectMemberResponseDto,
   ProjectResponseDto,
+  RoleResponseDto,
+  UserResponseDto,
 } from "@/app/(home)/types/responseDTOs";
+import { inviteUserToOrganization } from "@/app/lib/client_service/organization_services.client";
+import AddGroupToProjectModal from "./AddGroupToProjectModal";
+import AddUsersToProjectModal from "./AddUsersToProjectModal";
+import EditProjectMemberRoleModal from "./EditProjectMemberRoleModal";
 import ProjectUsersHeader from "./ProjectUsersHeader";
 import ProjectUsersListTable from "./ProjectUsersListTable";
-import AddUsersToProjectModal from "./AddUsersToProjectModal";
-import AddGroupToProjectModal from "./AddGroupToProjectModal";
 import RemoveProjectMemberModal from "./RemoveProjectMemberModal";
-import EditProjectMemberRoleModal from "./EditProjectMemberRoleModal";
+("@/app/lib/client_service/organizations_services.client");
 
+import { useLanguage } from "@/app/contexts/Language";
 import {
   ConfirmModalState,
   EditRoleModalState,
   ProjectMemberTableRow,
   buildTableData,
 } from "../../types/projectUsersTypes";
-import { useLanguage } from "@/app/contexts/Language";
 
 /* -------------------------------------------------------------------------- */
 /*                         ProjectUsersTable Component                        */
@@ -72,11 +74,15 @@ const ProjectUsersTable = ({ members, roles, project }: Props) => {
   /* ------------------------------------------------------------------------ */
 
   const [showAddGroupModal, setShowAddGroupModal] = useState(false);
-  const [availableGroups, setAvailableGroups] = useState<GroupResponseDto[]>([]);
+  const [availableGroups, setAvailableGroups] = useState<GroupResponseDto[]>(
+    [],
+  );
   const [groupModalLoading, setGroupModalLoading] = useState(false);
   const [selectedGroupId, setSelectedGroupId] = useState<string>("");
   const [selectedGroupRoleId, setSelectedGroupRoleId] = useState<string>("");
-  const [groupMembersCache, setGroupMembersCache] = useState<Map<number, UserResponseDto[]>>(new Map());
+  const [groupMembersCache, setGroupMembersCache] = useState<
+    Map<number, UserResponseDto[]>
+  >(new Map());
 
   /* ------------------------------------------------------------------------ */
   /*                        Confirm Remove / Future Use                       */
@@ -140,42 +146,45 @@ const ProjectUsersTable = ({ members, roles, project }: Props) => {
   /*                     Add Users Modal: Open & Handler                      */
   /* ------------------------------------------------------------------------ */
 
- const handleOpenAddUsersModal = async () => {
-  if (!organizationId) {
-    toast.error(t.translations.NO_ORG_SELECTED);
-    return;
-  }
+  const handleOpenAddUsersModal = async () => {
+    if (!organizationId) {
+      toast.error(t.translations.NO_ORG_SELECTED);
+      return;
+    }
 
-  setShowAddUserModal(true);
-  setUserModalLoading(true);
+    setShowAddUserModal(true);
+    setUserModalLoading(true);
 
-  try {
-    const users = await getAllUsers(organizationId);
-    setAvailableUsers(users);
-  } catch (error) {
-    console.error("Failed to load users:", error);
-    toast.error(t.translations.UNABLE_TO_LOAD_USERS);
-  } finally {
-    setUserModalLoading(false);
-  }
-};
+    try {
+      const users = await getAllUsers(organizationId);
+      setAvailableUsers(users);
+    } catch (error) {
+      console.error("Failed to load users:", error);
+      toast.error(t.translations.UNABLE_TO_LOAD_USERS);
+    } finally {
+      setUserModalLoading(false);
+    }
+  };
 
-  const handleAddInviteUser = async (emailOrUserId: string | number, roleId?: number) => {
+  const handleAddInviteUser = async (
+    emailOrUserId: string | number,
+    roleId?: number,
+  ) => {
     if (!organizationId) {
       throw new Error(t.translations.MISSING_ORG_ID);
     }
 
     // If it's a string (email), invite external user
-    if (typeof emailOrUserId === 'string') {
+    if (typeof emailOrUserId === "string") {
       const inviteData: InviteUserToOrganizationRequestDto = {
         userEmail: emailOrUserId,
         userName: emailOrUserId.split("@")[0],
       };
 
       await inviteUserToOrganization(organizationId, inviteData);
-    } 
+    }
     // If it's a number (userId), add existing org user to project
-    else if (typeof emailOrUserId === 'number' && roleId && projectId) {
+    else if (typeof emailOrUserId === "number" && roleId && projectId) {
       await addMemberToProject(organizationId, projectId, {
         roleId,
         userId: emailOrUserId,
@@ -185,7 +194,10 @@ const ProjectUsersTable = ({ members, roles, project }: Props) => {
     // Refresh the members list
     try {
       if (projectId) {
-        const updatedMembers = await getProjectMembers(organizationId, projectId);
+        const updatedMembers = await getProjectMembers(
+          organizationId,
+          projectId,
+        );
         setTableData(buildTableData(updatedMembers));
       } else {
         const updatedMembers = await getAllUsers(organizationId);
@@ -194,7 +206,7 @@ const ProjectUsersTable = ({ members, roles, project }: Props) => {
     } catch (refreshError) {
       console.error("Failed to refresh members list:", refreshError);
     }
-};
+  };
 
   /* ------------------------------------------------------------------------ */
   /*                     Add Group Modal: Open & Handler                      */
@@ -231,7 +243,9 @@ const ProjectUsersTable = ({ members, roles, project }: Props) => {
     // Fetch asynchronously and cache
     getGroupMembers(organizationId, groupId)
       .then((groupMembers) => {
-        setGroupMembersCache((prev) => new Map(prev).set(groupId, groupMembers));
+        setGroupMembersCache((prev) =>
+          new Map(prev).set(groupId, groupMembers),
+        );
       })
       .catch((error) => {
         console.error(`Failed to load members for group ${groupId}:`, error);
