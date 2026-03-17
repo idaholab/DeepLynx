@@ -23,7 +23,7 @@ public class HistoricalEdgeBusinessTests : IntegrationTestBase
     private Mock<ILogger<NotificationBusiness>> _mockNotificationLogger = null!;
     private INotificationBusiness _notificationBusiness = null!;
     private BulkCopyUpsertExecutor _mockBulkCopyUpsertExecutor = null!;
-    
+    private ISensitivityLabelService _sensitivityLabelService = null!;
     public long destinationRecordId;
     public long destinationRecordId2;
     public long dsid;
@@ -55,7 +55,8 @@ public class HistoricalEdgeBusinessTests : IntegrationTestBase
         _mockBulkCopyUpsertExecutor = new BulkCopyUpsertExecutor();
         _eventBusiness = new EventBusiness(Context, _notificationBusiness, _mockBulkCopyUpsertExecutor);
         _historicalEdgeBusiness = new HistoricalEdgeBusiness(Context);
-        _edgeBusiness = new EdgeBusiness(Context, _eventBusiness, _mockBulkCopyUpsertExecutor);
+        _sensitivityLabelService = new SensitivityLabelService(Context);
+        _edgeBusiness = new EdgeBusiness(Context, _eventBusiness, _mockBulkCopyUpsertExecutor, _sensitivityLabelService);
     }
 
     protected override async Task SeedTestDataAsync()

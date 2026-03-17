@@ -1,5 +1,6 @@
 using deeplynx.business;
 using deeplynx.datalayer.Models;
+using deeplynx.helpers;
 using deeplynx.helpers.BigData;
 using deeplynx.helpers.Hubs;
 using deeplynx.interfaces;
@@ -29,7 +30,8 @@ public class GraphBusinessTests : IntegrationTestBase
     private INotificationBusiness _notificationBusiness = null!;
     private ProjectBusiness _projectBusiness = null!;
     private IBulkCopyUpsertExecutor _bulkCopyUpsertExecutor = null!;
-    
+    private ISensitivityLabelService _sensitivityLabelService = null!;
+
     public long classId;
     public long dsid;
     public long oid;
@@ -60,11 +62,12 @@ public class GraphBusinessTests : IntegrationTestBase
             new NotificationBusiness(Context, _mockNotificationLogger.Object, _mockHubContext.Object);
         _bulkCopyUpsertExecutor = new BulkCopyUpsertExecutor();
         _eventBusiness = new EventBusiness(Context, _notificationBusiness, _bulkCopyUpsertExecutor);
-        
-        _mockOrganizationBusiness = new Mock<IOrganizationBusiness>();
 
-        _graphBusiness = new GraphBusiness(Context, _eventBusiness);
-        _edgeBusiness = new EdgeBusiness(Context, _eventBusiness, _bulkCopyUpsertExecutor);
+        _mockOrganizationBusiness = new Mock<IOrganizationBusiness>();
+        _sensitivityLabelService = new SensitivityLabelService(Context);
+
+        _graphBusiness = new GraphBusiness(Context, _eventBusiness, _sensitivityLabelService);
+        _edgeBusiness = new EdgeBusiness(Context, _eventBusiness, _bulkCopyUpsertExecutor, _sensitivityLabelService);
         _dataSourceBusiness = new DataSourceBusiness(Context, _edgeBusiness, _mockRecordBusiness.Object,
             _eventBusiness);
         _classBusiness = new ClassBusiness(
@@ -219,7 +222,7 @@ public class GraphBusinessTests : IntegrationTestBase
         await _projectBusiness.AddMemberToProject(pid, null, uid1, null);
 
         // Act
-        var result = await _graphBusiness.GetEdgesByRecord(oid, pid, record1Id, true, 1, 20);
+        var result = await _graphBusiness.GetEdgesByRecord(uid1, oid, pid, record1Id, true, 1, 20);
 
         // Assert
         Assert.Empty(result);
@@ -271,7 +274,7 @@ public class GraphBusinessTests : IntegrationTestBase
         await Context.SaveChangesAsync();
 
         // Act
-        var result = await _graphBusiness.GetEdgesByRecord(oid, pid, record1Id, true, 1, 20);
+        var result = await _graphBusiness.GetEdgesByRecord(uid1, oid, pid, record1Id, true, 1, 20);
 
         // Assert
         Assert.Single(result);
@@ -324,7 +327,7 @@ public class GraphBusinessTests : IntegrationTestBase
         await Context.SaveChangesAsync();
 
         // Act
-        var result = await _graphBusiness.GetEdgesByRecord(oid, pid, record1Id, false, 1, 20);
+        var result = await _graphBusiness.GetEdgesByRecord(uid1, oid, pid, record1Id, false, 1, 20);
 
         // Assert
         Assert.Single(result);
@@ -352,7 +355,7 @@ public class GraphBusinessTests : IntegrationTestBase
         await Context.SaveChangesAsync();
 
         // Act
-        var result = await _graphBusiness.GetEdgesByRecord(oid, pid, record1Id, true, 1, 20);
+        var result = await _graphBusiness.GetEdgesByRecord(uid1, oid, pid, record1Id, true, 1, 20);
 
         // Assert
         Assert.Single(result);
@@ -381,16 +384,16 @@ public class GraphBusinessTests : IntegrationTestBase
         await Context.SaveChangesAsync();
 
         // Act - Get page 1 (2 items)
-        var page1 = await _graphBusiness.GetEdgesByRecord(oid, pid, record1Id, true, 1, 2);
-        
+        var page1 = await _graphBusiness.GetEdgesByRecord(uid1, oid, pid, record1Id, true, 1, 2);
+
         // Act - Get page 2 (2 items)
-        var page2 = await _graphBusiness.GetEdgesByRecord(oid, pid, record1Id, true, 2, 2);
-        
+        var page2 = await _graphBusiness.GetEdgesByRecord(uid1, oid, pid, record1Id, true, 2, 2);
+
         // Assert
         Assert.Equal(2, page1.Count);
         Assert.Equal(2, page2.Count);
-     
-        
+
+
         // Verify no duplicates across pages
         var allIds = page1.Select(r => r.RelatedRecordId)
             .Concat(page2.Select(r => r.RelatedRecordId))
@@ -417,7 +420,7 @@ public class GraphBusinessTests : IntegrationTestBase
         await Context.SaveChangesAsync();
 
         // Act
-        var result = await _graphBusiness.GetEdgesByRecord(oid, pid, record1Id, true, 5, 20);
+        var result = await _graphBusiness.GetEdgesByRecord(uid1, oid, pid, record1Id, true, 5, 20);
 
         // Assert
         Assert.Empty(result);
@@ -428,7 +431,7 @@ public class GraphBusinessTests : IntegrationTestBase
     {
         // Act & Assert
         await Assert.ThrowsAsync<ArgumentException>(() =>
-            _graphBusiness.GetEdgesByRecord(oid, pid, record1Id, true, -1, 20));
+            _graphBusiness.GetEdgesByRecord(uid1, oid, pid, record1Id, true, -1, 20));
     }
 
     [Fact]
@@ -453,7 +456,7 @@ public class GraphBusinessTests : IntegrationTestBase
 
         // Act & Assert
         await Assert.ThrowsAsync<KeyNotFoundException>(() =>
-            _graphBusiness.GetEdgesByRecord(oid, pid, archivedRecord.Id, true, 1, 20));
+            _graphBusiness.GetEdgesByRecord(uid1, oid, pid, archivedRecord.Id, true, 1, 20));
     }
 
     #endregion
@@ -522,7 +525,7 @@ public class GraphBusinessTests : IntegrationTestBase
         // Assert
         Assert.Equal(3, result.Nodes.Count);
         Assert.Equal(3, result.Links.Count);
-        
+
         // Verify each node appears only once
         var nodeIds = result.Nodes.Select(n => n.Id).ToList();
         Assert.Equal(nodeIds.Distinct().Count(), nodeIds.Count);
@@ -565,7 +568,7 @@ public class GraphBusinessTests : IntegrationTestBase
         // Assert
         Assert.Equal(2, result.Nodes.Count);
         Assert.Equal(2, result.Links.Count);
-        
+
         // Verify both directions are present
         Assert.Contains(result.Links, l => l.Source == record1Id && l.Target == record2Id);
         Assert.Contains(result.Links, l => l.Source == record2Id && l.Target == record1Id);
@@ -669,7 +672,7 @@ public class GraphBusinessTests : IntegrationTestBase
         // Assert
         Assert.Equal(5, result.Nodes.Count);
         Assert.Equal(4, result.Links.Count);
-        
+
         // Verify root node type
         Assert.Single(result.Nodes.Where(n => n.Type == "root"));
         Assert.Equal(4, result.Nodes.Count(n => n.Type == "node"));
@@ -737,7 +740,7 @@ public class GraphBusinessTests : IntegrationTestBase
         };
         Context.Groups.Add(group);
         await Context.SaveChangesAsync();
-        
+
         var user = await Context.Users.FindAsync(uid1);
         if (user != null)
         {

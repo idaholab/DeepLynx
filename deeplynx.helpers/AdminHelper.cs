@@ -36,22 +36,22 @@ public static class AdminHelper
     {
         var sql = projectId.HasValue
             ? """
-              SELECT 1 FROM users
+              SELECT 1 FROM deeplynx.users
                 WHERE id = {0} AND is_sys_admin = true
               UNION ALL
-              SELECT 1 FROM organization_users
+              SELECT 1 FROM deeplynx.organization_users
                 WHERE user_id = {0} AND organization_id = {1} AND is_org_admin = true
               UNION ALL
-              SELECT 1 FROM project_members pm
-              JOIN roles r ON r.id = pm.role_id
+              SELECT 1 FROM deeplynx.project_members pm
+              JOIN deeplynx.roles r ON r.id = pm.role_id
                 WHERE pm.user_id = {0} AND pm.project_id = {2} AND r.name = 'Admin'
               LIMIT 1
               """
             : """
-              SELECT 1 FROM users
+              SELECT 1 FROM deeplynx.users
                 WHERE id = {0} AND is_sys_admin = true
               UNION ALL
-              SELECT 1 FROM organization_users
+              SELECT 1 FROM deeplynx.organization_users
                 WHERE user_id = {0} AND organization_id = {1} AND is_org_admin = true
               LIMIT 1
               """;
