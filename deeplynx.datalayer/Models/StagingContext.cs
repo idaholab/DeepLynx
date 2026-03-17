@@ -20,6 +20,8 @@ public class StagingContext : DbContext
 
     public virtual DbSet<Relationship> Relationships { get; set; }
 
+    public virtual DbSet<CrossSchemaEdge> CrossSchemaEdges { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema("staging");
@@ -188,6 +190,28 @@ public class StagingContext : DbContext
             entity.Ignore(e => e.LastUpdatedByUser);
         });
 
+        modelBuilder.Entity<CrossSchemaEdge>(entity =>
+        {
+            entity.ToTable("cross_schema_edges", "staging");
+
+            entity.HasKey(e => e.Id).HasName("cross_schema_edges_pkey");
+
+            entity.HasIndex(e => e.ExtractionId)
+                .HasDatabaseName("idx_cross_schema_edges_extraction_id");
+
+            entity.HasIndex(e => e.ProjectId)
+                .HasDatabaseName("idx_cross_schema_edges_project_id");
+
+            entity.Property(e => e.Id).UseIdentityAlwaysColumn();
+            entity.Property(e => e.LastUpdatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+            entity.HasOne<Extraction>()
+                .WithMany()
+                .HasForeignKey(e => e.ExtractionId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("cross_schema_edges_extraction_id_fkey");
+        });
+
         modelBuilder.Entity<Record>(entity =>
         {
             entity.ToTable("records", "staging");
@@ -241,6 +265,9 @@ public class StagingContext : DbContext
                 .HasForeignKey(e => e.ExtractionId)
                 .OnDelete(DeleteBehavior.SetNull)
                 .HasConstraintName("records_extraction_id_fkey");
+
+            // Shadow property: name of a deeplynx class to resolve at promotion when ClassId is null
+            entity.Property<string?>("ClassName").HasColumnName("class_name");
 
             // Ignore non-staging navigations to prevent transitive entity discovery
             entity.Ignore(e => e.DataSource);
@@ -315,6 +342,10 @@ public class StagingContext : DbContext
                 .HasForeignKey(e => e.ExtractionId)
                 .OnDelete(DeleteBehavior.SetNull)
                 .HasConstraintName("relationships_extraction_id_fkey");
+
+            // Shadow properties: class names to resolve at promotion when OriginId/DestinationId are null
+            entity.Property<string?>("OriginName").HasColumnName("origin_name");
+            entity.Property<string?>("DestinationName").HasColumnName("destination_name");
 
             // Ignore non-staging navigations to prevent transitive entity discovery
             entity.Ignore(e => e.Project);

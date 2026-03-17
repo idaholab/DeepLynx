@@ -175,6 +175,7 @@ try
     builder.Services.AddTransient<IRoleBusiness, RoleBusiness>();
     builder.Services.AddTransient<ISensitivityLabelBusiness, SensitivityLabelBusiness>();
     builder.Services.AddTransient<IPermissionBusiness, PermissionBusiness>();
+    builder.Services.AddTransient<IExtractionBusiness, ExtractionBusiness>();
     builder.Services.AddTransient<IProjectRolePermissionService, ProjectRolePermissionService>();
     builder.Services.AddTransient<IOrgRolePermissionService, OrgRolePermissionService>();
     builder.Services.AddScoped<IBulkCopyUpsertExecutor, BulkCopyUpsertExecutor>();
@@ -253,6 +254,7 @@ try
 
                 // AI Services
                 new() { Name = "Lattice", Description = "Useful data views for DeepLynx Lattice use" },
+                new() { Name = "Extraction", Description = "Extraction for DeepLynx Lattice use" },
 
                 // Authentication
                 new() { Name = "OauthHandshake", Description = "OAuth2 authorization flow" },
@@ -324,7 +326,7 @@ try
                 new JsonObject
                 {
                     ["name"] = "AI Services",
-                    ["tags"] = new JsonArray { "Lattice" }
+                    ["tags"] = new JsonArray { "Lattice", "Extraction" }
                 },
                 new JsonObject
                 {
