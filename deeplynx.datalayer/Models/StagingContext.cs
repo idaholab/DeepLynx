@@ -28,6 +28,7 @@ public class StagingContext : DbContext
 
         // Ignore all entities not part of the staging schema to prevent transitive discovery issues
         modelBuilder.Ignore<deeplynx.datalayer.Models.Action>();
+        modelBuilder.Ignore<AiModelConfig>();
         modelBuilder.Ignore<ApiKey>();
         modelBuilder.Ignore<DataSource>();
         modelBuilder.Ignore<Event>();
@@ -48,6 +49,7 @@ public class StagingContext : DbContext
         modelBuilder.Ignore<Subscription>();
         modelBuilder.Ignore<Tag>();
         modelBuilder.Ignore<User>();
+        modelBuilder.Ignore<UserModelToken>();
 
         // Extraction lives in the deeplynx schema - referenced for FK purposes only, excluded from staging migrations
         modelBuilder.Entity<Extraction>(entity =>
