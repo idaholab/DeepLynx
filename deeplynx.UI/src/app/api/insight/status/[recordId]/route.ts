@@ -1,15 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
+import {
+  fetchInsight,
+  getInsightErrorMessage,
+  parseInsightBody,
+} from "@/app/lib/server_service/insight_services.server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-function getInsightBaseUrl(): string {
-  const raw = process.env.INSIGHT_API_URL || "http://localhost:5009";
-  return raw.replace(/\/+$/, "");
-}
-
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ recordId: string }> },
 ) {
   try {
@@ -23,25 +23,15 @@ export async function GET(
       );
     }
 
-    const baseUrl = getInsightBaseUrl();
-    const targetUrl = `${baseUrl}/ingestion_status/${recordIdNum}`;
+    const upstreamResponse = await fetchInsight(
+      `/ingestion_status/${recordIdNum}`,
+      {
+        method: "GET",
+        headers: { Accept: "application/json" },
+      },
+    );
 
-    const upstreamResponse = await fetch(targetUrl, {
-      method: "GET",
-      headers: { Accept: "application/json" },
-      cache: "no-store",
-    });
-
-    const responseText = await upstreamResponse.text();
-    let responseBody: unknown = null;
-
-    if (responseText) {
-      try {
-        responseBody = JSON.parse(responseText);
-      } catch {
-        responseBody = { message: responseText };
-      }
-    }
+    const responseBody = await parseInsightBody(upstreamResponse);
 
     if (!upstreamResponse.ok) {
       return NextResponse.json(
@@ -59,10 +49,10 @@ export async function GET(
     console.error("Insight status proxy error:", error);
     return NextResponse.json(
       {
-        message:
-          error instanceof Error
-            ? error.message
-            : "Unexpected insight status proxy error",
+        message: getInsightErrorMessage(
+          "Unexpected insight status proxy error",
+          error,
+        ),
       },
       { status: 500 },
     );

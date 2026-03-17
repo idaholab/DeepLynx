@@ -1,36 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
+import {
+  fetchInsight,
+  getInsightErrorMessage,
+  parseInsightBody,
+} from "@/app/lib/server_service/insight_services.server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-function getInsightBaseUrl(): string {
-  const raw = process.env.INSIGHT_API_URL || "http://localhost:5009";
-  return raw.replace(/\/+$/, "");
-}
-
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const baseUrl = getInsightBaseUrl();
-    const targetUrl = `${baseUrl}/upload_document`;
-
-    const upstreamResponse = await fetch(targetUrl, {
+    const upstreamResponse = await fetchInsight("/upload_document", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
-      cache: "no-store",
     });
 
-    const responseText = await upstreamResponse.text();
-    let responseBody: unknown = null;
-
-    if (responseText) {
-      try {
-        responseBody = JSON.parse(responseText);
-      } catch {
-        responseBody = { message: responseText };
-      }
-    }
+    const responseBody = await parseInsightBody(upstreamResponse);
 
     if (!upstreamResponse.ok) {
       return NextResponse.json(
@@ -48,10 +35,10 @@ export async function POST(request: NextRequest) {
     console.error("Insight upload proxy error:", error);
     return NextResponse.json(
       {
-        message:
-          error instanceof Error
-            ? error.message
-            : "Unexpected insight upload proxy error",
+        message: getInsightErrorMessage(
+          "Unexpected insight upload proxy error",
+          error,
+        ),
       },
       { status: 500 },
     );

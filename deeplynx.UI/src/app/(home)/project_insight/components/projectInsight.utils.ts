@@ -10,50 +10,10 @@ import type {
   ProjectInsightRecord,
   ProjectInsightStatus,
 } from "./projectInsight.types";
-
-const INSIGHT_SUPPORTED_FILE_TYPES = new Set(["pdf", "txt", "html", "htm"]);
-
-function normalizeFileType(value?: string | null): string | null {
-  if (!value) return null;
-  const normalized = value.trim().toLowerCase().replace(/^\./, "");
-  return normalized.length > 0 ? normalized : null;
-}
-
-function getFileExtensionFromValue(value?: string | null): string | null {
-  if (!value) return null;
-  const trimmed = value.trim();
-  if (!trimmed) return null;
-
-  try {
-    const url = new URL(trimmed);
-    return getFileExtensionFromValue(url.pathname);
-  } catch {
-    // Not a URL, continue parsing as a local path.
-  }
-
-  const withoutQueryOrHash = trimmed.split(/[?#]/, 1)[0];
-  const lastPathSegment =
-    withoutQueryOrHash.split("/").pop() ?? withoutQueryOrHash;
-  const extensionIndex = lastPathSegment.lastIndexOf(".");
-
-  if (extensionIndex <= 0 || extensionIndex === lastPathSegment.length - 1) {
-    return null;
-  }
-
-  return normalizeFileType(lastPathSegment.slice(extensionIndex + 1));
-}
-
-function resolveInsightFileType(
-  fileType?: string | null,
-  uri?: string | null,
-  name?: string | null,
-): string | null {
-  return (
-    normalizeFileType(fileType) ??
-    getFileExtensionFromValue(uri) ??
-    getFileExtensionFromValue(name)
-  );
-}
+import {
+  isInsightSupportedFileType,
+  resolveInsightFileType,
+} from "@/app/lib/insight_file_support";
 
 function normalizeNamedOptions(value: unknown): NamedInsightOption[] {
   if (!value) return [];
@@ -125,9 +85,11 @@ export function mapProjectInsightRecords(
         labels: normalizeNamedOptions(record.labels),
         lastUpdatedAt: record.lastUpdatedAt ?? null,
         isArchived: Boolean(record.isArchived),
-        isInsightSupported:
-          resolvedFileType !== null &&
-          INSIGHT_SUPPORTED_FILE_TYPES.has(resolvedFileType),
+        isInsightSupported: isInsightSupportedFileType(
+          record.fileType,
+          record.uri,
+          record.name,
+        ),
       },
     ];
   });

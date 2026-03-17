@@ -1,27 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
+import {
+  fetchInsight,
+  getInsightErrorMessage,
+} from "@/app/lib/server_service/insight_services.server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-function getInsightBaseUrl(): string {
-  const raw = process.env.INSIGHT_API_URL || "http://localhost:5009";
-  return raw.replace(/\/+$/, "");
-}
-
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const baseUrl = getInsightBaseUrl();
-    const targetUrl = `${baseUrl}/query`;
-
-    const upstreamResponse = await fetch(targetUrl, {
+    const upstreamResponse = await fetchInsight("/query", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Accept: "text/plain",
       },
       body: JSON.stringify(body),
-      cache: "no-store",
     });
 
     if (!upstreamResponse.ok) {
@@ -56,10 +51,7 @@ export async function POST(request: NextRequest) {
     console.error("Insight query proxy error:", error);
     return NextResponse.json(
       {
-        message:
-          error instanceof Error
-            ? error.message
-            : "Unexpected insight proxy error",
+        message: getInsightErrorMessage("Unexpected insight proxy error", error),
       },
       { status: 500 },
     );
