@@ -468,23 +468,15 @@ spec:
             - containerPort: 15692
           env:
             - name: RABBITMQ_DEFAULT_USER
-              value: ${RABBITMQ_DEFAULT_USER} # todo move
               valueFrom:
                 configMapKeyRef:
                   name: app-config
-                  key: backend-base-url # todo fix
+                  key: rabbitmq-default-user
             - name: RABBITMQ_DEFAULT_PASS
-              value: ${RABBITMQ_DEFAULT_PASS} # todo move
               valueFrom:
-                configMapKeyRef:
-                  name: app-config
-                  key: backend-base-url # todo fix
-            - name: RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS
-              value: ${RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS} # todo move
-              valueFrom:
-                configMapKeyRef:
-                  name: app-config
-                  key: backend-base-url # todo fix
+                secretKeyRef:
+                  name: app-secrets
+                  key: rabbitmq-default-pass
           resources:
             requests:
               memory: "2Gi"
@@ -529,35 +521,24 @@ spec:
           imagePullPolicy: Always
           env:
             - name: MINIO_ROOT_USER
-              value: ${MINIO_ROOT_USER} # todo move
               valueFrom:
                 configMapKeyRef:
                   name: app-config
-                  key: backend-base-url # todo fix
+                  key: minio-root-user
             - name: MINIO_ROOT_PASSWORD
-              value: ${MINIO_ROOT_PASSWORD} # todo move
               valueFrom:
-                configMapKeyRef:
-                  name: app-config
-                  key: backend-base-url # todo fix
+                secretKeyRef:
+                  name: app-secrets
+                  key: minio-root-password
             - name: MINIO_ENDPOINT
-              value: ${MINIO_ENDPOINT} # todo move
               valueFrom:
                 configMapKeyRef:
                   name: app-config
-                  key: backend-base-url # todo fix
+                  key: minio-endpoint
             - name: MINIO_VOLUMES
-              value: "/data" # todo move
-              valueFrom:
-                configMapKeyRef:
-                  name: app-config
-                  key: backend-base-url # todo fix
+              value: "/data"
             - name: MINIO_CONSOLE_ADDRESS
-              value: ":9101" # todo move
-              valueFrom:
-                configMapKeyRef:
-                  name: app-config
-                  key: backend-base-url # todo fix
+              value: ":9101"
           resources:
             limits:
               memory: "4Gi"
@@ -615,49 +596,21 @@ spec:
             - containerPort: 5009
           env:
             - name: LITELLM_LOCAL_MODEL_COST_MAP
-              value: "True" # todo move
-              valueFrom:
-                configMapKeyRef:
-                  name: app-config
-                  key: backend-base-url # todo fix
+              value: "True"
             - name: RABBITMQ_HOST
-              value: "insight-rabbitmq-service" # todo move
-              valueFrom:
-                configMapKeyRef:
-                  name: app-config
-                  key: backend-base-url # todo fix
+              value: "insight-rabbitmq-service"
             - name: MINIO_ENDPOINT
-              value: "insight-minio-service:9100" # todo move
-              valueFrom:
-                configMapKeyRef:
-                  name: app-config
-                  key: backend-base-url # todo fix
+              value: "insight-minio-service:9100"
             - name: PG_HOST
-              value: ${POSTGRES_DB_HOST} # todo move
-              valueFrom:
-                configMapKeyRef:
-                  name: app-config
-                  key: backend-base-url # todo fix
+              value: ${POSTGRES_DB_HOST}
             - name: PG_PORT
               value: "5432"
             - name: PG_USER
-              value: ${POSTGRES_USER} # todo move
-              valueFrom:
-                configMapKeyRef:
-                  name: app-config
-                  key: backend-base-url # todo fix
+              value: ${POSTGRES_USER}
             - name: PG_PASSWORD
-              value: ${POSTGRES_PASSWORD} # todo move
-              valueFrom:
-                configMapKeyRef:
-                  name: app-config
-                  key: backend-base-url # todo fix
+              value: ${POSTGRES_PASSWORD}
             - name: PG_DBNAME
-              value: ${POSTGRES_DB_NAME} # todo move
-              valueFrom:
-                configMapKeyRef:
-                  name: app-config
-                  key: backend-base-url # todo fix
+              value: ${POSTGRES_DB_NAME}
           resources:
             limits:
               memory: "4Gi"
@@ -693,49 +646,21 @@ spec:
           command: ["python", "-m", "runner"]
           env:
             - name: LITELLM_LOCAL_MODEL_COST_MAP
-              value: "True" # todo move
-              valueFrom:
-                configMapKeyRef:
-                  name: app-config
-                  key: backend-base-url # todo fix
+              value: "True"
             - name: RABBITMQ_HOST
-              value: "insight-rabbitmq-service" # todo move
-              valueFrom:
-                configMapKeyRef:
-                  name: app-config
-                  key: backend-base-url # todo fix
+              value: "insight-rabbitmq-service"
             - name: MINIO_ENDPOINT
-              value: "insight-minio-service:9100" # todo move
-              valueFrom:
-                configMapKeyRef:
-                  name: app-config
-                  key: backend-base-url # todo fix
+              value: "insight-minio-service:9100"
             - name: PG_HOST
-              value: ${POSTGRES_DB_HOST} # todo move
-              valueFrom:
-                configMapKeyRef:
-                  name: app-config
-                  key: backend-base-url # todo fix
+              value: ${POSTGRES_DB_HOST}
             - name: PG_PORT
               value: "5432"
             - name: PG_USER
-              value: ${POSTGRES_USER} # todo move
-              valueFrom:
-                configMapKeyRef:
-                  name: app-config
-                  key: backend-base-url # todo fix
+              value: ${POSTGRES_USER}
             - name: PG_PASSWORD
-              value: ${POSTGRES_PASSWORD} # todo move
-              valueFrom:
-                configMapKeyRef:
-                  name: app-config
-                  key: backend-base-url # todo fix
+              value: ${POSTGRES_PASSWORD}
             - name: PG_DBNAME
-              value: ${POSTGRES_DB_NAME} # todo move
-              valueFrom:
-                configMapKeyRef:
-                  name: app-config
-                  key: backend-base-url # todo fix
+              value: ${POSTGRES_DB_NAME}
           resources:
             limits:
               memory: "4Gi"
