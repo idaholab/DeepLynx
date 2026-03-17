@@ -184,7 +184,10 @@ try
     builder.Services.AddTransient<IOrganizationService, OrganizationService>();
     builder.Services.AddTransient<ISavedSearchBusiness, SavedSearchBusiness>();
     builder.Services.AddTransient<IGraphBusiness, GraphBusiness>();
+    builder.Services.AddTransient<IUserModelTokenBusiness, UserModelTokenBusiness>();
+    builder.Services.AddTransient<IAiModelConfigBusiness, AiModelConfigBusiness>();
     builder.Services.AddScoped<ISensitivityLabelService, SensitivityLabelService>();
+
 
     //OpenApi Documentation
     builder.Services.AddOpenApi(options =>
@@ -255,6 +258,9 @@ try
                 // AI Services
                 new() { Name = "Lattice", Description = "Useful data views for DeepLynx Lattice use" },
                 new() { Name = "Extraction", Description = "Extraction for DeepLynx Lattice use" },
+                new() { Name = "Organization - AI Model Config", Description = "AI model configuration management" },
+                new() { Name = "Project - AI Model Config", Description = "AI model configuration management" },
+                new() { Name = "User Model Token", Description = "User AI model token management" },
 
                 // Authentication
                 new() { Name = "OauthHandshake", Description = "OAuth2 authorization flow" },
@@ -326,7 +332,7 @@ try
                 new JsonObject
                 {
                     ["name"] = "AI Services",
-                    ["tags"] = new JsonArray { "Lattice", "Extraction" }
+                    ["tags"] = new JsonArray { "Lattice", "Extraction", "Organization - AI Model Config", "Project - AI Model Config", "User Model Token" }
                 },
                 new JsonObject
                 {
