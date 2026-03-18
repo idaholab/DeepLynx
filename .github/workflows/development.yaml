@@ -20,11 +20,13 @@ jobs:
       - name: Checkout Submodules
         env:
           INSIGHT_KEY: ${{ secrets.DEPLOY_KEY_INSIGHT }}
+          KNOWN_HOSTS: ${{ secrets.GHE_KNOWN_HOSTS }}
         run: |
           echo "$INSIGHT_KEY" > /tmp/insight_deploy
+          echo "$KNOWN_HOSTS" > /tmp/known_hosts
           chmod 600 /tmp/insight_deploy
-          GIT_SSH_COMMAND="ssh -i /tmp/insight_deploy" git submodule update --init --recursive
-          rm /tmp/insight_deploy
+          GIT_SSH_COMMAND="ssh -i /tmp/insight_deploy -o UserKnownHostsFile=/tmp/known_hosts" git submodule update --init --recursive
+          rm /tmp/insight_deploy /tmp/known_hosts
 
       # Builds the required image
       - shell: bash
