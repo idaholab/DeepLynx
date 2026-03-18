@@ -385,44 +385,8 @@ const GraphClientPage = ({
   }, [graphData, selectedNodeId]);
 
   return (
-    <div className="mt-4 space-y-4">
-      <section className="rounded-2xl border border-base-300 bg-base-100 shadow-sm">
-        <div className="flex flex-col gap-4 border-b border-base-300 px-5 py-5 lg:flex-row lg:items-start lg:justify-between">
-          <div className="space-y-2">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="badge badge-outline border-info/30 text-info">
-                Graph Overview
-              </span>
-              <span className="badge badge-outline">Depth {depth}</span>
-              {isLoading && <span className="badge badge-ghost">Loading</span>}
-            </div>
-            <div>
-              <h2 className="text-2xl font-semibold text-base-content">
-                {rootNode?.label || "Record graph"}
-              </h2>
-              <p className="text-sm text-base-content/70">
-                Use the graph to discover connections, then inspect exact
-                relationship rows in the table.
-              </p>
-            </div>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2 text-sm">
-            <span className="rounded-full bg-base-200 px-3 py-1 text-base-content/80">
-              {stats.nodes} nodes
-            </span>
-            <span className="rounded-full bg-base-200 px-3 py-1 text-base-content/80">
-              {stats.links} links
-            </span>
-            <span className="rounded-full bg-base-200 px-3 py-1 text-base-content/80">
-              {stats.incoming} incoming
-            </span>
-            <span className="rounded-full bg-base-200 px-3 py-1 text-base-content/80">
-              {stats.outgoing} outgoing
-            </span>
-          </div>
-        </div>
-
+    <div className="mt-4 p-4">
+      <section className="rounded-2xl bg-base-100 shadow-sm">
         <div className="space-y-4 p-4">
           <section className="overflow-hidden rounded-2xl border border-base-300 bg-base-100 shadow-sm">
             <div className="flex flex-col gap-4 border-b border-base-300 px-4 py-4 lg:flex-row lg:items-center lg:justify-between">
@@ -480,32 +444,6 @@ const GraphClientPage = ({
               </div>
 
               <div className="flex flex-wrap items-center gap-2">
-                {(["all", "incoming", "outgoing"] as GraphViewMode[]).map(
-                  (mode) => (
-                    <button
-                      key={mode}
-                      type="button"
-                      className={`btn btn-sm ${
-                        viewMode === mode ? "btn-primary" : "btn-outline"
-                      }`}
-                      onClick={() => setViewMode(mode)}
-                    >
-                      {mode === "all"
-                        ? "All"
-                        : mode === "incoming"
-                          ? "Incoming only"
-                          : "Outgoing only"}
-                    </button>
-                  ),
-                )}
-                <button
-                  type="button"
-                  className="btn btn-outline btn-sm"
-                  onClick={() => controllerRef.current?.fitGraph()}
-                >
-                  <ArrowsPointingOutIcon className="size-4" />
-                  Fit
-                </button>
                 <button
                   type="button"
                   className="btn btn-outline btn-sm"
@@ -553,14 +491,6 @@ const GraphClientPage = ({
             </div>
 
             <div className="flex flex-col gap-3 border-t border-base-300 px-4 py-4 text-sm text-base-content/70 lg:flex-row lg:items-center lg:justify-between">
-              <div className="flex items-start gap-2">
-                <InformationCircleIcon className="mt-0.5 size-5 text-info" />
-                <p>
-                  Click a node to inspect it. The graph now keeps the traced
-                  path from the root highlighted while the relationship table
-                  below shows exact connected records.
-                </p>
-              </div>
               <div className="flex flex-wrap gap-3 text-xs uppercase tracking-wide text-base-content/50">
                 <span className="flex items-center gap-2">
                   <span className="size-2.5 rounded-full bg-teal-700" />
@@ -584,15 +514,25 @@ const GraphClientPage = ({
 
           <section className="grid gap-4 xl:grid-cols-[320px_minmax(0,1fr)_340px]">
             <aside className="rounded-2xl border border-base-300 bg-base-100 p-5 shadow-sm">
-              <p className="text-sm font-medium uppercase tracking-[0.16em] text-base-content/50">
-                Selected Node
-              </p>
+              <div className="flex flex-wrap gap-2 items-center justify-between">
+                <p className="text-sm font-medium uppercase tracking-[0.16em] text-base-content/50">
+                  Selected Node
+                </p>
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  onClick={() => handleOpenRecord(selectedNode.id)}
+                >
+                  <ArrowTopRightOnSquareIcon className="size-4" />
+                </button>
+              </div>
+
               <h3 className="mt-2 text-xl font-semibold text-base-content">
                 {selectedNode?.label || "No node selected"}
               </h3>
               <p className="mt-1 text-sm text-base-content/70">
                 {selectedNode
-                  ? "This summary stays compact while the full relationship list lives in the table."
+                  ? ""
                   : "Choose a node in the graph to populate the summary and relationship table."}
               </p>
 
@@ -600,53 +540,11 @@ const GraphClientPage = ({
                 <div className="mt-5 space-y-4">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="badge badge-outline">
-                      {selectedNode.type}
-                    </span>
-                    <span className="badge badge-outline">
                       Depth {selectedNode.depth}
                     </span>
                     <span className="badge badge-outline">
-                      #{selectedNode.id}
+                      Record ID: {selectedNode.id}
                     </span>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="rounded-xl bg-base-200 px-3 py-3">
-                      <p className="text-xs uppercase tracking-wide text-base-content/50">
-                        Incoming
-                      </p>
-                      <p className="mt-1 text-lg font-semibold text-base-content">
-                        {stats.incoming}
-                      </p>
-                    </div>
-                    <div className="rounded-xl bg-base-200 px-3 py-3">
-                      <p className="text-xs uppercase tracking-wide text-base-content/50">
-                        Outgoing
-                      </p>
-                      <p className="mt-1 text-lg font-semibold text-base-content">
-                        {stats.outgoing}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      className="btn btn-primary btn-sm"
-                      onClick={() => handleOpenRecord(selectedNode.id)}
-                    >
-                      <ArrowTopRightOnSquareIcon className="size-4" />
-                      Open record
-                    </button>
-                    <button
-                      type="button"
-                      className="btn btn-outline btn-sm"
-                      onClick={() =>
-                        controllerRef.current?.focusNode(selectedNode.id)
-                      }
-                    >
-                      Center graph
-                    </button>
                   </div>
 
                   <div className="rounded-2xl border border-base-300 bg-base-100 p-4">
@@ -723,7 +621,7 @@ const GraphClientPage = ({
                   <thead className="sticky top-0 bg-base-200">
                     <tr className="text-base-content">
                       <th>Direction</th>
-                      <th>Relationship</th>
+                      <th></th>
                       <th>Connected Record</th>
                       <th>Depth</th>
                       <th>ID</th>
@@ -799,14 +697,14 @@ const GraphClientPage = ({
               <p className="text-sm font-medium uppercase tracking-[0.16em] text-base-content/50">
                 Traced Path
               </p>
-              <h3 className="mt-2 text-xl font-semibold text-base-content">
+              <h3 className="mt-2 text-xl font-semibold text-base-content border-b pb-2">
                 {selectedNode
                   ? `${Math.max(pathToSelected.nodeIds.length - 1, 0)} hops`
                   : "No trace"}
               </h3>
               <p className="mt-1 text-sm text-base-content/70">
                 {selectedNode
-                  ? "This panel mirrors the orange highlighted route in the graph from the root record to your selected node."
+                  ? ""
                   : "Select a node to compute and display the traced path from the root."}
               </p>
 
@@ -821,7 +719,7 @@ const GraphClientPage = ({
                             node.isSelected
                               ? "border-primary bg-primary text-primary-content"
                               : node.isRoot
-                                ? "border-info/40 bg-info/10 text-info"
+                                ? "bg-secondary text-secondary-content"
                                 : "border-base-300 bg-base-100 text-base-content hover:bg-base-200"
                           }`}
                           onClick={() => handleSelectNode(node.id)}
@@ -1024,6 +922,7 @@ const MyGraph = ({
     const pathEdgeIdsSet = new Set(pathEdgeIdsRef.current);
     const pathEdges = new Set<string>();
     const zoomRatio = camera?.getState?.().ratio ?? 1;
+    const hasMeaningfulPath = pathNodeKeys.size > 1;
 
     if (hoverNodeRef.current && graph.hasNode(hoverNodeRef.current)) {
       const hoverNodeKey = hoverNodeRef.current;
@@ -1094,7 +993,7 @@ const MyGraph = ({
       const isPathNode = pathNodeKeys.has(node);
       const shouldDim =
         viewModeRef.current === "path"
-          ? pathNodeKeys.size > 0 && !isSelected && !isHovered && !isPathNode
+          ? hasMeaningfulPath && !isSelected && !isHovered && !isPathNode
           : Boolean(activeNodeKey) && !isSelected && !isHovered && !isConnected;
 
       const nextLabel =
@@ -1113,7 +1012,11 @@ const MyGraph = ({
         nextColor = "#115e59";
       } else if (isHovered) {
         nextColor = "#0369a1";
-      } else if (viewModeRef.current === "path" && isPathNode) {
+      } else if (
+        viewModeRef.current === "path" &&
+        hasMeaningfulPath &&
+        isPathNode
+      ) {
         nextColor = "#f97316";
       } else if (shouldDim) {
         nextColor = "#cbd5e1";
@@ -1124,7 +1027,11 @@ const MyGraph = ({
         nextSize = originalSize * 1.65;
       } else if (isHovered) {
         nextSize = originalSize * 1.45;
-      } else if (viewModeRef.current === "path" && isPathNode) {
+      } else if (
+        viewModeRef.current === "path" &&
+        hasMeaningfulPath &&
+        isPathNode
+      ) {
         nextSize = originalSize * 1.2;
       } else if (isConnected) {
         nextSize = originalSize * 1.15;
@@ -1148,7 +1055,7 @@ const MyGraph = ({
         graph.setEdgeAttribute(edge, "color", "#2563eb");
         graph.setEdgeAttribute(edge, "size", 4);
       } else if (
-        (viewModeRef.current === "path" && pathNodeKeys.size > 0) ||
+        (viewModeRef.current === "path" && hasMeaningfulPath) ||
         activeNodeKey
       ) {
         graph.setEdgeAttribute(edge, "color", "#dbe4ee");
