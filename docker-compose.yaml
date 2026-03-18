@@ -104,7 +104,7 @@ services:
     volumes:
       - nx_postgres_data:/var/lib/postgresql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres && psql -U postgres -d deeplynx -c 'SELECT 1;'"]
+      test: [ "CMD-SHELL", "pg_isready -U postgres && psql -U postgres -d deeplynx -c 'SELECT 1;'" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -130,7 +130,7 @@ services:
     depends_on:
       nx-postgres:
         condition: service_healthy
-    
+
   mcp:
     build:
       context: ./
@@ -146,7 +146,7 @@ services:
       - server
 
   insight-rabbitmq:
-    profiles: [insight]
+    profiles: [ insight ]
     build:
       context: ./deeplynx.insight/app/rabbitmq
       dockerfile: Dockerfiles/Dockerfile.production
@@ -166,7 +166,7 @@ services:
       - nexus-network
 
   insight-minio:
-    profiles: [insight]
+    profiles: [ insight ]
     build:
       context: ./deeplynx.insight/app/minio
       dockerfile: Dockerfiles/Dockerfile.production
@@ -187,7 +187,7 @@ services:
       - nexus-network
 
   insight-fastapi:
-    profiles: [insight]
+    profiles: [ insight ]
     build:
       context: ./deeplynx.insight/app/fastapi
       dockerfile: Dockerfiles/Dockerfile.production
@@ -218,7 +218,7 @@ services:
       - nexus-network
 
   insight-rabbitmq-runner:
-    profiles: [insight]
+    profiles: [ insight ]
     build:
       context: ./deeplynx.insight/app/rabbitmq
       dockerfile: Dockerfiles/Dockerfile.runner.production
@@ -249,11 +249,10 @@ services:
 networks:
   nexus-network:
     driver: bridge
-  
+
 volumes:
   object_storage:
     driver: local
-  
-  
+
   nx_postgres_data:
     name: nx_postgres_data

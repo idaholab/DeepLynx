@@ -27,6 +27,7 @@ import {
   FolderIcon,
   PresentationChartLineIcon,
   RectangleGroupIcon,
+  SparklesIcon,
   XMarkIcon,
 } from "@heroicons/react/24/outline";
 
@@ -393,6 +394,7 @@ const SideMenu: React.FC<SideMenuProps> = ({
               )}
             </Link>
           </li>
+
           {/* TimeseriesViewer */}
           <li className="mt-2">
             <Link
@@ -429,6 +431,18 @@ const SideMenu: React.FC<SideMenuProps> = ({
               </Link>
             </li>
           </ProjectAdminRoute>
+
+          {/* Project Insight */}
+          <li className="mt-2">
+            <Link
+              href="/project_insight"
+              onClick={() => onMobileClose?.()}
+              className={getItemClass("/project_insight")}
+            >
+              <SparklesIcon className="size-6" />
+              {!isCollapsed && <p className="ml-2">Insight</p>}
+            </Link>
+          </li>
         </ul>
       </aside>
 
