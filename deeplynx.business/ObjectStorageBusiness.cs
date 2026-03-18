@@ -253,13 +253,8 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
 
         try
         {
-            returnedObjectStorage.Name = dto.Name;
-            returnedObjectStorage.Default = dto.Default;
-            returnedObjectStorage.LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
-            returnedObjectStorage.LastUpdatedBy = currentUserId;
-            await _context.SaveChangesAsync();
-
             // reset the defaults at the project or org level
+            // * Before saving the updated object storage
             if (dto.Default)
             {
                 if (projectId.HasValue)
@@ -267,6 +262,12 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
                 else
                     await ResetOrganizationDefaults(organizationId, returnedObjectStorage.Id);
             }
+            
+            returnedObjectStorage.Name = dto.Name;
+            returnedObjectStorage.Default = dto.Default;
+            returnedObjectStorage.LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
+            returnedObjectStorage.LastUpdatedBy = currentUserId;
+            await _context.SaveChangesAsync();
 
             await transaction.CommitAsync();
 
