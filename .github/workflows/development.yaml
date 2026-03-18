@@ -12,9 +12,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v3
-
-      - name: Init submodules
-        run: git submodule update --init --recursive
+        with:
+          submodules: recursive
+          ssh-key: ${{ secrets.INSIGHT_DEPLOY_KEY }}
 
       # Builds the required image
       - shell: bash
