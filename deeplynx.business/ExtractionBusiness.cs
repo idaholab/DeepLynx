@@ -38,7 +38,6 @@ public class ExtractionBusiness : IExtractionBusiness
         long dataSourceId,
         CreateExtractionRequestDto dto)
     {
-        // 1. Create the Extraction record in the deeplynx schema
         var extraction = new Extraction
         {
             Properties = dto.Properties?.ToJsonString(),
@@ -56,8 +55,7 @@ public class ExtractionBusiness : IExtractionBusiness
             var classNameToStagingId = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
             var relationshipNameToStagingId = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
             var originalIdToStagingRecordId = new Dictionary<string, long>();
-
-            // 2. Insert staging classes
+            
             foreach (var classDto in dto.Classes ?? [])
             {
                 var stagingClass = new Class
@@ -75,8 +73,7 @@ public class ExtractionBusiness : IExtractionBusiness
                 await _stagingContext.SaveChangesAsync();
                 classNameToStagingId[stagingClass.Name] = stagingClass.Id;
             }
-
-            // 3. Insert staging relationships
+            
             // OriginId/DestinationId are class IDs — resolve from this payload's staging classes only.
             // If the class only exists in deeplynx, leave the ID null and store the name as a shadow
             // property so promotion can resolve it by name.
@@ -110,7 +107,6 @@ public class ExtractionBusiness : IExtractionBusiness
                 relationshipNameToStagingId[stagingRelationship.Name] = stagingRelationship.Id;
             }
 
-            // 4. Insert staging records
             // ClassId is resolved from this payload's staging classes only.
             // If the class only exists in deeplynx, ClassId stays null and the class name is stored
             // as a shadow property so promotion can resolve it by name.
@@ -148,7 +144,6 @@ public class ExtractionBusiness : IExtractionBusiness
                 originalIdToStagingRecordId[stagingRecord.OriginalId] = stagingRecord.Id;
             }
 
-            // 5. Insert staging edges
             // Edges where both endpoints resolve to staging records go into staging.edges (intra-schema FKs enforced).
             // Edges where either endpoint is a deeplynx-only record go into staging.cross_schema_edges,
             // which stores original_id strings resolved at promotion time.
