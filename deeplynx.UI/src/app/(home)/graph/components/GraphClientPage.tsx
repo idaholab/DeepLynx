@@ -101,6 +101,10 @@ type SigmaInstance = {
   on?: (event: string, handler: (payload: any) => void) => void;
   refresh?: () => void;
   kill?: () => void;
+  graphToViewport?: (coordinates: { x: number; y: number }) => {
+    x: number;
+    y: number;
+  };
 };
 
 const GraphClientPage = ({
@@ -873,6 +877,8 @@ const MyGraph = ({
   const pathEdgeIdsRef = useRef<number[]>(pathEdgeIds);
   const initialCameraStateRef = useRef<CameraState | null>(null);
   const [isLayoutSettling, setIsLayoutSettling] = useState(true);
+  const flowCanvasRef = useRef<HTMLCanvasElement>(null);
+  const flowFrameRef = useRef<number | null>(null);
 
   const focusNode = useCallback((nodeId: number) => {
     const graph = graphRef.current;
@@ -947,6 +953,118 @@ const MyGraph = ({
       camera.setState(initialState);
     }
   }, []);
+
+  const drawEdgeFlow = useCallback(
+    (timestamp: number) => {
+      const canvas = flowCanvasRef.current;
+      const container = containerRef.current;
+      const graph = graphRef.current;
+      const sigma = sigmaRef.current;
+
+      if (!canvas || !container || !graph || !sigma?.graphToViewport) return;
+
+      const graphToViewport = (coordinates: { x: number; y: number }) =>
+        sigma.graphToViewport!(coordinates);
+
+      const context = canvas.getContext("2d");
+      if (!context) return;
+
+      const width = container.clientWidth;
+      const height = container.clientHeight;
+      const pixelRatio = window.devicePixelRatio || 1;
+
+      if (
+        canvas.width !== width * pixelRatio ||
+        canvas.height !== height * pixelRatio
+      ) {
+        canvas.width = width * pixelRatio;
+        canvas.height = height * pixelRatio;
+        canvas.style.width = `${width}px`;
+        canvas.style.height = `${height}px`;
+      }
+
+      context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+      context.clearRect(0, 0, width, height);
+
+      if (isLayoutSettling) return;
+
+      const speed = 0.55;
+      const progress = ((timestamp / 1000) * speed) % 1;
+
+      const drawFlow = (
+        fromKey: string,
+        toKey: string,
+        color: string,
+        offset = 0,
+      ) => {
+        if (!graph.hasNode(fromKey) || !graph.hasNode(toKey)) return;
+
+        const fromNode = graph.getNodeAttributes(fromKey);
+        const toNode = graph.getNodeAttributes(toKey);
+
+        const from = graphToViewport({ x: fromNode.x, y: fromNode.y });
+        const to = graphToViewport({ x: toNode.x, y: toNode.y });
+
+        const dx = to.x - from.x;
+        const dy = to.y - from.y;
+        const angle = Math.atan2(dy, dx);
+
+        for (let trailIndex = 0; trailIndex < 3; trailIndex += 1) {
+          const trailProgress = (progress - trailIndex * 0.12 + offset + 1) % 1;
+          const x = from.x + dx * trailProgress;
+          const y = from.y + dy * trailProgress;
+          const alpha = 1 - trailIndex * 0.28;
+          const size = trailIndex === 0 ? 8 : 6;
+
+          context.save();
+          context.translate(x, y);
+          context.rotate(angle);
+          context.fillStyle = color
+            .replace("rgb(", "rgba(")
+            .replace(")", `, ${alpha})`);
+          context.beginPath();
+          context.moveTo(size, 0);
+          context.lineTo(-size * 0.6, size * 0.45);
+          context.lineTo(-size * 0.6, -size * 0.45);
+          context.closePath();
+          context.fill();
+          context.restore();
+        }
+      };
+
+      const hoverNodeKey = hoverNodeRef.current;
+
+      if (hoverNodeKey && graph.hasNode(hoverNodeKey)) {
+        graph.forEachEdge(hoverNodeKey, (edge, attributes, source, target) => {
+          if (attributes.direction === "bidirectional") {
+            drawFlow(source, target, "rgb(168, 85, 247)", 0);
+            drawFlow(target, source, "rgb(168, 85, 247)", 0.5);
+          } else if (target === hoverNodeKey) {
+            drawFlow(source, target, "rgb(239, 68, 68)");
+          } else {
+            drawFlow(source, target, "rgb(37, 99, 235)");
+          }
+        });
+
+        return;
+      }
+
+      if (pathNodeIdsRef.current.length < 2 || !selectedNodeIdRef.current)
+        return;
+
+      for (
+        let index = 0;
+        index < pathNodeIdsRef.current.length - 1;
+        index += 1
+      ) {
+        const fromNodeKey = String(pathNodeIdsRef.current[index]);
+        const toNodeKey = String(pathNodeIdsRef.current[index + 1]);
+
+        drawFlow(fromNodeKey, toNodeKey, "rgb(249, 115, 22)");
+      }
+    },
+    [isLayoutSettling],
+  );
 
   const refreshGraphAppearance = useCallback(() => {
     const graph = graphRef.current;
@@ -1470,6 +1588,21 @@ const MyGraph = ({
     refreshGraphAppearance,
   ]);
 
+  useEffect(() => {
+    const animate = (timestamp: number) => {
+      drawEdgeFlow(timestamp);
+      flowFrameRef.current = window.requestAnimationFrame(animate);
+    };
+
+    flowFrameRef.current = window.requestAnimationFrame(animate);
+
+    return () => {
+      if (flowFrameRef.current !== null) {
+        window.cancelAnimationFrame(flowFrameRef.current);
+      }
+    };
+  }, [drawEdgeFlow]);
+
   return (
     <div className="relative h-full min-h-[720px] w-full">
       {isLayoutSettling && (
@@ -1480,6 +1613,11 @@ const MyGraph = ({
           </span>
         </div>
       )}
+
+      <canvas
+        ref={flowCanvasRef}
+        className="pointer-events-none absolute inset-0 z-[1] h-full w-full"
+      />
 
       <div
         ref={containerRef}
