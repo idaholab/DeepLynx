@@ -15,11 +15,7 @@ jobs:
         with:
           submodules: recursive
           ssh-key: ${{ secrets.DEPLOY_KEY }}
-          ssh-known-hosts: |
-          github.inl.gov ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDCp4hvIr3PKwzJZM4pKfYVB8ch8pf9eX9Up+L/quHz/HQjtDw8XbSSipZOwGMccwkGShyfpbxhp7HNasUGSLHWLkom6FFU0VFuJtP6JxvNVvvqq729yZaV0EHftG1Ac7xBOfvIc7n53I87OwuFFOwYj7BIQwaQGpIgj9tPHsVveKt3ZNvFjDWV+y+YTBaTqk4gAtyc1IiadC4YCK7yZ041JiXxixk0coTRMMFCul6PyHnKok53OtvMIAjvyMZQ0d644exEDvmRkWsEUxAIvjm2sTmxdvQaN3xAINB8qSXHLS90d6EDfT3gvM7HqIl4RBNSXgqTKs7LAySStqDQfJm9
-          github.inl.gov ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBAgDAmBZ0s3CTMWzo340x9JvVn5jMWA31S7AvSiKQyI8clir/MM8PN5F9WcZStOeQofOGsmKly3Gr0sGlIQHzbg=
-          github.inl.gov ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAII+P08C3MSjO/AXrAAdCv4bccn7anzjvBo2QXasHM7Il
-
+          
       # Builds the required image
       - shell: bash
         name: Container Build
