@@ -12,6 +12,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v3
+        with:
+          submodules: recursive
 
       # Builds the required image
       - shell: bash
@@ -86,6 +88,26 @@ jobs:
             --image $ACR_PATH:deeplynxv3-mcp-$GITHUB_RUN_NUMBER \
             --file Dockerfiles/mcp/Dockerfile.public \
             .
+
+          az acr build --registry $ACR_REGISTRY \
+            --image $ACR_PATH:insight-rabbitmq-$GITHUB_RUN_NUMBER \
+            --file deeplynx.insight/app/rabbitmq/Dockerfiles/Dockerfile.production \
+            deeplynx.insight/app/rabbitmq
+
+          az acr build --registry $ACR_REGISTRY \
+            --image $ACR_PATH:insight-rabbitmq-runner-$GITHUB_RUN_NUMBER \
+            --file deeplynx.insight/app/rabbitmq/Dockerfiles/Dockerfile.runner.production \
+            deeplynx.insight/app/rabbitmq
+
+          az acr build --registry $ACR_REGISTRY \
+            --image $ACR_PATH:insight-minio-$GITHUB_RUN_NUMBER \
+            --file deeplynx.insight/app/minio/Dockerfiles/Dockerfile.production \
+            deeplynx.insight/app/minio
+
+          az acr build --registry $ACR_REGISTRY \
+            --image $ACR_PATH:insight-fastapi-$GITHUB_RUN_NUMBER \
+            --file deeplynx.insight/app/fastapi/Dockerfiles/Dockerfile.production \
+            deeplynx.insight/app/fastapi
 
   kubernetes:
     needs: build
