@@ -143,7 +143,12 @@ const GraphClientPage = ({
 
   const pathNodes = useMemo(
     () =>
-      buildPathNodes(pathToSelected, nodeLookup, selectedNodeId, t.translations),
+      buildPathNodes(
+        pathToSelected,
+        nodeLookup,
+        selectedNodeId,
+        t.translations,
+      ),
     [nodeLookup, pathToSelected, selectedNodeId, t.translations],
   );
 
@@ -257,7 +262,7 @@ const GraphClientPage = ({
           </section>
 
           {/* Supporting analysis panels under the graph */}
-          <section className="grid gap-4 xl:grid-cols-[320px_minmax(0,1fr)_340px]">
+          <section className="grid items-start gap-4 xl:grid-cols-[320px_minmax(0,1fr)_340px]">
             <SelectedNodePanel
               selectedNode={selectedNode}
               selectedRecord={selectedRecord}
