@@ -10,14 +10,10 @@ jobs:
     runs-on: [self-hosted]
     environment: development
     steps:
-      - name: Add github.inl.gov to known hosts
-        run: ssh-keyscan github.inl.gov >> ~/.ssh/known_hosts
-
       - name: Checkout
         uses: actions/checkout@v3
         with:
           submodules: recursive
-          ssh-key: ${{ secrets.INSIGHT_DEPLOY_KEY }}
 
       # Builds the required image
       - shell: bash
