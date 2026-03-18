@@ -339,6 +339,10 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
     resetAllState();
   }, [recordId, resetAllState]);
 
+  useEffect(() => {
+    setActiveTab(0);
+  }, [recordId]);
+
   // ============= DATA LOADING EFFECTS =============
   useEffect(() => {
     const fetchRecord = async () => {

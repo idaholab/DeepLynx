@@ -521,7 +521,7 @@ const GraphClientPage = ({
                 <button
                   type="button"
                   className="btn btn-secondary btn-sm"
-                  onClick={() => handleOpenRecord(selectedNode.id)}
+                  onClick={() => handleOpenRecord(Number(selectedNode?.id))}
                 >
                   <ArrowTopRightOnSquareIcon className="size-4" />
                 </button>
