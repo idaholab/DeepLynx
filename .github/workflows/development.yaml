@@ -16,7 +16,7 @@ jobs:
           submodules: recursive
           ssh-key: |
             ${{ secrets.DEPLOY_KEY }}
-            ${{ secrets.INSIGHT_DEPLOY_KEY }}
+            ${{ secrets.DEPLOY_KEY_INSIGHT }}
           ssh-known-hosts: ${{ secrets.GHE_KNOWN_HOSTS }}
 
       # Builds the required image
