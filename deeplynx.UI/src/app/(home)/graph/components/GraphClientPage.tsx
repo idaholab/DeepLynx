@@ -39,6 +39,8 @@ interface EdgeAttributes extends Attributes {
   label?: string;
   relationshipId?: number | null;
   edgeId?: number;
+  type?: "arrow" | "double-arrow";
+  direction?: "incoming" | "outgoing" | "bidirectional";
 }
 
 interface GraphClientPageProps {
@@ -117,6 +119,7 @@ const GraphClientPage = ({
     useState<RecordResponseDto | null>(null);
   const [isDetailsLoading, setIsDetailsLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [showAllLabels, setShowAllLabels] = useState(false);
   const [viewMode, setViewMode] = useState<GraphViewMode>("all");
 
@@ -130,12 +133,7 @@ const GraphClientPage = ({
         return current;
       }
 
-      return (
-        graphData.nodes.find((node) => node.id === recordId)?.id ??
-        graphData.rootNodeId ??
-        graphData.nodes[0]?.id ??
-        null
-      );
+      return null;
     });
   }, [graphData, recordId]);
 
@@ -355,6 +353,7 @@ const GraphClientPage = ({
 
     setSearchQuery(firstResult.label);
     handleSelectNode(firstResult.id);
+    setIsSearchOpen(false);
   }, [handleSelectNode, searchResults]);
 
   const handleControlsReady = useCallback(
@@ -398,7 +397,13 @@ const GraphClientPage = ({
                     className="grow"
                     placeholder="Search nodes by label"
                     value={searchQuery}
-                    onChange={(event) => setSearchQuery(event.target.value)}
+                    onChange={(event) => {
+                      setSearchQuery(event.target.value);
+                      setIsSearchOpen(true);
+                    }}
+                    onFocus={() => {
+                      if (searchQuery.trim()) setIsSearchOpen(true);
+                    }}
                     onKeyDown={(event) => {
                       if (event.key === "Enter") {
                         event.preventDefault();
@@ -408,7 +413,7 @@ const GraphClientPage = ({
                   />
                 </label>
 
-                {searchQuery.trim() && (
+                {isSearchOpen && searchQuery.trim() && (
                   <div className="absolute z-20 mt-2 w-full overflow-hidden rounded-xl border border-base-300 bg-base-100 shadow-xl">
                     {searchResults.length > 0 ? (
                       searchResults.map((node) => (
@@ -419,6 +424,7 @@ const GraphClientPage = ({
                           onClick={() => {
                             setSearchQuery(node.label);
                             handleSelectNode(node.id);
+                            setIsSearchOpen(false);
                           }}
                         >
                           <span>
@@ -521,7 +527,12 @@ const GraphClientPage = ({
                 <button
                   type="button"
                   className="btn btn-secondary btn-sm"
-                  onClick={() => handleOpenRecord(Number(selectedNode?.id))}
+                  onClick={() => {
+                    if (selectedNode) {
+                      handleOpenRecord(selectedNode.id);
+                    }
+                  }}
+                  disabled={!selectedNode}
                 >
                   <ArrowTopRightOnSquareIcon className="size-4" />
                 </button>
@@ -916,6 +927,7 @@ const MyGraph = ({
     const connectedNodeKeys = new Set<string>();
     const incomingEdges = new Set<string>();
     const outgoingEdges = new Set<string>();
+    const bidirectionalEdges = new Set<string>();
     const pathNodeKeys = new Set(
       pathNodeIdsRef.current.map((nodeId) => String(nodeId)),
     );
@@ -927,18 +939,20 @@ const MyGraph = ({
     if (hoverNodeRef.current && graph.hasNode(hoverNodeRef.current)) {
       const hoverNodeKey = hoverNodeRef.current;
 
-      graph.forEachEdge(hoverNodeKey, (edge, _attributes, source, target) => {
+      graph.forEachEdge(hoverNodeKey, (edge, attributes, source, target) => {
         connectedNodeKeys.add(source);
         connectedNodeKeys.add(target);
 
-        if (target === hoverNodeKey) {
+        if (attributes.direction === "bidirectional") {
+          bidirectionalEdges.add(edge);
+        } else if (target === hoverNodeKey) {
           incomingEdges.add(edge);
         } else {
           outgoingEdges.add(edge);
         }
       });
       connectedNodeKeys.delete(hoverNodeKey);
-    } else if (viewModeRef.current === "path" && pathNodeKeys.size > 0) {
+    } else if (viewModeRef.current === "path" && hasMeaningfulPath) {
       graph.forEachEdge((edge, attributes, source, target) => {
         if (pathEdgeIdsSet.has(attributes.edgeId || -1)) {
           pathEdges.add(edge);
@@ -952,26 +966,26 @@ const MyGraph = ({
       viewModeRef.current !== "all"
     ) {
       graph.forEachEdge(activeNodeKey, (edge, _attributes, source, target) => {
-        const isIncoming = target === activeNodeKey;
-        const isOutgoing = source === activeNodeKey;
+        connectedNodeKeys.add(source);
+        connectedNodeKeys.add(target);
 
-        if (viewModeRef.current === "incoming" && isIncoming) {
+        if (_attributes.direction === "bidirectional") {
+          bidirectionalEdges.add(edge);
+        } else if (target === activeNodeKey) {
           incomingEdges.add(edge);
-          connectedNodeKeys.add(source);
-          connectedNodeKeys.add(target);
-        } else if (viewModeRef.current === "outgoing" && isOutgoing) {
+        } else {
           outgoingEdges.add(edge);
-          connectedNodeKeys.add(source);
-          connectedNodeKeys.add(target);
         }
       });
       connectedNodeKeys.delete(activeNodeKey);
     } else if (activeNodeKey && graph.hasNode(activeNodeKey)) {
-      graph.forEachEdge(activeNodeKey, (edge, _attributes, source, target) => {
+      graph.forEachEdge(activeNodeKey, (edge, attributes, source, target) => {
         connectedNodeKeys.add(source);
         connectedNodeKeys.add(target);
 
-        if (target === activeNodeKey) {
+        if (attributes.direction === "bidirectional") {
+          bidirectionalEdges.add(edge);
+        } else if (target === activeNodeKey) {
           incomingEdges.add(edge);
         } else {
           outgoingEdges.add(edge);
@@ -1045,8 +1059,8 @@ const MyGraph = ({
     });
 
     graph.forEachEdge((edge) => {
-      if (viewModeRef.current === "path" && pathEdges.has(edge)) {
-        graph.setEdgeAttribute(edge, "color", "#f97316");
+      if (bidirectionalEdges.has(edge)) {
+        graph.setEdgeAttribute(edge, "color", "#a855f7");
         graph.setEdgeAttribute(edge, "size", 4);
       } else if (incomingEdges.has(edge)) {
         graph.setEdgeAttribute(edge, "color", "#ef4444");
@@ -1098,8 +1112,13 @@ const MyGraph = ({
         onLoadingChange(true);
         onError(null);
 
-        const [{ default: Sigma }, { default: FA2Layout }] = await Promise.all([
+        const [
+          { default: Sigma },
+          { EdgeDoubleArrowProgram },
+          { default: FA2Layout },
+        ] = await Promise.all([
           import("sigma"),
+          import("sigma/rendering"),
           import("graphology-layout-forceatlas2/worker"),
         ]);
 
@@ -1189,19 +1208,59 @@ const MyGraph = ({
           });
         });
 
-        links.forEach((link) => {
-          const sourceId = String(link.source);
-          const targetId = String(link.target);
+        const edgePairs = new Map<string, GraphLinkSummary[]>();
 
-          if (graph.hasNode(sourceId) && graph.hasNode(targetId)) {
-            graph.addEdge(sourceId, targetId, {
-              size: 2,
-              color: "#94a3b8",
-              label: link.relationshipName || undefined,
-              relationshipId: link.relationshipId,
-              edgeId: link.edgeId,
-            });
-          }
+        links.forEach((link) => {
+          const pairKey =
+            link.source < link.target
+              ? `${link.source}:${link.target}`
+              : `${link.target}:${link.source}`;
+
+          const existing = edgePairs.get(pairKey) || [];
+          existing.push(link);
+          edgePairs.set(pairKey, existing);
+        });
+
+        edgePairs.forEach((pairLinks) => {
+          const first = pairLinks[0];
+          if (!first) return;
+
+          const forwardLinks = pairLinks.filter(
+            (link) =>
+              link.source === first.source && link.target === first.target,
+          );
+          const reverseLinks = pairLinks.filter(
+            (link) =>
+              link.source === first.target && link.target === first.source,
+          );
+          const aggregatedLabels = pairLinks
+            .map((link) => link.relationshipName)
+            .filter((relationshipName): relationshipName is string =>
+              Boolean(relationshipName),
+            );
+
+          const sourceId = String(first.source);
+          const targetId = String(first.target);
+
+          if (!graph.hasNode(sourceId) || !graph.hasNode(targetId)) return;
+
+          const hasBidirectionalLink =
+            forwardLinks.length > 0 && reverseLinks.length > 0;
+
+          graph.addEdge(sourceId, targetId, {
+            size: 2,
+            color: "#94a3b8",
+            label: hasBidirectionalLink
+              ? aggregatedLabels.join(" / ") || "Bidirectional"
+              : aggregatedLabels.join(" / ") ||
+                first.relationshipName ||
+                undefined,
+
+            relationshipId: first.relationshipId,
+            edgeId: first.edgeId,
+            type: hasBidirectionalLink ? "double-arrow" : "arrow",
+            direction: hasBidirectionalLink ? "bidirectional" : "outgoing",
+          });
         });
 
         if (sigmaRef.current) {
@@ -1225,6 +1284,9 @@ const MyGraph = ({
         const sigma = new Sigma(graph, graphContainer, {
           renderEdgeLabels: false,
           defaultEdgeType: "arrow",
+          edgeProgramClasses: {
+            "double-arrow": EdgeDoubleArrowProgram,
+          },
           labelSize: 14,
           labelWeight: "500",
           allowInvalidContainer: true,
