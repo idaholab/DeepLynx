@@ -193,26 +193,57 @@ const GraphClientPage = ({
   const selectedNodeConnections = useMemo(() => {
     if (!graphData || !selectedNodeId) return [];
 
-    return graphData.links
+    const groupedConnections = new Map<
+      number,
+      {
+        edgeIds: number[];
+        relationshipNames: Set<string>;
+        hasIncoming: boolean;
+        hasOutgoing: boolean;
+      }
+    >();
+
+    graphData.links
       .filter(
         (link) =>
           link.source === selectedNodeId || link.target === selectedNodeId,
       )
-      .map((link) => {
+      .forEach((link) => {
         const isOutgoing = link.source === selectedNodeId;
         const connectedNodeId = isOutgoing ? link.target : link.source;
 
-        return {
-          edgeId: link.edgeId,
-          direction: isOutgoing ? "Outgoing" : "Incoming",
-          relationshipName: link.relationshipName || "Related to",
-          connectedNodeId,
-          connectedNodeLabel:
-            nodeLookup.get(connectedNodeId)?.label ||
-            `Record ${connectedNodeId}`,
-          connectedNodeDepth: nodeLookup.get(connectedNodeId)?.depth ?? null,
+        const existing = groupedConnections.get(connectedNodeId) ?? {
+          edgeIds: [],
+          relationshipNames: new Set<string>(),
+          hasIncoming: false,
+          hasOutgoing: false,
         };
+
+        existing.edgeIds.push(link.edgeId);
+        existing.relationshipNames.add(link.relationshipName || "Related to");
+        existing.hasOutgoing ||= isOutgoing;
+        existing.hasIncoming ||= !isOutgoing;
+
+        groupedConnections.set(connectedNodeId, existing);
       });
+
+    return Array.from(groupedConnections.entries()).map(
+      ([connectedNodeId, connection]) => ({
+        rowId: `${selectedNodeId}:${connectedNodeId}`,
+        edgeId: connection.edgeIds[0],
+        direction:
+          connection.hasIncoming && connection.hasOutgoing
+            ? "Bidirectional"
+            : connection.hasIncoming
+              ? "Incoming"
+              : "Outgoing",
+        relationshipName: Array.from(connection.relationshipNames).join(" / "),
+        connectedNodeId,
+        connectedNodeLabel:
+          nodeLookup.get(connectedNodeId)?.label || `Record ${connectedNodeId}`,
+        connectedNodeDepth: nodeLookup.get(connectedNodeId)?.depth ?? null,
+      }),
+    );
   }, [graphData, nodeLookup, selectedNodeId]);
 
   const filteredConnections = useMemo(() => {
@@ -222,8 +253,10 @@ const GraphClientPage = ({
 
     return selectedNodeConnections.filter((connection) =>
       viewMode === "incoming"
-        ? connection.direction === "Incoming"
-        : connection.direction === "Outgoing",
+        ? connection.direction === "Incoming" ||
+          connection.direction === "Bidirectional"
+        : connection.direction === "Outgoing" ||
+          connection.direction === "Bidirectional",
     );
   }, [selectedNodeConnections, viewMode]);
 
@@ -642,13 +675,15 @@ const GraphClientPage = ({
                   <tbody>
                     {filteredConnections.length > 0 ? (
                       filteredConnections.map((connection) => (
-                        <tr key={connection.edgeId} className="hover">
+                        <tr key={connection.rowId} className="hover">
                           <td>
                             <span
                               className={`badge ${
-                                connection.direction === "Incoming"
-                                  ? "badge-error badge-outline"
-                                  : "badge-info badge-outline"
+                                connection.direction === "Bidirectional"
+                                  ? "badge-secondary badge-outline"
+                                  : connection.direction === "Incoming"
+                                    ? "badge-error badge-outline"
+                                    : "badge-info badge-outline"
                               }`}
                             >
                               {connection.direction}
@@ -1059,7 +1094,10 @@ const MyGraph = ({
     });
 
     graph.forEachEdge((edge) => {
-      if (bidirectionalEdges.has(edge)) {
+      if (pathEdges.has(edge)) {
+        graph.setEdgeAttribute(edge, "color", "#f97316");
+        graph.setEdgeAttribute(edge, "size", 4);
+      } else if (bidirectionalEdges.has(edge)) {
         graph.setEdgeAttribute(edge, "color", "#a855f7");
         graph.setEdgeAttribute(edge, "size", 4);
       } else if (incomingEdges.has(edge)) {
@@ -1083,7 +1121,6 @@ const MyGraph = ({
         graph.setEdgeAttribute(edge, "size", 2);
       }
     });
-
     sigma.refresh?.();
   }, []);
 
@@ -1372,6 +1409,7 @@ const MyGraph = ({
             return;
           }
 
+          hoverNodeRef.current = null;
           onNodeSelect(nodeId);
         });
 
