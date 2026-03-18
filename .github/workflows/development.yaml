@@ -17,6 +17,7 @@ jobs:
           ssh-key: |
             ${{ secrets.DEPLOY_KEY }}
             ${{ secrets.INSIGHT_DEPLOY_KEY }}
+          ssh-known-hosts: ${{ secrets.GHE_KNOWN_HOSTS }}
 
       # Builds the required image
       - shell: bash
