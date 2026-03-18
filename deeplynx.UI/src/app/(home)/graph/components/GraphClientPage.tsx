@@ -39,7 +39,13 @@ interface EdgeAttributes extends Attributes {
   label?: string;
   relationshipId?: number | null;
   edgeId?: number;
-  type?: "arrow" | "double-arrow";
+  type?:
+    | "arrow"
+    | "double-arrow"
+    | "clamped"
+    | "double-clamped"
+    | "clamped-arrow"
+    | "double-clamped-arrow";
   direction?: "incoming" | "outgoing" | "bidirectional";
 }
 
@@ -105,6 +111,11 @@ type SigmaInstance = {
     x: number;
     y: number;
   };
+  viewportToGraph?: (coordinates: { x: number; y: number }) => {
+    x: number;
+    y: number;
+  };
+  setSetting?: (key: string, value: unknown) => void;
 };
 
 const GraphClientPage = ({
@@ -879,6 +890,9 @@ const MyGraph = ({
   const [isLayoutSettling, setIsLayoutSettling] = useState(true);
   const flowCanvasRef = useRef<HTMLCanvasElement>(null);
   const flowFrameRef = useRef<number | null>(null);
+  const draggedNodeRef = useRef<string | null>(null);
+  const dragOffsetRef = useRef({ x: 0, y: 0 });
+  const hasDraggedRef = useRef(false);
 
   const focusNode = useCallback((nodeId: number) => {
     const graph = graphRef.current;
@@ -904,6 +918,15 @@ const MyGraph = ({
     } else if (typeof camera.setState === "function") {
       camera.setState(nextState);
     }
+  }, []);
+
+  const stopDragging = useCallback(() => {
+    draggedNodeRef.current = null;
+    sigmaRef.current?.setSetting?.("enableCameraPanning", true);
+
+    window.setTimeout(() => {
+      hasDraggedRef.current = false;
+    }, 0);
   }, []);
 
   const fitGraph = useCallback(() => {
@@ -1269,7 +1292,12 @@ const MyGraph = ({
 
         const [
           { default: Sigma },
-          { EdgeDoubleArrowProgram },
+          {
+            EdgeClampedProgram,
+            EdgeDoubleClampedProgram,
+            createEdgeArrowHeadProgram,
+            createEdgeCompoundProgram,
+          },
           { default: FA2Layout },
         ] = await Promise.all([
           import("sigma"),
@@ -1413,7 +1441,9 @@ const MyGraph = ({
 
             relationshipId: first.relationshipId,
             edgeId: first.edgeId,
-            type: hasBidirectionalLink ? "double-arrow" : "arrow",
+            type: hasBidirectionalLink
+              ? "double-clamped-arrow"
+              : "clamped-arrow",
             direction: hasBidirectionalLink ? "bidirectional" : "outgoing",
           });
         });
@@ -1436,11 +1466,35 @@ const MyGraph = ({
           return;
         }
 
+        const ClampedArrowProgram = createEdgeCompoundProgram([
+          EdgeClampedProgram,
+          createEdgeArrowHeadProgram({
+            extremity: "target",
+            lengthToThicknessRatio: 4,
+            widenessToThicknessRatio: 4,
+          }),
+        ]);
+
+        const DoubleClampedArrowProgram = createEdgeCompoundProgram([
+          EdgeDoubleClampedProgram,
+          createEdgeArrowHeadProgram({
+            extremity: "source",
+            lengthToThicknessRatio: 4,
+            widenessToThicknessRatio: 4,
+          }),
+          createEdgeArrowHeadProgram({
+            extremity: "target",
+            lengthToThicknessRatio: 4,
+            widenessToThicknessRatio: 4,
+          }),
+        ]);
+
         const sigma = new Sigma(graph, graphContainer, {
           renderEdgeLabels: false,
-          defaultEdgeType: "arrow",
+          defaultEdgeType: "clamped-arrow",
           edgeProgramClasses: {
-            "double-arrow": EdgeDoubleArrowProgram,
+            "clamped-arrow": ClampedArrowProgram,
+            "double-clamped-arrow": DoubleClampedArrowProgram,
           },
           labelSize: 14,
           labelWeight: "500",
@@ -1522,6 +1576,8 @@ const MyGraph = ({
         sigma.on?.("clickNode", ({ node }) => {
           const nodeId = Number(node);
 
+          if (hasDraggedRef.current) return;
+
           if (selectedNodeIdRef.current === nodeId) {
             onNodeOpen(nodeId);
             return;
@@ -1532,9 +1588,61 @@ const MyGraph = ({
         });
 
         sigma.on?.("clickStage", () => {
+          if (hasDraggedRef.current) return;
+
           hoverNodeRef.current = null;
           onNodeSelect(null);
         });
+
+        sigma.on?.("downNode", ({ node, event }) => {
+          const graphPoint = sigma.viewportToGraph?.({
+            x: event.x,
+            y: event.y,
+          });
+          if (!graphPoint || !graph.hasNode(node)) return;
+
+          const nodeAttributes = graph.getNodeAttributes(node);
+
+          draggedNodeRef.current = node;
+          dragOffsetRef.current = {
+            x: nodeAttributes.x - graphPoint.x,
+            y: nodeAttributes.y - graphPoint.y,
+          };
+          hasDraggedRef.current = false;
+
+          sigma.setSetting?.("enableCameraPanning", false);
+          event.preventSigmaDefault();
+        });
+
+        sigma.on?.("moveBody", ({ event }) => {
+          const draggedNode = draggedNodeRef.current;
+          const graphPoint = sigma.viewportToGraph?.({
+            x: event.x,
+            y: event.y,
+          });
+
+          if (!draggedNode || !graphPoint || !graph.hasNode(draggedNode))
+            return;
+
+          hasDraggedRef.current = true;
+
+          graph.setNodeAttribute(
+            draggedNode,
+            "x",
+            graphPoint.x + dragOffsetRef.current.x,
+          );
+          graph.setNodeAttribute(
+            draggedNode,
+            "y",
+            graphPoint.y + dragOffsetRef.current.y,
+          );
+
+          sigma.refresh?.();
+          event.preventSigmaDefault();
+        });
+
+        sigma.on?.("upNode", stopDragging);
+        sigma.on?.("upStage", stopDragging);
 
         onDataLoaded({
           nodes: data.nodes.map((node) => ({
