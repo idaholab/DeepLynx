@@ -71,6 +71,7 @@ interface GraphExplorerData {
 interface GraphController {
   fitGraph: () => void;
   focusNode: (nodeId: number) => void;
+  resetView: () => void;
 }
 
 type GraphViewMode = "all" | "incoming" | "outgoing" | "path";
@@ -345,7 +346,7 @@ const GraphClientPage = ({
     const targetNodeId = rootNode?.id ?? recordId;
     setSearchQuery("");
     setSelectedNodeId(targetNodeId);
-    controllerRef.current?.fitGraph();
+    controllerRef.current?.resetView();
   }, [recordId, rootNode?.id]);
 
   const handleSearchSubmit = useCallback(() => {
@@ -926,6 +927,7 @@ const MyGraph = ({
   const viewModeRef = useRef<GraphViewMode>(viewMode);
   const pathNodeIdsRef = useRef<number[]>(pathNodeIds);
   const pathEdgeIdsRef = useRef<number[]>(pathEdgeIds);
+  const initialCameraStateRef = useRef<CameraState | null>(null);
   const [isLayoutSettling, setIsLayoutSettling] = useState(true);
 
   const focusNode = useCallback((nodeId: number) => {
@@ -977,8 +979,8 @@ const MyGraph = ({
     const spanX = Math.max(maxX - minX, 1);
     const spanY = Math.max(maxY - minY, 1);
     const nextState: CameraState = {
-      x: minX + spanX / 2 - 2,
-      y: minY + spanY / 2 + 0.9,
+      x: minX + spanX / 2,
+      y: minY + spanY / 2,
       ratio: Math.max(spanX, spanY) * 0.1,
       angle: 0,
     };
@@ -987,6 +989,18 @@ const MyGraph = ({
       camera.animate(nextState, { duration: 300 });
     } else if (typeof camera.setState === "function") {
       camera.setState(nextState);
+    }
+  }, []);
+
+  const resetView = useCallback(() => {
+    const camera = sigmaRef.current?.getCamera?.();
+    const initialState = initialCameraStateRef.current;
+    if (!camera || !initialState) return;
+
+    if (typeof camera.animate === "function") {
+      camera.animate(initialState, { duration: 300 });
+    } else if (typeof camera.setState === "function") {
+      camera.setState(initialState);
     }
   }, []);
 
@@ -1359,6 +1373,7 @@ const MyGraph = ({
 
         timeoutRef.current = setTimeout(() => {
           layout.stop?.();
+          initialCameraStateRef.current = camera?.getState?.() ?? null;
           setIsLayoutSettling(false);
           refreshGraphAppearance();
           onLoadingChange(false);
@@ -1408,6 +1423,7 @@ const MyGraph = ({
         onControlsReady({
           fitGraph,
           focusNode,
+          resetView,
         });
 
         refreshGraphAppearance();
@@ -1434,6 +1450,7 @@ const MyGraph = ({
     depth,
     fitGraph,
     focusNode,
+    resetView,
     onControlsReady,
     onDataLoaded,
     onError,
