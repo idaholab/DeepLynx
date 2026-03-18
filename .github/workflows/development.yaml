@@ -13,11 +13,18 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
         with:
-          submodules: recursive
-          ssh-key: |
-            ${{ secrets.DEPLOY_KEY }}
-            ${{ secrets.DEPLOY_KEY_INSIGHT }}
+          submodules: false
+          ssh-key: ${{ secrets.DEPLOY_KEY }}
           ssh-known-hosts: ${{ secrets.GHE_KNOWN_HOSTS }}
+
+      - name: Checkout Submodules
+        env:
+          INSIGHT_KEY: ${{ secrets.DEPLOY_KEY_INSIGHT }}
+        run: |
+          echo "$INSIGHT_KEY" > /tmp/insight_deploy
+          chmod 600 /tmp/insight_deploy
+          GIT_SSH_COMMAND="ssh -i /tmp/insight_deploy" git submodule update --init --recursive
+          rm /tmp/insight_deploy
 
       # Builds the required image
       - shell: bash
