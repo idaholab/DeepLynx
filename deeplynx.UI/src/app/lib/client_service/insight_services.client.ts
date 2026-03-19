@@ -180,7 +180,7 @@ function extractInsightErrorMessage(value: unknown): string {
 export async function queueInsightUpload(
   payload: InsightUploadPayload,
 ): Promise<InsightUploadResponse> {
-  const response = await fetch("/api/insight/upload", {
+  const response = await fetch("/api/v1/insight/upload", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(toUploadRequestBody(payload)),
