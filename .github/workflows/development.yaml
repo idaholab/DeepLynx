@@ -110,7 +110,7 @@ jobs:
           az acr build --registry $ACR_REGISTRY \
             --image $ACR_PATH:insight-rabbitmq-runner-$GITHUB_RUN_NUMBER \
             --file deeplynx.insight/app/rabbitmq/Dockerfiles/Dockerfile.runner.production \
-            deeplynx.insight/app/rabbitmq
+            deeplynx.insight
 
           az acr build --registry $ACR_REGISTRY \
             --image $ACR_PATH:insight-minio-$GITHUB_RUN_NUMBER \
@@ -120,7 +120,7 @@ jobs:
           az acr build --registry $ACR_REGISTRY \
             --image $ACR_PATH:insight-fastapi-$GITHUB_RUN_NUMBER \
             --file deeplynx.insight/app/fastapi/Dockerfiles/Dockerfile.production \
-            deeplynx.insight/app/fastapi
+            deeplynx.insight
 
   kubernetes:
     needs: build
