@@ -4,7 +4,9 @@ using deeplynx.helpers;
 using deeplynx.interfaces;
 using deeplynx.models;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using Newtonsoft.Json;
 using JsonSerializer = System.Text.Json.JsonSerializer;
 
@@ -19,6 +21,7 @@ public class FileBusiness
     private readonly long _recommendedChunkSize;
     private readonly IRecordBusiness _recordBusiness;
     private readonly ISensitivityLabelService _sensitivityLabelService;
+    private readonly InsightServiceClient _insightServiceClient;
 
     // NOTE: Chunked upload methods currently only support filesystem storage.
     // When Azure/S3 chunked uploads are needed, refactor these methods to 
@@ -28,13 +31,15 @@ public class FileBusiness
         IFileBusinessFactory factory,
         IDataSourceBusiness dataSourceBusiness,
         IClassBusiness classBusiness,
-        IRecordBusiness recordBusiness)
+        IRecordBusiness recordBusiness,
+        InsightServiceClient insightServiceClient)
     {
         _context = context;
         _factory = factory;
         _dataSourceBusiness = dataSourceBusiness;
         _classBusiness = classBusiness;
         _recordBusiness = recordBusiness;
+        _insightServiceClient = insightServiceClient;
 
         // Initialize recommended chunk size from environment variable
         var chunkSizeStr = Environment.GetEnvironmentVariable("RECOMMENDED_CHUNK_SIZE")
@@ -68,7 +73,7 @@ public class FileBusiness
         IFormFile file,
         List<long>? sensitivityLabelIds = null,
         IFormFile? metadataFile = null,
-        bool? embed = false)
+        bool embed = false)
     {
         long realDataSourceId;
         if (file == null || file.Length == 0) throw new ArgumentException("File is required and cannot be empty.");
@@ -134,11 +139,59 @@ public class FileBusiness
             Uri = uri
         };
 
-        // return the newly created metadata record for the file
-        return await _recordBusiness.CreateRecord(currentUserId, organizationId, projectId, realDataSourceId,
+        var createdRecord = await _recordBusiness.CreateRecord(currentUserId, organizationId, projectId, realDataSourceId,
             recordRequest, sensitivityLabelIds, embedded: embed);
-        
-        // TODO: If embed is true send the record ID and URI to the CREATE Insight API
+
+        if (embed)
+        {
+            var languageModel = await _context.AiModelConfigs.FirstOrDefaultAsync(c => c.ModelType == "language" && c.Default == true);
+            var embeddingModel = await _context.AiModelConfigs.FirstOrDefaultAsync(c => c.ModelType == "embedding" && c.Default == true);
+
+            if (languageModel == null || embeddingModel == null)
+                throw new KeyNotFoundException("no default language and or embedding model configured");
+
+            string languageToken = null!;
+            string embeddingToken = null!;
+            if (languageModel.RequiresToken == true)
+            {
+                languageToken = await _context.UserModelTokens
+                    .Where(t => t.UserId == currentUserId && t.AiModelConfigId == languageModel.Id)
+                    .Select(t => t.Token)
+                    .FirstOrDefaultAsync();
+            }
+
+            if (embeddingModel.RequiresToken == true)
+            {
+                embeddingToken = await _context.UserModelTokens
+                    .Where(t => t.UserId == currentUserId && t.AiModelConfigId == embeddingModel.Id)
+                    .Select(t => t.Token)
+                    .FirstOrDefaultAsync();
+            }
+
+            var embeddingDto = new CreateInsightEmbeddingRequestDto
+            {
+                FileInfo = new List<CreateInsightEmbeddingRequestDto.FileInfoDto>
+                {
+                    new CreateInsightEmbeddingRequestDto.FileInfoDto
+                    {
+                        FileId = createdRecord.Id,
+                        FileUri = createdRecord.Uri! // On file upload this will never be null
+                    }
+                },
+                LanguageModelServerUrl = languageModel.ServerUrl,
+                LanguageModelName = languageModel.ModelName,
+                LanguageModelToken = languageToken,
+                EmbeddingServerUrl = embeddingModel.ServerUrl,
+                EmbeddingModelName = embeddingModel.ModelName,
+                EmbeddingModelToken = embeddingToken
+            };
+
+            // fire and forget- Insight manages a queue for this
+            _ = _insightServiceClient.CreateEmbedding(embeddingDto);
+        }
+
+        // return the newly created metadata record for the file
+        return createdRecord;
     }
 
     /// <summary>
@@ -151,10 +204,10 @@ public class FileBusiness
     /// <param name="file">file to update to</param>
     /// <param name="embed">Boolean value that determines if the file will be embedded by Insight</param>
     public async Task<RecordResponseDto> UpdateFile(
-        long currentUserId, 
-        long organizationId, 
+        long currentUserId,
+        long organizationId,
         long projectId,
-        long recordId, 
+        long recordId,
         IFormFile file,
         bool? embed = false
         )
@@ -191,7 +244,7 @@ public class FileBusiness
         };
         return await _recordBusiness.UpdateRecord(currentUserId, organizationId, projectId, recordId,
             updateRecordRequest, embedded: embed);
-        
+
         // TODO: If embed is true send the record ID and URI to the UPDATE Insight API (or delete then add if no update endpoint exists)
     }
 
@@ -267,7 +320,7 @@ public class FileBusiness
         await fileBusiness.DeleteFile(record, configData);
 
         return await _recordBusiness.DeleteRecord(currentUserId, organizationId, projectId, recordId);
-        
+
         // TODO: Delete all references to this record in the pgVector embeddings table
     }
 
@@ -445,7 +498,7 @@ public class FileBusiness
 
         return await _recordBusiness.CreateRecord(currentUserId, organizationId, projectId, realDataSourceId,
             recordRequest, sensitivityLabelIds, embedded: embed);
-        
+
         // TODO: If embed is true then pass the record ID and URI to INSIGHT CREATE API
     }
 

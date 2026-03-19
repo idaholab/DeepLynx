@@ -24,11 +24,12 @@ public class AiModelConfigBusiness : IAiModelConfigBusiness
         "openai",
         "anthropic",
         "hpc",
+        "ollama"
     };
 
     private static readonly List<string> ModelTypeList = new List<string>
     {
-        "llm",
+        "language",
         "embedding"
     };
 
@@ -50,7 +51,7 @@ public class AiModelConfigBusiness : IAiModelConfigBusiness
 
         if (projectId.HasValue)
             query = query.Where(x => x.ProjectId == projectId || x.ProjectId == null);
-        else 
+        else
             query = query.Where(x => x.ProjectId == null);
 
         if (hideArchived)
@@ -165,9 +166,9 @@ public class AiModelConfigBusiness : IAiModelConfigBusiness
             if (dto.Default)
             {
                 if (projectId.HasValue)
-                    await ResetProjectDefaults(projectId.Value, newConfig.Id);
+                    await ResetProjectDefaults(projectId.Value, newConfig.Id, newConfig.ModelType);
                 else
-                    await ResetOrganizationDefaults(organizationId, newConfig.Id);
+                    await ResetOrganizationDefaults(organizationId, newConfig.Id, newConfig.ModelType);
             }
 
             await transaction.CommitAsync();
@@ -237,10 +238,14 @@ public class AiModelConfigBusiness : IAiModelConfigBusiness
 
                 if (!returnedModelConfig.Default && dto.Default.Value)
                 {
+                    // Use the incoming ModelType if it's being updated, otherwise use the existing one.
+                    // This ensures we reset defaults only among configs of the same model type.
+                    var modelType = dto.ModelType ?? returnedModelConfig.ModelType;
+
                     if (projectId.HasValue)
-                        await ResetProjectDefaults(projectId.Value, returnedModelConfig.Id);
+                        await ResetProjectDefaults(projectId.Value, returnedModelConfig.Id, modelType);
                     else
-                        await ResetOrganizationDefaults(organizationId, returnedModelConfig.Id);
+                        await ResetOrganizationDefaults(organizationId, returnedModelConfig.Id, modelType);
                 }
             }
 
@@ -365,8 +370,8 @@ public class AiModelConfigBusiness : IAiModelConfigBusiness
         await _context.SaveChangesAsync();
         return true;
     }
-    
-    
+
+
     /// <summary>
     ///     Unarchive a single AI Model Configuration
     /// </summary>
@@ -407,19 +412,19 @@ public class AiModelConfigBusiness : IAiModelConfigBusiness
         return true;
     }
 
-    private async Task ResetProjectDefaults(long projectId, long newDefaultId)
+    private async Task ResetProjectDefaults(long projectId, long newDefaultId, string modelType)
     {
-        // check for existing defaults at the project level and remove them from being default
+        // Reset defaults only among configs of the same model type at the project level
         await _context.AiModelConfigs
-            .Where(os => os.ProjectId == projectId && os.Id != newDefaultId)
+            .Where(os => os.ProjectId == projectId && os.Id != newDefaultId && os.ModelType == modelType)
             .ExecuteUpdateAsync(s => s.SetProperty(os => os.Default, false));
     }
 
-    private async Task ResetOrganizationDefaults(long organizationId, long newDefaultId)
+    private async Task ResetOrganizationDefaults(long organizationId, long newDefaultId, string modelType)
     {
-        // check for existing defaults at the org level and remove them from being default
+        // Reset defaults only among configs of the same model type at the org level
         await _context.AiModelConfigs
-            .Where(os => os.OrganizationId == organizationId && os.ProjectId == null && os.Id != newDefaultId)
+            .Where(os => os.OrganizationId == organizationId && os.ProjectId == null && os.Id != newDefaultId && os.ModelType == modelType)
             .ExecuteUpdateAsync(s => s.SetProperty(os => os.Default, false));
     }
 }

@@ -180,8 +180,8 @@ try
     builder.Services.AddTransient<IGraphBusiness, GraphBusiness>();
     builder.Services.AddTransient<IUserModelTokenBusiness, UserModelTokenBusiness>();
     builder.Services.AddTransient<IAiModelConfigBusiness, AiModelConfigBusiness>();
+    builder.Services.AddHttpClient<InsightServiceClient>();
     builder.Services.AddScoped<ISensitivityLabelService, SensitivityLabelService>();
-
 
     //OpenApi Documentation
     builder.Services.AddOpenApi(options =>
