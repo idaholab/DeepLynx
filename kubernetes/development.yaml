@@ -538,7 +538,7 @@ spec:
                   name: app-config
                   key: minio-endpoint
             - name: MINIO_VOLUMES
-              value: "/data"
+              value: "/data/duckdb"
             - name: MINIO_CONSOLE_ADDRESS
               value: ":9101"
           resources:
@@ -566,7 +566,7 @@ spec:
             - containerPort: 9101
           volumeMounts:
             - name: duckdb-storage
-              mountPath: /data
+              mountPath: /data/duckdb
       volumes:
         - name: duckdb-storage
           persistentVolumeClaim:
