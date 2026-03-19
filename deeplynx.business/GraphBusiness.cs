@@ -9,22 +9,28 @@ public class GraphBusiness : IGraphBusiness
 {
     private readonly DeeplynxContext _context;
     private readonly IEventBusiness _eventBusiness;
+    private readonly ISensitivityLabelService _sensitivityLabelService;
 
     /// <summary>
     ///     Initializes a new instance of the <see cref="GraphBusiness" /> class.
     /// </summary>
     /// <param name="context">The database context used for the Graph operations.</param>
     /// <param name="eventBusiness">Used for logging events during create, update, and delete Operations.</param>
+    /// <param name="sensitivityLabelService">Used checking record sensitivity label authorization.</param>
     public GraphBusiness(
-        DeeplynxContext context, IEventBusiness eventBusiness)
+        DeeplynxContext context,
+        IEventBusiness eventBusiness,
+        ISensitivityLabelService sensitivityLabelService)
     {
         _context = context;
         _eventBusiness = eventBusiness;
+        _sensitivityLabelService = sensitivityLabelService;
     }
 
     /// <summary>
     ///     Retrieves all edges for a specific project and (optionally) datasource
     /// </summary>
+    /// <param name="currentUserId">The ID of the requesting user</param>
     /// <param name="organizationId">The ID of the organization to which the record belongs</param>
     /// <param name="projectId">The ID of the project to which the record belongs</param>
     /// <param name="recordId">The ID of the record by which to filter edges</param>
@@ -33,6 +39,7 @@ public class GraphBusiness : IGraphBusiness
     /// <param name="pageSize">Max size of list to return</param>
     /// <returns>A list of edges based on the applied filters.</returns>
     public async Task<List<RelatedRecordsResponseDto>> GetEdgesByRecord(
+        long currentUserId,
         long organizationId,
         long projectId,
         long recordId,
@@ -41,32 +48,62 @@ public class GraphBusiness : IGraphBusiness
         int pageSize)
     {
         if (page < 1) throw new ArgumentException("Page must be greater than 0");
-
         if (pageSize < 1 || pageSize > 100) throw new ArgumentException("Page size must be between 1 and 100");
 
-        var recordExists = await _context.Records
-            .AnyAsync(r => r.Id == recordId
-                           && r.OrganizationId == organizationId
-                           && r.ProjectId == projectId
-                           && !r.IsArchived);
+        var sourceRecord = await _context.Records
+            .Include(r => r.Labels)
+            .FirstOrDefaultAsync(r => r.Id == recordId
+                                    && r.OrganizationId == organizationId
+                                    && r.ProjectId == projectId
+                                    && !r.IsArchived);
 
-        if (!recordExists) throw new KeyNotFoundException($"Record with id {recordId} not found");
+        if (sourceRecord == null) throw new KeyNotFoundException($"Record with id {recordId} not found");
+
+        var isAdmin = await AdminHelper.IsAnyAdmin(_context, currentUserId, organizationId, projectId);
 
         IQueryable<Edge> edgeQuery = _context.Edges
             .Include(e => e.Relationship)
-            .Where(e => !e.IsArchived);
+            .Where(e => !e.IsArchived
+                && e.OrganizationId == organizationId
+                && e.ProjectId == projectId);
 
-        if (isOrigin)
-            edgeQuery = edgeQuery
-                .Include(e => e.Destination)
-                .Where(e => e.OriginId == recordId && !e.Destination.IsArchived);
+        if (!isAdmin)
+        {
+            var userAuthorizedLabels = await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
+                currentUserId, organizationId, projectId, "read record");
+
+            if (sourceRecord.Labels.Any() && !sourceRecord.Labels.All(l => userAuthorizedLabels.Contains(l.Id)))
+                throw new UnauthorizedAccessException($"Access Denied: You do not have access to all the sensitivity labels on record: {recordId}");
+
+            if (isOrigin)
+                edgeQuery = edgeQuery
+                    .Include(e => e.Destination).ThenInclude(r => r.Labels)
+                    .Where(e => e.OriginId == recordId
+                        && !e.Destination.IsArchived
+                        && (!e.Destination.Labels.Any()
+                            || e.Destination.Labels.All(l => userAuthorizedLabels.Contains(l.Id))));
+            else
+                edgeQuery = edgeQuery
+                    .Include(e => e.Origin).ThenInclude(r => r.Labels)
+                    .Where(e => e.DestinationId == recordId
+                        && !e.Origin.IsArchived
+                        && (!e.Origin.Labels.Any()
+                            || e.Origin.Labels.All(l => userAuthorizedLabels.Contains(l.Id))));
+        }
         else
-            edgeQuery = edgeQuery
-                .Include(e => e.Origin)
-                .Where(e => e.DestinationId == recordId && !e.Origin.IsArchived);
+        {
+            if (isOrigin)
+                edgeQuery = edgeQuery
+                    .Include(e => e.Destination)
+                    .Where(e => e.OriginId == recordId && !e.Destination.IsArchived);
+            else
+                edgeQuery = edgeQuery
+                    .Include(e => e.Origin)
+                    .Where(e => e.DestinationId == recordId && !e.Origin.IsArchived);
+        }
 
         return await edgeQuery
-            .OrderBy(e => e.Id) // Important: Add consistent ordering for predictable pagination
+            .OrderBy(e => e.Id)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .Select(e => new RelatedRecordsResponseDto
@@ -97,61 +134,73 @@ public class GraphBusiness : IGraphBusiness
     {
         if (depth > 3) throw new ArgumentException("Depth must be no more than 3");
 
-        var rootRecord = await _context.Records.FindAsync(recordId);
+        var rootRecord = await _context.Records
+            .Include(r => r.Labels)
+            .FirstOrDefaultAsync(r => r.Id == recordId);
+
         if (rootRecord == null) throw new KeyNotFoundException($"Record with id {recordId} not found");
 
-        // find projects the user has access to
-        var userProjectIds = await _context.Projects.Where(p =>
-                p.ProjectMembers.Any(pm =>
+        var isAdmin = await AdminHelper.IsAnyAdmin(_context, userId, organizationId, projectId);
+
+        List<long> userProjectIds;
+        List<long>? userAuthorizedLabels = null;
+
+        if (isAdmin)
+        {
+            userProjectIds = await _context.Projects
+                .Select(p => p.Id)
+                .ToListAsync();
+        }
+        else
+        {
+            userProjectIds = await _context.Projects
+                .Where(p => p.ProjectMembers.Any(pm =>
                     pm.UserId == userId ||
-                    (pm.GroupId.HasValue && pm.Group != null && pm.Group.Users.Any(u => u.Id == userId))
-                ))
-            .Select(p => p.Id)
-            .ToListAsync();
+                    (pm.GroupId.HasValue && pm.Group != null && pm.Group.Users.Any(u => u.Id == userId))))
+                .Select(p => p.Id)
+                .ToListAsync();
 
-        if (userProjectIds.Count == 0 || !userProjectIds.Contains(rootRecord.ProjectId))
-            throw new AccessViolationException($"You do not have access to view record with id {recordId}");
+            if (userProjectIds.Count == 0 || !userProjectIds.Contains(rootRecord.ProjectId))
+                throw new AccessViolationException($"You do not have access to view record with id {recordId}");
 
-        var nodes = new Dictionary<long, GraphNode>(); // Stores all unique nodes we discover
-        var links = new List<GraphLink>(); // Stores all connections between nodes
-        var visitedEdges = new HashSet<long>(); // Tracks which edges we've already processed (prevents duplicates)
-        var visitedRecords = new HashSet<long>(); // Tracks which records we've already explored (prevents reprocessing)
+            userAuthorizedLabels = await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
+                userId, organizationId, userProjectIds.ToArray(), "read record");
 
-        // Add the starting record as our root node
+            if (rootRecord.Labels.Any() && !rootRecord.Labels.All(l => userAuthorizedLabels.Contains(l.Id)))
+                throw new UnauthorizedAccessException($"Access Denied: You do not have access to all the sensitivity labels on record: {recordId}");
+        }
+
+        var nodes = new Dictionary<long, GraphNode>();
+        var links = new List<GraphLink>();
+        var visitedEdges = new HashSet<long>();
+        var visitedRecords = new HashSet<long>();
+
         nodes[recordId] = new GraphNode
         {
             Id = recordId,
             Label = rootRecord.Name,
-            Type = "root" // root of the graph
+            Type = "root"
         };
 
-        // Start with just the root node to process
         var currentLevelRecordIds = new List<long> { recordId };
 
         for (var currentDepth = 0; currentDepth < depth; currentDepth++)
         {
             var nextLevelRecordIds = new List<long>();
 
-            // Process each record at the current level
             foreach (var currentLevelRecordId in currentLevelRecordIds)
             {
-                // Skip if we've already explored this record
                 if (visitedRecords.Contains(currentLevelRecordId)) continue;
 
                 visitedRecords.Add(currentLevelRecordId);
 
-                // Get all connections FROM this record (outgoing edges)
-                var outgoingEdges = await GetGraphEdges(currentLevelRecordId, userProjectIds, true);
+                var outgoingEdges = await GetGraphEdges(currentLevelRecordId, userProjectIds, userAuthorizedLabels, isAdmin, true);
+                var incomingEdges = await GetGraphEdges(currentLevelRecordId, userProjectIds, userAuthorizedLabels, isAdmin, false);
 
-                // Get all connections TO this record (incoming edges)
-                var incomingEdges = await GetGraphEdges(currentLevelRecordId, userProjectIds, false);
-
-                // add links and nodes to the graph for outgoing and incoming
                 ProcessEdges(outgoingEdges, nodes, links, visitedEdges, nextLevelRecordIds, true);
                 ProcessEdges(incomingEdges, nodes, links, visitedEdges, nextLevelRecordIds, false);
             }
 
-            // Move next level records to current
             currentLevelRecordIds = nextLevelRecordIds;
         }
 
@@ -167,26 +216,35 @@ public class GraphBusiness : IGraphBusiness
     /// </summary>
     /// <param name="recordId">The ID of the record to get edges for</param>
     /// <param name="userProjectIds">The ID of the projects the user has access to</param>
+    /// <param name="userAuthorizedLabels">list of Sensitivity Label IDs that the requesting user has access to</param>
+    /// <param name="isAdmin">if admin then skip sensitivity label checks</param>
     /// <param name="isOutgoing">True for edges going OUT from this record, False for edges coming IN to this record</param>
     /// <returns>A list of edges with their related data (origin, destination, relationship) loaded</returns>
-    private async Task<List<Edge>> GetGraphEdges(long recordId, List<long> userProjectIds, bool isOutgoing)
+    private async Task<List<Edge>> GetGraphEdges(
+        long recordId,
+        List<long> userProjectIds,
+        List<long>? userAuthorizedLabels,
+        bool isAdmin,
+        bool isOutgoing)
     {
-        // Start building our database query
         var query = _context.Edges
-            .Include(e => e.Origin)
-            .Include(e => e.Destination)
+            .Include(e => e.Origin).ThenInclude(r => r.Labels)
+            .Include(e => e.Destination).ThenInclude(r => r.Labels)
             .Include(e => e.Relationship)
             .Where(e =>
-                userProjectIds.Contains(e.ProjectId) && // only edges in user projects
-                userProjectIds.Contains(e.Origin.ProjectId) && // only edges that have origins in user projects
-                userProjectIds.Contains(e.Destination
-                    .ProjectId) && // only edges that have destinations in user projects
-                !e.IsArchived); // Only non-archived edges
+                userProjectIds.Contains(e.ProjectId) &&
+                userProjectIds.Contains(e.Origin.ProjectId) &&
+                userProjectIds.Contains(e.Destination.ProjectId) &&
+                !e.IsArchived);
 
-        if (isOutgoing)
-            query = query.Where(e => e.OriginId == recordId);
-        else
-            query = query.Where(e => e.DestinationId == recordId);
+        if (!isAdmin)
+            query = query.Where(e =>
+                (!e.Origin.Labels.Any() || e.Origin.Labels.All(l => userAuthorizedLabels!.Contains(l.Id))) &&
+                (!e.Destination.Labels.Any() || e.Destination.Labels.All(l => userAuthorizedLabels!.Contains(l.Id))));
+
+        query = isOutgoing
+            ? query.Where(e => e.OriginId == recordId)
+            : query.Where(e => e.DestinationId == recordId);
 
         return await query.ToListAsync();
     }
