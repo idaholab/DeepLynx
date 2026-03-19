@@ -45,10 +45,12 @@ import RelatedRecordsCardSkeleton from "./skeletons/RelatedRecordsSkeleton";
 import { getAllSensitivityLabelsProject } from "@/app/lib/client_service/sensitivity_labels_services.client";
 import AddEdgeModal from "./components/AddEdgeModal";
 import ClassSelectorModal from "./components/ClassSelectorModal";
+import RecordInsightChat from "./components/RecordInsightChat";
 import {
   RelatedRecordViewModel,
   useRecordRelationships,
 } from "./hooks/useRecordRelationships";
+import { isInsightSupportedFileType } from "@/app/lib/insight_file_support";
 
 // ============= HELPER FUNCTIONS =============
 interface PropertyRow {
@@ -122,6 +124,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
   const [record, setRecord] = useState<HistoricalRecordResponseDto | null>(
     null,
   );
+  const [recordFileType, setRecordFileType] = useState<string | null>(null);
   const [recordClass, setRecordClass] = useState<ClassResponseDto | null>(null);
   const [tags, setTags] = useState<TagResponseDto[]>([]);
   const [selectedTags, setSelectedTags] = useState<TagResponseDto[]>([]);
@@ -220,6 +223,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
 
   const resetAllState = useCallback(() => {
     setRecord(null);
+    setRecordFileType(null);
     setSelectedTags([]);
     setSelectedIds([]);
     setSelectedLabels([]);
@@ -376,6 +380,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
           true,
         );
 
+        setRecordFileType(liveRecord.fileType ?? null);
         setSelectedIds(mapSelectedIds(liveRecord.tags ?? []));
         setSelectedLabelIds(mapSelectedIds(liveRecord.labels ?? []));
       } catch (error) {
@@ -612,6 +617,12 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
     return <RecordLoading />;
   }
 
+  const isInsightSupported = isInsightSupportedFileType(
+    recordFileType,
+    record?.uri,
+    record?.name,
+  );
+
   const tabs = [
     {
       label: t.translations.RECORD_INFORMATION,
@@ -638,6 +649,13 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
 
           {/* Right Column - Tags & Relations */}
           <div className="w-full xl:flex-1 space-y-4">
+            {isInsightSupported ? (
+              <RecordInsightChat
+                recordId={record.id}
+                recordName={record.name}
+                recordUri={record.uri}
+              />
+            ) : null}
             {/* Tags Card */}
             <RecordTagsPanel
               tags={tags}

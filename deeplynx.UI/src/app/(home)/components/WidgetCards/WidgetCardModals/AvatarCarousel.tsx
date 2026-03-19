@@ -21,10 +21,12 @@ const AvatarCarousel: React.FC<AvatarCarouselProps> = ({ people }) => {
 
   useEffect(() => {
     const handleResize = () => {
-      const newAvatarsPerPage = Math.floor(
-        (window.innerWidth * 0.3 - (24 + 24 + 24 + 32.5)) / 50
+      const nextAvatarsPerPage = Math.max(
+        1,
+        Math.floor((window.innerWidth * 0.3 - (24 + 24 + 24 + 32.5)) / 50),
       );
-      setAvatarsPerPage(newAvatarsPerPage);
+
+      setAvatarsPerPage(nextAvatarsPerPage);
     };
 
     window.addEventListener("resize", handleResize);
@@ -32,6 +34,10 @@ const AvatarCarousel: React.FC<AvatarCarouselProps> = ({ people }) => {
 
     return () => window.removeEventListener("resize", handleResize);
   }, []);
+
+  useEffect(() => {
+    setCurrentPage(0);
+  }, [people.length, avatarsPerPage]);
 
   const totalPages = Math.ceil(people.length / avatarsPerPage);
 
