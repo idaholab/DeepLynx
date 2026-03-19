@@ -3,6 +3,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using deeplynx.business;
 using deeplynx.datalayer.Models;
+using deeplynx.helpers;
 using deeplynx.helpers.BigData;
 using deeplynx.helpers.Hubs;
 using deeplynx.interfaces;
@@ -57,11 +58,10 @@ public class MetadataBusinessTests : IntegrationTestBase
         // Build leaf dependencies first
         _tagBusiness = new TagBusiness(Context, _eventBusiness);
         _sensitivityLabelBusiness = new SensitivityLabelBusiness(Context, _eventBusiness);
-    
-        // Mock the interface that was never assigned
-        _sensitivityLabelService = new Mock<ISensitivityLabelService>().Object;
 
-        _edgeBusiness = new EdgeBusiness(Context, _eventBusiness, _mockBulkCopyUpsertExecutor);
+        _sensitivityLabelService = new SensitivityLabelService(Context);
+
+        _edgeBusiness = new EdgeBusiness(Context, _eventBusiness, _mockBulkCopyUpsertExecutor, _sensitivityLabelService);
         _recordBusiness = new RecordBusiness(
             Context, _eventBusiness, _mockBulkCopyUpsertExecutor, _tagBusiness, _sensitivityLabelBusiness, _sensitivityLabelService);
         _relationshipBusiness = new RelationshipBusiness(Context, _edgeBusiness, _eventBusiness);
