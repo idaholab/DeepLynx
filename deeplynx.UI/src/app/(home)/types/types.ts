@@ -102,10 +102,6 @@ export type UploadProgressEvent = {
 
 //Widgets
 export type WidgetType =
-  | "DataOverview"
-  | "Links"
-  | "Graph"
-  | "RecentActivity"
   | "ProjectOverview"
   | "TeamMembers";
 
@@ -220,3 +216,9 @@ export type Project = {
   id: string,
   name: string
 }
+
+export type ExpandableTableColumn<T> = {
+  header: string;
+  data: (row: T) => ReactNode;
+  isExpandTrigger?: (row: T) => boolean;
+};

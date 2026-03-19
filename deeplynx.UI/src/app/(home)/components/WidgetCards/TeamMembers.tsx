@@ -1,6 +1,6 @@
 import AddMember from "@/app/(home)/components/WidgetCards/WidgetCardModals/AddMemberModal";
-import { peopleData } from "@/app/(home)/dummy_data/data";
-import { Column, TeamMember } from "@/app/(home)/types/types";
+import { Column } from "@/app/(home)/types/types";
+import { UserResponseDto } from "@/app/(home)/types/responseDTOs";
 import { useLanguage } from "@/app/contexts/Language";
 import { useProjectSession } from "@/app/contexts/ProjectSessionProvider";
 import { getAllUsers } from "@/app/lib/client_service/user_services.client";
@@ -12,10 +12,17 @@ import GenericTable from "../GenericTable";
 import AvatarCarousel from "./WidgetCardModals/AvatarCarousel";
 import { useOrganizationSession } from "@/app/contexts/OrganizationSessionProvider";
 
+type TeamMemberRow = {
+  id: number;
+  name: string;
+  email: string;
+  role: string;
+};
+
 const TeamMembersWidget: React.FC = () => {
   const [showTable, setShowTable] = useState(false);
   const [addMemberModal, setAddMemberModal] = useState(false);
-  const [users, setUsers] = useState<{ name: string; email: string }[]>([]);
+  const [users, setUsers] = useState<UserResponseDto[]>([]);
   const { project } = useProjectSession();
   const { t } = useLanguage();
   const { organization } = useOrganizationSession();
@@ -29,7 +36,7 @@ const TeamMembersWidget: React.FC = () => {
       try {
         const data = await getAllUsers(
           organization?.organizationId,
-          project?.projectId
+          project?.projectId,
         );
         setUsers(data);
       } catch (error) {
@@ -42,15 +49,22 @@ const TeamMembersWidget: React.FC = () => {
     }
   }, [organization?.organizationId, project?.projectId]);
 
-  const teamMemberColumns: Column<TeamMember>[] = [
+  const teamMemberRows: TeamMemberRow[] = users.map((user) => ({
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    role: user.role ?? t.translations.NOT_AVAILABLE,
+  }));
+
+  const teamMemberColumns: Column<TeamMemberRow>[] = [
     {
-      header: "Name",
+      header: t.translations.NAME,
       data: "name",
       cell: (row) => (
         <div className="flex items-center gap-3">
           <div className="avatar">
             <div className="mask mask-circle h-10 w-10">
-              <AvatarCell name={row.name} image={row.image} />
+              <AvatarCell name={row.name} />
             </div>
           </div>
           <div>{row.name}</div>
@@ -59,13 +73,13 @@ const TeamMembersWidget: React.FC = () => {
       sortable: true,
     },
     {
-      header: "Role",
-      data: "role",
+      header: t.translations.EMAIL,
+      data: "email",
       sortable: true,
     },
     {
-      header: "Last Login",
-      data: "lastLogin",
+      header: t.translations.ROLE,
+      data: "role",
       sortable: true,
     },
   ];
@@ -91,11 +105,11 @@ const TeamMembersWidget: React.FC = () => {
       </div>
 
       {!showTable ? (
-        <AvatarCarousel people={users} />
+        <AvatarCarousel people={teamMemberRows} />
       ) : (
         <GenericTable
           columns={teamMemberColumns}
-          data={peopleData}
+          data={teamMemberRows}
           enablePagination
           rowsPerPage={4}
         />
