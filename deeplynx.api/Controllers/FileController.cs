@@ -50,7 +50,7 @@ public class FileController : ControllerBase
     [HttpPost(Name = "api_upload_file")]
     [Auth("write", "file")]
     [Auth("write", "record")]
-    [Sensitivity("write file")]
+    [Sensitivity("upload file")]
     public async Task<ActionResult<RecordResponseDto>> UploadFile(
         long organizationId,
         long projectId,

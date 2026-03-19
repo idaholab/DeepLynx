@@ -174,6 +174,12 @@ public class SensitivityMiddleware
                 return;
             }
 
+            if (providedLabelIds.Count == 0)
+            {
+                await _next(context); 
+                return;
+            }
+
             // Check if user has permission for the provided labels
             if (providedLabelIds.Count > 0)
             {
