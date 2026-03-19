@@ -120,13 +120,8 @@ public class EdgeBusiness : IEdgeBusiness
     {
         var edge = await FindEdge(organizationId, edgeId, originId, destinationId);
 
-        if (edge == null) throw new KeyNotFoundException($"Edge with id {edgeId} not found");
-
-        if (edge.ProjectId != projectId)
-            throw new KeyNotFoundException($"Edge with id {edgeId} not found in project {projectId}");
-
-        if (hideArchived && edge.IsArchived)
-            throw new KeyNotFoundException($"Edge with id {edgeId} is archived");
+        if (edge == null || edge.ProjectId != projectId || (hideArchived && edge.IsArchived))
+            throw new KeyNotFoundException($"Edge not found");
 
         var isAdmin = await AdminHelper.IsAnyAdmin(_context, currentUserId, organizationId, projectId);
 
@@ -135,11 +130,11 @@ public class EdgeBusiness : IEdgeBusiness
             var userAuthorizedLabels = await _sensitivityLabelService
                 .GetAuthorizedSensitivityLabels(currentUserId, organizationId, projectId, "read record");
 
-            if (edge.Origin != null && edge.Origin.Labels.Any() && !edge.Origin.Labels.All(l => userAuthorizedLabels.Contains(l.Id)))
-                throw new UnauthorizedAccessException($"Access Denied: You do not have access to all the sensitivity labels on the origin record: {edge.OriginId}");
+            var originBlocked = edge.Origin != null && edge.Origin.Labels.Any() && !edge.Origin.Labels.All(l => userAuthorizedLabels.Contains(l.Id));
+            var destinationBlocked = edge.Destination != null && edge.Destination.Labels.Any() && !edge.Destination.Labels.All(l => userAuthorizedLabels.Contains(l.Id));
 
-            if (edge.Destination != null && edge.Destination.Labels.Any() && !edge.Destination.Labels.All(l => userAuthorizedLabels.Contains(l.Id)))
-                throw new UnauthorizedAccessException($"Access Denied: You do not have access to all the sensitivity labels on the destination record: {edge.DestinationId}");
+            if (originBlocked || destinationBlocked)
+                throw new KeyNotFoundException($"Edge not found");
         }
 
         return new EdgeResponseDto
