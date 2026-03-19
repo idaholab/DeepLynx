@@ -9,42 +9,42 @@ using deeplynx.helpers;
 namespace deeplynx.api.Controllers;
 
 [ApiController]
-[Route("organizations/{organizationId:long}/projects/{projectId:long}/datasources/{dataSourceId:long}/timeseries")]
+[Route("organizations/{organizationId:long}/projects/{projectId:long}/records/{recordId:long}/timeseries")]
 [Authorize]
-public class TimeseriesController : ControllerBase
+public class OlapController : ControllerBase
 {
-    private readonly ILogger<TimeseriesController> _logger;
-    private readonly ITimeseriesBusiness _timeseriesBusiness;
+    private readonly ILogger<OlapController> _logger;
+    private readonly IOlapBusiness _olapBusiness;
 
     /// <summary>
-    ///     Initializes a new instance of the <see cref="TimeseriesController" /> class
+    ///     Initializes a new instance of the <see cref="OlapController" /> class
     /// </summary>
     /// <param name="timeseriesBusiness">The business logic interface for handling time series operations.</param>
     /// <param name="logger">Error/Info logging interface for database log table.</param>
-    public TimeseriesController(ITimeseriesBusiness timeseriesBusiness, ILogger<TimeseriesController> logger)
+    public OlapController(IOlapBusiness timeseriesBusiness, ILogger<OlapController> logger)
     {
-        _timeseriesBusiness = timeseriesBusiness;
+        _olapBusiness = timeseriesBusiness;
         _logger = logger;
     }
 
     /// <summary>
-    ///     Query Timeseries
+    ///     Execute OLAP Query
     /// </summary>
     /// <param name="organizationId">ID of organization that timeseries data is associated with</param>
     /// <param name="projectId">ID of project that timeseries data is associated with</param>
-    /// <param name="dataSourceId">ID of data source that timeseries data is associated with</param>
-    /// <param name="request"> The request containing an sql query string</param>
-    /// <param name="fileType">The type of file to convert query to</param>
+    /// <param name="request"> The request containing an sql query string</param>z
+    /// <param name="recordId"> ID of the record to query from</param>
     /// <returns></returns>
-    [HttpPost("query", Name = "api_query_timeseries_blob")]
+    [HttpPost("query", Name = "api_execute_olap_query")]
     [Auth("read", "record")]
-    public async Task<ActionResult<PlotDataDto>> QueryTabularFile(long organizationId, long projectId, [FromQuery]long recordId, [FromQuery] string viewName, [FromBody] TimeseriesQueryRequestDto request)
+    [Auth("read", "file")]
+    public async Task<ActionResult<PlotDataDto>> ExecuteOlapQuery(long organizationId, long projectId, long recordId, [FromQuery] string viewName, [FromBody] TimeseriesQueryRequestDto request)
     {
         try
         {
             var currentUserId = UserContextStorage.UserId;
             var reportRecordResponse =
-                await _timeseriesBusiness.QueryTabularFile(currentUserId,organizationId, projectId, recordId, request.Query, viewName);
+                await _olapBusiness.QueryTabularFile(currentUserId, organizationId, projectId, recordId, request.Query, viewName);
             return Ok(reportRecordResponse);
         }
         catch (NoResultsException nrException)
@@ -60,22 +60,23 @@ public class TimeseriesController : ControllerBase
     }
 
     /// <summary>
-    ///     Append File to DuckDB Table
+    ///     Append Tabular File
     /// </summary>
     /// <param name="organizationId">ID of organization that timeseries data is associated with</param>
     /// <param name="projectId">ID of project that timeseries data is associated with</param>
-    /// <param name="dataSourceId">ID of data source that timeseries data is associated with</param>
+    /// <param name="recordId"> ID of the record being appended to</param>
+    /// <param name="partNumber"> Part number of the file being appended</param>
     /// <param name="file">Timeseries file</param>
-    /// <param name="tableName">Name of the duckDB table on which the timeseries data is encoded</param>
     /// <returns></returns>
     [HttpPatch("append", Name = "api_append_timeseries_file")]
+    [Auth("read", "record")]
     [Auth("update", "file")]
-    public async Task<ActionResult<string>> AppendTimeseriesTable(
-        long organizationId, long projectId, long dataSourceId, IFormFile file, string tableName)
+    public async Task<ActionResult<string>> AppendTabularFile(
+        long organizationId, long projectId, long recordId, [FromQuery] long partNumber, IFormFile file)
     {
         try
         {
-            await _timeseriesBusiness.AppendTimeseriesTable(organizationId, projectId, dataSourceId, file, tableName);
+            await _olapBusiness.AppendTabularBlob(organizationId, projectId, recordId, partNumber, file);
             return Ok("Data appended");
         }
         catch (Exception e)
@@ -95,31 +96,31 @@ public class TimeseriesController : ControllerBase
     /// <param name="tableName">Name of the duckDB table on which the timeseries data is encoded</param>
     /// <param name="fileType">The type of file to convert query to</param>
     /// <returns></returns>
-    [HttpGet("export", Name = "api_export_timeseries_table")]
-    [Auth("read", "record")]
-    [Auth("read", "file")]
-    public async Task<IActionResult> ExportTimeseriesTable(
-        long organizationId, long projectId, long dataSourceId, [FromQuery] string tableName, string fileType)
-    {
-        try
-        {
-            var currentUserId = UserContextStorage.UserId;
-            var timeseriesUploadRecord =
-                await _timeseriesBusiness.ExportTimeseriesTable(currentUserId, organizationId, projectId, dataSourceId,
-                    tableName,
-                    fileType);
-            return Ok(new { TimeseriesUploadRecord = timeseriesUploadRecord });
-        }
-        catch (Exception e)
-        {
-            var message = $"An error occurred while querying a timeseries table {tableName}: {e}";
-            _logger.LogError(message);
-            return StatusCode(StatusCodes.Status500InternalServerError, message);
-        }
-    }
+    // [HttpGet("export", Name = "api_export_timeseries_table")]
+    // [Auth("read", "record")]
+    // [Auth("read", "file")]
+    // public async Task<IActionResult> ExportTimeseriesTable(
+    //     long organizationId, long projectId, long dataSourceId, [FromQuery] string tableName, string fileType)
+    // {
+    //     try
+    //     {
+    //         var currentUserId = UserContextStorage.UserId;
+    //         var timeseriesUploadRecord =
+    //             await _timeseriesBusiness.ExportTimeseriesTable(currentUserId, organizationId, projectId, dataSourceId,
+    //                 tableName,
+    //                 fileType);
+    //         return Ok(new { TimeseriesUploadRecord = timeseriesUploadRecord });
+    //     }
+    //     catch (Exception e)
+    //     {
+    //         var message = $"An error occurred while querying a timeseries table {tableName}: {e}";
+    //         _logger.LogError(message);
+    //         return StatusCode(StatusCodes.Status500InternalServerError, message);
+    //     }
+    // }
 
     /// <summary>
-    ///     Get a view of data points
+    ///     Get a View of Data Points
     /// </summary>
     /// <param name="organizationId">ID of organization that timeseries data is associated with</param>
     /// <param name="projectId">ID of project that timeseries data is associated with</param>
@@ -136,7 +137,7 @@ public class TimeseriesController : ControllerBase
         try
         {
             var currentUserId = UserContextStorage.UserId;
-            var timeseriesPlotData = await _timeseriesBusiness.GetPlotData(currentUserId, organizationId, projectId, dataSourceId, recordId, limit, rowStride);
+            var timeseriesPlotData = await _olapBusiness.GetPlotData(currentUserId, organizationId, projectId, dataSourceId, recordId, limit, rowStride);
             return Ok(new { TimeseriesPlotData = timeseriesPlotData });
         }
         catch (ArgumentException e)

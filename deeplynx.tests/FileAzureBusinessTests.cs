@@ -10,7 +10,7 @@ using Record = deeplynx.datalayer.Models.Record;
 namespace deeplynx.tests;
 
 // Fixture specifically for this test class only
-public class AzuriteFixture : IAsyncLifetime
+public class FileAzuriteFixture : IAsyncLifetime
 {
     private AzuriteContainer _azuriteContainer = null!;
     
@@ -33,10 +33,10 @@ public class AzuriteFixture : IAsyncLifetime
 }
 
 [Collection("Test Suite Collection")]
-public class FileAzureBusinessTests : IntegrationTestBase, IClassFixture<AzuriteFixture>
+public class FileAzureBusinessTests : IntegrationTestBase, IClassFixture<FileAzuriteFixture>
 {
     private FileAzureBusiness _fileAzureBusiness = null!;
-    private readonly AzuriteFixture _azuriteFixture;
+    private readonly FileAzuriteFixture _azuriteFixture;
     private string _connectionString = null!;
     private string _containerName = "test-container";
     private ObjectStorageConfigDto _objectStorageConfig = null!;
@@ -48,7 +48,7 @@ public class FileAzureBusinessTests : IntegrationTestBase, IClassFixture<Azurite
     private long _uid;
     private long _recordId;
 
-    public FileAzureBusinessTests(TestSuiteFixture fixture, AzuriteFixture azuriteFixture) : base(fixture)
+    public FileAzureBusinessTests(TestSuiteFixture fixture, FileAzuriteFixture azuriteFixture) : base(fixture)
     {
         _azuriteFixture = azuriteFixture;
     }

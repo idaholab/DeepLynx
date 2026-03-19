@@ -18,7 +18,7 @@ public class FileBusiness
     private readonly IFileBusinessFactory _factory;
     private readonly long _recommendedChunkSize;
     private readonly IRecordBusiness _recordBusiness;
-    private readonly ITimeseriesBusiness _timeseriesBusiness;
+    private readonly IOlapBusiness _olapBusiness;
     private readonly ISensitivityLabelService _sensitivityLabelService;
     
 
@@ -31,14 +31,14 @@ public class FileBusiness
         IDataSourceBusiness dataSourceBusiness,
         IClassBusiness classBusiness,
         IRecordBusiness recordBusiness,
-        ITimeseriesBusiness timeseriesBusiness)
+        IOlapBusiness olapBusiness)
     {
         _context = context;
         _factory = factory;
         _dataSourceBusiness = dataSourceBusiness;
         _classBusiness = classBusiness;
         _recordBusiness = recordBusiness;
-        _timeseriesBusiness = timeseriesBusiness;
+        _olapBusiness = olapBusiness;
         
 
         // Initialize recommended chunk size from environment variable
@@ -129,25 +129,12 @@ public class FileBusiness
         
         // Extract column names for tabular files (CSV/Parquet)
         if (fileExtension == "csv" || fileExtension == "parquet")
-        {
-            try
-            {
-                var columns = await _timeseriesBusiness.ExtractTabularColumns(objectStorage, configData, uri);
+        { 
+            var columns = await _olapBusiness.ExtractTabularColumns(objectStorage, configData, uri);
                 if (columns != null && columns.Count > 0)
                 {
-                    // Add columns array to existing properties
-                    properties["columns"] = new JsonArray(columns.Select(c => JsonValue.Create(c)).ToArray());
-                    properties["isTabular"] = true;
+                    properties["columns"] = columns;
                 }
-                else
-                {
-                    properties["isTabular"] = false;
-                }
-            }
-            catch (Exception ex)
-            {
-                properties["isTabular"] = false;
-            }
         }
 
         var recordRequest = new CreateRecordRequestDto

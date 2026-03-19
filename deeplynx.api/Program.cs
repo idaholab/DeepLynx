@@ -147,7 +147,7 @@ try
     builder.Services.AddTransient<IDataSourceBusiness, DataSourceBusiness>();
     builder.Services.AddTransient<IRelationshipBusiness, RelationshipBusiness>();
     builder.Services.AddTransient<ITagBusiness, TagBusiness>();
-    builder.Services.AddTransient<ITimeseriesBusiness, TimeseriesBusiness>();
+    builder.Services.AddTransient<IOlapBusiness, OlapBusiness>();
     builder.Services.AddTransient<IUserBusiness, UserBusiness>();
     builder.Services.AddTransient<INotificationBusiness, NotificationBusiness>();
     builder.Services.AddTransient<IInvitationBusiness, InvitationBusiness>();

@@ -12,17 +12,44 @@
 // using Microsoft.Extensions.DependencyInjection;
 // using Microsoft.Extensions.Logging;
 // using Moq;
+// using Parquet;
+// using Parquet.Data;
+// using Parquet.Schema;
+// using Testcontainers.Azurite;
 //
 // namespace deeplynx.tests;
 //
+// // Fixture specifically for this test class only
+// public class AzuriteOlapFixture : IAsyncLifetime
+// {
+//     private AzuriteContainer _azuriteContainer = null!;
+//     
+//     public string AzuriteConnectionString { get; private set; } = null!;
+//
+//     public async Task InitializeAsync()
+//     {
+//         _azuriteContainer = new AzuriteBuilder()
+//             .WithImage("mcr.microsoft.com/azure-storage/azurite:latest")
+//             .Build();
+//
+//         await _azuriteContainer.StartAsync();
+//         AzuriteConnectionString = _azuriteContainer.GetConnectionString();
+//     }
+//
+//     public async Task DisposeAsync()
+//     {
+//         await _azuriteContainer.DisposeAsync();
+//     }
+// }
+//
 // [Collection("Test Suite Collection")]
-// public class TimeseriesBusinessTests : IntegrationTestBase, IAsyncLifetime
+// public class OlapBusinessTests : IntegrationTestBase, IAsyncLifetime, IClassFixture<AzuriteOlapFixture>
 // {
 //     private static readonly string _testDuckDbBasePath;
 //
 //     // Static constructor runs before anything else, ensuring env var is set
 //     // before TimeseriesBusiness static field is initialized
-//     static TimeseriesBusinessTests()
+//     static OlapBusinessTests()
 //     {
 //         _testDuckDbBasePath = Path.Combine(Path.GetTempPath(), "deeplynx_test_duckdb", Guid.NewGuid().ToString());
 //         Environment.SetEnvironmentVariable("DUCKDB_BASE_PATH", _testDuckDbBasePath);
@@ -32,14 +59,14 @@
 //     private SensitivityLabelBusiness _sensitivityLabelBusiness = null!;
 //     private Mock<IHubContext<EventNotificationHub>> _mockHubContext = null!;
 //     private Mock<ILogger<NotificationBusiness>> _mockNotificationLogger = null!;
-//     private Mock<ILogger<TimeseriesBusiness>> _mockTimeseriesLogger = null!;
+//     private Mock<ILogger<OlapBusiness>> _mockTimeseriesLogger = null!;
 //     private Mock<IServiceScopeFactory> _mockServiceScopeFactory = null!;
 //     private BulkCopyUpsertExecutor _mockBulkCopyUpsertExecutor = null!;
 //     private INotificationBusiness _notificationBusiness = null!;
 //     private RecordBusiness _recordBusiness = null!;
 //     private RelationshipBusiness _relationshipBusiness = null!;
 //     private TagBusiness _tagBusiness = null!;
-//     private TimeseriesBusiness _timeseriesBusiness = null!;
+//     private OlapBusiness _timeseriesBusiness = null!;
 //     private ISensitivityLabelService _sensitivityLabelService = null!;
 //
 //     private long _organizationId;
@@ -48,7 +75,7 @@
 //     private long _userId;
 //     private long _classId;
 //
-//     public TimeseriesBusinessTests(TestSuiteFixture fixture) : base(fixture)
+//     public OlapBusinessTests(TestSuiteFixture fixture) : base(fixture)
 //     {
 //     }
 //
@@ -62,7 +89,7 @@
 //         // Set up mocks
 //         _mockHubContext = new Mock<IHubContext<EventNotificationHub>>();
 //         _mockNotificationLogger = new Mock<ILogger<NotificationBusiness>>();
-//         _mockTimeseriesLogger = new Mock<ILogger<TimeseriesBusiness>>();
+//         _mockTimeseriesLogger = new Mock<ILogger<OlapBusiness>>();
 //         _mockServiceScopeFactory = new Mock<IServiceScopeFactory>();
 //
 //         // Set up service scope factory mock
@@ -82,12 +109,10 @@
 //         _recordBusiness = new RecordBusiness(Context, _eventBusiness, _mockBulkCopyUpsertExecutor, _tagBusiness, _sensitivityLabelBusiness, _sensitivityLabelService);
 //         _classBusiness = new ClassBusiness(Context, _recordBusiness, _relationshipBusiness, _eventBusiness);
 //
-//         _timeseriesBusiness = new TimeseriesBusiness(
+//         _timeseriesBusiness = new OlapBusiness(
 //             Context,
 //             _recordBusiness,
-//             _classBusiness,
-//             _mockTimeseriesLogger.Object,
-//             _mockServiceScopeFactory.Object);
+//             _mockTimeseriesLogger.Object);
 //
 //         // Set up test data
 //         await SetupTestDataAsync();
@@ -228,6 +253,60 @@
 //         {
 //             Headers = new HeaderDictionary(),
 //             ContentType = "text/csv"
+//         };
+//     }
+//     
+//    private static async Task<IFormFile> CreateLargeTestParquetFile(int rowCount, string fileName = "large_test.parquet")
+//     {
+//         var baseTime = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+//         var random = new Random(42);
+//
+//         var schema = new ParquetSchema(
+//             new DataField<DateTimeOffset>("timestamp"),
+//             new DataField<double>("value"),
+//             new DataField<string>("sensor_id"),
+//             new DataField<double>("temperature"),
+//             new DataField<double>("pressure")
+//         );
+//
+//         var timestamps   = new DateTimeOffset[rowCount];
+//         var values       = new double[rowCount];
+//         var sensorIds    = new string[rowCount];
+//         var temperatures = new double[rowCount];
+//         var pressures    = new double[rowCount];
+//
+//         for (int i = 0; i < rowCount; i++)
+//         {
+//             timestamps[i]   = new DateTimeOffset(baseTime.AddSeconds(i));
+//             values[i]       = Math.Round(random.NextDouble() * 100, 2);
+//             sensorIds[i]    = $"sensor_{i % 5}";
+//             temperatures[i] = Math.Round(20 + random.NextDouble() * 10, 2);
+//             pressures[i]    = Math.Round(1000 + random.NextDouble() * 50, 2);
+//         }
+//
+//         // Write to a temp stream, then extract bytes before it's disposed
+//         byte[] parquetBytes;
+//         using (var writeStream = new MemoryStream())
+//         {
+//             using (var writer = await ParquetWriter.CreateAsync(schema, writeStream))
+//             {
+//                 using var groupWriter = writer.CreateRowGroup();
+//                 await groupWriter.WriteColumnAsync(new DataColumn(schema.DataFields[0], timestamps));
+//                 await groupWriter.WriteColumnAsync(new DataColumn(schema.DataFields[1], values));
+//                 await groupWriter.WriteColumnAsync(new DataColumn(schema.DataFields[2], sensorIds));
+//                 await groupWriter.WriteColumnAsync(new DataColumn(schema.DataFields[3], temperatures));
+//                 await groupWriter.WriteColumnAsync(new DataColumn(schema.DataFields[4], pressures));
+//             }
+//
+//             parquetBytes = writeStream.ToArray(); // safe to call even after ParquetWriter closes the stream
+//         }
+//
+//         var readStream = new MemoryStream(parquetBytes);
+//
+//         return new FormFile(readStream, 0, readStream.Length, "file", fileName)
+//         {
+//             Headers = new HeaderDictionary(),
+//             ContentType = "application/octet-stream"
 //         };
 //     }
 //     /// <summary>
