@@ -2,21 +2,23 @@
 
 import { useLanguage } from "@/app/contexts/Language";
 import { useOrganizationSession } from "@/app/contexts/OrganizationSessionProvider";
+import { useProjectSession } from "@/app/contexts/ProjectSessionProvider";
 import {
   cancelChunkedUpload,
   cancelCurrentUpload,
   CHUNK_THRESHOLD,
   uploadFile,
-  uploadFilesBatch,
 } from "@/app/lib/client_service/file_upload_services.client";
+import { getAllClasses } from "@/app/lib/client_service/class_services.client";
+import { updateFile } from "@/app/lib/client_service/file_services.client";
 import { uploadBulkMetadata } from "@/app/lib/client_service/metadata_service.client";
+import { fullTextSearch } from "@/app/lib/client_service/query_services.client";
+import { getAllRecords } from "@/app/lib/client_service/record_services.client";
 import { uploadTimeseriesFile } from "@/app/lib/client_service/timeseries_services.client";
 import { parseBackendErrors } from "@/app/lib/error_parser";
 import { createUploadToastManager } from "@/app/lib/uploadToastManager";
-import { useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
-import FileDetailsCard from "../components/FileDetailCard";
-import SelectedFilesCard from "../components/SelectedFilesCard";
 import { useBulkUploadState } from "./hooks/useBulkUploadState";
 import { useProjectResources } from "./hooks/useProjectResources";
 import { useUploadState } from "./hooks/useUploadState";
@@ -24,44 +26,219 @@ import {
   ArrowUpOnSquareStackIcon,
   DocumentIcon,
 } from "@heroicons/react/24/outline";
-import type { ExistingFile, UploadProgressEvent } from "../types/types";
+import type {
+  ExistingFile,
+  FileMetadata,
+  UploadProgressEvent,
+} from "../types/types";
+import type { ClassResponseDto } from "../types/responseDTOs";
 import BulkUploadSection from "./components/BulkUploadSection";
 import FileUploadSection from "./components/FileUploadSection";
 import ProjectResourceSelectors from "./components/ProjectResourceSelectors";
+import MetadataTemplateDownload from "./components/MetadataTemplateDownload";
 
-type Props = {
-  initialAvailableFiles: ExistingFile[];
-};
+const MAX_CONCURRENT_FILE_UPLOADS = 5;
+const MULTI_FILE_PROGRESS_TOAST_THRESHOLD = 30;
 
-export default function UploadCenterClient({ initialAvailableFiles }: Props) {
+function mapRecordToExistingFile(record: {
+  id?: number | string | null;
+  name?: string | null;
+  description?: string | null;
+  lastUpdatedAt?: string | null;
+  lastUpdatedBy?: string | null;
+  dataSourceName?: string | null;
+}): ExistingFile | null {
+  if (record.id == null) return null;
+  return {
+    id: String(record.id),
+    name: record.name?.trim() || String(record.id),
+    description: record.description ?? undefined,
+    lastUpdate: record.lastUpdatedAt ?? undefined,
+    updatedBy: record.lastUpdatedBy ?? undefined,
+    dataSource: record.dataSourceName ?? undefined,
+  };
+}
+
+function dedupeExistingFiles(files: ExistingFile[]): ExistingFile[] {
+  const map = new Map<string, ExistingFile>();
+  for (const file of files) {
+    map.set(String(file.id), file);
+  }
+  return Array.from(map.values());
+}
+
+function interpolate(
+  template: string,
+  values: Record<string, string | number>,
+): string {
+  return Object.entries(values).reduce(
+    (result, [key, value]) => result.replace(`{${key}}`, String(value)),
+    template,
+  );
+}
+
+export default function UploadCenterClient() {
   const { t } = useLanguage();
   const { organization } = useOrganizationSession();
+  const { project: sessionProject, hasLoaded: hasLoadedProjectSession } =
+    useProjectSession();
   const organizationId = organization?.organizationId;
+  const numericOrganizationId =
+    organizationId !== undefined ? Number(organizationId) : undefined;
 
   const fileUploadState = useUploadState();
   const bulkUploadState = useBulkUploadState();
-  const projectResources = useProjectResources(organizationId as number);
+  const projectResources = useProjectResources(numericOrganizationId);
   const uploadToastManager = useMemo(() => createUploadToastManager(), []);
-  const { setTargetFileId, setMulti, multi } = fileUploadState;
-  const { projectId, dataSourceId, objectStorageId, projects, dataSources } =
-    projectResources;
+  const { setTargetFileId } = fileUploadState;
+  const {
+    projectId,
+    dataSourceId,
+    objectStorageId,
+    projects,
+    dataSources,
+    setProjectId,
+  } = projectResources;
   const selectedFiles = fileUploadState.selectedFiles;
+  const [availableFiles, setAvailableFiles] = useState<ExistingFile[]>([]);
+  const [availableClasses, setAvailableClasses] = useState<ClassResponseDto[]>(
+    [],
+  );
+  const [isLoadingClasses, setIsLoadingClasses] = useState(false);
+
+  useEffect(() => {
+    if (!organizationId || !projectId) {
+      setAvailableFiles([]);
+      return;
+    }
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const records = await getAllRecords(
+          Number(organizationId),
+          Number(projectId),
+          undefined,
+          undefined,
+          true,
+        );
+        if (cancelled) return;
+
+        const mapped = dedupeExistingFiles(
+          records
+            .map((record) => mapRecordToExistingFile(record))
+            .filter((record): record is ExistingFile => record !== null),
+        );
+        setAvailableFiles(mapped);
+      } catch (error) {
+        console.error("Error loading records for update picker:", error);
+        if (!cancelled) setAvailableFiles([]);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [organizationId, projectId]);
+
+  useEffect(() => {
+    if (!projectId) {
+      setAvailableClasses([]);
+      setIsLoadingClasses(false);
+      return;
+    }
+
+    let cancelled = false;
+    setIsLoadingClasses(true);
+
+    (async () => {
+      try {
+        const classes = await getAllClasses(Number(projectId), true);
+        if (cancelled) return;
+        setAvailableClasses(classes);
+      } catch (error) {
+        console.error("Error loading classes for metadata helper:", error);
+        if (!cancelled) setAvailableClasses([]);
+      } finally {
+        if (!cancelled) setIsLoadingClasses(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [projectId]);
+
+  useEffect(() => {
+    if (projectId) return;
+    if (!hasLoadedProjectSession) return;
+
+    const sessionProjectId = sessionProject?.projectId;
+    if (!sessionProjectId) return;
+
+    const sessionProjectIdString = String(sessionProjectId);
+    const existsInProjects = projects.some(
+      (project) => String(project.id) === sessionProjectIdString,
+    );
+    if (existsInProjects) {
+      setProjectId(sessionProjectIdString);
+    }
+  }, [
+    projectId,
+    hasLoadedProjectSession,
+    sessionProject,
+    projects,
+    setProjectId,
+  ]);
+
+  const handleSearchAvailableFiles = useCallback(
+    async (query: string): Promise<ExistingFile[]> => {
+      const trimmedQuery = query.trim();
+      if (!trimmedQuery) return availableFiles;
+      if (!organizationId || !projectId) return [];
+
+      try {
+        const results = await fullTextSearch(
+          Number(organizationId),
+          trimmedQuery,
+          [Number(projectId)],
+        );
+
+        return dedupeExistingFiles(
+          results
+            .map((record) => mapRecordToExistingFile(record))
+            .filter((record): record is ExistingFile => record !== null),
+        );
+      } catch (error) {
+        console.error("Error searching records for update picker:", error);
+        return [];
+      }
+    },
+    [availableFiles, organizationId, projectId],
+  );
 
   const needsTarget =
     fileUploadState.uploadType === "version" ||
     fileUploadState.uploadType === "properties";
-  const isMultiAllowed = fileUploadState.uploadType === "new";
-  const showRightPanel =
-    selectedFiles.length > 0 && fileUploadState.uploadMode === "file";
-  const selectedTarget =
-    initialAvailableFiles.find((f) => f.id === fileUploadState.targetFileId) ??
-    null;
+  const selectedMetadata = selectedFiles.map(
+    (_, idx) => fileUploadState.filesMetadata[idx] ?? {},
+  );
+  const hasAnyNonTimeseriesNewFiles = selectedMetadata.some(
+    (metadata) =>
+      (metadata.recordMode ?? "new") === "new" && !metadata.isTimeSeries,
+  );
+  const hasUpdateRecordsMissingTarget = selectedMetadata.some(
+    (metadata) =>
+      (metadata.recordMode ?? "new") === "update" && !metadata.targetRecordId,
+  );
+  const requiresObjectStorage = hasAnyNonTimeseriesNewFiles;
 
   const canUpload =
     selectedFiles.length > 0 &&
     !!projectId &&
     !!dataSourceId &&
-    !!objectStorageId &&
+    (!requiresObjectStorage || !!objectStorageId) &&
+    !hasUpdateRecordsMissingTarget &&
     (!needsTarget || !!fileUploadState.targetFileId);
 
   // Clear target file when not needed
@@ -69,19 +246,13 @@ export default function UploadCenterClient({ initialAvailableFiles }: Props) {
     if (!needsTarget) setTargetFileId("");
   }, [needsTarget, setTargetFileId]);
 
-  // Manage multi toggle
-  useEffect(() => {
-    if (!isMultiAllowed && multi) {
-      setMulti(false);
-    }
-  }, [isMultiAllowed, multi, setMulti]);
-
   const handleFileUpload = async () => {
     if (!organizationId || !projectId || selectedFiles.length === 0) {
       toast.error(t.translations.SELECT_A_PROJECT_AND_AT_LEAST_ONE_FILE);
       return;
     }
 
+    fileUploadState.cleanUploadError(0);
     fileUploadState.setIsUploading(true);
     fileUploadState.setUploadProgress(null);
 
@@ -92,6 +263,7 @@ export default function UploadCenterClient({ initialAvailableFiles }: Props) {
     const showChunkedProgressToast =
       selectedFiles.length === 1 &&
       !!selectedSingleFile &&
+      selectedMetadata?.recordMode !== "update" &&
       !selectedMetadata?.isTimeSeries &&
       selectedSingleFile.size > CHUNK_THRESHOLD;
     const uploadContext = {
@@ -99,6 +271,40 @@ export default function UploadCenterClient({ initialAvailableFiles }: Props) {
       projectId,
       dataSourceId,
       objectStorageId,
+    };
+    const getUploadErrorMessage = (error: unknown) => {
+      const errorMessages = extractErrorMessages(
+        error,
+        t.translations.UNKNOWN_ERROR_OCCURRED,
+        t.translations.UNKNOWN_ERROR,
+      );
+      const [parsedError] = parseBackendErrors(errorMessages, {
+        objectStorageIdNotFoundInProject:
+          t.translations.OBJECT_STORAGE_ID_NOT_FOUND_IN_PROJECT,
+        objectStorageIdNotFoundSuggestion:
+          t.translations.OBJECT_STORAGE_ID_NOT_FOUND_IN_PROJECT_SUGGESTION,
+        originalIdAlreadyInUse: t.translations.ORIGINAL_ID_ALREADY_IN_USE,
+        originalIdAlreadyInUseSuggestion:
+          t.translations.ORIGINAL_ID_ALREADY_IN_USE_SUGGESTION,
+        classIdNotFoundInProject:
+          t.translations.CLASS_ID_DOES_NOT_EXIST_IN_PROJECT,
+        classIdNotFoundSuggestion:
+          t.translations.CLASS_ID_NOT_FOUND_IN_PROJECT_SUGGESTION,
+        duplicateSuggestion: t.translations.DUPLICATE_RECORD_SUGGESTION,
+        permissionSuggestion: t.translations.PERMISSION_REQUIRED_SUGGESTION,
+        validationSuggestion: t.translations.VALIDATION_ERROR_SUGGESTION,
+        relationshipSuggestion:
+          t.translations.RELATIONSHIP_ID_NOT_FOUND_SUGGESTION,
+        invalidSelectedDataSource: t.translations.INVALID_SELECTED_DATA_SOURCE,
+        invalidSelectedDataSourceSuggestion:
+          t.translations.INVALID_SELECTED_DATA_SOURCE_SUGGESTION,
+      });
+
+      return parsedError
+        ? parsedError.suggestion
+          ? `${parsedError.message} ${parsedError.suggestion}`
+          : parsedError.message
+        : t.translations.UPLOAD_FAILED_SEE_CONSOLE_FOR_DETAILS;
     };
 
     if (showChunkedProgressToast) {
@@ -143,25 +349,155 @@ export default function UploadCenterClient({ initialAvailableFiles }: Props) {
 
     try {
       if (selectedFiles.length > 1) {
-        const results = await uploadFilesBatch({
-          ...uploadContext,
-          files: selectedFiles,
-        });
-
-        const ok = results.filter((r) => r.status === "fulfilled").length;
-        const fail = results.length - ok;
-        uploadToastManager.success(
-          `Uploaded ${ok} file(s)${fail ? ` • ${fail} failed` : ""}`,
+        const shouldShowMultiFileProgressToast =
+          selectedFiles.length >= MULTI_FILE_PROGRESS_TOAST_THRESHOLD;
+        const results: PromiseSettledResult<unknown>[] = Array(
+          selectedFiles.length,
         );
-        if (fail) console.warn("Batch upload failures:", results);
+        let completed = 0;
+        let succeeded = 0;
+        let failed = 0;
+        let nextFileIndex = 0;
+
+        if (shouldShowMultiFileProgressToast) {
+          uploadToastManager.show({
+            title: t.translations.UPLOADING_FILES,
+            message: `0 / ${selectedFiles.length} ${t.translations.FILES_LABEL}`,
+            percent: 0,
+          });
+        }
+
+        const uploadWorker = async (): Promise<void> => {
+          while (true) {
+            const currentIndex = nextFileIndex++;
+            if (currentIndex >= selectedFiles.length) return;
+
+            const file = selectedFiles[currentIndex];
+            const metadata = fileUploadState.filesMetadata[currentIndex] ?? {};
+            fileUploadState.cleanUploadError(currentIndex);
+
+            try {
+              if ((metadata.recordMode ?? "new") === "update") {
+                if (!metadata.targetRecordId) {
+                  throw new Error(t.translations.PLEASE_SELECT_RECORD_TO_UPDATE);
+                }
+                const value = await updateFile(
+                  Number(organizationId),
+                  Number(projectId),
+                  Number(metadata.targetRecordId),
+                  file,
+                );
+                results[currentIndex] = { status: "fulfilled", value };
+              } else if (metadata.isTimeSeries) {
+                const value = await uploadTimeseriesFile(
+                  Number(organizationId),
+                  Number(projectId),
+                  Number(dataSourceId),
+                  file,
+                );
+                results[currentIndex] = { status: "fulfilled", value };
+              } else {
+                const value = await uploadFile({
+                  ...uploadContext,
+                  file,
+                  name: metadata.name || file.name,
+                  description: metadata.description || "",
+                  metadataFile: metadata.metadataFile,
+                });
+                results[currentIndex] = { status: "fulfilled", value };
+              }
+              succeeded += 1;
+            } catch (reason) {
+              fileUploadState.setUploadError(
+                currentIndex,
+                getUploadErrorMessage(reason),
+              );
+              results[currentIndex] = { status: "rejected", reason };
+              failed += 1;
+            } finally {
+              completed += 1;
+              if (shouldShowMultiFileProgressToast) {
+                uploadToastManager.show({
+                  title: t.translations.UPLOADING_FILES,
+                  message: `${completed} / ${selectedFiles.length} ${t.translations.FILES_LABEL}`,
+                  percent: (completed / selectedFiles.length) * 100,
+                });
+              }
+            }
+          }
+        };
+
+        const workers = Array.from(
+          {
+            length: Math.min(MAX_CONCURRENT_FILE_UPLOADS, selectedFiles.length),
+          },
+          () => uploadWorker(),
+        );
+        await Promise.all(workers);
+
+        if (failed) {
+          const failedFiles: File[] = [];
+          const failedMetadata: Record<number, FileMetadata> = {};
+          const failedErrors: Record<number, string> = {};
+
+          results.forEach((results, originalIndex) => {
+            if (results?.status !== "rejected") return;
+
+            const nextIndex = failedFiles.length;
+            failedFiles.push(selectedFiles[originalIndex]);
+
+            const metadata = fileUploadState.filesMetadata[originalIndex];
+            if (metadata) {
+              failedMetadata[nextIndex] = metadata;
+            }
+
+            const error = fileUploadState.uploadErrorByFileIndex[originalIndex];
+            if (error) {
+              failedErrors[nextIndex] = error;
+            }
+          });
+
+          fileUploadState.setSelectedFiles(failedFiles);
+          fileUploadState.setAllFilesMetadata(failedMetadata);
+          fileUploadState.setAllUploadErrors(failedErrors);
+
+          uploadToastManager.error(
+            t.translations.SOME_UPLOADS_FAILED_CHECK_FILE_CARDS,
+          );
+
+          return;
+        }
+
+        uploadToastManager.success(
+          interpolate(t.translations.UPLOAD_BATCH_SUCCESS, {
+            success: succeeded,
+          }),
+        );
+
         fileUploadState.resetFileUpload();
+
         return;
       }
 
       const file = selectedFiles[0];
       const metadata = fileUploadState.filesMetadata[0] ?? {};
+      fileUploadState.cleanUploadError(0);
 
-      if (metadata.isTimeSeries) {
+      if ((metadata.recordMode ?? "new") === "update") {
+        if (!metadata.targetRecordId) {
+          toast.error(t.translations.PLEASE_SELECT_RECORD_TO_UPDATE);
+          return;
+        }
+        await updateFile(
+          Number(organizationId),
+          Number(projectId),
+          Number(metadata.targetRecordId),
+          file,
+        );
+        uploadToastManager.success(
+          t.translations.RECORD_FILE_UPDATED_SUCCESSFULLY,
+        );
+      } else if (metadata.isTimeSeries) {
         await uploadTimeseriesFile(
           Number(organizationId),
           Number(projectId),
@@ -193,9 +529,8 @@ export default function UploadCenterClient({ initialAvailableFiles }: Props) {
         uploadToastManager.message(t.translations.UPLOAD_CANCELLED);
       } else {
         console.error("Upload error:", err);
-        uploadToastManager.error(
-          t.translations.UPLOAD_FAILED_SEE_CONSOLE_FOR_DETAILS,
-        );
+        fileUploadState.setUploadError(0, getUploadErrorMessage(err));
+        uploadToastManager.error(t.translations.UPLOAD_FAILED_CHECK_FILE_CARD);
       }
       fileUploadState.setUploadProgress(null);
     } finally {
@@ -246,7 +581,9 @@ export default function UploadCenterClient({ initialAvailableFiles }: Props) {
       await new Promise((resolve) => setTimeout(resolve, 500));
 
       toast.success(
-        `Successfully uploaded ${bulkUploadState.validationResult.validCount} records!`,
+        interpolate(t.translations.BULK_UPLOAD_SUCCESS_WITH_COUNT, {
+          count: bulkUploadState.validationResult.validCount,
+        }),
       );
 
       bulkUploadState.resetBulkUpload();
@@ -259,7 +596,27 @@ export default function UploadCenterClient({ initialAvailableFiles }: Props) {
         t.translations.UNKNOWN_ERROR_OCCURRED,
         t.translations.UNKNOWN_ERROR,
       );
-      const parsedErrors = parseBackendErrors(errorMessages);
+      const parsedErrors = parseBackendErrors(errorMessages, {
+        objectStorageIdNotFoundInProject:
+          t.translations.OBJECT_STORAGE_ID_NOT_FOUND_IN_PROJECT,
+        objectStorageIdNotFoundSuggestion:
+          t.translations.OBJECT_STORAGE_ID_NOT_FOUND_IN_PROJECT_SUGGESTION,
+        originalIdAlreadyInUse: t.translations.ORIGINAL_ID_ALREADY_IN_USE,
+        originalIdAlreadyInUseSuggestion:
+          t.translations.ORIGINAL_ID_ALREADY_IN_USE_SUGGESTION,
+        classIdNotFoundInProject:
+          t.translations.CLASS_ID_DOES_NOT_EXIST_IN_PROJECT,
+        classIdNotFoundSuggestion:
+          t.translations.CLASS_ID_NOT_FOUND_IN_PROJECT_SUGGESTION,
+        duplicateSuggestion: t.translations.DUPLICATE_RECORD_SUGGESTION,
+        permissionSuggestion: t.translations.PERMISSION_REQUIRED_SUGGESTION,
+        validationSuggestion: t.translations.VALIDATION_ERROR_SUGGESTION,
+        relationshipSuggestion:
+          t.translations.RELATIONSHIP_ID_NOT_FOUND_SUGGESTION,
+        invalidSelectedDataSource: t.translations.INVALID_SELECTED_DATA_SOURCE,
+        invalidSelectedDataSourceSuggestion:
+          t.translations.INVALID_SELECTED_DATA_SOURCE_SUGGESTION,
+      });
       bulkUploadState.setBackendErrors(parsedErrors);
 
       toast.error(
@@ -274,162 +631,172 @@ export default function UploadCenterClient({ initialAvailableFiles }: Props) {
   };
 
   return (
-    <div>
-      {/* HEADER */}
-      <div className="bg-base-200/40 px-3 sm:px-6 lg:px-12 p-6">
-        <h1 className="text-xl sm:text-2xl font-bold text-base-content">
-          {t.translations.UPLOAD_CENTER}
-        </h1>
-      </div>
+    <div className="min-h-screen bg-base-100">
+      <header className="bg-base-200/50 border-b border-base-300/30">
+        <div className="px-4 sm:px-6 lg:px-12 py-6">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <h1 className="text-2xl font-bold text-base-content">
+                {t.translations.UPLOAD_CENTER}
+              </h1>
+              <p className="text-sm text-base-content/70 mt-1">
+                {t.translations.UPLOAD_CENTER_DESCRIPTION}
+              </p>
+            </div>
 
-      <div
-        className={`flex flex-col xl:flex-row gap-6 xl:gap-8 p-3 sm:p-6 lg:p-10 ${
-          showRightPanel ? "xl:justify-between" : "justify-center"
-        }`}
-      >
-        {/* LEFT PANEL */}
-        <div
-          className={`w-full xl:w-3/5 ${
-            showRightPanel ? "" : "max-w-5xl mx-auto"
-          }`}
-        >
-          {/* UPLOAD MODE TOGGLE */}
-          <div className="mb-6">
-            <label className="label">
-              <span className="label-text font-bold text-base-content">
-                {t.translations.UPLOAD_MODE}
+            <div className="flex flex-wrap gap-2">
+              <span className="badge badge-outline">
+                {fileUploadState.uploadMode === "file"
+                  ? t.translations.FILE_UPLOAD
+                  : t.translations.BULK_METADATA}
               </span>
-            </label>
-            <div className="btn-group">
-              <button
-                type="button"
-                className={`btn btn-sm mr-5 ${
-                  fileUploadState.uploadMode === "file"
-                    ? "btn-primary"
-                    : "btn-ghost"
-                }`}
-                onClick={() => {
-                  fileUploadState.setUploadMode("file");
-                  bulkUploadState.setCsvFile(null);
-                }}
-              >
-                <DocumentIcon className="size-6" />
-                {t.translations.FILE_UPLOAD}
-              </button>
-              <button
-                type="button"
-                className={`btn btn-sm ${
-                  fileUploadState.uploadMode === "bulk"
-                    ? "btn-primary"
-                    : "btn-ghost"
-                }`}
-                onClick={() => {
-                  fileUploadState.setUploadMode("bulk");
-                  fileUploadState.setSelectedFiles([]);
-                  fileUploadState.resetFileUpload();
-                }}
-              >
-                <ArrowUpOnSquareStackIcon className="size-6" />
-                {t.translations.BULK_METADATA}
-              </button>
+              <span className="badge badge-outline">
+                {selectedFiles.length} {t.translations.FILES_LABEL}
+              </span>
             </div>
           </div>
-
-          {/* PROJECT RESOURCE SELECTORS */}
-          <div className="p-4 space-y-4">
-            <ProjectResourceSelectors
-              {...projectResources}
-              hasOrganization={!!organization}
-              uploadMode={fileUploadState.uploadMode}
-            />
-
-            {/* MODE-SPECIFIC CONTENT */}
-            {fileUploadState.uploadMode === "file" ? (
-              <FileUploadSection
-                uploadType={fileUploadState.uploadType}
-                setUploadType={fileUploadState.setUploadType}
-                multi={fileUploadState.multi}
-                setMulti={fileUploadState.setMulti}
-                selectedFiles={fileUploadState.selectedFiles}
-                setSelectedFiles={fileUploadState.setSelectedFiles}
-                setShowMultiFileWarning={
-                  fileUploadState.setShowMultiFileWarning
-                }
-                dropKey={fileUploadState.dropKey}
-                filesMetadata={fileUploadState.filesMetadata}
-                handleMetadataChange={fileUploadState.handleMetadataChange}
-                targetFileId={fileUploadState.targetFileId}
-                setTargetFileId={fileUploadState.setTargetFileId}
-                availableFiles={initialAvailableFiles}
-                needsTarget={needsTarget}
-                isMultiAllowed={isMultiAllowed}
-                isUploading={fileUploadState.isUploading}
-              />
-            ) : (
-              <BulkUploadSection
-                {...bulkUploadState}
-                projectId={projectId}
-                dataSourceId={dataSourceId}
-                organizationId={organizationId as number}
-                projects={projects}
-                dataSources={dataSources}
-              />
-            )}
-          </div>
         </div>
+      </header>
 
-        {/* RIGHT PANEL */}
-        {showRightPanel && (
-          <div className="w-full xl:w-2/5">
-            <FileDetailsCard
-              needsTarget={needsTarget}
-              selectedTarget={selectedTarget}
-            />
-            <SelectedFilesCard
-              files={fileUploadState.selectedFiles}
-              onRemoveAt={fileUploadState.removeAt}
-              onClear={fileUploadState.clearAll}
-              onUpload={handleFileUpload}
-              canUpload={canUpload}
-              isUploading={fileUploadState.isUploading}
-            />
-            {fileUploadState.isUploading && !fileUploadState.uploadProgress && (
-              <div className="mt-4 p-4 bg-base-200 rounded-lg flex flex-col items-center justify-center space-y-3">
-                <span className="loading loading-spinner loading-lg text-primary"></span>
-                <p className="text-sm text-base-content/70 text-center">
-                  {t.translations.PREPARING_UPLOAD}
-                </p>
+      <main className="px-4 sm:px-6 lg:px-12 py-6">
+        <div className="mx-auto w-full max-w-5xl">
+          <section className="w-full">
+            <div className="card bg-base-100 shadow-xl">
+              <div className="card-body space-y-6">
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <span className="badge badge-primary badge-sm">1</span>
+                    <h2 className="text-lg font-semibold text-base-content">
+                      {t.translations.UPLOAD_MODE}
+                    </h2>
+                  </div>
+
+                  <div
+                    role="radiogroup"
+                    aria-label={t.translations.UPLOAD_WORKFLOW_VIEW_ARIA}
+                    className="inline-flex rounded-full border border-base-300/70 bg-base-200/50 p-1"
+                  >
+                    <button
+                      type="button"
+                      role="radio"
+                      aria-checked={fileUploadState.uploadMode === "file"}
+                      className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition ${
+                        fileUploadState.uploadMode === "file"
+                          ? "bg-base-100 text-base-content shadow-sm"
+                          : "text-base-content/70 hover:text-base-content"
+                      }`}
+                      onClick={() => {
+                        fileUploadState.setUploadMode("file");
+                        bulkUploadState.setCsvFile(null);
+                      }}
+                    >
+                      <DocumentIcon className="size-4 opacity-80" />
+                      {t.translations.FILE_UPLOAD}
+                    </button>
+
+                    <button
+                      type="button"
+                      role="radio"
+                      aria-checked={fileUploadState.uploadMode === "bulk"}
+                      className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition ${
+                        fileUploadState.uploadMode === "bulk"
+                          ? "bg-base-100 text-base-content shadow-sm"
+                          : "text-base-content/70 hover:text-base-content"
+                      }`}
+                      onClick={() => {
+                        fileUploadState.setUploadMode("bulk");
+                        fileUploadState.resetFileUpload();
+                      }}
+                    >
+                      <ArrowUpOnSquareStackIcon className="size-4 opacity-80" />
+                      {t.translations.BULK_METADATA}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="divider my-0" />
+
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <span className="badge badge-primary badge-sm">2</span>
+                    <h2 className="text-lg font-semibold text-base-content">
+                      {t.translations.PROJECT} / {t.translations.DATA_SOURCE}
+                    </h2>
+                  </div>
+
+                  <div className="p-4">
+                    <ProjectResourceSelectors
+                      {...projectResources}
+                      hasOrganization={!!organization}
+                      uploadMode={fileUploadState.uploadMode}
+                    />
+                  </div>
+                </div>
+
+                <div className="divider my-0" />
+
+                <div className="space-y-3">
+                  <div className="flex justify-between">
+                    <div className="flex gap-2 items-center">
+                      <span className="badge badge-primary badge-sm">3</span>
+                      <h2 className="text-lg font-semibold text-base-content">
+                        {fileUploadState.uploadMode === "file"
+                          ? t.translations.FILE_UPLOAD
+                          : t.translations.BULK_METADATA}
+                      </h2>
+                    </div>
+                    {fileUploadState.uploadMode === "file" && (
+                      <div className="mb-2 flex justify-end">
+                        <MetadataTemplateDownload />
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="bg-base-100 p-4">
+                    {fileUploadState.uploadMode === "file" ? (
+                      <FileUploadSection
+                        selectedFiles={selectedFiles}
+                        setSelectedFiles={fileUploadState.setSelectedFiles}
+                        dropKey={fileUploadState.dropKey}
+                        handleMetadataChange={
+                          fileUploadState.handleMetadataChange
+                        }
+                        uploadErrorByFileIndex={
+                          fileUploadState.uploadErrorByFileIndex
+                        }
+                        targetFileId={fileUploadState.targetFileId}
+                        setTargetFileId={fileUploadState.setTargetFileId}
+                        availableFiles={availableFiles}
+                        availableClasses={availableClasses}
+                        isLoadingClasses={isLoadingClasses}
+                        onSearchFiles={handleSearchAvailableFiles}
+                        needsTarget={needsTarget}
+                        isUploading={fileUploadState.isUploading}
+                        canUpload={canUpload}
+                        onUpload={handleFileUpload}
+                        onClear={fileUploadState.clearAll}
+                        onRemoveAt={fileUploadState.removeAt}
+                        projectId={Number(projectId)}
+                      />
+                    ) : (
+                      <BulkUploadSection
+                        {...bulkUploadState}
+                        projectId={projectId}
+                        dataSourceId={dataSourceId}
+                        organizationId={organizationId as number}
+                        projects={projects}
+                        dataSources={dataSources}
+                      />
+                    )}
+                  </div>
+                </div>
               </div>
-            )}
-          </div>
-        )}
-      </div>
+            </div>
+          </section>
+        </div>
+      </main>
 
       {/* MODALS */}
-
-      {/* Multi File Warning Modal */}
-      {fileUploadState.showMultiFileWarning && (
-        <div className="modal modal-open">
-          <div className="modal-box">
-            <h3 className="font-bold text-lg">
-              {t.translations.CANT_SWITCH_TO_SINGLE_FILE}
-            </h3>
-            <p className="py-2">{t.translations.MULTI_FILE_WARNING}</p>
-            <div className="modal-action">
-              <button
-                className="btn btn-secondary"
-                onClick={() => fileUploadState.setShowMultiFileWarning(false)}
-              >
-                {t.translations.OKAY}
-              </button>
-            </div>
-          </div>
-          <div
-            className="modal-backdrop"
-            onClick={() => fileUploadState.setShowMultiFileWarning(false)}
-          />
-        </div>
-      )}
 
       {/* Upload Confirmation Modal */}
       {bulkUploadState.showUploadConfirm &&

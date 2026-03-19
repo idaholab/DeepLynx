@@ -2,6 +2,12 @@
 "use client";
 
 import { useLanguage } from "@/app/contexts/Language";
+import { useOrganizationSession } from "@/app/contexts/OrganizationSessionProvider";
+import { useSafeSession } from "@/app/hooks/useSafeSession";
+import {
+  getAllOrganizationsForUser,
+  getOrganizationLogoUrl,
+} from "@/app/lib/client_service/organization_services.client";
 import {
   AdjustmentsHorizontalIcon,
   ArrowRightStartOnRectangleIcon,
@@ -10,32 +16,26 @@ import {
   ChevronDownIcon,
   ChevronUpIcon,
   Cog6ToothIcon,
+  CommandLineIcon,
   GlobeAmericasIcon,
   QuestionMarkCircleIcon,
   UserCircleIcon,
   UserGroupIcon,
-  CommandLineIcon,
 } from "@heroicons/react/24/outline";
+import { signOut } from "next-auth/react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import React, { useState, useEffect } from "react";
-import SideMenu from "./SideMenu";
-import AvatarCell from "./Avatar";
-import { signOut } from "next-auth/react";
+import { useEffect, useState, type MouseEvent, type ReactNode } from "react";
 import { OrgAdminRoute, SysAdminRoute } from "../rbac/RBACComponents";
 import { useRBAC } from "../rbac/useRBAC";
-import { useOrganizationSession } from "@/app/contexts/OrganizationSessionProvider";
 import { OrganizationResponseDto } from "../types/responseDTOs";
-import { useSafeSession } from "@/app/hooks/useSafeSession";
-import {
-  getAllOrganizationsForUser,
-  getOrganizationLogoUrl,
-} from "@/app/lib/client_service/organization_services.client";
-import TopBanner from "./VulnerabilityBanner";
+import AvatarCell from "./Avatar";
 import { Banner } from "./Banner";
+import SideMenu from "./SideMenu";
+import TopBanner from "./VulnerabilityBanner";
 
-const LayoutShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+const LayoutShell = ({ children }: { children: ReactNode }) => {
   const { t } = useLanguage();
   const router = useRouter();
   const pathname = usePathname();
@@ -47,7 +47,6 @@ const LayoutShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user } = useRBAC();
   const { organization, setOrganization } = useOrganizationSession();
 
-  const [selectedItem, setSelectedItem] = useState<string>("");
   const [organizations, setOrganizations] = useState<OrganizationResponseDto[]>(
     [],
   );
@@ -58,7 +57,7 @@ const LayoutShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [orgLogoUrl, setOrgLogoUrl] = useState<string | null>(null);
 
   // Handle menu toggle
-  const [isMenuCollapsed, setIsMenuCollapsed] = React.useState(false);
+  const [isMenuCollapsed, setIsMenuCollapsed] = useState(false);
 
   // Fetch organizations for the switcher
   useEffect(() => {
@@ -158,12 +157,8 @@ const LayoutShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const displayImage = session?.user?.image;
 
   // Function to handle item click events
-  const handleItemClick = (
-    item: string,
-    event: React.MouseEvent<HTMLElement>,
-  ) => {
+  const handleItemClick = (item: string, event: MouseEvent<HTMLElement>) => {
     event.preventDefault();
-    setSelectedItem(item);
     router.push(item);
   };
 
@@ -310,7 +305,11 @@ const LayoutShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           />
         )}
         {/* Side Menu */}
-        <div className="fixed top-20 bottom-0 hidden lg:flex z-40">
+        <div
+          className={`fixed top-20 bottom-0 hidden lg:flex ${
+            isUserDropdownOpen ? "z-[60]" : "z-40"
+          }`}
+        >
           <aside
             className={
               "h-full shadow-xl w-18 login text-primary-content p-4 transition-all duration-300 flex flex-col"
@@ -369,15 +368,15 @@ const LayoutShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
               </li>
               <li className="mt-5">
                 <div className="relative flex justify-center">
-                  <div
+                  <button
+                    type="button"
                     className="cursor-pointer"
-                    onClick={() => setIsUserDropdownOpen(!isUserDropdownOpen)}
+                    onClick={() => setIsUserDropdownOpen((open) => !open)}
                   >
                     <UserCircleIcon className="size-10" />
-                  </div>
+                  </button>
                   {isUserDropdownOpen && (
                     <>
-                      {/* Backdrop to close dropdown when clicking outside */}
                       <div
                         className="fixed inset-0 z-[100]"
                         onClick={() => setIsUserDropdownOpen(false)}

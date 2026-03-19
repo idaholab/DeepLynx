@@ -63,6 +63,7 @@ public class FileBusiness
     /// <param name="file">file to upload</param>
     /// <param name="sensitivityLabelIds">The IDs of the Sensitivity Labels that will be attached to the record</param>
     /// <param name="metadataFile">(Optional) Metadata file to associate with the file upload</param>
+    /// <param name="embed">Boolean value that determines if the file will be embedded by Insight</param>
     public async Task<RecordResponseDto> UploadFile(
         long currentUserId,
         long organizationId,
@@ -71,7 +72,8 @@ public class FileBusiness
         long? objectStorageId,
         IFormFile file,
         List<long>? sensitivityLabelIds = null,
-        IFormFile? metadataFile = null)
+        IFormFile? metadataFile = null,
+        bool? embed = false)
     {
         long realDataSourceId;
         if (file == null || file.Length == 0) throw new ArgumentException("File is required and cannot be empty.");
@@ -152,7 +154,9 @@ public class FileBusiness
 
         // return the newly created metadata record for the file
         return await _recordBusiness.CreateRecord(currentUserId, organizationId, projectId, realDataSourceId,
-            recordRequest, sensitivityLabelIds);
+            recordRequest, sensitivityLabelIds, embedded: embed);
+        
+        // TODO: If embed is true send the record ID and URI to the CREATE Insight API
     }
 
     /// <summary>
@@ -163,8 +167,15 @@ public class FileBusiness
     /// <param name="projectId">ID of the project to which the file belongs</param>
     /// <param name="recordId">ID of record that contains the info of the file to replace</param>
     /// <param name="file">file to update to</param>
-    public async Task<RecordResponseDto> UpdateFile(long currentUserId, long organizationId, long projectId,
-        long recordId, IFormFile file)
+    /// <param name="embed">Boolean value that determines if the file will be embedded by Insight</param>
+    public async Task<RecordResponseDto> UpdateFile(
+        long currentUserId, 
+        long organizationId, 
+        long projectId,
+        long recordId, 
+        IFormFile file,
+        bool? embed = false
+        )
     {
         var record = await _recordBusiness.GetRecord(currentUserId, organizationId, projectId, recordId, true);
 
@@ -197,7 +208,9 @@ public class FileBusiness
             FileType = Path.GetExtension(file.FileName).TrimStart('.').ToLower()
         };
         return await _recordBusiness.UpdateRecord(currentUserId, organizationId, projectId, recordId,
-            updateRecordRequest);
+            updateRecordRequest, embedded: embed);
+        
+        // TODO: If embed is true send the record ID and URI to the UPDATE Insight API (or delete then add if no update endpoint exists)
     }
 
     /// <summary>
@@ -272,6 +285,8 @@ public class FileBusiness
         await fileBusiness.DeleteFile(record, configData);
 
         return await _recordBusiness.DeleteRecord(currentUserId, organizationId, projectId, recordId);
+        
+        // TODO: Delete all references to this record in the pgVector embeddings table
     }
 
 
@@ -393,7 +408,8 @@ public class FileBusiness
         long? objectStorageId,
         FileUploadCompleteRequestDto request,
         List<long>? sensitivityLabelIds = null,
-        CreateRecordFileUploadRequestDto? metadata = null)
+        CreateRecordFileUploadRequestDto? metadata = null,
+        bool? embed = false)
     {
         // Resolve data source
         long realDataSourceId;
@@ -446,7 +462,9 @@ public class FileBusiness
         };
 
         return await _recordBusiness.CreateRecord(currentUserId, organizationId, projectId, realDataSourceId,
-            recordRequest, sensitivityLabelIds);
+            recordRequest, sensitivityLabelIds, embedded: embed);
+        
+        // TODO: If embed is true then pass the record ID and URI to INSIGHT CREATE API
     }
 
     /// <summary>
