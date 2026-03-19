@@ -603,6 +603,16 @@ spec:
               value: "insight-rabbitmq-service"
             - name: MINIO_ENDPOINT
               value: "insight-minio-service:9100"
+            - name: MINIO_ACCESS_KEY
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: minio-root-user
+            - name: MINIO_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: minio-root-password
             - name: PG_HOST
               value: ${POSTGRES_DB_HOST}
             - name: PG_PORT
@@ -619,7 +629,7 @@ spec:
               cpu: "1500m"
           volumeMounts:
             - name: duckdb-storage
-              mountPath: /data
+              mountPath: /data/duckdb
       volumes:
         - name: duckdb-storage
           persistentVolumeClaim:
@@ -653,6 +663,16 @@ spec:
               value: "insight-rabbitmq-service"
             - name: MINIO_ENDPOINT
               value: "insight-minio-service:9100"
+            - name: MINIO_ACCESS_KEY
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: minio-root-user
+            - name: MINIO_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: minio-root-password
             - name: PG_HOST
               value: ${POSTGRES_DB_HOST}
             - name: PG_PORT
@@ -669,7 +689,7 @@ spec:
               cpu: "1500m"
           volumeMounts:
             - name: duckdb-storage
-              mountPath: /data
+              mountPath: /data/duckdb
       volumes:
         - name: duckdb-storage
           persistentVolumeClaim:
