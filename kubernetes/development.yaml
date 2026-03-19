@@ -532,11 +532,14 @@ spec:
                 secretKeyRef:
                   name: app-secrets
                   key: minio-root-password
+            - name: MINIO_API_PORT
+              value: "9100"
+            - name: MINIO_UI_PORT
+              value: "9101"
+            - name: MINIO_ALIAS
+              value: "insight"
             - name: MINIO_ENDPOINT
-              valueFrom:
-                configMapKeyRef:
-                  name: app-config
-                  key: minio-endpoint
+              value: "http://localhost:9100"
             - name: MINIO_VOLUMES
               value: "/data/duckdb"
             - name: MINIO_CONSOLE_ADDRESS
