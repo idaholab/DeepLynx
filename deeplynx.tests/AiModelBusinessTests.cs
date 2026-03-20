@@ -84,6 +84,7 @@ public class AiModelConfigBusinessTests : IntegrationTestBase
         pid2 = project2.Id;
 
         // Create model configs
+
         var config1 = new AiModelConfig
         {
             OrganizationId = oid,
@@ -91,13 +92,14 @@ public class AiModelConfigBusinessTests : IntegrationTestBase
             ServerUrl = "https://api.openai.com",
             ModelProvider = "open ai",
             ModelName = "gpt-4o",
-            ModelType = "llm",
+            ModelType = "language",
             RequiresToken = true,
             Default = true,
             IsArchived = false,
             LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
             LastUpdatedBy = uid
         };
+
         // Org-level default config
         var config2 = new AiModelConfig
         {
@@ -106,13 +108,14 @@ public class AiModelConfigBusinessTests : IntegrationTestBase
             ServerUrl = "https://api.anthropic.com",
             ModelProvider = "anthropic",
             ModelName = "claude-opus-4-6",
-            ModelType = "llm",
+            ModelType = "language",
             RequiresToken = true,
             Default = true,
             IsArchived = false,
             LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
             LastUpdatedBy = uid
         };
+
         // Archived project-level config
         var config3 = new AiModelConfig
         {
@@ -222,7 +225,7 @@ public class AiModelConfigBusinessTests : IntegrationTestBase
         Assert.Equal("https://api.openai.com", config.ServerUrl);
         Assert.Equal("open ai", config.ModelProvider);
         Assert.Equal("gpt-4o", config.ModelName);
-        Assert.Equal("llm", config.ModelType);
+        Assert.Equal("language", config.ModelType);
         Assert.True(config.RequiresToken);
         Assert.True(config.Default);
         Assert.False(config.IsArchived);
@@ -301,6 +304,167 @@ public class AiModelConfigBusinessTests : IntegrationTestBase
 
     #endregion
 
+    #region GetDefaultAiModelConfig Tests
+
+    [Fact]
+    public async Task GetDefaultAiModelConfig_Success_ReturnsProjectLevelDefault()
+    {
+        // Act - config1 is the default llm for pid
+        var result = await _aiModelConfigBusiness.GetDefaultAiModelConfig(uid, oid, pid, "language");
+
+        // Assert
+        Assert.Equal(mcid1, result.Id);
+        Assert.Equal(pid, result.ProjectId);
+        Assert.True(result.Default);
+    }
+
+    [Fact]
+    public async Task GetDefaultAiModelConfig_Success_ReturnsOrgLevelDefault_WhenNoProjectId()
+    {
+        // Act - config2 is the default language model at org level
+        var result = await _aiModelConfigBusiness.GetDefaultAiModelConfig(uid, oid, null, "language");
+
+        // Assert
+        Assert.Equal(mcid2, result.Id);
+        Assert.Null(result.ProjectId);
+        Assert.True(result.Default);
+    }
+
+    [Fact]
+    public async Task GetDefaultAiModelConfig_Success_FallsBackToOrgDefault_WhenNoProjectLevelDefault()
+    {
+        // Act - pid has no default embedding config, should fall back to org level
+        // pid2 has no project-level default language model, so should fall back to org-level default (config2)
+        var result = await _aiModelConfigBusiness.GetDefaultAiModelConfig(uid, oid, pid2, "language");
+
+        // Assert - should have fallen back to org-level default (config2)
+        Assert.Equal(mcid2, result.Id);
+        Assert.Null(result.ProjectId);
+        Assert.True(result.Default);
+    }
+
+    [Fact]
+    public async Task GetDefaultAiModelConfig_Fails_WhenNoDefaultExistsForModelType()
+    {
+        // Act & Assert - no default embedding config exists at org or project level
+        await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            _aiModelConfigBusiness.GetDefaultAiModelConfig(uid, oid, pid, "embedding"));
+    }
+
+    [Fact]
+    public async Task GetDefaultAiModelConfig_Fails_WhenWrongOrganization()
+    {
+        // Act & Assert - oid2 has no configs at all
+        await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            _aiModelConfigBusiness.GetDefaultAiModelConfig(uid, oid2, null, "language"));
+    }
+
+    [Fact]
+    public async Task GetDefaultAiModelConfig_DoesNotReturn_ArchivedConfig()
+    {
+        // Arrange - archive config1 (project-level default) and config2 (org-level default)
+        // so the only remaining llm default would be archived
+        var config1 = await Context.AiModelConfigs.FindAsync(mcid1);
+        var config2 = await Context.AiModelConfigs.FindAsync(mcid2);
+        config1!.IsArchived = true;
+        config2!.IsArchived = true;
+        await Context.SaveChangesAsync();
+
+        // Act & Assert
+        await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            _aiModelConfigBusiness.GetDefaultAiModelConfig(uid, oid, pid, "language"));
+    }
+
+    [Fact]
+    public async Task GetDefaultAiModelConfig_ReturnsToken_WhenModelRequiresToken()
+    {
+        // Arrange - add a token for uid against config1
+        var userToken = new UserModelToken
+        {
+            UserId = uid,
+            AiModelConfigId = mcid1,
+            Token = "test-token-abc123"
+        };
+        Context.UserModelTokens.Add(userToken);
+        await Context.SaveChangesAsync();
+
+        // Act
+        var result = await _aiModelConfigBusiness.GetDefaultAiModelConfig(uid, oid, pid, "language");
+
+        // Assert
+        Assert.Equal(mcid1, result.Id);
+        Assert.Equal("test-token-abc123", result.Token);
+    }
+
+    [Fact]
+    public async Task GetDefaultAiModelConfig_ReturnsNullToken_WhenModelDoesNotRequireToken()
+    {
+        // Arrange - create a default embedding config that doesn't require a token
+        var noTokenConfig = new AiModelConfig
+        {
+            OrganizationId = oid,
+            ProjectId = null,
+            ServerUrl = "https://hpc.example.com",
+            ModelProvider = "hpc",
+            ModelName = "hpc-embed",
+            ModelType = "embedding",
+            RequiresToken = false,
+            Default = true,
+            IsArchived = false,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid
+        };
+        Context.AiModelConfigs.Add(noTokenConfig);
+        await Context.SaveChangesAsync();
+
+        // Act
+        var result = await _aiModelConfigBusiness.GetDefaultAiModelConfig(uid, oid, null, "embedding");
+
+        // Assert
+        Assert.Equal(noTokenConfig.Id, result.Id);
+        Assert.Null(result.Token);
+    }
+
+    [Fact]
+    public async Task GetDefaultAiModelConfig_ReturnsNullToken_WhenModelRequiresToken_ButNoneStoredForUser()
+    {
+        // Act - config1 requires a token but no UserModelToken exists for uid
+        var result = await _aiModelConfigBusiness.GetDefaultAiModelConfig(uid, oid, pid, "language");
+
+        // Assert
+        Assert.Equal(mcid1, result.Id);
+        Assert.Null(result.Token);
+    }
+
+    [Fact]
+    public async Task GetDefaultAiModelConfig_ReturnsCorrectToken_ForCorrectUser()
+    {
+        // Arrange - add tokens for two different users against config1
+        var otherUser = new User
+        {
+            Name = "Other User",
+            Email = "other.user@test.com",
+            Password = "other_password",
+            IsArchived = false
+        };
+        Context.Users.Add(otherUser);
+        await Context.SaveChangesAsync();
+
+        Context.UserModelTokens.AddRange(
+            new UserModelToken { UserId = uid, AiModelConfigId = mcid1, Token = "token-for-uid" },
+            new UserModelToken { UserId = otherUser.Id, AiModelConfigId = mcid1, Token = "token-for-other-user" }
+        );
+        await Context.SaveChangesAsync();
+
+        // Act
+        var result = await _aiModelConfigBusiness.GetDefaultAiModelConfig(uid, oid, pid, "language");
+
+        // Assert - should only return the token belonging to uid
+        Assert.Equal("token-for-uid", result.Token);
+    }
+
+    #endregion
+
     #region CreateAiModelConfig Tests
 
     [Fact]
@@ -313,7 +477,7 @@ public class AiModelConfigBusinessTests : IntegrationTestBase
             ServerUrl = "https://new.api.com",
             ModelProvider = "anthropic",
             ModelName = "claude-sonnet-4-6",
-            ModelType = "llm",
+            ModelType = "language",
             RequiresToken = true,
             Default = false
         };
@@ -328,7 +492,7 @@ public class AiModelConfigBusinessTests : IntegrationTestBase
         Assert.Equal("https://new.api.com", result.ServerUrl);
         Assert.Equal("anthropic", result.ModelProvider);
         Assert.Equal("claude-sonnet-4-6", result.ModelName);
-        Assert.Equal("llm", result.ModelType);
+        Assert.Equal("language", result.ModelType);
         Assert.True(result.RequiresToken);
         Assert.False(result.Default);
         Assert.False(result.IsArchived);
@@ -345,7 +509,7 @@ public class AiModelConfigBusinessTests : IntegrationTestBase
             ServerUrl = "https://org.api.com",
             ModelProvider = "hpc",
             ModelName = "hpc-llm",
-            ModelType = "llm",
+            ModelType = "language",
             RequiresToken = false,
             Default = false
         };
@@ -367,7 +531,7 @@ public class AiModelConfigBusinessTests : IntegrationTestBase
             ServerUrl = "https://new-default.api.com",
             ModelProvider = "anthropic",
             ModelName = "new-default-model",
-            ModelType = "llm",
+            ModelType = "language",
             RequiresToken = true,
             Default = true
         };
@@ -393,7 +557,7 @@ public class AiModelConfigBusinessTests : IntegrationTestBase
             ServerUrl = "https://new-org-default.api.com",
             ModelProvider = "anthropic",
             ModelName = "new-org-default-model",
-            ModelType = "llm",
+            ModelType = "language",
             RequiresToken = true,
             Default = true
         };
@@ -418,7 +582,7 @@ public class AiModelConfigBusinessTests : IntegrationTestBase
             ServerUrl = "https://api.example.com",
             ModelProvider = "not-a-real-provider",
             ModelName = "some-model",
-            ModelType = "llm",
+            ModelType = "language",
             RequiresToken = false,
             Default = false
         };
@@ -456,7 +620,7 @@ public class AiModelConfigBusinessTests : IntegrationTestBase
             ServerUrl = "https://api.anthropic.com",
             ModelProvider = "Anthropic", // mixed case
             ModelName = "claude-haiku-4-5",
-            ModelType = "LLM", // mixed case
+            ModelType = "Language", // mixed case
             RequiresToken = true,
             Default = false
         };
@@ -508,7 +672,7 @@ public class AiModelConfigBusinessTests : IntegrationTestBase
         // Assert
         Assert.Equal("gpt-4-turbo", result.ModelName);
         Assert.Equal("https://api.openai.com", result.ServerUrl); // unchanged
-        Assert.Equal("llm", result.ModelType);                    // unchanged
+        Assert.Equal("language", result.ModelType);                    // unchanged
         Assert.True(result.RequiresToken);                        // unchanged
         Assert.True(result.Default);                              // unchanged
     }
@@ -568,7 +732,7 @@ public class AiModelConfigBusinessTests : IntegrationTestBase
             ServerUrl = "https://hpc.example.com",
             ModelProvider = "hpc",
             ModelName = "hpc-model",
-            ModelType = "llm",
+            ModelType = "language",
             RequiresToken = false,
             Default = false,
             IsArchived = false,
@@ -617,7 +781,7 @@ public class AiModelConfigBusinessTests : IntegrationTestBase
             ServerUrl = "https://deleteme.api.com",
             ModelProvider = "anthropic",
             ModelName = "deletable-model",
-            ModelType = "llm",
+            ModelType = "language",
             RequiresToken = false,
             Default = false,
             IsArchived = false,
@@ -685,7 +849,7 @@ public class AiModelConfigBusinessTests : IntegrationTestBase
             ServerUrl = "https://archiveme.api.com",
             ModelProvider = "anthropic",
             ModelName = "archivable-model",
-            ModelType = "llm",
+            ModelType = "language",
             RequiresToken = false,
             Default = false,
             IsArchived = false,

@@ -28,7 +28,7 @@ public class AiModelConfigBusiness : IAiModelConfigBusiness
 
     private static readonly List<string> ModelTypeList = new List<string>
     {
-        "llm",
+        "language",
         "embedding"
     };
 
@@ -50,7 +50,7 @@ public class AiModelConfigBusiness : IAiModelConfigBusiness
 
         if (projectId.HasValue)
             query = query.Where(x => x.ProjectId == projectId || x.ProjectId == null);
-        else 
+        else
             query = query.Where(x => x.ProjectId == null);
 
         if (hideArchived)
@@ -441,8 +441,8 @@ public class AiModelConfigBusiness : IAiModelConfigBusiness
         await _context.SaveChangesAsync();
         return true;
     }
-    
-    
+
+
     /// <summary>
     ///     Unarchive a single AI Model Configuration
     /// </summary>
