@@ -626,6 +626,39 @@ spec:
               value: ${POSTGRES_PASSWORD}
             - name: PG_DBNAME
               value: ${POSTGRES_DB_NAME}
+            - name: LLM_AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: hpc-ai-temp-nexus-key
+            - name: MM_AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: hpc-ai-temp-nexus-key
+            - name: EMB_AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: hpc-ai-temp-nexus-key
+            - name: LLM_SERVER_URL
+              value: "https://api.hpc.inl.gov/llm/v1"
+            - name: LLM_MODEL_NAME
+              value: "gpt-oss-120b"
+            - name: MM_SERVER_URL
+              value: "https://api.hpc.inl.gov/llm/v1"
+            - name: MM_MODEL_NAME
+              value: "Mistral-Small-3.2-24B-Instruct-2506"
+            - name: EMB_SERVER_URL
+              value: "https://api.hpc.inl.gov/llm/v1"
+            - name: EMB_MODEL_NAME
+              value: "bge-m3"
+            - name: EMB_DIMENSION
+              value: "1024"
+            - name: RAG_MAX_CHUNKS
+              value: "25"
+            - name: LITELLM_HTTP_LOGGING
+              value: "false"
           resources:
             limits:
               memory: "4Gi"
@@ -686,6 +719,49 @@ spec:
               value: ${POSTGRES_PASSWORD}
             - name: PG_DBNAME
               value: ${POSTGRES_DB_NAME}
+            - name: LLM_AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: hpc-ai-temp-nexus-key
+            - name: MM_AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: hpc-ai-temp-nexus-key
+            - name: EMB_AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: hpc-ai-temp-nexus-key
+            - name: LLM_SERVER_URL
+              value: "https://api.hpc.inl.gov/llm/v1"
+            - name: LLM_MODEL_NAME
+              value: "gpt-oss-120b"
+            - name: MM_SERVER_URL
+              value: "https://api.hpc.inl.gov/llm/v1"
+            - name: MM_MODEL_NAME
+              value: "Mistral-Small-3.2-24B-Instruct-2506"
+            - name: EMB_SERVER_URL
+              value: "https://api.hpc.inl.gov/llm/v1"
+            - name: EMB_MODEL_NAME
+              value: "bge-m3"
+            - name: EMB_DIMENSION
+              value: "1024"
+            - name: IMG_TO_TEXT_PROCS
+              value: "2"
+            - name: IMG_TO_TEXT_BATCH_SIZE
+              value: "20"
+            - name: IMG_TO_TEXT_BATCH_TIMEOUT
+              value: "0.5"
+            - name: PDF_TO_IMG_PROCS
+              value: "2"
+            - name: TEXT_TO_CHUNKS_PROCS
+              value: "2"
+            - name: RAG_MAX_CHUNKS
+              value: "25"
+            - name: LITELLM_HTTP_LOGGING
+              value: "false"
           resources:
             limits:
               memory: "4Gi"
