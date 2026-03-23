@@ -172,6 +172,8 @@ spec:
                 secretKeyRef:
                   name: app-secrets
                   key: jwt-secret-key
+            - name: INSIGHT_API_URL
+              value: "http://insight-fastapi-service"
             - name: AUTH_TRUST_HOST
               value: "true"
             - name: AUTH_SECRET
@@ -443,6 +445,261 @@ spec:
             - containerPort: 43656
 
 ---
+# insight-rabbitmq
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: insight-rabbitmq
+  namespace: deeplynx-test
+spec:
+  selector:
+    matchLabels:
+      app: insight-rabbitmq
+  template:
+    metadata:
+      labels:
+        app: insight-rabbitmq
+    spec:
+      containers:
+        - name: deeplynx-test
+          image: ${CI_REGISTRY}/${CI_REGISTRY_PATH}:insight-rabbitmq-${GITHUB_RUN_NUMBER}
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 5672
+            - containerPort: 15672
+            - containerPort: 15692
+          env:
+            - name: RABBITMQ_DEFAULT_USER
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: rabbitmq-default-user
+            - name: RABBITMQ_DEFAULT_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: rabbitmq-default-pass
+          resources:
+            requests:
+              memory: "2Gi"
+              cpu: "1000m"
+            limits:
+              memory: "2Gi"
+              cpu: "1000m"
+          livenessProbe:
+            exec:
+              command: ["rabbitmq-diagnostics", "-q", "check_port_connectivity"]
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 5
+          readinessProbe:
+            exec:
+              command: ["rabbitmq-diagnostics", "-q", "check_port_connectivity"]
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+
+---
+# insight-minio
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: insight-minio
+  namespace: deeplynx-test
+spec:
+  selector:
+    matchLabels:
+      app: insight-minio
+  template:
+    metadata:
+      labels:
+        app: insight-minio
+    spec:
+      containers:
+        - name: deeplynx-test
+          image: ${CI_REGISTRY}/${CI_REGISTRY_PATH}:insight-minio-${GITHUB_RUN_NUMBER}
+          imagePullPolicy: Always
+          env:
+            - name: MINIO_ROOT_USER
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: minio-root-user
+            - name: MINIO_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: minio-root-password
+            - name: MINIO_API_PORT
+              value: "9100"
+            - name: MINIO_UI_PORT
+              value: "9101"
+            - name: MINIO_ALIAS
+              value: "insight"
+            - name: MINIO_ENDPOINT
+              value: "http://localhost:9100"
+            - name: MINIO_VOLUMES
+              value: "/data/duckdb"
+            - name: MINIO_CONSOLE_ADDRESS
+              value: ":9101"
+          resources:
+            limits:
+              memory: "4Gi"
+              cpu: "1500m"
+          livenessProbe:
+            httpGet:
+              path: /minio/health/live
+              port: 9100
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 5
+          readinessProbe:
+            httpGet:
+              path: /minio/health/live
+              port: 9100
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          ports:
+            - containerPort: 9100
+            - containerPort: 9101
+          volumeMounts:
+            - name: duckdb-storage
+              mountPath: /data/duckdb
+      volumes:
+        - name: duckdb-storage
+          persistentVolumeClaim:
+            claimName: ${AZURE_FILE_SHARE_PVC}
+
+---
+# insight-fastapi
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: insight-fastapi
+  namespace: deeplynx-test
+spec:
+  selector:
+    matchLabels:
+      app: insight-fastapi
+  template:
+    metadata:
+      labels:
+        app: insight-fastapi
+    spec:
+      containers:
+        - name: deeplynx-test
+          image: ${CI_REGISTRY}/${CI_REGISTRY_PATH}:insight-fastapi-${GITHUB_RUN_NUMBER}
+          imagePullPolicy: Always
+          command:
+            ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "5009"]
+          ports:
+            - containerPort: 5009
+          env:
+            - name: LITELLM_LOCAL_MODEL_COST_MAP
+              value: "True"
+            - name: RABBITMQ_HOST
+              value: "insight-rabbitmq-service"
+            - name: MINIO_ENDPOINT
+              value: "insight-minio-service:9100"
+            - name: MINIO_ACCESS_KEY
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: minio-root-user
+            - name: MINIO_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: minio-root-password
+            - name: PG_HOST
+              value: ${POSTGRES_DB_HOST}
+            - name: PG_PORT
+              value: "5432"
+            - name: PG_USER
+              value: ${POSTGRES_USER}
+            - name: PG_PASSWORD
+              value: ${POSTGRES_PASSWORD}
+            - name: PG_DBNAME
+              value: ${POSTGRES_DB_NAME}
+          resources:
+            limits:
+              memory: "4Gi"
+              cpu: "1500m"
+          volumeMounts:
+            - name: duckdb-storage
+              mountPath: /data/duckdb
+      volumes:
+        - name: duckdb-storage
+          persistentVolumeClaim:
+            claimName: ${AZURE_FILE_SHARE_PVC}
+
+---
+# insight-rabbitmq-runner
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: insight-rabbitmq-runner
+  namespace: deeplynx-test
+spec:
+  selector:
+    matchLabels:
+      app: insight-rabbitmq-runner
+  template:
+    metadata:
+      labels:
+        app: insight-rabbitmq-runner
+    spec:
+      containers:
+        - name: deeplynx-test
+          image: ${CI_REGISTRY}/${CI_REGISTRY_PATH}:insight-rabbitmq-runner-${GITHUB_RUN_NUMBER}
+          imagePullPolicy: Always
+          command: ["python", "-m", "runner"]
+          env:
+            - name: LITELLM_LOCAL_MODEL_COST_MAP
+              value: "True"
+            - name: RABBITMQ_HOST
+              value: "insight-rabbitmq-service"
+            - name: MINIO_ENDPOINT
+              value: "insight-minio-service:9100"
+            - name: MINIO_ACCESS_KEY
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: minio-root-user
+            - name: MINIO_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: minio-root-password
+            - name: PG_HOST
+              value: ${POSTGRES_DB_HOST}
+            - name: PG_PORT
+              value: "5432"
+            - name: PG_USER
+              value: ${POSTGRES_USER}
+            - name: PG_PASSWORD
+              value: ${POSTGRES_PASSWORD}
+            - name: PG_DBNAME
+              value: ${POSTGRES_DB_NAME}
+          resources:
+            limits:
+              memory: "4Gi"
+              cpu: "1500m"
+          volumeMounts:
+            - name: duckdb-storage
+              mountPath: /data/duckdb
+      volumes:
+        - name: duckdb-storage
+          persistentVolumeClaim:
+            claimName: ${AZURE_FILE_SHARE_PVC}
+
+
+---
 apiVersion: v1
 kind: Service
 metadata:
@@ -501,6 +758,60 @@ spec:
       targetPort: 43656
   selector:
     app: deeplynx-mcp
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: insight-rabbitmq-service
+  namespace: deeplynx-test
+spec:
+  type: ClusterIP
+  ports:
+    - name: amqp
+      port: 5672
+      targetPort: 5672
+    - name: management
+      port: 15672
+      targetPort: 15672
+    - name: prometheus
+      port: 15692
+      targetPort: 15692
+  selector:
+    app: insight-rabbitmq
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: insight-minio-service
+  namespace: deeplynx-test
+spec:
+  type: ClusterIP
+  ports:
+    - name: api
+      port: 9100
+      targetPort: 9100
+    - name: console
+      port: 9101
+      targetPort: 9101
+  selector:
+    app: insight-minio
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: insight-fastapi-service
+  namespace: deeplynx-test
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 80
+      targetPort: 5009
+  selector:
+    app: insight-fastapi
 
 ---
 apiVersion: networking.k8s.io/v1
