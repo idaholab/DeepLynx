@@ -630,17 +630,17 @@ spec:
               valueFrom:
                 secretKeyRef:
                   name: app-secrets
-                  key: hpc-ai-temp-nexus-key
+                  key: llm-auth-token
             - name: MM_AUTH_TOKEN
               valueFrom:
                 secretKeyRef:
                   name: app-secrets
-                  key: hpc-ai-temp-nexus-key
+                  key: mm-auth-token
             - name: EMB_AUTH_TOKEN
               valueFrom:
                 secretKeyRef:
                   name: app-secrets
-                  key: hpc-ai-temp-nexus-key
+                  key: emb-auth-token
             - name: LLM_SERVER_URL
               value: "https://api.hpc.inl.gov/llm/v1"
             - name: LLM_MODEL_NAME
@@ -723,17 +723,17 @@ spec:
               valueFrom:
                 secretKeyRef:
                   name: app-secrets
-                  key: hpc-ai-temp-nexus-key
+                  key: llm-auth-token
             - name: MM_AUTH_TOKEN
               valueFrom:
                 secretKeyRef:
                   name: app-secrets
-                  key: hpc-ai-temp-nexus-key
+                  key: mm-auth-token
             - name: EMB_AUTH_TOKEN
               valueFrom:
                 secretKeyRef:
                   name: app-secrets
-                  key: hpc-ai-temp-nexus-key
+                  key: emb-auth-token
             - name: LLM_SERVER_URL
               value: "https://api.hpc.inl.gov/llm/v1"
             - name: LLM_MODEL_NAME
