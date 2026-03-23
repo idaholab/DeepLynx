@@ -1,967 +1,1497 @@
-// using System.Text;
-// using System.Text.Json.Nodes;
-// using deeplynx.business;
-// using deeplynx.datalayer.Models;
-// using deeplynx.helpers;
-// using deeplynx.helpers.BigData;
-// using deeplynx.helpers.Hubs;
-// using deeplynx.interfaces;
-// using deeplynx.models;
-// using Microsoft.AspNetCore.Http;
-// using Microsoft.AspNetCore.SignalR;
-// using Microsoft.Extensions.DependencyInjection;
-// using Microsoft.Extensions.Logging;
-// using Moq;
-// using Parquet;
-// using Parquet.Data;
-// using Parquet.Schema;
-// using Testcontainers.Azurite;
-//
-// namespace deeplynx.tests;
-//
-// // Fixture specifically for this test class only
-// public class AzuriteOlapFixture : IAsyncLifetime
-// {
-//     private AzuriteContainer _azuriteContainer = null!;
-//     
-//     public string AzuriteConnectionString { get; private set; } = null!;
-//
-//     public async Task InitializeAsync()
-//     {
-//         _azuriteContainer = new AzuriteBuilder()
-//             .WithImage("mcr.microsoft.com/azure-storage/azurite:latest")
-//             .Build();
-//
-//         await _azuriteContainer.StartAsync();
-//         AzuriteConnectionString = _azuriteContainer.GetConnectionString();
-//     }
-//
-//     public async Task DisposeAsync()
-//     {
-//         await _azuriteContainer.DisposeAsync();
-//     }
-// }
-//
-// [Collection("Test Suite Collection")]
-// public class OlapBusinessTests : IntegrationTestBase, IAsyncLifetime, IClassFixture<AzuriteOlapFixture>
-// {
-//     private static readonly string _testDuckDbBasePath;
-//
-//     // Static constructor runs before anything else, ensuring env var is set
-//     // before TimeseriesBusiness static field is initialized
-//     static OlapBusinessTests()
-//     {
-//         _testDuckDbBasePath = Path.Combine(Path.GetTempPath(), "deeplynx_test_duckdb", Guid.NewGuid().ToString());
-//         Environment.SetEnvironmentVariable("DUCKDB_BASE_PATH", _testDuckDbBasePath);
-//     }
-//     private ClassBusiness _classBusiness = null!;
-//     private EventBusiness _eventBusiness = null!;
-//     private SensitivityLabelBusiness _sensitivityLabelBusiness = null!;
-//     private Mock<IHubContext<EventNotificationHub>> _mockHubContext = null!;
-//     private Mock<ILogger<NotificationBusiness>> _mockNotificationLogger = null!;
-//     private Mock<ILogger<OlapBusiness>> _mockTimeseriesLogger = null!;
-//     private Mock<IServiceScopeFactory> _mockServiceScopeFactory = null!;
-//     private BulkCopyUpsertExecutor _mockBulkCopyUpsertExecutor = null!;
-//     private INotificationBusiness _notificationBusiness = null!;
-//     private RecordBusiness _recordBusiness = null!;
-//     private RelationshipBusiness _relationshipBusiness = null!;
-//     private TagBusiness _tagBusiness = null!;
-//     private OlapBusiness _timeseriesBusiness = null!;
-//     private ISensitivityLabelService _sensitivityLabelService = null!;
-//
-//     private long _organizationId;
-//     private long _projectId;
-//     private long _dataSourceId;
-//     private long _userId;
-//     private long _classId;
-//
-//     public OlapBusinessTests(TestSuiteFixture fixture) : base(fixture)
-//     {
-//     }
-//
-//     public override async Task InitializeAsync()
-//     {
-//         await base.InitializeAsync();
-//
-//         // Ensure test directory exists
-//         Directory.CreateDirectory(_testDuckDbBasePath);
-//
-//         // Set up mocks
-//         _mockHubContext = new Mock<IHubContext<EventNotificationHub>>();
-//         _mockNotificationLogger = new Mock<ILogger<NotificationBusiness>>();
-//         _mockTimeseriesLogger = new Mock<ILogger<OlapBusiness>>();
-//         _mockServiceScopeFactory = new Mock<IServiceScopeFactory>();
-//
-//         // Set up service scope factory mock
-//         var mockScope = new Mock<IServiceScope>();
-//         var mockServiceProvider = new Mock<IServiceProvider>();
-//         mockServiceProvider.Setup(sp => sp.GetService(typeof(DeeplynxContext))).Returns(Context);
-//         mockScope.Setup(s => s.ServiceProvider).Returns(mockServiceProvider.Object);
-//         _mockServiceScopeFactory.Setup(f => f.CreateScope()).Returns(mockScope.Object);
-//         _mockBulkCopyUpsertExecutor = new BulkCopyUpsertExecutor();
-//         _sensitivityLabelService = new SensitivityLabelService(Context);
-//
-//         // Set up business layer dependencies
-//         _notificationBusiness = new NotificationBusiness(Context, _mockNotificationLogger.Object, _mockHubContext.Object);
-//         _eventBusiness = new EventBusiness(Context, _notificationBusiness, _mockBulkCopyUpsertExecutor);
-//         _tagBusiness = new TagBusiness(Context, _eventBusiness);
-//         _sensitivityLabelBusiness = new SensitivityLabelBusiness(Context, _eventBusiness);
-//         _recordBusiness = new RecordBusiness(Context, _eventBusiness, _mockBulkCopyUpsertExecutor, _tagBusiness, _sensitivityLabelBusiness, _sensitivityLabelService);
-//         _classBusiness = new ClassBusiness(Context, _recordBusiness, _relationshipBusiness, _eventBusiness);
-//
-//         _timeseriesBusiness = new OlapBusiness(
-//             Context,
-//             _recordBusiness,
-//             _mockTimeseriesLogger.Object);
-//
-//         // Set up test data
-//         await SetupTestDataAsync();
-//     }
-//
-//     public new async Task DisposeAsync()
-//     {
-//         // Clean up test DuckDB directory
-//         if (Directory.Exists(_testDuckDbBasePath))
-//         {
-//             try
-//             {
-//                 Directory.Delete(_testDuckDbBasePath, true);
-//             }
-//             catch
-//             {
-//                 // Ignore cleanup errors in tests
-//             }
-//         }
-//
-//         await base.DisposeAsync();
-//     }
-//
-//     private async Task SetupTestDataAsync()
-//     {
-//         // Create user
-//         var user = new User
-//         {
-//             Name = "Test User",
-//             Email = "timeseries-test@test.com",
-//             Password = "test_password",
-//             IsArchived = false
-//         };
-//         Context.Users.Add(user);
-//         await Context.SaveChangesAsync();
-//         _userId = user.Id;
-//
-//         // Create organization
-//         var org = new Organization { Name = "Test Org" };
-//         Context.Organizations.Add(org);
-//         await Context.SaveChangesAsync();
-//         _organizationId = org.Id;
-//
-//         // Create project
-//         var project = new Project
-//         {
-//             Name = "Timeseries Test Project",
-//             Description = "Test project for timeseries unit tests",
-//             LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
-//             LastUpdatedBy = _userId,
-//             OrganizationId = _organizationId
-//         };
-//         Context.Projects.Add(project);
-//         await Context.SaveChangesAsync();
-//         _projectId = project.Id;
-//
-//         // Create data source
-//         var dataSource = new DataSource
-//         {
-//             Name = "Timeseries Test DataSource",
-//             Description = "Test data source for timeseries unit tests",
-//             ProjectId = _projectId,
-//             LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
-//             LastUpdatedBy = _userId,
-//             OrganizationId = _organizationId
-//         };
-//         Context.DataSources.Add(dataSource);
-//         await Context.SaveChangesAsync();
-//         _dataSourceId = dataSource.Id;
-//
-//         // Create default timeseries class
-//         var testClass = new Class
-//         {
-//             Name = "Timeseries",
-//             Description = "",
-//             Uuid = "uuid-1",
-//             ProjectId = _projectId,
-//             OrganizationId = _organizationId,
-//             LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
-//             LastUpdatedBy = _userId,
-//             IsArchived = false
-//         };
-//         Context.Classes.Add(testClass);
-//         await Context.SaveChangesAsync();
-//         _classId = testClass.Id;
-//
-//         // Create object storage for reports
-//         var config = new JsonObject();
-//         var objectStorage = new ObjectStorage
-//         {
-//             Name = "Timeseries Default",
-//             Type = "filesystem",
-//             Config = config.ToString(),
-//             ProjectId = _projectId,
-//             LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
-//             LastUpdatedBy = _userId,
-//             OrganizationId = _organizationId
-//         };
-//         Context.ObjectStorages.Add(objectStorage);
-//         await Context.SaveChangesAsync();
-//     }
-//
-//     private static IFormFile CreateTestCsvFile(string content, string fileName = "test.csv")
-//     {
-//         var bytes = Encoding.UTF8.GetBytes(content);
-//         var stream = new MemoryStream(bytes);
-//         stream.Position = 0;
-//         return new FormFile(stream, 0, bytes.Length, "file", fileName)
-//         {
-//             Headers = new HeaderDictionary(),
-//             ContentType = "text/csv"
-//         };
-//     }
-//
-//     private static IFormFile CreateLargeTestCsvFile(int rowCount, string fileName = "large_test.csv")
-//     {
-//         var sb = new StringBuilder();
-//         sb.AppendLine("timestamp,value,sensor_id,temperature,pressure");
-//
-//         var baseTime = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc);
-//         var random = new Random(42); // Fixed seed for reproducibility
-//
-//         for (int i = 0; i < rowCount; i++)
-//         {
-//             var timestamp = baseTime.AddSeconds(i).ToString("yyyy-MM-ddTHH:mm:ss");
-//             var value = Math.Round(random.NextDouble() * 100, 2);
-//             var sensorId = $"sensor_{i % 5}";
-//             var temperature = Math.Round(20 + random.NextDouble() * 10, 2);
-//             var pressure = Math.Round(1000 + random.NextDouble() * 50, 2);
-//             sb.AppendLine($"{timestamp},{value},{sensorId},{temperature},{pressure}");
-//         }
-//
-//         var content = sb.ToString();
-//         var bytes = Encoding.UTF8.GetBytes(content);
-//         var stream = new MemoryStream(bytes);
-//         stream.Position = 0;
-//         return new FormFile(stream, 0, bytes.Length, "file", fileName)
-//         {
-//             Headers = new HeaderDictionary(),
-//             ContentType = "text/csv"
-//         };
-//     }
-//     
-//    private static async Task<IFormFile> CreateLargeTestParquetFile(int rowCount, string fileName = "large_test.parquet")
-//     {
-//         var baseTime = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc);
-//         var random = new Random(42);
-//
-//         var schema = new ParquetSchema(
-//             new DataField<DateTimeOffset>("timestamp"),
-//             new DataField<double>("value"),
-//             new DataField<string>("sensor_id"),
-//             new DataField<double>("temperature"),
-//             new DataField<double>("pressure")
-//         );
-//
-//         var timestamps   = new DateTimeOffset[rowCount];
-//         var values       = new double[rowCount];
-//         var sensorIds    = new string[rowCount];
-//         var temperatures = new double[rowCount];
-//         var pressures    = new double[rowCount];
-//
-//         for (int i = 0; i < rowCount; i++)
-//         {
-//             timestamps[i]   = new DateTimeOffset(baseTime.AddSeconds(i));
-//             values[i]       = Math.Round(random.NextDouble() * 100, 2);
-//             sensorIds[i]    = $"sensor_{i % 5}";
-//             temperatures[i] = Math.Round(20 + random.NextDouble() * 10, 2);
-//             pressures[i]    = Math.Round(1000 + random.NextDouble() * 50, 2);
-//         }
-//
-//         // Write to a temp stream, then extract bytes before it's disposed
-//         byte[] parquetBytes;
-//         using (var writeStream = new MemoryStream())
-//         {
-//             using (var writer = await ParquetWriter.CreateAsync(schema, writeStream))
-//             {
-//                 using var groupWriter = writer.CreateRowGroup();
-//                 await groupWriter.WriteColumnAsync(new DataColumn(schema.DataFields[0], timestamps));
-//                 await groupWriter.WriteColumnAsync(new DataColumn(schema.DataFields[1], values));
-//                 await groupWriter.WriteColumnAsync(new DataColumn(schema.DataFields[2], sensorIds));
-//                 await groupWriter.WriteColumnAsync(new DataColumn(schema.DataFields[3], temperatures));
-//                 await groupWriter.WriteColumnAsync(new DataColumn(schema.DataFields[4], pressures));
-//             }
-//
-//             parquetBytes = writeStream.ToArray(); // safe to call even after ParquetWriter closes the stream
-//         }
-//
-//         var readStream = new MemoryStream(parquetBytes);
-//
-//         return new FormFile(readStream, 0, readStream.Length, "file", fileName)
-//         {
-//             Headers = new HeaderDictionary(),
-//             ContentType = "application/octet-stream"
-//         };
-//     }
-//     /// <summary>
-//     /// Generates CSV content with specified number of rows
-//     /// </summary>
-//     private static string GenerateLargeCsvContent(int rows)
-//     {
-//         var sb = new StringBuilder();
-//         sb.AppendLine("Timestamp,Temperature_K,Data_1,Data_2,Data_3");
-//
-//         var random = new Random(42); // Fixed seed for reproducibility
-//         var baseTime = new DateTime(2024, 7, 15, 7, 32, 27, DateTimeKind.Utc);
-//
-//         for (int i = 0; i < rows; i++)
-//         {
-//             var timestamp = baseTime.AddMilliseconds(i * 10).ToString("yyyy-MM-dd HH:mm:ss.fffffff");
-//             var temperature = Math.Round(873.15 + random.NextDouble() * 100, 2);
-//             sb.AppendLine($"{timestamp},{temperature},{i},{i * 2},{i * 3}");
-//         }
-//
-//         return sb.ToString();
-//     }
-//
-//     /// <summary>
-//     /// Splits byte array into chunks of specified size
-//     /// </summary>
-//     private static List<byte[]> SplitIntoChunks(byte[] data, int chunkSize)
-//     {
-//         var chunks = new List<byte[]>();
-//         for (int i = 0; i < data.Length; i += chunkSize)
-//         {
-//             int size = Math.Min(chunkSize, data.Length - i);
-//             var chunk = new byte[size];
-//             Array.Copy(data, i, chunk, 0, size);
-//             chunks.Add(chunk);
-//         }
-//         return chunks;
-//     }
-//
-//     /// <summary>
-//     /// Creates an IFormFile from raw bytes (for chunk uploads)
-//     /// </summary>
-//     private static IFormFile CreateChunkFile(byte[] bytes, string fileName)
-//     {
-//         var stream = new MemoryStream(bytes);
-//         stream.Position = 0;
-//         return new FormFile(stream, 0, bytes.Length, "chunk", fileName)
-//         {
-//             Headers = new HeaderDictionary(),
-//             ContentType = "application/octet-stream"
-//         };
-//     }
-//
-//     private static IFormFile CreateTestParquetFile(string fileName = "test.parquet")
-//     {
-//         // Create minimal valid parquet-like content for testing
-//         // In real tests, you'd use a parquet library to create valid files
-//         var bytes = new byte[] { 0x50, 0x41, 0x52, 0x31 }; // PAR1 magic bytes
-//         var stream = new MemoryStream(bytes);
-//         return new FormFile(stream, 0, bytes.Length, "file", fileName)
-//         {
-//             Headers = new HeaderDictionary(),
-//             ContentType = "application/octet-stream"
-//         };
-//     }
-//
-//     #region UploadFile Tests
-//
-//     [Fact]
-//     public async Task UploadFile_WithValidCsv_CreatesTableAndRecord()
-//     {
-//         // Arrange
-//         var csvContent = "timestamp,value,sensor_id\n2024-01-01T00:00:00,42.5,sensor_1\n2024-01-01T00:01:00,43.2,sensor_1";
-//         var file = CreateTestCsvFile(csvContent, "sensor_data.csv");
-//
-//         // Act
-//         var result = await _timeseriesBusiness.UploadFile(
-//             _userId, _organizationId, _projectId, _dataSourceId, file);
-//
-//         // Assert
-//         Assert.NotNull(result);
-//         Assert.Equal("sensor_data.csv", result.Name);
-//         Assert.Equal("csv", result.FileType);
-//         Assert.StartsWith("duckdb://", result.Uri);
-//         Assert.NotNull(result.ClassId);
-//     }
-//
-//     [Fact]
-//     public async Task UploadFile_WithNullFile_ThrowsArgumentException()
-//     {
-//         // Arrange
-//         IFormFile? file = null;
-//
-//         // Act & Assert
-//         await Assert.ThrowsAsync<NullReferenceException>(() =>
-//             _timeseriesBusiness.UploadFile(_userId, _organizationId, _projectId, _dataSourceId, file!));
-//     }
-//
-//     [Fact]
-//     public async Task UploadFile_WithEmptyFile_ThrowsArgumentException()
-//     {
-//         // Arrange
-//         var stream = new MemoryStream();
-//         var file = new FormFile(stream, 0, 0, "file", "empty.csv")
-//         {
-//             Headers = new HeaderDictionary(),
-//             ContentType = "text/csv"
-//         };
-//
-//         // Act & Assert
-//         await Assert.ThrowsAsync<ArgumentException>(() =>
-//             _timeseriesBusiness.UploadFile(_userId, _organizationId, _projectId, _dataSourceId, file));
-//     }
-//
-//     [Fact]
-//     public async Task UploadFile_WithUnsupportedFileType_ThrowsArgumentException()
-//     {
-//         // Arrange
-//         var content = "some content";
-//         var bytes = Encoding.UTF8.GetBytes(content);
-//         var stream = new MemoryStream(bytes);
-//         var file = new FormFile(stream, 0, bytes.Length, "file", "data.json")
-//         {
-//             Headers = new HeaderDictionary(),
-//             ContentType = "application/json"
-//         };
-//
-//         // Act & Assert
-//         var ex = await Assert.ThrowsAsync<ArgumentException>(() =>
-//             _timeseriesBusiness.UploadFile(_userId, _organizationId, _projectId, _dataSourceId, file));
-//         Assert.Contains("Only .csv and .parquet files are supported", ex.Message);
-//     }
-//
-//     [Fact]
-//     public async Task UploadFile_WithInvalidDataSource_ThrowsException()
-//     {
-//         // Arrange
-//         var csvContent = "timestamp,value\n2024-01-01,42.5";
-//         var file = CreateTestCsvFile(csvContent);
-//         var invalidDataSourceId = 99999L;
-//
-//         // Act & Assert
-//         await Assert.ThrowsAsync<KeyNotFoundException>(() =>
-//             _timeseriesBusiness.UploadFile(_userId, _organizationId, _projectId, invalidDataSourceId, file));
-//     }
-//
-//     #endregion
-//
-//     #region StartUpload Tests
-//
-//     [Fact]
-//     public async Task StartUpload_WithValidCsvFileName_ReturnsUploadId()
-//     {
-//         // Act
-//         var uploadId = await _timeseriesBusiness.StartUpload(
-//             _organizationId, _projectId, _dataSourceId, "large_file.csv");
-//
-//         // Assert
-//         Assert.NotNull(uploadId);
-//         Assert.True(Guid.TryParse(uploadId, out _));
-//     }
-//
-//     [Fact]
-//     public async Task StartUpload_WithValidParquetFileName_ReturnsUploadId()
-//     {
-//         // Act
-//         var uploadId = await _timeseriesBusiness.StartUpload(
-//             _organizationId, _projectId, _dataSourceId, "large_file.parquet");
-//
-//         // Assert
-//         Assert.NotNull(uploadId);
-//         Assert.True(Guid.TryParse(uploadId, out _));
-//     }
-//
-//     [Fact]
-//     public async Task StartUpload_WithUnsupportedFileType_ThrowsArgumentException()
-//     {
-//         // Act & Assert
-//         var ex = await Assert.ThrowsAsync<ArgumentException>(() =>
-//             _timeseriesBusiness.StartUpload(_organizationId, _projectId, _dataSourceId, "data.xlsx"));
-//         Assert.Contains("Only .csv and .parquet files are supported", ex.Message);
-//     }
-//
-//     [Fact]
-//     public async Task StartUpload_CreatesUploadDirectory()
-//     {
-//         // Act
-//         var uploadId = await _timeseriesBusiness.StartUpload(
-//             _organizationId, _projectId, _dataSourceId, "test.csv");
-//
-//         // Assert
-//         var expectedPath = Path.Combine(_testDuckDbBasePath,
-//             $"org_{_organizationId}", $"project_{_projectId}",
-//             $"datasource_{_dataSourceId}", uploadId);
-//         Assert.True(Directory.Exists(expectedPath));
-//     }
-//
-//     #endregion
-//
-//     #region UploadChunk Tests
-//
-//     [Fact]
-//     public async Task UploadChunk_WithValidChunk_ReturnsSuccess()
-//     {
-//         // Arrange
-//         var uploadId = await _timeseriesBusiness.StartUpload(
-//             _organizationId, _projectId, _dataSourceId, "chunked.csv");
-//
-//         // Create a realistic chunk from CSV bytes
-//         var csvContent = "timestamp,value\n2024-01-01T00:00:00,42.5\n2024-01-01T00:01:00,43.2";
-//         var chunkBytes = Encoding.UTF8.GetBytes(csvContent);
-//         var chunk = CreateChunkFile(chunkBytes, "chunked.csv");
-//
-//         // Act
-//         var result = await _timeseriesBusiness.UploadChunk(
-//             _organizationId, _projectId, _dataSourceId, chunk, uploadId, 0);
-//
-//         // Assert
-//         Assert.Equal("success", result);
-//     }
-//
-//     [Fact]
-//     public async Task UploadChunk_WithNullChunk_ThrowsArgumentException()
-//     {
-//         // Arrange
-//         var uploadId = await _timeseriesBusiness.StartUpload(
-//             _organizationId, _projectId, _dataSourceId, "chunked.csv");
-//
-//         // Act & Assert
-//         await Assert.ThrowsAsync<NullReferenceException>(() =>
-//             _timeseriesBusiness.UploadChunk(_organizationId, _projectId, _dataSourceId, null!, uploadId, 0));
-//     }
-//
-//     [Fact]
-//     public async Task UploadChunk_WithEmptyChunk_ThrowsArgumentException()
-//     {
-//         // Arrange
-//         var uploadId = await _timeseriesBusiness.StartUpload(
-//             _organizationId, _projectId, _dataSourceId, "chunked.csv");
-//         var stream = new MemoryStream();
-//         var chunk = new FormFile(stream, 0, 0, "chunk", "chunked.csv");
-//
-//         // Act & Assert
-//         await Assert.ThrowsAsync<ArgumentException>(() =>
-//             _timeseriesBusiness.UploadChunk(_organizationId, _projectId, _dataSourceId, chunk, uploadId, 0));
-//     }
-//
-//     #endregion
-//
-//     #region CompleteUpload Tests
-//
-//     [Fact]
-//     public async Task CompleteUpload_WithValidChunks_CreatesTableAndRecord()
-//     {
-//         // Arrange - create CSV content and split into byte chunks
-//         var csvContent = GenerateLargeCsvContent(500); // 500 rows should give us decent size
-//         var csvBytes = Encoding.UTF8.GetBytes(csvContent);
-//         var chunkSize = 1024; // 1KB chunks for testing (real usage is 5MB)
-//         var chunks = SplitIntoChunks(csvBytes, chunkSize);
-//
-//         // Step 1: Initialize upload
-//         var uploadId = await _timeseriesBusiness.StartUpload(
-//             _organizationId, _projectId, _dataSourceId, "chunked_upload.csv");
-//
-//         Assert.NotNull(uploadId);
-//         Assert.True(Guid.TryParse(uploadId, out _));
-//
-//         // Step 2: Upload each chunk
-//         for (int i = 0; i < chunks.Count; i++)
-//         {
-//             var chunkFile = CreateChunkFile(chunks[i], "chunked_upload.csv");
-//             var result = await _timeseriesBusiness.UploadChunk(
-//                 _organizationId, _projectId, _dataSourceId, chunkFile, uploadId, i);
-//             Assert.Equal("success", result);
-//         }
-//
-//         // Step 3: Complete upload
-//         var request = new TimeseriesUploadCompleteRequestDto
-//         {
-//             UploadId = uploadId,
-//             FileName = "chunked_upload.csv",
-//             TotalChunks = chunks.Count
-//         };
-//
-//         var completeResult = await _timeseriesBusiness.CompleteUpload(
-//             _userId, _organizationId, _projectId, _dataSourceId, request);
-//
-//         // Assert
-//         Assert.NotNull(completeResult);
-//         Assert.Equal("chunked_upload.csv", completeResult.Name);
-//         Assert.StartsWith("duckdb://", completeResult.Uri);
-//
-//         // Verify the table was created and has data
-//         var latestRow = await _timeseriesBusiness.GetLatestRow(
-//             _userId, _organizationId, _projectId, _dataSourceId, completeResult.Id);
-//         Assert.NotEmpty(latestRow);
-//     }
-//
-//     [Fact]
-//     public async Task ChunkedUpload_FullWorkflow()
-//     {
-//         // 1. Initialize upload (get uploadId)
-//         // 2. Upload chunks sequentially with chunk numbers
-//         // 3. Complete upload (merge chunks on server)
-//
-//         // Arrange - simulate a larger file split into multiple chunks
-//         var csvContent = GenerateLargeCsvContent(1000);
-//         var csvBytes = Encoding.UTF8.GetBytes(csvContent);
-//         var chunkSize = 2048; // 2KB chunks
-//         var chunks = SplitIntoChunks(csvBytes, chunkSize);
-//         var fileName = "large_upload.csv";
-//
-//         // Step 1: Initialize Upload
-//         var uploadId = await _timeseriesBusiness.StartUpload(
-//             _organizationId, _projectId, _dataSourceId, fileName);
-//
-//         Assert.NotNull(uploadId);
-//
-//         // Step 2: Upload Chunks
-//         for (int chunkNumber = 0; chunkNumber < chunks.Count; chunkNumber++)
-//         {
-//             var chunkFile = CreateChunkFile(chunks[chunkNumber], fileName);
-//             var chunkResult = await _timeseriesBusiness.UploadChunk(
-//                 _organizationId, _projectId, _dataSourceId,
-//                 chunkFile, uploadId, chunkNumber);
-//
-//             Assert.Equal("success", chunkResult);
-//         }
-//
-//         // Step 3: Complete Upload
-//         var completeRequest = new TimeseriesUploadCompleteRequestDto
-//         {
-//             UploadId = uploadId,
-//             FileName = fileName,
-//             TotalChunks = chunks.Count
-//         };
-//
-//         var result = await _timeseriesBusiness.CompleteUpload(
-//             _userId, _organizationId, _projectId, _dataSourceId, completeRequest);
-//
-//         // Verify
-//         Assert.NotNull(result);
-//         Assert.Equal(fileName, result.Name);
-//         Assert.Equal("csv", result.FileType);
-//         Assert.StartsWith("duckdb://", result.Uri);
-//
-//         // Verify data integrity - check we can query the table
-//         var plotData = await _timeseriesBusiness.GetPlotData(
-//             _userId, _organizationId, _projectId, _dataSourceId, result.Id, 10, 1);
-//         Assert.NotNull(plotData.Data);
-//     }
-//
-//     #endregion
-//
-//     #region GetPlotData Tests
-//
-//     [Fact]
-//     public async Task GetPlotData_WithValidRecord_ReturnsData()
-//     {
-//         // Arrange - upload a file with enough data to plot
-//         var file = CreateLargeTestCsvFile(50, "plot_test.csv");
-//         var uploadResult = await _timeseriesBusiness.UploadFile(
-//             _userId, _organizationId, _projectId, _dataSourceId, file);
-//
-//         // Act
-//         var result = await _timeseriesBusiness.GetPlotData(
-//             _userId, _organizationId, _projectId, _dataSourceId, uploadResult.Id, 100, 1);
-//
-//         // Assert
-//         Assert.NotNull(result);
-//         Assert.NotNull(result.Data);
-//         Assert.NotEmpty(result.Data);
-//     }
-//
-//     [Fact]
-//     public async Task GetPlotData_WithInvalidRecordId_ThrowsException()
-//     {
-//         // Arrange - first upload a valid file to create the DuckDB database
-//         var csvContent = "timestamp,value\n2024-01-01,42.5";
-//         var file = CreateTestCsvFile(csvContent, "setup.csv");
-//         await _timeseriesBusiness.UploadFile(_userId, _organizationId, _projectId, _dataSourceId, file);
-//
-//         // Act & Assert - use a record ID that doesn't exist
-//         await Assert.ThrowsAnyAsync<Exception>(() =>
-//             _timeseriesBusiness.GetPlotData(_userId, _organizationId, _projectId, _dataSourceId, -1, 100, 1));
-//     }
-//
-//     #endregion
-//
-//     #region GetLatestRow Tests
-//
-//     [Fact]
-//     public async Task GetLatestRow_WithValidRecord_ReturnsLatestRow()
-//     {
-//         // Arrange - use the large file generator for consistent data
-//         var file = CreateLargeTestCsvFile(20, "latest_row_test.csv");
-//         var uploadResult = await _timeseriesBusiness.UploadFile(
-//             _userId, _organizationId, _projectId, _dataSourceId, file);
-//
-//         // Act
-//         var result = await _timeseriesBusiness.GetLatestRow(
-//             _userId, _organizationId, _projectId, _dataSourceId, uploadResult.Id);
-//
-//         // Assert
-//         Assert.NotNull(result);
-//         Assert.NotEmpty(result);
-//         Assert.True(result.ContainsKey("value"));
-//         Assert.True(result.ContainsKey("timestamp"));
-//     }
-//
-//     [Fact]
-//     public async Task GetLatestRow_WithInvalidRecordId_ThrowsException()
-//     {
-//         // Arrange - create db first
-//         var csvContent = "timestamp,value\n2024-01-01,42.5";
-//         var file = CreateTestCsvFile(csvContent, "setup2.csv");
-//         await _timeseriesBusiness.UploadFile(_userId, _organizationId, _projectId, _dataSourceId, file);
-//
-//         // Act & Assert
-//         await Assert.ThrowsAnyAsync<Exception>(() =>
-//             _timeseriesBusiness.GetLatestRow(_userId, _organizationId, _projectId, _dataSourceId, -1));
-//     }
-//
-//     #endregion
-//
-//     #region AppendTimeseriesTable Tests
-//
-//     [Fact]
-//     public async Task AppendTimeseriesTable_WithValidData_AppendsRows()
-//     {
-//         // Arrange - create initial table
-//         var initialCsv = "timestamp,value\n2024-01-01T00:00:00,42.5";
-//         var initialFile = CreateTestCsvFile(initialCsv, "append_test.csv");
-//         var uploadResult = await _timeseriesBusiness.UploadFile(
-//             _userId, _organizationId, _projectId, _dataSourceId, initialFile);
-//         var tableName = uploadResult.Uri!.Replace("duckdb://", "");
-//
-//         // Create append data
-//         var appendCsv = "2024-01-01T00:01:00,99.9";
-//         var appendFile = CreateTestCsvFile(appendCsv, "append_data.csv");
-//
-//         // Act
-//         await _timeseriesBusiness.AppendTimeseriesTable(
-//             _organizationId, _projectId, _dataSourceId, appendFile, tableName);
-//
-//         // Assert - verify by getting latest row
-//         var latestRow = await _timeseriesBusiness.GetLatestRow(
-//             _userId, _organizationId, _projectId, _dataSourceId, uploadResult.Id);
-//         Assert.Equal(99.9, Convert.ToDouble(latestRow["value"]));
-//     }
-//
-//     [Fact]
-//     public async Task AppendTimeseriesTable_WithInvalidTableName_ThrowsArgumentException()
-//     {
-//         // Arrange
-//         var csvContent = "timestamp,value\n2024-01-01,42.5";
-//         var file = CreateTestCsvFile(csvContent, "append.csv");
-//
-//         // Create db first
-//         var setupFile = CreateTestCsvFile(csvContent, "setup3.csv");
-//         await _timeseriesBusiness.UploadFile(_userId, _organizationId, _projectId, _dataSourceId, setupFile);
-//
-//         // Act & Assert
-//         var ex = await Assert.ThrowsAsync<ArgumentException>(() =>
-//             _timeseriesBusiness.AppendTimeseriesTable(
-//                 _organizationId, _projectId, _dataSourceId, file, "nonexistent_table"));
-//         Assert.Contains("Invalid table name", ex.Message);
-//     }
-//
-//     [Fact]
-//     public async Task AppendTimeseriesTable_WithUnsupportedFileType_ThrowsArgumentException()
-//     {
-//         // Arrange
-//         var bytes = Encoding.UTF8.GetBytes("data");
-//         var stream = new MemoryStream(bytes);
-//         var file = new FormFile(stream, 0, bytes.Length, "file", "data.json");
-//
-//         // Act & Assert
-//         await Assert.ThrowsAsync<ArgumentException>(() =>
-//             _timeseriesBusiness.AppendTimeseriesTable(
-//                 _organizationId, _projectId, _dataSourceId, file, "any_table"));
-//     }
-//
-//     #endregion
-//
-//     #region ExportTimeseriesTable Tests
-//
-//     [Fact]
-//     public async Task ExportTimeseriesTable_WithCsvFormat_CreatesReportRecord()
-//     {
-//         // Arrange
-//         var csvContent = "timestamp,value\n2024-01-01,42.5";
-//         var file = CreateTestCsvFile(csvContent, "export_test.csv");
-//         var uploadResult = await _timeseriesBusiness.UploadFile(
-//             _userId, _organizationId, _projectId, _dataSourceId, file);
-//         var tableName = uploadResult.Uri!.Replace("duckdb://", "");
-//
-//         // Act
-//         var result = await _timeseriesBusiness.ExportTimeseriesTable(
-//             _userId, _organizationId, _projectId, _dataSourceId, tableName, "csv");
-//
-//         // Assert
-//         Assert.NotNull(result);
-//         Assert.EndsWith(".csv", result.Name);
-//         Assert.Equal("csv", result.FileType);
-//     }
-//
-//     [Fact]
-//     public async Task ExportTimeseriesTable_WithParquetFormat_CreatesReportRecord()
-//     {
-//         // Arrange
-//         var csvContent = "timestamp,value\n2024-01-01,42.5";
-//         var file = CreateTestCsvFile(csvContent, "export_parquet_test.csv");
-//         var uploadResult = await _timeseriesBusiness.UploadFile(
-//             _userId, _organizationId, _projectId, _dataSourceId, file);
-//         var tableName = uploadResult.Uri!.Replace("duckdb://", "");
-//
-//         // Act
-//         var result = await _timeseriesBusiness.ExportTimeseriesTable(
-//             _userId, _organizationId, _projectId, _dataSourceId, tableName, "parquet");
-//
-//         // Assert
-//         Assert.NotNull(result);
-//         Assert.EndsWith(".parquet", result.Name);
-//         Assert.Equal("parquet", result.FileType);
-//     }
-//
-//     [Fact]
-//     public async Task ExportTimeseriesTable_WithUnsupportedFormat_ThrowsException()
-//     {
-//         // Act & Assert
-//         await Assert.ThrowsAsync<NotSupportedException>(() =>
-//             _timeseriesBusiness.ExportTimeseriesTable(
-//                 _userId, _organizationId, _projectId, _dataSourceId, "any_table", "xlsx"));
-//     }
-//
-//     #endregion
-//
-//     #region QueryTimeseries Tests
-//
-//     [Fact]
-//     public async Task QueryTimeseries_WithValidQuery_CreatesReportRecord()
-//     {
-//         // Arrange
-//         var csvContent = "timestamp,value\n2024-01-01,42.5\n2024-01-02,43.2";
-//         var file = CreateTestCsvFile(csvContent, "query_test.csv");
-//         var uploadResult = await _timeseriesBusiness.UploadFile(
-//             _userId, _organizationId, _projectId, _dataSourceId, file);
-//         var tableName = uploadResult.Uri!.Replace("duckdb://", "");
-//
-//         var request = new TimeseriesQueryRequestDto
-//         {
-//             Query = $"SELECT * FROM '{tableName}' WHERE value > 42"
-//         };
-//
-//         // Act
-//         var result = await _timeseriesBusiness.QueryTimeseries(
-//             _userId, request, _organizationId, _projectId, _dataSourceId, "csv");
-//
-//         // Assert
-//         Assert.NotNull(result);
-//         Assert.NotNull(result.Properties);
-//         Assert.Contains("in progress", result.Properties.ToLowerInvariant());
-//     }
-//
-//     #endregion
-//
-//     #region InterpolateRows Tests
-//
-//     [Fact]
-//     public async Task InterpolateRows_WithValidParameters_CreatesReportRecord()
-//     {
-//         // Arrange - create table with enough rows to interpolate
-//         var file = CreateLargeTestCsvFile(100, "interpolate_test.csv");
-//         var uploadResult = await _timeseriesBusiness.UploadFile(
-//             _userId, _organizationId, _projectId, _dataSourceId, file);
-//         var tableName = uploadResult.Uri!.Replace("duckdb://", "");
-//
-//         // Act - get every 10th row
-//         var result = await _timeseriesBusiness.InterpolateRows(
-//             _userId, _organizationId, _projectId, _dataSourceId, "10", tableName, "csv");
-//
-//         // Assert
-//         Assert.NotNull(result);
-//         Assert.EndsWith(".csv", result.Name);
-//     }
-//
-//     #endregion
-//
-//     #region Edge Cases and Error Handling
-//
-//     [Fact]
-//     public async Task UploadFile_WithNonExistentDataSource_ThrowsKeyNotFoundException()
-//     {
-//         // Arrange
-//         var csvContent = "timestamp,value\n2024-01-01,42.5";
-//         var file = CreateTestCsvFile(csvContent);
-//
-//         // Act & Assert
-//         await Assert.ThrowsAsync<KeyNotFoundException>(() =>
-//             _timeseriesBusiness.UploadFile(_userId, _organizationId, _projectId, 999999L, file));
-//     }
-//
-//     [Fact]
-//     public async Task GetPlotData_WithValidRecord_ReturnsColumnsAndData()
-//     {
-//         // Arrange - upload a file with known data
-//         var csvContent = "timestamp,value,temperature\n2024-01-01T00:00:00,42.5,20.1\n2024-01-01T00:01:00,43.0,20.5\n2024-01-01T00:02:00,44.5,21.0";
-//         var file = CreateTestCsvFile(csvContent, "plot_data_test.csv");
-//         var uploadResult = await _timeseriesBusiness.UploadFile(
-//             _userId, _organizationId, _projectId, _dataSourceId, file);
-//
-//         // Act
-//         var result = await _timeseriesBusiness.GetPlotData(
-//             _userId, _organizationId, _projectId, _dataSourceId, uploadResult.Id, 100, 1);
-//
-//         // Assert
-//         Assert.NotNull(result);
-//
-//         // Verify columns
-//         Assert.NotNull(result.Columns);
-//         Assert.Equal(3, result.Columns.Length);
-//         Assert.Contains("timestamp", result.Columns);
-//         Assert.Contains("value", result.Columns);
-//         Assert.Contains("temperature", result.Columns);
-//
-//         // Verify data
-//         Assert.NotNull(result.Data);
-//         Assert.Equal(3, result.Data.Length);
-//
-//         // Each row should have 3 values
-//         foreach (var row in result.Data)
-//         {
-//             Assert.Equal(3, row.Length);
-//         }
-//     }
-//
-//     [Fact]
-//     public async Task MultipleUploads_CreateSeparateTables()
-//     {
-//         // Arrange & Act
-//         var csv1 = "timestamp,value\n2024-01-01,1";
-//         var file1 = CreateTestCsvFile(csv1, "file1.csv");
-//         var result1 = await _timeseriesBusiness.UploadFile(
-//             _userId, _organizationId, _projectId, _dataSourceId, file1);
-//
-//         var csv2 = "timestamp,value\n2024-01-01,2";
-//         var file2 = CreateTestCsvFile(csv2, "file2.csv");
-//         var result2 = await _timeseriesBusiness.UploadFile(
-//             _userId, _organizationId, _projectId, _dataSourceId, file2);
-//
-//         // Assert
-//         Assert.NotEqual(result1.Uri, result2.Uri);
-//         Assert.NotEqual(result1.OriginalId, result2.OriginalId);
-//     }
-//
-//     #endregion
-// }
+using System.Text;
+using System.Text.Json.Nodes;
+using Azure.Storage.Blobs;
+using deeplynx.business;
+using deeplynx.datalayer.Models;
+using deeplynx.helpers;
+using deeplynx.helpers.BigData;
+using deeplynx.helpers.Hubs;
+using deeplynx.interfaces;
+using deeplynx.models;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.SignalR;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Moq;
+using Newtonsoft.Json;
+using Parquet;
+using Parquet.Data;
+using Parquet.Schema;
+using Testcontainers.Azurite;
+using Record = deeplynx.datalayer.Models.Record;
+
+namespace deeplynx.tests;
+
+// Fixture specifically for this test class only
+public class OlapAzuriteFixture : IAsyncLifetime
+{
+    private AzuriteContainer _azuriteContainer = null!;
+
+    public string AzuriteConnectionString { get; private set; } = null!;
+
+    public async Task InitializeAsync()
+    {
+        _azuriteContainer = new AzuriteBuilder()
+            .WithImage("mcr.microsoft.com/azure-storage/azurite:latest")
+            .Build();
+
+        await _azuriteContainer.StartAsync();
+        AzuriteConnectionString = _azuriteContainer.GetConnectionString();
+    }
+
+    public async Task DisposeAsync()
+    {
+        await _azuriteContainer.DisposeAsync();
+    }
+}
+
+[Collection("Test Suite Collection")]
+public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteFixture>
+{
+    private static readonly string _tempFileSystemBasePath;
+    private readonly OlapAzuriteFixture _azuriteFixture;
+    private long _azureObjectStorageId;
+    private ClassBusiness _classBusiness = null!;
+    private long _classId;
+    private string _connectionString = null!;
+    private readonly string _containerName = "test-container";
+    private DataSourceBusiness _dataSourceBusiness = null!;
+    private long _dataSourceId;
+    private Mock<IEdgeBusiness> _edgeBusiness = null!;
+    private EventBusiness _eventBusiness = null!;
+    private FileBusiness _fileBusiness = null!;
+    private Mock<IFileBusinessFactory> _fileBusinessFactory = null!;
+    private long _fileSystemObjectStorageId;
+    private BulkCopyUpsertExecutor _mockBulkCopyUpsertExecutor = null!;
+    private Mock<IHubContext<EventNotificationHub>> _mockHubContext = null!;
+    private Mock<ILogger<NotificationBusiness>> _mockNotificationLogger = null!;
+    private Mock<IRelationshipBusiness> _mockRelationshipBusiness = null!;
+    private Mock<IServiceScopeFactory> _mockServiceScopeFactory = null!;
+    private Mock<ILogger<OlapBusiness>> _mockTimeseriesLogger = null!;
+    private INotificationBusiness _notificationBusiness = null!;
+    private ObjectStorageBusiness _objectStorageBusiness = null!;
+    private ObjectStorageConfigDto _objectStorageConfig = null!;
+    private OlapBusiness _olapBusiness = null!;
+
+    private long _organizationId;
+    private long _projectId;
+    private RecordBusiness _recordBusiness = null!;
+    private RelationshipBusiness _relationshipBusiness = null!;
+    private SensitivityLabelBusiness _sensitivityLabelBusiness = null!;
+    private ISensitivityLabelService _sensitivityLabelService = null!;
+    private TagBusiness _tagBusiness = null!;
+    private long _userId;
+
+    // Static constructor runs before anything else, ensuring env var is set
+    // before TimeseriesBusiness static field is initialized
+    static OlapBusinessTests()
+    {
+        _tempFileSystemBasePath = Path.Combine(Path.GetTempPath(), "olap_test");
+    }
+
+    public OlapBusinessTests(TestSuiteFixture fixture, OlapAzuriteFixture azuriteFixture) : base(fixture)
+    {
+        _azuriteFixture = azuriteFixture;
+    }
+
+    public override async Task InitializeAsync()
+    {
+        await base.InitializeAsync();
+
+        // Set up mocks
+        _edgeBusiness = new Mock<IEdgeBusiness>();
+        _mockRelationshipBusiness = new Mock<IRelationshipBusiness>();
+        _fileBusinessFactory = new Mock<IFileBusinessFactory>();
+        _mockHubContext = new Mock<IHubContext<EventNotificationHub>>();
+        _mockNotificationLogger = new Mock<ILogger<NotificationBusiness>>();
+        _mockTimeseriesLogger = new Mock<ILogger<OlapBusiness>>();
+        _mockServiceScopeFactory = new Mock<IServiceScopeFactory>();
+
+        // Set up service scope factory mock
+        var mockScope = new Mock<IServiceScope>();
+        var mockServiceProvider = new Mock<IServiceProvider>();
+        mockServiceProvider.Setup(sp => sp.GetService(typeof(DeeplynxContext))).Returns(Context);
+        mockScope.Setup(s => s.ServiceProvider).Returns(mockServiceProvider.Object);
+        _mockServiceScopeFactory.Setup(f => f.CreateScope()).Returns(mockScope.Object);
+        _mockBulkCopyUpsertExecutor = new BulkCopyUpsertExecutor();
+        _sensitivityLabelService = new SensitivityLabelService(Context);
+
+        // Set up business layer dependencies
+        _objectStorageBusiness = new ObjectStorageBusiness(Context);
+        _notificationBusiness =
+            new NotificationBusiness(Context, _mockNotificationLogger.Object, _mockHubContext.Object);
+        _dataSourceBusiness = new DataSourceBusiness(Context, _edgeBusiness.Object, _recordBusiness, _eventBusiness);
+        _eventBusiness = new EventBusiness(Context, _notificationBusiness, _mockBulkCopyUpsertExecutor);
+        _classBusiness = new ClassBusiness(Context, _recordBusiness, _mockRelationshipBusiness.Object, _eventBusiness);
+        _tagBusiness = new TagBusiness(Context, _eventBusiness);
+        _sensitivityLabelBusiness = new SensitivityLabelBusiness(Context, _eventBusiness);
+        _recordBusiness = new RecordBusiness(Context, _eventBusiness, _mockBulkCopyUpsertExecutor, _tagBusiness,
+            _sensitivityLabelBusiness, _sensitivityLabelService);
+
+        // Wire up the real filesystem implementation via the factory mock
+        var realFileFilesystemBusiness =
+            new FileFilesystemBusiness(Context, _objectStorageBusiness, _classBusiness, _recordBusiness);
+        _fileBusinessFactory
+            .Setup(x => x.CreateFileBusiness("filesystem"))
+            .Returns(realFileFilesystemBusiness);
+
+        // Wire up the real filesystem implementation via the factory mock
+        var realFileAzureBusiness = new FileAzureBusiness();
+        _fileBusinessFactory
+            .Setup(x => x.CreateFileBusiness("azure_object"))
+            .Returns(realFileAzureBusiness);
+
+        _olapBusiness = new OlapBusiness(
+            Context,
+            _recordBusiness,
+            _mockTimeseriesLogger.Object);
+        _connectionString = _azuriteFixture.AzuriteConnectionString;
+
+        _fileBusiness = new FileBusiness(
+            Context,
+            _fileBusinessFactory.Object,
+            _dataSourceBusiness,
+            _classBusiness,
+            _recordBusiness,
+            _olapBusiness
+        );
+    }
+
+    public override async Task DisposeAsync()
+    {
+        // Clean up test DuckDB directory
+        if (Directory.Exists(_tempFileSystemBasePath))
+            try
+            {
+                Directory.Delete(_tempFileSystemBasePath, true);
+            }
+            catch
+            {
+                // Ignore cleanup errors in tests
+            }
+
+        var blobServiceClient = new BlobServiceClient(_connectionString);
+
+        // Get all containers
+        await foreach (var containerItem in blobServiceClient.GetBlobContainersAsync())
+        {
+            var container = blobServiceClient.GetBlobContainerClient(containerItem.Name);
+            await container.DeleteIfExistsAsync();
+        }
+
+        await base.DisposeAsync();
+    }
+
+    protected override async Task SeedTestDataAsync()
+    {
+        await base.SeedTestDataAsync();
+
+        // Create user
+        var user = new User
+        {
+            Name = "Test User",
+            Email = "timeseries-test@test.com",
+            Password = "test_password",
+            IsArchived = false
+        };
+        Context.Users.Add(user);
+        await Context.SaveChangesAsync();
+        _userId = user.Id;
+
+        // Create organization
+        var org = new Organization { Name = "Test Org" };
+        Context.Organizations.Add(org);
+        await Context.SaveChangesAsync();
+        _organizationId = org.Id;
+
+        // Create project
+        var project = new Project
+        {
+            Name = "Timeseries Test Project",
+            Description = "Test project for timeseries unit tests",
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = _userId,
+            OrganizationId = _organizationId
+        };
+        Context.Projects.Add(project);
+        await Context.SaveChangesAsync();
+        _projectId = project.Id;
+
+        // Create data source
+        var dataSource = new DataSource
+        {
+            Name = "Timeseries Test DataSource",
+            Description = "Test data source for timeseries unit tests",
+            ProjectId = _projectId,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = _userId,
+            OrganizationId = _organizationId
+        };
+        Context.DataSources.Add(dataSource);
+        await Context.SaveChangesAsync();
+        _dataSourceId = dataSource.Id;
+
+        // Create default timeseries class
+        var testClass = new Class
+        {
+            Name = "Timeseries",
+            Description = "",
+            Uuid = "uuid-1",
+            ProjectId = _projectId,
+            OrganizationId = _organizationId,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = _userId,
+            IsArchived = false
+        };
+        Context.Classes.Add(testClass);
+        await Context.SaveChangesAsync();
+        _classId = testClass.Id;
+
+        // Create object storage for reports
+        var azureConfig = new ObjectStorageConfigDto
+        {
+            AzureObjectConfig = new AzureObjectConfigDto
+            {
+                AzureConnectionString = _azuriteFixture.AzuriteConnectionString,
+                AzureContainerName = "test-container"
+            }
+        };
+        var azureObjectStorage = new ObjectStorage
+        {
+            Name = "Azurite",
+            Type = "azure_object",
+            Config = JsonConvert.SerializeObject(azureConfig),
+            ProjectId = _projectId,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = _userId,
+            OrganizationId = _organizationId
+        };
+        Context.ObjectStorages.Add(azureObjectStorage);
+        await Context.SaveChangesAsync();
+        _azureObjectStorageId = azureObjectStorage.Id;
+
+        var config = new ObjectStorageConfigDto
+        {
+            MountPath = _tempFileSystemBasePath
+        };
+        var objectStorage = new ObjectStorage
+        {
+            Name = "Test File System",
+            Type = "filesystem",
+            Config = JsonConvert.SerializeObject(config),
+            ProjectId = _projectId,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = _userId,
+            OrganizationId = _organizationId
+        };
+        Context.ObjectStorages.Add(objectStorage);
+        await Context.SaveChangesAsync();
+        _fileSystemObjectStorageId = objectStorage.Id;
+    }
+
+    private static IFormFile CreateTestCsvFile(string content, string fileName = "test.csv")
+    {
+        var bytes = Encoding.UTF8.GetBytes(content);
+        var stream = new MemoryStream(bytes);
+        stream.Position = 0;
+        return new FormFile(stream, 0, bytes.Length, "file", fileName)
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "text/csv"
+        };
+    }
+
+    private static async Task<IFormFile> CreateLargeTestParquetFile(int rowCount,
+        string fileName = "large_test.parquet")
+    {
+        var baseTime = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        var random = new Random(42);
+
+        var schema = new ParquetSchema(
+            new DataField<DateTime>("timestamp"),
+            new DataField<double>("value"),
+            new DataField<string>("sensor_id"),
+            new DataField<double>("temperature"),
+            new DataField<double>("pressure")
+        );
+
+        var timestamps = new DateTime[rowCount];
+        var values = new double[rowCount];
+        var sensorIds = new string[rowCount];
+        var temperatures = new double[rowCount];
+        var pressures = new double[rowCount];
+
+        for (var i = 0; i < rowCount; i++)
+        {
+            timestamps[i] = baseTime.AddSeconds(i);
+            values[i] = Math.Round(random.NextDouble() * 100, 2);
+            sensorIds[i] = $"sensor_{i % 5}";
+            temperatures[i] = Math.Round(20 + random.NextDouble() * 10, 2);
+            pressures[i] = Math.Round(1000 + random.NextDouble() * 50, 2);
+        }
+
+        // Write to a temp stream, then extract bytes before it's disposed
+        byte[] parquetBytes;
+        using (var writeStream = new MemoryStream())
+        {
+            using (var writer = await ParquetWriter.CreateAsync(schema, writeStream))
+            {
+                using var groupWriter = writer.CreateRowGroup();
+                await groupWriter.WriteColumnAsync(new DataColumn(schema.DataFields[0], timestamps));
+                await groupWriter.WriteColumnAsync(new DataColumn(schema.DataFields[1], values));
+                await groupWriter.WriteColumnAsync(new DataColumn(schema.DataFields[2], sensorIds));
+                await groupWriter.WriteColumnAsync(new DataColumn(schema.DataFields[3], temperatures));
+                await groupWriter.WriteColumnAsync(new DataColumn(schema.DataFields[4], pressures));
+            }
+
+            parquetBytes = writeStream.ToArray(); // safe to call even after ParquetWriter closes the stream
+        }
+
+        var readStream = new MemoryStream(parquetBytes);
+
+        return new FormFile(readStream, 0, readStream.Length, "file", fileName)
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "application/octet-stream"
+        };
+    }
+
+    private static async Task<IFormFile> CreateParquetFileWithSchema(
+        ParquetSchema schema,
+        Dictionary<string, Array> columnData,
+        string fileName)
+    {
+        byte[] parquetBytes;
+
+        using (var writeStream = new MemoryStream())
+        {
+            using (var writer = await ParquetWriter.CreateAsync(schema, writeStream))
+            {
+                using var groupWriter = writer.CreateRowGroup();
+
+                foreach (var field in schema.GetDataFields())
+                    await groupWriter.WriteColumnAsync(
+                        new DataColumn(field, columnData[field.Name]));
+            }
+
+            parquetBytes = writeStream.ToArray();
+        }
+
+        var readStream = new MemoryStream(parquetBytes);
+
+        return new FormFile(readStream, 0, readStream.Length, "file", fileName)
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "application/octet-stream"
+        };
+    }
+
+    private static async Task<IFormFile> CreateSchemaMismatchParquetFile_ExtraColumn(
+        int rowCount,
+        string fileName = "extra_column.parquet")
+    {
+        var schema = new ParquetSchema(
+            new DataField<DateTime>("timestamp"),
+            new DataField<double>("value"),
+            new DataField<string>("sensor_id"),
+            new DataField<double>("temperature"),
+            new DataField<double>("pressure"),
+            new DataField<string>("unexpected")
+        );
+
+        var baseTime = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+
+        var data = new Dictionary<string, Array>
+        {
+            ["timestamp"] = Enumerable.Range(0, rowCount).Select(i => baseTime.AddSeconds(i)).ToArray(),
+            ["value"] = Enumerable.Range(0, rowCount).Select(i => (double)i).ToArray(),
+            ["sensor_id"] = Enumerable.Range(0, rowCount).Select(i => $"sensor_{i % 2}").ToArray(),
+            ["temperature"] = Enumerable.Range(0, rowCount).Select(i => 20.0 + i).ToArray(),
+            ["pressure"] = Enumerable.Range(0, rowCount).Select(i => 1000.0 + i).ToArray(),
+            ["unexpected"] = Enumerable.Range(0, rowCount).Select(i => $"x{i}").ToArray()
+        };
+
+        return await CreateParquetFileWithSchema(schema, data, fileName);
+    }
+
+    private static async Task<IFormFile> CreateSchemaMismatchParquetFile_MissingColumn(
+        int rowCount,
+        string fileName = "missing_column.parquet")
+    {
+        var schema = new ParquetSchema(
+            new DataField<DateTime>("timestamp"),
+            new DataField<double>("value"),
+            new DataField<string>("sensor_id"),
+            new DataField<double>("temperature")
+        );
+
+        var baseTime = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+
+        var data = new Dictionary<string, Array>
+        {
+            ["timestamp"] = Enumerable.Range(0, rowCount).Select(i => baseTime.AddSeconds(i)).ToArray(),
+            ["value"] = Enumerable.Range(0, rowCount).Select(i => (double)i).ToArray(),
+            ["sensor_id"] = Enumerable.Range(0, rowCount).Select(i => $"sensor_{i % 2}").ToArray(),
+            ["temperature"] = Enumerable.Range(0, rowCount).Select(i => 20.0 + i).ToArray()
+        };
+
+        return await CreateParquetFileWithSchema(schema, data, fileName);
+    }
+
+    private static async Task<IFormFile> CreateSchemaMismatchParquetFile_TypeMismatch(
+        int rowCount,
+        string fileName = "type_mismatch.parquet")
+    {
+        var schema = new ParquetSchema(
+            new DataField<DateTime>("timestamp"),
+            new DataField<int>("value"),
+            new DataField<string>("sensor_id"),
+            new DataField<double>("temperature"),
+            new DataField<double>("pressure")
+        );
+
+        var baseTime = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+
+        var data = new Dictionary<string, Array>
+        {
+            ["timestamp"] = Enumerable.Range(0, rowCount).Select(i => baseTime.AddSeconds(i)).ToArray(),
+            ["value"] = Enumerable.Range(0, rowCount).ToArray(),
+            ["sensor_id"] = Enumerable.Range(0, rowCount).Select(i => $"sensor_{i % 2}").ToArray(),
+            ["temperature"] = Enumerable.Range(0, rowCount).Select(i => 20.0 + i).ToArray(),
+            ["pressure"] = Enumerable.Range(0, rowCount).Select(i => 1000.0 + i).ToArray()
+        };
+
+        return await CreateParquetFileWithSchema(schema, data, fileName);
+    }
+
+    private async Task<RecordResponseDto> UploadFilesystemParquet(int rowCount, string fileName = "base.parquet")
+    {
+        var file = await CreateLargeTestParquetFile(rowCount, fileName);
+        return await _fileBusiness.UploadFile(
+            _userId, _organizationId, _projectId, _dataSourceId, _fileSystemObjectStorageId, file);
+    }
+
+    private async Task<RecordResponseDto> UploadAzureParquet(int rowCount, string fileName = "base.parquet")
+    {
+        var file = await CreateLargeTestParquetFile(rowCount, fileName);
+        return await _fileBusiness.UploadFile(
+            _userId, _organizationId, _projectId, _dataSourceId, _azureObjectStorageId, file);
+    }
+
+    private static long FindColumnIndex(PlotDataDto plotData, string columnName)
+    {
+        var idx = Array.FindIndex(plotData.Columns, c => c == columnName);
+        Assert.True(idx >= 0, $"Column '{columnName}' was not found.");
+        return idx;
+    }
+
+    private async Task<Record> GetRecordEntity(long recordId)
+    {
+        var record = await Context.Records.FirstOrDefaultAsync(r => r.Id == recordId);
+        Assert.NotNull(record);
+        return record!;
+    }
+    
+    #region Append Tabular Blob
+    
+    [Fact]
+    public async Task AppendTabularBlob_SecondAppend_Azure_AddsNewPartWithoutChangingUri()
+    {
+        var result = await UploadAzureParquet(5, "dataset.parquet");
+
+        // First append — migrates to folder
+        await _olapBusiness.AppendTabularBlob(
+            _organizationId, _projectId, result.Id, 1,
+            await CreateLargeTestParquetFile(3, "append1.parquet"));
+
+        var afterFirstAppend = await GetRecordEntity(result.Id);
+        var folderUri = afterFirstAppend.Uri!;
+        Assert.EndsWith("/", folderUri);
+
+        // Second append — should add part 2 without touching the URI
+        await _olapBusiness.AppendTabularBlob(
+            _organizationId, _projectId, result.Id, 2,
+            await CreateLargeTestParquetFile(4, "append2.parquet"));
+
+        var afterSecondAppend = await GetRecordEntity(result.Id);
+        Assert.Equal(folderUri, afterSecondAppend.Uri);
+
+        var blobServiceClient = new BlobServiceClient(_connectionString);
+        var container = blobServiceClient.GetBlobContainerClient(_containerName);
+
+        Assert.True(await container.GetBlobClient($"{folderUri}0.parquet").ExistsAsync());
+        Assert.True(await container.GetBlobClient($"{folderUri}1.parquet").ExistsAsync());
+        Assert.True(await container.GetBlobClient($"{folderUri}2.parquet").ExistsAsync());
+
+        var queryResult = await _olapBusiness.QueryTabularFile(
+            _userId, _organizationId, _projectId, result.Id,
+            "SELECT COUNT(*) AS total FROM data", "data");
+
+        Assert.Single(queryResult.Data);
+        Assert.Equal(12L, Convert.ToInt64(queryResult.Data[0][0]));
+    }
+    
+    [Fact]
+    public async Task AppendTabularBlob_Azure_DuplicatePartOnSecondAppend_LeavesExistingPartsUntouched()
+    {
+        var result = await UploadAzureParquet(5, "dataset.parquet");
+
+        await _olapBusiness.AppendTabularBlob(
+            _organizationId, _projectId, result.Id, 1,
+            await CreateLargeTestParquetFile(3, "append1.parquet"));
+
+        var record = await GetRecordEntity(result.Id);
+        var folderUri = record.Uri!;
+
+        var testFile = await CreateLargeTestParquetFile(4, "append_dup.parquet");
+
+        // Attempt to append to a part number that already exists
+        var ex = await Assert.ThrowsAsync<ArgumentException>(() =>
+            _olapBusiness.AppendTabularBlob(
+                _organizationId, _projectId, result.Id, 1,
+                testFile));
+
+        Assert.Contains("Part 1 already exists", ex.Message);
+
+        // URI must be unchanged
+        var recordAfter = await Context.Records.AsNoTracking().FirstAsync(r => r.Id == result.Id);
+        Assert.Equal(folderUri, recordAfter.Uri);
+
+        var blobServiceClient = new BlobServiceClient(_connectionString);
+        var container = blobServiceClient.GetBlobContainerClient(_containerName);
+
+        // Existing parts must still be intact, no spurious part 2 written
+        Assert.True(await container.GetBlobClient($"{folderUri}0.parquet").ExistsAsync());
+        Assert.True(await container.GetBlobClient($"{folderUri}1.parquet").ExistsAsync());
+        Assert.False(await container.GetBlobClient($"{folderUri}2.parquet").ExistsAsync());
+
+        // Row count must be unchanged
+        var queryResult = await _olapBusiness.QueryTabularFile(
+            _userId, _organizationId, _projectId, result.Id,
+            "SELECT COUNT(*) AS total FROM data", "data");
+
+        Assert.Equal(8L, Convert.ToInt64(queryResult.Data[0][0]));
+    }
+    
+    [Fact]
+    public async Task AppendTabularBlob_Azure_SchemaMismatch_ExtraColumn_LeavesOriginalBlobIntact()
+    {
+        var result = await UploadAzureParquet(5, "dataset.parquet");
+        var originalRecord = await Context.Records.AsNoTracking().FirstAsync(r => r.Id == result.Id);
+        var originalUri = originalRecord.Uri!;
+
+        var appendFile = await CreateSchemaMismatchParquetFile_ExtraColumn(3);
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            _olapBusiness.AppendTabularBlob(_organizationId, _projectId, result.Id, 1, appendFile));
+
+        Assert.Contains("unexpected column", ex.Message);
+
+        var recordAfter = await Context.Records.AsNoTracking().FirstAsync(r => r.Id == result.Id);
+        Assert.Equal(originalUri, recordAfter.Uri);
+
+        var blobServiceClient = new BlobServiceClient(_connectionString);
+        var container = blobServiceClient.GetBlobContainerClient(_containerName);
+
+        Assert.True(await container.GetBlobClient(originalUri).ExistsAsync());
+
+        var folderPrefix = originalUri[..^".parquet".Length] + "/";
+        Assert.False(await container.GetBlobClient($"{folderPrefix}0.parquet").ExistsAsync());
+        Assert.False(await container.GetBlobClient($"{folderPrefix}1.parquet").ExistsAsync());
+    }
+    
+    [Fact]
+    public async Task AppendTabularBlob_Azure_SchemaMismatch_MissingColumn_LeavesOriginalBlobIntact()
+    {
+        var result = await UploadAzureParquet(5, "dataset.parquet");
+        var originalRecord = await Context.Records.AsNoTracking().FirstAsync(r => r.Id == result.Id);
+        var originalUri = originalRecord.Uri!;
+
+        var appendFile = await CreateSchemaMismatchParquetFile_MissingColumn(3);
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            _olapBusiness.AppendTabularBlob(_organizationId, _projectId, result.Id, 1, appendFile));
+
+        Assert.Contains("missing column", ex.Message);
+
+        var recordAfter = await Context.Records.AsNoTracking().FirstAsync(r => r.Id == result.Id);
+        Assert.Equal(originalUri, recordAfter.Uri);
+
+        var blobServiceClient = new BlobServiceClient(_connectionString);
+        var container = blobServiceClient.GetBlobContainerClient(_containerName);
+
+        Assert.True(await container.GetBlobClient(originalUri).ExistsAsync());
+
+        var folderPrefix = originalUri[..^".parquet".Length] + "/";
+        Assert.False(await container.GetBlobClient($"{folderPrefix}0.parquet").ExistsAsync());
+    }
+    
+    [Fact]
+    public async Task AppendTabularBlob_Azure_SchemaMismatch_TypeMismatch_LeavesOriginalBlobIntact()
+    {
+        var result = await UploadAzureParquet(5, "dataset.parquet");
+        var originalRecord = await Context.Records.AsNoTracking().FirstAsync(r => r.Id == result.Id);
+        var originalUri = originalRecord.Uri!;
+
+        var appendFile = await CreateSchemaMismatchParquetFile_TypeMismatch(3);
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            _olapBusiness.AppendTabularBlob(_organizationId, _projectId, result.Id, 1, appendFile));
+
+        Assert.Contains("type mismatch", ex.Message);
+
+        var recordAfter = await Context.Records.AsNoTracking().FirstAsync(r => r.Id == result.Id);
+        Assert.Equal(originalUri, recordAfter.Uri);
+
+        var blobServiceClient = new BlobServiceClient(_connectionString);
+        var container = blobServiceClient.GetBlobContainerClient(_containerName);
+
+        Assert.True(await container.GetBlobClient(originalUri).ExistsAsync());
+
+        var folderPrefix = originalUri[..^".parquet".Length] + "/";
+        Assert.False(await container.GetBlobClient($"{folderPrefix}0.parquet").ExistsAsync());
+    }
+    
+    [Fact]
+    public async Task AppendTabularBlob_FirstAppend_Filesystem_MigratesToFolderAndQueriesAllRows()
+    {
+        var baseRows = 5;
+        var appendRows = 3;
+
+        var result = await UploadFilesystemParquet(baseRows, "dataset.parquet");
+        var appendFile = await CreateLargeTestParquetFile(appendRows, "append.parquet");
+
+        await _olapBusiness.AppendTabularBlob(
+            _organizationId, _projectId, result.Id, 1, appendFile);
+
+        var record = await GetRecordEntity(result.Id);
+
+        Assert.EndsWith(Path.DirectorySeparatorChar.ToString(), record.Uri);
+        Assert.True(Directory.Exists(record.Uri));
+
+        var part0 = Path.Combine(record.Uri!, "0.parquet");
+        var part1 = Path.Combine(record.Uri!, "1.parquet");
+
+        Assert.True(File.Exists(part0));
+        Assert.True(File.Exists(part1));
+
+        var queryResult = await _olapBusiness.QueryTabularFile(
+            _userId, _organizationId, _projectId, result.Id,
+            "SELECT * FROM data", "data");
+
+        Assert.Equal(baseRows + appendRows, queryResult.Data.Length);
+        Assert.Equal(5, queryResult.Columns.Length);
+    }
+
+    [Fact]
+    public async Task AppendTabularBlob_SecondAppend_Filesystem_AddsNewPartWithoutChangingUri()
+    {
+        var result = await UploadFilesystemParquet(5, "dataset.parquet");
+
+        await _olapBusiness.AppendTabularBlob(
+            _organizationId, _projectId, result.Id, 1,
+            await CreateLargeTestParquetFile(3, "append1.parquet"));
+
+        var afterFirstAppend = await GetRecordEntity(result.Id);
+        var folderUri = afterFirstAppend.Uri!;
+
+        await _olapBusiness.AppendTabularBlob(
+            _organizationId, _projectId, result.Id, 2,
+            await CreateLargeTestParquetFile(4, "append2.parquet"));
+
+        var afterSecondAppend = await GetRecordEntity(result.Id);
+
+        Assert.Equal(folderUri, afterSecondAppend.Uri);
+        Assert.True(File.Exists(Path.Combine(folderUri, "0.parquet")));
+        Assert.True(File.Exists(Path.Combine(folderUri, "1.parquet")));
+        Assert.True(File.Exists(Path.Combine(folderUri, "2.parquet")));
+
+        var queryResult = await _olapBusiness.QueryTabularFile(
+            _userId, _organizationId, _projectId, result.Id,
+            "SELECT COUNT(*) AS total FROM data", "data");
+
+        Assert.Single(queryResult.Data);
+        Assert.Equal(12L, Convert.ToInt64(queryResult.Data[0][0]));
+    }
+
+    [Fact]
+    public async Task AppendTabularBlob_FirstAppend_Azure_MigratesToFolderAndQueriesAllRows()
+    {
+        var baseRows = 5;
+        var appendRows = 3;
+
+        var result = await UploadAzureParquet(baseRows, "dataset.parquet");
+        var appendFile = await CreateLargeTestParquetFile(appendRows, "append.parquet");
+
+        await _olapBusiness.AppendTabularBlob(
+            _organizationId, _projectId, result.Id, 1, appendFile);
+
+        var record = await GetRecordEntity(result.Id);
+
+        Assert.EndsWith("/", record.Uri);
+
+        var blobServiceClient = new BlobServiceClient(_connectionString);
+        var container = blobServiceClient.GetBlobContainerClient(_containerName);
+
+        Assert.True(await container.GetBlobClient($"{record.Uri}0.parquet").ExistsAsync());
+        Assert.True(await container.GetBlobClient($"{record.Uri}1.parquet").ExistsAsync());
+        Assert.False(await container.GetBlobClient("dataset.parquet").ExistsAsync());
+
+        var queryResult = await _olapBusiness.QueryTabularFile(
+            _userId, _organizationId, _projectId, result.Id,
+            "SELECT * FROM data", "data");
+
+        Assert.Equal(baseRows + appendRows, queryResult.Data.Length);
+        Assert.Equal(5, queryResult.Columns.Length);
+    }
+
+    [Fact]
+    public async Task AppendTabularBlob_PartZero_Throws()
+    {
+        var result = await UploadFilesystemParquet(5, "dataset.parquet");
+        var appendFile = await CreateLargeTestParquetFile(3, "append.parquet");
+
+        var ex = await Assert.ThrowsAsync<ArgumentException>(() =>
+            _olapBusiness.AppendTabularBlob(_organizationId, _projectId, result.Id, 0, appendFile));
+
+        Assert.Contains("Part number 0 is reserved", ex.Message);
+    }
+
+    [Fact]
+    public async Task AppendTabularBlob_NonParquet_Throws()
+    {
+        var result = await UploadFilesystemParquet(5, "dataset.parquet");
+        var csv = CreateTestCsvFile("timestamp,value\n2024-01-01T00:00:00,1", "append.csv");
+
+        var ex = await Assert.ThrowsAsync<ArgumentException>(() =>
+            _olapBusiness.AppendTabularBlob(_organizationId, _projectId, result.Id, 1, csv));
+
+        Assert.Contains("Only Parquet files are supported", ex.Message);
+    }
+
+    [Fact]
+    public async Task AppendTabularBlob_EmptyFile_Throws()
+    {
+        var result = await UploadFilesystemParquet(5, "dataset.parquet");
+
+        var stream = new MemoryStream();
+        var empty = new FormFile(stream, 0, 0, "file", "empty.parquet")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "application/octet-stream"
+        };
+
+        var ex = await Assert.ThrowsAsync<ArgumentException>(() =>
+            _olapBusiness.AppendTabularBlob(_organizationId, _projectId, result.Id, 1, empty));
+
+        Assert.Contains("Cannot append an empty file", ex.Message);
+    }
+
+    [Fact]
+    public async Task AppendTabularBlob_RecordDoesNotExist_Throws()
+    {
+        var appendFile = await CreateLargeTestParquetFile(3, "append.parquet");
+
+        var ex = await Assert.ThrowsAsync<ArgumentException>(() =>
+            _olapBusiness.AppendTabularBlob(_organizationId, _projectId, -999, 1, appendFile));
+
+        Assert.Contains("does not exist", ex.Message);
+    }
+
+    [Fact]
+    public async Task AppendTabularBlob_FileTypeMismatch_Throws()
+    {
+        var csv = CreateTestCsvFile("timestamp,value\n2024-01-01T00:00:00,1", "base.csv");
+        var uploaded = await _fileBusiness.UploadFile(
+            _userId, _organizationId, _projectId, _dataSourceId, _fileSystemObjectStorageId, csv);
+
+        var appendFile = await CreateLargeTestParquetFile(3, "append.parquet");
+
+        var ex = await Assert.ThrowsAsync<ArgumentException>(() =>
+            _olapBusiness.AppendTabularBlob(_organizationId, _projectId, uploaded.Id, 1, appendFile));
+
+        Assert.Contains("File types differ", ex.Message);
+    }
+
+    [Fact]
+    public async Task AppendTabularBlob_RecordUriMissing_Throws()
+    {
+        var result = await UploadFilesystemParquet(5, "dataset.parquet");
+
+        var record = await GetRecordEntity(result.Id);
+        record.Uri = null;
+        await Context.SaveChangesAsync();
+
+        var appendFile = await CreateLargeTestParquetFile(3, "append.parquet");
+
+        var ex = await Assert.ThrowsAsync<ArgumentException>(() =>
+            _olapBusiness.AppendTabularBlob(_organizationId, _projectId, result.Id, 1, appendFile));
+
+        Assert.Contains("Record has no URI", ex.Message);
+    }
+
+    [Fact]
+    public async Task AppendTabularBlob_FirstAppend_DuplicatePart_CleansUpAndLeavesOriginalIntact()
+    {
+        var result = await UploadFilesystemParquet(5, "dataset.parquet");
+        var originalRecord = await Context.Records.AsNoTracking().FirstAsync(r => r.Id == result.Id);
+        var originalUri = originalRecord.Uri!;
+
+        var expectedFolder = originalUri[..^".parquet".Length] + Path.DirectorySeparatorChar;
+        Directory.CreateDirectory(expectedFolder);
+        File.WriteAllBytes(Path.Combine(expectedFolder, "1.parquet"), new byte[] { 1, 2, 3 });
+
+        var appendFile = await CreateLargeTestParquetFile(3, "append.parquet");
+
+        var ex = await Assert.ThrowsAsync<ArgumentException>(() =>
+            _olapBusiness.AppendTabularBlob(_organizationId, _projectId, result.Id, 1, appendFile));
+
+        Assert.Contains("Part 1 already exists", ex.Message);
+
+        var recordAfter = await Context.Records.AsNoTracking().FirstAsync(r => r.Id == result.Id);
+        Assert.Equal(originalUri, recordAfter.Uri);
+
+        Assert.True(File.Exists(originalUri));
+        Assert.False(File.Exists(Path.Combine(expectedFolder, "0.parquet")));
+        Assert.True(File.Exists(Path.Combine(expectedFolder, "1.parquet")));
+    }
+
+    [Fact]
+    public async Task AppendTabularBlob_ExistingFolder_DuplicatePart_LeavesExistingPartsUntouched()
+    {
+        var result = await UploadFilesystemParquet(5, "dataset.parquet");
+
+        await _olapBusiness.AppendTabularBlob(
+            _organizationId, _projectId, result.Id, 1,
+            await CreateLargeTestParquetFile(3, "append1.parquet"));
+
+        var record = await GetRecordEntity(result.Id);
+        var folderUri = record.Uri!;
+
+        var testFile = await CreateLargeTestParquetFile(4, "append_duplicate.parquet");
+        var ex = await Assert.ThrowsAsync<ArgumentException>(() =>
+            _olapBusiness.AppendTabularBlob(
+                _organizationId, _projectId, result.Id, 1,
+                testFile));
+
+        Assert.Contains("Part 1 already exists", ex.Message);
+
+        Assert.True(File.Exists(Path.Combine(folderUri, "0.parquet")));
+        Assert.True(File.Exists(Path.Combine(folderUri, "1.parquet")));
+        Assert.False(File.Exists(Path.Combine(folderUri, "2.parquet")));
+
+        var queryResult = await _olapBusiness.QueryTabularFile(
+            _userId, _organizationId, _projectId, result.Id,
+            "SELECT COUNT(*) AS total FROM data", "data");
+
+        Assert.Equal(8L, Convert.ToInt64(queryResult.Data[0][0]));
+    }
+
+    [Fact]
+    public async Task AppendTabularBlob_SchemaMismatch_ExtraColumn_DoesNotMutateState()
+    {
+        var result = await UploadFilesystemParquet(5, "dataset.parquet");
+        var originalRecord = await Context.Records.AsNoTracking().FirstAsync(r => r.Id == result.Id);
+        var originalUri = originalRecord.Uri!;
+
+        var appendFile = await CreateSchemaMismatchParquetFile_ExtraColumn(3);
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            _olapBusiness.AppendTabularBlob(_organizationId, _projectId, result.Id, 1, appendFile));
+
+        Assert.Contains("unexpected column", ex.Message);
+
+        var recordAfter = await Context.Records.AsNoTracking().FirstAsync(r => r.Id == result.Id);
+        Assert.Equal(originalUri, recordAfter.Uri);
+        Assert.True(File.Exists(originalUri));
+
+        var expectedFolder = originalUri[..^".parquet".Length] + Path.DirectorySeparatorChar;
+        Assert.False(Directory.Exists(expectedFolder));
+    }
+
+    [Fact]
+    public async Task AppendTabularBlob_SchemaMismatch_MissingColumn_ThrowsAndDoesNotMutateState()
+    {
+        var result = await UploadFilesystemParquet(5, "dataset.parquet");
+        var originalRecord = await Context.Records.AsNoTracking().FirstAsync(r => r.Id == result.Id);
+        var originalUri = originalRecord.Uri!;
+
+        var appendFile = await CreateSchemaMismatchParquetFile_MissingColumn(3);
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            _olapBusiness.AppendTabularBlob(_organizationId, _projectId, result.Id, 1, appendFile));
+
+        Assert.Contains("missing column", ex.Message);
+
+        var recordAfter = await Context.Records.AsNoTracking().FirstAsync(r => r.Id == result.Id);
+        Assert.Equal(originalUri, recordAfter.Uri);
+        Assert.True(File.Exists(originalUri));
+    }
+
+    [Fact]
+    public async Task AppendTabularBlob_SchemaMismatch_TypeMismatch_ThrowsAndDoesNotMutateState()
+    {
+        var result = await UploadFilesystemParquet(5, "dataset.parquet");
+        var originalRecord = await Context.Records.AsNoTracking().FirstAsync(r => r.Id == result.Id);
+        var originalUri = originalRecord.Uri!;
+
+        var appendFile = await CreateSchemaMismatchParquetFile_TypeMismatch(3);
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            _olapBusiness.AppendTabularBlob(_organizationId, _projectId, result.Id, 1, appendFile));
+
+        Assert.Contains("type mismatch", ex.Message);
+
+        var recordAfter = await Context.Records.AsNoTracking().FirstAsync(r => r.Id == result.Id);
+        Assert.Equal(originalUri, recordAfter.Uri);
+        Assert.True(File.Exists(originalUri));
+    }
+
+    [Fact]
+    public async Task AppendTabularBlob_Azure_DuplicatePartOnFirstAppend_LeavesOriginalBlobIntact()
+    {
+        var result = await UploadAzureParquet(5, "dataset.parquet");
+
+        var originalRecord = await Context.Records.AsNoTracking().FirstAsync(r => r.Id == result.Id);
+        var originalUri = originalRecord.Uri!;
+        Assert.EndsWith(".parquet", originalUri);
+
+        var blobServiceClient = new BlobServiceClient(_connectionString);
+        var container = blobServiceClient.GetBlobContainerClient(_containerName);
+        await container.CreateIfNotExistsAsync();
+
+        var folderPrefix = originalUri[..^".parquet".Length] + "/";
+        var preCreatedPartUri = $"{folderPrefix}1.parquet";
+
+        var preCreatedPart = container.GetBlobClient(preCreatedPartUri);
+        await preCreatedPart.UploadAsync(
+            BinaryData.FromBytes(new byte[] { 1, 2, 3 }).ToStream(),
+            true);
+
+        var appendFile = await CreateLargeTestParquetFile(3, "append.parquet");
+
+        var ex = await Assert.ThrowsAsync<ArgumentException>(() =>
+            _olapBusiness.AppendTabularBlob(_organizationId, _projectId, result.Id, 1, appendFile));
+
+        Assert.Contains("Part 1 already exists", ex.Message);
+
+        var recordAfter = await Context.Records.AsNoTracking().FirstAsync(r => r.Id == result.Id);
+        Assert.Equal(originalUri, recordAfter.Uri);
+
+        Assert.True(await container.GetBlobClient(originalUri).ExistsAsync());
+        Assert.False(await container.GetBlobClient($"{folderPrefix}0.parquet").ExistsAsync());
+        Assert.True(await container.GetBlobClient($"{folderPrefix}1.parquet").ExistsAsync());
+    }
+    
+    #endregion
+    
+    #region Query Tabular File
+
+    [Fact]
+    public async Task QueryTabularFile_SingleCsv_Success_ReturnsData()
+    {
+        var csvContent =
+            "timestamp,value,sensor_id,temperature,pressure\n" +
+            "2024-01-01T00:00:00,42.5,sensor_1,21.1,1001.2\n" +
+            "2024-01-01T00:01:00,43.2,sensor_2,21.3,1001.4\n";
+
+        var file = CreateTestCsvFile(csvContent, "sensor_data.csv");
+
+        var result = await _fileBusiness.UploadFile(
+            _userId, _organizationId, _projectId, _dataSourceId, _fileSystemObjectStorageId, file);
+
+        var queryResult = await _olapBusiness.QueryTabularFile(
+            _userId, _organizationId, _projectId, result.Id,
+            "SELECT * FROM data", "data");
+
+        Assert.NotNull(queryResult);
+        Assert.Equal(2, queryResult.Data.Length);
+        Assert.Equal(5, queryResult.Columns.Length);
+    }
+
+    [Fact]
+    public async Task QueryTabularFile_AppendedFolder_Success_ReadsAcrossAllParts()
+    {
+        var result = await UploadFilesystemParquet(5, "dataset.parquet");
+
+        await _olapBusiness.AppendTabularBlob(
+            _organizationId, _projectId, result.Id, 1,
+            await CreateLargeTestParquetFile(3, "append1.parquet"));
+
+        await _olapBusiness.AppendTabularBlob(
+            _organizationId, _projectId, result.Id, 2,
+            await CreateLargeTestParquetFile(4, "append2.parquet"));
+
+        var queryResult = await _olapBusiness.QueryTabularFile(
+            _userId, _organizationId, _projectId, result.Id,
+            "SELECT COUNT(*) AS total FROM data", "data");
+
+        Assert.Single(queryResult.Data);
+        Assert.Equal(12L, Convert.ToInt64(queryResult.Data[0][0]));
+    }
+
+    [Fact]
+    public async Task QueryTabularFile_EmptyViewName_Throws()
+    {
+        var result = await UploadFilesystemParquet(5, "dataset.parquet");
+
+        var ex = await Assert.ThrowsAsync<ArgumentException>(() =>
+            _olapBusiness.QueryTabularFile(
+                _userId, _organizationId, _projectId, result.Id,
+                "SELECT * FROM data", ""));
+
+        Assert.Contains("View name is required", ex.Message);
+    }
+
+    [Fact]
+    public async Task QueryTabularFile_EmptyQuery_Throws()
+    {
+        var result = await UploadFilesystemParquet(5, "dataset.parquet");
+
+        var ex = await Assert.ThrowsAsync<ArgumentException>(() =>
+            _olapBusiness.QueryTabularFile(
+                _userId, _organizationId, _projectId, result.Id,
+                "", "data"));
+
+        Assert.Contains("Query is required", ex.Message);
+    }
+
+    [Fact]
+    public async Task QueryTabularFile_QueryDoesNotReferenceView_Throws()
+    {
+        var result = await UploadFilesystemParquet(5, "dataset.parquet");
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            _olapBusiness.QueryTabularFile(
+                _userId, _organizationId, _projectId, result.Id,
+                "SELECT 1", "data"));
+
+        Assert.Contains("must reference the view", ex.Message);
+    }
+
+    [Fact]
+    public async Task QueryTabularFile_InvalidViewName_Throws()
+    {
+        var result = await UploadFilesystemParquet(5, "dataset.parquet");
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            _olapBusiness.QueryTabularFile(
+                _userId, _organizationId, _projectId, result.Id,
+                "SELECT * FROM bad_name", "bad-name"));
+
+        Assert.Contains("Query must reference the view", ex.Message);
+    }
+
+    [Theory]
+    [InlineData("SELECT * FROM data;")]
+    [InlineData("COPY data TO 'x.csv'")]
+    [InlineData("SELECT * FROM read_parquet('abc.parquet')")]
+    [InlineData("DELETE FROM data")]
+    [InlineData("ATTACH 'foo.db'")]
+    public async Task QueryTabularFile_DangerousOrMultiStatementQuery_Throws(string query)
+    {
+        var result = await UploadFilesystemParquet(5, "dataset.parquet");
+
+        await Assert.ThrowsAnyAsync<Exception>(() =>
+            _olapBusiness.QueryTabularFile(
+                _userId, _organizationId, _projectId, result.Id,
+                query, "data"));
+    }
+
+    [Fact]
+    public async Task QueryTabularFile_RecordDoesNotExist_Throws()
+    {
+        var ex = await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            _olapBusiness.QueryTabularFile(
+                _userId, _organizationId, _projectId, -999,
+                "SELECT * FROM data", "data"));
+    }
+
+    [Fact]
+    public async Task QueryTabularFile_SelectSpecificColumns_ReturnsExpectedProjection()
+    {
+        var result = await UploadFilesystemParquet(5, "dataset.parquet");
+
+        var queryResult = await _olapBusiness.QueryTabularFile(
+            _userId, _organizationId, _projectId, result.Id,
+            "SELECT sensor_id, value FROM data", "data");
+
+        Assert.Equal(2, queryResult.Columns.Length);
+        Assert.Equal("sensor_id", queryResult.Columns[0]);
+        Assert.Equal("value", queryResult.Columns[1]);
+        Assert.Equal(5, queryResult.Data.Length);
+    }
+
+    [Fact]
+    public async Task QueryTablularFile_Success_ReturnsData()
+    {
+        var rows = 100;
+        // //Arrange
+        // var csvContent = "timestamp,value,sensor_id\n2024-01-01T00:00:00,42.5,sensor_1\n2024-01-01T00:01:00,43.2,sensor_1";
+        var file = await CreateLargeTestParquetFile(rows, "sensor_data.parquet");
+        //
+        // // Act
+        var result = await _fileBusiness.UploadFile(
+            _userId, _organizationId, _projectId, _dataSourceId, _fileSystemObjectStorageId, file);
+
+        // // Assert
+        Assert.NotNull(result);
+        Assert.Equal("sensor_data.parquet", result.Name);
+        Assert.Equal("parquet", result.FileType);
+
+        var queryResult = await _olapBusiness.QueryTabularFile(_userId, _organizationId, _projectId, result.Id,
+            "Select * From data", "data");
+        Assert.NotNull(queryResult);
+        Assert.Equal(rows, queryResult.Data.Length);
+        Assert.Equal(5, queryResult.Columns.Length);
+    }
+    
+    #endregion
+    
+    #region Get Plot Data
+    
+    [Fact]
+    public async Task GetPlotData_RecordDoesNotExist_Throws()
+    {
+        await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            _olapBusiness.GetPlotData(
+                _userId, _organizationId, _projectId, _dataSourceId, -999, 5, 1));
+    }
+
+    [Fact]
+    public async Task GetPlotData_Azure_SingleFile_ReturnsLastNRowsInAscendingOrder()
+    {
+        var result = await UploadAzureParquet(10, "dataset.parquet");
+
+        var plotData = await _olapBusiness.GetPlotData(
+            _userId, _organizationId, _projectId, _dataSourceId, result.Id, 3, 1);
+
+        Assert.NotNull(plotData);
+        Assert.Equal(3, plotData.Data.Length);
+
+        var timestampIndex = (int)FindColumnIndex(plotData, "timestamp");
+
+        var timestamps = plotData.Data
+            .Select(r => Convert.ToDateTime(r[timestampIndex]))
+            .ToArray();
+
+        // Last 3 rows of 10, returned in ascending order
+        Assert.True(timestamps[0] < timestamps[1]);
+        Assert.True(timestamps[1] < timestamps[2]);
+        Assert.Equal(new DateTime(2024, 1, 1, 0, 0, 7), timestamps[0]);
+        Assert.Equal(new DateTime(2024, 1, 1, 0, 0, 8), timestamps[1]);
+        Assert.Equal(new DateTime(2024, 1, 1, 0, 0, 9), timestamps[2]);
+    }
+
+    [Fact]
+    public async Task GetPlotData_Azure_AppendedFolder_UsesGlobalOrderingAcrossParts()
+    {
+        var result = await UploadAzureParquet(5, "dataset.parquet");
+
+        await _olapBusiness.AppendTabularBlob(
+            _organizationId, _projectId, result.Id, 1,
+            await CreateLargeTestParquetFile(3, "append1.parquet"));
+
+        await _olapBusiness.AppendTabularBlob(
+            _organizationId, _projectId, result.Id, 2,
+            await CreateLargeTestParquetFile(4, "append2.parquet"));
+
+        var plotData = await _olapBusiness.GetPlotData(
+            _userId, _organizationId, _projectId, _dataSourceId, result.Id, 4, 1);
+
+        Assert.Equal(4, plotData.Data.Length);
+
+        var timestampIndex = (int)FindColumnIndex(plotData, "timestamp");
+
+        var timestamps = plotData.Data
+            .Select(r => Convert.ToDateTime(r[timestampIndex]))
+            .ToArray();
+
+        // The last 4 rows globally (across all three parts) in ascending order
+        Assert.Equal(new DateTime(2024, 1, 1, 0, 0, 0), timestamps[0]);
+        Assert.Equal(new DateTime(2024, 1, 1, 0, 0, 1), timestamps[1]);
+        Assert.Equal(new DateTime(2024, 1, 1, 0, 0, 2), timestamps[2]);
+        Assert.Equal(new DateTime(2024, 1, 1, 0, 0, 3), timestamps[3]);
+    }
+
+    [Fact]
+    public async Task GetPlotData_SingleFile_ReturnsLastNRowsInAscendingOrder()
+    {
+        var result = await UploadFilesystemParquet(10, "dataset.parquet");
+
+        var plotData = await _olapBusiness.GetPlotData(
+            _userId, _organizationId, _projectId, _dataSourceId, result.Id, 3, 1);
+
+        Assert.NotNull(plotData);
+        Assert.Equal(3, plotData.Data.Length);
+
+        var timestampIndex = (int)FindColumnIndex(plotData, "timestamp");
+
+        var timestamps = plotData.Data
+            .Select(r => Convert.ToDateTime(r[timestampIndex]))
+            .ToArray();
+
+        Assert.True(timestamps[0] < timestamps[1]);
+        Assert.True(timestamps[1] < timestamps[2]);
+        Assert.Equal(new DateTime(2024, 1, 1, 0, 0, 7), timestamps[0]);
+        Assert.Equal(new DateTime(2024, 1, 1, 0, 0, 8), timestamps[1]);
+        Assert.Equal(new DateTime(2024, 1, 1, 0, 0, 9), timestamps[2]);
+    }
+
+    [Fact]
+    public async Task GetPlotData_RowStride_AppliesEveryNthRow()
+    {
+        var result = await UploadFilesystemParquet(10, "dataset.parquet");
+
+        var plotData = await _olapBusiness.GetPlotData(
+            _userId, _organizationId, _projectId, _dataSourceId, result.Id, 10, 2);
+
+        Assert.NotNull(plotData);
+        Assert.Equal(5, plotData.Data.Length);
+
+        var timestampIndex = (int)FindColumnIndex(plotData, "timestamp");
+
+        var timestamps = plotData.Data
+            .Select(r => Convert.ToDateTime(r[timestampIndex]))
+            .ToArray();
+
+        Assert.Equal(new DateTime(2024, 1, 1, 0, 0, 1), timestamps[0]);
+        Assert.Equal(new DateTime(2024, 1, 1, 0, 0, 3), timestamps[1]);
+        Assert.Equal(new DateTime(2024, 1, 1, 0, 0, 5), timestamps[2]);
+        Assert.Equal(new DateTime(2024, 1, 1, 0, 0, 7), timestamps[3]);
+        Assert.Equal(new DateTime(2024, 1, 1, 0, 0, 9), timestamps[4]);
+    }
+
+    [Fact]
+    public async Task GetPlotData_AppendedFolder_UsesGlobalOrderingAcrossParts()
+    {
+        var result = await UploadFilesystemParquet(5, "dataset.parquet");
+
+        await _olapBusiness.AppendTabularBlob(
+            _organizationId, _projectId, result.Id, 1,
+            await CreateLargeTestParquetFile(3, "append1.parquet"));
+
+        await _olapBusiness.AppendTabularBlob(
+            _organizationId, _projectId, result.Id, 2,
+            await CreateLargeTestParquetFile(4, "append2.parquet"));
+
+        var plotData = await _olapBusiness.GetPlotData(
+            _userId, _organizationId, _projectId, _dataSourceId, result.Id, 4, 1);
+
+        Assert.Equal(4, plotData.Data.Length);
+
+        var timestampIndex = (int)FindColumnIndex(plotData, "timestamp");
+
+        var timestamps = plotData.Data
+            .Select(r => Convert.ToDateTime(r[timestampIndex]))
+            .ToArray();
+
+        Assert.Equal(new DateTime(2024, 1, 1, 0, 0, 0), timestamps[0]);
+        Assert.Equal(new DateTime(2024, 1, 1, 0, 0, 1), timestamps[1]);
+        Assert.Equal(new DateTime(2024, 1, 1, 0, 0, 2), timestamps[2]);
+        Assert.Equal(new DateTime(2024, 1, 1, 0, 0, 3), timestamps[3]);
+    }
+
+    [Fact]
+    public async Task GetPlotData_RecordHasNoUri_Throws()
+    {
+        var result = await UploadFilesystemParquet(5, "dataset.parquet");
+
+        var record = await GetRecordEntity(result.Id);
+        record.Uri = null;
+        await Context.SaveChangesAsync();
+
+        var ex = await Assert.ThrowsAsync<ArgumentException>(() =>
+            _olapBusiness.GetPlotData(
+                _userId, _organizationId, _projectId, _dataSourceId, result.Id, 5, 1));
+
+        Assert.Contains("does not have a URI", ex.Message);
+    }
+    
+    #endregion
+    
+    #region Extract Tabular Columns
+    
+    [Fact]
+    public async Task ExtractTabularColumns_AzureCsv_ReturnsExpectedColumns()
+    {
+        var csvContent =
+            "timestamp,value,sensor_id,temperature,pressure\n" +
+            "2024-01-01T00:00:00,42.5,sensor_1,21.1,1001.2\n" +
+            "2024-01-01T00:01:00,43.2,sensor_2,21.3,1001.4\n";
+
+        var file = CreateTestCsvFile(csvContent, "sensor_data.csv");
+
+        var result = await _fileBusiness.UploadFile(
+            _userId, _organizationId, _projectId, _dataSourceId, _azureObjectStorageId, file);
+
+        var record = await GetRecordEntity(result.Id);
+
+        var objectStorage = await Context.ObjectStorages.FirstAsync(o => o.Id == _azureObjectStorageId);
+        var config = JsonConvert.DeserializeObject<ObjectStorageConfigDto>(objectStorage.Config)!;
+
+        var columns = await _olapBusiness.ExtractTabularColumns(
+            objectStorage,
+            config,
+            record.Uri!);
+
+        Assert.NotNull(columns);
+        Assert.Equal(5, columns!.Count);
+
+        var names = columns
+            .Select(c => ((JsonObject)c!)["name"]!.ToString())
+            .ToArray();
+
+        Assert.Contains("timestamp", names);
+        Assert.Contains("value", names);
+        Assert.Contains("sensor_id", names);
+        Assert.Contains("temperature", names);
+        Assert.Contains("pressure", names);
+    }
+
+    [Fact]
+    public async Task ExtractTabularColumns_FilesystemParquet_ReturnsExpectedColumns()
+    {
+        var result = await UploadFilesystemParquet(5, "dataset.parquet");
+        var record = await GetRecordEntity(result.Id);
+
+        var objectStorage = await Context.ObjectStorages.FirstAsync(o => o.Id == _fileSystemObjectStorageId);
+        var config = JsonConvert.DeserializeObject<ObjectStorageConfigDto>(objectStorage.Config)!;
+
+        var columns = await _olapBusiness.ExtractTabularColumns(
+            objectStorage,
+            config,
+            record.Uri!);
+
+        Assert.NotNull(columns);
+        Assert.Equal(5, columns!.Count);
+
+        var first = (JsonObject)columns[0]!;
+        Assert.Equal("timestamp", first["name"]!.ToString());
+        Assert.Equal("DateTime", first["type"]!.ToString());
+    }
+
+    [Fact]
+    public async Task ExtractTabularColumns_FilesystemCsv_ReturnsExpectedColumns()
+    {
+        var csvContent =
+            "timestamp,value,sensor_id,temperature,pressure\n" +
+            "2024-01-01T00:00:00,42.5,sensor_1,21.1,1001.2\n" +
+            "2024-01-01T00:01:00,43.2,sensor_2,21.3,1001.4\n";
+
+        var file = CreateTestCsvFile(csvContent, "sensor_data.csv");
+
+        var result = await _fileBusiness.UploadFile(
+            _userId, _organizationId, _projectId, _dataSourceId, _fileSystemObjectStorageId, file);
+
+        var record = await GetRecordEntity(result.Id);
+
+        var objectStorage = await Context.ObjectStorages.FirstAsync(o => o.Id == _fileSystemObjectStorageId);
+        var config = JsonConvert.DeserializeObject<ObjectStorageConfigDto>(objectStorage.Config)!;
+
+        var columns = await _olapBusiness.ExtractTabularColumns(
+            objectStorage,
+            config,
+            record.Uri!);
+
+        Assert.NotNull(columns);
+        Assert.Equal(5, columns!.Count);
+
+        var names = columns
+            .Select(c => ((JsonObject)c!)["name"]!.ToString())
+            .ToArray();
+
+        Assert.Contains("timestamp", names);
+        Assert.Contains("value", names);
+        Assert.Contains("sensor_id", names);
+        Assert.Contains("temperature", names);
+        Assert.Contains("pressure", names);
+    }
+
+    [Fact]
+    public async Task ExtractTabularColumns_AzureParquet_ReturnsExpectedColumns()
+    {
+        var result = await UploadAzureParquet(5, "dataset.parquet");
+        var record = await GetRecordEntity(result.Id);
+
+        var objectStorage = await Context.ObjectStorages.FirstAsync(o => o.Id == _azureObjectStorageId);
+        var config = JsonConvert.DeserializeObject<ObjectStorageConfigDto>(objectStorage.Config)!;
+
+        var columns = await _olapBusiness.ExtractTabularColumns(
+            objectStorage,
+            config,
+            record.Uri!);
+
+        Assert.NotNull(columns);
+        Assert.Equal(5, columns!.Count);
+
+        var first = (JsonObject)columns[0]!;
+        Assert.Equal("timestamp", first["name"]!.ToString());
+    }
+
+    [Fact]
+    public async Task ExtractTabularColumns_InvalidFilesystemFile_ReturnsNull()
+    {
+        var objectStorage = await Context.ObjectStorages.FirstAsync(o => o.Id == _fileSystemObjectStorageId);
+        var config = JsonConvert.DeserializeObject<ObjectStorageConfigDto>(objectStorage.Config)!;
+
+        var columns = await _olapBusiness.ExtractTabularColumns(
+            objectStorage,
+            config,
+            Path.Combine(_tempFileSystemBasePath, "does_not_exist.parquet"));
+
+        Assert.Null(columns);
+    }
+
+    [Fact]
+    public async Task ExtractTabularColumns_UnsupportedStorageType_ReturnsNull()
+    {
+        var unsupportedStorage = new ObjectStorage
+        {
+            Id = 9999,
+            Name = "Unsupported",
+            Type = "s3",
+            Config = "{}",
+            OrganizationId = _organizationId,
+            ProjectId = _projectId
+        };
+
+        var config = new ObjectStorageConfigDto();
+
+        var columns = await _olapBusiness.ExtractTabularColumns(
+            unsupportedStorage,
+            config,
+            "some_file.parquet");
+
+        Assert.Null(columns);
+    }
+
+    [Fact]
+    public async Task AppendTabularBlob_ThenQueryTabularFile_SelectCountAndProjection_WorksEndToEnd()
+    {
+        var result = await UploadFilesystemParquet(6, "dataset.parquet");
+
+        await _olapBusiness.AppendTabularBlob(
+            _organizationId, _projectId, result.Id, 1,
+            await CreateLargeTestParquetFile(4, "append1.parquet"));
+
+        var countResult = await _olapBusiness.QueryTabularFile(
+            _userId, _organizationId, _projectId, result.Id,
+            "SELECT COUNT(*) AS total FROM data", "data");
+
+        Assert.Single(countResult.Data);
+        Assert.Equal(10L, Convert.ToInt64(countResult.Data[0][0]));
+
+        var projectionResult = await _olapBusiness.QueryTabularFile(
+            _userId, _organizationId, _projectId, result.Id,
+            "SELECT sensor_id, pressure FROM data", "data");
+
+        Assert.Equal(2, projectionResult.Columns.Length);
+        Assert.Equal("sensor_id", projectionResult.Columns[0]);
+        Assert.Equal("pressure", projectionResult.Columns[1]);
+        Assert.Equal(10, projectionResult.Data.Length);
+    }
+    
+    #endregion
+}
