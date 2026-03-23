@@ -396,8 +396,8 @@ public class RecordController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
-    
-        /// <summary>
+
+    /// <summary>
     ///     Attach a Sensitivity Label to a Record
     /// </summary>
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
@@ -521,8 +521,9 @@ public class RecordController : ControllerBase
     {
         try
         {
+            var currentUserId = UserContextStorage.UserId;
             var edges = await _graphBusiness.GetEdgesByRecord(
-                organizationId, projectId, recordId, isOrigin, page, pageSize);
+                currentUserId, organizationId, projectId, recordId, isOrigin, page, pageSize);
             return Ok(edges);
         }
         catch (Exception exc)
