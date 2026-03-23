@@ -679,6 +679,8 @@ metadata:
   name: insight-rabbitmq-runner
   namespace: deeplynxv3-dev
 spec:
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: insight-rabbitmq-runner
@@ -687,6 +689,7 @@ spec:
       labels:
         app: insight-rabbitmq-runner
     spec:
+      terminationGracePeriodSeconds: 120
       containers:
         - name: deeplynxv3
           image: ${CI_REGISTRY}/${CI_REGISTRY_PATH}:insight-rabbitmq-runner-${GITHUB_RUN_NUMBER}
