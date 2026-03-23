@@ -1,11 +1,14 @@
 import { useLanguage } from "@/app/contexts/Language";
 import { GraphConnectionSummary, GraphNodeSummary } from "./graphTypes";
+import { RecordResponseDto } from "@/app/(home)/types/responseDTOs";
 
 interface RelationshipTableProps {
   selectedNode: GraphNodeSummary | null;
   filteredConnections: GraphConnectionSummary[];
   onSelectNode: (nodeId: number) => void;
   onOpenRecord: (nodeId: number) => void;
+  selectedRecord: RecordResponseDto | null;
+  isDetailsLoading: boolean;
 }
 
 const RelationshipTable = ({
@@ -13,6 +16,8 @@ const RelationshipTable = ({
   filteredConnections,
   onSelectNode,
   onOpenRecord,
+  selectedRecord,
+  isDetailsLoading,
 }: RelationshipTableProps) => {
   const { t } = useLanguage();
 
@@ -50,6 +55,31 @@ const RelationshipTable = ({
               </tr>
             </thead>
             <tbody>
+              {selectedNode && (
+                <tr className="bg-base-200/60">
+                  <td>
+                    <span className="badge badge-primary badge-outline">
+                      Selected
+                    </span>
+                  </td>
+                  <td className="font-medium text-base-content">Root</td>
+                  <td className="text-base-content/70">
+                    {selectedRecord?.name || selectedNode.label}
+                  </td>
+                  <td className="text-base-content/70">{selectedNode.depth}</td>
+                  <td className="text-base-content/60">#{selectedNode.id}</td>
+                  <td className="text-right">
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      onClick={() => onOpenRecord(selectedNode.id)}
+                    >
+                      {t.translations.OPEN}
+                    </button>
+                  </td>
+                </tr>
+              )}
+
               {filteredConnections.length > 0 ? (
                 filteredConnections.map((connection) => (
                   <tr key={connection.rowId} className="hover">

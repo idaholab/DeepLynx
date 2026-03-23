@@ -10,7 +10,6 @@ import GraphCanvas from "./components/GraphCanvas";
 import GraphLegend from "./components/GraphLegend";
 import GraphToolbar from "./components/GraphToolbar";
 import RelationshipTable from "./components/RelationshipTable";
-import SelectedNodePanel from "./components/SelectedNodePanel";
 import TracedPathPanel from "./components/TracedPathPanel";
 import {
   buildFilteredConnections,
@@ -262,19 +261,14 @@ const GraphClientPage = ({
           </section>
 
           {/* Supporting analysis panels under the graph */}
-          <section className="grid items-start gap-4 xl:grid-cols-[320px_minmax(0,1fr)_340px]">
-            <SelectedNodePanel
-              selectedNode={selectedNode}
-              selectedRecord={selectedRecord}
-              isDetailsLoading={isDetailsLoading}
-              onOpenRecord={handleOpenRecord}
-            />
-
+          <section className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
             <RelationshipTable
               selectedNode={selectedNode}
               filteredConnections={filteredConnections}
               onSelectNode={(nodeId) => handleSelectNode(nodeId)}
               onOpenRecord={handleOpenRecord}
+              selectedRecord={selectedRecord}
+              isDetailsLoading={isDetailsLoading}
             />
 
             <TracedPathPanel
