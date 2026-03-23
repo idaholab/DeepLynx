@@ -189,8 +189,8 @@ services:
   insight-fastapi:
     profiles: [ insight ]
     build:
-      context: ./deeplynx.insight/app/fastapi
-      dockerfile: Dockerfiles/Dockerfile.production
+      context: ./deeplynx.insight
+      dockerfile: app/fastapi/Dockerfiles/Dockerfile.production
     ports:
       - "5009:5009"
     command: [ "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "5009" ]
@@ -220,8 +220,8 @@ services:
   insight-rabbitmq-runner:
     profiles: [ insight ]
     build:
-      context: ./deeplynx.insight/app/rabbitmq
-      dockerfile: Dockerfiles/Dockerfile.runner.production
+      context: ./deeplynx.insight
+      dockerfile: app/rabbitmq/Dockerfiles/Dockerfile.runner.production
     command: [ "python", "-m", "runner" ]
     env_file:
       - ./deeplynx.insight/.env.production
