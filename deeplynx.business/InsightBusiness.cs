@@ -10,9 +10,7 @@ namespace deeplynx.business;
 
 public class InsightBusiness : IInsightBusiness
 {
-    // Upload uses mixed casing — camelCase inside file_info items, snake_case everywhere else.
-    // Query and status are fully snake_case.
-    // We use explicit JsonPropertyName attributes on all request models to be precise.
+    
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
@@ -283,18 +281,6 @@ public class InsightBusiness : IInsightBusiness
         return trimmed;
     }
 }
-
-// -------------------------------------------------------------------------
-// Insight API request bodies — wire format only, private to this file.
-// These match what the Insight API expects exactly. Do not expose these
-// outside InsightBusiness; use the public DTOs for your API's contract.
-// -------------------------------------------------------------------------
-
-/// <summary>
-///     Wire body for POST /upload_document.
-///     Top-level fields are snake_case; file_info items use camelCase —
-///     this is intentional and matches what the Insight API expects.
-/// </summary>
 file sealed class InsightUploadRequestBody
 {
     [JsonPropertyName("file_info")]
