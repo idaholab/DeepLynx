@@ -28,7 +28,7 @@ public class AiModelConfigBusiness : IAiModelConfigBusiness
 
     private static readonly List<string> ModelTypeList = new List<string>
     {
-        "llm",
+        "language",
         "embedding"
     };
 
@@ -50,7 +50,7 @@ public class AiModelConfigBusiness : IAiModelConfigBusiness
 
         if (projectId.HasValue)
             query = query.Where(x => x.ProjectId == projectId || x.ProjectId == null);
-        else 
+        else
             query = query.Where(x => x.ProjectId == null);
 
         if (hideArchived)
@@ -115,6 +115,82 @@ public class AiModelConfigBusiness : IAiModelConfigBusiness
             IsArchived = returnedAiModelConfig.IsArchived,
             LastUpdatedAt = returnedAiModelConfig.LastUpdatedAt,
             LastUpdatedBy = returnedAiModelConfig.LastUpdatedBy
+        };
+    }
+
+    /// <summary>
+    ///     Retrieves the default AI Model Configuration for the given model type, scoped to a project if provided,
+    ///     otherwise falling back to the organization-level default. Optionally resolves the user's API token
+    ///     for the returned model if one is required.
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization to which the model config belongs</param>
+    /// <param name="projectId">
+    ///     The ID of the project to scope the lookup to. If provided, project-level defaults are
+    ///     preferred over organization-level defaults. If null, only organization-level defaults are considered.
+    /// </param>
+    /// <param name="modelType">The type of model to retrieve (e.g. "language" or "embedding")</param>
+    /// <param name="currentUserId">
+    ///     the id of the user making the request. If needed, the user's stored token for the model will be resolved and included
+    ///     in the result when the model requires a token.
+    /// </param>
+    /// <returns>A <see cref="AiModelConfigResponseDto"/> containing the model config and optionally the resolved token.</returns>
+    /// <exception cref="KeyNotFoundException">Thrown when no default config is found for the given model type and scope.</exception>
+    public async Task<AiModelConfigResponseDto> GetDefaultAiModelConfig(
+        long currentUserId,
+        long organizationId,
+        long? projectId,
+        string modelType)
+    {
+        AiModelConfig? modelConfig = null;
+
+        if (projectId.HasValue)
+        {
+            modelConfig = await _context.AiModelConfigs
+                .FirstOrDefaultAsync(c =>
+                    c.OrganizationId == organizationId &&
+                    c.ProjectId == projectId &&
+                    c.ModelType == modelType &&
+                    c.Default == true &&
+                    !c.IsArchived);
+        }
+
+        // Fall back to org-level default if no project-level default was found
+        modelConfig ??= await _context.AiModelConfigs
+            .FirstOrDefaultAsync(c =>
+                c.OrganizationId == organizationId &&
+                c.ProjectId == null &&
+                c.ModelType == modelType &&
+                c.Default == true &&
+                !c.IsArchived);
+
+        if (modelConfig is null)
+            throw new KeyNotFoundException(
+                $"No default {modelType} model configuration found for organization {organizationId}.");
+
+        string? token = null;
+        if (modelConfig.RequiresToken == true)
+        {
+            token = await _context.UserModelTokens
+                .Where(t => t.UserId == currentUserId && t.AiModelConfigId == modelConfig.Id)
+                .Select(t => t.Token)
+                .FirstOrDefaultAsync();
+        }
+
+        return new AiModelConfigResponseDto
+        {
+            Id = modelConfig.Id,
+            OrganizationId = modelConfig.OrganizationId,
+            ProjectId = modelConfig.ProjectId,
+            ServerUrl = modelConfig.ServerUrl,
+            ModelProvider = modelConfig.ModelProvider,
+            ModelName = modelConfig.ModelName,
+            ModelType = modelConfig.ModelType,
+            RequiresToken = modelConfig.RequiresToken,
+            Default = modelConfig.Default,
+            IsArchived = modelConfig.IsArchived,
+            LastUpdatedAt = modelConfig.LastUpdatedAt,
+            LastUpdatedBy = modelConfig.LastUpdatedBy,
+            Token = token
         };
     }
 
@@ -365,8 +441,8 @@ public class AiModelConfigBusiness : IAiModelConfigBusiness
         await _context.SaveChangesAsync();
         return true;
     }
-    
-    
+
+
     /// <summary>
     ///     Unarchive a single AI Model Configuration
     /// </summary>
