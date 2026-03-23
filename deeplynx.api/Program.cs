@@ -181,8 +181,14 @@ try
     builder.Services.AddTransient<IUserModelTokenBusiness, UserModelTokenBusiness>();
     builder.Services.AddTransient<IAiModelConfigBusiness, AiModelConfigBusiness>();
     builder.Services.AddScoped<ISensitivityLabelService, SensitivityLabelService>();
+    builder.Services.AddHttpClient<IInsightBusiness, InsightBusiness>(client =>
+    {
+        var baseUrl = Environment.GetEnvironmentVariable("INSIGHT_FASTAPI_URL")
+                      ?? throw new InvalidOperationException("Insight base URL is not configured.");
 
-
+        client.BaseAddress = new Uri(baseUrl);
+    });
+    
     //OpenApi Documentation
     builder.Services.AddOpenApi(options =>
     {
@@ -254,6 +260,7 @@ try
                 new() { Name = "Organization - AI Model Config", Description = "AI model configuration management" },
                 new() { Name = "Project - AI Model Config", Description = "AI model configuration management" },
                 new() { Name = "User Model Token", Description = "User AI model token management" },
+                new() { Name = "Insight", Description = "Deeplynx Insight management" },
 
                 // Authentication
                 new() { Name = "OauthHandshake", Description = "OAuth2 authorization flow" },
@@ -325,7 +332,7 @@ try
                 new JsonObject
                 {
                     ["name"] = "AI Services",
-                    ["tags"] = new JsonArray { "Lattice", "Organization - AI Model Config", "Project - AI Model Config", "User Model Token" }
+                    ["tags"] = new JsonArray { "Lattice", "Organization - AI Model Config", "Project - AI Model Config", "User Model Token", "Insight" }
                 },
                 new JsonObject
                 {

@@ -117,6 +117,65 @@ public class AiModelConfigBusiness : IAiModelConfigBusiness
             LastUpdatedBy = returnedAiModelConfig.LastUpdatedBy
         };
     }
+    
+    /// <summary>
+    ///     Retrieves a specific AI Model Configuration by ID and resolves the user's API token if one is required.
+    /// </summary>
+    /// <param name="currentUserId">The ID of the user making the request. Used to look up a stored token if the model requires one.</param>
+    /// <param name="organizationId">The ID of the organization to which the model config belongs.</param>
+    /// <param name="projectId">
+    ///     The ID of the project to scope the lookup to. If provided, the config must belong to that project
+    ///     or have no project (org-level). If null, only org-level configs are considered.
+    /// </param>
+    /// <param name="aiModelConfigId">The ID of the AI Model Configuration to retrieve.</param>
+    /// <returns>A <see cref="AiModelConfigResponseDto"/> containing the model config and optionally the resolved token.</returns>
+    /// <exception cref="KeyNotFoundException">Thrown when no config is found for the given ID and scope, or when it is archived.</exception>
+    /// <exception cref="InvalidOperationException">Thrown when the model requires a token but none is found for the user.</exception>
+    public async Task<AiModelConfigResponseDto> GetAiModelConfigWithToken(
+        long currentUserId,
+        long organizationId,
+        long? projectId,
+        long aiModelConfigId)
+    {
+        var query = _context.AiModelConfigs
+            .Where(x => x.Id == aiModelConfigId && x.OrganizationId == organizationId && !x.IsArchived)
+            .AsQueryable();
+
+        if (projectId.HasValue)
+            query = query.Where(x => x.ProjectId == projectId || x.ProjectId == null);
+        else
+            query = query.Where(x => x.ProjectId == null);
+
+        var modelConfig = await query.FirstOrDefaultAsync();
+        if (modelConfig is null)
+            throw new KeyNotFoundException($"AI Model Configuration with ID {aiModelConfigId} not found.");
+
+        string? token = null;
+        if (modelConfig.RequiresToken == true)
+        {
+            token = await _context.UserModelTokens
+                .Where(t => t.UserId == currentUserId && t.AiModelConfigId == modelConfig.Id)
+                .Select(t => t.Token)
+                .FirstOrDefaultAsync();
+        }
+
+        return new AiModelConfigResponseDto
+        {
+            Id = modelConfig.Id,
+            OrganizationId = modelConfig.OrganizationId,
+            ProjectId = modelConfig.ProjectId,
+            ServerUrl = modelConfig.ServerUrl,
+            ModelProvider = modelConfig.ModelProvider,
+            ModelName = modelConfig.ModelName,
+            ModelType = modelConfig.ModelType,
+            RequiresToken = modelConfig.RequiresToken,
+            Default = modelConfig.Default,
+            IsArchived = modelConfig.IsArchived,
+            LastUpdatedAt = modelConfig.LastUpdatedAt,
+            LastUpdatedBy = modelConfig.LastUpdatedBy,
+            Token = token
+        };
+    }
 
     /// <summary>
     ///     Retrieves the default AI Model Configuration for the given model type, scoped to a project if provided,
