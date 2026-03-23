@@ -308,7 +308,7 @@ try
                 new() { Name = "Project - Tag", Description = "Project-level tags" },
 
                 // Timeseries
-                new() { Name = "Timeseries", Description = "Time-series data" },
+                new() { Name = "Olap", Description = "OLAP tabular file operations" },
 
                 // Other
                 new() { Name = "Notification", Description = "Notifications" }
@@ -390,8 +390,8 @@ try
                 },
                 new JsonObject
                 {
-                    ["name"] = "Timeseries",
-                    ["tags"] = new JsonArray { "Timeseries" }
+                    ["name"] = "Olap",
+                    ["tags"] = new JsonArray { "Olap" }
                 },
                 new JsonObject
                 {

@@ -3,7 +3,6 @@ using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using Azure.Storage.Blobs;
 using deeplynx.datalayer.Models;
-using deeplynx.helpers;
 using deeplynx.interfaces;
 using deeplynx.models;
 using DuckDB.NET.Data;
@@ -300,101 +299,117 @@ public class OlapBusiness(
     }
 
     /// <summary>
-    ///     Get a view of data points from a parquet/csv file stored in Azure Blob or local filesystem
+    ///     Returns the highest numeric part number that currently exists
+    ///     in the append folder for the given record, or <c>0</c> if the
+    ///     record has not been appended to yet (its URI still points to a
+    ///     flat <c>.parquet</c> file rather than a folder).
+    ///     <para>
+    ///         Part 0 is the original file as migrated by the first call
+    ///         to <see cref="AppendTabularBlob" />, so <c>0</c> reliably
+    ///         means "no appends have occurred yet" without ambiguity.
+    ///     </para>
+    ///     <para>
+    ///         Only <c>.parquet</c> files whose stem can be parsed as a
+    ///         non-negative integer are considered.  Any other files in
+    ///         the folder are silently ignored so that stray files never
+    ///         corrupt the result.
+    ///     </para>
     /// </summary>
-    /// <param name="organizationId">ID of organization that timeseries data is associated with</param>
-    /// <param name="projectId">ID of project that timeseries data is associated with</param>
-    /// <param name="dataSourceId">ID of data source that timeseries data is associated with</param>
-    /// <param name="recordId">ID of record pointing to the parquet/csv file</param>
-    /// <param name="limit">Maximum number of data points to include</param>
-    /// <param name="rowStride">every nth row to get (row number 4 = every 4th row)</param>
-    /// <returns>A json array of plot data</returns>
-    public async Task<PlotDataDto> GetPlotData(long currentUserId, long organizationId, long projectId,
-        long dataSourceId, long recordId, long limit, long rowStride)
+    /// <param name="organizationId">ID of the owning organization.</param>
+    /// <param name="projectId">ID of the owning project.</param>
+    /// <param name="recordId">ID of the record whose folder to inspect.</param>
+    /// <returns>
+    ///     The highest part number found in the folder, or <c>0</c> when
+    ///     the record is still a flat file.  The next safe part number to
+    ///     pass to <see cref="AppendTabularBlob" /> is always
+    ///     <c>GetHighestPartNumber(...) + 1</c> with no special casing.
+    /// </returns>
+    /// <exception cref="ArgumentException">
+    ///     Thrown when the record does not exist, has no URI, or its
+    ///     object storage cannot be found.
+    /// </exception>
+    /// <exception cref="InvalidOperationException">
+    ///     Thrown when the object storage type is not supported, or when
+    ///     the folder exists but contains no recognisable part files.
+    /// </exception>
+    public async Task<long> GetHighestPartNumber(
+        long organizationId,
+        long projectId,
+        long recordId)
     {
-        await ExistenceHelper.EnsureDataSourceExistsForProjectAsync(_context, dataSourceId, projectId);
+        var record = await _context.Records.FirstOrDefaultAsync(r =>
+            r.OrganizationId == organizationId &&
+            r.ProjectId == projectId &&
+            r.Id == recordId);
 
-        var record = await _recordBusiness.GetRecord(currentUserId, organizationId, projectId, recordId, true);
+        if (record == null)
+            throw new ArgumentException($"Record with ID {recordId} does not exist.");
 
         if (string.IsNullOrWhiteSpace(record.Uri))
-            throw new ArgumentException($"Record {recordId} does not have a URI");
+            throw new ArgumentException("Record has no URI.");
 
-        var objectStorage = _context.ObjectStorages.FirstOrDefault(os => os.OrganizationId == organizationId &&
-                                                                         (os.ProjectId == projectId ||
-                                                                          os.ProjectId == null) &&
-                                                                         os.Id == record.ObjectStorageId);
+        var extension = Path.GetExtension(record.Uri);
+
+        if (!string.IsNullOrEmpty(extension))
+        {
+            if (!extension.Equals(".parquet", StringComparison.OrdinalIgnoreCase))
+                throw new ArgumentException(
+                    $"Only Parquet files are supported for part number tracking. Record URI has extension '{extension}'.");
+
+            // Flat file — no appends have been made yet. Return 0 because the original
+            // file is conceptually part 0 (the value AppendTabularBlob uses when it
+            // migrates it), so highest + 1 = 1 is always the correct next part.
+            return 0;
+        }
+
+        var objectStorage = _context.ObjectStorages.FirstOrDefault(os =>
+            os.OrganizationId == organizationId &&
+            (os.ProjectId == projectId || os.ProjectId == null) &&
+            os.Id == record.ObjectStorageId);
 
         if (objectStorage == null)
-            throw new ArgumentException(
-                $"Object storage with ID {record.ObjectStorageId} does not exist for project with ID of {projectId}");
+            throw new ArgumentException($"Object storage not found for project {projectId}.");
 
-        var objectStorageConfig = JsonConvert.DeserializeObject<ObjectStorageConfigDto>(objectStorage.Config);
-        if (objectStorageConfig == null)
-            throw new InvalidOperationException("Config data for object storage is null or invalid");
+        var objectStorageConfig = JsonConvert.DeserializeObject<ObjectStorageConfigDto>(objectStorage.Config)
+                                  ?? throw new InvalidOperationException("Object storage config is null or invalid.");
 
-        // Determine storage type and get appropriate connection
-        DuckDBConnection connection;
-        string fileUrl;
-        bool isFolder;
+        IEnumerable<long> partNumbers;
 
         if (objectStorage.Type == "azure_object")
         {
-            // Azure Blob Storage
-            var containerName = objectStorageConfig.AzureObjectConfig?.AzureContainerName;
-            if (string.IsNullOrWhiteSpace(containerName))
-                throw new ArgumentException("Container name is required for Azure storage");
+            var containerName = objectStorageConfig.AzureObjectConfig?.AzureContainerName
+                                ?? throw new ArgumentException("Azure container name is required.");
 
-            connection = await GetAzureDuckDbConnection(objectStorageConfig);
+            var containerClient = new BlobServiceClient(objectStorageConfig.AzureObjectConfig!.AzureConnectionString)
+                .GetBlobContainerClient(containerName);
 
-            var escapedContainer = containerName.Replace("'", "''");
-            var escapedPath = record.Uri.Replace("'", "''");
-            fileUrl = $"az://{escapedContainer}/{escapedPath}";
-
-            isFolder = record.Uri.EndsWith("/", StringComparison.Ordinal);
+            partNumbers = containerClient
+                .GetBlobs(prefix: record.Uri)
+                .Where(b => b.Name.EndsWith(".parquet", StringComparison.OrdinalIgnoreCase))
+                .Select(b => Path.GetFileNameWithoutExtension(b.Name))
+                .Where(stem => long.TryParse(stem, out _))
+                .Select(long.Parse);
         }
         else if (objectStorage.Type == "filesystem")
         {
-            // Local filesystem
-            connection = await GetLocalDuckDbConnection();
-
-            var escapedPath = record.Uri.Replace("'", "''");
-            fileUrl = escapedPath;
-
-            isFolder = record.Uri.EndsWith(Path.DirectorySeparatorChar)
-                       || record.Uri.EndsWith('/')
-                       || Directory.Exists(record.Uri);
+            partNumbers = Directory
+                .EnumerateFiles(record.Uri, "*.parquet")
+                .Select(p => Path.GetFileNameWithoutExtension(p))
+                .Where(stem => long.TryParse(stem, out _))
+                .Select(long.Parse);
         }
         else
         {
-            throw new InvalidOperationException("Object storage type is not supported for timeseries file queries");
+            throw new InvalidOperationException($"Unsupported object storage type: {objectStorage.Type}");
         }
 
-        // For folders, read all part files ordered by part number first so that
-        // row_number() reflects true insertion order across all parts, and the
-        // final ORDER BY rn DESC + LIMIT gives the correct last N rows globally.
-        var fromClause = isFolder
-            ? $"(SELECT * EXCLUDE filename FROM read_parquet(['{fileUrl.TrimEnd('/')}/*.parquet'], union_by_name = true, filename = true) ORDER BY CAST(regexp_extract(filename, '(\\d+)\\.parquet$', 1) AS BIGINT))"
-            : $"'{fileUrl}'";
+        var parts = partNumbers.ToList();
 
-        await using (connection)
-        {
-            // Query the file directly with rowStride and limit
-            await using var cmd = connection.CreateCommand();
-            cmd.CommandText = $@"
-                                WITH numbered AS (
-                                    SELECT *, row_number() OVER () as rn 
-                                    FROM {fromClause}
-                                )
-                                SELECT * EXCLUDE rn
-                                FROM numbered 
-                                WHERE rn % {rowStride} = 0 
-                                ORDER BY rn DESC 
-                                LIMIT {limit}";
+        if (parts.Count == 0)
+            throw new InvalidOperationException(
+                "No numeric part files found in the dataset folder.");
 
-            await using var reader = await cmd.ExecuteReaderAsync();
-
-            return await ReaderToPlotData(reader, true);
-        }
+        return parts.Max();
     }
 
     /// <summary>
@@ -510,6 +525,101 @@ public class OlapBusiness(
         {
             logger.LogError($"Error while extracting columns: {ex.Message}");
             return null;
+        }
+    }
+
+    /// <summary>
+    ///     Get a view of data points from a parquet/csv file stored in Azure Blob or local filesystem
+    /// </summary>
+    /// <param name="organizationId">ID of organization that timeseries data is associated with</param>
+    /// <param name="projectId">ID of project that timeseries data is associated with</param>
+    /// <param name="recordId">ID of record pointing to the parquet/csv file</param>
+    /// <param name="limit">Maximum number of data points to include</param>
+    /// <param name="rowStride">every nth row to get (row number 4 = every 4th row)</param>
+    /// <returns>A json array of plot data</returns>
+    public async Task<PlotDataDto> GetPlotData(long currentUserId, long organizationId, long projectId, long recordId,
+        long limit, long rowStride)
+    {
+        var record = await _recordBusiness.GetRecord(currentUserId, organizationId, projectId, recordId, true);
+
+        if (string.IsNullOrWhiteSpace(record.Uri))
+            throw new ArgumentException($"Record {recordId} does not have a URI");
+
+        var objectStorage = _context.ObjectStorages.FirstOrDefault(os => os.OrganizationId == organizationId &&
+                                                                         (os.ProjectId == projectId ||
+                                                                          os.ProjectId == null) &&
+                                                                         os.Id == record.ObjectStorageId);
+
+        if (objectStorage == null)
+            throw new ArgumentException(
+                $"Object storage with ID {record.ObjectStorageId} does not exist for project with ID of {projectId}");
+
+        var objectStorageConfig = JsonConvert.DeserializeObject<ObjectStorageConfigDto>(objectStorage.Config);
+        if (objectStorageConfig == null)
+            throw new InvalidOperationException("Config data for object storage is null or invalid");
+
+        // Determine storage type and get appropriate connection
+        DuckDBConnection connection;
+        string fileUrl;
+        bool isFolder;
+
+        if (objectStorage.Type == "azure_object")
+        {
+            // Azure Blob Storage
+            var containerName = objectStorageConfig.AzureObjectConfig?.AzureContainerName;
+            if (string.IsNullOrWhiteSpace(containerName))
+                throw new ArgumentException("Container name is required for Azure storage");
+
+            connection = await GetAzureDuckDbConnection(objectStorageConfig);
+
+            var escapedContainer = containerName.Replace("'", "''");
+            var escapedPath = record.Uri.Replace("'", "''");
+            fileUrl = $"az://{escapedContainer}/{escapedPath}";
+
+            isFolder = record.Uri.EndsWith("/", StringComparison.Ordinal);
+        }
+        else if (objectStorage.Type == "filesystem")
+        {
+            // Local filesystem
+            connection = await GetLocalDuckDbConnection();
+
+            var escapedPath = record.Uri.Replace("'", "''");
+            fileUrl = escapedPath;
+
+            isFolder = record.Uri.EndsWith(Path.DirectorySeparatorChar)
+                       || record.Uri.EndsWith('/')
+                       || Directory.Exists(record.Uri);
+        }
+        else
+        {
+            throw new InvalidOperationException("Object storage type is not supported for timeseries file queries");
+        }
+
+        // For folders, read all part files ordered by part number first so that
+        // row_number() reflects true insertion order across all parts, and the
+        // final ORDER BY rn DESC + LIMIT gives the correct last N rows globally.
+        var fromClause = isFolder
+            ? $"(SELECT * EXCLUDE filename FROM read_parquet(['{fileUrl.TrimEnd('/')}/*.parquet'], union_by_name = true, filename = true) ORDER BY CAST(regexp_extract(filename, '(\\d+)\\.parquet$', 1) AS BIGINT))"
+            : $"'{fileUrl}'";
+
+        await using (connection)
+        {
+            // Query the file directly with rowStride and limit
+            await using var cmd = connection.CreateCommand();
+            cmd.CommandText = $@"
+                                WITH numbered AS (
+                                    SELECT *, row_number() OVER () as rn 
+                                    FROM {fromClause}
+                                )
+                                SELECT * EXCLUDE rn
+                                FROM numbered 
+                                WHERE rn % {rowStride} = 0 
+                                ORDER BY rn DESC 
+                                LIMIT {limit}";
+
+            await using var reader = await cmd.ExecuteReaderAsync();
+
+            return await ReaderToPlotData(reader, true);
         }
     }
 

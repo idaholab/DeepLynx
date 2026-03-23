@@ -13,7 +13,7 @@ public interface IOlapBusiness
         long recordId,
         long partNumber,
         IFormFile file);
-    
+
     Task<PlotDataDto> QueryTabularFile(
         long currentUserId,
         long organizationId,
@@ -22,8 +22,13 @@ public interface IOlapBusiness
         string userQuery,
         string viewName);
 
-    Task<PlotDataDto> GetPlotData(long currentUserId, long organizationId, long projectId,
-        long dataSourceId, long recordId, long limit, long rowNumber);
+    Task<PlotDataDto> GetPlotData(long currentUserId, long organizationId, long projectId, long recordId, long limit,
+        long rowNumber);
+
+    Task<long> GetHighestPartNumber(
+        long organizationId,
+        long projectId,
+        long recordId);
 
     Task<JsonArray?> ExtractTabularColumns(
         ObjectStorage objectStorage,

@@ -51,11 +51,11 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
 {
     private static readonly string _tempFileSystemBasePath;
     private readonly OlapAzuriteFixture _azuriteFixture;
+    private readonly string _containerName = "test-container";
     private long _azureObjectStorageId;
     private ClassBusiness _classBusiness = null!;
     private long _classId;
     private string _connectionString = null!;
-    private readonly string _containerName = "test-container";
     private DataSourceBusiness _dataSourceBusiness = null!;
     private long _dataSourceId;
     private Mock<IEdgeBusiness> _edgeBusiness = null!;
@@ -302,10 +302,13 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
         };
     }
 
-    private static async Task<IFormFile> CreateLargeTestParquetFile(int rowCount,
-        string fileName = "large_test.parquet")
+    private static async Task<IFormFile> CreateLargeTestParquetFile(
+        int rowCount,
+        string fileName = "large_test.parquet",
+        int timestampOffsetSeconds = 0)
     {
-        var baseTime = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        var baseTime = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc)
+            .AddSeconds(timestampOffsetSeconds);
         var random = new Random(42);
 
         var schema = new ParquetSchema(
@@ -492,9 +495,9 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
         Assert.NotNull(record);
         return record!;
     }
-    
+
     #region Append Tabular Blob
-    
+
     [Fact]
     public async Task AppendTabularBlob_SecondAppend_Azure_AddsNewPartWithoutChangingUri()
     {
@@ -531,7 +534,7 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
         Assert.Single(queryResult.Data);
         Assert.Equal(12L, Convert.ToInt64(queryResult.Data[0][0]));
     }
-    
+
     [Fact]
     public async Task AppendTabularBlob_Azure_DuplicatePartOnSecondAppend_LeavesExistingPartsUntouched()
     {
@@ -573,7 +576,7 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
 
         Assert.Equal(8L, Convert.ToInt64(queryResult.Data[0][0]));
     }
-    
+
     [Fact]
     public async Task AppendTabularBlob_Azure_SchemaMismatch_ExtraColumn_LeavesOriginalBlobIntact()
     {
@@ -600,7 +603,7 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
         Assert.False(await container.GetBlobClient($"{folderPrefix}0.parquet").ExistsAsync());
         Assert.False(await container.GetBlobClient($"{folderPrefix}1.parquet").ExistsAsync());
     }
-    
+
     [Fact]
     public async Task AppendTabularBlob_Azure_SchemaMismatch_MissingColumn_LeavesOriginalBlobIntact()
     {
@@ -626,7 +629,7 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
         var folderPrefix = originalUri[..^".parquet".Length] + "/";
         Assert.False(await container.GetBlobClient($"{folderPrefix}0.parquet").ExistsAsync());
     }
-    
+
     [Fact]
     public async Task AppendTabularBlob_Azure_SchemaMismatch_TypeMismatch_LeavesOriginalBlobIntact()
     {
@@ -652,7 +655,7 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
         var folderPrefix = originalUri[..^".parquet".Length] + "/";
         Assert.False(await container.GetBlobClient($"{folderPrefix}0.parquet").ExistsAsync());
     }
-    
+
     [Fact]
     public async Task AppendTabularBlob_FirstAppend_Filesystem_MigratesToFolderAndQueriesAllRows()
     {
@@ -983,9 +986,9 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
         Assert.False(await container.GetBlobClient($"{folderPrefix}0.parquet").ExistsAsync());
         Assert.True(await container.GetBlobClient($"{folderPrefix}1.parquet").ExistsAsync());
     }
-    
+
     #endregion
-    
+
     #region Query Tabular File
 
     [Fact]
@@ -1146,17 +1149,17 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
         Assert.Equal(rows, queryResult.Data.Length);
         Assert.Equal(5, queryResult.Columns.Length);
     }
-    
+
     #endregion
-    
+
     #region Get Plot Data
-    
+
     [Fact]
     public async Task GetPlotData_RecordDoesNotExist_Throws()
     {
         await Assert.ThrowsAsync<KeyNotFoundException>(() =>
             _olapBusiness.GetPlotData(
-                _userId, _organizationId, _projectId, _dataSourceId, -999, 5, 1));
+                _userId, _organizationId, _projectId, -999, 5, 1));
     }
 
     [Fact]
@@ -1165,7 +1168,7 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
         var result = await UploadAzureParquet(10, "dataset.parquet");
 
         var plotData = await _olapBusiness.GetPlotData(
-            _userId, _organizationId, _projectId, _dataSourceId, result.Id, 3, 1);
+            _userId, _organizationId, _projectId, result.Id, 3, 1);
 
         Assert.NotNull(plotData);
         Assert.Equal(3, plotData.Data.Length);
@@ -1198,7 +1201,7 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
             await CreateLargeTestParquetFile(4, "append2.parquet"));
 
         var plotData = await _olapBusiness.GetPlotData(
-            _userId, _organizationId, _projectId, _dataSourceId, result.Id, 4, 1);
+            _userId, _organizationId, _projectId, result.Id, 4, 1);
 
         Assert.Equal(4, plotData.Data.Length);
 
@@ -1221,7 +1224,7 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
         var result = await UploadFilesystemParquet(10, "dataset.parquet");
 
         var plotData = await _olapBusiness.GetPlotData(
-            _userId, _organizationId, _projectId, _dataSourceId, result.Id, 3, 1);
+            _userId, _organizationId, _projectId, result.Id, 3, 1);
 
         Assert.NotNull(plotData);
         Assert.Equal(3, plotData.Data.Length);
@@ -1245,7 +1248,7 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
         var result = await UploadFilesystemParquet(10, "dataset.parquet");
 
         var plotData = await _olapBusiness.GetPlotData(
-            _userId, _organizationId, _projectId, _dataSourceId, result.Id, 10, 2);
+            _userId, _organizationId, _projectId, result.Id, 10, 2);
 
         Assert.NotNull(plotData);
         Assert.Equal(5, plotData.Data.Length);
@@ -1277,7 +1280,7 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
             await CreateLargeTestParquetFile(4, "append2.parquet"));
 
         var plotData = await _olapBusiness.GetPlotData(
-            _userId, _organizationId, _projectId, _dataSourceId, result.Id, 4, 1);
+            _userId, _organizationId, _projectId, result.Id, 4, 1);
 
         Assert.Equal(4, plotData.Data.Length);
 
@@ -1304,15 +1307,15 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
 
         var ex = await Assert.ThrowsAsync<ArgumentException>(() =>
             _olapBusiness.GetPlotData(
-                _userId, _organizationId, _projectId, _dataSourceId, result.Id, 5, 1));
+                _userId, _organizationId, _projectId, result.Id, 5, 1));
 
         Assert.Contains("does not have a URI", ex.Message);
     }
-    
+
     #endregion
-    
+
     #region Extract Tabular Columns
-    
+
     [Fact]
     public async Task ExtractTabularColumns_AzureCsv_ReturnsExpectedColumns()
     {
@@ -1492,6 +1495,313 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
         Assert.Equal("pressure", projectionResult.Columns[1]);
         Assert.Equal(10, projectionResult.Data.Length);
     }
-    
+
+    #endregion
+
+    #region Get Highest Part Number
+
+    [Fact]
+    public async Task GetHighestPartNumber_FlatFile_ReturnsZero()
+    {
+        // A freshly uploaded file has not been appended to yet.
+        // 0 represents the original file (part 0 in the folder convention),
+        // so highest + 1 = 1 is the correct first part number with no special casing.
+        var result = await UploadFilesystemParquet(5, "dataset.parquet");
+
+        var highest = await _olapBusiness.GetHighestPartNumber(
+            _organizationId, _projectId, result.Id);
+
+        Assert.Equal(0L, highest);
+    }
+
+    [Fact]
+    public async Task GetHighestPartNumber_NonParquetExtension_Throws()
+    {
+        var csv = CreateTestCsvFile("timestamp,value\n2024-01-01T00:00:00,1", "data.csv");
+        var uploaded = await _fileBusiness.UploadFile(
+            _userId, _organizationId, _projectId, _dataSourceId, _fileSystemObjectStorageId, csv);
+
+        var ex = await Assert.ThrowsAsync<ArgumentException>(() =>
+            _olapBusiness.GetHighestPartNumber(_organizationId, _projectId, uploaded.Id));
+
+        Assert.Contains("Only Parquet files are supported", ex.Message);
+    }
+
+    [Fact]
+    public async Task GetHighestPartNumber_Filesystem_AfterFirstAppend_ReturnsOne()
+    {
+        var result = await UploadFilesystemParquet(5, "dataset.parquet");
+
+        await _olapBusiness.AppendTabularBlob(
+            _organizationId, _projectId, result.Id, 1,
+            await CreateLargeTestParquetFile(3, "append1.parquet"));
+
+        var highest = await _olapBusiness.GetHighestPartNumber(
+            _organizationId, _projectId, result.Id);
+
+        Assert.Equal(1L, highest);
+    }
+
+    [Fact]
+    public async Task GetHighestPartNumber_Filesystem_AfterMultipleAppends_ReturnsHighest()
+    {
+        var result = await UploadFilesystemParquet(5, "dataset.parquet");
+
+        await _olapBusiness.AppendTabularBlob(
+            _organizationId, _projectId, result.Id, 1,
+            await CreateLargeTestParquetFile(3, "append1.parquet"));
+
+        await _olapBusiness.AppendTabularBlob(
+            _organizationId, _projectId, result.Id, 2,
+            await CreateLargeTestParquetFile(4, "append2.parquet"));
+
+        await _olapBusiness.AppendTabularBlob(
+            _organizationId, _projectId, result.Id, 3,
+            await CreateLargeTestParquetFile(2, "append3.parquet"));
+
+        var highest = await _olapBusiness.GetHighestPartNumber(
+            _organizationId, _projectId, result.Id);
+
+        Assert.Equal(3L, highest);
+    }
+
+    [Fact]
+    public async Task GetHighestPartNumber_Azure_AfterFirstAppend_ReturnsOne()
+    {
+        var result = await UploadAzureParquet(5, "dataset.parquet");
+
+        await _olapBusiness.AppendTabularBlob(
+            _organizationId, _projectId, result.Id, 1,
+            await CreateLargeTestParquetFile(3, "append1.parquet"));
+
+        var highest = await _olapBusiness.GetHighestPartNumber(
+            _organizationId, _projectId, result.Id);
+
+        Assert.Equal(1L, highest);
+    }
+
+    [Fact]
+    public async Task GetHighestPartNumber_Azure_AfterMultipleAppends_ReturnsHighest()
+    {
+        var result = await UploadAzureParquet(5, "dataset.parquet");
+
+        await _olapBusiness.AppendTabularBlob(
+            _organizationId, _projectId, result.Id, 1,
+            await CreateLargeTestParquetFile(3, "append1.parquet"));
+
+        await _olapBusiness.AppendTabularBlob(
+            _organizationId, _projectId, result.Id, 2,
+            await CreateLargeTestParquetFile(4, "append2.parquet"));
+
+        var highest = await _olapBusiness.GetHighestPartNumber(
+            _organizationId, _projectId, result.Id);
+
+        Assert.Equal(2L, highest);
+    }
+
+    [Fact]
+    public async Task GetHighestPartNumber_RecordDoesNotExist_Throws()
+    {
+        var ex = await Assert.ThrowsAsync<ArgumentException>(() =>
+            _olapBusiness.GetHighestPartNumber(_organizationId, _projectId, -999));
+
+        Assert.Contains("does not exist", ex.Message);
+    }
+
+    [Fact]
+    public async Task GetHighestPartNumber_RecordUriMissing_Throws()
+    {
+        var result = await UploadFilesystemParquet(5, "dataset.parquet");
+        var record = await GetRecordEntity(result.Id);
+        record.Uri = null;
+        await Context.SaveChangesAsync();
+
+        var ex = await Assert.ThrowsAsync<ArgumentException>(() =>
+            _olapBusiness.GetHighestPartNumber(_organizationId, _projectId, result.Id));
+
+        Assert.Contains("Record has no URI", ex.Message);
+    }
+
+    [Fact]
+    public async Task GetHighestPartNumber_NextPartFormula_IsAlwaysSafe()
+    {
+        // The intended usage is always: next = GetHighestPartNumber(...) + 1
+        // This works uniformly whether the record is still a flat file (returns 0)
+        // or already has parts (returns the highest part number found).
+        var result = await UploadFilesystemParquet(5, "dataset.parquet");
+
+        // Flat file: returns 0, so next part = 1
+        var highest = await _olapBusiness.GetHighestPartNumber(
+            _organizationId, _projectId, result.Id);
+        Assert.Equal(0L, highest);
+
+        await _olapBusiness.AppendTabularBlob(
+            _organizationId, _projectId, result.Id, highest + 1,
+            await CreateLargeTestParquetFile(3, "append1.parquet"));
+
+        // After first append: returns 1, so next part = 2
+        highest = await _olapBusiness.GetHighestPartNumber(
+            _organizationId, _projectId, result.Id);
+        Assert.Equal(1L, highest);
+
+        await _olapBusiness.AppendTabularBlob(
+            _organizationId, _projectId, result.Id, highest + 1,
+            await CreateLargeTestParquetFile(2, "append2.parquet"));
+
+        // After second append: returns 2, so next part = 3
+        highest = await _olapBusiness.GetHighestPartNumber(
+            _organizationId, _projectId, result.Id);
+        Assert.Equal(2L, highest);
+    }
+
+    #endregion
+
+    #region Ecosystem
+
+    [Fact]
+    public async Task Ecosystem_Filesystem_UploadAppendQueryPlotAndAppendByPartNumber()
+    {
+        // ── Step 1: Upload base parquet file (5 rows) ────────────────────────
+        var baseFile = await CreateLargeTestParquetFile(5, "dataset.parquet");
+        var uploadResult = await _fileBusiness.UploadFile(
+            _userId, _organizationId, _projectId, _dataSourceId, _fileSystemObjectStorageId, baseFile);
+
+        Assert.NotNull(uploadResult);
+        Assert.Equal("parquet", uploadResult.FileType);
+
+        var recordAfterUpload = await GetRecordEntity(uploadResult.Id);
+        Assert.EndsWith(".parquet", recordAfterUpload.Uri, StringComparison.OrdinalIgnoreCase);
+
+        // ── Step 2: Append part 1 (3 rows, timestamps continue from row 5) ───
+        await _olapBusiness.AppendTabularBlob(
+            _organizationId, _projectId, uploadResult.Id, 1,
+            await CreateLargeTestParquetFile(3, "append1.parquet", 5));
+
+        var recordAfterFirstAppend = await GetRecordEntity(uploadResult.Id);
+        Assert.EndsWith(Path.DirectorySeparatorChar.ToString(), recordAfterFirstAppend.Uri);
+        Assert.True(File.Exists(Path.Combine(recordAfterFirstAppend.Uri!, "0.parquet")));
+        Assert.True(File.Exists(Path.Combine(recordAfterFirstAppend.Uri!, "1.parquet")));
+
+        // ── Step 3: Query all rows across the folder ──────────────────────────
+        var queryResult = await _olapBusiness.QueryTabularFile(
+            _userId, _organizationId, _projectId, uploadResult.Id,
+            "SELECT * FROM data", "data");
+
+        Assert.Equal(8, queryResult.Data.Length); // 5 base + 3 appended
+        Assert.Equal(5, queryResult.Columns.Length);
+
+        // ── Step 4: Get plot data and verify ascending temporal order ─────────
+        var plotData = await _olapBusiness.GetPlotData(
+            _userId, _organizationId, _projectId, uploadResult.Id, 4, 1);
+
+        Assert.Equal(4, plotData.Data.Length);
+
+        var timestampIndex = (int)FindColumnIndex(plotData, "timestamp");
+        var timestamps = plotData.Data
+            .Select(r => Convert.ToDateTime(r[timestampIndex]))
+            .ToArray();
+
+        // Last 4 of 8 rows in ascending order: 00:00:04, 00:00:05, 00:00:06, 00:00:07
+        Assert.Equal(new DateTime(2024, 1, 1, 0, 0, 4), timestamps[0]);
+        Assert.Equal(new DateTime(2024, 1, 1, 0, 0, 5), timestamps[1]);
+        Assert.Equal(new DateTime(2024, 1, 1, 0, 0, 6), timestamps[2]);
+        Assert.Equal(new DateTime(2024, 1, 1, 0, 0, 7), timestamps[3]);
+
+        // ── Step 5: Get highest part number and derive next part ──────────────
+        var highestPart = await _olapBusiness.GetHighestPartNumber(
+            _organizationId, _projectId, uploadResult.Id);
+
+        Assert.Equal(1L, highestPart);
+        var nextPart = highestPart + 1; // = 2
+
+        // ── Step 6: Append using the derived part number (4 rows, timestamps continue from row 8) ──
+        await _olapBusiness.AppendTabularBlob(
+            _organizationId, _projectId, uploadResult.Id, nextPart,
+            await CreateLargeTestParquetFile(4, "append2.parquet", 8));
+
+        Assert.True(File.Exists(Path.Combine(recordAfterFirstAppend.Uri!, "2.parquet")));
+
+        var finalCount = await _olapBusiness.QueryTabularFile(
+            _userId, _organizationId, _projectId, uploadResult.Id,
+            "SELECT COUNT(*) AS total FROM data", "data");
+
+        Assert.Single(finalCount.Data);
+        Assert.Equal(12L, Convert.ToInt64(finalCount.Data[0][0])); // 5 + 3 + 4
+    }
+
+    [Fact]
+    public async Task Ecosystem_Azure_UploadAppendQueryPlotAndAppendByPartNumber()
+    {
+        // ── Step 1: Upload base parquet file (5 rows) ────────────────────────
+        var baseFile = await CreateLargeTestParquetFile(5, "dataset.parquet");
+        var uploadResult = await _fileBusiness.UploadFile(
+            _userId, _organizationId, _projectId, _dataSourceId, _azureObjectStorageId, baseFile);
+
+        Assert.NotNull(uploadResult);
+        Assert.Equal("parquet", uploadResult.FileType);
+
+        var recordAfterUpload = await GetRecordEntity(uploadResult.Id);
+        Assert.EndsWith(".parquet", recordAfterUpload.Uri, StringComparison.OrdinalIgnoreCase);
+
+        // ── Step 2: Append part 1 (3 rows, timestamps continue from row 5) ───
+        await _olapBusiness.AppendTabularBlob(
+            _organizationId, _projectId, uploadResult.Id, 1,
+            await CreateLargeTestParquetFile(3, "append1.parquet", 5));
+
+        var recordAfterFirstAppend = await GetRecordEntity(uploadResult.Id);
+        Assert.EndsWith("/", recordAfterFirstAppend.Uri);
+
+        var blobServiceClient = new BlobServiceClient(_connectionString);
+        var container = blobServiceClient.GetBlobContainerClient(_containerName);
+        Assert.True(await container.GetBlobClient($"{recordAfterFirstAppend.Uri}0.parquet").ExistsAsync());
+        Assert.True(await container.GetBlobClient($"{recordAfterFirstAppend.Uri}1.parquet").ExistsAsync());
+
+        // ── Step 3: Query all rows across the folder ──────────────────────────
+        var queryResult = await _olapBusiness.QueryTabularFile(
+            _userId, _organizationId, _projectId, uploadResult.Id,
+            "SELECT * FROM data", "data");
+
+        Assert.Equal(8, queryResult.Data.Length); // 5 base + 3 appended
+        Assert.Equal(5, queryResult.Columns.Length);
+
+        // ── Step 4: Get plot data and verify ascending temporal order ─────────
+        var plotData = await _olapBusiness.GetPlotData(
+            _userId, _organizationId, _projectId, uploadResult.Id, 4, 1);
+
+        Assert.Equal(4, plotData.Data.Length);
+
+        var timestampIndex = (int)FindColumnIndex(plotData, "timestamp");
+        var timestamps = plotData.Data
+            .Select(r => Convert.ToDateTime(r[timestampIndex]))
+            .ToArray();
+
+        // Last 4 of 8 rows in ascending order: 00:00:04, 00:00:05, 00:00:06, 00:00:07
+        Assert.Equal(new DateTime(2024, 1, 1, 0, 0, 4), timestamps[0]);
+        Assert.Equal(new DateTime(2024, 1, 1, 0, 0, 5), timestamps[1]);
+        Assert.Equal(new DateTime(2024, 1, 1, 0, 0, 6), timestamps[2]);
+        Assert.Equal(new DateTime(2024, 1, 1, 0, 0, 7), timestamps[3]);
+
+        // ── Step 5: Get highest part number and derive next part ──────────────
+        var highestPart = await _olapBusiness.GetHighestPartNumber(
+            _organizationId, _projectId, uploadResult.Id);
+
+        Assert.Equal(1L, highestPart);
+        var nextPart = highestPart + 1; // = 2
+
+        // ── Step 6: Append using the derived part number (4 rows, timestamps continue from row 8) ──
+        await _olapBusiness.AppendTabularBlob(
+            _organizationId, _projectId, uploadResult.Id, nextPart,
+            await CreateLargeTestParquetFile(4, "append2.parquet", 8));
+
+        Assert.True(await container.GetBlobClient($"{recordAfterFirstAppend.Uri}2.parquet").ExistsAsync());
+
+        var finalCount = await _olapBusiness.QueryTabularFile(
+            _userId, _organizationId, _projectId, uploadResult.Id,
+            "SELECT COUNT(*) AS total FROM data", "data");
+
+        Assert.Single(finalCount.Data);
+        Assert.Equal(12L, Convert.ToInt64(finalCount.Data[0][0])); // 5 + 3 + 4
+    }
+
     #endregion
 }
