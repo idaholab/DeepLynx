@@ -232,9 +232,9 @@ public class InsightBusiness : IInsightBusiness
             FileIds = payload.FileIds,
             SamplingParameters = new InsightSamplingParametersBody
             {
-                Temperature = sp?.Temperature,
-                MaxTokens = sp?.MaxTokens,
-                TopP = sp?.TopP
+                Temperature = sp?.Temperature ?? 0.7,
+                MaxTokens = sp?.MaxTokens ?? 1024,
+                TopP = sp?.TopP ?? 0.9
             },
             LlmServerUrl = llmConfig.ServerUrl,
             LlmModelName = llmConfig.ModelName,
@@ -378,11 +378,11 @@ file sealed class InsightQueryRequestBody
 file sealed class InsightSamplingParametersBody
 {
     [JsonPropertyName("temperature")]
-    public double? Temperature { get; set; }
+    public double Temperature { get; set; } = 0.7;
 
     [JsonPropertyName("max_tokens")]
-    public int? MaxTokens { get; set; }
+    public int MaxTokens { get; set; } = 1024;
 
     [JsonPropertyName("top_p")]
-    public double? TopP { get; set; }
+    public double TopP { get; set; } = 0.9;
 }

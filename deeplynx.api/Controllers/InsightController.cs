@@ -74,7 +74,7 @@ public class InsightController : ControllerBase
     /// </summary>
     /// <param name="organizationId">ID of the organization.</param>
     /// <param name="projectId">ID of the project.</param>
-    /// <param name="languageModelConfigId">Optional explicit LLM model config ID. Language Model Type can be LLM or VLM. Defaults to the project/org LLM default, or VLM default if no LLM configured.</param>
+    /// <param name="languageModelConfigId">Optional explicit language model config ID. Language Model Type can be LLM or VLM. Defaults to the project/org LLM default, or VLM default if no LLM configured.</param>
     /// <param name="embeddingModelConfigId">Optional explicit embedding model config ID. Defaults to the project/org default.</param>
     /// <param name="dto">Query payload containing the question, file IDs, and sampling parameters.</param>
     /// <param name="cancellationToken">Propagated from the HTTP request lifecycle.</param>

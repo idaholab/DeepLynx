@@ -620,7 +620,7 @@ public class AiModelConfigBusinessTests : IntegrationTestBase
             ServerUrl = "https://api.anthropic.com",
             ModelProvider = "Anthropic", // mixed case
             ModelName = "claude-haiku-4-5",
-            ModelType = "Language", // mixed case
+            ModelType = "Llm", // mixed case
             RequiresToken = true,
             Default = false
         };

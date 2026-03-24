@@ -285,7 +285,7 @@ public class AiModelConfigBusiness : IAiModelConfigBusiness
                 OrganizationId = organizationId,
                 ProjectId = projectId,
                 ServerUrl = dto.ServerUrl,
-                ModelProvider = dto.ModelProvider,
+                ModelProvider = dto.ModelProvider.ToLower(),
                 ModelName = dto.ModelName,
                 ModelType = dto.ModelType.ToLower(),
                 RequiresToken = dto.RequiresToken,
