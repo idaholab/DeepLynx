@@ -27,12 +27,12 @@ public class InsightController : ControllerBase
 
     /// <summary>
     ///     Queue a document upload for embedding via Insight.
-    ///     Insight manages ingestion internally via RabbitMQ — poll the ingestion
-    ///     status endpoint to track progress after this returns 200.
+    ///     Insight manages ingestion internally via RabbitMQ.
+    ///     Poll the ingestion status endpoint to track progress after this returns 200.
     /// </summary>
     /// <param name="organizationId">ID of the organization.</param>
     /// <param name="projectId">ID of the project.</param>
-    /// <param name="llmModelConfigId">Optional explicit LLM model config ID. Defaults to the project/org default.</param>
+    /// <param name="vlmModelConfigId">Optional explicit VLM model config ID. Defaults to the project/org default.</param>
     /// <param name="embeddingModelConfigId">Optional explicit embedding model config ID. Defaults to the project/org default.</param>
     /// <param name="dto">Upload payload containing file info.</param>
     /// <returns>202 Accepted once Insight has acknowledged the request.</returns>
@@ -40,14 +40,14 @@ public class InsightController : ControllerBase
     public async Task<IActionResult> Upload(
         long organizationId,
         long projectId,
-        [FromQuery] long? llmModelConfigId,
+        [FromQuery] long? vlmModelConfigId,
         [FromQuery] long? embeddingModelConfigId,
         [FromBody] InsightUploadRequestDto dto)
     {
         try
         {
             var userId = UserContextStorage.UserId;
-            await _insightBusiness.QueueInsightUpload(userId, organizationId, projectId, llmModelConfigId, embeddingModelConfigId, dto);
+            await _insightBusiness.QueueInsightUpload(userId, organizationId, projectId, vlmModelConfigId, embeddingModelConfigId, dto);
             return Accepted(new { message = "Upload queued. Poll /ingestion_status/{fileId} to track progress." });
         }
         catch (KeyNotFoundException exc)
@@ -70,7 +70,8 @@ public class InsightController : ControllerBase
 
     /// <summary>
     ///     Stream a RAG query response from Insight as plain text chunks.
-    ///     The response body is streamed directly. consume it as a readable stream on the client.
+    ///     The response body is streamed directly. Consume it as a readable stream on the client.
+    ///     Language Model Type can be LLM or VLM
     /// </summary>
     /// <param name="organizationId">ID of the organization.</param>
     /// <param name="projectId">ID of the project.</param>
@@ -110,8 +111,8 @@ public class InsightController : ControllerBase
         {
             _logger.LogError("Model config not found during Insight query for project {ProjectId}: {Error}", projectId, exc.Message);
 
-            // Headers are already sent once we start streaming, so we can't change the
-            // status code. Write the error into the stream instead so the client knows.
+            // Headers are already sent once streaming is started, can't change the status code.
+            // Write the error into the stream instead so the client knows.
             if (!Response.HasStarted)
                 Response.StatusCode = StatusCodes.Status404NotFound;
             else

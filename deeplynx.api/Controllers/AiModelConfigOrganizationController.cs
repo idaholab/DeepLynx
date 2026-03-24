@@ -118,6 +118,7 @@ public class AiModelConfigController : ControllerBase
 
     /// <summary>
     ///     Create a new AI Model Configuration for an organization. Model Types include LLM, VLM, and Embedding
+    ///     Insight Features require a VLM and an Embedding Model (LLM is optional)
     /// </summary>
     /// <param name="organizationId">The ID of the organization under which the AI Model Configuration will be created.</param>
     /// <param name="dto">The data transfer object containing the details of the AI Model Configuration to create.</param>
