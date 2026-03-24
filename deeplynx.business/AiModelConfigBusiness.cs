@@ -300,9 +300,9 @@ public class AiModelConfigBusiness : IAiModelConfigBusiness
             if (dto.Default)
             {
                 if (projectId.HasValue)
-                    await ResetProjectDefaults(projectId.Value, newConfig.Id);
+                    await ResetProjectDefaults(projectId.Value, newConfig.Id, newConfig.ModelType);
                 else
-                    await ResetOrganizationDefaults(organizationId, newConfig.Id);
+                    await ResetOrganizationDefaults(organizationId, newConfig.Id, newConfig.ModelType);
             }
 
             await transaction.CommitAsync();
@@ -373,9 +373,9 @@ public class AiModelConfigBusiness : IAiModelConfigBusiness
                 if (!returnedModelConfig.Default && dto.Default.Value)
                 {
                     if (projectId.HasValue)
-                        await ResetProjectDefaults(projectId.Value, returnedModelConfig.Id);
+                        await ResetProjectDefaults(projectId.Value, returnedModelConfig.Id, returnedModelConfig.ModelType);
                     else
-                        await ResetOrganizationDefaults(organizationId, returnedModelConfig.Id);
+                        await ResetOrganizationDefaults(organizationId, returnedModelConfig.Id, returnedModelConfig.ModelType);
                 }
             }
 
@@ -542,19 +542,17 @@ public class AiModelConfigBusiness : IAiModelConfigBusiness
         return true;
     }
 
-    private async Task ResetProjectDefaults(long projectId, long newDefaultId)
+    private async Task ResetProjectDefaults(long projectId, long newDefaultId, string modelType)
     {
-        // check for existing defaults at the project level and remove them from being default
         await _context.AiModelConfigs
-            .Where(os => os.ProjectId == projectId && os.Id != newDefaultId)
+            .Where(os => os.ProjectId == projectId && os.Id != newDefaultId && os.ModelType == modelType)
             .ExecuteUpdateAsync(s => s.SetProperty(os => os.Default, false));
     }
 
-    private async Task ResetOrganizationDefaults(long organizationId, long newDefaultId)
+    private async Task ResetOrganizationDefaults(long organizationId, long newDefaultId, string modelType)
     {
-        // check for existing defaults at the org level and remove them from being default
         await _context.AiModelConfigs
-            .Where(os => os.OrganizationId == organizationId && os.ProjectId == null && os.Id != newDefaultId)
+            .Where(os => os.OrganizationId == organizationId && os.ProjectId == null && os.Id != newDefaultId && os.ModelType == modelType)
             .ExecuteUpdateAsync(s => s.SetProperty(os => os.Default, false));
     }
 }
