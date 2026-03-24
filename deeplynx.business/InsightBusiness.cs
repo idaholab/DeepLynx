@@ -94,6 +94,7 @@ public class InsightBusiness : IInsightBusiness
     /// <summary>
     ///     Streams a RAG query response from the Insight API chunk by chunk.
     ///     Maps to POST /query.
+    ///     language Model Type can be LLM or VLM
     /// </summary>
     /// <param name="currentUserId">The ID of the user making the request. Used to resolve model tokens when required.</param>
     /// <param name="organizationId">The ID of the organization. Used to scope model config resolution.</param>
