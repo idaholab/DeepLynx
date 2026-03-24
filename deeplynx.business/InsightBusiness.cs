@@ -122,8 +122,6 @@ public class InsightBusiness : IInsightBusiness
         InsightQueryRequestDto payload,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
-        // Resolve configs before entering the iterator — exceptions cannot be thrown
-        // directly from inside an async iterator (they would be swallowed until enumeration).
         var llmConfig = await ResolveModelConfig(currentUserId, organizationId, projectId, languageModelConfigId, "llm");
         var embeddingConfig = await ResolveModelConfig(currentUserId, organizationId, projectId, embeddingModelConfigId, "embedding");
 
@@ -214,11 +212,7 @@ public class InsightBusiness : IInsightBusiness
 
         return config;
     }
-
-    /// <summary>
-    ///     Inner async iterator for <see cref="StreamInsightQuery"/>. Separated so that config resolution
-    ///     (and any exceptions it may throw) happens before enumeration begins.
-    /// </summary>
+    
     private async IAsyncEnumerable<string> StreamInsightQueryCore(
         AiModelConfigResponseDto llmConfig,
         AiModelConfigResponseDto embeddingConfig,
@@ -249,9 +243,7 @@ public class InsightBusiness : IInsightBusiness
             Content = Serialize(body),
             Headers = { Accept = { new("text/plain") } }
         };
-
-        // ResponseHeadersRead lets us start consuming the body before it finishes arrives,
-        // which is what enables real streaming.
+        
         var response = await _httpClient.SendAsync(
             request,
             HttpCompletionOption.ResponseHeadersRead,
@@ -279,7 +271,6 @@ public class InsightBusiness : IInsightBusiness
         new(JsonSerializer.Serialize(obj, JsonOptions), Encoding.UTF8, "application/json");
 
     /// <summary>
-    ///     Mirrors the normalizeInsightFileUri logic from the frontend.
     ///     Ensures URIs are either fully-qualified (http/https/etc.) or rooted at /data/.
     /// </summary>
     private static string NormalizeFileUri(string fileUri)
@@ -333,7 +324,7 @@ file sealed class InsightUploadRequestBody
 
 /// <summary>
 ///     Individual file entry inside file_info.
-///     Insight expects camelCase for these fields specifically.
+///     Insight expects camelCase
 /// </summary>
 file sealed class InsightUploadFileInfoBody
 {
