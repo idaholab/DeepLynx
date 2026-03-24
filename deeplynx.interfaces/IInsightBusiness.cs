@@ -9,7 +9,7 @@ public interface IInsightBusiness
         long currentUserId,
         long organizationId,
         long projectId,
-        long? llmModelConfigId,
+        long? vlmModelConfigId,
         long? embeddingModelConfigId,
         InsightUploadRequestDto payload);
 
@@ -17,7 +17,7 @@ public interface IInsightBusiness
         long currentUserId,
         long organizationId,
         long projectId,
-        long? llmModelConfigId,
+        long? languageModelConfigId,
         long? embeddingModelConfigId,
         InsightQueryRequestDto payload,
         [EnumeratorCancellation] CancellationToken cancellationToken = default);

@@ -74,7 +74,7 @@ public class InsightController : ControllerBase
     /// </summary>
     /// <param name="organizationId">ID of the organization.</param>
     /// <param name="projectId">ID of the project.</param>
-    /// <param name="llmModelConfigId">Optional explicit LLM model config ID. Defaults to the project/org default.</param>
+    /// <param name="languageModelConfigId">Optional explicit LLM model config ID. Defaults to the project/org default.</param>
     /// <param name="embeddingModelConfigId">Optional explicit embedding model config ID. Defaults to the project/org default.</param>
     /// <param name="dto">Query payload containing the question, file IDs, and sampling parameters.</param>
     /// <param name="cancellationToken">Propagated from the HTTP request lifecycle.</param>
@@ -82,7 +82,7 @@ public class InsightController : ControllerBase
     public async Task Query(
         long organizationId,
         long projectId,
-        [FromQuery] long? llmModelConfigId,
+        [FromQuery] long? languageModelConfigId,
         [FromQuery] long? embeddingModelConfigId,
         [FromBody] InsightQueryRequestDto dto,
         CancellationToken cancellationToken)
@@ -95,7 +95,7 @@ public class InsightController : ControllerBase
         {
             await foreach (var chunk in _insightBusiness.StreamInsightQuery(
                                userId, organizationId, projectId,
-                               llmModelConfigId, embeddingModelConfigId,
+                               languageModelConfigId, embeddingModelConfigId,
                                dto, cancellationToken))
             {
                 await Response.WriteAsync(chunk, cancellationToken);

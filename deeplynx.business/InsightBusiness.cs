@@ -43,7 +43,7 @@ public class InsightBusiness : IInsightBusiness
     /// <param name="currentUserId">The ID of the user making the request. Used to resolve model tokens when required.</param>
     /// <param name="organizationId">The ID of the organization. Used to scope model config resolution.</param>
     /// <param name="projectId">The ID of the project. Project-level model config defaults are preferred over org-level defaults.</param>
-    /// <param name="llmModelConfigId">
+    /// <param name="vlmModelConfigId">
     ///     Optional explicit LLM model config ID. If null, the default language model config for the org/project is used.
     /// </param>
     /// <param name="embeddingModelConfigId">
@@ -57,11 +57,11 @@ public class InsightBusiness : IInsightBusiness
         long currentUserId,
         long organizationId,
         long projectId,
-        long? llmModelConfigId,
+        long? vlmModelConfigId,
         long? embeddingModelConfigId,
         InsightUploadRequestDto payload)
     {
-        var llmConfig = await ResolveModelConfig(currentUserId, organizationId, projectId, llmModelConfigId, "language");
+        var vlmConfig = await ResolveModelConfig(currentUserId, organizationId, projectId, vlmModelConfigId, "vlm");
         var embeddingConfig = await ResolveModelConfig(currentUserId, organizationId, projectId, embeddingModelConfigId, "embedding");
 
         var body = new InsightUploadRequestBody
@@ -71,9 +71,9 @@ public class InsightBusiness : IInsightBusiness
                 FileId = f.FileId,
                 FileUri = NormalizeFileUri(f.FileUri)
             }).ToList(),
-            LlmServerUrl = llmConfig.ServerUrl,
-            LlmModelName = llmConfig.ModelName,
-            LlmAuthToken = llmConfig.Token,
+            LlmServerUrl = vlmConfig.ServerUrl,
+            LlmModelName = vlmConfig.ModelName,
+            LlmAuthToken = vlmConfig.Token,
             EmbeddingServerUrl = embeddingConfig.ServerUrl,
             EmbeddingModelName = embeddingConfig.ModelName,
             EmbeddingAuthToken = embeddingConfig.Token
@@ -98,7 +98,7 @@ public class InsightBusiness : IInsightBusiness
     /// <param name="currentUserId">The ID of the user making the request. Used to resolve model tokens when required.</param>
     /// <param name="organizationId">The ID of the organization. Used to scope model config resolution.</param>
     /// <param name="projectId">The ID of the project. Project-level model config defaults are preferred over org-level defaults.</param>
-    /// <param name="llmModelConfigId">
+    /// <param name="languageModelConfigId">
     ///     Optional explicit LLM model config ID. If null, the default language model config for the org/project is used.
     /// </param>
     /// <param name="embeddingModelConfigId">
@@ -116,14 +116,14 @@ public class InsightBusiness : IInsightBusiness
         long currentUserId,
         long organizationId,
         long projectId,
-        long? llmModelConfigId,
+        long? languageModelConfigId,
         long? embeddingModelConfigId,
         InsightQueryRequestDto payload,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         // Resolve configs before entering the iterator — exceptions cannot be thrown
         // directly from inside an async iterator (they would be swallowed until enumeration).
-        var llmConfig = await ResolveModelConfig(currentUserId, organizationId, projectId, llmModelConfigId, "language");
+        var llmConfig = await ResolveModelConfig(currentUserId, organizationId, projectId, languageModelConfigId, "llm");
         var embeddingConfig = await ResolveModelConfig(currentUserId, organizationId, projectId, embeddingModelConfigId, "embedding");
 
         await foreach (var chunk in StreamInsightQueryCore(llmConfig, embeddingConfig, payload, cancellationToken))
@@ -177,14 +177,39 @@ public class InsightBusiness : IInsightBusiness
         long? modelConfigId,
         string modelType)
     {
-        var config = modelConfigId.HasValue
-            ? await _aiModelConfigBusiness.GetAiModelConfigWithToken(currentUserId, organizationId, projectId, modelConfigId.Value)
-            : await _aiModelConfigBusiness.GetDefaultAiModelConfig(currentUserId, organizationId, projectId, modelType);
+        AiModelConfigResponseDto config;
+        
+        // If requesting the default LLM and none exists, fallback to the default VLM.
+        // // (This scenario is expected only for insight queries.)
+        if (!modelConfigId.HasValue && modelType == "llm")
+        {
+            try
+            {
+                config = await _aiModelConfigBusiness.GetDefaultAiModelConfig(
+                    currentUserId, organizationId, projectId, "llm");
+            }
+            catch (KeyNotFoundException)
+            {
+                config = await _aiModelConfigBusiness.GetDefaultAiModelConfig(
+                    currentUserId, organizationId, projectId, "vlm");
+            }
+        }
+        // Otherwise:
+        // - If a modelConfigId is provided, fetch that specific config
+        // - If not, fetch the default config for the requested modelType
+        else
+        {
+            config = modelConfigId.HasValue
+                ? await _aiModelConfigBusiness.GetAiModelConfigWithToken(currentUserId, organizationId, projectId,
+                    modelConfigId.Value)
+                : await _aiModelConfigBusiness.GetDefaultAiModelConfig(currentUserId, organizationId, projectId,
+                    modelType);
+        }
 
         if (config.RequiresToken == true && string.IsNullOrWhiteSpace(config.Token))
-            throw new InvalidOperationException(
-                $"The {modelType} model configuration (ID: {config.Id}) requires an API token, " +
-                $"but none was found for user {currentUserId}. Please add a token for this model.");
+                throw new InvalidOperationException(
+                    $"The {modelType} model configuration (ID: {config.Id}) requires an API token, " +
+                    $"but none was found for user {currentUserId}. Please add a token for this model.");
 
         return config;
     }

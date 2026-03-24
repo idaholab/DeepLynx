@@ -28,7 +28,8 @@ public class AiModelConfigBusiness : IAiModelConfigBusiness
 
     private static readonly List<string> ModelTypeList = new List<string>
     {
-        "language",
+        "llm",
+        "vlm",
         "embedding"
     };
 
@@ -187,7 +188,7 @@ public class AiModelConfigBusiness : IAiModelConfigBusiness
     ///     The ID of the project to scope the lookup to. If provided, project-level defaults are
     ///     preferred over organization-level defaults. If null, only organization-level defaults are considered.
     /// </param>
-    /// <param name="modelType">The type of model to retrieve (e.g. "language" or "embedding")</param>
+    /// <param name="modelType">The type of model to retrieve (e.g. "llm", "vlm" or "embedding")</param>
     /// <param name="currentUserId">
     ///     the id of the user making the request. If needed, the user's stored token for the model will be resolved and included
     ///     in the result when the model requires a token.
@@ -286,7 +287,7 @@ public class AiModelConfigBusiness : IAiModelConfigBusiness
                 ServerUrl = dto.ServerUrl,
                 ModelProvider = dto.ModelProvider,
                 ModelName = dto.ModelName,
-                ModelType = dto.ModelType,
+                ModelType = dto.ModelType.ToLower(),
                 RequiresToken = dto.RequiresToken,
                 Default = dto.Default,
                 IsArchived = false,
