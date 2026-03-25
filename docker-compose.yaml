@@ -36,19 +36,6 @@ services:
     depends_on:
       - server
 
-  docs:
-    build:
-      context: ./
-      dockerfile: Dockerfiles/docs/Dockerfile.local
-    environment:
-      NODE_ENV: production
-    ports:
-      - "3001:3001"
-    networks:
-      - nexus-network
-    depends_on:
-      - server
-
   server:
     build:
       context: ./
@@ -85,9 +72,6 @@ services:
       - nexus-network
     volumes:
       - object_storage:/data
-    depends_on:
-      db-version-check:
-        condition: service_completed_successfully
 
   nx-postgres:
     build:
@@ -104,49 +88,18 @@ services:
     volumes:
       - nx_postgres_data:/var/lib/postgresql
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U postgres && psql -U postgres -d deeplynx -c 'SELECT 1;'" ]
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U postgres && psql -U postgres -d deeplynx -c 'SELECT 1;'",
+        ]
       interval: 10s
       timeout: 5s
       retries: 5
       start_period: 30s
 
-  db-version-check:
-    image: postgres:18-alpine3.23
-    networks:
-      - nexus-network
-    volumes:
-      - ./Dockerfiles/database/check_db_version.sh:/scripts/check_db_version.sh
-    environment:
-      DB_HOST: nx-postgres
-      DB_USER: postgres
-      DB_PASSWORD: nexuscore
-      DB_NAME: deeplynx
-    command: >
-      sh -c "
-        apk add --no-cache bash &&
-        chmod +x /scripts/check_db_version.sh &&
-        /scripts/check_db_version.sh
-      "
-    depends_on:
-      nx-postgres:
-        condition: service_healthy
-
-  mcp:
-    build:
-      context: ./
-      dockerfile: Dockerfiles/mcp/Dockerfile.local
-    environment:
-      NEXUS_API_URL: "http://server:5000/api/v1"
-      MCP_SERVER_URL: "http://0.0.0.0:43656"
-    ports:
-      - "43656:43656"
-    networks:
-      - nexus-network
-    depends_on:
-      - server
-
   insight-rabbitmq:
-    profiles: [ insight ]
+    profiles: [insight]
     build:
       context: ./deeplynx.insight/app/rabbitmq
       dockerfile: Dockerfiles/Dockerfile.production
@@ -157,7 +110,7 @@ services:
     env_file:
       - ./deeplynx.insight/.env.production
     healthcheck:
-      test: [ "CMD", "rabbitmq-diagnostics", "-q", "check_port_connectivity" ]
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "check_port_connectivity"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -166,7 +119,7 @@ services:
       - nexus-network
 
   insight-minio:
-    profiles: [ insight ]
+    profiles: [insight]
     build:
       context: ./deeplynx.insight/app/minio
       dockerfile: Dockerfiles/Dockerfile.production
@@ -176,9 +129,9 @@ services:
     env_file:
       - ./deeplynx.insight/.env.production
     environment:
-      - MINIO_ENDPOINT=http://localhost:9100
+      - MINIO_ENDPOINT=host.docker.internal:9100
     healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:9100/minio/health/live" ]
+      test: ["CMD", "curl", "-f", "http://localhost:9100/minio/health/live"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -187,13 +140,13 @@ services:
       - nexus-network
 
   insight-fastapi:
-    profiles: [ insight ]
+    profiles: [insight]
     build:
       context: ./deeplynx.insight
       dockerfile: app/fastapi/Dockerfiles/Dockerfile.production
     ports:
       - "5009:5009"
-    command: [ "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "5009" ]
+    command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "5009"]
     env_file:
       - ./deeplynx.insight/.env.production
     environment:
@@ -210,19 +163,17 @@ services:
         condition: service_healthy
       insight-minio:
         condition: service_healthy
-      db-version-check:
-        condition: service_completed_successfully
     volumes:
       - object_storage:/data
     networks:
       - nexus-network
 
   insight-rabbitmq-runner:
-    profiles: [ insight ]
+    profiles: [insight]
     build:
       context: ./deeplynx.insight
       dockerfile: app/rabbitmq/Dockerfiles/Dockerfile.runner.production
-    command: [ "python", "-m", "runner" ]
+    command: ["python", "-m", "runner"]
     env_file:
       - ./deeplynx.insight/.env.production
     environment:
@@ -239,12 +190,22 @@ services:
         condition: service_healthy
       insight-minio:
         condition: service_healthy
-      db-version-check:
-        condition: service_completed_successfully
     volumes:
       - object_storage:/data
     networks:
       - nexus-network
+
+  nexus-pgAdmin-service:
+    image: dpage/pgadmin4
+    env_file:
+      - .env
+    platform: linux/amd64
+    ports:
+      - 5050:80
+    networks:
+      - nexus-network
+    depends_on:
+      - nx-postgres
 
 networks:
   nexus-network:
