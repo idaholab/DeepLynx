@@ -512,6 +512,8 @@ metadata:
   name: insight-minio
   namespace: deeplynxv3-dev
 spec:
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: insight-minio
