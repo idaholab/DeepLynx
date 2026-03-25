@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using JsonSerializer = System.Text.Json.JsonSerializer;
 
@@ -22,6 +23,8 @@ public class FileBusiness
     private readonly IRecordBusiness _recordBusiness;
     private readonly ISensitivityLabelService _sensitivityLabelService;
     private readonly InsightServiceClient _insightServiceClient;
+    private readonly IAiModelConfigBusiness _aiModelConfigBusiness;
+    private readonly ILogger _logger;
 
     // NOTE: Chunked upload methods currently only support filesystem storage.
     // When Azure/S3 chunked uploads are needed, refactor these methods to 
@@ -32,7 +35,9 @@ public class FileBusiness
         IDataSourceBusiness dataSourceBusiness,
         IClassBusiness classBusiness,
         IRecordBusiness recordBusiness,
-        InsightServiceClient insightServiceClient)
+        InsightServiceClient insightServiceClient,
+        IAiModelConfigBusiness aiModelConfigBusiness,
+        ILogger<FileBusiness> logger)
     {
         _context = context;
         _factory = factory;
@@ -40,6 +45,8 @@ public class FileBusiness
         _classBusiness = classBusiness;
         _recordBusiness = recordBusiness;
         _insightServiceClient = insightServiceClient;
+        _aiModelConfigBusiness = aiModelConfigBusiness;
+        _logger = logger;
 
         // Initialize recommended chunk size from environment variable
         var chunkSizeStr = Environment.GetEnvironmentVariable("RECOMMENDED_CHUNK_SIZE")
@@ -77,7 +84,6 @@ public class FileBusiness
     {
         long realDataSourceId;
         if (file == null || file.Length == 0) throw new ArgumentException("File is required and cannot be empty.");
-        file = new SanitizedFormFile(file);
         file = new SanitizedFormFile(file);
         if (dataSourceId.HasValue)
         {
@@ -144,50 +150,7 @@ public class FileBusiness
 
         if (embed)
         {
-            var languageModel = await _context.AiModelConfigs.FirstOrDefaultAsync(c => c.ModelType == "language" && c.Default == true);
-            var embeddingModel = await _context.AiModelConfigs.FirstOrDefaultAsync(c => c.ModelType == "embedding" && c.Default == true);
-
-            if (languageModel == null || embeddingModel == null)
-                throw new KeyNotFoundException("no default language and or embedding model configured");
-
-            string languageToken = null!;
-            string embeddingToken = null!;
-            if (languageModel.RequiresToken == true)
-            {
-                languageToken = await _context.UserModelTokens
-                    .Where(t => t.UserId == currentUserId && t.AiModelConfigId == languageModel.Id)
-                    .Select(t => t.Token)
-                    .FirstOrDefaultAsync();
-            }
-
-            if (embeddingModel.RequiresToken == true)
-            {
-                embeddingToken = await _context.UserModelTokens
-                    .Where(t => t.UserId == currentUserId && t.AiModelConfigId == embeddingModel.Id)
-                    .Select(t => t.Token)
-                    .FirstOrDefaultAsync();
-            }
-
-            var embeddingDto = new CreateInsightEmbeddingRequestDto
-            {
-                FileInfo = new List<CreateInsightEmbeddingRequestDto.FileInfoDto>
-                {
-                    new CreateInsightEmbeddingRequestDto.FileInfoDto
-                    {
-                        FileId = createdRecord.Id,
-                        FileUri = createdRecord.Uri! // On file upload this will never be null
-                    }
-                },
-                LanguageModelServerUrl = languageModel.ServerUrl,
-                LanguageModelName = languageModel.ModelName,
-                LanguageModelToken = languageToken,
-                EmbeddingServerUrl = embeddingModel.ServerUrl,
-                EmbeddingModelName = embeddingModel.ModelName,
-                EmbeddingModelToken = embeddingToken
-            };
-
-            // fire and forget- Insight manages a queue for this
-            _ = _insightServiceClient.CreateEmbedding(embeddingDto);
+            await TriggerEmbedding(currentUserId, organizationId, projectId, createdRecord.Id, createdRecord.Uri!);
         }
 
         // return the newly created metadata record for the file
@@ -209,13 +172,12 @@ public class FileBusiness
         long projectId,
         long recordId,
         IFormFile file,
-        bool? embed = false
+        bool embed = false
         )
     {
         var record = await _recordBusiness.GetRecord(currentUserId, organizationId, projectId, recordId, true);
 
         if (file == null || file.Length == 0) throw new ArgumentException("File is required and cannot be empty.");
-        file = new SanitizedFormFile(file);
         file = new SanitizedFormFile(file);
 
         if (record.ObjectStorageId == null) throw new KeyNotFoundException("Record needs an object storage id");
@@ -242,10 +204,16 @@ public class FileBusiness
             Uri = uri,
             FileType = Path.GetExtension(file.FileName).TrimStart('.').ToLower()
         };
-        return await _recordBusiness.UpdateRecord(currentUserId, organizationId, projectId, recordId,
+        
+        var updatedRecord = await _recordBusiness.UpdateRecord(currentUserId, organizationId, projectId, recordId,
             updateRecordRequest, embedded: embed);
 
-        // TODO: If embed is true send the record ID and URI to the UPDATE Insight API (or delete then add if no update endpoint exists)
+        if (embed)
+        {
+            await TriggerEmbedding(currentUserId, organizationId, projectId, updatedRecord.Id, updatedRecord.Uri!, overwrite: true);
+        }
+        
+        return updatedRecord;
     }
 
     /// <summary>
@@ -320,8 +288,8 @@ public class FileBusiness
         await fileBusiness.DeleteFile(record, configData);
 
         return await _recordBusiness.DeleteRecord(currentUserId, organizationId, projectId, recordId);
-
-        // TODO: Delete all references to this record in the pgVector embeddings table
+        
+        // Embeddings made by Insight that reference this record will be auto deleted
     }
 
 
@@ -444,7 +412,7 @@ public class FileBusiness
         FileUploadCompleteRequestDto request,
         List<long>? sensitivityLabelIds = null,
         CreateRecordFileUploadRequestDto? metadata = null,
-        bool? embed = false)
+        bool embed = false)
     {
         // Resolve data source
         long realDataSourceId;
@@ -496,10 +464,15 @@ public class FileBusiness
             FileType = Path.GetExtension(request.FileName).TrimStart('.').ToLower()
         };
 
-        return await _recordBusiness.CreateRecord(currentUserId, organizationId, projectId, realDataSourceId,
+        var createdRecord = await _recordBusiness.CreateRecord(currentUserId, organizationId, projectId, realDataSourceId,
             recordRequest, sensitivityLabelIds, embedded: embed);
-
-        // TODO: If embed is true then pass the record ID and URI to INSIGHT CREATE API
+        
+        if (embed)
+        {
+            await TriggerEmbedding(currentUserId, organizationId, projectId, createdRecord.Id, createdRecord.Uri!);
+        }
+        
+        return createdRecord;
     }
 
     /// <summary>
@@ -572,5 +545,76 @@ public class FileBusiness
         }
 
         return objectStorage;
+    }
+    
+    /// <summary>
+    ///     Triggers an embedding request to Insight for a given file record.
+    ///     Fire-and-forget: the embedding is queued by Insight and errors are logged.
+    /// </summary>
+    /// <param name="currentUserId">ID of the User executing this method.</param>
+    /// <param name="organizationId">ID of the Organization to which the project belongs</param>
+    /// <param name="projectId">ID of the project to which the file belongs</param>
+    /// <param name="recordId">ID of the record to embed</param>
+    /// <param name="uri">URI of the file to embed</param>
+    /// <param name="overwrite">Whether to overwrite an existing embedding for this record</param>
+    private async Task TriggerEmbedding(
+        long currentUserId,
+        long organizationId,
+        long projectId,
+        long recordId,
+        string uri,
+        bool overwrite = false)
+    {
+        var vlm = await _aiModelConfigBusiness.GetDefaultAiModelConfig(
+            currentUserId, organizationId, projectId, "vlm");
+
+        var embeddingModel = await _aiModelConfigBusiness.GetDefaultAiModelConfig(
+            currentUserId, organizationId, projectId, "embedding");
+
+        if (vlm == null || embeddingModel == null)
+            throw new InvalidOperationException(
+                "Embedding was requested but no default VLM and/or embedding model is configured " +
+                $"for project {projectId}. The file record was created successfully.");
+
+        var embeddingDto = new CreateInsightEmbeddingRequestDto
+        {
+            FileInfo = new List<CreateInsightEmbeddingRequestDto.FileInfoDto>
+            {
+                new CreateInsightEmbeddingRequestDto.FileInfoDto
+                {
+                    FileId = recordId,
+                    FileUri = uri
+                }
+            },
+            LanguageModelServerUrl = vlm.ServerUrl,
+            LanguageModelName = vlm.ModelName,
+            LanguageModelToken = vlm.Token,
+            EmbeddingServerUrl = embeddingModel.ServerUrl,
+            EmbeddingModelName = embeddingModel.ModelName,
+            EmbeddingModelToken = embeddingModel.Token,
+            Overwrite = overwrite
+        };
+
+        // Fire and forget, but log any failures so they aren't silently swallowed
+        _ = _insightServiceClient.Upload(embeddingDto).ContinueWith((Task<InsightUploadResponseDto> t) =>
+        {
+            if (t.IsFaulted)
+            {
+                _logger.LogError(t.Exception,
+                    "Insight enqueue failed for record {RecordId} in project {ProjectId}",
+                    recordId, projectId);
+                return;
+            }
+    
+            var result = t.Result;
+            if (result?.Status == "error")
+                _logger.LogError(
+                    "Insight enqueue returned error for record {RecordId}: {Error}",
+                    recordId, result.Error);
+            else if (result?.Status == "skipped")
+                _logger.LogInformation(
+                    "Insight skipped embedding for record {RecordId}: {Reason}",
+                    recordId, result.Reason);
+        }, TaskContinuationOptions.None);
     }
 }

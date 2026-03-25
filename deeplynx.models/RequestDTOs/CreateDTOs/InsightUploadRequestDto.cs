@@ -1,25 +1,35 @@
 using System.ComponentModel.DataAnnotations;
 using System.Text.Json.Serialization;
 
-public class CreateInsightEmbeddingRequestDto
+public class InsightUploadRequestDto
 {
     [Required]
+    [JsonPropertyName("file_info")]
     public List<FileInfoDto> FileInfo { get; set; }
 
     [Required]
-    public string LanguageModelServerUrl { get; set; }
+    [JsonPropertyName("vlm_server_url")]
+    public string VlmServerUrl { get; set; }
 
     [Required]
-    public string LanguageModelName { get; set; }
+    [JsonPropertyName("vlm_name")]
+    public string VlmName { get; set; }
 
     [Required]
+    [JsonPropertyName("embedding_server_url")]
     public string EmbeddingServerUrl { get; set; }
 
     [Required]
+    [JsonPropertyName("embedding_model_name")]
     public string EmbeddingModelName { get; set; }
 
-    public string? LanguageModelToken { get; set; }
+    [JsonPropertyName("vlm_token")]
+    public string? VlmToken { get; set; }
+
+    [JsonPropertyName("embedding_model_token")]
     public string? EmbeddingModelToken { get; set; }
+
+    [JsonPropertyName("overwrite")]
     public bool? Overwrite { get; set; }
 
     public class FileInfoDto
@@ -29,7 +39,7 @@ public class CreateInsightEmbeddingRequestDto
         public long FileId { get; set; }
 
         [Required]
-        [JsonPropertyName("fileUri")]
+        [JsonPropertyName("fileURI")]
         public string FileUri { get; set; }
     }
 }
