@@ -570,12 +570,28 @@ spec:
             - containerPort: 9100
             - containerPort: 9101
           volumeMounts:
-            - name: duckdb-storage
-              mountPath: /data/duckdb
+            - name: minio-storage
+              mountPath: /data/minio
       volumes:
-        - name: duckdb-storage
+        - name: minio-storage
           persistentVolumeClaim:
-            claimName: ${AZURE_FILE_SHARE_PVC}
+            claimName: minio-pvc
+
+# Minio Persistent Volume Claim
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  namespace: deeplynx-test
+  labels:
+    app: insight-minio
+  name: minio-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi
 
 ---
 # insight-fastapi
