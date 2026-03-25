@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
-  fetchInsight,
   getInsightErrorMessage,
+  queryInsight,
 } from "@/app/lib/server_service/insight_services.server";
 
 export const runtime = "nodejs";
@@ -10,14 +10,7 @@ export const dynamic = "force-dynamic";
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const upstreamResponse = await fetchInsight("/query", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "text/plain",
-      },
-      body: JSON.stringify(body),
-    });
+    const upstreamResponse = await queryInsight(body);
 
     if (!upstreamResponse.ok) {
       const errorBody = await upstreamResponse.text();
