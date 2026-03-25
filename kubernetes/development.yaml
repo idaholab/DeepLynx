@@ -633,6 +633,16 @@ spec:
               value: "True"
             - name: RABBITMQ_HOST
               value: "insight-rabbitmq-service"
+            - name: RABBITMQ_USERNAME
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: rabbitmq-default-user
+            - name: RABBITMQ_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: rabbitmq-default-pass
             - name: MINIO_ENDPOINT
               value: "insight-minio-service:9100"
             - name: MINIO_ACCESS_KEY
