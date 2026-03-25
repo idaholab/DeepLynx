@@ -509,6 +509,8 @@ metadata:
   name: insight-minio
   namespace: deeplynx-test
 spec:
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: insight-minio
