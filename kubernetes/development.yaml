@@ -553,7 +553,7 @@ spec:
             - name: MINIO_ALIAS
               value: "insight"
             - name: MINIO_ENDPOINT
-              value: "http://localhost:9100"
+              value: "localhost:9100"
             - name: MINIO_VOLUMES
               value: "/data/minio"
             - name: MINIO_CONSOLE_ADDRESS
@@ -731,12 +731,12 @@ spec:
               value: "insight-rabbitmq-service"
             - name: MINIO_ENDPOINT
               value: "insight-minio-service:9100"
-            - name: RABBITMQ_DEFAULT_USER
+            - name: RABBITMQ_USERNAME
               valueFrom:
                 configMapKeyRef:
                   name: app-config
                   key: rabbitmq-default-user
-            - name: RABBITMQ_DEFAULT_PASS
+            - name: RABBITMQ_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: app-secrets
