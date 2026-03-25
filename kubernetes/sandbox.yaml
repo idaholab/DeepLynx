@@ -543,7 +543,7 @@ spec:
             - name: MINIO_ENDPOINT
               value: "http://localhost:9100"
             - name: MINIO_VOLUMES
-              value: "/data/duckdb"
+              value: "/data/minio"
             - name: MINIO_CONSOLE_ADDRESS
               value: ":9101"
           resources:
