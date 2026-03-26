@@ -623,6 +623,10 @@ spec:
       labels:
         app: insight-fastapi
     spec:
+      hostAliases:
+        - ip: "141.221.75.4"
+          hostnames:
+            - "api.hpc.inl.gov"
       containers:
         - name: deeplynxv3
           image: ${CI_REGISTRY}/${CI_REGISTRY_PATH}:insight-fastapi-${GITHUB_RUN_NUMBER}
@@ -731,6 +735,10 @@ spec:
         app: insight-rabbitmq-runner
     spec:
       terminationGracePeriodSeconds: 120
+      hostAliases:
+        - ip: "141.221.75.4"
+          hostnames:
+            - "api.hpc.inl.gov"
       containers:
         - name: deeplynxv3
           image: ${CI_REGISTRY}/${CI_REGISTRY_PATH}:insight-rabbitmq-runner-${GITHUB_RUN_NUMBER}
