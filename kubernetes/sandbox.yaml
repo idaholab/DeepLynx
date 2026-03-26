@@ -552,7 +552,7 @@ spec:
             - name: MINIO_ALIAS
               value: "insight"
             - name: MINIO_ENDPOINT
-              value: "http://localhost:9100"
+              value: "localhost:9100"
             - name: MINIO_VOLUMES
               value: "/data/minio"
             - name: MINIO_CONSOLE_ADDRESS
