@@ -2,8 +2,10 @@
 "use client";
 import { useLanguage } from "@/app/contexts/Language";
 import { useOrganizationSession } from "@/app/contexts/OrganizationSessionProvider";
-import { getProjectStats } from "@/app/lib/client_service/projects_services.client";
-import { getAllUsers } from "@/app/lib/client_service/user_services.client";
+import {
+  getProjectMembers,
+  getProjectStats,
+} from "@/app/lib/client_service/projects_services.client";
 import {
   ArrowsRightLeftIcon,
   CircleStackIcon,
@@ -13,7 +15,10 @@ import {
 import { format } from "date-fns";
 import { useRouter } from "next/navigation";
 import React, { useEffect, useState } from "react";
-import { ProjectResponseDto } from "../types/responseDTOs";
+import {
+  ProjectMemberResponseDto,
+  ProjectResponseDto,
+} from "../types/responseDTOs";
 import AvatarCell from "./Avatar";
 
 interface Props {
@@ -31,7 +36,10 @@ const ExpandedProjectCard: React.FC<Props> = ({ project, onClose }) => {
     records: number;
     connections: number;
   } | null>(null);
-  const [users, setUsers] = useState<{ name: string }[]>([]);
+  const [users, setUsers] = useState<ProjectMemberResponseDto[]>([]);
+  const projectContacts = users.filter(
+    (user) => user.role?.trim().toLowerCase() === "admin",
+  );
 
   useEffect(() => {
     if (!project.id || !organization?.organizationId) return;
@@ -40,7 +48,7 @@ const ExpandedProjectCard: React.FC<Props> = ({ project, onClose }) => {
       try {
         const data = await getProjectStats(
           organization?.organizationId as number,
-          project.id as number
+          project.id as number,
         );
         setStats({
           classes: data.classes,
@@ -51,13 +59,17 @@ const ExpandedProjectCard: React.FC<Props> = ({ project, onClose }) => {
         console.error("Failed to fetch project stats:", error);
       }
     };
+
     fetchStats();
   }, [project.id, organization?.organizationId]);
 
   useEffect(() => {
     const fetchAllUsers = async () => {
       try {
-        const data = await getAllUsers(Number(project?.id));
+        const data = await getProjectMembers(
+          Number(organization?.organizationId),
+          Number(project?.id),
+        );
         setUsers(data);
       } catch (error) {
         console.error("Failed to fetch projects:", error);
@@ -65,7 +77,7 @@ const ExpandedProjectCard: React.FC<Props> = ({ project, onClose }) => {
     };
 
     fetchAllUsers();
-  }, [project]);
+  }, [organization?.organizationId, project?.id]);
 
   return (
     <div>
@@ -94,18 +106,36 @@ const ExpandedProjectCard: React.FC<Props> = ({ project, onClose }) => {
       </div>
 
       {/* Team Members Section */}
-      <div className="mb-6">
-        <p className="text-sm font-medium text-base-content/80 mb-3">
-          {t.translations.TEAM_MEMBERS}
-        </p>
-        <div className="flex flex-wrap gap-2">
-          {users.map((person, index) => (
-            <div key={index} className="avatar">
-              <div className="w-10 h-10 relative overflow-hidden rounded-full ring-2 ring-base-300/30">
-                <AvatarCell name={person.name} />
+      <div className="flex justify-between">
+        <div className="mb-6">
+          <p className="text-sm font-medium text-base-content/80 mb-3">
+            {t.translations.TEAM_MEMBERS} ({users.length})
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {users.map((person, index) => (
+              <div key={index} className="avatar">
+                <div className="w-10 h-10 relative overflow-hidden rounded-full ring-2 ring-base-300/30">
+                  <AvatarCell name={person.name} />
+                </div>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <p className="text-sm font-medium text-base-content/80 mb-3">
+            Project Contacts
+          </p>
+          <div className="space-y-1">
+            {projectContacts.map((user, index) => (
+              <p key={`${user.memberId ?? user.email ?? user.name}-${index}`}>
+                {user.name}
+              </p>
+            ))}
+            {projectContacts.length === 0 && (
+              <p className="text-sm text-base-content/60">No admin contacts</p>
+            )}
+          </div>
         </div>
       </div>
 
