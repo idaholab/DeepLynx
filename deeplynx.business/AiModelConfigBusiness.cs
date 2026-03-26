@@ -142,13 +142,26 @@ public class AiModelConfigBusiness : IAiModelConfigBusiness
         var query = _context.AiModelConfigs
             .Where(x => x.Id == aiModelConfigId && x.OrganizationId == organizationId && !x.IsArchived)
             .AsQueryable();
-
+        
+        AiModelConfig? modelConfig;
         if (projectId.HasValue)
-            query = query.Where(x => x.ProjectId == projectId || x.ProjectId == null);
-        else
-            query = query.Where(x => x.ProjectId == null);
+        {
+            modelConfig = await query
+                .Where(x => x.ProjectId == projectId)
+                .FirstOrDefaultAsync();
 
-        var modelConfig = await query.FirstOrDefaultAsync();
+            modelConfig ??= await _context.AiModelConfigs
+                .Where(x => x.Id == aiModelConfigId && x.OrganizationId == organizationId && !x.IsArchived)
+                .Where(x => x.ProjectId == null)
+                .FirstOrDefaultAsync();
+        }
+        else
+        {
+            modelConfig = await query
+                .Where(x => x.ProjectId == null)
+                .FirstOrDefaultAsync();
+        }
+
         if (modelConfig is null)
             throw new KeyNotFoundException($"AI Model Configuration with ID {aiModelConfigId} not found.");
 

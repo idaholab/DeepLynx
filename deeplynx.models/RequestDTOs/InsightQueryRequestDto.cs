@@ -36,15 +36,3 @@ public class InsightQueryRequestDto
     [JsonPropertyName("embedding_auth_token")]
     public string? EmbeddingModelToken { get; set; }
 }
-
-public class InsightSamplingParametersDto
-{
-    [JsonPropertyName("temperature")]
-    public double? Temperature { get; set; }
-
-    [JsonPropertyName("max_tokens")]
-    public int? MaxTokens { get; set; }
-
-    [JsonPropertyName("top_p")]
-    public double? TopP { get; set; }
-}

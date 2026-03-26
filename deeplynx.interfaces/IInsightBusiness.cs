@@ -11,7 +11,7 @@ public interface IInsightBusiness
         long projectId,
         long? vlmModelConfigId,
         long? embeddingModelConfigId,
-        InsightUploadRequestDto payload);
+        InsightUploadApiRequestDto payload);
 
     IAsyncEnumerable<string> StreamInsightQuery(
         long currentUserId,
@@ -19,8 +19,21 @@ public interface IInsightBusiness
         long projectId,
         long? languageModelConfigId,
         long? embeddingModelConfigId,
-        InsightQueryRequestDto payload,
+        InsightQueryApiRequestDto payload,
         [EnumeratorCancellation] CancellationToken cancellationToken = default);
 
     Task<InsightIngestionStatusResponseDto> FetchInsightIngestionStatus(long recordId);
+
+    void TriggerEmbedding(
+        long currentUserId,
+        long organizationId,
+        long projectId,
+        long recordId,
+        string uri,
+        long? vlmConfigId = null,
+        long? embeddingModelConfigId = null,
+        bool overwrite = false);
+
+    bool IsSupportedFile(string fileType);
+
 }

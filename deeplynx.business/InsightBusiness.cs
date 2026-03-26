@@ -2,25 +2,32 @@ using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
 using deeplynx.interfaces;
 using deeplynx.models;
+using Microsoft.Extensions.Logging;
 
 namespace deeplynx.business;
 
 public class InsightBusiness : IInsightBusiness
 {
+    /// <summary>
+    ///     File types supported for embedding by the Insight service.
+    /// </summary>
+    public static readonly IReadOnlySet<string> SupportedFileTypes = new HashSet<string>
+    {
+        "pdf", "txt", "html", "htm"
+    };
+
     private readonly InsightServiceClient _insightServiceClient;
     private readonly IAiModelConfigBusiness _aiModelConfigBusiness;
+    private readonly ILogger<InsightBusiness> _logger;
 
-    /// <summary>
-    ///     Initializes a new instance of the <see cref="InsightBusiness" /> class.
-    /// </summary>
-    /// <param name="insightServiceClient">Used to make requests to the Insight API.</param>
-    /// <param name="aiModelConfigBusiness">
-    ///     Used to resolve LLM and embedding model configurations when explicit config IDs are not provided.
-    /// </param>
-    public InsightBusiness(InsightServiceClient insightServiceClient, IAiModelConfigBusiness aiModelConfigBusiness)
+    public InsightBusiness(
+        InsightServiceClient insightServiceClient,
+        IAiModelConfigBusiness aiModelConfigBusiness,
+        ILogger<InsightBusiness> logger)
     {
         _insightServiceClient = insightServiceClient;
         _aiModelConfigBusiness = aiModelConfigBusiness;
+        _logger = logger;
     }
 
     /// <summary>
@@ -38,8 +45,7 @@ public class InsightBusiness : IInsightBusiness
     /// <param name="embeddingModelConfigId">
     ///     Optional explicit embedding model config ID. If null, the default embedding config for the org/project is used.
     /// </param>
-    /// <param name="payload">Upload payload from the caller.</param>
-    /// <returns>Task that completes once Insight has acknowledged the request (2xx).</returns>
+    /// <param name="payload">Upload payload from the caller containing file IDs and URIs.</param>
     /// <exception cref="InvalidOperationException">Thrown when Insight returns a non-success status, or when a required token is missing.</exception>
     /// <exception cref="KeyNotFoundException">Thrown when a specified or default model config cannot be found.</exception>
     public async Task QueueInsightUpload(
@@ -48,7 +54,7 @@ public class InsightBusiness : IInsightBusiness
         long projectId,
         long? vlmModelConfigId,
         long? embeddingModelConfigId,
-        InsightUploadRequestDto payload)
+        InsightUploadApiRequestDto payload)
     {
         var vlmConfig = await ResolveModelConfig(currentUserId, organizationId, projectId, vlmModelConfigId, "vlm");
         var embeddingConfig = await ResolveModelConfig(currentUserId, organizationId, projectId, embeddingModelConfigId, "embedding");
@@ -69,9 +75,52 @@ public class InsightBusiness : IInsightBusiness
         };
 
         await _insightServiceClient.Upload(request);
+    }
 
-        // Response body intentionally not read — Insight queues the work
-        // internally via RabbitMQ. Poll FetchInsightIngestionStatus for progress.
+    /// <summary>
+    ///     Fire-and-forget wrapper around <see cref="QueueInsightUpload"/>.
+    ///     Errors are logged rather than propagated so the caller is not blocked.
+    ///     Intended for use after file uploads and updates where embedding should
+    ///     happen asynchronously without affecting the response to the caller.
+    /// </summary>
+    /// <param name="currentUserId">The ID of the user making the request.</param>
+    /// <param name="organizationId">The ID of the organization.</param>
+    /// <param name="projectId">The ID of the project.</param>
+    /// <param name="recordId">The ID of the record to embed.</param>
+    /// <param name="uri">The URI of the file to embed.</param>
+    /// <param name="vlmConfigId">Optional explicit VLM model config ID. If null, the project/org default is used.</param>
+    /// <param name="embeddingModelConfigId">Optional explicit embedding model config ID. If null, the project/org default is used.</param>
+    /// <param name="overwrite">Whether to overwrite an existing embedding for this record.</param>
+    public void TriggerEmbedding(
+        long currentUserId,
+        long organizationId,
+        long projectId,
+        long recordId,
+        string uri,
+        long? vlmConfigId = null,
+        long? embeddingModelConfigId = null,
+        bool overwrite = false)
+    {
+        var payload = new InsightUploadApiRequestDto
+        {
+            FileInfo = new List<InsightUploadApiRequestDto.FileInfoDto>
+            {
+                new InsightUploadApiRequestDto.FileInfoDto
+                {
+                    FileId = recordId,
+                    FileUri = uri
+                }
+            },
+        };
+
+        _ = QueueInsightUpload(currentUserId, organizationId, projectId, vlmConfigId, embeddingModelConfigId, payload)
+            .ContinueWith(t =>
+            {
+                if (t.IsFaulted)
+                    _logger.LogError(t.Exception,
+                        "Insight enqueue failed for record {RecordId} in project {ProjectId}",
+                        recordId, projectId);
+            }, TaskContinuationOptions.None);
     }
 
     /// <summary>
@@ -82,12 +131,13 @@ public class InsightBusiness : IInsightBusiness
     /// <param name="organizationId">The ID of the organization. Used to scope model config resolution.</param>
     /// <param name="projectId">The ID of the project. Project-level model config defaults are preferred over org-level defaults.</param>
     /// <param name="languageModelConfigId">
-    ///     Optional explicit LLM model config ID. If null, the default language model config for the org/project is used.
+    ///     Optional explicit LLM model config ID. If null, the default LLM config is used,
+    ///     falling back to the default VLM config if no LLM is configured.
     /// </param>
     /// <param name="embeddingModelConfigId">
     ///     Optional explicit embedding model config ID. If null, the default embedding config for the org/project is used.
     /// </param>
-    /// <param name="payload">Query payload from the caller.</param>
+    /// <param name="payload">Query payload containing the question, file IDs, and sampling parameters.</param>
     /// <param name="cancellationToken">Token to cancel the streaming operation.</param>
     /// <returns>
     ///     An async enumerable of string chunks as they stream from Insight.
@@ -101,7 +151,7 @@ public class InsightBusiness : IInsightBusiness
         long projectId,
         long? languageModelConfigId,
         long? embeddingModelConfigId,
-        InsightQueryRequestDto payload,
+        InsightQueryApiRequestDto payload,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         var llmConfig = await ResolveModelConfig(currentUserId, organizationId, projectId, languageModelConfigId, "llm");
@@ -123,6 +173,14 @@ public class InsightBusiness : IInsightBusiness
         return _insightServiceClient.GetIngestionStatus(recordId);
     }
 
+    /// <summary>
+    ///     Returns whether the given file type is supported for embedding by Insight.
+    ///     Check is case-insensitive.
+    /// </summary>
+    /// <param name="fileType">File extension without the leading dot (e.g. "pdf", "txt").</param>
+    public bool IsSupportedFile(string fileType) =>
+        SupportedFileTypes.Contains(fileType, StringComparer.OrdinalIgnoreCase);
+
     // -------------------------------------------------------------------------
     // Private helpers
     // -------------------------------------------------------------------------
@@ -138,7 +196,7 @@ public class InsightBusiness : IInsightBusiness
     ///     An explicit model config ID to look up. When null, the default config for
     ///     <paramref name="modelType"/> is resolved instead.
     /// </param>
-    /// <param name="modelType">The model type string used when falling back to the default (e.g. "llm" or "embedding").</param>
+    /// <param name="modelType">The model type string used when falling back to the default (e.g. "llm", "vlm", or "embedding").</param>
     /// <returns>The resolved <see cref="AiModelConfigResponseDto"/>, with <c>Token</c> populated if applicable.</returns>
     /// <exception cref="KeyNotFoundException">Thrown when the config or its default cannot be found.</exception>
     /// <exception cref="InvalidOperationException">Thrown when a token is required but not found for the user.</exception>
@@ -151,8 +209,6 @@ public class InsightBusiness : IInsightBusiness
     {
         AiModelConfigResponseDto config;
 
-        // If requesting the default LLM and none exists, fallback to the default VLM.
-        // (This scenario is expected only for insight queries.)
         if (!modelConfigId.HasValue && modelType == "llm")
         {
             try
@@ -166,9 +222,6 @@ public class InsightBusiness : IInsightBusiness
                     currentUserId, organizationId, projectId, "vlm");
             }
         }
-        // Otherwise:
-        // - If a modelConfigId is provided, fetch that specific config
-        // - If not, fetch the default config for the requested modelType
         else
         {
             config = modelConfigId.HasValue
@@ -189,7 +242,7 @@ public class InsightBusiness : IInsightBusiness
     private async IAsyncEnumerable<string> StreamInsightQueryCore(
         AiModelConfigResponseDto llmConfig,
         AiModelConfigResponseDto embeddingConfig,
-        InsightQueryRequestDto payload,
+        InsightQueryApiRequestDto payload,
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
         var sp = payload.SamplingParameters;
@@ -211,7 +264,6 @@ public class InsightBusiness : IInsightBusiness
             EmbeddingModelToken = embeddingConfig.Token
         };
 
-        // EnsureSuccessStatusCode is called inside Query; no need to re-check here.
         var stream = await _insightServiceClient.Query(request);
 
         using var reader = new StreamReader(stream);
@@ -233,19 +285,15 @@ public class InsightBusiness : IInsightBusiness
         var trimmed = fileUri.Trim();
         if (string.IsNullOrEmpty(trimmed)) return trimmed;
 
-        // Already a fully-qualified URI (http://, s3://, etc.)
         if (Regex.IsMatch(trimmed, @"^[a-z][a-z0-9+.\-]*:\/\/", RegexOptions.IgnoreCase))
             return trimmed;
 
-        // Already rooted at /data/
         if (trimmed.StartsWith("/data/"))
             return trimmed;
 
-        // Nexus org-scoped path starting with org_
         if (trimmed.StartsWith("org_"))
             return $"/data/{trimmed}";
 
-        // Path containing /org_ somewhere in the middle
         var orgIdx = trimmed.IndexOf("/org_", StringComparison.Ordinal);
         if (orgIdx >= 0)
             return $"/data{trimmed[orgIdx..]}";

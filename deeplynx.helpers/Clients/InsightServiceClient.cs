@@ -1,5 +1,6 @@
 using System.Net.Http.Json;
 using deeplynx.models;
+using Microsoft.AspNetCore.Mvc.Infrastructure;
 
 public class InsightServiceClient
 {

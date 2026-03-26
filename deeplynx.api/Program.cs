@@ -180,15 +180,9 @@ try
     builder.Services.AddTransient<IGraphBusiness, GraphBusiness>();
     builder.Services.AddTransient<IUserModelTokenBusiness, UserModelTokenBusiness>();
     builder.Services.AddTransient<IAiModelConfigBusiness, AiModelConfigBusiness>();
-    builder.Services.AddHttpClient<InsightServiceClient>();
     builder.Services.AddScoped<ISensitivityLabelService, SensitivityLabelService>();
-    builder.Services.AddHttpClient<IInsightBusiness, InsightBusiness>(client =>
-    {
-        var baseUrl = Environment.GetEnvironmentVariable("INSIGHT_FASTAPI_URL")
-                      ?? throw new InvalidOperationException("Insight base URL is not configured.");
-
-        client.BaseAddress = new Uri(baseUrl);
-    });
+    builder.Services.AddTransient<IInsightBusiness, InsightBusiness>();
+    builder.Services.AddHttpClient<InsightServiceClient>();
     
     //OpenApi Documentation
     builder.Services.AddOpenApi(options =>

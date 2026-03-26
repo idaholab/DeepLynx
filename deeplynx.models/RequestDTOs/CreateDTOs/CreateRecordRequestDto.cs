@@ -28,9 +28,6 @@ public class CreateRecordRequestDto
     [JsonPropertyName("original_id")]
     public string OriginalId { get; set; }
     
-    [JsonPropertyName("Embed")]
-    public string Embed { get; set; }
-    
     [JsonPropertyName("class_id")]
     public long? ClassId { get; set; }
     
@@ -42,4 +39,7 @@ public class CreateRecordRequestDto
     
     [JsonPropertyName("tags")]
     public List<string>? Tags { get; set; }
+    
+    [JsonPropertyName("embed")]
+    public bool? Embed { get; set; }
 }

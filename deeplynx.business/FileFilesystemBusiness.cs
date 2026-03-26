@@ -39,36 +39,38 @@ public class FileFilesystemBusiness : IFileBusiness
     /// <param name="file">The file the user wants to upload</param>
     /// <param name="guid">The unique identifier for file names</param>
     public async Task<string> UploadFile(
-    long organizationId,
-    long projectId,
-    long dataSourceId,
-    ObjectStorageConfigDto objectStorageConfig,
-    IFormFile file,
-    Guid guid
+        long organizationId,
+        long projectId,
+        long dataSourceId,
+        ObjectStorageConfigDto objectStorageConfig,
+        IFormFile file,
+        Guid guid
     )
     {
+        // TODO: Cache these
         if (objectStorageConfig.MountPath == null)
             throw new Exception("File system mount path not set in object storage");
 
         var fileName = $"{guid}_{file.FileName}";
 
-        var relativePath = Path.Combine(
+        // create a file path in the format <mountdir>/project_<id>/datasource_<id>/filename
+        var filePath = Path.Combine(
+            objectStorageConfig.MountPath,
             "org_" + organizationId,
             "project_" + projectId,
             "datasource_" + dataSourceId,
             fileName);
-
-        var filePath = Path.Combine(objectStorageConfig.MountPath, relativePath);
-
+        // create the directory for the file if not exists
         Directory.CreateDirectory(Path.GetDirectoryName(filePath) ??
-                                throw new InvalidOperationException("error creating upload path."));
+                                  throw new InvalidOperationException("error creating upload path."));
 
+        // copy the file to its new location
         await using (var stream = new FileStream(filePath, FileMode.Create))
         {
             await file.CopyToAsync(stream);
         }
 
-        return relativePath;
+        return filePath;
     }
 
     /// <summary>
@@ -163,7 +165,7 @@ public class FileFilesystemBusiness : IFileBusiness
         if (!File.Exists(filePath)) throw new FileNotFoundException("The file to update does not exist.", filePath);
 
         File.Delete(filePath);
-
+        
         var directory = Path.GetDirectoryName(filePath);
 
         if (objectStorageConfig.MountPath == null)
@@ -202,10 +204,10 @@ public class FileFilesystemBusiness : IFileBusiness
     public async Task<Guid> StartUpload(long organizationId, long projectId, long datasourceId, ObjectStorageConfigDto objectStorageConfig)
     {
         var uploadId = Guid.NewGuid();
-
+        
         if (objectStorageConfig.MountPath == null)
             throw new InvalidOperationException("File system mount path not set in object storage");
-
+        
         var uploadPath = Path.Combine(
             objectStorageConfig.MountPath,
             $"org_{organizationId}",
@@ -215,7 +217,7 @@ public class FileFilesystemBusiness : IFileBusiness
             uploadId.ToString()
         );
         Directory.CreateDirectory(uploadPath);
-
+        
         return uploadId;
     }
 
@@ -298,7 +300,7 @@ public class FileFilesystemBusiness : IFileBusiness
                     File.Delete(chunkFilePath); // Clean up chunk after merging
                 }
             }
-
+            
 
             // Create IFormFile from merged file for upload
             await using var fileStream = new FileStream(mergedFilePath, FileMode.Open, FileAccess.Read);

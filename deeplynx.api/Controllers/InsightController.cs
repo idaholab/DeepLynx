@@ -42,7 +42,7 @@ public class InsightController : ControllerBase
         long projectId,
         [FromQuery] long? vlmModelConfigId,
         [FromQuery] long? embeddingModelConfigId,
-        [FromBody] InsightUploadRequestDto dto)
+        [FromBody] InsightUploadApiRequestDto dto)
     {
         try
         {
@@ -84,7 +84,7 @@ public class InsightController : ControllerBase
         long projectId,
         [FromQuery] long? languageModelConfigId,
         [FromQuery] long? embeddingModelConfigId,
-        [FromBody] InsightQueryRequestDto dto,
+        [FromBody] InsightQueryApiRequestDto dto,
         CancellationToken cancellationToken)
     {
         var userId = UserContextStorage.UserId;
