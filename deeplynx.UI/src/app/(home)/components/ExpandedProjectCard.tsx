@@ -1,29 +1,66 @@
-// src/app/(home)/components/ExpandableProjectCard.tsx
 "use client";
+
 import { useLanguage } from "@/app/contexts/Language";
 import { useOrganizationSession } from "@/app/contexts/OrganizationSessionProvider";
 import {
   getProjectMembers,
   getProjectStats,
 } from "@/app/lib/client_service/projects_services.client";
+import { formatLocalDateTime } from "@/app/lib/date_time";
 import {
   ArrowsRightLeftIcon,
   CircleStackIcon,
   RectangleGroupIcon,
   XMarkIcon,
 } from "@heroicons/react/24/outline";
-import { format } from "date-fns";
 import { useRouter } from "next/navigation";
-import React, { useEffect, useState } from "react";
+import React, { type ComponentType, type SVGProps, useEffect, useState } from "react";
 import {
   ProjectMemberResponseDto,
   ProjectResponseDto,
 } from "../types/responseDTOs";
-import AvatarCell from "./Avatar";
+import { ContactAvatarCell } from "./Avatar";
+
+const MAX_VISIBLE_CONTACTS = 2;
+const MAX_VISIBLE_MEMBERS = 5;
+
+const SECTION_TITLE_CLASS = "mb-2 text-sm font-medium text-base-content/80";
+const AVATAR_FRAME_CLASS =
+  "relative h-10 w-10 overflow-hidden rounded-full ring-2 ring-base-300/30";
+
+type ProjectStatsSummary = {
+  classes: number;
+  records: number;
+  connections: number;
+};
+
+type StatIcon = ComponentType<SVGProps<SVGSVGElement>>;
 
 interface Props {
   project: ProjectResponseDto;
   onClose: () => void;
+}
+
+interface ProjectStatCardProps {
+  title: string;
+  value: number;
+  Icon: StatIcon;
+}
+
+function ProjectStatCard({ title, value, Icon }: ProjectStatCardProps) {
+  return (
+    <div className="rounded-lg border border-base-300/30 bg-base-200 p-3">
+      <div className="flex items-center gap-3">
+        <Icon className="size-8 text-secondary" />
+        <div>
+          <div className="text-xs font-medium text-base-content/60">
+            {title}
+          </div>
+          <div className="text-lg font-bold text-base-content">{value}</div>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 const ExpandedProjectCard: React.FC<Props> = ({ project, onClose }) => {
@@ -31,163 +68,178 @@ const ExpandedProjectCard: React.FC<Props> = ({ project, onClose }) => {
   const { t } = useLanguage();
   const { organization } = useOrganizationSession();
 
-  const [stats, setStats] = useState<{
-    classes: number;
-    records: number;
-    connections: number;
-  } | null>(null);
-  const [users, setUsers] = useState<ProjectMemberResponseDto[]>([]);
-  const projectContacts = users.filter(
-    (user) => user.role?.trim().toLowerCase() === "admin",
-  );
+  const [stats, setStats] = useState<ProjectStatsSummary | null>(null);
+  const [members, setMembers] = useState<ProjectMemberResponseDto[]>([]);
+
+  const organizationId = organization?.organizationId;
+  const projectId = project.id;
+  const numericOrganizationId = organizationId ? Number(organizationId) : null;
+  const numericProjectId = projectId ? Number(projectId) : null;
+  const formattedLastUpdatedAt = project.lastUpdatedAt
+    ? formatLocalDateTime(
+        project.lastUpdatedAt instanceof Date
+          ? project.lastUpdatedAt.toISOString()
+          : String(project.lastUpdatedAt),
+      )
+    : t.translations.UNKNOWN;
+
+  const projectContacts = members
+    .filter((member) => member.role?.trim().toLowerCase() === "admin")
+    .slice(0, MAX_VISIBLE_CONTACTS);
+  const visibleMembers = members.slice(0, MAX_VISIBLE_MEMBERS);
+  const hiddenMemberCount = Math.max(members.length - visibleMembers.length, 0);
+  const statCards: ProjectStatCardProps[] = [
+    {
+      title: t.translations.CLASSES,
+      value: stats?.classes ?? 0,
+      Icon: RectangleGroupIcon,
+    },
+    {
+      title: t.translations.RECORDS,
+      value: stats?.records ?? 0,
+      Icon: CircleStackIcon,
+    },
+    {
+      title: t.translations.DATA_SOURCES,
+      value: stats?.connections ?? 0,
+      Icon: ArrowsRightLeftIcon,
+    },
+  ];
 
   useEffect(() => {
-    if (!project.id || !organization?.organizationId) return;
+    if (!numericProjectId || !numericOrganizationId) {
+      setStats(null);
+      setMembers([]);
+      return;
+    }
 
-    const fetchStats = async () => {
-      try {
-        const data = await getProjectStats(
-          organization?.organizationId as number,
-          project.id as number,
-        );
+    let isActive = true;
+
+    const fetchProjectDetails = async () => {
+      const [statsResult, membersResult] = await Promise.allSettled([
+        getProjectStats(numericOrganizationId, numericProjectId),
+        getProjectMembers(numericOrganizationId, numericProjectId),
+      ]);
+
+      if (!isActive) {
+        return;
+      }
+
+      if (statsResult.status === "fulfilled") {
         setStats({
-          classes: data.classes,
-          records: data.records,
-          connections: data.datasources,
+          classes: statsResult.value.classes,
+          records: statsResult.value.records,
+          connections: statsResult.value.datasources,
         });
-      } catch (error) {
-        console.error("Failed to fetch project stats:", error);
+      } else {
+        console.error("Failed to fetch project stats:", statsResult.reason);
+        setStats(null);
+      }
+
+      if (membersResult.status === "fulfilled") {
+        setMembers(membersResult.value);
+      } else {
+        console.error("Failed to fetch project members:", membersResult.reason);
+        setMembers([]);
       }
     };
 
-    fetchStats();
-  }, [project.id, organization?.organizationId]);
+    void fetchProjectDetails();
 
-  useEffect(() => {
-    const fetchAllUsers = async () => {
-      try {
-        const data = await getProjectMembers(
-          Number(organization?.organizationId),
-          Number(project?.id),
-        );
-        setUsers(data);
-      } catch (error) {
-        console.error("Failed to fetch projects:", error);
-      }
+    return () => {
+      isActive = false;
     };
-
-    fetchAllUsers();
-  }, [organization?.organizationId, project?.id]);
+  }, [numericOrganizationId, numericProjectId]);
 
   return (
     <div>
-      {/* Header Section */}
-      <div className="flex justify-between items-start mb-4">
+      <div className="mb-6 flex items-start justify-between gap-4">
         <div className="flex-1">
           <h2 className="text-2xl font-bold text-base-content">
             {project.name}
           </h2>
-          <p className="text-sm text-base-content/70 mt-1">
+          <p className="mt-1 text-sm text-base-content/70">
             {project.description}
           </p>
-          <p className="text-xs text-base-content/50 mt-2">
-            {t.translations.LAST_EDIT}{" "}
-            {format(new Date(project.lastUpdatedAt!), "MM/dd/yyyy hh:mm:s")}
+          <p className="mt-2 text-xs text-base-content/50">
+            {t.translations.LAST_EDIT}: {formattedLastUpdatedAt}
           </p>
         </div>
         <button
           onClick={onClose}
           aria-label="Close details"
-          className="p-1 rounded-lg hover:bg-base-300/30 transition-colors"
+          className="rounded-lg p-1 transition-colors hover:bg-base-300/30"
           data-tour={`project-row-${project.id ?? 0}-close`}
         >
           <XMarkIcon className="size-6 text-base-content/60 hover:text-base-content" />
         </button>
       </div>
 
-      {/* Team Members Section */}
-      <div className="flex justify-between">
-        <div className="mb-6">
-          <p className="text-sm font-medium text-base-content/80 mb-3">
-            {t.translations.TEAM_MEMBERS} ({users.length})
-          </p>
+      <div className="mb-6 flex items-start justify-between gap-6">
+        <section className="space-y-2">
+          <p className={SECTION_TITLE_CLASS}>{t.translations.PROJECT_CONTACTS}</p>
           <div className="flex flex-wrap gap-2">
-            {users.map((person, index) => (
-              <div key={index} className="avatar">
-                <div className="w-10 h-10 relative overflow-hidden rounded-full ring-2 ring-base-300/30">
-                  <AvatarCell name={person.name} />
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div>
-          <p className="text-sm font-medium text-base-content/80 mb-3">
-            Project Contacts
-          </p>
-          <div className="space-y-1">
-            {projectContacts.map((user, index) => (
-              <p key={`${user.memberId ?? user.email ?? user.name}-${index}`}>
-                {user.name}
-              </p>
+            {projectContacts.map((member) => (
+              <ContactAvatarCell
+                key={member.memberId ?? member.email}
+                name={member.name}
+                email={member.email}
+                avatarClassName={AVATAR_FRAME_CLASS}
+              />
             ))}
             {projectContacts.length === 0 && (
-              <p className="text-sm text-base-content/60">No admin contacts</p>
+              <p className="text-sm text-base-content/60">
+                {t.translations.NO_ADMIN_CONTACTS}
+              </p>
             )}
           </div>
-        </div>
+        </section>
+
+        <section className="space-y-2">
+          <p className={SECTION_TITLE_CLASS}>
+            {t.translations.TEAM_MEMBERS} ({members.length})
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {visibleMembers.map((member) => (
+              <ContactAvatarCell
+                key={member.memberId ?? member.email}
+                name={member.name}
+                email={member.email}
+                avatarClassName={AVATAR_FRAME_CLASS}
+              />
+            ))}
+            {hiddenMemberCount > 0 && (
+              <div className="avatar">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-secondary text-sm font-semibold text-secondary-content ring-2 ring-base-300/30">
+                  +{hiddenMemberCount}
+                </div>
+              </div>
+            )}
+          </div>
+        </section>
       </div>
 
-      {/* Stats Section */}
       {!stats ? (
-        <div className="text-center py-8 text-base-content/60">
+        <div className="py-8 text-center text-base-content/60">
           {t.translations.NO_STATS}
         </div>
       ) : (
-        <div className="grid grid-cols-3 gap-4 mb-6">
-          {[
-            {
-              title: "Classes",
-              value: stats?.classes,
-              Icon: RectangleGroupIcon,
-            },
-            {
-              title: "Records",
-              value: stats?.records,
-              Icon: CircleStackIcon,
-            },
-            {
-              title: "Data Sources",
-              value: stats?.connections,
-              Icon: ArrowsRightLeftIcon,
-            },
-          ].map(({ title, value, Icon }, idx) => (
-            <div
-              key={idx}
-              className="bg-base-200 rounded-lg p-3 border border-base-300/30"
-            >
-              <div className="flex items-center gap-3">
-                <Icon className="size-8 text-secondary" />
-                <div>
-                  <div className="text-xs text-base-content/60 font-medium">
-                    {title}
-                  </div>
-                  <div className="text-lg font-bold text-base-content">
-                    {value}
-                  </div>
-                </div>
-              </div>
-            </div>
+        <div className="mb-6 grid gap-4 sm:grid-cols-3">
+          {statCards.map((card) => (
+            <ProjectStatCard
+              key={card.title}
+              title={card.title}
+              value={card.value}
+              Icon={card.Icon}
+            />
           ))}
         </div>
       )}
 
-      {/* Action Button */}
-      <div className="flex justify-end pt-2 border-base-300/20">
+      <div className="flex justify-end pt-2">
         <button
           className="btn btn-secondary btn-sm"
-          onClick={() => router.push(`/project/${project.id}`)}
+          onClick={() => router.push(`/project/${projectId}`)}
         >
           {t.translations.EXPLORE}
         </button>

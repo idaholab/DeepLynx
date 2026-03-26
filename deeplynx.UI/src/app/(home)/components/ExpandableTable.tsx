@@ -114,7 +114,7 @@ export function ExpandableTable<T>({
   const renderExpandedRow = (row: T, rowId: string | number) => (
     <tr>
       <td colSpan={columns.length + 2} className="p-0">
-        <div className="overflow-hidden transition-all duration-500 ease-in-out max-h-[1000px] opacity-100">
+        <div className="overflow-visible transition-all duration-500 ease-in-out max-h-[1000px] opacity-100">
           <div
             className="card bg-base-200 border border-base-300/30 p-6 rounded-box shadow-lg shadow-dynamic-shadow"
             data-tour={`project-row-${rowId}-expanded`}
