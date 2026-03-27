@@ -12,6 +12,21 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v3
+        with:
+          submodules: false
+          ssh-key: ${{ secrets.DEPLOY_KEY }}
+          ssh-known-hosts: ${{ secrets.GHE_KNOWN_HOSTS }}
+
+      - name: Checkout Submodules
+        env:
+          INSIGHT_KEY: ${{ secrets.DEPLOY_KEY_INSIGHT }}
+          KNOWN_HOSTS: ${{ secrets.GHE_KNOWN_HOSTS }}
+        run: |
+          echo "$INSIGHT_KEY" > /tmp/insight_deploy
+          echo "$KNOWN_HOSTS" > /tmp/known_hosts
+          chmod 600 /tmp/insight_deploy
+          GIT_SSH_COMMAND="ssh -i /tmp/insight_deploy -o UserKnownHostsFile=/tmp/known_hosts" git submodule update --init --recursive
+          rm /tmp/insight_deploy /tmp/known_hosts
 
       # Builds the required image
       - shell: bash
@@ -87,6 +102,26 @@ jobs:
             --file Dockerfiles/mcp/Dockerfile.public \
             .
 
+          az acr build --registry $ACR_REGISTRY \
+            --image $ACR_PATH:insight-rabbitmq-$GITHUB_RUN_NUMBER \
+            --file deeplynx.insight/app/rabbitmq/Dockerfiles/Dockerfile.production \
+            deeplynx.insight/app/rabbitmq
+
+          az acr build --registry $ACR_REGISTRY \
+            --image $ACR_PATH:insight-rabbitmq-runner-$GITHUB_RUN_NUMBER \
+            --file deeplynx.insight/app/rabbitmq/Dockerfiles/Dockerfile.runner.production \
+            deeplynx.insight
+
+          az acr build --registry $ACR_REGISTRY \
+            --image $ACR_PATH:insight-minio-$GITHUB_RUN_NUMBER \
+            --file deeplynx.insight/app/minio/Dockerfiles/Dockerfile.production \
+            deeplynx.insight/app/minio
+
+          az acr build --registry $ACR_REGISTRY \
+            --image $ACR_PATH:insight-fastapi-$GITHUB_RUN_NUMBER \
+            --file deeplynx.insight/app/fastapi/Dockerfiles/Dockerfile.production \
+            deeplynx.insight
+
   kubernetes:
     needs: build
     runs-on: [self-hosted]
@@ -116,6 +151,11 @@ jobs:
             --from-literal=next-auth-secret="${{ secrets.NEXTAUTH_SECRET }}" \
             --from-literal=service-token="${{ secrets.SERVICE_TOKEN }}" \
             --from-literal=jwt-secret-key="${{ secrets.JWT_SECRET_KEY }}" \
+            --from-literal=rabbitmq-default-pass="${{ secrets.RABBITMQ_DEFAULT_PASS }}" \
+            --from-literal=minio-root-password="${{ secrets.MINIO_ROOT_PASSWORD }}" \
+            --from-literal=llm-auth-token="${{ secrets.LLM_AUTH_TOKEN }}" \
+            --from-literal=mm-auth-token="${{ secrets.MM_AUTH_TOKEN }}" \
+            --from-literal=emb-auth-token="${{ secrets.EMB_AUTH_TOKEN }}" \
             --namespace=deeplynxv3-dev \
             --dry-run=client -o yaml | kubectl apply -f -
       # Create Kubernetes ConfigMap for non-sensitive environment variables
@@ -130,6 +170,9 @@ jobs:
             --from-literal=backend-base-url="${{ vars.BACKEND_BASE_URL }}" \
             --from-literal=disabled-front-auth="${{ vars.NEXT_PUBLIC_DISABLE_FRONTEND_AUTHENTICATION }}" \
             --from-literal=hosted-link="${{ vars.HOSTED_LINK }}" \
+            --from-literal=rabbitmq-default-user="${{ vars.RABBITMQ_DEFAULT_USER }}" \
+            --from-literal=minio-root-user="${{ vars.MINIO_ROOT_USER }}" \
+            --from-literal=minio-endpoint="${{ vars.MINIO_ENDPOINT }}" \
             --namespace=deeplynxv3-dev \
             --dry-run=client -o yaml | kubectl apply -f -
       # Overwrites ${VARIABLES} in the kube manifest with secrets

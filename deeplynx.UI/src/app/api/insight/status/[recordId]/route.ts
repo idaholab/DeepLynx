@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
-  fetchInsight,
+  fetchInsightIngestionStatus,
   getInsightErrorMessage,
-  parseInsightBody,
 } from "@/app/lib/server_service/insight_services.server";
 
 export const runtime = "nodejs";
@@ -23,15 +22,8 @@ export async function GET(
       );
     }
 
-    const upstreamResponse = await fetchInsight(
-      `/ingestion_status/${recordIdNum}`,
-      {
-        method: "GET",
-        headers: { Accept: "application/json" },
-      },
-    );
-
-    const responseBody = await parseInsightBody(upstreamResponse);
+    const { upstreamResponse, responseBody } =
+      await fetchInsightIngestionStatus(recordIdNum);
 
     if (!upstreamResponse.ok) {
       return NextResponse.json(

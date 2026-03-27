@@ -91,6 +91,37 @@ public class AiModelConfigProjectController : ControllerBase
     }
 
     /// <summary>
+    ///     Get the default AI Model Configuration for a given model type at the project level,
+    ///     falling back to the organization-level default if no project-level default is found.
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization to which the project belongs.</param>
+    /// <param name="projectId">The ID of the project whose default AI Model Configuration is being retrieved.</param>
+    /// <param name="modelType">The type of model to retrieve the default configuration for (e.g. "language" or "embedding").</param>
+    /// <returns>The default AI Model Configuration DTO for the specified model type.</returns>
+    [HttpGet("default", Name = "api_get_default_ai_model_config_project")]
+    public async Task<ActionResult<AiModelConfigResponseDto>> GetDefaultAiModelConfig(
+        long organizationId,
+        long projectId,
+        [FromQuery] string modelType)
+    {
+        try
+        {
+            var currentUserId = UserContextStorage.UserId;
+            var aiModelConfig = await _aiModelConfigBusiness.GetDefaultAiModelConfig(currentUserId, organizationId, projectId, modelType);
+            return Ok(aiModelConfig);
+        }
+        catch (KeyNotFoundException exc)
+        {
+            return NotFound(exc.Message);
+        }
+        catch (Exception exc)
+        {
+            _logger.LogError(exc, "An unexpected error occurred while fetching the default {ModelType} AI Model Configuration for project {ProjectId}", modelType, projectId);
+            return StatusCode(StatusCodes.Status500InternalServerError, "An unexpected error occurred while fetching the default AI Model Configuration.");
+        }
+    }
+
+    /// <summary>
     ///     Create a new AI Model Configuration for a project.
     /// </summary>
     /// <param name="organizationId">The ID of the organization under which the AI Model Configuration will be created.</param>
