@@ -257,7 +257,7 @@ const GraphClientPage = ({
               />
             </div>
 
-            <GraphLegend />
+            <GraphLegend nodes={graphData?.nodes ?? []} />
           </section>
 
           {/* Supporting analysis panels under the graph */}

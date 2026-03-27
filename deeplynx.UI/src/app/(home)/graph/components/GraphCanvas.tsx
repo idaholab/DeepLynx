@@ -14,6 +14,7 @@ import {
   SigmaInstance,
 } from "./graphTypes";
 import { getGraphDataForRecord } from "@/app/lib/client_service/record_services.client";
+import { buildClassColorMap, getSizeForDepth } from "./graphStyle";
 
 interface GraphCanvasProps {
   organizationId: number | null;
@@ -388,20 +389,7 @@ const GraphCanvas = ({
           ? originalLabel
           : "";
 
-      let nextColor = originalColor;
-      if (isSelected) {
-        nextColor = "#115e59";
-      } else if (isHovered) {
-        nextColor = "#0369a1";
-      } else if (
-        viewModeRef.current === "path" &&
-        hasMeaningfulPath &&
-        isPathNode
-      ) {
-        nextColor = "#f97316";
-      } else if (shouldDim) {
-        nextColor = "#cbd5e1";
-      }
+      const nextColor = originalColor;
 
       let nextSize = originalSize;
       if (isSelected) {
@@ -556,12 +544,6 @@ const GraphCanvas = ({
           }
         }
 
-        const getColorByDepth = (nodeId: number): string => {
-          const nodeDepth = nodeDepths.get(nodeId) || 0;
-          const colors = ["#0f766e", "#0284c7", "#d97706", "#64748b"];
-          return colors[Math.min(nodeDepth, colors.length - 1)];
-        };
-
         const nodes = data.nodes;
         if (nodes.length === 0) {
           onError(t.translations.GRAPH_NO_NODES_FOUND);
@@ -569,19 +551,24 @@ const GraphCanvas = ({
           return;
         }
 
+        const classColorMap = buildClassColorMap(nodes);
+
         nodes.forEach((node, index) => {
           const nodeId = String(node.id);
           const angle = (index / nodes.length) * Math.PI * 2;
-          const radius =
-            node.type === "root" ? 0 : 3 + (nodeDepths.get(node.id) || 0) * 2;
+          const nodeDepth = nodeDepths.get(node.id) || 0;
+          const radius = node.type === "root" ? 0 : 6;
+          const classKey = String(node.classId ?? node.className ?? "unknown");
 
           graph.addNode(nodeId, {
             x: Math.cos(angle) * radius,
             y: Math.sin(angle) * radius,
-            size: node.type === "root" ? 24 : 14,
+            size: getSizeForDepth(nodeDepth),
             label: node.label,
-            color: getColorByDepth(node.id),
+            color: classColorMap.get(classKey) || "#64748b",
             nodeType: node.type,
+            classId: node.classId,
+            className: node.className,
           });
         });
 
@@ -612,9 +599,8 @@ const GraphCanvas = ({
           );
           const aggregatedLabels = pairLinks
             .map((link) => link.relationshipName)
-            .filter(
-              (relationshipName): relationshipName is string =>
-                Boolean(relationshipName),
+            .filter((relationshipName): relationshipName is string =>
+              Boolean(relationshipName),
             );
 
           const sourceId = String(first.source);
@@ -852,7 +838,9 @@ const GraphCanvas = ({
         refreshGraphAppearance();
       } catch (err) {
         onError(
-          err instanceof Error ? err.message : t.translations.GRAPH_FAILED_TO_LOAD,
+          err instanceof Error
+            ? err.message
+            : t.translations.GRAPH_FAILED_TO_LOAD,
         );
         onLoadingChange(false);
       }

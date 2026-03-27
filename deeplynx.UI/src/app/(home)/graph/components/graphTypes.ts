@@ -8,6 +8,8 @@ export interface NodeAttributes extends Attributes {
   label: string;
   color: string;
   nodeType: string;
+  classId?: number | null;
+  className?: string | null;
 }
 
 export interface EdgeAttributes extends Attributes {
@@ -38,6 +40,8 @@ export interface GraphNodeSummary {
   label: string;
   type: string;
   depth: number;
+  classId?: number | null;
+  className?: string | null;
 }
 
 export interface GraphLinkSummary {
