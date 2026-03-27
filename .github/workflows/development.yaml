@@ -73,7 +73,7 @@ jobs:
             --build-arg BACKEND_BASE_URL=${{ vars.BACKEND_BASE_URL }} \
             --build-arg NEXT_PUBLIC_DISABLE_FRONTEND_AUTHENTICATION=${{ vars.NEXT_PUBLIC_DISABLE_FRONTEND_AUTHENTICATION }} \
             .
-          
+
           az acr build --registry $ACR_REGISTRY \
             --image $ACR_PATH:deeplynxv3-server-$GITHUB_RUN_NUMBER \
             --file Dockerfiles/server/Dockerfile.public \
@@ -211,7 +211,6 @@ jobs:
           JWT_ISSUER: ${{vars.JWT_ISSUER}}
           JWT_SECRET_KEY: ${{ secrets.JWT_SECRET_KEY }}
           JWT_AUDIENCE: ${{vars.JWT_AUDIENCE}}
-          INSIGHT_FASTAPI_URL: ${{ vars.INSIGHT_FASTAPI_URL }}
           INSIGHT_FASTAPI_URL: ${{ vars.INSIGHT_FASTAPI_URL }}
           POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
 
