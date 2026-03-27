@@ -519,6 +519,17 @@ spec:
       labels:
         app: insight-minio
     spec:
+      securityContext:
+        fsGroup: 1000
+      initContainers:
+        - name: init-container
+          image: busybox
+          command: ["sh", "-c", "chown -R 1000:1000 /data/minio && chmod -R 700 /data/minio"]
+          volumeMounts:
+            - name: minio-storage
+              mountPath: /data/minio
+          securityContext:
+            runAsUser: 0
       containers:
         - name: deeplynx-test
           image: ${CI_REGISTRY}/${CI_REGISTRY_PATH}:insight-minio-${GITHUB_RUN_NUMBER}
@@ -541,9 +552,9 @@ spec:
             - name: MINIO_ALIAS
               value: "insight"
             - name: MINIO_ENDPOINT
-              value: "http://localhost:9100"
+              value: "localhost:9100"
             - name: MINIO_VOLUMES
-              value: "/data/duckdb"
+              value: "/data/minio"
             - name: MINIO_CONSOLE_ADDRESS
               value: ":9101"
           resources:
@@ -609,6 +620,10 @@ spec:
       labels:
         app: insight-fastapi
     spec:
+      hostAliases:
+        - ip: "141.221.75.4"
+          hostnames:
+            - "api.hpc.inl.gov"
       containers:
         - name: deeplynx-test
           image: ${CI_REGISTRY}/${CI_REGISTRY_PATH}:insight-fastapi-${GITHUB_RUN_NUMBER}
@@ -718,6 +733,10 @@ spec:
         app: insight-rabbitmq-runner
     spec:
       terminationGracePeriodSeconds: 120
+      hostAliases:
+        - ip: "141.221.75.4"
+          hostnames:
+            - "api.hpc.inl.gov"
       containers:
         - name: deeplynx-test
           image: ${CI_REGISTRY}/${CI_REGISTRY_PATH}:insight-rabbitmq-runner-${GITHUB_RUN_NUMBER}
