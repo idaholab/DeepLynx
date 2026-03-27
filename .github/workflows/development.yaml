@@ -211,6 +211,8 @@ jobs:
           JWT_ISSUER: ${{vars.JWT_ISSUER}}
           JWT_SECRET_KEY: ${{ secrets.JWT_SECRET_KEY }}
           JWT_AUDIENCE: ${{vars.JWT_AUDIENCE}}
+          INSIGHT_FASTAPI_URL: ${{ vars.INSIGHT_FASTAPI_URL }}
+          INSIGHT_FASTAPI_URL: ${{ vars.INSIGHT_FASTAPI_URL }}
           POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
 
         run: |

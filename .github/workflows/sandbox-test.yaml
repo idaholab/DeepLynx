@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       environment:
-        description: 'Environment to deploy to'
+        description: "Environment to deploy to"
         required: true
-        default: 'Test'
+        default: "Test"
 
   push:
     branches: ["develop"]
@@ -223,6 +223,7 @@ jobs:
           JWT_ISSUER: ${{vars.JWT_ISSUER}}
           JWT_SECRET_KEY: ${{ secrets.JWT_SECRET_KEY }}
           JWT_AUDIENCE: ${{vars.JWT_AUDIENCE}}
+          INSIGHT_FASTAPI_URL: ${{ vars.INSIGHT_FASTAPI_URL }}
           POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
 
         run: |
