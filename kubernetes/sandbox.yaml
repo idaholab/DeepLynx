@@ -509,6 +509,8 @@ metadata:
   name: insight-minio
   namespace: deeplynx-test
 spec:
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: insight-minio
@@ -517,6 +519,17 @@ spec:
       labels:
         app: insight-minio
     spec:
+      securityContext:
+        fsGroup: 1000
+      initContainers:
+        - name: init-container
+          image: busybox
+          command: ["sh", "-c", "chown -R 1000:1000 /data/minio && chmod -R 700 /data/minio"]
+          volumeMounts:
+            - name: minio-storage
+              mountPath: /data/minio
+          securityContext:
+            runAsUser: 0
       containers:
         - name: deeplynx-test
           image: ${CI_REGISTRY}/${CI_REGISTRY_PATH}:insight-minio-${GITHUB_RUN_NUMBER}
@@ -539,9 +552,9 @@ spec:
             - name: MINIO_ALIAS
               value: "insight"
             - name: MINIO_ENDPOINT
-              value: "http://localhost:9100"
+              value: "localhost:9100"
             - name: MINIO_VOLUMES
-              value: "/data/duckdb"
+              value: "/data/minio"
             - name: MINIO_CONSOLE_ADDRESS
               value: ":9101"
           resources:
@@ -568,12 +581,28 @@ spec:
             - containerPort: 9100
             - containerPort: 9101
           volumeMounts:
-            - name: duckdb-storage
-              mountPath: /data/duckdb
+            - name: minio-storage
+              mountPath: /data/minio
       volumes:
-        - name: duckdb-storage
+        - name: minio-storage
           persistentVolumeClaim:
-            claimName: ${AZURE_FILE_SHARE_PVC}
+            claimName: minio-pvc
+
+# Minio Persistent Volume Claim
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  namespace: deeplynx-test
+  labels:
+    app: insight-minio
+  name: minio-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi
 
 ---
 # insight-fastapi
@@ -591,6 +620,10 @@ spec:
       labels:
         app: insight-fastapi
     spec:
+      hostAliases:
+        - ip: "141.221.75.4"
+          hostnames:
+            - "api.hpc.inl.gov"
       containers:
         - name: deeplynx-test
           image: ${CI_REGISTRY}/${CI_REGISTRY_PATH}:insight-fastapi-${GITHUB_RUN_NUMBER}
@@ -604,6 +637,16 @@ spec:
               value: "True"
             - name: RABBITMQ_HOST
               value: "insight-rabbitmq-service"
+            - name: RABBITMQ_USERNAME
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: rabbitmq-default-user
+            - name: RABBITMQ_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: rabbitmq-default-pass
             - name: MINIO_ENDPOINT
               value: "insight-minio-service:9100"
             - name: MINIO_ACCESS_KEY
@@ -626,6 +669,39 @@ spec:
               value: ${POSTGRES_PASSWORD}
             - name: PG_DBNAME
               value: ${POSTGRES_DB_NAME}
+            - name: LLM_AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: llm-auth-token
+            - name: MM_AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: mm-auth-token
+            - name: EMB_AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: emb-auth-token
+            - name: LLM_SERVER_URL
+              value: "https://api.hpc.inl.gov/llm/v1"
+            - name: LLM_MODEL_NAME
+              value: "gpt-oss-120b"
+            - name: MM_SERVER_URL
+              value: "https://api.hpc.inl.gov/llm/v1"
+            - name: MM_MODEL_NAME
+              value: "Mistral-Small-3.2-24B-Instruct-2506"
+            - name: EMB_SERVER_URL
+              value: "https://api.hpc.inl.gov/llm/v1"
+            - name: EMB_MODEL_NAME
+              value: "bge-m3"
+            - name: EMB_DIMENSION
+              value: "1024"
+            - name: RAG_MAX_CHUNKS
+              value: "25"
+            - name: LITELLM_HTTP_LOGGING
+              value: "false"
           resources:
             limits:
               memory: "4Gi"
@@ -646,6 +722,8 @@ metadata:
   name: insight-rabbitmq-runner
   namespace: deeplynx-test
 spec:
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: insight-rabbitmq-runner
@@ -654,6 +732,11 @@ spec:
       labels:
         app: insight-rabbitmq-runner
     spec:
+      terminationGracePeriodSeconds: 120
+      hostAliases:
+        - ip: "141.221.75.4"
+          hostnames:
+            - "api.hpc.inl.gov"
       containers:
         - name: deeplynx-test
           image: ${CI_REGISTRY}/${CI_REGISTRY_PATH}:insight-rabbitmq-runner-${GITHUB_RUN_NUMBER}
@@ -664,6 +747,16 @@ spec:
               value: "True"
             - name: RABBITMQ_HOST
               value: "insight-rabbitmq-service"
+            - name: RABBITMQ_USERNAME
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: rabbitmq-default-user
+            - name: RABBITMQ_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: rabbitmq-default-pass
             - name: MINIO_ENDPOINT
               value: "insight-minio-service:9100"
             - name: MINIO_ACCESS_KEY
@@ -686,6 +779,49 @@ spec:
               value: ${POSTGRES_PASSWORD}
             - name: PG_DBNAME
               value: ${POSTGRES_DB_NAME}
+            - name: LLM_AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: llm-auth-token
+            - name: MM_AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: mm-auth-token
+            - name: EMB_AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: emb-auth-token
+            - name: LLM_SERVER_URL
+              value: "https://api.hpc.inl.gov/llm/v1"
+            - name: LLM_MODEL_NAME
+              value: "gpt-oss-120b"
+            - name: MM_SERVER_URL
+              value: "https://api.hpc.inl.gov/llm/v1"
+            - name: MM_MODEL_NAME
+              value: "Mistral-Small-3.2-24B-Instruct-2506"
+            - name: EMB_SERVER_URL
+              value: "https://api.hpc.inl.gov/llm/v1"
+            - name: EMB_MODEL_NAME
+              value: "bge-m3"
+            - name: EMB_DIMENSION
+              value: "1024"
+            - name: IMG_TO_TEXT_PROCS
+              value: "2"
+            - name: IMG_TO_TEXT_BATCH_SIZE
+              value: "20"
+            - name: IMG_TO_TEXT_BATCH_TIMEOUT
+              value: "0.5"
+            - name: PDF_TO_IMG_PROCS
+              value: "2"
+            - name: TEXT_TO_CHUNKS_PROCS
+              value: "2"
+            - name: RAG_MAX_CHUNKS
+              value: "25"
+            - name: LITELLM_HTTP_LOGGING
+              value: "false"
           resources:
             limits:
               memory: "4Gi"

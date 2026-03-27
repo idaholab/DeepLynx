@@ -153,6 +153,9 @@ jobs:
             --from-literal=jwt-secret-key="${{ secrets.JWT_SECRET_KEY }}" \
             --from-literal=rabbitmq-default-pass="${{ secrets.RABBITMQ_DEFAULT_PASS }}" \
             --from-literal=minio-root-password="${{ secrets.MINIO_ROOT_PASSWORD }}" \
+            --from-literal=llm-auth-token="${{ secrets.LLM_AUTH_TOKEN }}" \
+            --from-literal=mm-auth-token="${{ secrets.MM_AUTH_TOKEN }}" \
+            --from-literal=emb-auth-token="${{ secrets.EMB_AUTH_TOKEN }}" \
             --namespace=deeplynxv3-dev \
             --dry-run=client -o yaml | kubectl apply -f -
       # Create Kubernetes ConfigMap for non-sensitive environment variables
