@@ -559,12 +559,14 @@ const GraphCanvas = ({
           const nodeDepth = nodeDepths.get(node.id) || 0;
           const radius = node.type === "root" ? 0 : 6;
           const classKey = String(node.classId ?? node.className ?? "unknown");
+          const displayLabel =
+            node.type === "root" ? `ROOT: ${node.label}` : node.label;
 
           graph.addNode(nodeId, {
             x: Math.cos(angle) * radius,
             y: Math.sin(angle) * radius,
             size: getSizeForDepth(nodeDepth),
-            label: node.label,
+            label: displayLabel,
             color: classColorMap.get(classKey) || "#64748b",
             nodeType: node.type,
             classId: node.classId,

@@ -87,10 +87,10 @@ const RelationshipTable = ({
                       <span
                         className={`badge ${
                           connection.direction === "Bidirectional"
-                            ? "badge-secondary badge-outline"
+                            ? "border-purple-500 bg-purple-50 text-purple-700"
                             : connection.direction === "Incoming"
                               ? "badge-error badge-outline"
-                              : "badge-info badge-outline"
+                              : "badge-secondary badge-outline"
                         }`}
                       >
                         {connection.direction === "Bidirectional"
