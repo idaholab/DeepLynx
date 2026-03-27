@@ -83,8 +83,6 @@ public class InsightBusiness : IInsightBusiness
     ///     Intended for use after file uploads and updates where embedding should
     ///     happen asynchronously without affecting the response to the caller.
     /// </summary>
-    /// <param name="currentUserId">The ID of the user making the request.</param>
-    /// <param name="organizationId">The ID of the organization.</param>
     /// <param name="projectId">The ID of the project.</param>
     /// <param name="recordId">The ID of the record to embed.</param>
     /// <param name="uri">The URI of the file to embed.</param>
@@ -92,28 +90,26 @@ public class InsightBusiness : IInsightBusiness
     /// <param name="embeddingModelConfigId">Optional explicit embedding model config ID. If null, the project/org default is used.</param>
     /// <param name="overwrite">Whether to overwrite an existing embedding for this record.</param>
     public void TriggerEmbedding(
-        long currentUserId,
-        long organizationId,
         long projectId,
         long recordId,
         string uri,
-        long? vlmConfigId = null,
-        long? embeddingModelConfigId = null,
+        AiModelConfigResponseDto vlmConfig,      // pass already-resolved configs
+        AiModelConfigResponseDto embeddingConfig,
         bool overwrite = false)
     {
-        var payload = new InsightUploadApiRequestDto
+        var request = new InsightUploadRequestDto
         {
-            FileInfo = new List<InsightUploadApiRequestDto.FileInfoDto>
-            {
-                new InsightUploadApiRequestDto.FileInfoDto
-                {
-                    FileId = recordId,
-                    FileUri = uri
-                }
-            },
+            FileInfo = [new() { FileId = recordId, FileUri = NormalizeFileUri(uri) }],
+            Overwrite = overwrite,
+            VlmServerUrl = vlmConfig.ServerUrl,
+            VlmName = vlmConfig.ModelName,
+            VlmToken = vlmConfig.Token,
+            EmbeddingServerUrl = embeddingConfig.ServerUrl,
+            EmbeddingModelName = embeddingConfig.ModelName,
+            EmbeddingModelToken = embeddingConfig.Token
         };
 
-        _ = QueueInsightUpload(currentUserId, organizationId, projectId, vlmConfigId, embeddingModelConfigId, payload)
+        _ = _insightServiceClient.Upload(request)
             .ContinueWith(t =>
             {
                 if (t.IsFaulted)
@@ -200,7 +196,7 @@ public class InsightBusiness : IInsightBusiness
     /// <returns>The resolved <see cref="AiModelConfigResponseDto"/>, with <c>Token</c> populated if applicable.</returns>
     /// <exception cref="KeyNotFoundException">Thrown when the config or its default cannot be found.</exception>
     /// <exception cref="InvalidOperationException">Thrown when a token is required but not found for the user.</exception>
-    private async Task<AiModelConfigResponseDto> ResolveModelConfig(
+    public async Task<AiModelConfigResponseDto> ResolveModelConfig(
         long currentUserId,
         long organizationId,
         long projectId,

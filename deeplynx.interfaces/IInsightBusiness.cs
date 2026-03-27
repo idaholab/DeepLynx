@@ -25,14 +25,19 @@ public interface IInsightBusiness
     Task<InsightIngestionStatusResponseDto> FetchInsightIngestionStatus(long recordId);
 
     void TriggerEmbedding(
-        long currentUserId,
-        long organizationId,
         long projectId,
         long recordId,
         string uri,
-        long? vlmConfigId = null,
-        long? embeddingModelConfigId = null,
+        AiModelConfigResponseDto vlmConfig,
+        AiModelConfigResponseDto embeddingConfig,
         bool overwrite = false);
+
+    Task<AiModelConfigResponseDto> ResolveModelConfig(
+        long currentUserId,
+        long organizationId,
+        long projectId,
+        long? modelConfigId,
+        string modelType);
 
     bool IsSupportedFile(string fileType);
 

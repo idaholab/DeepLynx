@@ -40,10 +40,11 @@ public class FileController : ControllerBase
     /// <param name="dataSourceId">The ID of the data source to which the file belongs</param>
     /// <param name="objectStorageId">The ID of the object storage method</param>
     /// <param name="file">The file to upload</param>
-    /// <param name="embed">Boolean value that determines if the file will be embedded by Insight</param>
     /// <param name="sensitivityLabelIds">The IDs of the Sensitivity Labels that will be attached to the record</param>
-    /// <param name="metadata">
-    /// </param>
+    /// <param name="metadata">Optional metadata that will be appended to the created record</param>
+    /// <param name="embed">Boolean value that determines if the file will be embedded by Insight</param>
+    /// <param name="vlmConfigId">Optional ID of the VLM model that will be used by Insight if embed is set to true</param>
+    /// <param name="embeddingModelConfigId">Optional ID of the Embedding model that will be used by Insight if embed is set to true</param>
     /// <returns>Record response DTO containing file information</returns>
     [HttpPost(Name = "api_upload_file")]
     [Auth("write", "file")]
@@ -59,14 +60,14 @@ public class FileController : ControllerBase
         IFormFile? metadata,
         [FromQuery] bool embed = false,
         [FromQuery] long? vlmConfigId = null,
-        [FromQuery] long? embeddingModelConfig = null)
+        [FromQuery] long? embeddingModelConfigId = null)
     {
         try
         {
             var currentUserId = UserContextStorage.UserId;
             var fileUploadInfo =
                 await _fileBusiness.UploadFile(currentUserId, organizationId, projectId, dataSourceId, objectStorageId,
-                    file, sensitivityLabelIds, metadata, embed, vlmConfigId, embeddingModelConfig);
+                    file, sensitivityLabelIds, metadata, embed, vlmConfigId, embeddingModelConfigId);
             return Ok(fileUploadInfo);
         }
         catch (Exception exc)
@@ -84,6 +85,8 @@ public class FileController : ControllerBase
     /// <param name="projectId">The ID of the project to which the file belongs</param>
     /// <param name="recordId">The ID of the record that contains file information</param>
     /// <param name="file">The file to replace the old one</param>
+    /// <param name="vlmConfigId">Optional ID of the VLM model that will be used by Insight if embed is set to true</param>
+    /// <param name="embeddingModelConfigId">Optional ID of the Embedding model that will be used by Insight if embed is set to true</param>
     /// <returns>Record response DTO containing updated file information</returns>
     [HttpPut("{recordId:long}", Name = "api_update_file")]
     [Auth("update", "file")]
@@ -93,7 +96,9 @@ public class FileController : ControllerBase
         long organizationId,
         long projectId,
         long recordId,
-        IFormFile file)
+        IFormFile file,
+        [FromQuery] long? vlmConfigId = null,
+        [FromQuery] long? embeddingModelConfigId = null)
     {
         try
         {
@@ -276,6 +281,8 @@ public class FileController : ControllerBase
     /// <param name="request">File upload completion request DTO with optional metadata DTO</param>
     /// <param name="sensitivityLabelIds">Optional List of ID's for the Sensitivity Labels to be associated with this file/record</param>
     /// <param name="embed">Optional boolean that determines if the file will be embedded by Insight</param>
+    /// <param name="vlmConfigId">Optional ID of the VLM model that will be used by Insight if embed is set to true</param>
+    /// <param name="embeddingModelConfigId">Optional ID of the Embedding model that will be used by Insight if embed is set to true</param>
     /// <returns>Record response DTO containing file information</returns>
     [HttpPost("upload/complete", Name = "api_complete_file_upload")]
     [Auth("write", "file")]
@@ -287,14 +294,16 @@ public class FileController : ControllerBase
         [FromQuery] long? objectStorageId,
         [FromBody] FileUploadCompleteRequestDto request,
         [FromQuery] List<long>? sensitivityLabelIds,
-        [FromQuery] bool embed = false)
+        [FromQuery] bool embed = false,
+        [FromQuery] long? vlmConfigId = null,
+        [FromQuery] long? embeddingModelConfigId = null)
     {
         try
         {
             var currentUserId = UserContextStorage.UserId;
             var fileRecord = await _fileBusiness.CompleteUpload(
                 currentUserId, organizationId, projectId, dataSourceId, objectStorageId, request, sensitivityLabelIds,
-                request.Metadata, embed);
+                request.Metadata, embed, vlmConfigId, embeddingModelConfigId);
             return Ok(fileRecord);
         }
         catch (Exception exc)

@@ -120,9 +120,14 @@ public class FileBusiness
             realDataSourceId, recordRequest, sensitivityLabelIds);
 
         if (embed)
-            _insightBusiness.TriggerEmbedding(currentUserId, organizationId, projectId, createdRecord.Id,
-                createdRecord.Uri!, vlmConfigId, embeddingModelConfigId);
-
+        {
+            var vlmConfig = await _insightBusiness.ResolveModelConfig(currentUserId, organizationId, projectId, vlmConfigId, "vlm");
+            var embeddingModelConfig = await _insightBusiness.ResolveModelConfig(currentUserId, organizationId, projectId, embeddingModelConfigId, "embedding");
+            
+            _insightBusiness.TriggerEmbedding(projectId, createdRecord.Id,
+                            createdRecord.Uri!, vlmConfig, embeddingModelConfig);
+        }
+        
         return createdRecord;
     }
 
@@ -134,7 +139,9 @@ public class FileBusiness
         long organizationId,
         long projectId,
         long recordId,
-        IFormFile file)
+        IFormFile file,
+        long? vlmConfigId = null,
+        long? embeddingModelConfigId = null)
     {
         var record = await _recordBusiness.GetRecord(currentUserId, organizationId, projectId, recordId, true);
 
@@ -165,9 +172,15 @@ public class FileBusiness
             updateRecordRequest);
 
         if (record.Embedded)
-            _insightBusiness.TriggerEmbedding(currentUserId, organizationId, projectId, updatedRecord.Id,
-                updatedRecord.Uri!, overwrite: true);
-
+        {
+            var vlmConfig =
+                await _insightBusiness.ResolveModelConfig(currentUserId, organizationId, projectId, vlmConfigId, "vlm");
+            var embeddingModelConfig = 
+                await _insightBusiness.ResolveModelConfig(currentUserId, organizationId, projectId, embeddingModelConfigId, "embedding");
+            
+            _insightBusiness.TriggerEmbedding(projectId, updatedRecord.Id, updatedRecord.Uri!, vlmConfig, embeddingModelConfig, overwrite: true);
+        }
+        
         return updatedRecord;
     }
 
@@ -294,7 +307,9 @@ public class FileBusiness
         FileUploadCompleteRequestDto request,
         List<long>? sensitivityLabelIds = null,
         CreateRecordFileUploadRequestDto? metadata = null,
-        bool embed = false)
+        bool embed = false,
+        long? vlmConfigId = null,
+        long? embeddingModelConfigId = null)
     {
         var realDataSourceId = await ResolveDataSourceId(organizationId, projectId, dataSourceId);
         var objectStorage = await GetObjectStorageWithConfig(organizationId, projectId, objectStorageId);
@@ -330,10 +345,15 @@ public class FileBusiness
 
         var createdRecord = await _recordBusiness.CreateRecord(currentUserId, organizationId, projectId,
             realDataSourceId, recordRequest, sensitivityLabelIds);
-
+        
         if (embed)
-            _insightBusiness.TriggerEmbedding(currentUserId, organizationId, projectId, createdRecord.Id,
-                createdRecord.Uri!);
+        {
+            var vlmConfig = await _insightBusiness.ResolveModelConfig(currentUserId, organizationId, projectId, vlmConfigId, "vlm");
+            var embeddingModelConfig = await _insightBusiness.ResolveModelConfig(currentUserId, organizationId, projectId, embeddingModelConfigId, "embedding");
+            
+            _insightBusiness.TriggerEmbedding(projectId, createdRecord.Id,
+                createdRecord.Uri!, vlmConfig, embeddingModelConfig);
+        }
 
         return createdRecord;
     }
