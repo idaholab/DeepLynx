@@ -606,7 +606,7 @@ spec:
               cpu: "1500m"
           volumeMounts:
             - name: nexus-storage
-              mountPath: /data
+              mountPath: /data/duckdb
               readOnly: true
             - name: insight-storage
               mountPath: /data/insight
