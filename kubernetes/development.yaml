@@ -500,7 +500,23 @@ spec:
             timeoutSeconds: 5
             failureThreshold: 3
 
-# insight-storage
+# insight-storage StorageClass with UID 1000 mount options for python user
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: azurefile-insight
+provisioner: file.csi.azure.com
+parameters:
+  skuName: Premium_LRS
+mountOptions:
+  - dir_mode=0777
+  - file_mode=0666
+  - uid=1000
+  - gid=1000
+reclaimPolicy: Retain
+allowVolumeExpansion: true
+volumeBindingMode: Immediate
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -513,7 +529,7 @@ spec:
   resources:
     requests:
       storage: 10Gi
-  storageClassName: ${AZURE_FILE_SHARE_STORAGE_CLASS}
+  storageClassName: azurefile-insight
 
 # insight-fastapi
 ---
