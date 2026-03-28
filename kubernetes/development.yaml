@@ -6,8 +6,8 @@ metadata:
   labels:
     name: deeplynxv3-dev
 
----
 # Secret for Azure Storage Account with SAS Token
+---
 apiVersion: v1
 kind: Secret
 metadata:
@@ -20,8 +20,8 @@ stringData:
   azurestorageaccountkey: ${AZURE_STORAGE_ACCOUNT_KEY}
   azurestorageconnectionstring: ${AZURE_OBJECT_CONNECTION_STRING}
 
----
 # Persistent Volume pointing to existing Azure File Share
+---
 apiVersion: v1
 kind: PersistentVolume
 metadata:
@@ -57,8 +57,8 @@ spec:
       name: azure-storage-secret
       namespace: deeplynxv3-dev
 
----
 # Storage Class (simplified for static provisioning)
+---
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
@@ -71,8 +71,8 @@ reclaimPolicy: Retain
 allowVolumeExpansion: true
 volumeBindingMode: Immediate
 
----
 # Persistent Volume Claim
+---
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -86,7 +86,6 @@ spec:
       storage: 60Gi
   storageClassName: ${AZURE_FILE_SHARE_STORAGE_CLASS}
   volumeName: ${AZURE_FILE_SHARE_PERSISTENT_VOLUME} # Bind to the specific PV
-
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -138,8 +137,9 @@ spec:
               value: ${JWT_ISSUER}
             - name: JWT_AUDIENCE
               value: ${JWT_AUDIENCE}
-            # DuckDB Configuration
             - name: DUCKDB_BASE_PATH
+              # DuckDB Configuration
+
               value: ${DUCKDB_BASE_PATH}
             - name: SMTP_SERVER
               value: ${SMTP_SERVER}
@@ -161,8 +161,9 @@ spec:
               value: ${SUPERUSER_EMAIL}
             - name: TENANT_MODE
               value: ${TENANT_MODE}
-            # Runtime environment variables from secrets (sensitive)
             - name: OKTA_CLIENT_SECRET
+              # Runtime environment variables from secrets (sensitive)
+
               valueFrom:
                 secretKeyRef:
                   name: app-secrets
@@ -191,8 +192,9 @@ spec:
                 secretKeyRef:
                   name: app-secrets
                   key: service-token
-            # Runtime environment variables from configmap (non-sensitive)
             - name: NEXT_PUBLIC_DISABLE_FRONTEND_AUTHENTICATION
+              # Runtime environment variables from configmap (non-sensitive)
+
               valueFrom:
                 configMapKeyRef:
                   name: app-config
@@ -235,7 +237,6 @@ spec:
         - name: duckdb-storage
           persistentVolumeClaim:
             claimName: ${AZURE_FILE_SHARE_PVC}
-
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -287,8 +288,9 @@ spec:
               value: ${JWT_SECRET_KEY}
             - name: JWT_AUDIENCE
               value: ${JWT_AUDIENCE}
-            # DuckDB Configuration (same as frontend)
             - name: DUCKDB_BASE_PATH
+              # DuckDB Configuration (same as frontend)
+
               value: ${DUCKDB_BASE_PATH}
             - name: SMTP_SERVER
               value: ${SMTP_SERVER}
@@ -310,8 +312,9 @@ spec:
               value: ${DISABLE_BACKEND_AUTHENTICATION}
             - name: SUPERUSER_EMAIL
               value: ${SUPERUSER_EMAIL}
-            # Backend may also need these environment variables
             - name: OKTA_CLIENT_SECRET
+              # Backend may also need these environment variables
+
               valueFrom:
                 secretKeyRef:
                   name: app-secrets
@@ -375,8 +378,8 @@ spec:
           persistentVolumeClaim:
             claimName: ${AZURE_FILE_SHARE_PVC}
 
----
 #docs
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -408,8 +411,8 @@ spec:
           ports:
             - containerPort: 3001
 
----
 #mcp
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -444,8 +447,8 @@ spec:
           ports:
             - containerPort: 43656
 
----
 # insight-rabbitmq
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -461,7 +464,7 @@ spec:
         app: insight-rabbitmq
     spec:
       containers:
-        - name: deeplynxv3
+        - name: insight-rabbitmq
           image: ${CI_REGISTRY}/${CI_REGISTRY_PATH}:insight-rabbitmq-${GITHUB_RUN_NUMBER}
           imagePullPolicy: Always
           ports:
@@ -501,82 +504,23 @@ spec:
             timeoutSeconds: 5
             failureThreshold: 3
 
+# insight-storage: scratch volume for the Insight processing pipeline
 ---
-# insight-minio
-apiVersion: apps/v1
-kind: Deployment
+apiVersion: v1
+kind: PersistentVolumeClaim
 metadata:
-  name: insight-minio
+  name: insight-storage
   namespace: deeplynxv3-dev
 spec:
-  selector:
-    matchLabels:
-      app: insight-minio
-  template:
-    metadata:
-      labels:
-        app: insight-minio
-    spec:
-      containers:
-        - name: deeplynxv3
-          image: ${CI_REGISTRY}/${CI_REGISTRY_PATH}:insight-minio-${GITHUB_RUN_NUMBER}
-          imagePullPolicy: Always
-          env:
-            - name: MINIO_ROOT_USER
-              valueFrom:
-                configMapKeyRef:
-                  name: app-config
-                  key: minio-root-user
-            - name: MINIO_ROOT_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: app-secrets
-                  key: minio-root-password
-            - name: MINIO_API_PORT
-              value: "9100"
-            - name: MINIO_UI_PORT
-              value: "9101"
-            - name: MINIO_ALIAS
-              value: "insight"
-            - name: MINIO_ENDPOINT
-              value: "http://localhost:9100"
-            - name: MINIO_VOLUMES
-              value: "/data/duckdb"
-            - name: MINIO_CONSOLE_ADDRESS
-              value: ":9101"
-          resources:
-            limits:
-              memory: "4Gi"
-              cpu: "1500m"
-          livenessProbe:
-            httpGet:
-              path: /minio/health/live
-              port: 9100
-            initialDelaySeconds: 30
-            periodSeconds: 10
-            timeoutSeconds: 5
-            failureThreshold: 5
-          readinessProbe:
-            httpGet:
-              path: /minio/health/live
-              port: 9100
-            initialDelaySeconds: 10
-            periodSeconds: 10
-            timeoutSeconds: 5
-            failureThreshold: 3
-          ports:
-            - containerPort: 9100
-            - containerPort: 9101
-          volumeMounts:
-            - name: duckdb-storage
-              mountPath: /data/duckdb
-      volumes:
-        - name: duckdb-storage
-          persistentVolumeClaim:
-            claimName: ${AZURE_FILE_SHARE_PVC}
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 10Gi
+  storageClassName: ${AZURE_FILE_SHARE_STORAGE_CLASS}
 
----
 # insight-fastapi
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -592,11 +536,9 @@ spec:
         app: insight-fastapi
     spec:
       containers:
-        - name: deeplynxv3
+        - name: insight-fastapi
           image: ${CI_REGISTRY}/${CI_REGISTRY_PATH}:insight-fastapi-${GITHUB_RUN_NUMBER}
           imagePullPolicy: Always
-          command:
-            ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "5009"]
           ports:
             - containerPort: 5009
           env:
@@ -604,18 +546,6 @@ spec:
               value: "True"
             - name: RABBITMQ_HOST
               value: "insight-rabbitmq-service"
-            - name: MINIO_ENDPOINT
-              value: "insight-minio-service:9100"
-            - name: MINIO_ACCESS_KEY
-              valueFrom:
-                configMapKeyRef:
-                  name: app-config
-                  key: minio-root-user
-            - name: MINIO_SECRET_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: app-secrets
-                  key: minio-root-password
             - name: PG_HOST
               value: ${POSTGRES_DB_HOST}
             - name: PG_PORT
@@ -631,15 +561,21 @@ spec:
               memory: "4Gi"
               cpu: "1500m"
           volumeMounts:
-            - name: duckdb-storage
-              mountPath: /data/duckdb
+            - name: nexus-storage
+              mountPath: /data
+              readOnly: true
+            - name: insight-storage
+              mountPath: /data/insight
       volumes:
-        - name: duckdb-storage
+        - name: nexus-storage
           persistentVolumeClaim:
             claimName: ${AZURE_FILE_SHARE_PVC}
+        - name: insight-storage
+          persistentVolumeClaim:
+            claimName: insight-storage
 
----
 # insight-rabbitmq-runner
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -655,27 +591,14 @@ spec:
         app: insight-rabbitmq-runner
     spec:
       containers:
-        - name: deeplynxv3
+        - name: insight-rabbitmq-runner
           image: ${CI_REGISTRY}/${CI_REGISTRY_PATH}:insight-rabbitmq-runner-${GITHUB_RUN_NUMBER}
           imagePullPolicy: Always
-          command: ["python", "-m", "runner"]
           env:
             - name: LITELLM_LOCAL_MODEL_COST_MAP
               value: "True"
             - name: RABBITMQ_HOST
               value: "insight-rabbitmq-service"
-            - name: MINIO_ENDPOINT
-              value: "insight-minio-service:9100"
-            - name: MINIO_ACCESS_KEY
-              valueFrom:
-                configMapKeyRef:
-                  name: app-config
-                  key: minio-root-user
-            - name: MINIO_SECRET_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: app-secrets
-                  key: minio-root-password
             - name: PG_HOST
               value: ${POSTGRES_DB_HOST}
             - name: PG_PORT
@@ -691,13 +614,12 @@ spec:
               memory: "4Gi"
               cpu: "1500m"
           volumeMounts:
-            - name: duckdb-storage
-              mountPath: /data/duckdb
+            - name: insight-storage
+              mountPath: /data/insight
       volumes:
-        - name: duckdb-storage
+        - name: insight-storage
           persistentVolumeClaim:
-            claimName: ${AZURE_FILE_SHARE_PVC}
-
+            claimName: insight-storage
 ---
 apiVersion: v1
 kind: Service
@@ -712,7 +634,6 @@ spec:
       targetPort: 3000
   selector:
     app: deeplynxv3
-
 ---
 apiVersion: v1
 kind: Service
@@ -727,7 +648,6 @@ spec:
       targetPort: 5000
   selector:
     app: deeplynxbackend
-
 ---
 apiVersion: v1
 kind: Service
@@ -742,7 +662,6 @@ spec:
       targetPort: 3001
   selector:
     app: deeplynx-docs
-
 ---
 apiVersion: v1
 kind: Service
@@ -757,7 +676,6 @@ spec:
       targetPort: 43656
   selector:
     app: deeplynx-mcp
-
 ---
 apiVersion: v1
 kind: Service
@@ -778,25 +696,6 @@ spec:
       targetPort: 15692
   selector:
     app: insight-rabbitmq
-
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: insight-minio-service
-  namespace: deeplynxv3-dev
-spec:
-  type: ClusterIP
-  ports:
-    - name: api
-      port: 9100
-      targetPort: 9100
-    - name: console
-      port: 9101
-      targetPort: 9101
-  selector:
-    app: insight-minio
-
 ---
 apiVersion: v1
 kind: Service
@@ -811,7 +710,6 @@ spec:
       targetPort: 5009
   selector:
     app: insight-fastapi
-
 ---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
