@@ -502,7 +502,7 @@ spec:
 
 # insight-storage
 ---
-apiVersion: apps/v1
+apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: insight-storage
