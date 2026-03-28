@@ -500,37 +500,6 @@ spec:
             timeoutSeconds: 5
             failureThreshold: 3
 
-# insight-storage StorageClass with UID 1000 mount options for python user
----
-apiVersion: storage.k8s.io/v1
-kind: StorageClass
-metadata:
-  name: azurefile-insight
-provisioner: file.csi.azure.com
-parameters:
-  skuName: Premium_LRS
-mountOptions:
-  - dir_mode=0777
-  - file_mode=0666
-  - uid=1000
-  - gid=1000
-reclaimPolicy: Retain
-allowVolumeExpansion: true
-volumeBindingMode: Immediate
----
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: insight-storage
-  namespace: deeplynxv3-dev
-spec:
-  accessModes:
-    - ReadWriteMany
-  resources:
-    requests:
-      storage: 10Gi
-  storageClassName: azurefile-insight
-
 # insight-fastapi
 ---
 apiVersion: apps/v1
@@ -616,6 +585,8 @@ spec:
               value: "25"
             - name: LITELLM_HTTP_LOGGING
               value: "false"
+            - name: STORAGE_BASE_DIR
+              value: "/data/duckdb/insight"
           resources:
             limits:
               memory: "4Gi"
@@ -623,16 +594,10 @@ spec:
           volumeMounts:
             - name: nexus-storage
               mountPath: /data/duckdb
-              readOnly: true
-            - name: insight-storage
-              mountPath: /data/insight
       volumes:
         - name: nexus-storage
           persistentVolumeClaim:
             claimName: ${AZURE_FILE_SHARE_PVC}
-        - name: insight-storage
-          persistentVolumeClaim:
-            claimName: insight-storage
 
 # insight-rabbitmq-runner
 ---
@@ -730,17 +695,19 @@ spec:
               value: "25"
             - name: LITELLM_HTTP_LOGGING
               value: "false"
+            - name: STORAGE_BASE_DIR
+              value: "/data/duckdb/insight"
           resources:
             limits:
               memory: "4Gi"
               cpu: "1500m"
           volumeMounts:
-            - name: insight-storage
-              mountPath: /data/insight
+            - name: nexus-storage
+              mountPath: /data/duckdb
       volumes:
-        - name: insight-storage
+        - name: nexus-storage
           persistentVolumeClaim:
-            claimName: insight-storage
+            claimName: ${AZURE_FILE_SHARE_PVC}
 ---
 apiVersion: v1
 kind: Service
