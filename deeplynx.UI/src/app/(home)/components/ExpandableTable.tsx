@@ -38,7 +38,11 @@ export function ExpandableTable<T>({
   const [expandedRowId, setExpandedRowId] = useState<string | number | null>(
     null,
   );
-  const { sortValue, setSortValue, sortedItems: sortedData } = useSortedItems({
+  const {
+    sortValue,
+    setSortValue,
+    sortedItems: sortedData,
+  } = useSortedItems({
     items: data,
     sortOptions,
     defaultSortValue,
@@ -110,7 +114,7 @@ export function ExpandableTable<T>({
   const renderExpandedRow = (row: T, rowId: string | number) => (
     <tr>
       <td colSpan={columns.length + 2} className="p-0">
-        <div className="overflow-hidden transition-all duration-500 ease-in-out max-h-[1000px] opacity-100">
+        <div className="overflow-visible transition-all duration-500 ease-in-out max-h-[1000px] opacity-100">
           <div
             className="card bg-base-200 border border-base-300/30 p-6 rounded-box shadow-lg shadow-dynamic-shadow"
             data-tour={`project-row-${rowId}-expanded`}
@@ -122,10 +126,7 @@ export function ExpandableTable<T>({
     </tr>
   );
 
-  const renderCollapsedRow = (
-    row: T,
-    rowId: string | number,
-  ) => (
+  const renderCollapsedRow = (row: T, rowId: string | number) => (
     <tr className={COLLAPSED_ROW_CLASS}>
       {columns.map((column, index) => {
         const shouldTriggerExpand = column.isExpandTrigger?.(row) ?? false;
