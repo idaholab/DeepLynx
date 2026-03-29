@@ -111,6 +111,41 @@ services:
       retries: 5
       start_period: 30s
 
+  db-version-check:
+    image: postgres:18-alpine3.23
+    networks:
+      - nexus-network
+    volumes:
+      - ./Dockerfiles/database/check_db_version.sh:/scripts/check_db_version.sh
+    environment:
+      DB_HOST: nx-postgres
+      DB_USER: postgres
+      DB_PASSWORD: nexuscore
+      DB_NAME: deeplynx
+    command: >
+      sh -c "
+        apk add --no-cache bash &&
+        chmod +x /scripts/check_db_version.sh &&
+        /scripts/check_db_version.sh
+      "
+    depends_on:
+      nx-postgres:
+        condition: service_healthy
+
+  mcp:
+    build:
+      context: ./
+      dockerfile: Dockerfiles/mcp/Dockerfile.local
+    environment:
+      NEXUS_API_URL: "http://server:5000/api/v1"
+      MCP_SERVER_URL: "http://0.0.0.0:43656"
+    ports:
+      - "43656:43656"
+    networks:
+      - nexus-network
+    depends_on:
+      - server
+
   insight-rabbitmq:
     profiles: [insight]
     build:
@@ -177,6 +212,8 @@ services:
     depends_on:
       insight-rabbitmq:
         condition: service_healthy
+      nx-postgres:
+        condition: service_healthy
     volumes:
       - object_storage:/data
       - insight_storage:/data/insight
@@ -194,41 +231,6 @@ services:
       - nexus-network
     depends_on:
       - nx-postgres
-
-  db-version-check:
-    image: postgres:18-alpine3.23
-    networks:
-      - nexus-network
-    volumes:
-      - ./Dockerfiles/database/check_db_version.sh:/scripts/check_db_version.sh
-    environment:
-      DB_HOST: nx-postgres
-      DB_USER: postgres
-      DB_PASSWORD: nexuscore
-      DB_NAME: deeplynx
-    command: >
-      sh -c "
-        apk add --no-cache bash &&
-        chmod +x /scripts/check_db_version.sh &&
-        /scripts/check_db_version.sh
-      "
-    depends_on:
-      nx-postgres:
-        condition: service_healthy
-
-  mcp:
-    build:
-      context: ./
-      dockerfile: Dockerfiles/mcp/Dockerfile.local
-    environment:
-      NEXUS_API_URL: "http://server:5000/api/v1"
-      MCP_SERVER_URL: "http://0.0.0.0:43656"
-    ports:
-      - "43656:43656"
-    networks:
-      - nexus-network
-    depends_on:
-      - server
 
 networks:
   nexus-network:
