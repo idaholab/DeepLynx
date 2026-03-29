@@ -118,27 +118,6 @@ services:
     networks:
       - nexus-network
 
-  insight-minio:
-    profiles: [insight]
-    build:
-      context: ./deeplynx.insight/app/minio
-      dockerfile: Dockerfiles/Dockerfile.production
-    ports:
-      - "9100:9100"
-      - "9101:9101"
-    env_file:
-      - ./deeplynx.insight/.env.production
-    environment:
-      - MINIO_ENDPOINT=host.docker.internal:9100
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9100/minio/health/live"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
-    networks:
-      - nexus-network
-
   insight-fastapi:
     profiles: [insight]
     build:
@@ -152,7 +131,6 @@ services:
     environment:
       - LITELLM_LOCAL_MODEL_COST_MAP=True
       - RABBITMQ_HOST=insight-rabbitmq
-      - MINIO_ENDPOINT=insight-minio:9100
       - PG_HOST=nx-postgres
       - PG_PORT=5432
       - PG_USER=postgres
@@ -161,8 +139,8 @@ services:
     depends_on:
       insight-rabbitmq:
         condition: service_healthy
-      insight-minio:
-        condition: service_healthy
+      db-version-check:
+        condition: service_completed_successfully
     volumes:
       - object_storage:/data
     networks:
@@ -179,7 +157,6 @@ services:
     environment:
       - LITELLM_LOCAL_MODEL_COST_MAP=True
       - RABBITMQ_HOST=insight-rabbitmq
-      - MINIO_ENDPOINT=insight-minio:9100
       - PG_HOST=nx-postgres
       - PG_PORT=5432
       - PG_USER=postgres
@@ -188,8 +165,8 @@ services:
     depends_on:
       insight-rabbitmq:
         condition: service_healthy
-      insight-minio:
-        condition: service_healthy
+      db-version-check:
+        condition: service_completed_successfully
     volumes:
       - object_storage:/data
     networks:
