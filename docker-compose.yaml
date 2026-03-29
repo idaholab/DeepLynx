@@ -85,6 +85,9 @@ services:
       - nexus-network
     volumes:
       - object_storage:/data
+    depends_on:
+      nx-postgres:
+        condition: service_completed_successfully
 
   nx-postgres:
     build:
@@ -186,6 +189,8 @@ services:
       - PG_DBNAME=deeplynx
     depends_on:
       insight-rabbitmq:
+        condition: service_healthy
+      nx-postgres:
         condition: service_healthy
     volumes:
       - object_storage:/data
