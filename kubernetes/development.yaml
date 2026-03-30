@@ -169,7 +169,6 @@ spec:
               value: ${TENANT_MODE}
             - name: OKTA_CLIENT_SECRET
               # Runtime environment variables from secrets (sensitive)
-
               valueFrom:
                 secretKeyRef:
                   name: app-secrets
@@ -200,7 +199,6 @@ spec:
                   key: service-token
             - name: NEXT_PUBLIC_DISABLE_FRONTEND_AUTHENTICATION
               # Runtime environment variables from configmap (non-sensitive)
-
               valueFrom:
                 configMapKeyRef:
                   name: app-config
@@ -296,7 +294,6 @@ spec:
               value: ${JWT_AUDIENCE}
             - name: DUCKDB_BASE_PATH
               # DuckDB Configuration (same as frontend)
-
               value: ${DUCKDB_BASE_PATH}
             - name: SMTP_SERVER
               value: ${SMTP_SERVER}
@@ -322,7 +319,6 @@ spec:
               value: ${SUPERUSER_EMAIL}
             - name: OKTA_CLIENT_SECRET
               # Backend may also need these environment variables
-
               valueFrom:
                 secretKeyRef:
                   name: app-secrets
@@ -516,116 +512,6 @@ spec:
             failureThreshold: 3
 
 
-# insight-minio
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: insight-minio
-  namespace: deeplynxv3-dev
-spec:
-  strategy:
-    type: Recreate
-  selector:
-    matchLabels:
-      app: insight-minio
-  template:
-    metadata:
-      labels:
-        app: insight-minio
-    spec:
-      securityContext:
-        fsGroup: 1000
-      initContainers:
-        - name: init-container
-          image: busybox
-          command:
-            [
-              "sh",
-              "-c",
-              "chown -R 1000:1000 /data/minio && chmod -R 700 /data/minio",
-            ]
-          volumeMounts:
-            - name: minio-storage
-              mountPath: /data/minio
-          securityContext:
-            runAsUser: 0
-      containers:
-        - name: deeplynxv3
-          image: ${CI_REGISTRY}/${CI_REGISTRY_PATH}:insight-minio-${GITHUB_RUN_NUMBER}
-          imagePullPolicy: Always
-          env:
-            - name: MINIO_ROOT_USER
-              valueFrom:
-                configMapKeyRef:
-                  name: app-config
-                  key: minio-root-user
-            - name: MINIO_ROOT_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: app-secrets
-                  key: minio-root-password
-            - name: MINIO_API_PORT
-              value: "9100"
-            - name: MINIO_UI_PORT
-              value: "9101"
-            - name: MINIO_ALIAS
-              value: "insight"
-            - name: MINIO_ENDPOINT
-              value: "localhost:9100"
-            - name: MINIO_VOLUMES
-              value: "/data/minio"
-            - name: MINIO_CONSOLE_ADDRESS
-              value: ":9101"
-          resources:
-            limits:
-              memory: "4Gi"
-              cpu: "1500m"
-          livenessProbe:
-            httpGet:
-              path: /minio/health/live
-              port: 9100
-            initialDelaySeconds: 30
-            periodSeconds: 10
-            timeoutSeconds: 5
-            failureThreshold: 5
-          readinessProbe:
-            httpGet:
-              path: /minio/health/live
-              port: 9100
-            initialDelaySeconds: 10
-            periodSeconds: 10
-            timeoutSeconds: 5
-            failureThreshold: 3
-          ports:
-            - containerPort: 9100
-            - containerPort: 9101
-          volumeMounts:
-            - name: minio-storage
-              mountPath: /data/minio
-      volumes:
-        - name: minio-storage
-          persistentVolumeClaim:
-            claimName: minio-pvc
-
-
-# Minio Persistent Volume Claim
----
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  namespace: deeplynxv3-dev
-  labels:
-    app: insight-minio
-  name: minio-pvc
-spec:
-  accessModes:
-    - ReadWriteOnce
-  resources:
-    requests:
-      storage: 2Gi
-
-
 # insight-fastapi
 ---
 apiVersion: apps/v1
@@ -669,18 +555,6 @@ spec:
                 secretKeyRef:
                   name: app-secrets
                   key: rabbitmq-default-pass
-            - name: MINIO_ENDPOINT
-              value: "insight-minio-service:9100"
-            - name: MINIO_ACCESS_KEY
-              valueFrom:
-                configMapKeyRef:
-                  name: app-config
-                  key: minio-root-user
-            - name: MINIO_SECRET_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: app-secrets
-                  key: minio-root-password
             - name: PG_HOST
               value: ${POSTGRES_DB_HOST}
             - name: PG_PORT
@@ -724,15 +598,17 @@ spec:
               value: "25"
             - name: LITELLM_HTTP_LOGGING
               value: "false"
+            - name: STORAGE_BASE_DIR
+              value: "/data/duckdb/insight"
           resources:
             limits:
               memory: "4Gi"
               cpu: "1500m"
           volumeMounts:
-            - name: duckdb-storage
+            - name: nexus-storage
               mountPath: /data/duckdb
       volumes:
-        - name: duckdb-storage
+        - name: nexus-storage
           persistentVolumeClaim:
             claimName: ${AZURE_FILE_SHARE_PVC}
 
@@ -770,8 +646,6 @@ spec:
               value: "True"
             - name: RABBITMQ_HOST
               value: "insight-rabbitmq-service"
-            - name: MINIO_ENDPOINT
-              value: "insight-minio-service:9100"
             - name: RABBITMQ_USERNAME
               valueFrom:
                 configMapKeyRef:
@@ -782,16 +656,6 @@ spec:
                 secretKeyRef:
                   name: app-secrets
                   key: rabbitmq-default-pass
-            - name: MINIO_ACCESS_KEY
-              valueFrom:
-                configMapKeyRef:
-                  name: app-config
-                  key: minio-root-user
-            - name: MINIO_SECRET_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: app-secrets
-                  key: minio-root-password
             - name: PG_HOST
               value: ${POSTGRES_DB_HOST}
             - name: PG_PORT
@@ -845,15 +709,17 @@ spec:
               value: "25"
             - name: LITELLM_HTTP_LOGGING
               value: "false"
+            - name: STORAGE_BASE_DIR
+              value: "/data/duckdb/insight"
           resources:
             limits:
               memory: "4Gi"
               cpu: "1500m"
           volumeMounts:
-            - name: duckdb-storage
+            - name: nexus-storage
               mountPath: /data/duckdb
       volumes:
-        - name: duckdb-storage
+        - name: nexus-storage
           persistentVolumeClaim:
             claimName: ${AZURE_FILE_SHARE_PVC}
 ---
@@ -932,23 +798,6 @@ spec:
       targetPort: 15692
   selector:
     app: insight-rabbitmq
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: insight-minio-service
-  namespace: deeplynxv3-dev
-spec:
-  type: ClusterIP
-  ports:
-    - name: api
-      port: 9100
-      targetPort: 9100
-    - name: console
-      port: 9101
-      targetPort: 9101
-  selector:
-    app: insight-minio
 ---
 apiVersion: v1
 kind: Service
