@@ -181,7 +181,7 @@ const RecordTagsPanel: React.FC<Props> = ({
 
   return (
     <div className="card bg-base-100 shadow-lg">
-      <div className="card-body">
+      <div className="card-body p-3 sm:p-6">
         <Tabs tabs={tabs} activeTab={activeTab} onTabChange={setActiveTab} />
       </div>
     </div>

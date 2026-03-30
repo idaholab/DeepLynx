@@ -93,3 +93,33 @@ export async function updateUser(
     throw error;
   }
 }
+
+export async function setSysAdmin(
+  userId: number,
+  isAdmin: boolean
+): Promise<{ message: string}> {
+  try {
+    const res = await api.patch(`/users/${userId}/admin`, null, {
+      params: { isAdmin }
+    });
+    return res.data;
+  } catch (error) {
+    console.error("API call failed setting sys admin:", error);
+    throw error;
+  }
+}
+
+export async function archiveUser(
+  userId: number,
+  archive: boolean = true,
+): Promise<{ message: string }> {
+  try {
+    const res = await api.patch(`/users/${userId}`, null, {
+      params: { archive },
+    })
+    return res.data;
+  } catch (error) {
+    console.error("API call failed archiving user:", error);
+    throw error;
+  }
+}

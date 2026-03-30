@@ -91,4 +91,7 @@ public partial class Organization
     
     [InverseProperty("Organization")]
     public virtual ICollection<Tag> Tags { get; set; } = new List<Tag>();
+    
+    [InverseProperty("Organization")]
+    public virtual ICollection<AiModelConfig> AiModelConfigs { get; set; } = new List<AiModelConfig>();
 }

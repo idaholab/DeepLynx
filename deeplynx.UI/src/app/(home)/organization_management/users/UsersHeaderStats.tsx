@@ -18,6 +18,7 @@ interface UsersHeaderStatsProps {
   totalCount: number;
   loading: boolean;
   onInviteClick: () => void;
+  scope: "org" | "site";
 }
 
 const UsersHeaderStats: React.FC<UsersHeaderStatsProps> = ({
@@ -26,6 +27,7 @@ const UsersHeaderStats: React.FC<UsersHeaderStatsProps> = ({
   totalCount,
   loading,
   onInviteClick,
+  scope,
 }) => {
   const { t } = useLanguage();
   return (
@@ -34,10 +36,14 @@ const UsersHeaderStats: React.FC<UsersHeaderStatsProps> = ({
       <div className="flex justify-between items-center mb-6">
         <div>
           <h2 className="text-2xl font-bold">
-            {t.translations.ORGANIZATION_USERS}
+            {scope === "org"
+              ? t.translations.ORGANIZATION_USERS
+              : t.translations.SITE_USERS}
           </h2>
           <p className="text-base-content/70 text-sm mt-1">
-            {t.translations.MANAGE_USERS_IN_ORG_DESCRIPTION}
+            {scope === "org"
+              ? t.translations.MANAGE_USERS_IN_ORG_DESCRIPTION
+              : t.translations.MANAGE_USERS_IN_SITE_DESCRIPTION}
           </p>
         </div>
         <button
