@@ -53,7 +53,19 @@ RUN npm install -g npm@latest \
 COPY --from=frontend-build /usr/src/app .
 
 # Install production dependencies
-RUN npm install --omit=dev
+RUN npm install --omit-dev \
+    && ( \
+    set -e; \
+    tmp="$(mktemp -d)"; \
+    cd "$tmp"; \
+    npm pack picomatch@4.0.4 >/dev/null 2>&1; \
+    tar -xzf picomatch-4.0.4.tgz; \
+    rm -rf /usr/src/app/node_modules/tinyglobby/node_modules/picomatch; \
+    mkdir -p /usr/src/app/node_modules/tinyglobby/node_modules; \
+    mv package /usr/src/app/node_modules/tinyglobby/node_modules/picomatch; \
+    cd /; rm -rf "$tmp"; \
+    ) || true \
+    && node -e "try{console.log('tinyglobby nested picomatch now:', require('/usr/src/app/node_modules/tinyglobby/node_modules/picomatch/package.json').version)}catch(e){console.log('tinyglobby nested picomatch not found')}"
 
 # Explicitly set user
 RUN addgroup -S nexus && adduser -S nexus -G nexus
