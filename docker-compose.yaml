@@ -86,7 +86,7 @@ services:
     volumes:
       - object_storage:/data
     depends_on:
-      nx-postgres:
+      db-version-check:
         condition: service_completed_successfully
 
   nx-postgres:
@@ -190,8 +190,8 @@ services:
     depends_on:
       insight-rabbitmq:
         condition: service_healthy
-      nx-postgres:
-        condition: service_healthy
+      db-version-check:
+        condition: service_completed_successfully
     volumes:
       - object_storage:/data
       - insight_storage:/data/insight
@@ -217,25 +217,13 @@ services:
     depends_on:
       insight-rabbitmq:
         condition: service_healthy
-      nx-postgres:
-        condition: service_healthy
+      db-version-check:
+        condition: service_completed_successfully
     volumes:
       - object_storage:/data
       - insight_storage:/data/insight
     networks:
       - nexus-network
-
-  nexus-pgAdmin-service:
-    image: dpage/pgadmin4
-    env_file:
-      - .env
-    platform: linux/amd64
-    ports:
-      - 5050:80
-    networks:
-      - nexus-network
-    depends_on:
-      - nx-postgres
 
 networks:
   nexus-network:
