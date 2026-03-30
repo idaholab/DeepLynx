@@ -5,33 +5,16 @@ FROM node:lts-alpine AS frontend-build
 WORKDIR /usr/src/app
 
 # Install versioned os packages
-RUN apk update && apk upgrade --no-cache && \
-    apk add --no-cache \
-    busybox
+RUN apk update && apk upgrade --no-cache
 
-# Install latest global npm version and packages
-RUN npm install -g npm@latest
-
-# Copy package.json first
-COPY deeplynx.UI/package*.json ./
+# Copy dependency metadata first for better cache reuse
+COPY deeplynx.UI/package.json deeplynx.UI/package-lock.json ./
 
 # Install frontend dependencies
-RUN npm install \
-    && ( \
-    set -e; \
-    tmp="$(mktemp -d)"; \
-    cd "$tmp"; \
-    npm pack picomatch@4.0.4; \
-    tar -xzf picomatch-4.0.4.tgz; \
-    rm -rf /usr/src/app/node_modules/tinyglobby/node_modules/picomatch; \
-    mkdir -p /usr/src/app/node_modules/tinyglobby/node_modules; \
-    mv package /usr/src/app/node_modules/tinyglobby/node_modules/picomatch; \
-    cd /; rm -rf "$tmp"; \
-    ) || true \
-    && node -e "try{console.log('build-stage app tinyglobby nested picomatch:', require('/usr/src/app/node_modules/tinyglobby/node_modules/picomatch/package.json').version)}catch(e){console.log('build-stage app tinyglobby nested picomatch not found')}"
+RUN --mount=type=cache,target=/root/.npm npm ci
 
 # Copy the rest of the frontend source code
-COPY deeplynx.UI .
+COPY deeplynx.UI ./
 
 # Build the frontend
 RUN npm run build
@@ -43,43 +26,15 @@ FROM node:lts-alpine AS final
 WORKDIR /usr/src/app
 
 # Install versioned os packages
-RUN apk update && apk upgrade --no-cache && \
-    apk add --no-cache \
-    busybox
+RUN apk update && apk upgrade --no-cache
 
-# Install latest global npm version and packages
-RUN npm install -g npm@latest \
-    && ( \
-    set -e; \
-    tmp="$(mktemp -d)"; \
-    cd "$tmp"; \
-    npm pack minimatch@10.2.4 >/dev/null 2>&1 || npm pack minimatch@10.2.3 >/dev/null 2>&1; \
-    tar -xzf minimatch-*.tgz; \
-    rm -rf /usr/local/lib/node_modules/npm/node_modules/minimatch; \
-    mv package /usr/local/lib/node_modules/npm/node_modules/minimatch; \
-    cd /; rm -rf "$tmp"; \
-    ) || true \
-    && ( \
-    set -e; \
-    tmp="$(mktemp -d)"; \
-    cd "$tmp"; \
-    npm pack picomatch@4.0.4 >/dev/null 2>&1; \
-    tar -xzf picomatch-4.0.4.tgz; \
-    rm -rf /usr/local/lib/node_modules/npm/node_modules/tinyglobby/node_modules/picomatch; \
-    mkdir -p /usr/local/lib/node_modules/npm/node_modules/tinyglobby/node_modules; \
-    mv package /usr/local/lib/node_modules/npm/node_modules/tinyglobby/node_modules/picomatch; \
-    cd /; rm -rf "$tmp"; \
-    ) || true \
-    && node -e "try{console.log('npm-bundled minimatch now:', require('/usr/local/lib/node_modules/npm/node_modules/minimatch/package.json').version)}catch(e){console.log('npm-bundled minimatch not found')}" \
-    && node -e "try{console.log('npm-bundled tinyglobby nested picomatch now:', require('/usr/local/lib/node_modules/npm/node_modules/tinyglobby/node_modules/picomatch/package.json').version)}catch(e){console.log('npm-bundled tinyglobby nested picomatch not found')}"
+# Copy dependency metadata first
+COPY deeplynx.UI/package.json deeplynx.UI/package-lock.json ./
 
-# Copy package files first
-COPY --from=frontend-build /usr/src/app/package*.json ./
+# Production-only deterministic install
+RUN --mount=type=cache,target=/root/.npm npm ci --omit=dev
 
-# Install production dependencies BEFORE copying build artifacts
-RUN npm install --omit-dev
-
-# NOW copy the built application (including .next folder)
+# Copy runtime app artifacts
 COPY --from=frontend-build /usr/src/app/.next ./.next
 COPY --from=frontend-build /usr/src/app/public ./public
 # COPY --from=frontend-build /usr/src/app/next.config.js ./next.config.js

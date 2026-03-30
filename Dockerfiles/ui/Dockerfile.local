@@ -40,17 +40,14 @@ ENV CURL_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt
 ENV SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
 ENV SSL_CERT_DIR=/etc/ssl/certs/
 
-# Install latest global npm version and packages
-RUN npm install -g npm@latest
-
-# Copy package.json first
-COPY deeplynx.UI/package*.json ./
+# Copy dependency metadata first for better cache reuse
+COPY deeplynx.UI/package.json deeplynx.UI/package-lock.json ./
 
 # Install frontend dependencies
-RUN npm install
+RUN --mount=type=cache,target=/root/.npm npm ci
 
 # Copy the rest of the frontend source code
-COPY deeplynx.UI .
+COPY deeplynx.UI ./
 
 # Build the frontend
 RUN npm run build
@@ -71,22 +68,16 @@ ENV CURL_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt
 ENV SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
 ENV SSL_CERT_DIR=/etc/ssl/certs/
 
-# Install latest global npm version and packages
-RUN npm install -g npm@latest \
-    && ( \
-    set -e; \
-    tmp="$(mktemp -d)"; \
-    cd "$tmp"; \
-    npm pack minimatch@10.2.4 >/dev/null 2>&1 || npm pack minimatch@10.2.3 >/dev/null 2>&1; \
-    tar -xzf minimatch-*.tgz; \
-    rm -rf /usr/local/lib/node_modules/npm/node_modules/minimatch; \
-    mv package /usr/local/lib/node_modules/npm/node_modules/minimatch; \
-    cd /; rm -rf "$tmp"; \
-    ) || true \
-    && node -e "try{console.log('npm-bundled minimatch now:', require('/usr/local/lib/node_modules/npm/node_modules/minimatch/package.json').version)}catch(e){console.log('npm-bundled minimatch not found')}"
+# Copy dependency metadata first
+COPY deeplynx.UI/package.json deeplynx.UI/package-lock.json ./
 
-# Copy the built frontend code from the previous stage
-COPY --from=frontend-build /usr/src/app .
+# Production-only deterministic install
+RUN --mount=type=cache,target=/root/.npm npm ci --omit=dev
+
+# Copy runtime app artifacts
+COPY --from=frontend-build /usr/src/app/.next ./.next
+COPY --from=frontend-build /usr/src/app/public ./public
+# COPY --from=frontend-build /usr/src/app/next.config.js ./next.config.js
 
 # Expose the port the app runs on
 EXPOSE 3000
