@@ -39,7 +39,4 @@ public class CreateRecordRequestDto
     
     [JsonPropertyName("tags")]
     public List<string>? Tags { get; set; }
-    
-    [JsonPropertyName("embed")]
-    public bool? Embed { get; set; }
 }

@@ -18,7 +18,7 @@ public interface IRecordBusiness
 
     Task<RecordResponseDto> CreateRecord(
         long currentUserId, long organizationId, long projectId, long dataSourceId, CreateRecordRequestDto dto, 
-        List<long>? sensitivityLabelIds = null);
+        List<long>? sensitivityLabelIds = null, bool embedded = false);
 
     Task<List<RecordResponseDto>> BulkCreateRecords(
         long currentUserId, long organizationId, long projectId, long dataSourceId, List<CreateRecordRequestDto> dtos, List<long>? sensitivityLabelIds = null);

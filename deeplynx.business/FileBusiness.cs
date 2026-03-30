@@ -112,12 +112,11 @@ public class FileBusiness
             ClassId = metadata?.ClassId ?? fileClass.Id,
             ClassName = metadata?.ClassName ?? fileClass.Name,
             FileType = fileType,
-            Uri = uri,
-            Embed = embed,
+            Uri = uri
         };
 
         var createdRecord = await _recordBusiness.CreateRecord(currentUserId, organizationId, projectId,
-            realDataSourceId, recordRequest, sensitivityLabelIds);
+            realDataSourceId, recordRequest, sensitivityLabelIds, embed);
 
         if (embed)
         {
@@ -340,11 +339,10 @@ public class FileBusiness
             ClassId = metadata?.ClassId ?? fileClass.Id,
             ClassName = metadata?.ClassName ?? fileClass.Name,
             FileType = Path.GetExtension(request.FileName).TrimStart('.').ToLower(),
-            Embed = embed,
         };
 
         var createdRecord = await _recordBusiness.CreateRecord(currentUserId, organizationId, projectId,
-            realDataSourceId, recordRequest, sensitivityLabelIds);
+            realDataSourceId, recordRequest, sensitivityLabelIds, embedded: embed);
         
         if (embed)
         {

@@ -618,12 +618,12 @@ public class RecordBusiness : IRecordBusiness
     /// <param name="dataSourceId">The ID of the data source under which to create the record</param>
     /// <param name="dto">The data transfer object containing details on the record to be created</param>
     /// <param name="sensitivityLabelIds">The IDs of the labels to attach</param>
-    /// <param name="embed">Boolean value that determines if the file will be embedded by Insight</param>
+    /// <param name="embedded">Boolean value that determines if the file will be embedded by Insight</param>
     /// <returns>The newly created metadata record</returns>
     /// <exception cref="KeyNotFoundException">Returned if the project or datasource are not found</exception>
     /// <exception cref="Exception">Returned if the metadata is too deeply nested</exception>
     public async Task<RecordResponseDto> CreateRecord(long currentUserId, long organizationId, long projectId,
-        long dataSourceId, CreateRecordRequestDto dto, List<long>? sensitivityLabelIds = null)
+        long dataSourceId, CreateRecordRequestDto dto, List<long>? sensitivityLabelIds = null, bool embedded = false)
     {
         ValidationHelper.ValidateModel(dto);
         await ExistenceHelper.EnsureDataSourceExistsForProjectAsync(_context, dataSourceId, projectId);
@@ -658,7 +658,7 @@ public class RecordBusiness : IRecordBusiness
                 LastUpdatedBy = currentUserId,
                 FileType = dto.FileType,
                 OrganizationId = organizationId,
-                Embedded = dto.Embed ?? false,
+                Embedded = embedded,
             };
 
             _context.Records.Add(record);
@@ -722,7 +722,7 @@ public class RecordBusiness : IRecordBusiness
                     Id = l.Id,
                     Name = l.Name 
                 }).ToList(),
-                Embedded = dto.Embed ?? false,
+                Embedded = embedded,
             };
         }
         catch (Exception exc)
