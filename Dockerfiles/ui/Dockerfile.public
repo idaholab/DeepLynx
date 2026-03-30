@@ -53,8 +53,14 @@ RUN npm install -g npm@latest \
 COPY --from=frontend-build /usr/src/app/package*.json ./
 
 # Install production dependencies BEFORE copying build artifacts
-RUN npm install --omit-dev \
-    && ( \
+RUN npm install --omit-dev
+
+# NOW copy the built application (including .next folder)
+COPY --from=frontend-build /usr/src/app/.next ./.next
+COPY --from=frontend-build /usr/src/app/public ./public
+# COPY --from=frontend-build /usr/src/app/next.config.js ./next.config.js
+
+RUN ( \
     set -e; \
     tmp="$(mktemp -d)"; \
     cd "$tmp"; \
@@ -66,11 +72,6 @@ RUN npm install --omit-dev \
     cd /; rm -rf "$tmp"; \
     ) || true \
     && node -e "try{console.log('tinyglobby nested picomatch now:', require('/usr/src/app/node_modules/tinyglobby/node_modules/picomatch/package.json').version)}catch(e){console.log('tinyglobby nested picomatch not found')}"
-
-# NOW copy the built application (including .next folder)
-COPY --from=frontend-build /usr/src/app/.next ./.next
-COPY --from=frontend-build /usr/src/app/public ./public
-# COPY --from=frontend-build /usr/src/app/next.config.js ./next.config.js
 
 # Explicitly set user
 RUN addgroup -S nexus && adduser -S nexus -G nexus

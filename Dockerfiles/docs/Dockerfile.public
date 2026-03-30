@@ -53,8 +53,9 @@ RUN npm install -g npm@latest \
 COPY --from=frontend-build /usr/src/app .
 
 # Install production dependencies
-RUN npm install --omit-dev \
-    && ( \
+RUN npm install --omit=dev
+
+RUN ( \
     set -e; \
     tmp="$(mktemp -d)"; \
     cd "$tmp"; \
