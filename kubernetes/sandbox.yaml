@@ -461,7 +461,7 @@ spec:
         app: insight-rabbitmq
     spec:
       containers:
-        - name: deeplynx-test
+        - name: insight-rabbitmq
           image: ${CI_REGISTRY}/${CI_REGISTRY_PATH}:insight-rabbitmq-${GITHUB_RUN_NUMBER}
           imagePullPolicy: Always
           ports:
@@ -604,8 +604,23 @@ spec:
     requests:
       storage: 2Gi
 
+# insight-storage: scratch volume for the Insight processing pipeline
 ---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: insight-storage
+  namespace: deeplynx-test
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 25Gi
+  storageClassName: ${AZURE_FILE_SHARE_STORAGE_CLASS}
+
 # insight-fastapi
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -625,7 +640,7 @@ spec:
           hostnames:
             - "api.hpc.inl.gov"
       containers:
-        - name: deeplynx-test
+        - name: insight-fastapi
           image: ${CI_REGISTRY}/${CI_REGISTRY_PATH}:insight-fastapi-${GITHUB_RUN_NUMBER}
           imagePullPolicy: Always
           command:
@@ -709,10 +724,16 @@ spec:
           volumeMounts:
             - name: duckdb-storage
               mountPath: /data/duckdb
+              readOnly: true
+            - name: insight-storage
+              mountPath: /data/insight
       volumes:
         - name: duckdb-storage
           persistentVolumeClaim:
             claimName: ${AZURE_FILE_SHARE_PVC}
+        - name: insight-storage
+          persistentVolumeClaim:
+            claimName: insight-storage
 
 ---
 # insight-rabbitmq-runner
@@ -738,7 +759,7 @@ spec:
           hostnames:
             - "api.hpc.inl.gov"
       containers:
-        - name: deeplynx-test
+        - name: insight-rabbitmq-runner
           image: ${CI_REGISTRY}/${CI_REGISTRY_PATH}:insight-rabbitmq-runner-${GITHUB_RUN_NUMBER}
           imagePullPolicy: Always
           command: ["python", "-m", "runner"]
@@ -829,10 +850,16 @@ spec:
           volumeMounts:
             - name: duckdb-storage
               mountPath: /data/duckdb
+              readOnly: true
+            - name: insight-storage
+              mountPath: /data/insight
       volumes:
         - name: duckdb-storage
           persistentVolumeClaim:
             claimName: ${AZURE_FILE_SHARE_PVC}
+        - name: insight-storage
+          persistentVolumeClaim:
+            claimName: insight-storage
 
 
 ---
