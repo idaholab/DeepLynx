@@ -42,7 +42,7 @@ public class AiModelConfigController : ControllerBase
     /// <returns>A list of AI Model Configuration DTOs belonging to the specified organization.</returns>
     [HttpGet(Name = "api_get_all_ai_model_configs_organization")]
     public async Task<ActionResult<IEnumerable<AiModelConfigResponseDto>>> GetAllAiModelConfigs(
-        long organizationId,   
+        long organizationId,
         [FromQuery] bool hideArchived = true)
     {
         try
@@ -57,7 +57,7 @@ public class AiModelConfigController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
-    
+
     /// <summary>
     ///     Get a single AI Model Configuration by ID for an organization.
     /// </summary>
@@ -86,7 +86,36 @@ public class AiModelConfigController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, "An unexpected error occurred while fetching the AI Model Configuration.");
         }
     }
-    
+
+
+    /// <summary>
+    ///     Get the default AI Model Configuration for a given model type at the organization level.
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization whose default AI Model Configuration is being retrieved.</param>
+    /// <param name="modelType">The type of model to retrieve the default configuration for (e.g. "language" or "embedding").</param>
+    /// <returns>The default AI Model Configuration DTO for the specified model type.</returns>
+    [HttpGet("default", Name = "api_get_default_ai_model_config_organization")]
+    public async Task<ActionResult<AiModelConfigResponseDto>> GetDefaultAiModelConfig(
+        long organizationId,
+        [FromQuery] string modelType)
+    {
+        try
+        {
+            var currentUserId = UserContextStorage.UserId;
+            var aiModelConfig = await _aiModelConfigBusiness.GetDefaultAiModelConfig(currentUserId, organizationId, null, modelType);
+            return Ok(aiModelConfig);
+        }
+        catch (KeyNotFoundException exc)
+        {
+            return NotFound(exc.Message);
+        }
+        catch (Exception exc)
+        {
+            _logger.LogError(exc, "An unexpected error occurred while fetching the default {ModelType} AI Model Configuration for organization {OrganizationId}", modelType, organizationId);
+            return StatusCode(StatusCodes.Status500InternalServerError, "An unexpected error occurred while fetching the default AI Model Configuration.");
+        }
+    }
+
     /// <summary>
     ///     Create a new AI Model Configuration for an organization.
     /// </summary>
@@ -151,7 +180,7 @@ public class AiModelConfigController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, "An unexpected error occurred while updating the AI Model Configuration.");
         }
     }
-    
+
     /// <summary>
     ///     Archive or unarchive an AI Model Configuration for an organization.
     /// </summary>
@@ -192,7 +221,7 @@ public class AiModelConfigController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, $"An unexpected error occurred while {action} the AI Model Configuration.");
         }
     }
-    
+
     /// <summary>
     ///     Permanently delete an AI Model Configuration for an organization.
     /// </summary>
