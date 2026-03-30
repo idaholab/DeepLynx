@@ -6,7 +6,8 @@ import { PencilIcon, PlusIcon } from "@heroicons/react/24/outline";
 import Link from "next/link";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
-import PropertyTable from "../components/PropertyTable";
+import PropertyTable from "./components/PropertyTable";
+import CopyToClipboardButton from "@/app/(home)/components/CopyToClipboardButton";
 import {
   HistoricalRecordResponseDto,
   SensitivityLabelsDto,
@@ -51,6 +52,7 @@ import {
   useRecordRelationships,
 } from "./hooks/useRecordRelationships";
 import { isInsightSupportedFileType } from "@/app/lib/insight_file_support";
+import { formatLocalDateTime } from "@/app/lib/date_time";
 
 // ============= HELPER FUNCTIONS =============
 interface PropertyRow {
@@ -507,7 +509,15 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
             t.translations.RECORD_NAME_UPDATED,
           ),
       },
-      { label: t.translations.URI, value: record.uri },
+      {
+        label: t.translations.URI,
+        value: record.uri,
+        copyValue: record.uri ?? undefined,
+        copyTooltipLabel: t.translations.COPY_URI,
+        copyAriaLabel: t.translations.COPY_RECORD_URI,
+        idleIconClassName: "size-6 text-base-content/70",
+        copiedIconClassName: "size-6 text-success",
+      },
       {
         label: t.translations.ORIGINAL_ID,
         value: record.originalId,
@@ -519,8 +529,14 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
             t.translations.ORIGINAL_ID_UPDATED,
           ),
       },
-      { label: t.translations.LAST_UPDATED_AT, value: record.lastUpdatedAt },
-      { label: t.translations.DATA_SOURCE, value: record.dataSourceName },
+      {
+        label: t.translations.LAST_UPDATED_AT,
+        value: formatLocalDateTime(record.lastUpdatedAt),
+      },
+      {
+        label: t.translations.DATA_SOURCE,
+        value: record.dataSourceName,
+      },
     ];
   }, [record, handleUpdateRecord, t.translations]);
 
