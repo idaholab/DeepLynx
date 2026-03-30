@@ -59,7 +59,7 @@ public class FileController : ControllerBase
         IFormFile file,
         [FromQuery] List<long>? sensitivityLabelIds,
         IFormFile? metadata,
-        bool? embed = false)
+        bool embed = false)
     {
         try
         {
@@ -138,7 +138,7 @@ public class FileController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
-    
+
     /// <summary>
     ///     Generate Download URL
     /// </summary>
