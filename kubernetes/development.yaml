@@ -6,7 +6,6 @@ metadata:
   labels:
     name: deeplynxv3-dev
 
-
 # Secret for Azure Storage Account with SAS Token
 ---
 apiVersion: v1
@@ -20,7 +19,6 @@ stringData:
   azurestorageaccountsastoken: ${AZURE_STORAGE_ACCOUNT_SAS_TOKEN}
   azurestorageaccountkey: ${AZURE_STORAGE_ACCOUNT_KEY}
   azurestorageconnectionstring: ${AZURE_OBJECT_CONNECTION_STRING}
-
 
 # Persistent Volume pointing to existing Azure File Share
 ---
@@ -59,7 +57,6 @@ spec:
       name: azure-storage-secret
       namespace: deeplynxv3-dev
 
-
 # Storage Class (simplified for static provisioning)
 ---
 apiVersion: storage.k8s.io/v1
@@ -73,7 +70,6 @@ parameters:
 reclaimPolicy: Retain
 allowVolumeExpansion: true
 volumeBindingMode: Immediate
-
 
 # Persistent Volume Claim
 ---
@@ -169,6 +165,7 @@ spec:
               value: ${TENANT_MODE}
             - name: OKTA_CLIENT_SECRET
               # Runtime environment variables from secrets (sensitive)
+
               valueFrom:
                 secretKeyRef:
                   name: app-secrets
@@ -199,6 +196,7 @@ spec:
                   key: service-token
             - name: NEXT_PUBLIC_DISABLE_FRONTEND_AUTHENTICATION
               # Runtime environment variables from configmap (non-sensitive)
+
               valueFrom:
                 configMapKeyRef:
                   name: app-config
@@ -294,6 +292,7 @@ spec:
               value: ${JWT_AUDIENCE}
             - name: DUCKDB_BASE_PATH
               # DuckDB Configuration (same as frontend)
+
               value: ${DUCKDB_BASE_PATH}
             - name: SMTP_SERVER
               value: ${SMTP_SERVER}
@@ -319,6 +318,7 @@ spec:
               value: ${SUPERUSER_EMAIL}
             - name: OKTA_CLIENT_SECRET
               # Backend may also need these environment variables
+
               valueFrom:
                 secretKeyRef:
                   name: app-secrets
@@ -382,7 +382,6 @@ spec:
           persistentVolumeClaim:
             claimName: ${AZURE_FILE_SHARE_PVC}
 
-
 #docs
 ---
 apiVersion: apps/v1
@@ -415,7 +414,6 @@ spec:
               cpu: "1500m"
           ports:
             - containerPort: 3001
-
 
 #mcp
 ---
@@ -471,7 +469,7 @@ spec:
         app: insight-rabbitmq
     spec:
       containers:
-        - name: deeplynxv3
+        - name: insight-rabbitmq
           image: ${CI_REGISTRY}/${CI_REGISTRY_PATH}:insight-rabbitmq-${GITHUB_RUN_NUMBER}
           imagePullPolicy: Always
           ports:
@@ -511,6 +509,20 @@ spec:
             timeoutSeconds: 5
             failureThreshold: 3
 
+# insight-storage: scratch volume for the Insight processing pipeline
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: insight-storage
+  namespace: deeplynxv3-dev
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 25Gi
+  storageClassName: ${AZURE_FILE_SHARE_STORAGE_CLASS}
 
 # insight-fastapi
 ---
@@ -533,11 +545,9 @@ spec:
           hostnames:
             - "api.hpc.inl.gov"
       containers:
-        - name: deeplynxv3
+        - name: insight-fastapi
           image: ${CI_REGISTRY}/${CI_REGISTRY_PATH}:insight-fastapi-${GITHUB_RUN_NUMBER}
           imagePullPolicy: Always
-          command:
-            ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "5009"]
           ports:
             - containerPort: 5009
           env:
@@ -599,7 +609,7 @@ spec:
             - name: LITELLM_HTTP_LOGGING
               value: "false"
             - name: STORAGE_BASE_DIR
-              value: "/data/duckdb/insight"
+              value: "/data/insight"
           resources:
             limits:
               memory: "4Gi"
@@ -607,11 +617,16 @@ spec:
           volumeMounts:
             - name: nexus-storage
               mountPath: /data/duckdb
+              readOnly: true
+            - name: insight-storage
+              mountPath: /data/insight
       volumes:
         - name: nexus-storage
           persistentVolumeClaim:
             claimName: ${AZURE_FILE_SHARE_PVC}
-
+        - name: insight-storage
+          persistentVolumeClaim:
+            claimName: insight-storage
 
 # insight-rabbitmq-runner
 ---
@@ -637,10 +652,9 @@ spec:
           hostnames:
             - "api.hpc.inl.gov"
       containers:
-        - name: deeplynxv3
+        - name: insight-rabbitmq-runner
           image: ${CI_REGISTRY}/${CI_REGISTRY_PATH}:insight-rabbitmq-runner-${GITHUB_RUN_NUMBER}
           imagePullPolicy: Always
-          command: ["python", "-m", "runner"]
           env:
             - name: LITELLM_LOCAL_MODEL_COST_MAP
               value: "True"
@@ -710,7 +724,7 @@ spec:
             - name: LITELLM_HTTP_LOGGING
               value: "false"
             - name: STORAGE_BASE_DIR
-              value: "/data/duckdb/insight"
+              value: "/data/insight"
           resources:
             limits:
               memory: "4Gi"
@@ -718,10 +732,16 @@ spec:
           volumeMounts:
             - name: nexus-storage
               mountPath: /data/duckdb
+              readOnly: true
+            - name: insight-storage
+              mountPath: /data/insight
       volumes:
         - name: nexus-storage
           persistentVolumeClaim:
             claimName: ${AZURE_FILE_SHARE_PVC}
+        - name: insight-storage
+          persistentVolumeClaim:
+            claimName: insight-storage
 ---
 apiVersion: v1
 kind: Service
