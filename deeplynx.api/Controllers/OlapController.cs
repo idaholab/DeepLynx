@@ -9,7 +9,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace deeplynx.api.Controllers;
 
 [ApiController]
-[Route("organizations/{organizationId:long}/projects/{projectId:long}/records/{recordId:long}/timeseries")]
+[Route("organizations/{organizationId:long}/projects/{projectId:long}/records/{recordId:long}/olap")]
 [Authorize]
 [Tags("Olap")]
 public class OlapController : ControllerBase
@@ -20,18 +20,18 @@ public class OlapController : ControllerBase
     /// <summary>
     ///     Initializes a new instance of the <see cref="OlapController" /> class
     /// </summary>
-    /// <param name="timeseriesBusiness">The business logic interface for handling time series operations.</param>
+    /// <param olapBusiness">The business logic interface for handling time series operations.</param>
     /// <param name="logger">Error/Info logging interface for database log table.</param>
-    public OlapController(IOlapBusiness timeseriesBusiness, ILogger<OlapController> logger)
+    public OlapController(IOlapBusiness olapBusiness, ILogger<OlapController> logger)
     {
-        _olapBusiness = timeseriesBusiness;
+        _olapBusiness = olapBusiness;
         _logger = logger;
     }
 
     /// <summary>
     ///     Execute OLAP Query
     /// </summary>
-    /// <param name="organizationId">ID of organization that timeseries data is associated with</param>
+    /// <param name="organizationId">ID of organization that tabular data is associated with</param>
     /// <param name="projectId">ID of project the tabular data is associated with</param>
     /// <param name="request"> The request containing an sql query string</param>
     /// <param name="viewName"> The request containing an sql query string</param>
@@ -42,7 +42,7 @@ public class OlapController : ControllerBase
     [Auth("read", "file")]
     [Sensitivity("download file")]
     public async Task<ActionResult<PlotDataDto>> ExecuteOlapQuery(long organizationId, long projectId, long recordId,
-        [FromQuery] string viewName, [FromBody] TimeseriesQueryRequestDto request)
+        [FromQuery] string viewName, [FromBody] OlapQueryRequestDto request)
     {
         try
         {
@@ -71,7 +71,7 @@ public class OlapController : ControllerBase
     /// <param name="projectId">ID of project the tabular data is associated with</param>
     /// <param name="recordId"> ID of the record being appended to</param>
     /// <param name="partNumber"> Part number of the file being appended</param>
-    /// <param name="file">Timeseries file</param>
+    /// <param name="file"> Tabular file to append</param>
     /// <returns></returns>
     [HttpPatch("append", Name = "api_append_tabular_file")]
     [Auth("read", "record")]
@@ -124,8 +124,8 @@ public class OlapController : ControllerBase
     //         return StatusCode(StatusCodes.Status500InternalServerError, message);
     //     }
     // }
-    
-    
+
+
     /// <summary>
     ///     Get a View of Data Points
     /// </summary>
@@ -147,7 +147,7 @@ public class OlapController : ControllerBase
             var currentUserId = UserContextStorage.UserId;
             var plotData =
                 await _olapBusiness.GetPlotData(currentUserId, organizationId, projectId, recordId, limit, rowStride);
-            return Ok(new { TimeseriesPlotData = plotData });
+            return Ok(new { PlotData = plotData });
         }
         catch (ArgumentException e)
         {

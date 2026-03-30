@@ -11,7 +11,6 @@ using deeplynx.interfaces;
 using deeplynx.models;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.SignalR;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Moq;
 
@@ -616,6 +615,185 @@ public class FileBusinessTests : IntegrationTestBase
         // Act & Assert
         await Assert.ThrowsAsync<ValidationException>(() =>
             _fileBusiness.UploadFile(uid, oid, pid, did, osid, file, null, metadataFile));
+    }
+    
+    [Fact]
+    public async Task UploadFile_CsvFile_AssignsTimeseriesClassAndExtractsColumns()
+    {
+        // Arrange
+        var csvContent = "timestamp,temperature,humidity\n2024-01-01,22.5,60.1\n2024-01-02,23.0,58.3";
+        var ms = new MemoryStream(Encoding.UTF8.GetBytes(csvContent));
+        var file = new FormFile(ms, 0, ms.Length, "file", "sensor-data.csv")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "text/csv"
+        };
+
+        // Act
+        var result = await _fileBusiness.UploadFile(uid, oid, pid, did, osid, file);
+
+        // Assert: Class should be upgraded to Timeseries
+        Assert.NotNull(result);
+        var resultClass = Context.Classes.First(c => c.Id == result.ClassId);
+        Assert.Equal("Timeseries", resultClass.Name);
+
+        // Assert: Columns should be present in the properties JSON
+        Assert.NotNull(result.Properties);
+        var properties = JsonNode.Parse(result.Properties)?.AsObject();
+        Assert.NotNull(properties);
+
+        var columnsArray = properties!["columns"]?.AsArray();
+        Assert.NotNull(columnsArray);
+        Assert.NotEmpty(columnsArray);
+        Assert.Contains(columnsArray, c => c!.AsObject()["name"]?.ToString() == "timestamp");
+        Assert.Contains(columnsArray, c => c!.AsObject()["name"]?.ToString() == "temperature");
+        Assert.Contains(columnsArray, c => c!.AsObject()["name"]?.ToString() == "humidity");
+    }
+
+    [Fact]
+    public async Task UploadFile_NonTabularFile_KeepsFileClassAndHasNoColumns()
+    {
+        // Arrange
+        var content = "This is a plain text document, not tabular data.";
+        var ms = new MemoryStream(Encoding.UTF8.GetBytes(content));
+        var file = new FormFile(ms, 0, ms.Length, "file", "notes.txt")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "text/plain"
+        };
+
+        // Act
+        var result = await _fileBusiness.UploadFile(uid, oid, pid, did, osid, file);
+
+        // Assert: Class should remain "File" and no columns should be written to properties
+        Assert.NotNull(result);
+        var resultClass = Context.Classes.First(c => c.Id == result.ClassId);
+        Assert.Equal("File", resultClass.Name);
+
+        if (result.Properties != null)
+        {
+            var properties = JsonNode.Parse(result.Properties)?.AsObject();
+            Assert.Null(properties?["columns"]);
+        }
+    }
+
+    [Fact]
+    public async Task UploadFile_CsvOnlyWhitespace_KeepsFileClass()
+    {
+        // Arrange: Empty CSV produces no parseable headers,
+        // so ExtractTabularColumns should return null/empty and the class should stay "File"
+        var csvContent = "                                                         " +
+                         "            \n                                                      " +
+                         "                                                                    " +
+                         "                                                                    " +
+                         "                                                                     " +
+                         "                                  ";
+        var ms = new MemoryStream(Encoding.UTF8.GetBytes(csvContent));
+        var file = new FormFile(ms, 0, ms.Length, "file", "empty-headers.csv")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "text/csv"
+        };
+
+        // Act
+        var result = await _fileBusiness.UploadFile(uid, oid, pid, did, osid, file);
+
+        // Assert: Without extractable columns the record should fall back to "File"
+        Assert.NotNull(result);
+        var resultClass = Context.Classes.First(c => c.Id == result.ClassId);
+        Assert.Equal("File", resultClass.Name);
+
+        if (result.Properties != null)
+        {
+            var properties = JsonNode.Parse(result.Properties)?.AsObject();
+            Assert.Null(properties?["columns"]);
+        }
+    }
+
+    [Fact]
+    public async Task UploadFile_CsvFile_MetadataClassIdOverridesTimeseriesClass()
+    {
+        // Arrange: A CSV that would normally resolve to Timeseries, but explicit metadata
+        // supplies a ClassId which takes precedence via the null-coalescing assignment
+        var csvContent = "id,value\n1,100\n2,200";
+        var ms = new MemoryStream(Encoding.UTF8.GetBytes(csvContent));
+        var file = new FormFile(ms, 0, ms.Length, "file", "data.csv")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "text/csv"
+        };
+
+        var fileClass = Context.Classes.First(c => c.Name == "File" && c.ProjectId == pid);
+
+        var metadata = new CreateRecordFileUploadRequestDto
+        {
+            Name = "Override Name",
+            Description = "Override Description",
+            Properties = new JsonObject(),
+            OriginalId = "override-original-id",
+            ClassId = fileClass.Id,
+            ClassName = fileClass.Name
+        };
+
+        var metadataJson = JsonSerializer.Serialize(metadata);
+        var metadataBytes = Encoding.UTF8.GetBytes(metadataJson);
+        var metadataStream = new MemoryStream(metadataBytes);
+        var metadataFile = new FormFile(metadataStream, 0, metadataStream.Length, "metadataFile", "metadata.json")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "application/json"
+        };
+
+        // Act
+        var result = await _fileBusiness.UploadFile(uid, oid, pid, did, osid, file, null, metadataFile);
+
+        // Assert: Explicit ClassId in metadata wins over the Timeseries upgrade
+        Assert.NotNull(result);
+        Assert.Equal(fileClass.Id, result.ClassId);
+    }
+
+    [Fact]
+    public async Task UploadFile_CsvFile_ColumnsAreMergedWithExistingMetadataProperties()
+    {
+        // Arrange: Metadata carries pre-existing properties; columns should be added alongside them
+        var csvContent = "voltage,current\n5.0,1.2\n3.3,0.8";
+        var ms = new MemoryStream(Encoding.UTF8.GetBytes(csvContent));
+        var file = new FormFile(ms, 0, ms.Length, "file", "measurements.csv")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "text/csv"
+        };
+
+        var metadata = new CreateRecordFileUploadRequestDto
+        {
+            Name = "Measurements",
+            Description = "Electrical measurements",
+            Properties = new JsonObject { ["source"] = "lab-bench-1" },
+            OriginalId = "measurements-001"
+        };
+
+        var metadataJson = JsonSerializer.Serialize(metadata);
+        var metadataBytes = Encoding.UTF8.GetBytes(metadataJson);
+        var metadataStream = new MemoryStream(metadataBytes);
+        var metadataFile = new FormFile(metadataStream, 0, metadataStream.Length, "metadataFile", "metadata.json")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "application/json"
+        };
+
+        // Act
+        var result = await _fileBusiness.UploadFile(uid, oid, pid, did, osid, file, null, metadataFile);
+
+        // Assert: Both the original metadata property and the extracted columns should be present
+        Assert.NotNull(result);
+        var resultClass = Context.Classes.First(c => c.Id == result.ClassId);
+        Assert.Equal("Timeseries", resultClass.Name);
+
+        Assert.NotNull(result.Properties);
+        var properties = JsonNode.Parse(result.Properties)?.AsObject();
+        Assert.NotNull(properties);
+        Assert.NotNull(properties!["columns"]);
+        Assert.Equal("lab-bench-1", properties["source"]!.GetValue<string>());
     }
 
     #endregion

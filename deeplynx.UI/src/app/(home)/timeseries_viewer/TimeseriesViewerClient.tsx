@@ -9,7 +9,7 @@ import { ArrowDownTrayIcon } from '@heroicons/react/24/outline';
 import * as echarts from 'echarts';
 import { useProjectSession } from '@/app/contexts/ProjectSessionProvider';
 import { HistoricalRecordResponseDto } from '../types/responseDTOs';
-import { getTimeseriesPlotData } from '@/app/lib/client_service/timeseries_services.client';
+import { getPlotData } from '@/app/lib/client_service/olap_services.client';
 
 type Props = {
     timeseriesFiles: HistoricalRecordResponseDto[]
@@ -41,10 +41,9 @@ export default function TimeseriesViewerClient({ timeseriesFiles }: Props) {
         try {
             setLoading(true);
 
-            const plotData = await getTimeseriesPlotData(
+            const plotData = await getPlotData(
                 Number(organization?.organizationId),
                 Number(project?.projectId),
-                datasourceId,
                 recordId,
                 limitValue,
                 rowStrideValue

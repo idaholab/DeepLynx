@@ -102,9 +102,9 @@ public class FileBusiness
         var guid = Guid.NewGuid();
 
         var uri = await fileBusiness.UploadFile(organizationId, projectId, realDataSourceId, configData, file, guid);
-
-        var fileClass = await _classBusiness.GetOrCreateClass(currentUserId, organizationId, projectId, "File");
-
+        
+        var recordClass = await _classBusiness.GetOrCreateClass(currentUserId, organizationId, projectId, "File");
+        
         CreateRecordFileUploadRequestDto? metadata = null;
 
         if (metadataFile != null)
@@ -132,11 +132,30 @@ public class FileBusiness
         // Extract column names for tabular files (CSV/Parquet)
         if (fileExtension == "csv" || fileExtension == "parquet")
         { 
-            var columns = await _olapBusiness.ExtractTabularColumns(objectStorage, configData, uri);
+            bool hasContent;
+            using (var reader = new StreamReader(file.OpenReadStream()))
+            {
+                hasContent = false;
+                var buffer = new char[256];
+                int bytesRead;
+                while ((bytesRead = await reader.ReadAsync(buffer, 0, buffer.Length)) > 0 && !hasContent)
+                {
+                    if (buffer.Take(bytesRead).Any(c => !char.IsWhiteSpace(c)))
+                    {
+                        hasContent = true;
+                    }
+                }
+            }
+
+            if (hasContent)
+            {
+                var columns = await _olapBusiness.ExtractTabularColumns(objectStorage, configData, uri);
                 if (columns != null && columns.Count > 0)
                 {
                     properties["columns"] = columns;
+                    recordClass = await _classBusiness.GetOrCreateClass(currentUserId, organizationId, projectId, "Timeseries");
                 }
+            }
         }
 
         var recordRequest = new CreateRecordRequestDto
@@ -146,8 +165,8 @@ public class FileBusiness
             ObjectStorageId = objectStorage.Id,
             Description = metadata?.Description ?? file.FileName,
             OriginalId = metadata?.OriginalId ?? guid.ToString(),
-            ClassId = metadata?.ClassId ?? fileClass.Id,
-            ClassName = metadata?.ClassName ?? fileClass.Name,
+            ClassId = metadata?.ClassId ?? recordClass.Id,
+            ClassName = metadata?.ClassName ?? recordClass.Name,
             FileType = fileExtension,
             Uri = uri
         };
