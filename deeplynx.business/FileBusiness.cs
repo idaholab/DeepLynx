@@ -68,7 +68,7 @@ public class FileBusiness
         IFormFile file,
         List<long>? sensitivityLabelIds = null,
         IFormFile? metadataFile = null,
-        bool? embed = false)
+        bool embed = false)
     {
         long realDataSourceId;
         if (file == null || file.Length == 0) throw new ArgumentException("File is required and cannot be empty.");
@@ -137,7 +137,7 @@ public class FileBusiness
         // return the newly created metadata record for the file
         return await _recordBusiness.CreateRecord(currentUserId, organizationId, projectId, realDataSourceId,
             recordRequest, sensitivityLabelIds, embedded: embed);
-        
+
         // TODO: If embed is true send the record ID and URI to the CREATE Insight API
     }
 
@@ -151,10 +151,10 @@ public class FileBusiness
     /// <param name="file">file to update to</param>
     /// <param name="embed">Boolean value that determines if the file will be embedded by Insight</param>
     public async Task<RecordResponseDto> UpdateFile(
-        long currentUserId, 
-        long organizationId, 
+        long currentUserId,
+        long organizationId,
         long projectId,
-        long recordId, 
+        long recordId,
         IFormFile file,
         bool? embed = false
         )
@@ -191,7 +191,7 @@ public class FileBusiness
         };
         return await _recordBusiness.UpdateRecord(currentUserId, organizationId, projectId, recordId,
             updateRecordRequest, embedded: embed);
-        
+
         // TODO: If embed is true send the record ID and URI to the UPDATE Insight API (or delete then add if no update endpoint exists)
     }
 
@@ -267,7 +267,7 @@ public class FileBusiness
         await fileBusiness.DeleteFile(record, configData);
 
         return await _recordBusiness.DeleteRecord(currentUserId, organizationId, projectId, recordId);
-        
+
         // TODO: Delete all references to this record in the pgVector embeddings table
     }
 
@@ -391,7 +391,7 @@ public class FileBusiness
         FileUploadCompleteRequestDto request,
         List<long>? sensitivityLabelIds = null,
         CreateRecordFileUploadRequestDto? metadata = null,
-        bool? embed = false)
+        bool embed = false)
     {
         // Resolve data source
         long realDataSourceId;
@@ -445,7 +445,7 @@ public class FileBusiness
 
         return await _recordBusiness.CreateRecord(currentUserId, organizationId, projectId, realDataSourceId,
             recordRequest, sensitivityLabelIds, embedded: embed);
-        
+
         // TODO: If embed is true then pass the record ID and URI to INSIGHT CREATE API
     }
 

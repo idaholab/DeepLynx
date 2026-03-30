@@ -58,15 +58,14 @@ public class FileController : ControllerBase
         [FromQuery] long? objectStorageId,
         IFormFile file,
         [FromQuery] List<long>? sensitivityLabelIds,
-        IFormFile? metadata,
-        bool? embed = false)
+        IFormFile? metadata)
     {
         try
         {
             var currentUserId = UserContextStorage.UserId;
             var fileUploadInfo =
                 await _fileBusiness.UploadFile(currentUserId, organizationId, projectId, dataSourceId, objectStorageId,
-                    file, sensitivityLabelIds, metadata, embed);
+                    file, sensitivityLabelIds, metadata);
             return Ok(fileUploadInfo);
         }
         catch (Exception exc)
@@ -138,7 +137,7 @@ public class FileController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
-    
+
     /// <summary>
     ///     Generate Download URL
     /// </summary>
