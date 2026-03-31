@@ -1,4 +1,4 @@
-// src/app/lib/client_service/timeseries_services.client.ts
+// src/app/lib/client_service/olap_services.client.ts
 "use client";
 
 import { OlapPlotData, OlapPlotResponse } from "@/app/(home)/types/olap_types";
@@ -30,7 +30,7 @@ export async function getPlotData(
             `/organizations/${organizationId}/projects/${projectId}/records/${recordId}/olap/plot?${searchParams.toString()}`
         );
 
-        return res.data.timeseriesPlotData;
+        return res.data.plotData;
     } catch (error) {
         console.error("Error fetching plot data:", error);
         throw error;

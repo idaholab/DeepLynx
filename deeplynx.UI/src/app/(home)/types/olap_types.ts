@@ -4,6 +4,6 @@ export type OlapPlotData = {
 }
 
 export type OlapPlotResponse = {
-    timeseriesPlotData: OlapPlotData;
+    plotData: OlapPlotData;
 }
 
