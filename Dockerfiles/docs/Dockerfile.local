@@ -27,32 +27,24 @@ COPY deeplynx.docs ./
 RUN npm run build
 
 # Stage 2: Create the final image
-FROM node:lts-alpine AS final
+FROM gcr.io/distroless/nodejs22-debian12 AS final
 
 # Set working directory
 WORKDIR /usr/src/app
 
-# Configure INL certs and environment variables
-RUN apk --no-check-certificate add wget ca-certificates
-RUN wget -q -P /usr/local/share/ca-certificates/ http://certstore.inl.gov/pki/CAINLROOT_B64.crt
-RUN /usr/sbin/update-ca-certificates
-ENV NODE_EXTRA_CA_CERTS=/etc/ssl/certs/ca-certificates.crt
-ENV REQUESTS_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt
-ENV CURL_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt
-ENV SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
-ENV SSL_CERT_DIR=/etc/ssl/certs/
+# Copy standalone runtime output
+COPY --from=frontend-build /usr/src/app/.next/standalone ./
+COPY --from=frontend-build /usr/src/app/.next/static ./.next/static
+COPY --from=frontend-build /usr/src/app/public ./public
 
-# Copy dependency metadata first
-COPY deeplynx.docs/package.json deeplynx.docs/package-lock.json ./
+# Non-root user
+USER nonroot:nonroot
 
-# Install production dependencies
-RUN --mount=type=cache,target=/root/.npm npm ci --omit=dev
-
-# Copy the built frontend code from the previous stage
-COPY --from=frontend-build /usr/src/app ./
+# Set the port the app runs on
+ENV PORT=3001
 
 # Expose the port the app runs on
 EXPOSE 3001
 
 # Set the command to run the application
-CMD ["npm", "start" ]
+CMD ["server.js"]
