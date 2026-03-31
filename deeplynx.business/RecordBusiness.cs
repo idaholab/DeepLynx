@@ -517,9 +517,9 @@ public class RecordBusiness : IRecordBusiness
             new NpgsqlParameter($"@record{i}_id", pair.recordId),
             new NpgsqlParameter($"@label{i}_id", pair.labelId)
         }));
-        
+
         var valueTuples = string.Join(", ", recordLabelPairs.Select((_, i) => $"(@record{i}_id, @label{i}_id)"));
-        
+
         sql = string.Format(sql, valueTuples);
 
         await _context.Database.ExecuteSqlRawAsync(sql, parameters.ToArray());
@@ -758,7 +758,7 @@ public class RecordBusiness : IRecordBusiness
         if (records.Count == 0) throw new Exception("Unable to bulk create records: no records selected for creation");
 
         await EnsureMultipleObjectStoragesExistOnce(organizationId, projectId, records);
-        
+
         var sensitivityLabelsRequired = await _sensitivityLabelService.IsSensitivityLabelRequired(organizationId, projectId);
 
         if (sensitivityLabelsRequired && (sensitivityLabelIds == null || sensitivityLabelIds.Count == 0))
