@@ -224,11 +224,10 @@ const LayoutShell = ({ children }: { children: ReactNode }) => {
                     <li key={org.id} className="w-full">
                       <a
                         onClick={() => handleOrganizationSwitch(org)}
-                        className={`flex items-center gap-2 w-full max-w-full ${
-                          organization?.organizationId === org.id
+                        className={`flex items-center gap-2 w-full max-w-full ${organization?.organizationId === org.id
                             ? "active bg-info/60"
                             : ""
-                        }`}
+                          }`}
                       >
                         <div className="min-w-0 flex-1 overflow-hidden">
                           <div className=" font-medium truncate">
@@ -283,9 +282,8 @@ const LayoutShell = ({ children }: { children: ReactNode }) => {
         )}
         {/* Side Menu */}
         <div
-          className={`fixed top-20 bottom-0 hidden lg:flex ${
-            isUserDropdownOpen ? "z-[60]" : "z-40"
-          }`}
+          className={`fixed top-20 bottom-0 hidden lg:flex ${isUserDropdownOpen ? "z-[60]" : "z-40"
+            }`}
         >
           <aside
             className={
@@ -397,7 +395,7 @@ const LayoutShell = ({ children }: { children: ReactNode }) => {
                   <QuestionMarkCircleIcon className="size-10" />
                 </Link>
               </li>
-              <span className="text-xs font-bold text-base-200/50">v0.4.0</span>
+              <span className="text-xs font-bold text-base-200/50">v0.5.0</span>
             </ul>
           </aside>
         </div>
@@ -407,9 +405,8 @@ const LayoutShell = ({ children }: { children: ReactNode }) => {
           onMobileClose={() => setIsMobileNavOpen(false)}
         />
         <main
-          className={`transition-all duration-300 w-full mt-20 ml-0 ${
-            isMenuCollapsed ? "lg:ml-40" : "lg:ml-82"
-          }`}
+          className={`transition-all duration-300 w-full mt-20 ml-0 ${isMenuCollapsed ? "lg:ml-40" : "lg:ml-82"
+            }`}
         >
           {/* Organization Banner */}
           <div className="sticky top-25 z-20">
