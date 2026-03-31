@@ -212,6 +212,7 @@ public class RecordController : ControllerBase
     /// <returns>The created records</returns>
     [HttpPost("bulk", Name = "api_create_many_records")]
     [Auth("write", "record")]
+    [Sensitivity("write record")]
     public async Task<ActionResult<List<RecordResponseDto>>> BulkCreateRecords(
         long organizationId,
         long projectId,
