@@ -1,5 +1,5 @@
 # Stage 1: Build the frontend
-FROM node:lts-alpine AS frontend-build
+FROM node:24.14.1-alpine3.23 AS frontend-build
 
 # Set working directory
 WORKDIR /usr/src/app
@@ -27,7 +27,7 @@ COPY deeplynx.docs ./
 RUN npm run build
 
 # Stage 2: Create the final image
-FROM gcr.io/distroless/nodejs22-debian12 AS final
+FROM gcr.io/distroless/nodejs22-debian12:debug AS final
 
 # Set working directory
 WORKDIR /usr/src/app
@@ -36,9 +36,6 @@ WORKDIR /usr/src/app
 COPY --from=frontend-build /usr/src/app/.next/standalone ./
 COPY --from=frontend-build /usr/src/app/.next/static ./.next/static
 COPY --from=frontend-build /usr/src/app/public ./public
-
-# Non-root user
-USER nonroot:nonroot
 
 # Set the port the app runs on
 ENV PORT=3001
