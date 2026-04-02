@@ -333,21 +333,216 @@ Several items in this plan have ordering dependencies with findings in the archi
 
 ---
 
+## Section 2: Local Deployment
+
+Findings from reviewing `docker-compose.yaml`, `Dockerfiles/server/entrypoint.sh`, `Dockerfiles/server/Dockerfile.local`, `Dockerfiles/ui/Dockerfile.local`, and `Dockerfiles/database/check_db_version.sh`.
+
+---
+
+## L-P0 — Critical
+
+### L-P0-1: Server final image is the nightly SDK, not a runtime image
+
+**File:** `Dockerfiles/server/Dockerfile.local` line 49
+
+**Problem:** The final stage uses `mcr.microsoft.com/dotnet/nightly/sdk:10.0`. The nightly SDK is ~3× larger than the runtime image, includes build tooling that has no place in a runtime container, and is not a stable release channel.
+
+**Implementation:**
+
+```dockerfile
+# Before
+FROM mcr.microsoft.com/dotnet/nightly/sdk:10.0 AS final
+
+# After
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
+```
+
+The `postgresql-client` install in the final stage remains valid — `apt-get` is available on the aspnet image (Debian-based).
+
+---
+
+### L-P0-2: No health check on `server` — `ui`, `docs`, and `mcp` start before the API is ready
+
+**File:** `docker-compose.yaml`
+
+**Problem:** `nx-postgres` and `insight-rabbitmq` have health checks. `server` does not. `ui`, `docs`, and `mcp` use `depends_on: server` without a condition, so Compose starts them the moment the server container launches — not when the API is ready to accept requests. Requests during the startup window fail silently.
+
+**Implementation:**
+
+Add a health check to the `server` service:
+
+```yaml
+server:
+  healthcheck:
+    test: ["CMD-SHELL", "curl -sf http://localhost:5000/health || exit 1"]
+    interval: 10s
+    timeout: 5s
+    retries: 10
+    start_period: 30s
+```
+
+Update `ui`, `docs`, and `mcp` to wait for the server to be healthy:
+
+```yaml
+ui:
+  depends_on:
+    server:
+      condition: service_healthy
+
+docs:
+  depends_on:
+    server:
+      condition: service_healthy
+
+mcp:
+  depends_on:
+    server:
+      condition: service_healthy
+```
+
+**Note:** The `curl` binary must be present in the server image. It is not installed by default in `mcr.microsoft.com/dotnet/aspnet`. Add it alongside `postgresql-client`:
+
+```dockerfile
+RUN apt-get update && apt-get install -y \
+    postgresql-client \
+    curl \
+    && apt-get clean
+```
+
+---
+
+## L-P1 — Operational Gaps
+
+### L-P1-1: Core service config is hardcoded in `docker-compose.yaml`
+
+**File:** `docker-compose.yaml`
+
+**Problem:** `server`, `ui`, `docs`, and `mcp` have all configuration inline as `environment:` blocks. Insight services correctly use `env_file:`. Developers cannot customize values (database password, email addresses, JWT secret, auth flags) without editing the compose file, which risks accidental commits of personal config.
+
+**Implementation:**
+
+Add an `env_file` reference to each core service pointing at the project `.env` (which is `.gitignore`d):
+
+```yaml
+server:
+  env_file:
+    - .env
+  environment:           # keep only non-secret, non-variable defaults here
+    FILE_STORAGE_METHOD: filesystem
+    STORAGE_DIRECTORY: /data
+    ...
+```
+
+Move all variable or sensitive values (`POSTGRES_PASSWORD`, `JWT_SECRET_KEY`, `SUPERUSER_EMAIL`, `DISABLE_BACKEND_AUTHENTICATION`) into `.env_sample` with placeholder values, and document that the developer must copy to `.env` and fill in. Non-sensitive defaults that should work out of the box can remain as inline `environment:` entries.
+
+---
+
+### L-P1-2: `SUPERUSER_EMAIL` hardcoded to a specific developer's address
+
+**File:** `docker-compose.yaml` line 80
+
+**Problem:** `SUPERUSER_EMAIL: jaren.brownlee@inl.gov` is hardcoded. Every developer who runs `docker compose up` creates a SysAdmin account for that address. Any system emails triggered during local development are directed to a real person.
+
+**Implementation:** Move `SUPERUSER_EMAIL` to `.env_sample` with a placeholder value (`SUPERUSER_EMAIL=admin@example.com`). Remove it from the hardcoded `environment:` block in the compose file (covered by L-P1-1).
+
+---
+
+### L-P1-3: Duplicate and redundant database/pgvector setup across startup scripts
+
+**Files:** `docker-compose.yaml`, `Dockerfiles/server/entrypoint.sh`, `Dockerfiles/database/check_db_version.sh`
+
+**Problem:** Three overlapping mechanisms attempt to set up the same resources:
+
+1. The official `postgres` image with `POSTGRES_DB=deeplynx` already creates the `deeplynx` database during container init.
+2. `entrypoint.sh` lines 12–19 try to create `deeplynx` again — this is dead code for all fresh installs.
+3. `check_db_version.sh` lines 46–54 attempt to install pgvector (suppressing failure with `> /dev/null 2>&1`, then setting `NEEDS_UPGRADE=true`).
+4. `entrypoint.sh` line 23 attempts pgvector install again with `|| true`, hiding any remaining failure.
+
+**Implementation:**
+
+- Remove the database existence check and creation block from `entrypoint.sh` (lines 11–19). The postgres image handles this.
+- Consolidate pgvector install to `check_db_version.sh` only, and remove `|| true`/output suppression so failures are visible.
+- Remove the duplicate pgvector install from `entrypoint.sh` line 23 entirely (the version check job runs first and either succeeds or exits non-zero, blocking `server` from starting via the `depends_on` chain).
+
+This is related to P1-3 in Section 1 (the `|| true` fix) — both should land in the same change.
+
+---
+
+## L-P2 — Hardening
+
+### L-P2-1: INL cert fetch duplicated across Dockerfile build and final stages
+
+**Files:** `Dockerfiles/server/Dockerfile.local`, `Dockerfiles/ui/Dockerfile.local`
+
+**Problem:** Both Dockerfiles fetch the INL CA cert (`wget certstore.inl.gov/...`) in the build stage and then again in the final stage. The final stage does not inherit the build stage's cert store, so the second fetch is necessary — but the first one is not, since the build stage uses the cert only for subsequent `RUN` commands (dotnet restore, npm install).
+
+**Implementation:** For `Dockerfile.local` files that run inside an INL network environment, the cert fetch in the build stage is genuinely needed (to reach package registries). Leave it. For `Dockerfile.public` variants intended for external use, evaluate whether the cert fetch should be removed entirely or replaced with a documented substitution step.
+
+No immediate code change needed; this is an awareness item.
+
+---
+
+### L-P2-2: `minimatch` patch in UI Dockerfile is fragile
+
+**File:** `Dockerfiles/ui/Dockerfile.local` lines 78–86
+
+**Problem:** The final stage performs an inline npm package surgery to patch `minimatch`, ending with `|| true`. If the patched path doesn't exist or the pack fails, the patch silently does nothing — which defeats the purpose of patching a vulnerable dependency.
+
+**Implementation:**
+
+Determine whether the `minimatch` vulnerability is still present in the current `node:lts-alpine` base image. If it is, pin the base image to a version where the vulnerability is resolved and remove the patch script. If the vulnerability is already fixed upstream, remove the patch entirely.
+
+```bash
+# Check current minimatch version in a fresh node:lts-alpine container
+docker run --rm node:lts-alpine node -e "console.log(require('/usr/local/lib/node_modules/npm/node_modules/minimatch/package.json').version)"
+```
+
+---
+
+### L-P2-3: Investigate `moon.css` copied into server image
+
+**File:** `Dockerfiles/server/Dockerfile.local` line 62
+
+**Problem:** `COPY deeplynx.api/moon.css .` places a CSS file in the .NET publish output directory alongside the application DLLs. The ASP.NET Core runtime does not serve this file. If it is a static asset, it belongs in the UI build, not the server image.
+
+**Implementation:** Determine what `moon.css` is used for. If it is loaded at runtime by the .NET application (e.g., for Scalar API docs theming), the copy is intentional and should be documented. If it is unused, remove the `COPY` line.
+
+---
+
+## Cross-Section Dependencies
+
+| This Plan | Dependency |
+| --- | --- |
+| P0-1 (probes) | Upgrade `/health` to probe DB + Redis first (arch review §2.3) — static health response makes readiness probes unreliable |
+| P0-3 (smoke test) | Same — health check upgrade makes smoke test signal trustworthy |
+| P1-2 (replica params) | Do not increase replicas > 1 until Redis cache + SignalR backplane are in place (arch review §2.4) |
+| P2-1 (migrations) | `--migrate` flag requires a code change in `deeplynx.api`; DbContext lifetime fix (arch review §2.1) should land in the same release |
+| L-P0-2 (server health check) | Requires `curl` added to server image (covered in L-P0-1 implementation) |
+| L-P1-3 (pgvector consolidation) | Aligns with P1-3 (`|| true` removal) — deliver together |
+
+---
+
 ## Delivery Sequence
 
 ```text
 Sprint 1
-├── P0-1  Readiness/liveness probes (after /health upgrade)
-├── P0-2  Resource requests
-├── P0-3  Smoke test + rollback in CI
-└── P1-3  Fix entrypoint.sh || true
+├── L-P0-1  Replace nightly SDK final image with aspnet runtime
+├── L-P0-2  Add server health check; update ui/docs/mcp depends_on
+├── P0-1    Readiness/liveness probes (after /health upgrade)
+├── P0-2    Resource requests
+├── P0-3    Smoke test + rollback in CI
+└── P1-3 + L-P1-3  Fix entrypoint.sh || true; consolidate pgvector setup
 
 Sprint 2
-├── P1-1  Parallel image builds
-├── P1-2  Explicit replicas + rolling update params
-└── P2-2  PodDisruptionBudgets
+├── L-P1-1  Move core service config to env_file
+├── L-P1-2  Remove hardcoded SUPERUSER_EMAIL
+├── P1-1    Parallel image builds
+├── P1-2    Explicit replicas + rolling update params
+└── P2-2    PodDisruptionBudgets
 
 Sprint 3
-├── P2-1  Migration Job (requires --migrate flag in API)
-└── P2-3  Confirm ACR tag immutability
+├── L-P2-2  Resolve or remove minimatch patch
+├── L-P2-3  Investigate moon.css
+├── P2-1    Migration Job (requires --migrate flag in API)
+└── P2-3    Confirm ACR tag immutability
 ```
