@@ -9,7 +9,8 @@
     "dev:docs": "npm --prefix ../deeplynx.docs run dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "test": "npx playwright test"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",
