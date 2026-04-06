@@ -104,7 +104,11 @@ services:
     volumes:
       - nx_postgres_data:/var/lib/postgresql
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U postgres && psql -U postgres -d deeplynx -c 'SELECT 1;'" ]
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U postgres && psql -U postgres -d deeplynx -c 'SELECT 1;'",
+        ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -146,7 +150,7 @@ services:
       - server
 
   insight-rabbitmq:
-    profiles: [ insight ]
+    profiles: [insight]
     build:
       context: ./deeplynx.insight/app/rabbitmq
       dockerfile: Dockerfiles/Dockerfile.production
@@ -157,7 +161,7 @@ services:
     env_file:
       - ./deeplynx.insight/.env.production
     healthcheck:
-      test: [ "CMD", "rabbitmq-diagnostics", "-q", "check_port_connectivity" ]
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "check_port_connectivity"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -166,13 +170,13 @@ services:
       - nexus-network
 
   insight-fastapi:
-    profiles: [ insight ]
+    profiles: [insight]
     build:
       context: ./deeplynx.insight
       dockerfile: app/fastapi/Dockerfiles/Dockerfile.production
     ports:
       - "5009:5009"
-    command: [ "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "5009" ]
+    command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "5009"]
     env_file:
       - ./deeplynx.insight/.env.production
     environment:
@@ -190,15 +194,16 @@ services:
         condition: service_completed_successfully
     volumes:
       - object_storage:/data
+      - insight_storage:/data/insight
     networks:
       - nexus-network
 
   insight-rabbitmq-runner:
-    profiles: [ insight ]
+    profiles: [insight]
     build:
       context: ./deeplynx.insight
       dockerfile: app/rabbitmq/Dockerfiles/Dockerfile.runner.production
-    command: [ "python", "-m", "runner" ]
+    command: ["python", "-m", "runner"]
     env_file:
       - ./deeplynx.insight/.env.production
     environment:
@@ -216,6 +221,7 @@ services:
         condition: service_completed_successfully
     volumes:
       - object_storage:/data
+      - insight_storage:/data/insight
     networks:
       - nexus-network
 
@@ -226,6 +232,6 @@ networks:
 volumes:
   object_storage:
     driver: local
-
+  insight_storage:
   nx_postgres_data:
     name: nx_postgres_data
