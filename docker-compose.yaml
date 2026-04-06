@@ -225,6 +225,18 @@ services:
     networks:
       - nexus-network
 
+  # lattice:
+  #   build:
+  #     context: ./deeplynx.lattice/postgres_rag_llm
+  #     dockerfile: Dockerfile
+  #   env_file: ./deeplynx.lattice/postgres_rag_llm/.env
+  #   ports:
+  #     - "8080:8080"
+  #   networks:
+  #     - nexus-network
+  #   depends_on:
+  #       - server
+
 networks:
   nexus-network:
     driver: bridge
