@@ -73,12 +73,15 @@ const RecentRecordsCard: React.FC<Props> = ({
     [t],
   );
 
-  const { sortValue, setSortValue, sortedItems: sortedRecords } =
-    useSortedItems({
-      items: records,
-      sortOptions,
-      defaultSortValue: "dateNew",
-    });
+  const {
+    sortValue,
+    setSortValue,
+    sortedItems: sortedRecords,
+  } = useSortedItems({
+    items: records,
+    sortOptions,
+    defaultSortValue: "dateNew",
+  });
 
   // Local pagination state for the sorted dataset.
   const {
@@ -201,13 +204,6 @@ const RecentRecordsCard: React.FC<Props> = ({
                   {t.translations.LAST_EDIT}:
                 </span>{" "}
                 {formatLocalDateTime(record.lastUpdatedAt)}
-              </span>
-
-              <span>
-                <span className="text-base-content/50">
-                  {t.translations.PROJECT}:
-                </span>{" "}
-                {record.projectName}
               </span>
 
               <span>
