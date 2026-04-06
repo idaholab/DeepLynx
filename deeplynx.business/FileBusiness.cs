@@ -64,7 +64,8 @@ public class FileBusiness
         IFormFile? metadataFile = null,
         bool embed = false,
         long? vlmConfigId = null,
-        long? embeddingModelConfigId = null)
+        long? embeddingModelConfigId = null,
+        string? userJwt = null)
     {
         if (file == null || file.Length == 0) throw new ArgumentException("File is required and cannot be empty.");
         file = new SanitizedFormFile(file);
@@ -122,11 +123,11 @@ public class FileBusiness
         {
             var vlmConfig = await _insightBusiness.ResolveModelConfig(currentUserId, organizationId, projectId, vlmConfigId, "vlm");
             var embeddingModelConfig = await _insightBusiness.ResolveModelConfig(currentUserId, organizationId, projectId, embeddingModelConfigId, "embedding");
-            
+
             _insightBusiness.TriggerEmbedding(projectId, createdRecord.Id,
-                            createdRecord.Uri!, vlmConfig, embeddingModelConfig);
+                            createdRecord.Uri!, vlmConfig, embeddingModelConfig, userJwt);
         }
-        
+
         return createdRecord;
     }
 
@@ -140,7 +141,8 @@ public class FileBusiness
         long recordId,
         IFormFile file,
         long? vlmConfigId = null,
-        long? embeddingModelConfigId = null)
+        long? embeddingModelConfigId = null,
+        string? userJwt = null)
     {
         var record = await _recordBusiness.GetRecord(currentUserId, organizationId, projectId, recordId, true);
 
@@ -174,12 +176,12 @@ public class FileBusiness
         {
             var vlmConfig =
                 await _insightBusiness.ResolveModelConfig(currentUserId, organizationId, projectId, vlmConfigId, "vlm");
-            var embeddingModelConfig = 
+            var embeddingModelConfig =
                 await _insightBusiness.ResolveModelConfig(currentUserId, organizationId, projectId, embeddingModelConfigId, "embedding");
-            
-            _insightBusiness.TriggerEmbedding(projectId, updatedRecord.Id, updatedRecord.Uri!, vlmConfig, embeddingModelConfig, overwrite: true);
+
+            _insightBusiness.TriggerEmbedding(projectId, updatedRecord.Id, updatedRecord.Uri!, vlmConfig, embeddingModelConfig, userJwt, overwrite: true);
         }
-        
+
         return updatedRecord;
     }
 
@@ -343,12 +345,12 @@ public class FileBusiness
 
         var createdRecord = await _recordBusiness.CreateRecord(currentUserId, organizationId, projectId,
             realDataSourceId, recordRequest, sensitivityLabelIds, embedded: embed);
-        
+
         if (embed)
         {
             var vlmConfig = await _insightBusiness.ResolveModelConfig(currentUserId, organizationId, projectId, vlmConfigId, "vlm");
             var embeddingModelConfig = await _insightBusiness.ResolveModelConfig(currentUserId, organizationId, projectId, embeddingModelConfigId, "embedding");
-            
+
             _insightBusiness.TriggerEmbedding(projectId, createdRecord.Id,
                 createdRecord.Uri!, vlmConfig, embeddingModelConfig);
         }

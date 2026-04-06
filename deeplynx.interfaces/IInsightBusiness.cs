@@ -30,6 +30,7 @@ public interface IInsightBusiness
         string uri,
         AiModelConfigResponseDto vlmConfig,
         AiModelConfigResponseDto embeddingConfig,
+        string? userJwt = null,
         bool overwrite = false);
 
     Task<AiModelConfigResponseDto> ResolveModelConfig(

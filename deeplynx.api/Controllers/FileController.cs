@@ -65,9 +65,10 @@ public class FileController : ControllerBase
         try
         {
             var currentUserId = UserContextStorage.UserId;
+            var userJwt = UserContextStorage.Token;
             var fileUploadInfo =
                 await _fileBusiness.UploadFile(currentUserId, organizationId, projectId, dataSourceId, objectStorageId,
-                    file, sensitivityLabelIds, metadata, embed, vlmConfigId, embeddingModelConfigId);
+                    file, sensitivityLabelIds, metadata, embed, vlmConfigId, embeddingModelConfigId, userJwt);
             return Ok(fileUploadInfo);
         }
         catch (Exception exc)
@@ -103,8 +104,9 @@ public class FileController : ControllerBase
         try
         {
             var currentUserId = UserContextStorage.UserId;
+            var userJwt = UserContextStorage.Token;
             var updatedFileInfo =
-                await _fileBusiness.UpdateFile(currentUserId, organizationId, projectId, recordId, file);
+                await _fileBusiness.UpdateFile(currentUserId, organizationId, projectId, recordId, file, vlmConfigId, embeddingModelConfigId, userJwt);
             return Ok(updatedFileInfo);
         }
         catch (Exception exc)

@@ -93,8 +93,9 @@ public class InsightBusiness : IInsightBusiness
         long projectId,
         long recordId,
         string uri,
-        AiModelConfigResponseDto vlmConfig,      // pass already-resolved configs
+        AiModelConfigResponseDto vlmConfig,
         AiModelConfigResponseDto embeddingConfig,
+        string? userJwt = null,
         bool overwrite = false)
     {
         var request = new InsightUploadRequestDto
@@ -106,7 +107,8 @@ public class InsightBusiness : IInsightBusiness
             VlmToken = vlmConfig.Token,
             EmbeddingServerUrl = embeddingConfig.ServerUrl,
             EmbeddingModelName = embeddingConfig.ModelName,
-            EmbeddingModelToken = embeddingConfig.Token
+            EmbeddingModelToken = embeddingConfig.Token,
+            UserJwt = userJwt
         };
 
         _ = _insightServiceClient.Upload(request)
