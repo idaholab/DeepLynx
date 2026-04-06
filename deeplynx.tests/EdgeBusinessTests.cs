@@ -32,6 +32,7 @@ public class EdgeBusinessTests : IntegrationTestBase
     private INotificationBusiness _notificationBusiness = null!;
     private ProjectBusiness _projectBusiness = null!;
     private BulkCopyUpsertExecutor _mockBulkCopyExecutor = null!;
+    private ISensitivityLabelService _sensitivityLabelService = null!;
     public long destinationRecordId;
     public long destinationRecordId2;
     public long destinationRecordId3;
@@ -65,8 +66,9 @@ public class EdgeBusinessTests : IntegrationTestBase
         _mockBulkCopyExecutor = new BulkCopyUpsertExecutor();
         _eventBusiness = new EventBusiness(Context, _notificationBusiness, _mockBulkCopyExecutor);
         _mockOrganizationBusiness = new Mock<IOrganizationBusiness>();
+        _sensitivityLabelService = new SensitivityLabelService(Context);
 
-        _edgeBusiness = new EdgeBusiness(Context, _eventBusiness, _mockBulkCopyExecutor);
+        _edgeBusiness = new EdgeBusiness(Context, _eventBusiness, _mockBulkCopyExecutor, _sensitivityLabelService);
         _dataSourceBusiness = new DataSourceBusiness(Context, _edgeBusiness, _mockRecordBusiness.Object,
             _eventBusiness);
         _classBusiness = new ClassBusiness(
@@ -392,9 +394,9 @@ public class EdgeBusinessTests : IntegrationTestBase
         Assert.Equal(2, result.Count);
         Assert.All(result, e => Assert.True(e.Id > 0));
 
-            var eventList = await Context.Events.ToListAsync();
-            Assert.Equal(1, eventList.Count); // bulk events just log one event with count
-        }
+        var eventList = await Context.Events.ToListAsync();
+        Assert.Equal(1, eventList.Count); // bulk events just log one event with count
+    }
 
     [Fact]
     public async Task BulkCreateEdges_Fails_IfNullDto()
@@ -422,7 +424,7 @@ public class EdgeBusinessTests : IntegrationTestBase
             new CreateEdgeRequestDto { OriginId = (int)originRecordId, DestinationId = (int)destinationRecordId });
 
         // Act
-        var list = await _edgeBusiness.GetAllEdges(oid, pid, null, true);
+        var list = await _edgeBusiness.GetAllEdges(uid1, oid, pid, null, true);
 
         // Assert
         Assert.All(list, e => Assert.Equal(pid, e.ProjectId));
@@ -459,8 +461,8 @@ public class EdgeBusinessTests : IntegrationTestBase
         await Context.SaveChangesAsync();
 
         // Act
-        var listWithArchived = await _edgeBusiness.GetAllEdges(oid, pid, null, false);
-        var listWithoutArchived = await _edgeBusiness.GetAllEdges(oid, pid, null, true);
+        var listWithArchived = await _edgeBusiness.GetAllEdges(uid1, oid, pid, null, false);
+        var listWithoutArchived = await _edgeBusiness.GetAllEdges(uid1, oid, pid, null, true);
 
         // Assert
         Assert.Contains(listWithArchived, e => e.Id == archivedEdge.Id);
@@ -489,7 +491,7 @@ public class EdgeBusinessTests : IntegrationTestBase
         await Context.SaveChangesAsync();
 
         // Act
-        var result = await _edgeBusiness.GetEdge(oid, pid, testEdge.Id, null, null, true);
+        var result = await _edgeBusiness.GetEdge(uid1, oid, pid, testEdge.Id, null, null, true);
 
         // Assert
         Assert.Equal(testEdge.Id, result.Id);
@@ -515,7 +517,7 @@ public class EdgeBusinessTests : IntegrationTestBase
         await Context.SaveChangesAsync();
 
         // Act
-        var result = await _edgeBusiness.GetEdge(oid, pid, null, originRecordId, destinationRecordId, true);
+        var result = await _edgeBusiness.GetEdge(uid1, oid, pid, null, originRecordId, destinationRecordId, true);
 
         // Assert
         Assert.Equal(testEdge.Id, result.Id);
@@ -542,7 +544,7 @@ public class EdgeBusinessTests : IntegrationTestBase
 
         // Act & Assert
         await Assert.ThrowsAsync<KeyNotFoundException>(() =>
-            _edgeBusiness.GetEdge(oid, pid + 999, testEdge.Id, null, null, true));
+            _edgeBusiness.GetEdge(uid1, oid, pid + 999, testEdge.Id, null, null, true));
     }
 
     [Fact]
@@ -565,7 +567,7 @@ public class EdgeBusinessTests : IntegrationTestBase
 
         // Act & Assert
         await Assert.ThrowsAsync<KeyNotFoundException>(() =>
-            _edgeBusiness.GetEdge(oid, pid, testEdge.Id, null, null, true));
+            _edgeBusiness.GetEdge(uid1, oid, pid, testEdge.Id, null, null, true));
     }
 
     [Fact]
@@ -574,7 +576,7 @@ public class EdgeBusinessTests : IntegrationTestBase
         // Act & Assert
         var exception =
             await Assert.ThrowsAsync<KeyNotFoundException>(() =>
-                _edgeBusiness.GetEdge(oid, pid, null, null, null, true));
+                _edgeBusiness.GetEdge(uid1, oid, pid, null, null, null, true));
         Assert.Contains("Please supply either an edgeID or an originID and destinationID", exception.Message);
     }
 
@@ -751,7 +753,7 @@ public class EdgeBusinessTests : IntegrationTestBase
         Assert.NotEqual(DateTime.MinValue, updatedEdge.LastUpdatedAt);
 
         // Verify that get function gets updated version
-        var getResult = await _edgeBusiness.GetEdge(oid, pid, testEdge.Id, edgeOriginId, edgeDestinationId, true);
+        var getResult = await _edgeBusiness.GetEdge(uid1, oid, pid, testEdge.Id, edgeOriginId, edgeDestinationId, true);
         Assert.NotNull(getResult);
         Assert.Equal((int)relationshipId, getResult.RelationshipId);
         Assert.Equal(edgeOriginId, getResult.OriginId);

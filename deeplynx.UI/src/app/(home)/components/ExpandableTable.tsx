@@ -1,25 +1,27 @@
-// src/app/(home)/components/ExpandedProjectCard.tsx
 import { useLanguage } from "@/app/contexts/Language";
-import {
-  ChevronDownIcon,
-  ChevronLeftIcon,
-  ChevronRightIcon,
-} from "@heroicons/react/24/outline";
-import React, { useState, ReactNode, useEffect } from "react";
+import { ChevronDownIcon } from "@heroicons/react/24/outline";
+import React, { ReactNode, useEffect, useState } from "react";
+import PaginationControls from "./PaginationControls";
+import { useLocalPagination } from "../../hooks/useLocalPagination";
+import { ExpandableTableColumn } from "../types/types";
+import SortSelect from "./SortSelect";
+import { useSortedItems } from "../hooks/useSortedItems";
+import type { SortOption } from "../hooks/useSortedItems";
 
-interface translationsProps<T> {
+interface ExpandableTableProps<T> {
   data: T[];
-  columns: {
-    header: string;
-    data: (row: T) => ReactNode;
-    isExpandTrigger?: (row: T) => boolean;
-  }[];
+  columns: ExpandableTableColumn<T>[];
   renderExpandedContent: (row: T, onClose: () => void) => ReactNode;
   onExplore: (row: T) => void;
   getRowId: (row: T) => string | number | undefined;
+  sortOptions?: SortOption<T>[];
+  defaultSortValue?: string;
 }
 
-const RECORDS_PER_PAGE = 5;
+const DATA_CELL_CLASS =
+  "text-base-content first:rounded-l-lg last:rounded-r-lg border-b-4 border-base-100";
+const COLLAPSED_ROW_CLASS =
+  "bg-base-200/30 hover:bg-base-300/60 transition-colors shadow shadow-dynamic-shadow";
 
 export function ExpandableTable<T>({
   data,
@@ -27,128 +29,179 @@ export function ExpandableTable<T>({
   renderExpandedContent,
   onExplore,
   getRowId,
-}: translationsProps<T>) {
-  const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
-  const [currentPage, setCurrentPage] = useState(1);
+  sortOptions,
+  defaultSortValue,
+}: ExpandableTableProps<T>) {
   const { t } = useLanguage();
 
-  const toggleRow = (index: number) => {
-    setExpandedIndex(expandedIndex === index ? null : index);
-  };
-
-  const closeExpanded = () => setExpandedIndex(null);
-
-  const totalPages = Math.ceil(data.length / RECORDS_PER_PAGE);
-  const startIndex = (currentPage - 1) * RECORDS_PER_PAGE;
-  const paginatedRecords = data.slice(
-    startIndex,
-    startIndex + RECORDS_PER_PAGE
+  // View state
+  const [expandedRowId, setExpandedRowId] = useState<string | number | null>(
+    null,
   );
+  const {
+    sortValue,
+    setSortValue,
+    sortedItems: sortedData,
+  } = useSortedItems({
+    items: data,
+    sortOptions,
+    defaultSortValue,
+  });
+
+  const {
+    currentPage,
+    pageSize,
+    paginatedItems: paginatedRows,
+    resetPagination,
+    setCurrentPage,
+    setPageSize,
+    startIndex,
+    totalPages,
+  } = useLocalPagination({
+    items: sortedData,
+    initialPageSize: 5,
+  });
+
+  // Keep expansion and page state valid as the visible dataset changes.
+  useEffect(() => {
+    setExpandedRowId(null);
+  }, [currentPage, pageSize, sortValue]);
 
   useEffect(() => {
-    setExpandedIndex(null);
-  }, [currentPage]);
+    resetPagination();
+  }, [resetPagination, sortValue]);
+
+  useEffect(() => {
+    if (expandedRowId === null) return;
+
+    const rowStillExists = sortedData.some((row, index) => {
+      const rowId = getRowId(row) ?? index;
+      return rowId === expandedRowId;
+    });
+
+    if (!rowStillExists) {
+      setExpandedRowId(null);
+    }
+  }, [expandedRowId, getRowId, sortedData]);
+
+  // Row interaction handlers
+  const toggleRow = (rowId: string | number) => {
+    setExpandedRowId((currentRowId) => (currentRowId === rowId ? null : rowId));
+  };
+
+  const closeExpanded = () => setExpandedRowId(null);
+
+  // Render helpers
+  const renderHeader = () => {
+    if (expandedRowId !== null) {
+      return null;
+    }
+
+    return (
+      <thead>
+        <tr>
+          {columns.map((column, index) => (
+            <th key={index} className="text-base-content font-semibold">
+              {column.header}
+            </th>
+          ))}
+          <th></th>
+        </tr>
+      </thead>
+    );
+  };
+
+  const renderExpandedRow = (row: T, rowId: string | number) => (
+    <tr>
+      <td colSpan={columns.length + 2} className="p-0">
+        <div className="overflow-visible transition-all duration-500 ease-in-out max-h-[1000px] opacity-100">
+          <div
+            className="card bg-base-200 border border-base-300/30 p-6 rounded-box shadow-lg shadow-dynamic-shadow"
+            data-tour={`project-row-${rowId}-expanded`}
+          >
+            {renderExpandedContent(row, closeExpanded)}
+          </div>
+        </div>
+      </td>
+    </tr>
+  );
+
+  const renderCollapsedRow = (row: T, rowId: string | number) => (
+    <tr className={COLLAPSED_ROW_CLASS}>
+      {columns.map((column, index) => {
+        const shouldTriggerExpand = column.isExpandTrigger?.(row) ?? false;
+
+        return (
+          <td
+            key={index}
+            className={`${DATA_CELL_CLASS} ${shouldTriggerExpand ? "cursor-pointer" : ""}`}
+            onClick={shouldTriggerExpand ? () => toggleRow(rowId) : undefined}
+          >
+            {column.data(row)}
+          </td>
+        );
+      })}
+
+      <td className="border-b-4 border-base-100">
+        <button
+          className="btn btn-sm btn-outline btn-secondary hover:btn-secondary mr-3"
+          onClick={() => onExplore(row)}
+        >
+          {t.translations.EXPLORE}
+        </button>
+      </td>
+
+      <td className="rounded-r-lg border-b-4 border-base-100 text-right">
+        <button
+          onClick={() => toggleRow(rowId)}
+          aria-label="Expand row"
+          aria-expanded={expandedRowId === rowId}
+          className="p-1 rounded-lg hover:bg-base-300/50 transition-colors"
+          data-tour={`project-row-${rowId}-toggle`}
+        >
+          <ChevronDownIcon className="size-6 text-base-content/60 hover:text-base-content transition-colors" />
+        </button>
+      </td>
+    </tr>
+  );
 
   return (
     <div>
+      {sortOptions?.length ? (
+        <SortSelect
+          value={sortValue}
+          onChange={setSortValue}
+          options={sortOptions}
+          containerClassName="flex items-center justify-end gap-1 mb-4"
+        />
+      ) : null}
       <table className="table w-full">
-        {expandedIndex === null && (
-          <thead>
-            <tr>
-              {columns.map((col, i) => (
-                <th key={i} className="text-base-content font-semibold">
-                  {col.header}
-                </th>
-              ))}
-              <th></th>
-            </tr>
-          </thead>
-        )}
+        {renderHeader()}
 
         <tbody>
-          {paginatedRecords.map((row, index) => {
+          {paginatedRows.map((row, index) => {
             const globalIndex = startIndex + index;
-            const rowid = getRowId(row) ?? globalIndex;
+            const rowId = getRowId(row) ?? globalIndex;
+
             return (
-              <React.Fragment key={globalIndex}>
-                {expandedIndex === globalIndex ? (
-                  <tr>
-                    <td colSpan={columns.length + 2} className="p-0">
-                      <div className="overflow-hidden transition-all duration-500 ease-in-out max-h-[1000px] opacity-100">
-                        <div
-                          className="card bg-base-200 border border-base-300/30 p-6 rounded-box shadow-lg shadow-dynamic-shadow"
-                          data-tour={`project-row-${rowid}-expanded`}
-                        >
-                          {renderExpandedContent(row, closeExpanded)}
-                        </div>
-                      </div>
-                    </td>
-                  </tr>
-                ) : (
-                  <tr className="bg-base-200/30 hover:bg-base-300/60 transition-colors shadow shadow-dynamic-shadow">
-                      {columns.map((col, i) => {
-                          const shouldTrigger = col.isExpandTrigger?.(row) ?? false;
-                          return (
-
-                              <td
-                                  key={i}
-                                  className={`text-base-content first:rounded-l-lg last:rounded-r-lg border-b-4 border-base-100 ${shouldTrigger ? "cursor-pointer" : ""}`}
-                                  onClick={shouldTrigger ? () => toggleRow(globalIndex) : undefined}
-                              >
-                                  {col.data(row)}
-                              </td>
-                        );
-                    })}
-
-                    <td className="border-b-4 border-base-100">
-                      <button
-                        className="btn btn-sm btn-outline btn-secondary hover:btn-secondary mr-3"
-                        onClick={() => onExplore(row)}
-                      >
-                        {t.translations.EXPLORE}
-                      </button>
-                    </td>
-                    <td className="rounded-r-lg border-b-4 border-base-100 text-right">
-                      <button
-                        onClick={() => toggleRow(globalIndex)}
-                        aria-label="Expand row"
-                        aria-expanded={expandedIndex === globalIndex}
-                        className="p-1 rounded-lg hover:bg-base-300/50 transition-colors"
-                        data-tour={`project-row-${rowid}-toggle`}
-                      >
-                        <ChevronDownIcon className="size-6 text-base-content/60 hover:text-base-content transition-colors" />
-                      </button>
-                    </td>
-                  </tr>
-                )}
+              <React.Fragment key={rowId}>
+                {expandedRowId === rowId
+                  ? renderExpandedRow(row, rowId)
+                  : renderCollapsedRow(row, rowId)}
               </React.Fragment>
             );
           })}
         </tbody>
       </table>
 
-      {/* Pagination Controls */}
-      {totalPages > 1 && (
-        <div className="flex justify-end items-center gap-2 mt-4">
-          <button
-            className="btn btn-sm btn-ghost hover:bg-base-200"
-            disabled={currentPage === 1}
-            onClick={() => setCurrentPage((prev) => prev - 1)}
-          >
-            <ChevronLeftIcon className="size-5 text-base-content/70" />
-          </button>
-          <span className="px-3 text-sm text-base-content/80 font-medium">
-            {t.translations.PAGE} {currentPage} {t.translations.OF} {totalPages}
-          </span>
-          <button
-            className="btn btn-sm btn-ghost hover:bg-base-200"
-            disabled={currentPage === totalPages}
-            onClick={() => setCurrentPage((prev) => prev + 1)}
-          >
-            <ChevronRightIcon className="size-5 text-base-content/70" />
-          </button>
-        </div>
-      )}
+      {/* Pagination controls */}
+      <PaginationControls
+        currentPage={currentPage}
+        pageSize={pageSize}
+        totalPages={totalPages}
+        onPageChange={setCurrentPage}
+        onPageSizeChange={setPageSize}
+      />
     </div>
   );
 }

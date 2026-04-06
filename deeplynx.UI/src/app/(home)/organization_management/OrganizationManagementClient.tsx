@@ -41,7 +41,7 @@ const OrganizationManagementClient = ({
   const tabData = [
     {
       label: t.translations.USERS,
-      content: <UsersTable members={members} />,
+      content: <UsersTable members={members} scope="org" />,
     },
     {
       label: t.translations.ROLES_AND_PERMISSIONS,
@@ -82,15 +82,15 @@ const OrganizationManagementClient = ({
 
   return (
     <div>
-      <div className="bg-base-200/40 pl-12 p-6">
-        <h1 className="text-2xl font-bold text-base-content">
+      <div className="bg-base-200/40 px-3 sm:px-6 lg:px-12 p-6">
+        <h1 className="text-xl sm:text-2xl font-bold text-base-content">
           {t.translations.ORGANIZATION_MANAGEMENT}
         </h1>
       </div>
-      <div className="p-2">
+      <div className="p-2 sm:p-3">
         <Tabs
           tabs={tabData}
-          className="tabs tabs-border ml-5"
+          className="mx-1 sm:mx-3"
           onTabChange={handleTabChange}
           activeTab={activeTab}
         />

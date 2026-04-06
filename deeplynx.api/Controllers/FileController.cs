@@ -40,7 +40,9 @@ public class FileController : ControllerBase
     /// <param name="dataSourceId">The ID of the data source to which the file belongs</param>
     /// <param name="objectStorageId">The ID of the object storage method</param>
     /// <param name="file">The file to upload</param>
+    /// <param name="sensitivityLabelIds">The IDs of the Sensitivity Labels that will be attached to the record</param>
     /// <param name="metadata">
+    /// <param name="embed">Boolean value that determines if the file will be embedded by Insight</param>
     ///     Both file to upload and *optional metadata file to associate with the file to upload. Metadata
     ///     file must follow the CreateRecordFileUploadRequestDto that can be found in Models.
     /// </param>
@@ -48,7 +50,7 @@ public class FileController : ControllerBase
     [HttpPost(Name = "api_upload_file")]
     [Auth("write", "file")]
     [Auth("write", "record")]
-    [Sensitivity("write file")]
+    [Sensitivity("upload file")]
     public async Task<ActionResult<RecordResponseDto>> UploadFile(
         long organizationId,
         long projectId,
@@ -135,7 +137,7 @@ public class FileController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
-    
+
     /// <summary>
     ///     Generate Download URL
     /// </summary>

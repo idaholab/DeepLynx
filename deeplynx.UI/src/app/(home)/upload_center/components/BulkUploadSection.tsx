@@ -116,7 +116,9 @@ export default function BulkUploadSection(props: BulkUploadSectionProps) {
       }
     } catch (error) {
       console.error("Error parsing CSV:", error);
-      props.setCsvParseErrors(["Unexpected error while parsing CSV file"]);
+      props.setCsvParseErrors([
+        t.translations.UNEXPECTED_ERROR_WHILE_PARSING_CSV_FILE,
+      ]);
       toast.error(t.translations.ERROR_PARSING_CSV_FILE);
     } finally {
       props.setIsParsing(false);
@@ -131,11 +133,10 @@ export default function BulkUploadSection(props: BulkUploadSectionProps) {
           <InformationCircleIcon className="size-6" />
           <div>
             <h3 className="font-semibold text-base-content">
-              {t.translations.BULK_METADATA_UPLOAD || "Bulk Metadata Upload"}
+              {t.translations.BULK_METADATA_UPLOAD}
             </h3>
             <p className="text-sm text-base-content/70 mt-1">
-              {t.translations.BULK_METADATA_INSTRUCTIONS ||
-                "Create multiple records at once by uploading a CSV file with metadata."}
+              {t.translations.BULK_METADATA_INSTRUCTIONS}
             </p>
           </div>
         </div>

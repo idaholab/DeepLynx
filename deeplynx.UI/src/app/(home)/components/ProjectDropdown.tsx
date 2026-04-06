@@ -84,23 +84,25 @@ const ProjectDropdown: React.FC<ProjectDropdownProps> = ({
     if (selectedIds.includes("ALL")) return "All Your Projects";
     if (selectedIds.length === 1) {
       const project = projects.find((p) => p.id === selectedIds[0]);
-      return project?.name || "1 project selected";
+      const name = project?.name || "1 project selected"
+      return  name.length >50 ? name.slice(0 ,50) + "..." : name;
     }
     return `${selectedIds.length} projects selected`;
   }, [selectedIds, projects]);
 
   return (
     <div
-      className="relative inline-block text-left min-w-sm text-base-content/80"
+      className="relative inline-block text-left w-full sm:min-w-[18rem] max-w-full text-base-content/80"
       ref={dropdownRef}
     >
       <button
-        className="flex items-center gap-1 text-md"
+        className="flex items-center gap-1 text-md max-w-full"
         onClick={() => setIsOpen((o) => !o)}
+        title={selectedIds.length === 1 ? projects.find((p) => p.id === selectedIds[0])?.name : undefined}
         type="button"
       >
-        {selectedLabel}{" "}
-        {selectedLabel === "All your Projects" && `(${projects.length})`}
+        <span className="truncate">{selectedLabel}</span>
+        {selectedLabel === "All Your Projects" && `(${projects.length})`}
         {isOpen ? (
           <ChevronUpIcon className="w-5 h-5 ml-1" />
         ) : (

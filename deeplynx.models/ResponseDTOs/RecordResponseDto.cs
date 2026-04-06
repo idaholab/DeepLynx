@@ -49,4 +49,6 @@ public class RecordResponseDto
 
     [NotMapped] public ICollection<RecordTagDto> Tags { get; set; }
     [NotMapped] public ICollection<RecordLabelDto> Labels { get; set; }
+    
+    [Column("embedded")] public bool Embedded { get; set; }
 }
