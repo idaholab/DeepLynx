@@ -159,6 +159,8 @@ spec:
               value: ${DISABLE_BACKEND_AUTHENTICATION}
             - name: SUPERUSER_EMAIL
               value: ${SUPERUSER_EMAIL}
+            - name: INSIGHT_FASTAPI_URL
+              value: ${INSIGHT_FASTAPI_URL}
             - name: TENANT_MODE
               value: ${TENANT_MODE}
             - name: OKTA_CLIENT_SECRET
@@ -310,6 +312,8 @@ spec:
               value: ${TENANT_MODE}
             - name: DISABLE_BACKEND_AUTHENTICATION
               value: ${DISABLE_BACKEND_AUTHENTICATION}
+            - name: INSIGHT_FASTAPI_URL
+              value: ${INSIGHT_FASTAPI_URL}
             - name: SUPERUSER_EMAIL
               value: ${SUPERUSER_EMAIL}
             - name: OKTA_CLIENT_SECRET
@@ -446,6 +450,7 @@ spec:
               cpu: "500m"
           ports:
             - containerPort: 43656
+
 
 # insight-rabbitmq
 ---
