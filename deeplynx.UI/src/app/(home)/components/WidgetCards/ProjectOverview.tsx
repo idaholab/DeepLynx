@@ -44,7 +44,7 @@ const ProjectOverviewWidget = () => {
         <h2 className="card-title">{t.translations.PROJECT_OVERVIEW}</h2>
         {/* Peter wanted this button. DL-1564.  */}
         <button className="btn btn-outline btn-secondary btn-disabled">
-          Ontology
+          Explore
         </button>
       </div>
 
