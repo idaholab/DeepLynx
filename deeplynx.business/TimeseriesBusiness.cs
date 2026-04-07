@@ -96,6 +96,8 @@ public class TimeseriesBusiness(
 
         var uri = "duckdb://" + tableName;
 
+        var fileSize = file.Length;
+
         try
         {
             // copy file to path for db
@@ -109,7 +111,6 @@ public class TimeseriesBusiness(
 
             // delete file when its in duckdb
             File.Delete(filePath);
-
 
             // create record for file's db table
             var recordClass = await _classBusiness.GetOrCreateClass(
@@ -131,7 +132,8 @@ public class TimeseriesBusiness(
                 Uri = uri,
                 ClassId = recordClass.Id,
                 ClassName = recordClass.Name,
-                FileType = Path.GetExtension(file.FileName).TrimStart('.').ToLower()
+                FileType = Path.GetExtension(file.FileName).TrimStart('.').ToLower(),
+                FileSize = fileSize
             };
 
             return await _recordBusiness.CreateRecord(currentUserId, organizationId, projectId, dataSourceId,
@@ -296,6 +298,9 @@ public class TimeseriesBusiness(
                 }
             }
 
+            // get file size information
+            var fileSize = new FileInfo(finalFilePath).Length;
+
             await CreateTimeseriesTable(organizationId, projectId, dataSourceId, tableName, fileType);
 
             Directory.Delete(tempFolderPath, true); // Clean up the datasource folder
@@ -319,7 +324,8 @@ public class TimeseriesBusiness(
                 Uri = uri,
                 ClassId = recordClass.Id,
                 ClassName = recordClass.Name,
-                FileType = Path.GetExtension(request.FileName).TrimStart('.').ToLower()
+                FileType = Path.GetExtension(request.FileName).TrimStart('.').ToLower(),
+                FileSize = fileSize
             };
 
             return await _recordBusiness.CreateRecord(currentUserId, organizationId, projectId, dataSourceId,
@@ -433,6 +439,8 @@ public class TimeseriesBusiness(
             await file.CopyToAsync(stream);
             await stream.FlushAsync();
         }
+
+        // TODO: update file size on record info for the file being appended
 
         try
         {
@@ -848,6 +856,8 @@ public class TimeseriesBusiness(
                 await command.ExecuteNonQueryAsync();
                 await connection.CloseAsync();
 
+                var fileSize = new FileInfo(filePath).Length;
+
                 var properties = new JsonObject
                 {
                     ["status"] = Status.Completed,
@@ -860,6 +870,7 @@ public class TimeseriesBusiness(
                 record.Properties = properties.ToString();
                 record.Uri = filePath;
                 record.LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
+                record.FileSize = fileSize;
 
                 backgroundContext.Records.Update(record);
                 await backgroundContext.SaveChangesAsync();

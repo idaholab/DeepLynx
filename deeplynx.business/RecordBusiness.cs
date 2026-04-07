@@ -106,6 +106,7 @@ public class RecordBusiness : IRecordBusiness
                 LastUpdatedAt = r.LastUpdatedAt,
                 IsArchived = r.IsArchived,
                 FileType = r.FileType,
+                FileSize = r.FileSize,
                 Tags = r.Tags.Select(t => new RecordTagDto
                 {
                     Id = t.Id,
@@ -175,6 +176,7 @@ public class RecordBusiness : IRecordBusiness
                 LastUpdatedAt = r.LastUpdatedAt,
                 IsArchived = r.IsArchived,
                 FileType = r.FileType,
+                FileSize = r.FileSize,
                 Tags = r.Tags.Select(t => new RecordTagDto
                 {
                     Id = t.Id,
@@ -232,6 +234,7 @@ public class RecordBusiness : IRecordBusiness
             LastUpdatedAt = record.LastUpdatedAt,
             IsArchived = record.IsArchived,
             FileType = record.FileType,
+            FileSize = record.FileSize,
             Tags = record.Tags.Select(t => new RecordTagDto
             {
                 Id = t.Id,
@@ -594,6 +597,7 @@ public class RecordBusiness : IRecordBusiness
             LastUpdatedAt = r.LastUpdatedAt,
             IsArchived = r.IsArchived,
             FileType = r.FileType,
+            FileSize = r.FileSize,
             Tags = r.Tags.Select(t => new RecordTagDto
             {
                 Id = t.Id,
@@ -655,6 +659,7 @@ public class RecordBusiness : IRecordBusiness
                 LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
                 LastUpdatedBy = currentUserId,
                 FileType = dto.FileType,
+                FileSize = dto.FileSize,
                 OrganizationId = organizationId,
                 Embedded = embedded,
             };
@@ -714,6 +719,7 @@ public class RecordBusiness : IRecordBusiness
                 LastUpdatedAt = record.LastUpdatedAt,
                 IsArchived = record.IsArchived,
                 FileType = record.FileType,
+                FileSize = record.FileSize,
                 Tags = tags,
                 Labels = record.Labels.Select(l => new RecordLabelDto()
                 {
@@ -820,6 +826,7 @@ public class RecordBusiness : IRecordBusiness
             class_id            BIGINT NULL,
             object_storage_id   BIGINT NULL,
             file_type           TEXT NULL,
+            file_size           BIGINT NULL,
             last_updated_at     TIMESTAMP WITHOUT TIME ZONE NOT NULL,
             is_archived         BOOLEAN NOT NULL,
             last_updated_by     BIGINT NULL
@@ -828,17 +835,17 @@ public class RecordBusiness : IRecordBusiness
         const string copyCmd = @"
         COPY tmp_records
         (organization_id, project_id, data_source_id, name, description, uri,
-         original_id, properties, class_id, object_storage_id, file_type,
+         original_id, properties, class_id, object_storage_id, file_type, file_size,
          last_updated_at, is_archived, last_updated_by)
         FROM STDIN (FORMAT BINARY)";
 
         const string upsertSql = @"
         INSERT INTO deeplynx.records
         (organization_id, project_id, data_source_id, name, description, uri,
-         original_id, properties, class_id, object_storage_id, file_type,
+         original_id, properties, class_id, object_storage_id, file_type, file_size,
          last_updated_at, is_archived, last_updated_by)
         SELECT organization_id, project_id, data_source_id, name, description, uri,
-               original_id, properties, class_id, object_storage_id, file_type,
+               original_id, properties, class_id, object_storage_id, file_type, file_size,
                last_updated_at, is_archived, last_updated_by
         FROM tmp_records
         ON CONFLICT (project_id, data_source_id, original_id) DO UPDATE
@@ -849,9 +856,11 @@ public class RecordBusiness : IRecordBusiness
               class_id          = COALESCE(EXCLUDED.class_id, records.class_id),
               object_storage_id = COALESCE(EXCLUDED.object_storage_id, records.object_storage_id),
               last_updated_at   = EXCLUDED.last_updated_at,
-              file_type         = COALESCE(EXCLUDED.file_type, records.file_type), 
+              file_type         = COALESCE(EXCLUDED.file_type, records.file_type),
+              file_size         = COALESCE(EXCLUDED.file_size, records.file_size),
               last_updated_by   = EXCLUDED.last_updated_by
-        RETURNING id, organization_id, project_id, data_source_id, original_id, name, class_id, object_storage_id, file_type, last_updated_by, description, properties;";
+        RETURNING id, organization_id, project_id, data_source_id, original_id, name, class_id, 
+            object_storage_id, file_type, file_size, last_updated_by, description, properties;";
 
         var inserted = await _bulkCopyUpsertExecutor.CopyUpsertAsync(
             conn, tx,
@@ -879,6 +888,8 @@ public class RecordBusiness : IRecordBusiness
                 else w.WriteNull();
                 if (dto.FileType is null) w.WriteNull();
                 else w.Write(dto.FileType, NpgsqlDbType.Text);
+                if (dto.FileSize is null) w.WriteNull();
+                else w.Write(dto.FileSize, NpgsqlDbType.Bigint);
 
                 w.Write(now, NpgsqlDbType.Timestamp);
                 w.Write(false, NpgsqlDbType.Boolean);
@@ -1281,6 +1292,7 @@ public class RecordBusiness : IRecordBusiness
         returnedRecord.LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
         returnedRecord.LastUpdatedBy = currentUserId;
         returnedRecord.FileType = dto.FileType ?? returnedRecord.FileType;
+        returnedRecord.FileSize = dto.FileSize ?? returnedRecord.FileSize;
         returnedRecord.Embedded = embedded ?? false; // If the updated record is not to be embedded, set false and skip embedding with Insight
 
         _context.Records.Update(returnedRecord);
@@ -1315,7 +1327,8 @@ public class RecordBusiness : IRecordBusiness
             LastUpdatedBy = returnedRecord.LastUpdatedBy,
             LastUpdatedAt = returnedRecord.LastUpdatedAt,
             IsArchived = returnedRecord.IsArchived,
-            FileType = returnedRecord.FileType
+            FileType = returnedRecord.FileType,
+            FileSize = returnedRecord.FileSize
         };
     }
 
@@ -1501,6 +1514,7 @@ public class RecordBusiness : IRecordBusiness
         var iCls = r.GetOrdinal("class_id");
         var iObj = r.GetOrdinal("object_storage_id");
         var iType = r.GetOrdinal("file_type");
+        var iSize = r.GetOrdinal("file_size");
         var iUser = r.GetOrdinal("last_updated_by");
         var iDesc = r.GetOrdinal("description");
         var iProp = r.GetOrdinal("properties");
@@ -1515,6 +1529,7 @@ public class RecordBusiness : IRecordBusiness
             ClassId = r.IsDBNull(iCls) ? null : r.GetInt64(iCls),
             ObjectStorageId = r.IsDBNull(iObj) ? null : r.GetInt64(iObj),
             FileType = r.IsDBNull(iType) ? null : r.GetString(iType),
+            FileSize = r.IsDBNull(iSize) ? null : r.GetInt64(iSize),
             LastUpdatedBy = r.IsDBNull(iUser) ? null : r.GetInt64(iUser),
             Description = r.IsDBNull(iDesc) ? null : r.GetString(iDesc),
             Properties = r.IsDBNull(iProp) ? null : r.GetString(iProp)
