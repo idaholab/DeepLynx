@@ -1,36 +1,7 @@
 {
     "recommendations": [
-        // --- Already in repo (do not remove) ---
-        "ms-dotnettools.csdevkit", // C# Dev Kit — IntelliSense, project system, debugger
-        "hbenl.vscode-test-explorer", // Test Explorer UI — generic test runner framework
-        "tekumara.typos-vscode", // Typos — fast source code spell checker
-        // --- .NET / C# ---
-        "ms-dotnettools.csharp", // C# language support (pulled in by Dev Kit, explicit for clarity)
-        "ms-dotnettools.vscode-dotnet-runtime", // .NET runtime manager for extensions
-        "aliasadidev.nugetpackagemanagergui", // NuGet package browser
-        // --- Docker ---
-        "ms-azuretools.vscode-docker", // Compose IntelliSense, container & image management
-        // --- PostgreSQL ---
-        "cweijan.vscode-postgresql-client2", // Query editor, table browser, connection manager
-        // --- Python (Insight FastAPI) ---
-        "ms-python.python", // Python IntelliSense, linting, env management
-        "ms-python.vscode-pylance", // Fast type checking for Python
-        "charliermarsh.ruff", // Fast Python linter/formatter
-        // --- REST / API ---
-        "humao.rest-client", // Send HTTP requests from .http files
-        // --- Git / Submodules ---
-        "eamodio.gitlens", // Inline blame, history, submodule awareness
-        "mhutchie.git-graph", // Visual branch and commit graph
-        // --- Environment Files ---
-        "mikestead.dotenv", // Syntax highlighting for .env files
-        // --- React (Alexandria frontend) ---
-        "dsznajder.es7-react-js-snippets", // React component snippets
-        "esbenp.prettier-vscode", // Code formatter for JS/TS/JSX
-        "dbaeumer.vscode-eslint", // Linting for React codebase
-        // --- YAML / Config ---
-        "redhat.vscode-yaml", // Schema validation for docker-compose.yaml, Helm charts
-        // --- General ---
-        "editorconfig.editorconfig", // Respects .editorconfig for team-consistent formatting
-        "usernamehakobyan.error-lens" // Inline compiler and lint errors
+        "ms-dotnettools.csdevkit",
+        "hbenl.vscode-test-explorer",
+        "tekumara.typos-vscode"
     ]
 }
