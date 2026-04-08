@@ -64,8 +64,10 @@ public partial class DeeplynxContext : DbContext
     public virtual DbSet<SavedSearch> SavedSearches { get; set; }
     
     public virtual DbSet<AiModelConfig> AiModelConfigs { get; set; }
-    
+
     public virtual DbSet<UserModelToken> UserModelTokens { get; set; }
+
+    public virtual DbSet<Embedding> Embeddings { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -1293,6 +1295,26 @@ public partial class DeeplynxContext : DbContext
                 .IsRequired()
                 .OnDelete(DeleteBehavior.Cascade)
                 .HasConstraintName("user_model_tokens_ai_model_config_id_fkey");
+        });
+
+        modelBuilder.Entity<Embedding>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("embeddings_pkey");
+
+            entity.HasIndex(e => e.Id)
+                .HasDatabaseName("idx_embeddings_id");
+
+            entity.HasIndex(e => e.RecordId)
+                .HasDatabaseName("idx_embeddings_record_id");
+
+            entity.Property(e => e.Id).UseIdentityAlwaysColumn();
+            entity.Property(e => e.LastUpdatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+            entity.HasOne(d => d.Record)
+                .WithMany(p => p.Embeddings)
+                .HasForeignKey(d => d.RecordId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("embeddings_record_id_fkey");
         });
 
         OnModelCreatingPartial(modelBuilder);

@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
+using Pgvector;
 using deeplynx.datalayer.Models;
 
 #nullable disable
@@ -549,6 +550,51 @@ namespace deeplynx.datalayer.Migrations
                         {
                             t.HasCheckConstraint("CK_edges_origin_destination_different", "origin_id <> destination_id");
                         });
+                });
+
+            modelBuilder.Entity("deeplynx.datalayer.Models.Embedding", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTime>("LastUpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("last_updated_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<int>("PageNumber")
+                        .HasColumnType("integer")
+                        .HasColumnName("page_number");
+
+                    b.Property<long>("RecordId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("record_id");
+
+                    b.Property<string>("TextChunk")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("text_chunk");
+
+                    b.Property<Vector>("Vector")
+                        .IsRequired()
+                        .HasColumnType("vector(1024)")
+                        .HasColumnName("vector");
+
+                    b.HasKey("Id")
+                        .HasName("embeddings_pkey");
+
+                    b.HasIndex("Id")
+                        .HasDatabaseName("idx_embeddings_id");
+
+                    b.HasIndex("RecordId")
+                        .HasDatabaseName("idx_embeddings_record_id");
+
+                    b.ToTable("embeddings", "dl_vector");
                 });
 
             modelBuilder.Entity("deeplynx.datalayer.Models.Event", b =>
@@ -2369,6 +2415,18 @@ namespace deeplynx.datalayer.Migrations
                     b.Navigation("Relationship");
                 });
 
+            modelBuilder.Entity("deeplynx.datalayer.Models.Embedding", b =>
+                {
+                    b.HasOne("deeplynx.datalayer.Models.Record", "Record")
+                        .WithMany("Embeddings")
+                        .HasForeignKey("RecordId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("embeddings_record_id_fkey");
+
+                    b.Navigation("Record");
+                });
+
             modelBuilder.Entity("deeplynx.datalayer.Models.Event", b =>
                 {
                     b.HasOne("deeplynx.datalayer.Models.DataSource", "DataSource")
@@ -3061,6 +3119,8 @@ namespace deeplynx.datalayer.Migrations
                     b.Navigation("EdgeDestinations");
 
                     b.Navigation("EdgeOrigins");
+
+                    b.Navigation("Embeddings");
 
                     b.Navigation("HistoricalRecords");
                 });
