@@ -8,7 +8,7 @@ WORKDIR /usr/src/app
 COPY deeplynx.docs/package.json deeplynx.docs/package-lock.json ./
 
 # Install frontend dependencies
-RUN --mount=type=cache,target=/root/.npm npm ci
+RUN npm ci
 
 # Copy the rest of the frontend source code
 COPY deeplynx.docs ./
