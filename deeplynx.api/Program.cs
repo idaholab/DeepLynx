@@ -12,6 +12,9 @@ using Microsoft.AspNetCore.Http.Features;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
+using Npgsql;
+using Pgvector.EntityFrameworkCore;
+using Pgvector.Npgsql;
 using Scalar.AspNetCore;
 using Serilog;
 using Log = Serilog.Log;
@@ -132,8 +135,12 @@ try
     */
     builder.Services.AddHttpContextAccessor();
 
+    var dataSourceBuilder = new NpgsqlDataSourceBuilder(connectionString);
+    dataSourceBuilder.UseVector();
+    var dataSource = dataSourceBuilder.Build();
+
     builder.Services.AddDbContext<DeeplynxContext>(
-        options => options.UseNpgsql(connectionString),
+        options => options.UseNpgsql(dataSource, o => o.UseVector()),
         ServiceLifetime.Transient
     );
 

@@ -96,4 +96,7 @@ public partial class Record
     
     [InverseProperty("LastUpdatedRecords")]
     public virtual User? LastUpdatedByUser { get; set; }
+
+    [InverseProperty("Record")]
+    public virtual ICollection<Embedding> Embeddings { get; set; } = new List<Embedding>();
 }
