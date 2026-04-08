@@ -23,6 +23,8 @@
         <PackageReference Include="Microsoft.Bcl.AsyncInterfaces" Version="10.0.2" />
         <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.0.1" />
         <PackageReference Include="Moq" Version="4.20.72" />
+        <PackageReference Include="Pgvector" Version="0.3.2" />
+        <PackageReference Include="Pgvector.EntityFrameworkCore" Version="0.3.0" />
         <PackageReference Include="Testcontainers" Version="4.10.0" />
         <PackageReference Include="Testcontainers.PostgreSql" Version="4.10.0" />
         <PackageReference Include="Testcontainers.Redis" Version="4.10.0" />

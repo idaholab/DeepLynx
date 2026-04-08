@@ -5,6 +5,9 @@ using deeplynx.interfaces;
 using deeplynx.tests;
 using DotNetEnv;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
+using Pgvector.EntityFrameworkCore;
+using Pgvector.Npgsql;
 using Testcontainers.Azurite;
 using Testcontainers.PostgreSql;
 using Testcontainers.Redis;
@@ -28,7 +31,8 @@ public class TestSuiteFixture : IAsyncLifetime
 
     public string PostgresConnectionString { get; private set; }
     public string RedisConnectionString { get; private set; }
-    
+    public NpgsqlDataSource PostgresDataSource { get; private set; }
+
     public DeeplynxContext Context { get; private set; }
 
     // Runs at the beginning of every test suite
@@ -44,8 +48,12 @@ public class TestSuiteFixture : IAsyncLifetime
 
         PostgresConnectionString = _postgresContainer.GetConnectionString();
 
+        var dataSourceBuilder = new NpgsqlDataSourceBuilder(PostgresConnectionString);
+        dataSourceBuilder.UseVector();
+        PostgresDataSource = dataSourceBuilder.Build();
+
         var options = new DbContextOptionsBuilder<DeeplynxContext>()
-            .UseNpgsql(PostgresConnectionString)
+            .UseNpgsql(PostgresDataSource, o => o.UseVector())
             .Options;
 
         Context = new DeeplynxContext(options);
@@ -90,7 +98,7 @@ public class IntegrationTestBase : IAsyncLifetime
     {
         _fixture = fixture;
         Context = new DeeplynxContext(new DbContextOptionsBuilder<DeeplynxContext>()
-            .UseNpgsql(_fixture.PostgresConnectionString)
+            .UseNpgsql(_fixture.PostgresDataSource, o => o.UseVector())
             .Options);
     }
 
