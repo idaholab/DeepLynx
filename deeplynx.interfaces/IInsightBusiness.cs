@@ -11,7 +11,8 @@ public interface IInsightBusiness
         long projectId,
         long? vlmModelConfigId,
         long? embeddingModelConfigId,
-        InsightUploadApiRequestDto payload);
+        InsightUploadApiRequestDto payload,
+        string? userJwt = null);
 
     IAsyncEnumerable<string> StreamInsightQuery(
         long currentUserId,
