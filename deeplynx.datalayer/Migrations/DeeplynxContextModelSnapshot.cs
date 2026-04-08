@@ -582,7 +582,7 @@ namespace deeplynx.datalayer.Migrations
 
                     b.Property<Vector>("Vector")
                         .IsRequired()
-                        .HasColumnType("vector(1024)")
+                        .HasColumnType("vector")
                         .HasColumnName("vector");
 
                     b.HasKey("Id")

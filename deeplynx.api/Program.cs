@@ -13,6 +13,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
 using Npgsql;
+using Pgvector.EntityFrameworkCore;
 using Pgvector.Npgsql;
 using Scalar.AspNetCore;
 using Serilog;
@@ -139,7 +140,7 @@ try
     var dataSource = dataSourceBuilder.Build();
 
     builder.Services.AddDbContext<DeeplynxContext>(
-        options => options.UseNpgsql(dataSource),
+        options => options.UseNpgsql(dataSource, o => o.UseVector()),
         ServiceLifetime.Transient
     );
 
