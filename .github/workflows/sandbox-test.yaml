@@ -124,10 +124,6 @@ jobs:
             --file deeplynx.insight/app/rabbitmq/Dockerfiles/Dockerfile.runner.production \
             deeplynx.insight
 
-          az acr build --registry $ACR_REGISTRY \
-            --image $ACR_PATH:insight-minio-$GITHUB_RUN_NUMBER \
-            --file deeplynx.insight/app/minio/Dockerfiles/Dockerfile.production \
-            deeplynx.insight/app/minio
 
           az acr build --registry $ACR_REGISTRY \
             --image $ACR_PATH:insight-fastapi-$GITHUB_RUN_NUMBER \
@@ -164,7 +160,9 @@ jobs:
             --from-literal=service-token="${{ secrets.SERVICE_TOKEN }}" \
             --from-literal=jwt-secret-key="${{ secrets.JWT_SECRET_KEY }}" \
             --from-literal=rabbitmq-default-pass="${{ secrets.RABBITMQ_DEFAULT_PASS }}" \
-            --from-literal=minio-root-password="${{ secrets.MINIO_ROOT_PASSWORD }}" \
+            --from-literal=llm-auth-token="${{ secrets.LLM_AUTH_TOKEN }}" \
+            --from-literal=mm-auth-token="${{ secrets.MM_AUTH_TOKEN }}" \
+            --from-literal=emb-auth-token="${{ secrets.EMB_AUTH_TOKEN }}" \
             --namespace=deeplynx-test \
             --dry-run=client -o yaml | kubectl apply -f -
       # Create Kubernetes ConfigMap for non-sensitive environment variables
@@ -180,8 +178,6 @@ jobs:
             --from-literal=disabled-front-auth="${{ vars.NEXT_PUBLIC_DISABLE_FRONTEND_AUTHENTICATION }}" \
             --from-literal=hosted-link="${{ vars.HOSTED_LINK }}" \
             --from-literal=rabbitmq-default-user="${{ vars.RABBITMQ_DEFAULT_USER }}" \
-            --from-literal=minio-root-user="${{ vars.MINIO_ROOT_USER }}" \
-            --from-literal=minio-endpoint="${{ vars.MINIO_ENDPOINT }}" \
             --namespace=deeplynx-test \
             --dry-run=client -o yaml | kubectl apply -f -
       # Overwrites ${VARIABLES} in the kube manifest with secrets

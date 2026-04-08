@@ -802,6 +802,84 @@ public class GraphBusinessTests : IntegrationTestBase
         Assert.Equal(record1Id, result.Nodes[0].Id);
         Assert.Empty(result.Links);
     }
+    
+    [Fact]
+    public async Task GetGraphData_RootNode_IncludesClassData()
+    {
+        // Arrange
+        await _projectBusiness.AddMemberToProject(pid, null, uid1, null);
+
+        // Act
+        var result = await _graphBusiness.GetGraphDataForRecord(oid, pid, record1Id, uid1, 1);
+
+        // Assert
+        var rootNode = result.Nodes.Single(n => n.Type == "root");
+        Assert.Equal(classId, rootNode.ClassId);
+        Assert.Equal("Test Class", rootNode.ClassName);
+    }
+
+    [Fact]
+    public async Task GetGraphData_ConnectedNodes_IncludeClassData()
+    {
+        await _projectBusiness.AddMemberToProject(pid, null, uid1, null);
+
+        var edge = new Edge
+        {
+            OriginId = record1Id,
+            DestinationId = record2Id,
+            DataSourceId = dsid,
+            ProjectId = pid,
+            OrganizationId = oid,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
+        };
+        Context.Edges.Add(edge);
+        await Context.SaveChangesAsync();
+
+        var result = await _graphBusiness.GetGraphDataForRecord(oid, pid, record1Id, uid1, 1);
+
+        var connectedNode = result.Nodes.Single(n => n.Id == record2Id);
+        Assert.Equal(classId, connectedNode.ClassId);
+        Assert.Equal("Test Class", connectedNode.ClassName);
+    }
+
+    [Fact]
+    public async Task GetGraphData_NodeWithNoClass_ReturnsNullClassData()
+    {
+        await _projectBusiness.AddMemberToProject(pid, null, uid1, null);
+
+        var unclassifiedRecord = new Record
+        {
+            ProjectId = pid,
+            DataSourceId = dsid,
+            ClassId = null,
+            OrganizationId = oid,
+            Description = "Unclassified Record Description",
+            Name = "Unclassified Record",
+            Properties = "{}",
+            OriginalId = "r_unclassified",
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
+        };
+        Context.Records.Add(unclassifiedRecord);
+        await Context.SaveChangesAsync();
+
+        var edge = new Edge
+        {
+            OriginId = record1Id,
+            DestinationId = unclassifiedRecord.Id,
+            DataSourceId = dsid,
+            ProjectId = pid,
+            OrganizationId = oid,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
+        };
+        Context.Edges.Add(edge);
+        await Context.SaveChangesAsync();
+
+        var result = await _graphBusiness.GetGraphDataForRecord(oid, pid, record1Id, uid1, 1);
+
+        var unclassifiedNode = result.Nodes.Single(n => n.Id == unclassifiedRecord.Id);
+        Assert.Null(unclassifiedNode.ClassId);
+        Assert.Null(unclassifiedNode.ClassName);
+    }
 
     #endregion
 }

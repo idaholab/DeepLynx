@@ -461,7 +461,7 @@ spec:
         app: insight-rabbitmq
     spec:
       containers:
-        - name: deeplynx-test
+        - name: insight-rabbitmq
           image: ${CI_REGISTRY}/${CI_REGISTRY_PATH}:insight-rabbitmq-${GITHUB_RUN_NUMBER}
           imagePullPolicy: Always
           ports:
@@ -501,82 +501,24 @@ spec:
             timeoutSeconds: 5
             failureThreshold: 3
 
+
+# insight-storage: scratch volume for the Insight processing pipeline
 ---
-# insight-minio
-apiVersion: apps/v1
-kind: Deployment
+apiVersion: v1
+kind: PersistentVolumeClaim
 metadata:
-  name: insight-minio
+  name: insight-storage
   namespace: deeplynx-test
 spec:
-  selector:
-    matchLabels:
-      app: insight-minio
-  template:
-    metadata:
-      labels:
-        app: insight-minio
-    spec:
-      containers:
-        - name: deeplynx-test
-          image: ${CI_REGISTRY}/${CI_REGISTRY_PATH}:insight-minio-${GITHUB_RUN_NUMBER}
-          imagePullPolicy: Always
-          env:
-            - name: MINIO_ROOT_USER
-              valueFrom:
-                configMapKeyRef:
-                  name: app-config
-                  key: minio-root-user
-            - name: MINIO_ROOT_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: app-secrets
-                  key: minio-root-password
-            - name: MINIO_API_PORT
-              value: "9100"
-            - name: MINIO_UI_PORT
-              value: "9101"
-            - name: MINIO_ALIAS
-              value: "insight"
-            - name: MINIO_ENDPOINT
-              value: "http://localhost:9100"
-            - name: MINIO_VOLUMES
-              value: "/data/duckdb"
-            - name: MINIO_CONSOLE_ADDRESS
-              value: ":9101"
-          resources:
-            limits:
-              memory: "4Gi"
-              cpu: "1500m"
-          livenessProbe:
-            httpGet:
-              path: /minio/health/live
-              port: 9100
-            initialDelaySeconds: 30
-            periodSeconds: 10
-            timeoutSeconds: 5
-            failureThreshold: 5
-          readinessProbe:
-            httpGet:
-              path: /minio/health/live
-              port: 9100
-            initialDelaySeconds: 10
-            periodSeconds: 10
-            timeoutSeconds: 5
-            failureThreshold: 3
-          ports:
-            - containerPort: 9100
-            - containerPort: 9101
-          volumeMounts:
-            - name: duckdb-storage
-              mountPath: /data/duckdb
-      volumes:
-        - name: duckdb-storage
-          persistentVolumeClaim:
-            claimName: ${AZURE_FILE_SHARE_PVC}
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 25Gi
+  storageClassName: ${AZURE_FILE_SHARE_STORAGE_CLASS}
 
----
 # insight-fastapi
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -591,8 +533,12 @@ spec:
       labels:
         app: insight-fastapi
     spec:
+      hostAliases:
+        - ip: "141.221.75.4"
+          hostnames:
+            - "api.hpc.inl.gov"
       containers:
-        - name: deeplynx-test
+        - name: insight-fastapi
           image: ${CI_REGISTRY}/${CI_REGISTRY_PATH}:insight-fastapi-${GITHUB_RUN_NUMBER}
           imagePullPolicy: Always
           command:
@@ -604,18 +550,16 @@ spec:
               value: "True"
             - name: RABBITMQ_HOST
               value: "insight-rabbitmq-service"
-            - name: MINIO_ENDPOINT
-              value: "insight-minio-service:9100"
-            - name: MINIO_ACCESS_KEY
+            - name: RABBITMQ_USERNAME
               valueFrom:
                 configMapKeyRef:
                   name: app-config
-                  key: minio-root-user
-            - name: MINIO_SECRET_KEY
+                  key: rabbitmq-default-user
+            - name: RABBITMQ_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: app-secrets
-                  key: minio-root-password
+                  key: rabbitmq-default-pass
             - name: PG_HOST
               value: ${POSTGRES_DB_HOST}
             - name: PG_PORT
@@ -626,6 +570,41 @@ spec:
               value: ${POSTGRES_PASSWORD}
             - name: PG_DBNAME
               value: ${POSTGRES_DB_NAME}
+            - name: LLM_AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: llm-auth-token
+            - name: MM_AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: mm-auth-token
+            - name: EMB_AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: emb-auth-token
+            - name: LLM_SERVER_URL
+              value: "https://api.hpc.inl.gov/llm/v1"
+            - name: LLM_MODEL_NAME
+              value: "gpt-oss-120b"
+            - name: MM_SERVER_URL
+              value: "https://api.hpc.inl.gov/llm/v1"
+            - name: MM_MODEL_NAME
+              value: "Mistral-Small-3.2-24B-Instruct-2506"
+            - name: EMB_SERVER_URL
+              value: "https://api.hpc.inl.gov/llm/v1"
+            - name: EMB_MODEL_NAME
+              value: "bge-m3"
+            - name: EMB_DIMENSION
+              value: "1024"
+            - name: RAG_MAX_CHUNKS
+              value: "25"
+            - name: LITELLM_HTTP_LOGGING
+              value: "false"
+            - name: STORAGE_BASE_DIR
+              value: "/data/insight"
           resources:
             limits:
               memory: "4Gi"
@@ -633,10 +612,16 @@ spec:
           volumeMounts:
             - name: duckdb-storage
               mountPath: /data/duckdb
+              readOnly: true
+            - name: insight-storage
+              mountPath: /data/insight
       volumes:
         - name: duckdb-storage
           persistentVolumeClaim:
             claimName: ${AZURE_FILE_SHARE_PVC}
+        - name: insight-storage
+          persistentVolumeClaim:
+            claimName: insight-storage
 
 ---
 # insight-rabbitmq-runner
@@ -646,6 +631,8 @@ metadata:
   name: insight-rabbitmq-runner
   namespace: deeplynx-test
 spec:
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: insight-rabbitmq-runner
@@ -654,8 +641,13 @@ spec:
       labels:
         app: insight-rabbitmq-runner
     spec:
+      terminationGracePeriodSeconds: 120
+      hostAliases:
+        - ip: "141.221.75.4"
+          hostnames:
+            - "api.hpc.inl.gov"
       containers:
-        - name: deeplynx-test
+        - name: insight-rabbitmq-runner
           image: ${CI_REGISTRY}/${CI_REGISTRY_PATH}:insight-rabbitmq-runner-${GITHUB_RUN_NUMBER}
           imagePullPolicy: Always
           command: ["python", "-m", "runner"]
@@ -664,18 +656,16 @@ spec:
               value: "True"
             - name: RABBITMQ_HOST
               value: "insight-rabbitmq-service"
-            - name: MINIO_ENDPOINT
-              value: "insight-minio-service:9100"
-            - name: MINIO_ACCESS_KEY
+            - name: RABBITMQ_USERNAME
               valueFrom:
                 configMapKeyRef:
                   name: app-config
-                  key: minio-root-user
-            - name: MINIO_SECRET_KEY
+                  key: rabbitmq-default-user
+            - name: RABBITMQ_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: app-secrets
-                  key: minio-root-password
+                  key: rabbitmq-default-pass
             - name: PG_HOST
               value: ${POSTGRES_DB_HOST}
             - name: PG_PORT
@@ -686,6 +676,51 @@ spec:
               value: ${POSTGRES_PASSWORD}
             - name: PG_DBNAME
               value: ${POSTGRES_DB_NAME}
+            - name: LLM_AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: llm-auth-token
+            - name: MM_AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: mm-auth-token
+            - name: EMB_AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: emb-auth-token
+            - name: LLM_SERVER_URL
+              value: "https://api.hpc.inl.gov/llm/v1"
+            - name: LLM_MODEL_NAME
+              value: "gpt-oss-120b"
+            - name: MM_SERVER_URL
+              value: "https://api.hpc.inl.gov/llm/v1"
+            - name: MM_MODEL_NAME
+              value: "Mistral-Small-3.2-24B-Instruct-2506"
+            - name: EMB_SERVER_URL
+              value: "https://api.hpc.inl.gov/llm/v1"
+            - name: EMB_MODEL_NAME
+              value: "bge-m3"
+            - name: EMB_DIMENSION
+              value: "1024"
+            - name: IMG_TO_TEXT_PROCS
+              value: "2"
+            - name: IMG_TO_TEXT_BATCH_SIZE
+              value: "20"
+            - name: IMG_TO_TEXT_BATCH_TIMEOUT
+              value: "0.5"
+            - name: PDF_TO_IMG_PROCS
+              value: "2"
+            - name: TEXT_TO_CHUNKS_PROCS
+              value: "2"
+            - name: RAG_MAX_CHUNKS
+              value: "25"
+            - name: LITELLM_HTTP_LOGGING
+              value: "false"
+            - name: STORAGE_BASE_DIR
+              value: "/data/insight"
           resources:
             limits:
               memory: "4Gi"
@@ -693,10 +728,16 @@ spec:
           volumeMounts:
             - name: duckdb-storage
               mountPath: /data/duckdb
+              readOnly: true
+            - name: insight-storage
+              mountPath: /data/insight
       volumes:
         - name: duckdb-storage
           persistentVolumeClaim:
             claimName: ${AZURE_FILE_SHARE_PVC}
+        - name: insight-storage
+          persistentVolumeClaim:
+            claimName: insight-storage
 
 
 ---
@@ -779,24 +820,6 @@ spec:
       targetPort: 15692
   selector:
     app: insight-rabbitmq
-
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: insight-minio-service
-  namespace: deeplynx-test
-spec:
-  type: ClusterIP
-  ports:
-    - name: api
-      port: 9100
-      targetPort: 9100
-    - name: console
-      port: 9101
-      targetPort: 9101
-  selector:
-    app: insight-minio
 
 ---
 apiVersion: v1
