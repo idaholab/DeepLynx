@@ -34,5 +34,5 @@ public class UpdateRecordRequestDto
     public string? FileType { get; set; }
 
     [JsonPropertyName("file_size")]
-    public string? FileSize { get; set; }
+    public long? FileSize { get; set; }
 }

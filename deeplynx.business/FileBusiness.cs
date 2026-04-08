@@ -431,7 +431,7 @@ public class FileBusiness
 
         // Create file record
         var fileClass = await _classBusiness.GetOrCreateClass(currentUserId, organizationId, projectId, "File");
-        var fileSize = file.Length;
+        var fileSize = new FileInfo(uri).Length;
         var recordRequest = new CreateRecordRequestDto
         {
             Properties = metadata?.Properties ?? new JsonObject
