@@ -71,7 +71,8 @@ public class InsightBusiness : IInsightBusiness
             VlmToken = vlmConfig.Token,
             EmbeddingServerUrl = embeddingConfig.ServerUrl,
             EmbeddingModelName = embeddingConfig.ModelName,
-            EmbeddingModelToken = embeddingConfig.Token
+            EmbeddingModelToken = embeddingConfig.Token,
+            Overwrite = false // this endpoint will never be used for updates
         };
 
         await _insightServiceClient.Upload(request);
@@ -93,20 +94,20 @@ public class InsightBusiness : IInsightBusiness
         long projectId,
         long recordId,
         string uri,
-        AiModelConfigResponseDto vlmConfig,      // pass already-resolved configs
-        AiModelConfigResponseDto embeddingConfig,
+        AiModelConfigResponseDto vlmConfigId,
+        AiModelConfigResponseDto embeddingModelConfigId,
         bool overwrite = false)
     {
         var request = new InsightUploadRequestDto
         {
             FileInfo = [new() { FileId = recordId, FileUri = NormalizeFileUri(uri) }],
             Overwrite = overwrite,
-            VlmServerUrl = vlmConfig.ServerUrl,
-            VlmName = vlmConfig.ModelName,
-            VlmToken = vlmConfig.Token,
-            EmbeddingServerUrl = embeddingConfig.ServerUrl,
-            EmbeddingModelName = embeddingConfig.ModelName,
-            EmbeddingModelToken = embeddingConfig.Token
+            VlmServerUrl = vlmConfigId.ServerUrl,
+            VlmName = vlmConfigId.ModelName,
+            VlmToken = vlmConfigId.Token,
+            EmbeddingServerUrl = embeddingModelConfigId.ServerUrl,
+            EmbeddingModelName = embeddingModelConfigId.ModelName,
+            EmbeddingModelToken = embeddingModelConfigId.Token
         };
 
         _ = _insightServiceClient.Upload(request)
