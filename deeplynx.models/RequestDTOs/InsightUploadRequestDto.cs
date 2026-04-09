@@ -29,8 +29,7 @@ public class InsightUploadRequestDto
     [JsonPropertyName("embedding_auth_token")]
     public string? EmbeddingModelToken { get; set; }
 
-    [JsonPropertyName("overwrite")]
-    public bool? Overwrite { get; set; }
+    [JsonPropertyName("overwrite")] public bool Overwrite { get; set; } = false;
 
     public class FileInfoDto
     {

@@ -3,7 +3,6 @@ using System.Text.RegularExpressions;
 using deeplynx.datalayer.Models;
 using deeplynx.interfaces;
 using deeplynx.models;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
 namespace deeplynx.business;
@@ -88,7 +87,8 @@ public class InsightBusiness : IInsightBusiness
             VlmToken = vlmConfig.Token,
             EmbeddingServerUrl = embeddingConfig.ServerUrl,
             EmbeddingModelName = embeddingConfig.ModelName,
-            EmbeddingModelToken = embeddingConfig.Token
+            EmbeddingModelToken = embeddingConfig.Token,
+            Overwrite = false // this endpoint will never be used for updates
         };
 
         await _insightServiceClient.Upload(request);
