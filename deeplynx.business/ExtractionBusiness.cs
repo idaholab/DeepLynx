@@ -16,7 +16,7 @@ public class ExtractionBusiness : IExtractionBusiness
     }
 
     /// <summary>
-    ///     Creates extraction job and inserts staged records, classes, edges, and relationships
+    ///     Stage extractions from Lattice. Inserts staged records, classes, edges, and relationships
     /// </summary>
     /// <param name="currentUserId">ID of the User executing this method.</param>
     /// <param name="organizationId">
@@ -31,12 +31,12 @@ public class ExtractionBusiness : IExtractionBusiness
     /// </param>
     /// <returns>ExtractionResponseDto which contains counts of staged entities</returns>
     /// <exception cref="Exception">Returned if error occurs during extraction transaction</exception>
-    public async Task<ExtractionResponseDto> CreateExtraction(
+    public async Task<ExtractionResponseDto> LatticeEntityStaging(
         long currentUserId,
         long organizationId,
         long projectId,
         long dataSourceId,
-        CreateExtractionRequestDto dto)
+        CreateStagingRequestDto dto)
     {
         var extraction = new Extraction
         {
@@ -109,7 +109,7 @@ public class ExtractionBusiness : IExtractionBusiness
 
             // ClassId is resolved from this payload's staging classes only.
             // If the class only exists in deeplynx, ClassId stays null and the class name is stored
-            // as a shadow property so promotion can resolve it by name.
+            // so promotion can resolve it by name.
             foreach (var recordDto in dto.Records ?? [])
             {
                 var classId = recordDto.ClassId;
@@ -197,7 +197,7 @@ public class ExtractionBusiness : IExtractionBusiness
                         DeeplynxRelationshipName = edgeDto.DeeplynxRelationshipName
                     });
                 }
-                // else: no resolvable origin or destination at all — silently skip
+                // no origin or destination 
             }
 
             await _stagingContext.SaveChangesAsync();

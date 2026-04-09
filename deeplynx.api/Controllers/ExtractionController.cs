@@ -29,7 +29,7 @@ public class ExtractionController : ControllerBase
     }
 
     /// <summary>
-    ///     Create an extraction job
+    ///     Stage extractions from Lattice
     /// </summary>
     /// <param name="organizationId">
     ///     The ID of the organization to which the staged classes, records, edges and relationships
@@ -51,23 +51,23 @@ public class ExtractionController : ControllerBase
     ///     - Edges can reference records by origin_original_id / destination_original_id
     ///     - Edges can reference relationships by relationship_name
     /// </remarks>
-    [HttpPost(Name = "api_create_an_extraction")]
-    public async Task<ActionResult<ExtractionResponseDto>> CreateExtraction(
+    [HttpPost(Name = "api_stage_extractions")]
+    public async Task<ActionResult<ExtractionResponseDto>> LatticeExtractionStaging(
         long organizationId,
         long projectId,
         [FromQuery] long dataSourceId,
-        [FromBody] CreateExtractionRequestDto dto)
+        [FromBody] CreateStagingRequestDto dto)
     {
         try
         {
             var currentUserId = UserContextStorage.UserId;
-            var result = await _extractionBusiness.CreateExtraction(
+            var result = await _extractionBusiness.LatticeEntityStaging(
                 currentUserId, organizationId, projectId, dataSourceId, dto);
             return Ok(result);
         }
         catch (Exception exc)
         {
-            var message = $"An error occurred while creating extraction: {exc}";
+            var message = $"An error occurred while staging extractions: {exc}";
             _logger.LogError(message);
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }

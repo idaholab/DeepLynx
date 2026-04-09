@@ -4,7 +4,7 @@ using System.Text.Json.Serialization;
 
 namespace deeplynx.models;
 
-public class CreateExtractionRequestDto
+public class CreateStagingRequestDto
 {
     [JsonPropertyName("properties")] public JsonObject? Properties { get; set; }
 
