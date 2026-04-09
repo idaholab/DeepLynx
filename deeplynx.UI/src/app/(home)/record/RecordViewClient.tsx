@@ -36,7 +36,7 @@ import {
   updateRecord,
 } from "@/app/lib/client_service/record_services.client";
 import { getAllTags } from "@/app/lib/client_service/tag_services.client";
-import GraphClientPage from "../graph/components/GraphClientPage";
+import GraphClientPage from "../graph/GraphClientPage";
 import { ClassResponseDto } from "../types/responseDTOs";
 import AdditionalPropertiesEditor from "./components/AdditionalPropertiesEditor";
 import RecordHistoryTab from "./components/RecordHistoryTab";
@@ -342,6 +342,10 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
   useEffect(() => {
     resetAllState();
   }, [recordId, resetAllState]);
+
+  useEffect(() => {
+    setActiveTab(0);
+  }, [recordId]);
 
   // ============= DATA LOADING EFFECTS =============
   useEffect(() => {
