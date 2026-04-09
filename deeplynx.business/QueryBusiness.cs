@@ -2,7 +2,6 @@ using System.Text.Json;
 using deeplynx.datalayer.Models;
 using deeplynx.interfaces;
 using deeplynx.models;
-using deeplynx.helpers;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using NpgsqlTypes;
@@ -123,10 +122,21 @@ public class QueryBusiness : IQueryBusiness
                         var jsonbColumns = new[] { "properties", "tags" };
 
                         if (jsonbColumns.Contains(query.Filter.ToLower()))
-                            // For JSONB columns, convert to text and search
-                            condition = $"jsonb_pretty(hr.{query.Filter}) ILIKE @{paramName}";
+                        {
+                            if (query.Filter.ToLower() == "tags")
+                                // Tags are an array of objects - flatten and search only the name values
+                                condition =
+                                    $"EXISTS (SELECT 1 FROM jsonb_array_elements(hr.{query.Filter}) elem WHERE elem->>'name' ILIKE @{paramName})";
+                            else
+                                // Properties is a flat object already - we can just search the values
+                                condition =
+                                    $"EXISTS (SELECT 1 FROM jsonb_each_text(hr.{query.Filter}) WHERE value ILIKE @{paramName})";
+                        }
                         else
+                        {
                             condition = $"hr.{query.Filter} ILIKE @{paramName}";
+                        }
+
                         parameters.Add(new NpgsqlParameter(paramName, $"%{query.Value}%"));
                     }
                     else if (query.Operator == "=")
@@ -375,7 +385,8 @@ public class QueryBusiness : IQueryBusiness
             Value = authorizedLabelIds.ToArray()
         };
 
-        var historicalRecordsResults = _context.HistoricalRecords.FromSqlRaw(sql, param1, param2, param3, param4, param5);
+        var historicalRecordsResults =
+            _context.HistoricalRecords.FromSqlRaw(sql, param1, param2, param3, param4, param5);
 
         return await historicalRecordsResults
             .Select(r => new HistoricalRecordResponseDto
@@ -412,16 +423,14 @@ public class QueryBusiness : IQueryBusiness
         // Get authorized sensitivity labels for the user
         var authorizedLabelIds = await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
             currentUserId, organizationId, projectIds, "read record");
-    
+
         var query = _context.HistoricalRecords
             .Where(r => r.OrganizationId == organizationId && !r.IsArchived);
 
         if (projectIds.Length > 0)
             query = query.Where(r => projectIds.Contains(r.ProjectId));
         else
-        {
             return new List<HistoricalRecordResponseDto>();
-        }
 
         var authorizedRecordIds = await _context.Records
             .Where(rec =>
@@ -433,11 +442,11 @@ public class QueryBusiness : IQueryBusiness
             )
             .Select(rec => rec.Id)
             .ToListAsync();
-        
+
         // Filter historical records by authorized record IDs
         query = query.Where(r => authorizedRecordIds.Contains(r.RecordId));
 
-        
+
         var records = await query
             .GroupBy(r => r.RecordId)
             .Select(g => g.OrderByDescending(r => r.LastUpdatedAt).First())
@@ -463,7 +472,7 @@ public class QueryBusiness : IQueryBusiness
             LastUpdatedAt = r.LastUpdatedAt
         });
     }
-    
+
     /// <summary>
     ///     Retrieves all records for multiple projects.
     /// </summary>
@@ -475,13 +484,13 @@ public class QueryBusiness : IQueryBusiness
         long currentUserId, long organizationId, long[] projects, bool hideArchived)
     {
         var authorizedLabelIds = await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
-            currentUserId, organizationId, projects, "read record");   
-        
+            currentUserId, organizationId, projects, "read record");
+
         var projectSet = new HashSet<long>(projects);
 
         var recordQuery = _context.HistoricalRecords
             .Where(r => projectSet.Contains(r.ProjectId) && r.OrganizationId == organizationId);
-        
+
         var authorizedRecordIds = await _context.Records
             .Where(rec =>
                 // Either the record has no labels
@@ -492,7 +501,7 @@ public class QueryBusiness : IQueryBusiness
             )
             .Select(rec => rec.Id)
             .ToListAsync();
-        
+
         // Filter historical records by authorized record IDs
         recordQuery = recordQuery.Where(r => authorizedRecordIds.Contains(r.RecordId));
 
