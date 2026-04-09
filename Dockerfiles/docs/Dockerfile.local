@@ -27,7 +27,7 @@ COPY deeplynx.docs ./
 RUN npm run build
 
 # Stage 2: Create the final image
-FROM gcr.io/distroless/nodejs22-debian13:debug AS final
+FROM gcr.io/distroless/nodejs24-debian13:debug AS final
 
 # Set working directory
 WORKDIR /usr/src/app
