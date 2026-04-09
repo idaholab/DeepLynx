@@ -17,7 +17,7 @@ COPY deeplynx.UI ./
 RUN npm run build
 
 # Stage 2: Create the final image
-FROM gcr.io/distroless/nodejs22-debian13 AS final
+FROM gcr.io/distroless/nodejs22-debian13:nonroot AS final
 
 # Set working directory
 WORKDIR /usr/src/app
@@ -26,9 +26,6 @@ WORKDIR /usr/src/app
 COPY --from=frontend-build /usr/src/app/.next/standalone ./
 COPY --from=frontend-build /usr/src/app/.next/static ./.next/static
 COPY --from=frontend-build /usr/src/app/public ./public
-
-# Non-root user 
-USER nonroot:nonroot
 
 # Expose the port the app runs on
 EXPOSE 3000
