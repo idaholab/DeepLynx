@@ -515,9 +515,9 @@ public class RecordBusiness : IRecordBusiness
             new NpgsqlParameter($"@record{i}_id", pair.recordId),
             new NpgsqlParameter($"@label{i}_id", pair.labelId)
         }));
-        
+
         var valueTuples = string.Join(", ", recordLabelPairs.Select((_, i) => $"(@record{i}_id, @label{i}_id)"));
-        
+
         sql = string.Format(sql, valueTuples);
 
         await _context.Database.ExecuteSqlRawAsync(sql, parameters.ToArray());
@@ -621,7 +621,7 @@ public class RecordBusiness : IRecordBusiness
     /// <exception cref="KeyNotFoundException">Returned if the project or datasource are not found</exception>
     /// <exception cref="Exception">Returned if the metadata is too deeply nested</exception>
     public async Task<RecordResponseDto> CreateRecord(long currentUserId, long organizationId, long projectId,
-        long dataSourceId, CreateRecordRequestDto dto, List<long>? sensitivityLabelIds = null, bool? embedded = false)
+        long dataSourceId, CreateRecordRequestDto dto, List<long>? sensitivityLabelIds = null, bool embedded = false)
     {
         ValidationHelper.ValidateModel(dto);
         await ExistenceHelper.EnsureDataSourceExistsForProjectAsync(_context, dataSourceId, projectId);
@@ -656,7 +656,7 @@ public class RecordBusiness : IRecordBusiness
                 LastUpdatedBy = currentUserId,
                 FileType = dto.FileType,
                 OrganizationId = organizationId,
-                Embedded = embedded ?? false,
+                Embedded = embedded,
             };
 
             _context.Records.Add(record);
@@ -720,7 +720,7 @@ public class RecordBusiness : IRecordBusiness
                     Id = l.Id,
                     Name = l.Name
                 }).ToList(),
-                Embedded = embedded ?? false,
+                Embedded = embedded,
             };
         }
         catch (Exception exc)
@@ -756,7 +756,7 @@ public class RecordBusiness : IRecordBusiness
         if (records.Count == 0) throw new Exception("Unable to bulk create records: no records selected for creation");
 
         await EnsureMultipleObjectStoragesExistOnce(organizationId, projectId, records);
-        
+
         var sensitivityLabelsRequired = await _sensitivityLabelService.IsSensitivityLabelRequired(organizationId, projectId);
 
         if (sensitivityLabelsRequired && (sensitivityLabelIds == null || sensitivityLabelIds.Count == 0))
@@ -1218,7 +1218,7 @@ public class RecordBusiness : IRecordBusiness
 
         _context.Records.Remove(returnedRecord);
         await _context.SaveChangesAsync();
-        
+
         // TODO: IF THE RECORD HAS EMBEDDED == TRUE pass the record ID to DELETE INSIGHT API
 
         // Log record delete event
@@ -1285,7 +1285,7 @@ public class RecordBusiness : IRecordBusiness
 
         _context.Records.Update(returnedRecord);
         await _context.SaveChangesAsync();
-        
+
         // TODO: If Embedded is true pass the record ID to the UPDATE embedded file endpoint
 
         // Log Record Update Event
