@@ -78,6 +78,7 @@ services:
       SUPPORT_EMAIL: jaren.brownlee@inl.gov
       DISABLE_BACKEND_AUTHENTICATION: true # change to false if supplying okta info on lines 12-13, 25-26
       SUPERUSER_EMAIL: jaren.brownlee@inl.gov
+      INSIGHT_FASTAPI_URL: http://insight-fastapi:5009
     entrypoint: /usr/local/bin/entrypoint.sh
     ports:
       - "5000:5000"
