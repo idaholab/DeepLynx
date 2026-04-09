@@ -43,9 +43,9 @@ const ProjectOverviewWidget = () => {
       <div className="flex justify-between">
         <h2 className="card-title">{t.translations.PROJECT_OVERVIEW}</h2>
         {/* Peter wanted this button. DL-1564.  */}
-        <button className="btn btn-outline btn-secondary btn-disabled">
+        {/* <button className="btn btn-outline btn-secondary btn-disabled">
           Explore
-        </button>
+        </button> */}
       </div>
 
       {/* Show only the project stats that are actually provided by the API. */}
