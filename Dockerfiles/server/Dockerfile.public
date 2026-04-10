@@ -32,8 +32,8 @@ WORKDIR /usr/src/app
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
     libc6=2.39-0ubuntu8.7 \
-    libssl3=3.0.13-0ubuntu3.7 \
-    openssl=3.0.13-0ubuntu3.7 \
+    libssl3=3.0.13-0ubuntu3.9 \
+    openssl=3.0.13-0ubuntu3.9 \
     libpam0g=1.5.3-5ubuntu5.5 \
     libpam-runtime=1.5.3-5ubuntu5.5 \
     libpam-modules-bin=1.5.3-5ubuntu5.5 \
