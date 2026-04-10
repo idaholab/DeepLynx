@@ -1,9 +1,7 @@
 using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
-using deeplynx.datalayer.Models;
 using deeplynx.interfaces;
 using deeplynx.models;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
 namespace deeplynx.business;
@@ -91,6 +89,7 @@ public class InsightBusiness : IInsightBusiness
             EmbeddingServerUrl = embeddingConfig.ServerUrl,
             EmbeddingModelName = embeddingConfig.ModelName,
             EmbeddingModelToken = embeddingConfig.Token,
+            Overwrite = false, // this endpoint will never be used for updates
             UserJwt = userJwt
         };
 

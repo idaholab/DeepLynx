@@ -51,8 +51,20 @@ public class FileBusiness
     }
 
     /// <summary>
-    ///     Uploads file using specified object storage method
+    ///     Upload a File
     /// </summary>
+    /// <param name="currentUserId">The ID of the requesting user</param>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <param name="projectId">The ID of the project to which the file belongs</param>
+    /// <param name="dataSourceId">The ID of the data source to which the file belongs</param>
+    /// <param name="objectStorageId">The ID of the object storage method</param>
+    /// <param name="file">The file to upload</param>
+    /// <param name="sensitivityLabelIds">The IDs of the Sensitivity Labels that will be attached to the record</param>
+    /// <param name="metadataFile">Optional metadata that will be appended to the created record</param>
+    /// <param name="embed">Boolean value that determines if the file will be embedded by Insight</param>
+    /// <param name="vlmConfigId">Optional ID of the VLM model that will be used by Insight if embed is set to true</param>
+    /// <param name="embeddingModelConfigId">Optional ID of the Embedding model that will be used by Insight if embed is set to true</param>
+    /// <returns>Record response DTO containing file information</returns>
     public async Task<RecordResponseDto> UploadFile(
         long currentUserId,
         long organizationId,
@@ -132,8 +144,16 @@ public class FileBusiness
     }
 
     /// <summary>
-    ///     Replaces a file but uses the same guid for the file name
+    ///     Update a File
     /// </summary>
+    /// <param name="currentUserId">The ID of the requesting user</param>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <param name="projectId">The ID of the project to which the file belongs</param>
+    /// <param name="recordId">The ID of the record that contains file information</param>
+    /// <param name="file">The file to replace the old one</param>
+    /// <param name="vlmConfigId">Optional ID of the VLM model that will be used by Insight if embed is set to true</param>
+    /// <param name="embeddingModelConfigId">Optional ID of the Embedding model that will be used by Insight if embed is set to true</param>
+    /// <returns>Record response DTO containing updated file information</returns>
     public async Task<RecordResponseDto> UpdateFile(
         long currentUserId,
         long organizationId,
@@ -186,8 +206,13 @@ public class FileBusiness
     }
 
     /// <summary>
-    ///     Downloads a file
+    ///     Download a File
     /// </summary>
+    /// <param name="currentUserId">The ID of the requesting user</param>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <param name="projectId">The ID of the project to which the file belongs</param>
+    /// <param name="recordId">The ID of the record that contains file information</param>
+    /// <returns>The file stream for download</returns>
     public async Task<FileStreamResult> DownloadFile(long currentUserId, long organizationId, long projectId,
         long recordId)
     {
@@ -203,8 +228,13 @@ public class FileBusiness
     }
 
     /// <summary>
-    ///     Generates a download URL
+    ///     Generate Download URL
     /// </summary>
+    /// <param name="currentUserId">The ID of the requesting user</param>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <param name="projectId">The ID of the project to which the file belongs</param>
+    /// <param name="recordId">The ID of the record that contains file information</param>
+    /// <returns>The file stream for download</returns>
     public async Task<string> GenerateDownloadURL(long currentUserId, long organizationId, long projectId,
         long recordId)
     {
@@ -220,8 +250,13 @@ public class FileBusiness
     }
 
     /// <summary>
-    ///     Deletes a file
+    ///     Delete a File
     /// </summary>
+    /// <param name="currentUserId">The ID of the requesting user</param>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <param name="projectId">The ID of the project to which the file belongs</param>
+    /// <param name="recordId">The ID of the record that contains file information</param>
+    /// <returns>A message stating the file was successfully deleted.</returns>
     public async Task<bool> DeleteFile(long currentUserId, long organizationId, long projectId, long recordId)
     {
         var record = await _recordBusiness.GetRecord(currentUserId, organizationId, projectId, recordId, true);
@@ -241,8 +276,14 @@ public class FileBusiness
     }
 
     /// <summary>
-    ///     Initializes a chunked upload session
+    ///     Start Chunked File Upload (For large files over 500MB)
     /// </summary>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <param name="projectId">The ID of the project to which the file belongs</param>
+    /// <param name="dataSourceId">The ID of the data source to which the file belongs</param>
+    /// <param name="objectStorageId">The ID of the object storage method</param>
+    /// <param name="request">File upload initialization request DTO</param>
+    /// <returns>{UploadId, ChunkSize}</returns>
     public async Task<FileUploadSessionResponseDto> StartUpload(
         long organizationId,
         long projectId,
@@ -270,8 +311,16 @@ public class FileBusiness
     }
 
     /// <summary>
-    ///     Uploads a single chunk of a file
+    ///     Upload File Chunk
     /// </summary>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <param name="projectId">The ID of the project to which the file belongs</param>
+    /// <param name="dataSourceId">The ID of the data source to which the file belongs</param>
+    /// <param name="objectStorageId">The ID of the object storage method</param>
+    /// <param name="chunk">File chunk from form</param>
+    /// <param name="uploadId">ID of upload session</param>
+    /// <param name="chunkNumber">Chunk number (0-indexed)</param>
+    /// <returns>{ChunkUploadStatus}</returns>
     public async Task<string> UploadChunk(
         long organizationId,
         long projectId,
@@ -297,8 +346,20 @@ public class FileBusiness
     }
 
     /// <summary>
-    ///     Completes the upload by merging chunks and creating the file record
+    ///     Complete Chunked File Upload
     /// </summary>
+    /// <param name="currentUserId">The ID of the requesting user</param>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <param name="projectId">The ID of the project to which the file belongs</param>
+    /// <param name="dataSourceId">The ID of the data source to which the file belongs</param>
+    /// <param name="objectStorageId">The ID of the object storage method</param>
+    /// <param name="request">File upload completion request DTO with optional metadata DTO</param>
+    /// <param name="sensitivityLabelIds">Optional List of ID's for the Sensitivity Labels to be associated with this file/record</param>
+    /// <param name="metadata">Additional metadata that will be appended to the record</param>
+    /// <param name="embed">Optional boolean that determines if the file will be embedded by Insight</param>
+    /// <param name="vlmConfigId">Optional ID of the VLM model that will be used by Insight if embed is set to true</param>
+    /// <param name="embeddingModelConfigId">Optional ID of the Embedding model that will be used by Insight if embed is set to true</param>
+    /// <returns>Record response DTO containing file information</returns>
     public async Task<RecordResponseDto> CompleteUpload(
         long currentUserId,
         long organizationId,
@@ -359,8 +420,16 @@ public class FileBusiness
     }
 
     /// <summary>
-    ///     Cancels an in-progress upload and cleans up temporary files
+    ///     Cancel Chunked File Upload
     /// </summary>
+    /// <param name="currentUserId">The ID of the requesting user</param>
+    
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <param name="projectId">The ID of the project to which the file belongs</param>
+    /// <param name="dataSourceId">The ID of the data source to which the file belongs</param>
+    /// <param name="objectStorageId">The ID of the object storage method</param>
+    /// <param name="uploadId">ID of upload session to cancel</param>
+    /// <returns>A message stating the upload was successfully cancelled</returns>
     public async Task CancelUpload(
         long currentUserId,
         long organizationId,

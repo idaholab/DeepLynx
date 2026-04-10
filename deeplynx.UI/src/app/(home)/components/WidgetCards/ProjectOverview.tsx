@@ -24,7 +24,7 @@ const ProjectOverviewWidget = () => {
       try {
         const data = await getProjectStats(
           organization?.organizationId as number,
-          project?.projectId as number
+          project?.projectId as number,
         );
         setStats({
           classes: data.classes,
@@ -40,7 +40,13 @@ const ProjectOverviewWidget = () => {
 
   return (
     <div className="card-body">
-      <h2 className="card-title">{t.translations.PROJECT_OVERVIEW}</h2>
+      <div className="flex justify-between">
+        <h2 className="card-title">{t.translations.PROJECT_OVERVIEW}</h2>
+        {/* Peter wanted this button. DL-1564.  */}
+        {/* <button className="btn btn-outline btn-secondary btn-disabled">
+          Explore
+        </button> */}
+      </div>
 
       {/* Show only the project stats that are actually provided by the API. */}
       <div className="grid grid-cols-1 gap-4 p-4 rounded-lg sm:grid-cols-3">
