@@ -1,7 +1,6 @@
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using deeplynx.business;
-using deeplynx.datalayer.MigrationRunner;
 using deeplynx.datalayer.Models;
 using deeplynx.helpers;
 using deeplynx.helpers.BigData;
@@ -464,14 +463,23 @@ try
     await DatabaseVersionChecker.CheckDatabaseVersion(connectionString);
 
     /* ╔════════════════════════════╗
-       ║      Apply Migrations      ║
-       ╚════════════════════════════╝ */
-    await MigrationRunner.ApplyMigrations(connectionString);
-
-    /* ╔════════════════════════════╗
        ║      App Configurations    ║
        ╚════════════════════════════╝ */
     var app = builder.Build();
+
+    /* ╔════════════════════════════╗
+       ║      Apply Migrations      ║
+       ╚════════════════════════════╝ */
+    using (var scope = app.Services.CreateScope())
+    {
+        var dbContext = scope.ServiceProvider.GetRequiredService<DeeplynxContext>();
+        await dbContext.Database.MigrateAsync();
+
+        var stagingContext = scope.ServiceProvider.GetRequiredService<StagingContext>();
+        await stagingContext.Database.MigrateAsync();
+    }
+
+    Log.Information("Migrations applied successfully.");
 
     /* ╔════════════════════════════╗
        ║      App Base Path         ║
