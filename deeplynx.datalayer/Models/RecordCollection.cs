@@ -13,9 +13,6 @@ public partial class RecordCollection
     [Column("properties", TypeName = "jsonb")]
     public string? Properties { get; set; } = null!;
 
-    [Column("original_id")]
-    public string? OriginalId { get; set; } = null!;
-
     [Column("name")]
     public string Name { get; set; } = null!;
 

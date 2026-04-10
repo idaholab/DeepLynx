@@ -889,15 +889,11 @@ public partial class DeeplynxContext : DbContext
 
             entity.HasIndex(e => e.Name)
                 .HasDatabaseName("idx_record_collections_name");
-
-            entity.HasIndex(e => e.OriginalId)
-                .HasDatabaseName("idx_record_collections_original_id");
             
             // Creates a partial unique index to make sure if a user is adding an originalID, it is unique within the project
-            entity.HasIndex(e => new { e.ProjectId, e.OriginalId })
-                .HasDatabaseName("unique_record_collection_original_id")
-                .IsUnique()
-                .HasFilter("original_id IS NOT NULL");
+            entity.HasIndex(e => new { e.ProjectId, e.Name })
+                .HasDatabaseName("unique_record_collection_name")
+                .IsUnique();
 
             entity.HasIndex(e => e.Properties, "idx_record_collections_properties").HasMethod("gin");
 
