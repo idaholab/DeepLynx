@@ -78,6 +78,7 @@ services:
       SUPPORT_EMAIL: jaren.brownlee@inl.gov
       DISABLE_BACKEND_AUTHENTICATION: true # change to false if supplying okta info on lines 12-13, 25-26
       SUPERUSER_EMAIL: jaren.brownlee@inl.gov
+      INSIGHT_FASTAPI_URL: http://insight-fastapi:5009
     entrypoint: /usr/local/bin/entrypoint.sh
     ports:
       - "5000:5000"
@@ -224,6 +225,18 @@ services:
       - insight_storage:/data/insight
     networks:
       - nexus-network
+
+  # lattice:
+  #   build:
+  #     context: ./deeplynx.lattice/postgres_rag_llm
+  #     dockerfile: Dockerfile
+  #   env_file: ./deeplynx.lattice/postgres_rag_llm/.env
+  #   ports:
+  #     - "8080:8080"
+  #   networks:
+  #     - nexus-network
+  #   depends_on:
+  #       - server
 
 networks:
   nexus-network:
