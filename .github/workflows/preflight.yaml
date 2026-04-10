@@ -24,8 +24,10 @@ jobs:
           az cloud set --name AzureUSGovernment
           az login --service-principal -u $ACR_SP_USER -p $ACR_SP_PASSWORD --tenant $ACR_SP_TENANT
           az account set --subscription $ACR_SUBSCRIPTION
+
+          # Build app image without pushing to registry
           az acr build --registry $ACR_REGISTRY \
-            --image $ACR_PATH:deeplynxv3-ui-$GITHUB_RUN_NUMBER \
+            --no-push \
             --file Dockerfiles/ui/Dockerfile.public \
             --build-arg OKTA_CLIENT_ID=${{ vars.OKTA_CLIENT_ID }} \
             --build-arg OKTA_ISSUER=${{ vars.OKTA_ISSUER }} \
@@ -37,11 +39,11 @@ jobs:
             --build-arg NEXTAUTH_SECRET=${{ secrets.NEXTAUTH_SECRET }} \
             --build-arg SERVICE_TOKEN=${{ secrets.SERVICE_TOKEN }} \
             --build-arg BACKEND_BASE_URL=${{ vars.BACKEND_BASE_URL }} \
-            --build-arg NEXT_PUBLIC_DISABLE_FRONTEND_AUTHENTICATION=${{ vars.NEXT_PUBLIC_DISABLE_FRONTEND_AUTHENTICATION }} \
             .
 
+          # Build backend image without pushing to registry
           az acr build --registry $ACR_REGISTRY \
-            --image $ACR_PATH:deeplynxv3-server-$GITHUB_RUN_NUMBER \
+            --no-push \
             --file Dockerfiles/server/Dockerfile.public \
             --build-arg OKTA_CLIENT_ID=${{ vars.OKTA_CLIENT_ID }} \
             --build-arg OKTA_ISSUER=${{ vars.OKTA_ISSUER }} \
@@ -53,8 +55,6 @@ jobs:
             --build-arg NEXTAUTH_SECRET=${{ secrets.NEXTAUTH_SECRET }} \
             --build-arg BACKEND_BASE_URL=${{ vars.BACKEND_BASE_URL }} \
             --build-arg SERVICE_TOKEN=${{ secrets.SERVICE_TOKEN }} \
-            --build-arg NEXT_PUBLIC_DISABLE_FRONTEND_AUTHENTICATION=${{ vars.NEXT_PUBLIC_DISABLE_FRONTEND_AUTHENTICATION }} \
-            --build-arg HOSTED_LINK=${{ vars.HOSTED_LINK }} \
             .
 
           echo "✅ Both Docker images built successfully!"
