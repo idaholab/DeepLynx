@@ -4,6 +4,7 @@
 *.zip
 dist
 
+
 ## Mac OS ##
 .DS_Store
 .idea
@@ -14,6 +15,8 @@ dist
 ## Web ##
 /deeplynx.api/.DS_Store
 /deeplynx.api/.idea
+/deeplynx.api/bin*
+/deeplynx.datalayer/bin*
 
 ## Web ##
 /**/obj/
@@ -30,3 +33,4 @@ duckdb
 /storage
 
 .continue
+
