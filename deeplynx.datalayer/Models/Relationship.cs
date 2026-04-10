@@ -32,6 +32,8 @@ public class Relationship
 
     [Column("is_archived")] public bool IsArchived { get; set; }
 
+    [Column("extraction_id")] public long? ExtractionId { get; set; }
+
     [ForeignKey("DestinationId")]
     [InverseProperty("RelationshipDestinations")]
     public virtual Class? Destination { get; set; }

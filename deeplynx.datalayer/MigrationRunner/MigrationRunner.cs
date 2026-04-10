@@ -19,6 +19,9 @@ namespace deeplynx.datalayer.MigrationRunner
                 {
                     var dbContext = scope.ServiceProvider.GetRequiredService<DeeplynxContext>();
                     await dbContext.Database.MigrateAsync();
+
+                    var stagingContext = scope.ServiceProvider.GetRequiredService<StagingContext>();
+                    await stagingContext.Database.MigrateAsync();
                 }
 
                 Console.WriteLine("Migrations applied successfully.");
@@ -34,6 +37,8 @@ namespace deeplynx.datalayer.MigrationRunner
         private static void ConfigureServices(IServiceCollection services, string connectionString)
         {
             services.AddDbContext<DeeplynxContext>(options =>
+                options.UseNpgsql(connectionString));
+            services.AddDbContext<StagingContext>(options =>
                 options.UseNpgsql(connectionString));
         }
     }

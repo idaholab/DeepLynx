@@ -38,6 +38,7 @@ public class FileBusinessTests : IntegrationTestBase
     private SensitivityLabelBusiness _sensitivityLabelBusiness = null!;
     private ISensitivityLabelService _sensitivityLabelService = null!;
     private TagBusiness _tagBusiness = null!;
+    private Mock<IInsightBusiness> _insightBusiness = null!;
 
     public long did; // datasource ID
     public long oid; // organization ID
@@ -64,7 +65,7 @@ public class FileBusinessTests : IntegrationTestBase
         _mockBulkCopyExecutor = new BulkCopyUpsertExecutor();
         _eventBusiness = new EventBusiness(Context, _notificationBusiness, _mockBulkCopyExecutor);
 
-
+        _insightBusiness = new Mock<IInsightBusiness>();
         _fileBusinessFactory = new Mock<IFileBusinessFactory>();
 
         _dataSourceBusiness =
@@ -76,12 +77,15 @@ public class FileBusinessTests : IntegrationTestBase
         _sensitivityLabelService = new SensitivityLabelService(Context);
         _recordBusiness = new RecordBusiness(Context, _eventBusiness, _mockBulkCopyExecutor, _tagBusiness,
             _sensitivityLabelBusiness, _sensitivityLabelService);
+
+        _dataSourceBusiness =
+            new DataSourceBusiness(Context, _edgeBusiness.Object, _recordBusiness, _eventBusiness);
+        _objectStorageBusiness = new ObjectStorageBusiness(Context);
         _classBusiness = new ClassBusiness(Context, _recordBusiness, _relationshipBusiness.Object, _eventBusiness);
 
         var realFileFilesystemBusiness =
             new FileFilesystemBusiness(Context, _objectStorageBusiness, _classBusiness, _recordBusiness);
 
-        // Object storage should also determine this implicitly - but we can also add this failsafe for now
         _fileBusinessFactory
             .Setup(x => x.CreateFileBusiness("filesystem"))
             .Returns(realFileFilesystemBusiness);
@@ -91,7 +95,8 @@ public class FileBusinessTests : IntegrationTestBase
             _fileBusinessFactory.Object,
             _dataSourceBusiness,
             _classBusiness,
-            _recordBusiness
+            _recordBusiness,
+            _insightBusiness.Object
         );
     }
 
