@@ -12,6 +12,9 @@ using Microsoft.AspNetCore.Http.Features;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
+using Npgsql;
+using Pgvector.EntityFrameworkCore;
+using Pgvector.Npgsql;
 using Scalar.AspNetCore;
 using Serilog;
 using Log = Serilog.Log;
@@ -132,7 +135,16 @@ try
     */
     builder.Services.AddHttpContextAccessor();
 
+    var dataSourceBuilder = new NpgsqlDataSourceBuilder(connectionString);
+    dataSourceBuilder.UseVector();
+    var dataSource = dataSourceBuilder.Build();
+
     builder.Services.AddDbContext<DeeplynxContext>(
+        options => options.UseNpgsql(dataSource, o => o.UseVector()),
+        ServiceLifetime.Transient
+    );
+
+    builder.Services.AddDbContext<StagingContext>(
         options => options.UseNpgsql(connectionString),
         ServiceLifetime.Transient
     );
@@ -170,6 +182,7 @@ try
     builder.Services.AddTransient<IRoleBusiness, RoleBusiness>();
     builder.Services.AddTransient<ISensitivityLabelBusiness, SensitivityLabelBusiness>();
     builder.Services.AddTransient<IPermissionBusiness, PermissionBusiness>();
+    builder.Services.AddTransient<IExtractionBusiness, ExtractionBusiness>();
     builder.Services.AddTransient<IProjectRolePermissionService, ProjectRolePermissionService>();
     builder.Services.AddTransient<IOrgRolePermissionService, OrgRolePermissionService>();
     builder.Services.AddScoped<IBulkCopyUpsertExecutor, BulkCopyUpsertExecutor>();
@@ -252,6 +265,7 @@ try
 
                 // AI Services
                 new() { Name = "Lattice", Description = "Useful data views for DeepLynx Lattice use" },
+                new() { Name = "Extraction", Description = "Extraction for DeepLynx Lattice use" },
                 new() { Name = "Organization - AI Model Config", Description = "AI model configuration management" },
                 new() { Name = "Project - AI Model Config", Description = "AI model configuration management" },
                 new() { Name = "User Model Token", Description = "User AI model token management" },
@@ -327,7 +341,7 @@ try
                 new JsonObject
                 {
                     ["name"] = "AI Services",
-                    ["tags"] = new JsonArray { "Lattice", "Organization - AI Model Config", "Project - AI Model Config", "User Model Token", "Insight" }
+                    ["tags"] = new JsonArray { "Lattice", "Extraction", "Organization - AI Model Config", "Project - AI Model Config", "User Model Token", "Insight" }
                 },
                 new JsonObject
                 {
