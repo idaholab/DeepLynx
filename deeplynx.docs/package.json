@@ -20,11 +20,11 @@
     "typescript": "^5.9.2"
   },
   "dependencies": {
-    "next": "^15.5.3",
+    "next": "^15.5.14",
     "nextra": "^4.4.0",
     "nextra-theme-docs": "^4.4.0",
-    "react": "^19.1.1",
-    "react-dom": "^19.1.1"
+    "react": "^19.1.5",
+    "react-dom": "^19.1.5"
   },
   "overrides": {
     "minimatch": "^10.2.4"

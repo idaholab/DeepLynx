@@ -27,8 +27,10 @@ public class RecordBusiness : IRecordBusiness
     /// </summary>
     /// <param name="context">The database context used for the record operations.</param>
     /// <param name="eventBusiness">Used for logging events during create, update, and delete Operations.</param>
+    /// <param name="bulkCopyUpsertExecutor">Executor for efficient database inserts for bulk operations</param>
     /// <param name="tagBusiness">Used for creating tags related to a record.</param>
     /// <param name="labelBusiness">Used for creating tags related to a record.</param>
+    /// <param name="sensitivityLabelService">Service for sensitivity label authorization operations.</param>
     public RecordBusiness(
         DeeplynxContext context,
         IEventBusiness eventBusiness,
@@ -718,7 +720,7 @@ public class RecordBusiness : IRecordBusiness
                 Labels = record.Labels.Select(l => new RecordLabelDto()
                 {
                     Id = l.Id,
-                    Name = l.Name
+                    Name = l.Name 
                 }).ToList(),
                 Embedded = embedded,
             };
@@ -1218,9 +1220,7 @@ public class RecordBusiness : IRecordBusiness
 
         _context.Records.Remove(returnedRecord);
         await _context.SaveChangesAsync();
-
-        // TODO: IF THE RECORD HAS EMBEDDED == TRUE pass the record ID to DELETE INSIGHT API
-
+        
         // Log record delete event
         await _eventBusiness.CreateEvent(currentUserId, organizationId, projectId, new CreateEventRequestDto
         {
@@ -1248,8 +1248,7 @@ public class RecordBusiness : IRecordBusiness
     /// <exception cref="KeyNotFoundException">Returned if record to be updated is not found</exception>
     public async Task<RecordResponseDto> UpdateRecord(long currentUserId, long organizationId, long projectId,
         long recordId,
-        UpdateRecordRequestDto dto,
-        bool? embedded = false)
+        UpdateRecordRequestDto dto)
     {
         ValidationHelper.ValidateModel(dto);
 
@@ -1281,13 +1280,10 @@ public class RecordBusiness : IRecordBusiness
         returnedRecord.LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
         returnedRecord.LastUpdatedBy = currentUserId;
         returnedRecord.FileType = dto.FileType ?? returnedRecord.FileType;
-        returnedRecord.Embedded = embedded ?? false; // If the updated record is not to be embedded, set false and skip embedding with Insight
 
         _context.Records.Update(returnedRecord);
         await _context.SaveChangesAsync();
-
-        // TODO: If Embedded is true pass the record ID to the UPDATE embedded file endpoint
-
+        
         // Log Record Update Event
         await _eventBusiness.CreateEvent(currentUserId, organizationId, projectId, new CreateEventRequestDto
         {

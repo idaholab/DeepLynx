@@ -20,13 +20,16 @@ jobs:
       - name: Checkout Submodules
         env:
           INSIGHT_KEY: ${{ secrets.DEPLOY_KEY_INSIGHT }}
+          LATTICE_KEY: ${{ secrets.DEPLOY_KEY_LATTICE }}
           KNOWN_HOSTS: ${{ secrets.GHE_KNOWN_HOSTS }}
         run: |
           echo "$INSIGHT_KEY" > /tmp/insight_deploy
+          echo "$LATTICE_KEY" > /tmp/lattice_deploy
           echo "$KNOWN_HOSTS" > /tmp/known_hosts
-          chmod 600 /tmp/insight_deploy
-          GIT_SSH_COMMAND="ssh -i /tmp/insight_deploy -o UserKnownHostsFile=/tmp/known_hosts" git submodule update --init --recursive
-          rm /tmp/insight_deploy /tmp/known_hosts
+          chmod 600 /tmp/insight_deploy /tmp/lattice_deploy
+          GIT_SSH_COMMAND="ssh -i /tmp/insight_deploy -o UserKnownHostsFile=/tmp/known_hosts" git submodule update --init --recursive deeplynx.insight
+          GIT_SSH_COMMAND="ssh -i /tmp/lattice_deploy -o UserKnownHostsFile=/tmp/known_hosts" git submodule update --init --recursive deeplynx.lattice
+          rm /tmp/insight_deploy /tmp/lattice_deploy /tmp/known_hosts
 
       # Builds the required image
       - shell: bash
@@ -73,7 +76,7 @@ jobs:
             --build-arg BACKEND_BASE_URL=${{ vars.BACKEND_BASE_URL }} \
             --build-arg NEXT_PUBLIC_DISABLE_FRONTEND_AUTHENTICATION=${{ vars.NEXT_PUBLIC_DISABLE_FRONTEND_AUTHENTICATION }} \
             .
-          
+
           az acr build --registry $ACR_REGISTRY \
             --image $ACR_PATH:deeplynxv3-server-$GITHUB_RUN_NUMBER \
             --file Dockerfiles/server/Dockerfile.public \
@@ -203,6 +206,7 @@ jobs:
           JWT_ISSUER: ${{vars.JWT_ISSUER}}
           JWT_SECRET_KEY: ${{ secrets.JWT_SECRET_KEY }}
           JWT_AUDIENCE: ${{vars.JWT_AUDIENCE}}
+          INSIGHT_FASTAPI_URL: ${{ vars.INSIGHT_FASTAPI_URL }}
           POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
 
         run: |
