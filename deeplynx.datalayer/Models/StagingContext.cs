@@ -31,6 +31,7 @@ public class StagingContext : DbContext
         modelBuilder.Ignore<AiModelConfig>();
         modelBuilder.Ignore<ApiKey>();
         modelBuilder.Ignore<DataSource>();
+        modelBuilder.Ignore<Embedding>();
         modelBuilder.Ignore<Event>();
         modelBuilder.Ignore<Group>();
         modelBuilder.Ignore<HistoricalEdge>();
