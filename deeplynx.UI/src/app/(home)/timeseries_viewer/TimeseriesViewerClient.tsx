@@ -1,5 +1,5 @@
 'use client';
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useCallback } from 'react'
 import Tabs from '../components/Tabs';
 import { useLanguage } from '@/app/contexts/Language';
 import { useOrganizationSession } from '@/app/contexts/OrganizationSessionProvider';
@@ -59,7 +59,12 @@ export default function TimeseriesViewerClient({ timeseriesFiles, organizationId
         }
     }
 
-    const loadTimeseriesData = async (datasourceId: number, recordId: number, limitValue: number, rowStrideValue: number) => {
+    const loadTimeseriesData = useCallback(async (
+        datasourceId: number,
+        recordId: number,
+        limitValue: number,
+        rowStrideValue: number
+        ) => {
         try {
             setLoading(true);
 
@@ -73,7 +78,7 @@ export default function TimeseriesViewerClient({ timeseriesFiles, organizationId
             );
 
             const { columns, data } = plotData;
-            setSchema(columns)
+            setSchema(columns);
 
             const transformed = columns.map((colName, colIndex) => ({
                 name: colName,
@@ -82,18 +87,15 @@ export default function TimeseriesViewerClient({ timeseriesFiles, organizationId
 
             setTimeseriesData(transformed);
 
-            // Set default X axis (first column)
             if (transformed.length > 0) {
                 setSelectedXAxis(transformed[0].name);
             }
 
-            // Set default Y axes (all columns except first)
             if (transformed.length > 1) {
                 const yAxisOptions = transformed.slice(1).map(s => s.name);
                 setSelectedYAxes(yAxisOptions);
             }
 
-            // Set all series as visible
             const newVisibleSeries: Record<string, boolean> = {};
             transformed.slice(1).forEach(series => {
                 newVisibleSeries[series.name] = true;
@@ -105,7 +107,7 @@ export default function TimeseriesViewerClient({ timeseriesFiles, organizationId
         } finally {
             setLoading(false);
         }
-    };
+    }, [organization?.organizationId, project?.projectId]);
 
     const filteredTimeseriesData = React.useMemo(() => {
         if (!selectedXAxis || selectedYAxes.length === 0) return [];
@@ -118,11 +120,15 @@ export default function TimeseriesViewerClient({ timeseriesFiles, organizationId
     }, [timeseriesData, selectedXAxis, selectedYAxes]);
 
     // Load data when activeFile changes
-    useEffect(() => {
+    const refreshActiveFile = useCallback(() => {
         if (activeFile?.dataSourceId && activeFile?.id) {
             loadTimeseriesData(activeFile.dataSourceId, activeFile.id, limit, rowStride);
         }
-    }, [activeFile, limit, rowStride]);
+    }, [activeFile?.dataSourceId, activeFile?.id, limit, rowStride, loadTimeseriesData])
+
+    useEffect(() => {
+        refreshActiveFile()
+    }, [refreshActiveFile]);
 
     // ============================================
     // CHART CONFIGURATION
@@ -359,6 +365,13 @@ export default function TimeseriesViewerClient({ timeseriesFiles, organizationId
             </div>
 
             <div className="flex justify-end p-4">
+                <button 
+                    className="btn btn-primary btn-sm mr-2"
+                    onClick={() => refreshActiveFile()}
+                    >
+                        <ArrowPathIcon className="size-6" />
+                </button>
+
                 <div className="dropdown dropdown-end">
                     <button tabIndex={0} className="btn btn-primary btn-sm">
                         <ArrowDownTrayIcon className="size-6" />
