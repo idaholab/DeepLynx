@@ -17,15 +17,18 @@ COPY deeplynx.docs ./
 RUN npm run build
 
 # Stage 2: Create the final image
-FROM gcr.io/distroless/nodejs24-debian13:nonroot AS final
+FROM chainguard/node:latest AS final
 
 # Set working directory
 WORKDIR /usr/src/app
 
-# Copy standalone runtime output
-COPY --from=frontend-build /usr/src/app/.next/standalone ./
-COPY --from=frontend-build /usr/src/app/.next/static ./.next/static
-COPY --from=frontend-build /usr/src/app/public ./public
+# Copy standalone runtime output and allow runtime cache
+USER root
+COPY --chown=65532:65532 --from=frontend-build /usr/src/app/.next/standalone ./
+COPY --chown=65532:65532 --from=frontend-build /usr/src/app/.next/static ./.next/static
+COPY --chown=65532:65532 --from=frontend-build /usr/src/app/public ./public
+RUN mkdir -p /app/.next/cache && chown -R 65532:65532 /app
+USER 65532
 
 # Set the port the app runs on
 ENV PORT=3001
