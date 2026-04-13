@@ -54,4 +54,7 @@ public class Relationship
 
     [InverseProperty("LastUpdatedRelationships")]
     public virtual User? LastUpdatedByUser { get; set; }
+    
+    [InverseProperty("Relationship")]
+    public virtual ICollection<OntologyVector> OntologyVectors { get; set; } = new List<OntologyVector>();
 }
