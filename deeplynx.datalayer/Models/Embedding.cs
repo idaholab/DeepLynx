@@ -1,6 +1,5 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
-using Pgvector;
 
 namespace deeplynx.datalayer.Models;
 
@@ -21,7 +20,7 @@ public class Embedding
     public string TextChunk { get; set; } = null!;
 
     [Column("vector")]
-    public Vector Vector { get; set; } = null!;
+    public string Vector { get; set; } = null!;
 
     [Column("last_updated_at", TypeName = "timestamp without time zone")]
     public DateTime LastUpdatedAt { get; set; }

@@ -2,8 +2,10 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
+using Pgvector;
 using deeplynx.datalayer.Models;
 
 #nullable disable
@@ -11,9 +13,11 @@ using deeplynx.datalayer.Models;
 namespace deeplynx.datalayer.Migrations
 {
     [DbContext(typeof(DeeplynxContext))]
-    partial class DeeplynxContextModelSnapshot : ModelSnapshot
+    [Migration("20260413141702_OntologyVectors")]
+    partial class OntologyVectors
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -591,7 +595,7 @@ namespace deeplynx.datalayer.Migrations
                         .HasColumnType("text")
                         .HasColumnName("text_chunk");
 
-                    b.Property<string>("Vector")
+                    b.Property<Vector>("Vector")
                         .IsRequired()
                         .HasColumnType("vector")
                         .HasColumnName("vector");
@@ -1211,7 +1215,7 @@ namespace deeplynx.datalayer.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("relationship_id");
 
-                    b.Property<string>("Vector")
+                    b.Property<Vector>("Vector")
                         .IsRequired()
                         .HasColumnType("vector")
                         .HasColumnName("vector");
@@ -1579,10 +1583,6 @@ namespace deeplynx.datalayer.Migrations
                     b.Property<bool>("Embedded")
                         .HasColumnType("boolean")
                         .HasColumnName("embedded");
-
-                    b.Property<long?>("FileSize")
-                        .HasColumnType("bigint")
-                        .HasColumnName("file_size");
 
                     b.Property<long?>("ExtractionId")
                         .HasColumnType("bigint")

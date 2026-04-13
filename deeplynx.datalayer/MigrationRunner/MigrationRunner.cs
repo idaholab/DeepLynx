@@ -1,6 +1,9 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using deeplynx.datalayer.Models;
+using Npgsql;
+using Pgvector.EntityFrameworkCore;
+using Pgvector.Npgsql;
 
 namespace deeplynx.datalayer.MigrationRunner
 {
@@ -31,13 +34,18 @@ namespace deeplynx.datalayer.MigrationRunner
                 Console.WriteLine($"An error occurred while applying migrations: {ex.Message}");
                 Console.WriteLine("Are the database connection credentials correct?");
                 Console.WriteLine("Migrations were NOT applied.");
+                throw;
             }
         }
 
         private static void ConfigureServices(IServiceCollection services, string connectionString)
         {
+            var dataSourceBuilder = new NpgsqlDataSourceBuilder(connectionString);
+            dataSourceBuilder.UseVector();
+            var dataSource = dataSourceBuilder.Build();
+
             services.AddDbContext<DeeplynxContext>(options =>
-                options.UseNpgsql(connectionString));
+                options.UseNpgsql(dataSource));
             services.AddDbContext<StagingContext>(options =>
                 options.UseNpgsql(connectionString));
         }

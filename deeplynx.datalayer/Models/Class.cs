@@ -48,4 +48,7 @@ public class Class
 
     [InverseProperty("LastUpdatedClasses")]
     public virtual User? LastUpdatedByUser { get; set; }
+    
+    [InverseProperty("Class")]
+    public virtual ICollection<OntologyVector> OntologyVectors { get; set; } = new List<OntologyVector>();
 }
