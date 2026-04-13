@@ -71,7 +71,7 @@ public partial class DeeplynxContext : DbContext
 
     public virtual DbSet<Embedding> Embeddings { get; set; }
     
-    public virtual DbSet<Embedding> OntologyVectors { get; set; }
+    public virtual DbSet<OntologyVector> OntologyVectors { get; set; }
 
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -1351,6 +1351,7 @@ public partial class DeeplynxContext : DbContext
 
             entity.Property(e => e.Id).UseIdentityAlwaysColumn();
             entity.Property(e => e.LastUpdatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+            entity.Property(e => e.Vector).HasColumnType("vector");
 
             entity.HasOne(d => d.Record)
                 .WithMany(p => p.Embeddings)
@@ -1373,6 +1374,7 @@ public partial class DeeplynxContext : DbContext
                 .HasDatabaseName("idx_ontology_vectors_relationship_id");
 
             entity.Property(e => e.Id).UseIdentityAlwaysColumn();
+            entity.Property(e => e.Vector).HasColumnType("vector");
 
             entity.HasOne(d => d.Class)
                 .WithMany(p => p.OntologyVectors)
