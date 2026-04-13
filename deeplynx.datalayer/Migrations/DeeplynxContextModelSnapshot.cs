@@ -4,7 +4,6 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
-using Pgvector;
 using deeplynx.datalayer.Models;
 
 #nullable disable
@@ -592,7 +591,7 @@ namespace deeplynx.datalayer.Migrations
                         .HasColumnType("text")
                         .HasColumnName("text_chunk");
 
-                    b.Property<Vector>("Vector")
+                    b.Property<string>("Vector")
                         .IsRequired()
                         .HasColumnType("vector")
                         .HasColumnName("vector");
@@ -1212,7 +1211,7 @@ namespace deeplynx.datalayer.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("relationship_id");
 
-                    b.Property<Vector>("Vector")
+                    b.Property<string>("Vector")
                         .IsRequired()
                         .HasColumnType("vector")
                         .HasColumnName("vector");

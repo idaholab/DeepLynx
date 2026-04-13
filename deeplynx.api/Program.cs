@@ -139,7 +139,7 @@ try
     var dataSource = dataSourceBuilder.Build();
 
     builder.Services.AddDbContext<DeeplynxContext>(
-        options => options.UseNpgsql(dataSource, o => o.UseVector()),
+        options => options.UseNpgsql(dataSource),
         ServiceLifetime.Transient
     );
 
