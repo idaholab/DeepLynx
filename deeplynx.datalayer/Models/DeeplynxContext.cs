@@ -70,6 +70,9 @@ public partial class DeeplynxContext : DbContext
     public virtual DbSet<UserModelToken> UserModelTokens { get; set; }
 
     public virtual DbSet<Embedding> Embeddings { get; set; }
+    
+    public virtual DbSet<Embedding> OntologyVectors { get; set; }
+
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -1354,6 +1357,34 @@ public partial class DeeplynxContext : DbContext
                 .HasForeignKey(d => d.RecordId)
                 .OnDelete(DeleteBehavior.Cascade)
                 .HasConstraintName("embeddings_record_id_fkey");
+        });
+        
+        modelBuilder.Entity<OntologyVector>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("ontology_vectors_pkey");
+
+            entity.HasIndex(e => e.Id)
+                .HasDatabaseName("idx_ontology_vectors_id");
+
+            entity.HasIndex(e => e.ClassId)
+                .HasDatabaseName("idx_ontology_vectors_class_id");
+            
+            entity.HasIndex(e => e.RelationshipId)
+                .HasDatabaseName("idx_ontology_vectors_relationship_id");
+
+            entity.Property(e => e.Id).UseIdentityAlwaysColumn();
+
+            entity.HasOne(d => d.Class)
+                .WithMany(p => p.OntologyVectors)
+                .HasForeignKey(d => d.ClassId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("ontology_vectors_class_id_fkey");
+            
+            entity.HasOne(d => d.Relationship)
+                .WithMany(p => p.OntologyVectors)
+                .HasForeignKey(d => d.RelationshipId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("ontology_vectors_relationship_id_fkey");
         });
 
         OnModelCreatingPartial(modelBuilder);
