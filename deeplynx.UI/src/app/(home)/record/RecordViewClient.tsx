@@ -503,6 +503,11 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
   // ============= MEMOIZED VALUES =============
   const systemPropertiesRows = useMemo(() => {
     if (!record) return [];
+
+    const isDownloadable = !!record.uri &&
+      record.uri.trim().length > 0 &&
+      record.uri.toLowerCase() !== "null";
+
     return [
       { label: t.translations.RECORD_ID, value: record.id },
       {
@@ -543,10 +548,14 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
             t.translations.ORIGINAL_ID_UPDATED,
           ),
       },
-      {
-        label: t.translations.FILE_SIZE,
-        value: formatFileSize(record.fileSize)
-      },
+      // {
+      //   label: t.translations.FILE_SIZE,
+      //   value: formatFileSize(record.fileSize)
+      // },
+      ...(isDownloadable ? [{
+        label: t.translations.FILE_SIZE || "File Size",
+        value: formatFileSize(record.fileSize),
+      }] : []),
       {
         label: t.translations.LAST_UPDATED_AT,
         value: formatLocalDateTime(record.lastUpdatedAt),
@@ -647,6 +656,10 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
     return <RecordLoading />;
   }
 
+  const isDownloadable = !!record.uri &&
+    record.uri.trim().length > 0 &&
+    record.uri.toLowerCase() !== "null"
+
   const isInsightSupported = isInsightSupportedFileType(
     recordFileType,
     record?.uri,
@@ -663,11 +676,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
             <PropertyTable
               title={t.translations.SYSTEM_PROPERTIES}
               rows={systemPropertiesRows}
-              download={
-                !!record.uri &&
-                record.uri.trim().length > 0 &&
-                record.uri.toLowerCase() !== "null"
-              }
+              download={isDownloadable}
               recordName={record.name}
             />
             <PropertyTable
