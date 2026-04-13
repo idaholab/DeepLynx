@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using deeplynx.datalayer.Models;
@@ -11,9 +12,11 @@ using deeplynx.datalayer.Models;
 namespace deeplynx.datalayer.Migrations
 {
     [DbContext(typeof(DeeplynxContext))]
-    partial class DeeplynxContextModelSnapshot : ModelSnapshot
+    [Migration("20260407165926_AddFileSizeColumn")]
+    partial class AddFileSizeColumn
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -296,10 +299,6 @@ namespace deeplynx.datalayer.Migrations
                         .HasColumnType("text")
                         .HasColumnName("description");
 
-                    b.Property<long?>("ExtractionId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("extraction_id");
-
                     b.Property<bool>("IsArchived")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
@@ -339,8 +338,6 @@ namespace deeplynx.datalayer.Migrations
 
                     b.HasKey("Id")
                         .HasName("classes_pkey");
-
-                    b.HasIndex("ExtractionId");
 
                     b.HasIndex("Id")
                         .HasDatabaseName("idx_classes_id");
@@ -484,10 +481,6 @@ namespace deeplynx.datalayer.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("destination_id");
 
-                    b.Property<long?>("ExtractionId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("extraction_id");
-
                     b.Property<bool>("IsArchived")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
@@ -533,8 +526,6 @@ namespace deeplynx.datalayer.Migrations
                     b.HasIndex("DestinationId")
                         .HasDatabaseName("idx_edges_destination_id");
 
-                    b.HasIndex("ExtractionId");
-
                     b.HasIndex("Id")
                         .HasDatabaseName("idx_edges_id");
 
@@ -561,51 +552,6 @@ namespace deeplynx.datalayer.Migrations
                         {
                             t.HasCheckConstraint("CK_edges_origin_destination_different", "origin_id <> destination_id");
                         });
-                });
-
-            modelBuilder.Entity("deeplynx.datalayer.Models.Embedding", b =>
-                {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint")
-                        .HasColumnName("id");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("Id"));
-
-                    b.Property<DateTime>("LastUpdatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp without time zone")
-                        .HasColumnName("last_updated_at")
-                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
-
-                    b.Property<int>("PageNumber")
-                        .HasColumnType("integer")
-                        .HasColumnName("page_number");
-
-                    b.Property<long>("RecordId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("record_id");
-
-                    b.Property<string>("TextChunk")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("text_chunk");
-
-                    b.Property<string>("Vector")
-                        .IsRequired()
-                        .HasColumnType("vector")
-                        .HasColumnName("vector");
-
-                    b.HasKey("Id")
-                        .HasName("embeddings_pkey");
-
-                    b.HasIndex("Id")
-                        .HasDatabaseName("idx_embeddings_id");
-
-                    b.HasIndex("RecordId")
-                        .HasDatabaseName("idx_embeddings_record_id");
-
-                    b.ToTable("embeddings", "dl_vector");
                 });
 
             modelBuilder.Entity("deeplynx.datalayer.Models.Event", b =>
@@ -681,31 +627,6 @@ namespace deeplynx.datalayer.Migrations
                         .HasDatabaseName("idx_events_project_id");
 
                     b.ToTable("events", "deeplynx");
-                });
-
-            modelBuilder.Entity("deeplynx.datalayer.Models.Extraction", b =>
-                {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint")
-                        .HasColumnName("id");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("Id"));
-
-                    b.Property<long?>("CreatedBy")
-                        .HasColumnType("bigint")
-                        .HasColumnName("created_by");
-
-                    b.Property<string>("Properties")
-                        .HasColumnType("jsonb")
-                        .HasColumnName("properties");
-
-                    b.HasKey("Id")
-                        .HasName("extractions_pkey");
-
-                    b.HasIndex("CreatedBy");
-
-                    b.ToTable("extractions", "deeplynx");
                 });
 
             modelBuilder.Entity("deeplynx.datalayer.Models.Group", b =>
@@ -1194,43 +1115,6 @@ namespace deeplynx.datalayer.Migrations
                     b.ToTable("object_storages", "deeplynx");
                 });
 
-            modelBuilder.Entity("deeplynx.datalayer.Models.OntologyVector", b =>
-                {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint")
-                        .HasColumnName("id");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("Id"));
-
-                    b.Property<long?>("ClassId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("class_id");
-
-                    b.Property<long?>("RelationshipId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("relationship_id");
-
-                    b.Property<string>("Vector")
-                        .IsRequired()
-                        .HasColumnType("vector")
-                        .HasColumnName("vector");
-
-                    b.HasKey("Id")
-                        .HasName("ontology_vectors_pkey");
-
-                    b.HasIndex("ClassId")
-                        .HasDatabaseName("idx_ontology_vectors_class_id");
-
-                    b.HasIndex("Id")
-                        .HasDatabaseName("idx_ontology_vectors_id");
-
-                    b.HasIndex("RelationshipId")
-                        .HasDatabaseName("idx_ontology_vectors_relationship_id");
-
-                    b.ToTable("ontology_vector", "dl_vector");
-                });
-
             modelBuilder.Entity("deeplynx.datalayer.Models.Organization", b =>
                 {
                     b.Property<long>("Id")
@@ -1584,10 +1468,6 @@ namespace deeplynx.datalayer.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("file_size");
 
-                    b.Property<long?>("ExtractionId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("extraction_id");
-
                     b.Property<string>("FileType")
                         .HasColumnType("text")
                         .HasColumnName("file_type");
@@ -1648,8 +1528,6 @@ namespace deeplynx.datalayer.Migrations
                     b.HasIndex("DataSourceId")
                         .HasDatabaseName("idx_records_data_source_id");
 
-                    b.HasIndex("ExtractionId");
-
                     b.HasIndex("Id")
                         .HasDatabaseName("idx_records_id");
 
@@ -1699,10 +1577,6 @@ namespace deeplynx.datalayer.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("destination_id");
 
-                    b.Property<long?>("ExtractionId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("extraction_id");
-
                     b.Property<bool>("IsArchived")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
@@ -1749,8 +1623,6 @@ namespace deeplynx.datalayer.Migrations
 
                     b.HasIndex("DestinationId")
                         .HasDatabaseName("idx_relationships_destination_id");
-
-                    b.HasIndex("ExtractionId");
 
                     b.HasIndex("Id")
                         .HasDatabaseName("idx_relationships_id");
@@ -2389,12 +2261,6 @@ namespace deeplynx.datalayer.Migrations
 
             modelBuilder.Entity("deeplynx.datalayer.Models.Class", b =>
                 {
-                    b.HasOne("deeplynx.datalayer.Models.Extraction", null)
-                        .WithMany()
-                        .HasForeignKey("ExtractionId")
-                        .OnDelete(DeleteBehavior.SetNull)
-                        .HasConstraintName("classes_extraction_id_fkey");
-
                     b.HasOne("deeplynx.datalayer.Models.User", "LastUpdatedByUser")
                         .WithMany("LastUpdatedClasses")
                         .HasForeignKey("LastUpdatedBy")
@@ -2463,12 +2329,6 @@ namespace deeplynx.datalayer.Migrations
                         .IsRequired()
                         .HasConstraintName("edges_destination_id_fkey");
 
-                    b.HasOne("deeplynx.datalayer.Models.Extraction", null)
-                        .WithMany()
-                        .HasForeignKey("ExtractionId")
-                        .OnDelete(DeleteBehavior.SetNull)
-                        .HasConstraintName("edges_extraction_id_fkey");
-
                     b.HasOne("deeplynx.datalayer.Models.User", "LastUpdatedByUser")
                         .WithMany("LastUpdatedEdges")
                         .HasForeignKey("LastUpdatedBy")
@@ -2516,18 +2376,6 @@ namespace deeplynx.datalayer.Migrations
                     b.Navigation("Relationship");
                 });
 
-            modelBuilder.Entity("deeplynx.datalayer.Models.Embedding", b =>
-                {
-                    b.HasOne("deeplynx.datalayer.Models.Record", "Record")
-                        .WithMany("Embeddings")
-                        .HasForeignKey("RecordId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("embeddings_record_id_fkey");
-
-                    b.Navigation("Record");
-                });
-
             modelBuilder.Entity("deeplynx.datalayer.Models.Event", b =>
                 {
                     b.HasOne("deeplynx.datalayer.Models.DataSource", "DataSource")
@@ -2560,16 +2408,6 @@ namespace deeplynx.datalayer.Migrations
                     b.Navigation("Organization");
 
                     b.Navigation("Project");
-                });
-
-            modelBuilder.Entity("deeplynx.datalayer.Models.Extraction", b =>
-                {
-                    b.HasOne("deeplynx.datalayer.Models.User", "CreatedByUser")
-                        .WithMany()
-                        .HasForeignKey("CreatedBy")
-                        .OnDelete(DeleteBehavior.NoAction);
-
-                    b.Navigation("CreatedByUser");
                 });
 
             modelBuilder.Entity("deeplynx.datalayer.Models.Group", b =>
@@ -2714,25 +2552,6 @@ namespace deeplynx.datalayer.Migrations
                     b.Navigation("Project");
                 });
 
-            modelBuilder.Entity("deeplynx.datalayer.Models.OntologyVector", b =>
-                {
-                    b.HasOne("deeplynx.datalayer.Models.Class", "Class")
-                        .WithMany("OntologyVectors")
-                        .HasForeignKey("ClassId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .HasConstraintName("ontology_vectors_class_id_fkey");
-
-                    b.HasOne("deeplynx.datalayer.Models.Relationship", "Relationship")
-                        .WithMany("OntologyVectors")
-                        .HasForeignKey("RelationshipId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .HasConstraintName("ontology_vectors_relationship_id_fkey");
-
-                    b.Navigation("Class");
-
-                    b.Navigation("Relationship");
-                });
-
             modelBuilder.Entity("deeplynx.datalayer.Models.Organization", b =>
                 {
                     b.HasOne("deeplynx.datalayer.Models.User", "LastUpdatedByUser")
@@ -2868,12 +2687,6 @@ namespace deeplynx.datalayer.Migrations
                         .IsRequired()
                         .HasConstraintName("records_data_source_id_fkey");
 
-                    b.HasOne("deeplynx.datalayer.Models.Extraction", null)
-                        .WithMany()
-                        .HasForeignKey("ExtractionId")
-                        .OnDelete(DeleteBehavior.SetNull)
-                        .HasConstraintName("records_extraction_id_fkey");
-
                     b.HasOne("deeplynx.datalayer.Models.User", "LastUpdatedByUser")
                         .WithMany("LastUpdatedRecords")
                         .HasForeignKey("LastUpdatedBy")
@@ -2918,12 +2731,6 @@ namespace deeplynx.datalayer.Migrations
                         .HasForeignKey("DestinationId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .HasConstraintName("relationships_destination_id_fkey");
-
-                    b.HasOne("deeplynx.datalayer.Models.Extraction", null)
-                        .WithMany()
-                        .HasForeignKey("ExtractionId")
-                        .OnDelete(DeleteBehavior.SetNull)
-                        .HasConstraintName("relationships_extraction_id_fkey");
 
                     b.HasOne("deeplynx.datalayer.Models.User", "LastUpdatedByUser")
                         .WithMany("LastUpdatedRelationships")
@@ -3138,8 +2945,6 @@ namespace deeplynx.datalayer.Migrations
 
             modelBuilder.Entity("deeplynx.datalayer.Models.Class", b =>
                 {
-                    b.Navigation("OntologyVectors");
-
                     b.Navigation("Records");
 
                     b.Navigation("RelationshipDestinations");
@@ -3264,16 +3069,12 @@ namespace deeplynx.datalayer.Migrations
 
                     b.Navigation("EdgeOrigins");
 
-                    b.Navigation("Embeddings");
-
                     b.Navigation("HistoricalRecords");
                 });
 
             modelBuilder.Entity("deeplynx.datalayer.Models.Relationship", b =>
                 {
                     b.Navigation("Edges");
-
-                    b.Navigation("OntologyVectors");
                 });
 
             modelBuilder.Entity("deeplynx.datalayer.Models.Role", b =>

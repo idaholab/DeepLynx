@@ -67,6 +67,7 @@ export function mapProjectInsightRecords(
         description: record.description?.trim() ?? "",
         uri: record.uri?.trim() || null,
         fileType: resolvedFileType,
+        fileSize: record.fileSize || null,
         classId:
           typeof record.classId === "number" ? Number(record.classId) : null,
         className:
