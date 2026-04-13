@@ -52,9 +52,11 @@ public partial class Record
     [Column("file_type")]
     public string? FileType { get; set; }
 
-    [Column("embedded")] 
+    [Column("embedded")]
     public bool Embedded { get; set; }
-    
+
+    [Column("extraction_id")] public long? ExtractionId { get; set; }
+
     [ForeignKey("ClassId")]
     [InverseProperty("Records")]
     public virtual Class? Class { get; set; }
@@ -94,4 +96,7 @@ public partial class Record
     
     [InverseProperty("LastUpdatedRecords")]
     public virtual User? LastUpdatedByUser { get; set; }
+
+    [InverseProperty("Record")]
+    public virtual ICollection<Embedding> Embeddings { get; set; } = new List<Embedding>();
 }

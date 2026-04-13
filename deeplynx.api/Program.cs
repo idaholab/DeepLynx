@@ -1,7 +1,6 @@
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using deeplynx.business;
-using deeplynx.datalayer.MigrationRunner;
 using deeplynx.datalayer.Models;
 using deeplynx.helpers;
 using deeplynx.helpers.BigData;
@@ -12,6 +11,9 @@ using Microsoft.AspNetCore.Http.Features;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
+using Npgsql;
+using Pgvector.EntityFrameworkCore;
+using Pgvector.Npgsql;
 using Scalar.AspNetCore;
 using Serilog;
 using Log = Serilog.Log;
@@ -132,7 +134,16 @@ try
     */
     builder.Services.AddHttpContextAccessor();
 
+    var dataSourceBuilder = new NpgsqlDataSourceBuilder(connectionString);
+    dataSourceBuilder.UseVector();
+    var dataSource = dataSourceBuilder.Build();
+
     builder.Services.AddDbContext<DeeplynxContext>(
+        options => options.UseNpgsql(dataSource, o => o.UseVector()),
+        ServiceLifetime.Transient
+    );
+
+    builder.Services.AddDbContext<StagingContext>(
         options => options.UseNpgsql(connectionString),
         ServiceLifetime.Transient
     );
@@ -170,6 +181,7 @@ try
     builder.Services.AddTransient<IRoleBusiness, RoleBusiness>();
     builder.Services.AddTransient<ISensitivityLabelBusiness, SensitivityLabelBusiness>();
     builder.Services.AddTransient<IPermissionBusiness, PermissionBusiness>();
+    builder.Services.AddTransient<IExtractionBusiness, ExtractionBusiness>();
     builder.Services.AddTransient<IProjectRolePermissionService, ProjectRolePermissionService>();
     builder.Services.AddTransient<IOrgRolePermissionService, OrgRolePermissionService>();
     builder.Services.AddScoped<IBulkCopyUpsertExecutor, BulkCopyUpsertExecutor>();
@@ -181,8 +193,9 @@ try
     builder.Services.AddTransient<IUserModelTokenBusiness, UserModelTokenBusiness>();
     builder.Services.AddTransient<IAiModelConfigBusiness, AiModelConfigBusiness>();
     builder.Services.AddScoped<ISensitivityLabelService, SensitivityLabelService>();
-
-
+    builder.Services.AddTransient<IInsightBusiness, InsightBusiness>();
+    builder.Services.AddHttpClient<InsightServiceClient>();
+    
     //OpenApi Documentation
     builder.Services.AddOpenApi(options =>
     {
@@ -251,9 +264,11 @@ try
 
                 // AI Services
                 new() { Name = "Lattice", Description = "Useful data views for DeepLynx Lattice use" },
+                new() { Name = "Extraction", Description = "Extraction for DeepLynx Lattice use" },
                 new() { Name = "Organization - AI Model Config", Description = "AI model configuration management" },
                 new() { Name = "Project - AI Model Config", Description = "AI model configuration management" },
                 new() { Name = "User Model Token", Description = "User AI model token management" },
+                new() { Name = "Insight", Description = "Deeplynx Insight management" },
 
                 // Authentication
                 new() { Name = "OauthHandshake", Description = "OAuth2 authorization flow" },
@@ -325,7 +340,7 @@ try
                 new JsonObject
                 {
                     ["name"] = "AI Services",
-                    ["tags"] = new JsonArray { "Lattice", "Organization - AI Model Config", "Project - AI Model Config", "User Model Token" }
+                    ["tags"] = new JsonArray { "Lattice", "Extraction", "Organization - AI Model Config", "Project - AI Model Config", "User Model Token", "Insight" }
                 },
                 new JsonObject
                 {
@@ -448,14 +463,23 @@ try
     await DatabaseVersionChecker.CheckDatabaseVersion(connectionString);
 
     /* ╔════════════════════════════╗
-       ║      Apply Migrations      ║
-       ╚════════════════════════════╝ */
-    await MigrationRunner.ApplyMigrations(connectionString);
-
-    /* ╔════════════════════════════╗
        ║      App Configurations    ║
        ╚════════════════════════════╝ */
     var app = builder.Build();
+
+    /* ╔════════════════════════════╗
+       ║      Apply Migrations      ║
+       ╚════════════════════════════╝ */
+    using (var scope = app.Services.CreateScope())
+    {
+        var dbContext = scope.ServiceProvider.GetRequiredService<DeeplynxContext>();
+        await dbContext.Database.MigrateAsync();
+
+        var stagingContext = scope.ServiceProvider.GetRequiredService<StagingContext>();
+        await stagingContext.Database.MigrateAsync();
+    }
+
+    Log.Information("Migrations applied successfully.");
 
     /* ╔════════════════════════════╗
        ║      App Base Path         ║

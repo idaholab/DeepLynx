@@ -159,6 +159,8 @@ spec:
               value: ${DISABLE_BACKEND_AUTHENTICATION}
             - name: SUPERUSER_EMAIL
               value: ${SUPERUSER_EMAIL}
+            - name: INSIGHT_FASTAPI_URL
+              value: ${INSIGHT_FASTAPI_URL}
             - name: TENANT_MODE
               value: ${TENANT_MODE}
             # Runtime environment variables from secrets (sensitive)
@@ -304,6 +306,8 @@ spec:
               value: ${INVITE_URL}
             - name: SUPPORT_EMAIL
               value: ${SUPPORT_EMAIL}
+            - name: INSIGHT_FASTAPI_URL
+              value: ${INSIGHT_FASTAPI_URL}
             - name: TENANT_MODE
               value: ${TENANT_MODE}
             - name: DISABLE_BACKEND_AUTHENTICATION

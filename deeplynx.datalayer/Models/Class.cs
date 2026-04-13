@@ -28,6 +28,8 @@ public class Class
 
     [Column("is_archived")] public bool IsArchived { get; set; }
 
+    [Column("extraction_id")] public long? ExtractionId { get; set; }
+
     [ForeignKey("ProjectId")]
     [InverseProperty("Classes")]
     public virtual Project Project { get; set; } = null!;
