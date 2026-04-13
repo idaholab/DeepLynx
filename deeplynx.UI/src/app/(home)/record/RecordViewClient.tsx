@@ -490,6 +490,16 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
     t.translations.FAILED_TO_FETCH_CLASSES,
   ]);
 
+  // helper function to format file size
+  const formatFileSize = (bytes : number | null | undefined): string => {
+    if (bytes == null) return "-";
+    if (bytes === 0) return "0 bytes";
+    const k = 1024;
+    const sizes = ["Bytes", "KB", "MB", "GB", "TB"];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
+  };
+
   // ============= MEMOIZED VALUES =============
   const systemPropertiesRows = useMemo(() => {
     if (!record) return [];
@@ -532,6 +542,10 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
             value,
             t.translations.ORIGINAL_ID_UPDATED,
           ),
+      },
+      {
+        label: t.translations.FILE_SIZE,
+        value: formatFileSize(record.fileSize)
       },
       {
         label: t.translations.LAST_UPDATED_AT,
