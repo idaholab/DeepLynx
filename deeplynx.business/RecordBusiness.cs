@@ -1254,7 +1254,6 @@ public class RecordBusiness : IRecordBusiness
     /// <param name="projectId">The ID of the project to which the record belongs</param>
     /// <param name="recordId">The ID of the record to be updated</param>
     /// <param name="dto">The data transfer object containing details on the record to be updated</param>
-    /// <param name="embedded">Boolean value that determines if the file will be embedded by Insight</param>
     /// <returns>The newly updated metadata record</returns>
     /// <exception cref="KeyNotFoundException">Returned if record to be updated is not found</exception>
     public async Task<RecordResponseDto> UpdateRecord(long currentUserId, long organizationId, long projectId,
@@ -1292,7 +1291,6 @@ public class RecordBusiness : IRecordBusiness
         returnedRecord.LastUpdatedBy = currentUserId;
         returnedRecord.FileType = dto.FileType ?? returnedRecord.FileType;
         returnedRecord.FileSize = dto.FileSize ?? returnedRecord.FileSize;
-        returnedRecord.Embedded = embedded ?? false; // If the updated record is not to be embedded, set false and skip embedding with Insight
 
         _context.Records.Update(returnedRecord);
         await _context.SaveChangesAsync();
