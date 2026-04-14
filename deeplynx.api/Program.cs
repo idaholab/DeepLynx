@@ -4,8 +4,8 @@ using deeplynx.business;
 using deeplynx.datalayer.MigrationRunner;
 using deeplynx.datalayer.Models;
 using deeplynx.helpers;
-using deeplynx.helpers.Hubs;
 using deeplynx.helpers.BigData;
+using deeplynx.helpers.Hubs;
 using deeplynx.interfaces;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Http.Features;
@@ -154,9 +154,6 @@ try
     builder.Services.AddTransient<ITokenBusiness, TokenBusiness>();
     builder.Services.AddTransient<IOauthApplicationBusiness, OauthApplicationBusiness>();
 
-
-    Console.WriteLine("Program cs: " + connectionString);
-
     builder.Services.AddTransient<IQueryBusiness, QueryBusiness>();
     builder.Services.AddTransient<IMetadataBusiness, MetadataBusiness>();
     builder.Services.AddTransient<IHistoricalRecordBusiness, HistoricalRecordBusiness>();
@@ -176,11 +173,15 @@ try
     builder.Services.AddTransient<IProjectRolePermissionService, ProjectRolePermissionService>();
     builder.Services.AddTransient<IOrgRolePermissionService, OrgRolePermissionService>();
     builder.Services.AddScoped<IBulkCopyUpsertExecutor, BulkCopyUpsertExecutor>();
-    builder.Services.AddTransient<ISysAdminService, SysAdminService>();
+    builder.Services.AddTransient<IAdminService, AdminService>();
     builder.Services.AddTransient<IOauthHandshakeBusiness, OauthHandshakeBusiness>();
     builder.Services.AddTransient<IOrganizationService, OrganizationService>();
     builder.Services.AddTransient<ISavedSearchBusiness, SavedSearchBusiness>();
     builder.Services.AddTransient<IGraphBusiness, GraphBusiness>();
+    builder.Services.AddTransient<IUserModelTokenBusiness, UserModelTokenBusiness>();
+    builder.Services.AddTransient<IAiModelConfigBusiness, AiModelConfigBusiness>();
+    builder.Services.AddScoped<ISensitivityLabelService, SensitivityLabelService>();
+
 
     //OpenApi Documentation
     builder.Services.AddOpenApi(options =>
@@ -194,7 +195,7 @@ try
                 Description =
                     "DeepLynx Nexus API for managing organizational data and relationships. Endpoints are organized by Organization-level (/api/organizations/{organizationId}) and Project-level (/api/projects/{projectId}) scopes.",
                 Contact = new OpenApiContact
-                { 
+                {
                     Name = "Nexus Support",
                     Email = "Jaren.Brownlee@inl.gov"
                 }
@@ -202,6 +203,16 @@ try
 
             document.Servers = new List<OpenApiServer>
             {
+                new()
+                {
+                    Url = "http://localhost:5095/api/v1/",
+                    Description = "Local Development"
+                },
+                new()
+                {
+                    Url = "http://localhost:5000/api/v1/",
+                    Description = "Docker Environment"
+                },
                 new()
                 {
                     Url = "https://deeplynx.inl.gov/api/v1/",
@@ -216,11 +227,6 @@ try
                 {
                     Url = "https://deeplynx-test.dev.inl.gov/api/v1/",
                     Description = "Test"
-                },
-                new()
-                {
-                    Url = "http://localhost:5000/api/v1/",
-                    Description = "Docker Environment"
                 },
                 new()
                 {
@@ -242,6 +248,12 @@ try
                 new() { Name = "Project", Description = "Project management" },
                 new() { Name = "User", Description = "User management" },
                 new() { Name = "Group", Description = "Group management" },
+
+                // AI Services
+                new() { Name = "Lattice", Description = "Useful data views for DeepLynx Lattice use" },
+                new() { Name = "Organization - AI Model Config", Description = "AI model configuration management" },
+                new() { Name = "Project - AI Model Config", Description = "AI model configuration management" },
+                new() { Name = "User Model Token", Description = "User AI model token management" },
 
                 // Authentication
                 new() { Name = "OauthHandshake", Description = "OAuth2 authorization flow" },
@@ -309,6 +321,11 @@ try
                 {
                     ["name"] = "Administration",
                     ["tags"] = new JsonArray { "Organization", "Project", "User", "Group" }
+                },
+                new JsonObject
+                {
+                    ["name"] = "AI Services",
+                    ["tags"] = new JsonArray { "Lattice", "Organization - AI Model Config", "Project - AI Model Config", "User Model Token" }
                 },
                 new JsonObject
                 {
@@ -424,22 +441,25 @@ try
             return Task.CompletedTask;
         });
     });
- 
 
+    /* ╔════════════════════════════╗
+       ║      Check DB Version      ║
+       ╚════════════════════════════╝ */
+    await DatabaseVersionChecker.CheckDatabaseVersion(connectionString);
 
-/* ╔════════════════════════════╗
-   ║      Apply Migrations      ║
-   ╚════════════════════════════╝ */
+    /* ╔════════════════════════════╗
+       ║      Apply Migrations      ║
+       ╚════════════════════════════╝ */
     await MigrationRunner.ApplyMigrations(connectionString);
 
-/* ╔════════════════════════════╗
-   ║      App Configurations    ║
-   ╚════════════════════════════╝ */
+    /* ╔════════════════════════════╗
+       ║      App Configurations    ║
+       ╚════════════════════════════╝ */
     var app = builder.Build();
 
-/* ╔════════════════════════════╗
-   ║      App Base Path         ║
-   ╚════════════════════════════╝ */
+    /* ╔════════════════════════════╗
+       ║      App Base Path         ║
+       ╚════════════════════════════╝ */
     PathString basePath = "/api/v1";
     app.UsePathBase(basePath);
 
@@ -449,6 +469,7 @@ try
     app.UseAuthentication(); // Must be first
     app.UseMiddleware<UserContextMiddleware>(); // Second - sets UserId/Email
     app.UseMiddleware<AuthMiddleware>(); // Third - sets OrganizationId
+    app.UseMiddleware<SensitivityMiddleware>();
     app.UseAuthorization(); // Fourth
     app.MapControllers(); // Last
 

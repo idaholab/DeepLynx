@@ -27,6 +27,13 @@ public partial class Organization
 
     [Column("default_org")]
     public bool DefaultOrg { get; set; } = false;
+    
+    [Column("banner")]
+    [MaxLength(50)]
+    public string? Banner { get; set; }
+    
+    [Column("require_sensitivity_label")]
+    public bool RequireSensitivityLabel { get; set; } = false;
 
     [InverseProperty("Organization")]
     public virtual ICollection<Group> Groups { get; set; } = new List<Group>();
@@ -84,4 +91,7 @@ public partial class Organization
     
     [InverseProperty("Organization")]
     public virtual ICollection<Tag> Tags { get; set; } = new List<Tag>();
+    
+    [InverseProperty("Organization")]
+    public virtual ICollection<AiModelConfig> AiModelConfigs { get; set; } = new List<AiModelConfig>();
 }

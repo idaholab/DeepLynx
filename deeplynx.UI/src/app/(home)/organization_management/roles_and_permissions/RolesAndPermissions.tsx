@@ -4,11 +4,11 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useOrganizationSession } from "@/app/contexts/OrganizationSessionProvider";
 import { useProjectSession } from "@/app/contexts/ProjectSessionProvider";
 import {
-  archiveRole,
-  createRole,
+  archiveOrgRole,
+  createOrgRole,
   getOrgRolePermissions,
-  setPermissionsForRole,
-  updateRole,
+  setPermissionsForOrgRole,
+  updateOrgRole,
 } from "@/app/lib/client_service/role_services.client";
 import { ExclamationCircleIcon } from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
@@ -56,15 +56,16 @@ const RolesAndPermissions = ({
   /* ------------------------------------------------------------------------ */
 
   const [activeLayout, setActiveLayout] = useState<"split-view" | "matrix">(
-    "split-view"
+    "split-view",
   );
   const [rolesLocked, setRolesLocked] = useState(false);
   const [selectedRoleId, setSelectedRoleId] = useState<number | null>(
-    initialRoles[0]?.id || null
+    initialRoles[0]?.id || null,
   );
 
-  const [roles, setRoles] = useState(initialRoles);
-  const [permissions, setPermissions] = useState(initialPermissions);
+  const [roles, setRoles] = useState<RoleResponseDto[]>(initialRoles);
+  const [permissions, setPermissions] =
+    useState<PermissionResponseDto[]>(initialPermissions);
 
   const [rolePermissions, setRolePermissions] = useState<
     Record<number, PermissionResponseDto[]>
@@ -99,11 +100,28 @@ const RolesAndPermissions = ({
     };
 
     try {
-      const newRole = await createRole(
+      const newRole = await createOrgRole(
         organization.organizationId as number,
-        project?.projectId as number,
-        dto
+        dto,
       );
+
+      const userRole = roles.find((r) => r.name === "User");
+      if (userRole && rolePermissions[userRole.id]) {
+        const userPermissionIds = rolePermissions[userRole.id].map((p) =>
+          Number(p.id),
+        );
+
+        await setPermissionsForOrgRole(
+          organization.organizationId as number,
+          newRole.id,
+          userPermissionIds,
+        );
+
+        setRolePermissions((prev) => ({
+          ...prev,
+          [newRole.id]: rolePermissions[userRole.id],
+        }));
+      }
 
       setRoles((prev) => [...prev, newRole]);
       setSelectedRoleId(newRole.id);
@@ -125,19 +143,18 @@ const RolesAndPermissions = ({
   const handleUpdateRole = async (
     roleId: number,
     name?: string | null,
-    description?: string | null
+    description?: string | null,
   ) => {
     try {
       const dto: UpdateRoleRequestDto = { name, description };
-      const updatedRole = await updateRole(
+      const updatedRole = await updateOrgRole(
         organization?.organizationId as number,
-        project?.projectId as number,
         roleId,
-        dto
+        dto,
       );
 
       setRoles((prev) =>
-        prev.map((role) => (role.id === roleId ? updatedRole : role))
+        prev.map((role) => (role.id === roleId ? updatedRole : role)),
       );
       toast.success("Role updated successfully");
     } catch (error) {
@@ -163,17 +180,16 @@ const RolesAndPermissions = ({
 
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [roleToDelete, setRoleToDelete] = useState<RoleResponseDto | null>(
-    null
+    null,
   );
 
   const handleDeleteRole = async () => {
     if (!roleToDelete) return;
 
     try {
-      await archiveRole(
+      await archiveOrgRole(
         organization?.organizationId as number,
-        project?.projectId as number,
-        roleToDelete.id
+        roleToDelete.id,
       );
 
       // Remove archived role from UI
@@ -182,7 +198,7 @@ const RolesAndPermissions = ({
       // Re-select a fallback role if needed
       if (selectedRoleId === roleToDelete.id) {
         const remainingRoles = roles.filter(
-          (role) => role.id !== roleToDelete.id
+          (role) => role.id !== roleToDelete.id,
         );
         setSelectedRoleId(remainingRoles[0]?.id || null);
       }
@@ -211,7 +227,7 @@ const RolesAndPermissions = ({
 
   const [isEditingPermissions, setIsEditingPermissions] = useState(false);
   const [tempPermissions, setTempPermissions] = useState<Set<number>>(
-    new Set()
+    new Set(),
   );
 
   const handleStartEditingPermissions = () => {
@@ -240,15 +256,14 @@ const RolesAndPermissions = ({
     if (!currentRole) return;
 
     try {
-      await setPermissionsForRole(
+      await setPermissionsForOrgRole(
         organization?.organizationId as number,
-        project?.projectId as number,
         currentRole.id,
-        Array.from(tempPermissions)
+        Array.from(tempPermissions),
       );
 
       const updatedPerms = permissions.filter((p) =>
-        tempPermissions.has(Number(p.id))
+        tempPermissions.has(Number(p.id)),
       );
 
       setRolePermissions((prev) => ({
@@ -307,7 +322,7 @@ const RolesAndPermissions = ({
 
   const handleToggleMatrixPermission = (
     roleId: number,
-    permissionId: number
+    permissionId: number,
   ) => {
     const scrollTop = tableContainerRef.current?.scrollTop || 0;
     const scrollLeft = tableContainerRef.current?.scrollLeft || 0;
@@ -342,11 +357,10 @@ const RolesAndPermissions = ({
     try {
       const updatePromises = roles.map((role) => {
         const newPermissions = Array.from(matrixTempPermissions[role.id] || []);
-        return setPermissionsForRole(
+        return setPermissionsForOrgRole(
           organization?.organizationId as number,
-          project?.projectId as number,
           role.id,
-          newPermissions
+          newPermissions,
         );
       });
 
@@ -357,7 +371,7 @@ const RolesAndPermissions = ({
       roles.forEach((role) => {
         const permIds = matrixTempPermissions[role.id] || new Set();
         updatedRolePermissions[role.id] = permissions.filter((p) =>
-          permIds.has(Number(p.id))
+          permIds.has(Number(p.id)),
         );
       });
 
@@ -383,7 +397,7 @@ const RolesAndPermissions = ({
 
   const matrixRoleHasPermission = (
     roleId: number,
-    permissionId: number
+    permissionId: number,
   ): boolean => {
     if (isEditingMatrix) {
       return matrixTempPermissions[roleId]?.has(permissionId) || false;
@@ -396,14 +410,21 @@ const RolesAndPermissions = ({
   /* ------------------------------------------------------------------------ */
 
   const groupPermissionsByResource = (): PermissionCategory[] => {
-    const grouped = permissions.reduce((acc, perm) => {
-      const resource = perm.resource || "General";
-      if (!acc[resource]) {
-        acc[resource] = [];
-      }
-      acc[resource].push(perm);
-      return acc;
-    }, {} as Record<string, PermissionResponseDto[]>);
+    const orgScopedPermissions = permissions.filter(
+      (perm) => perm.projectId == null,
+    );
+
+    const grouped = orgScopedPermissions.reduce(
+      (acc, perm) => {
+        const resource = perm.resource || "General";
+        if (!acc[resource]) {
+          acc[resource] = [];
+        }
+        acc[resource].push(perm);
+        return acc;
+      },
+      {} as Record<string, PermissionResponseDto[]>,
+    );
 
     return Object.entries(grouped).map(([resource, perms]) => ({
       id: resource.toLowerCase().replace(/\s+/g, "-"),
@@ -419,26 +440,29 @@ const RolesAndPermissions = ({
   /*                    Fetching Role Permissions (API Calls)                 */
   /* ------------------------------------------------------------------------ */
 
-  const fetchRolePermissions = useCallback(async (roleId: number) => {
-    if (rolePermissions[roleId]) return;
-    if (!organization?.organizationId) return;
+  const fetchRolePermissions = useCallback(
+    async (roleId: number) => {
+      if (rolePermissions[roleId]) return;
+      if (!organization?.organizationId) return;
 
-    setIsLoadingPermissions(true);
-    try {
-      const perms = await getOrgRolePermissions(
-        organization.organizationId as number,
-        roleId
-      );
-      setRolePermissions((prev) => ({
-        ...prev,
-        [roleId]: perms,
-      }));
-    } catch (error) {
-      console.error(`Error fetching permissions for role ${roleId}:`, error);
-    } finally {
-      setIsLoadingPermissions(false);
-    }
-  }, [organization?.organizationId, rolePermissions]);
+      setIsLoadingPermissions(true);
+      try {
+        const perms = await getOrgRolePermissions(
+          organization.organizationId as number,
+          roleId,
+        );
+        setRolePermissions((prev) => ({
+          ...prev,
+          [roleId]: perms,
+        }));
+      } catch (error) {
+        console.error(`Error fetching permissions for role ${roleId}:`, error);
+      } finally {
+        setIsLoadingPermissions(false);
+      }
+    },
+    [organization?.organizationId, rolePermissions],
+  );
 
   const fetchAllRolePermissions = useCallback(async () => {
     if (!organization?.organizationId) return;
@@ -452,11 +476,11 @@ const RolesAndPermissions = ({
           })
           .catch((error) => {
             console.error(
-              `❌ Error fetching permissions for role ${role.name} (ID: ${role.id}):`,
-              error
+              `Error fetching permissions for role ${role.name} (ID: ${role.id}):`,
+              error,
             );
             return { roleId: role.id, perms: [] };
-          })
+          }),
       );
 
       const results = await Promise.all(promises);
@@ -469,7 +493,7 @@ const RolesAndPermissions = ({
       setRolePermissions(newRolePermissions);
       setInitialLoadComplete(true);
     } catch (error) {
-      console.error("❌ Error fetching all role permissions:", error);
+      console.error("Error fetching all role permissions:", error);
     } finally {
       setIsLoadingPermissions(false);
     }
@@ -584,6 +608,7 @@ const RolesAndPermissions = ({
           onRoleSelection={handleRoleSelection}
           onEditClick={handleEditClick}
           onDeleteClick={handleDeleteClick}
+          onCreateRole={() => setIsCreateModalOpen(true)}
           onStartEditingPermissions={handleStartEditingPermissions}
           onCancelEditingPermissions={handleCancelEditingPermissions}
           onSavePermissions={handleSavePermissions}

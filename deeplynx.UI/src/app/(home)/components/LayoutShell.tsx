@@ -2,40 +2,42 @@
 "use client";
 
 import { useLanguage } from "@/app/contexts/Language";
-import {
-  AdjustmentsHorizontalIcon,
-  ArrowRightStartOnRectangleIcon,
-  BookOpenIcon,
-  ChevronDownIcon,
-  ChevronUpIcon,
-  Cog6ToothIcon,
-  GlobeAmericasIcon,
-  QuestionMarkCircleIcon,
-  UserCircleIcon,
-  UserGroupIcon,
-  CommandLineIcon,
-} from "@heroicons/react/24/outline";
-import Image from "next/image";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import React, { useState, useEffect } from "react";
-import SideMenu from "./SideMenu";
-import AvatarCell from "./Avatar";
-import { signOut } from "next-auth/react";
-import { OrgAdminRoute, RoleGate, SysAdminRoute } from "../rbac/RBACComponents";
-import { useRBAC } from "../rbac/useRBAC";
 import { useOrganizationSession } from "@/app/contexts/OrganizationSessionProvider";
-import { OrganizationResponseDto } from "../types/responseDTOs";
 import { useSafeSession } from "@/app/hooks/useSafeSession";
 import {
   getAllOrganizationsForUser,
   getOrganizationLogoUrl,
 } from "@/app/lib/client_service/organization_services.client";
+import {
+  AdjustmentsHorizontalIcon,
+  ArrowRightStartOnRectangleIcon,
+  Bars3Icon,
+  BookOpenIcon,
+  ChevronDownIcon,
+  Cog6ToothIcon,
+  CommandLineIcon,
+  GlobeAmericasIcon,
+  QuestionMarkCircleIcon,
+  UserCircleIcon,
+  UserGroupIcon,
+} from "@heroicons/react/24/outline";
+import { signOut } from "next-auth/react";
+import Image from "next/image";
+import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useState, type ReactNode } from "react";
+import { OrgAdminRoute, SysAdminRoute } from "../rbac/RBACComponents";
+import { useRBAC } from "../rbac/useRBAC";
+import { OrganizationResponseDto } from "../types/responseDTOs";
+import AvatarCell from "./Avatar";
+import { Banner } from "./Banner";
+import SideMenu from "./SideMenu";
 import TopBanner from "./VulnerabilityBanner";
 
-const LayoutShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+const LayoutShell = ({ children }: { children: ReactNode }) => {
   const { t } = useLanguage();
   const router = useRouter();
+  const pathname = usePathname();
 
   const isAuthDisabled =
     process.env.NEXT_PUBLIC_DISABLE_FRONTEND_AUTHENTICATION === "true";
@@ -44,17 +46,22 @@ const LayoutShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user } = useRBAC();
   const { organization, setOrganization } = useOrganizationSession();
 
-  const [selectedItem, setSelectedItem] = useState<string>("");
   const [organizations, setOrganizations] = useState<OrganizationResponseDto[]>(
     [],
   );
   const [loadingOrgs, setLoadingOrgs] = useState(false);
-  const [isOrgDropdownOpen, setIsOrgDropdownOpen] = useState(false);
   const [isUserDropdownOpen, setIsUserDropdownOpen] = useState(false);
+  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const [orgLogoUrl, setOrgLogoUrl] = useState<string | null>(null);
 
   // Handle menu toggle
-  const [isMenuCollapsed, setIsMenuCollapsed] = React.useState(false);
+  const [isMenuCollapsed, setIsMenuCollapsed] = useState(false);
+  const displayName = isAuthDisabled
+    ? (user?.name ?? "")
+    : (session?.user?.name ?? "");
+  const displayEmail = isAuthDisabled
+    ? (user?.email ?? "")
+    : (session?.user?.email ?? "");
 
   // Fetch organizations for the switcher
   useEffect(() => {
@@ -95,6 +102,11 @@ const LayoutShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     loadOrganizationLogo();
   }, [organization?.organizationId]);
 
+  useEffect(() => {
+    setIsMobileNavOpen(false);
+    setIsUserDropdownOpen(false);
+  }, [pathname]);
+
   const handleMenuToggle = (isCollapsed: boolean) => {
     setIsMenuCollapsed(isCollapsed);
   };
@@ -120,12 +132,9 @@ const LayoutShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     setOrganization({
       organizationId: org.id,
       organizationName: org.name,
+      banner: org.banner ?? null,
     });
 
-    // Close dropdown
-    setIsOrgDropdownOpen(false);
-
-    // Navigate to home page - this will trigger a full server-side re-render
     router.push("/");
   };
 
@@ -138,44 +147,37 @@ const LayoutShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     return [firstName, lastName].filter(Boolean).join(" ");
   };
 
-  // When auth is disabled, use RBAC user. When enabled, use session.
-  const displayName = isAuthDisabled
-    ? user?.name || ""
-    : session?.user?.name || "";
-
-  const displayEmail = isAuthDisabled
-    ? user?.email || ""
-    : session?.user?.email || "";
-
   const displayImage = session?.user?.image;
-
-  // Function to handle item click events
-  const handleItemClick = (
-    item: string,
-    event: React.MouseEvent<HTMLElement>,
-  ) => {
-    event.preventDefault();
-    setSelectedItem(item);
-    router.push(item);
-  };
 
   return (
     <div className="flex flex-col min-h-screen bg-base-100 text-base-content">
       {/* Top Banner */}
       <TopBanner />
       {/* Banner/Header */}
-      <header className="bg-[var(--base-400)] text-primary-content flex justify-between items-center px-5 py-3 z-50 fixed w-full top-6">
+      <header className="bg-[var(--base-400)] text-primary-content flex justify-between items-center gap-2 px-3 sm:px-5 py-2 sm:py-3 z-50 fixed w-full top-6">
         {/* Organization Switcher */}
-        <div className="dropdown">
-          <div className="flex items-center">
-            <div className="flex items-center py-2 gap-3">
+        <div className="flex items-center gap-2 min-w-0">
+          <button
+            type="button"
+            onClick={() => setIsMobileNavOpen((prev) => !prev)}
+            className="btn btn-ghost btn-sm btn-circle lg:hidden shrink-0"
+            aria-label="Toggle navigation"
+          >
+            <Bars3Icon className="size-6" />
+          </button>
+          <div className="dropdown min-w-0 group">
+            <div
+              tabIndex={0}
+              role="button"
+              className="flex items-center gap-3 min-w-0 cursor-pointer py-2"
+            >
               {/* Organization Logo (if exists) */}
               {orgLogoUrl ? (
                 <div className="avatar">
                   <div className="w-10 h-10 rounded-lg overflow-hidden bg-base-100 flex items-center justify-center relative">
                     <Image
                       src={orgLogoUrl}
-                      alt={organization?.organizationName || "Organization"}
+                      alt={organization?.organizationName ?? "No Organization"}
                       fill
                       sizes="40px"
                       className="object-contain p-1"
@@ -188,34 +190,22 @@ const LayoutShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                 </div>
               ) : (
                 // Fallback to UserGroupIcon if no logo
-                <UserGroupIcon className="size-8" />
+                <UserGroupIcon className="size-7 sm:size-8 shrink-0" />
               )}
 
-              <div className="flex flex-col">
+              <div className="flex flex-col min-w-0">
                 <span className="text-xs opacity-70">
                   {t.translations.ORGANIZATION}
                 </span>
-                <h1 className="text-lg font-bold truncate">
-                  {organization?.organizationName || "No Organization"}
+                <h1 className="text-base sm:text-lg font-bold truncate max-w-[45vw] sm:max-w-[18rem]">
+                  {organization?.organizationName ?? "No Organization"}
                 </h1>
               </div>
+              <ChevronDownIcon className="size-7 shrink-0 transition-transform group-focus-within:rotate-180" />
             </div>
-            <button
-              tabIndex={0}
-              onClick={() => setIsOrgDropdownOpen(!isOrgDropdownOpen)}
-              className="btn btn-ghost btn-sm btn-circle"
-            >
-              {isOrgDropdownOpen ? (
-                <ChevronUpIcon className="size-5" />
-              ) : (
-                <ChevronDownIcon className="size-5" />
-              )}
-            </button>
-          </div>
-          {isOrgDropdownOpen && (
             <ul
               tabIndex={0}
-              className="dropdown-content menu bg-base-100 text-base-content rounded-box z-[100] w-72 max-w-72 p-2 shadow-xl border border-base-300 mt-2"
+              className="dropdown-content menu bg-base-100 text-base-content rounded-box z-[100] w-72 max-w-[90vw] p-2 shadow-xl border border-base-300 mt-2"
             >
               {loadingOrgs ? (
                 <li>
@@ -259,11 +249,7 @@ const LayoutShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                   ))}
                   <div className="divider my-1"></div>
                   <li>
-                    <Link
-                      href="/select-org"
-                      className="hover:bg-base-200"
-                      onClick={() => setIsOrgDropdownOpen(false)}
-                    >
+                    <Link href="/select-org" className="hover:bg-base-200">
                       <UserGroupIcon className="size-5" />
                       {t.translations.VIEW_ALL_ORGANIZATIONS}
                     </Link>
@@ -271,23 +257,34 @@ const LayoutShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                 </>
               )}
             </ul>
-          )}
+          </div>
         </div>
-        <div>
+        <div className="shrink-0">
           <Image
             src="/assets/nexusWhite.png"
             alt="Logo"
             height={20}
             width={150}
-            className="rounded cursor-pointer"
+            className="rounded cursor-pointer w-[120px] sm:w-[150px] h-auto"
             onClick={() => router.push("/")}
           />
         </div>
       </header>
       {/* Page Content */}
       <div className="flex h-full z-0 mt-6">
+        {isMobileNavOpen && (
+          <button
+            type="button"
+            className="fixed inset-0 bg-black/40 z-30 lg:hidden"
+            onClick={() => setIsMobileNavOpen(false)}
+            aria-label="Close navigation overlay"
+          />
+        )}
         {/* Side Menu */}
-        <div className="fixed top-20 bottom-0 flex z-40">
+        <div
+          className={`fixed top-20 bottom-0 hidden lg:flex ${isUserDropdownOpen ? "z-[60]" : "z-40"
+            }`}
+        >
           <aside
             className={
               "h-full shadow-xl w-18 login text-primary-content p-4 transition-all duration-300 flex flex-col"
@@ -300,21 +297,13 @@ const LayoutShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                 </Link>
               </li>
               <li className="mt-5">
-                <Link
-                  href="/data_catalog"
-                  onClick={(e) => handleItemClick("/data_catalog", e)}
-                >
+                <Link href="/data_catalog/all_records">
                   <BookOpenIcon className="size-10" />
                 </Link>
               </li>
               <OrgAdminRoute>
                 <li className="mt-5">
-                  <Link
-                    href="/organization_management"
-                    onClick={(e) =>
-                      handleItemClick("/organization_management", e)
-                    }
-                  >
+                  <Link href="/organization_management">
                     <AdjustmentsHorizontalIcon className="size-10" />
                   </Link>
                 </li>
@@ -343,21 +332,21 @@ const LayoutShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                 </Link>
               </li>
               <li className="mt-5">
-                <div className="relative">
-                  <div
-                    className="btn cursor-pointer"
-                    onClick={() => setIsUserDropdownOpen(!isUserDropdownOpen)}
+                <div className="relative flex justify-center">
+                  <button
+                    type="button"
+                    className="cursor-pointer"
+                    onClick={() => setIsUserDropdownOpen((open) => !open)}
                   >
                     <UserCircleIcon className="size-10" />
-                  </div>
+                  </button>
                   {isUserDropdownOpen && (
                     <>
-                      {/* Backdrop to close dropdown when clicking outside */}
                       <div
                         className="fixed inset-0 z-[100]"
                         onClick={() => setIsUserDropdownOpen(false)}
                       />
-                      <ul className="menu bg-base-100 text-base-content rounded-box w-auto min-w-52 max-w-[90vw] p-2 shadow-xl border border-base-300 fixed left-20 bottom-4 z-[101]">
+                      <ul className="menu bg-base-100 text-base-content rounded-box w-auto min-w-52 max-w-[90vw] p-2 shadow-xl border border-base-300 fixed right-4 lg:right-auto lg:left-20 bottom-4 z-[101]">
                         <li>
                           <div className="flex bg-base-100">
                             <AvatarCell
@@ -379,7 +368,6 @@ const LayoutShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                           <Link
                             href="/settings"
                             className="text-base-content hover:bg-base-200"
-                            onClick={() => setIsUserDropdownOpen(false)}
                           >
                             <Cog6ToothIcon className="size-6" />
                             {t.translations.SETTINGS}
@@ -403,25 +391,29 @@ const LayoutShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                 </div>
               </li>
               <li className="mt-5 mb-16">
-                <Link
-                  href={
-                    process.env.NEXT_PUBLIC_DOCS_PATH
-                      ? `${process.env.NEXT_PUBLIC_DOCS_PATH}`
-                      : "/docs"
-                  }
-                >
+                <Link href={process.env.NEXT_PUBLIC_DOCS_PATH ?? "/docs"}>
                   <QuestionMarkCircleIcon className="size-10" />
                 </Link>
               </li>
-              <span className="text-xs font-bold text-base-200/50">V0.3.0</span>
+              <span className="text-xs font-bold text-base-200/50">v0.5.0</span>
             </ul>
           </aside>
         </div>
-        <SideMenu onToggle={handleMenuToggle} />
+        <SideMenu
+          onToggle={handleMenuToggle}
+          mobileOpen={isMobileNavOpen}
+          onMobileClose={() => setIsMobileNavOpen(false)}
+        />
         <main
-          className={`transition-all duration-300 w-full mt-20 ${isMenuCollapsed ? "ml-40" : "ml-82"
+          className={`transition-all duration-300 w-full mt-20 ml-0 ${isMenuCollapsed ? "lg:ml-40" : "lg:ml-82"
             }`}
         >
+          {/* Organization Banner */}
+          <div className="sticky top-25 z-20">
+            <Banner />
+          </div>
+
+          {/* Page Content */}
           {children}
         </main>
       </div>

@@ -133,7 +133,7 @@ public class ObjectStorageProjectController : ControllerBase
     /// <param name="dto">The data transfer object containing updated object storage details</param>
     /// <returns>The updated object storage</returns>
     [HttpPut("{objectStorageId:long}", Name = "api_update_object_storage_project")]
-    [Auth("write", "object_storage")]
+    [Auth("update", "object_storage")]
     public async Task<ActionResult<ObjectStorageResponseDto>> UpdateObjectStorage(
         long organizationId,
         long projectId,
@@ -193,7 +193,7 @@ public class ObjectStorageProjectController : ControllerBase
     /// <param name="archive">True to archive the object storage, false to unarchive it.</param>
     /// <returns>A message stating the object storage was successfully archived or unarchived.</returns>
     [HttpPatch("{objectStorageId:long}", Name = "api_archive_object_storage_project")]
-    [Auth("write", "object_storage")]
+    [Auth("update", "object_storage")]
     public async Task<ActionResult> ArchiveObjectStorage(
         long organizationId,
         long projectId,
@@ -258,7 +258,7 @@ public class ObjectStorageProjectController : ControllerBase
     /// <param name="objectStorageId">The ID of the object storage to set as default</param>
     /// <returns>The updated object storage</returns>
     [HttpPatch("{objectStorageId:long}/default", Name = "api_set_default_object_storage_project")]
-    [Auth("write", "object_storage")]
+    [Auth("update", "object_storage")]
     public async Task<ActionResult<ObjectStorageResponseDto>> SetDefaultObjectStorage(
         long organizationId,
         long projectId,

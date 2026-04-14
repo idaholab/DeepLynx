@@ -4,7 +4,6 @@ import { getAllGroupsServer } from "@/app/lib/server_service/group_services.serv
 import { getAllProjectsServer } from "@/app/lib/server_service/projects_services.server";
 import {
   getAllOrgRolesServer,
-  getOrgRolePermissionsServer,
 } from "@/app/lib/server_service/role_services.server";
 import { getAllUsersServer } from "@/app/lib/server_service/user_services.server";
 import { cookies } from "next/headers";
@@ -18,6 +17,7 @@ import {
   UserResponseDto,
 } from "../types/responseDTOs";
 import OrganizationManagmentClient from "./OrganizationManagementClient";
+import { getAllOrgPermissionsServer } from "@/app/lib/server_service/permissions_services.server";
 
 export const dynamic = "force-dynamic";
 
@@ -53,7 +53,7 @@ const OrganizationManagementPage = async ({
   try {
     const apiProjects = await getAllProjectsServer(
       organizationId as number,
-      true
+      true,
     );
     projects = apiProjects.map(mapToProjectResponseDtos);
   } catch (e) {
@@ -76,16 +76,7 @@ const OrganizationManagementPage = async ({
   try {
     // First, fetch roles for the organization
     roles = await getAllOrgRolesServer(Number(organizationId));
-
-    // Then, fetch permissions for the FIRST role if it exists
-    if (roles.length > 0) {
-      permissions = await getOrgRolePermissionsServer(
-        Number(organizationId),
-        roles[0].id // ✅ Use the first role's actual ID
-      );
-    } else {
-      permissions = [];
-    }
+    permissions = await getAllOrgPermissionsServer(Number(organizationId), true);
   } catch (error) {
     console.error("Failed to fetch roles or permissions:", error);
   }
@@ -93,7 +84,7 @@ const OrganizationManagementPage = async ({
   // Fetch users filtered by organization
   const members = (await getAllUsersServer(
     undefined,
-    Number(organizationId)
+    Number(organizationId),
   )) as UserResponseDto[];
 
   const params = await searchParams;

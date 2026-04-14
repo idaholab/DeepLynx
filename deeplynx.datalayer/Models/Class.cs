@@ -14,6 +14,9 @@ public class Class
 
     [Column("uuid")] public string? Uuid { get; set; }
 
+    [Column("properties", TypeName = "jsonb")]
+    public string? Properties { get; set; }
+
     [Column("project_id")] public long? ProjectId { get; set; }
 
     [Column("organization_id")] public long OrganizationId { get; set; }

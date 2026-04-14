@@ -185,6 +185,11 @@ body {
   color: var(--foreground);
   font-family: var(--font-sans);
   font-weight: 500;
+  overflow-x: hidden;
+}
+
+html {
+  overflow-x: hidden;
 }
 
 .login {
@@ -210,7 +215,8 @@ body {
 }
 
 .shadow-dynamic {
-  box-shadow: 0 4px 6px -1px var(--color-dynamic-shadow),
+  box-shadow:
+    0 4px 6px -1px var(--color-dynamic-shadow),
     0 2px 4px -2px var(--color-dynamic-shadow);
 }
 
@@ -253,4 +259,8 @@ body {
   to {
     transform: rotate(360deg);
   }
+}
+
+.copy-tooltip::before {
+  font-size: 0.65rem;
 }

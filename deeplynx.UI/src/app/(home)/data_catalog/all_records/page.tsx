@@ -1,4 +1,4 @@
-// app/(home)/(routes)/data_catalog/page.tsx
+// app/(home)/(routes)/data_catalog/all_records/page.tsx
 import { cookies } from "next/headers";
 import { ProjectResponseDto } from "../../types/responseDTOs";
 import { RecordTableRow } from "../../types/types";
@@ -38,7 +38,7 @@ export default async function Page({
 
   // Keep SSR for projects (fast initial render, no client flash)
   const projects = (await getAllProjectsServer(
-    organizationId as number
+    organizationId as number,
   )) as ProjectResponseDto[];
   const initialProjects = projects.map((p) => ({
     id: String(p.id),

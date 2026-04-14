@@ -96,24 +96,7 @@ export default function ProjectSettingsClient({
     {
       label: "Roles",
       content: <div></div>,
-    },
-    //  TODO POST FY: ADD BACK DATA SOURCE / OBJ STORAGE
-    // {
-    //   label: "Data Source",
-    //   content: (
-    //     <DataSourceTable
-    //       data={mySavedSearches}
-    //     />
-    //   ),
-    // },
-    // {
-    //   label: "Object Storage",
-    //   content: (
-    //     <ObjectStorageTable
-    //       data={mySavedSearches}
-    //     />
-    //   ),
-    // },
+    }
   ];
 
   const handleTabChange = (label: string) => {
@@ -145,8 +128,8 @@ export default function ProjectSettingsClient({
 
   return (
     <div>
-      <div className="bg-base-200/40 pl-12 p-6">
-        <h1 className="text-2xl font-bold text-base-content">
+      <div className="bg-base-200/40 px-3 sm:px-6 lg:px-12 p-6">
+        <h1 className="text-xl sm:text-2xl font-bold text-base-content">
           {t.translations.PROJECT_SETTINGS}
         </h1>
         <div className="mt-2">
@@ -161,16 +144,16 @@ export default function ProjectSettingsClient({
           />
         </div>
       </div>
-      <div className="p-2 flex justify-between items-center">
+      <div className="p-2 sm:p-3 flex flex-col sm:flex-row justify-between sm:items-center gap-3">
         <Tabs
           tabs={tabData}
-          className="tabs tabs-border ml-5"
+          className="mx-1 sm:mx-3 flex-1"
           onTabChange={handleTabChange}
           activeTab={activeTab}
         />
         <button
           onClick={handleAddButtonClick}
-          className="btn btn-secondary text-white mr-6"
+          className="btn btn-secondary text-white self-start sm:self-auto"
         >
           <PlusIcon className="size-6" />
           {activeTab === "Members"

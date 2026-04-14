@@ -7,6 +7,7 @@ import {
   InformationCircleIcon,
 } from "@heroicons/react/24/outline";
 import type { TagResponseDto } from "@/app/(home)/types/responseDTOs";
+import { useLanguage } from "@/app/contexts/Language";
 
 interface Props {
   tags: TagResponseDto[];
@@ -42,44 +43,25 @@ const OrgTagsPanel: React.FC<Props> = ({
   onEditTag,
   onArchiveClick,
 }) => {
+  const { t } = useLanguage();
   return (
-    <div className="card bg-base-100 border border-secondary/60 shadow-sm">
+    <div className="card bg-base-100 shadow-lg">
       <div className="card-body">
         {/* Header + Controls */}
         <div className="flex items-start justify-between gap-4 mb-3">
           <div className="flex-1">
             <div className="flex items-center gap-2">
               <TagIcon className="w-5 h-5 text-secondary" />
-              <h3 className="font-semibold text-base">Organization Tags</h3>
+              <h3 className="font-semibold text-base">
+                {t.translations.ORGANIZATION_TAGS}
+              </h3>
             </div>
             <p className="text-xs text-base-content/70 mt-1 max-w-md">
-              Tags for classification, workflows, and search. All projects
-              inherit these and can optionally add their own.
+              {t.translations.ORGANIZATION_TAGS_DESCRIPTION}
             </p>
           </div>
 
           <div className="flex flex-col items-end gap-2">
-            {/* Lock toggle */}
-            <button
-              type="button"
-              className={`btn btn-xs gap-1 ${
-                tagsLocked ? "btn-error" : "btn-ghost"
-              }`}
-              onClick={onToggleLock}
-            >
-              {tagsLocked ? (
-                <>
-                  <LockClosedIcon className="w-4 h-4" />
-                  Locked
-                </>
-              ) : (
-                <>
-                  <LockOpenIcon className="w-4 h-4" />
-                  Unlocked
-                </>
-              )}
-            </button>
-
             {/* Search input */}
             <div className="form-control w-40">
               <div className="input input-xs input-bordered flex items-center gap-1 px-2">
@@ -87,7 +69,7 @@ const OrgTagsPanel: React.FC<Props> = ({
                 <input
                   type="text"
                   className="grow text-[0.7rem] bg-transparent focus:outline-none"
-                  placeholder="Search tags..."
+                  placeholder={t.translations.SEARCH_TAGS}
                   value={tagSearch}
                   onChange={(e) => setTagSearch(e.target.value)}
                 />
@@ -102,13 +84,13 @@ const OrgTagsPanel: React.FC<Props> = ({
               disabled={tagsLocked || !orgId}
               title={
                 !orgId
-                  ? "No organization selected"
+                  ? t.translations.NO_ORG_SELECTED
                   : tagsLocked
-                  ? "Tags are locked at the org level"
-                  : "Create new tag"
+                    ? t.translations.TAGS_LOCKED_AT_ORG_LEVEL_SHORT
+                    : t.translations.CREATE_NEW_TAG
               }
             >
-              + New Tag
+              + {t.translations.NEW_TAG}
             </button>
           </div>
         </div>
@@ -116,32 +98,25 @@ const OrgTagsPanel: React.FC<Props> = ({
         {/* n of m line */}
         <div className="flex justify-between items-center mb-3 text-[0.7rem] text-base-content/60">
           <span>
-            Showing <span className="font-semibold">{filteredCount}</span> of{" "}
-            <span className="font-semibold">{tagCount}</span> tags
+            {t.translations.SHOWING}{" "}
+            <span className="font-semibold">{filteredCount}</span>{" "}
+            {t.translations.OF}{" "}
+            <span className="font-semibold">{tagCount}</span>{" "}
+            {t.translations.TAGS_LOWER}
           </span>
           {tagSearch.trim() && (
             <span className="italic">
-              Filtered by:{" "}
+              {t.translations.FILTERED_BY}
               <span className="font-medium break-all">{tagSearch}</span>
             </span>
           )}
-        </div>
-
-        {/* Info text */}
-        <div className="flex items-start gap-2 mb-3 text-xs text-base-content/70">
-          <InformationCircleIcon className="w-4 h-4" />
-          <p>
-            When locked, projects{" "}
-            <span className="font-semibold">cannot define new tags</span> and
-            must use only the tags defined at the organization level.
-          </p>
         </div>
 
         {/* Tag list */}
         <div className="space-y-2 max-h-72 overflow-y-auto">
           {tagsLoading ? (
             <div className="py-6 text-center text-xs text-base-content/60">
-              Loading organization tags…
+              {t.translations.LOADING_ORGANIZATION_TAGS}
             </div>
           ) : tagsError ? (
             <div className="py-6 text-center text-xs text-error">
@@ -150,8 +125,8 @@ const OrgTagsPanel: React.FC<Props> = ({
           ) : filteredTags.length === 0 ? (
             <div className="py-6 text-center text-xs text-base-content/60 border border-dashed border-base-300 rounded-lg">
               {tagSearch.trim()
-                ? "No tags match your search."
-                : "No tags defined. Create tags to standardize metadata across all projects."}
+                ? t.translations.NO_TAGS_MATCH_SEARCH
+                : t.translations.NO_TAGS_DEFINED_HELP}
             </div>
           ) : (
             filteredTags.map((tag) => (
@@ -163,9 +138,6 @@ const OrgTagsPanel: React.FC<Props> = ({
                   <span className="badge badge-secondary badge-outline badge-sm">
                     {tag.name}
                   </span>
-                  <span className="text-[0.7rem] text-base-content/70">
-                    Inherited by all projects
-                  </span>
                 </div>
                 <div className="flex items-center gap-1">
                   <button
@@ -173,9 +145,13 @@ const OrgTagsPanel: React.FC<Props> = ({
                     className="btn btn-ghost btn-xs"
                     onClick={() => onEditTag(tag.id)}
                     disabled={tagsLocked}
-                    title={tagsLocked ? "Tags are locked" : "Edit"}
+                    title={
+                      tagsLocked
+                        ? t.translations.TAGS_ARE_LOCKED
+                        : t.translations.EDIT
+                    }
                   >
-                    Edit
+                    {t.translations.EDIT}
                   </button>
                   <button
                     type="button"
@@ -184,11 +160,13 @@ const OrgTagsPanel: React.FC<Props> = ({
                     disabled={tagsLocked || archivingTagId === tag.id}
                     title={
                       tagsLocked
-                        ? "Tags are locked"
-                        : "Archive (soft delete) tag"
+                        ? t.translations.TAGS_ARE_LOCKED
+                        : t.translations.ARCHIVE_SOFT_DELETE_TAG
                     }
                   >
-                    {archivingTagId === tag.id ? "Archiving..." : "Delete"}
+                    {archivingTagId === tag.id
+                      ? t.translations.ARCHIVING
+                      : t.translations.DELETE}
                   </button>
                 </div>
               </div>

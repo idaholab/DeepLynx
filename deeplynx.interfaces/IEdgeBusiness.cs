@@ -5,10 +5,10 @@ namespace deeplynx.interfaces;
 public interface IEdgeBusiness
 {
     Task<List<EdgeResponseDto>> GetAllEdges(
-        long organizationId, long projectId, long? dataSourceId, bool hideArchived);
+        long currentUserId, long organizationId, long projectId, long? dataSourceId, bool hideArchived);
 
     Task<EdgeResponseDto> GetEdge(
-        long organizationId, long projectId, long? edgeId, long? originId, long? destinationId, bool hideArchived);
+        long currentUserId, long organizationId, long projectId, long? edgeId, long? originId, long? destinationId, bool hideArchived);
 
     Task<EdgeResponseDto> CreateEdge(
         long currentUserId, long organizationId, long projectId, long dataSourceId, CreateEdgeRequestDto edge);
@@ -30,4 +30,6 @@ public interface IEdgeBusiness
 
     Task<long> UnarchiveEdge(
         long currentUserId, long organizationId, long projectId, long? edgeId, long? originId, long? destinationId);
+
+    Task<List<LatticeEdgeDto>> GetLatticeEdges(long organizationId, long projectId);
 }

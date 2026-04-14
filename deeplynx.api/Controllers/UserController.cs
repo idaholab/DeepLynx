@@ -1,3 +1,4 @@
+using deeplynx.helpers;
 using deeplynx.helpers.Context;
 using deeplynx.interfaces;
 using deeplynx.models;
@@ -96,6 +97,7 @@ public class UserController : ControllerBase
     /// <param name="dto">User request DTO</param>
     /// <returns>User response DTO</returns>
     [HttpPost(Name = "api_create_a_user")]
+    [OrgAdmin]
     public async Task<ActionResult<UserResponseDto>> CreateUser([FromBody] CreateUserRequestDto dto)
     {
         try
@@ -119,7 +121,8 @@ public class UserController : ControllerBase
     /// <param name="dto">User request DTO</param>
     /// <returns>User response DTO</returns>
     [HttpPut("{userId:long}", Name = "api_update_a_user")]
-    public async Task<ActionResult<UserResponseDto>> UpdateClass(long userId, [FromBody] UpdateUserRequestDto dto)
+    [OrgAdmin]
+    public async Task<ActionResult<UserResponseDto>> UpdateUser(long userId, [FromBody] UpdateUserRequestDto dto)
     {
         try
         {
@@ -140,6 +143,7 @@ public class UserController : ControllerBase
     /// <param name="userId">The ID of the user to delete.</param>
     /// <returns>A message stating the user was successfully deleted.</returns>
     [HttpDelete("{userId:long}", Name = "api_delete_a_user")]
+    [SysAdmin]
     public async Task<IActionResult> DeleteUser(long userId)
     {
         try
@@ -162,6 +166,7 @@ public class UserController : ControllerBase
     /// <param name="archive">True to archive the user, false to unarchive it.</param>
     /// <returns>A message stating the user was successfully archived or unarchived.</returns>
     [HttpPatch("{userId:long}", Name = "api_archive_user")]
+    [SysAdmin]
     public async Task<IActionResult> ArchiveUser(
         long userId,
         [FromQuery] bool archive)
@@ -192,14 +197,24 @@ public class UserController : ControllerBase
     /// <param name="userId">ID of user to grant the sysadmin rights to </param>
     /// <returns>User response DTO</returns>
     [HttpPatch("{userId:long}/admin", Name = "api_set_sys_admin")]
-    public async Task<ActionResult<UserResponseDto>> SetSysAdmin(long userId)
+    [SysAdmin]
+    public async Task<ActionResult<UserResponseDto>> SetSysAdmin(
+        long userId,
+        [FromQuery] bool? isAdmin = true
+    )
     {
         try
         {
             // get the authorizer ID from the middleware context
             var authorizerId = UserContextStorage.UserId;
-            var granted = await _userBusiness.SetSysAdmin(authorizerId, userId);
-            return Ok(new { message = $"Granted sysadmin rights to user {userId}" });
+            var granted = await _userBusiness.SetSysAdmin(authorizerId, userId, isAdmin);
+            var userIsAdmin = isAdmin ?? true;
+            return Ok(new
+            {
+                message = userIsAdmin
+                    ? $"Granted sysadmin rights to user {userId}"
+                    : $"Removed sysAdmin rights from user {userId}"
+            });
         }
         catch (Exception exc)
         {

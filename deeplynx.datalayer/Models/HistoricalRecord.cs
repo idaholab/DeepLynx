@@ -48,6 +48,9 @@ public partial class HistoricalRecord
 
     [Column("tags", TypeName = "jsonb")]
     public string? Tags { get; set; }
+    
+    [Column("labels", TypeName = "jsonb")]
+    public string? Labels { get; set; }
 
     [Column("last_updated_by")]
     public string? LastUpdatedBy { get; set; }

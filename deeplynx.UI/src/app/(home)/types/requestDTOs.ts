@@ -33,11 +33,14 @@ export type PermissionRequestDto =
 export type CreateOrganizationRequestDto = {
   name: string;
   description?: string;
+  banner?: string;
 }
 
 export type UpdateOrganizationRequestDto = {
-  name: string;
-  description?: string;
+  name?: string | null;
+  description?: string | null;
+  defaultOrg?: boolean | null;
+  banner?: string | null;
 }
 
 export type CreateOauthApplicationRequestDto = {
@@ -58,11 +61,13 @@ export type UpdateOauthApplicationRequestDto = {
 
 export type CreateObjectStorageRequestDto = {
   name: string;
-  config: string;
+  config: Record<string, unknown>;
+  default?: boolean;
 }
 
 export type UpdateObjectStorageRequestDto = {
   name: string;
+  default: boolean;
 }
 
 export type CreateClassRequestDto = {
@@ -171,6 +176,7 @@ export type CreateProjectRequestDto = {
   name: string;
   description?: string;
   abbreviation?: string;
+  banner?: string;
 };
 
 export type UpdateProjectRequestDto = {
@@ -178,6 +184,7 @@ export type UpdateProjectRequestDto = {
   name?: string;
   description?: string;
   abbreviation?: string;
+  banner?: string | null;
 };
 
 export type CreateRecordRequestDto = {
@@ -240,14 +247,23 @@ export type CreateTagRequestDto = {
 export type UpdateTagRequestDto = {
   name?: string;
 }
+export type CreateSensitivityLabelDto = {
+  name: string;
+  description?: string | null;
+}
+
+export type UpdateSensitivityLabelDto = {
+  name?: string | null;
+  description?: string | null;
+}
 
 export interface InviteUserToOrganizationRequestDto {
-    userEmail: string;
-    userName?: string;
+  userEmail: string;
+  userName?: string;
 }
 
 export interface InviteUserToProjectRequestDto {
-    userEmail: string;
-    userName?: string;
-    roleId?: number | string;
+  userEmail: string;
+  userName?: string;
+  roleId?: number | string;
 }

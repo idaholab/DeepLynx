@@ -33,9 +33,9 @@ class DeepLynxClient:
         url = f"{self.base_url}{endpoint}"
         return requests.post(url, json=json, headers=self.headers)
     
-    def put(self, endpoint: str, json: Dict = None):
+    def put(self, endpoint: str, params: Dict = None, json: Dict = None):
         url = f"{self.base_url}{endpoint}"
-        return requests.put(url, json=json, headers=self.headers)
+        return requests.put(url, params=params, json=json, headers=self.headers)
     
     def patch(self, endpoint: str, params: Dict = None, json: Dict = None):
         url = f"{self.base_url}{endpoint}"
@@ -98,28 +98,26 @@ def current_user_id(client):
 
 @pytest.fixture(scope="session")
 def organization(client, current_user_id):
-    """Create or reuse test organization."""
     org_name = "DeepLynx API Test Organization"
-    
-    # Check if exists
+
     response = client.get("/organizations")
     for org in response.json():
         if org.get("name") == org_name:
             return org.get("id")
-    
-    # Create new
+
     response = client.post(
         "/organizations",
         json={"name": org_name, "description": "Test organization"}
     )
     assert response.status_code == 200
 
-    add_user_url = f"/organizations/{organization}/user?userId={current_user_id}&isAdmin=true"
-    add_user_response = client.post(add_user_url)
+    org_id = response.json().get("id")
 
+    add_user_url = f"/organizations/{org_id}/user?userId={current_user_id}&isAdmin=true"
+    add_user_response = client.post(add_user_url)
     assert add_user_response.status_code == 200
 
-    return response.json().get("id")
+    return org_id
 
 
 @pytest.fixture(scope="session")
@@ -647,6 +645,17 @@ def cleanup_project_tags(client, project):
             client.delete(f"/projects/{project}/tags/{tag_id}")
         except:
             pass
+            
+@pytest.fixture
+def cleanup_project_labels(client, project):
+    """Track and cleanup project-level labels."""
+    created_ids = []
+    yield created_ids
+    for label_id in created_ids:
+        try:
+            client.delete(f"/projects/{project}/labels/{label_id}")
+        except:
+            pass
 
 @pytest.fixture
 def cleanup_org_roles(client, organization):
@@ -678,6 +687,30 @@ def cleanup_created_users(client):
     for user_id in created_ids:
         try:
             client.delete(f"/users/{user_id}")
+        except:
+            pass
+
+@pytest.fixture
+def cleanup_timeseries(client, organization, project, test_datasource_project):
+    """Track and cleanup timeseries tables created during tests."""
+    table_names = []
+    yield table_names
+    # Note: Add actual cleanup logic once you have a delete endpoint
+    for table_name in table_names:
+        try:
+            # delete the leftovers
+            pass
+        except:
+            pass
+            
+@pytest.fixture
+def cleanup_project_roles(client, organization):
+    """Track and cleanup project-level roles."""
+    created_roles = [] 
+    yield created_roles
+    for project_id, role_id in created_roles:
+        try:
+            client.delete(f"/organizations/{organization}/projects/{project_id}/roles/{role_id}")
         except:
             pass
 

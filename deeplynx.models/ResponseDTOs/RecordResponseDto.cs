@@ -8,6 +8,12 @@ public class RecordTagDto
     public string Name { get; set; }
 }
 
+public class RecordLabelDto
+{
+    public long Id { get; set; }
+    public string Name { get; set; }
+}
+
 public class RecordResponseDto
 {
     [Column("id")] public long Id { get; set; }
@@ -42,4 +48,7 @@ public class RecordResponseDto
     [Column("file_type")] public string? FileType { get; set; }
 
     [NotMapped] public ICollection<RecordTagDto> Tags { get; set; }
+    [NotMapped] public ICollection<RecordLabelDto> Labels { get; set; }
+    
+    [Column("embedded")] public bool Embedded { get; set; }
 }

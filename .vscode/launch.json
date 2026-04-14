@@ -1,0 +1,45 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "deeplynx.api: http",
+            "type": "coreclr",
+            "request": "launch",
+            "preLaunchTask": "build",
+            "program": "${workspaceFolder}/deeplynx.api/bin/Debug/net10.0/deeplynx.api.dll",
+            "args": [],
+            "cwd": "${workspaceFolder}/deeplynx.api",
+            "console": "internalConsole",
+            "stopAtEntry": false,
+            "serverReadyAction": {
+                "action": "openExternally",
+                "pattern": "\\bNow listening on:\\s+(https?://\\S+)",
+                "uriFormat": "%s/api/v1/scalar"
+            },
+            "env": {
+                "ASPNETCORE_ENVIRONMENT": "Development",
+                "ASPNETCORE_URLS": "http://localhost:5095"
+            }
+        },
+        {
+            "name": "deeplynx.api: https",
+            "type": "coreclr",
+            "request": "launch",
+            "preLaunchTask": "build",
+            "program": "${workspaceFolder}/deeplynx.api/bin/Debug/net10.0/deeplynx.api.dll",
+            "args": [],
+            "cwd": "${workspaceFolder}/deeplynx.api",
+            "console": "internalConsole",
+            "stopAtEntry": false,
+            "serverReadyAction": {
+                "action": "openExternally",
+                "pattern": "\\bNow listening on:\\s+(https://\\S+)",
+                "uriFormat": "%s/api/v1/scalar"
+            },
+            "env": {
+                "ASPNETCORE_ENVIRONMENT": "Development",
+                "ASPNETCORE_URLS": "https://localhost:7035;http://localhost:5095"
+            }
+        }
+    ]
+}

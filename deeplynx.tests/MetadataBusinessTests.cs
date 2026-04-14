@@ -3,6 +3,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using deeplynx.business;
 using deeplynx.datalayer.Models;
+using deeplynx.helpers;
 using deeplynx.helpers.BigData;
 using deeplynx.helpers.Hubs;
 using deeplynx.interfaces;
@@ -21,17 +22,17 @@ public class MetadataBusinessTests : IntegrationTestBase
     private ClassBusiness _classBusiness = null!;
     private EdgeBusiness _edgeBusiness = null!;
     private EventBusiness _eventBusiness = null!;
+    private SensitivityLabelBusiness _sensitivityLabelBusiness = null!;
     private MetadataBusiness _metadataBusiness = null!;
-    private Mock<IEdgeBusiness> _mockEdgeBusiness = null!;
+    private EdgeBusiness _mockEdgeBusiness = null!;
     private Mock<IHubContext<EventNotificationHub>> _mockHubContext = null!;
     private Mock<ILogger<NotificationBusiness>> _mockNotificationLogger = null!;
-    private Mock<IRecordBusiness> _mockRecordBusiness = null!;
-    private Mock<IRelationshipBusiness> _mockRelationshipBusiness = null!;
     private INotificationBusiness _notificationBusiness = null!;
     private RecordBusiness _recordBusiness = null!;
     private RelationshipBusiness _relationshipBusiness = null!;
     private TagBusiness _tagBusiness = null!;
     private BulkCopyUpsertExecutor _mockBulkCopyUpsertExecutor = null!;
+    private ISensitivityLabelService _sensitivityLabelService = null!;
     public long cid; // origin class ID
     public long cid2; // destination class ID
     public long did;
@@ -48,36 +49,28 @@ public class MetadataBusinessTests : IntegrationTestBase
     {
         await base.InitializeAsync();
 
-        _mockRecordBusiness = new Mock<IRecordBusiness>();
-        _mockRelationshipBusiness = new Mock<IRelationshipBusiness>();
-        _mockEdgeBusiness = new Mock<IEdgeBusiness>();
-
         _mockHubContext = new Mock<IHubContext<EventNotificationHub>>();
         _mockNotificationLogger = new Mock<ILogger<NotificationBusiness>>();
-        _notificationBusiness =
-            new NotificationBusiness(Context, _mockNotificationLogger.Object, _mockHubContext.Object);
+        _notificationBusiness = new NotificationBusiness(Context, _mockNotificationLogger.Object, _mockHubContext.Object);
         _mockBulkCopyUpsertExecutor = new BulkCopyUpsertExecutor();
         _eventBusiness = new EventBusiness(Context, _notificationBusiness, _mockBulkCopyUpsertExecutor);
 
-        _classBusiness = new ClassBusiness(
-            Context, _mockRecordBusiness.Object,
-            _mockRelationshipBusiness.Object, _eventBusiness);
-
-        _relationshipBusiness = new RelationshipBusiness(
-            Context, _mockEdgeBusiness.Object, _eventBusiness);
-
+        // Build leaf dependencies first
         _tagBusiness = new TagBusiness(Context, _eventBusiness);
-        _recordBusiness = new RecordBusiness(Context, _eventBusiness, _mockBulkCopyUpsertExecutor, _tagBusiness);
-        _edgeBusiness = new EdgeBusiness(Context, _eventBusiness, _mockBulkCopyUpsertExecutor);
+        _sensitivityLabelBusiness = new SensitivityLabelBusiness(Context, _eventBusiness);
+
+        _sensitivityLabelService = new SensitivityLabelService(Context);
+
+        _edgeBusiness = new EdgeBusiness(Context, _eventBusiness, _mockBulkCopyUpsertExecutor, _sensitivityLabelService);
+        _recordBusiness = new RecordBusiness(
+            Context, _eventBusiness, _mockBulkCopyUpsertExecutor, _tagBusiness, _sensitivityLabelBusiness, _sensitivityLabelService);
+        _relationshipBusiness = new RelationshipBusiness(Context, _edgeBusiness, _eventBusiness);
+
+        // Now classBusiness gets valid dependencies
+        _classBusiness = new ClassBusiness(Context, _recordBusiness, _relationshipBusiness, _eventBusiness);
 
         _metadataBusiness = new MetadataBusiness(
-            Context,
-            _classBusiness,
-            _relationshipBusiness,
-            _tagBusiness,
-            _recordBusiness,
-            _edgeBusiness
-        );
+            Context, _classBusiness, _relationshipBusiness, _tagBusiness, _recordBusiness, _edgeBusiness);
     }
 
     # region Helper methods

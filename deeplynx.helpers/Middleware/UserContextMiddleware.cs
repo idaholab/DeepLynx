@@ -1,4 +1,3 @@
-using System.Security.Claims;
 using deeplynx.datalayer.Models;
 using deeplynx.helpers.Context;
 using Microsoft.AspNetCore.Http;
@@ -37,7 +36,7 @@ public class UserContextMiddleware
                 _logger.LogInformation($"Available claims: {string.Join(", ", allClaims)}");
 
                 // Try to extract email from multiple possible claim types
-                var email = ExtractEmail(context.User);
+                var email = ClaimsEmailExtractor.ExtractEmail(context.User);
 
                 if (!string.IsNullOrEmpty(email))
                 {
@@ -84,44 +83,5 @@ public class UserContextMiddleware
             UserContextStorage.Email = null;
             UserContextStorage.UserId = 0;
         }
-    }
-
-    private string? ExtractEmail(ClaimsPrincipal user)
-    {
-        // Try various claim types in order of preference
-
-        // 1. Standard email claim
-        var email = user.FindFirst(ClaimTypes.Email)?.Value;
-        if (!string.IsNullOrEmpty(email)) return email;
-
-        // 2. Simple "email" claim (common in JWT)
-        email = user.FindFirst("email")?.Value;
-        if (!string.IsNullOrEmpty(email)) return email;
-
-        // 3. Subject claim (Okta uses this for email sometimes)
-        email = user.FindFirst("sub")?.Value;
-        if (!string.IsNullOrEmpty(email)) return email;
-
-        // 4. Name claim (your HS256 token uses this)
-        email = user.FindFirst(ClaimTypes.Name)?.Value;
-        if (!string.IsNullOrEmpty(email)) return email;
-
-        // 5. Simple "name" claim
-        email = user.FindFirst("name")?.Value;
-        if (!string.IsNullOrEmpty(email)) return email;
-
-        // 6. NameIdentifier with namespace (Okta format)
-        email = user.FindFirst("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier")?.Value;
-        if (!string.IsNullOrEmpty(email)) return email;
-
-        // 7. Preferred username
-        email = user.FindFirst("preferred_username")?.Value;
-        if (!string.IsNullOrEmpty(email)) return email;
-
-        // 8. Username
-        email = user.FindFirst("username")?.Value;
-        if (!string.IsNullOrEmpty(email)) return email;
-
-        return null;
     }
 }

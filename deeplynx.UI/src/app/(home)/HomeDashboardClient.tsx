@@ -4,11 +4,10 @@
 import CreateWidget from "@/app/(home)/components/CreateWidgetsModal";
 import { ExpandableTable } from "@/app/(home)/components/ExpandableTable";
 import ExpandedProjectCard from "@/app/(home)/components/ExpandedProjectCard";
-import { WidgetType } from "./types/types";
 import { PlusIcon, QuestionMarkCircleIcon } from "@heroicons/react/24/outline";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useLanguage } from "../contexts/Language";
 import CreateProject from "./components/CreateProjectsModal";
 import SearchInput from "./components/SearchInput";
@@ -21,6 +20,7 @@ import { useRBAC } from "./rbac/useRBAC";
 import { useSafeSession } from "../hooks/useSafeSession";
 import { useProjectSession } from "../contexts/ProjectSessionProvider";
 import { getAllProjects } from "../lib/client_service/projects_services.client";
+import type { SortOption } from "./hooks/useSortedItems";
 
 type Props = { initialProjects: ProjectResponseDto[] };
 
@@ -51,7 +51,7 @@ export default function HomeDashboardClient({ initialProjects }: Props) {
     try {
       const data = await getAllProjects(
         organization.organizationId as number,
-        true
+        true,
       );
       setProjects(data);
     } catch (err) {
@@ -68,19 +68,13 @@ export default function HomeDashboardClient({ initialProjects }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [organization?.organizationId, hasLoaded, refreshProjects]);
 
-  const filteredProjects = projects
-    .filter((project) => {
-      const term = searchTerm.toLowerCase();
-      return (
-        project.name.toLowerCase().includes(term) ||
-        project.description?.toLowerCase().includes(term)
-      );
-    })
-    .sort((a, b) => {
-      const dateA = new Date(a.lastUpdatedAt!).getTime();
-      const dateB = new Date(b.lastUpdatedAt!).getTime();
-      return dateB - dateA;
-    });
+  const filteredProjects = projects.filter((project) => {
+    const term = searchTerm.toLowerCase();
+    return (
+      project.name.toLowerCase().includes(term) ||
+      project.description?.toLowerCase().includes(term)
+    );
+  });
 
   const { startTour } = useDashboardTour({
     filteredProjects,
@@ -94,6 +88,66 @@ export default function HomeDashboardClient({ initialProjects }: Props) {
     });
     router.push(`/project/${row.id}`);
   };
+
+  const compareOptionalText = (
+    left?: string | null,
+    right?: string | null,
+    direction: "asc" | "desc" = "asc",
+  ) => {
+    const a = left?.trim();
+    const b = right?.trim();
+
+    if (!a && !b) return 0;
+    if (!a) return 1;
+    if (!b) return -1;
+
+    return direction === "asc"
+      ? a.localeCompare(b, undefined, { sensitivity: "base" })
+      : b.localeCompare(a, undefined, { sensitivity: "base" });
+  };
+
+  const toTime = (value?: string | Date | null) =>
+    value ? new Date(value).getTime() : 0;
+
+  const projectSortOptions = useMemo<SortOption<ProjectResponseDto>[]>(
+    () => [
+      {
+        value: "nameAZ",
+        label: t.translations.SORT_NAME_A_TO_Z,
+        compare: (a, b) =>
+          a.name.localeCompare(b.name, undefined, { sensitivity: "base" }),
+      },
+      {
+        value: "nameZA",
+        label: t.translations.SORT_NAME_Z_TO_A,
+        compare: (a, b) =>
+          b.name.localeCompare(a.name, undefined, { sensitivity: "base" }),
+      },
+      {
+        value: "descriptionAZ",
+        label: t.translations.SORT_DESCRIPTION_A_TO_Z,
+        compare: (a, b) =>
+          compareOptionalText(a.description, b.description, "asc"),
+      },
+      {
+        value: "descriptionZA",
+        label: t.translations.SORT_DESCRIPTION_Z_TO_A,
+        compare: (a, b) =>
+          compareOptionalText(a.description, b.description, "desc"),
+      },
+      {
+        value: "dateNew",
+        label: t.translations.SORT_DATE_NEWEST,
+        compare: (a, b) => toTime(b.lastUpdatedAt) - toTime(a.lastUpdatedAt),
+      },
+      {
+        value: "dateOld",
+        label: t.translations.SORT_DATE_OLDEST,
+        compare: (a, b) => toTime(a.lastUpdatedAt) - toTime(b.lastUpdatedAt),
+      },
+    ],
+    [t],
+  );
 
   const columns = [
     {
@@ -111,15 +165,24 @@ export default function HomeDashboardClient({ initialProjects }: Props) {
           }}
           className="font-bold text-secondary hover:text-base-content/80 underline underline-offset-2 transition-colors"
         >
-          {row.name}
+          {row.name.length > 50 ? row.name.slice(0, 50) + "..." : row.name}
         </Link>
       ),
     },
     {
       header: t.translations.DESCRIPTION,
-      data: (row: ProjectResponseDto) => (
-        <span className="text-base-content/80">{row.description || "—"}</span>
-      ),
+      isExpandTrigger: (row: ProjectResponseDto) =>
+        (row.description?.length ?? 0) > 200,
+      data: (row: ProjectResponseDto) => {
+        const isLong = (row.description?.length ?? 0) > 200;
+        return (
+          <span className="text-base-content/80">
+            {isLong
+              ? row.description!.slice(0, 80) + "..."
+              : row.description || "—"}
+          </span>
+        );
+      },
     },
     {
       header: t.translations.LAST_UPDATED_AT,
@@ -130,7 +193,6 @@ export default function HomeDashboardClient({ initialProjects }: Props) {
       ),
     },
   ];
-
 
   const formatUserName = (fullName?: string | null): string => {
     if (!fullName) return "";
@@ -164,9 +226,9 @@ export default function HomeDashboardClient({ initialProjects }: Props) {
   return (
     <div className="min-h-screen bg-base-100">
       <header className="bg-base-200/50 border-b border-base-300/30 sticky z-10 backdrop-blur-sm">
-        <div className="flex justify-between items-center px-4 sm:px-6 lg:px-12 py-4">
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold text-base-content">
+        <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-3 px-3 sm:px-6 lg:px-12 py-4">
+          <div className="flex items-center gap-3 min-w-0">
+            <h1 className="text-lg sm:text-2xl font-bold text-base-content truncate">
               {`${t.translations.WELECOME}, ${formatUserName(displayName)}`}
             </h1>
             <button
@@ -177,27 +239,28 @@ export default function HomeDashboardClient({ initialProjects }: Props) {
               <QuestionMarkCircleIcon className="w-5 h-5" />
             </button>
           </div>
-          <div data-tour="search-input">
+          <div data-tour="search-input" className="w-full lg:w-auto">
             <SearchInput
               placeholder="Search Projects"
+              className="w-full lg:min-w-[18rem]"
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
         </div>
       </header>
 
-      <div className="p-6">
-        <div className="w-4/5 mx-auto">
+      <div className="p-3 sm:p-6">
+        <div className="w-full xl:w-4/5 mx-auto">
           <div
             className="card card-border shadow-md shadow-dynamic-shadow p-4"
             data-tour="projects-section"
           >
-            <div className="flex justify-between items-center mb-4">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4">
               <h3 className="text-info-content text-lg font-semibold">
                 {t.translations.YOUR_PROJECTS}
               </h3>
 
-              <div className="flex gap-2 w-full sm:w-auto">
+              <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
                 <button
                   onClick={() => setIsRecordModalOpen(true)}
                   className="btn btn-outline btn-secondary btn-sm flex-1 sm:flex-initial"
@@ -225,6 +288,8 @@ export default function HomeDashboardClient({ initialProjects }: Props) {
               )}
               onExplore={onExplore}
               getRowId={(p) => p.id}
+              sortOptions={projectSortOptions}
+              defaultSortValue="dateNew"
             />
           </div>
         </div>

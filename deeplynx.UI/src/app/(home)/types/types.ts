@@ -61,7 +61,10 @@ export type FileMetadata = {
   name: string;
   description: string;
   isTimeSeries: boolean;
+  recordMode?: "new" | "update";
+  targetRecordId?: string;
   updateAction?: "merge" | "overwrite";
+  metadataFile?: File;
 };
 
 export type ChunkedUploadSession = {
@@ -99,10 +102,6 @@ export type UploadProgressEvent = {
 
 //Widgets
 export type WidgetType =
-  | "DataOverview"
-  | "Links"
-  | "Graph"
-  | "RecentActivity"
   | "ProjectOverview"
   | "TeamMembers";
 
@@ -151,6 +150,7 @@ export type UploadFileArgs = {
   tags?: string[];
   originalId?: string;
   classId?: number;
+  metadataFile?: File;
   onProgress?: (progress: UploadProgressEvent) => void;
 }
 
@@ -204,6 +204,7 @@ export type UsersTableRow = {
   isActive: boolean;
   isArchived: boolean;
   isSysAdmin: boolean;
+  isOrgAdmin?: boolean | null;
   isPending?: boolean;
   invitedAt?: string;
   projectName?: string;
@@ -215,3 +216,9 @@ export type Project = {
   id: string,
   name: string
 }
+
+export type ExpandableTableColumn<T> = {
+  header: string;
+  data: (row: T) => ReactNode;
+  isExpandTrigger?: (row: T) => boolean;
+};

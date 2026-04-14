@@ -24,7 +24,7 @@ const ProjectDropdown: React.FC<ProjectDropdownProps> = ({
   const allIds = useMemo(() => projects.map((p) => p.id), [projects]);
   const defaultToken = useMemo(
     () => (defaultSelected ?? []).map(String).join("|"),
-    [defaultSelected]
+    [defaultSelected],
   );
 
   // Apply defaultSelected when loaded / when it changes
@@ -75,32 +75,34 @@ const ProjectDropdown: React.FC<ProjectDropdownProps> = ({
   const filteredProjects = useMemo(
     () =>
       projects.filter((p) =>
-        p.name.toLowerCase().includes(searchTerm.toLowerCase())
+        p.name.toLowerCase().includes(searchTerm.toLowerCase()),
       ),
-    [projects, searchTerm]
+    [projects, searchTerm],
   );
 
   const selectedLabel = useMemo(() => {
     if (selectedIds.includes("ALL")) return "All Your Projects";
     if (selectedIds.length === 1) {
       const project = projects.find((p) => p.id === selectedIds[0]);
-      return project?.name || "1 project selected";
+      const name = project?.name || "1 project selected"
+      return  name.length >50 ? name.slice(0 ,50) + "..." : name;
     }
     return `${selectedIds.length} projects selected`;
   }, [selectedIds, projects]);
 
   return (
     <div
-      className="relative inline-block text-left min-w-sm text-base-content/80"
+      className="relative inline-block text-left w-full sm:min-w-[18rem] max-w-full text-base-content/80"
       ref={dropdownRef}
     >
       <button
-        className="flex items-center gap-1 text-md"
+        className="flex items-center gap-1 text-md max-w-full"
         onClick={() => setIsOpen((o) => !o)}
+        title={selectedIds.length === 1 ? projects.find((p) => p.id === selectedIds[0])?.name : undefined}
         type="button"
       >
-        {selectedLabel}{" "}
-        {selectedLabel === "All your Projects" && `(${projects.length})`}
+        <span className="truncate">{selectedLabel}</span>
+        {selectedLabel === "All Your Projects" && `(${projects.length})`}
         {isOpen ? (
           <ChevronUpIcon className="w-5 h-5 ml-1" />
         ) : (
@@ -122,7 +124,7 @@ const ProjectDropdown: React.FC<ProjectDropdownProps> = ({
             <label className="label cursor-pointer justify-start gap-2">
               <input
                 type="checkbox"
-                className="checkbox text-white checked:bg-dynamic-blue border-dynamic-blue"
+                className="checkbox checked:checkbox-secondary"
                 checked={selectedIds.includes("ALL")}
                 onChange={() => toggleProject("ALL")}
               />
@@ -136,15 +138,15 @@ const ProjectDropdown: React.FC<ProjectDropdownProps> = ({
             {filteredProjects.map((project) => (
               <label
                 key={project.id}
-                className="label cursor-pointer justify-start gap-2 text-base-content"
+                className="label cursor-pointer justify-start gap-2 text-base-content truncate"
               >
                 <input
                   type="checkbox"
-                  className="checkbox text-white checked:bg-dynamic-blue border-dynamic-blue"
+                  className="checkbox checked:checkbox-secondary"
                   checked={selectedIds.includes(project.id)}
                   onChange={() => toggleProject(project.id)}
                 />
-                <span className="label-text">{project.name}</span>
+                <span className="label-text" title={project.name}>{project.name.length> 50 ? project.name.slice(0,50) + "..." : project.name}</span>
               </label>
             ))}
           </div>

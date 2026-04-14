@@ -5,14 +5,17 @@ import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 
 import EditSysUser from "../../components/SiteManagementPortal/EditSysUser";
-import { UserResponseDto } from "../../types/responseDTOs";
+import { OrganizationResponseDto, UserResponseDto } from "../../types/responseDTOs";
 
 import { useOrganizationSession } from "@/app/contexts/OrganizationSessionProvider";
 import {
   removeUserFromOrganization,
   inviteUserToOrganization,
 } from "@/app/lib/client_service/organization_services.client";
-import { getAllUsers } from "@/app/lib/client_service/user_services.client";
+import {
+  archiveUser,
+  getAllUsers,
+} from "@/app/lib/client_service/user_services.client";
 import { InviteUserToOrganizationRequestDto } from "../../types/requestDTOs";
 import DeleteModal from "./DeleteModal";
 import InviteUserModal from "./InviteUserModal";
@@ -27,6 +30,8 @@ import { useLanguage } from "@/app/contexts/Language";
 
 interface Props {
   members: UserResponseDto[];
+  scope?: "org" | "site";
+  availableOrganizations?: OrganizationResponseDto[];
 }
 
 type ConfirmModalState = {
@@ -49,6 +54,7 @@ const buildTableData = (users: UserResponseDto[]): UsersTableRow[] => {
     isActive: user.isActive,
     isArchived: user.isArchived,
     isSysAdmin: user.isSysAdmin,
+    isOrgAdmin: user.isOrgAdmin,
     isPending: false,
   }));
 
@@ -59,13 +65,17 @@ const buildTableData = (users: UserResponseDto[]): UsersTableRow[] => {
 /*                           UsersTable Component                             */
 /* -------------------------------------------------------------------------- */
 
-const UsersTable = ({ members }: Props) => {
+const UsersTable = ({
+  members,
+  scope = "org",
+  availableOrganizations = [],
+}: Props) => {
   /* ------------------------------------------------------------------------ */
   /*                               Core State                                */
   /* ------------------------------------------------------------------------ */
 
   const [tableData, setTableData] = useState<UsersTableRow[]>(() =>
-    buildTableData(members)
+    buildTableData(members),
   );
   const [loading, setLoading] = useState(false);
   const { t } = useLanguage();
@@ -75,8 +85,9 @@ const UsersTable = ({ members }: Props) => {
   /* ------------------------------------------------------------------------ */
 
   const [showInviteModal, setShowInviteModal] = useState(false);
-  const [inviteEmail, setInviteEmail] = useState("");
   const [modalLoading, setModalLoading] = useState(false);
+  const [selectedInviteOrganizationId, setSelectedInviteOrganizationId] =
+    useState("");
 
   /* ------------------------------------------------------------------------ */
   /*                            Edit User Modal State                         */
@@ -84,6 +95,8 @@ const UsersTable = ({ members }: Props) => {
 
   const [editingUserId, setEditingUserId] = useState<number | null>(null);
   const [editUserName, setEditUserName] = useState("");
+  const [editUserIsOrgAdmin, setEditUserIsOrgAdmin] = useState(false);
+  const [editUserIsSysAdmin, setEditUserIsSysAdmin] = useState(false);
 
   /* ------------------------------------------------------------------------ */
   /*                         Confirm Remove/Cancel State                      */
@@ -107,12 +120,13 @@ const UsersTable = ({ members }: Props) => {
   /* ------------------------------------------------------------------------ */
 
   const loadAllData = async () => {
-    if (!organization?.organizationId) return;
+    if (scope === "org" && !organization?.organizationId) return;
 
     try {
-      const users: UserResponseDto[] = await getAllUsers(
-        organization.organizationId
-      );
+      const users: UserResponseDto[] =
+        scope === "org"
+          ? await getAllUsers(organization!.organizationId)
+          : await getAllUsers();
       setTableData(buildTableData(users));
     } catch (error) {
       console.error("Failed to load data:", error);
@@ -129,6 +143,17 @@ const UsersTable = ({ members }: Props) => {
   /* ------------------------------------------------------------------------ */
 
   const handleOpenInviteModal = () => {
+    if (scope === "site") {
+      if (availableOrganizations.length === 0) {
+        toast.error(t.translations.ORGANIZATION_NOT_FOUND);
+        return;
+      }
+
+      setSelectedInviteOrganizationId((current) =>
+        current || String(availableOrganizations[0].id),
+      );
+    }
+
     setShowInviteModal(true);
   };
 
@@ -136,49 +161,85 @@ const UsersTable = ({ members }: Props) => {
   /*                          Invite Flow: Send Invitation                    */
   /* ------------------------------------------------------------------------ */
 
-  const handleInviteUser = async () => {
-    if (!inviteEmail) {
-      toast.error(t.translations.PLEASE_ENTER_EMAIL_ADDRESS);
-      return;
-    }
+  type InviteResults = {
+    successful: string[];
+    failed: { email: string; error: string }[];
+  };
 
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(inviteEmail)) {
-      toast.error(t.translations.PLEASE_ENTER_VALID_EMAIL_ADDRESS);
-      return;
-    }
+  const handleInviteUsers = async (
+    emails: string[],
+  ): Promise<InviteResults> => {
+    const targetOrganizationId =
+      scope === "org"
+        ? organization?.organizationId
+        : selectedInviteOrganizationId;
 
-    if (!organization?.organizationId) {
+    if (!targetOrganizationId) {
       toast.error(t.translations.NO_ORG_SELECTED);
-      return;
+      return {
+        successful: [],
+        failed: emails.map((email) => ({
+          email,
+          error: t.translations.NO_ORG_SELECTED,
+        })),
+      };
     }
+
+    // (InviteUserModal already validates format, but keep this as a safety net)
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+    setModalLoading(true);
+
+    const results: InviteResults = { successful: [], failed: [] };
 
     try {
-      setModalLoading(true);
+      for (const email of emails) {
+        const trimmed = email.trim();
 
-      // Prepare organization invite data
-      const inviteData: InviteUserToOrganizationRequestDto = {
-        userEmail: inviteEmail,
-        userName: inviteEmail.split("@")[0], // Extract username from email
-      };
+        if (!emailRegex.test(trimmed)) {
+          results.failed.push({
+            email: trimmed,
+            error: t.translations.PLEASE_ENTER_VALID_EMAIL_ADDRESS,
+          });
+          continue;
+        }
 
-      // Call organization invite API
-      await inviteUserToOrganization(
-        organization.organizationId as number,
-        inviteData
-      );
+        try {
+          const inviteData: InviteUserToOrganizationRequestDto = {
+            userEmail: trimmed,
+            userName: trimmed.split("@")[0],
+          };
 
-      toast.success(`${t.translations.INVITATION_SENT_TO_} ${inviteEmail}`);
+          await inviteUserToOrganization(
+            Number(targetOrganizationId),
+            inviteData,
+          );
 
-      // Refresh the user list
-      await loadAllData();
+          results.successful.push(trimmed);
+        } catch (err: any) {
+          // Try to extract a useful message; fall back to generic translation
+          const message =
+            err?.response?.data?.message ||
+            err?.message ||
+            t.translations.FAILED_TO_SEND_INVITATION;
 
-      // Close modal and reset form
-      setShowInviteModal(false);
-      setInviteEmail("");
-    } catch (error) {
-      console.error("Error inviting user:", error);
-      toast.error(t.translations.FAILED_TO_SEND_INVITATION);
+          results.failed.push({ email: trimmed, error: String(message) });
+        }
+      }
+
+      // Toast summary (optional but nice UX)
+      if (results.successful.length > 0) {
+        toast.success(
+          `${t.translations.INVITATION_SENT_TO_} ${results.successful.length}`,
+        );
+        await loadAllData(); // refresh once
+      }
+
+      if (results.failed.length > 0) {
+        toast.error(t.translations.FAILED_TO_SEND_INVITATION);
+      }
+
+      return results;
     } finally {
       setModalLoading(false);
     }
@@ -200,7 +261,7 @@ const UsersTable = ({ members }: Props) => {
 
       await inviteUserToOrganization(
         organization.organizationId as number,
-        inviteData
+        inviteData,
       );
 
       toast.success(`${t.translations.INVITATION_RESENT_TO_} ${email}`);
@@ -225,17 +286,20 @@ const UsersTable = ({ members }: Props) => {
       if (confirmModal.isPending) {
         // TODO: API call to cancel invite
         toast.success(t.translations.INVITATION_CANCELED);
-      } else {
+      } else if (scope === "org") {
         if (!organization?.organizationId) {
           throw new Error("No organization selected");
         }
 
         await removeUserFromOrganization(
           organization.organizationId as number,
-          confirmModal.itemId
+          confirmModal.itemId,
         );
 
         toast.success(t.translations.USER_REMOVED_FROM_ORG);
+      } else if (scope === "site") {
+        await archiveUser(confirmModal.itemId, true);
+        toast.success(t.translations.USER_ARCHIVED_SUCCESSFULLY);
       }
 
       // Refresh org-scoped list
@@ -252,7 +316,9 @@ const UsersTable = ({ members }: Props) => {
       toast.error(
         confirmModal.isPending
           ? t.translations.FAILED_TO_CANCEL_INVITATION
-          : t.translations.FAILED_TO_REMOVE_USER
+          : scope === "org"
+            ? t.translations.FAILED_TO_REMOVE_USER
+            : t.translations.FAILED_TO_ARCHIVE_USER,
       );
     } finally {
       setLoading(false);
@@ -264,7 +330,7 @@ const UsersTable = ({ members }: Props) => {
   /* ------------------------------------------------------------------------ */
 
   const activeUserCount = tableData.filter(
-    (u) => !u.isPending && u.isActive && !u.isArchived
+    (u) => !u.isPending && u.isActive && !u.isArchived,
   ).length;
   const pendingCount = tableData.filter((u) => u.isActive === false).length;
   const totalCount = activeUserCount + pendingCount;
@@ -284,16 +350,25 @@ const UsersTable = ({ members }: Props) => {
             totalCount={totalCount}
             loading={loading}
             onInviteClick={handleOpenInviteModal}
+            scope={scope}
           />
 
           {/* Combined Users & Pending Invites Table */}
           <UsersListTable
             tableData={tableData}
+            scope={scope}
             loading={loading}
             onResendInvite={handleResendInvite}
-            onEditUser={(id: number, name: string) => {
+            onEditUser={(
+              id: number,
+              name: string,
+              isOrgAdmin: boolean,
+              isSysAdmin: boolean,
+            ) => {
               setEditingUserId(id);
               setEditUserName(name);
+              setEditUserIsOrgAdmin(isOrgAdmin);
+              setEditUserIsSysAdmin(isSysAdmin);
             }}
             onOpenConfirm={(item: ConfirmModalState) => setConfirmModal(item)}
           />
@@ -303,14 +378,13 @@ const UsersTable = ({ members }: Props) => {
       {/* Invite User Modal */}
       <InviteUserModal
         isOpen={showInviteModal}
-        inviteEmail={inviteEmail}
         modalLoading={modalLoading}
-        onClose={() => {
-          setShowInviteModal(false);
-          setInviteEmail("");
-        }}
-        onInvite={handleInviteUser}
-        onChangeEmail={setInviteEmail}
+        onClose={() => setShowInviteModal(false)}
+        onInvite={handleInviteUsers}
+        scope={scope}
+        availableOrganizations={availableOrganizations}
+        selectedOrganizationId={selectedInviteOrganizationId}
+        onSelectedOrganizationChange={setSelectedInviteOrganizationId}
       />
 
       {/* Edit User Modal */}
@@ -324,6 +398,10 @@ const UsersTable = ({ members }: Props) => {
           userId={editingUserId}
           userName={editUserName}
           onUserUpdated={loadAllData}
+          currentOrgAdminStatus={editUserIsOrgAdmin}
+          currentSysAdminStatus={editUserIsSysAdmin}
+          scope={scope}
+          organizationId={organization?.organizationId as number}
         />
       )}
 
@@ -342,17 +420,23 @@ const UsersTable = ({ members }: Props) => {
         title={
           confirmModal.isPending
             ? t.translations.CANCEL_INVITATION
-            : t.translations.REMOVE_USER
+            : scope === "org"
+              ? t.translations.REMOVE_USER
+              : t.translations.ARCHIVE_USER
         }
         message={
           confirmModal.isPending
             ? `${t.translations.SURE_YOU_WANT_TO_CANCEL_INVITATION_FOR_} ${confirmModal.itemName}? ${t.translations.THEY_WILL_NOT_BE_ABLE_TO_JOIN_WITH_LINK}`
-            : `${t.translations.ARE_YOU_SURE_YOU_WANT_TO_REMOVE_} ${confirmModal.itemName} ${t.translations.THEY_WILL_LOSE_ACCESS_FROM_ALL_PROJECTS}`
+            : scope === "org"
+              ? `${t.translations.ARE_YOU_SURE_YOU_WANT_TO_REMOVE_} ${confirmModal.itemName} ${t.translations.THEY_WILL_LOSE_ACCESS_FROM_ALL_PROJECTS}`
+              : `${t.translations.ARE_YOU_SURE_YOU_WANT_TO_ARCHIVE_} ${confirmModal.itemName}? ${t.translations.THEY_WILL_NO_LONGER_BE_ABLE_TO_SIGN_IN_UNTIL_UNARCHIVED}`
         }
         confirmText={
           confirmModal.isPending
             ? t.translations.CANCEL_INVITE
-            : t.translations.REMOVE
+            : scope === "org"
+              ? t.translations.REMOVE
+              : t.translations.ARCHIVE
         }
         cancelText={
           confirmModal.isPending

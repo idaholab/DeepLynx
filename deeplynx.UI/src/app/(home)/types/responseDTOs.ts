@@ -67,6 +67,7 @@ export interface HistoricalRecordResponseDto {
   projectId?: number;
   projectName: string;
   tags?: string | null;
+  labels?: string | null;
   lastUpdatedAt: string;
   lastUpdatedBy?: string | null;
   isArchived: boolean;
@@ -90,6 +91,7 @@ export type RecordResponseDto = {
   isArchived?: boolean;
   fileType?: string | null;
   tags?: { id: number | null; name: string }[];
+  labels?: { id: number | null; name: string }[];
 };
 
 export type ObjectStorageResponseDto = {
@@ -111,6 +113,7 @@ export type OrganizationResponseDto = {
   lastUpdatedBy?: string | null;
   isArchived: boolean;
   defaultOrg?: boolean;
+  banner?: string;
 }
 
 export type PermissionResponseDto = {
@@ -147,6 +150,7 @@ export type ProjectResponseDto = {
   lastUpdatedBy?: string | null;
   isArchived: boolean;
   organizationId: number | string;
+  banner?: string;
 };
 
 export type ProjectStatResponseDto = {
@@ -155,7 +159,6 @@ export type ProjectStatResponseDto = {
   datasources: number;
 }
 
-//which one
 export type RoleResponseDto = {
   id: number;
   name: string;
@@ -177,6 +180,17 @@ export type TagResponseDto = {
   archivedAt?: string | null;
 };
 
+export type SensitivityLabelsDto = {
+  id: number;
+  name: string;
+  description: string | null;
+  lastUpdatedAt: string;
+  lastUpdatedBy: number | null;
+  isArchived: boolean;
+  projectId: number | null;
+  organizationId: number | null;
+}
+
 export type UserResponseDto =
   {
     id: number;
@@ -184,12 +198,13 @@ export type UserResponseDto =
     email: string;
     username: string;
     isSysAdmin: boolean;
+    isOrgAdmin?: boolean | null;
     isArchived: boolean;
     isActive: boolean;
     role?: string;
   }
 
-  export type UserAdminInfoDto = {
+export type UserAdminInfoDto = {
   id: number;
   name: string;
   email: string;
@@ -257,21 +272,21 @@ export type PaginatedEventsResponseDto =
   };
 
 export type EventResponseDto = {
-    id: number;
-    operation: string;
-    entityType: string;
-    entityId?: number | null;
-    projectId: number;
-    organizationId?: number | null;
-    organizationName: string;
-    dataSourceId?: number | null;
-    properties?: JSON | string | null;
-    projectName?: string | null;
-    entityName?: string | null;
-    dataSourceName?: string | null;
-    lastUpdatedAt?: string | null;
-    lastUpdatedBy?: number | null;
-    lastUpdatedByUserName?: string | null;
+  id: number;
+  operation: string;
+  entityType: string;
+  entityId?: number | null;
+  projectId: number;
+  organizationId?: number | null;
+  organizationName: string;
+  dataSourceId?: number | null;
+  properties?: JSON | string | null;
+  projectName?: string | null;
+  entityName?: string | null;
+  dataSourceName?: string | null;
+  lastUpdatedAt?: string | null;
+  lastUpdatedBy?: number | null;
+  lastUpdatedByUserName?: string | null;
 };
 
 export type EdgeResponseDto = {

@@ -176,6 +176,8 @@ spec:
                   key: jwt-secret-key
             - name: INSIGHT_API_URL
               value: "http://insight-fastapi-service"
+            - name: INSIGHT_API_URL
+              value: "http://insight-fastapi-service"
             - name: AUTH_TRUST_HOST
               value: "true"
             - name: AUTH_SECRET
