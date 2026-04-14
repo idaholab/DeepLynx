@@ -159,6 +159,8 @@ spec:
               value: ${DISABLE_BACKEND_AUTHENTICATION}
             - name: SUPERUSER_EMAIL
               value: ${SUPERUSER_EMAIL}
+            - name: INSIGHT_FASTAPI_URL
+              value: ${INSIGHT_FASTAPI_URL}
             - name: TENANT_MODE
               value: ${TENANT_MODE}
             # Runtime environment variables from secrets (sensitive)
@@ -172,6 +174,8 @@ spec:
                 secretKeyRef:
                   name: app-secrets
                   key: jwt-secret-key
+            - name: INSIGHT_API_URL
+              value: "http://insight-fastapi-service"
             - name: INSIGHT_API_URL
               value: "http://insight-fastapi-service"
             - name: AUTH_TRUST_HOST
@@ -304,6 +308,8 @@ spec:
               value: ${INVITE_URL}
             - name: SUPPORT_EMAIL
               value: ${SUPPORT_EMAIL}
+            - name: INSIGHT_FASTAPI_URL
+              value: ${INSIGHT_FASTAPI_URL}
             - name: TENANT_MODE
               value: ${TENANT_MODE}
             - name: DISABLE_BACKEND_AUTHENTICATION
@@ -534,9 +540,9 @@ spec:
         app: insight-fastapi
     spec:
       hostAliases:
-        - ip: "141.221.75.4"
+        - ip: "10.6.17.82"
           hostnames:
-            - "api.hpc.inl.gov"
+            - "deeplynx-api.inl.gov"
       containers:
         - name: insight-fastapi
           image: ${CI_REGISTRY}/${CI_REGISTRY_PATH}:insight-fastapi-${GITHUB_RUN_NUMBER}
@@ -586,15 +592,15 @@ spec:
                   name: app-secrets
                   key: emb-auth-token
             - name: LLM_SERVER_URL
-              value: "https://api.hpc.inl.gov/llm/v1"
+              value: "http://deeplynx-api.inl.gov:4000/v1"
             - name: LLM_MODEL_NAME
-              value: "gpt-oss-120b"
+              value: "llm"
             - name: MM_SERVER_URL
-              value: "https://api.hpc.inl.gov/llm/v1"
+              value: "http://deeplynx-api.inl.gov:4000/v1"
             - name: MM_MODEL_NAME
-              value: "Mistral-Small-3.2-24B-Instruct-2506"
+              value: "mmllm"
             - name: EMB_SERVER_URL
-              value: "https://api.hpc.inl.gov/llm/v1"
+              value: "http://deeplynx-api.inl.gov:4000/v1"
             - name: EMB_MODEL_NAME
               value: "bge-m3"
             - name: EMB_DIMENSION
@@ -643,9 +649,9 @@ spec:
     spec:
       terminationGracePeriodSeconds: 120
       hostAliases:
-        - ip: "141.221.75.4"
+        - ip: "10.6.17.82"
           hostnames:
-            - "api.hpc.inl.gov"
+            - "deeplynx-api.inl.gov"
       containers:
         - name: insight-rabbitmq-runner
           image: ${CI_REGISTRY}/${CI_REGISTRY_PATH}:insight-rabbitmq-runner-${GITHUB_RUN_NUMBER}
@@ -692,15 +698,15 @@ spec:
                   name: app-secrets
                   key: emb-auth-token
             - name: LLM_SERVER_URL
-              value: "https://api.hpc.inl.gov/llm/v1"
+              value: "http://deeplynx-api.inl.gov:4000/v1"
             - name: LLM_MODEL_NAME
-              value: "gpt-oss-120b"
+              value: "llm"
             - name: MM_SERVER_URL
-              value: "https://api.hpc.inl.gov/llm/v1"
+              value: "http://deeplynx-api.inl.gov:4000/v1"
             - name: MM_MODEL_NAME
-              value: "Mistral-Small-3.2-24B-Instruct-2506"
+              value: "mmllm"
             - name: EMB_SERVER_URL
-              value: "https://api.hpc.inl.gov/llm/v1"
+              value: "http://deeplynx-api.inl.gov:4000/v1"
             - name: EMB_MODEL_NAME
               value: "bge-m3"
             - name: EMB_DIMENSION
