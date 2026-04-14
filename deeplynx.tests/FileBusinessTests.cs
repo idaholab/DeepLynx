@@ -38,6 +38,7 @@ public class FileBusinessTests : IntegrationTestBase
     private SensitivityLabelBusiness _sensitivityLabelBusiness = null!;
     private ISensitivityLabelService _sensitivityLabelService = null!;
     private TagBusiness _tagBusiness = null!;
+    private Mock<IInsightBusiness> _insightBusiness = null!;
 
     public long did; // datasource ID
     public long oid; // organization ID
@@ -64,7 +65,7 @@ public class FileBusinessTests : IntegrationTestBase
         _mockBulkCopyExecutor = new BulkCopyUpsertExecutor();
         _eventBusiness = new EventBusiness(Context, _notificationBusiness, _mockBulkCopyExecutor);
 
-
+        _insightBusiness = new Mock<IInsightBusiness>();
         _fileBusinessFactory = new Mock<IFileBusinessFactory>();
 
         _dataSourceBusiness =
@@ -76,12 +77,15 @@ public class FileBusinessTests : IntegrationTestBase
         _sensitivityLabelService = new SensitivityLabelService(Context);
         _recordBusiness = new RecordBusiness(Context, _eventBusiness, _mockBulkCopyExecutor, _tagBusiness,
             _sensitivityLabelBusiness, _sensitivityLabelService);
+
+        _dataSourceBusiness =
+            new DataSourceBusiness(Context, _edgeBusiness.Object, _recordBusiness, _eventBusiness);
+        _objectStorageBusiness = new ObjectStorageBusiness(Context);
         _classBusiness = new ClassBusiness(Context, _recordBusiness, _relationshipBusiness.Object, _eventBusiness);
 
         var realFileFilesystemBusiness =
             new FileFilesystemBusiness(Context, _objectStorageBusiness, _classBusiness, _recordBusiness);
 
-        // Object storage should also determine this implicitly - but we can also add this failsafe for now
         _fileBusinessFactory
             .Setup(x => x.CreateFileBusiness("filesystem"))
             .Returns(realFileFilesystemBusiness);
@@ -91,7 +95,8 @@ public class FileBusinessTests : IntegrationTestBase
             _fileBusinessFactory.Object,
             _dataSourceBusiness,
             _classBusiness,
-            _recordBusiness
+            _recordBusiness,
+            _insightBusiness.Object
         );
     }
 
@@ -218,8 +223,7 @@ public class FileBusinessTests : IntegrationTestBase
             pid,
             did,
             osid, // Explicitly specify project storage
-            file,
-            embed: true
+            file
         );
 
         // Assert
@@ -228,7 +232,6 @@ public class FileBusinessTests : IntegrationTestBase
         Assert.Equal(osid, result.ObjectStorageId); // Should use specified storage
         Assert.True(File.Exists(result.Uri));
         Assert.True(result.Uri.Contains(_testDirectory), "File should be in project directory");
-        Assert.True(result.Embedded);
     }
 
     [Fact]
@@ -269,8 +272,7 @@ public class FileBusinessTests : IntegrationTestBase
             pid,
             did,
             orgOsId, // Explicitly use org storage
-            file,
-            embed: true
+            file
         );
 
         // Assert
@@ -282,7 +284,6 @@ public class FileBusinessTests : IntegrationTestBase
             $"File should be in org directory. Actual: {result.Uri}");
         Assert.False(result.Uri.Contains(_testDirectory),
             $"File should NOT be in project directory. Actual: {result.Uri}");
-        Assert.True(result.Embedded);
     }
 
     [Fact]
@@ -322,8 +323,7 @@ public class FileBusinessTests : IntegrationTestBase
             pid,
             did,
             osid, // Explicitly use project storage
-            file,
-            embed: true
+            file
         );
 
         // Assert: Should use project storage, not org default
@@ -332,7 +332,6 @@ public class FileBusinessTests : IntegrationTestBase
         Assert.True(result.Uri.Contains(_testDirectory),
             "Should use specified project storage, not org default");
         Assert.False(result.Uri.Contains(_orgDefaultDirectory));
-        Assert.True(result.Embedded);
     }
 
     [Fact]
@@ -379,8 +378,7 @@ public class FileBusinessTests : IntegrationTestBase
                 pid,
                 did,
                 secondaryOsId, // Use non-default storage
-                file,
-                embed: true
+                file
             );
 
             // Assert
@@ -390,7 +388,6 @@ public class FileBusinessTests : IntegrationTestBase
                 $"Should use secondary storage. Actual: {result.Uri}");
             Assert.False(result.Uri.Contains(_testDirectory));
             Assert.False(result.Uri.Contains(_orgDefaultDirectory));
-            Assert.True(result.Embedded);
         }
         finally
         {
@@ -415,7 +412,7 @@ public class FileBusinessTests : IntegrationTestBase
 
         // Act & Assert
         var exception = await Assert.ThrowsAsync<KeyNotFoundException>(() =>
-            _fileBusiness.UploadFile(uid, oid, pid, did, invalidStorageId, file, embed: true)
+            _fileBusiness.UploadFile(uid, oid, pid, did, invalidStorageId, file)
         );
 
         Assert.Contains("No object storage found", exception.Message);
@@ -1287,6 +1284,8 @@ public class FileBusinessTests : IntegrationTestBase
         };
 
         var result = await _fileBusiness.CompleteUpload(uid, oid, pid, did, osid, completeRequest);
+        
+        
 
         // Assert: Should use SECOND upload (last write wins)
         var finalFilePath = result.Uri;
@@ -1910,8 +1909,7 @@ public class FileBusinessTests : IntegrationTestBase
             pid,
             did,
             null, // objectStorageId is null
-            file,
-            embed: true
+            file
         );
 
         // Assert
@@ -1920,7 +1918,6 @@ public class FileBusinessTests : IntegrationTestBase
         Assert.Equal(osid, result.ObjectStorageId); // Should use project default
         Assert.True(File.Exists(result.Uri));
         Assert.True(result.Uri.Contains(_testDirectory), "File should be in project directory");
-        Assert.True(result.Embedded);
     }
 
     [Fact]
@@ -1999,6 +1996,218 @@ public class FileBusinessTests : IntegrationTestBase
         );
 
         Assert.Contains("No default object storage found", exception.Message);
+    }
+
+    #endregion
+    
+    #region FileSize Tests
+
+    [Fact]
+    public async Task UploadFile_CapturesFileSize()
+    {
+        // Arrange
+        var content = "Test file content with some length";
+        var expectedSize = System.Text.Encoding.UTF8.GetBytes(content).Length;
+        var ms = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(content));
+        var file = new FormFile(ms, 0, ms.Length, "file", "filesize-test.txt")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "text/plain"
+        };
+
+        // Act
+        var result = await _fileBusiness.UploadFile(
+            uid, oid, pid, did, osid, file
+        );
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.NotNull(result.FileSize);
+        Assert.Equal(expectedSize, result.FileSize);
+        
+        // Verify file size persisted in database
+        var dbRecord = await Context.Records.FindAsync(result.Id);
+        Assert.NotNull(dbRecord);
+        Assert.Equal(expectedSize, dbRecord.FileSize);
+    }
+
+    [Fact]
+    public async Task UploadFile_LargeFile_CapturesCorrectFileSize()
+    {
+        // Arrange - Create a 1MB file
+        var content = new string('A', 1024 * 1024); // 1MB of 'A' characters
+        var expectedSize = System.Text.Encoding.UTF8.GetBytes(content).Length;
+        var ms = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(content));
+        var file = new FormFile(ms, 0, ms.Length, "file", "large-file.txt")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "text/plain"
+        };
+
+        // Act
+        var result = await _fileBusiness.UploadFile(
+            uid, oid, pid, did, osid, file
+        );
+
+        // Assert
+        Assert.NotNull(result.FileSize);
+        Assert.Equal(expectedSize, result.FileSize);
+        Assert.True(result.FileSize > 1000000); // Over 1MB
+    }
+
+    [Fact]
+    public async Task UpdateFile_UpdatesFileSize()
+    {
+        // Arrange - Upload initial file
+        var initialContent = "Initial content";
+        var ms1 = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(initialContent));
+        var file1 = new FormFile(ms1, 0, ms1.Length, "file", "update-size-test.txt")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "text/plain"
+        };
+        var initialRecord = await _fileBusiness.UploadFile(uid, oid, pid, did, osid, file1);
+        var initialSize = initialRecord.FileSize;
+
+        // Act - Update with larger file
+        var newContent = "This is much longer content for the updated file";
+        var expectedNewSize = System.Text.Encoding.UTF8.GetBytes(newContent).Length;
+        var ms2 = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(newContent));
+        var file2 = new FormFile(ms2, 0, ms2.Length, "file", "updated-size.txt")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "text/plain"
+        };
+        var updatedRecord = await _fileBusiness.UpdateFile(uid, oid, pid, initialRecord.Id, file2);
+
+        // Assert
+        Assert.NotNull(updatedRecord.FileSize);
+        Assert.Equal(expectedNewSize, updatedRecord.FileSize);
+        Assert.NotEqual(initialSize, updatedRecord.FileSize);
+        Assert.True(updatedRecord.FileSize > initialSize);
+        
+        // Verify in database
+        var dbRecord = await Context.Records.FindAsync(updatedRecord.Id);
+        Assert.Equal(expectedNewSize, dbRecord.FileSize);
+    }
+
+    [Fact]
+    public async Task GetRecord_ReturnsFileSize()
+    {
+        // Arrange
+        var content = "Content for get test";
+        var expectedSize = System.Text.Encoding.UTF8.GetBytes(content).Length;
+        var ms = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(content));
+        var file = new FormFile(ms, 0, ms.Length, "file", "get-size-test.txt")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "text/plain"
+        };
+        var uploadedRecord = await _fileBusiness.UploadFile(uid, oid, pid, did, osid, file);
+
+        // Act
+        var retrievedRecord = await _recordBusiness.GetRecord(uid, oid, pid, uploadedRecord.Id, true);
+
+        // Assert
+        Assert.NotNull(retrievedRecord);
+        Assert.NotNull(retrievedRecord.FileSize);
+        Assert.Equal(expectedSize, retrievedRecord.FileSize);
+    }
+
+    [Fact]
+    public async Task GetAllRecords_ReturnsFileSizes()
+    {
+        // Arrange - Upload multiple files with different sizes
+        var file1Content = "Small file";
+        var file1Size = System.Text.Encoding.UTF8.GetBytes(file1Content).Length;
+        var ms1 = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(file1Content));
+        var file1 = new FormFile(ms1, 0, ms1.Length, "file", "small.txt")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "text/plain"
+        };
+        
+        var file2Content = new string('B', 5000); // Larger file
+        var file2Size = System.Text.Encoding.UTF8.GetBytes(file2Content).Length;
+        var ms2 = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(file2Content));
+        var file2 = new FormFile(ms2, 0, ms2.Length, "file", "large.txt")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "text/plain"
+        };
+
+        await _fileBusiness.UploadFile(uid, oid, pid, did, osid, file1);
+        await _fileBusiness.UploadFile(uid, oid, pid, did, osid, file2);
+
+        // Act
+        var allRecords = await _recordBusiness.GetAllRecords(uid, oid, pid, did, true);
+
+        // Assert
+        var uploadedRecords = allRecords.Where(r => r.Name == "small.txt" || r.Name == "large.txt").ToList();
+        Assert.Equal(2, uploadedRecords.Count);
+        Assert.All(uploadedRecords, r => Assert.NotNull(r.FileSize));
+        
+        var smallFile = uploadedRecords.First(r => r.Name == "small.txt");
+        var largeFile = uploadedRecords.First(r => r.Name == "large.txt");
+        
+        Assert.Equal(file1Size, smallFile.FileSize);
+        Assert.Equal(file2Size, largeFile.FileSize);
+        Assert.True(largeFile.FileSize > smallFile.FileSize);
+    }
+
+    [Fact]
+    public async Task CompleteUpload_ChunkedUpload_CapturesCorrectFileSize()
+    {
+        // Arrange
+        var content = "Chunked upload content with multiple parts that will be merged";
+        var expectedSize = System.Text.Encoding.UTF8.GetBytes(content).Length;
+        var chunks = new[] { "Chunked upload ", "content with ", "multiple parts ", "that will be merged" };
+        
+        var session = await _fileBusiness.StartUpload(
+            oid, pid, did, osid,
+            new FileUploadInitRequestDto { FileName = "chunked-size.txt", FileSize = expectedSize }
+        );
+
+        // Act - Upload chunks
+        for (int i = 0; i < chunks.Length; i++)
+        {
+            await _fileBusiness.UploadChunk(oid, pid, did, osid, CreateFormFile(chunks[i]), session.UploadId, i);
+        }
+
+        var completeRequest = new FileUploadCompleteRequestDto
+        {
+            UploadId = session.UploadId,
+            FileName = "chunked-size.txt",
+            TotalChunks = chunks.Length
+        };
+
+        var result = await _fileBusiness.CompleteUpload(uid, oid, pid, did, osid, completeRequest);
+
+        // Assert
+        Assert.NotNull(result.FileSize);
+        Assert.Equal(expectedSize, result.FileSize);
+        
+        // Verify actual file size matches
+        var filePath = result.Uri;
+        var actualFileSize = new FileInfo(filePath).Length;
+        Assert.Equal(expectedSize, actualFileSize);
+    }
+
+    [Fact]
+    public async Task UploadFile_EmptyFile_CapturesZeroSize()
+    {
+        // Arrange
+        var ms = new MemoryStream(Array.Empty<byte>());
+        var file = new FormFile(ms, 0, 0, "file", "empty.txt")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "text/plain"
+        };
+
+        // Act & Assert - Should throw because empty files aren't allowed
+        await Assert.ThrowsAsync<ArgumentException>(() =>
+            _fileBusiness.UploadFile(uid, oid, pid, did, osid, file)
+        );
     }
 
     #endregion

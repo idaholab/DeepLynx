@@ -12,10 +12,16 @@ import {
 } from "@heroicons/react/24/outline";
 import React, { useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { downloadFile, getStorageType, isPresignedUrlStorage } from "@/app/lib/client_service/file_services.client";
+import {
+  downloadFile,
+  getStorageType,
+  isPresignedUrlStorage,
+} from "@/app/lib/client_service/file_services.client";
+import { useLanguage } from "@/app/contexts/Language";
 import { useOrganizationSession } from "@/app/contexts/OrganizationSessionProvider";
 import axios from "axios";
 import toast from "react-hot-toast";
+import CopyToClipboardButton from "../../components/CopyToClipboardButton";
 
 interface PropertyRow {
   label: string;
@@ -24,6 +30,11 @@ interface PropertyRow {
   onEdit?: (newValue: string) => void;
   isNested?: boolean;
   nestedRows?: PropertyRow[];
+  copyValue?: string;
+  copyTooltipLabel?: string;
+  copyAriaLabel?: string;
+  idleIconClassName?: string;
+  copiedIconClassName?: string;
 }
 
 interface PropertyTableProps {
@@ -64,6 +75,7 @@ const PropertyTable: React.FC<PropertyTableProps> = ({
   const projectId = projectIdParam ? Number(projectIdParam) : NaN;
   const recordId = recordIdParam ? Number(recordIdParam) : NaN;
   const canDownload = Number.isFinite(projectId) && Number.isFinite(recordId);
+  const { t } = useLanguage();
   const { organization, hasLoaded } = useOrganizationSession();
 
   const handleDownload = async () => {
@@ -83,7 +95,7 @@ const PropertyTable: React.FC<PropertyTableProps> = ({
       const storageType = await getStorageType(
         organization?.organizationId as number,
         projectId,
-        recordId
+        recordId,
       );
 
       const usePresignedUrl = isPresignedUrlStorage(storageType);
@@ -146,7 +158,7 @@ const PropertyTable: React.FC<PropertyTableProps> = ({
 
       // For presigned URL downloads, show toast message
       if (usePresignedUrl) {
-        toast.success("Download started in browser", {
+        toast.success(t.translations.DOWNLOAD_STARTED_IN_BROWSER, {
           icon: "📥",
           duration: 3000,
         });
@@ -317,8 +329,11 @@ const PropertyTable: React.FC<PropertyTableProps> = ({
                 {hasNested ? (
                   <span className="text-base-content/60 italic">
                     {isExpanded
-                      ? "Expanded"
-                      : `${row.nestedRows?.length} properties`}
+                      ? t.translations.RECORD_HISTORY_EXPANDED
+                      : t.translations.PROPERTIES_COUNT.replace(
+                          "{count}",
+                          String(row.nestedRows?.length ?? 0),
+                        )}
                   </span>
                 ) : (
                   row.value
@@ -327,6 +342,15 @@ const PropertyTable: React.FC<PropertyTableProps> = ({
             )}
           </div>
           <div className="col-span-1 p-3 flex justify-center items-center gap-1">
+            {row.copyValue && editingIndex !== index && !hasNested && (
+              <CopyToClipboardButton
+                value={row.copyValue}
+                tooltipLabel={row.copyTooltipLabel ?? t.translations.COPY}
+                ariaLabel={row.copyAriaLabel ?? t.translations.COPY_VALUE}
+                idleIconClassName={row.idleIconClassName}
+                copiedIconClassName={row.copiedIconClassName}
+              />
+            )}
             {row.editable && editingIndex !== index && !hasNested && (
               <PencilIcon
                 className="text-primary hover:text-primary-focus size-6 cursor-pointer transition-colors"
@@ -371,7 +395,8 @@ const PropertyTable: React.FC<PropertyTableProps> = ({
   };
 
   // Show progress bar only for blob downloads (non-presigned URL)
-  const showProgressBar = !isPresignedUrl && downloadProgress !== null && bytesDownloaded !== null;
+  const showProgressBar =
+    !isPresignedUrl && downloadProgress !== null && bytesDownloaded !== null;
 
   return (
     <div className={`${className}`}>
@@ -384,7 +409,7 @@ const PropertyTable: React.FC<PropertyTableProps> = ({
               {onEditProperties && (
                 <button
                   onClick={onEditProperties}
-                  title="Edit properties"
+                  title={t.translations.EDIT_PROPERTIES}
                   className="p-1 transition-colors cursor-pointer hover:text-primary"
                 >
                   <PencilIcon className="size-6 text-primary" />
@@ -394,12 +419,16 @@ const PropertyTable: React.FC<PropertyTableProps> = ({
               {download && (
                 <div className="flex items-center gap-3">
                   {/* Status indicator - show during preparation or for presigned URL downloads */}
-                  {downloading && (preparingDownload || isPresignedUrl) && !showProgressBar && (
-                    <div className="flex items-center gap-2 min-w-[200px]">
-                      <div className="loading loading-spinner loading-sm text-primary"></div>
-                      <span className="text-sm text-base-content">Preparing download...</span>
-                    </div>
-                  )}
+                  {downloading &&
+                    (preparingDownload || isPresignedUrl) &&
+                    !showProgressBar && (
+                      <div className="flex items-center gap-2 min-w-[200px]">
+                        <div className="loading loading-spinner loading-sm text-primary"></div>
+                        <span className="text-sm text-base-content">
+                          {t.translations.PREPARING_DOWNLOAD}
+                        </span>
+                      </div>
+                    )}
 
                   {/* Progress bar - only show for blob downloads */}
                   {showProgressBar && (
@@ -421,7 +450,9 @@ const PropertyTable: React.FC<PropertyTableProps> = ({
                           {formatBytes(bytesDownloaded.total)}
                         </span>
                         {timeRemaining !== null && timeRemaining > 0 && (
-                          <span>ETA: {formatTime(timeRemaining)}</span>
+                          <span>
+                            {t.translations.ETA}: {formatTime(timeRemaining)}
+                          </span>
                         )}
                       </div>
                     </div>
@@ -432,7 +463,7 @@ const PropertyTable: React.FC<PropertyTableProps> = ({
                     <button
                       onClick={handleCancelDownload}
                       className="p-1 text-error hover:text-error-focus transition-colors cursor-pointer"
-                      title="Cancel download"
+                      title={t.translations.CANCEL_DOWNLOAD}
                     >
                       <XMarkIcon className="w-8 h-8" />
                     </button>
@@ -442,13 +473,14 @@ const PropertyTable: React.FC<PropertyTableProps> = ({
                       disabled={!canDownload}
                       title={
                         canDownload
-                          ? "Download file"
-                          : "Missing projectId or recordId in URL"
+                          ? t.translations.DOWNLOAD_FILE
+                          : t.translations.MISSING_PROJECT_OR_RECORD_ID_IN_URL
                       }
-                      className={`p-1 transition-colors ${canDownload
-                        ? "hover:text-primary cursor-pointer"
-                        : "opacity-50 cursor-not-allowed"
-                        }`}
+                      className={`p-1 transition-colors ${
+                        canDownload
+                          ? "hover:text-primary cursor-pointer"
+                          : "opacity-50 cursor-not-allowed"
+                      }`}
                     >
                       <ArrowDownTrayIcon className="w-8 h-8" />
                     </button>
