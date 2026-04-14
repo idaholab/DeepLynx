@@ -11,6 +11,7 @@ export type ProjectInsightRecord = {
   description: string;
   uri: string | null;
   fileType: string | null;
+  fileSize: number | null;
   classId: number | null;
   className: string;
   dataSourceId: number | null;

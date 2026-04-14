@@ -2282,4 +2282,448 @@ public class RecordBusinessTests : IntegrationTestBase
     }
 
     #endregion
+    
+    #region FileSize Tests
+
+    [Fact]
+    public async Task CreateRecord_WithFileSize_StoresFileSize()
+    {
+        // Arrange
+        var fileSize = 1024000L; // 1MB
+        var dto = new CreateRecordRequestDto
+        {
+            Name = "Record with File Size",
+            Description = "Test record with file size",
+            Properties = (JsonObject)JsonNode.Parse(JsonSerializer.Serialize(new { TestProp = "TestValue" }))!,
+            OriginalId = "filesize-record-1",
+            ClassId = cid,
+            FileType = "pdf",
+            FileSize = fileSize
+        };
+
+        // Act
+        var result = await _recordBusiness.CreateRecord(uid, organizationId, pid, did, dto);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.NotNull(result.FileSize);
+        Assert.Equal(fileSize, result.FileSize);
+        
+        // Verify in database
+        var dbRecord = await Context.Records.FindAsync(result.Id);
+        Assert.NotNull(dbRecord);
+        Assert.Equal(fileSize, dbRecord.FileSize);
+    }
+
+    [Fact]
+    public async Task CreateRecord_WithoutFileSize_AllowsNull()
+    {
+        // Arrange
+        var dto = new CreateRecordRequestDto
+        {
+            Name = "Record without File Size",
+            Description = "Test record without file size",
+            Properties = (JsonObject)JsonNode.Parse(JsonSerializer.Serialize(new { TestProp = "TestValue" }))!,
+            OriginalId = "no-filesize-record",
+            ClassId = cid,
+            FileSize = null // Explicitly null
+        };
+
+        // Act
+        var result = await _recordBusiness.CreateRecord(uid, organizationId, pid, did, dto);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Null(result.FileSize);
+        
+        // Verify in database
+        var dbRecord = await Context.Records.FindAsync(result.Id);
+        Assert.Null(dbRecord.FileSize);
+    }
+
+    [Fact]
+    public async Task UpdateRecord_UpdatesFileSize()
+    {
+        // Arrange - Create initial record with file size
+        var initialSize = 500000L;
+        var createDto = new CreateRecordRequestDto
+        {
+            Name = "Initial Record",
+            Description = "Initial description",
+            Properties = (JsonObject)JsonNode.Parse(JsonSerializer.Serialize(new { TestProp = "TestValue" }))!,
+            OriginalId = "update-filesize-test",
+            ClassId = cid,
+            FileSize = initialSize
+        };
+        var createdRecord = await _recordBusiness.CreateRecord(uid, organizationId, pid, did, createDto);
+
+        // Act - Update with new file size
+        var newSize = 750000L;
+        var updateDto = new UpdateRecordRequestDto
+        {
+            FileSize = newSize
+        };
+        var result = await _recordBusiness.UpdateRecord(uid, organizationId, pid, createdRecord.Id, updateDto);
+
+        // Assert
+        Assert.NotNull(result.FileSize);
+        Assert.Equal(newSize, result.FileSize);
+        Assert.NotEqual(initialSize, result.FileSize);
+        
+        // Verify in database
+        var dbRecord = await Context.Records.FindAsync(result.Id);
+        Assert.Equal(newSize, dbRecord.FileSize);
+    }
+
+    [Fact]
+    public async Task UpdateRecord_PartialUpdate_PreservesFileSize()
+    {
+        // Arrange - Create record with file size
+        var originalSize = 1000000L;
+        var createDto = new CreateRecordRequestDto
+        {
+            Name = "Preserve Size Record",
+            Description = "Original description",
+            Properties = (JsonObject)JsonNode.Parse(JsonSerializer.Serialize(new { TestProp = "TestValue" }))!,
+            OriginalId = "preserve-size-test",
+            ClassId = cid,
+            FileSize = originalSize
+        };
+        var createdRecord = await _recordBusiness.CreateRecord(uid, organizationId, pid, did, createDto);
+
+        // Act - Update only name, not file size
+        var updateDto = new UpdateRecordRequestDto
+        {
+            Name = "Updated Name Only"
+        };
+        var result = await _recordBusiness.UpdateRecord(uid, organizationId, pid, createdRecord.Id, updateDto);
+
+        // Assert - File size should be preserved
+        Assert.Equal(originalSize, result.FileSize);
+        
+        // Verify in database
+        var dbRecord = await Context.Records.FindAsync(result.Id);
+        Assert.Equal(originalSize, dbRecord.FileSize);
+    }
+    
+    [Fact]
+    public async Task GetRecord_ReturnsFileSize()
+    {
+        // Arrange - Create record with file size
+        var fileSize = 2048000L;
+        var createDto = new CreateRecordRequestDto
+        {
+            Name = "Get File Size Record",
+            Description = "Test getting file size",
+            Properties = (JsonObject)JsonNode.Parse(JsonSerializer.Serialize(new { TestProp = "TestValue" }))!,
+            OriginalId = "get-filesize-test",
+            ClassId = cid,
+            FileSize = fileSize
+        };
+        var createdRecord = await _recordBusiness.CreateRecord(uid, organizationId, pid, did, createDto);
+
+        // Act
+        var result = await _recordBusiness.GetRecord(uid, organizationId, pid, createdRecord.Id, true);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(fileSize, result.FileSize);
+    }
+
+    [Fact]
+    public async Task GetAllRecords_ReturnsFileSizes()
+    {
+        // Arrange - Create multiple records with different file sizes
+        var sizes = new[] { 100000L, 500000L, 1000000L };
+        var recordIds = new List<long>();
+
+        for (int i = 0; i < sizes.Length; i++)
+        {
+            var dto = new CreateRecordRequestDto
+            {
+                Name = $"Record {i}",
+                Description = $"Record with size {sizes[i]}",
+                Properties = (JsonObject)JsonNode.Parse(JsonSerializer.Serialize(new { Index = i }))!,
+                OriginalId = $"multi-size-{i}",
+                ClassId = cid,
+                FileSize = sizes[i]
+            };
+            var record = await _recordBusiness.CreateRecord(uid, organizationId, pid, did, dto);
+            recordIds.Add(record.Id);
+        }
+
+        // Act
+        var allRecords = await _recordBusiness.GetAllRecords(uid, organizationId, pid, did, true);
+
+        // Assert
+        var createdRecords = allRecords.Where(r => recordIds.Contains(r.Id)).OrderBy(r => r.FileSize).ToList();
+        Assert.Equal(3, createdRecords.Count);
+        
+        for (int i = 0; i < sizes.Length; i++)
+        {
+            Assert.Equal(sizes[i], createdRecords[i].FileSize);
+        }
+    }
+
+    [Fact]
+    public async Task GetRecordsByTags_ReturnsFileSizes()
+    {
+        // Arrange - Create records with tags and file sizes
+        var tag = await Context.Tags.FirstAsync(t => t.Id == tid);
+        
+        var dto1 = new CreateRecordRequestDto
+        {
+            Name = "Tagged Record 1",
+            Description = "Record with tag and size",
+            Properties = (JsonObject)JsonNode.Parse(JsonSerializer.Serialize(new { Test = "Value" }))!,
+            OriginalId = "tagged-size-1",
+            ClassId = cid,
+            FileSize = 250000L,
+            Tags = new List<string> { tag.Name }
+        };
+        
+        var dto2 = new CreateRecordRequestDto
+        {
+            Name = "Tagged Record 2",
+            Description = "Record with tag and size",
+            Properties = (JsonObject)JsonNode.Parse(JsonSerializer.Serialize(new { Test = "Value" }))!,
+            OriginalId = "tagged-size-2",
+            ClassId = cid,
+            FileSize = 750000L,
+            Tags = new List<string> { tag.Name }
+        };
+
+        await _recordBusiness.CreateRecord(uid, organizationId, pid, did, dto1);
+        await _recordBusiness.CreateRecord(uid, organizationId, pid, did, dto2);
+
+        // Act
+        var results = await _recordBusiness.GetRecordsByTags(uid, organizationId, pid, new[] { tid }, true);
+
+        // Assert
+        var taggedRecords = results.Where(r => r.Name.StartsWith("Tagged Record")).ToList();
+        Assert.Equal(2, taggedRecords.Count);
+        Assert.All(taggedRecords, r => Assert.NotNull(r.FileSize));
+        Assert.Contains(taggedRecords, r => r.FileSize == 250000L);
+        Assert.Contains(taggedRecords, r => r.FileSize == 750000L);
+    }
+
+    [Fact]
+    public async Task GetRecordsByOriginalId_ReturnsFileSizes()
+    {
+        // Arrange - Create records with file sizes
+        var originalIds = new List<string> { "orig-size-1", "orig-size-2" };
+        var sizes = new[] { 300000L, 600000L };
+
+        for (int i = 0; i < originalIds.Count; i++)
+        {
+            var dto = new CreateRecordRequestDto
+            {
+                Name = $"Original ID Record {i}",
+                Description = "Test record",
+                Properties = (JsonObject)JsonNode.Parse(JsonSerializer.Serialize(new { Index = i }))!,
+                OriginalId = originalIds[i],
+                ClassId = cid,
+                FileSize = sizes[i]
+            };
+            await _recordBusiness.CreateRecord(uid, organizationId, pid, did, dto);
+        }
+
+        // Act
+        var results = await _recordBusiness.GetRecordsByOriginalId(uid, organizationId, pid, originalIds);
+
+        // Assert
+        Assert.Equal(2, results.Count);
+        Assert.All(results, r => Assert.NotNull(r.FileSize));
+        
+        var record1 = results.First(r => r.OriginalId == "orig-size-1");
+        var record2 = results.First(r => r.OriginalId == "orig-size-2");
+        
+        Assert.Equal(300000L, record1.FileSize);
+        Assert.Equal(600000L, record2.FileSize);
+    }
+
+    [Fact]
+    public async Task BulkCreateRecords_WithFileSizes_CreatesAllCorrectly()
+    {
+        // Arrange
+        var records = new List<CreateRecordRequestDto>
+        {
+            new()
+            {
+                Name = "Bulk Record 1",
+                Description = "Bulk record with size",
+                OriginalId = "bulk-size-1",
+                Properties = (JsonObject)JsonNode.Parse(JsonSerializer.Serialize(new { Index = 1 }))!,
+                ClassId = cid,
+                FileSize = 100000L
+            },
+            new()
+            {
+                Name = "Bulk Record 2",
+                Description = "Bulk record with size",
+                OriginalId = "bulk-size-2",
+                Properties = (JsonObject)JsonNode.Parse(JsonSerializer.Serialize(new { Index = 2 }))!,
+                ClassId = cid,
+                FileSize = 200000L
+            },
+            new()
+            {
+                Name = "Bulk Record 3",
+                Description = "Bulk record with size",
+                OriginalId = "bulk-size-3",
+                Properties = (JsonObject)JsonNode.Parse(JsonSerializer.Serialize(new { Index = 3 }))!,
+                ClassId = cid,
+                FileSize = 300000L
+            }
+        };
+
+        // Act
+        var results = await _recordBusiness.BulkCreateRecords(uid, organizationId, pid, did, records);
+
+        // Assert
+        Assert.Equal(3, results.Count);
+        Assert.All(results, r => Assert.NotNull(r.FileSize));
+        
+        Assert.Contains(results, r => r.FileSize == 100000L);
+        Assert.Contains(results, r => r.FileSize == 200000L);
+        Assert.Contains(results, r => r.FileSize == 300000L);
+        
+        // Verify in database
+        foreach (var result in results)
+        {
+            var dbRecord = await Context.Records.FindAsync(result.Id);
+            Assert.NotNull(dbRecord);
+            Assert.Equal(result.FileSize, dbRecord.FileSize);
+        }
+    }
+
+    [Fact]
+    public async Task BulkCreateRecords_MixedFileSizes_HandlesNullsCorrectly()
+    {
+        // Arrange - Some records with file sizes, some without
+        var records = new List<CreateRecordRequestDto>
+        {
+            new()
+            {
+                Name = "With Size",
+                Description = "Has file size",
+                OriginalId = "mixed-1",
+                Properties = (JsonObject)JsonNode.Parse(JsonSerializer.Serialize(new { Test = "Value" }))!,
+                ClassId = cid,
+                FileSize = 500000L
+            },
+            new()
+            {
+                Name = "Without Size",
+                Description = "No file size",
+                OriginalId = "mixed-2",
+                Properties = (JsonObject)JsonNode.Parse(JsonSerializer.Serialize(new { Test = "Value" }))!,
+                ClassId = cid,
+                FileSize = null
+            }
+        };
+
+        // Act
+        var results = await _recordBusiness.BulkCreateRecords(uid, organizationId, pid, did, records);
+
+        // Assert
+        Assert.Equal(2, results.Count);
+        
+        var withSize = results.First(r => r.Name == "With Size");
+        var withoutSize = results.First(r => r.Name == "Without Size");
+        
+        Assert.Equal(500000L, withSize.FileSize);
+        Assert.Null(withoutSize.FileSize);
+    }
+
+    [Fact]
+    public async Task ArchiveRecord_PreservesFileSize()
+    {
+        // Arrange - Create record with file size
+        var fileSize = 1500000L;
+        var dto = new CreateRecordRequestDto
+        {
+            Name = "Archive Size Test",
+            Description = "Test file size after archive",
+            Properties = (JsonObject)JsonNode.Parse(JsonSerializer.Serialize(new { Test = "Value" }))!,
+            OriginalId = "archive-size-test",
+            ClassId = cid,
+            FileSize = fileSize
+        };
+        var createdRecord = await _recordBusiness.CreateRecord(uid, organizationId, pid, did, dto);
+
+        // Act - Archive the record
+        await _recordBusiness.ArchiveRecord(uid, organizationId, pid, createdRecord.Id);
+        
+        // Assert - File size should be preserved even when archived
+        Context.ChangeTracker.Clear();
+        var archivedRecord = await Context.Records.FindAsync(createdRecord.Id);
+        Assert.NotNull(archivedRecord);
+        Assert.True(archivedRecord.IsArchived);
+        Assert.Equal(fileSize, archivedRecord.FileSize);
+    }
+
+    [Fact]
+    public async Task UnarchiveRecord_PreservesFileSize()
+    {
+        // Arrange - Create and archive record with file size
+        var fileSize = 2000000L;
+        var dto = new CreateRecordRequestDto
+        {
+            Name = "Unarchive Size Test",
+            Description = "Test file size after unarchive",
+            Properties = (JsonObject)JsonNode.Parse(JsonSerializer.Serialize(new { Test = "Value" }))!,
+            OriginalId = "unarchive-size-test",
+            ClassId = cid,
+            FileSize = fileSize
+        };
+        var createdRecord = await _recordBusiness.CreateRecord(uid, organizationId, pid, did, dto);
+        await _recordBusiness.ArchiveRecord(uid, organizationId, pid, createdRecord.Id);
+
+        // Act - Unarchive the record
+        await _recordBusiness.UnarchiveRecord(uid, organizationId, pid, createdRecord.Id);
+        
+        // Assert - File size should still be preserved
+        Context.ChangeTracker.Clear();
+        var unarchivedRecord = await Context.Records.FindAsync(createdRecord.Id);
+        Assert.NotNull(unarchivedRecord);
+        Assert.False(unarchivedRecord.IsArchived);
+        Assert.Equal(fileSize, unarchivedRecord.FileSize);
+    }
+
+    [Fact]
+    public async Task GetRecordsCountByDataSource_IncludesRecordsWithAndWithoutFileSize()
+    {
+        // Arrange - Create records with and without file sizes
+        var dto1 = new CreateRecordRequestDto
+        {
+            Name = "With Size Count",
+            Description = "Has size",
+            Properties = (JsonObject)JsonNode.Parse(JsonSerializer.Serialize(new { Test = "Value" }))!,
+            OriginalId = "count-with-size",
+            ClassId = cid,
+            FileSize = 100000L
+        };
+        
+        var dto2 = new CreateRecordRequestDto
+        {
+            Name = "Without Size Count",
+            Description = "No size",
+            Properties = (JsonObject)JsonNode.Parse(JsonSerializer.Serialize(new { Test = "Value" }))!,
+            OriginalId = "count-without-size",
+            ClassId = cid,
+            FileSize = null
+        };
+
+        await _recordBusiness.CreateRecord(uid, organizationId, pid, did, dto1);
+        await _recordBusiness.CreateRecord(uid, organizationId, pid, did, dto2);
+
+        // Act
+        var count = await _recordBusiness.GetRecordsCountByDataSource(organizationId, pid, did, true);
+
+        // Assert - Both records should be counted regardless of file size
+        Assert.True(count >= 2);
+    }
+
+    #endregion
 }

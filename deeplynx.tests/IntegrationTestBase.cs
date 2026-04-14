@@ -38,43 +38,53 @@ public class TestSuiteFixture : IAsyncLifetime
     // Runs at the beginning of every test suite
     public async Task InitializeAsync()
     {
-        // Start containers
-        await _postgresContainer.StartAsync();
-        await _redisContainer.StartAsync();
+        try {
+            // Start containers
+            await _postgresContainer.StartAsync();
+            await _redisContainer.StartAsync();
 
-        // Set up configuration for redis cache tests
-        RedisConnectionString = _redisContainer.GetConnectionString();
-        Environment.SetEnvironmentVariable("REDIS_CONNECTION_STRING", RedisConnectionString);
+            // Set up configuration for redis cache tests
+            RedisConnectionString = _redisContainer.GetConnectionString();
+            Environment.SetEnvironmentVariable("REDIS_CONNECTION_STRING", RedisConnectionString);
 
-        PostgresConnectionString = _postgresContainer.GetConnectionString();
+            PostgresConnectionString = _postgresContainer.GetConnectionString();
 
-        var dataSourceBuilder = new NpgsqlDataSourceBuilder(PostgresConnectionString);
-        dataSourceBuilder.UseVector();
-        PostgresDataSource = dataSourceBuilder.Build();
+            var dataSourceBuilder = new NpgsqlDataSourceBuilder(PostgresConnectionString);
+            dataSourceBuilder.UseVector();
+            PostgresDataSource = dataSourceBuilder.Build();
 
-        var options = new DbContextOptionsBuilder<DeeplynxContext>()
-            .UseNpgsql(PostgresDataSource, o => o.UseVector())
-            .Options;
+            var options = new DbContextOptionsBuilder<DeeplynxContext>()
+                .UseNpgsql(PostgresDataSource, o => o.UseVector())
+                .Options;
 
-        Context = new DeeplynxContext(options);
+            Context = new DeeplynxContext(options);
 
-        // Apply migrations only once
-        await Context.Database.MigrateAsync();
+            // Apply migrations only once
+            await Context.Database.MigrateAsync();
 
-        // Apply env variables without exposing values in tests
-        var projectRoot = Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", ".."));
-        var envFilePath = Path.Combine(projectRoot, ".env");
-        Env.Load(envFilePath);
-        // ensure the notification service is tested
-        Environment.SetEnvironmentVariable("ENABLE_NOTIFICATION_SERVICE", "true");
+            // Apply env variables without exposing values in tests
+            var projectRoot =
+                Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", ".."));
+            var envFilePath = Path.Combine(projectRoot, ".env");
+            Env.Load(envFilePath);
+            // ensure the notification service is tested
+            Environment.SetEnvironmentVariable("ENABLE_NOTIFICATION_SERVICE", "true");
+        }
+        catch (Exception ex)
+        {
+            // clean up any partially initialized resources
+            await DisposeAsync();
+            throw new InvalidOperationException("Failed to initialize test suite", ex);
+        }
+        
     }
 
     // Runs at the end of every test suite
     public async Task DisposeAsync()
     {
-        await Context.DisposeAsync();
-        await _postgresContainer.DisposeAsync();
-        await _redisContainer.DisposeAsync();
+        if (Context != null) await Context.DisposeAsync();
+        if (_postgresContainer != null) await _postgresContainer.DisposeAsync();
+        if (_redisContainer != null) await _redisContainer.DisposeAsync();
     }
 }
 
