@@ -1784,7 +1784,7 @@ public class RecordBusinessAuthTests : IntegrationTestBase
 
         // Act & Assert - Records with sensitivity label should NOT be returned because user lacks access
         var exception = await Assert.ThrowsAsync<KeyNotFoundException>(() =>
-            _recordBusiness.GetRecordsByOriginalId(uid, organizationId, pid, new List<string> { originalId }));
+            _recordBusiness.GetRecordsByOriginalId(uid, organizationId, pid, did, new List<string> { originalId }, true));
 
         Assert.Contains($"Records not found or access is unauthorized with original IDs: {originalId}",
             exception.Message);
@@ -1867,7 +1867,7 @@ public class RecordBusinessAuthTests : IntegrationTestBase
 
         // Act - Get records by original ID (user DOES have access to the label)
         var result =
-            await _recordBusiness.GetRecordsByOriginalId(uid, organizationId, pid, new List<string> { originalId });
+            await _recordBusiness.GetRecordsByOriginalId(uid, organizationId, pid, did, new List<string> { originalId }, true);
 
         // Assert - Record with accessible label SHOULD be returned
         Assert.NotNull(result);
@@ -1901,7 +1901,7 @@ public class RecordBusinessAuthTests : IntegrationTestBase
 
         // Act - Get records by original ID (no labels to check)
         var result =
-            await _recordBusiness.GetRecordsByOriginalId(uid, organizationId, pid, new List<string> { originalId });
+            await _recordBusiness.GetRecordsByOriginalId(uid, organizationId, pid, did, new List<string> { originalId }, true);
 
         // Assert - Record without labels SHOULD be returned
         Assert.NotNull(result);
@@ -2037,7 +2037,7 @@ public class RecordBusinessAuthTests : IntegrationTestBase
 
         // Act - Get records by original ID (user has access to both labels)
         var result =
-            await _recordBusiness.GetRecordsByOriginalId(uid, organizationId, pid, new List<string> { originalId });
+            await _recordBusiness.GetRecordsByOriginalId(uid, organizationId, pid, did, new List<string> { originalId }, true);
 
         // Assert - Record with both accessible labels SHOULD be returned
         Assert.NotNull(result);
@@ -2157,7 +2157,7 @@ public class RecordBusinessAuthTests : IntegrationTestBase
 
         // Act & Assert - Record should NOT be returned (user must have access to ALL labels)
         var exception = await Assert.ThrowsAsync<KeyNotFoundException>(() =>
-            _recordBusiness.GetRecordsByOriginalId(uid, organizationId, pid, new List<string> { originalId }));
+            _recordBusiness.GetRecordsByOriginalId(uid, organizationId, pid, did, new List<string> { originalId }, true));
 
         Assert.Contains($"Records not found or access is unauthorized with original IDs: {originalId}",
             exception.Message);
@@ -2278,8 +2278,8 @@ public class RecordBusinessAuthTests : IntegrationTestBase
 
         // Act - Try to get both records by original IDs
         var exception = await Assert.ThrowsAsync<KeyNotFoundException>(() =>
-            _recordBusiness.GetRecordsByOriginalId(uid, organizationId, pid,
-                new List<string> { originalId1, originalId2 }));
+            _recordBusiness.GetRecordsByOriginalId(uid, organizationId, pid, did,
+                new List<string> { originalId1, originalId2 }, true));
 
         // Assert - Should throw because one record is not accessible
         Assert.Contains($"Records not found or access is unauthorized with original IDs: {originalId2}",
@@ -2287,7 +2287,7 @@ public class RecordBusinessAuthTests : IntegrationTestBase
 
         // Also verify that we CAN get just the accessible record
         var accessibleResult =
-            await _recordBusiness.GetRecordsByOriginalId(uid, organizationId, pid, new List<string> { originalId1 });
+            await _recordBusiness.GetRecordsByOriginalId(uid, organizationId, pid, did, new List<string> { originalId1 }, true);
         Assert.NotNull(accessibleResult);
         Assert.Single(accessibleResult);
         Assert.Equal(recordWithAccess.Id, accessibleResult[0].Id);
