@@ -46,3 +46,11 @@ public/images/*
 
 # But keep the directory
 !public/images/.gitkeep
+
+# Playwright
+node_modules/
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+/playwright/.auth/
