@@ -1,5 +1,6 @@
 using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
+using deeplynx.datalayer.Models;
 using deeplynx.interfaces;
 using deeplynx.models;
 using Microsoft.Extensions.Logging;
@@ -16,18 +17,24 @@ public class InsightBusiness : IInsightBusiness
         "pdf", "txt", "html", "htm"
     };
 
+    private readonly DeeplynxContext _context;
     private readonly InsightServiceClient _insightServiceClient;
     private readonly IAiModelConfigBusiness _aiModelConfigBusiness;
     private readonly ILogger<InsightBusiness> _logger;
+    private readonly ISensitivityLabelService _sensitivityLabelService;
 
     public InsightBusiness(
+        DeeplynxContext context,
         InsightServiceClient insightServiceClient,
         IAiModelConfigBusiness aiModelConfigBusiness,
-        ILogger<InsightBusiness> logger)
+        ILogger<InsightBusiness> logger,
+        ISensitivityLabelService sensitivityLabelService)
     {
+        _context = context;
         _insightServiceClient = insightServiceClient;
         _aiModelConfigBusiness = aiModelConfigBusiness;
         _logger = logger;
+        _sensitivityLabelService = sensitivityLabelService;
     }
 
     /// <summary>
@@ -45,7 +52,7 @@ public class InsightBusiness : IInsightBusiness
     /// <param name="embeddingModelConfigId">
     ///     Optional explicit embedding model config ID. If null, the default embedding config for the org/project is used.
     /// </param>
-    /// <param name="payload">Upload payload from the caller containing file IDs and URIs.</param>
+    /// <param name="payload">Upload dto from the caller containing file IDs and URIs.</param>
     /// <exception cref="InvalidOperationException">Thrown when Insight returns a non-success status, or when a required token is missing.</exception>
     /// <exception cref="KeyNotFoundException">Thrown when a specified or default model config cannot be found.</exception>
     public async Task QueueInsightUpload(
@@ -59,9 +66,18 @@ public class InsightBusiness : IInsightBusiness
         var vlmConfig = await ResolveModelConfig(currentUserId, organizationId, projectId, vlmModelConfigId, "vlm");
         var embeddingConfig = await ResolveModelConfig(currentUserId, organizationId, projectId, embeddingModelConfigId, "embedding");
 
+        var recordIds = payload.FileInfo.Select(f => f.FileId).ToList();
+
+        var authorizedIds = await _sensitivityLabelService
+            .FilterAuthorizedRecordIds(currentUserId, organizationId, projectId, recordIds, _context);
+
+        var authorizedFileInfo = payload.FileInfo
+            .Where(f => authorizedIds.Contains(f.FileId))
+            .ToList();
+
         var request = new InsightUploadRequestDto
         {
-            FileInfo = payload.FileInfo.Select(f => new InsightUploadRequestDto.FileInfoDto
+            FileInfo = authorizedFileInfo.Select(f => new InsightUploadRequestDto.FileInfoDto
             {
                 FileId = f.FileId,
                 FileUri = NormalizeFileUri(f.FileUri)
@@ -87,27 +103,27 @@ public class InsightBusiness : IInsightBusiness
     /// <param name="projectId">The ID of the project.</param>
     /// <param name="recordId">The ID of the record to embed.</param>
     /// <param name="uri">The URI of the file to embed.</param>
-    /// <param name="vlmConfigId">Optional explicit VLM model config ID. If null, the project/org default is used.</param>
-    /// <param name="embeddingModelConfigId">Optional explicit embedding model config ID. If null, the project/org default is used.</param>
+    /// <param name="vlmConfig">Optional explicit VLM model config ID. If null, the project/org default is used.</param>
+    /// <param name="embeddingConfig">Optional explicit embedding model config ID. If null, the project/org default is used.</param>
     /// <param name="overwrite">Whether to overwrite an existing embedding for this record.</param>
     public void TriggerEmbedding(
         long projectId,
         long recordId,
         string uri,
-        AiModelConfigResponseDto vlmConfigId,
-        AiModelConfigResponseDto embeddingModelConfigId,
+        AiModelConfigResponseDto vlmConfig,
+        AiModelConfigResponseDto embeddingConfig,
         bool overwrite = false)
     {
         var request = new InsightUploadRequestDto
         {
             FileInfo = [new() { FileId = recordId, FileUri = NormalizeFileUri(uri) }],
             Overwrite = overwrite,
-            VlmServerUrl = vlmConfigId.ServerUrl,
-            VlmName = vlmConfigId.ModelName,
-            VlmToken = vlmConfigId.Token,
-            EmbeddingServerUrl = embeddingModelConfigId.ServerUrl,
-            EmbeddingModelName = embeddingModelConfigId.ModelName,
-            EmbeddingModelToken = embeddingModelConfigId.Token
+            VlmServerUrl = vlmConfig.ServerUrl,
+            VlmName = vlmConfig.ModelName,
+            VlmToken = vlmConfig.Token,
+            EmbeddingServerUrl = embeddingConfig.ServerUrl,
+            EmbeddingModelName = embeddingConfig.ModelName,
+            EmbeddingModelToken = embeddingConfig.Token
         };
 
         _ = _insightServiceClient.Upload(request)
@@ -153,6 +169,13 @@ public class InsightBusiness : IInsightBusiness
     {
         var llmConfig = await ResolveModelConfig(currentUserId, organizationId, projectId, languageModelConfigId, "llm");
         var embeddingConfig = await ResolveModelConfig(currentUserId, organizationId, projectId, embeddingModelConfigId, "embedding");
+
+        var authorizedIds = await _sensitivityLabelService
+            .FilterAuthorizedRecordIds(currentUserId, organizationId, projectId, payload.FileIds, _context);
+
+        payload.FileIds = payload.FileIds
+            .Where(id => authorizedIds.Contains(id))
+            .ToArray();
 
         await foreach (var chunk in StreamInsightQueryCore(llmConfig, embeddingConfig, payload, cancellationToken))
             yield return chunk;

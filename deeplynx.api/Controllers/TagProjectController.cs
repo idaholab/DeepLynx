@@ -51,6 +51,33 @@ public class TagProjectController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
+    
+    /// <summary>
+    ///     Get Tags By Name
+    /// </summary>
+    /// <param name="projectId">The ID of the project whose tags are to be retrieved</param>
+    /// <param name="hideArchived">Flag indicating whether to hide archived tags from the result (Default true)</param>
+    /// <returns>A list of tags belonging to the project.</returns>
+    [HttpPost("by-name", Name = "api_get_tags_by_name_project")]
+    [Auth("read", "tag")]
+    public async Task<ActionResult<IEnumerable<TagResponseDto>>> GetTagsByName(
+        long projectId, 
+        [FromBody] List<string> tagNames,
+        [FromQuery] bool hideArchived = true)
+    {
+        try
+        {
+            var organizationId = UserContextStorage.OrganizationId;
+            var tags = await _tagBusiness.GetTagsByName(organizationId, projectId, tagNames, hideArchived);
+            return Ok(tags);
+        }
+        catch (Exception exception)
+        {
+            var message = $"An error occurred while listing all tags: {exception}";
+            _logger.LogError(message);
+            return StatusCode(StatusCodes.Status500InternalServerError, message);
+        }
+    }
 
     /// <summary>
     ///     Get a tag 
