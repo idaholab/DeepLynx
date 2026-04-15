@@ -2084,7 +2084,7 @@ public class RecordBusinessTests : IntegrationTestBase
     public async Task GetRecordsByOriginalId_ValidOriginalIds_ReturnsMatchingRecords()
     {
         // Act
-        var result = await _recordBusiness.GetRecordsByOriginalId(uid, organizationId, pid, ["og_id"]);
+        var result = await _recordBusiness.GetRecordsByOriginalId(uid, organizationId, pid, did, ["og_id"], true);
 
         // Assert
         Assert.Equal(1, result.Count);
@@ -2098,7 +2098,7 @@ public class RecordBusinessTests : IntegrationTestBase
         // Act & Assert
         var exception =
             await Assert.ThrowsAsync<KeyNotFoundException>(() =>
-                _recordBusiness.GetRecordsByOriginalId(uid, organizationId, pid, ["non-existent-id"]));
+                _recordBusiness.GetRecordsByOriginalId(uid, organizationId, pid, did, ["non-existent-id"], true));
 
         Assert.Contains("Records not found or access is unauthorized with original IDs", exception.Message);
     }
@@ -2108,7 +2108,7 @@ public class RecordBusinessTests : IntegrationTestBase
     {
         // Act & Assert
         await Assert.ThrowsAsync<ArgumentException>(() =>
-            _recordBusiness.GetRecordsByOriginalId(uid, organizationId, pid, null));
+            _recordBusiness.GetRecordsByOriginalId(uid, organizationId, pid, did, null, true));
     }
 
     [Fact]
@@ -2122,9 +2122,26 @@ public class RecordBusinessTests : IntegrationTestBase
         // Act & Assert
         var exception =
             await Assert.ThrowsAsync<KeyNotFoundException>(() =>
-                _recordBusiness.GetRecordsByOriginalId(uid, organizationId, pid, ["og_id"]));
+                _recordBusiness.GetRecordsByOriginalId(uid, organizationId, pid, did, ["og_id"], true));
 
         Assert.Contains("og_id", exception.Message);
+    }
+    
+    [Fact]
+    public async Task GetRecordsByOriginalId_IncludesArchivedRecords_WhenHideArchivedFalse()
+    {
+        // Arrange
+        var record = await Context.Records.FindAsync(rid);
+        record.IsArchived = true;
+        await Context.SaveChangesAsync();
+
+        // Act
+        var result = await _recordBusiness.GetRecordsByOriginalId(uid, organizationId, pid, did, ["og_id"], false);
+
+        // Assert
+        Assert.Single(result);
+        Assert.Equal("og_id", result.First().OriginalId);
+        Assert.True(result.First().IsArchived);
     }
 
     [Fact]
@@ -2133,9 +2150,20 @@ public class RecordBusinessTests : IntegrationTestBase
         // Act & Assert
         var exception =
             await Assert.ThrowsAsync<KeyNotFoundException>(() =>
-                _recordBusiness.GetRecordsByOriginalId(uid, organizationId, 999L, ["some-id"]));
+                _recordBusiness.GetRecordsByOriginalId(uid, organizationId, 999L, did, ["og-id"], true));
 
-        Assert.Contains("Records not found or access is unauthorized with original IDs", exception.Message);
+        Assert.Contains("No data source with Id", exception.Message);
+    }
+    
+    [Fact]
+    public async Task GetRecordsByOriginalId_InvalidDataSourceId_ThrowsKeyNotFoundException()
+    {
+        // Act & Assert
+        var exception =
+            await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+                _recordBusiness.GetRecordsByOriginalId(uid, organizationId, pid, 999999L, ["og-id"], true));
+
+        Assert.Contains("No data source with Id", exception.Message);
     }
 
     #endregion
@@ -2529,7 +2557,7 @@ public class RecordBusinessTests : IntegrationTestBase
         }
 
         // Act
-        var results = await _recordBusiness.GetRecordsByOriginalId(uid, organizationId, pid, originalIds);
+        var results = await _recordBusiness.GetRecordsByOriginalId(uid, organizationId, pid, did, originalIds, true);
 
         // Assert
         Assert.Equal(2, results.Count);
