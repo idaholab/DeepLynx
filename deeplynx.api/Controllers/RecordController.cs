@@ -103,6 +103,48 @@ public class RecordController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
+    
+    /// <summary>
+    ///     Get Records by Original IDs
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <param name="projectId">The ID of the project to search within</param>
+    /// <param name="dataSourceId">The ID of the data source to search within</param>
+    /// <param name="originalIds">List of original IDs to retrieve records for</param>
+    /// <param name="hideArchived">Flag indicating whether to hide archived records from the result (Default true)</param>
+    /// <returns>A list of records matching the provided original IDs.</returns>
+    [HttpPost("by-original-ids", Name = "api_get_records_by_original_ids")]
+    [Auth("read", "record")]
+    [Sensitivity("read record")]
+    public async Task<ActionResult<IEnumerable<RecordResponseDto>>> GetRecordsByOriginalId(
+        long organizationId,
+        long projectId,
+        [FromQuery] long dataSourceId,
+        [FromBody] List<string> originalIds,
+        [FromQuery] bool hideArchived = true)
+    {
+        try
+        {
+            var currentUserId = UserContextStorage.UserId;
+            var records = await _recordBusiness.GetRecordsByOriginalId(
+                currentUserId, organizationId, projectId, dataSourceId, originalIds, hideArchived);
+            return Ok(records);
+        }
+        catch (ArgumentException exc)
+        {
+            return BadRequest(exc.Message);
+        }
+        catch (KeyNotFoundException exc)
+        {
+            return NotFound(exc.Message);
+        }
+        catch (Exception exc)
+        {
+            var message = $"An error occurred while retrieving records by original ID: {exc}";
+            _logger.LogError(message);
+            return StatusCode(StatusCodes.Status500InternalServerError, message);
+        }
+    }
 
     /// <summary>
     ///     Get a Record

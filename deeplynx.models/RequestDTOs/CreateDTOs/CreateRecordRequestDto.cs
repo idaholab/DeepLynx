@@ -36,6 +36,9 @@ public class CreateRecordRequestDto
 
     [JsonPropertyName("file_type")]
     public string? FileType { get; set; }
+    
+    [JsonPropertyName("file_size")]
+    public long? FileSize { get; set; }
 
     [JsonPropertyName("tags")]
     public List<string>? Tags { get; set; }

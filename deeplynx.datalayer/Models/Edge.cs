@@ -30,6 +30,8 @@ public class Edge
 
     [Column("is_archived")] public bool IsArchived { get; set; }
 
+    [Column("extraction_id")] public long? ExtractionId { get; set; }
+
     [ForeignKey("DataSourceId")]
     [InverseProperty("Edges")]
     public virtual DataSource DataSource { get; set; } = null!;
