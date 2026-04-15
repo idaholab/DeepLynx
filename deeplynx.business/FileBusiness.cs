@@ -97,6 +97,8 @@ public class FileBusiness
 
         var fileClass = await _classBusiness.GetOrCreateClass(currentUserId, organizationId, projectId, "File");
 
+        var fileSize = file.Length;
+
         CreateRecordFileUploadRequestDto? metadata = null;
         if (metadataFile != null)
         {
@@ -125,7 +127,8 @@ public class FileBusiness
             ClassId = metadata?.ClassId ?? fileClass.Id,
             ClassName = metadata?.ClassName ?? fileClass.Name,
             FileType = fileType,
-            Uri = uri
+            Uri = uri,
+            FileSize = fileSize
         };
 
         var createdRecord = await _recordBusiness.CreateRecord(currentUserId, organizationId, projectId,
@@ -178,6 +181,8 @@ public class FileBusiness
 
         var uri = await fileBusiness.UpdateFile(record, configData, file, guid);
 
+        var fileSize = file.Length;
+
         var updateRecordRequest = new UpdateRecordRequestDto
         {
             Properties = new JsonObject
@@ -186,7 +191,8 @@ public class FileBusiness
             },
             Name = file.FileName,
             Uri = uri,
-            FileType = Path.GetExtension(file.FileName).TrimStart('.').ToLower()
+            FileType = Path.GetExtension(file.FileName).TrimStart('.').ToLower(),
+            FileSize = fileSize
         };
 
         var updatedRecord = await _recordBusiness.UpdateRecord(currentUserId, organizationId, projectId, recordId,
@@ -386,6 +392,7 @@ public class FileBusiness
             guid);
 
         var fileClass = await _classBusiness.GetOrCreateClass(currentUserId, organizationId, projectId, "File");
+        var fileSize = new FileInfo(uri).Length;
         var recordRequest = new CreateRecordRequestDto
         {
             Properties = metadata?.Properties ?? new JsonObject
@@ -402,6 +409,7 @@ public class FileBusiness
             ClassId = metadata?.ClassId ?? fileClass.Id,
             ClassName = metadata?.ClassName ?? fileClass.Name,
             FileType = Path.GetExtension(request.FileName).TrimStart('.').ToLower(),
+            FileSize = fileSize
         };
 
         var createdRecord = await _recordBusiness.CreateRecord(currentUserId, organizationId, projectId,

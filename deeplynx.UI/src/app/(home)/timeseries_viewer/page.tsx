@@ -70,6 +70,8 @@ export default async function Page({
     return (
         <TimeseriesViewerClient
             timeseriesFiles={availableFiles}
+            organizationId={Number(organizationId)}
+            projectId={Number(projectId)}
         />
     );
 }
