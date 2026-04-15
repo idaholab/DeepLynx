@@ -16,6 +16,8 @@ public class HistoricalRecordResponseDto
     public string? ObjectStorageName { get; set; }
     public long ProjectId { get; set; }
     public string ProjectName { get; set; }
+    public string? FileType {get; set;}
+    public long? FileSize {get; set;}
     public string? Tags { get; set; } = null!;
     public string? Labels { get; set; } = null!;
     public DateTime LastUpdatedAt { get; set; }
