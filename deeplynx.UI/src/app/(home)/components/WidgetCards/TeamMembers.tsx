@@ -1,42 +1,26 @@
-import AddMember from "@/app/(home)/components/WidgetCards/WidgetCardModals/AddMemberModal";
+import { ProjectMemberResponseDto } from "@/app/(home)/types/responseDTOs";
 import { Column } from "@/app/(home)/types/types";
-import { UserResponseDto } from "@/app/(home)/types/responseDTOs";
 import { useLanguage } from "@/app/contexts/Language";
+import { useOrganizationSession } from "@/app/contexts/OrganizationSessionProvider";
 import { useProjectSession } from "@/app/contexts/ProjectSessionProvider";
-import { getAllUsers } from "@/app/lib/client_service/user_services.client";
-import { ChevronDownIcon } from "@heroicons/react/24/outline";
-import { PlusCircleIcon } from "@heroicons/react/24/solid";
+import { getProjectMembers } from "@/app/lib/client_service/projects_services.client";
 import React, { useEffect, useState } from "react";
 import AvatarCell from "../Avatar";
 import GenericTable from "../GenericTable";
-import AvatarCarousel from "./WidgetCardModals/AvatarCarousel";
-import { useOrganizationSession } from "@/app/contexts/OrganizationSessionProvider";
-
-type TeamMemberRow = {
-  id: number;
-  name: string;
-  email: string;
-  role: string;
-};
+import Link from "next/link";
 
 const TeamMembersWidget: React.FC = () => {
-  const [showTable, setShowTable] = useState(false);
-  const [addMemberModal, setAddMemberModal] = useState(false);
-  const [users, setUsers] = useState<UserResponseDto[]>([]);
+  const [users, setUsers] = useState<ProjectMemberResponseDto[]>([]);
   const { project } = useProjectSession();
   const { t } = useLanguage();
   const { organization } = useOrganizationSession();
 
-  const handleToggle = () => {
-    setShowTable((prev) => !prev);
-  };
-
   useEffect(() => {
     const fetchAllUsers = async () => {
       try {
-        const data = await getAllUsers(
-          organization?.organizationId,
-          project?.projectId,
+        const data = await getProjectMembers(
+          organization?.organizationId as number,
+          project?.projectId as number,
         );
         setUsers(data);
       } catch (error) {
@@ -49,14 +33,14 @@ const TeamMembersWidget: React.FC = () => {
     }
   }, [organization?.organizationId, project?.projectId]);
 
-  const teamMemberRows: TeamMemberRow[] = users.map((user) => ({
-    id: user.id,
+  const teamMemberRows: ProjectMemberResponseDto[] = users.map((user) => ({
+    id: user.memberId,
     name: user.name,
     email: user.email,
     role: user.role ?? t.translations.NOT_AVAILABLE,
   }));
 
-  const teamMemberColumns: Column<TeamMemberRow>[] = [
+  const teamMemberColumns: Column<ProjectMemberResponseDto>[] = [
     {
       header: t.translations.NAME,
       data: "name",
@@ -85,40 +69,26 @@ const TeamMembersWidget: React.FC = () => {
   ];
 
   return (
-    <div className="card-body">
-      <div className="flex justify-between">
-        <h2 className="card-title flex items-center">
-          {t.translations.TEAM_MEMBERS}
-          {showTable && (
-            <button onClick={() => setAddMemberModal(true)} className="ml-1">
-              <PlusCircleIcon className="w-7 h-7 text-secondary" />
-            </button>
-          )}
-        </h2>
-        <button onClick={handleToggle} className="btn btn-sm btn-ghost">
-          {showTable ? (
-            <ChevronDownIcon className="size-6 rotate-180" />
-          ) : (
-            <ChevronDownIcon className="size-6" />
-          )}
-        </button>
-      </div>
-
-      {!showTable ? (
-        <AvatarCarousel people={teamMemberRows} />
-      ) : (
+    <div className="card">
+      <div className="card-body">
+        <div className="flex justify-between">
+          <h2 className="card-title flex items-center">
+            {t.translations.TEAM_MEMBERS}
+          </h2>
+          <Link
+            href={`/project_management/${project?.projectId}`}
+            className="btn btn-outline btn-secondary"
+          >
+            {t.translations.MANAGE}
+          </Link>
+        </div>
         <GenericTable
           columns={teamMemberColumns}
           data={teamMemberRows}
           enablePagination
           rowsPerPage={4}
         />
-      )}
-
-      <AddMember
-        isOpen={addMemberModal}
-        onClose={() => setAddMemberModal(false)}
-      />
+      </div>
     </div>
   );
 };

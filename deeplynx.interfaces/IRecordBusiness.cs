@@ -36,6 +36,6 @@ public interface IRecordBusiness
     Task<bool> BulkAttachTags(List<RecordTagLinkDto> dtos);
     Task<bool> BulkAttachLabels(
         long currentUserId, long organizationId, long projectId, List<long> recordIds, List<long> sensitiityLabelIds);
-    Task<List<RecordResponseDto>> GetRecordsByOriginalId(long currentUserId, long organizationId, long projectId, List<string> originalIds);
+    Task<List<RecordResponseDto>> GetRecordsByOriginalId(long currentUserId, long organizationId, long projectId, long dataSourceId, List<string> originalIds, bool hideArchived);
     Task<List<LatticeRecordDto>> GetLatticeRecords(long organizationId, long projectId);
 }

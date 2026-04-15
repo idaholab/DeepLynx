@@ -885,4 +885,173 @@ public class TimeseriesBusinessTests : IntegrationTestBase, IAsyncLifetime
     }
 
     #endregion
+    
+    #region FileSize Tests
+
+    [Fact]
+    public async Task UploadFile_CapturesFileSize()
+    {
+        // Arrange
+        var csvContent = GenerateLargeCsvContent(100); // 100 rows
+        var expectedSize = System.Text.Encoding.UTF8.GetBytes(csvContent).Length;
+        var file = CreateTestCsvFile(csvContent, "filesize_test.csv");
+
+        // Act
+        var result = await _timeseriesBusiness.UploadFile(
+            _userId, _organizationId, _projectId, _dataSourceId, file);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.NotNull(result.FileSize);
+        Assert.Equal(expectedSize, result.FileSize);
+        
+        // Verify file size persisted in database
+        var dbRecord = await Context.Records.FindAsync(result.Id);
+        Assert.NotNull(dbRecord);
+        Assert.Equal(expectedSize, dbRecord.FileSize);
+    }
+
+    [Fact]
+    public async Task UploadFile_LargeTimeseries_CapturesCorrectFileSize()
+    {
+        // Arrange - Create a large CSV file (10,000 rows)
+        var csvContent = GenerateLargeCsvContent(10000);
+        var expectedSize = System.Text.Encoding.UTF8.GetBytes(csvContent).Length;
+        var file = CreateTestCsvFile(csvContent, "large_timeseries.csv");
+
+        // Act
+        var result = await _timeseriesBusiness.UploadFile(
+            _userId, _organizationId, _projectId, _dataSourceId, file);
+
+        // Assert
+        Assert.NotNull(result.FileSize);
+        Assert.Equal(expectedSize, result.FileSize);
+        Assert.True(result.FileSize > 500000); // Should be over 500KB for 10k rows
+    }
+
+    [Fact]
+    public async Task CompleteUpload_ChunkedTimeseries_CapturesCorrectFileSize()
+    {
+        // Arrange - Create CSV content and split into chunks
+        var csvContent = GenerateLargeCsvContent(1000);
+        var expectedSize = System.Text.Encoding.UTF8.GetBytes(csvContent).Length;
+        var csvBytes = System.Text.Encoding.UTF8.GetBytes(csvContent);
+        var chunkSize = 2048;
+        var chunks = SplitIntoChunks(csvBytes, chunkSize);
+        var fileName = "chunked_timeseries_size.csv";
+
+        // Step 1: Initialize Upload
+        var uploadId = await _timeseriesBusiness.StartUpload(
+            _organizationId, _projectId, _dataSourceId, fileName);
+
+        // Step 2: Upload Chunks
+        for (int i = 0; i < chunks.Count; i++)
+        {
+            var chunkFile = CreateChunkFile(chunks[i], fileName);
+            await _timeseriesBusiness.UploadChunk(
+                _organizationId, _projectId, _dataSourceId, chunkFile, uploadId, i);
+        }
+
+        // Step 3: Complete Upload
+        var completeRequest = new TimeseriesUploadCompleteRequestDto
+        {
+            UploadId = uploadId,
+            FileName = fileName,
+            TotalChunks = chunks.Count
+        };
+
+        // Act
+        var result = await _timeseriesBusiness.CompleteUpload(
+            _userId, _organizationId, _projectId, _dataSourceId, completeRequest);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.NotNull(result.FileSize);
+        Assert.Equal(expectedSize, result.FileSize);
+        
+        // Verify in database
+        var dbRecord = await Context.Records.FindAsync(result.Id);
+        Assert.Equal(expectedSize, dbRecord.FileSize);
+    }
+
+    [Fact]
+    public async Task GetRecord_TimeseriesFile_ReturnsFileSize()
+    {
+        // Arrange
+        var csvContent = GenerateLargeCsvContent(50);
+        var expectedSize = System.Text.Encoding.UTF8.GetBytes(csvContent).Length;
+        var file = CreateTestCsvFile(csvContent, "get_size_test.csv");
+        var uploadedRecord = await _timeseriesBusiness.UploadFile(
+            _userId, _organizationId, _projectId, _dataSourceId, file);
+
+        // Act
+        var retrievedRecord = await _recordBusiness.GetRecord(
+            _userId, _organizationId, _projectId, uploadedRecord.Id, true);
+
+        // Assert
+        Assert.NotNull(retrievedRecord);
+        Assert.NotNull(retrievedRecord.FileSize);
+        Assert.Equal(expectedSize, retrievedRecord.FileSize);
+    }
+
+    [Fact]
+    public async Task MultipleUploads_DifferentSizes_CapturesAllCorrectly()
+    {
+        // Arrange & Act - Upload multiple files with different sizes
+        var smallCsv = GenerateLargeCsvContent(10);
+        var mediumCsv = GenerateLargeCsvContent(100);
+        var largeCsv = GenerateLargeCsvContent(1000);
+        
+        var smallSize = System.Text.Encoding.UTF8.GetBytes(smallCsv).Length;
+        var mediumSize = System.Text.Encoding.UTF8.GetBytes(mediumCsv).Length;
+        var largeSize = System.Text.Encoding.UTF8.GetBytes(largeCsv).Length;
+
+        var result1 = await _timeseriesBusiness.UploadFile(
+            _userId, _organizationId, _projectId, _dataSourceId, 
+            CreateTestCsvFile(smallCsv, "small.csv"));
+        
+        var result2 = await _timeseriesBusiness.UploadFile(
+            _userId, _organizationId, _projectId, _dataSourceId, 
+            CreateTestCsvFile(mediumCsv, "medium.csv"));
+        
+        var result3 = await _timeseriesBusiness.UploadFile(
+            _userId, _organizationId, _projectId, _dataSourceId, 
+            CreateTestCsvFile(largeCsv, "large.csv"));
+
+        // Assert
+        Assert.Equal(smallSize, result1.FileSize);
+        Assert.Equal(mediumSize, result2.FileSize);
+        Assert.Equal(largeSize, result3.FileSize);
+        
+        // Verify ordering
+        Assert.True(result1.FileSize < result2.FileSize);
+        Assert.True(result2.FileSize < result3.FileSize);
+    }
+
+    [Fact]
+    public async Task ExportTimeseriesTable_CreatesReportWithFileSize()
+    {
+        // Arrange - Upload initial file
+        var csvContent = GenerateLargeCsvContent(50);
+        var file = CreateTestCsvFile(csvContent, "export_source.csv");
+        var uploadResult = await _timeseriesBusiness.UploadFile(
+            _userId, _organizationId, _projectId, _dataSourceId, file);
+        var tableName = uploadResult.Uri!.Replace("duckdb://", "");
+
+        // Act - Export the table
+        var exportResult = await _timeseriesBusiness.ExportTimeseriesTable(
+            _userId, _organizationId, _projectId, _dataSourceId, tableName, "csv");
+
+        // Wait a bit for background job to complete
+        await Task.Delay(1000);
+
+        // Assert - Get the completed record
+        Context.ChangeTracker.Clear();
+        var completedRecord = await Context.Records.FindAsync(exportResult.Id);
+        Assert.NotNull(completedRecord);
+        Assert.NotNull(completedRecord.FileSize);
+        Assert.True(completedRecord.FileSize > 0);
+    }
+
+    #endregion
 }
