@@ -98,6 +98,7 @@ public class RecordBusiness : IRecordBusiness
             LastUpdatedAt = r.LastUpdatedAt,
             IsArchived = r.IsArchived,
             FileType = r.FileType,
+            FileSize = r.FileSize,
             Tags = r.Tags.Select(t => new RecordTagDto
             {
                 Id = t.Id,
