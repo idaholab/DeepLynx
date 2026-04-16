@@ -67,8 +67,9 @@ public class OrganizationController : ControllerBase
         try
         {
             var currentUserId = UserContextStorage.UserId;
+            var isSysAdmin = UserContextStorage.IsSysAdmin;
             var organizations = await _organizationBusiness
-                .GetAllOrganizationsForUser(currentUserId, hideArchived);
+                .GetAllOrganizationsForUser(currentUserId, hideArchived, isSysAdmin);
             return Ok(organizations);
         }
         catch (Exception exc)
