@@ -11,8 +11,8 @@ namespace deeplynx.api.Controllers;
 [Authorize]
 public class InsightController : ControllerBase
 {
-    private readonly ILogger<InsightController> _logger;
     private readonly IInsightBusiness _insightBusiness;
+    private readonly ILogger<InsightController> _logger;
 
     /// <summary>
     ///     Initializes a new instance of the <see cref="InsightController" /> class.
@@ -47,12 +47,14 @@ public class InsightController : ControllerBase
         try
         {
             var userId = UserContextStorage.UserId;
-            await _insightBusiness.QueueInsightUpload(userId, organizationId, projectId, vlmModelConfigId, embeddingModelConfigId, dto);
+            await _insightBusiness.QueueInsightUpload(userId, organizationId, projectId, vlmModelConfigId,
+                embeddingModelConfigId, dto);
             return Accepted(new { message = "Upload queued. Poll /ingestion_status/{fileId} to track progress." });
         }
         catch (KeyNotFoundException exc)
         {
-            _logger.LogError("Model config not found during Insight upload for project {ProjectId}: {Error}", projectId, exc.Message);
+            _logger.LogError("Model config not found during Insight upload for project {ProjectId}: {Error}", projectId,
+                exc.Message);
             return NotFound(exc.Message);
         }
         catch (InvalidOperationException exc)
@@ -74,7 +76,10 @@ public class InsightController : ControllerBase
     /// </summary>
     /// <param name="organizationId">ID of the organization.</param>
     /// <param name="projectId">ID of the project.</param>
-    /// <param name="languageModelConfigId">Optional explicit language model config ID. Language Model Type can be LLM or VLM. Defaults to the project/org LLM default, or VLM default if no LLM configured.</param>
+    /// <param name="languageModelConfigId">
+    ///     Optional explicit language model config ID. Language Model Type can be LLM or VLM.
+    ///     Defaults to the project/org LLM default, or VLM default if no LLM configured.
+    /// </param>
     /// <param name="embeddingModelConfigId">Optional explicit embedding model config ID. Defaults to the project/org default.</param>
     /// <param name="dto">Query payload containing the question, file IDs, and sampling parameters.</param>
     /// <param name="cancellationToken">Propagated from the HTTP request lifecycle.</param>
@@ -108,7 +113,8 @@ public class InsightController : ControllerBase
         }
         catch (KeyNotFoundException exc)
         {
-            _logger.LogError("Model config not found during Insight query for project {ProjectId}: {Error}", projectId, exc.Message);
+            _logger.LogError("Model config not found during Insight query for project {ProjectId}: {Error}", projectId,
+                exc.Message);
 
             // Headers are already sent once streaming is started, can't change the status code.
             // Write the error into the stream instead so the client knows.
@@ -160,12 +166,52 @@ public class InsightController : ControllerBase
         }
         catch (InvalidOperationException exc)
         {
-            _logger.LogError("Failed to check ingestion status for file {FileId} in project {ProjectId}: {Error}", fileId, projectId, exc.Message);
+            _logger.LogError("Failed to check ingestion status for file {FileId} in project {ProjectId}: {Error}",
+                fileId, projectId, exc.Message);
             return StatusCode(StatusCodes.Status502BadGateway, exc.Message);
         }
         catch (Exception exc)
         {
             var message = $"An unexpected error occurred while checking ingestion status for file {fileId}: {exc}";
+            _logger.LogError(message);
+            return StatusCode(StatusCodes.Status500InternalServerError, message);
+        }
+    }
+
+    /// <summary>
+    ///     Queue embedding jobs for all class and relationship descriptions in the project.
+    /// </summary>
+    /// <param name="organizationId">ID of the organization.</param>
+    /// <param name="projectId">ID of the project whose ontology strings will be embedded.</param>
+    /// <param name="embeddingModelConfigId">Optional explicit embedding model config ID. Defaults to the project/org default. If no default is configured, Insight falls back to its own environment defaults.</param>
+    /// <returns>202 Accepted once all items have been queued.</returns>
+    [HttpPost("embed_strings", Name = "api_insight_embed_strings")]
+    public async Task<IActionResult> EmbedStrings(
+        long organizationId,
+        long projectId,
+        [FromQuery] long? embeddingModelConfigId)
+    {
+        try
+        {
+            var userId = UserContextStorage.UserId;
+            await _insightBusiness.QueueInsightEmbedStrings(userId, organizationId, projectId,
+                embeddingModelConfigId);
+            return Accepted(new { message = "Ontology embedding queued." });
+        }
+        catch (KeyNotFoundException exc)
+        {
+            _logger.LogError("Model config not found during Insight upload for project {ProjectId}: {Error}", projectId,
+                exc.Message);
+            return NotFound(exc.Message);
+        }
+        catch (InvalidOperationException exc)
+        {
+            _logger.LogError("Ontology embeddings failed for project {ProjectId}: {Error}", projectId, exc.Message);
+            return BadRequest(exc.Message);
+        }
+        catch (Exception exc)
+        {
+            var message = $"An unexpected error occurred while queuing Insight ontology embeddings for project {projectId}: {exc}";
             _logger.LogError(message);
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }

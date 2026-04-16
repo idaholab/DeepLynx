@@ -1,7 +1,9 @@
 using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
+using deeplynx.datalayer.Models;
 using deeplynx.interfaces;
 using deeplynx.models;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
 namespace deeplynx.business;
@@ -19,15 +21,18 @@ public class InsightBusiness : IInsightBusiness
     private readonly InsightServiceClient _insightServiceClient;
     private readonly IAiModelConfigBusiness _aiModelConfigBusiness;
     private readonly ILogger<InsightBusiness> _logger;
+    private readonly DeeplynxContext _context;
+
 
     public InsightBusiness(
         InsightServiceClient insightServiceClient,
         IAiModelConfigBusiness aiModelConfigBusiness,
-        ILogger<InsightBusiness> logger)
+        ILogger<InsightBusiness> logger, DeeplynxContext context)
     {
         _insightServiceClient = insightServiceClient;
         _aiModelConfigBusiness = aiModelConfigBusiness;
         _logger = logger;
+        _context = context;
     }
 
     /// <summary>
@@ -234,6 +239,70 @@ public class InsightBusiness : IInsightBusiness
                 $"but none was found for user {currentUserId}. Please add a token for this model.");
 
         return config;
+    }
+    
+    /// <summary>
+    ///     Queues embedding jobs for all class and relationship descriptions in the project.
+    ///     Fetches descriptions from the database, publishes each as an OntologyMessage to Insight's
+    ///     RabbitMQ ontology_queue, and returns immediately. Maps to POST /embed_strings.
+    /// </summary>
+    /// <param name="currentUserId">The ID of the user making the request. Used to resolve model tokens when required.</param>
+    /// <param name="organizationId">The ID of the organization. Used to scope model config resolution.</param>
+    /// <param name="projectId">The ID of the project whose class and relationship descriptions will be embedded.</param>
+    /// <param name="embeddingModelConfigId">
+    ///     Optional explicit embedding model config ID. If null, the project/org default is used.
+    ///     If no default is configured, Insight falls back to its own environment defaults.
+    /// </param>
+    /// <exception cref="InvalidOperationException">Thrown when a required model token is missing.</exception>
+    public async Task QueueInsightEmbedStrings(
+        long currentUserId,
+        long organizationId,
+        long projectId,
+        long? embeddingModelConfigId)
+    {
+        string? serverUrl = null;
+        string? modelName = null;
+        string? token = null;
+
+        try
+        {
+            var embeddingConfig = await ResolveModelConfig(currentUserId, organizationId, projectId, embeddingModelConfigId, "embedding");
+            serverUrl = embeddingConfig.ServerUrl;
+            modelName = embeddingConfig.ModelName;
+            token = embeddingConfig.Token;
+        }
+        catch (KeyNotFoundException)
+        {
+            // No default configured — Insight will fall back to its own ENV vars
+        }
+
+        var classEmbeds = await _context.Classes
+            .Where(c => c.ProjectId == projectId && !string.IsNullOrEmpty(c.Description))
+            .Select(c => new InsightEmbedStringRequestDto.EmbedStringDto
+            {
+                ClassId = c.Id,
+                Text = c.Description!
+            })
+            .ToListAsync();
+
+        var relationshipEmbeds = await _context.Relationships
+            .Where(r => r.ProjectId == projectId && !string.IsNullOrEmpty(r.Description))
+            .Select(r => new InsightEmbedStringRequestDto.EmbedStringDto
+            {
+                RelationshipId = r.Id,
+                Text = r.Description!
+            })
+            .ToListAsync();
+
+        var request = new InsightEmbedStringRequestDto
+        {
+            EmbedStringInfo = classEmbeds.Concat(relationshipEmbeds).ToList(),
+            EmbeddingServerUrl = serverUrl,
+            EmbeddingModelName = modelName,
+            EmbeddingModelToken = token,
+        };
+
+        await _insightServiceClient.EmbedStrings(request);
     }
 
     private async IAsyncEnumerable<string> StreamInsightQueryCore(
