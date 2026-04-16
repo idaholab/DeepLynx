@@ -42,7 +42,8 @@ public class ExtractionBusiness : IExtractionBusiness
         var extraction = new Extraction
         {
             Properties = dto.Properties?.ToJsonString(),
-            CreatedBy = currentUserId
+            CreatedBy = currentUserId,
+            Status = ExtractionStatus.Complete
         };
         _context.Extractions.Add(extraction);
         await _context.SaveChangesAsync();
