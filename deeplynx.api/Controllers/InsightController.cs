@@ -49,7 +49,8 @@ public class InsightController : ControllerBase
         try
         {
             var userId = UserContextStorage.UserId;
-            await _insightBusiness.QueueInsightUpload(userId, organizationId, projectId, vlmModelConfigId, embeddingModelConfigId, dto);
+            var userJwt = UserContextStorage.Token;
+            await _insightBusiness.QueueInsightUpload(userId, organizationId, projectId, vlmModelConfigId, embeddingModelConfigId, dto, userJwt);
             return Accepted(new { message = "Upload queued. Poll /ingestion_status/{fileId} to track progress." });
         }
         catch (KeyNotFoundException exc)

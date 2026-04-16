@@ -57,8 +57,8 @@ public class RecordBusiness : IRecordBusiness
     /// <param name="fileType">File extension to filter by (e.g., pdf, png, jpg)</param>
     /// <returns>A list of records based on the applied filters.</returns>
     public async Task<List<RecordResponseDto>> GetAllRecords(
-    long currentUserId, long organizationId, long projectId, long? dataSourceId, bool hideArchived,
-    string? fileType = null)
+        long currentUserId, long organizationId, long projectId, long? dataSourceId, bool hideArchived,
+        string? fileType = null)
     {
         var userAuthorizedLabels = await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
             currentUserId, organizationId, projectId, "read record");

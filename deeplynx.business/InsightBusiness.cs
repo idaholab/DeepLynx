@@ -53,6 +53,7 @@ public class InsightBusiness : IInsightBusiness
     ///     Optional explicit embedding model config ID. If null, the default embedding config for the org/project is used.
     /// </param>
     /// <param name="payload">Upload dto from the caller containing file IDs and URIs.</param>
+    /// <param name="userJwt">The requesting user's JWT used for forwarding to Insight</param>
     /// <exception cref="InvalidOperationException">Thrown when Insight returns a non-success status, or when a required token is missing.</exception>
     /// <exception cref="KeyNotFoundException">Thrown when a specified or default model config cannot be found.</exception>
     public async Task QueueInsightUpload(
@@ -61,7 +62,8 @@ public class InsightBusiness : IInsightBusiness
         long projectId,
         long? vlmModelConfigId,
         long? embeddingModelConfigId,
-        InsightUploadApiRequestDto payload)
+        InsightUploadApiRequestDto payload,
+        string? userJwt = null)
     {
         var vlmConfig = await ResolveModelConfig(currentUserId, organizationId, projectId, vlmModelConfigId, "vlm");
         var embeddingConfig = await ResolveModelConfig(currentUserId, organizationId, projectId, embeddingModelConfigId, "embedding");
@@ -88,7 +90,8 @@ public class InsightBusiness : IInsightBusiness
             EmbeddingServerUrl = embeddingConfig.ServerUrl,
             EmbeddingModelName = embeddingConfig.ModelName,
             EmbeddingModelToken = embeddingConfig.Token,
-            Overwrite = false // this endpoint will never be used for updates
+            Overwrite = false, // this endpoint will never be used for updates
+            UserJwt = userJwt
         };
 
         await _insightServiceClient.Upload(request);
@@ -105,6 +108,7 @@ public class InsightBusiness : IInsightBusiness
     /// <param name="uri">The URI of the file to embed.</param>
     /// <param name="vlmConfig">Optional explicit VLM model config ID. If null, the project/org default is used.</param>
     /// <param name="embeddingConfig">Optional explicit embedding model config ID. If null, the project/org default is used.</param>
+    /// <param name="userJwt">The requesting user's JWT used for forwarding to Insight</param>
     /// <param name="overwrite">Whether to overwrite an existing embedding for this record.</param>
     public void TriggerEmbedding(
         long projectId,
@@ -112,6 +116,7 @@ public class InsightBusiness : IInsightBusiness
         string uri,
         AiModelConfigResponseDto vlmConfig,
         AiModelConfigResponseDto embeddingConfig,
+        string? userJwt = null,
         bool overwrite = false)
     {
         var request = new InsightUploadRequestDto
@@ -123,7 +128,8 @@ public class InsightBusiness : IInsightBusiness
             VlmToken = vlmConfig.Token,
             EmbeddingServerUrl = embeddingConfig.ServerUrl,
             EmbeddingModelName = embeddingConfig.ModelName,
-            EmbeddingModelToken = embeddingConfig.Token
+            EmbeddingModelToken = embeddingConfig.Token,
+            UserJwt = userJwt
         };
 
         _ = _insightServiceClient.Upload(request)
