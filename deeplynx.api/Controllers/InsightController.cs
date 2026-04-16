@@ -1,3 +1,4 @@
+using deeplynx.helpers;
 using deeplynx.helpers.Context;
 using deeplynx.interfaces;
 using deeplynx.models;
@@ -37,6 +38,7 @@ public class InsightController : ControllerBase
     /// <param name="dto">Upload payload containing file info.</param>
     /// <returns>202 Accepted once Insight has acknowledged the request.</returns>
     [HttpPost("upload", Name = "api_insight_upload")]
+    [Auth("write", "insight")]
     public async Task<IActionResult> Upload(
         long organizationId,
         long projectId,
@@ -84,6 +86,8 @@ public class InsightController : ControllerBase
     /// <param name="dto">Query payload containing the question, file IDs, and sampling parameters.</param>
     /// <param name="cancellationToken">Propagated from the HTTP request lifecycle.</param>
     [HttpPost("query", Name = "api_insight_query")]
+    [Auth("read", "insight")]
+    [Sensitivity("read record")]
     public async Task Query(
         long organizationId,
         long projectId,

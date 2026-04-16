@@ -490,9 +490,24 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
     t.translations.FAILED_TO_FETCH_CLASSES,
   ]);
 
+  // helper function to format file size
+  const formatFileSize = (bytes : number | null | undefined): string => {
+    if (bytes == null) return "-";
+    if (bytes === 0) return "0 bytes";
+    const k = 1024;
+    const sizes = ["Bytes", "KB", "MB", "GB", "TB"];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
+  };
+
   // ============= MEMOIZED VALUES =============
   const systemPropertiesRows = useMemo(() => {
     if (!record) return [];
+
+    const isDownloadable = !!record.uri &&
+      record.uri.trim().length > 0 &&
+      record.uri.toLowerCase() !== "null";
+
     return [
       { label: t.translations.RECORD_ID, value: record.id },
       {
@@ -533,6 +548,14 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
             t.translations.ORIGINAL_ID_UPDATED,
           ),
       },
+      // {
+      //   label: t.translations.FILE_SIZE,
+      //   value: formatFileSize(record.fileSize)
+      // },
+      ...(isDownloadable ? [{
+        label: t.translations.FILE_SIZE || "File Size",
+        value: formatFileSize(record.fileSize),
+      }] : []),
       {
         label: t.translations.LAST_UPDATED_AT,
         value: formatLocalDateTime(record.lastUpdatedAt),
@@ -633,6 +656,10 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
     return <RecordLoading />;
   }
 
+  const isDownloadable = !!record.uri &&
+    record.uri.trim().length > 0 &&
+    record.uri.toLowerCase() !== "null"
+
   const isInsightSupported = isInsightSupportedFileType(
     recordFileType,
     record?.uri,
@@ -649,11 +676,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
             <PropertyTable
               title={t.translations.SYSTEM_PROPERTIES}
               rows={systemPropertiesRows}
-              download={
-                !!record.uri &&
-                record.uri.trim().length > 0 &&
-                record.uri.toLowerCase() !== "null"
-              }
+              download={isDownloadable}
               recordName={record.name}
             />
             <PropertyTable
