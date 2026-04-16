@@ -86,6 +86,8 @@ public class HistoricalRecordBusiness : IHistoricalRecordBusiness
                 Tags = r.Tags,
                 Labels = r.Labels,
                 LastUpdatedBy = r.LastUpdatedBy,
+                FileType = r.FileType,
+                FileSize = r.FileSize,
                 IsArchived = r.IsArchived,
                 LastUpdatedAt = r.LastUpdatedAt
             });
@@ -125,6 +127,8 @@ public class HistoricalRecordBusiness : IHistoricalRecordBusiness
                 ProjectName = r.ProjectName,
                 Tags = r.Tags,
                 LastUpdatedBy = r.LastUpdatedBy,
+                FileType = r.FileType,
+                FileSize = r.FileSize,
                 IsArchived = r.IsArchived,
                 LastUpdatedAt = r.LastUpdatedAt
             })
@@ -194,6 +198,8 @@ public class HistoricalRecordBusiness : IHistoricalRecordBusiness
             Tags = record.Tags,
             Labels = record.Labels,
             LastUpdatedBy = record.LastUpdatedBy,
+            FileType = record.FileType,
+            FileSize = record.FileSize,
             IsArchived = record.IsArchived,
             LastUpdatedAt = record.LastUpdatedAt
         };
