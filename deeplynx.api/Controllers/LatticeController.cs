@@ -21,15 +21,18 @@ public class LatticeController : ControllerBase
 {
     private readonly IExtractionBusiness _extractionBusiness;
     private readonly IInsightBusiness _insightBusiness;
+    private readonly ILatticeOrchestrationBusiness _latticeOrchestration;
     private readonly ILogger<LatticeController> _logger;
 
     public LatticeController(
         IExtractionBusiness extractionBusiness,
         IInsightBusiness insightBusiness,
+        ILatticeOrchestrationBusiness latticeOrchestration,
         ILogger<LatticeController> logger)
     {
         _extractionBusiness = extractionBusiness;
         _insightBusiness = insightBusiness;
+        _latticeOrchestration = latticeOrchestration;
         _logger = logger;
     }
 
@@ -139,6 +142,45 @@ public class LatticeController : ControllerBase
         catch (Exception exc)
         {
             var message = $"An error occurred during ontology similarity search: {exc}";
+            _logger.LogError(message);
+            return StatusCode(StatusCodes.Status500InternalServerError, message);
+        }
+    }
+
+    /// <summary>
+    ///     Trigger asynchronous entity extraction on a document record via the Lattice service.
+    ///     Creates an Extraction record (status: pending → running) and returns immediately.
+    ///     Lattice processes the extraction and calls back via the staging endpoint when complete.
+    ///     NEXUS_BASE_URL and NEXUS_SERVICE_TOKEN environment variables must be set so Lattice
+    ///     can authenticate its callback.
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization.</param>
+    /// <param name="projectId">The ID of the project.</param>
+    /// <param name="recordId">The ID of the document record to extract from.</param>
+    /// <param name="dto">Extraction configuration: data_source_id, mode, similarity_limit.</param>
+    /// <returns>202 Accepted with the extraction_id to poll for status.</returns>
+    [HttpPost("records/{recordId:long}/trigger", Name = "api_trigger_extraction")]
+    public async Task<IActionResult> TriggerExtraction(
+        long organizationId,
+        long projectId,
+        long recordId,
+        [FromBody] TriggerExtractionRequestDto dto)
+    {
+        try
+        {
+            var currentUserId = UserContextStorage.UserId;
+            var extractionId = await _latticeOrchestration.TriggerLatticeExtraction(
+                currentUserId, organizationId, projectId, dto.DataSourceId, recordId, dto.Mode, dto.SimilarityLimit);
+            return Accepted(new { extraction_id = extractionId });
+        }
+        catch (InvalidOperationException exc)
+        {
+            _logger.LogWarning(exc.Message);
+            return BadRequest(exc.Message);
+        }
+        catch (Exception exc)
+        {
+            var message = $"An error occurred while triggering Lattice extraction: {exc}";
             _logger.LogError(message);
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
