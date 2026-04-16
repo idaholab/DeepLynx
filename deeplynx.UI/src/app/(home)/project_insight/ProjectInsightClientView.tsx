@@ -1,13 +1,11 @@
 "use client";
 
-import React, { useDeferredValue, useEffect, useState } from "react";
-import toast from "react-hot-toast";
-import {
-  AdjustmentsHorizontalIcon,
-  ChatBubbleLeftRightIcon,
-  XMarkIcon,
-} from "@heroicons/react/24/outline";
 import SearchBar from "@/app/(home)/components/SearchBar";
+import type {
+  ClassResponseDto,
+  DataSourceResponseDto,
+  TagResponseDto,
+} from "@/app/(home)/types/responseDTOs";
 import { useLanguage } from "@/app/contexts/Language";
 import { useOrganizationSession } from "@/app/contexts/OrganizationSessionProvider";
 import { useProjectSession } from "@/app/contexts/ProjectSessionProvider";
@@ -20,13 +18,15 @@ import {
 import { fullTextSearch } from "@/app/lib/client_service/query_services.client";
 import { getAllRecords } from "@/app/lib/client_service/record_services.client";
 import { getAllTags } from "@/app/lib/client_service/tag_services.client";
-import type {
-  ClassResponseDto,
-  DataSourceResponseDto,
-  TagResponseDto,
-} from "@/app/(home)/types/responseDTOs";
+import {
+  AdjustmentsHorizontalIcon,
+  XMarkIcon,
+} from "@heroicons/react/24/outline";
+import { useDeferredValue, useEffect, useState } from "react";
+import toast from "react-hot-toast";
 import ProjectInsightChat from "./components/ProjectInsightChat";
 import ProjectInsightFilters from "./components/ProjectInsightFilters";
+import ProjectInsightLoadingSkeleton from "./components/ProjectInsightLoadingSkeleton";
 import ProjectInsightRecordCard from "./components/ProjectInsightRecordCard";
 import ProjectInsightRecordSection from "./components/ProjectInsightRecordSection";
 import type {
@@ -659,17 +659,7 @@ export default function ProjectInsightClientView() {
   );
 
   if (!hasProjectLoaded || !hasOrganizationLoaded || isLoadingRecords) {
-    return (
-      <div className="px-4 py-10 lg:px-6">
-        <div className="card border border-base-300/60 bg-base-100 shadow-lg">
-          <div className="card-body">
-            <p className="text-sm text-base-content/70">
-              {t.translations.PROJECT_INSIGHT_LOADING_RECORDS}
-            </p>
-          </div>
-        </div>
-      </div>
-    );
+    return <ProjectInsightLoadingSkeleton />;
   }
 
   if (!projectId || !organizationId) {
