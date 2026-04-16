@@ -911,6 +911,105 @@ public partial class DeeplynxContext : DbContext
                         j.IndexerProperty<long>("TagId").HasColumnName("tag_id");
                     });
         });
+        
+        modelBuilder.Entity<RecordCollection>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("record_collections_pkey");
+
+            entity.HasIndex(e => e.Id)
+                .HasDatabaseName("idx_record_collections_id");
+
+            entity.HasIndex(e => e.OrganizationId)
+                .HasDatabaseName("idx_record_collections_organization_id");
+
+            entity.HasIndex(e => e.ProjectId)
+                .HasDatabaseName("idx_record_collections_project_id");
+
+            entity.HasIndex(e => e.Name)
+                .HasDatabaseName("idx_record_collections_name");
+            
+            // Creates a partial unique index to make sure if a user is adding an originalID, it is unique within the project
+            entity.HasIndex(e => new { e.ProjectId, e.Name })
+                .HasDatabaseName("unique_record_collection_name")
+                .IsUnique();
+
+            entity.HasIndex(e => e.Properties, "idx_record_collections_properties").HasMethod("gin");
+
+            entity.Property(e => e.Id).UseIdentityAlwaysColumn();
+            entity.Property(e => e.LastUpdatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+            entity.Property(e => e.IsArchived).HasDefaultValue(false);
+
+            entity.HasIndex(e => e.LastUpdatedBy).HasDatabaseName("idx_record_collections_last_updated_by");
+
+            entity.HasOne(d => d.LastUpdatedByUser)
+                .WithMany(p => p.LastUpdatedRecordCollections)
+                .HasForeignKey(d => d.LastUpdatedBy)
+                .OnDelete(DeleteBehavior.NoAction)
+                .HasConstraintName(null);
+
+            entity.HasOne(d => d.Project).WithMany(p => p.RecordCollections).HasConstraintName("record_collections_project_id_fkey");
+
+            entity.HasOne(d => d.Organization).WithMany(p => p.RecordCollections)
+                .HasConstraintName("record_collections_organization_id_fkey");
+
+            entity.HasMany(d => d.Labels).WithMany(p => p.RecordCollections)
+                .UsingEntity<Dictionary<string, object>>(
+                    "RecordCollectionLabels",
+                    r => r.HasOne<SensitivityLabel>().WithMany()
+                        .HasForeignKey("LabelId")
+                        .HasConstraintName("record_collection_labels_label_id_fkey"),
+                    l => l.HasOne<RecordCollection>().WithMany()
+                        .HasForeignKey("RecordCollectionId")
+                        .HasConstraintName("record_collection_labels_record_collection_id_fkey"),
+                    j =>
+                    {
+                        j.HasKey("RecordCollectionId", "LabelId").HasName("record_collection_labels_pkey");
+                        j.ToTable("record_collection_labels", "deeplynx");
+                        j.HasIndex(new[] { "LabelId" }, "idx_record_collection_labels_label_id");
+                        j.HasIndex(new[] { "RecordCollectionId" }, "idx_record_collection_labels_record_collection_id");
+                        j.IndexerProperty<long>("RecordCollectionId").HasColumnName("record_collection_id");
+                        j.IndexerProperty<long>("LabelId").HasColumnName("label_id");
+                    });
+
+            entity.HasMany(d => d.Tags).WithMany(p => p.RecordCollections)
+                .UsingEntity<Dictionary<string, object>>(
+                    "RecordCollectionTags",
+                    r => r.HasOne<Tag>().WithMany()
+                        .HasForeignKey("TagId")
+                        .HasConstraintName("record_collection_tags_tag_id_fkey"),
+                    l => l.HasOne<RecordCollection>().WithMany()
+                        .HasForeignKey("RecordCollectionId")
+                        .HasConstraintName("record_collection_tags_record_collection_id_fkey"),
+                    j =>
+                    {
+                        j.HasKey("RecordCollectionId", "TagId").HasName("record_collection_tags_pkey");
+                        j.ToTable("record_collection_tags", "deeplynx");
+                        j.HasIndex(new[] { "RecordCollectionId" }, "idx_record_collection_tags_record_collection_id");
+                        j.HasIndex(new[] { "TagId" }, "idx_record_collection_tags_tag_id");
+                        j.IndexerProperty<long>("RecordCollectionId").HasColumnName("record_collection_id");
+                        j.IndexerProperty<long>("TagId").HasColumnName("tag_id");
+                    });
+            
+            entity.HasMany(d => d.Records).WithMany(p => p.RecordCollections)
+                .UsingEntity<Dictionary<string, object>>(
+                    "RecordCollectionRecords",
+                    r => r.HasOne<Record>().WithMany()
+                        .HasForeignKey("RecordId")
+                        .HasConstraintName("record_collection_records_record_id_fkey"),
+                    l => l.HasOne<RecordCollection>().WithMany()
+                        .HasForeignKey("RecordCollectionId")
+                        .HasConstraintName("record_collection_records_record_collection_id_fkey"),
+                    j =>
+                    {
+                        j.HasKey("RecordCollectionId", "RecordId").HasName("record_collection_records_pkey");
+                        j.ToTable("record_collection_records", "deeplynx");
+                        j.HasIndex(new[] { "RecordCollectionId" }, "idx_record_collection_records_record_collection_id");
+                        j.HasIndex(new[] { "RecordId" }, "idx_record_collection_records_record_id");
+                        j.IndexerProperty<long>("RecordCollectionId").HasColumnName("record_collection_id");
+                        j.IndexerProperty<long>("RecordId").HasColumnName("record_id");
+                    });
+        });
 
         modelBuilder.Entity<Relationship>(entity =>
         {
