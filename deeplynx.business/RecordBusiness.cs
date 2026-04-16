@@ -55,14 +55,14 @@ public class RecordBusiness : IRecordBusiness
     /// <param name="dataSourceId">(Optional) The ID of the datasource by which to filter records</param>
     /// <param name="hideArchived">Flag indicating whether to hide archived records from the result</param>
     /// <param name="fileType">File extension to filter by (e.g., pdf, png, jpg)</param>
+    /// <param name="isSysAdmin">Optional param determining if the requesting user is a system admin</param>
+    /// <param name="isOrgAdmin">Optional param determining if the requesting user is an organization admin</param>
+    /// <param name="isProjectAdmin">Optional param determining if the requesting user is a project admin</param>
     /// <returns>A list of records based on the applied filters.</returns>
     public async Task<List<RecordResponseDto>> GetAllRecords(
-    long currentUserId, long organizationId, long projectId, long? dataSourceId, bool hideArchived,
-    string? fileType = null)
+        long currentUserId, long organizationId, long projectId, long? dataSourceId, bool hideArchived,
+        string? fileType = null, bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false)
     {
-        var userAuthorizedLabels = await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
-            currentUserId, organizationId, projectId, "read record");
-
         var recordQuery = _context.Records
             .Where(r => r.ProjectId == projectId && r.OrganizationId == organizationId);
 
@@ -75,9 +75,17 @@ public class RecordBusiness : IRecordBusiness
             var formattedFileType = fileType.TrimStart('.').ToLower();
             recordQuery = recordQuery.Where(r => r.FileType == formattedFileType);
         }
+        
+        // if user is not admin, filter out unauthorized labels
+        if (!isSysAdmin && !isOrgAdmin && !isProjectAdmin)
+        {
+            var userAuthorizedLabels = await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
+                currentUserId, organizationId, projectId, "read record");
+            
+            recordQuery = recordQuery.WithAuthorizedLabels(userAuthorizedLabels);
+        }
 
         var records = await recordQuery
-            .WithAuthorizedLabels(userAuthorizedLabels)
             .Include(r => r.Tags)
             .Include(r => r.Labels)
             .ToListAsync();
@@ -120,13 +128,14 @@ public class RecordBusiness : IRecordBusiness
     /// <param name="projectId">The ID of the project whose records are to be retrieved</param>
     /// <param name="tagIds">List of tag IDs - returned records must contain every given ID</param>
     /// <param name="hideArchived">Flag indicating whether to hide archived records from the result</param>
+    /// <param name="isSysAdmin">Optional param determining if the requesting user is a system admin</param>
+    /// <param name="isOrgAdmin">Optional param determining if the requesting user is an organization admin</param>
+    /// <param name="isProjectAdmin">Optional param determining if the requesting user is a project admin</param>
     /// <returns></returns>
     public async Task<List<RecordResponseDto>> GetRecordsByTags(
-        long currentUserId, long organizationId, long projectId, long[] tagIds, bool hideArchived)
+        long currentUserId, long organizationId, long projectId, long[] tagIds, bool hideArchived,
+        bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false)
     {
-        var userAuthorizedLabels = await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
-                currentUserId, organizationId, projectId, "read record");
-
         var recordQuery = _context.Records
             .Where(r => r.ProjectId == projectId && r.OrganizationId == organizationId);
 
@@ -135,9 +144,16 @@ public class RecordBusiness : IRecordBusiness
         // Only return records that contain ALL given IDs
         recordQuery = recordQuery.Where(r =>
             tagIds.All(tagId => r.Tags.Any(t => t.Id == tagId)));
+        
+        // if user is not admin, filter out unauthorized labels
+        if (!isSysAdmin && !isOrgAdmin && !isProjectAdmin)
+        {
+            var userAuthorizedLabels = await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
+                currentUserId, organizationId, projectId, "read record");
+            recordQuery = recordQuery.WithAuthorizedLabels(userAuthorizedLabels);
+        }
 
         var records = await recordQuery
-            .WithAuthorizedLabels(userAuthorizedLabels)
             .Include(r => r.Tags)
             .Include(r => r.Labels)
             .ToListAsync();
@@ -1216,12 +1232,16 @@ public class RecordBusiness : IRecordBusiness
     /// <param name="projectId">The project ID to search within</param>
     /// <param name="dataSourceId">The data source ID to search within</param>
     /// <param name="originalIds">List of original IDs to validate</param>
+    /// <param name="hideArchived">Flag indicating whether to hide archived records from the result</param>
+    /// <param name="isSysAdmin">Optional param determining if the requesting user is a system admin</param>
+    /// <param name="isOrgAdmin">Optional param determining if the requesting user is an organization admin</param>
+    /// <param name="isProjectAdmin">Optional param determining if the requesting user is a project admin</param>
     /// <returns>List of records that were found</returns>
     /// <exception cref="KeyNotFoundException">Thrown if one or more original IDs not found</exception>
     /// <exception cref="ArgumentException">Thrown if originalIds list is null or empty</exception>
-    public async Task<List<RecordResponseDto>> GetRecordsByOriginalId(long currentUserId, long organizationId,
-        long projectId, long dataSourceId,
-        List<string> originalIds, bool hideArchived)
+    public async Task<List<RecordResponseDto>> GetRecordsByOriginalId(
+        long currentUserId, long organizationId, long projectId, long dataSourceId,
+        List<string> originalIds, bool hideArchived, bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false)
     {
         if (originalIds == null || !originalIds.Any())
             throw new ArgumentException("Original IDs list cannot be null or empty", nameof(originalIds));
@@ -1242,24 +1262,25 @@ public class RecordBusiness : IRecordBusiness
 
         if (!dataSourceExists) throw new KeyNotFoundException($"No data source with Id {dataSourceId} in org {organizationId} or project {projectId}");
 
-        // Filtering Record By User's Sensitivity Label access
-        var userAuthorizedLabels =
-            await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
-                currentUserId, organizationId, projectId, "read record");
-
-
         // Query for existing records (excluding archived)
-        var existingRecords = await _context.Records
+        var recordQuery = _context.Records
             .Include(r => r.Labels)
             .Include(r => r.Tags)
             .Where(r => r.ProjectId == projectId
                         && r.DataSourceId == dataSourceId
                         && r.OrganizationId == organizationId
                         && (!hideArchived || !r.IsArchived)
-                        && cleanOriginalIds.Contains(r.OriginalId))
-            .Where(r => !r.Labels.Any() ||
-                        r.Labels.All(label => userAuthorizedLabels.Contains(label.Id)))
-            .ToListAsync();
+                        && cleanOriginalIds.Contains(r.OriginalId));
+        
+        // if user is not admin, filter out unauthorized labels
+        if (!isSysAdmin && !isOrgAdmin && !isProjectAdmin)
+        {
+            var userAuthorizedLabels = await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
+                currentUserId, organizationId, projectId, "read record");
+            recordQuery = recordQuery.WithAuthorizedLabels(userAuthorizedLabels);
+        }
+        
+        var existingRecords = await recordQuery.ToListAsync();
 
         // Check for missing records
         var foundOriginalIds = existingRecords.Select(r => r.OriginalId).ToHashSet();
@@ -1332,6 +1353,7 @@ public class RecordBusiness : IRecordBusiness
     /// <summary>
     ///     Make sure every object storage ID exists, filtering in memory with one DB trip
     /// </summary>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
     /// <param name="projectId"> Shared project ID of the object storages </param>
     /// <param name="records"> Records with object storages to check</param>
     /// <exception cref="KeyNotFoundException">If an object storage ID is not found</exception>
