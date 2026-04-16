@@ -195,6 +195,7 @@ try
     builder.Services.AddScoped<ISensitivityLabelService, SensitivityLabelService>();
     builder.Services.AddTransient<IInsightBusiness, InsightBusiness>();
     builder.Services.AddHttpClient<InsightServiceClient>();
+    builder.Services.AddHttpClient<LatticeServiceClient>();
     
     //OpenApi Documentation
     builder.Services.AddOpenApi(options =>
