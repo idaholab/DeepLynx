@@ -110,7 +110,7 @@ public class OrganizationController : ControllerBase
     /// <param name="dto">Data structure of organization to create</param>
     /// <returns></returns>
     [HttpPost(Name = "api_create_organization")]
-    [Auth("write", "organization")]
+    [Auth("write", "organization", allowWithoutContext: true)]
     public async Task<ActionResult<OrganizationResponseDto>> CreateOrganization(
         [FromBody] CreateOrganizationRequestDto dto)
     {
