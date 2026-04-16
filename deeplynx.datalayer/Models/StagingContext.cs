@@ -45,6 +45,7 @@ public class StagingContext : DbContext
         modelBuilder.Ignore<Permission>();
         modelBuilder.Ignore<Project>();
         modelBuilder.Ignore<ProjectMember>();
+        modelBuilder.Ignore<RecordCollection>();
         modelBuilder.Ignore<Role>();
         modelBuilder.Ignore<SavedSearch>();
         modelBuilder.Ignore<SensitivityLabel>();
@@ -72,6 +73,12 @@ public class StagingContext : DbContext
             .ToTable("GroupUser", "staging", t => t.ExcludeFromMigrations());
         modelBuilder.Entity("PermissionRole")
             .ToTable("PermissionRole", "staging", t => t.ExcludeFromMigrations());
+        modelBuilder.Entity("RecordCollectionSensitivityLabel")
+            .ToTable("RecordCollectionSensitivityLabel", "staging", t => t.ExcludeFromMigrations());
+        modelBuilder.Entity("RecordCollectionTag")
+            .ToTable("RecordCollectionTag", "staging", t => t.ExcludeFromMigrations());
+        modelBuilder.Entity("RecordRecordCollection")
+            .ToTable("RecordRecordCollection", "staging", t => t.ExcludeFromMigrations());
 
         modelBuilder.Entity<Class>(entity =>
         {
