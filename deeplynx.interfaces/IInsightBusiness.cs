@@ -42,5 +42,10 @@ public interface IInsightBusiness
         string modelType);
 
     bool IsSupportedFile(string fileType);
+    Task QueueInsightEmbedStrings(
+    long currentUserId,
+    long organizationId,
+    long projectId,
+    long? embeddingModelConfigId);
 
 }

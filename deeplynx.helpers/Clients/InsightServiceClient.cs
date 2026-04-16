@@ -36,4 +36,10 @@ public class InsightServiceClient
         return await response.Content.ReadFromJsonAsync<InsightIngestionStatusResponseDto>()
                ?? throw new InvalidOperationException($"Insight returned an empty response body for file {fileId}");
     }
+    
+    public async Task EmbedStrings(InsightEmbedStringRequestDto dto)
+    {
+        var response = await _client.PostAsJsonAsync("/embed_strings", dto);
+        response.EnsureSuccessStatusCode();
+    }
 }
