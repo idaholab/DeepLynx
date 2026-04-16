@@ -196,6 +196,7 @@ try
     builder.Services.AddTransient<IInsightBusiness, InsightBusiness>();
     builder.Services.AddHttpClient<InsightServiceClient>();
     builder.Services.AddHttpClient<LatticeServiceClient>();
+    builder.Services.AddTransient<ILatticeOrchestrationBusiness, LatticeOrchestrationBusiness>();
     
     //OpenApi Documentation
     builder.Services.AddOpenApi(options =>
