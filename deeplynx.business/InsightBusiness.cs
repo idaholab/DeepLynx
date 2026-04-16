@@ -22,7 +22,6 @@ public class InsightBusiness : IInsightBusiness
     private readonly InsightServiceClient _insightServiceClient;
     private readonly IAiModelConfigBusiness _aiModelConfigBusiness;
     private readonly ILogger<InsightBusiness> _logger;
-    private readonly DeeplynxContext _context;
 
     private readonly ISensitivityLabelService _sensitivityLabelService;
 
@@ -30,7 +29,7 @@ public class InsightBusiness : IInsightBusiness
         DeeplynxContext context,
         InsightServiceClient insightServiceClient,
         IAiModelConfigBusiness aiModelConfigBusiness,
-        ILogger<InsightBusiness> logger, DeeplynxContext context,
+        ILogger<InsightBusiness> logger,
         ISensitivityLabelService sensitivityLabelService)
     {
         _context = context;
