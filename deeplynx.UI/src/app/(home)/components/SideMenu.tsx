@@ -20,6 +20,7 @@ import type { ProjectResponseDto } from "../types/responseDTOs";
 import {
   AdjustmentsHorizontalIcon,
   ArrowUpTrayIcon,
+  ClipboardDocumentCheckIcon,
   ChevronDownIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
@@ -441,6 +442,17 @@ const SideMenu: React.FC<SideMenuProps> = ({
             >
               <SparklesIcon className="size-6" />
               {!isCollapsed && <p className="ml-2">Insight</p>}
+            </Link>
+          </li>
+
+          <li className="mt-2">
+            <Link
+              href="/lattice_mockups/decisions"
+              onClick={() => onMobileClose?.()}
+              className={getItemClass("/lattice_mockups/decisions")}
+            >
+              <ClipboardDocumentCheckIcon className="size-6" />
+              {!isCollapsed && <p className="ml-2">Lattice</p>}
             </Link>
           </li>
         </ul>

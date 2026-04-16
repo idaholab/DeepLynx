@@ -2,7 +2,12 @@
 
 "use client";
 import Tabs from "@/app/(home)/components/Tabs";
-import { PencilIcon, PlusIcon } from "@heroicons/react/24/outline";
+import {
+  ArrowTopRightOnSquareIcon,
+  PencilIcon,
+  PlusIcon,
+  SparklesIcon,
+} from "@heroicons/react/24/outline";
 import Link from "next/link";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
@@ -639,6 +644,14 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
     record?.name,
   );
 
+  const latticePreviewQuery = new URLSearchParams({
+    projectId: String(projectId),
+    recordId: String(record.id),
+    recordName: record.name ?? "",
+    recordUri: record.uri ?? "",
+    recordClass: recordClass?.name ?? record.dataSourceName ?? "Unclassified",
+  }).toString();
+
   const tabs = [
     {
       label: t.translations.RECORD_INFORMATION,
@@ -752,31 +765,75 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
   return (
     <div className="mx-3 sm:mx-4 lg:mr-0 lg:ml-0">
       <div className="bg-base-200/40 px-3 sm:px-6 lg:px-12 p-4">
-        <h1 className="text-xl sm:text-2xl font-bold text-base-content break-words">
-          {record.name}
-        </h1>
-        {record.classId ? (
-          <div className="flex flex-wrap gap-2 py-auto items-center">
-            <span className="badge badge-primary">
-              {recordClass?.name || <div className="loading size-3" />}
-            </span>
-            <button
-              onClick={() => setIsClassModalOpen(true)}
-              className="btn btn-ghost btn-xs btn-circle"
-              title={t.translations.EDIT_CLASS}
-            >
-              <PencilIcon className="size-4" />
-            </button>
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+          <div>
+            <h1 className="text-xl sm:text-2xl font-bold text-base-content break-words">
+              {record.name}
+            </h1>
+            {record.classId ? (
+              <div className="flex flex-wrap gap-2 py-auto items-center">
+                <span className="badge badge-primary">
+                  {recordClass?.name || <div className="loading size-3" />}
+                </span>
+                <button
+                  onClick={() => setIsClassModalOpen(true)}
+                  className="btn btn-ghost btn-xs btn-circle"
+                  title={t.translations.EDIT_CLASS}
+                >
+                  <PencilIcon className="size-4" />
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setIsClassModalOpen(true)}
+                className="btn btn-sm btn-outline mt-2"
+              >
+                <PlusIcon className="w-4 h-4 mr-1" />
+                {t.translations.ADD_CLASS || "Add Class"}
+              </button>
+            )}
           </div>
-        ) : (
-          <button
-            onClick={() => setIsClassModalOpen(true)}
-            className="btn btn-sm btn-outline mt-2"
-          >
-            <PlusIcon className="w-4 h-4 mr-1" />
-            {t.translations.ADD_CLASS || "Add Class"}
-          </button>
-        )}
+
+          <div className="max-w-xl rounded-2xl border border-info/20 bg-gradient-to-r from-base-100 to-info/10 p-4 shadow-sm">
+            <div className="flex items-start gap-3">
+              <div className="rounded-2xl bg-info/15 p-3 text-info">
+                <SparklesIcon className="size-6" />
+              </div>
+              <div className="space-y-3">
+                <div>
+                  <p className="text-sm font-semibold text-base-content">
+                    Lattice extraction mock flow
+                  </p>
+                  <p className="mt-1 text-sm text-base-content/70">
+                    Use this record as the source file and jump into the review
+                    mockups while the extraction endpoint is still pending.
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  <Link
+                    href={`/lattice_mockups/decisions?${latticePreviewQuery}`}
+                    className="btn btn-primary btn-sm"
+                  >
+                    Open Lattice Mockup
+                    <ArrowTopRightOnSquareIcon className="size-4" />
+                  </Link>
+                </div>
+
+                <div className="flex flex-wrap gap-2 text-xs text-base-content/60">
+                  <span className="rounded-full bg-base-200 px-3 py-1">
+                    Record ID {record.id}
+                  </span>
+                  <span className="rounded-full bg-base-200 px-3 py-1">
+                    {isInsightSupported
+                      ? "Insight-supported file"
+                      : "Mock-only preview"}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <Tabs
