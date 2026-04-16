@@ -70,6 +70,12 @@ public partial class HistoricalRecord
     [Column("is_archived")]
     public bool IsArchived { get; set; }
 
+    [Column("file_type")]
+    public string? FileType { get; set; }
+    
+    [Column("file_size")]
+    public long? FileSize { get; set; }
+
     [ForeignKey("RecordId")]
     [InverseProperty("HistoricalRecords")]
     public virtual Record Record { get; set; } = null!;

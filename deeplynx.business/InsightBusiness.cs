@@ -3,6 +3,7 @@ using System.Text.RegularExpressions;
 using deeplynx.datalayer.Models;
 using deeplynx.interfaces;
 using deeplynx.models;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
 namespace deeplynx.business;
@@ -21,6 +22,7 @@ public class InsightBusiness : IInsightBusiness
     private readonly InsightServiceClient _insightServiceClient;
     private readonly IAiModelConfigBusiness _aiModelConfigBusiness;
     private readonly ILogger<InsightBusiness> _logger;
+
     private readonly ISensitivityLabelService _sensitivityLabelService;
 
     public InsightBusiness(
@@ -34,6 +36,7 @@ public class InsightBusiness : IInsightBusiness
         _insightServiceClient = insightServiceClient;
         _aiModelConfigBusiness = aiModelConfigBusiness;
         _logger = logger;
+        _context = context;
         _sensitivityLabelService = sensitivityLabelService;
     }
 
@@ -53,6 +56,7 @@ public class InsightBusiness : IInsightBusiness
     ///     Optional explicit embedding model config ID. If null, the default embedding config for the org/project is used.
     /// </param>
     /// <param name="payload">Upload dto from the caller containing file IDs and URIs.</param>
+    /// <param name="userJwt">The requesting user's JWT used for forwarding to Insight</param>
     /// <exception cref="InvalidOperationException">Thrown when Insight returns a non-success status, or when a required token is missing.</exception>
     /// <exception cref="KeyNotFoundException">Thrown when a specified or default model config cannot be found.</exception>
     public async Task QueueInsightUpload(
@@ -61,7 +65,8 @@ public class InsightBusiness : IInsightBusiness
         long projectId,
         long? vlmModelConfigId,
         long? embeddingModelConfigId,
-        InsightUploadApiRequestDto payload)
+        InsightUploadApiRequestDto payload,
+        string? userJwt = null)
     {
         var vlmConfig = await ResolveModelConfig(currentUserId, organizationId, projectId, vlmModelConfigId, "vlm");
         var embeddingConfig = await ResolveModelConfig(currentUserId, organizationId, projectId, embeddingModelConfigId, "embedding");
@@ -88,7 +93,8 @@ public class InsightBusiness : IInsightBusiness
             EmbeddingServerUrl = embeddingConfig.ServerUrl,
             EmbeddingModelName = embeddingConfig.ModelName,
             EmbeddingModelToken = embeddingConfig.Token,
-            Overwrite = false // this endpoint will never be used for updates
+            Overwrite = false, // this endpoint will never be used for updates
+            UserJwt = userJwt
         };
 
         await _insightServiceClient.Upload(request);
@@ -105,6 +111,7 @@ public class InsightBusiness : IInsightBusiness
     /// <param name="uri">The URI of the file to embed.</param>
     /// <param name="vlmConfig">Optional explicit VLM model config ID. If null, the project/org default is used.</param>
     /// <param name="embeddingConfig">Optional explicit embedding model config ID. If null, the project/org default is used.</param>
+    /// <param name="userJwt">The requesting user's JWT used for forwarding to Insight</param>
     /// <param name="overwrite">Whether to overwrite an existing embedding for this record.</param>
     public void TriggerEmbedding(
         long projectId,
@@ -112,6 +119,7 @@ public class InsightBusiness : IInsightBusiness
         string uri,
         AiModelConfigResponseDto vlmConfig,
         AiModelConfigResponseDto embeddingConfig,
+        string? userJwt = null,
         bool overwrite = false)
     {
         var request = new InsightUploadRequestDto
@@ -123,7 +131,8 @@ public class InsightBusiness : IInsightBusiness
             VlmToken = vlmConfig.Token,
             EmbeddingServerUrl = embeddingConfig.ServerUrl,
             EmbeddingModelName = embeddingConfig.ModelName,
-            EmbeddingModelToken = embeddingConfig.Token
+            EmbeddingModelToken = embeddingConfig.Token,
+            UserJwt = userJwt
         };
 
         _ = _insightServiceClient.Upload(request)
@@ -257,6 +266,70 @@ public class InsightBusiness : IInsightBusiness
                 $"but none was found for user {currentUserId}. Please add a token for this model.");
 
         return config;
+    }
+    
+    /// <summary>
+    ///     Queues embedding jobs for all class and relationship descriptions in the project.
+    ///     Fetches descriptions from the database, publishes each as an OntologyMessage to Insight's
+    ///     RabbitMQ ontology_queue, and returns immediately. Maps to POST /embed_strings.
+    /// </summary>
+    /// <param name="currentUserId">The ID of the user making the request. Used to resolve model tokens when required.</param>
+    /// <param name="organizationId">The ID of the organization. Used to scope model config resolution.</param>
+    /// <param name="projectId">The ID of the project whose class and relationship descriptions will be embedded.</param>
+    /// <param name="embeddingModelConfigId">
+    ///     Optional explicit embedding model config ID. If null, the project/org default is used.
+    ///     If no default is configured, Insight falls back to its own environment defaults.
+    /// </param>
+    /// <exception cref="InvalidOperationException">Thrown when a required model token is missing.</exception>
+    public async Task QueueInsightEmbedStrings(
+        long currentUserId,
+        long organizationId,
+        long projectId,
+        long? embeddingModelConfigId)
+    {
+        string? serverUrl = null;
+        string? modelName = null;
+        string? token = null;
+
+        try
+        {
+            var embeddingConfig = await ResolveModelConfig(currentUserId, organizationId, projectId, embeddingModelConfigId, "embedding");
+            serverUrl = embeddingConfig.ServerUrl;
+            modelName = embeddingConfig.ModelName;
+            token = embeddingConfig.Token;
+        }
+        catch (KeyNotFoundException)
+        {
+            // No default configured — Insight will fall back to its own ENV vars
+        }
+
+        var classEmbeds = await _context.Classes
+            .Where(c => c.ProjectId == projectId && !string.IsNullOrEmpty(c.Description))
+            .Select(c => new InsightEmbedStringRequestDto.EmbedStringDto
+            {
+                ClassId = c.Id,
+                Text = c.Description!
+            })
+            .ToListAsync();
+
+        var relationshipEmbeds = await _context.Relationships
+            .Where(r => r.ProjectId == projectId && !string.IsNullOrEmpty(r.Description))
+            .Select(r => new InsightEmbedStringRequestDto.EmbedStringDto
+            {
+                RelationshipId = r.Id,
+                Text = r.Description!
+            })
+            .ToListAsync();
+
+        var request = new InsightEmbedStringRequestDto
+        {
+            EmbedStringInfo = classEmbeds.Concat(relationshipEmbeds).ToList(),
+            EmbeddingServerUrl = serverUrl,
+            EmbeddingModelName = modelName,
+            EmbeddingModelToken = token,
+        };
+
+        await _insightServiceClient.EmbedStrings(request);
     }
 
     private async IAsyncEnumerable<string> StreamInsightQueryCore(
