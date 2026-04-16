@@ -2,6 +2,7 @@
 "use client";
 
 import { OlapPlotData, OlapPlotResponse } from "@/app/(home)/types/olap_types";
+import { HistoricalRecordResponseDto } from "@/app/(home)/types/responseDTOs";
 import api from "./api";
 
 
@@ -33,6 +34,29 @@ export async function getPlotData(
         return res.data.plotData;
     } catch (error) {
         console.error("Error fetching plot data:", error);
+        throw error;
+    }
+}
+
+/**
+ * Get all timeseries files for a project
+ * @param organizationId - ID of the organization
+ * @param projectId - ID of the project
+ * @returns Promise with array of RecordResponseDto
+ */
+export async function getTimeseriesFiles(
+    organizationId: number,
+    projectId: number
+): Promise<HistoricalRecordResponseDto[]> {
+    try {
+        const res = await api.post<HistoricalRecordResponseDto[]>(
+            `/organizations/${organizationId}/query/records/advanced?projectIds=${projectId}`,
+            [{ filter: "class_name", operator: "=", value: "Timeseries" }]
+        );
+
+        return res.data;
+    } catch (error) {
+        console.error("Error fetching timeseries files:", error);
         throw error;
     }
 }
