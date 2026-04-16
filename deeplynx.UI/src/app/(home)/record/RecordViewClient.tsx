@@ -6,7 +6,8 @@ import { PencilIcon, PlusIcon } from "@heroicons/react/24/outline";
 import Link from "next/link";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
-import PropertyTable from "../components/PropertyTable";
+import PropertyTable from "./components/PropertyTable";
+import CopyToClipboardButton from "@/app/(home)/components/CopyToClipboardButton";
 import {
   HistoricalRecordResponseDto,
   SensitivityLabelsDto,
@@ -36,7 +37,7 @@ import {
   updateRecord,
 } from "@/app/lib/client_service/record_services.client";
 import { getAllTags } from "@/app/lib/client_service/tag_services.client";
-import GraphClientPage from "../graph/components/GraphClientPage";
+import GraphClientPage from "../graph/GraphClientPage";
 import { ClassResponseDto } from "../types/responseDTOs";
 import AdditionalPropertiesEditor from "./components/AdditionalPropertiesEditor";
 import RecordHistoryTab from "./components/RecordHistoryTab";
@@ -51,6 +52,7 @@ import {
   useRecordRelationships,
 } from "./hooks/useRecordRelationships";
 import { isInsightSupportedFileType } from "@/app/lib/insight_file_support";
+import { formatLocalDateTime } from "@/app/lib/date_time";
 
 // ============= HELPER FUNCTIONS =============
 interface PropertyRow {
@@ -343,6 +345,10 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
     resetAllState();
   }, [recordId, resetAllState]);
 
+  useEffect(() => {
+    setActiveTab(0);
+  }, [recordId]);
+
   // ============= DATA LOADING EFFECTS =============
   useEffect(() => {
     const fetchRecord = async () => {
@@ -484,9 +490,24 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
     t.translations.FAILED_TO_FETCH_CLASSES,
   ]);
 
+  // helper function to format file size
+  const formatFileSize = (bytes : number | null | undefined): string => {
+    if (bytes == null) return "-";
+    if (bytes === 0) return "0 bytes";
+    const k = 1024;
+    const sizes = ["Bytes", "KB", "MB", "GB", "TB"];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
+  };
+
   // ============= MEMOIZED VALUES =============
   const systemPropertiesRows = useMemo(() => {
     if (!record) return [];
+
+    const isDownloadable = !!record.uri &&
+      record.uri.trim().length > 0 &&
+      record.uri.toLowerCase() !== "null";
+
     return [
       { label: t.translations.RECORD_ID, value: record.id },
       {
@@ -507,7 +528,15 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
             t.translations.RECORD_NAME_UPDATED,
           ),
       },
-      { label: t.translations.URI, value: record.uri },
+      {
+        label: t.translations.URI,
+        value: record.uri,
+        copyValue: record.uri ?? undefined,
+        copyTooltipLabel: t.translations.COPY_URI,
+        copyAriaLabel: t.translations.COPY_RECORD_URI,
+        idleIconClassName: "size-6 text-base-content/70",
+        copiedIconClassName: "size-6 text-success",
+      },
       {
         label: t.translations.ORIGINAL_ID,
         value: record.originalId,
@@ -519,8 +548,22 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
             t.translations.ORIGINAL_ID_UPDATED,
           ),
       },
-      { label: t.translations.LAST_UPDATED_AT, value: record.lastUpdatedAt },
-      { label: t.translations.DATA_SOURCE, value: record.dataSourceName },
+      // {
+      //   label: t.translations.FILE_SIZE,
+      //   value: formatFileSize(record.fileSize)
+      // },
+      ...(isDownloadable ? [{
+        label: t.translations.FILE_SIZE || "File Size",
+        value: formatFileSize(record.fileSize),
+      }] : []),
+      {
+        label: t.translations.LAST_UPDATED_AT,
+        value: formatLocalDateTime(record.lastUpdatedAt),
+      },
+      {
+        label: t.translations.DATA_SOURCE,
+        value: record.dataSourceName,
+      },
     ];
   }, [record, handleUpdateRecord, t.translations]);
 
@@ -613,6 +656,10 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
     return <RecordLoading />;
   }
 
+  const isDownloadable = !!record.uri &&
+    record.uri.trim().length > 0 &&
+    record.uri.toLowerCase() !== "null"
+
   const isInsightSupported = isInsightSupportedFileType(
     recordFileType,
     record?.uri,
@@ -629,11 +676,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
             <PropertyTable
               title={t.translations.SYSTEM_PROPERTIES}
               rows={systemPropertiesRows}
-              download={
-                !!record.uri &&
-                record.uri.trim().length > 0 &&
-                record.uri.toLowerCase() !== "null"
-              }
+              download={isDownloadable}
               recordName={record.name}
             />
             <PropertyTable

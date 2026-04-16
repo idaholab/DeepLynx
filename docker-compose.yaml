@@ -78,6 +78,7 @@ services:
       SUPPORT_EMAIL: jaren.brownlee@inl.gov
       DISABLE_BACKEND_AUTHENTICATION: true # change to false if supplying okta info on lines 12-13, 25-26
       SUPERUSER_EMAIL: jaren.brownlee@inl.gov
+      INSIGHT_FASTAPI_URL: http://insight-fastapi:5009
     entrypoint: /usr/local/bin/entrypoint.sh
     ports:
       - "5000:5000"
@@ -104,7 +105,11 @@ services:
     volumes:
       - nx_postgres_data:/var/lib/postgresql
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U postgres && psql -U postgres -d deeplynx -c 'SELECT 1;'" ]
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U postgres && psql -U postgres -d deeplynx -c 'SELECT 1;'",
+        ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -146,7 +151,7 @@ services:
       - server
 
   insight-rabbitmq:
-    profiles: [ insight ]
+    profiles: [insight]
     build:
       context: ./deeplynx.insight/app/rabbitmq
       dockerfile: Dockerfiles/Dockerfile.production
@@ -157,28 +162,7 @@ services:
     env_file:
       - ./deeplynx.insight/.env.production
     healthcheck:
-      test: [ "CMD", "rabbitmq-diagnostics", "-q", "check_port_connectivity" ]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
-    networks:
-      - nexus-network
-
-  insight-minio:
-    profiles: [ insight ]
-    build:
-      context: ./deeplynx.insight/app/minio
-      dockerfile: Dockerfiles/Dockerfile.production
-    ports:
-      - "9100:9100"
-      - "9101:9101"
-    env_file:
-      - ./deeplynx.insight/.env.production
-    environment:
-      - MINIO_ENDPOINT=http://localhost:9100
-    healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:9100/minio/health/live" ]
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "check_port_connectivity"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -187,19 +171,18 @@ services:
       - nexus-network
 
   insight-fastapi:
-    profiles: [ insight ]
+    profiles: [insight]
     build:
       context: ./deeplynx.insight
       dockerfile: app/fastapi/Dockerfiles/Dockerfile.production
     ports:
       - "5009:5009"
-    command: [ "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "5009" ]
+    command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "5009"]
     env_file:
       - ./deeplynx.insight/.env.production
     environment:
       - LITELLM_LOCAL_MODEL_COST_MAP=True
       - RABBITMQ_HOST=insight-rabbitmq
-      - MINIO_ENDPOINT=insight-minio:9100
       - PG_HOST=nx-postgres
       - PG_PORT=5432
       - PG_USER=postgres
@@ -208,27 +191,25 @@ services:
     depends_on:
       insight-rabbitmq:
         condition: service_healthy
-      insight-minio:
-        condition: service_healthy
       db-version-check:
         condition: service_completed_successfully
     volumes:
       - object_storage:/data
+      - insight_storage:/data/insight
     networks:
       - nexus-network
 
   insight-rabbitmq-runner:
-    profiles: [ insight ]
+    profiles: [insight]
     build:
       context: ./deeplynx.insight
       dockerfile: app/rabbitmq/Dockerfiles/Dockerfile.runner.production
-    command: [ "python", "-m", "runner" ]
+    command: ["python", "-m", "runner"]
     env_file:
       - ./deeplynx.insight/.env.production
     environment:
       - LITELLM_LOCAL_MODEL_COST_MAP=True
       - RABBITMQ_HOST=insight-rabbitmq
-      - MINIO_ENDPOINT=insight-minio:9100
       - PG_HOST=nx-postgres
       - PG_PORT=5432
       - PG_USER=postgres
@@ -237,14 +218,25 @@ services:
     depends_on:
       insight-rabbitmq:
         condition: service_healthy
-      insight-minio:
-        condition: service_healthy
       db-version-check:
         condition: service_completed_successfully
     volumes:
       - object_storage:/data
+      - insight_storage:/data/insight
     networks:
       - nexus-network
+
+  # lattice:
+  #   build:
+  #     context: ./deeplynx.lattice/postgres_rag_llm
+  #     dockerfile: Dockerfile
+  #   env_file: ./deeplynx.lattice/postgres_rag_llm/.env
+  #   ports:
+  #     - "8080:8080"
+  #   networks:
+  #     - nexus-network
+  #   depends_on:
+  #       - server
 
 networks:
   nexus-network:
@@ -253,6 +245,6 @@ networks:
 volumes:
   object_storage:
     driver: local
-
+  insight_storage:
   nx_postgres_data:
     name: nx_postgres_data

@@ -126,4 +126,29 @@ public class SensitivityLabelService : ISensitivityLabelService
 
         return labelIds;
     }
+
+    public async Task<HashSet<long>> FilterAuthorizedRecordIds(
+    long currentUserId,
+    long organizationId,
+    long projectId,
+    ICollection<long> recordIds,
+    DeeplynxContext context)
+    {
+        if (recordIds.Count == 0)
+            return [];
+
+        var authorizedLabels = await GetAuthorizedSensitivityLabels(
+            currentUserId, organizationId, projectId, "read record");
+
+        var ids = await context.Records
+            .Where(r => r.ProjectId == projectId
+                    && r.OrganizationId == organizationId
+                    && recordIds.Contains(r.Id)
+                    && (r.Labels.Count == 0
+                        || r.Labels.All(l => authorizedLabels.Contains(l.Id))))
+            .Select(r => r.Id)
+            .ToListAsync();
+
+        return [.. ids];
+    }
 }

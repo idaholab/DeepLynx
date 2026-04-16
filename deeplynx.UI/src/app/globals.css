@@ -215,7 +215,8 @@ html {
 }
 
 .shadow-dynamic {
-  box-shadow: 0 4px 6px -1px var(--color-dynamic-shadow),
+  box-shadow:
+    0 4px 6px -1px var(--color-dynamic-shadow),
     0 2px 4px -2px var(--color-dynamic-shadow);
 }
 
@@ -258,4 +259,8 @@ html {
   to {
     transform: rotate(360deg);
   }
+}
+
+.copy-tooltip::before {
+  font-size: 0.65rem;
 }

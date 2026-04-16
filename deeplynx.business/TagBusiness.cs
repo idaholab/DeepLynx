@@ -513,7 +513,7 @@ public class TagBusiness : ITagBusiness
     /// <returns>List of tags that were found</returns>
     /// <exception cref="KeyNotFoundException">Thrown if one or more tag names not found</exception>
     /// <exception cref="ArgumentException">Thrown if tagNames list is null or empty</exception>
-    public async Task<List<TagResponseDto>> GetTagsByName(long organizationId, long? projectId, List<string> tagNames)
+    public async Task<List<TagResponseDto>> GetTagsByName(long organizationId, long? projectId, List<string> tagNames, bool hideArchived)
     {
         if (tagNames == null || !tagNames.Any())
             throw new ArgumentException("Tag names list cannot be null or empty", nameof(tagNames));
@@ -530,7 +530,7 @@ public class TagBusiness : ITagBusiness
         // Query for existing tags (excluding archived)
         var tagQuery = _context.Tags.Where(t =>
             t.OrganizationId == organizationId &&
-            !t.IsArchived &&
+            (!hideArchived || !t.IsArchived) &&
             cleanTagNames.Contains(t.Name));
 
         if (projectId.HasValue)

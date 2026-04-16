@@ -8,6 +8,12 @@ public interface IAiModelConfigBusiness
     Task<List<AiModelConfigResponseDto>> GetAllAiModelConfigs(long organizationId, long? projectId, bool hideArchived);
     Task<AiModelConfigResponseDto> GetAiModelConfig(long organizationId, long? projectId, long aiModelConfigId, bool hideArchived);
     Task<AiModelConfigResponseDto> GetDefaultAiModelConfig(long currentUserId, long organizationId, long? projectId, string modelType);
+
+    Task<AiModelConfigResponseDto> GetAiModelConfigWithToken(
+        long currentUserId,
+        long organizationId,
+        long? projectId,
+        long aiModelConfigId);
     Task<AiModelConfigResponseDto> CreateAiModelConfig(long currentUserId, long organizationId, long? projectId, CreateAiModelConfigDto dto);
     Task<AiModelConfigResponseDto> UpdateAiModelConfig(long currentUserId, long organizationId, long? projectId, long aiModelConfigId,
         UpdateAiModelConfigDto dto);

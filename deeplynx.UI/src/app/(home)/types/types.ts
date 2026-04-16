@@ -179,6 +179,8 @@ export type GraphNode = {
   id: number;
   label: string;
   type: string;
+  classId: number | null;
+  className: string | null;
 };
 
 export type GraphLink = {

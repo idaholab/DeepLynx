@@ -135,6 +135,7 @@ public class GraphBusiness : IGraphBusiness
         if (depth > 3) throw new ArgumentException("Depth must be no more than 3");
 
         var rootRecord = await _context.Records
+            .Include(r => r.Class)
             .Include(r => r.Labels)
             .FirstOrDefaultAsync(r => r.Id == recordId);
 
@@ -179,7 +180,9 @@ public class GraphBusiness : IGraphBusiness
         {
             Id = recordId,
             Label = rootRecord.Name,
-            Type = "root"
+            Type = "root",
+            ClassId = rootRecord.Class?.Id,
+            ClassName = rootRecord.Class?.Name
         };
 
         var currentLevelRecordIds = new List<long> { recordId };
@@ -229,7 +232,9 @@ public class GraphBusiness : IGraphBusiness
     {
         var query = _context.Edges
             .Include(e => e.Origin).ThenInclude(r => r.Labels)
+            .Include(e => e.Origin).ThenInclude(r => r.Class)
             .Include(e => e.Destination).ThenInclude(r => r.Labels)
+            .Include(e => e.Destination).ThenInclude(r => r.Class)
             .Include(e => e.Relationship)
             .Where(e =>
                 userProjectIds.Contains(e.ProjectId) &&
@@ -284,7 +289,9 @@ public class GraphBusiness : IGraphBusiness
                 {
                     Id = connectedRecordId,
                     Label = connectedRecord.Name,
-                    Type = "node"
+                    Type = "node",
+                    ClassId = connectedRecord.Class?.Id,
+                    ClassName = connectedRecord.Class?.Name
                 };
 
                 // Add this node to the list of nodes to explore in the next depth level

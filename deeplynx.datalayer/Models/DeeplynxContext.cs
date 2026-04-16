@@ -25,6 +25,8 @@ public partial class DeeplynxContext : DbContext
 
     public virtual DbSet<Event> Events { get; set; }
 
+    public virtual DbSet<Extraction> Extractions { get; set; }
+
     public virtual DbSet<Group> Groups { get; set; }
 
     public virtual DbSet<HistoricalEdge> HistoricalEdges { get; set; }
@@ -64,8 +66,13 @@ public partial class DeeplynxContext : DbContext
     public virtual DbSet<SavedSearch> SavedSearches { get; set; }
     
     public virtual DbSet<AiModelConfig> AiModelConfigs { get; set; }
-    
+
     public virtual DbSet<UserModelToken> UserModelTokens { get; set; }
+
+    public virtual DbSet<Embedding> Embeddings { get; set; }
+    
+    public virtual DbSet<OntologyVector> OntologyVectors { get; set; }
+
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -171,6 +178,25 @@ public partial class DeeplynxContext : DbContext
                 .WithMany(o => o.Classes)
                 .OnDelete(DeleteBehavior.Cascade)
                 .HasConstraintName("classes_organization_id_fkey");
+
+            entity.HasOne<Extraction>()
+                .WithMany()
+                .HasForeignKey(e => e.ExtractionId)
+                .OnDelete(DeleteBehavior.SetNull)
+                .HasConstraintName("classes_extraction_id_fkey");
+        });
+
+        modelBuilder.Entity<Extraction>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("extractions_pkey");
+
+            entity.Property(e => e.Id).UseIdentityAlwaysColumn();
+
+            entity.HasOne(d => d.CreatedByUser)
+                .WithMany()
+                .HasForeignKey(d => d.CreatedBy)
+                .OnDelete(DeleteBehavior.NoAction)
+                .HasConstraintName(null);
         });
 
         modelBuilder.Entity<DataSource>(entity =>
@@ -280,6 +306,12 @@ public partial class DeeplynxContext : DbContext
             entity.HasOne(d => d.Relationship).WithMany(p => p.Edges)
                 .OnDelete(DeleteBehavior.SetNull)
                 .HasConstraintName("edges_relationship_id_fkey");
+
+            entity.HasOne<Extraction>()
+                .WithMany()
+                .HasForeignKey(e => e.ExtractionId)
+                .OnDelete(DeleteBehavior.SetNull)
+                .HasConstraintName("edges_extraction_id_fkey");
         });
 
         // Org-level entity - kinda \\
@@ -835,6 +867,12 @@ public partial class DeeplynxContext : DbContext
             entity.HasOne(d => d.Organization).WithMany(p => p.Records)
                 .HasConstraintName("records_organization_id_fkey");
 
+            entity.HasOne<Extraction>()
+                .WithMany()
+                .HasForeignKey(e => e.ExtractionId)
+                .OnDelete(DeleteBehavior.SetNull)
+                .HasConstraintName("records_extraction_id_fkey");
+
             entity.HasMany(d => d.Labels).WithMany(p => p.Records)
                 .UsingEntity<Dictionary<string, object>>(
                     "RecordLabel",
@@ -871,6 +909,105 @@ public partial class DeeplynxContext : DbContext
                         j.HasIndex(new[] { "TagId" }, "idx_record_tags_tag_id");
                         j.IndexerProperty<long>("RecordId").HasColumnName("record_id");
                         j.IndexerProperty<long>("TagId").HasColumnName("tag_id");
+                    });
+        });
+        
+        modelBuilder.Entity<RecordCollection>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("record_collections_pkey");
+
+            entity.HasIndex(e => e.Id)
+                .HasDatabaseName("idx_record_collections_id");
+
+            entity.HasIndex(e => e.OrganizationId)
+                .HasDatabaseName("idx_record_collections_organization_id");
+
+            entity.HasIndex(e => e.ProjectId)
+                .HasDatabaseName("idx_record_collections_project_id");
+
+            entity.HasIndex(e => e.Name)
+                .HasDatabaseName("idx_record_collections_name");
+            
+            // Creates a partial unique index to make sure if a user is adding an originalID, it is unique within the project
+            entity.HasIndex(e => new { e.ProjectId, e.Name })
+                .HasDatabaseName("unique_record_collection_name")
+                .IsUnique();
+
+            entity.HasIndex(e => e.Properties, "idx_record_collections_properties").HasMethod("gin");
+
+            entity.Property(e => e.Id).UseIdentityAlwaysColumn();
+            entity.Property(e => e.LastUpdatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+            entity.Property(e => e.IsArchived).HasDefaultValue(false);
+
+            entity.HasIndex(e => e.LastUpdatedBy).HasDatabaseName("idx_record_collections_last_updated_by");
+
+            entity.HasOne(d => d.LastUpdatedByUser)
+                .WithMany(p => p.LastUpdatedRecordCollections)
+                .HasForeignKey(d => d.LastUpdatedBy)
+                .OnDelete(DeleteBehavior.NoAction)
+                .HasConstraintName(null);
+
+            entity.HasOne(d => d.Project).WithMany(p => p.RecordCollections).HasConstraintName("record_collections_project_id_fkey");
+
+            entity.HasOne(d => d.Organization).WithMany(p => p.RecordCollections)
+                .HasConstraintName("record_collections_organization_id_fkey");
+
+            entity.HasMany(d => d.Labels).WithMany(p => p.RecordCollections)
+                .UsingEntity<Dictionary<string, object>>(
+                    "RecordCollectionLabels",
+                    r => r.HasOne<SensitivityLabel>().WithMany()
+                        .HasForeignKey("LabelId")
+                        .HasConstraintName("record_collection_labels_label_id_fkey"),
+                    l => l.HasOne<RecordCollection>().WithMany()
+                        .HasForeignKey("RecordCollectionId")
+                        .HasConstraintName("record_collection_labels_record_collection_id_fkey"),
+                    j =>
+                    {
+                        j.HasKey("RecordCollectionId", "LabelId").HasName("record_collection_labels_pkey");
+                        j.ToTable("record_collection_labels", "deeplynx");
+                        j.HasIndex(new[] { "LabelId" }, "idx_record_collection_labels_label_id");
+                        j.HasIndex(new[] { "RecordCollectionId" }, "idx_record_collection_labels_record_collection_id");
+                        j.IndexerProperty<long>("RecordCollectionId").HasColumnName("record_collection_id");
+                        j.IndexerProperty<long>("LabelId").HasColumnName("label_id");
+                    });
+
+            entity.HasMany(d => d.Tags).WithMany(p => p.RecordCollections)
+                .UsingEntity<Dictionary<string, object>>(
+                    "RecordCollectionTags",
+                    r => r.HasOne<Tag>().WithMany()
+                        .HasForeignKey("TagId")
+                        .HasConstraintName("record_collection_tags_tag_id_fkey"),
+                    l => l.HasOne<RecordCollection>().WithMany()
+                        .HasForeignKey("RecordCollectionId")
+                        .HasConstraintName("record_collection_tags_record_collection_id_fkey"),
+                    j =>
+                    {
+                        j.HasKey("RecordCollectionId", "TagId").HasName("record_collection_tags_pkey");
+                        j.ToTable("record_collection_tags", "deeplynx");
+                        j.HasIndex(new[] { "RecordCollectionId" }, "idx_record_collection_tags_record_collection_id");
+                        j.HasIndex(new[] { "TagId" }, "idx_record_collection_tags_tag_id");
+                        j.IndexerProperty<long>("RecordCollectionId").HasColumnName("record_collection_id");
+                        j.IndexerProperty<long>("TagId").HasColumnName("tag_id");
+                    });
+            
+            entity.HasMany(d => d.Records).WithMany(p => p.RecordCollections)
+                .UsingEntity<Dictionary<string, object>>(
+                    "RecordCollectionRecords",
+                    r => r.HasOne<Record>().WithMany()
+                        .HasForeignKey("RecordId")
+                        .HasConstraintName("record_collection_records_record_id_fkey"),
+                    l => l.HasOne<RecordCollection>().WithMany()
+                        .HasForeignKey("RecordCollectionId")
+                        .HasConstraintName("record_collection_records_record_collection_id_fkey"),
+                    j =>
+                    {
+                        j.HasKey("RecordCollectionId", "RecordId").HasName("record_collection_records_pkey");
+                        j.ToTable("record_collection_records", "deeplynx");
+                        j.HasIndex(new[] { "RecordCollectionId" }, "idx_record_collection_records_record_collection_id");
+                        j.HasIndex(new[] { "RecordId" }, "idx_record_collection_records_record_id");
+                        j.IndexerProperty<long>("RecordCollectionId").HasColumnName("record_collection_id");
+                        j.IndexerProperty<long>("RecordId").HasColumnName("record_id");
                     });
         });
 
@@ -940,6 +1077,12 @@ public partial class DeeplynxContext : DbContext
 
             entity.HasOne(d => d.Organization).WithMany(p => p.Relationships)
                 .HasConstraintName("relationships_organization_id_fkey");
+
+            entity.HasOne<Extraction>()
+                .WithMany()
+                .HasForeignKey(e => e.ExtractionId)
+                .OnDelete(DeleteBehavior.SetNull)
+                .HasConstraintName("relationships_extraction_id_fkey");
         });
 
         // Org-level entity \\
@@ -1293,6 +1436,56 @@ public partial class DeeplynxContext : DbContext
                 .IsRequired()
                 .OnDelete(DeleteBehavior.Cascade)
                 .HasConstraintName("user_model_tokens_ai_model_config_id_fkey");
+        });
+
+        modelBuilder.Entity<Embedding>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("embeddings_pkey");
+
+            entity.HasIndex(e => e.Id)
+                .HasDatabaseName("idx_embeddings_id");
+
+            entity.HasIndex(e => e.RecordId)
+                .HasDatabaseName("idx_embeddings_record_id");
+
+            entity.Property(e => e.Id).UseIdentityAlwaysColumn();
+            entity.Property(e => e.LastUpdatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+            entity.Property(e => e.Vector).HasColumnType("vector");
+
+            entity.HasOne(d => d.Record)
+                .WithMany(p => p.Embeddings)
+                .HasForeignKey(d => d.RecordId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("embeddings_record_id_fkey");
+        });
+        
+        modelBuilder.Entity<OntologyVector>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("ontology_vectors_pkey");
+
+            entity.HasIndex(e => e.Id)
+                .HasDatabaseName("idx_ontology_vectors_id");
+
+            entity.HasIndex(e => e.ClassId)
+                .HasDatabaseName("idx_ontology_vectors_class_id");
+            
+            entity.HasIndex(e => e.RelationshipId)
+                .HasDatabaseName("idx_ontology_vectors_relationship_id");
+
+            entity.Property(e => e.Id).UseIdentityAlwaysColumn();
+            entity.Property(e => e.Vector).HasColumnType("vector");
+
+            entity.HasOne(d => d.Class)
+                .WithMany(p => p.OntologyVectors)
+                .HasForeignKey(d => d.ClassId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("ontology_vectors_class_id_fkey");
+            
+            entity.HasOne(d => d.Relationship)
+                .WithMany(p => p.OntologyVectors)
+                .HasForeignKey(d => d.RelationshipId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("ontology_vectors_relationship_id_fkey");
         });
 
         OnModelCreatingPartial(modelBuilder);
