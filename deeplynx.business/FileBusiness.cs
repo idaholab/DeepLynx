@@ -161,8 +161,8 @@ public class FileBusiness
             ObjectStorageId = objectStorage.Id,
             Description = metadata?.Description ?? file.FileName,
             OriginalId = metadata?.OriginalId ?? guid.ToString(),
-            ClassId = metadata?.ClassId ?? fileClass.Id,
-            ClassName = metadata?.ClassName ?? fileClass.Name,
+            ClassId = metadata?.ClassId ?? recordClass.Id,
+            ClassName = metadata?.ClassName ?? recordClass.Name,
             FileType = fileType,
             Uri = uri,
             FileSize = fileSize

@@ -73,6 +73,7 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
     private ObjectStorageBusiness _objectStorageBusiness = null!;
     private ObjectStorageConfigDto _objectStorageConfig = null!;
     private OlapBusiness _olapBusiness = null!;
+    private Mock<IInsightBusiness> _insightBusiness = null!;
 
     private long _organizationId;
     private long _projectId;
@@ -116,6 +117,7 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
         _mockServiceScopeFactory.Setup(f => f.CreateScope()).Returns(mockScope.Object);
         _mockBulkCopyUpsertExecutor = new BulkCopyUpsertExecutor();
         _sensitivityLabelService = new SensitivityLabelService(Context);
+        _insightBusiness = new Mock<IInsightBusiness>();
 
         // Set up business layer dependencies
         _objectStorageBusiness = new ObjectStorageBusiness(Context);
@@ -154,6 +156,7 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
             _dataSourceBusiness,
             _classBusiness,
             _recordBusiness,
+            _insightBusiness.Object,
             _olapBusiness
         );
     }
