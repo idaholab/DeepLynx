@@ -1,6 +1,7 @@
 using deeplynx.datalayer.Models;
 using deeplynx.interfaces;
 using deeplynx.models;
+using Microsoft.EntityFrameworkCore;
 
 namespace deeplynx.business;
 
@@ -222,6 +223,53 @@ public class ExtractionBusiness : IExtractionBusiness
             await _context.SaveChangesAsync();
             throw;
         }
+    }
+
+    /// <summary>
+    ///     Searches for the most similar ontology terms (classes and/or relationships) in the project
+    ///     by comparing a record's stored embeddings against all ontology vectors using cosine similarity.
+    ///     When a record has multiple embedding chunks, the best score across all chunks is used per ontology entry.
+    /// </summary>
+    /// <param name="recordId">The ID of the record whose embeddings are used as the query vectors.</param>
+    /// <param name="projectId">The ID of the project — only classes and relationships belonging to this project are searched.</param>
+    /// <param name="limit">Maximum number of results to return.</param>
+    /// <param name="termType">Optional filter: "class" or "relationship". Null returns both.</param>
+    public async Task<List<OntologySimilarityResultDto>> SearchOntologySimilarity(
+        long recordId,
+        long projectId,
+        int limit = 5,
+        string? termType = null)
+    {
+        // Raw SQL is justified here: the <=> cosine distance operator is PostgreSQL/pgvector-specific
+        // and the cross-join + GROUP BY + MIN(distance) aggregation across two schemas has no clean
+        // EF Core LINQ equivalent. Database.SqlQuery<T> with a FormattableString is injection-safe.
+        // DISTINCT ON (ov.id) ordered by distance ASC picks the single closest chunk per ontology
+        // entry, which lets us return both the best score and the text of the matching chunk.
+        // The outer query then re-orders by score and applies the limit.
+        return await _context.Database
+            .SqlQuery<OntologySimilarityResultDto>($"""
+                SELECT name, technical_id, type, description, score, text_chunk
+                FROM (
+                    SELECT DISTINCT ON (ov.id)
+                        COALESCE(c.name, rel.name)                                      AS name,
+                        COALESCE(ov.class_id, ov.relationship_id)                       AS technical_id,
+                        CASE WHEN ov.class_id IS NOT NULL THEN 'entity' ELSE 'relation' END AS type,
+                        COALESCE(c.description, rel.description)                        AS description,
+                        1 - (ov.vector <=> e.vector)                                    AS score,
+                        e.text_chunk
+                    FROM dl_vector.ontology_vector ov
+                    LEFT JOIN deeplynx.classes c   ON c.id = ov.class_id
+                    LEFT JOIN deeplynx.relationships rel ON rel.id = ov.relationship_id
+                    JOIN dl_vector.embeddings e     ON e.record_id = {recordId}
+                    WHERE (c.project_id = {projectId} OR rel.project_id = {projectId})
+                      AND ({termType}::text IS NULL OR
+                           CASE WHEN ov.class_id IS NOT NULL THEN 'entity' ELSE 'relation' END = {termType}::text)
+                    ORDER BY ov.id, ov.vector <=> e.vector
+                ) ranked
+                ORDER BY score DESC
+                LIMIT {limit}
+                """)
+            .ToListAsync();
     }
 
     private static long? ResolveClassId(string? name, Dictionary<string, long> map)
