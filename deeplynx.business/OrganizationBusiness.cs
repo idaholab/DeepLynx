@@ -45,11 +45,20 @@ public class OrganizationBusiness : IOrganizationBusiness
     /// <summary>
     ///     Retrieves all organizations
     /// </summary>
+    /// <param name="userId">The ID of the requesting User</param>
     /// <param name="hideArchived">Flag indicating whether to hide archived organizations from the result</param>
+    /// <param name="isSysAdmin">Boolean value indicating if the requesting user is a system admin</param>
     /// <returns>A list of organizations</returns>
     public async Task<IEnumerable<OrganizationResponseDto>> GetAllOrganizations(bool hideArchived = true)
     {
         var organizationQuery = _context.Organizations.AsQueryable();
+
+        // if (!isSysAdmin)
+        // {
+        //     organizationQuery = organizationQuery
+        //         .Where(o => o.OrganizationUsers.Any(u => u.UserId == userId))
+        //         .Include(o => o.OrganizationUsers);
+        // }
 
         if (hideArchived) organizationQuery = organizationQuery.Where(o => !o.IsArchived);
 

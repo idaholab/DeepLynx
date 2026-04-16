@@ -37,7 +37,7 @@ public class OrganizationController : ControllerBase
     /// <param name="hideArchived">Flag indicating whether to hide or show archived orgs</param>
     /// <returns></returns>
     [HttpGet(Name = "api_get_all_organizations")]
-    [Auth("read", "organization")]
+    [Auth("read", "organization", allowWithoutContext: true)]
     public async Task<ActionResult<IEnumerable<OrganizationResponseDto>>> GetAllOrganizations(
         [FromQuery] bool hideArchived = true)
     {
