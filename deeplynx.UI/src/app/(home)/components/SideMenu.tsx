@@ -20,6 +20,7 @@ import type { ProjectResponseDto } from "../types/responseDTOs";
 import {
   AdjustmentsHorizontalIcon,
   ArrowUpTrayIcon,
+  ClipboardDocumentCheckIcon,
   ChevronDownIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
@@ -256,14 +257,12 @@ const SideMenu: React.FC<SideMenuProps> = ({
 
   return (
     <div
-      className={`fixed top-20 bottom-0 left-0 lg:left-18 flex z-40 transition-transform duration-300 ${
-        mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
-      }`}
+      className={`fixed top-20 bottom-0 left-0 lg:left-18 flex z-40 transition-transform duration-300 ${mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
+        }`}
     >
       <aside
-        className={`h-full shadow-xl ${
-          isCollapsed ? "w-22" : "w-[18rem] sm:w-[20rem] lg:w-64"
-        } bg-[var(--base-400)] brightness-120 text-primary-content p-4 transition-all duration-300 flex flex-col overflow-y-auto`}
+        className={`h-full shadow-xl ${isCollapsed ? "w-22" : "w-[18rem] sm:w-[20rem] lg:w-64"
+          } bg-[var(--base-400)] brightness-120 text-primary-content p-4 transition-all duration-300 flex flex-col overflow-y-auto`}
       >
         <div className="flex justify-end lg:hidden">
           <button
@@ -344,11 +343,10 @@ const SideMenu: React.FC<SideMenuProps> = ({
                     <li key={proj.id}>
                       <button
                         onClick={() => handleProjectClick(proj)}
-                        className={`w-full text-left py-2 px-4 rounded transition text-sm flex items-center ${
-                          isProjectActive(proj.id)
+                        className={`w-full text-left py-2 px-4 rounded transition text-sm flex items-center ${isProjectActive(proj.id)
                             ? "bg-info/30 text-primary-content font-semibold"
                             : "hover:bg-info/20 text-primary-content"
-                        }`}
+                          }`}
                       >
                         <span className="truncate">{proj.name}</span>
                         {isProjectActive(proj.id) && (
@@ -449,6 +447,17 @@ const SideMenu: React.FC<SideMenuProps> = ({
 
           <li className="mt-2">
             <Link
+              href="/lattice_mockups/decisions"
+              onClick={() => onMobileClose?.()}
+              className={getItemClass("/lattice_mockups/decisions")}
+            >
+              <ClipboardDocumentCheckIcon className="size-6" />
+              {!isCollapsed && <p className="ml-2">Lattice</p>}
+            </Link>
+          </li>
+
+          <li className="mt-2">
+            <Link
               href="/data_schema/"
               onClick={() => onMobileClose?.()}
               className={getItemClass("/data_schema/")}
@@ -457,7 +466,7 @@ const SideMenu: React.FC<SideMenuProps> = ({
               {!isCollapsed && <p className="ml-2">Data Schema</p>}
             </Link>
           </li>
-          </ul>
+        </ul>
       </aside>
 
       {/* ---------------------------- Toggle Tab ----------------------------- */}
