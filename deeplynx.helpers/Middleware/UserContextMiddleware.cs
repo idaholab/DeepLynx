@@ -31,6 +31,12 @@ public class UserContextMiddleware
             {
                 _logger.LogInformation("User is authenticated, extracting user context");
 
+                var authHeader = context.Request.Headers["Authorization"].ToString();
+                if (authHeader.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+                {
+                    UserContextStorage.Token = authHeader["Bearer ".Length..].Trim();
+                }
+
                 // Log all claims for debugging
                 var allClaims = context.User.Claims.Select(c => $"{c.Type}={c.Value}");
                 _logger.LogInformation($"Available claims: {string.Join(", ", allClaims)}");
