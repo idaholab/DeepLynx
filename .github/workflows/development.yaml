@@ -5,8 +5,7 @@ on:
     branches: ["develop"]
 
 jobs:
-  # ── Shared checkout — runs once, uploads workspace for all build jobs ───────
-  checkout:
+  build-ui:
     runs-on: [self-hosted]
     environment: development
     steps:
@@ -16,39 +15,6 @@ jobs:
           submodules: false
           ssh-key: ${{ secrets.DEPLOY_KEY }}
           ssh-known-hosts: ${{ secrets.GHE_KNOWN_HOSTS }}
-
-      - name: Checkout Submodules
-        env:
-          INSIGHT_KEY: ${{ secrets.DEPLOY_KEY_INSIGHT }}
-          LATTICE_KEY: ${{ secrets.DEPLOY_KEY_LATTICE }}
-          KNOWN_HOSTS: ${{ secrets.GHE_KNOWN_HOSTS }}
-        run: |
-          echo "$INSIGHT_KEY" > /tmp/insight_deploy
-          echo "$LATTICE_KEY" > /tmp/lattice_deploy
-          echo "$KNOWN_HOSTS" > /tmp/known_hosts
-          chmod 600 /tmp/insight_deploy /tmp/lattice_deploy
-          GIT_SSH_COMMAND="ssh -i /tmp/insight_deploy -o UserKnownHostsFile=/tmp/known_hosts" git submodule update --init --recursive deeplynx.insight
-          GIT_SSH_COMMAND="ssh -i /tmp/lattice_deploy -o UserKnownHostsFile=/tmp/known_hosts" git submodule update --init --recursive deeplynx.lattice
-          rm /tmp/insight_deploy /tmp/lattice_deploy /tmp/known_hosts
-
-      - name: Upload workspace
-        uses: actions/upload-artifact@v4
-        with:
-          name: workspace
-          path: .
-          retention-days: 1
-
-  # ── Build jobs — each picks up on the next idle runner ─────────────────────
-
-  build-ui:
-    needs: checkout
-    runs-on: [self-hosted]
-    environment: development
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          name: workspace
-          path: .
       - shell: bash
         name: Container Build
         env:
@@ -80,14 +46,15 @@ jobs:
             .
 
   build-server:
-    needs: checkout
     runs-on: [self-hosted]
     environment: development
     steps:
-      - uses: actions/download-artifact@v4
+      - name: Checkout
+        uses: actions/checkout@v3
         with:
-          name: workspace
-          path: .
+          submodules: false
+          ssh-key: ${{ secrets.DEPLOY_KEY }}
+          ssh-known-hosts: ${{ secrets.GHE_KNOWN_HOSTS }}
       - shell: bash
         name: Container Build
         env:
@@ -120,14 +87,15 @@ jobs:
             .
 
   build-docs:
-    needs: checkout
     runs-on: [self-hosted]
     environment: development
     steps:
-      - uses: actions/download-artifact@v4
+      - name: Checkout
+        uses: actions/checkout@v3
         with:
-          name: workspace
-          path: .
+          submodules: false
+          ssh-key: ${{ secrets.DEPLOY_KEY }}
+          ssh-known-hosts: ${{ secrets.GHE_KNOWN_HOSTS }}
       - shell: bash
         name: Container Build
         env:
@@ -149,14 +117,15 @@ jobs:
             .
 
   build-mcp:
-    needs: checkout
     runs-on: [self-hosted]
     environment: development
     steps:
-      - uses: actions/download-artifact@v4
+      - name: Checkout
+        uses: actions/checkout@v3
         with:
-          name: workspace
-          path: .
+          submodules: false
+          ssh-key: ${{ secrets.DEPLOY_KEY }}
+          ssh-known-hosts: ${{ secrets.GHE_KNOWN_HOSTS }}
       - shell: bash
         name: Container Build
         env:
@@ -177,14 +146,25 @@ jobs:
             .
 
   build-insight-rabbitmq:
-    needs: checkout
     runs-on: [self-hosted]
     environment: development
     steps:
-      - uses: actions/download-artifact@v4
+      - name: Checkout
+        uses: actions/checkout@v3
         with:
-          name: workspace
-          path: .
+          submodules: false
+          ssh-key: ${{ secrets.DEPLOY_KEY }}
+          ssh-known-hosts: ${{ secrets.GHE_KNOWN_HOSTS }}
+      - name: Checkout Insight Submodule
+        env:
+          INSIGHT_KEY: ${{ secrets.DEPLOY_KEY_INSIGHT }}
+          KNOWN_HOSTS: ${{ secrets.GHE_KNOWN_HOSTS }}
+        run: |
+          echo "$INSIGHT_KEY" > /tmp/insight_deploy
+          echo "$KNOWN_HOSTS" > /tmp/known_hosts
+          chmod 600 /tmp/insight_deploy
+          GIT_SSH_COMMAND="ssh -i /tmp/insight_deploy -o UserKnownHostsFile=/tmp/known_hosts" git submodule update --init --recursive deeplynx.insight
+          rm /tmp/insight_deploy /tmp/known_hosts
       - shell: bash
         name: Container Build
         env:
@@ -205,14 +185,25 @@ jobs:
             deeplynx.insight/app/rabbitmq
 
   build-insight-rabbitmq-runner:
-    needs: checkout
     runs-on: [self-hosted]
     environment: development
     steps:
-      - uses: actions/download-artifact@v4
+      - name: Checkout
+        uses: actions/checkout@v3
         with:
-          name: workspace
-          path: .
+          submodules: false
+          ssh-key: ${{ secrets.DEPLOY_KEY }}
+          ssh-known-hosts: ${{ secrets.GHE_KNOWN_HOSTS }}
+      - name: Checkout Insight Submodule
+        env:
+          INSIGHT_KEY: ${{ secrets.DEPLOY_KEY_INSIGHT }}
+          KNOWN_HOSTS: ${{ secrets.GHE_KNOWN_HOSTS }}
+        run: |
+          echo "$INSIGHT_KEY" > /tmp/insight_deploy
+          echo "$KNOWN_HOSTS" > /tmp/known_hosts
+          chmod 600 /tmp/insight_deploy
+          GIT_SSH_COMMAND="ssh -i /tmp/insight_deploy -o UserKnownHostsFile=/tmp/known_hosts" git submodule update --init --recursive deeplynx.insight
+          rm /tmp/insight_deploy /tmp/known_hosts
       - shell: bash
         name: Container Build
         env:
@@ -233,14 +224,25 @@ jobs:
             deeplynx.insight
 
   build-insight-fastapi:
-    needs: checkout
     runs-on: [self-hosted]
     environment: development
     steps:
-      - uses: actions/download-artifact@v4
+      - name: Checkout
+        uses: actions/checkout@v3
         with:
-          name: workspace
-          path: .
+          submodules: false
+          ssh-key: ${{ secrets.DEPLOY_KEY }}
+          ssh-known-hosts: ${{ secrets.GHE_KNOWN_HOSTS }}
+      - name: Checkout Insight Submodule
+        env:
+          INSIGHT_KEY: ${{ secrets.DEPLOY_KEY_INSIGHT }}
+          KNOWN_HOSTS: ${{ secrets.GHE_KNOWN_HOSTS }}
+        run: |
+          echo "$INSIGHT_KEY" > /tmp/insight_deploy
+          echo "$KNOWN_HOSTS" > /tmp/known_hosts
+          chmod 600 /tmp/insight_deploy
+          GIT_SSH_COMMAND="ssh -i /tmp/insight_deploy -o UserKnownHostsFile=/tmp/known_hosts" git submodule update --init --recursive deeplynx.insight
+          rm /tmp/insight_deploy /tmp/known_hosts
       - shell: bash
         name: Container Build
         env:
@@ -260,7 +262,6 @@ jobs:
             --file deeplynx.insight/app/fastapi/Dockerfiles/Dockerfile.production \
             deeplynx.insight
 
-  # ── Kubernetes deploy — waits for all 7 builds to finish ───────────────────
   kubernetes:
     needs: [build-ui, build-server, build-docs, build-mcp, build-insight-rabbitmq, build-insight-rabbitmq-runner, build-insight-fastapi]
     runs-on: [self-hosted]
