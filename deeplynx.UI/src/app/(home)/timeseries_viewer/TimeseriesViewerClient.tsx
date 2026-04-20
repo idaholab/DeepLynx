@@ -9,7 +9,7 @@ import { ArrowDownTrayIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
 import * as echarts from 'echarts';
 import { useProjectSession } from '@/app/contexts/ProjectSessionProvider';
 import { HistoricalRecordResponseDto } from '../types/responseDTOs';
-import { getTimeseriesPlotData, getTimeseriesFiles } from '@/app/lib/client_service/timeseries_services.client';
+import { getPlotData, getTimeseriesFiles } from '@/app/lib/client_service/olap_services.client';
 import { CustomQueryRequestDto } from "../types/requestDTOs";
 
 
@@ -42,11 +42,11 @@ export default function TimeseriesViewerClient({ timeseriesFiles, organizationId
     }>>([]);
 
     const dto: CustomQueryRequestDto = {
-            filter: "class_name",
-            operator: '=',
-            value: "Timeseries"
-        }
-    
+        filter: "class_name",
+        operator: '=',
+        value: "Timeseries"
+    }
+
     const fetchTimeseriesFiles = async () => {
         try {
             const result = await getTimeseriesFiles(
@@ -64,14 +64,13 @@ export default function TimeseriesViewerClient({ timeseriesFiles, organizationId
         recordId: number,
         limitValue: number,
         rowStrideValue: number
-        ) => {
+    ) => {
         try {
             setLoading(true);
 
-            const plotData = await getTimeseriesPlotData(
+            const plotData = await getPlotData(
                 Number(organization?.organizationId),
                 Number(project?.projectId),
-                datasourceId,
                 recordId,
                 limitValue,
                 rowStrideValue
@@ -221,13 +220,13 @@ export default function TimeseriesViewerClient({ timeseriesFiles, organizationId
                     <div className="card-body">
                         <div className="flex justify-between">
                             <h3 className="font-semibold mb-4">{t.translations.AVAILABLE_TIMESERIES_FILES}</h3>
-                            <button 
-                            className="btn btn-primary btn-sm mr-2"
-                            onClick={() => fetchTimeseriesFiles()}
+                            <button
+                                className="btn btn-primary btn-sm mr-2"
+                                onClick={() => fetchTimeseriesFiles()}
                             >
                                 <ArrowPathIcon className="size-6" />
                             </button>
-                        </div>                        
+                        </div>
                         <div className="space-y-2 max-h-[300px] overflow-y-auto">
                             {availableTimeseriesFiles.map((file, index) => (
                                 <div
@@ -365,11 +364,11 @@ export default function TimeseriesViewerClient({ timeseriesFiles, organizationId
             </div>
 
             <div className="flex justify-end p-4">
-                <button 
+                <button
                     className="btn btn-primary btn-sm mr-2"
                     onClick={() => refreshActiveFile()}
-                    >
-                        <ArrowPathIcon className="size-6" />
+                >
+                    <ArrowPathIcon className="size-6" />
                 </button>
 
                 <div className="dropdown dropdown-end">

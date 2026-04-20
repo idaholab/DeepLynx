@@ -158,7 +158,7 @@ try
     builder.Services.AddTransient<IDataSourceBusiness, DataSourceBusiness>();
     builder.Services.AddTransient<IRelationshipBusiness, RelationshipBusiness>();
     builder.Services.AddTransient<ITagBusiness, TagBusiness>();
-    builder.Services.AddTransient<ITimeseriesBusiness, TimeseriesBusiness>();
+    builder.Services.AddTransient<IOlapBusiness, OlapBusiness>();
     builder.Services.AddTransient<IUserBusiness, UserBusiness>();
     builder.Services.AddTransient<INotificationBusiness, NotificationBusiness>();
     builder.Services.AddTransient<IInvitationBusiness, InvitationBusiness>();
@@ -323,7 +323,7 @@ try
                 new() { Name = "Project - Tag", Description = "Project-level tags" },
 
                 // Timeseries
-                new() { Name = "Timeseries", Description = "Time-series data" },
+                new() { Name = "Olap", Description = "OLAP tabular file operations" },
 
                 // Other
                 new() { Name = "Notification", Description = "Notifications" }
@@ -405,8 +405,8 @@ try
                 },
                 new JsonObject
                 {
-                    ["name"] = "Timeseries",
-                    ["tags"] = new JsonArray { "Timeseries" }
+                    ["name"] = "Olap",
+                    ["tags"] = new JsonArray { "Olap" }
                 },
                 new JsonObject
                 {
