@@ -28,9 +28,13 @@ COPY --from=frontend-build /usr/src/app/.next/standalone ./
 COPY --from=frontend-build /usr/src/app/.next/static ./.next/static
 COPY --from=frontend-build /usr/src/app/public ./public
 
-# Allow runtime cache in case of dhi perm blocking
+# Allow runtime cache in case of (future) dhi perm blocking
 RUN mkdir -p /usr/src/app/.next/cache \
     && chown -R node:node /usr/src/app
+
+# RM bundled npm as we use standalone out. Delete if application runtime npm required 
+RUN rm -rf /usr/local/lib/node_modules/npm && rm -rf /usr/local/lib/node_modules/corepack \
+    && rm -f /usr/local/bin/npm && rm -f /usr/local/bin/corepack
 
 # User account
 USER node
