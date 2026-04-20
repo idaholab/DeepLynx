@@ -32,7 +32,7 @@ const TagOverviewStrip: React.FC<Props> = ({
       <div className="stat bg-base-100 shadow-lg rounded-xl">
         <div className="stat-title flex items-center gap-1 text-xs">
           <ShieldCheckIcon className="w-4 h-4 text-secondary" />
-          {t.translations.ORG_SECURITY_LABELS}
+          {t.translations.SENSITIVITY_LABELS}
         </div>
         <div className="stat-value text-secondary text-xl">{labelCount}</div>
         <div className="stat-desc text-xs flex items-center gap-1">
