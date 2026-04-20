@@ -45,7 +45,7 @@ namespace deeplynx.datalayer.MigrationRunner
             var dataSource = dataSourceBuilder.Build();
 
             services.AddDbContext<DeeplynxContext>(options =>
-                options.UseNpgsql(dataSource, o => o.UseVector()));
+                options.UseNpgsql(dataSource));
             services.AddDbContext<StagingContext>(options =>
                 options.UseNpgsql(connectionString));
         }

@@ -51,6 +51,9 @@ public partial class Record
     
     [Column("file_type")]
     public string? FileType { get; set; }
+    
+    [Column("file_size")]
+    public long? FileSize { get; set; }
 
     [Column("embedded")]
     public bool Embedded { get; set; }
@@ -93,6 +96,10 @@ public partial class Record
     [ForeignKey("RecordId")]
     [InverseProperty("Records")]
     public virtual ICollection<Tag> Tags { get; set; } = new List<Tag>();
+    
+    [ForeignKey("RecordId")]
+    [InverseProperty("Records")]
+    public virtual ICollection<RecordCollection> RecordCollections { get; set; } = new List<RecordCollection>();
     
     [InverseProperty("LastUpdatedRecords")]
     public virtual User? LastUpdatedByUser { get; set; }

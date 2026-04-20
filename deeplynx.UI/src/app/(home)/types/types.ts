@@ -60,7 +60,6 @@ export type DatePickerQuery = {
 export type FileMetadata = {
   name: string;
   description: string;
-  isTimeSeries: boolean;
   recordMode?: "new" | "update";
   targetRecordId?: string;
   updateAction?: "merge" | "overwrite";

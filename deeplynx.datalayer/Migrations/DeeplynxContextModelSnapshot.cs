@@ -4,7 +4,6 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
-using Pgvector;
 using deeplynx.datalayer.Models;
 
 #nullable disable
@@ -41,6 +40,66 @@ namespace deeplynx.datalayer.Migrations
                     b.HasIndex(new[] { "UserId" }, "idx_group_users_user_id");
 
                     b.ToTable("group_users", "deeplynx");
+                });
+
+            modelBuilder.Entity("RecordCollectionLabels", b =>
+                {
+                    b.Property<long>("RecordCollectionId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("record_collection_id");
+
+                    b.Property<long>("LabelId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("label_id");
+
+                    b.HasKey("RecordCollectionId", "LabelId")
+                        .HasName("record_collection_labels_pkey");
+
+                    b.HasIndex(new[] { "LabelId" }, "idx_record_collection_labels_label_id");
+
+                    b.HasIndex(new[] { "RecordCollectionId" }, "idx_record_collection_labels_record_collection_id");
+
+                    b.ToTable("record_collection_labels", "deeplynx");
+                });
+
+            modelBuilder.Entity("RecordCollectionRecords", b =>
+                {
+                    b.Property<long>("RecordCollectionId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("record_collection_id");
+
+                    b.Property<long>("RecordId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("record_id");
+
+                    b.HasKey("RecordCollectionId", "RecordId")
+                        .HasName("record_collection_records_pkey");
+
+                    b.HasIndex(new[] { "RecordCollectionId" }, "idx_record_collection_records_record_collection_id");
+
+                    b.HasIndex(new[] { "RecordId" }, "idx_record_collection_records_record_id");
+
+                    b.ToTable("record_collection_records", "deeplynx");
+                });
+
+            modelBuilder.Entity("RecordCollectionTags", b =>
+                {
+                    b.Property<long>("RecordCollectionId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("record_collection_id");
+
+                    b.Property<long>("TagId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("tag_id");
+
+                    b.HasKey("RecordCollectionId", "TagId")
+                        .HasName("record_collection_tags_pkey");
+
+                    b.HasIndex(new[] { "RecordCollectionId" }, "idx_record_collection_tags_record_collection_id");
+
+                    b.HasIndex(new[] { "TagId" }, "idx_record_collection_tags_tag_id");
+
+                    b.ToTable("record_collection_tags", "deeplynx");
                 });
 
             modelBuilder.Entity("RecordLabel", b =>
@@ -592,7 +651,7 @@ namespace deeplynx.datalayer.Migrations
                         .HasColumnType("text")
                         .HasColumnName("text_chunk");
 
-                    b.Property<Vector>("Vector")
+                    b.Property<string>("Vector")
                         .IsRequired()
                         .HasColumnType("vector")
                         .HasColumnName("vector");
@@ -895,6 +954,14 @@ namespace deeplynx.datalayer.Migrations
                     b.Property<string>("Description")
                         .HasColumnType("text")
                         .HasColumnName("description");
+
+                    b.Property<long?>("FileSize")
+                        .HasColumnType("bigint")
+                        .HasColumnName("file_size");
+
+                    b.Property<string>("FileType")
+                        .HasColumnType("text")
+                        .HasColumnName("file_type");
 
                     b.Property<bool>("IsArchived")
                         .ValueGeneratedOnAdd()
@@ -1212,7 +1279,7 @@ namespace deeplynx.datalayer.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("relationship_id");
 
-                    b.Property<Vector>("Vector")
+                    b.Property<string>("Vector")
                         .IsRequired()
                         .HasColumnType("vector")
                         .HasColumnName("vector");
@@ -1585,6 +1652,10 @@ namespace deeplynx.datalayer.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("extraction_id");
 
+                    b.Property<long?>("FileSize")
+                        .HasColumnType("bigint")
+                        .HasColumnName("file_size");
+
                     b.Property<string>("FileType")
                         .HasColumnType("text")
                         .HasColumnName("file_type");
@@ -1677,6 +1748,82 @@ namespace deeplynx.datalayer.Migrations
                     NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex(new[] { "Properties" }, "idx_records_properties"), "gin");
 
                     b.ToTable("records", "deeplynx");
+                });
+
+            modelBuilder.Entity("deeplynx.datalayer.Models.RecordCollection", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("description");
+
+                    b.Property<bool>("IsArchived")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("is_archived");
+
+                    b.Property<DateTime>("LastUpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("last_updated_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<long?>("LastUpdatedBy")
+                        .HasColumnType("bigint")
+                        .HasColumnName("last_updated_by");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("name");
+
+                    b.Property<long>("OrganizationId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("organization_id");
+
+                    b.Property<long>("ProjectId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("project_id");
+
+                    b.Property<string>("Properties")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("properties");
+
+                    b.HasKey("Id")
+                        .HasName("record_collections_pkey");
+
+                    b.HasIndex("Id")
+                        .HasDatabaseName("idx_record_collections_id");
+
+                    b.HasIndex("LastUpdatedBy")
+                        .HasDatabaseName("idx_record_collections_last_updated_by");
+
+                    b.HasIndex("Name")
+                        .HasDatabaseName("idx_record_collections_name");
+
+                    b.HasIndex("OrganizationId")
+                        .HasDatabaseName("idx_record_collections_organization_id");
+
+                    b.HasIndex("ProjectId")
+                        .HasDatabaseName("idx_record_collections_project_id");
+
+                    b.HasIndex("ProjectId", "Name")
+                        .IsUnique()
+                        .HasDatabaseName("unique_record_collection_name");
+
+                    b.HasIndex(new[] { "Properties" }, "idx_record_collections_properties");
+
+                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex(new[] { "Properties" }, "idx_record_collections_properties"), "gin");
+
+                    b.ToTable("record_collections", "deeplynx");
                 });
 
             modelBuilder.Entity("deeplynx.datalayer.Models.Relationship", b =>
@@ -2256,6 +2403,57 @@ namespace deeplynx.datalayer.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("group_users_group_id_fkey");
+                });
+
+            modelBuilder.Entity("RecordCollectionLabels", b =>
+                {
+                    b.HasOne("deeplynx.datalayer.Models.SensitivityLabel", null)
+                        .WithMany()
+                        .HasForeignKey("LabelId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("record_collection_labels_label_id_fkey");
+
+                    b.HasOne("deeplynx.datalayer.Models.RecordCollection", null)
+                        .WithMany()
+                        .HasForeignKey("RecordCollectionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("record_collection_labels_record_collection_id_fkey");
+                });
+
+            modelBuilder.Entity("RecordCollectionRecords", b =>
+                {
+                    b.HasOne("deeplynx.datalayer.Models.RecordCollection", null)
+                        .WithMany()
+                        .HasForeignKey("RecordCollectionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("record_collection_records_record_collection_id_fkey");
+
+                    b.HasOne("deeplynx.datalayer.Models.Record", null)
+                        .WithMany()
+                        .HasForeignKey("RecordId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("record_collection_records_record_id_fkey");
+                });
+
+            modelBuilder.Entity("RecordCollectionTags", b =>
+                {
+                    b.HasOne("deeplynx.datalayer.Models.RecordCollection", null)
+                        .WithMany()
+                        .HasForeignKey("RecordCollectionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("record_collection_tags_record_collection_id_fkey");
+
+                    b.HasOne("deeplynx.datalayer.Models.Tag", null)
+                        .WithMany()
+                        .HasForeignKey("TagId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("record_collection_tags_tag_id_fkey");
                 });
 
             modelBuilder.Entity("RecordLabel", b =>
@@ -2908,6 +3106,34 @@ namespace deeplynx.datalayer.Migrations
                     b.Navigation("Project");
                 });
 
+            modelBuilder.Entity("deeplynx.datalayer.Models.RecordCollection", b =>
+                {
+                    b.HasOne("deeplynx.datalayer.Models.User", "LastUpdatedByUser")
+                        .WithMany("LastUpdatedRecordCollections")
+                        .HasForeignKey("LastUpdatedBy")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.HasOne("deeplynx.datalayer.Models.Organization", "Organization")
+                        .WithMany("RecordCollections")
+                        .HasForeignKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("record_collections_organization_id_fkey");
+
+                    b.HasOne("deeplynx.datalayer.Models.Project", "Project")
+                        .WithMany("RecordCollections")
+                        .HasForeignKey("ProjectId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("record_collections_project_id_fkey");
+
+                    b.Navigation("LastUpdatedByUser");
+
+                    b.Navigation("Organization");
+
+                    b.Navigation("Project");
+                });
+
             modelBuilder.Entity("deeplynx.datalayer.Models.Relationship", b =>
                 {
                     b.HasOne("deeplynx.datalayer.Models.Class", "Destination")
@@ -3205,6 +3431,8 @@ namespace deeplynx.datalayer.Migrations
 
                     b.Navigation("Projects");
 
+                    b.Navigation("RecordCollections");
+
                     b.Navigation("Records");
 
                     b.Navigation("Relationships");
@@ -3241,6 +3469,8 @@ namespace deeplynx.datalayer.Migrations
                     b.Navigation("Permissions");
 
                     b.Navigation("ProjectMembers");
+
+                    b.Navigation("RecordCollections");
 
                     b.Navigation("Records");
 
@@ -3310,6 +3540,8 @@ namespace deeplynx.datalayer.Migrations
                     b.Navigation("LastUpdatedPermissions");
 
                     b.Navigation("LastUpdatedProjects");
+
+                    b.Navigation("LastUpdatedRecordCollections");
 
                     b.Navigation("LastUpdatedRecords");
 

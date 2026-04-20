@@ -11,7 +11,8 @@ public interface IInsightBusiness
         long projectId,
         long? vlmModelConfigId,
         long? embeddingModelConfigId,
-        InsightUploadApiRequestDto payload);
+        InsightUploadApiRequestDto payload,
+        string? userJwt = null);
 
     IAsyncEnumerable<string> StreamInsightQuery(
         long currentUserId,
@@ -30,6 +31,7 @@ public interface IInsightBusiness
         string uri,
         AiModelConfigResponseDto vlmConfig,
         AiModelConfigResponseDto embeddingConfig,
+        string? userJwt = null,
         bool overwrite = false);
 
     Task<AiModelConfigResponseDto> ResolveModelConfig(
@@ -40,5 +42,10 @@ public interface IInsightBusiness
         string modelType);
 
     bool IsSupportedFile(string fileType);
+    Task QueueInsightEmbedStrings(
+    long currentUserId,
+    long organizationId,
+    long projectId,
+    long? embeddingModelConfigId);
 
 }

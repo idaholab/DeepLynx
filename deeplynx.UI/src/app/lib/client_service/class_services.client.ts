@@ -184,16 +184,17 @@ export const getAllClassesOrg = async (
     projectIds?: number[],
     hideArchived: boolean = true
 ): Promise<ClassResponseDto[]> => {
-    try {
-        const res = await api.get(
-            `/organizations/${organizationId}/classes`,
-            { params: { projectIds, hideArchived } }
-        );
-        return res.data;
-    } catch (error) {
-        console.error("Error getting all classes for organization:", error);
-        throw error;
-    }
+  try {
+    const projectIdsQuery = projectIds?.map(id => `projectIds=${id}`).join('&') ?? '';
+    const separator = projectIdsQuery ? '&' : '';
+    const res = await api.get(
+        `/organizations/${organizationId}/classes?${projectIdsQuery}${separator}hideArchived=${hideArchived}`
+    );
+    return res.data;
+  } catch (error) {
+    console.error("Error getting all classes for organization:", error);
+    throw error;
+  }
 };
 
 /**

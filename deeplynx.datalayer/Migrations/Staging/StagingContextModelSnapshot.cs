@@ -407,6 +407,10 @@ namespace deeplynx.datalayer.Migrations.Staging
                         .HasColumnType("bigint")
                         .HasColumnName("extraction_id");
 
+                    b.Property<long?>("FileSize")
+                        .HasColumnType("bigint")
+                        .HasColumnName("file_size");
+
                     b.Property<string>("FileType")
                         .HasColumnType("text")
                         .HasColumnName("file_type");

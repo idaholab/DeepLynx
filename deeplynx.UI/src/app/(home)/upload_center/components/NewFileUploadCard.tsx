@@ -79,7 +79,6 @@ export default function NewFileUploadCard({
   const [recordSearchInput, setRecordSearchInput] = useState("");
   const [isSearching, setIsSearching] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
-  const [isTimeSeries, setIsTimeSeries] = useState(false);
   const [metadataFile, setMetadataFile] = useState<File | undefined>(undefined);
   const [metadataPreview, setMetadataPreview] = useState<
     Record<string, unknown> | undefined
@@ -178,12 +177,6 @@ export default function NewFileUploadCard({
   const selectedRecord =
     displayedFiles.find((f) => String(f.id) === String(targetRecordId)) ??
     availableFiles.find((f) => String(f.id) === String(targetRecordId));
-  const selectedDataType =
-    recordMode === "update"
-      ? "standard"
-      : isTimeSeries
-        ? "timeseries"
-        : "standard";
 
   const handleSearch = useCallback(
     async ({ query }: { query: string; option?: string }) => {
@@ -206,12 +199,6 @@ export default function NewFileUploadCard({
     },
     [availableFiles, onSearchFiles],
   );
-
-  useEffect(() => {
-    if (recordMode === "update" && isTimeSeries) {
-      setIsTimeSeries(false);
-    }
-  }, [recordMode, isTimeSeries]);
 
   useEffect(() => {
     if (recordMode !== "update") {
@@ -247,7 +234,6 @@ export default function NewFileUploadCard({
     const metadata: FileMetadata = {
       name: defaultName,
       description: "",
-      isTimeSeries: recordMode === "update" ? false : isTimeSeries,
       recordMode,
       ...(recordMode === "update" && targetRecordId ? { targetRecordId } : {}),
       ...(metadataFile && { metadataFile }),
@@ -257,7 +243,6 @@ export default function NewFileUploadCard({
     defaultName,
     recordMode,
     targetRecordId,
-    isTimeSeries,
     metadataFile,
     fileIndex,
     onMetadataChange,
@@ -284,11 +269,10 @@ export default function NewFileUploadCard({
                 type="button"
                 role="radio"
                 aria-checked={recordMode === "new"}
-                className={`rounded-full px-3 py-1 text-xs font-medium transition ${
-                  recordMode === "new"
-                    ? "bg-base-100 text-base-content shadow-sm"
-                    : "text-base-content/70"
-                }`}
+                className={`rounded-full px-3 py-1 text-xs font-medium transition ${recordMode === "new"
+                  ? "bg-base-100 text-base-content shadow-sm"
+                  : "text-base-content/70"
+                  }`}
                 onClick={() => setRecordMode("new")}
               >
                 {t.translations.NEW_RECORD}
@@ -297,11 +281,10 @@ export default function NewFileUploadCard({
                 type="button"
                 role="radio"
                 aria-checked={recordMode === "update"}
-                className={`rounded-full px-3 py-1 text-xs font-medium transition ${
-                  recordMode === "update"
-                    ? "bg-base-100 text-base-content shadow-sm"
-                    : "text-base-content/70"
-                }`}
+                className={`rounded-full px-3 py-1 text-xs font-medium transition ${recordMode === "update"
+                  ? "bg-base-100 text-base-content shadow-sm"
+                  : "text-base-content/70"
+                  }`}
                 onClick={() => setRecordMode("update")}
               >
                 {t.translations.UPDATE_EXISTING_RECORD}
@@ -358,9 +341,8 @@ export default function NewFileUploadCard({
                         key={f.id}
                         type="button"
                         onClick={() => setTargetRecordId(String(f.id))}
-                        className={`w-full border-b border-base-300/60 px-3 py-2 text-left last:border-b-0 transition ${
-                          selected ? "bg-base-200/70" : "hover:bg-base-200/30"
-                        }`}
+                        className={`w-full border-b border-base-300/60 px-3 py-2 text-left last:border-b-0 transition ${selected ? "bg-base-200/70" : "hover:bg-base-200/30"
+                          }`}
                       >
                         <div className="flex items-center justify-between gap-2">
                           <div className="min-w-0">
@@ -406,50 +388,6 @@ export default function NewFileUploadCard({
           )}
           <div className="flex justify-between flex-col-2">
             <div>
-              {/* Row 1: Data Type + Metadata Preview */}
-              <div className="grid gap-4 md:grid-cols-2 md:items-start">
-                <div className="min-w-0 space-y-2">
-                  <span className="label-text block font-semibold">
-                    {t.translations.DATA_TYPE}
-                  </span>
-                  <div
-                    role="radiogroup"
-                    aria-label={t.translations.DATA_TYPE}
-                    className="inline-flex rounded-full border border-base-300/70 bg-base-200/50 p-1"
-                  >
-                    <button
-                      type="button"
-                      role="radio"
-                      aria-checked={selectedDataType === "standard"}
-                      className={`rounded-full px-3 py-1 text-xs font-medium transition ${
-                        selectedDataType === "standard"
-                          ? "bg-base-100 text-base-content shadow-sm"
-                          : "text-base-content/70"
-                      }`}
-                      onClick={() => setIsTimeSeries(false)}
-                    >
-                      {t.translations.STANDARD_FILE}
-                    </button>
-                    <button
-                      type="button"
-                      role="radio"
-                      aria-checked={selectedDataType === "timeseries"}
-                      className={`rounded-full px-3 py-1 text-xs font-medium transition ${
-                        selectedDataType === "timeseries"
-                          ? "bg-base-100 text-base-content shadow-sm"
-                          : "text-base-content/70"
-                      } ${recordMode === "update" ? "cursor-not-allowed opacity-50" : ""}`}
-                      onClick={() => {
-                        if (recordMode === "update") return;
-                        setIsTimeSeries(true);
-                      }}
-                      disabled={recordMode === "update"}
-                    >
-                      {t.translations.TIMESERIES}
-                    </button>
-                  </div>
-                </div>
-              </div>
               {/* Row 2: Metadata File */}
               <div className="flex flex-col gap-1 mt-4">
                 <label

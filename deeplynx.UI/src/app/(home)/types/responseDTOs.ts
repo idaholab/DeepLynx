@@ -71,6 +71,8 @@ export interface HistoricalRecordResponseDto {
   lastUpdatedAt: string;
   lastUpdatedBy?: string | null;
   isArchived: boolean;
+  fileType?: string | null;
+  fileSize?: number | null;
   objectStorageId?: number;
   objectStorageName?: string | null;
 }
@@ -90,6 +92,7 @@ export type RecordResponseDto = {
   lastUpdatedBy?: string | null;
   isArchived?: boolean;
   fileType?: string | null;
+  fileSize?: number | null;
   tags?: { id: number | null; name: string }[];
   labels?: { id: number | null; name: string }[];
 };

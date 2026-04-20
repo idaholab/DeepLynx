@@ -20,7 +20,9 @@ public class FileBusiness
     private readonly IFileBusinessFactory _factory;
     private readonly long _recommendedChunkSize;
     private readonly IRecordBusiness _recordBusiness;
+    private readonly IOlapBusiness _olapBusiness;
     private readonly IInsightBusiness _insightBusiness;
+
 
     // NOTE: Chunked upload methods currently only support filesystem storage.
     // When Azure/S3 chunked uploads are needed, refactor these methods to 
@@ -31,7 +33,8 @@ public class FileBusiness
         IDataSourceBusiness dataSourceBusiness,
         IClassBusiness classBusiness,
         IRecordBusiness recordBusiness,
-        IInsightBusiness insightBusiness)
+        IInsightBusiness insightBusiness,
+        IOlapBusiness olapBusiness)
     {
         _context = context;
         _factory = factory;
@@ -39,6 +42,8 @@ public class FileBusiness
         _classBusiness = classBusiness;
         _recordBusiness = recordBusiness;
         _insightBusiness = insightBusiness;
+        _olapBusiness = olapBusiness;
+
 
         var chunkSizeStr = Environment.GetEnvironmentVariable("RECOMMENDED_CHUNK_SIZE")
                            ?? throw new InvalidOperationException(
@@ -76,7 +81,8 @@ public class FileBusiness
         IFormFile? metadataFile = null,
         bool embed = false,
         long? vlmConfigId = null,
-        long? embeddingModelConfigId = null)
+        long? embeddingModelConfigId = null,
+        string? userJwt = null)
     {
         if (file == null || file.Length == 0) throw new ArgumentException("File is required and cannot be empty.");
         file = new SanitizedFormFile(file);
@@ -94,7 +100,9 @@ public class FileBusiness
 
         var uri = await fileBusiness.UploadFile(organizationId, projectId, realDataSourceId, configData, file, guid);
 
-        var fileClass = await _classBusiness.GetOrCreateClass(currentUserId, organizationId, projectId, "File");
+        var recordClass = await _classBusiness.GetOrCreateClass(currentUserId, organizationId, projectId, "File");
+
+        var fileSize = file.Length;
 
         CreateRecordFileUploadRequestDto? metadata = null;
         if (metadataFile != null)
@@ -111,20 +119,53 @@ public class FileBusiness
             ValidationHelper.ValidateModel(metadata);
         }
 
+        // Get file extension
+        var fileExtension = Path.GetExtension(file.FileName).TrimStart('.').ToLower();
+
+        // Initialize properties
+        var properties = metadata?.Properties ?? new JsonObject();
+
+        // Extract column names for tabular files (CSV/Parquet)
+        if (fileExtension == "csv" || fileExtension == "parquet")
+        {
+            bool hasContent;
+            using (var reader = new StreamReader(file.OpenReadStream()))
+            {
+                hasContent = false;
+                var buffer = new char[256];
+                int bytesRead;
+                while ((bytesRead = await reader.ReadAsync(buffer, 0, buffer.Length)) > 0 && !hasContent)
+                {
+                    if (buffer.Take(bytesRead).Any(c => !char.IsWhiteSpace(c)))
+                    {
+                        hasContent = true;
+                    }
+                }
+            }
+
+            if (hasContent)
+            {
+                var columns = await _olapBusiness.ExtractTabularColumns(objectStorage, configData, uri);
+                if (columns != null && columns.Count > 0)
+                {
+                    properties["columns"] = columns;
+                    recordClass = await _classBusiness.GetOrCreateClass(currentUserId, organizationId, projectId, "Timeseries");
+                }
+            }
+        }
+
         var recordRequest = new CreateRecordRequestDto
         {
-            Properties = metadata?.Properties ?? new JsonObject
-            {
-                ["fileType"] = Path.GetExtension(file.FileName).TrimStart('.').ToLower()
-            },
+            Properties = properties,
             Name = metadata?.Name ?? file.FileName,
             ObjectStorageId = objectStorage.Id,
             Description = metadata?.Description ?? file.FileName,
             OriginalId = metadata?.OriginalId ?? guid.ToString(),
-            ClassId = metadata?.ClassId ?? fileClass.Id,
-            ClassName = metadata?.ClassName ?? fileClass.Name,
+            ClassId = metadata?.ClassId ?? recordClass.Id,
+            ClassName = metadata?.ClassName ?? recordClass.Name,
             FileType = fileType,
-            Uri = uri
+            Uri = uri,
+            FileSize = fileSize
         };
 
         var createdRecord = await _recordBusiness.CreateRecord(currentUserId, organizationId, projectId,
@@ -134,11 +175,11 @@ public class FileBusiness
         {
             var vlmConfig = await _insightBusiness.ResolveModelConfig(currentUserId, organizationId, projectId, vlmConfigId, "vlm");
             var embeddingModelConfig = await _insightBusiness.ResolveModelConfig(currentUserId, organizationId, projectId, embeddingModelConfigId, "embedding");
-            
+
             _insightBusiness.TriggerEmbedding(projectId, createdRecord.Id,
-                            createdRecord.Uri!, vlmConfig, embeddingModelConfig);
+                            createdRecord.Uri!, vlmConfig, embeddingModelConfig, userJwt);
         }
-        
+
         return createdRecord;
     }
 
@@ -160,7 +201,8 @@ public class FileBusiness
         long recordId,
         IFormFile file,
         long? vlmConfigId = null,
-        long? embeddingModelConfigId = null)
+        long? embeddingModelConfigId = null,
+        string? userJwt = null)
     {
         var record = await _recordBusiness.GetRecord(currentUserId, organizationId, projectId, recordId, true);
 
@@ -176,6 +218,8 @@ public class FileBusiness
 
         var uri = await fileBusiness.UpdateFile(record, configData, file, guid);
 
+        var fileSize = file.Length;
+
         var updateRecordRequest = new UpdateRecordRequestDto
         {
             Properties = new JsonObject
@@ -184,7 +228,8 @@ public class FileBusiness
             },
             Name = file.FileName,
             Uri = uri,
-            FileType = Path.GetExtension(file.FileName).TrimStart('.').ToLower()
+            FileType = Path.GetExtension(file.FileName).TrimStart('.').ToLower(),
+            FileSize = fileSize
         };
 
         var updatedRecord = await _recordBusiness.UpdateRecord(currentUserId, organizationId, projectId, recordId,
@@ -194,12 +239,12 @@ public class FileBusiness
         {
             var vlmConfig =
                 await _insightBusiness.ResolveModelConfig(currentUserId, organizationId, projectId, vlmConfigId, "vlm");
-            var embeddingModelConfig = 
+            var embeddingModelConfig =
                 await _insightBusiness.ResolveModelConfig(currentUserId, organizationId, projectId, embeddingModelConfigId, "embedding");
-            
-            _insightBusiness.TriggerEmbedding(projectId, updatedRecord.Id, updatedRecord.Uri!, vlmConfig, embeddingModelConfig, overwrite: true);
+
+            _insightBusiness.TriggerEmbedding(projectId, updatedRecord.Id, updatedRecord.Uri!, vlmConfig, embeddingModelConfig, userJwt, overwrite: true);
         }
-        
+
         return updatedRecord;
     }
 
@@ -384,6 +429,7 @@ public class FileBusiness
             guid);
 
         var fileClass = await _classBusiness.GetOrCreateClass(currentUserId, organizationId, projectId, "File");
+        var fileSize = new FileInfo(uri).Length;
         var recordRequest = new CreateRecordRequestDto
         {
             Properties = metadata?.Properties ?? new JsonObject
@@ -400,16 +446,17 @@ public class FileBusiness
             ClassId = metadata?.ClassId ?? fileClass.Id,
             ClassName = metadata?.ClassName ?? fileClass.Name,
             FileType = Path.GetExtension(request.FileName).TrimStart('.').ToLower(),
+            FileSize = fileSize
         };
 
         var createdRecord = await _recordBusiness.CreateRecord(currentUserId, organizationId, projectId,
             realDataSourceId, recordRequest, sensitivityLabelIds, embedded: embed);
-        
+
         if (embed)
         {
             var vlmConfig = await _insightBusiness.ResolveModelConfig(currentUserId, organizationId, projectId, vlmConfigId, "vlm");
             var embeddingModelConfig = await _insightBusiness.ResolveModelConfig(currentUserId, organizationId, projectId, embeddingModelConfigId, "embedding");
-            
+
             _insightBusiness.TriggerEmbedding(projectId, createdRecord.Id,
                 createdRecord.Uri!, vlmConfig, embeddingModelConfig);
         }
@@ -421,7 +468,7 @@ public class FileBusiness
     ///     Cancel Chunked File Upload
     /// </summary>
     /// <param name="currentUserId">The ID of the requesting user</param>
-    
+
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
     /// <param name="projectId">The ID of the project to which the file belongs</param>
     /// <param name="dataSourceId">The ID of the data source to which the file belongs</param>
