@@ -491,7 +491,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
   ]);
 
   // helper function to format file size
-  const formatFileSize = (bytes : number | null | undefined): string => {
+  const formatFileSize = (bytes: number | null | undefined): string => {
     if (bytes == null) return "-";
     if (bytes === 0) return "0 bytes";
     const k = 1024;
@@ -504,7 +504,8 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
   const systemPropertiesRows = useMemo(() => {
     if (!record) return [];
 
-    const isDownloadable = !!record.uri &&
+    const isDownloadable =
+      !!record.uri &&
       record.uri.trim().length > 0 &&
       record.uri.toLowerCase() !== "null";
 
@@ -552,10 +553,14 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
       //   label: t.translations.FILE_SIZE,
       //   value: formatFileSize(record.fileSize)
       // },
-      ...(isDownloadable ? [{
-        label: t.translations.FILE_SIZE || "File Size",
-        value: formatFileSize(record.fileSize),
-      }] : []),
+      ...(isDownloadable
+        ? [
+            {
+              label: t.translations.FILE_SIZE || "File Size",
+              value: formatFileSize(record.fileSize),
+            },
+          ]
+        : []),
       {
         label: t.translations.LAST_UPDATED_AT,
         value: formatLocalDateTime(record.lastUpdatedAt),
@@ -656,9 +661,10 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
     return <RecordLoading />;
   }
 
-  const isDownloadable = !!record.uri &&
+  const isDownloadable =
+    !!record.uri &&
     record.uri.trim().length > 0 &&
-    record.uri.toLowerCase() !== "null"
+    record.uri.toLowerCase() !== "null";
 
   const isInsightSupported = isInsightSupportedFileType(
     recordFileType,
@@ -690,6 +696,12 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
           <div className="w-full xl:flex-1 space-y-4">
             {isInsightSupported ? (
               <RecordInsightChat
+                organizationId={
+                  organization?.organizationId
+                    ? Number(organization.organizationId)
+                    : undefined
+                }
+                projectId={projectId}
                 recordId={record.id}
                 recordName={record.name}
                 recordUri={record.uri}

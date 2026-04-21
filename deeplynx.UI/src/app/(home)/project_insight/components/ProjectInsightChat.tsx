@@ -15,6 +15,8 @@ type InsightMessage = {
 };
 
 interface ProjectInsightChatProps {
+  organizationId?: number;
+  projectId?: number;
   projectName: string;
   scopedRecordIds: number[];
 }
@@ -37,6 +39,8 @@ function withTokens(
 }
 
 export default function ProjectInsightChat({
+  organizationId,
+  projectId,
   projectName,
   scopedRecordIds,
 }: ProjectInsightChatProps) {
@@ -114,6 +118,13 @@ export default function ProjectInsightChat({
   async function handleSend(input: string) {
     const prompt = input.trim();
     if (!prompt || isResponding) return;
+    if (!organizationId || !projectId) {
+      setMessages((prev) => [
+        ...prev,
+        createMessage("assistant", t.translations.INSIGHT_UNKNOWN_ERROR),
+      ]);
+      return;
+    }
 
     if (scopeCount === 0) {
       setMessages((prev) => [
@@ -129,15 +140,18 @@ export default function ProjectInsightChat({
     setIsResponding(true);
 
     try {
-      const responseText = await streamInsightQuery(
+      const assistantResponseText = await streamInsightQuery(
         {
+          organizationId,
+          projectId,
           question: prompt,
           fileIds: scopedRecordIds,
         },
-        (chunk) => appendMessageChunk(assistantMessage.id, chunk),
+        (responseChunk) =>
+          appendMessageChunk(assistantMessage.id, responseChunk),
       );
 
-      if (!responseText.trim()) {
+      if (!assistantResponseText.trim()) {
         replaceMessageContent(
           assistantMessage.id,
           t.translations.INSIGHT_EMPTY_RESPONSE,

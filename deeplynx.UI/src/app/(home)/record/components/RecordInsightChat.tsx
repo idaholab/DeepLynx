@@ -33,6 +33,8 @@ interface InsightMessage {
 }
 
 interface RecordInsightChatProps {
+  organizationId?: number;
+  projectId?: number;
   recordId?: number;
   recordUri?: string | null;
   recordName?: string | null;
@@ -81,6 +83,8 @@ function buildIntroMessage(
 }
 
 const RecordInsightChat: React.FC<RecordInsightChatProps> = ({
+  organizationId,
+  projectId,
   recordId,
   recordUri,
   recordName,
@@ -234,14 +238,18 @@ const RecordInsightChat: React.FC<RecordInsightChatProps> = ({
   }, [ingestionState]);
 
   useEffect(() => {
-    if (!recordId) return;
+    if (!organizationId || !projectId || !recordId) return;
 
     let cancelled = false;
 
-    const checkInitialStatus = async () => {
+    const checkInitialIngestionStatus = async () => {
       try {
-        const status = await fetchInsightIngestionStatus(recordId);
-        if (cancelled || !status.indexed) return;
+        const ingestionStatus = await fetchInsightIngestionStatus({
+          organizationId,
+          projectId,
+          fileId: recordId,
+        });
+        if (cancelled || !ingestionStatus.indexed) return;
 
         setIngestionState("ready");
       } catch {
@@ -249,25 +257,29 @@ const RecordInsightChat: React.FC<RecordInsightChatProps> = ({
       }
     };
 
-    void checkInitialStatus();
+    void checkInitialIngestionStatus();
 
     return () => {
       cancelled = true;
     };
-  }, [recordId]);
+  }, [organizationId, projectId, recordId]);
 
   useEffect(() => {
-    if (!recordId) return;
+    if (!organizationId || !projectId || !recordId) return;
     if (ingestionState !== "queued" && ingestionState !== "processing") return;
 
     let cancelled = false;
 
     const poll = async () => {
       try {
-        const status = await fetchInsightIngestionStatus(recordId);
+        const ingestionStatus = await fetchInsightIngestionStatus({
+          organizationId,
+          projectId,
+          fileId: recordId,
+        });
         if (cancelled) return;
 
-        if (status.indexed) {
+        if (ingestionStatus.indexed) {
           setIngestionState("ready");
           return;
         }
@@ -288,11 +300,18 @@ const RecordInsightChat: React.FC<RecordInsightChatProps> = ({
       cancelled = true;
       clearInterval(interval);
     };
-  }, [recordId, ingestionState]);
+  }, [organizationId, projectId, recordId, ingestionState]);
 
   async function handleSend(input: string) {
     const prompt = input.trim();
     if (!prompt || isResponding) return;
+    if (!organizationId || !projectId || !recordId) {
+      setMessages((prev) => [
+        ...prev,
+        createMessage("assistant", t.translations.INSIGHT_UNKNOWN_ERROR),
+      ]);
+      return;
+    }
     if (ingestionState !== "ready") {
       setMessages((prev) => [
         ...prev,
@@ -307,15 +326,13 @@ const RecordInsightChat: React.FC<RecordInsightChatProps> = ({
     setIsResponding(true);
 
     try {
-      const responseText = await streamInsightQuery(
-        {
-          question: prompt,
-          fileIds: recordId ? [recordId] : undefined,
-        },
-        (chunk) => appendMessageChunk(assistantMessage.id, chunk),
+      const assistantResponseText = await streamInsightQuery(
+        { organizationId, projectId, question: prompt, fileIds: [recordId] },
+        (responseChunk) =>
+          appendMessageChunk(assistantMessage.id, responseChunk),
       );
 
-      if (!responseText.trim()) {
+      if (!assistantResponseText.trim()) {
         replaceMessageContent(
           assistantMessage.id,
           t.translations.INSIGHT_EMPTY_RESPONSE,
@@ -337,7 +354,7 @@ const RecordInsightChat: React.FC<RecordInsightChatProps> = ({
   }
 
   async function handleQueueUpload() {
-    if (!recordId) {
+    if (!organizationId || !projectId || !recordId) {
       setIngestionState("error");
       return;
     }
@@ -352,21 +369,12 @@ const RecordInsightChat: React.FC<RecordInsightChatProps> = ({
     setIngestionState("queued");
 
     try {
-      const result = await queueInsightUpload({
-        fileInfo: [{ fileId: recordId, fileURI: uri }],
+      await queueInsightUpload({
+        organizationId,
+        projectId,
+        fileInfo: [{ fileId: recordId, fileUri: uri }],
       });
-      const first = result.results[0];
-
-      if (!first) {
-        setIngestionState("error");
-        return;
-      }
-
-      if (first.status === "queued") {
-        setIngestionState("queued");
-      } else {
-        setIngestionState("error");
-      }
+      setIngestionState("queued");
     } catch (error) {
       console.error("Insight upload failed:", error);
       setIngestionState("error");
