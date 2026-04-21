@@ -45,6 +45,10 @@ public class LatticeController : ControllerBase
     /// </param>
     /// <param name="projectId">The ID of the project to which the staged classes, records, edges and relationships belong</param>
     /// <param name="dataSourceId">The ID of the datasource to which the staged records and edges belong</param>
+    /// <param name="extractionId">
+    ///     When supplied, ties this payload to an existing Extraction created during trigger.
+    ///     Lattice passes this as a query param on its success callback.
+    /// </param>
     /// <param name="dto">
     ///     CreateExtractionRequestDTO that contains the CreateDTOs for Classes, Records, Edges, and
     ///     Relationships as well as extraction configurations
@@ -64,18 +68,60 @@ public class LatticeController : ControllerBase
         long organizationId,
         long projectId,
         [FromQuery] long dataSourceId,
+        [FromQuery] long? extractionId,
         [FromBody] CreateStagingRequestDto dto)
     {
         try
         {
             var currentUserId = UserContextStorage.UserId;
             var result = await _extractionBusiness.LatticeEntityStaging(
-                currentUserId, organizationId, projectId, dataSourceId, dto);
+                currentUserId, organizationId, projectId, dataSourceId, dto, extractionId);
             return Ok(result);
+        }
+        catch (InvalidOperationException exc)
+        {
+            _logger.LogWarning(exc.Message);
+            return BadRequest(exc.Message);
         }
         catch (Exception exc)
         {
             var message = $"An error occurred while staging extractions: {exc}";
+            _logger.LogError(message);
+            return StatusCode(StatusCodes.Status500InternalServerError, message);
+        }
+    }
+
+    /// <summary>
+    ///     Lattice error callback. Called when Lattice fails to complete an extraction.
+    ///     Marks the extraction as failed and logs the error details from Lattice.
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization.</param>
+    /// <param name="projectId">The ID of the project.</param>
+    /// <param name="extractionId">The ID of the extraction that failed.</param>
+    /// <param name="dto">Error details from Lattice.</param>
+    [HttpPost("{extractionId:long}/error", Name = "api_extraction_error")]
+    public async Task<IActionResult> LatticeExtractionError(
+        long organizationId,
+        long projectId,
+        long extractionId,
+        [FromBody] LatticeExtractionErrorDto dto)
+    {
+        try
+        {
+            _logger.LogError(
+                "Lattice reported extraction failure. ExtractionId={ExtractionId} OrgId={OrgId} ProjectId={ProjectId} Error={Error} Detail={Detail}",
+                extractionId, organizationId, projectId, dto.Error, dto.Detail);
+            await _extractionBusiness.MarkExtractionFailed(extractionId, dto.Error);
+            return Ok();
+        }
+        catch (InvalidOperationException exc)
+        {
+            _logger.LogWarning(exc.Message);
+            return BadRequest(exc.Message);
+        }
+        catch (Exception exc)
+        {
+            var message = $"An error occurred while recording extraction failure: {exc}";
             _logger.LogError(message);
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
