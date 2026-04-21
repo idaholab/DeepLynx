@@ -57,6 +57,7 @@ public class LatticeOrchestrationBusiness : ILatticeOrchestrationBusiness
             
             // Generate a short-lived token for the triggering user so Lattice can authenticate
             // its callback. 240 minutes gives generous headroom for a ~45-minute extraction.
+            //TODO: Need service user logic to use tokens not tied to user accounts
             var apiKeyPair = await _tokenBusiness.CreateApiKey(currentUserId);
             var callbackToken = await _tokenBusiness.CreateToken(
                 apiKeyPair.apiKey, apiKeyPair.apiSecret, 240);
