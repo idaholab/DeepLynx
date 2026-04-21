@@ -8,6 +8,7 @@
 
     <ItemGroup>
       <PackageReference Include="Microsoft.AspNetCore.Authentication.Cookies" Version="2.3.9" />
+              <PackageReference Include="System.Security.Cryptography.Xml" Version="8.0.3" />
       <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.2" />
       <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.2">
         <PrivateAssets>all</PrivateAssets>
