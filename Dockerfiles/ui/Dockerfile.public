@@ -13,6 +13,18 @@ RUN npm ci
 # Copy the rest of the frontend source code
 COPY deeplynx.UI ./
 
+# Patch 2026-33671
+RUN set -eux; \
+    cd /usr/src/app; \
+    target="node_modules/next/dist/compiled/picomatch"; \
+    test -d "$target"; \
+    wget -q -O /tmp/picomatch-4.0.4.tgz https://registry.npmjs.org/picomatch/-/picomatch-4.0.4.tgz; \
+    echo "515b5ab666558ed9a117483a310892aede54a68dd78f2d8db6604513e578571c  /tmp/picomatch-4.0.4.tgz" | sha256sum -c -; \
+    rm -rf "$target"/*; \
+    tar -xzf /tmp/picomatch-4.0.4.tgz --strip-components=1 -C "$target"; \
+    rm -f /tmp/picomatch-4.0.4.tgz; \
+    grep -q '"version": "4.0.4"' "$target/package.json"
+
 # Build the frontend
 RUN npm run build
 
