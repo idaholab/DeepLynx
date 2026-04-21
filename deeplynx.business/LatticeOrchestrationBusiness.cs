@@ -11,20 +11,20 @@ public class LatticeOrchestrationBusiness : ILatticeOrchestrationBusiness
     private readonly IExtractionBusiness _extractionBusiness;
     private readonly LatticeServiceClient _latticeClient;
     private readonly string _nexusBaseUrl;
-    private readonly string _nexusServiceToken;
+    private readonly ITokenBusiness _tokenBusiness;
 
     public LatticeOrchestrationBusiness(
         DeeplynxContext context,
         IExtractionBusiness extractionBusiness,
+        ITokenBusiness tokenBusiness,
         LatticeServiceClient latticeClient)
     {
         _context = context;
         _extractionBusiness = extractionBusiness;
+        _tokenBusiness = tokenBusiness;
         _latticeClient = latticeClient;
         _nexusBaseUrl = Environment.GetEnvironmentVariable("NEXUS_BASE_URL")
-            ?? throw new InvalidOperationException("NEXUS_BASE_URL environment variable is not set.");
-        _nexusServiceToken = Environment.GetEnvironmentVariable("NEXUS_SERVICE_TOKEN")
-            ?? throw new InvalidOperationException("NEXUS_SERVICE_TOKEN environment variable is not set.");
+                        ?? throw new InvalidOperationException("NEXUS_BASE_URL environment variable is not set.");
     }
 
     public async Task<long> TriggerLatticeExtraction(
@@ -36,11 +36,10 @@ public class LatticeOrchestrationBusiness : ILatticeOrchestrationBusiness
         string mode,
         int similarityLimit)
     {
-        // check record exists before proceeding 
         var record = await _context.Records
-            .Where(r => r.Id == recordId && r.ProjectId == projectId)
-            .FirstOrDefaultAsync()
-            ?? throw new InvalidOperationException($"Record {recordId} not found in project {projectId}");
+                         .Where(r => r.Id == recordId && r.ProjectId == projectId)
+                         .FirstOrDefaultAsync()
+                     ?? throw new InvalidOperationException($"Record {recordId} not found in project {projectId}");
 
         var extraction = new Extraction
         {
@@ -54,6 +53,13 @@ public class LatticeOrchestrationBusiness : ILatticeOrchestrationBusiness
         {
             var ontologyContext = await _extractionBusiness.SearchOntologySimilarity(
                 recordId, projectId, similarityLimit);
+            
+            
+            // Generate a short-lived token for the triggering user so Lattice can authenticate
+            // its callback. 240 minutes gives generous headroom for a ~45-minute extraction.
+            var apiKeyPair = await _tokenBusiness.CreateApiKey(currentUserId);
+            var callbackToken = await _tokenBusiness.CreateToken(
+                apiKeyPair.apiKey, apiKeyPair.apiSecret, 240);
 
             await _latticeClient.TriggerExtraction(new LatticeExtractionTriggerRequestDto
             {
@@ -69,7 +75,7 @@ public class LatticeOrchestrationBusiness : ILatticeOrchestrationBusiness
                     ProjectId = projectId,
                     DataSourceId = dataSourceId,
                     BaseUrl = _nexusBaseUrl,
-                    Token = _nexusServiceToken
+                    Token = callbackToken
                 }
             });
 
