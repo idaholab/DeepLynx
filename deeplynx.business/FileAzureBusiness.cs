@@ -499,4 +499,52 @@ public class FileAzureBusiness: IFileBusiness
         // Delete the blob - this automatically removes all uncommitted blocks associated with it
         await blockBlobClient.DeleteIfExistsAsync();
     }
+    
+    /// <summary>
+    /// Gets the total storage size in bytes for files matching the given prefix in Azure Blob Storage.
+    /// </summary>
+    /// <param name="prefix">The blob prefix to search (e.g., "organization_1/project_2/")</param>
+    /// <param name="objectStorageConfig">Azure storage configuration</param>
+    /// <returns>Total bytes used by blobs matching the prefix</returns>
+    public async Task<long> GetStorageSize(string prefix, ObjectStorageConfigDto objectStorageConfig)
+    {
+        if (objectStorageConfig.AzureObjectConfig == null)
+            return 0;
+        
+        long totalSize = 0;
+        
+        var container = new BlobContainerClient(
+            objectStorageConfig.AzureObjectConfig.AzureConnectionString,
+            objectStorageConfig.AzureObjectConfig.AzureContainerName);
+        
+        if (!await container.ExistsAsync())
+            return 0;
+        
+        await foreach (var blobItem in container.GetBlobsAsync(
+                           prefix: string.IsNullOrEmpty(prefix) ? null : prefix))
+        {
+            if (blobItem.Properties.ContentLength.HasValue)
+            {
+                totalSize += blobItem.Properties.ContentLength.Value;
+            }
+        }
+        
+        return totalSize;
+    }
+ 
+    /// <summary>
+    /// Builds the Azure-specific blob prefix.
+    /// Azure uses the format: organization_{id}/project_{id}/
+    /// </summary>
+    /// <param name="organizationId">The organization ID</param>
+    /// <param name="projectId">Optional project ID</param>
+    /// <returns>Azure blob prefix string</returns>
+    public string BuildPrefix(long organizationId, long? projectId)
+    {
+        // Azure format: organization_1/project_2/
+        if (projectId.HasValue)
+            return $"organization_{organizationId}/project_{projectId.Value}/";
+        else
+            return $"organization_{organizationId}/";
+    }
 }
