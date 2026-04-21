@@ -47,6 +47,7 @@ import { getAllSensitivityLabelsProject } from "@/app/lib/client_service/sensiti
 import AddEdgeModal from "./components/AddEdgeModal";
 import ClassSelectorModal from "./components/ClassSelectorModal";
 import RecordInsightChat from "./components/RecordInsightChat";
+import RecordCollectionsPanel from "./components/RecordCollectionsPanel";
 import {
   RelatedRecordViewModel,
   useRecordRelationships,
@@ -716,6 +717,11 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
               setSelectedLabels={setSelectedLabels}
               setSelectedLabelIds={setSelectedLabelIds}
               title={t.translations.TAGS}
+            />
+
+            <RecordCollectionsPanel
+              recordId={record.id}
+              recordName={record.name ?? t.translations.RECORD_ ?? "Record"}
             />
 
             {/* Related Records Card - Origins */}

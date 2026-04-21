@@ -24,6 +24,7 @@ import {
   ChevronLeftIcon,
   ChevronRightIcon,
   ChevronUpIcon,
+  CircleStackIcon,
   FolderIcon,
   PresentationChartLineIcon,
   RectangleGroupIcon,
@@ -406,6 +407,17 @@ const SideMenu: React.FC<SideMenuProps> = ({
               {!isCollapsed && (
                 <p className="ml-2">{t.translations.TIMESERIES_VIEWER}</p>
               )}
+            </Link>
+          </li>
+
+          <li className="mt-2">
+            <Link
+              href="/data_catalog/data_collections"
+              onClick={() => onMobileClose?.()}
+              className={getItemClass("/data_catalog/data_collections")}
+            >
+              <CircleStackIcon className="size-6" />
+              {!isCollapsed && <p className="ml-2">Data Collections</p>}
             </Link>
           </li>
 
