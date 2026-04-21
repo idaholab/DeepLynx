@@ -17,7 +17,11 @@ public class ExtractionBusiness : IExtractionBusiness
     }
 
     /// <summary>
-    ///     Stage extractions from Lattice. Inserts staged records, classes, edges, and relationships
+    ///     Stage extractions from Lattice. Inserts staged records, classes, edges, and relationships.
+    ///     When <paramref name="extractionId" /> is supplied (Lattice callback flow), the existing
+    ///     Extraction record is updated to Complete on success or Failed on error, rather than creating
+    ///     a new one. When omitted (manual staging flow), a new Extraction is created and immediately
+    ///     marked Complete.
     /// </summary>
     /// <param name="currentUserId">ID of the User executing this method.</param>
     /// <param name="organizationId">
@@ -30,6 +34,10 @@ public class ExtractionBusiness : IExtractionBusiness
     ///     CreateExtractionRequestDTO that contains the CreateDTOs for Classes, Records, Edges, and
     ///     Relationships as well as extraction configurations
     /// </param>
+    /// <param name="extractionId">
+    ///     When set, ties this payload to an existing Extraction created during trigger.
+    ///     Lattice passes this as a query param on its success callback.
+    /// </param>
     /// <returns>ExtractionResponseDto which contains counts of staged entities</returns>
     /// <exception cref="Exception">Returned if error occurs during extraction transaction</exception>
     public async Task<ExtractionResponseDto> LatticeEntityStaging(
@@ -37,16 +45,31 @@ public class ExtractionBusiness : IExtractionBusiness
         long organizationId,
         long projectId,
         long dataSourceId,
-        CreateStagingRequestDto dto)
+        CreateStagingRequestDto dto,
+        long? extractionId = null)
     {
-        var extraction = new Extraction
+        // When extractionId is supplied, Lattice is calling back after completing an extraction
+        // we already created. Update that record rather than creating a new one.
+        var isCallback = extractionId.HasValue;
+        Extraction extraction;
+
+        if (isCallback)
         {
-            Properties = dto.Properties?.ToJsonString(),
-            CreatedBy = currentUserId,
-            Status = ExtractionStatus.Complete
-        };
-        _context.Extractions.Add(extraction);
-        await _context.SaveChangesAsync();
+            extraction = await _context.Extractions.FindAsync(extractionId!.Value)
+                ?? throw new InvalidOperationException($"Extraction {extractionId} not found.");
+            extraction.Properties = dto.Properties?.ToJsonString();
+        }
+        else
+        {
+            extraction = new Extraction
+            {
+                Properties = dto.Properties?.ToJsonString(),
+                CreatedBy = currentUserId,
+                Status = ExtractionStatus.Complete
+            };
+            _context.Extractions.Add(extraction);
+            await _context.SaveChangesAsync();
+        }
 
         await using var stagingTransaction = await _stagingContext.Database.BeginTransactionAsync();
         try
@@ -57,7 +80,7 @@ public class ExtractionBusiness : IExtractionBusiness
             var classNameToStagingId = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
             var relationshipNameToStagingId = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
             var originalIdToStagingRecordId = new Dictionary<string, long>();
-            
+
             foreach (var classDto in dto.Classes ?? [])
             {
                 var stagingClass = new Class
@@ -75,14 +98,15 @@ public class ExtractionBusiness : IExtractionBusiness
                 await _stagingContext.SaveChangesAsync();
                 classNameToStagingId[stagingClass.Name] = stagingClass.Id;
             }
-            
+
             // OriginId/DestinationId are class IDs — resolve from this payload's staging classes only.
             // If the class only exists in deeplynx, leave the ID null and store the name as a shadow
             // property so promotion can resolve it by name.
             foreach (var relDto in dto.Relationships ?? [])
             {
                 var originId = relDto.OriginId ?? ResolveClassId(relDto.OriginName, classNameToStagingId);
-                var destinationId = relDto.DestinationId ?? ResolveClassId(relDto.DestinationName, classNameToStagingId);
+                var destinationId =
+                    relDto.DestinationId ?? ResolveClassId(relDto.DestinationName, classNameToStagingId);
 
                 var stagingRelationship = new Relationship
                 {
@@ -103,7 +127,8 @@ public class ExtractionBusiness : IExtractionBusiness
                 if (originId == null && relDto.OriginName != null)
                     _stagingContext.Entry(stagingRelationship).Property("OriginName").CurrentValue = relDto.OriginName;
                 if (destinationId == null && relDto.DestinationName != null)
-                    _stagingContext.Entry(stagingRelationship).Property("DestinationName").CurrentValue = relDto.DestinationName;
+                    _stagingContext.Entry(stagingRelationship).Property("DestinationName").CurrentValue =
+                        relDto.DestinationName;
 
                 await _stagingContext.SaveChangesAsync();
                 relationshipNameToStagingId[stagingRelationship.Name] = stagingRelationship.Id;
@@ -116,7 +141,7 @@ public class ExtractionBusiness : IExtractionBusiness
             {
                 var classId = recordDto.ClassId;
                 if (classId == null && recordDto.ClassName != null
-                    && classNameToStagingId.TryGetValue(recordDto.ClassName, out var stagingClassId))
+                                    && classNameToStagingId.TryGetValue(recordDto.ClassName, out var stagingClassId))
                     classId = stagingClassId;
 
                 var stagingRecord = new Record
@@ -163,7 +188,6 @@ public class ExtractionBusiness : IExtractionBusiness
                                         || edgeDto.DeeplynxRelationshipName != null;
 
                 if (originId != null && destinationId != null && !hasCrossSchemaRef)
-                {
                     // Both endpoints resolved to staging records — standard staging edge
                     _stagingContext.Edges.Add(new Edge
                     {
@@ -178,9 +202,7 @@ public class ExtractionBusiness : IExtractionBusiness
                         LastUpdatedBy = currentUserId,
                         ExtractionId = extraction.Id
                     });
-                }
                 else if (hasCrossSchemaRef || originId != null || destinationId != null)
-                {
                     // At least one endpoint or relationship references a deeplynx entity — cross-schema edge
                     _stagingContext.CrossSchemaEdges.Add(new CrossSchemaEdge
                     {
@@ -198,13 +220,17 @@ public class ExtractionBusiness : IExtractionBusiness
                         RelationshipName = edgeDto.RelationshipName,
                         DeeplynxRelationshipName = edgeDto.DeeplynxRelationshipName
                     });
-                }
-                // no origin or destination 
+                // no origin or destination
             }
 
             await _stagingContext.SaveChangesAsync();
-
             await stagingTransaction.CommitAsync();
+
+            if (isCallback)
+            {
+                extraction.Status = ExtractionStatus.Complete;
+                await _context.SaveChangesAsync();
+            }
 
             return new ExtractionResponseDto
             {
@@ -220,10 +246,32 @@ public class ExtractionBusiness : IExtractionBusiness
         catch
         {
             await stagingTransaction.RollbackAsync();
-            _context.Extractions.Remove(extraction);
+
+            if (isCallback)
+            {
+                extraction.Status = ExtractionStatus.Failed;
+            }
+            else
+            {
+                _context.Extractions.Remove(extraction);
+            }
+
             await _context.SaveChangesAsync();
             throw;
         }
+    }
+
+    /// <summary>
+    ///     Marks an extraction as failed. Called when Lattice reports an error via its error callback.
+    /// </summary>
+    /// <param name="extractionId">The ID of the extraction to mark as failed.</param>
+    /// <param name="errorMessage">Optional error message from Lattice, logged by the caller.</param>
+    public async Task MarkExtractionFailed(long extractionId, string? errorMessage = null)
+    {
+        var extraction = await _context.Extractions.FindAsync(extractionId)
+            ?? throw new InvalidOperationException($"Extraction {extractionId} not found.");
+        extraction.Status = ExtractionStatus.Failed;
+        await _context.SaveChangesAsync();
     }
 
     /// <summary>
@@ -241,35 +289,29 @@ public class ExtractionBusiness : IExtractionBusiness
         int limit = 5,
         string? termType = null)
     {
-        // Raw SQL is justified here: the <=> cosine distance operator is PostgreSQL/pgvector-specific
-        // and the cross-join + GROUP BY + MIN(distance) aggregation across two schemas has no clean
-        // EF Core LINQ equivalent. Database.SqlQuery<T> with a FormattableString is injection-safe.
-        // DISTINCT ON (ov.id) ordered by distance ASC picks the single closest chunk per ontology
-        // entry, which lets us return both the best score and the text of the matching chunk.
-        // The outer query then re-orders by score and applies the limit.
         return await _context.Database
             .SqlQuery<OntologySimilarityResultDto>($"""
-                SELECT name, technical_id, type, description, score, text_chunk
-                FROM (
-                    SELECT DISTINCT ON (ov.id)
-                        COALESCE(c.name, rel.name)                                      AS name,
-                        COALESCE(ov.class_id, ov.relationship_id)                       AS technical_id,
-                        CASE WHEN ov.class_id IS NOT NULL THEN 'entity' ELSE 'relation' END AS type,
-                        COALESCE(c.description, rel.description)                        AS description,
-                        1 - (ov.vector <=> e.vector)                                    AS score,
-                        e.text_chunk
-                    FROM dl_vector.ontology_vector ov
-                    LEFT JOIN deeplynx.classes c   ON c.id = ov.class_id
-                    LEFT JOIN deeplynx.relationships rel ON rel.id = ov.relationship_id
-                    JOIN dl_vector.embeddings e     ON e.record_id = {recordId}
-                    WHERE (c.project_id = {projectId} OR rel.project_id = {projectId})
-                      AND ({termType}::text IS NULL OR
-                           CASE WHEN ov.class_id IS NOT NULL THEN 'entity' ELSE 'relation' END = {termType}::text)
-                    ORDER BY ov.id, ov.vector <=> e.vector
-                ) ranked
-                ORDER BY score DESC
-                LIMIT {limit}
-                """)
+                                                    SELECT name, technical_id, type, description, score, text_chunk
+                                                    FROM (
+                                                        SELECT DISTINCT ON (ov.id)
+                                                            COALESCE(c.name, rel.name)                                      AS name,
+                                                            COALESCE(ov.class_id, ov.relationship_id)                       AS technical_id,
+                                                            CASE WHEN ov.class_id IS NOT NULL THEN 'entity' ELSE 'relation' END AS type,
+                                                            COALESCE(c.description, rel.description)                        AS description,
+                                                            1 - (ov.vector <=> e.vector)                                    AS score,
+                                                            e.text_chunk
+                                                        FROM dl_vector.ontology_vector ov
+                                                        LEFT JOIN deeplynx.classes c   ON c.id = ov.class_id
+                                                        LEFT JOIN deeplynx.relationships rel ON rel.id = ov.relationship_id
+                                                        JOIN dl_vector.embeddings e     ON e.record_id = {recordId}
+                                                        WHERE (c.project_id = {projectId} OR rel.project_id = {projectId})
+                                                          AND ({termType}::text IS NULL OR
+                                                               CASE WHEN ov.class_id IS NOT NULL THEN 'entity' ELSE 'relation' END = {termType}::text)
+                                                        ORDER BY ov.id, ov.vector <=> e.vector
+                                                    ) ranked
+                                                    ORDER BY score DESC
+                                                    LIMIT {limit}
+                                                    """)
             .ToListAsync();
     }
 

@@ -9,7 +9,10 @@ public interface IExtractionBusiness
         long organizationId,
         long projectId,
         long dataSourceId,
-        CreateStagingRequestDto dto);
+        CreateStagingRequestDto dto,
+        long? extractionId = null);
+
+    Task MarkExtractionFailed(long extractionId, string? errorMessage = null);
 
     Task<List<OntologySimilarityResultDto>> SearchOntologySimilarity(
         long recordId,
