@@ -60,29 +60,36 @@ public class SavedSearchBusiness : ISavedSearchBusiness
     ///     Get saved searches
     /// </summary>
     /// <param name="userId">The ID of the user</param>
+    /// <param name="searchFilters">Optional filters to query for specific saved searches</param>
     /// <returns>List of saved searches for the user</returns>
-    public async Task<List<CustomQueryDtos.CustomQueryResponseDto>> GetSavedSearches(long userId)
+    public async Task<List<CustomQueryDtos.CustomQueryResponseDto>> GetSavedSearches(long userId, CustomQueryDtos.FilterSavedQueryRequestDto? searchFilters)
     {
-        var savedSearches = await _context.SavedSearches
-            .Where(s => s.UserId == userId)
-            .ToListAsync();
+        var query = _context.SavedSearches
+            .Where(s => s.UserId == userId);
 
-        var result = new List<CustomQueryDtos.CustomQueryResponseDto>();
-
-        foreach (var search in savedSearches)
+        if (searchFilters != null)
         {
-            // Deserialize the JSON string back to the original structure
-            var searchData = JsonSerializer.Deserialize<CustomQueryDtos.CustomQueryResponseDto>(search.Search);
+            if (searchFilters.Name != null)
+                query = query.Where(s => s.Name == searchFilters.Name);
 
-            Console.WriteLine($"Filters count: {searchData?.Filter?.Length ?? 0}");
-
-            result.Add(new CustomQueryDtos.CustomQueryResponseDto
+            if (searchFilters.TextSearch != null)
             {
-                textSearch = searchData?.textSearch,
-                Filter = searchData?.Filter
-            });
+                var jsonFilter = JsonSerializer.Serialize(new { textSearch = searchFilters.TextSearch });
+                query = query.Where(s => EF.Functions.JsonContains(s.Search, jsonFilter));
+            }
+
+            if (searchFilters.LastUpdatedBefore != null)
+                query = query.Where(s => s.LastUpdatedAt <= searchFilters.LastUpdatedBefore);
+
+            if (searchFilters.LastUpdatedAfter != null)
+                query = query.Where(s => s.LastUpdatedAt >= searchFilters.LastUpdatedAfter);
         }
 
-        return result;
+        var savedSearches = await query.ToListAsync();
+
+        return savedSearches
+            .Select(s => JsonSerializer.Deserialize<CustomQueryDtos.CustomQueryResponseDto>(s.Search))
+            .Where(s => s != null)
+            .ToList()!;
     }
 }
