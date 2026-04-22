@@ -28,7 +28,7 @@ import type {
 } from "@/app/(home)/types/responseDTOs";
 
 import ConfirmArchiveTagModal from "./ConfirmArchiveTagModal";
-import TagOverviewStrip from "./TagOverviewStrip";
+import OrganizationTagOverviewStrip from "./OrganizationTagOverviewStrip";
 import SecurityLabelsOrg from "./SecurityLabelsOrg";
 import OrgTagsPanel from "./OrgTagsPanel";
 import TagEditModal from "./TagEditModal";
@@ -398,14 +398,14 @@ const TagManagementClient: React.FC<Props> = ({ projects }) => {
   /*                               Derived Data                               */
   /* ------------------------------------------------------------------------ */
 
-  const tagCount = tags.length;
-  const filteredCount = filteredTags.length;
+  const organizationTagCount = tags.length;
+  const filteredTagCount = filteredTags.length;
 
-  const labelCount = labels.length;
+  const sensitivityLabelCount = labels.length;
   const filteredLabelCount = filteredLabels.length;
 
-  const projectsWithLabels = 0; // labels are org-level only in this view
-  const projectsWithTags = projects.length;
+  const projectsWithSensitivityLabelsCount = 0; // labels are org-level only in this view
+  const projectsWithTagsCount = projects.length;
 
   /* ------------------------------------------------------------------------ */
   /*                               Main Render                                */
@@ -424,13 +424,15 @@ const TagManagementClient: React.FC<Props> = ({ projects }) => {
       </div>
 
       {/* Overview Strip */}
-      <TagOverviewStrip
-        labelCount={labelCount}
-        projectsWithLabels={projectsWithLabels}
-        tagCount={tagCount}
-        projectsWithTags={projectsWithTags}
-        tagsLocked={tagsLocked}
-        labelsLocked={labelsLocked}
+      <OrganizationTagOverviewStrip
+        sensitivityLabelCount={sensitivityLabelCount}
+        projectsWithSensitivityLabelsCount={
+          projectsWithSensitivityLabelsCount
+        }
+        organizationTagCount={organizationTagCount}
+        projectsWithTagsCount={projectsWithTagsCount}
+        organizationTagsLocked={tagsLocked}
+        organizationLabelsLocked={labelsLocked}
       />
 
       {/* Two-Column Layout */}
@@ -445,7 +447,7 @@ const TagManagementClient: React.FC<Props> = ({ projects }) => {
           labelSearch={labelSearch}
           setLabelSearch={setLabelSearch}
           filteredCount={filteredLabelCount}
-          labelCount={labelCount}
+          labelCount={sensitivityLabelCount}
           orgId={orgId}
           archivingLabelId={archivingLabelId}
           onToggleLock={() => setLabelsLocked((prev) => !prev)}
@@ -463,8 +465,8 @@ const TagManagementClient: React.FC<Props> = ({ projects }) => {
           filteredTags={filteredTags}
           tagSearch={tagSearch}
           setTagSearch={setTagSearch}
-          filteredCount={filteredCount}
-          tagCount={tagCount}
+          filteredCount={filteredTagCount}
+          tagCount={organizationTagCount}
           orgId={orgId}
           archivingTagId={archivingTagId}
           onToggleLock={() => setTagsLocked((prev) => !prev)}
