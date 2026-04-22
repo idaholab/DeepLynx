@@ -40,6 +40,12 @@ test.describe("Upload Center", () => {
   test("File Upload is the default mode", async ({ page }) => {
     // In file upload mode, the drag & drop zone is visible
     await expect(
+      page.getByRole("heading", { name: "File Upload" }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Download Metadata Template" }),
+    ).toBeVisible();
+    await expect(
       page.getByText("Drag & drop files here"),
     ).toBeVisible();
   });
@@ -50,56 +56,43 @@ test.describe("Upload Center", () => {
     ).toBeVisible();
   });
 
-  test("Select a project box is visible", async ({ page}) => {
+
+  test("Select a project box is visible", async ({ page }) => {
     await expect(
-      page.getByText("Select a projectProjectTest"),
+      page.getByText("Select a projectProject"),
     ).toBeVisible();
   })
 
-  test("Select a project dropdown is visible", async ({ page }) =>{
+  test("Select a project dropdown is visible", async ({ page }) => {
     await expect(
-      page.getByLabel("Select a project")
+      page.getByLabel("Select a")
     ).toBeVisible();
   });
-  
-  test("Data source box is visible", async ({ page}) => {
+
+  test("Data source box is visible", async ({ page }) => {
     await expect(
       page.getByText("Data sourceData"),
     ).toBeVisible();
   })
 
-  test("Data source dropdown is visible", async ({ page }) =>{
+  test("Data source dropdown is visible", async ({ page }) => {
     await expect(
       page.getByLabel("Data source")
     ).toBeVisible();
   });
 
-  test("Storage destination box is visible", async ({ page}) => {
+  test("Storage destination box is visible", async ({ page }) => {
     await expect(
       page.getByText("Storage DestinationObject"),
     ).toBeVisible();
   })
 
-    test("Storage Destination dropdown is visible", async ({ page }) =>{
+  test("Storage Destination dropdown is visible", async ({ page }) => {
     await expect(
       page.getByLabel("Storage Destination")
     ).toBeVisible();
   });
 
-  /* await page.getByText('Select a project').click();
-
-
-  await page.getByText('Select a projectProjectTest').click();
-  await page.locator('.size-6.text-success').first().click();
-  await page.getByText('Data sourceData').click();
-  await page.getByText('Data source', { exact: true }).click();
-  await page.locator('span').filter({ hasText: 'Data source' }).first().click();
-  await page.getByText('Storage DestinationObject').click();
-  await page.locator('span').filter({ hasText: 'Storage Destination' }).first().click();
-  await page.getByText('Storage Destination').click();
-  await page.locator('label:nth-child(3) > .flex > .size-6').click();
-  await page.locator('.space-y-3 > .p-4').first().click();
- */
   test("drag and drop zone is visible in file mode", async ({ page }) => {
     await expect(
       page.getByText("Drag & drop files here"),
@@ -113,7 +106,42 @@ test.describe("Upload Center", () => {
     // The Bulk Metadata section renders with an info box containing
     // "Bulk Metadata Upload" heading and the CsvTemplateDownload button.
     await expect(
+      page.getByRole("heading", { name: "Bulk Metadata", exact: true }),
+    ).toBeVisible();
+    await expect(
       page.getByText("Bulk Metadata Upload"),
+    ).toBeVisible();
+    await expect(
+      page.getByText("Create multiple records at"),
+    ).toBeVisible();
+  });
+
+  test("switching to Bulk Metadata mode renders bulk upload section components", async ({
+    page,
+  }) => {
+    await page.getByRole("radio", { name: "Bulk Metadata" }).click();
+    // The Bulk Metadata section renders with an info box containing
+    // "Bulk Metadata Upload" heading and the CsvTemplateDownload button.
+    await expect(
+      page.getByRole("heading", { name: "Bulk Metadata", exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByText("Bulk Metadata Upload"),
+    ).toBeVisible();
+    await expect(
+      page.getByText("Create multiple records at"),
+    ).toBeVisible();
+    await expect(
+      page.getByText("Step 1: Download Template"),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Step 1: Download Template" }),
+    ).toBeVisible();
+    await expect(
+      page.getByText("Step 2: Upload Your CSV"),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Step 2: Upload Your CSV" }),
     ).toBeVisible();
   });
 });
