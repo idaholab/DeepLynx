@@ -5,6 +5,12 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace deeplynx.api.Controllers;
 
+/// <summary>
+///     Controller for retrieving summary statistics at a project level
+/// </summary>
+/// <remarks>
+///     This controller provides endpoints to populate the DeepLynx metrics pages for Nexus project admins.
+/// </remarks>
 [ApiController]
 [Route("organizations/{organizationId:long}/projects/{projectId:long}/metrics")]
 [Authorize]
@@ -14,6 +20,11 @@ public class MetricsProjectController : ControllerBase
     private readonly IMetricsBusiness _metricsBusiness;
     private readonly ILogger<MetricsController> _logger;
     
+    /// <summary>
+    ///     Initializes a new instance of the <see cref="MetricsProjectController" /> class
+    /// </summary>
+    /// <param name="metricsBusiness">The business logic interface for handling metrics retrievals</param>
+    /// <param name="logger">Error/info logging interface for database log table</param>
     public MetricsProjectController(
         IMetricsBusiness metricsBusiness, 
         ILogger<MetricsController> logger)
@@ -22,6 +33,12 @@ public class MetricsProjectController : ControllerBase
         _logger = logger;
     }
 
+    /// <summary>
+    ///     Get Bytes Ingested
+    /// </summary>
+    /// <param name="organizationId">The organization to which the project belongs</param>
+    /// <param name="projectId">The project from which to retrieve the summary statistic</param>
+    /// <returns>The total number of bytes of file data stored in this project's registered object storages.</returns>
     [HttpGet("storage/size", Name = "api_storage_size_project")]
     [SysAdmin]
     public async Task<IActionResult> GetProjectStorageSize(

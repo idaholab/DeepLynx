@@ -1,6 +1,8 @@
 using deeplynx.datalayer.Models;
+using deeplynx.helpers;
 using deeplynx.interfaces;
 using deeplynx.models;
+using deeplynx.models.MetricsDTOs;
 using Microsoft.EntityFrameworkCore;
 using Newtonsoft.Json;
 
@@ -32,7 +34,7 @@ public class MetricsBusiness : IMetricsBusiness
     /// <param name="organizationId">The ID of the organization to which the object storage belongs</param>
     /// <param name="projectId">ID of the project in which the object storage belongs</param>
     /// <param name="objectStorageId">ID of the object storage from which to get the total bytes</param>
-    public async Task<long> GetObjectStorageSize(
+    public async Task<StorageSizeDto> GetObjectStorageSize(
         long organizationId,
         long? projectId,
         long objectStorageId)
@@ -46,16 +48,23 @@ public class MetricsBusiness : IMetricsBusiness
             throw new KeyNotFoundException($"Object storage {objectStorageId} not found");
         
         // Validate project scope if provided
-        if (projectId.HasValue && objectStorage.ProjectId.HasValue && objectStorage.ProjectId != projectId)
-            throw new InvalidOperationException($"Object storage {objectStorageId} does not belong to project {projectId}");
-        
+        if (projectId.HasValue)
+        {
+            await ExistenceHelper.EnsureProjectExistsAsync(_context, projectId.Value);
+
+            if (objectStorage.ProjectId.HasValue && objectStorage.ProjectId != projectId)
+                throw new InvalidOperationException(
+                    $"Object storage {objectStorageId} does not belong to project {projectId}");
+        }
+
         // Build prefix based on scope and storage type
         long? effectiveProjectId = projectId ?? objectStorage.ProjectId;
         var fileBusiness = _fileBusinessFactory.CreateFileBusiness(objectStorage.Type);
         var prefix = fileBusiness.BuildPrefix(organizationId, effectiveProjectId);
         
         var configData = DeserializeConfig(objectStorage.Config);
-        return await fileBusiness.GetStorageSize(prefix, configData);
+        var totalBytes = await fileBusiness.GetStorageSize(prefix, configData);
+        return new StorageSizeDto{ Bytes = totalBytes };
     }
 
     /// <summary>
@@ -64,12 +73,18 @@ public class MetricsBusiness : IMetricsBusiness
     /// <param name="organizationId">The ID of the organization to which the object storage belongs</param>
     /// <param name="projectId">ID of the project from which to get the total bytes</param>
     /// <returns>Dictionary of objectStorageId -> total bytes</returns>
-    // TODO: Add error if project/org supplied don't exist or don't match up
-    public async Task<Dictionary<long, long>> GetProjectStorageSize(
+    public async Task<StorageSizeDto> GetProjectStorageSize(
         long organizationId, 
         long projectId)
     {
-        var results = new Dictionary<long, long>();
+        // validate org and project exist and match
+        await ExistenceHelper.EnsureOrganizationExistsAsync(_context, organizationId);
+        var project = await ExistenceHelper.EnsureProjectExistsAsync(_context, projectId);
+        
+        if (project.OrganizationId != organizationId)
+            throw new InvalidOperationException($"Project {projectId} does not belong to organization {organizationId}");
+        
+        long totalBytes = 0;
         
         var objectStorages = await _context.ObjectStorages
             .Where(os => os.OrganizationId == organizationId 
@@ -85,17 +100,16 @@ public class MetricsBusiness : IMetricsBusiness
                 var prefix = fileBusiness.BuildPrefix(organizationId, projectId);
                 
                 var configData = DeserializeConfig(objectStorage.Config);
-                var totalBytes = await fileBusiness.GetStorageSize(prefix, configData);
-                results[objectStorage.Id] = totalBytes;
+                var osBytes = await fileBusiness.GetStorageSize(prefix, configData);
+                totalBytes += osBytes;
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"Failed to get size for object storage {objectStorage.Id}: {ex.Message}");
-                results[objectStorage.Id] = 0;
             }
         }
         
-        return results;
+        return new StorageSizeDto{ Bytes = totalBytes };
     }
 
     /// <summary>
@@ -103,9 +117,12 @@ public class MetricsBusiness : IMetricsBusiness
     /// </summary>
     /// <param name="organizationId">The ID of the organization from which to get the total bytes</param>
     /// <returns>Dictionary of objectStorageId -> total bytes</returns>
-    public async Task<Dictionary<long, long>> GetOrganizationStorageSize(long organizationId)
+    public async Task<StorageSizeDto> GetOrganizationStorageSize(long organizationId)
     {
-        var results = new Dictionary<long, long>();
+        // verify organization exists
+        await ExistenceHelper.EnsureOrganizationExistsAsync(_context, organizationId);
+
+        long totalBytes = 0;
         
         var objectStorages = await _context.ObjectStorages
             .Where(os => os.OrganizationId == organizationId && !os.IsArchived)
@@ -119,26 +136,25 @@ public class MetricsBusiness : IMetricsBusiness
                 var prefix = fileBusiness.BuildPrefix(organizationId, null);
                 
                 var configData = DeserializeConfig(objectStorage.Config);
-                var totalBytes = await fileBusiness.GetStorageSize(prefix, configData);
-                results[objectStorage.Id] = totalBytes;
+                var osBytes = await fileBusiness.GetStorageSize(prefix, configData);
+                totalBytes += osBytes;
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"Failed to get size for object storage {objectStorage.Id}: {ex.Message}");
-                results[objectStorage.Id] = 0;
             }
         }
         
-        return results;
+        return new StorageSizeDto{ Bytes = totalBytes };
     }
 
     /// <summary>
     ///     Gets total bytes for each object storage system-wide
     /// </summary>
     /// <returns>Dictionary of objectStorageId -> total bytes</returns>
-    public async Task<Dictionary<long, long>> GetSystemStorageSize()
+    public async Task<StorageSizeDto> GetSystemStorageSize()
     {
-        var results = new Dictionary<long, long>();
+        long totalBytes = 0;
         
         // select only the first of each unique config in order to eliminate duplicates
         var objectStorages = await _context.ObjectStorages
@@ -156,17 +172,16 @@ public class MetricsBusiness : IMetricsBusiness
                 var prefix = "";
                 
                 var configData = DeserializeConfig(objectStorage.Config);
-                var totalBytes = await fileBusiness.GetStorageSize(prefix, configData);
-                results[objectStorage.Id] = totalBytes;
+                var osBytes = await fileBusiness.GetStorageSize(prefix, configData);
+                totalBytes += osBytes;
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"Failed to get size for object storage {objectStorage.Id}: {ex.Message}");
-                results[objectStorage.Id] = 0;
             }
         }
         
-        return results;
+        return new StorageSizeDto{ Bytes = totalBytes };
     }
     
     private static ObjectStorageConfigDto DeserializeConfig(string config)
