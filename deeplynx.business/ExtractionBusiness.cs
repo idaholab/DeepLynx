@@ -292,24 +292,28 @@ public class ExtractionBusiness : IExtractionBusiness
             .SqlQuery<OntologySimilarityResultDto>($"""
                                                     SELECT name, technical_id, type, description, score, text_chunk
                                                     FROM (
-                                                        SELECT DISTINCT ON (ov.id)
+                                                        SELECT 
                                                             COALESCE(c.name, rel.name)                                      AS name,
                                                             COALESCE(ov.class_id, ov.relationship_id)                       AS technical_id,
                                                             CASE WHEN ov.class_id IS NOT NULL THEN 'entity' ELSE 'relation' END AS type,
                                                             COALESCE(c.description, rel.description)                        AS description,
                                                             1 - (ov.vector <=> e.vector)                                    AS score,
-                                                            e.text_chunk
-                                                        FROM dl_vector.ontology_vector ov
+                                                            e.text_chunk,
+                                                        ROW_NUMBER() OVER (
+                                                               PARTITION BY e.id
+                                                               ORDER BY ov.vector <=> e.vector ASC
+                                                           ) AS rank
+                                                        FROM dl_vector.embeddings e
+                                                        JOIN dl_vector.ontology_vector ov ON TRUE
                                                         LEFT JOIN deeplynx.classes c   ON c.id = ov.class_id
                                                         LEFT JOIN deeplynx.relationships rel ON rel.id = ov.relationship_id
-                                                        JOIN dl_vector.embeddings e     ON e.record_id = {recordId}
-                                                        WHERE (c.project_id = {projectId} OR rel.project_id = {projectId})
+                                                        WHERE e.record_id = {recordId}
+                                                        AND (c.project_id = {projectId} OR rel.project_id = {projectId})
                                                           AND ({termType}::text IS NULL OR
                                                                CASE WHEN ov.class_id IS NOT NULL THEN 'entity' ELSE 'relation' END = {termType}::text)
-                                                        ORDER BY ov.id, ov.vector <=> e.vector
                                                     ) ranked
-                                                    ORDER BY score DESC
-                                                    LIMIT {limit}
+                                                    WHERE rank <= {limit}
+                                                    ORDER BY text_chunk, rank;
                                                     """)
             .ToListAsync();
     }
