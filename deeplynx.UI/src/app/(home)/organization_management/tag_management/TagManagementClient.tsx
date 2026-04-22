@@ -404,7 +404,7 @@ const TagManagementClient: React.FC<Props> = ({ projects }) => {
   const sensitivityLabelCount = labels.length;
   const filteredLabelCount = filteredLabels.length;
 
-  const projectsWithSensitivityLabelsCount = 0; // labels are org-level only in this view
+  const projectsWithSensitivityLabelsCount = projects.length;
   const projectsWithTagsCount = projects.length;
 
   /* ------------------------------------------------------------------------ */

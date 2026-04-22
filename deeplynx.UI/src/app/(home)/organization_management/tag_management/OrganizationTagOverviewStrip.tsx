@@ -61,8 +61,7 @@ const OrganizationTagOverviewStrip: React.FC<Props> = ({
           {projectsWithSensitivityLabelsCount}
         </div>
         <div className="stat-desc text-xs text-base-content/70 flex items-center gap-1">
-          <InformationCircleIcon className="w-4 h-4" />
-          <span>{t.translations.PROJECT_USAGE_TRACKING_COMING_SOON}</span>
+          <span>{t.translations.INHERITING_ORGANIZATION_LEVEL_LABELS}</span>
         </div>
       </div>
 
