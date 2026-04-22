@@ -99,7 +99,6 @@ public class SavedSearchBusinessTests : IntegrationTestBase
         Assert.NotNull(savedSearch);
         Assert.Equal(alias, savedSearch.Name);
         Assert.Equal(uid1, savedSearch.UserId);
-        Assert.False(savedSearch.IsFavorite);
         Assert.NotNull(savedSearch.Search);
     }
 
@@ -121,7 +120,7 @@ public class SavedSearchBusinessTests : IntegrationTestBase
         var textSearch = "Captain";
 
         // Act
-        var result = await _savedSearchBusiness.SaveSearch(uid1, alias, textSearch, filters, true);
+        var result = await _savedSearchBusiness.SaveSearch(uid1, alias, textSearch, filters);
 
         // Assert
         Assert.True(result);
@@ -130,7 +129,6 @@ public class SavedSearchBusinessTests : IntegrationTestBase
             .FirstOrDefaultAsync(s => s.UserId == uid1 && s.Name == alias);
 
         Assert.NotNull(savedSearch);
-        Assert.True(savedSearch.IsFavorite);
     }
 
     [Fact]
@@ -314,7 +312,7 @@ public class SavedSearchBusinessTests : IntegrationTestBase
         };
 
         await _savedSearchBusiness.SaveSearch(uid1, "Search 1", "captain", filters1);
-        await _savedSearchBusiness.SaveSearch(uid1, "Search 2", "clone", filters2, true);
+        await _savedSearchBusiness.SaveSearch(uid1, "Search 2", "clone", filters2);
 
         // Act
         var result = await _savedSearchBusiness.GetSavedSearches(uid1);
