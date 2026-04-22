@@ -1,6 +1,7 @@
 "use client";
 
 import SearchBar from "@/app/(home)/components/SearchBar";
+import { useInsightModelSelection } from "@/app/(home)/components/insight/useInsightModelSelection";
 import type {
   ClassResponseDto,
   DataSourceResponseDto,
@@ -92,6 +93,8 @@ export default function ProjectInsightClientView() {
     EMPTY_TAB_FILTER_STATE,
   );
   const deferredLibrarySearchQuery = useDeferredValue(libraryState.searchQuery);
+  const { selectedInsightModels, setSelectedInsightModels } =
+    useInsightModelSelection(organizationId, projectId);
 
   // Tab state helpers
   const {
@@ -488,6 +491,9 @@ export default function ProjectInsightClientView() {
         organizationId,
         projectId,
         fileInfo: uploadFileInfo,
+        vlmModelConfigId: selectedInsightModels.uploadModelConfigId ?? undefined,
+        embeddingModelConfigId:
+          selectedInsightModels.embeddingModelConfigId ?? undefined,
       });
       toast.success(
         withTokens(t.translations.PROJECT_INSIGHT_QUEUED_SUMMARY, {
@@ -698,6 +704,8 @@ export default function ProjectInsightClientView() {
               organizationId={organizationId}
               projectId={projectId}
               projectName={projectName}
+              selectedInsightModels={selectedInsightModels}
+              onSelectedInsightModelsChange={setSelectedInsightModels}
               scopedRecordIds={visibleEmbeddedRecords.map(
                 (record) => record.id,
               )}

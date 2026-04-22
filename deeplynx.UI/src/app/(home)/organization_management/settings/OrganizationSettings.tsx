@@ -58,13 +58,6 @@ const OrganizationSettings = () => {
   // TODO: This is just place fillers for now
   const services: Service[] = [
     {
-      id: "insight",
-      name: "Insight",
-      icon: <ChartBarIcon className="w-5 h-5" />,
-      description: "Advanced analytics and reporting",
-      status: "disconnected",
-    },
-    {
       id: "lattice",
       name: "Lattice",
       icon: <Squares2X2Icon className="w-5 h-5" />,

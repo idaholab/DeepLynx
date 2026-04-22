@@ -1,8 +1,15 @@
 "use client";
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import InsightModelSettingsModal from "@/app/(home)/components/insight/InsightModelSettingsModal";
+import {
+  buildInsightModelBadges,
+  formatInsightTimestamp,
+} from "@/app/(home)/components/insight/insightChat.utils";
+import type { InsightModelSelection } from "@/app/(home)/components/insight/useInsightModelSelection";
 import { streamInsightQuery } from "@/app/lib/client_service/insight_services.client";
 import { useLanguage } from "@/app/contexts/Language";
+import { Cog6ToothIcon } from "@heroicons/react/24/outline";
 import { PaperAirplaneIcon } from "@heroicons/react/24/solid";
 
 type InsightRole = "assistant" | "user";
@@ -19,13 +26,10 @@ interface ProjectInsightChatProps {
   projectId?: number;
   projectName: string;
   scopedRecordIds: number[];
-}
-
-function getCurrentTimestamp(): string {
-  return new Intl.DateTimeFormat(undefined, {
-    hour: "numeric",
-    minute: "2-digit",
-  }).format(new Date());
+  selectedInsightModels: InsightModelSelection;
+  onSelectedInsightModelsChange: (
+    nextSelection: InsightModelSelection,
+  ) => void;
 }
 
 function withTokens(
@@ -43,6 +47,8 @@ export default function ProjectInsightChat({
   projectId,
   projectName,
   scopedRecordIds,
+  selectedInsightModels,
+  onSelectedInsightModelsChange,
 }: ProjectInsightChatProps) {
   const { t } = useLanguage();
   const scopeCount = scopedRecordIds.length;
@@ -51,6 +57,7 @@ export default function ProjectInsightChat({
   const promptInputRef = useRef<HTMLTextAreaElement>(null);
   const [draft, setDraft] = useState("");
   const [isResponding, setIsResponding] = useState(false);
+  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [messages, setMessages] = useState<InsightMessage[]>([]);
 
   const introMessage = useMemo(
@@ -66,6 +73,7 @@ export default function ProjectInsightChat({
       ),
     [projectName, scopeCount, t.translations],
   );
+  const selectedModelBadges = buildInsightModelBadges(selectedInsightModels);
 
   useEffect(() => {
     messageIdRef.current = 1;
@@ -76,7 +84,7 @@ export default function ProjectInsightChat({
         id: messageIdRef.current++,
         role: "assistant",
         content: introMessage,
-        timestamp: getCurrentTimestamp(),
+        timestamp: formatInsightTimestamp(),
       },
     ]);
   }, [introMessage]);
@@ -93,7 +101,7 @@ export default function ProjectInsightChat({
       id: messageIdRef.current++,
       role,
       content,
-      timestamp: getCurrentTimestamp(),
+      timestamp: formatInsightTimestamp(),
     };
   }
 
@@ -146,6 +154,10 @@ export default function ProjectInsightChat({
           projectId,
           question: prompt,
           fileIds: scopedRecordIds,
+          languageModelConfigId:
+            selectedInsightModels.queryModelConfigId ?? undefined,
+          embeddingModelConfigId:
+            selectedInsightModels.embeddingModelConfigId ?? undefined,
         },
         (responseChunk) =>
           appendMessageChunk(assistantMessage.id, responseChunk),
@@ -176,16 +188,38 @@ export default function ProjectInsightChat({
     <section className="card border border-base-300/60 bg-base-100 shadow-lg h-full min-h-0">
       <div className="card-body flex h-full min-h-0 flex-col gap-4 p-5 lg:p-6">
         <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-          <div className="flex flex-wrap items-end gap-2">
+          <div className="flex flex-col gap-2">
             <span className="text-xs text-base-content/60">
               {t.translations.INSIGHT_CONVERSATION_NOT_SAVED}
             </span>
+            {selectedModelBadges.length > 0 ? (
+              <div className="flex flex-wrap gap-2">
+                {selectedModelBadges.map((badgeLabel) => (
+                  <span
+                    key={badgeLabel}
+                    className="badge badge-outline badge-sm text-base-content/80"
+                  >
+                    {badgeLabel}
+                  </span>
+                ))}
+              </div>
+            ) : null}
           </div>
-          <span className="badge badge-outline badge-secondary">
-            {withTokens(t.translations.PROJECT_INSIGHT_SCOPE_COUNT, {
-              count: scopeCount,
-            })}
-          </span>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="badge badge-outline badge-secondary">
+              {withTokens(t.translations.PROJECT_INSIGHT_SCOPE_COUNT, {
+                count: scopeCount,
+              })}
+            </span>
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm btn-circle"
+              onClick={() => setIsSettingsModalOpen(true)}
+              title={t.translations.INSIGHT_MODEL_SETTINGS}
+            >
+              <Cog6ToothIcon className="size-5" />
+            </button>
+          </div>
         </div>
 
         <div className="flex-1 min-h-0 rounded-box border border-base-300 bg-base-200/70">
@@ -266,6 +300,14 @@ export default function ProjectInsightChat({
           </div>
         </form>
       </div>
+      <InsightModelSettingsModal
+        isOpen={isSettingsModalOpen}
+        organizationId={organizationId}
+        projectId={projectId}
+        selectedInsightModels={selectedInsightModels}
+        onClose={() => setIsSettingsModalOpen(false)}
+        onSaveSelection={onSelectedInsightModelsChange}
+      />
     </section>
   );
 }

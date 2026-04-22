@@ -1,6 +1,12 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
+import InsightModelSettingsModal from "@/app/(home)/components/insight/InsightModelSettingsModal";
+import {
+  buildInsightModelBadges,
+  formatInsightTimestamp,
+} from "@/app/(home)/components/insight/insightChat.utils";
+import { useInsightModelSelection } from "@/app/(home)/components/insight/useInsightModelSelection";
 import {
   fetchInsightIngestionStatus,
   queueInsightUpload,
@@ -13,6 +19,7 @@ import {
   ChatBubbleLeftRightIcon,
   ChevronDownIcon,
   ChevronUpIcon,
+  Cog6ToothIcon,
   CloudArrowUpIcon,
   PaperAirplaneIcon,
 } from "@heroicons/react/24/outline";
@@ -48,13 +55,6 @@ const INGESTION_BADGE_CLASS: Record<IngestionState, string> = {
   ready: "badge-success",
   error: "badge-error",
 };
-
-function getCurrentTimestamp(): string {
-  return new Intl.DateTimeFormat(undefined, {
-    hour: "numeric",
-    minute: "2-digit",
-  }).format(new Date());
-}
 
 function playAudio(audioRef: React.RefObject<HTMLAudioElement | null>) {
   const audio = audioRef.current;
@@ -106,16 +106,19 @@ const RecordInsightChat: React.FC<RecordInsightChatProps> = ({
   const [isQueueingUpload, setIsQueueingUpload] = useState(false);
   const [isWidgetCollapsed, setIsWidgetCollapsed] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
+  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [ingestionState, setIngestionState] =
     useState<IngestionState>("not_queued");
   const [messages, setMessages] = useState<InsightMessage[]>([]);
+  const { selectedInsightModels, setSelectedInsightModels } =
+    useInsightModelSelection(organizationId, projectId);
 
   function createMessage(role: InsightRole, content: string): InsightMessage {
     return {
       id: messageIdRef.current++,
       role,
       content,
-      timestamp: getCurrentTimestamp(),
+      timestamp: formatInsightTimestamp(),
     };
   }
 
@@ -149,7 +152,7 @@ const RecordInsightChat: React.FC<RecordInsightChatProps> = ({
           t.translations.INSIGHT_INTRO_READY,
           t.translations.INSIGHT_INTRO_NOT_READY,
         ),
-        timestamp: getCurrentTimestamp(),
+        timestamp: formatInsightTimestamp(),
       },
     ]);
     setDraft("");
@@ -167,6 +170,8 @@ const RecordInsightChat: React.FC<RecordInsightChatProps> = ({
   ]);
 
   useEffect(() => {
+    // The first assistant message doubles as the empty-state copy, so keep it
+    // in sync with ingestion status until the user starts the conversation.
     setMessages((prev) => {
       if (prev.length !== 1 || prev[0]?.role !== "assistant") {
         return prev;
@@ -208,6 +213,8 @@ const RecordInsightChat: React.FC<RecordInsightChatProps> = ({
   }, [isResponding, isWidgetCollapsed]);
 
   useEffect(() => {
+    // Audio refs are loaded lazily so the widget can stay client-only without
+    // blocking the initial render.
     readyAudioRef.current = new Audio("/assets/notification.mp3");
     readyAudioRef.current.preload = "auto";
 
@@ -327,7 +334,16 @@ const RecordInsightChat: React.FC<RecordInsightChatProps> = ({
 
     try {
       const assistantResponseText = await streamInsightQuery(
-        { organizationId, projectId, question: prompt, fileIds: [recordId] },
+        {
+          organizationId,
+          projectId,
+          question: prompt,
+          fileIds: [recordId],
+          languageModelConfigId:
+            selectedInsightModels.queryModelConfigId ?? undefined,
+          embeddingModelConfigId:
+            selectedInsightModels.embeddingModelConfigId ?? undefined,
+        },
         (responseChunk) =>
           appendMessageChunk(assistantMessage.id, responseChunk),
       );
@@ -373,6 +389,9 @@ const RecordInsightChat: React.FC<RecordInsightChatProps> = ({
         organizationId,
         projectId,
         fileInfo: [{ fileId: recordId, fileUri: uri }],
+        vlmModelConfigId: selectedInsightModels.uploadModelConfigId ?? undefined,
+        embeddingModelConfigId:
+          selectedInsightModels.embeddingModelConfigId ?? undefined,
       });
       setIngestionState("queued");
     } catch (error) {
@@ -402,23 +421,35 @@ const RecordInsightChat: React.FC<RecordInsightChatProps> = ({
   );
   const hasStartedConversation = messages.length > 1 || isResponding;
   const visibleMessages = hasStartedConversation ? messages.slice(1) : [];
+  const selectedModelBadges = buildInsightModelBadges(selectedInsightModels);
 
   return (
     <div className="card bg-base-100 shadow-md mt-4 p-2">
       <div className="flex items-center justify-between gap-3 px-4 py-1">
-        <div className="flex min-w-0 items-center gap-2">
-          <ChatBubbleLeftRightIcon className="size-6 text-secondary shrink-0" />
-          <h3 className="text-xl font-bold text-base-content">
-            {t.translations.INSIGHT}
-          </h3>
-          <span className="badge badge-outline badge-sm">
-            {t.translations.INSIGHT_FILE_SCOPED}
-          </span>
-          <span
-            className={`badge badge-sm ${INGESTION_BADGE_CLASS[ingestionState]}`}
-          >
-            {ingestionBadgeLabel}
-          </span>
+        <div className="min-w-0">
+          <div className="flex min-w-0 items-center gap-2">
+            <ChatBubbleLeftRightIcon className="size-6 text-secondary shrink-0" />
+            <h3 className="text-xl font-bold text-base-content">
+              {t.translations.INSIGHT}
+            </h3>
+            <span className="badge badge-outline badge-sm">
+              {t.translations.INSIGHT_FILE_SCOPED}
+            </span>
+            <span
+              className={`badge badge-sm ${INGESTION_BADGE_CLASS[ingestionState]}`}
+            >
+              {ingestionBadgeLabel}
+            </span>
+          </div>
+          {selectedModelBadges.length > 0 ? (
+            <div className="mt-2 flex flex-wrap gap-2">
+              {selectedModelBadges.map((badgeLabel) => (
+                <span key={badgeLabel} className="badge badge-outline badge-sm">
+                  {badgeLabel}
+                </span>
+              ))}
+            </div>
+          ) : null}
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -433,6 +464,14 @@ const RecordInsightChat: React.FC<RecordInsightChatProps> = ({
             {isQueueingUpload
               ? t.translations.INSIGHT_QUEUEING
               : t.translations.INSIGHT_QUEUE_RECORD}
+          </button>
+          <button
+            type="button"
+            className="btn btn-ghost btn-xs btn-circle"
+            onClick={() => setIsSettingsModalOpen(true)}
+            title={t.translations.INSIGHT_MODEL_SETTINGS}
+          >
+            <Cog6ToothIcon className="size-6" />
           </button>
           <button
             type="button"
@@ -549,6 +588,14 @@ const RecordInsightChat: React.FC<RecordInsightChatProps> = ({
           </div>
         </div>
       )}
+      <InsightModelSettingsModal
+        isOpen={isSettingsModalOpen}
+        organizationId={organizationId}
+        projectId={projectId}
+        selectedInsightModels={selectedInsightModels}
+        onClose={() => setIsSettingsModalOpen(false)}
+        onSaveSelection={setSelectedInsightModels}
+      />
     </div>
   );
 };
