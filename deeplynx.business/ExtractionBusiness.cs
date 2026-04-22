@@ -277,7 +277,6 @@ public class ExtractionBusiness : IExtractionBusiness
     /// <summary>
     ///     Searches for the most similar ontology terms (classes and/or relationships) in the project
     ///     by comparing a record's stored embeddings against all ontology vectors using cosine similarity.
-    ///     When a record has multiple embedding chunks, the best score across all chunks is used per ontology entry.
     /// </summary>
     /// <param name="recordId">The ID of the record whose embeddings are used as the query vectors.</param>
     /// <param name="projectId">The ID of the project — only classes and relationships belonging to this project are searched.</param>

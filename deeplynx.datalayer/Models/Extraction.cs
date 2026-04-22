@@ -34,3 +34,9 @@ public static class ExtractionStatus
     public const string Complete = "complete";
     public const string Failed = "failed";
 }
+
+public static class ExtractionMode
+{
+    public const string Discovery = "discovery";
+    public const string Strict = "strict";
+}
