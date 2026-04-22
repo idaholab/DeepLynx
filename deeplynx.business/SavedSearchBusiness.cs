@@ -60,7 +60,7 @@ public class SavedSearchBusiness : ISavedSearchBusiness
     /// <param name="userId">The ID of the user</param>
     /// <param name="searchFilters">Optional filters to query for specific saved searches</param>
     /// <returns>List of saved searches for the user</returns>
-    public async Task<List<CustomQueryDtos.CustomQueryResponseDto>> GetSavedSearches(long userId, CustomQueryDtos.FilterSavedQueryRequestDto? searchFilters)
+    public async Task<List<CustomQueryDtos.CustomQueryResponseDto>> GetSavedSearches(long userId, CustomQueryDtos.FilterSavedQueryRequestDto? searchFilters = null)
     {
         var query = _context.SavedSearches
             .Where(s => s.UserId == userId);
