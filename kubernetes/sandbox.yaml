@@ -414,9 +414,12 @@ spec:
                   name: app-config
                   key: hosted-link
           resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
             limits:
-              memory: "4Gi"
-              cpu: "1500m"
+              cpu: "500m"
+              memory: "512Mi"
           ports:
             - containerPort: 3001
 
