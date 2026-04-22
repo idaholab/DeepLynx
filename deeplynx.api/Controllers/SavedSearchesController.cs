@@ -63,7 +63,7 @@ public class SavedSearchController : ControllerBase
     /// </summary>
     /// <param name="searchFilters">Optional filters to narrow results of saved searches query</param>
     /// <returns>A list of saved searches belonging to the user.</returns>
-    [HttpPost(Name = "api_query_get_saved_searches")]
+    [HttpPost("search", Name = "api_query_get_saved_searches")]
     public async Task<ActionResult<IEnumerable<TagResponseDto>>> GetSavedSearches(
         [FromBody] CustomQueryDtos.FilterSavedQueryRequestDto? searchFilters = null)
     {
