@@ -159,6 +159,7 @@ try
     builder.Services.AddTransient<IRelationshipBusiness, RelationshipBusiness>();
     builder.Services.AddTransient<ITagBusiness, TagBusiness>();
     builder.Services.AddTransient<IOlapBusiness, OlapBusiness>();
+    builder.Services.AddTransient<IMetricsBusiness, MetricsBusiness>();
     builder.Services.AddTransient<IUserBusiness, UserBusiness>();
     builder.Services.AddTransient<INotificationBusiness, NotificationBusiness>();
     builder.Services.AddTransient<IInvitationBusiness, InvitationBusiness>();
@@ -325,6 +326,9 @@ try
                 // Timeseries
                 new() { Name = "Olap", Description = "OLAP tabular file operations" },
 
+                // Metrics
+                new() { Name = "Metrics", Description = "System Statistics" },
+                
                 // Other
                 new() { Name = "Notification", Description = "Notifications" }
             };
@@ -407,6 +411,11 @@ try
                 {
                     ["name"] = "Olap",
                     ["tags"] = new JsonArray { "Olap" }
+                },
+                new JsonObject
+                {
+                    ["name"] = "Metrics",
+                    ["tags"] = new JsonArray { "Metrics", "Organization - Metrics", "Project - Metrics" }
                 },
                 new JsonObject
                 {

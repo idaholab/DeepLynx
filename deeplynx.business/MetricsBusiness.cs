@@ -64,6 +64,7 @@ public class MetricsBusiness : IMetricsBusiness
     /// <param name="organizationId">The ID of the organization to which the object storage belongs</param>
     /// <param name="projectId">ID of the project from which to get the total bytes</param>
     /// <returns>Dictionary of objectStorageId -> total bytes</returns>
+    // TODO: Add error if project/org supplied don't exist or don't match up
     public async Task<Dictionary<long, long>> GetProjectStorageSize(
         long organizationId, 
         long projectId)
@@ -139,8 +140,11 @@ public class MetricsBusiness : IMetricsBusiness
     {
         var results = new Dictionary<long, long>();
         
+        // select only the first of each unique config in order to eliminate duplicates
         var objectStorages = await _context.ObjectStorages
             .Where(os => !os.IsArchived)
+            .GroupBy(os => os.Config)
+            .Select(g => g.First())
             .ToListAsync();
         
         foreach (var objectStorage in objectStorages)
@@ -164,7 +168,7 @@ public class MetricsBusiness : IMetricsBusiness
         
         return results;
     }
-
+    
     private static ObjectStorageConfigDto DeserializeConfig(string config)
     {
         return JsonConvert.DeserializeObject<ObjectStorageConfigDto>(config)
