@@ -64,4 +64,14 @@ public class FileS3Business:  IFileBusiness
         ObjectStorageConfigDto objectStorageConfig)
     {
     }
+
+    public async Task<long> GetStorageSize(string prefix, ObjectStorageConfigDto objectStorageConfig)
+    {
+        return 0;
+    }
+
+    public string BuildPrefix(long organizationId, long? projectId)
+    {
+        return "";
+    }
 }
