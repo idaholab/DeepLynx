@@ -92,8 +92,7 @@ public class LatticeController : ControllerBase
     }
 
     /// <summary>
-    ///     Lattice error callback. Called when Lattice fails to complete an extraction.
-    ///     Marks the extraction as failed and logs the error details from Lattice.
+    ///     Lattice error callback.
     /// </summary>
     /// <param name="organizationId">The ID of the organization.</param>
     /// <param name="projectId">The ID of the project.</param>
@@ -129,8 +128,6 @@ public class LatticeController : ControllerBase
 
     /// <summary>
     ///     Trigger ontology embedding for all classes and relationships in the project.
-    ///     Queues descriptions for embedding via the Insight service. Must be called before
-    ///     using the ontology similarity search endpoint.
     /// </summary>
     /// <param name="organizationId">The ID of the organization.</param>
     /// <param name="projectId">The ID of the project whose ontology will be embedded.</param>
@@ -159,53 +156,14 @@ public class LatticeController : ControllerBase
     }
 
     /// <summary>
-    ///     Search for the most similar ontology classes and/or relationships in the project
-    ///     using cosine similarity against a record's stored embeddings.
-    /// </summary>
-    /// <param name="organizationId">The ID of the organization.</param>
-    /// <param name="projectId">The ID of the project to scope the ontology search to.</param>
-    /// <param name="recordId">The ID of the record whose embeddings are used as the query.</param>
-    /// <param name="limit">Maximum number of results to return. Defaults to 5.</param>
-    /// <param name="type">Optional filter: "class" or "relationship". Omit to return both.</param>
-    /// <returns>
-    ///     A list of ontology matches ordered by similarity score descending.
-    ///     Each result includes: name, technical_id, type, description, score.
-    /// </returns>
-    [HttpGet("records/{recordId:long}/ontology-similarity", Name = "api_ontology_similarity")]
-    public async Task<ActionResult<List<OntologySimilarityResultDto>>> OntologySimilarity(
-        long organizationId,
-        long projectId,
-        long recordId,
-        [FromQuery] int limit = 5,
-        [FromQuery] string? type = null)
-    {
-        try
-        {
-            var results = await _extractionBusiness.SearchOntologySimilarity(
-                recordId, projectId, limit, type);
-            return Ok(results);
-        }
-        catch (Exception exc)
-        {
-            var message = $"An error occurred during ontology similarity search: {exc}";
-            _logger.LogError(message);
-            return StatusCode(StatusCodes.Status500InternalServerError, message);
-        }
-    }
-
-    /// <summary>
-    ///     Trigger asynchronous entity extraction on a document record via the Lattice service.
-    ///     Creates an Extraction record (status: pending → running) and returns immediately.
-    ///     Lattice processes the extraction and calls back via the staging endpoint when complete.
-    ///     NEXUS_BASE_URL and NEXUS_SERVICE_TOKEN environment variables must be set so Lattice
-    ///     can authenticate its callback.
+    ///     Trigger asynchronous Lattice extraction
     /// </summary>
     /// <param name="organizationId">The ID of the organization.</param>
     /// <param name="projectId">The ID of the project.</param>
     /// <param name="recordId">The ID of the document record to extract from.</param>
-    /// <param name="dto">Extraction configuration: data_source_id, mode, similarity_limit.</param>
-    /// <returns>202 Accepted with the extraction_id to poll for status.</returns>
-    [HttpPost("records/{recordId:long}/trigger", Name = "api_trigger_extraction")]
+    /// <param name="dto">Extraction configuration: data_source_id, mode.</param>
+    /// <returns>202 Accepted with the extraction_id.</returns>
+    [HttpPost("/organizations/{organizationId:long}/projects/{projectId:long}/records/{recordId:long}/trigger", Name = "api_trigger_extraction")]
     public async Task<IActionResult> TriggerExtraction(
         long organizationId,
         long projectId,
@@ -216,7 +174,7 @@ public class LatticeController : ControllerBase
         {
             var currentUserId = UserContextStorage.UserId;
             var extractionId = await _latticeOrchestration.TriggerLatticeExtraction(
-                currentUserId, organizationId, projectId, dto.DataSourceId, recordId, dto.Mode, dto.SimilarityLimit);
+                currentUserId, organizationId, projectId, dto.DataSourceId, recordId, dto.Mode);
             return Accepted(new { extraction_id = extractionId });
         }
         catch (InvalidOperationException exc)
