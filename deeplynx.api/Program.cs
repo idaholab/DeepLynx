@@ -266,7 +266,6 @@ try
 
                 // AI Services
                 new() { Name = "Lattice", Description = "Useful data views for DeepLynx Lattice use" },
-                new() { Name = "Extraction", Description = "Extraction for DeepLynx Lattice use" },
                 new() { Name = "Organization - AI Model Config", Description = "AI model configuration management" },
                 new() { Name = "Project - AI Model Config", Description = "AI model configuration management" },
                 new() { Name = "User Model Token", Description = "User AI model token management" },
@@ -342,7 +341,7 @@ try
                 new JsonObject
                 {
                     ["name"] = "AI Services",
-                    ["tags"] = new JsonArray { "Lattice", "Extraction", "Organization - AI Model Config", "Project - AI Model Config", "User Model Token", "Insight" }
+                    ["tags"] = new JsonArray { "Lattice", "Organization - AI Model Config", "Project - AI Model Config", "User Model Token", "Insight" }
                 },
                 new JsonObject
                 {
@@ -454,6 +453,30 @@ try
             {
                 Description = "Internal Server Error"
             });
+
+            return Task.CompletedTask;
+        });
+        // Mark non-nullable value-type query parameters as required in the OpenAPI spec.
+        // Path parameters are already required by default; query parameters are not, even when
+        // their C# type is non-nullable (e.g. long, int, bool). Scalar renders this distinction
+        // visually, so this transformer ensures the spec matches the actual binding behaviour.
+        options.AddOperationTransformer((operation, context, cancellationToken) =>
+        {
+            if (operation.Parameters is null) return Task.CompletedTask;
+
+            foreach (var parameter in operation.Parameters.OfType<OpenApiParameter>())
+            {
+                if (parameter.In != ParameterLocation.Query) continue;
+
+                var paramDesc = context.Description.ParameterDescriptions
+                    .FirstOrDefault(p => p.Name == parameter.Name);
+
+                if (paramDesc?.Type is { IsValueType: true } t
+                    && Nullable.GetUnderlyingType(t) is null)
+                {
+                    parameter.Required = true;
+                }
+            }
 
             return Task.CompletedTask;
         });
