@@ -16,7 +16,19 @@ RUN npm install -g npm@latest
 COPY deeplynx.docs/package*.json ./
 
 # Install frontend dependencies
-RUN npm install
+RUN npm install \
+    && ( \
+    set -e; \
+    tmp="$(mktemp -d)"; \
+    cd "$tmp"; \
+    npm pack picomatch@4.0.4; \
+    tar -xzf picomatch-4.0.4.tgz; \
+    rm -rf /usr/src/app/node_modules/tinyglobby/node_modules/picomatch; \
+    mkdir -p /usr/src/app/node_modules/tinyglobby/node_modules; \
+    mv package /usr/src/app/node_modules/tinyglobby/node_modules/picomatch; \
+    cd /; rm -rf "$tmp"; \
+    ) || true \
+    && node -e "try{console.log('build-stage app tinyglobby nested picomatch:', require('/usr/src/app/node_modules/tinyglobby/node_modules/picomatch/package.json').version)}catch(e){console.log('build-stage app tinyglobby nested picomatch not found')}"
 
 # Copy the rest of the frontend source code
 COPY deeplynx.docs .
@@ -47,7 +59,19 @@ RUN npm install -g npm@latest \
     mv package /usr/local/lib/node_modules/npm/node_modules/minimatch; \
     cd /; rm -rf "$tmp"; \
     ) || true \
-    && node -e "try{console.log('npm-bundled minimatch now:', require('/usr/local/lib/node_modules/npm/node_modules/minimatch/package.json').version)}catch(e){console.log('npm-bundled minimatch not found')}"
+    && ( \
+    set -e; \
+    tmp="$(mktemp -d)"; \
+    cd "$tmp"; \
+    npm pack picomatch@4.0.4 >/dev/null 2>&1; \
+    tar -xzf picomatch-4.0.4.tgz; \
+    rm -rf /usr/local/lib/node_modules/npm/node_modules/tinyglobby/node_modules/picomatch; \
+    mkdir -p /usr/local/lib/node_modules/npm/node_modules/tinyglobby/node_modules; \
+    mv package /usr/local/lib/node_modules/npm/node_modules/tinyglobby/node_modules/picomatch; \
+    cd /; rm -rf "$tmp"; \
+    ) || true \
+    && node -e "try{console.log('npm-bundled minimatch now:', require('/usr/local/lib/node_modules/npm/node_modules/minimatch/package.json').version)}catch(e){console.log('npm-bundled minimatch not found')}" \
+    && node -e "try{console.log('npm-bundled tinyglobby nested picomatch now:', require('/usr/local/lib/node_modules/npm/node_modules/tinyglobby/node_modules/picomatch/package.json').version)}catch(e){console.log('npm-bundled tinyglobby nested picomatch not found')}"
 
 # Copy the built frontend code from the previous stage
 COPY --from=frontend-build /usr/src/app .

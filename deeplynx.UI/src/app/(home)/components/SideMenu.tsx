@@ -20,7 +20,6 @@ import type { ProjectResponseDto } from "../types/responseDTOs";
 import {
   AdjustmentsHorizontalIcon,
   ArrowUpTrayIcon,
-  BellIcon,
   ChevronDownIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
@@ -28,6 +27,8 @@ import {
   FolderIcon,
   PresentationChartLineIcon,
   RectangleGroupIcon,
+  SparklesIcon,
+  XMarkIcon,
 } from "@heroicons/react/24/outline";
 
 /* -------------------------------------------------------------------------- */
@@ -36,6 +37,8 @@ import {
 
 interface SideMenuProps {
   onToggle: (isCollapsed: boolean) => void;
+  mobileOpen?: boolean;
+  onMobileClose?: () => void;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -48,7 +51,11 @@ const orgAllowedPaths = ["/organization_management"];
 /*                               SideMenu Component                           */
 /* -------------------------------------------------------------------------- */
 
-const SideMenu: React.FC<SideMenuProps> = ({ onToggle }) => {
+const SideMenu: React.FC<SideMenuProps> = ({
+  onToggle,
+  mobileOpen = false,
+  onMobileClose,
+}) => {
   /* --------------------------------- Hooks -------------------------------- */
 
   const { t } = useLanguage();
@@ -169,6 +176,12 @@ const SideMenu: React.FC<SideMenuProps> = ({ onToggle }) => {
     }
   }, [isOrgPortalRoute]);
 
+  useEffect(() => {
+    if (mobileOpen && !isOrgPortalRoute) {
+      setIsCollapsed(false);
+    }
+  }, [mobileOpen, isOrgPortalRoute]);
+
   /* ------------------------------- Handlers ------------------------------- */
 
   const toggleMenu = () => {
@@ -185,6 +198,7 @@ const SideMenu: React.FC<SideMenuProps> = ({ onToggle }) => {
     });
     setActiveProject(selectedProject);
     router.push(`/project/${selectedProject.id}`);
+    onMobileClose?.();
   };
 
   const handleItemClick = (
@@ -199,6 +213,7 @@ const SideMenu: React.FC<SideMenuProps> = ({ onToggle }) => {
     event.preventDefault();
     setSelectedItem(item);
     router.push(item);
+    onMobileClose?.();
   };
 
   /* -------------------------- Derived / Helpers --------------------------- */
@@ -237,12 +252,26 @@ const SideMenu: React.FC<SideMenuProps> = ({ onToggle }) => {
   /* --------------------------------- Main Render ---------------------------------- */
 
   return (
-    <div className="fixed top-18 bottom-0 left-18 flex z-30">
+    <div
+      className={`fixed top-20 bottom-0 left-0 lg:left-18 flex z-40 transition-transform duration-300 ${
+        mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
+      }`}
+    >
       <aside
         className={`h-full shadow-xl ${
-          isCollapsed ? "w-22" : "w-64"
+          isCollapsed ? "w-22" : "w-[18rem] sm:w-[20rem] lg:w-64"
         } bg-[var(--base-400)] brightness-120 text-primary-content p-4 transition-all duration-300 flex flex-col overflow-y-auto`}
       >
+        <div className="flex justify-end lg:hidden">
+          <button
+            type="button"
+            className="btn btn-ghost btn-xs btn-circle"
+            onClick={() => onMobileClose?.()}
+            aria-label="Close navigation menu"
+          >
+            <XMarkIcon className="size-5" />
+          </button>
+        </div>
         {/* ----------------------------- Projects ---------------------------- */}
         {!isOrgPortalRoute && (
           <div className="mt-5">
@@ -356,6 +385,7 @@ const SideMenu: React.FC<SideMenuProps> = ({ onToggle }) => {
           <li className="mt-2">
             <Link
               href="/upload_center"
+              onClick={() => onMobileClose?.()}
               className={getItemClass("/upload_center")}
             >
               <ArrowUpTrayIcon className="size-6" />
@@ -364,10 +394,12 @@ const SideMenu: React.FC<SideMenuProps> = ({ onToggle }) => {
               )}
             </Link>
           </li>
+
           {/* TimeseriesViewer */}
           <li className="mt-2">
             <Link
               href="/timeseries_viewer"
+              onClick={() => onMobileClose?.()}
               className={getItemClass("/timeseries_viewer")}
             >
               <PresentationChartLineIcon className="size-6" />
@@ -399,12 +431,24 @@ const SideMenu: React.FC<SideMenuProps> = ({ onToggle }) => {
               </Link>
             </li>
           </ProjectAdminRoute>
+
+          {/* Project Insight */}
+          <li className="mt-2">
+            <Link
+              href="/project_insight"
+              onClick={() => onMobileClose?.()}
+              className={getItemClass("/project_insight")}
+            >
+              <SparklesIcon className="size-6" />
+              {!isCollapsed && <p className="ml-2">Insight</p>}
+            </Link>
+          </li>
         </ul>
       </aside>
 
       {/* ---------------------------- Toggle Tab ----------------------------- */}
       <div
-        className="h-8 w-4 bg-base-300 brightness-120 text-primary-content flex items-center justify-center cursor-pointer rounded-r-md mt-16"
+        className="hidden lg:flex h-8 w-4 bg-base-300 brightness-120 text-primary-content items-center justify-center cursor-pointer rounded-r-md mt-16"
         onClick={toggleMenu}
       >
         {isCollapsed ? (

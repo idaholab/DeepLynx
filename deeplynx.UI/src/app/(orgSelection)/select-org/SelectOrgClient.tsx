@@ -167,7 +167,7 @@ const SelectOrgClient = ({ session }: Props) => {
           <div className="card bg-base-100 shadow-xl w-full">
             {/* Header */}
             <div className="card-body p-6">
-              <div className="flex items-center justify-between mb-4">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
                 <div className="flex items-center gap-3">
                   <h2 className="text-xl font-semibold text-base-content">
                     Welcome back, {formatUserName(session.user.name)}
@@ -199,13 +199,15 @@ const SelectOrgClient = ({ session }: Props) => {
                   organizations.map((org) => (
                     <div
                       key={org.id}
-                      className="flex items-center justify-between p-4 hover:bg-base-200 rounded-lg transition-colors"
+                      className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-4 hover:bg-base-200 rounded-lg transition-colors"
                     >
                       {/* Left side - Logo and info */}
-                      <div className="flex items-center gap-4">
+                      <div className="flex items-start sm:items-center gap-4">
                         <AvatarCell name={org.name} />
-                        <div>
-                          <h3 className="font-semibold text-lg text-base-content">{org.name}</h3>
+                        <div className="min-w-0">
+                          <h3 className="font-semibold text-lg text-base-content break-words">
+                            {org.name}
+                          </h3>
                           {org.description && (
                             <p className="text-xs text-base-content/50 mt-1">
                               {org.description}
@@ -226,7 +228,7 @@ const SelectOrgClient = ({ session }: Props) => {
                       </div>
 
                       {/* Right side - Actions */}
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 self-start sm:self-auto">
                         <RoleGate role="sysAdmin">
                           <button className="btn btn-ghost btn-sm btn-circle">
                             <Cog6ToothIcon className="size-6" />

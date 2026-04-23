@@ -45,10 +45,12 @@ import RelatedRecordsCardSkeleton from "./skeletons/RelatedRecordsSkeleton";
 import { getAllSensitivityLabelsProject } from "@/app/lib/client_service/sensitivity_labels_services.client";
 import AddEdgeModal from "./components/AddEdgeModal";
 import ClassSelectorModal from "./components/ClassSelectorModal";
+import RecordInsightChat from "./components/RecordInsightChat";
 import {
   RelatedRecordViewModel,
   useRecordRelationships,
 } from "./hooks/useRecordRelationships";
+import { isInsightSupportedFileType } from "@/app/lib/insight_file_support";
 
 // ============= HELPER FUNCTIONS =============
 interface PropertyRow {
@@ -68,9 +70,7 @@ function parseMaybeJsonArray<T>(value?: string | T[] | null): T[] {
 }
 
 function mapSelectedIds(items: MinimalSelectionItem[]): string[] {
-  return items
-    .filter((item) => item.id != null)
-    .map((item) => String(item.id));
+  return items.filter((item) => item.id != null).map((item) => String(item.id));
 }
 
 function parseNestedProperties(obj: JSON): PropertyRow[] {
@@ -124,6 +124,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
   const [record, setRecord] = useState<HistoricalRecordResponseDto | null>(
     null,
   );
+  const [recordFileType, setRecordFileType] = useState<string | null>(null);
   const [recordClass, setRecordClass] = useState<ClassResponseDto | null>(null);
   const [tags, setTags] = useState<TagResponseDto[]>([]);
   const [selectedTags, setSelectedTags] = useState<TagResponseDto[]>([]);
@@ -222,6 +223,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
 
   const resetAllState = useCallback(() => {
     setRecord(null);
+    setRecordFileType(null);
     setSelectedTags([]);
     setSelectedIds([]);
     setSelectedLabels([]);
@@ -355,10 +357,14 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
           true,
         );
         setRecord(data);
-        const historicalTags =
-          parseMaybeJsonArray<{ id: number | null; name: string }>(data.tags);
-        const historicalLabels =
-          parseMaybeJsonArray<{ id: number | null; name: string }>(data.labels);
+        const historicalTags = parseMaybeJsonArray<{
+          id: number | null;
+          name: string;
+        }>(data.tags);
+        const historicalLabels = parseMaybeJsonArray<{
+          id: number | null;
+          name: string;
+        }>(data.labels);
         setSelectedIds(mapSelectedIds(historicalTags));
         setSelectedLabelIds(mapSelectedIds(historicalLabels));
 
@@ -370,6 +376,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
           true,
         );
 
+        setRecordFileType(liveRecord.fileType ?? null);
         setSelectedIds(mapSelectedIds(liveRecord.tags ?? []));
         setSelectedLabelIds(mapSelectedIds(liveRecord.labels ?? []));
       } catch (error) {
@@ -606,13 +613,19 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
     return <RecordLoading />;
   }
 
+  const isInsightSupported = isInsightSupportedFileType(
+    recordFileType,
+    record?.uri,
+    record?.name,
+  );
+
   const tabs = [
     {
       label: t.translations.RECORD_INFORMATION,
       content: (
-        <div className="flex gap-6 mt-4">
+        <div className="flex flex-col xl:flex-row gap-6 mt-4">
           {/* Left Column - Properties */}
-          <div className="w-full md:w-1/2 space-y-4">
+          <div className="w-full xl:w-1/2 space-y-4">
             <PropertyTable
               title={t.translations.SYSTEM_PROPERTIES}
               rows={systemPropertiesRows}
@@ -631,7 +644,14 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
           </div>
 
           {/* Right Column - Tags & Relations */}
-          <div className="flex-1 space-y-4">
+          <div className="w-full xl:flex-1 space-y-4">
+            {isInsightSupported ? (
+              <RecordInsightChat
+                recordId={record.id}
+                recordName={record.name}
+                recordUri={record.uri}
+              />
+            ) : null}
             {/* Tags Card */}
             <RecordTagsPanel
               tags={tags}
@@ -710,11 +730,13 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
 
   // ============= MAIN RENDER =============
   return (
-    <div className="mr-4">
-      <div className="bg-base-200/40 pl-12 p-4">
-        <h1 className="text-2xl font-bold text-base-content">{record.name}</h1>
+    <div className="mx-3 sm:mx-4 lg:mr-0 lg:ml-0">
+      <div className="bg-base-200/40 px-3 sm:px-6 lg:px-12 p-4">
+        <h1 className="text-xl sm:text-2xl font-bold text-base-content break-words">
+          {record.name}
+        </h1>
         {record.classId ? (
-          <div className="flex gap-2 py-auto items-center">
+          <div className="flex flex-wrap gap-2 py-auto items-center">
             <span className="badge badge-primary">
               {recordClass?.name || <div className="loading size-3" />}
             </span>
@@ -739,7 +761,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
 
       <Tabs
         tabs={tabs}
-        className="ml-6 pt-6"
+        className="pt-6"
         activeTab={tabs[activeTab].label}
         onTabChange={(label) =>
           setActiveTab(tabs.findIndex((tab) => tab.label === label))
