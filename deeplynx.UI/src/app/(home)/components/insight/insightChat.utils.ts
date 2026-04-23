@@ -11,16 +11,23 @@ export function formatInsightTimestamp(): string {
 
 export function buildInsightModelBadges(
   selectedInsightModels: InsightModelSelection,
+  defaultModelLabel: string,
 ): string[] {
   return [
-    selectedInsightModels.queryModelName
-      ? `Q: ${selectedInsightModels.queryModelName}`
-      : null,
-    selectedInsightModels.uploadModelName
-      ? `U: ${selectedInsightModels.uploadModelName}`
-      : null,
-    selectedInsightModels.embeddingModelName
-      ? `E: ${selectedInsightModels.embeddingModelName}`
-      : null,
-  ].filter((badgeLabel): badgeLabel is string => Boolean(badgeLabel));
+    `Q: ${
+      selectedInsightModels.queryModelConfigId === null
+        ? defaultModelLabel
+        : selectedInsightModels.queryModelName ?? defaultModelLabel
+    }`,
+    `U: ${
+      selectedInsightModels.uploadModelConfigId === null
+        ? defaultModelLabel
+        : selectedInsightModels.uploadModelName ?? defaultModelLabel
+    }`,
+    `E: ${
+      selectedInsightModels.embeddingModelConfigId === null
+        ? defaultModelLabel
+        : selectedInsightModels.embeddingModelName ?? defaultModelLabel
+    }`,
+  ];
 }

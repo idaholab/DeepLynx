@@ -14,6 +14,59 @@ function buildProjectAiModelConfigRoute(
   return `/organizations/${organizationId}/projects/${projectId}/ai-model-configs`;
 }
 
+function buildOrganizationAiModelConfigRoute(organizationId: number): string {
+  return `/organizations/${organizationId}/ai-model-configs`;
+}
+
+export async function getOrganizationAiModelConfigs(
+  organizationId: number,
+  hideArchived = true,
+): Promise<AiModelConfigResponseDto[]> {
+  const response = await api.get<AiModelConfigResponseDto[]>(
+    buildOrganizationAiModelConfigRoute(organizationId),
+    { params: { hideArchived } },
+  );
+
+  return response.data;
+}
+
+export async function createOrganizationAiModelConfig(
+  organizationId: number,
+  createModelConfigRequest: CreateAiModelConfigRequestDto,
+): Promise<AiModelConfigResponseDto> {
+  const response = await api.post<AiModelConfigResponseDto>(
+    buildOrganizationAiModelConfigRoute(organizationId),
+    createModelConfigRequest,
+  );
+
+  return response.data;
+}
+
+export async function updateOrganizationAiModelConfig(
+  organizationId: number,
+  aiModelConfigId: number,
+  updateModelConfigRequest: UpdateAiModelConfigRequestDto,
+): Promise<AiModelConfigResponseDto> {
+  const response = await api.put<AiModelConfigResponseDto>(
+    `${buildOrganizationAiModelConfigRoute(organizationId)}/${aiModelConfigId}`,
+    updateModelConfigRequest,
+  );
+
+  return response.data;
+}
+
+export async function archiveOrganizationAiModelConfig(
+  organizationId: number,
+  aiModelConfigId: number,
+  archive = true,
+): Promise<void> {
+  await api.patch(
+    `${buildOrganizationAiModelConfigRoute(organizationId)}/${aiModelConfigId}/archive`,
+    undefined,
+    { params: { archive } },
+  );
+}
+
 export async function getProjectAiModelConfigs(
   organizationId: number,
   projectId: number,
@@ -58,10 +111,11 @@ export async function archiveProjectAiModelConfig(
   organizationId: number,
   projectId: number,
   aiModelConfigId: number,
+  archive = true,
 ): Promise<void> {
   await api.patch(
     `${buildProjectAiModelConfigRoute(organizationId, projectId)}/${aiModelConfigId}/archive`,
     undefined,
-    { params: { archive: true } },
+    { params: { archive } },
   );
 }

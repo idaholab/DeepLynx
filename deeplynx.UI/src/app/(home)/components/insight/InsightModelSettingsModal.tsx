@@ -3,32 +3,21 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   CheckCircleIcon,
+  ExclamationCircleIcon,
   EyeIcon,
   EyeSlashIcon,
-  ExclamationCircleIcon,
-  PencilSquareIcon,
-  PlusIcon,
+  KeyIcon,
   XMarkIcon,
 } from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
 import { useLanguage } from "@/app/contexts/Language";
 import { useRBAC } from "@/app/(home)/rbac/useRBAC";
-import type {
-  AiModelProvider,
-  AiModelType,
-  CreateAiModelConfigRequestDto,
-  UpdateAiModelConfigRequestDto,
-} from "@/app/(home)/types/requestDTOs";
+import type { AiModelType } from "@/app/(home)/types/requestDTOs";
 import type {
   AiModelConfigResponseDto,
   UserModelTokenResponseDto,
 } from "@/app/(home)/types/responseDTOs";
-import {
-  archiveProjectAiModelConfig,
-  createProjectAiModelConfig,
-  getProjectAiModelConfigs,
-  updateProjectAiModelConfig,
-} from "@/app/lib/client_service/ai_model_config_services.client";
+import { getProjectAiModelConfigs } from "@/app/lib/client_service/ai_model_config_services.client";
 import {
   createUserModelToken,
   getUserModelTokens,
@@ -37,7 +26,6 @@ import {
 import type { InsightModelSelection } from "./useInsightModelSelection";
 
 type InsightSelectionSection = "query" | "upload" | "embedding";
-type ModelEditorMode = "create" | "edit";
 
 interface InsightModelSettingsModalProps {
   isOpen: boolean;
@@ -48,83 +36,23 @@ interface InsightModelSettingsModalProps {
   onSaveSelection: (nextSelection: InsightModelSelection) => void;
 }
 
-interface InsightModelConfigFormState {
-  modelName: string;
-  modelType: AiModelType;
-  modelProvider: AiModelProvider;
-  serverUrl: string;
-  requiresToken: boolean;
-  isDefaultConfig: boolean;
-  userToken: string;
-}
-
-interface InsightModelEditorState {
-  editorMode: ModelEditorMode;
-  editingModelConfigId: number | null;
-  formState: InsightModelConfigFormState;
-}
-
 interface InsightModelSelectionCardProps {
   title: string;
   description: string;
-  emptyOptionLabel: string;
+  defaultModelLabel: string;
   availableModelConfigs: AiModelConfigResponseDto[];
   selectedModelConfigId: number | null;
+  selectedModelName: string | null;
+  savedUserTokensByConfigId: Record<number, UserModelTokenResponseDto>;
   onSelectedModelChange: (nextModelConfigId: number | null) => void;
-  onOpenCreateEditor: () => void;
-  onOpenEditEditor: () => void;
+  onOpenTokenEditor: () => void;
 }
 
-const MODEL_PROVIDER_OPTIONS: Array<{
-  label: string;
-  value: AiModelProvider;
-}> = [
-  { label: "OpenAI", value: "openai" },
-  { label: "Anthropic", value: "anthropic" },
-  { label: "HPC", value: "hpc" },
-  { label: "Ollama", value: "ollama" },
-];
-
-const MODEL_TYPE_OPTIONS: Array<{
-  label: string;
-  value: AiModelType;
-}> = [
-  { label: "LLM", value: "llm" },
-  { label: "VLM", value: "vlm" },
-  { label: "Embedding", value: "embedding" },
-];
-
-const DEFAULT_MODEL_CONFIG_FORM_STATE: InsightModelConfigFormState = {
-  modelName: "",
-  modelType: "llm",
-  modelProvider: "openai",
-  serverUrl: "",
-  requiresToken: false,
-  isDefaultConfig: false,
-  userToken: "",
-};
-
-function createEmptyModelConfigFormState(
-  suggestedModelType: AiModelType,
-): InsightModelConfigFormState {
-  return {
-    ...DEFAULT_MODEL_CONFIG_FORM_STATE,
-    modelType: suggestedModelType,
-  };
-}
-
-function getSuggestedModelType(
-  insightSelectionSection: InsightSelectionSection,
-): AiModelType {
-  if (insightSelectionSection === "upload") {
-    return "vlm";
-  }
-
-  if (insightSelectionSection === "embedding") {
-    return "embedding";
-  }
-
-  return "llm";
+interface InsightTokenEditorState {
+  modelConfigId: number;
+  modelName: string;
+  tokenValue: string;
+  tokenStatus: "saved" | "missing";
 }
 
 function getAllowedModelTypes(
@@ -150,9 +78,43 @@ function buildModelConfigOptionLabel(
   return `${aiModelConfig.modelName} (${aiModelConfig.modelType.toUpperCase()} • ${aiModelConfig.modelProvider}) • ${scopeLabel}${defaultLabel}`;
 }
 
+function buildUpdatedSelectionForSection(
+  currentSelection: InsightModelSelection,
+  insightSelectionSection: InsightSelectionSection,
+  selectedModelConfig: AiModelConfigResponseDto | null,
+  defaultModelLabel: string,
+): InsightModelSelection {
+  // A null config id intentionally means "use the backend default Nexus Model".
+  const nextModelConfigId = selectedModelConfig?.id ?? null;
+  const nextModelName = selectedModelConfig?.modelName ?? defaultModelLabel;
+
+  if (insightSelectionSection === "query") {
+    return {
+      ...currentSelection,
+      queryModelConfigId: nextModelConfigId,
+      queryModelName: nextModelName,
+    };
+  }
+
+  if (insightSelectionSection === "upload") {
+    return {
+      ...currentSelection,
+      uploadModelConfigId: nextModelConfigId,
+      uploadModelName: nextModelName,
+    };
+  }
+
+  return {
+    ...currentSelection,
+    embeddingModelConfigId: nextModelConfigId,
+    embeddingModelName: nextModelName,
+  };
+}
+
 function syncSelectedModelNames(
   currentSelection: InsightModelSelection,
   availableModelConfigs: AiModelConfigResponseDto[],
+  defaultModelLabel: string,
 ): InsightModelSelection {
   const queryModelConfig = availableModelConfigs.find(
     (aiModelConfig) => aiModelConfig.id === currentSelection.queryModelConfigId,
@@ -168,82 +130,37 @@ function syncSelectedModelNames(
 
   return {
     queryModelConfigId: queryModelConfig?.id ?? null,
-    queryModelName: queryModelConfig?.modelName ?? null,
+    queryModelName: queryModelConfig?.modelName ?? defaultModelLabel,
     uploadModelConfigId: uploadModelConfig?.id ?? null,
-    uploadModelName: uploadModelConfig?.modelName ?? null,
+    uploadModelName: uploadModelConfig?.modelName ?? defaultModelLabel,
     embeddingModelConfigId: embeddingModelConfig?.id ?? null,
-    embeddingModelName: embeddingModelConfig?.modelName ?? null,
-  };
-}
-
-function buildUpdatedSelectionForSection(
-  currentSelection: InsightModelSelection,
-  insightSelectionSection: InsightSelectionSection,
-  selectedModelConfig: AiModelConfigResponseDto | null,
-): InsightModelSelection {
-  if (insightSelectionSection === "query") {
-    return {
-      ...currentSelection,
-      queryModelConfigId: selectedModelConfig?.id ?? null,
-      queryModelName: selectedModelConfig?.modelName ?? null,
-    };
-  }
-
-  if (insightSelectionSection === "upload") {
-    return {
-      ...currentSelection,
-      uploadModelConfigId: selectedModelConfig?.id ?? null,
-      uploadModelName: selectedModelConfig?.modelName ?? null,
-    };
-  }
-
-  return {
-    ...currentSelection,
-    embeddingModelConfigId: selectedModelConfig?.id ?? null,
-    embeddingModelName: selectedModelConfig?.modelName ?? null,
-  };
-}
-
-function buildModelEditorStateFromSelectedConfig(
-  selectedModelConfig: AiModelConfigResponseDto,
-  draftTokenValuesByConfigId: Record<number, string>,
-  savedUserTokensByConfigId: Record<number, UserModelTokenResponseDto>,
-): InsightModelEditorState {
-  return {
-    editorMode: "edit",
-    editingModelConfigId: selectedModelConfig.projectId
-      ? selectedModelConfig.id
-      : null,
-    formState: {
-      modelName: selectedModelConfig.modelName,
-      modelType: selectedModelConfig.modelType as AiModelType,
-      modelProvider: selectedModelConfig.modelProvider as AiModelProvider,
-      serverUrl: selectedModelConfig.serverUrl,
-      requiresToken: selectedModelConfig.requiresToken,
-      isDefaultConfig: selectedModelConfig.default,
-      userToken:
-        draftTokenValuesByConfigId[selectedModelConfig.id] ??
-        savedUserTokensByConfigId[selectedModelConfig.id]?.token ??
-        "",
-    },
+    embeddingModelName: embeddingModelConfig?.modelName ?? defaultModelLabel,
   };
 }
 
 function InsightModelSelectionCard({
   title,
   description,
-  emptyOptionLabel,
+  defaultModelLabel,
   availableModelConfigs,
   selectedModelConfigId,
+  selectedModelName,
+  savedUserTokensByConfigId,
   onSelectedModelChange,
-  onOpenCreateEditor,
-  onOpenEditEditor,
+  onOpenTokenEditor,
 }: InsightModelSelectionCardProps) {
   const { t } = useLanguage();
   const selectedModelConfig =
     availableModelConfigs.find(
       (aiModelConfig) => aiModelConfig.id === selectedModelConfigId,
     ) ?? null;
+  const activeModelName = selectedModelName ?? defaultModelLabel;
+  const tokenIsSaved = selectedModelConfig
+    ? Boolean(savedUserTokensByConfigId[selectedModelConfig.id])
+    : false;
+  const tokenActionIsEnabled = Boolean(
+    selectedModelConfig?.requiresToken,
+  );
 
   return (
     <div className="rounded-box border border-base-300 bg-base-100 p-4">
@@ -252,25 +169,15 @@ function InsightModelSelectionCard({
           <h4 className="text-base font-semibold text-base-content">{title}</h4>
           <p className="mt-1 text-sm text-base-content/70">{description}</p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            className="btn btn-ghost btn-sm gap-2"
-            onClick={onOpenCreateEditor}
-          >
-            <PlusIcon className="size-4" />
-            {t.translations.INSIGHT_NEW_MODEL}
-          </button>
-          <button
-            type="button"
-            className="btn btn-ghost btn-sm gap-2"
-            onClick={onOpenEditEditor}
-            disabled={!selectedModelConfig}
-          >
-            <PencilSquareIcon className="size-4" />
-            {t.translations.INSIGHT_EDIT_SELECTED_CONFIG}
-          </button>
-        </div>
+        <button
+          type="button"
+          className="btn btn-ghost btn-sm gap-2"
+          onClick={onOpenTokenEditor}
+          disabled={!tokenActionIsEnabled}
+        >
+          <KeyIcon className="size-4" />
+          {t.translations.INSIGHT_MANAGE_TOKEN}
+        </button>
       </div>
 
       <div className="mt-4 form-control">
@@ -282,13 +189,35 @@ function InsightModelSelectionCard({
             onSelectedModelChange(nextValue ? Number(nextValue) : null);
           }}
         >
-          <option value="">{emptyOptionLabel}</option>
+          <option value="">{defaultModelLabel}</option>
           {availableModelConfigs.map((aiModelConfig) => (
             <option key={aiModelConfig.id} value={aiModelConfig.id}>
               {buildModelConfigOptionLabel(aiModelConfig)}
             </option>
           ))}
         </select>
+      </div>
+
+      <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
+        <span className="font-medium text-base-content/70">
+          {t.translations.INSIGHT_ACTIVE_MODEL}:
+        </span>
+        <span className="badge badge-outline">{activeModelName}</span>
+        {selectedModelConfig?.requiresToken ? (
+          tokenIsSaved ? (
+            <span className="badge badge-success badge-outline">
+              {t.translations.INSIGHT_TOKEN_SAVED}
+            </span>
+          ) : (
+            <span className="badge badge-warning badge-outline">
+              {t.translations.INSIGHT_TOKEN_MISSING}
+            </span>
+          )
+        ) : (
+          <span className="badge badge-ghost">
+            {t.translations.INSIGHT_NO_TOKEN_REQUIRED}
+          </span>
+        )}
       </div>
     </div>
   );
@@ -305,6 +234,7 @@ export default function InsightModelSettingsModal({
   const { t } = useLanguage();
   const { user } = useRBAC();
   const currentUserId = user?.id;
+  const defaultModelLabel = t.translations.INSIGHT_NEXUS_MODEL;
   const [availableModelConfigs, setAvailableModelConfigs] = useState<
     AiModelConfigResponseDto[]
   >([]);
@@ -316,23 +246,12 @@ export default function InsightModelSettingsModal({
   >({});
   const [draftInsightModelSelection, setDraftInsightModelSelection] =
     useState<InsightModelSelection>(selectedInsightModels);
-  const [modelEditorMode, setModelEditorMode] =
-    useState<ModelEditorMode>("create");
-  const [editorSelectionSection, setEditorSelectionSection] =
-    useState<InsightSelectionSection>("query");
-  const [editingModelConfigId, setEditingModelConfigId] = useState<
-    number | null
-  >(null);
-  const [isModelEditorVisible, setIsModelEditorVisible] = useState(false);
-  const [modelConfigFormState, setModelConfigFormState] =
-    useState<InsightModelConfigFormState>(
-      createEmptyModelConfigFormState("llm"),
-    );
-  const [isLoadingModelSettings, setIsLoadingModelSettings] = useState(false);
-  const [isSavingModelConfig, setIsSavingModelConfig] = useState(false);
-  const [isArchivingModelConfig, setIsArchivingModelConfig] = useState(false);
-  const [modelConfigSaveError, setModelConfigSaveError] = useState("");
+  const [activeTokenEditor, setActiveTokenEditor] =
+    useState<InsightTokenEditorState | null>(null);
   const [isEditorTokenVisible, setIsEditorTokenVisible] = useState(false);
+  const [isLoadingModelSettings, setIsLoadingModelSettings] = useState(false);
+  const [isSavingUserToken, setIsSavingUserToken] = useState(false);
+  const [tokenSaveError, setTokenSaveError] = useState("");
 
   const queryModelConfigs = useMemo(
     () =>
@@ -361,6 +280,7 @@ export default function InsightModelSettingsModal({
       ),
     [availableModelConfigs],
   );
+
   const selectedModelConfigsMissingTokens = useMemo(() => {
     const selectedModelConfigIds = [
       draftInsightModelSelection.queryModelConfigId,
@@ -381,6 +301,8 @@ export default function InsightModelSettingsModal({
       .filter((aiModelConfig): aiModelConfig is AiModelConfigResponseDto =>
         Boolean(aiModelConfig),
       )
+      // Keep the config template visible in the dropdown, but do not let the user
+      // assign it as an active model until their personal token is saved.
       .filter(
         (aiModelConfig) =>
           aiModelConfig.requiresToken &&
@@ -393,6 +315,7 @@ export default function InsightModelSettingsModal({
     draftInsightModelSelection.uploadModelConfigId,
     savedUserTokensByConfigId,
   ]);
+
   const modelSelectionSections = [
     {
       sectionKey: "query" as const,
@@ -400,6 +323,7 @@ export default function InsightModelSettingsModal({
       description: t.translations.INSIGHT_QUERY_MODEL_DESCRIPTION,
       availableModelConfigs: queryModelConfigs,
       selectedModelConfigId: draftInsightModelSelection.queryModelConfigId,
+      selectedModelName: draftInsightModelSelection.queryModelName,
     },
     {
       sectionKey: "upload" as const,
@@ -407,14 +331,15 @@ export default function InsightModelSettingsModal({
       description: t.translations.INSIGHT_UPLOAD_MODEL_DESCRIPTION,
       availableModelConfigs: uploadModelConfigs,
       selectedModelConfigId: draftInsightModelSelection.uploadModelConfigId,
+      selectedModelName: draftInsightModelSelection.uploadModelName,
     },
     {
       sectionKey: "embedding" as const,
       title: t.translations.INSIGHT_EMBEDDING_MODEL,
       description: t.translations.INSIGHT_EMBEDDING_MODEL_DESCRIPTION,
       availableModelConfigs: embeddingModelConfigs,
-      selectedModelConfigId:
-        draftInsightModelSelection.embeddingModelConfigId,
+      selectedModelConfigId: draftInsightModelSelection.embeddingModelConfigId,
+      selectedModelName: draftInsightModelSelection.embeddingModelName,
     },
   ];
 
@@ -423,15 +348,24 @@ export default function InsightModelSettingsModal({
       return;
     }
 
-    setDraftInsightModelSelection(selectedInsightModels);
-    setModelEditorMode("create");
-    setEditorSelectionSection("query");
-    setEditingModelConfigId(null);
-    setIsModelEditorVisible(false);
-    setModelConfigFormState(createEmptyModelConfigFormState("llm"));
-    setModelConfigSaveError("");
+    // Reset the modal from the persisted selection each time it opens so
+    // unsaved edits do not leak between sessions.
+    setDraftInsightModelSelection(
+      syncSelectedModelNames(
+        selectedInsightModels,
+        availableModelConfigs,
+        defaultModelLabel,
+      ),
+    );
+    setActiveTokenEditor(null);
     setIsEditorTokenVisible(false);
-  }, [isOpen, selectedInsightModels]);
+    setTokenSaveError("");
+  }, [
+    availableModelConfigs,
+    defaultModelLabel,
+    isOpen,
+    selectedInsightModels,
+  ]);
 
   useEffect(() => {
     if (!isOpen || !organizationId || !projectId || !currentUserId) {
@@ -458,7 +392,11 @@ export default function InsightModelSettingsModal({
 
         setAvailableModelConfigs(loadedModelConfigs);
         setDraftInsightModelSelection((currentSelection) =>
-          syncSelectedModelNames(currentSelection, loadedModelConfigs),
+          syncSelectedModelNames(
+            currentSelection,
+            loadedModelConfigs,
+            defaultModelLabel,
+          ),
         );
         setSavedUserTokensByConfigId(
           Object.fromEntries(
@@ -495,11 +433,18 @@ export default function InsightModelSettingsModal({
     };
   }, [
     currentUserId,
+    defaultModelLabel,
     isOpen,
     organizationId,
     projectId,
     t.translations.INSIGHT_MODEL_CONFIGS_FAILED,
   ]);
+
+  function closeTokenEditor() {
+    setActiveTokenEditor(null);
+    setTokenSaveError("");
+    setIsEditorTokenVisible(false);
+  }
 
   function updateDraftSelection(
     insightSelectionSection: InsightSelectionSection,
@@ -515,211 +460,86 @@ export default function InsightModelSettingsModal({
         currentSelection,
         insightSelectionSection,
         nextModelConfig,
+        defaultModelLabel,
       ),
     );
-  }
 
-  function closeModelEditor() {
-    setIsModelEditorVisible(false);
-    setModelConfigSaveError("");
-    setIsEditorTokenVisible(false);
-  }
-
-  function openCreateModelEditor(
-    insightSelectionSection: InsightSelectionSection,
-  ) {
-    const suggestedModelType = getSuggestedModelType(insightSelectionSection);
-
-    setModelEditorMode("create");
-    setEditorSelectionSection(insightSelectionSection);
-    setEditingModelConfigId(null);
-    setIsModelEditorVisible(true);
-    setModelConfigFormState(
-      createEmptyModelConfigFormState(suggestedModelType),
-    );
-    setModelConfigSaveError("");
-    setIsEditorTokenVisible(false);
-  }
-
-  function openEditModelEditor(
-    insightSelectionSection: InsightSelectionSection,
-    selectedModelConfig: AiModelConfigResponseDto,
-  ) {
-    const nextEditorState = buildModelEditorStateFromSelectedConfig(
-      selectedModelConfig,
-      draftTokenValuesByConfigId,
-      savedUserTokensByConfigId,
-    );
-
-    setModelEditorMode(nextEditorState.editorMode);
-    setEditorSelectionSection(insightSelectionSection);
-    setEditingModelConfigId(nextEditorState.editingModelConfigId);
-    setIsModelEditorVisible(true);
-    setModelConfigFormState(nextEditorState.formState);
-    setModelConfigSaveError("");
-    setIsEditorTokenVisible(false);
-  }
-
-  async function refreshAvailableModelConfigs() {
-    if (!organizationId || !projectId) {
-      return [] as AiModelConfigResponseDto[];
+    if (activeTokenEditor?.modelConfigId === nextModelConfigId) {
+      return;
     }
 
-    const refreshedModelConfigs = await getProjectAiModelConfigs(
-      organizationId,
-      projectId,
-    );
-    setAvailableModelConfigs(refreshedModelConfigs);
-    setDraftInsightModelSelection((currentSelection) =>
-      syncSelectedModelNames(currentSelection, refreshedModelConfigs),
-    );
-    return refreshedModelConfigs;
+    closeTokenEditor();
   }
 
-  async function upsertUserTokenForModelConfig(
-    aiModelConfigId: number,
-    tokenValue: string,
-  ) {
-    if (!currentUserId) {
-      throw new Error(t.translations.INSIGHT_CURRENT_USER_REQUIRED);
-    }
-
-    const existingUserToken = savedUserTokensByConfigId[aiModelConfigId];
-    if (existingUserToken) {
-      return updateUserModelToken(currentUserId, existingUserToken.id, {
-        token: tokenValue,
-      });
-    }
-
-    return createUserModelToken(currentUserId, {
-      aiModelConfigId,
-      token: tokenValue,
+  function openTokenEditor(modelConfig: AiModelConfigResponseDto) {
+    setActiveTokenEditor({
+      modelConfigId: modelConfig.id,
+      modelName: modelConfig.modelName,
+      tokenValue:
+        draftTokenValuesByConfigId[modelConfig.id] ??
+        savedUserTokensByConfigId[modelConfig.id]?.token ??
+        "",
+      tokenStatus: savedUserTokensByConfigId[modelConfig.id]
+        ? "saved"
+        : "missing",
     });
+    setTokenSaveError("");
+    setIsEditorTokenVisible(false);
   }
 
-  async function handleSaveModelConfig() {
-    if (!organizationId || !projectId) {
-      setModelConfigSaveError(t.translations.INSIGHT_PROJECT_CONTEXT_REQUIRED);
+  async function handleSaveUserToken() {
+    if (!currentUserId || !activeTokenEditor) {
       return;
     }
 
-    if (
-      !modelConfigFormState.modelName.trim() ||
-      !modelConfigFormState.serverUrl.trim()
-    ) {
-      setModelConfigSaveError(
-        t.translations.INSIGHT_MODEL_CONFIG_REQUIRED_FIELDS,
-      );
+    const trimmedTokenValue = activeTokenEditor.tokenValue.trim();
+    if (!trimmedTokenValue) {
+      setTokenSaveError(t.translations.INSIGHT_TOKEN_REQUIRED);
       return;
     }
 
-    const createModelConfigRequest: CreateAiModelConfigRequestDto = {
-      model_name: modelConfigFormState.modelName.trim(),
-      model_provider: modelConfigFormState.modelProvider,
-      model_type: modelConfigFormState.modelType,
-      server_url: modelConfigFormState.serverUrl.trim(),
-      requires_token: modelConfigFormState.requiresToken,
-      default: modelConfigFormState.isDefaultConfig,
-    };
-    const updateModelConfigRequest: UpdateAiModelConfigRequestDto = {
-      model_name: modelConfigFormState.modelName.trim(),
-      model_type: modelConfigFormState.modelType,
-      server_url: modelConfigFormState.serverUrl.trim(),
-      requires_token: modelConfigFormState.requiresToken,
-      default: modelConfigFormState.isDefaultConfig,
-    };
-
-    setIsSavingModelConfig(true);
-    setModelConfigSaveError("");
+    setIsSavingUserToken(true);
+    setTokenSaveError("");
 
     try {
-      // Organization-scoped selections still open in "edit" mode for the user,
-      // but they save as a new project-scoped config because there is no project id to update.
-      const savedModelConfig =
-        modelEditorMode === "edit" && editingModelConfigId
-          ? await updateProjectAiModelConfig(
-              organizationId,
-              projectId,
-              editingModelConfigId,
-              updateModelConfigRequest,
-            )
-          : await createProjectAiModelConfig(
-              organizationId,
-              projectId,
-              createModelConfigRequest,
-            );
+      const existingUserToken =
+        savedUserTokensByConfigId[activeTokenEditor.modelConfigId];
+      const savedUserToken = existingUserToken
+        ? await updateUserModelToken(currentUserId, existingUserToken.id, {
+            token: trimmedTokenValue,
+          })
+        : await createUserModelToken(currentUserId, {
+            aiModelConfigId: activeTokenEditor.modelConfigId,
+            token: trimmedTokenValue,
+          });
 
-      const refreshedModelConfigs = await refreshAvailableModelConfigs();
-
-      if (
-        savedModelConfig.requiresToken &&
-        modelConfigFormState.userToken.trim().length > 0
-      ) {
-        const savedUserToken = await upsertUserTokenForModelConfig(
-          savedModelConfig.id,
-          modelConfigFormState.userToken.trim(),
-        );
-        setSavedUserTokensByConfigId((currentTokens) => ({
-          ...currentTokens,
-          [savedUserToken.aiModelConfigId]: savedUserToken,
-        }));
-        setDraftTokenValuesByConfigId((currentValues) => ({
-          ...currentValues,
-          [savedUserToken.aiModelConfigId]: savedUserToken.token,
-        }));
-      }
-
-      const refreshedSavedModelConfig =
-        refreshedModelConfigs.find(
-          (aiModelConfig) => aiModelConfig.id === savedModelConfig.id,
-        ) ?? savedModelConfig;
-      setDraftInsightModelSelection((currentSelection) =>
-        buildUpdatedSelectionForSection(
-          currentSelection,
-          editorSelectionSection,
-          refreshedSavedModelConfig,
-        ),
+      setSavedUserTokensByConfigId((currentTokens) => ({
+        ...currentTokens,
+        [savedUserToken.aiModelConfigId]: savedUserToken,
+      }));
+      setDraftTokenValuesByConfigId((currentValues) => ({
+        ...currentValues,
+        [savedUserToken.aiModelConfigId]: savedUserToken.token,
+      }));
+      setActiveTokenEditor((currentEditorState) =>
+        currentEditorState
+          ? {
+              ...currentEditorState,
+              tokenValue: savedUserToken.token,
+              tokenStatus: "saved",
+            }
+          : null,
       );
-      openEditModelEditor(editorSelectionSection, savedModelConfig);
-      toast.success(t.translations.INSIGHT_MODEL_CONFIG_SAVED);
+      toast.success(t.translations.INSIGHT_TOKEN_SAVED);
     } catch (error) {
-      console.error("Failed to save Insight model config:", error);
-      setModelConfigSaveError(
+      console.error("Failed to save Insight user token:", error);
+      setTokenSaveError(
         error instanceof Error
           ? error.message
           : t.translations.INSIGHT_UNKNOWN_ERROR,
       );
     } finally {
-      setIsSavingModelConfig(false);
-    }
-  }
-
-  async function handleArchiveModelConfig() {
-    if (!organizationId || !projectId || !editingModelConfigId) {
-      return;
-    }
-
-    setIsArchivingModelConfig(true);
-    setModelConfigSaveError("");
-
-    try {
-      await archiveProjectAiModelConfig(
-        organizationId,
-        projectId,
-        editingModelConfigId,
-      );
-      await refreshAvailableModelConfigs();
-      closeModelEditor();
-      toast.success(t.translations.INSIGHT_MODEL_CONFIG_ARCHIVED);
-    } catch (error) {
-      console.error("Failed to archive Insight model config:", error);
-      setModelConfigSaveError(
-        error instanceof Error
-          ? error.message
-          : t.translations.INSIGHT_UNKNOWN_ERROR,
-      );
-    } finally {
-      setIsArchivingModelConfig(false);
+      setIsSavingUserToken(false);
     }
   }
 
@@ -761,23 +581,22 @@ export default function InsightModelSettingsModal({
                     key={modelSelectionSection.sectionKey}
                     title={modelSelectionSection.title}
                     description={modelSelectionSection.description}
-                    emptyOptionLabel={t.translations.INSIGHT_NO_MODEL_SELECTED}
+                    defaultModelLabel={defaultModelLabel}
                     availableModelConfigs={
                       modelSelectionSection.availableModelConfigs
                     }
                     selectedModelConfigId={
                       modelSelectionSection.selectedModelConfigId
                     }
+                    selectedModelName={modelSelectionSection.selectedModelName}
+                    savedUserTokensByConfigId={savedUserTokensByConfigId}
                     onSelectedModelChange={(nextModelConfigId) =>
                       updateDraftSelection(
                         modelSelectionSection.sectionKey,
                         nextModelConfigId,
                       )
                     }
-                    onOpenCreateEditor={() =>
-                      openCreateModelEditor(modelSelectionSection.sectionKey)
-                    }
-                    onOpenEditEditor={() => {
+                    onOpenTokenEditor={() => {
                       const selectedModelConfig =
                         modelSelectionSection.availableModelConfigs.find(
                           (aiModelConfig) =>
@@ -785,279 +604,113 @@ export default function InsightModelSettingsModal({
                             modelSelectionSection.selectedModelConfigId,
                         );
 
-                      if (selectedModelConfig) {
-                        openEditModelEditor(
-                          modelSelectionSection.sectionKey,
-                          selectedModelConfig,
-                        );
+                      if (selectedModelConfig?.requiresToken) {
+                        openTokenEditor(selectedModelConfig);
                       }
                     }}
                   />
                 ))}
               </div>
 
-              {isModelEditorVisible ? (
+              {activeTokenEditor ? (
                 <div className="rounded-box border border-base-300 bg-base-100">
                   <div className="border-b border-base-300 px-5 py-4">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <div>
-                        <h4 className="text-lg font-semibold text-base-content">
-                          {modelEditorMode === "edit"
-                            ? t.translations.INSIGHT_EDIT_MODEL_CONFIG
-                            : t.translations.INSIGHT_CREATE_MODEL_CONFIG}
-                        </h4>
-                        <p className="mt-1 text-sm text-base-content/70">
-                          {modelEditorMode === "edit"
-                            ? t.translations.INSIGHT_EDIT_MODEL_EDITOR_DESCRIPTION
-                            : t.translations.INSIGHT_MODEL_EDITOR_DESCRIPTION}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {modelEditorMode === "edit" ? (
-                          <span className="badge badge-outline">
-                            {t.translations.INSIGHT_EDITING_EXISTING_CONFIG}
-                          </span>
-                        ) : null}
-                      </div>
+                    <h4 className="text-lg font-semibold text-base-content">
+                      {t.translations.INSIGHT_MANAGE_TOKEN}
+                    </h4>
+                    <p className="mt-1 text-sm text-base-content/70">
+                      {activeTokenEditor.tokenStatus === "saved"
+                        ? t.translations.INSIGHT_TOKEN_SAVED_DESCRIPTION
+                        : t.translations.INSIGHT_TOKEN_REQUIRED}
+                    </p>
+                    <div className="mt-3">
+                      <span className="badge badge-outline">
+                        {activeTokenEditor.modelName}
+                      </span>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 gap-4 p-5 lg:grid-cols-2">
+                  <div className="space-y-4 p-5">
+                    {/* Tokens remain user-scoped. Model templates stay at org/project scope. */}
                     <label className="form-control">
-                      <span className="label-text mb-2 mr-2">
-                        {t.translations.INSIGHT_MODEL_NAME}
+                      <span className="label-text mb-2">
+                        {t.translations.INSIGHT_USER_TOKEN}
                       </span>
-                      <input
-                        type="text"
-                        className="input input-bordered"
-                        placeholder={
-                          t.translations.INSIGHT_MODEL_NAME_PLACEHOLDER
-                        }
-                        value={modelConfigFormState.modelName}
-                        onChange={(event) =>
-                          setModelConfigFormState((currentFormState) => ({
-                            ...currentFormState,
-                            modelName: event.target.value,
-                          }))
-                        }
-                      />
-                    </label>
-
-                    <label className="form-control">
-                      <span className="label-text mb-2 mr-2">
-                        {t.translations.INSIGHT_MODEL_PROVIDER}
-                      </span>
-                      <select
-                        className="select select-bordered"
-                        value={modelConfigFormState.modelProvider}
-                        onChange={(event) =>
-                          setModelConfigFormState((currentFormState) => ({
-                            ...currentFormState,
-                            modelProvider: event.target
-                              .value as AiModelProvider,
-                          }))
-                        }
-                        disabled={modelEditorMode === "edit"}
-                      >
-                        {MODEL_PROVIDER_OPTIONS.map((modelProviderOption) => (
-                          <option
-                            key={modelProviderOption.value}
-                            value={modelProviderOption.value}
-                          >
-                            {modelProviderOption.label}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-
-                    <label className="form-control">
-                      <span className="label-text mb-2 mr-2">
-                        {t.translations.INSIGHT_MODEL_TYPE}
-                      </span>
-                      <select
-                        className="select select-bordered"
-                        value={modelConfigFormState.modelType}
-                        onChange={(event) =>
-                          setModelConfigFormState((currentFormState) => ({
-                            ...currentFormState,
-                            modelType: event.target.value as AiModelType,
-                          }))
-                        }
-                      >
-                        {MODEL_TYPE_OPTIONS.map((modelTypeOption) => (
-                          <option
-                            key={modelTypeOption.value}
-                            value={modelTypeOption.value}
-                          >
-                            {modelTypeOption.label}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-
-                    <label className="form-control">
-                      <span className="label-text mb-2 mr-2">
-                        {t.translations.INSIGHT_SERVER_URL}
-                      </span>
-                      <input
-                        type="text"
-                        className="input input-bordered"
-                        placeholder={
-                          t.translations.INSIGHT_SERVER_URL_PLACEHOLDER
-                        }
-                        value={modelConfigFormState.serverUrl}
-                        onChange={(event) =>
-                          setModelConfigFormState((currentFormState) => ({
-                            ...currentFormState,
-                            serverUrl: event.target.value,
-                          }))
-                        }
-                      />
-                    </label>
-
-                    <label className="form-control rounded-box border border-base-300 p-4">
-                      <span className="label cursor-pointer justify-start gap-3">
+                      <div className="join w-full">
                         <input
-                          type="checkbox"
-                          className="checkbox checkbox-primary"
-                          checked={modelConfigFormState.requiresToken}
+                          type={isEditorTokenVisible ? "text" : "password"}
+                          className="input input-bordered join-item w-full"
+                          placeholder={
+                            t.translations.INSIGHT_USER_TOKEN_PLACEHOLDER
+                          }
+                          value={activeTokenEditor.tokenValue}
                           onChange={(event) =>
-                            setModelConfigFormState((currentFormState) => ({
-                              ...currentFormState,
-                              requiresToken: event.target.checked,
-                              userToken: event.target.checked
-                                ? currentFormState.userToken
-                                : "",
-                            }))
+                            setActiveTokenEditor((currentEditorState) =>
+                              currentEditorState
+                                ? {
+                                    ...currentEditorState,
+                                    tokenValue: event.target.value,
+                                  }
+                                : null,
+                            )
                           }
                         />
-                        <span className="label-text font-medium">
-                          {t.translations.INSIGHT_REQUIRES_TOKEN}
-                        </span>
-                      </span>
-                    </label>
-
-                    <label className="form-control rounded-box border border-base-300 p-4">
-                      <span className="label cursor-pointer justify-start gap-3">
-                        <input
-                          type="checkbox"
-                          className="checkbox checkbox-primary"
-                          checked={modelConfigFormState.isDefaultConfig}
-                          onChange={(event) =>
-                            setModelConfigFormState((currentFormState) => ({
-                              ...currentFormState,
-                              isDefaultConfig: event.target.checked,
-                            }))
+                        <button
+                          type="button"
+                          className="btn btn-outline join-item"
+                          onClick={() =>
+                            setIsEditorTokenVisible(
+                              (currentIsEditorTokenVisible) =>
+                                !currentIsEditorTokenVisible,
+                            )
                           }
-                        />
-                        <span className="label-text font-medium">
-                          {t.translations.INSIGHT_DEFAULT_MODEL}
-                        </span>
-                      </span>
+                          title={t.translations.INSIGHT_TOGGLE_TOKEN_VISIBILITY}
+                          aria-label={
+                            t.translations.INSIGHT_TOGGLE_TOKEN_VISIBILITY
+                          }
+                        >
+                          {isEditorTokenVisible ? (
+                            <EyeSlashIcon className="size-4" />
+                          ) : (
+                            <EyeIcon className="size-4" />
+                          )}
+                        </button>
+                      </div>
                     </label>
 
-                    {modelConfigFormState.requiresToken ? (
-                      <label className="form-control lg:col-span-2">
-                        <span className="label-text mb-2">
-                          {t.translations.INSIGHT_USER_TOKEN}
-                        </span>
-                        <div className="join w-full">
-                          <input
-                            type={isEditorTokenVisible ? "text" : "password"}
-                            className="input input-bordered join-item w-full"
-                            placeholder={
-                              t.translations.INSIGHT_USER_TOKEN_PLACEHOLDER
-                            }
-                            value={modelConfigFormState.userToken}
-                            onChange={(event) =>
-                              setModelConfigFormState((currentFormState) => ({
-                                ...currentFormState,
-                                userToken: event.target.value,
-                              }))
-                            }
-                          />
-                          <button
-                            type="button"
-                            className="btn btn-outline join-item"
-                            onClick={() =>
-                              setIsEditorTokenVisible(
-                                (currentIsEditorTokenVisible) =>
-                                  !currentIsEditorTokenVisible,
-                              )
-                            }
-                            title={
-                              t.translations.INSIGHT_TOGGLE_TOKEN_VISIBILITY
-                            }
-                            aria-label={
-                              t.translations.INSIGHT_TOGGLE_TOKEN_VISIBILITY
-                            }
-                          >
-                            {isEditorTokenVisible ? (
-                              <EyeSlashIcon className="size-4" />
-                            ) : (
-                              <EyeIcon className="size-4" />
-                            )}
-                          </button>
-                        </div>
-                      </label>
+                    {tokenSaveError ? (
+                      <div className="alert alert-error">
+                        <ExclamationCircleIcon className="size-5" />
+                        <span>{tokenSaveError}</span>
+                      </div>
                     ) : null}
                   </div>
 
-                  {modelConfigSaveError ? (
-                    <div className="px-5 pb-5">
-                      <div className="alert alert-error">
-                        <ExclamationCircleIcon className="size-5" />
-                        <span>{modelConfigSaveError}</span>
-                      </div>
-                    </div>
-                  ) : null}
-
                   <div className="border-t border-base-300 px-5 py-4">
-                    <div className="flex items-center justify-between gap-3">
-                      <div>
-                        {modelEditorMode === "edit" && editingModelConfigId ? (
-                          <button
-                            type="button"
-                            className="btn btn-error btn-outline"
-                            onClick={() => {
-                              void handleArchiveModelConfig();
-                            }}
-                            disabled={isSavingModelConfig || isArchivingModelConfig}
-                          >
-                            {isArchivingModelConfig ? (
-                              <span className="loading loading-spinner loading-sm" />
-                            ) : null}
-                            {t.translations.INSIGHT_ARCHIVE_MODEL_CONFIG}
-                          </button>
-                        ) : null}
-                      </div>
-                      <div className="flex justify-end gap-3">
-                        <button
-                          type="button"
-                          className="btn btn-ghost"
-                          onClick={closeModelEditor}
-                          disabled={isSavingModelConfig || isArchivingModelConfig}
-                        >
-                          {t.translations.CANCEL}
-                        </button>
+                    <div className="flex justify-end gap-3">
+                      <button
+                        type="button"
+                        className="btn btn-ghost"
+                        onClick={closeTokenEditor}
+                        disabled={isSavingUserToken}
+                      >
+                        {t.translations.CANCEL}
+                      </button>
                       <button
                         type="button"
                         className="btn btn-primary gap-2"
-                        disabled={isSavingModelConfig || isArchivingModelConfig}
+                        disabled={isSavingUserToken}
                         onClick={() => {
-                          void handleSaveModelConfig();
+                          void handleSaveUserToken();
                         }}
                       >
-                        {isSavingModelConfig ? (
+                        {isSavingUserToken ? (
                           <span className="loading loading-spinner loading-sm" />
                         ) : (
                           <CheckCircleIcon className="size-4" />
                         )}
-                        {modelEditorMode === "edit"
-                          ? t.translations.SAVE_CHANGES
-                          : t.translations.CREATE}
+                        {t.translations.SAVE_CHANGES}
                       </button>
-                      </div>
                     </div>
                   </div>
                 </div>
@@ -1086,7 +739,14 @@ export default function InsightModelSettingsModal({
                 toast.error(t.translations.INSIGHT_TOKENS_REQUIRED_BEFORE_SAVE);
                 return;
               }
-              onSaveSelection(draftInsightModelSelection);
+
+              onSaveSelection(
+                syncSelectedModelNames(
+                  draftInsightModelSelection,
+                  availableModelConfigs,
+                  defaultModelLabel,
+                ),
+              );
               onClose();
             }}
             disabled={selectedModelConfigsMissingTokens.length > 0}

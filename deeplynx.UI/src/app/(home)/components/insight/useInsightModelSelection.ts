@@ -14,6 +14,7 @@ export interface InsightModelSelection {
 }
 
 export const EMPTY_INSIGHT_MODEL_SELECTION: InsightModelSelection = {
+  // Null config ids mean "use the backend default Nexus Model" for that role.
   queryModelConfigId: null,
   queryModelName: null,
   uploadModelConfigId: null,

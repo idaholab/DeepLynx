@@ -112,6 +112,10 @@ const RecordInsightChat: React.FC<RecordInsightChatProps> = ({
   const [messages, setMessages] = useState<InsightMessage[]>([]);
   const { selectedInsightModels, setSelectedInsightModels } =
     useInsightModelSelection(organizationId, projectId);
+  const selectedModelBadges = buildInsightModelBadges(
+    selectedInsightModels,
+    t.translations.INSIGHT_NEXUS_MODEL,
+  );
 
   function createMessage(role: InsightRole, content: string): InsightMessage {
     return {
@@ -421,8 +425,6 @@ const RecordInsightChat: React.FC<RecordInsightChatProps> = ({
   );
   const hasStartedConversation = messages.length > 1 || isResponding;
   const visibleMessages = hasStartedConversation ? messages.slice(1) : [];
-  const selectedModelBadges = buildInsightModelBadges(selectedInsightModels);
-
   return (
     <div className="card bg-base-100 shadow-md mt-4 p-2">
       <div className="flex items-center justify-between gap-3 px-4 py-1">

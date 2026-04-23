@@ -73,7 +73,10 @@ export default function ProjectInsightChat({
       ),
     [projectName, scopeCount, t.translations],
   );
-  const selectedModelBadges = buildInsightModelBadges(selectedInsightModels);
+  const selectedModelBadges = buildInsightModelBadges(
+    selectedInsightModels,
+    t.translations.INSIGHT_NEXUS_MODEL,
+  );
 
   useEffect(() => {
     messageIdRef.current = 1;

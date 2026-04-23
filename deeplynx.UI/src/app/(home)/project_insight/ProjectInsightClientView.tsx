@@ -7,11 +7,6 @@ import type {
   DataSourceResponseDto,
   TagResponseDto,
 } from "@/app/(home)/types/responseDTOs";
-import type {
-  ClassResponseDto,
-  DataSourceResponseDto,
-  TagResponseDto,
-} from "@/app/(home)/types/responseDTOs";
 import { useLanguage } from "@/app/contexts/Language";
 import { useOrganizationSession } from "@/app/contexts/OrganizationSessionProvider";
 import { useProjectSession } from "@/app/contexts/ProjectSessionProvider";
