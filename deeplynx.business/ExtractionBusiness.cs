@@ -285,7 +285,7 @@ public class ExtractionBusiness : IExtractionBusiness
     public async Task<List<OntologySimilarityResultDto>> SearchOntologySimilarity(
         long recordId,
         long projectId,
-        int limit = 5,
+        int limit = 20,
         string? termType = null)
     {
         return await _context.Database
