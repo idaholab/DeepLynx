@@ -729,9 +729,12 @@ spec:
             - name: STORAGE_BASE_DIR
               value: "/data/insight"
           resources:
+            requests:
+              memory: "512Mi"
+              cpu: "1500m"
             limits:
               memory: "4Gi"
-              cpu: "1500m"
+              cpu: "4000m"
           volumeMounts:
             - name: nexus-storage
               mountPath: /data/duckdb
