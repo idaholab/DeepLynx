@@ -59,7 +59,7 @@ public class LatticeOrchestrationBusiness : ILatticeOrchestrationBusiness
                      ?? throw new InvalidOperationException($"Record {recordId} not found in project {projectId}");
 
         // For strict mode, embeddings must exist before triggering. If they're missing, queue
-        // them automatically and fail fast so the caller can retry once they're ready.
+        // them automatically and fail fast so the user can retry once they're ready.
         if (mode == ExtractionMode.Strict)
             await EnsureEmbeddingsReady(currentUserId, organizationId, projectId, recordId, record);
 
