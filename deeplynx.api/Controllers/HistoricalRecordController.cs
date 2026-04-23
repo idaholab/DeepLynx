@@ -55,9 +55,12 @@ public class HistoricalRecordController : ControllerBase
         try
         {
             var currentUserId = UserContextStorage.UserId;
+            var isSysAdmin = UserContextStorage.IsSysAdmin;
+            var isOrgAdmin = UserContextStorage.IsOrgAdmin;
+            var isProjectAdmin = UserContextStorage.IsProjectAdmin;
             var records =
                 await _historicalRecordBusiness.GetAllHistoricalRecords(
-                    currentUserId, projectId, organizationId, dataSourceId, pointInTime, hideArchived);
+                    currentUserId, projectId, organizationId, dataSourceId, pointInTime, hideArchived, isSysAdmin, isOrgAdmin, isProjectAdmin);
             return Ok(records);
         }
         catch (Exception exc)

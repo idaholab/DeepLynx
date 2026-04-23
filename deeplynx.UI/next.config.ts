@@ -10,6 +10,7 @@ const nextConfig: NextConfig = {
   // env: {
   //   CUSTOM_KEY: process.env.CUSTOM_KEY,
   // },
+  output: 'standalone',
 };
 
 export default nextConfig;

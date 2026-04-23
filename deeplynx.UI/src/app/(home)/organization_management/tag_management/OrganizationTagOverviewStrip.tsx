@@ -9,34 +9,36 @@ import {
 import { useLanguage } from "@/app/contexts/Language";
 
 interface Props {
-  labelCount: number;
-  projectsWithLabels: number;
-  tagCount: number;
-  projectsWithTags: number;
-  tagsLocked: boolean;
-  labelsLocked: boolean;
+  sensitivityLabelCount: number;
+  projectsWithSensitivityLabelsCount: number;
+  organizationTagCount: number;
+  projectsWithTagsCount: number;
+  organizationTagsLocked: boolean;
+  organizationLabelsLocked: boolean;
 }
 
-const TagOverviewStrip: React.FC<Props> = ({
-  labelCount,
-  projectsWithLabels,
-  tagCount,
-  projectsWithTags,
-  tagsLocked,
-  labelsLocked,
+const OrganizationTagOverviewStrip: React.FC<Props> = ({
+  sensitivityLabelCount,
+  projectsWithSensitivityLabelsCount,
+  organizationTagCount,
+  projectsWithTagsCount,
+  organizationTagsLocked,
+  organizationLabelsLocked,
 }) => {
   const { t } = useLanguage();
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-6">
-      {/* Security Labels */}
       <div className="stat bg-base-100 shadow-lg rounded-xl">
         <div className="stat-title flex items-center gap-1 text-xs">
           <ShieldCheckIcon className="w-4 h-4 text-secondary" />
-          {t.translations.ORG_SECURITY_LABELS}
+          {t.translations.SENSITIVITY_LABELS}
         </div>
-        <div className="stat-value text-secondary text-xl">{labelCount}</div>
+        <div className="stat-value text-secondary text-xl">
+          {sensitivityLabelCount}
+        </div>
         <div className="stat-desc text-xs flex items-center gap-1">
-          {labelsLocked ? (
+          {organizationLabelsLocked ? (
             <>
               <LockClosedIcon className="w-4 h-4 text-error" />
               <span>{t.translations.LOCKED_FOR_ALL_PROJECTS}</span>
@@ -50,30 +52,29 @@ const TagOverviewStrip: React.FC<Props> = ({
         </div>
       </div>
 
-      {/* Projects with Labels */}
       <div className="stat bg-base-100 shadow-lg rounded-xl">
         <div className="stat-title flex items-center gap-1 text-xs">
           <ShieldCheckIcon className="w-4 h-4 text-secondary" />
           {t.translations.PROJECTS_WITH_LABELS}
         </div>
         <div className="stat-value text-secondary text-xl">
-          {projectsWithLabels}
+          {projectsWithSensitivityLabelsCount}
         </div>
         <div className="stat-desc text-xs text-base-content/70 flex items-center gap-1">
-          <InformationCircleIcon className="w-4 h-4" />
-          <span>{t.translations.PROJECT_USAGE_TRACKING_COMING_SOON}</span>
+          <span>{t.translations.INHERITING_ORGANIZATION_LEVEL_LABELS}</span>
         </div>
       </div>
 
-      {/* Org Tags */}
       <div className="stat bg-base-100 shadow-lg rounded-xl">
         <div className="stat-title flex items-center gap-1 text-xs">
           <TagIcon className="w-4 h-4 text-primary" />
           {t.translations.ORG_TAGS}
         </div>
-        <div className="stat-value text-primary text-xl">{tagCount}</div>
+        <div className="stat-value text-primary text-xl">
+          {organizationTagCount}
+        </div>
         <div className="stat-desc text-xs flex items-center gap-1">
-          {tagsLocked ? (
+          {organizationTagsLocked ? (
             <>
               <LockClosedIcon className="w-4 h-4 text-error" />
               <span>{t.translations.LOCKED_FOR_ALL_PROJECTS}</span>
@@ -87,14 +88,13 @@ const TagOverviewStrip: React.FC<Props> = ({
         </div>
       </div>
 
-      {/* Projects with Tags */}
       <div className="stat bg-base-100 shadow-lg rounded-xl">
         <div className="stat-title flex items-center gap-1 text-xs">
           <TagIcon className="w-4 h-4 text-secondary" />
           {t.translations.PROJECTS_WITH_TAGS}
         </div>
         <div className="stat-value text-secondary text-xl">
-          {projectsWithTags}
+          {projectsWithTagsCount}
         </div>
         <div className="stat-desc text-xs text-base-content/70">
           {t.translations.INHERITING_ORGANIZATION_LEVEL_TAGS}
@@ -104,4 +104,4 @@ const TagOverviewStrip: React.FC<Props> = ({
   );
 };
 
-export default TagOverviewStrip;
+export default OrganizationTagOverviewStrip;

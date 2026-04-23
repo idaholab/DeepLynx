@@ -64,13 +64,13 @@ public partial class DeeplynxContext : DbContext
     public virtual DbSet<User> Users { get; set; }
 
     public virtual DbSet<SavedSearch> SavedSearches { get; set; }
-    
+
     public virtual DbSet<AiModelConfig> AiModelConfigs { get; set; }
 
     public virtual DbSet<UserModelToken> UserModelTokens { get; set; }
 
     public virtual DbSet<Embedding> Embeddings { get; set; }
-    
+
     public virtual DbSet<OntologyVector> OntologyVectors { get; set; }
 
 
@@ -213,13 +213,13 @@ public partial class DeeplynxContext : DbContext
                 .HasDatabaseName("idx_data_sources_project_id");
 
             entity.Property(e => e.Id).UseIdentityAlwaysColumn();
-            
+
             entity.Property(e => e.LastUpdatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
 
             entity.Property(e => e.IsArchived).HasDefaultValue(false);
-            
+
             entity.HasIndex(e => e.LastUpdatedBy).HasDatabaseName("idx_data_sources_last_updated_by");
-            
+
             entity.HasIndex(e => new { e.OrganizationId, e.Name })
                 .HasDatabaseName("unique_organization_data_source_name")
                 .IsUnique()
@@ -229,18 +229,18 @@ public partial class DeeplynxContext : DbContext
                 .HasDatabaseName("unique_project_data_source_name")
                 .IsUnique()
                 .HasFilter("project_id IS NOT NULL");
-            
+
             entity.HasOne(d => d.LastUpdatedByUser)
                 .WithMany(p => p.LastUpdatedDataSources)
                 .HasForeignKey(d => d.LastUpdatedBy)
                 .OnDelete(DeleteBehavior.NoAction)
                 .HasConstraintName(null);
-            
+
             entity.HasOne(d => d.Project)
                 .WithMany(p => p.DataSources)
                 .OnDelete(DeleteBehavior.Cascade)
                 .HasConstraintName("data_sources_project_id_fkey");
-            
+
             entity.HasOne(d => d.Organization)
                 .WithMany(o => o.DataSources)
                 .OnDelete(DeleteBehavior.Cascade)
@@ -708,7 +708,7 @@ public partial class DeeplynxContext : DbContext
             entity.Property(e => e.IsArchived).HasDefaultValue(false);
 
             entity.HasIndex(e => e.LastUpdatedBy).HasDatabaseName("idx_permissions_last_updated_by");
-            
+
             // Check constraint: if is_default is true, organization_id, project_id, and label_id must be null
             entity.ToTable(p => p.HasCheckConstraint(
                 "chk_default_permissions_no_org_project_label",
@@ -911,7 +911,7 @@ public partial class DeeplynxContext : DbContext
                         j.IndexerProperty<long>("TagId").HasColumnName("tag_id");
                     });
         });
-        
+
         modelBuilder.Entity<RecordCollection>(entity =>
         {
             entity.HasKey(e => e.Id).HasName("record_collections_pkey");
@@ -927,7 +927,7 @@ public partial class DeeplynxContext : DbContext
 
             entity.HasIndex(e => e.Name)
                 .HasDatabaseName("idx_record_collections_name");
-            
+
             // Creates a partial unique index to make sure if a user is adding an originalID, it is unique within the project
             entity.HasIndex(e => new { e.ProjectId, e.Name })
                 .HasDatabaseName("unique_record_collection_name")
@@ -990,7 +990,7 @@ public partial class DeeplynxContext : DbContext
                         j.IndexerProperty<long>("RecordCollectionId").HasColumnName("record_collection_id");
                         j.IndexerProperty<long>("TagId").HasColumnName("tag_id");
                     });
-            
+
             entity.HasMany(d => d.Records).WithMany(p => p.RecordCollections)
                 .UsingEntity<Dictionary<string, object>>(
                     "RecordCollectionRecords",
@@ -1349,8 +1349,6 @@ public partial class DeeplynxContext : DbContext
 
             entity.Property(e => e.Id).UseIdentityAlwaysColumn();
 
-            entity.Property(e => e.IsFavorite).HasDefaultValue(false);
-
             entity.Property(e => e.LastUpdatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
 
             entity.HasOne(d => d.User)
@@ -1358,7 +1356,7 @@ public partial class DeeplynxContext : DbContext
                 .OnDelete(DeleteBehavior.Cascade)
                 .HasConstraintName("saved_searches_user_id_fkey");
         });
-        
+
         modelBuilder.Entity<AiModelConfig>(entity =>
         {
             entity.HasKey(e => e.Id).HasName("ai_model_configs_pkey");
@@ -1458,7 +1456,7 @@ public partial class DeeplynxContext : DbContext
                 .OnDelete(DeleteBehavior.Cascade)
                 .HasConstraintName("embeddings_record_id_fkey");
         });
-        
+
         modelBuilder.Entity<OntologyVector>(entity =>
         {
             entity.HasKey(e => e.Id).HasName("ontology_vectors_pkey");
@@ -1468,7 +1466,7 @@ public partial class DeeplynxContext : DbContext
 
             entity.HasIndex(e => e.ClassId)
                 .HasDatabaseName("idx_ontology_vectors_class_id");
-            
+
             entity.HasIndex(e => e.RelationshipId)
                 .HasDatabaseName("idx_ontology_vectors_relationship_id");
 
@@ -1480,7 +1478,7 @@ public partial class DeeplynxContext : DbContext
                 .HasForeignKey(d => d.ClassId)
                 .OnDelete(DeleteBehavior.Cascade)
                 .HasConstraintName("ontology_vectors_class_id_fkey");
-            
+
             entity.HasOne(d => d.Relationship)
                 .WithMany(p => p.OntologyVectors)
                 .HasForeignKey(d => d.RelationshipId)

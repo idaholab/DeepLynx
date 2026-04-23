@@ -25,19 +25,19 @@ public class HistoricalRecordBusiness : IHistoricalRecordBusiness
     /// <summary>
     ///     Retrieves all Historical Records for a specific project and datasource
     /// </summary>
+    /// <param name="currentUserId">The ID of current user</param>
     /// <param name="projectId">The ID of the project whose records are to be retrieved</param>
     /// <param name="organizationId">The ID of the organization under which project exists</param>
     /// <param name="dataSourceId">(Optional) The ID of the datasource by which to filter records</param>
     /// <param name="pointInTime">(Optional) Find the most current records that existed before this point in time</param>
     /// <param name="hideArchived">(Optional) Flag indicating whether to hide archived records from the result.</param>
+    /// <param name="isSysAdmin">Optional param determining if the requesting user is a system admin</param>
+    /// <param name="isOrgAdmin">Optional param determining if the requesting user is an organization admin</param>
+    /// <param name="isProjectAdmin">Optional param determining if the requesting user is a project admin</param>
     /// <returns>An array of records</returns>
     public async Task<IEnumerable<HistoricalRecordResponseDto>> GetAllHistoricalRecords(
-        long currentUserId,
-        long projectId,
-        long organizationId,
-        long? dataSourceId = null,
-        DateTime? pointInTime = null,
-        bool hideArchived = true)
+        long currentUserId, long projectId, long organizationId, long? dataSourceId = null, DateTime? pointInTime = null,
+        bool hideArchived = true, bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false)
     {
         var recordQuery = _context.HistoricalRecords
             .Where(r => r.ProjectId == projectId && r.OrganizationId == organizationId);
@@ -61,12 +61,16 @@ public class HistoricalRecordBusiness : IHistoricalRecordBusiness
             records = records.Where(r => !r.IsArchived).ToList();
 
         var recordIds = records.Select(r => r.RecordId).ToList();
-
-        var authorizedIds = await _sensitivityLabelService
-            .FilterAuthorizedRecordIds(currentUserId, organizationId, projectId, recordIds, _context);
+        
+        // if user is not admin, filter out unauthorized labels
+        if (!isSysAdmin && !isOrgAdmin && !isProjectAdmin)
+        {
+            var authorizedIds = await _sensitivityLabelService
+                        .FilterAuthorizedRecordIds(currentUserId, organizationId, projectId, recordIds, _context);
+            records = records.Where(r => authorizedIds.Contains(r.RecordId)).ToList();
+        }
 
         return records
-            .Where(r => authorizedIds.Contains(r.RecordId))
             .Select(r => new HistoricalRecordResponseDto
             {
                 Id = r.RecordId,
@@ -96,6 +100,7 @@ public class HistoricalRecordBusiness : IHistoricalRecordBusiness
     /// <summary>
     ///     Show the historical updates of a specific record
     /// </summary>
+    /// <param name="currentUserId">The ID of current user</param>
     /// <param name="recordId">The ID of the record to list history for</param>
     /// <param name="organizationId">The ID of the organization under which project exists</param>
     /// <returns>An array of record instances for the given record</returns>
@@ -141,6 +146,7 @@ public class HistoricalRecordBusiness : IHistoricalRecordBusiness
     /// <summary>
     ///     Find a record at a given point in time
     /// </summary>
+    /// <param name="currentUserId">The ID of current user</param>
     /// <param name="recordId">The ID of the record to retrieve</param>
     /// <param name="organizationId">The ID of the organization under which project exists</param>
     /// <param name="pointInTime">(Optional) Find the most current record that existed before this point in time</param>
