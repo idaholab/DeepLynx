@@ -10,8 +10,4 @@ public class TriggerExtractionRequestDto
     /// <summary>"discovery" or "strict"</summary>
     [JsonPropertyName("mode")]
     public string Mode { get; set; } = "discovery";
-
-    /// <summary>Number of ontology terms to include as context. Defaults to 20.</summary>
-    [JsonPropertyName("similarity_limit")]
-    public int SimilarityLimit { get; set; } = 20;
 }
