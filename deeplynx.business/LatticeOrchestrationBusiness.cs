@@ -30,14 +30,28 @@ public class LatticeOrchestrationBusiness : ILatticeOrchestrationBusiness
                         ?? throw new InvalidOperationException("NEXUS_BASE_URL environment variable is not set.");
     }
 
+    /// <summary>
+    ///     Creates a Pending Extraction record, builds ontology context via similarity search,
+    ///     generates a short-lived callback token, and fires the trigger request to Lattice.
+    ///     Returns immediately after Lattice acknowledges with 202; the extraction runs
+    ///     asynchronously on the Lattice side and calls back when complete.
+    ///     For strict mode, record and ontology embeddings must exist — missing embeddings are
+    ///     queued automatically and an exception is thrown so the caller can retry.
+    /// </summary>
+    /// <param name="currentUserId">ID of the user triggering the extraction. Used for the callback token and audit trail.</param>
+    /// <param name="organizationId">The ID of the organization.</param>
+    /// <param name="projectId">The ID of the project.</param>
+    /// <param name="dataSourceId">The ID of the data source extracted entities will be staged under.</param>
+    /// <param name="recordId">The ID of the document record to extract from.</param>
+    /// <param name="mode">Extraction mode: "discovery" (infer schema) or "strict" (map to existing ontology).</param>
+    /// <returns>The ID of the created Extraction record.</returns>
     public async Task<long> TriggerLatticeExtraction(
         long currentUserId,
         long organizationId,
         long projectId,
         long dataSourceId,
         long recordId,
-        string mode,
-        int similarityLimit)
+        string mode)
     {
         var record = await _context.Records
                          .Where(r => r.Id == recordId && r.ProjectId == projectId)
@@ -60,7 +74,7 @@ public class LatticeOrchestrationBusiness : ILatticeOrchestrationBusiness
         try
         {
             var ontologyContext = await _extractionBusiness.SearchOntologySimilarity(
-                recordId, projectId, similarityLimit);
+                recordId, projectId);
 
             // Generate a short-lived token for the triggering user so Lattice can authenticate
             // its callback. 240 minutes seems generous for a ~45-minute extraction.

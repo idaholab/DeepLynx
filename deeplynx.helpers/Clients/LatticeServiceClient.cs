@@ -11,8 +11,8 @@ public class LatticeServiceClient
         var url = Environment.GetEnvironmentVariable("LATTICE_FASTAPI_URL")
                   ?? throw new InvalidOperationException("LATTICE_FASTAPI_URL environment variable is not set.");
         _client.BaseAddress = new Uri(url);
-        // Lattice's trigger endpoint returns 202 immediately — Nexus only waits for that acknowledgment.
-        // The actual extraction runs asynchronously on the Lattice side for up to ~45 minutes.
+        // Lattice's trigger endpoint returns 202 immediately because of long wait times. 
+        // The actual extraction runs asynchronously on the Lattice side.
         _client.Timeout = TimeSpan.FromSeconds(60);
     }
 
