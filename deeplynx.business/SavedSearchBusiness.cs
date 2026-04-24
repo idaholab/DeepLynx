@@ -38,7 +38,7 @@ public class SavedSearchBusiness : ISavedSearchBusiness
         // Create an object that wraps both the textSearch and filters array
         var searchData = new CustomQueryDtos.CustomQueryResponseDto
         {
-            textSearch = textSearch,
+            TextSearch = textSearch,
             Filter = filters
         };
 
@@ -67,14 +67,8 @@ public class SavedSearchBusiness : ISavedSearchBusiness
 
         if (searchFilters != null)
         {
-            if (searchFilters.Name != null)
-                query = query.Where(s => s.Name == searchFilters.Name);
-
-            if (searchFilters.TextSearch != null)
-            {
-                var jsonFilter = JsonSerializer.Serialize(new { textSearch = searchFilters.TextSearch });
-                query = query.Where(s => EF.Functions.JsonContains(s.Search, jsonFilter));
-            }
+            if (!string.IsNullOrWhiteSpace(searchFilters.Name))
+                query = query.Where(s => s.Name.ToLower().Contains(searchFilters.Name.ToLower()));
 
             if (searchFilters.LastUpdatedBefore != null)
                 query = query.Where(s => s.LastUpdatedAt <= searchFilters.LastUpdatedBefore);
@@ -88,6 +82,9 @@ public class SavedSearchBusiness : ISavedSearchBusiness
         return savedSearches
             .Select(s => JsonSerializer.Deserialize<CustomQueryDtos.CustomQueryResponseDto>(s.Search))
             .Where(s => s != null)
+            .Where(s => string.IsNullOrWhiteSpace(searchFilters?.TextSearch) ||
+                (s!.TextSearch != null &&
+                s.TextSearch.Contains(searchFilters.TextSearch, StringComparison.OrdinalIgnoreCase)))
             .ToList()!;
     }
 }

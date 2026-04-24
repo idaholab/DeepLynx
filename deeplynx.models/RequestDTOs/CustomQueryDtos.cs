@@ -15,16 +15,16 @@ public class CustomQueryDtos
 
         public class CustomQueryResponseDto
         {
-                public string? textSearch { get; set; }
+                public string? TextSearch { get; set; }
                 public CustomQueryRequestDto[] Filter { get; set; }
         }
 
         public class FilterSavedQueryRequestDto
         {
-                public string? Name { get; set; } // savedSearches.Name column
-                public string? TextSearch { get; set; } // search JSONB textSearch field 
-                public DateTime? LastUpdatedBefore { get; set; } // start range to filter saved searches by last updated by field
-                public DateTime? LastUpdatedAfter { get; set; } // end range to filer saved searches by the last updated by field
+                public string? Name { get; set; }
+                public string? TextSearch { get; set; }
+                public DateTime? LastUpdatedBefore { get; set; }
+                public DateTime? LastUpdatedAfter { get; set; }
         }
 }
 
