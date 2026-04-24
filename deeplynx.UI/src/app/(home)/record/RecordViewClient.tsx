@@ -956,6 +956,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
           setActiveTab(tabs.findIndex((tab) => tab.label === label))
         }
         rightAction={
+          isInsightSupported ? (
           <div className="flex gap-2 items-center">
             <div
               className="tooltip"
@@ -1030,6 +1031,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
               )}
             </button>
           </div>
+          ) : null
         }
       />
       <ConfirmationModal
