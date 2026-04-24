@@ -37,18 +37,17 @@ public class SavedSearchController : ControllerBase
     /// <param name="filterArray">Array of QueryComponent dtos</param>
     /// <param name="textSearch">Full text search phrase</param>
     /// <param name="alias">Name for saved search</param>
-    /// <param name="favorite">Boolean for if favorite search or not</param>
     /// <returns>True if successfully saved</returns>
     [HttpPost(Name = "api_save_search")]
     public async Task<ActionResult<bool>> SaveSearch(
-        [FromQuery] string? textSearch, [FromQuery] string? alias, [FromQuery] bool favorite,
+        [FromQuery] string? textSearch, [FromQuery] string? alias,
         [FromBody] CustomQueryDtos.CustomQueryRequestDto[] filterArray)
     {
         try
         {
             // get user ID from the middleware context
             var currentUserId = UserContextStorage.UserId;
-            var result = await _savedSearchBusiness.SaveSearch(currentUserId, alias, textSearch, filterArray, favorite);
+            var result = await _savedSearchBusiness.SaveSearch(currentUserId, alias, textSearch, filterArray);
             return Ok(result);
         }
         catch (Exception exc)

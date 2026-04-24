@@ -7,21 +7,18 @@ namespace deeplynx.datalayer.Models;
 public class SavedSearch
 {
     [Key]
-    [Column("id")] 
+    [Column("id")]
     public long Id { get; set; }
 
-    [Column("name")] 
+    [Column("name")]
     public string Name { get; set; }
 
-    [Column("search", TypeName = "jsonb")] 
+    [Column("search", TypeName = "jsonb")]
     public string Search { get; set; } = null!;
 
     [Column("last_updated_at", TypeName = "timestamp without time zone")]
     public DateTime LastUpdatedAt { get; set; } = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
 
-    [Column("is_favorite")] 
-    public bool IsFavorite { get; set; } 
-    
     [Column("user_id")]
     public long? UserId { get; set; }
 

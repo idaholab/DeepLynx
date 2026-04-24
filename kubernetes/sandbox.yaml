@@ -227,9 +227,12 @@ spec:
                   name: app-config
                   key: backend-base-url
           resources:
+            requests:
+              cpu: "250m"
+              memory: "384Mi"
             limits:
-              memory: "4Gi"
-              cpu: "1500m"
+              cpu: "1000m"
+              memory: "1Gi"
           ports:
             - containerPort: 3000
           volumeMounts:
@@ -368,9 +371,12 @@ spec:
                   name: app-config
                   key: hosted-link
           resources:
+            requests:
+              cpu: "500m"
+              memory: "512Mi"
             limits:
-              memory: "4Gi"
-              cpu: "1500m"
+              cpu: "2000m"
+              memory: "2Gi"
           ports:
             - containerPort: 5000
           volumeMounts:
@@ -408,9 +414,12 @@ spec:
                   name: app-config
                   key: hosted-link
           resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
             limits:
-              memory: "4Gi"
-              cpu: "1500m"
+              cpu: "500m"
+              memory: "512Mi"
           ports:
             - containerPort: 3001
 
@@ -487,8 +496,8 @@ spec:
                   key: rabbitmq-default-pass
           resources:
             requests:
-              memory: "2Gi"
-              cpu: "1000m"
+              cpu: "250m"
+              memory: "512Mi"
             limits:
               memory: "2Gi"
               cpu: "1000m"
@@ -612,9 +621,12 @@ spec:
             - name: STORAGE_BASE_DIR
               value: "/data/insight"
           resources:
+            requests:
+              cpu: "150m"
+              memory: "256Mi"
             limits:
-              memory: "4Gi"
-              cpu: "1500m"
+              cpu: "750m"
+              memory: "768Mi"
           volumeMounts:
             - name: duckdb-storage
               mountPath: /data/duckdb
