@@ -164,6 +164,9 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
   const [isCheckingLatticeReadiness, setIsCheckingLatticeReadiness] =
     useState(false);
   const [isRecordInsightEmbedded, setIsRecordInsightEmbedded] = useState(false);
+  const [latticeMode, setLatticeMode] = useState<"strict" | "discovery">(
+    "discovery",
+  );
 
   const latticeIntroSlides = [
     {
@@ -695,9 +698,9 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
       return;
     }
 
-    if (!isRecordInsightEmbedded) {
+    if (latticeMode === "strict" && !isRecordInsightEmbedded) {
       toast.error(
-        "This record must be embedded with Insight before analysis can start.",
+        "This record must be embedded with Insight before strict analysis can start.",
       );
       return;
     }
@@ -711,7 +714,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
         recordId,
         {
           data_source_id: record.dataSourceId,
-          mode: "strict",
+          mode: latticeMode,
         },
       );
 
@@ -739,6 +742,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
     recordId,
     record?.dataSourceId,
     isRecordInsightEmbedded,
+    latticeMode,
   ]);
 
   useEffect(() => {
@@ -794,13 +798,20 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
     record?.name,
   );
 
-  const canTriggerLatticeExtract =
+  const hasLatticeRecordRequirements =
     isInsightSupported &&
     !!record.dataSourceId &&
     !!record.uri &&
     record.uri.trim().length > 0 &&
-    record.uri.toLowerCase() !== "null" &&
-    isRecordInsightEmbedded;
+    record.uri.toLowerCase() !== "null";
+
+  const canTriggerStrictLatticeExtract =
+    hasLatticeRecordRequirements && isRecordInsightEmbedded;
+
+  const canTriggerLatticeExtract =
+    latticeMode === "strict"
+      ? canTriggerStrictLatticeExtract
+      : hasLatticeRecordRequirements;
 
   const tabs = [
     {
@@ -829,6 +840,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
                 recordId={record.id}
                 recordName={record.name}
                 recordUri={record.uri}
+                onEmbeddingStatusChange={setIsRecordInsightEmbedded}
               />
             ) : null}
             {/* Tags Card */}
@@ -969,6 +981,29 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
                 <QuestionMarkCircleIcon className="size-6" />
               </button>
             </div>
+            {/* <div className="join">
+              <button
+                type="button"
+                className={`btn btn-sm join-item ${
+                  latticeMode === "discovery" ? "btn-primary" : "btn-outline"
+                }`}
+                onClick={() => setLatticeMode("discovery")}
+                disabled={isTriggeringLatticeExtraction}
+              >
+                Discovery
+              </button>
+              <button
+                type="button"
+                className={`btn btn-sm join-item ${
+                  latticeMode === "strict" ? "btn-primary" : "btn-outline"
+                }`}
+                onClick={() => setLatticeMode("strict")}
+                disabled={isTriggeringLatticeExtraction}
+              >
+                Strict
+              </button>
+            </div> */}
+
             <button
               type="button"
               className="btn btn-sm btn-outline btn-primary"
