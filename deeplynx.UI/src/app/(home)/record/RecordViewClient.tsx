@@ -170,19 +170,19 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
 
   const latticeIntroSlides = [
     {
-      title: "Analyze this record",
+      title: t.translations.LATTICE_INTRO_ANALYZE_TITLE,
       icon: RocketLaunchIcon,
-      body: "Lattice can review this record and identify useful structure, including possible records, classes, relationships, and edges.",
+      body: t.translations.LATTICE_INTRO_ANALYZE_BODY,
     },
     {
-      title: "Stage suggestions",
+      title: t.translations.LATTICE_INTRO_STAGE_TITLE,
       icon: CircleStackIcon,
-      body: "Extracted results from Lattice are placed in staging first. They are not added directly to the project.",
+      body: t.translations.LATTICE_INTRO_STAGE_BODY,
     },
     {
-      title: "Review before adding",
+      title: t.translations.LATTICE_INTRO_REVIEW_TITLE,
       icon: QuestionMarkCircleIcon,
-      body: "You can review, approve, or reject the staged results before they become part of your project data.",
+      body: t.translations.LATTICE_INTRO_REVIEW_BODY,
     },
   ];
 
@@ -694,14 +694,12 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
 
   const handleTriggerLatticeExtraction = useCallback(async () => {
     if (!organization?.organizationId || !record?.dataSourceId) {
-      toast.error("Unable to start analysis for this record.");
+      toast.error(t.translations.LATTICE_UNABLE_TO_START_ANALYSIS);
       return;
     }
 
     if (latticeMode === "strict" && !isRecordInsightEmbedded) {
-      toast.error(
-        "This record must be embedded with Insight before strict analysis can start.",
-      );
+      toast.error(t.translations.LATTICE_STRICT_REQUIRES_EMBEDDING);
       return;
     }
 
@@ -719,7 +717,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
       );
 
       toast.success(
-        `Record analysis started. Extraction ID: ${result.extraction_id}`,
+        `${t.translations.LATTICE_ANALYSIS_STARTED} ${result.extraction_id}`,
       );
     } catch (error: any) {
       console.error("Error triggering Lattice extraction:", error);
@@ -730,7 +728,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
           ? responseData
           : responseData?.message ||
             responseData?.detail ||
-            "Failed to start record analysis.";
+            t.translations.LATTICE_FAILED_TO_START_ANALYSIS;
 
       toast.error(message);
     } finally {
@@ -963,10 +961,10 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
               className="tooltip"
               data-tip={
                 !isInsightSupported
-                  ? "This file type is not supported for Insight embedding or Lattice analysis."
+                  ? t.translations.LATTICE_UNSUPPORTED_FILE_TOOLTIP
                   : isRecordInsightEmbedded
-                    ? "Use Lattice to find records, classes, relationships, and edges from this file. Results are staged for review before they are added to the project."
-                    : "This record must be embedded with Insight before it can be analyzed with Lattice."
+                    ? t.translations.LATTICE_READY_TOOLTIP
+                    : t.translations.LATTICE_REQUIRES_EMBEDDING_TOOLTIP
               }
             >
               <button
@@ -976,7 +974,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
                   setLatticeIntroSlide(0);
                   setIsLatticeIntroOpen(true);
                 }}
-                aria-label="Learn about AI record analysis"
+                aria-label={t.translations.LATTICE_LEARN_MORE_ARIA}
               >
                 <QuestionMarkCircleIcon className="size-6" />
               </button>
@@ -1017,16 +1015,16 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
               {isTriggeringLatticeExtraction ? (
                 <>
                   <span className="loading loading-spinner loading-xs" />
-                  Starting
+                  {t.translations.STARTING}
                 </>
               ) : isCheckingLatticeReadiness ? (
                 <>
                   <span className="loading loading-spinner loading-xs" />
-                  Checking
+                  {t.translations.CHECKING}
                 </>
               ) : (
                 <>
-                  Analyze Record{" "}
+                  {t.translations.ANALYZE_RECORD}{" "}
                   <ArrowTopRightOnSquareIcon className="size-4" />
                 </>
               )}
@@ -1087,7 +1085,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
                 type="button"
                 className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2"
                 onClick={() => setIsLatticeIntroOpen(false)}
-                aria-label="Close"
+                aria-label={t.translations.CLOSE}
               >
                 <XMarkIcon className="size-6" />
               </button>
@@ -1116,7 +1114,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
                       latticeIntroSlide === index ? "bg-primary" : "bg-base-300"
                     }`}
                     onClick={() => setLatticeIntroSlide(index)}
-                    aria-label={`Go to slide ${index + 1}`}
+                    aria-label={`${t.translations.LATTICE_GO_TO_SLIDE} ${index + 1}`}
                   />
                 ))}
               </div>
@@ -1131,7 +1129,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
                   setLatticeIntroSlide((slide) => Math.max(slide - 1, 0))
                 }
               >
-                Back
+                {t.translations.BACK}
               </button>
 
               {latticeIntroSlide === latticeIntroSlides.length - 1 ? (
@@ -1140,7 +1138,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
                   className="btn btn-primary"
                   onClick={() => setIsLatticeIntroOpen(false)}
                 >
-                  Got it
+                  {t.translations.GOT_IT}
                 </button>
               ) : (
                 <button
@@ -1152,7 +1150,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
                     )
                   }
                 >
-                  Next
+                  {t.translations.NEXT}
                 </button>
               )}
             </div>

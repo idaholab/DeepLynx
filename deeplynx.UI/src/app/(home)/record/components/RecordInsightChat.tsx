@@ -436,7 +436,11 @@ const RecordInsightChat: React.FC<RecordInsightChatProps> = ({
             type="button"
             className="btn btn-ghost btn-xs btn-circle"
             onClick={() => setIsExpanded((prev) => !prev)}
-            title={isExpanded ? "Collapse height" : "Expand height"}
+            title={
+              isExpanded
+                ? t.translations.INSIGHT_COLLAPSE_HEIGHT
+                : t.translations.INSIGHT_EXPAND_HEIGHT
+            }
             disabled={isWidgetCollapsed}
           >
             {isExpanded ? (
@@ -449,7 +453,11 @@ const RecordInsightChat: React.FC<RecordInsightChatProps> = ({
             type="button"
             className="btn btn-ghost btn-xs btn-circle"
             onClick={() => setIsWidgetCollapsed((prev) => !prev)}
-            title={isWidgetCollapsed ? "Expand widget" : "Collapse widget"}
+            title={
+              isWidgetCollapsed
+                ? t.translations.INSIGHT_EXPAND_WIDGET
+                : t.translations.INSIGHT_COLLAPSE_WIDGET
+            }
           >
             {isWidgetCollapsed ? (
               <ChevronDownIcon className="size-6" />
