@@ -732,8 +732,8 @@ spec:
               memory: "512Mi"
               cpu: "1500m"
             limits:
-              memory: "8Gi"
-              cpu: "4000m"
+              memory: "12Gi"
+              cpu: "10000m"
           volumeMounts:
             - name: duckdb-storage
               mountPath: /data/duckdb
