@@ -721,16 +721,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
       );
     } catch (error: any) {
       console.error("Error triggering Lattice extraction:", error);
-
-      const responseData = error?.response?.data;
-      const message =
-        typeof responseData === "string"
-          ? responseData
-          : responseData?.message ||
-            responseData?.detail ||
-            t.translations.LATTICE_FAILED_TO_START_ANALYSIS;
-
-      toast.error(message);
+      toast.error("Failed to extract with Lattice.");
     } finally {
       setIsTriggeringLatticeExtraction(false);
     }
@@ -957,30 +948,30 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
         }
         rightAction={
           isInsightSupported ? (
-          <div className="flex gap-2 items-center">
-            <div
-              className="tooltip"
-              data-tip={
-                !isInsightSupported
-                  ? t.translations.LATTICE_UNSUPPORTED_FILE_TOOLTIP
-                  : isRecordInsightEmbedded
-                    ? t.translations.LATTICE_READY_TOOLTIP
-                    : t.translations.LATTICE_REQUIRES_EMBEDDING_TOOLTIP
-              }
-            >
-              <button
-                type="button"
-                className="btn btn-ghost btn-sm btn-circle"
-                onClick={() => {
-                  setLatticeIntroSlide(0);
-                  setIsLatticeIntroOpen(true);
-                }}
-                aria-label={t.translations.LATTICE_LEARN_MORE_ARIA}
+            <div className="flex gap-2 items-center">
+              <div
+                className="tooltip"
+                data-tip={
+                  !isInsightSupported
+                    ? t.translations.LATTICE_UNSUPPORTED_FILE_TOOLTIP
+                    : isRecordInsightEmbedded
+                      ? t.translations.LATTICE_READY_TOOLTIP
+                      : t.translations.LATTICE_REQUIRES_EMBEDDING_TOOLTIP
+                }
               >
-                <QuestionMarkCircleIcon className="size-6" />
-              </button>
-            </div>
-            {/* <div className="join">
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm btn-circle"
+                  onClick={() => {
+                    setLatticeIntroSlide(0);
+                    setIsLatticeIntroOpen(true);
+                  }}
+                  aria-label={t.translations.LATTICE_LEARN_MORE_ARIA}
+                >
+                  <QuestionMarkCircleIcon className="size-6" />
+                </button>
+              </div>
+              {/* <div className="join">
               <button
                 type="button"
                 className={`btn btn-sm join-item ${
@@ -1003,34 +994,34 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
               </button>
             </div> */}
 
-            <button
-              type="button"
-              className="btn btn-sm btn-outline btn-primary"
-              onClick={handleTriggerLatticeExtraction}
-              disabled={
-                isTriggeringLatticeExtraction ||
-                isCheckingLatticeReadiness ||
-                !canTriggerLatticeExtract
-              }
-            >
-              {isTriggeringLatticeExtraction ? (
-                <>
-                  <span className="loading loading-spinner loading-xs" />
-                  {t.translations.STARTING}
-                </>
-              ) : isCheckingLatticeReadiness ? (
-                <>
-                  <span className="loading loading-spinner loading-xs" />
-                  {t.translations.CHECKING}
-                </>
-              ) : (
-                <>
-                  {t.translations.ANALYZE_RECORD}{" "}
-                  <ArrowTopRightOnSquareIcon className="size-4" />
-                </>
-              )}
-            </button>
-          </div>
+              <button
+                type="button"
+                className="btn btn-sm btn-outline btn-primary"
+                onClick={handleTriggerLatticeExtraction}
+                disabled={
+                  isTriggeringLatticeExtraction ||
+                  isCheckingLatticeReadiness ||
+                  !canTriggerLatticeExtract
+                }
+              >
+                {isTriggeringLatticeExtraction ? (
+                  <>
+                    <span className="loading loading-spinner loading-xs" />
+                    {t.translations.STARTING}
+                  </>
+                ) : isCheckingLatticeReadiness ? (
+                  <>
+                    <span className="loading loading-spinner loading-xs" />
+                    {t.translations.CHECKING}
+                  </>
+                ) : (
+                  <>
+                    {t.translations.ANALYZE_RECORD}{" "}
+                    <ArrowTopRightOnSquareIcon className="size-4" />
+                  </>
+                )}
+              </button>
+            </div>
           ) : null
         }
       />
