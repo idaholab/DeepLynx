@@ -2,7 +2,14 @@
 
 "use client";
 import Tabs from "@/app/(home)/components/Tabs";
-import { PencilIcon, PlusIcon } from "@heroicons/react/24/outline";
+import {
+  ArrowTopRightOnSquareIcon,
+  CircleStackIcon,
+  PencilIcon,
+  PlusIcon,
+  QuestionMarkCircleIcon,
+  RocketLaunchIcon,
+} from "@heroicons/react/24/outline";
 import Link from "next/link";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
@@ -148,6 +155,29 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
     [],
   );
   const [isLoadingClasses, setIsLoadingClasses] = useState(false);
+  const [isLatticeIntroOpen, setIsLatticeIntroOpen] = useState(false);
+  const [latticeIntroSlide, setLatticeIntroSlide] = useState(0);
+
+  const latticeIntroSlides = [
+    {
+      title: "Analyze this record",
+      icon: RocketLaunchIcon,
+      body: "Lattice can review this record and identify useful structure, including possible records, classes, relationships, and edges.",
+    },
+    {
+      title: "Stage suggestions",
+      icon: CircleStackIcon,
+      body: "Extracted results from Lattice are placed in staging first. They are not added directly to the project.",
+    },
+    {
+      title: "Review before adding",
+      icon: QuestionMarkCircleIcon,
+      body: "You can review, approve, or reject the staged results before they become part of your project data.",
+    },
+  ];
+
+  const currentLatticeIntroSlide = latticeIntroSlides[latticeIntroSlide];
+  const CurrentLatticeIntroIcon = currentLatticeIntroSlide.icon;
 
   const {
     originPage,
@@ -491,7 +521,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
   ]);
 
   // helper function to format file size
-  const formatFileSize = (bytes : number | null | undefined): string => {
+  const formatFileSize = (bytes: number | null | undefined): string => {
     if (bytes == null) return "-";
     if (bytes === 0) return "0 bytes";
     const k = 1024;
@@ -504,7 +534,8 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
   const systemPropertiesRows = useMemo(() => {
     if (!record) return [];
 
-    const isDownloadable = !!record.uri &&
+    const isDownloadable =
+      !!record.uri &&
       record.uri.trim().length > 0 &&
       record.uri.toLowerCase() !== "null";
 
@@ -552,10 +583,14 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
       //   label: t.translations.FILE_SIZE,
       //   value: formatFileSize(record.fileSize)
       // },
-      ...(isDownloadable ? [{
-        label: t.translations.FILE_SIZE || "File Size",
-        value: formatFileSize(record.fileSize),
-      }] : []),
+      ...(isDownloadable
+        ? [
+            {
+              label: t.translations.FILE_SIZE || "File Size",
+              value: formatFileSize(record.fileSize),
+            },
+          ]
+        : []),
       {
         label: t.translations.LAST_UPDATED_AT,
         value: formatLocalDateTime(record.lastUpdatedAt),
@@ -656,9 +691,10 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
     return <RecordLoading />;
   }
 
-  const isDownloadable = !!record.uri &&
+  const isDownloadable =
+    !!record.uri &&
     record.uri.trim().length > 0 &&
-    record.uri.toLowerCase() !== "null"
+    record.uri.toLowerCase() !== "null";
 
   const isInsightSupported = isInsightSupportedFileType(
     recordFileType,
@@ -809,8 +845,36 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
         onTabChange={(label) =>
           setActiveTab(tabs.findIndex((tab) => tab.label === label))
         }
+        rightAction={
+          <div className="flex gap-2 items-center">
+            <div
+              className="tooltip"
+              data-tip="Use Lattice to find records, classes, relationships, and edges from this file. Results are staged for review before they are added to the project."
+            >
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm btn-circle"
+                onClick={() => {
+                  setLatticeIntroSlide(0);
+                  setIsLatticeIntroOpen(true);
+                }}
+                aria-label="Learn about AI record analysis"
+              >
+                <QuestionMarkCircleIcon className="size-6" />
+              </button>
+            </div>
+            <button
+              type="button"
+              className="btn btn-sm btn-outline btn-primary"
+              onClick={() => {
+                // your action here
+              }}
+            >
+              Analyze Record <ArrowTopRightOnSquareIcon className="size-4" />
+            </button>
+          </div>
+        }
       />
-
       <ConfirmationModal
         isOpen={modal.isOpen}
         onClose={handleCloseModal}
@@ -818,7 +882,6 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
         tagName={modal.nameToRemove}
         recordName={modal.recordNameToRemove}
       />
-
       <AdditionalPropertiesEditor
         isOpen={isPropertiesEditorOpen}
         onClose={() => setIsPropertiesEditorOpen(false)}
@@ -832,7 +895,6 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
         onSave={handleSaveProperties}
         isSaving={isSavingProperties}
       />
-
       <ClassSelectorModal
         isOpen={isClassModalOpen}
         onClose={() => setIsClassModalOpen(false)}
@@ -842,7 +904,6 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
         onCreateClass={handleCreateClass}
         isLoading={isLoadingClasses}
       />
-
       <AddEdgeModal
         isOpen={isAddEdgeModalOpen}
         onClose={() => setIsAddEdgeModalOpen(false)}
@@ -859,6 +920,92 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
         onSearchRecords={handleSearchRecords}
         onCreateRelationships={handleCreateRelationships}
       />
+      {isLatticeIntroOpen ? (
+        <dialog className="modal modal-open">
+          <div className="modal-box max-w-xl">
+            <form method="dialog">
+              <button
+                type="button"
+                className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2"
+                onClick={() => setIsLatticeIntroOpen(false)}
+                aria-label="Close"
+              >
+                x
+              </button>
+            </form>
+
+            <div className="flex flex-col items-center text-center gap-4 pt-4">
+              <div className="rounded-full bg-primary/10 p-4 text-primary">
+                <CurrentLatticeIntroIcon className="size-10" />
+              </div>
+
+              <div>
+                <h3 className="text-lg font-bold">
+                  {currentLatticeIntroSlide.title}
+                </h3>
+                <p className="py-3 text-sm text-base-content/70">
+                  {currentLatticeIntroSlide.body}
+                </p>
+              </div>
+
+              <div className="flex gap-2">
+                {latticeIntroSlides.map((_, index) => (
+                  <button
+                    key={index}
+                    type="button"
+                    className={`h-2.5 w-2.5 rounded-full ${
+                      latticeIntroSlide === index ? "bg-primary" : "bg-base-300"
+                    }`}
+                    onClick={() => setLatticeIntroSlide(index)}
+                    aria-label={`Go to slide ${index + 1}`}
+                  />
+                ))}
+              </div>
+            </div>
+
+            <div className="modal-action justify-between">
+              <button
+                type="button"
+                className="btn btn-ghost"
+                disabled={latticeIntroSlide === 0}
+                onClick={() =>
+                  setLatticeIntroSlide((slide) => Math.max(slide - 1, 0))
+                }
+              >
+                Back
+              </button>
+
+              {latticeIntroSlide === latticeIntroSlides.length - 1 ? (
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={() => setIsLatticeIntroOpen(false)}
+                >
+                  Got it
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={() =>
+                    setLatticeIntroSlide((slide) =>
+                      Math.min(slide + 1, latticeIntroSlides.length - 1),
+                    )
+                  }
+                >
+                  Next
+                </button>
+              )}
+            </div>
+          </div>
+
+          <form method="dialog" className="modal-backdrop">
+            <button type="button" onClick={() => setIsLatticeIntroOpen(false)}>
+              close
+            </button>
+          </form>
+        </dialog>
+      ) : null}
     </div>
   );
 }
