@@ -9,17 +9,17 @@ import {
   PlusIcon,
   QuestionMarkCircleIcon,
   RocketLaunchIcon,
+  XMarkIcon,
 } from "@heroicons/react/24/outline";
 import Link from "next/link";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
-import PropertyTable from "./components/PropertyTable";
-import CopyToClipboardButton from "@/app/(home)/components/CopyToClipboardButton";
 import {
   HistoricalRecordResponseDto,
   SensitivityLabelsDto,
   TagResponseDto,
 } from "../types/responseDTOs";
+import PropertyTable from "./components/PropertyTable";
 import RecordLoading from "./loading";
 
 // Components
@@ -43,23 +43,25 @@ import {
   unattachTagFromRecord,
   updateRecord,
 } from "@/app/lib/client_service/record_services.client";
+import { getAllSensitivityLabelsProject } from "@/app/lib/client_service/sensitivity_labels_services.client";
 import { getAllTags } from "@/app/lib/client_service/tag_services.client";
+import { formatLocalDateTime } from "@/app/lib/date_time";
+import { isInsightSupportedFileType } from "@/app/lib/insight_file_support";
 import GraphClientPage from "../graph/GraphClientPage";
 import { ClassResponseDto } from "../types/responseDTOs";
-import AdditionalPropertiesEditor from "./components/AdditionalPropertiesEditor";
-import RecordHistoryTab from "./components/RecordHistoryTab";
-import RecordTagsPanel from "./components/RecordTagsPanel";
-import RelatedRecordsCardSkeleton from "./skeletons/RelatedRecordsSkeleton";
-import { getAllSensitivityLabelsProject } from "@/app/lib/client_service/sensitivity_labels_services.client";
 import AddEdgeModal from "./components/AddEdgeModal";
+import AdditionalPropertiesEditor from "./components/AdditionalPropertiesEditor";
 import ClassSelectorModal from "./components/ClassSelectorModal";
+import RecordHistoryTab from "./components/RecordHistoryTab";
 import RecordInsightChat from "./components/RecordInsightChat";
+import RecordTagsPanel from "./components/RecordTagsPanel";
 import {
   RelatedRecordViewModel,
   useRecordRelationships,
 } from "./hooks/useRecordRelationships";
-import { isInsightSupportedFileType } from "@/app/lib/insight_file_support";
-import { formatLocalDateTime } from "@/app/lib/date_time";
+import RelatedRecordsCardSkeleton from "./skeletons/RelatedRecordsSkeleton";
+import { triggerLatticeExtraction } from "@/app/lib/client_service/lattice_services.client";
+import { fetchInsightIngestionStatus } from "@/app/lib/client_service/insight_services.client";
 
 // ============= HELPER FUNCTIONS =============
 interface PropertyRow {
@@ -157,6 +159,11 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
   const [isLoadingClasses, setIsLoadingClasses] = useState(false);
   const [isLatticeIntroOpen, setIsLatticeIntroOpen] = useState(false);
   const [latticeIntroSlide, setLatticeIntroSlide] = useState(0);
+  const [isTriggeringLatticeExtraction, setIsTriggeringLatticeExtraction] =
+    useState(false);
+  const [isCheckingLatticeReadiness, setIsCheckingLatticeReadiness] =
+    useState(false);
+  const [isRecordInsightEmbedded, setIsRecordInsightEmbedded] = useState(false);
 
   const latticeIntroSlides = [
     {
@@ -682,6 +689,91 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
     }
   };
 
+  const handleTriggerLatticeExtraction = useCallback(async () => {
+    if (!organization?.organizationId || !record?.dataSourceId) {
+      toast.error("Unable to start analysis for this record.");
+      return;
+    }
+
+    if (!isRecordInsightEmbedded) {
+      toast.error(
+        "This record must be embedded with Insight before analysis can start.",
+      );
+      return;
+    }
+
+    try {
+      setIsTriggeringLatticeExtraction(true);
+
+      const result = await triggerLatticeExtraction(
+        organization.organizationId as number,
+        projectId,
+        recordId,
+        {
+          data_source_id: record.dataSourceId,
+          mode: "strict",
+        },
+      );
+
+      toast.success(
+        `Record analysis started. Extraction ID: ${result.extraction_id}`,
+      );
+    } catch (error: any) {
+      console.error("Error triggering Lattice extraction:", error);
+
+      const responseData = error?.response?.data;
+      const message =
+        typeof responseData === "string"
+          ? responseData
+          : responseData?.message ||
+            responseData?.detail ||
+            "Failed to start record analysis.";
+
+      toast.error(message);
+    } finally {
+      setIsTriggeringLatticeExtraction(false);
+    }
+  }, [
+    organization?.organizationId,
+    projectId,
+    recordId,
+    record?.dataSourceId,
+    isRecordInsightEmbedded,
+  ]);
+
+  useEffect(() => {
+    if (!recordId) return;
+
+    let cancelled = false;
+
+    const checkLatticeReadiness = async () => {
+      try {
+        setIsCheckingLatticeReadiness(true);
+
+        const status = await fetchInsightIngestionStatus(recordId);
+
+        if (cancelled) return;
+
+        setIsRecordInsightEmbedded(status.indexed);
+      } catch (error) {
+        if (cancelled) return;
+
+        console.error("Failed to check Insight embedding status:", error);
+        setIsRecordInsightEmbedded(false);
+      } finally {
+        if (!cancelled) {
+          setIsCheckingLatticeReadiness(false);
+        }
+      }
+    };
+
+    void checkLatticeReadiness();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [recordId]);
+
   // ============= RENDER HELPERS =============
   if (!hasLoaded || !organization) {
     return <RecordLoading />;
@@ -701,6 +793,14 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
     record?.uri,
     record?.name,
   );
+
+  const canTriggerLatticeExtract =
+    isInsightSupported &&
+    !!record.dataSourceId &&
+    !!record.uri &&
+    record.uri.trim().length > 0 &&
+    record.uri.toLowerCase() !== "null" &&
+    isRecordInsightEmbedded;
 
   const tabs = [
     {
@@ -849,7 +949,13 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
           <div className="flex gap-2 items-center">
             <div
               className="tooltip"
-              data-tip="Use Lattice to find records, classes, relationships, and edges from this file. Results are staged for review before they are added to the project."
+              data-tip={
+                !isInsightSupported
+                  ? "This file type is not supported for Insight embedding or Lattice analysis."
+                  : isRecordInsightEmbedded
+                    ? "Use Lattice to find records, classes, relationships, and edges from this file. Results are staged for review before they are added to the project."
+                    : "This record must be embedded with Insight before it can be analyzed with Lattice."
+              }
             >
               <button
                 type="button"
@@ -866,11 +972,29 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
             <button
               type="button"
               className="btn btn-sm btn-outline btn-primary"
-              onClick={() => {
-                // your action here
-              }}
+              onClick={handleTriggerLatticeExtraction}
+              disabled={
+                isTriggeringLatticeExtraction ||
+                isCheckingLatticeReadiness ||
+                !canTriggerLatticeExtract
+              }
             >
-              Analyze Record <ArrowTopRightOnSquareIcon className="size-4" />
+              {isTriggeringLatticeExtraction ? (
+                <>
+                  <span className="loading loading-spinner loading-xs" />
+                  Starting
+                </>
+              ) : isCheckingLatticeReadiness ? (
+                <>
+                  <span className="loading loading-spinner loading-xs" />
+                  Checking
+                </>
+              ) : (
+                <>
+                  Analyze Record{" "}
+                  <ArrowTopRightOnSquareIcon className="size-4" />
+                </>
+              )}
             </button>
           </div>
         }
@@ -930,7 +1054,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
                 onClick={() => setIsLatticeIntroOpen(false)}
                 aria-label="Close"
               >
-                x
+                <XMarkIcon className="size-6" />
               </button>
             </form>
 
