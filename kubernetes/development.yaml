@@ -733,7 +733,7 @@ spec:
               memory: "512Mi"
               cpu: "1500m"
             limits:
-              memory: "4Gi"
+              memory: "8Gi"
               cpu: "4000m"
           volumeMounts:
             - name: nexus-storage
