@@ -728,9 +728,12 @@ spec:
             - name: STORAGE_BASE_DIR
               value: "/data/insight"
           resources:
-            limits:
-              memory: "4Gi"
+            requests:
+              memory: "512Mi"
               cpu: "1500m"
+            limits:
+              memory: "8Gi"
+              cpu: "4000m"
           volumeMounts:
             - name: duckdb-storage
               mountPath: /data/duckdb
