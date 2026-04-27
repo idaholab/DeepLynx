@@ -725,4 +725,91 @@ public class SavedSearchBusinessTests : IntegrationTestBase
     }
 
     #endregion
+
+    #region ExecuteSavedSearch Tests
+
+    [Fact]
+    public async Task ExecuteSavedSearch_InvalidId_ThrowsKeyNotFoundException()
+    {
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            _savedSearchBusiness.ExecuteSavedSearch(99999, uid1, pid, [pid]));
+
+        Assert.Contains("Saved Search does not exist", exception.Message);
+    }
+
+    [Fact]
+    public async Task ExecuteSavedSearch_WrongUser_ThrowsKeyNotFoundException()
+    {
+        // Arrange - Save a search under uid1
+        var filters = new[]
+        {
+            new CustomQueryDtos.CustomQueryRequestDto
+            {
+                Connector = "AND",
+                Filter = "name",
+                Operator = "LIKE",
+                Value = "test"
+            }
+        };
+        await _savedSearchBusiness.SaveSearch(uid1, "User 1 Search", "test", filters);
+
+        var savedSearch = await Context.SavedSearches
+            .FirstAsync(s => s.UserId == uid1 && s.Name == "User 1 Search");
+
+        // Act & Assert - uid2 attempts to execute uid1's saved search
+        var exception = await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            _savedSearchBusiness.ExecuteSavedSearch(savedSearch.Id, uid2, pid, [pid]));
+
+        Assert.Contains("Saved Search does not exist", exception.Message);
+    }
+
+    [Fact]
+    public async Task ExecuteSavedSearch_CorruptedSearchJson_ThrowsArgumentException()
+    {
+        // Arrange - Manually insert a saved search with invalid/empty filter JSON
+        var badSearch = new SavedSearch
+        {
+            UserId = uid1,
+            Name = "Bad Search",
+            Search = JsonSerializer.Serialize(new { TextSearch = "test", Filter = (object)null })
+        };
+        Context.SavedSearches.Add(badSearch);
+        await Context.SaveChangesAsync();
+
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<ArgumentException>(() =>
+            _savedSearchBusiness.ExecuteSavedSearch(badSearch.Id, uid1, pid, [pid]));
+
+        Assert.Contains("invalid or empty query", exception.Message);
+    }
+
+    [Fact]
+    public async Task ExecuteSavedSearch_ValidSearch_ReturnsResults()
+    {
+        // Arrange
+        var filters = new[]
+        {
+            new CustomQueryDtos.CustomQueryRequestDto
+            {
+                Connector = "AND",
+                Filter = "name",
+                Operator = "LIKE",
+                Value = "test"
+            }
+        };
+        await _savedSearchBusiness.SaveSearch(uid1, "Valid Search", "test", filters);
+
+        var savedSearch = await Context.SavedSearches
+            .FirstAsync(s => s.UserId == uid1 && s.Name == "Valid Search");
+
+        // Act
+        var result = await _savedSearchBusiness.ExecuteSavedSearch(
+            savedSearch.Id, uid1, pid, [pid], isSysAdmin: true);
+
+        // Assert
+        Assert.NotNull(result);
+    }
+
+    #endregion
 }

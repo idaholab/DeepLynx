@@ -12,14 +12,14 @@ namespace deeplynx.business;
 public class SavedSearchBusiness : ISavedSearchBusiness
 {
     private readonly DeeplynxContext _context;
-    private readonly QueryBusiness _queryBusiness;
+    private readonly IQueryBusiness _queryBusiness;
 
     /// <summary>
     ///     Filter record request
     /// </summary>
     /// <param name="context">The database context to be used for filter operations.</param>
     /// <param name="queryBusiness">The business class needed to execute the saved search.</param>
-    public SavedSearchBusiness(DeeplynxContext context, QueryBusiness queryBusiness)
+    public SavedSearchBusiness(DeeplynxContext context, IQueryBusiness queryBusiness)
     {
         _context = context;
         _queryBusiness = queryBusiness;
@@ -103,8 +103,8 @@ public class SavedSearchBusiness : ISavedSearchBusiness
     /// <param name="isProjectAdmin">Boolean value determining if the user is a admin for all the project ID's referenced</param>
     /// <returns>List of records retrieved by the query</returns>
     public async Task<IEnumerable<HistoricalRecordResponseDto>> ExecuteSavedSearch(
-        long savedSearchId, long currentUserId, long organizationId, long[] projectIds,
-        bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false)
+    long savedSearchId, long currentUserId, long organizationId, long[] projectIds,
+    bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false)
     {
         var savedSearchResult = await _context.SavedSearches
             .FirstOrDefaultAsync(s => s.Id == savedSearchId && s.UserId == currentUserId);
@@ -112,10 +112,16 @@ public class SavedSearchBusiness : ISavedSearchBusiness
         if (savedSearchResult == null)
             throw new KeyNotFoundException("Saved Search does not exist");
 
-        var userQuery = savedSearchResult.Search;
+        var savedSearch = JsonSerializer.Deserialize<CustomQueryDtos.SavedSearchDto>(
+            savedSearchResult.Search,
+            new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
 
-        var queryResult = await _queryBusiness.Search(
-            currentUserId, userQuery, organizationId, projectIds, isSysAdmin, isOrgAdmin, isProjectAdmin);
+        if (savedSearch?.Filter == null)
+            throw new ArgumentException("Saved search contains an invalid or empty query.");
+
+        var queryResult = await _queryBusiness.QueryBuilder(
+            currentUserId, savedSearch.Filter, organizationId, projectIds,
+            savedSearch.TextSearch, isSysAdmin, isOrgAdmin, isProjectAdmin);
 
         return queryResult;
     }
