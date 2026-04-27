@@ -270,6 +270,16 @@ spec:
                 secretKeyRef:
                   name: azure-storage-secret
                   key: azurestorageconnectionstring
+            - name: ENCRYPTION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: encryption-key
+            - name: ENCRYPTION_IV
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: encryption-iv
             - name: AZURE_CONTAINER_NAME
               value: ${AZURE_CONTAINER_NAME}
             - name: ConnectionStrings__DefaultConnection
@@ -601,16 +611,6 @@ spec:
                 secretKeyRef:
                   name: app-secrets
                   key: emb-auth-token
-            - name: ENCRYPTION_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: app-secrets
-                  key: encryption-key
-            - name: ENCRYPTION_IV
-              valueFrom:
-                secretKeyRef:
-                  name: app-secrets
-                  key: encryption-iv
             - name: LLM_SERVER_URL
               value: "http://deeplynx-api.inl.gov:4000/v1"
             - name: LLM_MODEL_NAME
