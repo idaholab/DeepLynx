@@ -1,6 +1,3 @@
-[submodule "deeplynx.lattice"]
-	path = deeplynx.lattice
-	url = git@github.inl.gov:Digital-Engineering/DeepLynx-Lattice.git
 [submodule "deeplynx.insight"]
 	path = deeplynx.insight
 	url = git@github.inl.gov:Digital-Engineering/Insight.git
