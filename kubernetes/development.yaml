@@ -106,6 +106,8 @@ spec:
           image: ${CI_REGISTRY}/${CI_REGISTRY_PATH}:deeplynxv3-ui-${GITHUB_RUN_NUMBER}
           imagePullPolicy: Always
           env:
+            - name: NODE_ENV
+              value: "production"
             - name: AWS_S3_CONNECTION_STRING
               value: ${AWS_S3_CONNECTION_STRING}
             - name: AZURE_OBJECT_CONNECTION_STRING
@@ -139,7 +141,6 @@ spec:
               value: ${JWT_AUDIENCE}
             - name: DUCKDB_BASE_PATH
               # DuckDB Configuration
-
               value: ${DUCKDB_BASE_PATH}
             - name: SMTP_SERVER
               value: ${SMTP_SERVER}
@@ -165,7 +166,6 @@ spec:
               value: ${TENANT_MODE}
             - name: OKTA_CLIENT_SECRET
               # Runtime environment variables from secrets (sensitive)
-
               valueFrom:
                 secretKeyRef:
                   name: app-secrets
@@ -409,6 +409,8 @@ spec:
           image: ${CI_REGISTRY}/${CI_REGISTRY_PATH}:deeplynxv3-docs-${GITHUB_RUN_NUMBER}
           imagePullPolicy: Always
           env:
+            - name: NODE_ENV
+              value: "production"
             - name: HOSTED_LINK
               valueFrom:
                 configMapKeyRef:

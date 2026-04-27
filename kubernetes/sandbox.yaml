@@ -107,6 +107,8 @@ spec:
           image: ${CI_REGISTRY}/${CI_REGISTRY_PATH}:deeplynx-ui-${GITHUB_RUN_NUMBER}
           imagePullPolicy: Always
           env:
+            - name: NODE_ENV
+              value: "production"
             - name: AWS_S3_CONNECTION_STRING
               value: ${AWS_S3_CONNECTION_STRING}
             - name: AZURE_OBJECT_CONNECTION_STRING
@@ -408,6 +410,8 @@ spec:
           image: ${CI_REGISTRY}/${CI_REGISTRY_PATH}:deeplynx-docs-${GITHUB_RUN_NUMBER}
           imagePullPolicy: Always
           env:
+            - name: NODE_ENV
+              value: "production"
             - name: HOSTED_LINK
               valueFrom:
                 configMapKeyRef:

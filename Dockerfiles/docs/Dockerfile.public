@@ -4,6 +4,9 @@ FROM node:22-alpine AS frontend-build
 # Set working directory
 WORKDIR /usr/src/app
 
+# Build time env vars
+ENV NODE_ENV=production
+
 # Copy dependency metadata first
 COPY deeplynx.docs/package.json deeplynx.docs/package-lock.json ./
 
@@ -32,6 +35,9 @@ FROM node:22-alpine AS final
 
 # Set working directory
 WORKDIR /usr/src/app
+
+# Run time env vars
+ENV NODE_ENV=production
 
 # Copy standalone runtime output and 
 USER root
