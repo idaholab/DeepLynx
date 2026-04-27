@@ -3,6 +3,7 @@ using deeplynx.business;
 using deeplynx.datalayer.Models;
 using deeplynx.models;
 using Microsoft.EntityFrameworkCore;
+using deeplynx.helpers;
 
 namespace deeplynx.tests;
 
@@ -10,6 +11,8 @@ namespace deeplynx.tests;
 public class SavedSearchBusinessTests : IntegrationTestBase
 {
     private SavedSearchBusiness _savedSearchBusiness = null!;
+    private QueryBusiness _queryBusiness = null!;
+    private SensitivityLabelService _sensitivityLabelService = null!;
     private long pid; // project ID
 
     private long uid1; // user IDs
@@ -22,7 +25,9 @@ public class SavedSearchBusinessTests : IntegrationTestBase
     public override async Task InitializeAsync()
     {
         await base.InitializeAsync();
-        _savedSearchBusiness = new SavedSearchBusiness(Context);
+        _sensitivityLabelService = new SensitivityLabelService(Context);
+        _queryBusiness = new QueryBusiness(Context, _sensitivityLabelService);
+        _savedSearchBusiness = new SavedSearchBusiness(Context, _queryBusiness);
     }
 
     protected override async Task SeedTestDataAsync()
