@@ -5,7 +5,7 @@ metadata:
   name: deeplynx-test
   labels:
     name: deeplynx-test
-    
+
 ---
 # Secret for Azure Storage Account with SAS Token
 apiVersion: v1
@@ -19,7 +19,7 @@ stringData:
   azurestorageaccountsastoken: ${AZURE_STORAGE_ACCOUNT_SAS_TOKEN}
   azurestorageaccountkey: ${AZURE_STORAGE_ACCOUNT_KEY}
   azurestorageconnectionstring: ${AZURE_OBJECT_CONNECTION_STRING}
-  
+
 ---
 # Persistent Volume pointing to existing Azure File Share
 apiVersion: v1
@@ -46,7 +46,7 @@ spec:
   csi:
     driver: file.csi.azure.com
     readOnly: false
-    volumeHandle: ${AZURE_FILE_SHARE_VOLUME_HANDLE}  # Unique ID for this volume
+    volumeHandle: ${AZURE_FILE_SHARE_VOLUME_HANDLE} # Unique ID for this volume
     volumeAttributes:
       resourceGroup: ${AZURE_ACCOUNT_RESOURCE_GROUP}
       storageAccount: ${AZURE_STORAGE_ACCOUNT_NAME}
@@ -532,6 +532,7 @@ spec:
       storage: 25Gi
   storageClassName: ${AZURE_FILE_SHARE_STORAGE_CLASS}
 
+
 # insight-fastapi
 ---
 apiVersion: apps/v1
@@ -600,6 +601,16 @@ spec:
                 secretKeyRef:
                   name: app-secrets
                   key: emb-auth-token
+            - name: ENCRYPTION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: encryption-key
+            - name: ENCRYPTION_IV
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: encryption-iv
             - name: LLM_SERVER_URL
               value: "http://deeplynx-api.inl.gov:4000/v1"
             - name: LLM_MODEL_NAME
@@ -709,6 +720,16 @@ spec:
                 secretKeyRef:
                   name: app-secrets
                   key: emb-auth-token
+            - name: ENCRYPTION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: encryption-key
+            - name: ENCRYPTION_IV
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: encryption-iv
             - name: LLM_SERVER_URL
               value: "http://deeplynx-api.inl.gov:4000/v1"
             - name: LLM_MODEL_NAME
@@ -759,7 +780,6 @@ spec:
         - name: insight-storage
           persistentVolumeClaim:
             claimName: insight-storage
-
 
 ---
 apiVersion: v1

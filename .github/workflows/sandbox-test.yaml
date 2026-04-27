@@ -331,6 +331,8 @@ jobs:
             --from-literal=llm-auth-token="${{ secrets.LLM_AUTH_TOKEN }}" \
             --from-literal=mm-auth-token="${{ secrets.MM_AUTH_TOKEN }}" \
             --from-literal=emb-auth-token="${{ secrets.EMB_AUTH_TOKEN }}" \
+            --from-literal=encryption-key="${{ secrets.ENCRYPTION_KEY }}" \
+            --from-literal=encryption-iv="${{ secrets.ENCRYPTION_IV }}" \
             --namespace=deeplynx-test \
             --dry-run=client -o yaml | kubectl apply -f -
 
