@@ -10,20 +10,12 @@ public class EncryptionHelper
 
     public EncryptionHelper()
     {
-        // Load encryption key from environment variables
-        // Note: These are validated at startup by CheckEncryptionConfig
-        var keyBase64 = Environment.GetEnvironmentVariable("ENCRYPTION_KEY");
-        var ivBase64 = Environment.GetEnvironmentVariable("ENCRYPTION_IV");
-
-        if (string.IsNullOrWhiteSpace(keyBase64) || string.IsNullOrWhiteSpace(ivBase64))
-        {
-            throw new InvalidOperationException(
-                "ENCRYPTION_KEY and/or ENCRYPTION_IV environment variables are not set. " +
-                "This should have been caught at startup.");
-        }
-
-        _key = Convert.FromBase64String(keyBase64);
-        _iv = Convert.FromBase64String(ivBase64);
+        // Validate encryption keys at startup with CheckEncryptionConfig
+        CheckEncryptionConfig();
+        
+        // Load encryption key from environment variables if everything checks out
+        _key = Convert.FromBase64String(Environment.GetEnvironmentVariable("ENCRYPTION_KEY"));
+        _iv = Convert.FromBase64String(Environment.GetEnvironmentVariable("ENCRYPTION_IV"));
     }
 
     /// <summary>
@@ -58,8 +50,86 @@ public class EncryptionHelper
                 Console.WriteLine("==========================================================\n");
 
                 throw new InvalidOperationException(
-                    "ENCRYPTION_KEY and/or ENCRYPTION_IV environment variables are not set. " +
-                    "Please set them using the generated values above and restart.");
+                    "ENCRYPTION_KEY and/or ENCRYPTION_IV environment variables are not set.");
+            }
+            
+            // Validate that they're valid base64
+            byte[] key, iv;
+            try
+            {
+                key = Convert.FromBase64String(keyBase64);
+                iv = Convert.FromBase64String(ivBase64);
+            }
+            catch (FormatException)
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine("\n=====================================");
+                Console.WriteLine("❌ INVALID ENCRYPTION CONFIGURATION");
+                Console.WriteLine("=====================================\n");
+                Console.ResetColor();
+
+                Console.WriteLine("ENCRYPTION_KEY or ENCRYPTION_IV is not a valid base64 string.\n");
+
+                Console.ForegroundColor = ConsoleColor.Yellow;
+                Console.WriteLine("ACTION REQUIRED:");
+                Console.ResetColor();
+                Console.WriteLine("  1. Follow the instructions in the README to create valid encryption keys");
+                Console.WriteLine("  2. Add them to your environment variables or .env file");
+                Console.WriteLine("  3. Restart the application\n");
+
+                Console.WriteLine("==========================================================\n");
+
+                throw new InvalidOperationException(
+                    "ENCRYPTION_KEY or ENCRYPTION_IV is not a valid base64 string.");
+            }
+            
+            // Validate key and IV sizes
+            if (key.Length != 32)
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine("\n=====================================");
+                Console.WriteLine("❌ INVALID ENCRYPTION KEY SIZE");
+                Console.WriteLine("=====================================\n");
+                Console.ResetColor();
+
+                Console.WriteLine($"ENCRYPTION_KEY must be 32 bytes (256 bits) for AES-256.");
+                Console.WriteLine($"Current length: {key.Length} bytes\n");
+
+                Console.ForegroundColor = ConsoleColor.Yellow;
+                Console.WriteLine("ACTION REQUIRED:");
+                Console.ResetColor();
+                Console.WriteLine("  1. Follow the instructions in the README to create valid encryption keys");
+                Console.WriteLine("  2. Add them to your environment variables or .env file");
+                Console.WriteLine("  3. Restart the application\n");
+
+                Console.WriteLine("==========================================================\n");
+
+                throw new InvalidOperationException(
+                    $"ENCRYPTION_KEY must be 32 bytes (256 bits) for AES-256. Current length: {key.Length} bytes");
+            }
+            
+            if (iv.Length != 16)
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine("\n=====================================");
+                Console.WriteLine("❌ INVALID ENCRYPTION IV SIZE");
+                Console.WriteLine("=====================================\n");
+                Console.ResetColor();
+
+                Console.WriteLine($"ENCRYPTION_IV must be 16 bytes (128 bits).");
+                Console.WriteLine($"Current length: {iv.Length} bytes\n");
+
+                Console.ForegroundColor = ConsoleColor.Yellow;
+                Console.WriteLine("ACTION REQUIRED:");
+                Console.ResetColor();
+                Console.WriteLine("  1. Follow the instructions in the README to create valid encryption keys");
+                Console.WriteLine("  2. Add them to your environment variables or .env file");
+                Console.WriteLine("  3. Restart the application\n");
+
+                Console.WriteLine("==========================================================\n");
+
+                throw new InvalidOperationException(
+                    $"ENCRYPTION_IV must be 16 bytes (128 bits). Current length: {iv.Length} bytes");
             }
             
             // All checks passed
@@ -73,7 +143,7 @@ public class EncryptionHelper
         } catch (Exception ex)
         {
             Console.ForegroundColor = ConsoleColor.Red;
-            Console.WriteLine($"\n❌ Unexpected error during encryption verification: {ex.Message}");
+            Console.WriteLine($"Unexpected error during encryption verification: {ex.Message}");
             Console.ResetColor();
             throw;
         }

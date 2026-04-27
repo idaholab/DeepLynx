@@ -495,6 +495,11 @@ try
        ║      Check DB Version      ║
        ╚════════════════════════════╝ */
     await DatabaseVersionChecker.CheckDatabaseVersion(connectionString);
+    
+    /* ╔════════════════════════════╗
+       ║   Check Encryption Keys    ║
+       ╚════════════════════════════╝ */
+    EncryptionHelper.CheckEncryptionConfig();
 
     /* ╔════════════════════════════╗
        ║      App Configurations    ║

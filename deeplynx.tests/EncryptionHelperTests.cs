@@ -152,8 +152,48 @@ public class EncryptionHelperTests : IntegrationTestBase
         try
         {
             // Act & Assert
-            var exception = Assert.Throws<FormatException>(() => new EncryptionHelper());
-            Assert.Contains("not a valid Base-64 string", exception.Message);
+            var exception = Assert.Throws<InvalidOperationException>(() => new EncryptionHelper());
+            Assert.Contains("not a valid base64 string", exception.Message);
+        }
+        finally
+        {
+            ClearEncryptionEnvironmentVariables();
+        }
+    }
+    
+    [Fact]
+    public void Constructor_WithInvalidKeyLength_ThrowsException()
+    {
+        // Arrange - Create a 16-byte key (too small, needs 32 bytes)
+        var invalidKey = Convert.ToBase64String(new byte[16]);
+        var (_, iv) = GenerateValidKeys();
+        SetEncryptionEnvironmentVariables(invalidKey, iv);
+
+        try
+        {
+            // Act & Assert
+            var exception = Assert.Throws<InvalidOperationException>(() => new EncryptionHelper());
+            Assert.Contains("32 bytes", exception.Message);
+        }
+        finally
+        {
+            ClearEncryptionEnvironmentVariables();
+        }
+    }
+
+    [Fact]
+    public void Constructor_WithInvalidIVLength_ThrowsException()
+    {
+        // Arrange - Create an 8-byte IV (too small, needs 16 bytes)
+        var (key, _) = GenerateValidKeys();
+        var invalidIv = Convert.ToBase64String(new byte[8]);
+        SetEncryptionEnvironmentVariables(key, invalidIv);
+
+        try
+        {
+            // Act & Assert
+            var exception = Assert.Throws<InvalidOperationException>(() => new EncryptionHelper());
+            Assert.Contains("16 bytes", exception.Message);
         }
         finally
         {
