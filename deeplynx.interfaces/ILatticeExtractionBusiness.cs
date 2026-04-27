@@ -24,7 +24,6 @@ public interface ILatticeExtractionBusiness
         long currentUserId,
         long organizationId,
         long projectId,
-        long dataSourceId,
         long recordId,
         string mode);
 }

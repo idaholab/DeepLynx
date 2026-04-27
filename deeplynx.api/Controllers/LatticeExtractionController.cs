@@ -89,41 +89,6 @@ public class LatticeExtractionController : ControllerBase
     }
 
     /// <summary>
-    ///     Lattice error callback.
-    /// </summary>
-    /// <param name="organizationId">The ID of the organization.</param>
-    /// <param name="projectId">The ID of the project.</param>
-    /// <param name="extractionId">The ID of the extraction that failed.</param>
-    /// <param name="dto">Error details from Lattice.</param>
-    [HttpPost("{extractionId:long}/error", Name = "api_extraction_error")]
-    public async Task<IActionResult> LatticeExtractionError(
-        long organizationId,
-        long projectId,
-        long extractionId,
-        [FromBody] LatticeExtractionErrorDto dto)
-    {
-        try
-        {
-            _logger.LogError(
-                "Lattice reported extraction failure. ExtractionId={ExtractionId} OrgId={OrgId} ProjectId={ProjectId} Error={Error} Detail={Detail}",
-                extractionId, organizationId, projectId, dto.Error, dto.Detail);
-            await _latticeExtractionBusiness.MarkExtractionFailed(extractionId, dto.Error);
-            return Ok();
-        }
-        catch (InvalidOperationException exc)
-        {
-            _logger.LogWarning(exc.Message);
-            return BadRequest(exc.Message);
-        }
-        catch (Exception exc)
-        {
-            var message = $"An error occurred while recording extraction failure: {exc}";
-            _logger.LogError(message);
-            return StatusCode(StatusCodes.Status500InternalServerError, message);
-        }
-    }
-
-    /// <summary>
     ///     Trigger ontology embedding for all classes and relationships in the project.
     /// </summary>
     /// <param name="organizationId">The ID of the organization.</param>
@@ -158,20 +123,20 @@ public class LatticeExtractionController : ControllerBase
     /// <param name="organizationId">The ID of the organization.</param>
     /// <param name="projectId">The ID of the project.</param>
     /// <param name="recordId">The ID of the document record to extract from.</param>
-    /// <param name="dto">Extraction configuration: data_source_id, mode.</param>
+    /// <param name="mode">Extraction mode: strict or discovery</param>
     /// <returns>202 Accepted with the extraction_id.</returns>
     [HttpPost("/organizations/{organizationId:long}/projects/{projectId:long}/records/{recordId:long}/trigger", Name = "api_trigger_extraction")]
     public async Task<IActionResult> TriggerExtraction(
         long organizationId,
         long projectId,
         long recordId,
-        [FromBody] TriggerExtractionRequestDto dto)
+        [FromQuery] string mode)
     {
         try
         {
             var currentUserId = UserContextStorage.UserId;
             var extractionId = await _latticeExtractionBusiness.TriggerLatticeExtraction(
-                currentUserId, organizationId, projectId, dto.DataSourceId, recordId, dto.Mode);
+                currentUserId, organizationId, projectId, recordId, mode);
             return Accepted(new { extraction_id = extractionId });
         }
         catch (InvalidOperationException exc)
