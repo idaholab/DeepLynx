@@ -5,7 +5,7 @@
   "main": "src/index.js",
   "scripts": {
     "dev": "next --port 3001 --turbopack",
-    "build": "next build --debug",
+    "build": "next build",
     "start": "PORT=3001 next start",
     "postbuild": "pagefind --site .next/server/app --output-path public/_pagefind"
   },
