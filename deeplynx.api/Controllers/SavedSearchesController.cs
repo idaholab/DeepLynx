@@ -62,15 +62,17 @@ public class SavedSearchController : ControllerBase
     /// <summary>
     ///     Get Saved Searches
     /// </summary>
+    /// <param name="searchFilters">Optional filters to narrow results of saved searches query</param>
     /// <returns>A list of saved searches belonging to the user.</returns>
-    [HttpGet(Name = "api_query_get_saved_searches")]
-    public async Task<ActionResult<IEnumerable<TagResponseDto>>> GetSavedSearches()
+    [HttpPost("search", Name = "api_query_get_saved_searches")]
+    public async Task<ActionResult<IEnumerable<TagResponseDto>>> GetSavedSearches(
+        [FromBody] CustomQueryDtos.FilterSavedQueryRequestDto? searchFilters = null)
     {
         try
         {
             // get user ID from the middleware context
             var currentUserId = UserContextStorage.UserId;
-            var savedSearches = await _savedSearchBusiness.GetSavedSearches(currentUserId);
+            var savedSearches = await _savedSearchBusiness.GetSavedSearches(currentUserId, searchFilters);
             return Ok(savedSearches);
         }
         catch (Exception exception)
