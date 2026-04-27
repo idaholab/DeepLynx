@@ -79,6 +79,8 @@ services:
       DISABLE_BACKEND_AUTHENTICATION: true # change to false if supplying okta info on lines 12-13, 25-26
       SUPERUSER_EMAIL: jaren.brownlee@inl.gov
       INSIGHT_FASTAPI_URL: http://insight-fastapi:5009
+      ENCRYPTION_KEY: SU5TRUNVUkVfREVWX0tFWV8zMl9CWVRFU19MT05HISE= # base64 encoded from the string "INSECURE_DEV_KEY_32_BYTES_LONG!!"
+      ENCRYPTION_IV: SU5TRUNVUkVfREVWX0lWIQ== # base64 encoded from the string "INSECURE_DEV_IV!"
     entrypoint: /usr/local/bin/entrypoint.sh
     ports:
       - "5000:5000"
