@@ -7,7 +7,7 @@
     "all": "concurrently \"npm run dev:ui\" \"npm run dev:docs\"",
     "dev:ui": "next dev --port 3000 --turbopack",
     "dev:docs": "npm --prefix ../deeplynx.docs run dev",
-    "build": "next build",
+    "build": "next build --debug",
     "start": "next start",
     "lint": "next lint",
     "test": "npx playwright test"
