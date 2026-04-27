@@ -7,16 +7,18 @@ namespace deeplynx.helpers;
 [AttributeUsage(AttributeTargets.Class | AttributeTargets.Method, AllowMultiple = true)]
 public class AuthAttribute : Attribute
 {
-    public AuthAttribute(string action, string resource, bool includeArchived = false)
+    public AuthAttribute(string action, string resource, bool includeArchived = false, bool allowWithoutContext = false)
     {
         Action = action;
         Resource = resource;
         IncludeArchived = includeArchived;
+        AllowWithoutContext = allowWithoutContext;
     }
 
     public string Action { get; set; }
     public string Resource { get; set; }
     public bool IncludeArchived { get; set; }
+    public bool AllowWithoutContext { get; set; }
 }
 
 /// <summary>
@@ -83,7 +85,8 @@ public class AuthMiddleware
         }
 
         var isSysAdmin = await adminService.SysAdminCheck(userId);
-
+        UserContextStorage.IsSysAdmin = isSysAdmin;
+        
         // Handle SysAdmin attribute
         if (sysAdminAttr != null)
         {
@@ -99,16 +102,16 @@ public class AuthMiddleware
         }
 
         // Extract organization and project IDs
-        int? organizationId = null;
-        var projectIds = new List<int>();
+        long? organizationId = null;
+        var projectIds = new List<long>();
         long? capturedOrgId = null;
 
         var routeOrgId = context.GetRouteValue("organizationId")?.ToString();
-        if (!string.IsNullOrEmpty(routeOrgId) && int.TryParse(routeOrgId, out var tempOrgId))
+        if (!string.IsNullOrEmpty(routeOrgId) && long.TryParse(routeOrgId, out var tempOrgId))
             organizationId = tempOrgId;
 
         var routeProjectId = context.GetRouteValue("projectId")?.ToString();
-        if (!string.IsNullOrEmpty(routeProjectId) && int.TryParse(routeProjectId, out var tempProjectId))
+        if (!string.IsNullOrEmpty(routeProjectId) && long.TryParse(routeProjectId, out var tempProjectId))
             projectIds.Add(tempProjectId);
 
         if (context.Request.Query.TryGetValue("projectIds", out var queryProjectIds))
@@ -117,7 +120,7 @@ public class AuthMiddleware
                 {
                     var ids = idValue.Split(',', StringSplitOptions.RemoveEmptyEntries);
                     foreach (var id in ids)
-                        if (int.TryParse(id.Trim(), out var parsedId) && !projectIds.Contains(parsedId))
+                        if (long.TryParse(id.Trim(), out var parsedId) && !projectIds.Contains(parsedId))
                             projectIds.Add(parsedId);
                 }
 
@@ -150,7 +153,8 @@ public class AuthMiddleware
 
             // Check if user is org admin (using permission check)
             var isOrgAdmin = await adminService.OrgAdminCheck(userId, organizationId.Value);
-
+            UserContextStorage.IsOrgAdmin = isOrgAdmin;
+            
             if (!isOrgAdmin)
             {
                 context.Response.StatusCode = StatusCodes.Status403Forbidden;
@@ -161,9 +165,10 @@ public class AuthMiddleware
             await _next(context);
             return;
         }
-
-        // Original AuthAttribute logic
-        if (!isSysAdmin && !organizationId.HasValue && !projectIds.Any())
+        
+        var allowWithoutContext = authAttributes.Any(a => a.AllowWithoutContext);
+            
+        if (!isSysAdmin && !organizationId.HasValue && !projectIds.Any() && !allowWithoutContext)
         {
             context.Response.StatusCode = StatusCodes.Status400BadRequest;
             await context.Response.WriteAsJsonAsync(new
@@ -191,6 +196,10 @@ public class AuthMiddleware
                 );
 
             if (capturedOrgId.HasValue) UserContextStorage.OrganizationId = capturedOrgId.Value;
+
+            var isProjectAdmin = organizationId.HasValue && 
+                                 await adminService.ProjectAdminCheck(userId, organizationId.Value, projectIds);
+            UserContextStorage.IsProjectAdmin = isProjectAdmin;
         }
 
         if (isSysAdmin)
@@ -233,6 +242,10 @@ public class AuthMiddleware
                     authAttr.Action,
                     authAttr.Resource
                 );
+            }
+            else if (allowWithoutContext)
+            {
+                hasPermission = true;
             }
 
             if (!hasPermission)

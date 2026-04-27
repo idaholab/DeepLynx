@@ -28,11 +28,10 @@ public class SavedSearchBusiness : ISavedSearchBusiness
     /// <param name="userId">The ID of the user</param>
     /// <param name="textSearch">Full text search string</param>
     /// <param name="filters">Query filter object array</param>
-    /// <param name="favorite">Boolean for if favorite</param>
     /// <param name="alias">Name for saved search</param>
     /// <returns>True if successfully saved</returns>
     public async Task<bool> SaveSearch(long userId, string alias, string textSearch,
-        CustomQueryDtos.CustomQueryRequestDto[] filters, bool favorite = false)
+        CustomQueryDtos.CustomQueryRequestDto[] filters)
     {
         if (filters == null)
             throw new ArgumentNullException(nameof(filters), "Query filters cannot be null");
@@ -48,7 +47,6 @@ public class SavedSearchBusiness : ISavedSearchBusiness
         {
             Name = alias,
             Search = queryBuilt,
-            IsFavorite = favorite,
             UserId = userId
         };
         _context.SavedSearches.Add(savedSearch);
