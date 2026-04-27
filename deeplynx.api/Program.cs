@@ -182,7 +182,7 @@ try
     builder.Services.AddTransient<IRoleBusiness, RoleBusiness>();
     builder.Services.AddTransient<ISensitivityLabelBusiness, SensitivityLabelBusiness>();
     builder.Services.AddTransient<IPermissionBusiness, PermissionBusiness>();
-    builder.Services.AddTransient<IExtractionBusiness, ExtractionBusiness>();
+    builder.Services.AddTransient<ILatticeExtractionBusiness, LatticeExtractionBusiness>();
     builder.Services.AddTransient<IProjectRolePermissionService, ProjectRolePermissionService>();
     builder.Services.AddTransient<IOrgRolePermissionService, OrgRolePermissionService>();
     builder.Services.AddScoped<IBulkCopyUpsertExecutor, BulkCopyUpsertExecutor>();
@@ -196,8 +196,6 @@ try
     builder.Services.AddScoped<ISensitivityLabelService, SensitivityLabelService>();
     builder.Services.AddTransient<IInsightBusiness, InsightBusiness>();
     builder.Services.AddHttpClient<InsightServiceClient>();
-    builder.Services.AddHttpClient<LatticeServiceClient>();
-    builder.Services.AddTransient<ILatticeOrchestrationBusiness, LatticeOrchestrationBusiness>();
     
     //OpenApi Documentation
     builder.Services.AddOpenApi(options =>

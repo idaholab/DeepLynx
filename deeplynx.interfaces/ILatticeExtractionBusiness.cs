@@ -2,7 +2,7 @@ using deeplynx.models;
 
 namespace deeplynx.interfaces;
 
-public interface IExtractionBusiness
+public interface ILatticeExtractionBusiness
 {
     Task<ExtractionResponseDto> LatticeEntityStaging(
         long currentUserId,
@@ -19,4 +19,13 @@ public interface IExtractionBusiness
         long projectId,
         int limit = 5,
         string? termType = null);
+
+    Task<long> TriggerLatticeExtraction(
+        long currentUserId,
+        long organizationId,
+        long projectId,
+        long dataSourceId,
+        long recordId,
+        string mode);
 }
+

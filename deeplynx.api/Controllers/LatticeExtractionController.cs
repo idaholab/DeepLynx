@@ -17,22 +17,19 @@ namespace deeplynx.api.Controllers;
 [Route("organizations/{organizationId:long}/projects/{projectId:long}/extractions")]
 [Authorize]
 [Tags("Lattice")]
-public class LatticeController : ControllerBase
+public class LatticeExtractionController : ControllerBase
 {
-    private readonly IExtractionBusiness _extractionBusiness;
+    private readonly ILatticeExtractionBusiness _latticeExtractionBusiness;
     private readonly IInsightBusiness _insightBusiness;
-    private readonly ILatticeOrchestrationBusiness _latticeOrchestration;
-    private readonly ILogger<LatticeController> _logger;
+    private readonly ILogger<LatticeExtractionController> _logger;
 
-    public LatticeController(
-        IExtractionBusiness extractionBusiness,
+    public LatticeExtractionController(
+        ILatticeExtractionBusiness latticeExtractionBusiness,
         IInsightBusiness insightBusiness,
-        ILatticeOrchestrationBusiness latticeOrchestration,
-        ILogger<LatticeController> logger)
+        ILogger<LatticeExtractionController> logger)
     {
-        _extractionBusiness = extractionBusiness;
+        _latticeExtractionBusiness = latticeExtractionBusiness;
         _insightBusiness = insightBusiness;
-        _latticeOrchestration = latticeOrchestration;
         _logger = logger;
     }
 
@@ -74,7 +71,7 @@ public class LatticeController : ControllerBase
         try
         {
             var currentUserId = UserContextStorage.UserId;
-            var result = await _extractionBusiness.LatticeEntityStaging(
+            var result = await _latticeExtractionBusiness.LatticeEntityStaging(
                 currentUserId, organizationId, projectId, dataSourceId, dto, extractionId);
             return Ok(result);
         }
@@ -110,7 +107,7 @@ public class LatticeController : ControllerBase
             _logger.LogError(
                 "Lattice reported extraction failure. ExtractionId={ExtractionId} OrgId={OrgId} ProjectId={ProjectId} Error={Error} Detail={Detail}",
                 extractionId, organizationId, projectId, dto.Error, dto.Detail);
-            await _extractionBusiness.MarkExtractionFailed(extractionId, dto.Error);
+            await _latticeExtractionBusiness.MarkExtractionFailed(extractionId, dto.Error);
             return Ok();
         }
         catch (InvalidOperationException exc)
@@ -173,7 +170,7 @@ public class LatticeController : ControllerBase
         try
         {
             var currentUserId = UserContextStorage.UserId;
-            var extractionId = await _latticeOrchestration.TriggerLatticeExtraction(
+            var extractionId = await _latticeExtractionBusiness.TriggerLatticeExtraction(
                 currentUserId, organizationId, projectId, dto.DataSourceId, recordId, dto.Mode);
             return Accepted(new { extraction_id = extractionId });
         }
