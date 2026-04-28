@@ -129,7 +129,8 @@ const ProjectSecurityLabelsPanel: React.FC<Props> = ({
           <span>
             {t.translations.SHOWING}{" "}
             <span className="font-semibold">{filteredCount}</span>{" "}
-            {t.translations.OF} <span className="font-semibold">{labelCount}</span>{" "}
+            {t.translations.OF}{" "}
+            <span className="font-semibold">{labelCount}</span>{" "}
             {t.translations.LABELS_LOWER}
           </span>
           {labelSearch.trim() && (
@@ -166,7 +167,8 @@ const ProjectSecurityLabelsPanel: React.FC<Props> = ({
             <div className="py-6 text-center text-xs text-base-content/60 border border-dashed border-base-300 rounded-lg">
               {labelSearch.trim()
                 ? t.translations.NO_SECURITY_LABELS_MATCH_SEARCH
-                : t.translations.NO_PROJECT_SECURITY_LABELS_DEFINED_WHEN_UNLOCKED}
+                : t.translations
+                    .NO_PROJECT_SECURITY_LABELS_DEFINED_WHEN_UNLOCKED}
             </div>
           ) : (
             filteredLabels.map((label) => (

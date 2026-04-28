@@ -37,18 +37,17 @@ public class SavedSearchController : ControllerBase
     /// <param name="filterArray">Array of QueryComponent dtos</param>
     /// <param name="textSearch">Full text search phrase</param>
     /// <param name="alias">Name for saved search</param>
-    /// <param name="favorite">Boolean for if favorite search or not</param>
     /// <returns>True if successfully saved</returns>
     [HttpPost(Name = "api_save_search")]
     public async Task<ActionResult<bool>> SaveSearch(
-        [FromQuery] string? textSearch, [FromQuery] string? alias, [FromQuery] bool favorite,
+        [FromQuery] string? textSearch, [FromQuery] string? alias,
         [FromBody] CustomQueryDtos.CustomQueryRequestDto[] filterArray)
     {
         try
         {
             // get user ID from the middleware context
             var currentUserId = UserContextStorage.UserId;
-            var result = await _savedSearchBusiness.SaveSearch(currentUserId, alias, textSearch, filterArray, favorite);
+            var result = await _savedSearchBusiness.SaveSearch(currentUserId, alias, textSearch, filterArray);
             return Ok(result);
         }
         catch (Exception exc)
@@ -62,15 +61,17 @@ public class SavedSearchController : ControllerBase
     /// <summary>
     ///     Get Saved Searches
     /// </summary>
+    /// <param name="searchFilters">Optional filters to narrow results of saved searches query</param>
     /// <returns>A list of saved searches belonging to the user.</returns>
-    [HttpGet(Name = "api_query_get_saved_searches")]
-    public async Task<ActionResult<IEnumerable<TagResponseDto>>> GetSavedSearches()
+    [HttpPost("search", Name = "api_query_get_saved_searches")]
+    public async Task<ActionResult<IEnumerable<TagResponseDto>>> GetSavedSearches(
+        [FromBody] CustomQueryDtos.FilterSavedQueryRequestDto? searchFilters = null)
     {
         try
         {
             // get user ID from the middleware context
             var currentUserId = UserContextStorage.UserId;
-            var savedSearches = await _savedSearchBusiness.GetSavedSearches(currentUserId);
+            var savedSearches = await _savedSearchBusiness.GetSavedSearches(currentUserId, searchFilters);
             return Ok(savedSearches);
         }
         catch (Exception exception)

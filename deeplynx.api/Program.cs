@@ -12,8 +12,6 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
 using Npgsql;
-using Pgvector.EntityFrameworkCore;
-using Pgvector.Npgsql;
 using Scalar.AspNetCore;
 using Serilog;
 using Log = Serilog.Log;
@@ -158,7 +156,8 @@ try
     builder.Services.AddTransient<IDataSourceBusiness, DataSourceBusiness>();
     builder.Services.AddTransient<IRelationshipBusiness, RelationshipBusiness>();
     builder.Services.AddTransient<ITagBusiness, TagBusiness>();
-    builder.Services.AddTransient<ITimeseriesBusiness, TimeseriesBusiness>();
+    builder.Services.AddTransient<IOlapBusiness, OlapBusiness>();
+    builder.Services.AddTransient<IMetricsBusiness, MetricsBusiness>();
     builder.Services.AddTransient<IUserBusiness, UserBusiness>();
     builder.Services.AddTransient<INotificationBusiness, NotificationBusiness>();
     builder.Services.AddTransient<IInvitationBusiness, InvitationBusiness>();
@@ -181,7 +180,6 @@ try
     builder.Services.AddTransient<IRoleBusiness, RoleBusiness>();
     builder.Services.AddTransient<ISensitivityLabelBusiness, SensitivityLabelBusiness>();
     builder.Services.AddTransient<IPermissionBusiness, PermissionBusiness>();
-    builder.Services.AddTransient<IExtractionBusiness, ExtractionBusiness>();
     builder.Services.AddTransient<IProjectRolePermissionService, ProjectRolePermissionService>();
     builder.Services.AddTransient<IOrgRolePermissionService, OrgRolePermissionService>();
     builder.Services.AddScoped<IBulkCopyUpsertExecutor, BulkCopyUpsertExecutor>();
@@ -194,10 +192,11 @@ try
     builder.Services.AddTransient<IAiModelConfigBusiness, AiModelConfigBusiness>();
     builder.Services.AddScoped<ISensitivityLabelService, SensitivityLabelService>();
     builder.Services.AddTransient<IInsightBusiness, InsightBusiness>();
+    builder.Services.AddTransient<ILatticeExtractionBusiness, LatticeExtractionBusiness>();
     builder.Services.AddHttpClient<InsightServiceClient>();
     builder.Services.AddSingleton<AirflowTokenService>();
     builder.Services.AddHttpClient<AirflowServiceClient>();
-    
+
     //OpenApi Documentation
     builder.Services.AddOpenApi(options =>
     {
@@ -266,7 +265,6 @@ try
 
                 // AI Services
                 new() { Name = "Lattice", Description = "Useful data views for DeepLynx Lattice use" },
-                new() { Name = "Extraction", Description = "Extraction for DeepLynx Lattice use" },
                 new() { Name = "Organization - AI Model Config", Description = "AI model configuration management" },
                 new() { Name = "Project - AI Model Config", Description = "AI model configuration management" },
                 new() { Name = "User Model Token", Description = "User AI model token management" },
@@ -325,7 +323,10 @@ try
                 new() { Name = "Project - Tag", Description = "Project-level tags" },
 
                 // Timeseries
-                new() { Name = "Timeseries", Description = "Time-series data" },
+                new() { Name = "Olap", Description = "OLAP tabular file operations" },
+
+                // Metrics
+                new() { Name = "Metrics", Description = "System Statistics" },
 
                 // Integrations
                 new() { Name = "Airflow", Description = "Apache Airflow DAG management" },
@@ -345,7 +346,11 @@ try
                 new JsonObject
                 {
                     ["name"] = "AI Services",
-                    ["tags"] = new JsonArray { "Lattice", "Extraction", "Organization - AI Model Config", "Project - AI Model Config", "User Model Token", "Insight" }
+                    ["tags"] = new JsonArray
+                    {
+                        "Lattice", "Organization - AI Model Config", "Project - AI Model Config", "User Model Token",
+                        "Insight"
+                    }
                 },
                 new JsonObject
                 {
@@ -410,11 +415,6 @@ try
                 },
                 new JsonObject
                 {
-                    ["name"] = "Timeseries",
-                    ["tags"] = new JsonArray { "Timeseries" }
-                },
-                new JsonObject
-                {
                     ["name"] = "Integrations",
                     ["tags"] = new JsonArray { "Airflow" }
                 },
@@ -462,6 +462,28 @@ try
             {
                 Description = "Internal Server Error"
             });
+
+            return Task.CompletedTask;
+        });
+        // Mark non-nullable value-type query parameters as required in the OpenAPI spec.
+        // Path parameters are already required by default; query parameters are not, even when
+        // their C# type is non-nullable (e.g. long, int, bool). Scalar renders this distinction
+        // visually, so this transformer ensures the spec matches the actual binding behaviour.
+        options.AddOperationTransformer((operation, context, cancellationToken) =>
+        {
+            if (operation.Parameters is null) return Task.CompletedTask;
+
+            foreach (var parameter in operation.Parameters.OfType<OpenApiParameter>())
+            {
+                if (parameter.In != ParameterLocation.Query) continue;
+
+                var paramDesc = context.Description.ParameterDescriptions
+                    .FirstOrDefault(p => p.Name == parameter.Name);
+
+                if (paramDesc?.Type is { IsValueType: true } t
+                    && Nullable.GetUnderlyingType(t) is null)
+                    parameter.Required = true;
+            }
 
             return Task.CompletedTask;
         });

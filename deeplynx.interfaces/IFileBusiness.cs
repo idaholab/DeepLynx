@@ -29,4 +29,8 @@ public interface IFileBusiness
 
     Task CancelUpload(long organizationId, long projectId, long dataSourceId, string uploadId,
         ObjectStorageConfigDto objectStorageConfig);
+    
+    Task<long> GetStorageSize(string prefix, ObjectStorageConfigDto objectStorageConfig);
+ 
+    string BuildPrefix(long organizationId, long? projectId);
 }
