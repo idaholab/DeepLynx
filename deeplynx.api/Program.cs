@@ -415,6 +415,16 @@ try
                 },
                 new JsonObject
                 {
+                    ["name"] = "Olap",
+                    ["tags"] = new JsonArray { "Olap" }
+                },
+                new JsonObject
+                {
+                    ["name"] = "Metrics",
+                    ["tags"] = new JsonArray { "Metrics", "Organization - Metrics", "Project - Metrics" }
+                },
+                new JsonObject
+                {
                     ["name"] = "Integrations",
                     ["tags"] = new JsonArray { "Airflow" }
                 },
