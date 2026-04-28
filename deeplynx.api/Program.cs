@@ -195,6 +195,8 @@ try
     builder.Services.AddScoped<ISensitivityLabelService, SensitivityLabelService>();
     builder.Services.AddTransient<IInsightBusiness, InsightBusiness>();
     builder.Services.AddHttpClient<InsightServiceClient>();
+    builder.Services.AddSingleton<AirflowTokenService>();
+    builder.Services.AddHttpClient<AirflowServiceClient>();
     
     //OpenApi Documentation
     builder.Services.AddOpenApi(options =>
@@ -325,6 +327,9 @@ try
                 // Timeseries
                 new() { Name = "Timeseries", Description = "Time-series data" },
 
+                // Integrations
+                new() { Name = "Airflow", Description = "Apache Airflow DAG management" },
+
                 // Other
                 new() { Name = "Notification", Description = "Notifications" }
             };
@@ -407,6 +412,11 @@ try
                 {
                     ["name"] = "Timeseries",
                     ["tags"] = new JsonArray { "Timeseries" }
+                },
+                new JsonObject
+                {
+                    ["name"] = "Integrations",
+                    ["tags"] = new JsonArray { "Airflow" }
                 },
                 new JsonObject
                 {
