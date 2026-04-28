@@ -28,6 +28,7 @@ public class AirflowServiceClient
 
     public async Task<AirflowDagRunResponseDto> TriggerDagRun(string dagId, TriggerDagRunRequestDto dto)
     {
+        // logical_date is required by Airflow's trigger API; default to UtcNow if not provided by the caller
         dto.LogicalDate ??= DateTimeOffset.UtcNow;
         using var request = new HttpRequestMessage(HttpMethod.Post, $"api/v2/dags/{dagId}/dagRuns");
         request.Content = JsonContent.Create(dto);

@@ -6,6 +6,7 @@ public class TriggerDagRunRequestDto
     [JsonPropertyName("dag_run_id")]
     public string? DagRunId { get; set; }
 
+    // Required by Airflow — optional here; if omitted, the service layer defaults it to UtcNow before forwarding
     [JsonPropertyName("logical_date")]
     public DateTimeOffset? LogicalDate { get; set; }
 
