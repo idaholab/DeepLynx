@@ -36,6 +36,7 @@ interface RecordInsightChatProps {
   recordId?: number;
   recordUri?: string | null;
   recordName?: string | null;
+  onEmbeddingStatusChange?: (isEmbedded: boolean) => void;
 }
 
 const STATUS_POLL_INTERVAL_MS = 5000;
@@ -84,6 +85,7 @@ const RecordInsightChat: React.FC<RecordInsightChatProps> = ({
   recordId,
   recordUri,
   recordName,
+  onEmbeddingStatusChange,
 }) => {
   const { t } = useLanguage();
   const trimmedRecordName = recordName?.trim() ?? "";
@@ -161,6 +163,10 @@ const RecordInsightChat: React.FC<RecordInsightChatProps> = ({
     t.translations.INSIGHT_INTRO_READY,
     t.translations.INSIGHT_INTRO_NOT_READY,
   ]);
+
+  useEffect(() => {
+    onEmbeddingStatusChange?.(ingestionState === "ready");
+  }, [ingestionState, onEmbeddingStatusChange]);
 
   useEffect(() => {
     setMessages((prev) => {
@@ -430,7 +436,11 @@ const RecordInsightChat: React.FC<RecordInsightChatProps> = ({
             type="button"
             className="btn btn-ghost btn-xs btn-circle"
             onClick={() => setIsExpanded((prev) => !prev)}
-            title={isExpanded ? "Collapse height" : "Expand height"}
+            title={
+              isExpanded
+                ? t.translations.INSIGHT_COLLAPSE_HEIGHT
+                : t.translations.INSIGHT_EXPAND_HEIGHT
+            }
             disabled={isWidgetCollapsed}
           >
             {isExpanded ? (
@@ -443,7 +453,11 @@ const RecordInsightChat: React.FC<RecordInsightChatProps> = ({
             type="button"
             className="btn btn-ghost btn-xs btn-circle"
             onClick={() => setIsWidgetCollapsed((prev) => !prev)}
-            title={isWidgetCollapsed ? "Expand widget" : "Collapse widget"}
+            title={
+              isWidgetCollapsed
+                ? t.translations.INSIGHT_EXPAND_WIDGET
+                : t.translations.INSIGHT_COLLAPSE_WIDGET
+            }
           >
             {isWidgetCollapsed ? (
               <ChevronDownIcon className="size-6" />

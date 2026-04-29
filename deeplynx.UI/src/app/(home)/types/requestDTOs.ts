@@ -14,34 +14,32 @@ export type RelatedRecordsRequestDto = {
   page?: number;
   pageSize?: number;
   hideArchived?: boolean;
-}
+};
 
-export type CreateRoleRequestDto =
-  {
-    name: string;
-    description?: string | null;
-  }
+export type CreateRoleRequestDto = {
+  name: string;
+  description?: string | null;
+};
 
-export type PermissionRequestDto =
-  {
-    name: string;
-    description?: string | null;
-    projectId?: number;
-    organizationId?: number;
-  }
+export type PermissionRequestDto = {
+  name: string;
+  description?: string | null;
+  projectId?: number;
+  organizationId?: number;
+};
 
 export type CreateOrganizationRequestDto = {
   name: string;
   description?: string;
   banner?: string;
-}
+};
 
 export type UpdateOrganizationRequestDto = {
   name?: string | null;
   description?: string | null;
   defaultOrg?: boolean | null;
   banner?: string | null;
-}
+};
 
 export type CreateOauthApplicationRequestDto = {
   name: string;
@@ -49,7 +47,7 @@ export type CreateOauthApplicationRequestDto = {
   callbackUrl: string;
   baseUrl?: string;
   appOwnerEmail?: string;
-}
+};
 
 export type UpdateOauthApplicationRequestDto = {
   name?: string;
@@ -57,30 +55,30 @@ export type UpdateOauthApplicationRequestDto = {
   callbackUrl?: string;
   baseUrl?: string;
   appOwnerEmail?: string;
-}
+};
 
 export type CreateObjectStorageRequestDto = {
   name: string;
   config: Record<string, unknown>;
   default?: boolean;
-}
+};
 
 export type UpdateObjectStorageRequestDto = {
   name: string;
   default: boolean;
-}
+};
 
 export type CreateClassRequestDto = {
   name: string;
   description: string;
   uuid?: string;
-}
+};
 
 export type UpdateClassRequestDto = {
   name: string;
   description: string;
   uuid?: string;
-}
+};
 
 export type CreateDataSourceRequestDto = {
   name: string;
@@ -92,7 +90,6 @@ export type CreateDataSourceRequestDto = {
   default: boolean;
 };
 
-
 export type UpdateDataSourceRequestDto = {
   name?: string;
   description?: string | null;
@@ -101,7 +98,6 @@ export type UpdateDataSourceRequestDto = {
   baseUri?: string | null;
   config?: Record<string, unknown>;
 };
-
 
 export type CreateEdgeRequestDto = {
   origin_id?: number;
@@ -149,12 +145,12 @@ export type CreateEventRequestDto = {
 export type CreateGroupRequestDto = {
   name: string;
   description?: string;
-}
+};
 
 export type UpdateGroupRequestDto = {
   name?: string;
   description?: string;
-}
+};
 
 export type CreatePermissionRequestDto = {
   name: string;
@@ -234,7 +230,6 @@ export type UpdateRoleRequestDto = {
   description?: string | null;
 };
 
-
 export type CreateTokenDto = {
   apiKey: string;
   apiSecret: string;
@@ -243,19 +238,19 @@ export type CreateTokenDto = {
 
 export type CreateTagRequestDto = {
   name: string;
-}
+};
 export type UpdateTagRequestDto = {
   name?: string;
-}
+};
 export type CreateSensitivityLabelDto = {
   name: string;
   description?: string | null;
-}
+};
 
 export type UpdateSensitivityLabelDto = {
   name?: string | null;
   description?: string | null;
-}
+};
 
 export interface InviteUserToOrganizationRequestDto {
   userEmail: string;
@@ -266,4 +261,11 @@ export interface InviteUserToProjectRequestDto {
   userEmail: string;
   userName?: string;
   roleId?: number | string;
+}
+
+export type TriggerLatticeExtractionMode = "discovery" | "strict";
+
+export interface TriggerLatticeExtractionRequestDTO {
+  data_source_id: number;
+  mode: TriggerLatticeExtractionMode;
 }
