@@ -324,10 +324,7 @@ spec:
             - name: AIRFLOW_USERNAME
               value: ${AIRFLOW_USERNAME}
             - name: AIRFLOW_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: app-secrets
-                  key: airflow-password
+              value: ${AIRFLOW_PASSWORD}
             - name: OKTA_CLIENT_SECRET
               # Backend may also need these environment variables
 
