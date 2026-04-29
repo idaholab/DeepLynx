@@ -1,6 +1,7 @@
 using System.Text.Json.Nodes;
 using deeplynx.business;
 using deeplynx.datalayer.Models;
+using deeplynx.helpers;
 using deeplynx.helpers.Hubs;
 using deeplynx.interfaces;
 using deeplynx.models;
@@ -8,6 +9,7 @@ using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Moq;
+using Newtonsoft.Json;
 
 namespace deeplynx.tests;
 
@@ -26,6 +28,7 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
     private ObjectStorageBusiness _objectStorageBusiness;
     private Mock<IOrganizationBusiness> _organizationBusiness = null!;
     private ProjectBusiness _projectBusiness;
+    private EncryptionHelper _encryptionHelper = null!;
 
     public long archivedOs;
     private long organizationId;
@@ -51,9 +54,15 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
 
     public override async Task InitializeAsync()
     {
+        // Generate valid keys once and reuse them
+        // These are pre-generated valid AES-256 keys for testing
+        Environment.SetEnvironmentVariable("ENCRYPTION_KEY", "SU5TRUNVUkVfREVWX0tFWV8zMl9CWVRFU19MT05HISE="); // 32 bytes
+        Environment.SetEnvironmentVariable("ENCRYPTION_IV", "SU5TRUNVUkVfREVWX0lWIQ=="); // 16 bytes
+        
         await base.InitializeAsync();
         _organizationBusiness = new Mock<IOrganizationBusiness>();
-        _objectStorageBusiness = new ObjectStorageBusiness(Context);
+        _encryptionHelper = new EncryptionHelper();
+        _objectStorageBusiness = new ObjectStorageBusiness(Context, _encryptionHelper);
         _mockHubContext = new Mock<IHubContext<EventNotificationHub>>();
         _mockNotificationLogger = new Mock<ILogger<NotificationBusiness>>();
         _notificationBusiness =
@@ -1105,6 +1114,226 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
         Assert.NotNull(updatedObjectStorage.LastUpdatedByUser);
         Assert.Equal("Test User", updatedObjectStorage.LastUpdatedByUser.Name);
         Assert.Equal("Updated Name", updatedObjectStorage.Name);
+    }
+
+    #endregion
+    
+    #region GetDecryptedObjectStorages Tests
+
+    [Fact]
+    public async Task GetDecryptedObjectStorages_Success_FiltersByObjectStorageIds()
+    {
+        // Arrange
+        var config1 = new ObjectStorageConfigDto
+        {
+            MountPath = "./storage1/"
+        };
+        var config2 = new ObjectStorageConfigDto
+        {
+            AwsConnectionString = "aws-connection-string"
+        };
+        var config3 = new ObjectStorageConfigDto
+        {
+            AzureObjectConfig = new AzureObjectConfigDto
+            {
+                AzureConnectionString = "azure-connection-string",
+                AzureContainerName = "container-name"
+            }
+        };
+        
+        var encryptedConfig1 = _encryptionHelper.Encrypt(JsonConvert.SerializeObject(config1));
+        var encryptedConfig2 = _encryptionHelper.Encrypt(JsonConvert.SerializeObject(config2));
+        var encryptedConfig3 = _encryptionHelper.Encrypt(JsonConvert.SerializeObject(config3));
+
+        var storage1 = new ObjectStorage
+        {
+            Name = "Storage 1",
+            Type = "filesystem",
+            OrganizationId = organizationId,
+            ProjectId = null,
+            Config = encryptedConfig1,
+            Default = false,
+            IsArchived = false,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid
+        };
+        
+        var storage2 = new ObjectStorage
+        {
+            Name = "Storage 2",
+            Type = "aws_s3",
+            OrganizationId = organizationId,
+            ProjectId = null,
+            Config = encryptedConfig2,
+            Default = false,
+            IsArchived = false,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid
+        };
+        
+        var storage3 = new ObjectStorage
+        {
+            Name = "Storage 3",
+            Type = "azure_object",
+            OrganizationId = organizationId,
+            ProjectId = null,
+            Config = encryptedConfig3,
+            Default = false,
+            IsArchived = false,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid
+        };
+
+        Context.ObjectStorages.AddRange(storage1, storage2, storage3);
+        await Context.SaveChangesAsync();
+
+        // Act
+        var result = await _objectStorageBusiness.GetDecryptedObjectStorages(
+            null, null, new List<long> { storage1.Id, storage3.Id }, true);
+
+        // Assert
+        Assert.Equal(2, result.Count);
+        Assert.Contains(result, r => r.Name == "Storage 1");
+        Assert.Contains(result, r => r.Name == "Storage 3");
+        Assert.DoesNotContain(result, r => r.Name == "Storage 2");
+    }
+    
+    [Fact]
+    public async Task GetDecryptedObjectStorages_Fails_NoFiltersProvided()
+    {
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => _objectStorageBusiness.GetDecryptedObjectStorages(null, null, null, true));
+
+        Assert.Contains("At least one organization, project or object storage filter must be set", 
+            exception.Message);
+    }
+
+    [Fact]
+    public async Task GetDecryptedObjectStorages_Fails_EmptyObjectStorageIds()
+    {
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => _objectStorageBusiness.GetDecryptedObjectStorages(null, null, new List<long>(), true));
+
+        Assert.Contains("At least one organization, project or object storage filter must be set", 
+            exception.Message);
+    }
+
+    [Fact]
+    public async Task GetDecryptedObjectStorages_Success_DecryptsFilesystemConfigCorrectly()
+    {
+        // Arrange
+        var config = new ObjectStorageConfigDto
+        {
+            MountPath = "./my-test-storage/"
+        };
+        var encryptedConfig = _encryptionHelper.Encrypt(JsonConvert.SerializeObject(config));
+
+        var storage = new ObjectStorage
+        {
+            Name = "Test Storage",
+            Type = "filesystem",
+            OrganizationId = organizationId,
+            ProjectId = null,
+            Config = encryptedConfig,
+            Default = true,
+            IsArchived = false,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid
+        };
+
+        Context.ObjectStorages.Add(storage);
+        await Context.SaveChangesAsync();
+
+        // Act
+        var result = await _objectStorageBusiness.GetDecryptedObjectStorages(
+            organizationId, null, null, true);
+
+        // Assert
+        Assert.Single(result);
+        var decryptedStorage = result[0];
+        Assert.Equal("./my-test-storage/", decryptedStorage.Config.MountPath);
+    }
+
+    [Fact]
+    public async Task GetDecryptedObjectStorages_Success_DecryptsAwsConfigCorrectly()
+    {
+        // Arrange
+        var config = new ObjectStorageConfigDto
+        {
+            AwsConnectionString = "my-aws-connection-string"
+        };
+        var encryptedConfig = _encryptionHelper.Encrypt(JsonConvert.SerializeObject(config));
+
+        var storage = new ObjectStorage
+        {
+            Name = "AWS Storage",
+            Type = "aws_s3",
+            OrganizationId = organizationId,
+            ProjectId = null,
+            Config = encryptedConfig,
+            Default = false,
+            IsArchived = false,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid
+        };
+
+        Context.ObjectStorages.Add(storage);
+        await Context.SaveChangesAsync();
+
+        // Act
+        var result = await _objectStorageBusiness.GetDecryptedObjectStorages(
+            organizationId, null, null, true);
+
+        // Assert
+        Assert.Single(result);
+        var decryptedStorage = result[0];
+        Assert.Equal("my-aws-connection-string", decryptedStorage.Config.AwsConnectionString);
+    }
+
+    [Fact]
+    public async Task GetDecryptedObjectStorages_Success_DecryptsAzureConfigCorrectly()
+    {
+        // Arrange
+        var config = new ObjectStorageConfigDto
+        {
+            AzureObjectConfig = new AzureObjectConfigDto
+            {
+                AzureConnectionString = "my-azure-connection-string",
+                AzureContainerName = "my-container"
+            }
+        };
+        var encryptedConfig = _encryptionHelper.Encrypt(JsonConvert.SerializeObject(config));
+
+        var storage = new ObjectStorage
+        {
+            Name = "Azure Storage",
+            Type = "azure_object",
+            OrganizationId = organizationId,
+            ProjectId = null,
+            Config = encryptedConfig,
+            Default = false,
+            IsArchived = false,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid
+        };
+
+        Context.ObjectStorages.Add(storage);
+        await Context.SaveChangesAsync();
+
+        // Act
+        var result = await _objectStorageBusiness.GetDecryptedObjectStorages(
+            organizationId, null, null, true);
+
+        // Assert
+        Assert.Single(result);
+        var decryptedStorage = result[0];
+        Assert.NotNull(decryptedStorage.Config.AzureObjectConfig);
+        Assert.Equal("my-azure-connection-string", 
+            decryptedStorage.Config.AzureObjectConfig.AzureConnectionString);
+        Assert.Equal("my-container", 
+            decryptedStorage.Config.AzureObjectConfig.AzureContainerName);
     }
 
     #endregion

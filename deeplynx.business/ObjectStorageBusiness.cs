@@ -12,9 +12,11 @@ namespace deeplynx.business;
 public class ObjectStorageBusiness : IObjectStorageBusiness
 {
     private readonly DeeplynxContext _context;
+    private readonly EncryptionHelper _encryptionHelper;
 
-    public ObjectStorageBusiness(DeeplynxContext context)
+    public ObjectStorageBusiness(DeeplynxContext context, EncryptionHelper encryptionHelper)
     {
+        _encryptionHelper = encryptionHelper;
         _context = context;
     }
 
@@ -522,6 +524,65 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
         }
     }
 
+    public async Task<List<ObjectStorageDecryptedDto>> GetDecryptedObjectStorages(
+        long? organizationId,
+        long? projectId,
+        List<long>? objectStorageIds,
+        bool hideArchived)
+    {
+        if (!organizationId.HasValue && !projectId.HasValue && 
+            (objectStorageIds == null || !objectStorageIds.Any()))
+        {
+            throw new InvalidOperationException(
+                $"At least one organization, project or object storage filter must be set.");
+        }
+        
+        var query = _context.ObjectStorages.AsQueryable();
+
+        if (organizationId.HasValue)
+            query = query.Where(os => os.OrganizationId == organizationId);
+
+        if (projectId.HasValue)
+            query = query.Where(os => os.ProjectId == projectId || os.ProjectId == null);
+        else
+            query = query.Where(os => os.ProjectId == null);
+
+        if (objectStorageIds.Any())
+            query = query.Where(os => objectStorageIds.Contains(os.Id));
+        
+        if (hideArchived)
+            query = query.Where(os => !os.IsArchived);
+        
+        var objectStorages = await query.ToListAsync();
+        return objectStorages
+            .Select(os => new ObjectStorageDecryptedDto
+            {
+                Id = os.Id,
+                Name = os.Name,
+                Type = os.Type,
+                ProjectId = os.ProjectId,
+                OrganizationId = os.OrganizationId,
+                Default = os.Default,
+                LastUpdatedAt = os.LastUpdatedAt,
+                LastUpdatedBy = os.LastUpdatedBy,
+                IsArchived = os.IsArchived,
+                Config = DeserializeAndDecryptConfig(os.Config)
+            }).ToList();
+    }
+    
+    // Private Helpers
+    // private String SerializeAndEncryptConfig(ObjectStorageConfigDto config)
+    // {
+    //     
+    // }
+    
+    private ObjectStorageConfigDto DeserializeAndDecryptConfig(string encryptedConfig)
+    {
+        var decrypted = _encryptionHelper.Decrypt(encryptedConfig);
+        return JsonConvert.DeserializeObject<ObjectStorageConfigDto>(decrypted)
+               ?? throw new InvalidOperationException("Config data for object storage is null or invalid");
+    }
+    
     private async Task ResetProjectDefaults(long projectId, long newDefaultId)
     {
         // check for existing defaults at the project level and remove them from being default

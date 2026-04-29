@@ -41,6 +41,7 @@ public class FileBusinessTests : IntegrationTestBase
     private ISensitivityLabelService _sensitivityLabelService = null!;
     private TagBusiness _tagBusiness = null!;
     private Mock<IInsightBusiness> _insightBusiness = null!;
+    private EncryptionHelper _encryptionHelper = null!;
 
     public long did; // datasource ID
     public long oid; // organization ID
@@ -54,6 +55,11 @@ public class FileBusinessTests : IntegrationTestBase
 
     public override async Task InitializeAsync()
     {
+        // Generate valid keys once and reuse them
+        // These are pre-generated valid AES-256 keys for testing
+        Environment.SetEnvironmentVariable("ENCRYPTION_KEY", "SU5TRUNVUkVfREVWX0tFWV8zMl9CWVRFU19MT05HISE="); // 32 bytes
+        Environment.SetEnvironmentVariable("ENCRYPTION_IV", "SU5TRUNVUkVfREVWX0lWIQ=="); // 16 bytes
+        
         await base.InitializeAsync();
         Directory.CreateDirectory(_testDirectory);
         Directory.CreateDirectory(_orgDefaultDirectory);
@@ -63,6 +69,7 @@ public class FileBusinessTests : IntegrationTestBase
         _relationshipBusiness = new Mock<IRelationshipBusiness>();
         _mockNotificationLogger = new Mock<ILogger<NotificationBusiness>>();
         _mockTimeseriesLogger = new Mock<ILogger<OlapBusiness>>();
+        _encryptionHelper = new EncryptionHelper();
         _notificationBusiness =
             new NotificationBusiness(Context, _mockNotificationLogger.Object, _mockHubContext.Object);
         _mockBulkCopyExecutor = new BulkCopyUpsertExecutor();
@@ -73,7 +80,7 @@ public class FileBusinessTests : IntegrationTestBase
 
         _dataSourceBusiness =
             new DataSourceBusiness(Context, _edgeBusiness.Object, _recordBusiness, _eventBusiness);
-        _objectStorageBusiness = new ObjectStorageBusiness(Context);
+        _objectStorageBusiness = new ObjectStorageBusiness(Context, _encryptionHelper);
 
         _tagBusiness = new TagBusiness(Context, _eventBusiness);
         _sensitivityLabelBusiness = new SensitivityLabelBusiness(Context, _eventBusiness);
@@ -83,7 +90,7 @@ public class FileBusinessTests : IntegrationTestBase
 
         _dataSourceBusiness =
             new DataSourceBusiness(Context, _edgeBusiness.Object, _recordBusiness, _eventBusiness);
-        _objectStorageBusiness = new ObjectStorageBusiness(Context);
+        _objectStorageBusiness = new ObjectStorageBusiness(Context, _encryptionHelper);
         _timeseriesBusiness = new OlapBusiness(Context, _recordBusiness, _mockTimeseriesLogger.Object);
         _classBusiness = new ClassBusiness(Context, _recordBusiness, _relationshipBusiness.Object, _eventBusiness);
 

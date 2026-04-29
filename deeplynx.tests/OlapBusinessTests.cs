@@ -74,6 +74,7 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
     private ObjectStorageConfigDto _objectStorageConfig = null!;
     private OlapBusiness _olapBusiness = null!;
     private Mock<IInsightBusiness> _insightBusiness = null!;
+    private EncryptionHelper _encryptionHelper = null!;
 
     private long _organizationId;
     private long _projectId;
@@ -98,6 +99,11 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
 
     public override async Task InitializeAsync()
     {
+        // Generate valid keys once and reuse them
+        // These are pre-generated valid AES-256 keys for testing
+        Environment.SetEnvironmentVariable("ENCRYPTION_KEY", "SU5TRUNVUkVfREVWX0tFWV8zMl9CWVRFU19MT05HISE="); // 32 bytes
+        Environment.SetEnvironmentVariable("ENCRYPTION_IV", "SU5TRUNVUkVfREVWX0lWIQ=="); // 16 bytes
+        
         await base.InitializeAsync();
 
         // Set up mocks
@@ -120,7 +126,8 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
         _insightBusiness = new Mock<IInsightBusiness>();
 
         // Set up business layer dependencies
-        _objectStorageBusiness = new ObjectStorageBusiness(Context);
+        _encryptionHelper = new EncryptionHelper();
+        _objectStorageBusiness = new ObjectStorageBusiness(Context, _encryptionHelper);
         _notificationBusiness =
             new NotificationBusiness(Context, _mockNotificationLogger.Object, _mockHubContext.Object);
         _dataSourceBusiness = new DataSourceBusiness(Context, _edgeBusiness.Object, _recordBusiness, _eventBusiness);
