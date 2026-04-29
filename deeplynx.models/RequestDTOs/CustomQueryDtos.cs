@@ -26,6 +26,12 @@ public class CustomQueryDtos
                 public DateTime? LastUpdatedBefore { get; set; }
                 public DateTime? LastUpdatedAfter { get; set; }
         }
+
+        public class SavedSearchDto
+        {
+                public CustomQueryRequestDto[] Filter { get; set; }
+                public string? TextSearch { get; set; }
+        }
 }
 
 
