@@ -368,13 +368,13 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
                                                      SELECT name, class_or_relationship_id, type, description, score, text_chunk,
                                                             origin_class, destination_class
                                                      FROM (
-                                                         SELECT 
+                                                         SELECT
                                                              COALESCE(c.name, rel.name)                                      AS name,
                                                              COALESCE(ov.class_id, ov.relationship_id)                       AS class_or_relationship_id,
                                                              CASE WHEN ov.class_id IS NOT NULL THEN 'class' ELSE 'relationship' END AS type,
                                                              COALESCE(c.description, rel.description)                        AS description,
                                                              1 - (ov.vector <=> e.vector)                                    AS score,
-                                                             e.text_chunk,
+                                                             e.text_chunk                                                    AS text_chunk,
                                                              CASE WHEN ov.relationship_id IS NOT NULL THEN origin_c.name  END AS origin_class,
                                                              CASE WHEN ov.relationship_id IS NOT NULL THEN dest_c.name    END AS destination_class,
                                                              ROW_NUMBER() OVER (
@@ -391,7 +391,7 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
                                                            AND (c.project_id = {projectId} OR rel.project_id = {projectId})
                                                      ) ranked
                                                      WHERE rank <= {limit}
-                                                     ORDER BY text_chunk, rank; 
+                                                     ORDER BY text_chunk, rank;
                                                      """)
             .ToListAsync();
     }
@@ -540,7 +540,7 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
                   
                 DOCUMENT TEXT:
                   
-                {text}{truncation}
+                {text}
                   
                 Return ONLY valid JSON (no markdown, no explanations):
                   
@@ -636,8 +636,8 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
             }
 
             var filledPrompt = prompt
-                .Replace("{entity_list}", entityList)
-                .Replace("{relation_list}", relationList)
+                .Replace("{class_list}", entityList)
+                .Replace("{relationship_list}", relationList)
                 .Replace("{text}", text);
             
             return filledPrompt;
