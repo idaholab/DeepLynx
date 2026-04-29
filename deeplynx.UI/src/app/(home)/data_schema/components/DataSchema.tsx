@@ -461,8 +461,8 @@ export default function DataSchema({ mode }: DataSchemaProps) {
         name: normalizedName,
         description: newRelationshipDraft.description.trim(),
         uuid: newRelationshipDraft.uuid.trim() || undefined,
-        origin_id: newRelationshipDraft.originId,
-        destination_id: newRelationshipDraft.destinationId,
+        origin_id: newRelationshipDraft.originId ?? undefined,
+        destination_id: newRelationshipDraft.destinationId ?? undefined,
       };
 
       const createdRelationship = await createRelationship(projectId, dto);
