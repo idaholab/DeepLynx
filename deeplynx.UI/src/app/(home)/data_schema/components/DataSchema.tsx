@@ -1121,6 +1121,12 @@ export default function DataSchema({ mode }: DataSchemaProps) {
     </div>
   );
 
+  const contentByMode: Record<LayoutMode, React.ReactNode> = {
+    split: splitContent,
+    tabs: tabContent,
+    board: boardContent,
+  };
+
   return (
     <div>
       <div className="bg-base-200/40 p-6 px-3 sm:px-6 lg:px-12">
@@ -1135,9 +1141,7 @@ export default function DataSchema({ mode }: DataSchemaProps) {
       </div>
 
       <div className="space-y-6 p-2 sm:p-3">
-        {mode === "split" && splitContent}
-        {mode === "tabs" && tabContent}
-        {mode === "board" && boardContent}
+        {contentByMode[mode]}
       </div>
       
       {isCreateClassModalOpen ? (
