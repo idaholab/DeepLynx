@@ -193,8 +193,8 @@ try
     builder.Services.AddScoped<ISensitivityLabelService, SensitivityLabelService>();
     builder.Services.AddTransient<IInsightBusiness, InsightBusiness>();
     builder.Services.AddTransient<ILatticeExtractionBusiness, LatticeExtractionBusiness>();
+    builder.Services.AddMemoryCache();
     builder.Services.AddHttpClient<InsightServiceClient>();
-    builder.Services.AddSingleton<AirflowTokenService>();
     builder.Services.AddHttpClient<AirflowServiceClient>();
 
     //OpenApi Documentation
