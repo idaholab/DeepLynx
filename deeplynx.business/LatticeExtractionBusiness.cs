@@ -450,7 +450,7 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
     }
     
     
-    // Extraction needs at least 2 classes and 1 relationship (user made) to proceed
+    /// <summary>Throws if the project has fewer than 2 non-default classes or no relationships — the minimum needed for extraction.</summary>
     private async Task EnsureOntologyReady(long projectId)
     {
         // Default classes don't count
@@ -472,6 +472,7 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
         }
     }
 
+    /// <summary>Builds the LLM extraction prompt by running a similarity search and injecting the top-ranked ontology context and document text chunks.</summary>
     private async Task<string> ConstructPrompt(long recordId, long projectId, string mode)
     {
             //Cosine similarity search to retrieve similar ontology data with respect to document text chunk
@@ -643,16 +644,19 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
             return filledPrompt;
     }
     
+    /// <summary>Returns the staging class ID for the given name, or null if not found in the current payload.</summary>
     private static long? ResolveClassId(string? name, Dictionary<string, long> map)
     {
         return name != null && map.TryGetValue(name, out var id) ? id : null;
     }
 
+    /// <summary>Returns the staging record ID for the given original ID, or null if not found in the current payload.</summary>
     private static long? ResolveRecordId(string? originalId, Dictionary<string, long> map)
     {
         return originalId != null && map.TryGetValue(originalId, out var id) ? id : null;
     }
 
+    /// <summary>Returns the staging relationship ID for the given name, or null if not found in the current payload.</summary>
     private static long? ResolveRelationshipId(string? name, Dictionary<string, long> map)
     {
         return name != null && map.TryGetValue(name, out var id) ? id : null;
