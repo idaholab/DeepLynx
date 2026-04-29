@@ -31,7 +31,7 @@ import {
   updateRelationship,
 } from "@/app/lib/client_service/relationship_services.client";
 
-type LayoutMode = "split" | "tabs" | "board";
+type LayoutMode = "tabs";
 
 type Selection =
   | { kind: "class"; id: number }
@@ -43,12 +43,8 @@ interface DataSchemaProps {
 }
 
 const modeDescriptions: Record<LayoutMode, string> = {
-  split:
-    "Both resources stay visible at once, which makes cross-checking class definitions and relationship rules straightforward.",
   tabs:
-    "The workflow focuses one resource at a time while preserving the same CRUD inspector and list density.",
-  board:
-    "A more visual control room: class inventory on the left, relationship flow in the middle, and a shared inspector on the right.",
+    "Creation and management of classes and relationships to assign to records and vectors",
 };
 
 function statusClass(isArchived: boolean) {
@@ -1130,7 +1126,7 @@ export default function DataSchema({ mode }: DataSchemaProps) {
       <div className="bg-base-200/40 p-6 px-3 sm:px-6 lg:px-12">
         <div>
           <h1 className="text-xl font-bold text-base-content break-words sm:text-2xl">
-            Class and Relationship CRUD
+            Data Schema
           </h1>
           <p className="max-w-4xl text-sm text-base-content/70">
             {modeDescriptions[mode]}
