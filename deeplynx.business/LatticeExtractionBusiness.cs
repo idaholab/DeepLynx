@@ -364,7 +364,7 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
         long limit = 20)
     {
         return await _context.Database
-            .SqlQuery<OntologySimilarityResultDto>($$"""
+            .SqlQuery<OntologySimilarityResultDto>($"""
                                                      SELECT name, class_or_relationship_id, type, description, score, text_chunk,
                                                             origin_class, destination_class
                                                      FROM (
@@ -425,8 +425,17 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
     
         if (!recordEmbedded)
         {
-            var vlmConfig = await _insightBusiness.ResolveModelConfig(
-                currentUserId, organizationId, projectId, null, "vlm");
+            AiModelConfigResponseDto vlmConfig;
+            try
+            {
+                vlmConfig = await _insightBusiness.ResolveModelConfig(
+                    currentUserId, organizationId, projectId, null, "vlm");
+            }
+            catch (KeyNotFoundException)
+            {
+                vlmConfig = await _insightBusiness.ResolveModelConfig(
+                    currentUserId, organizationId, projectId, null, "llm");
+            }
             var embeddingConfig = await _insightBusiness.ResolveModelConfig(
                 currentUserId, organizationId, projectId, null, "embedding");
             _insightBusiness.TriggerEmbedding(projectId, recordId, record.Uri!, vlmConfig, embeddingConfig);
