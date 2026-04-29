@@ -507,27 +507,27 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
             var strictPrompt = """
                 You are a precise information extraction system for formal ontology-based knowledge graphs.
                   
-                Your task is to extract entities and relationships that MATCH the provided ontology schema.
+                Your task is to extract classes and relationships that MATCH the provided ontology schema.
                   
                 This ontology follows Common Core Ontologies (CCO) standards - a domain-neutral framework used across military, government, commercial, and academic sectors. Extract information relevant to ANY domain (defense, infrastructure, operations, organizations, facilities, equipment, personnel, etc.).
                   
-                ONTOLOGY SCHEMA - Entity Types (with definitions):
+                ONTOLOGY SCHEMA - Class Types (with definitions):
                   
-                {entity_list}
+                {class_list}
                   
-                ONTOLOGY SCHEMA - Valid Relation Patterns (domain, predicate, range):
+                ONTOLOGY SCHEMA - Valid Relationship Patterns (domain, predicate, range):
                   
-                {relation_list}
+                {relationship_list}
                   
                 EXTRACTION RULES (STRICT MODE - Ontology Compliance):
                   
-                1. Extract ONLY entities matching the provided entity types
-                2. Use the type definitions to correctly classify entities
-                3. Extract ONLY relations matching the valid relation patterns
-                4. Each relation MUST include subject_type and object_type
-                5. Every entity in a relation MUST also appear in the entities array
+                1. Extract ONLY classes matching the provided class types
+                2. Use the type definitions to correctly classify classes
+                3. Extract ONLY relationships matching the valid relationship patterns
+                4. Each relationship MUST include subject_type and object_type
+                5. Every class in a relationship MUST also appear in the class array
                 6. Assign confidence scores (0.0 to 1.0) based on extraction certainty
-                7. DO NOT create new entity types - use only the types listed above
+                7. DO NOT create new class types - use only the types listed above
                 8. Apply to ANY domain: military operations, facilities, organizations, equipment, personnel, missions, etc.
                  
                 ATTRIBUTE EXTRACTION RULES:
@@ -545,48 +545,48 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
                 Return ONLY valid JSON (no markdown, no explanations):
                   
                 {{
-                    "entities": [
-                        {{"entity": "RAF Mildenhall", "entity_type": "Air Force Base", "confidence": 0.95, "attributes": {{"location": "United Kingdom", "unit": "100th Air Refueling Wing"}}}},
-                        {{"entity": "100th Air Refueling Wing", "entity_type": "Military Organization", "confidence": 0.92, "attributes": {{"role": "air refueling", "commander": "Col. Johnny Galbert"}}}}
+                    "classes": [
+                        {{"class": "RAF Mildenhall", "class_type": "Air Force Base", "confidence": 0.95, "attributes": {{"location": "United Kingdom", "unit": "100th Air Refueling Wing"}}}},
+                        {{"class": "100th Air Refueling Wing", "class_type": "Military Organization", "confidence": 0.92, "attributes": {{"role": "air refueling", "commander": "Col. Johnny Galbert"}}}}
                     ],
-                    "relations": [
+                    "relationships": [
                         {{"subject": "100th Air Refueling Wing", "subject_type": "Military Organization",
-                        "relation_type": "located at", "object": "RAF Mildenhall", "object_type": "Air Force Base", "confidence": 0.90}}
+                        "relationship_type": "located at", "object": "RAF Mildenhall", "object_type": "Air Force Base", "confidence": 0.90}}
                     ]
                 }}
                   
-                CRITICAL: Use EXACT entity type names from the ontology schema. Be thorough - extract all relevant entities and relationships from the document.
+                CRITICAL: Use EXACT class type names from the ontology schema. Be thorough - extract all relevant classes and relationships from the document.
                 """;
             
             var discoveryPrompt = """
                 You are a knowledge extraction system for formal ontology-based knowledge graphs.
                 
-                Your task is to extract entities and relationships, preferring the provided ontology schema but discovering new types when necessary.
+                Your task is to extract classes and relationships, preferring the provided ontology schema but discovering new types when necessary.
                 
-                This ontology uses Common Core Ontologies (CCO) - a domain-neutral standard framework covering entities across ALL sectors: military operations, defense systems, government organizations, commercial facilities, infrastructure, personnel, missions, equipment, and more.
+                This ontology uses Common Core Ontologies (CCO) - a domain-neutral standard framework covering classes across ALL sectors: military operations, defense systems, government organizations, commercial facilities, infrastructure, personnel, missions, equipment, and more.
                 
-                PREFERRED ENTITY TYPES (use when applicable):
+                PREFERRED CLASS TYPES (use when applicable):
                 
-                {entity_list}
+                {class_list}
                 
-                PREFERRED RELATION PATTERNS (use when applicable):
+                PREFERRED RELATIONSHIP PATTERNS (use when applicable):
                 
-                {relation_list}
+                {relationship_list}
                 
                 EXTRACTION RULES (DISCOVERY MODE - Balanced Precision/Discovery):
                 
-                1. PREFER entities from the ontology types above when they fit well
+                1. PREFER classes from the ontology types above when they fit well
                 2. If an entity doesn't match any provided type well:
                    - Still extract it if contextually important
                    - Use the most similar ontology type, OR
                    - Create a specific descriptive type (e.g., "TacticalOperationsCenter", "MunitionsStorageFacility")
                 3. For discovered types, use confidence 0.60-0.80 (lower than ontology matches)
-                4. PREFER relations from the provided patterns
+                4. PREFER relationships from the provided patterns
                 5. If a relationship doesn't fit any pattern:
                    - Still extract if it represents important domain knowledge
-                   - Use descriptive relation names (e.g., "supports", "coordinates_with", "supervises")
-                6. Each relation MUST include subject_type and object_type
-                7. Every entity in a relation MUST also appear in the entities array
+                   - Use descriptive relationship names (e.g., "supports", "coordinates_with", "supervises")
+                6. Each relationship MUST include subject_type and object_type
+                7. Every class in a relationship MUST also appear in the classes array
                 
                 ATTRIBUTE EXTRACTION RULES:
                 1. Attributes MUST be explicitly stated in the document text.
@@ -611,15 +611,15 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
                 Return ONLY valid JSON (no markdown, no explanations):
                 
                 {{
-                    "entities": [
-                        {{"entity": "RAF Mildenhall", "entity_type": "Air Force Base", "confidence": 0.95, "attributes": {{"location": "United Kingdom", "unit": "100th Air Refueling Wing"}}}},
-                        {{"entity": "Tactical Operations Center", "entity_type": "CommandControlFacility", "confidence": 0.72, "attributes": {{"role": "command and control", "location": "operations center"}}}}
+                    "classes": [
+                        {{"class": "RAF Mildenhall", "class_type": "Air Force Base", "confidence": 0.95, "attributes": {{"location": "United Kingdom", "unit": "100th Air Refueling Wing"}}}},
+                        {{"class": "Tactical Operations Center", "class_type": "CommandControlFacility", "confidence": 0.72, "attributes": {{"role": "command and control", "location": "operations center"}}}}
                     ],
-                    "relations": [
+                    "relationships": [
                         {{"subject": "100th Air Refueling Wing", "subject_type": "Military Organization",
-                        "relation_type": "stationed at", "object": "RAF Mildenhall", "object_type": "Air Force Base", "confidence": 0.90}},
+                        "relationship_type": "stationed at", "object": "RAF Mildenhall", "object_type": "Air Force Base", "confidence": 0.90}},
                         {{"subject": "Tactical Operations Center", "subject_type": "CommandControlFacility",
-                        "relation_type": "coordinates", "object": "100th Air Refueling Wing", "object_type": "Military Organization", "confidence": 0.75}}
+                        "relationship_type": "coordinates", "object": "100th Air Refueling Wing", "object_type": "Military Organization", "confidence": 0.75}}
                     ]
                 }}
                 
