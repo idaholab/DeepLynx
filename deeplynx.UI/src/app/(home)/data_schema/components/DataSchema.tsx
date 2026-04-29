@@ -384,7 +384,7 @@ export default function DataSchema({ mode }: DataSchemaProps) {
       const updatedClass = await updateClass(projectId, selectedClass.id, {
         name: classDraft.name.trim() || selectedClass.name,
         description:
-          classDraft.description.trim() || selectedClass.description,
+          classDraft.description.trim() || (selectedClass.description ?? ""),
       });
 
       setClasses((previous) =>
@@ -499,7 +499,7 @@ export default function DataSchema({ mode }: DataSchemaProps) {
           name: relationshipDraft.name.trim() || selectedRelationship.name,
           description:
             relationshipDraft.description.trim() ||
-            selectedRelationship.description,
+            (selectedRelationship.description ?? ""),
           origin_id: relationshipDraft.originId ?? undefined,
           destination_id: relationshipDraft.destinationId ?? undefined,
         },
