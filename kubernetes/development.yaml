@@ -319,6 +319,15 @@ spec:
               value: ${INSIGHT_FASTAPI_URL}
             - name: SUPERUSER_EMAIL
               value: ${SUPERUSER_EMAIL}
+            - name: AIRFLOW_BASE_URL
+              value: ${AIRFLOW_BASE_URL}
+            - name: AIRFLOW_USERNAME
+              value: ${AIRFLOW_USERNAME}
+            - name: AIRFLOW_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: airflow-password
             - name: OKTA_CLIENT_SECRET
               # Backend may also need these environment variables
 

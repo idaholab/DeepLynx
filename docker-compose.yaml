@@ -79,6 +79,9 @@ services:
       DISABLE_BACKEND_AUTHENTICATION: true # change to false if supplying okta info on lines 12-13, 25-26
       SUPERUSER_EMAIL: jaren.brownlee@inl.gov
       INSIGHT_FASTAPI_URL: http://insight-fastapi:5009
+      AIRFLOW_BASE_URL: http://localhost:8080
+      AIRFLOW_USERNAME: admin
+      AIRFLOW_PASSWORD: admin
     entrypoint: /usr/local/bin/entrypoint.sh
     ports:
       - "5000:5000"
