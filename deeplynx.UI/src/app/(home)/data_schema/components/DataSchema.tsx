@@ -44,7 +44,7 @@ interface DataSchemaProps {
 
 const modeDescriptions: Record<LayoutMode, string> = {
   tabs:
-    "Creation and management of classes and relationships to assign to records and vectors",
+    "Creation and management of classes and relationships to assign to records and edges",
 };
 
 function statusClass(isArchived: boolean) {
