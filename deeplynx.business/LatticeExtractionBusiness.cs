@@ -20,8 +20,8 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
         _insightBusiness = insightBusiness;
         _insightServiceClient = insightServiceClient;
     }
-    
-     /// <summary>
+
+    /// <summary>
     ///     Creates a Pending Extraction record, builds ontology context via similarity search,
     ///     generates a short-lived callback token, and fires the trigger request to Lattice.
     ///     Returns immediately after Lattice acknowledges with 202; the extraction runs
@@ -46,9 +46,10 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
                          .Where(r => r.Id == recordId && r.ProjectId == projectId)
                          .FirstOrDefaultAsync()
                      ?? throw new InvalidOperationException($"Record {recordId} not found in project {projectId}");
-        
-        //TODO: Check for if 2 classes and 1 relationship exist 
-        
+
+        // Minimum ontology items necessary for extraction
+        await EnsureOntologyReady(projectId);
+
         // Ontology embeddings must exist before triggering. If they're missing, queue
         // them automatically and fail fast so the user can retry once they're ready.
         await EnsureEmbeddingsReady(currentUserId, organizationId, projectId, recordId, record);
@@ -63,176 +64,23 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
 
         try
         {
-            //Cosine similarity search to retrieve similar ontology data with respect to document text chunk
-            var results = await SearchOntologySimilarity(
-                recordId, projectId);
+            var filledPrompt = await ConstructPrompt(recordId, projectId, mode);
 
-            var classes = results
-                .Where(r => r.Type == "class")
-                .DistinctBy(r => r.ClassRelationshipId)
-                .Select(r => $"{r.Name}: {r.Description}");
+            //TODO: Fix hard coded model name. 
+            var response =
+                await _insightServiceClient.LatticeExtraction(filledPrompt, "Mistral-Small-3.2-24B-Instruct-2506");
 
-            var relationships = results
-                .Where(r => r.Type == "relationship" && r.RelationshipPattern != null)
-                .DistinctBy(r => r.ClassRelationshipId)
-                .Select(r => $"({r.RelationshipPattern!.OriginClassName}) -{r.RelationshipPattern.RelationshipName}-> ({r.RelationshipPattern.DestinationClassName})");
-
-            var textChunks = results
-                .Where(r => !string.IsNullOrEmpty(r.TextChunk))
-                .DistinctBy(r => r.TextChunk)
-                .Select(r => r.TextChunk!);
-
-            var entityList   = string.Join("\n", classes);
-            var relationList = string.Join("\n", relationships);
-            var text         = string.Join("\n\n", textChunks);
-            
-            //TODO: Construct payload to send to Insight 
-            //entity list is [(class name, description)]
-            //relation_list is [(origin class name, relationship name, destination class name)] 
-            //TODO: context_block is graph context, 2 hops 
-            //{text}{truncation} is ["example text", "text"]
-            //TODO: {truncation} is for document text chunk truncation, necessary only if it exceeds a certain character limit. Plus the "...truncated" message to the LLM
-            var prompt = "";
-            var strictPrompt = """
-                You are a precise information extraction system for formal ontology-based knowledge graphs.
-                  
-                Your task is to extract entities and relationships that MATCH the provided ontology schema.
-                  
-                This ontology follows Common Core Ontologies (CCO) standards - a domain-neutral framework used across military, government, commercial, and academic sectors. Extract information relevant to ANY domain (defense, infrastructure, operations, organizations, facilities, equipment, personnel, etc.).
-                  
-                ONTOLOGY SCHEMA - Entity Types (with definitions):
-                  
-                {entity_list}
-                  
-                ONTOLOGY SCHEMA - Valid Relation Patterns (domain, predicate, range):
-                  
-                {relation_list}
-                  
-                EXTRACTION RULES (STRICT MODE - Ontology Compliance):
-                  
-                1. Extract ONLY entities matching the provided entity types
-                2. Use the type definitions to correctly classify entities
-                3. Extract ONLY relations matching the valid relation patterns
-                4. Each relation MUST include subject_type and object_type
-                5. Every entity in a relation MUST also appear in the entities array
-                6. Assign confidence scores (0.0 to 1.0) based on extraction certainty
-                7. DO NOT create new entity types - use only the types listed above
-                8. Apply to ANY domain: military operations, facilities, organizations, equipment, personnel, missions, etc.
-                 
-                ATTRIBUTE EXTRACTION RULES:
-                1. Attributes MUST be explicitly stated in the document text.
-                2. Do NOT infer, speculate, or guess missing attributes.
-                3. Extract up to 5 high-value attributes per entity.
-                4. Prefer high-signal keys when available (e.g., manufacturer, model, role, location, dimensions, capacity, date, unit, commander).
-                5. Omit uncertain attributes entirely.
-                6. Keep values short and literal (no long paraphrases).
-                  
-                DOCUMENT TEXT:
-                  
-                {text}{truncation}
-                  
-                Return ONLY valid JSON (no markdown, no explanations):
-                  
-                {{
-                    "entities": [
-                        {{"entity": "RAF Mildenhall", "entity_type": "Air Force Base", "confidence": 0.95, "attributes": {{"location": "United Kingdom", "unit": "100th Air Refueling Wing"}}}},
-                        {{"entity": "100th Air Refueling Wing", "entity_type": "Military Organization", "confidence": 0.92, "attributes": {{"role": "air refueling", "commander": "Col. Johnny Galbert"}}}}
-                    ],
-                    "relations": [
-                        {{"subject": "100th Air Refueling Wing", "subject_type": "Military Organization",
-                        "relation_type": "located at", "object": "RAF Mildenhall", "object_type": "Air Force Base", "confidence": 0.90}}
-                    ]
-                }}
-                  
-                CRITICAL: Use EXACT entity type names from the ontology schema. Be thorough - extract all relevant entities and relationships from the document.
-                """;
-            
-            var discoveryPrompt = """
-                You are a knowledge extraction system for formal ontology-based knowledge graphs.
-                
-                Your task is to extract entities and relationships, preferring the provided ontology schema but discovering new types when necessary.
-                
-                This ontology uses Common Core Ontologies (CCO) - a domain-neutral standard framework covering entities across ALL sectors: military operations, defense systems, government organizations, commercial facilities, infrastructure, personnel, missions, equipment, and more.
-                
-                PREFERRED ENTITY TYPES (use when applicable):
-                
-                {entity_list}
-                
-                PREFERRED RELATION PATTERNS (use when applicable):
-                
-                {relation_list}
-                
-                EXTRACTION RULES (DISCOVERY MODE - Balanced Precision/Discovery):
-                
-                1. PREFER entities from the ontology types above when they fit well
-                2. If an entity doesn't match any provided type well:
-                   - Still extract it if contextually important
-                   - Use the most similar ontology type, OR
-                   - Create a specific descriptive type (e.g., "TacticalOperationsCenter", "MunitionsStorageFacility")
-                3. For discovered types, use confidence 0.60-0.80 (lower than ontology matches)
-                4. PREFER relations from the provided patterns
-                5. If a relationship doesn't fit any pattern:
-                   - Still extract if it represents important domain knowledge
-                   - Use descriptive relation names (e.g., "supports", "coordinates_with", "supervises")
-                6. Each relation MUST include subject_type and object_type
-                7. Every entity in a relation MUST also appear in the entities array
-                
-                ATTRIBUTE EXTRACTION RULES:
-                1. Attributes MUST be explicitly stated in the document text.
-                2. Do NOT infer, speculate, or guess missing attributes.
-                3. Extract up to 5 high-value attributes per entity.
-                4. Prefer high-signal keys when available (e.g., manufacturer, model, role, location, dimensions, capacity, date, unit, commander).
-                5. Omit uncertain attributes entirely.
-                6. Keep values short and literal (no long paraphrases).
-                
-                DISCOVERY GUIDELINES:
-                
-                - Ontology matches: confidence 0.85-0.95
-                - Similar ontology types: confidence 0.75-0.85
-                - New discovered types: confidence 0.60-0.75
-                - Type names: Clear, specific, CamelCase (e.g., "AirTrafficControlTower", "SecureCommandFacility")
-                - Apply to ANY domain: extract military units, facilities, operations, personnel roles, equipment, missions, etc.
-                
-                DOCUMENT TEXT:
-                
-                {text}
-                
-                Return ONLY valid JSON (no markdown, no explanations):
-                
-                {{
-                    "entities": [
-                        {{"entity": "RAF Mildenhall", "entity_type": "Air Force Base", "confidence": 0.95, "attributes": {{"location": "United Kingdom", "unit": "100th Air Refueling Wing"}}}},
-                        {{"entity": "Tactical Operations Center", "entity_type": "CommandControlFacility", "confidence": 0.72, "attributes": {{"role": "command and control", "location": "operations center"}}}}
-                    ],
-                    "relations": [
-                        {{"subject": "100th Air Refueling Wing", "subject_type": "Military Organization",
-                        "relation_type": "stationed at", "object": "RAF Mildenhall", "object_type": "Air Force Base", "confidence": 0.90}},
-                        {{"subject": "Tactical Operations Center", "subject_type": "CommandControlFacility",
-                        "relation_type": "coordinates", "object": "100th Air Refueling Wing", "object_type": "Military Organization", "confidence": 0.75}}
-                    ]
-                }}
-                
-                IMPORTANT: Balance ontology compliance with discovery. Extract comprehensively across all domains while preferring standard types when applicable.
-                """;
-            
-            if (mode == ExtractionMode.Strict)
+            if (response.IsSuccessStatusCode)
             {
-                prompt = strictPrompt; 
+                extraction.Status = ExtractionStatus.Running;
             }
             else
             {
-                prompt = discoveryPrompt;
+                extraction.Status = ExtractionStatus.Failed;
+                throw new HttpRequestException(
+                    $"Lattice extraction request failed");
             }
 
-            var filledPrompt = prompt
-                .Replace("{entity_list}", entityList)
-                .Replace("{relation_list}", relationList)
-                .Replace("{text}", text); 
-            
-            //TODO: Fix hard coded model name. 
-            await _insightServiceClient.LatticeExtraction(filledPrompt, "Mistral-Small-3.2-24B-Instruct-2506"); 
-
-            extraction.Status = ExtractionStatus.Running;
             await _context.SaveChangesAsync();
         }
         catch
@@ -243,6 +91,7 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
         }
 
         return extraction.Id;
+
     }
 
     /// <summary>
@@ -572,8 +421,6 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
                 _context.Classes.Any(c => c.Id == ov.ClassId && c.ProjectId == projectId) ||
                 _context.Relationships.Any(r => r.Id == ov.RelationshipId && r.ProjectId == projectId));
         
-        //TODO; Ensure 2 classes and 1 relationship exists 
-        
         if (recordEmbedded && ontologyEmbedded) return;
     
         if (!recordEmbedded)
@@ -592,8 +439,201 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
             "Embeddings are being generated for this extraction." +
             "Please retry the extraction in a few minutes.");
     }
+    
+    
+    // Extraction needs at least 2 classes and 1 relationship (user made) to proceed
+    private async Task EnsureOntologyReady(long projectId)
+    {
+        // Default classes don't count
+        var defaultClassNames = new[] { "Timeseries", "File" };
 
+        var currentClasses = await _context.Classes
+            .Where(c => c.ProjectId == projectId && !defaultClassNames.Contains(c.Name))
+            .ToListAsync();
 
+        var currentRelationships = await _context.Relationships
+            .Where(r => r.ProjectId == projectId)
+            .ToListAsync();
+
+        if (currentClasses.Count < 2 || currentRelationships.Count < 1)
+        {
+            throw new InvalidOperationException(
+                $"Project {projectId} does not have sufficient ontology defined. " +
+                "At least 2 non-default classes and 1 relationship are required.");
+        }
+    }
+
+    private async Task<string> ConstructPrompt(long recordId, long projectId, string mode)
+    {
+            //Cosine similarity search to retrieve similar ontology data with respect to document text chunk
+            //Specific formatting for LLM prompt construction 
+            var results = await SearchOntologySimilarity(
+                recordId, projectId);
+
+            var classes = results
+                .Where(r => r.Type == "class")
+                .DistinctBy(r => r.ClassRelationshipId)
+                .Select(r => $"{r.Name}: {r.Description}");
+
+            var relationships = results
+                .Where(r => r.Type == "relationship" && r.RelationshipPattern != null)
+                .DistinctBy(r => r.ClassRelationshipId)
+                .Select(r => $"({r.RelationshipPattern!.OriginClassName}) -{r.RelationshipPattern.RelationshipName}-> ({r.RelationshipPattern.DestinationClassName})");
+
+            var textChunks = results
+                .Where(r => !string.IsNullOrEmpty(r.TextChunk))
+                .DistinctBy(r => r.TextChunk)
+                .Select(r => r.TextChunk!);
+
+            var entityList   = string.Join("\n", classes);
+            var relationList = string.Join("\n", relationships);
+            var text         = string.Join("\n\n", textChunks);
+            
+            //entity list is [(class name, description)]
+            //relation_list is [(origin class name, relationship name, destination class name)] 
+            //TODO: context_block is graph context, 2 hops 
+            //{text}{truncation} is ["example text", "text"]
+            //TODO: {truncation} is for document text chunk truncation, necessary only if it exceeds a certain character limit. Plus the "...truncated" message to the LLM
+            var prompt = "";
+            var strictPrompt = """
+                You are a precise information extraction system for formal ontology-based knowledge graphs.
+                  
+                Your task is to extract entities and relationships that MATCH the provided ontology schema.
+                  
+                This ontology follows Common Core Ontologies (CCO) standards - a domain-neutral framework used across military, government, commercial, and academic sectors. Extract information relevant to ANY domain (defense, infrastructure, operations, organizations, facilities, equipment, personnel, etc.).
+                  
+                ONTOLOGY SCHEMA - Entity Types (with definitions):
+                  
+                {entity_list}
+                  
+                ONTOLOGY SCHEMA - Valid Relation Patterns (domain, predicate, range):
+                  
+                {relation_list}
+                  
+                EXTRACTION RULES (STRICT MODE - Ontology Compliance):
+                  
+                1. Extract ONLY entities matching the provided entity types
+                2. Use the type definitions to correctly classify entities
+                3. Extract ONLY relations matching the valid relation patterns
+                4. Each relation MUST include subject_type and object_type
+                5. Every entity in a relation MUST also appear in the entities array
+                6. Assign confidence scores (0.0 to 1.0) based on extraction certainty
+                7. DO NOT create new entity types - use only the types listed above
+                8. Apply to ANY domain: military operations, facilities, organizations, equipment, personnel, missions, etc.
+                 
+                ATTRIBUTE EXTRACTION RULES:
+                1. Attributes MUST be explicitly stated in the document text.
+                2. Do NOT infer, speculate, or guess missing attributes.
+                3. Extract up to 5 high-value attributes per entity.
+                4. Prefer high-signal keys when available (e.g., manufacturer, model, role, location, dimensions, capacity, date, unit, commander).
+                5. Omit uncertain attributes entirely.
+                6. Keep values short and literal (no long paraphrases).
+                  
+                DOCUMENT TEXT:
+                  
+                {text}{truncation}
+                  
+                Return ONLY valid JSON (no markdown, no explanations):
+                  
+                {{
+                    "entities": [
+                        {{"entity": "RAF Mildenhall", "entity_type": "Air Force Base", "confidence": 0.95, "attributes": {{"location": "United Kingdom", "unit": "100th Air Refueling Wing"}}}},
+                        {{"entity": "100th Air Refueling Wing", "entity_type": "Military Organization", "confidence": 0.92, "attributes": {{"role": "air refueling", "commander": "Col. Johnny Galbert"}}}}
+                    ],
+                    "relations": [
+                        {{"subject": "100th Air Refueling Wing", "subject_type": "Military Organization",
+                        "relation_type": "located at", "object": "RAF Mildenhall", "object_type": "Air Force Base", "confidence": 0.90}}
+                    ]
+                }}
+                  
+                CRITICAL: Use EXACT entity type names from the ontology schema. Be thorough - extract all relevant entities and relationships from the document.
+                """;
+            
+            var discoveryPrompt = """
+                You are a knowledge extraction system for formal ontology-based knowledge graphs.
+                
+                Your task is to extract entities and relationships, preferring the provided ontology schema but discovering new types when necessary.
+                
+                This ontology uses Common Core Ontologies (CCO) - a domain-neutral standard framework covering entities across ALL sectors: military operations, defense systems, government organizations, commercial facilities, infrastructure, personnel, missions, equipment, and more.
+                
+                PREFERRED ENTITY TYPES (use when applicable):
+                
+                {entity_list}
+                
+                PREFERRED RELATION PATTERNS (use when applicable):
+                
+                {relation_list}
+                
+                EXTRACTION RULES (DISCOVERY MODE - Balanced Precision/Discovery):
+                
+                1. PREFER entities from the ontology types above when they fit well
+                2. If an entity doesn't match any provided type well:
+                   - Still extract it if contextually important
+                   - Use the most similar ontology type, OR
+                   - Create a specific descriptive type (e.g., "TacticalOperationsCenter", "MunitionsStorageFacility")
+                3. For discovered types, use confidence 0.60-0.80 (lower than ontology matches)
+                4. PREFER relations from the provided patterns
+                5. If a relationship doesn't fit any pattern:
+                   - Still extract if it represents important domain knowledge
+                   - Use descriptive relation names (e.g., "supports", "coordinates_with", "supervises")
+                6. Each relation MUST include subject_type and object_type
+                7. Every entity in a relation MUST also appear in the entities array
+                
+                ATTRIBUTE EXTRACTION RULES:
+                1. Attributes MUST be explicitly stated in the document text.
+                2. Do NOT infer, speculate, or guess missing attributes.
+                3. Extract up to 5 high-value attributes per entity.
+                4. Prefer high-signal keys when available (e.g., manufacturer, model, role, location, dimensions, capacity, date, unit, commander).
+                5. Omit uncertain attributes entirely.
+                6. Keep values short and literal (no long paraphrases).
+                
+                DISCOVERY GUIDELINES:
+                
+                - Ontology matches: confidence 0.85-0.95
+                - Similar ontology types: confidence 0.75-0.85
+                - New discovered types: confidence 0.60-0.75
+                - Type names: Clear, specific, CamelCase (e.g., "AirTrafficControlTower", "SecureCommandFacility")
+                - Apply to ANY domain: extract military units, facilities, operations, personnel roles, equipment, missions, etc.
+                
+                DOCUMENT TEXT:
+                
+                {text}
+                
+                Return ONLY valid JSON (no markdown, no explanations):
+                
+                {{
+                    "entities": [
+                        {{"entity": "RAF Mildenhall", "entity_type": "Air Force Base", "confidence": 0.95, "attributes": {{"location": "United Kingdom", "unit": "100th Air Refueling Wing"}}}},
+                        {{"entity": "Tactical Operations Center", "entity_type": "CommandControlFacility", "confidence": 0.72, "attributes": {{"role": "command and control", "location": "operations center"}}}}
+                    ],
+                    "relations": [
+                        {{"subject": "100th Air Refueling Wing", "subject_type": "Military Organization",
+                        "relation_type": "stationed at", "object": "RAF Mildenhall", "object_type": "Air Force Base", "confidence": 0.90}},
+                        {{"subject": "Tactical Operations Center", "subject_type": "CommandControlFacility",
+                        "relation_type": "coordinates", "object": "100th Air Refueling Wing", "object_type": "Military Organization", "confidence": 0.75}}
+                    ]
+                }}
+                
+                IMPORTANT: Balance ontology compliance with discovery. Extract comprehensively across all domains while preferring standard types when applicable.
+                """;
+            
+            if (mode == ExtractionMode.Strict)
+            {
+                prompt = strictPrompt; 
+            }
+            else
+            {
+                prompt = discoveryPrompt;
+            }
+
+            var filledPrompt = prompt
+                .Replace("{entity_list}", entityList)
+                .Replace("{relation_list}", relationList)
+                .Replace("{text}", text);
+            
+            return filledPrompt;
+    }
+    
     private static long? ResolveClassId(string? name, Dictionary<string, long> map)
     {
         return name != null && map.TryGetValue(name, out var id) ? id : null;
