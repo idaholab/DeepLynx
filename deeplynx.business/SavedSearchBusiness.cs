@@ -85,7 +85,8 @@ public class SavedSearchBusiness : ISavedSearchBusiness
         return savedSearches
         .Select(s =>
         {
-            var query = JsonSerializer.Deserialize<CustomQueryDtos.CustomQueryResponseDto>(s.Search);
+            var query = JsonSerializer.Deserialize<CustomQueryDtos.CustomQueryResponseDto>(
+                s.Search, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
             if (query == null) return null;
             return new SavedSearchResponseDto
             {
