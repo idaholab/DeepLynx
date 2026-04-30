@@ -55,17 +55,17 @@ public class MetricsController : ControllerBase
     }
 
     /// <summary>
-    ///     Get Bytes Ingested
+    ///     Get System Data Source Count 
     /// </summary>
     /// <param name="hideArchived">Flag indicating whether to hide archived data sources from the result (Default true)</param>
-    /// <returns>The total number of bytes of file data stored in Nexus-registered object storages.</returns>
+    /// <returns>A count of data sources for the given project.</returns>
     [HttpGet("datasources/count", Name = "api_datasource_count_system")]
     [SysAdmin]
-    public async Task<IActionResult> GetDataSourceCount(bool hideArchived = true)
+    public async Task<IActionResult> GetSystemDataSourceCount(bool hideArchived = true)
     {
         try
         {
-            var byteSum = await _metricsBusiness.GetDataSourceCount(hideArchived);
+            var byteSum = await _metricsBusiness.GetSystemDataSourceCount(hideArchived);
             return Ok(byteSum);
         }
         catch (Exception exc)

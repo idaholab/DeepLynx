@@ -54,4 +54,31 @@ public class MetricsOrganizationController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
+
+    /// <summary>
+    ///     Get Organization Data Source Count 
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization to which the projectID belongs</param>
+    /// <param name="projectIds">(Optional)An array of project IDs within the organization to filter by</param>
+    /// <param name="hideArchived">Flag indicating whether to hide archived data sources from the result (Default true)</param>
+    /// <returns>A count of data sources for the given organization and its projects.</returns>
+    [HttpGet("count", Name = "api_count_data_sources_for_organization")]
+    [Auth("read", "data_source")]
+    public async Task<ActionResult<int>> GetDataSourceCount(
+        long organizationId,
+        [FromQuery] long[]? projectIds,
+        [FromQuery] bool hideArchived = true)
+    {
+        try
+        {
+            var dataSources = await _metricsBusiness.GetOrganizationDataSourceCount(organizationId, hideArchived);
+            return Ok(dataSources);
+        }
+        catch (Exception exc)
+        {
+            var message = $"An error occurred while listing all data sources: {exc}";
+            _logger.LogError(message);
+            return StatusCode(StatusCodes.Status500InternalServerError, message);
+        }
+    }
 }

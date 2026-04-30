@@ -10,8 +10,6 @@ public interface IDataSourceBusiness
     Task<DataSourceResponseDto> GetDataSource(long organizationId, long? projectId, long dataSourceId,
         bool hideArchived = true);
 
-    Task<int> GetDataSourceCount(long organizationId, long[]? projectId, bool hideArchived = true);
-
     Task<DataSourceResponseDto> GetDefaultDataSource(long organizationId, long? projectId);
 
     Task<DataSourceResponseDto> SetDefaultDataSource(long organizationId, long? projectId, long currentUserId,

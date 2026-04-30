@@ -185,11 +185,52 @@ public class MetricsBusiness : IMetricsBusiness
     }
 
     /// <summary>
+    ///     Gets datasource count for project
+    /// </summary>
+    /// <param name="projectId">The ID of the organization for which the data source belongs to</param>
+    /// <param name="hideArchived">Flag indicating whether to hide archived data sources from the result (Default true)</param>
+    /// <returns>Quantity of data sources system-wide</returns>
+    public async Task<int> GetProjectDataSourceCount(long projectId, bool hideArchived = true)
+    {
+        var dsQuery = _context.DataSources
+            .AsQueryable();
+
+        dsQuery = dsQuery.Where(d => d.ProjectId == projectId);    
+
+        // hide archived data sources
+        if (hideArchived)
+            dsQuery = dsQuery.Where(d => !d.IsArchived);
+
+        return await dsQuery.CountAsync();
+    }
+
+
+    /// <summary>
+    ///     Gets datasource count for organization
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization for which the data source belongs to</param>
+    /// <param name="hideArchived">Flag indicating whether to hide archived data sources from the result (Default true)</param>
+    /// <returns>Quantity of data sources system-wide</returns>
+    public async Task<int> GetOrganizationDataSourceCount(long organizationId, bool hideArchived = true)
+    {
+        var dsQuery = _context.DataSources
+            .AsQueryable();
+
+        dsQuery = dsQuery.Where(d => d.OrganizationId == organizationId);
+
+        // hide archived data sources
+        if (hideArchived)
+            dsQuery = dsQuery.Where(d => !d.IsArchived);
+
+        return await dsQuery.CountAsync();
+    }
+
+    /// <summary>
     ///     Gets datasource count system-wide
     /// </summary>
     /// <param name="hideArchived">Flag indicating whether to hide archived data sources from the result (Default true)</param>
     /// <returns>Quantity of data sources system-wide</returns>
-    public async Task<int> GetDataSourceCount(bool hideArchived = true)
+    public async Task<int> GetSystemDataSourceCount(bool hideArchived = true)
     {
         var dsQuery = _context.DataSources
             .AsQueryable();

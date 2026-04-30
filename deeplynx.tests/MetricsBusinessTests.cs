@@ -666,20 +666,20 @@ public class MetricsBusinessTests : IntegrationTestBase
 
     #endregion
 
-    #region GetDataSourceCount Tests
+    #region GetSystemDataSourceCount Tests
 
     [Fact]
-    public async Task GetDataSourceCount_ReturnsZero_WhenNoDataSources()
+    public async Task GetSystemDataSourceCount_ReturnsZero_WhenNoDataSources()
     {
         // Act
-        var count = await _metricsBusiness.GetDataSourceCount();
+        var count = await _metricsBusiness.GetSystemDataSourceCount();
 
         // Assert
         Assert.Equal(0, count);
     }
 
     [Fact]
-    public async Task GetDataSourceCount_ReturnsAllNonArchived_SystemWide()
+    public async Task GetSystemDataSourceCount_ReturnsAllNonArchived_SystemWide()
     {
         // Arrange - create data sources across both orgs
         Context.DataSources.Add(new DataSource
@@ -713,14 +713,14 @@ public class MetricsBusinessTests : IntegrationTestBase
         await Context.SaveChangesAsync();
 
         // Act
-        var count = await _metricsBusiness.GetDataSourceCount();
+        var count = await _metricsBusiness.GetSystemDataSourceCount();
 
         // Assert - should include all non-archived across all orgs
         Assert.Equal(3, count);
     }
 
     [Fact]
-    public async Task GetDataSourceCount_HideArchivedFalse_IncludesArchived()
+    public async Task GetSystemDataSourceCount_HideArchivedFalse_IncludesArchived()
     {
         // Arrange
         Context.DataSources.Add(new DataSource
@@ -740,12 +740,191 @@ public class MetricsBusinessTests : IntegrationTestBase
         await Context.SaveChangesAsync();
 
         // Act
-        var countWithArchived = await _metricsBusiness.GetDataSourceCount(hideArchived: false);
-        var countWithoutArchived = await _metricsBusiness.GetDataSourceCount(hideArchived: true);
+        var countWithArchived = await _metricsBusiness.GetSystemDataSourceCount(hideArchived: false);
+        var countWithoutArchived = await _metricsBusiness.GetSystemDataSourceCount(hideArchived: true);
 
         // Assert
         Assert.Equal(2, countWithArchived);
         Assert.Equal(1, countWithoutArchived);
+    }
+
+    #endregion
+
+    #region GetProjectDataSourceCount Tests
+
+    [Fact]
+    public async Task GetProjectDataSourceCount_ReturnsCount_ForProject()
+    {
+        // Arrange
+        Context.DataSources.Add(new DataSource
+        {
+            Name = "DS Project1 A",
+            OrganizationId = _oid,
+            ProjectId = _pid,
+            IsArchived = false
+        });
+        Context.DataSources.Add(new DataSource
+        {
+            Name = "DS Project1 B",
+            OrganizationId = _oid,
+            ProjectId = _pid,
+            IsArchived = false
+        });
+        Context.DataSources.Add(new DataSource
+        {
+            Name = "DS Project2",
+            OrganizationId = _oid,
+            ProjectId = _pid2,
+            IsArchived = false
+        });
+        await Context.SaveChangesAsync();
+
+        // Act
+        var count = await _metricsBusiness.GetProjectDataSourceCount(_pid);
+
+        // Assert - only data sources for project 1
+        Assert.Equal(2, count);
+    }
+
+    [Fact]
+    public async Task GetProjectDataSourceCount_ExcludesArchived_WhenHideArchivedTrue()
+    {
+        // Arrange
+        Context.DataSources.Add(new DataSource
+        {
+            Name = "DS Active",
+            OrganizationId = _oid,
+            ProjectId = _pid,
+            IsArchived = false
+        });
+        Context.DataSources.Add(new DataSource
+        {
+            Name = "DS Archived",
+            OrganizationId = _oid,
+            ProjectId = _pid,
+            IsArchived = true
+        });
+        await Context.SaveChangesAsync();
+
+        // Act
+        var count = await _metricsBusiness.GetProjectDataSourceCount(_pid, hideArchived: true);
+
+        // Assert
+        Assert.Equal(1, count);
+    }
+
+    [Fact]
+    public async Task GetProjectDataSourceCount_IncludesArchived_WhenHideArchivedFalse()
+    {
+        // Arrange
+        Context.DataSources.Add(new DataSource
+        {
+            Name = "DS Active",
+            OrganizationId = _oid,
+            ProjectId = _pid,
+            IsArchived = false
+        });
+        Context.DataSources.Add(new DataSource
+        {
+            Name = "DS Archived",
+            OrganizationId = _oid,
+            ProjectId = _pid,
+            IsArchived = true
+        });
+        await Context.SaveChangesAsync();
+
+        // Act
+        var count = await _metricsBusiness.GetProjectDataSourceCount(_pid, hideArchived: false);
+
+        // Assert
+        Assert.Equal(2, count);
+    }
+
+    [Fact]
+    public async Task GetProjectDataSourceCount_ReturnsZero_WhenNoDataSources()
+    {
+        // Act - project 2 has no data sources
+        var count = await _metricsBusiness.GetProjectDataSourceCount(_pid2);
+
+        // Assert
+        Assert.Equal(0, count);
+    }
+
+    #endregion
+
+    #region GetOrganizationDataSourceCount Tests
+
+    [Fact]
+    public async Task GetOrganizationDataSourceCount_ReturnsCount_ForOrganization()
+    {
+        // Arrange - data sources across org 1 (project + org-level) and org 2
+        Context.DataSources.Add(new DataSource
+        {
+            Name = "DS Org1 Project",
+            OrganizationId = _oid,
+            ProjectId = _pid,
+            IsArchived = false
+        });
+        Context.DataSources.Add(new DataSource
+        {
+            Name = "DS Org1 OrgLevel",
+            OrganizationId = _oid,
+            ProjectId = null,
+            IsArchived = false
+        });
+        Context.DataSources.Add(new DataSource
+        {
+            Name = "DS Org2",
+            OrganizationId = _oid2,
+            ProjectId = null,
+            IsArchived = false
+        });
+        await Context.SaveChangesAsync();
+
+        // Act
+        var count = await _metricsBusiness.GetOrganizationDataSourceCount(_oid);
+
+        // Assert - only data sources belonging to org 1
+        Assert.Equal(2, count);
+    }
+
+    [Fact]
+    public async Task GetOrganizationDataSourceCount_ExcludesArchived_WhenHideArchivedTrue()
+    {
+        // Arrange
+        Context.DataSources.Add(new DataSource
+        {
+            Name = "DS Active",
+            OrganizationId = _oid,
+            ProjectId = _pid,
+            IsArchived = false
+        });
+        Context.DataSources.Add(new DataSource
+        {
+            Name = "DS Archived",
+            OrganizationId = _oid,
+            ProjectId = _pid,
+            IsArchived = true
+        });
+        await Context.SaveChangesAsync();
+
+        // Act
+        var countWithArchived = await _metricsBusiness.GetOrganizationDataSourceCount(_oid, hideArchived: false);
+        var countWithoutArchived = await _metricsBusiness.GetOrganizationDataSourceCount(_oid, hideArchived: true);
+
+        // Assert
+        Assert.Equal(2, countWithArchived);
+        Assert.Equal(1, countWithoutArchived);
+    }
+
+    [Fact]
+    public async Task GetOrganizationDataSourceCount_ReturnsZero_WhenNoDataSources()
+    {
+        // Act - org 2 has no data sources
+        var count = await _metricsBusiness.GetOrganizationDataSourceCount(_oid2);
+
+        // Assert
+        Assert.Equal(0, count);
     }
 
     #endregion

@@ -579,38 +579,6 @@ public class DataSourceBusiness : IDataSourceBusiness
         };
     }
 
-    /// <summary>
-    ///     Retrieves data source count for a specific organization or project.
-    /// </summary>
-    /// <param name="organizationId">The ID of the organization for which the data source belongs to</param>
-    /// <param name="projectIds">ID's of the projects whose data sources are to be retrieved</param>
-    /// <param name="hideArchived">Flag indicating whether to hide archived data sources from the result (Default true)</param>
-    /// <returns>A list of data sources within the given project.</returns>
-    public async Task<int> GetDataSourceCount(
-        long organizationId,
-        long[]? projectIds,
-        bool hideArchived = true)
-    {
-        var dsQuery = _context.DataSources
-            .Where(d => d.OrganizationId == organizationId);
-
-        // hide archived data sources
-        if (hideArchived)
-            dsQuery = dsQuery.Where(d => !d.IsArchived);
-
-        // If project ids supplied, inherit org level data sources too 
-        if (projectIds is { Length: > 0 })
-            dsQuery = dsQuery.Where(d =>
-                (d.ProjectId.HasValue && projectIds.Contains(d.ProjectId.Value)) || d.ProjectId == null);
-        else
-            // If no project ids, only org-level data sources
-            dsQuery = dsQuery.Where(d => d.ProjectId == null);
-
-        var dataSourceCount = await dsQuery.CountAsync();
-
-        return dataSourceCount;
-    }
-
     private async Task ResetProjectDefaults(long projectId, long newDefaultId)
     {
         // check for existing defaults at the project level and remove them from being default
