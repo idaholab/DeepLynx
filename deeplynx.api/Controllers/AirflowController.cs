@@ -1,11 +1,13 @@
 using System.Net;
 using deeplynx.models;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace deeplynx.api.Controllers;
 
 [ApiController]
 [Route("airflow")]
+[Authorize]
 public class AirflowController : ControllerBase
 {
     private readonly AirflowServiceClient _airflowClient;
