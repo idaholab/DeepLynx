@@ -109,7 +109,6 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
     /// <param name="organizationId">The ID of the organization to which the object storage belongs</param>
     /// <param name="projectId">The ID of the project to which the object storage belongs</param>
     /// <param name="dto">A data transfer object with details on the new object storage to be created.</param>
-    /// <param name="makeDefault"> A boolean that tells whether to make the object storage default or not</param>
     public async Task<ObjectStorageResponseDto> CreateObjectStorage(
         long currentUserId,
         long organizationId,
@@ -177,7 +176,7 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
                 Default = dto.Default,
                 ProjectId = projectId,
                 OrganizationId = organizationId,
-                Config = JsonConvert.SerializeObject(dto.Config),
+                ConfigEncrypted = SerializeAndEncryptConfig(dto.Config),
                 LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
                 LastUpdatedBy = currentUserId
             };
@@ -524,6 +523,15 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
         }
     }
 
+    /// <summary>
+    ///     For internal use only (don't hook an API up to this)- returns the decrypted object storage config
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization to which the object storage belongs</param>
+    /// <param name="projectId">ID of the project in which the object storage belongs</param>
+    /// <param name="objectStorageIds">IDs of the object storage configs to get configs for</param>
+    /// <param name="hideArchived">Flag indicating whether to hide archived ObjectStorages from the result </param>
+    /// <returns>A list of object storages, including their decrypted configs</returns>
+    /// <exception cref="InvalidOperationException"></exception>
     public async Task<List<ObjectStorageDecryptedDto>> GetDecryptedObjectStorages(
         long? organizationId,
         long? projectId,
@@ -571,10 +579,11 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
     }
     
     // Private Helpers
-    // private String SerializeAndEncryptConfig(ObjectStorageConfigDto config)
-    // {
-    //     
-    // }
+    private String SerializeAndEncryptConfig(ObjectStorageConfigDto config)
+    {
+        var encrypted = _encryptionHelper.Encrypt(JsonConvert.SerializeObject(config));
+        return encrypted;
+    }
     
     private ObjectStorageConfigDto DeserializeAndDecryptConfig(string encryptedConfig)
     {

@@ -17,7 +17,10 @@ public partial class ObjectStorage
     public string Type { get; set; } = null!;
 
     [Column("config", TypeName = "jsonb")]
-    public string Config { get; set; } = null!;
+    public string? Config { get; set; } = null!;
+    
+    [Column("config_encrypted")]
+    public string? ConfigEncrypted { get; set; } = null!;
 
     [Column("project_id")]
     public long? ProjectId { get; set; }

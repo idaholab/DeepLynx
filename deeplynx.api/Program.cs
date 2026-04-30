@@ -545,8 +545,8 @@ try
         app.MapHub<EventNotificationHub>("/eventNotificationHub"); // endpoint for real-time notifications with SignalR
 
     /* ╔════════════════════════════╗
-    ║   Scalar Configuration     ║
-    ╚════════════════════════════╝ */
+       ║   Scalar Configuration     ║
+       ╚════════════════════════════╝ */
     // Always using scalar:
     //if (app.Environment.IsDevelopment()) { ...
     // app.UseOpenApi();
