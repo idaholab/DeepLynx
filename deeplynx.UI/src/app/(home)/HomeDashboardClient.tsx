@@ -257,7 +257,7 @@ export default function HomeDashboardClient({ initialProjects }: Props) {
  
             {/* Projects table — takes remaining space */}
             <div
-              className="w-full lg:flex-1 min-w-0 card card-border shadow-md shadow-dynamic-shadow p-4"
+              className="w-full min-h-130 lg:flex-1 min-w-0 card card-border shadow-md shadow-dynamic-shadow p-4"
               data-tour="projects-section"
             >
               <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4">

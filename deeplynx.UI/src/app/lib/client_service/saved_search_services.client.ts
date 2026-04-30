@@ -53,3 +53,18 @@ export async function saveSearch(
     throw error;
   }
 }
+
+/**
+ * Delete a saved search by ID for the current user.
+ *
+ * DELETE /saved-searches/:id
+ */
+export async function deleteSavedSearch(id: string): Promise<boolean> {
+  try {
+    const res = await api.delete<boolean>(`/saved-searches/${id}`);
+    return res.data;
+  } catch (error) {
+    console.error("Error deleting saved search:", error);
+    throw error;
+  }
+}
