@@ -269,3 +269,24 @@ export interface TriggerLatticeExtractionRequestDTO {
   data_source_id: number;
   mode: TriggerLatticeExtractionMode;
 }
+
+export interface SearchConditionDto {
+  connector?: string;
+  filter: string;
+  operator: string;
+  value?: string;
+  json?: string;
+}
+ 
+export interface ExecuteSavedSearchRequest {
+  filter: SearchConditionDto[];
+  textSearch?: string;
+}
+ 
+export interface SavedSearchFilterRequest {
+  name?: string;
+  textSearch?: string;
+  lastUpdatedBefore?: Date;
+  lastUpdatedAfter?: Date;
+}
+ 

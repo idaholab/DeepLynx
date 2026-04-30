@@ -1,3 +1,5 @@
+import { SearchConditionDto } from "./requestDTOs";
+
 export type ClassResponseDto = {
   id: number;
   name: string;
@@ -325,4 +327,14 @@ export type ProjectMemberResponseDto = {
 
 export interface TriggerLatticeExtractionResponseDTO {
   extraction_id: number;
+}
+
+export interface SavedSearchesResponseDto {
+  id: number;
+  name: string;
+  lastUpdatedAt: Date;
+  query: {
+    textSearch?: string;
+    filter: SearchConditionDto[] | null;
+  };
 }

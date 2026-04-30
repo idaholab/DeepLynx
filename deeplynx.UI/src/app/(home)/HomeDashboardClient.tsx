@@ -1,9 +1,10 @@
 // app/(home)/HomeDashboardClient.tsx
 "use client";
-
+ 
 import CreateWidget from "@/app/(home)/components/CreateWidgetsModal";
 import { ExpandableTable } from "@/app/(home)/components/ExpandableTable";
 import ExpandedProjectCard from "@/app/(home)/components/ExpandedProjectCard";
+import SavedSearchesWidget from "@/app/(home)/components/SavedSearchesWidget";
 import { PlusIcon, QuestionMarkCircleIcon } from "@heroicons/react/24/outline";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -21,16 +22,16 @@ import { useSafeSession } from "../hooks/useSafeSession";
 import { useProjectSession } from "../contexts/ProjectSessionProvider";
 import { getAllProjects } from "../lib/client_service/projects_services.client";
 import type { SortOption } from "./hooks/useSortedItems";
-
+ 
 type Props = { initialProjects: ProjectResponseDto[] };
-
+ 
 export default function HomeDashboardClient({ initialProjects }: Props) {
   const { t } = useLanguage();
   const router = useRouter();
-
+ 
   const isAuthDisabled =
     process.env.NEXT_PUBLIC_DISABLE_FRONTEND_AUTHENTICATION === "true";
-
+ 
   const { data: session } = useSafeSession();
   const { user } = useRBAC();
   const { organization, hasLoaded } = useOrganizationSession();
@@ -41,12 +42,12 @@ export default function HomeDashboardClient({ initialProjects }: Props) {
   const [projects, setProjects] =
     useState<ProjectResponseDto[]>(initialProjects);
   const [searchTerm, setSearchTerm] = useState("");
-
+ 
   const isRefreshing = useRef(false);
-
+ 
   const refreshProjects = useCallback(async () => {
     if (!organization || isRefreshing.current) return;
-
+ 
     isRefreshing.current = true;
     try {
       const data = await getAllProjects(
@@ -60,14 +61,14 @@ export default function HomeDashboardClient({ initialProjects }: Props) {
       isRefreshing.current = false;
     }
   }, [organization]);
-
+ 
   useEffect(() => {
     if (organization && hasLoaded) {
       refreshProjects();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [organization?.organizationId, hasLoaded, refreshProjects]);
-
+ 
   const filteredProjects = projects.filter((project) => {
     const term = searchTerm.toLowerCase();
     return (
@@ -75,12 +76,12 @@ export default function HomeDashboardClient({ initialProjects }: Props) {
       project.description?.toLowerCase().includes(term)
     );
   });
-
+ 
   const { startTour } = useDashboardTour({
     filteredProjects,
     initialProjects,
   });
-
+ 
   const onExplore = (row: ProjectResponseDto) => {
     setProject({
       projectId: row.id.toString(),
@@ -88,7 +89,7 @@ export default function HomeDashboardClient({ initialProjects }: Props) {
     });
     router.push(`/project/${row.id}`);
   };
-
+ 
   const compareOptionalText = (
     left?: string | null,
     right?: string | null,
@@ -96,19 +97,19 @@ export default function HomeDashboardClient({ initialProjects }: Props) {
   ) => {
     const a = left?.trim();
     const b = right?.trim();
-
+ 
     if (!a && !b) return 0;
     if (!a) return 1;
     if (!b) return -1;
-
+ 
     return direction === "asc"
       ? a.localeCompare(b, undefined, { sensitivity: "base" })
       : b.localeCompare(a, undefined, { sensitivity: "base" });
   };
-
+ 
   const toTime = (value?: string | Date | null) =>
     value ? new Date(value).getTime() : 0;
-
+ 
   const projectSortOptions = useMemo<SortOption<ProjectResponseDto>[]>(
     () => [
       {
@@ -148,7 +149,7 @@ export default function HomeDashboardClient({ initialProjects }: Props) {
     ],
     [t],
   );
-
+ 
   const columns = [
     {
       header: t.translations.PROJECT_NAME,
@@ -193,20 +194,20 @@ export default function HomeDashboardClient({ initialProjects }: Props) {
       ),
     },
   ];
-
+ 
   const formatUserName = (fullName?: string | null): string => {
     if (!fullName) return "";
-
+ 
     const parts = fullName.trim().split(/\s+/);
     const firstName = parts[0] ?? "";
     const lastName = parts[parts.length - 1] ?? "";
     return [firstName, lastName].filter(Boolean).join(" ");
   };
-
+ 
   const displayName = isAuthDisabled
     ? user?.name || ""
     : session?.user?.name || "";
-
+ 
   if (!hasLoaded) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-base-100">
@@ -214,7 +215,7 @@ export default function HomeDashboardClient({ initialProjects }: Props) {
       </div>
     );
   }
-
+ 
   if (!organization) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-base-100">
@@ -222,7 +223,7 @@ export default function HomeDashboardClient({ initialProjects }: Props) {
       </div>
     );
   }
-
+ 
   return (
     <div className="min-h-screen bg-base-100">
       <header className="bg-base-200/50 border-b border-base-300/30 sticky z-10 backdrop-blur-sm">
@@ -248,53 +249,64 @@ export default function HomeDashboardClient({ initialProjects }: Props) {
           </div>
         </div>
       </header>
-
+ 
       <div className="p-3 sm:p-6">
         <div className="w-full xl:w-4/5 mx-auto">
-          <div
-            className="card card-border shadow-md shadow-dynamic-shadow p-4"
-            data-tour="projects-section"
-          >
-            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4">
-              <h3 className="text-info-content text-lg font-semibold">
-                {t.translations.YOUR_PROJECTS}
-              </h3>
-
-              <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-                <button
-                  onClick={() => setIsRecordModalOpen(true)}
-                  className="btn btn-outline btn-secondary btn-sm flex-1 sm:flex-initial"
-                  data-tour="add-record"
-                >
-                  <PlusIcon className="size-5" />
-                  <span>{t.translations.RECORD}</span>
-                </button>
-                <button
-                  onClick={() => setIsProjectModalOpen(true)}
-                  className="btn btn-secondary btn-sm flex-1 sm:flex-initial"
-                  data-tour="create-project"
-                >
-                  <PlusIcon className="size-5" />
-                  <span>{t.translations.PROJECT}</span>
-                </button>
+          {/* Main content: projects table + saved searches side by side */}
+          <div className="flex flex-col lg:flex-row gap-4 items-start">
+ 
+            {/* Projects table — takes remaining space */}
+            <div
+              className="w-full lg:flex-1 min-w-0 card card-border shadow-md shadow-dynamic-shadow p-4"
+              data-tour="projects-section"
+            >
+              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4">
+                <h3 className="text-info-content text-lg font-semibold">
+                  {t.translations.YOUR_PROJECTS}
+                </h3>
+ 
+                <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                  <button
+                    onClick={() => setIsRecordModalOpen(true)}
+                    className="btn btn-outline btn-secondary btn-sm flex-1 sm:flex-initial"
+                    data-tour="add-record"
+                  >
+                    <PlusIcon className="size-5" />
+                    <span>{t.translations.RECORD}</span>
+                  </button>
+                  <button
+                    onClick={() => setIsProjectModalOpen(true)}
+                    className="btn btn-secondary btn-sm flex-1 sm:flex-initial"
+                    data-tour="create-project"
+                  >
+                    <PlusIcon className="size-5" />
+                    <span>{t.translations.PROJECT}</span>
+                  </button>
+                </div>
               </div>
+ 
+              <ExpandableTable
+                data={filteredProjects}
+                columns={columns}
+                renderExpandedContent={(project, onClose) => (
+                  <ExpandedProjectCard project={project} onClose={onClose} />
+                )}
+                onExplore={onExplore}
+                getRowId={(p) => p.id}
+                sortOptions={projectSortOptions}
+                defaultSortValue="dateNew"
+              />
             </div>
-
-            <ExpandableTable
-              data={filteredProjects}
-              columns={columns}
-              renderExpandedContent={(project, onClose) => (
-                <ExpandedProjectCard project={project} onClose={onClose} />
-              )}
-              onExplore={onExplore}
-              getRowId={(p) => p.id}
-              sortOptions={projectSortOptions}
-              defaultSortValue="dateNew"
-            />
+ 
+            {/* Saved searches — capped at 40% on large screens */}
+            <div className="w-full lg:w-[40%] lg:max-w-[40%] shrink-0">
+              <SavedSearchesWidget mode="org" projects={projects} />
+            </div>
+ 
           </div>
         </div>
       </div>
-
+ 
       <AddRecordModal
         isOpen={isRecordModalOpen}
         onClose={() => setIsRecordModalOpen(false)}
