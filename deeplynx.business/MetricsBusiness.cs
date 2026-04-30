@@ -183,6 +183,23 @@ public class MetricsBusiness : IMetricsBusiness
         
         return new StorageSizeDto{ Bytes = totalBytes };
     }
+
+    /// <summary>
+    ///     Gets datasource count system-wide
+    /// </summary>
+    /// <param name="hideArchived">Flag indicating whether to hide archived data sources from the result (Default true)</param>
+    /// <returns>Quantity of data sources system-wide</returns>
+    public async Task<int> GetDataSourceCount(bool hideArchived = true)
+    {
+        var dsQuery = _context.DataSources
+            .AsQueryable();
+
+        // hide archived data sources
+        if (hideArchived)
+            dsQuery = dsQuery.Where(d => !d.IsArchived);
+
+        return await dsQuery.CountAsync();
+    }
     
     private static ObjectStorageConfigDto DeserializeConfig(string config)
     {
