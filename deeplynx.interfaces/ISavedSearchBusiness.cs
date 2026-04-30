@@ -7,7 +7,7 @@ public interface ISavedSearchBusiness
     Task<bool> SaveSearch(
         long userId, string alias, string textSearch, CustomQueryDtos.CustomQueryRequestDto[] filters);
 
-    Task<List<SavedSearchResponseDto>> GetSavedSearches(long userId, SavedSearchRequestDtos.FilterSavedQueryRequestDto? searchFilters = null);
+    Task<PaginatedResponse<SavedSearchResponseDto>> GetSavedSearches(long userId, SavedSearchRequestDtos.FilterSavedQueryRequestDto? searchFilters = null);
 
     Task<IEnumerable<HistoricalRecordResponseDto>> ExecuteSavedSearch(
         long savedSearchId, long currentUserId, long organizationId, long[] projectIds,
