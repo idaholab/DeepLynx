@@ -193,7 +193,9 @@ try
     builder.Services.AddScoped<ISensitivityLabelService, SensitivityLabelService>();
     builder.Services.AddTransient<IInsightBusiness, InsightBusiness>();
     builder.Services.AddTransient<ILatticeExtractionBusiness, LatticeExtractionBusiness>();
+    builder.Services.AddMemoryCache();
     builder.Services.AddHttpClient<InsightServiceClient>();
+    builder.Services.AddHttpClient<AirflowServiceClient>();
 
     //OpenApi Documentation
     builder.Services.AddOpenApi(options =>
@@ -326,6 +328,9 @@ try
                 // Metrics
                 new() { Name = "Metrics", Description = "System Statistics" },
 
+                // Integrations
+                new() { Name = "Airflow", Description = "Apache Airflow DAG management" },
+
                 // Other
                 new() { Name = "Notification", Description = "Notifications" }
             };
@@ -417,6 +422,11 @@ try
                 {
                     ["name"] = "Metrics",
                     ["tags"] = new JsonArray { "Metrics", "Organization - Metrics", "Project - Metrics" }
+                },
+                new JsonObject
+                {
+                    ["name"] = "Integrations",
+                    ["tags"] = new JsonArray { "Airflow" }
                 },
                 new JsonObject
                 {
