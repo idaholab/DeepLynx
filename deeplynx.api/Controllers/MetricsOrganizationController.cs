@@ -71,7 +71,7 @@ public class MetricsOrganizationController : ControllerBase
     {
         try
         {
-            var dataSources = await _metricsBusiness.GetOrganizationDataSourceCount(organizationId, hideArchived);
+            var dataSources = await _metricsBusiness.GetOrganizationDataSourceCount(organizationId, projectIds, hideArchived);
             return Ok(dataSources);
         }
         catch (Exception exc)
