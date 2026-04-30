@@ -1,3 +1,4 @@
+using deeplynx.helpers;
 using deeplynx.helpers.Context;
 using deeplynx.interfaces;
 using deeplynx.models;
@@ -13,7 +14,7 @@ namespace deeplynx.api.Controllers;
 ///     This controller provides endpoints to create, update, delete, and retrieve class information.
 /// </remarks>
 [ApiController]
-[Route("saved-searches")]
+[Route("organizations/{organizationId:long}/saved-searches")]
 [Authorize]
 [Tags("Saved Search")]
 public class SavedSearchController : ControllerBase
@@ -61,20 +62,52 @@ public class SavedSearchController : ControllerBase
     /// <summary>
     ///     Get Saved Searches
     /// </summary>
+    /// <param name="searchFilters">Optional filters to narrow results of saved searches query</param>
     /// <returns>A list of saved searches belonging to the user.</returns>
-    [HttpGet(Name = "api_query_get_saved_searches")]
-    public async Task<ActionResult<IEnumerable<TagResponseDto>>> GetSavedSearches()
+    [HttpPost("search", Name = "api_query_get_saved_searches")]
+    public async Task<ActionResult<IEnumerable<TagResponseDto>>> GetSavedSearches(
+        [FromBody] CustomQueryDtos.FilterSavedQueryRequestDto? searchFilters = null)
     {
         try
         {
             // get user ID from the middleware context
             var currentUserId = UserContextStorage.UserId;
-            var savedSearches = await _savedSearchBusiness.GetSavedSearches(currentUserId);
+            var savedSearches = await _savedSearchBusiness.GetSavedSearches(currentUserId, searchFilters);
             return Ok(savedSearches);
         }
         catch (Exception exception)
         {
             var message = $"An error occurred while listing all saved searches: {exception}";
+            _logger.LogError(message);
+            return StatusCode(StatusCodes.Status500InternalServerError, message);
+        }
+    }
+
+    /// <summary>
+    ///     Execute a saved search
+    /// </summary>
+    /// <param name="savedSearchId">The ID of the saved search that will be executed</param>
+    /// <param name="organizationId">The ID of organization</param>
+    /// <param name="projectIds">List of project ID's that the query will take place in</param>
+    /// <returns>List of records retrieved by the query</returns>
+    [HttpGet(Name = "api_query_execute_saved_search")]
+    [Auth("read", "record")]
+    public async Task<ActionResult<IEnumerable<HistoricalRecordResponseDto>>> ExecuteSavedSearch(
+        long organizationId, [FromQuery] long[] projectIds, [FromQuery] long savedSearchId)
+    {
+        try
+        {
+            var currentUserId = UserContextStorage.UserId;
+            var isSysAdmin = UserContextStorage.IsSysAdmin;
+            var isOrgAdmin = UserContextStorage.IsOrgAdmin;
+            var isProjectAdmin = UserContextStorage.IsProjectAdmin;
+            var records = await _savedSearchBusiness.ExecuteSavedSearch(
+                savedSearchId, currentUserId, organizationId, projectIds, isSysAdmin, isOrgAdmin, isProjectAdmin);
+            return Ok(records);
+        }
+        catch (Exception exc)
+        {
+            var message = $"An unexpected error occurred while searching for records.: {exc}";
             _logger.LogError(message);
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }

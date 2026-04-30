@@ -2,17 +2,24 @@
 
 "use client";
 import Tabs from "@/app/(home)/components/Tabs";
-import { PencilIcon, PlusIcon } from "@heroicons/react/24/outline";
+import {
+  ArrowTopRightOnSquareIcon,
+  CircleStackIcon,
+  PencilIcon,
+  PlusIcon,
+  QuestionMarkCircleIcon,
+  RocketLaunchIcon,
+  XMarkIcon,
+} from "@heroicons/react/24/outline";
 import Link from "next/link";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
-import PropertyTable from "./components/PropertyTable";
-import CopyToClipboardButton from "@/app/(home)/components/CopyToClipboardButton";
 import {
   HistoricalRecordResponseDto,
   SensitivityLabelsDto,
   TagResponseDto,
 } from "../types/responseDTOs";
+import PropertyTable from "./components/PropertyTable";
 import RecordLoading from "./loading";
 
 // Components
@@ -36,23 +43,25 @@ import {
   unattachTagFromRecord,
   updateRecord,
 } from "@/app/lib/client_service/record_services.client";
+import { getAllSensitivityLabelsProject } from "@/app/lib/client_service/sensitivity_labels_services.client";
 import { getAllTags } from "@/app/lib/client_service/tag_services.client";
+import { formatLocalDateTime } from "@/app/lib/date_time";
+import { isInsightSupportedFileType } from "@/app/lib/insight_file_support";
 import GraphClientPage from "../graph/GraphClientPage";
 import { ClassResponseDto } from "../types/responseDTOs";
-import AdditionalPropertiesEditor from "./components/AdditionalPropertiesEditor";
-import RecordHistoryTab from "./components/RecordHistoryTab";
-import RecordTagsPanel from "./components/RecordTagsPanel";
-import RelatedRecordsCardSkeleton from "./skeletons/RelatedRecordsSkeleton";
-import { getAllSensitivityLabelsProject } from "@/app/lib/client_service/sensitivity_labels_services.client";
 import AddEdgeModal from "./components/AddEdgeModal";
+import AdditionalPropertiesEditor from "./components/AdditionalPropertiesEditor";
 import ClassSelectorModal from "./components/ClassSelectorModal";
+import RecordHistoryTab from "./components/RecordHistoryTab";
 import RecordInsightChat from "./components/RecordInsightChat";
+import RecordTagsPanel from "./components/RecordTagsPanel";
 import {
   RelatedRecordViewModel,
   useRecordRelationships,
 } from "./hooks/useRecordRelationships";
-import { isInsightSupportedFileType } from "@/app/lib/insight_file_support";
-import { formatLocalDateTime } from "@/app/lib/date_time";
+import RelatedRecordsCardSkeleton from "./skeletons/RelatedRecordsSkeleton";
+import { triggerLatticeExtraction } from "@/app/lib/client_service/lattice_services.client";
+import { fetchInsightIngestionStatus } from "@/app/lib/client_service/insight_services.client";
 
 // ============= HELPER FUNCTIONS =============
 interface PropertyRow {
@@ -148,6 +157,37 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
     [],
   );
   const [isLoadingClasses, setIsLoadingClasses] = useState(false);
+  const [isLatticeIntroOpen, setIsLatticeIntroOpen] = useState(false);
+  const [latticeIntroSlide, setLatticeIntroSlide] = useState(0);
+  const [isTriggeringLatticeExtraction, setIsTriggeringLatticeExtraction] =
+    useState(false);
+  const [isCheckingLatticeReadiness, setIsCheckingLatticeReadiness] =
+    useState(false);
+  const [isRecordInsightEmbedded, setIsRecordInsightEmbedded] = useState(false);
+  const [latticeMode, setLatticeMode] = useState<"strict" | "discovery">(
+    "discovery",
+  );
+
+  const latticeIntroSlides = [
+    {
+      title: t.translations.LATTICE_INTRO_ANALYZE_TITLE,
+      icon: RocketLaunchIcon,
+      body: t.translations.LATTICE_INTRO_ANALYZE_BODY,
+    },
+    {
+      title: t.translations.LATTICE_INTRO_STAGE_TITLE,
+      icon: CircleStackIcon,
+      body: t.translations.LATTICE_INTRO_STAGE_BODY,
+    },
+    {
+      title: t.translations.LATTICE_INTRO_REVIEW_TITLE,
+      icon: QuestionMarkCircleIcon,
+      body: t.translations.LATTICE_INTRO_REVIEW_BODY,
+    },
+  ];
+
+  const currentLatticeIntroSlide = latticeIntroSlides[latticeIntroSlide];
+  const CurrentLatticeIntroIcon = currentLatticeIntroSlide.icon;
 
   const {
     originPage,
@@ -491,7 +531,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
   ]);
 
   // helper function to format file size
-  const formatFileSize = (bytes : number | null | undefined): string => {
+  const formatFileSize = (bytes: number | null | undefined): string => {
     if (bytes == null) return "-";
     if (bytes === 0) return "0 bytes";
     const k = 1024;
@@ -504,7 +544,8 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
   const systemPropertiesRows = useMemo(() => {
     if (!record) return [];
 
-    const isDownloadable = !!record.uri &&
+    const isDownloadable =
+      !!record.uri &&
       record.uri.trim().length > 0 &&
       record.uri.toLowerCase() !== "null";
 
@@ -552,10 +593,14 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
       //   label: t.translations.FILE_SIZE,
       //   value: formatFileSize(record.fileSize)
       // },
-      ...(isDownloadable ? [{
-        label: t.translations.FILE_SIZE || "File Size",
-        value: formatFileSize(record.fileSize),
-      }] : []),
+      ...(isDownloadable
+        ? [
+            {
+              label: t.translations.FILE_SIZE || "File Size",
+              value: formatFileSize(record.fileSize),
+            },
+          ]
+        : []),
       {
         label: t.translations.LAST_UPDATED_AT,
         value: formatLocalDateTime(record.lastUpdatedAt),
@@ -647,6 +692,81 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
     }
   };
 
+  const handleTriggerLatticeExtraction = useCallback(async () => {
+    if (!organization?.organizationId || !record?.dataSourceId) {
+      toast.error(t.translations.LATTICE_UNABLE_TO_START_ANALYSIS);
+      return;
+    }
+
+    if (latticeMode === "strict" && !isRecordInsightEmbedded) {
+      toast.error(t.translations.LATTICE_STRICT_REQUIRES_EMBEDDING);
+      return;
+    }
+
+    try {
+      setIsTriggeringLatticeExtraction(true);
+
+      const result = await triggerLatticeExtraction(
+        organization.organizationId as number,
+        projectId,
+        recordId,
+        {
+          data_source_id: record.dataSourceId,
+          mode: latticeMode,
+        },
+      );
+
+      toast.success(
+        `${t.translations.LATTICE_ANALYSIS_STARTED} ${result.extraction_id}`,
+      );
+    } catch (error: any) {
+      console.error("Error triggering Lattice extraction:", error);
+      toast.error("Failed to extract with Lattice.");
+    } finally {
+      setIsTriggeringLatticeExtraction(false);
+    }
+  }, [
+    organization?.organizationId,
+    projectId,
+    recordId,
+    record?.dataSourceId,
+    isRecordInsightEmbedded,
+    latticeMode,
+  ]);
+
+  useEffect(() => {
+    if (!recordId) return;
+
+    let cancelled = false;
+
+    const checkLatticeReadiness = async () => {
+      try {
+        setIsCheckingLatticeReadiness(true);
+
+        const status = await fetchInsightIngestionStatus(recordId);
+
+        if (cancelled) return;
+
+        setIsRecordInsightEmbedded(status.indexed);
+      } catch (error) {
+        if (cancelled) return;
+
+        console.error("Failed to check Insight embedding status:", error);
+        setIsRecordInsightEmbedded(false);
+      } finally {
+        if (!cancelled) {
+          setIsCheckingLatticeReadiness(false);
+        }
+      }
+    };
+
+    void checkLatticeReadiness();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [recordId]);
+
   // ============= RENDER HELPERS =============
   if (!hasLoaded || !organization) {
     return <RecordLoading />;
@@ -656,15 +776,31 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
     return <RecordLoading />;
   }
 
-  const isDownloadable = !!record.uri &&
+  const isDownloadable =
+    !!record.uri &&
     record.uri.trim().length > 0 &&
-    record.uri.toLowerCase() !== "null"
+    record.uri.toLowerCase() !== "null";
 
   const isInsightSupported = isInsightSupportedFileType(
     recordFileType,
     record?.uri,
     record?.name,
   );
+
+  const hasLatticeRecordRequirements =
+    isInsightSupported &&
+    !!record.dataSourceId &&
+    !!record.uri &&
+    record.uri.trim().length > 0 &&
+    record.uri.toLowerCase() !== "null";
+
+  const canTriggerStrictLatticeExtract =
+    hasLatticeRecordRequirements && isRecordInsightEmbedded;
+
+  const canTriggerLatticeExtract =
+    latticeMode === "strict"
+      ? canTriggerStrictLatticeExtract
+      : hasLatticeRecordRequirements;
 
   const tabs = [
     {
@@ -693,6 +829,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
                 recordId={record.id}
                 recordName={record.name}
                 recordUri={record.uri}
+                onEmbeddingStatusChange={setIsRecordInsightEmbedded}
               />
             ) : null}
             {/* Tags Card */}
@@ -809,8 +946,85 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
         onTabChange={(label) =>
           setActiveTab(tabs.findIndex((tab) => tab.label === label))
         }
-      />
+        rightAction={
+          isInsightSupported ? (
+            <div className="flex gap-2 items-center">
+              <div
+                className="tooltip"
+                data-tip={
+                  !isInsightSupported
+                    ? t.translations.LATTICE_UNSUPPORTED_FILE_TOOLTIP
+                    : isRecordInsightEmbedded
+                      ? t.translations.LATTICE_READY_TOOLTIP
+                      : t.translations.LATTICE_REQUIRES_EMBEDDING_TOOLTIP
+                }
+              >
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm btn-circle"
+                  onClick={() => {
+                    setLatticeIntroSlide(0);
+                    setIsLatticeIntroOpen(true);
+                  }}
+                  aria-label={t.translations.LATTICE_LEARN_MORE_ARIA}
+                >
+                  <QuestionMarkCircleIcon className="size-6" />
+                </button>
+              </div>
+              {/* <div className="join">
+              <button
+                type="button"
+                className={`btn btn-sm join-item ${
+                  latticeMode === "discovery" ? "btn-primary" : "btn-outline"
+                }`}
+                onClick={() => setLatticeMode("discovery")}
+                disabled={isTriggeringLatticeExtraction}
+              >
+                Discovery
+              </button>
+              <button
+                type="button"
+                className={`btn btn-sm join-item ${
+                  latticeMode === "strict" ? "btn-primary" : "btn-outline"
+                }`}
+                onClick={() => setLatticeMode("strict")}
+                disabled={isTriggeringLatticeExtraction}
+              >
+                Strict
+              </button>
+            </div> */}
 
+              <button
+                type="button"
+                className="btn btn-sm btn-outline btn-primary"
+                onClick={handleTriggerLatticeExtraction}
+                disabled={
+                  isTriggeringLatticeExtraction ||
+                  isCheckingLatticeReadiness ||
+                  !canTriggerLatticeExtract
+                }
+              >
+                {isTriggeringLatticeExtraction ? (
+                  <>
+                    <span className="loading loading-spinner loading-xs" />
+                    {t.translations.STARTING}
+                  </>
+                ) : isCheckingLatticeReadiness ? (
+                  <>
+                    <span className="loading loading-spinner loading-xs" />
+                    {t.translations.CHECKING}
+                  </>
+                ) : (
+                  <>
+                    {t.translations.ANALYZE_RECORD}{" "}
+                    <ArrowTopRightOnSquareIcon className="size-4" />
+                  </>
+                )}
+              </button>
+            </div>
+          ) : null
+        }
+      />
       <ConfirmationModal
         isOpen={modal.isOpen}
         onClose={handleCloseModal}
@@ -818,7 +1032,6 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
         tagName={modal.nameToRemove}
         recordName={modal.recordNameToRemove}
       />
-
       <AdditionalPropertiesEditor
         isOpen={isPropertiesEditorOpen}
         onClose={() => setIsPropertiesEditorOpen(false)}
@@ -832,7 +1045,6 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
         onSave={handleSaveProperties}
         isSaving={isSavingProperties}
       />
-
       <ClassSelectorModal
         isOpen={isClassModalOpen}
         onClose={() => setIsClassModalOpen(false)}
@@ -842,7 +1054,6 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
         onCreateClass={handleCreateClass}
         isLoading={isLoadingClasses}
       />
-
       <AddEdgeModal
         isOpen={isAddEdgeModalOpen}
         onClose={() => setIsAddEdgeModalOpen(false)}
@@ -859,6 +1070,92 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
         onSearchRecords={handleSearchRecords}
         onCreateRelationships={handleCreateRelationships}
       />
+      {isLatticeIntroOpen ? (
+        <dialog className="modal modal-open">
+          <div className="modal-box max-w-xl">
+            <form method="dialog">
+              <button
+                type="button"
+                className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2"
+                onClick={() => setIsLatticeIntroOpen(false)}
+                aria-label={t.translations.CLOSE}
+              >
+                <XMarkIcon className="size-6" />
+              </button>
+            </form>
+
+            <div className="flex flex-col items-center text-center gap-4 pt-4">
+              <div className="rounded-full bg-primary/10 p-4 text-primary">
+                <CurrentLatticeIntroIcon className="size-10" />
+              </div>
+
+              <div>
+                <h3 className="text-lg font-bold">
+                  {currentLatticeIntroSlide.title}
+                </h3>
+                <p className="py-3 text-sm text-base-content/70">
+                  {currentLatticeIntroSlide.body}
+                </p>
+              </div>
+
+              <div className="flex gap-2">
+                {latticeIntroSlides.map((_, index) => (
+                  <button
+                    key={index}
+                    type="button"
+                    className={`h-2.5 w-2.5 rounded-full ${
+                      latticeIntroSlide === index ? "bg-primary" : "bg-base-300"
+                    }`}
+                    onClick={() => setLatticeIntroSlide(index)}
+                    aria-label={`${t.translations.LATTICE_GO_TO_SLIDE} ${index + 1}`}
+                  />
+                ))}
+              </div>
+            </div>
+
+            <div className="modal-action justify-between">
+              <button
+                type="button"
+                className="btn btn-ghost"
+                disabled={latticeIntroSlide === 0}
+                onClick={() =>
+                  setLatticeIntroSlide((slide) => Math.max(slide - 1, 0))
+                }
+              >
+                {t.translations.BACK}
+              </button>
+
+              {latticeIntroSlide === latticeIntroSlides.length - 1 ? (
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={() => setIsLatticeIntroOpen(false)}
+                >
+                  {t.translations.GOT_IT}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={() =>
+                    setLatticeIntroSlide((slide) =>
+                      Math.min(slide + 1, latticeIntroSlides.length - 1),
+                    )
+                  }
+                >
+                  {t.translations.NEXT}
+                </button>
+              )}
+            </div>
+          </div>
+
+          <form method="dialog" className="modal-backdrop">
+            <button type="button" onClick={() => setIsLatticeIntroOpen(false)}>
+              close
+            </button>
+          </form>
+        </dialog>
+      ) : null}
     </div>
   );
 }

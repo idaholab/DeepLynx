@@ -3,7 +3,6 @@ namespace deeplynx.models;
 public class CustomQueryDtos
 {
         public class CustomQueryRequestDto
-
         {
                 public string? Connector { get; set; } // AND, OR
                 public string Filter { get; set; } // properties from historical records model
@@ -12,12 +11,26 @@ public class CustomQueryDtos
 
                 public string? Json { get; set; }
         }
-        
+
 
         public class CustomQueryResponseDto
         {
-                public string? textSearch { get; set; }
+                public string? TextSearch { get; set; }
                 public CustomQueryRequestDto[] Filter { get; set; }
+        }
+
+        public class FilterSavedQueryRequestDto
+        {
+                public string? Name { get; set; }
+                public string? TextSearch { get; set; }
+                public DateTime? LastUpdatedBefore { get; set; }
+                public DateTime? LastUpdatedAfter { get; set; }
+        }
+
+        public class SavedSearchDto
+        {
+                public CustomQueryRequestDto[] Filter { get; set; }
+                public string? TextSearch { get; set; }
         }
 }
 

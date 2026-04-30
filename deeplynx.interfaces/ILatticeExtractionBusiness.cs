@@ -2,7 +2,7 @@ using deeplynx.models;
 
 namespace deeplynx.interfaces;
 
-public interface IExtractionBusiness
+public interface ILatticeExtractionBusiness
 {
     Task<ExtractionResponseDto> LatticeEntityStaging(
         long currentUserId,
@@ -16,7 +16,14 @@ public interface IExtractionBusiness
 
     Task<List<OntologySimilarityResultDto>> SearchOntologySimilarity(
         long recordId,
+        long projectId, 
+        long limit);
+
+    Task<long> TriggerLatticeExtraction(
+        long currentUserId,
+        long organizationId,
         long projectId,
-        int limit = 5,
-        string? termType = null);
+        long recordId,
+        string mode);
 }
+

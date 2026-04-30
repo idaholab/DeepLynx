@@ -49,7 +49,8 @@ public class QueryController : ControllerBase
             var isSysAdmin = UserContextStorage.IsSysAdmin;
             var isOrgAdmin = UserContextStorage.IsOrgAdmin;
             var isProjectAdmin = UserContextStorage.IsProjectAdmin;
-            var records = await _queryBusiness.Search(currentUserId, userQuery,organizationId, projectIds,
+            var records = await _queryBusiness.Search(
+                currentUserId, userQuery, organizationId, projectIds,
                 isSysAdmin, isOrgAdmin, isProjectAdmin);
             return Ok(records);
         }
@@ -96,7 +97,7 @@ public class QueryController : ControllerBase
     /// <summary>
     ///     Get Recent Records
     /// </summary>
-    /// <param name="organizationId"> Orginization Id of projects</param>
+    /// <param name="organizationId"> Organization Id of projects</param>
     /// <param name="projectIds">Array of project ids</param>
     /// <returns>List of record response DTOs sorted by most recent</returns>
     [HttpGet("recent", Name = "api_get_recent_records")]
@@ -143,7 +144,7 @@ public class QueryController : ControllerBase
             var isSysAdmin = UserContextStorage.IsSysAdmin;
             var isOrgAdmin = UserContextStorage.IsOrgAdmin;
             var isProjectAdmin = UserContextStorage.IsProjectAdmin;
-            var records = await _queryBusiness.GetMultiProjectRecords(currentUserId, organizationId, projects, 
+            var records = await _queryBusiness.GetMultiProjectRecords(currentUserId, organizationId, projects,
                 hideArchived, isSysAdmin, isOrgAdmin, isProjectAdmin);
             return Ok(records);
         }
