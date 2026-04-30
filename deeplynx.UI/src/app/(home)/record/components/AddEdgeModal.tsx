@@ -9,6 +9,8 @@ import {
 } from "@heroicons/react/24/outline";
 import SearchBar from "../../components/SearchBar";
 import { useLanguage } from "@/app/contexts/Language";
+import { getAllRelationships } from "@/app/lib/client_service/relationship_services.client";
+import type { RelationshipResponseDto } from "../../types/responseDTOs";
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -43,7 +45,8 @@ interface AddEdgeModalProps {
   ) => Promise<RecordSearchResult[]>;
   onCreateRelationships: (data: {
     records: RecordSearchResult[];
-    relationship: string;
+    relationshipId: number;
+    relationshipName: string;
     direction: "outgoing" | "incoming";
   }) => Promise<void>;
 }
@@ -131,6 +134,7 @@ export default function AddEdgeModal({
   currentRecord,
   relationship,
   direction,
+  projectId,
   onSearchRecords,
   onCreateRelationships,
 }: AddEdgeModalProps) {
@@ -151,7 +155,13 @@ export default function AddEdgeModal({
     [],
   );
   const [selectedDirection, setSelectedDirection] = useState(direction);
-  const [selectedRelationship] = useState(relationship);
+  const [availableRelationships, setAvailableRelationships] = useState<
+    RelationshipResponseDto[]
+  >([]);
+  const [selectedRelationshipId, setSelectedRelationshipId] = useState<
+    number | null
+  >(null);
+  const [isLoadingRelationships, setIsLoadingRelationships] = useState(false);
 
   // UI state
   const [isCreating, setIsCreating] = useState(false);
@@ -169,10 +179,50 @@ export default function AddEdgeModal({
       setSearchResults([]);
       setSelectedRecords([]);
       setHasSearched(false);
+      setAvailableRelationships([]);
+      setSelectedRelationshipId(null);
     } else {
       setSelectedDirection(direction);
     }
   }, [isOpen, direction]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadRelationships = async () => {
+      if (!isOpen || !projectId) return;
+
+      try {
+        setIsLoadingRelationships(true);
+        const data = await getAllRelationships(projectId, true);
+
+        if (cancelled) return;
+
+        setAvailableRelationships(data);
+
+        if (relationship) {
+          const matchedRelationship = data.find((item) => item.name === relationship);
+          setSelectedRelationshipId(matchedRelationship?.id ?? null);
+        }
+      } catch (error) {
+        console.error("Error loading relationships for add-edge modal:", error);
+        if (!cancelled) {
+          setAvailableRelationships([]);
+          setSelectedRelationshipId(null);
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoadingRelationships(false);
+        }
+      }
+    };
+
+    loadRelationships();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, projectId, relationship]);
 
   // ============================================================================
   // HANDLERS
@@ -229,11 +279,18 @@ export default function AddEdgeModal({
    * Creates relationships for all selected records
    */
   const handleCreate = async () => {
+    const selectedRelationship = availableRelationships.find(
+      (item) => item.id === selectedRelationshipId,
+    );
+
+    if (!selectedRelationship) return;
+
     setIsCreating(true);
     try {
       await onCreateRelationships({
         records: selectedRecords,
-        relationship: selectedRelationship,
+        relationshipId: selectedRelationship.id,
+        relationshipName: selectedRelationship.name,
         direction: selectedDirection,
       });
       onClose();
@@ -316,6 +373,33 @@ export default function AddEdgeModal({
                       {t.translations.INCOMING}
                     </button>
                   </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs text-gray-600 mb-1">
+                    {t.translations.RELATIONSHIP}
+                  </label>
+                  <select
+                    className="select select-bordered w-full bg-white"
+                    value={selectedRelationshipId ?? ""}
+                    onChange={(event) =>
+                      setSelectedRelationshipId(
+                        event.target.value ? Number(event.target.value) : null,
+                      )
+                    }
+                    disabled={isLoadingRelationships}
+                  >
+                    <option value="">
+                      {isLoadingRelationships
+                        ? t.translations.LOADING || "Loading..."
+                        : "Select a relationship"}
+                    </option>
+                    {availableRelationships.map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {item.name}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
             </div>
@@ -477,7 +561,11 @@ export default function AddEdgeModal({
             {t.translations.CANCEL}
           </button>
           <button
-            disabled={selectedRecords.length === 0 || isCreating}
+            disabled={
+              selectedRecords.length === 0 ||
+              isCreating ||
+              selectedRelationshipId == null
+            }
             onClick={handleCreate}
             className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
           >

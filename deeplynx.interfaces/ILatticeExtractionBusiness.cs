@@ -16,9 +16,8 @@ public interface ILatticeExtractionBusiness
 
     Task<List<OntologySimilarityResultDto>> SearchOntologySimilarity(
         long recordId,
-        long projectId,
-        int limit = 5,
-        string? termType = null);
+        long projectId, 
+        long limit);
 
     Task<long> TriggerLatticeExtraction(
         long currentUserId,

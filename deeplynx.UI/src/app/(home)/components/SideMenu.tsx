@@ -26,8 +26,11 @@ import {
   ChevronUpIcon,
   FolderIcon,
   PresentationChartLineIcon,
+  QueueListIcon,
   RectangleGroupIcon,
+  Squares2X2Icon,
   SparklesIcon,
+  TableCellsIcon,
   XMarkIcon,
 } from "@heroicons/react/24/outline";
 
@@ -443,7 +446,18 @@ const SideMenu: React.FC<SideMenuProps> = ({
               {!isCollapsed && <p className="ml-2">Insight</p>}
             </Link>
           </li>
-        </ul>
+
+          <li className="mt-2">
+            <Link
+              href="/data_schema/"
+              onClick={() => onMobileClose?.()}
+              className={getItemClass("/data_schema/")}
+            >
+              <TableCellsIcon className="size-6" />
+              {!isCollapsed && <p className="ml-2">Data Schema</p>}
+            </Link>
+          </li>
+          </ul>
       </aside>
 
       {/* ---------------------------- Toggle Tab ----------------------------- */}

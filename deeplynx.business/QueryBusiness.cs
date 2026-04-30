@@ -21,6 +21,7 @@ public class QueryBusiness : IQueryBusiness
     ///     Filter record request
     /// </summary>
     /// <param name="context">The database context to be used for filter operations.</param>
+    /// <param name="sensitivityLabelService">Helper service for Sensitivity Label Authorization.</param>
     public QueryBusiness(DeeplynxContext context, ISensitivityLabelService sensitivityLabelService)
     {
         _context = context;
@@ -40,7 +41,7 @@ public class QueryBusiness : IQueryBusiness
     /// <param name="isProjectAdmin">Optional param determining if the requesting user is a project admin</param>
     /// <returns>A list of historical record response dtos that match provided filters</returns>
     public async Task<IEnumerable<HistoricalRecordResponseDto>> QueryBuilder(
-        long currentUserId, CustomQueryDtos.CustomQueryRequestDto[] request, long organizationId, long[] projectIds, 
+        long currentUserId, CustomQueryDtos.CustomQueryRequestDto[] request, long organizationId, long[] projectIds,
         string? textSearch = null, bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false)
     {
         if (request == null) throw new ArgumentException("Custom query request dto cannot be null");
@@ -104,7 +105,7 @@ public class QueryBusiness : IQueryBusiness
                     Value = authorizedLabelIds.ToArray()
                 });
             }
-            
+
             // Build individual conditions
             var conditions = new List<string>();
             if (request?.Length > 0)
@@ -323,7 +324,7 @@ public class QueryBusiness : IQueryBusiness
         if (!isSysAdmin && !isOrgAdmin && !isProjectAdmin)
         {
             authorizedLabelIds = await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
-                    currentUserId, organizationId, projectIds, "read record");    
+                    currentUserId, organizationId, projectIds, "read record");
         }
 
         var processedQuery = string.Join(" & ",
@@ -403,7 +404,7 @@ public class QueryBusiness : IQueryBusiness
                 Value = authorizedLabelIds.ToArray()
             });
         }
-        
+
         var historicalRecordsResults =
             _context.HistoricalRecords.FromSqlRaw(sql, parameters.ToArray());
 

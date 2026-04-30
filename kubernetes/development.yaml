@@ -106,6 +106,8 @@ spec:
           image: ${CI_REGISTRY}/${CI_REGISTRY_PATH}:deeplynxv3-ui-${GITHUB_RUN_NUMBER}
           imagePullPolicy: Always
           env:
+            - name: NODE_ENV
+              value: "production"
             - name: AWS_S3_CONNECTION_STRING
               value: ${AWS_S3_CONNECTION_STRING}
             - name: AZURE_OBJECT_CONNECTION_STRING
@@ -139,7 +141,6 @@ spec:
               value: ${JWT_AUDIENCE}
             - name: DUCKDB_BASE_PATH
               # DuckDB Configuration
-
               value: ${DUCKDB_BASE_PATH}
             - name: SMTP_SERVER
               value: ${SMTP_SERVER}
@@ -165,7 +166,6 @@ spec:
               value: ${TENANT_MODE}
             - name: OKTA_CLIENT_SECRET
               # Runtime environment variables from secrets (sensitive)
-
               valueFrom:
                 secretKeyRef:
                   name: app-secrets
@@ -415,6 +415,8 @@ spec:
           image: ${CI_REGISTRY}/${CI_REGISTRY_PATH}:deeplynxv3-docs-${GITHUB_RUN_NUMBER}
           imagePullPolicy: Always
           env:
+            - name: NODE_ENV
+              value: "production"
             - name: HOSTED_LINK
               valueFrom:
                 configMapKeyRef:
@@ -745,11 +747,11 @@ spec:
               value: "/data/insight"
           resources:
             requests:
-              cpu: "200m"
-              memory: "256Mi"
-            limits:
-              cpu: "1000m"
               memory: "512Mi"
+              cpu: "1500m"
+            limits:
+              memory: "12Gi"
+              cpu: "10000m"
           volumeMounts:
             - name: nexus-storage
               mountPath: /data/duckdb
@@ -862,10 +864,13 @@ metadata:
   annotations:
     kubernetes.io/ingress.class: nginx
     nginx.ingress.kubernetes.io/configuration-snippet: |
-      more_clear_headers "strict-transport-security";
-      more_clear_headers "x-content-type-options";
-      more_clear_headers "x-frame-options";
-      more_clear_headers "content-security-policy";
+      more_set_headers "Referrer-Policy: strict-origin";
+      more_set_headers "X-Content-Type-Options: nosniff";
+      more_set_headers "X-Frame-Options: SAMEORIGIN";
+      more_clear_headers "X-Powered-By";
+      more_clear_headers "x-nextjs-cache";
+      more_clear_headers "x-nextjs-prerender";
+      more_clear_headers "x-nextjs-stale-time";
     nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
     nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
 spec:
