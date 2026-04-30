@@ -1,37 +1,33 @@
+using System.Text.Json.Serialization;
+
 namespace deeplynx.models;
 
 public class CustomQueryDtos
 {
         public class CustomQueryRequestDto
         {
-                public string? Connector { get; set; } // AND, OR
-                public string Filter { get; set; } // properties from historical records model
-                public string Operator { get; set; } // =, <, >, LIKE, KEY_VALUE
-                public string? Value { get; set; } // One selected option from listed values of Filters 
+                [JsonPropertyName("connector")]
+                public string? Connector { get; set; }
 
+                [JsonPropertyName("filter")]
+                public string Filter { get; set; }
+
+                [JsonPropertyName("operator")]
+                public string Operator { get; set; }
+
+                [JsonPropertyName("value")]
+                public string? Value { get; set; }
+
+                [JsonPropertyName("json")]
                 public string? Json { get; set; }
         }
 
-
         public class CustomQueryResponseDto
         {
+                [JsonPropertyName("textSearch")]
                 public string? TextSearch { get; set; }
-                public CustomQueryRequestDto[] Filter { get; set; }
-        }
 
-        public class FilterSavedQueryRequestDto
-        {
-                public string? Name { get; set; }
-                public string? TextSearch { get; set; }
-                public DateTime? LastUpdatedBefore { get; set; }
-                public DateTime? LastUpdatedAfter { get; set; }
-        }
-
-        public class SavedSearchDto
-        {
+                [JsonPropertyName("filter")]
                 public CustomQueryRequestDto[] Filter { get; set; }
-                public string? TextSearch { get; set; }
         }
 }
-
-
