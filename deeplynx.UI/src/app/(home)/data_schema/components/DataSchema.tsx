@@ -1121,11 +1121,11 @@ export default function DataSchema({ mode }: DataSchemaProps) {
     </div>
   );
 
-  const contentByMode: Record<LayoutMode, React.ReactNode> = {
+  const contentByMode = {
     split: splitContent,
     tabs: tabContent,
     board: boardContent,
-  };
+  } as const;
 
   return (
     <div>
