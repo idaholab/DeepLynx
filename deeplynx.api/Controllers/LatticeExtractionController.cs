@@ -63,6 +63,77 @@ public class LatticeExtractionController : ControllerBase
     }
 
     /// <summary>
+    ///     Mark an extraction as failed. Called by Insight when async extraction cannot complete.
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization.</param>
+    /// <param name="projectId">The ID of the project.</param>
+    /// <param name="extractionId">The extraction ID returned by the trigger endpoint.</param>
+    /// <param name="errorMessage">Optional error message from Insight describing the failure.</param>
+    [HttpPost("{extractionId:long}/failure", Name = "api_insight_extraction_failure")]
+    public async Task<IActionResult> InsightExtractionFailure(
+        long organizationId,
+        long projectId,
+        long extractionId,
+        [FromQuery] string? errorMessage = null)
+    {
+        try
+        {
+            await _latticeExtractionBusiness.MarkExtractionFailed(extractionId, errorMessage);
+            return Ok();
+        }
+        catch (InvalidOperationException exc)
+        {
+            _logger.LogWarning(exc.Message);
+            return NotFound(exc.Message);
+        }
+        catch (Exception exc)
+        {
+            var message = $"An error occurred while marking extraction {extractionId} as failed: {exc}";
+            _logger.LogError(message);
+            return StatusCode(StatusCodes.Status500InternalServerError, message);
+        }
+    }
+
+    /// <summary>
+    ///     Receive the LLM extraction result from Insight and stage it.
+    ///     Called by Insight once the async extraction completes. The payload shape matches
+    ///     the prompt defined in LatticeExtractionBusiness: a "classes" array of extracted
+    ///     entity instances and a "relationships" array of directed connections between them.
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization.</param>
+    /// <param name="projectId">The ID of the project.</param>
+    /// <param name="extractionId">The extraction ID returned by the trigger endpoint.</param>
+    /// <param name="dataSourceId">The data source the staged records and edges will belong to.</param>
+    /// <param name="dto">LLM response payload from Insight.</param>
+    [HttpPost("{extractionId:long}/callback", Name = "api_insight_extraction_callback")]
+    public async Task<IActionResult> InsightExtractionCallback(
+        long organizationId,
+        long projectId,
+        long extractionId,
+        [FromQuery] long dataSourceId,
+        [FromBody] InsightExtractionCallbackDto dto)
+    {
+        try
+        {
+            var currentUserId = UserContextStorage.UserId;
+            var result = await _latticeExtractionBusiness.ProcessInsightExtractionCallback(
+                currentUserId, organizationId, projectId, dataSourceId, extractionId, dto);
+            return Ok(result);
+        }
+        catch (InvalidOperationException exc)
+        {
+            _logger.LogWarning(exc.Message);
+            return NotFound(exc.Message);
+        }
+        catch (Exception exc)
+        {
+            var message = $"An error occurred while staging Insight extraction results: {exc}";
+            _logger.LogError(message);
+            return StatusCode(StatusCodes.Status500InternalServerError, message);
+        }
+    }
+
+    /// <summary>
     ///     Trigger asynchronous Lattice extraction
     /// </summary>
     /// <param name="organizationId">The ID of the organization.</param>

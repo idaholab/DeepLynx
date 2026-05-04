@@ -4,13 +4,13 @@ namespace deeplynx.interfaces;
 
 public interface ILatticeExtractionBusiness
 {
-    Task<ExtractionResponseDto> LatticeEntityStaging(
+    Task<ExtractionResponseDto> ProcessInsightExtractionCallback(
         long currentUserId,
         long organizationId,
         long projectId,
         long dataSourceId,
-        CreateStagingRequestDto dto,
-        long? extractionId = null);
+        long extractionId,
+        InsightExtractionCallbackDto dto);
 
     Task MarkExtractionFailed(long extractionId, string? errorMessage = null);
 

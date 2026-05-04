@@ -44,9 +44,12 @@ public class InsightServiceClient
         response.EnsureSuccessStatusCode();
     }
     
-    public async Task<HttpResponseMessage> LatticeExtraction(string prompt, string llm_model_name)
+    public async Task<HttpResponseMessage> LatticeExtraction(
+        string prompt,
+        string llmModelName,
+        object queryInfo)
     {
-        var requestParams = new { mode = "lattice", prompt = prompt, llm_model_name = llm_model_name}; 
+        var requestParams = new { mode = "lattice", prompt, llm_model_name = llmModelName, query_info = queryInfo };
         var response = await _client.PostAsJsonAsync("/query", requestParams);
         response.EnsureSuccessStatusCode();
         return response;
