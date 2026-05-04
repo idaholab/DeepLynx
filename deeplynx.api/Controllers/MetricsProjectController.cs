@@ -1,3 +1,4 @@
+using deeplynx.datalayer.Models;
 using deeplynx.helpers;
 using deeplynx.interfaces;
 using Microsoft.AspNetCore.Authorization;
@@ -42,7 +43,9 @@ public class MetricsProjectController : ControllerBase
     [HttpGet("storage/size", Name = "api_storage_size_project")]
     [SysAdmin]
     public async Task<IActionResult> GetProjectStorageSize(
-        long organizationId, long projectId)
+        long organizationId, 
+        long projectId
+        )
     {
         try
         {
@@ -53,6 +56,31 @@ public class MetricsProjectController : ControllerBase
         catch (Exception exc)
         {
             var message = $"An error occurred while retrieving byte count for the system: {exc}";
+            _logger.LogError(message);
+            return StatusCode(StatusCodes.Status500InternalServerError, message);
+        }
+    }
+
+    /// <summary>
+    ///     Get Project Data Source Count 
+    /// </summary>
+    /// <param name="projectId">The ID of the project whose data sources are to be retrieved</param>
+    /// <param name="hideArchived">Flag indicating whether to hide archived data sources from the result (Default true)</param>
+    /// <returns>A count of data sources for the given project.</returns>
+    [HttpGet("count", Name = "api_count_data_sources_for_project")]
+    [Auth("read", "data_source")]
+    public async Task<ActionResult<int>> GetDataSourceCount(
+        long projectId, 
+        [FromQuery] bool hideArchived = true)
+    {
+        try
+        {
+            var dataSources = await _metricsBusiness.GetProjectDataSourceCount(projectId, hideArchived);
+            return Ok(dataSources);
+        }
+        catch (Exception exc)
+        {
+            var message = $"An error occurred while listing all data sources: {exc}";
             _logger.LogError(message);
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
