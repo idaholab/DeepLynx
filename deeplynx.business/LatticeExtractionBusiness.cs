@@ -63,7 +63,8 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
         var extraction = new Extraction
         {
             CreatedBy = currentUserId,
-            Status = ExtractionStatus.Pending
+            Status = ExtractionStatus.Pending,
+            Mode = mode
         };
         _context.Extractions.Add(extraction);
         await _context.SaveChangesAsync();
@@ -122,13 +123,16 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
         var extraction = await _context.Extractions.FindAsync(extractionId)
                          ?? throw new InvalidOperationException($"Extraction {extractionId} not found.");
 
+        var mode = extraction.Mode
+                   ?? throw new InvalidOperationException($"Extraction {extractionId} has no mode set.");
+
         await using var transaction = await _latticeContext.Database.BeginTransactionAsync();
         try
         {
-            var classes = await StageClasses(extraction.Id, dto.Classes, organizationId, projectId);
-            var records = await StageRecords(extraction.Id, dto.Classes, classes, organizationId, projectId, dataSourceId);
-            var relationships = await StageRelationships(extraction.Id, dto.Relationships, classes, organizationId, projectId);
-            var edgeCount = await StageEdges(extraction.Id, dto.Relationships, records, relationships, organizationId, projectId, dataSourceId);
+            var classes = await StageClasses(extraction.Id, dto.Classes, organizationId, projectId, mode);
+            var records = await StageRecords(extraction.Id, dto.Classes, classes, organizationId, projectId, dataSourceId, mode);
+            var relationships = await StageRelationships(extraction.Id, dto.Relationships, classes, organizationId, projectId, mode);
+            var edgeCount = await StageEdges(extraction.Id, dto.Relationships, records, relationships, organizationId, projectId, dataSourceId, mode);
 
             await transaction.CommitAsync();
 
@@ -158,7 +162,8 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
         long extractionId,
         List<InsightExtractedClassDto> classes,
         long organizationId,
-        long projectId) => throw new NotImplementedException();
+        long projectId,
+        string mode) => throw new NotImplementedException();
 
     private Task<Dictionary<string, long>> StageRecords(
         long extractionId,
@@ -166,14 +171,16 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
         Dictionary<string, long> classTypeToId,
         long organizationId,
         long projectId,
-        long dataSourceId) => throw new NotImplementedException();
+        long dataSourceId,
+        string mode) => throw new NotImplementedException();
 
     private Task<Dictionary<string, long>> StageRelationships(
         long extractionId,
         List<InsightExtractedRelationshipDto> relationships,
         Dictionary<string, long> classTypeToId,
         long organizationId,
-        long projectId) => throw new NotImplementedException();
+        long projectId,
+        string mode) => throw new NotImplementedException();
 
     private Task<int> StageEdges(
         long extractionId,
@@ -182,7 +189,8 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
         Dictionary<string, long> relationshipKeyToId,
         long organizationId,
         long projectId,
-        long dataSourceId) => throw new NotImplementedException();
+        long dataSourceId,
+        string mode) => throw new NotImplementedException();
 
     /// <summary>
     ///     Marks an extraction as failed. Called when Lattice reports an error via its error callback.
@@ -517,7 +525,7 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
     // valid schema if class exists, instance would be new 
     
     
-    // Save to database and let the user approve or deny extraction output that has been validated. 
+    // Save to extraction tables and let the user approve or deny extraction before promotion to the deeplynx schema
     
     
     
