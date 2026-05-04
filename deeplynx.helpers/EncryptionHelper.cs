@@ -1,6 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
-using Newtonsoft.Json;
+using System.Text.Json;
 
 namespace deeplynx.helpers;
 
@@ -216,9 +216,17 @@ public class EncryptionHelper
     {
         if (data == null)
             throw new ArgumentException("Data cannot be null", nameof(data));
-        var json = JsonConvert.SerializeObject(data);
+    
+        var options = new JsonSerializerOptions()
+        {
+            WriteIndented = false
+        };
+    
+        var json = JsonSerializer.Serialize(data, options);
+    
         // explicitly add spaces after the colon to match the Postgres formatting for consistent encryption output
         json = System.Text.RegularExpressions.Regex.Replace(json, "\":(?! )", "\": ");
+    
         return Encrypt(json);
     }
 
@@ -234,7 +242,7 @@ public class EncryptionHelper
         try
         {
             var decrypted = Decrypt(encryptedData);
-            return JsonConvert.DeserializeObject<T>(decrypted)
+            return JsonSerializer.Deserialize<T>(decrypted)
                    ?? throw new InvalidOperationException(
                        $"Decrypted data for type {typeof(T).Name} is null or invalid");
         }

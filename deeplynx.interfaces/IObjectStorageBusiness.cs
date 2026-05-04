@@ -32,4 +32,11 @@ public interface IObjectStorageBusiness
 
     Task<ObjectStorageResponseDto> GetDefaultObjectStorage(
         long organizationId, long? projectId);
+
+    Task<ObjectStorageDecryptedDto> GetDecryptedObjectStorage(long objectStorageId);
+
+    Task<List<ObjectStorageDecryptedDto>> GetDecryptedObjectStorages(
+        long? organizationId,
+        long? projectId,
+        List<long>? objectStorageIds);
 }

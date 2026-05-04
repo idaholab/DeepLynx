@@ -522,6 +522,39 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
             throw new Exception($"Unable to set object storage {objectStorageId} as default");
         }
     }
+    
+    /// <summary>
+    ///     For internal use only (don't hook an API up to this)- returns a single decrypted object storage config
+    /// </summary>
+    /// <param name="objectStorageId">ID of the object storage to get config for</param>
+    /// <returns>A single object storage with its decrypted config</returns>
+    /// <exception cref="InvalidOperationException"></exception>
+    public async Task<ObjectStorageDecryptedDto> GetDecryptedObjectStorage(long objectStorageId)
+    {
+        // filter out archived by default instead of providing param
+        var query = _context.ObjectStorages
+            .Where(os => os.Id == objectStorageId)
+            .Where(os => !os.IsArchived);
+        
+        var returnedObjectStorage = await query.FirstOrDefaultAsync();
+
+        if (returnedObjectStorage is null)
+            throw new KeyNotFoundException($"Object storage with id {objectStorageId} not found");
+
+        return new ObjectStorageDecryptedDto
+        {
+            Id = returnedObjectStorage.Id,
+            Name = returnedObjectStorage.Name,
+            Type = returnedObjectStorage.Type,
+            ProjectId = returnedObjectStorage.ProjectId,
+            OrganizationId = returnedObjectStorage.OrganizationId,
+            Default = returnedObjectStorage.Default,
+            LastUpdatedAt = returnedObjectStorage.LastUpdatedAt,
+            LastUpdatedBy = returnedObjectStorage.LastUpdatedBy,
+            IsArchived = returnedObjectStorage.IsArchived,
+            Config = DeserializeAndDecryptConfig(returnedObjectStorage.ConfigEncrypted)
+        };
+    }
 
     /// <summary>
     ///     For internal use only (don't hook an API up to this)- returns the decrypted object storage config
@@ -529,14 +562,12 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
     /// <param name="organizationId">The ID of the organization to which the object storage belongs</param>
     /// <param name="projectId">ID of the project in which the object storage belongs</param>
     /// <param name="objectStorageIds">IDs of the object storage configs to get configs for</param>
-    /// <param name="hideArchived">Flag indicating whether to hide archived ObjectStorages from the result </param>
     /// <returns>A list of object storages, including their decrypted configs</returns>
     /// <exception cref="InvalidOperationException"></exception>
     public async Task<List<ObjectStorageDecryptedDto>> GetDecryptedObjectStorages(
         long? organizationId,
         long? projectId,
-        List<long>? objectStorageIds,
-        bool hideArchived)
+        List<long>? objectStorageIds)
     {
         if (!organizationId.HasValue && !projectId.HasValue && 
             (objectStorageIds == null || !objectStorageIds.Any()))
@@ -544,8 +575,10 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
             throw new InvalidOperationException(
                 $"At least one organization, project or object storage filter must be set.");
         }
-        
-        var query = _context.ObjectStorages.AsQueryable();
+
+        // filter out archived by default instead of providing a param
+        var query = _context.ObjectStorages
+            .Where(os => !os.IsArchived);
 
         if (organizationId.HasValue)
             query = query.Where(os => os.OrganizationId == organizationId);
@@ -557,9 +590,6 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
 
         if (objectStorageIds.Any())
             query = query.Where(os => objectStorageIds.Contains(os.Id));
-        
-        if (hideArchived)
-            query = query.Where(os => !os.IsArchived);
         
         var objectStorages = await query.ToListAsync();
         return objectStorages
@@ -574,7 +604,7 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
                 LastUpdatedAt = os.LastUpdatedAt,
                 LastUpdatedBy = os.LastUpdatedBy,
                 IsArchived = os.IsArchived,
-                Config = DeserializeAndDecryptConfig(os.Config)
+                Config = DeserializeAndDecryptConfig(os.ConfigEncrypted)
             }).ToList();
     }
     
