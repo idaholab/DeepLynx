@@ -5,7 +5,6 @@ namespace deeplynx.interfaces;
 public interface ILatticeExtractionBusiness
 {
     Task<ExtractionResponseDto> ProcessInsightExtractionCallback(
-        long currentUserId,
         long organizationId,
         long projectId,
         long dataSourceId,

@@ -83,10 +83,10 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
 
             var filledPrompt = await ConstructPrompt(recordId, projectId, mode);
 
-            //TODO: Fix hard coded model name.
+            var llmConfig = await _insightBusiness.ResolveModelConfig(
+                currentUserId, organizationId, projectId, null, "llm");
             var response =
-                await _insightServiceClient.LatticeExtraction(filledPrompt, "Mistral-Small-3.2-24B-Instruct-2506",
-                    queryInfo);
+                await _insightServiceClient.LatticeExtraction(filledPrompt, llmConfig.ModelName, queryInfo);
 
             if (response.IsSuccessStatusCode)
             {
@@ -114,7 +114,6 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
     
 
     public async Task<ExtractionResponseDto> ProcessInsightExtractionCallback(
-        long currentUserId,
         long organizationId,
         long projectId,
         long dataSourceId,
@@ -163,7 +162,7 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
             return new ExtractionResponseDto
             {
                 Id = extraction.Id,
-                CreatedBy = currentUserId,
+                CreatedBy = extraction.CreatedBy,
                 ClassCount = classes.Count,
                 RecordCount = records.Count,
                 RelationshipCount = relationships.Count,

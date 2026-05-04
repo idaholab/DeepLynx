@@ -69,6 +69,7 @@ public class LatticeExtractionController : ControllerBase
     /// <param name="projectId">The ID of the project.</param>
     /// <param name="extractionId">The extraction ID returned by the trigger endpoint.</param>
     /// <param name="errorMessage">Optional error message from Insight describing the failure.</param>
+    [AllowAnonymous]
     [HttpPost("{extractionId:long}/failure", Name = "api_insight_extraction_failure")]
     public async Task<IActionResult> InsightExtractionFailure(
         long organizationId,
@@ -105,6 +106,7 @@ public class LatticeExtractionController : ControllerBase
     /// <param name="extractionId">The extraction ID returned by the trigger endpoint.</param>
     /// <param name="dataSourceId">The data source the staged records and edges will belong to.</param>
     /// <param name="dto">LLM response payload from Insight.</param>
+    [AllowAnonymous]
     [HttpPost("{extractionId:long}/callback", Name = "api_insight_extraction_callback")]
     public async Task<IActionResult> InsightExtractionCallback(
         long organizationId,
@@ -115,9 +117,8 @@ public class LatticeExtractionController : ControllerBase
     {
         try
         {
-            var currentUserId = UserContextStorage.UserId;
             var result = await _latticeExtractionBusiness.ProcessInsightExtractionCallback(
-                currentUserId, organizationId, projectId, dataSourceId, extractionId, dto);
+                organizationId, projectId, dataSourceId, extractionId, dto);
             return Ok(result);
         }
         catch (InvalidOperationException exc)
