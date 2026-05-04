@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using Newtonsoft.Json;
 
 namespace deeplynx.helpers;
 
@@ -46,6 +47,7 @@ public class EncryptionHelper
                 Console.WriteLine("  1. Follow the instructions in the README to create valid encryption keys");
                 Console.WriteLine("  2. Add them to your environment variables or .env file");
                 Console.WriteLine("  3. Restart the application\n");
+                Console.ResetColor();
 
                 Console.WriteLine("==========================================================\n");
 
@@ -201,6 +203,45 @@ public class EncryptionHelper
         {
             throw new InvalidOperationException(
                 "Invalid ciphertext format. Expected base64-encoded string.", ex);
+        }
+    }
+    
+    /// <summary>
+    ///     Serialize a DTO or other json object and encrypt it
+    /// </summary>
+    /// <param name="data">The contents of the object</param>
+    /// <typeparam name="T">The DTO or other type of the object</typeparam>
+    /// <returns>Ciphertext based on the input</returns>
+    public string SerializeAndEncrypt<T>(T data)
+    {
+        if (data == null)
+            throw new ArgumentException("Data cannot be null", nameof(data));
+        var json = JsonConvert.SerializeObject(data);
+        // explicitly add spaces after the colon to match the Postgres formatting for consistent encryption output
+        json = System.Text.RegularExpressions.Regex.Replace(json, "\":(?! )", "\": ");
+        return Encrypt(json);
+    }
+
+    /// <summary>
+    ///     Deserialize ciphertext into the specified DTO
+    /// </summary>
+    /// <param name="encryptedData">Ciphertext to be decrypted and deserialized</param>
+    /// <typeparam name="T">DTO or other data format to deserialize the string into</typeparam>
+    /// <returns>Deserialized and decrypted data in the requested format</returns>
+    /// <exception cref="InvalidOperationException">Error if deserialized json does not match DTO</exception>
+    public T DeserializeAndDecrypt<T>(string encryptedData)
+    {
+        try
+        {
+            var decrypted = Decrypt(encryptedData);
+            return JsonConvert.DeserializeObject<T>(decrypted)
+                   ?? throw new InvalidOperationException(
+                       $"Decrypted data for type {typeof(T).Name} is null or invalid");
+        }
+        catch (JsonException ex)
+        {
+            throw new InvalidOperationException(
+                $"Decrypted data for type {typeof(T).Name} is null or invalid", ex);
         }
     }
 

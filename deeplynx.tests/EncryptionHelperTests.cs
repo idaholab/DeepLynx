@@ -40,6 +40,29 @@ public class EncryptionHelperTests : IntegrationTestBase
     }
 
     #endregion
+    
+    // Test DTOs for serialization tests
+    private class SimpleDto
+    {
+        public string Name { get; set; } = string.Empty;
+        public int Age { get; set; }
+    }
+
+    private class ComplexDto
+    {
+        public string Id { get; set; } = string.Empty;
+        public string Description { get; set; } = string.Empty;
+        public List<string> Tags { get; set; } = new List<string>();
+        public Dictionary<string, int> Metadata { get; set; } = new Dictionary<string, int>();
+        public DateTime CreatedAt { get; set; }
+        public NestedDto? Nested { get; set; }
+    }
+
+    private class NestedDto
+    {
+        public string Value { get; set; } = string.Empty;
+        public bool IsActive { get; set; }
+    }
 
     #region Constructor Tests
 
@@ -592,5 +615,279 @@ public class EncryptionHelperTests : IntegrationTestBase
         }
     }
 
+    #endregion
+    
+    #region SerializeAndEncrypt / DeserializeAndDecrypt Tests
+    [Fact]
+    public void SerializeAndEncrypt_WithSimpleDto_RoundTripsSuccessfully()
+    {
+        // Arrange
+        var (key, iv) = GenerateValidKeys();
+        SetEncryptionEnvironmentVariables(key, iv);
+
+        try
+        {
+            var helper = new EncryptionHelper();
+            var original = new SimpleDto
+            {
+                Name = "John Doe",
+                Age = 30
+            };
+
+            // Act
+            var encrypted = helper.SerializeAndEncrypt(original);
+            var decrypted = helper.DeserializeAndDecrypt<SimpleDto>(encrypted);
+
+            // Assert
+            Assert.NotNull(decrypted);
+            Assert.Equal(original.Name, decrypted.Name);
+            Assert.Equal(original.Age, decrypted.Age);
+        }
+        finally
+        {
+            ClearEncryptionEnvironmentVariables();
+        }
+    }
+
+    [Fact]
+    public void SerializeAndEncrypt_WithComplexDto_RoundTripsSuccessfully()
+    {
+        // Arrange
+        var (key, iv) = GenerateValidKeys();
+        SetEncryptionEnvironmentVariables(key, iv);
+
+        try
+        {
+            var helper = new EncryptionHelper();
+            var original = new ComplexDto
+            {
+                Id = "test-123",
+                Description = "A complex object for testing",
+                Tags = new List<string> { "tag1", "tag2", "tag3" },
+                Metadata = new Dictionary<string, int>
+                {
+                    { "count", 42 },
+                    { "priority", 1 }
+                },
+                CreatedAt = new DateTime(2024, 1, 15, 10, 30, 0, DateTimeKind.Utc),
+                Nested = new NestedDto
+                {
+                    Value = "nested value",
+                    IsActive = true
+                }
+            };
+
+            // Act
+            var encrypted = helper.SerializeAndEncrypt(original);
+            var decrypted = helper.DeserializeAndDecrypt<ComplexDto>(encrypted);
+
+            // Assert
+            Assert.NotNull(decrypted);
+            Assert.Equal(original.Id, decrypted.Id);
+            Assert.Equal(original.Description, decrypted.Description);
+            Assert.Equal(original.Tags.Count, decrypted.Tags.Count);
+            Assert.Equal(original.Tags[0], decrypted.Tags[0]);
+            Assert.Equal(original.Metadata["count"], decrypted.Metadata["count"]);
+            Assert.Equal(original.CreatedAt, decrypted.CreatedAt);
+            Assert.NotNull(decrypted.Nested);
+            Assert.Equal(original.Nested.Value, decrypted.Nested.Value);
+            Assert.Equal(original.Nested.IsActive, decrypted.Nested.IsActive);
+        }
+        finally
+        {
+            ClearEncryptionEnvironmentVariables();
+        }
+    }
+
+    [Fact]
+    public void SerializeAndEncrypt_WithNullProperties_HandlesCorrectly()
+    {
+        // Arrange
+        var (key, iv) = GenerateValidKeys();
+        SetEncryptionEnvironmentVariables(key, iv);
+
+        try
+        {
+            var helper = new EncryptionHelper();
+            var original = new ComplexDto
+            {
+                Id = "test-null",
+                Description = "Testing null properties",
+                Tags = new List<string>(),
+                Metadata = new Dictionary<string, int>(),
+                CreatedAt = DateTime.UtcNow,
+                Nested = null
+            };
+
+            // Act
+            var encrypted = helper.SerializeAndEncrypt(original);
+            var decrypted = helper.DeserializeAndDecrypt<ComplexDto>(encrypted);
+
+            // Assert
+            Assert.NotNull(decrypted);
+            Assert.Equal(original.Id, decrypted.Id);
+            Assert.Null(decrypted.Nested);
+        }
+        finally
+        {
+            ClearEncryptionEnvironmentVariables();
+        }
+    }
+
+    [Fact]
+    public void SerializeAndEncrypt_SameObjectMultipleTimes_ProducesSameCiphertext()
+    {
+        // Arrange
+        var (key, iv) = GenerateValidKeys();
+        SetEncryptionEnvironmentVariables(key, iv);
+
+        try
+        {
+            var helper = new EncryptionHelper();
+            var dto = new SimpleDto
+            {
+                Name = "Consistency Test",
+                Age = 25
+            };
+
+            // Act
+            var encrypted1 = helper.SerializeAndEncrypt(dto);
+            var encrypted2 = helper.SerializeAndEncrypt(dto);
+            var encrypted3 = helper.SerializeAndEncrypt(dto);
+
+            // Assert - Should produce same ciphertext (because we use fixed IV)
+            Assert.Equal(encrypted1, encrypted2);
+            Assert.Equal(encrypted2, encrypted3);
+        }
+        finally
+        {
+            ClearEncryptionEnvironmentVariables();
+        }
+    }
+    
+    [Fact]
+    public void SerializeAndEncrypt_WithNullObject_ThrowsException()
+    {
+        // Arrange
+        var (key, iv) = GenerateValidKeys();
+        SetEncryptionEnvironmentVariables(key, iv);
+
+        try
+        {
+            var helper = new EncryptionHelper();
+            SimpleDto? nullDto = null;
+
+            // Act & Assert
+            Assert.Throws<ArgumentException>(() => helper.SerializeAndEncrypt(nullDto!));
+        }
+        finally
+        {
+            ClearEncryptionEnvironmentVariables();
+        }
+    }
+
+    [Fact]
+    public void DeserializeAndDecrypt_WithInvalidJson_ThrowsException()
+    {
+        // Arrange
+        var (key, iv) = GenerateValidKeys();
+        SetEncryptionEnvironmentVariables(key, iv);
+
+        try
+        {
+            var helper = new EncryptionHelper();
+            // Encrypt something that's not valid JSON for the target type
+            var invalidJson = "This is not JSON";
+            var encrypted = helper.Encrypt(invalidJson);
+
+            // Act & Assert
+            var exception = Assert.Throws<InvalidOperationException>(
+                () => helper.DeserializeAndDecrypt<SimpleDto>(encrypted));
+            Assert.Contains("null or invalid", exception.Message);
+        }
+        finally
+        {
+            ClearEncryptionEnvironmentVariables();
+        }
+    }
+
+    [Fact]
+    public void DeserializeAndDecrypt_WithWrongKeys_ThrowsException()
+    {
+        // Arrange - Encrypt with one set of keys
+        var (key1, iv1) = GenerateValidKeys();
+        SetEncryptionEnvironmentVariables(key1, iv1);
+        var helper1 = new EncryptionHelper();
+        var original = new SimpleDto { Name = "Secret", Age = 25 };
+        var encrypted = helper1.SerializeAndEncrypt(original);
+        ClearEncryptionEnvironmentVariables();
+
+        // Act - Try to decrypt with different keys
+        var (key2, iv2) = GenerateValidKeys();
+        SetEncryptionEnvironmentVariables(key2, iv2);
+
+        try
+        {
+            var helper2 = new EncryptionHelper();
+
+            // Assert
+            var exception = Assert.Throws<InvalidOperationException>(
+                () => helper2.DeserializeAndDecrypt<SimpleDto>(encrypted));
+            Assert.Contains("Failed to decrypt", exception.Message);
+        }
+        finally
+        {
+            ClearEncryptionEnvironmentVariables();
+        }
+    }
+
+    [Fact]
+    public void SerializeAndEncrypt_AddsSpacesAfterColons()
+    {
+        // Arrange
+        var (key, iv) = GenerateValidKeys();
+        SetEncryptionEnvironmentVariables(key, iv);
+
+        try
+        {
+            var helper = new EncryptionHelper();
+            var dto = new SimpleDto { Name = "Test", Age = 30 };
+
+            // Act
+            var encrypted = helper.SerializeAndEncrypt(dto);
+            var decrypted = helper.Decrypt(encrypted);
+
+            // Assert - The decrypted JSON should have spaces after colons
+            Assert.Contains(": ", decrypted);
+            Assert.Contains("\"Name\": ", decrypted);
+            Assert.Contains("\"Age\": ", decrypted);
+        }
+        finally
+        {
+            ClearEncryptionEnvironmentVariables();
+        }
+    }
+
+    [Fact]
+    public void DeserializeAndDecrypt_WithNullEncryptedData_ThrowsException()
+    {
+        // Arrange
+        var (key, iv) = GenerateValidKeys();
+        SetEncryptionEnvironmentVariables(key, iv);
+
+        try
+        {
+            var helper = new EncryptionHelper();
+
+            // Act & Assert
+            Assert.Throws<ArgumentException>(
+                () => helper.DeserializeAndDecrypt<SimpleDto>(null!));
+        }
+        finally
+        {
+            ClearEncryptionEnvironmentVariables();
+        }
+    }
+    
     #endregion
 }
