@@ -34,6 +34,12 @@ public class ExtractionRelationship
     [Column("promoted_id")]
     public long? PromotedId { get; set; }
 
+    [Column("validation_status")]
+    public string? ValidationStatus { get; set; }
+
+    [Column("ontology_relationship_id")]
+    public long? OntologyRelationshipId { get; set; }
+
     public virtual ExtractionClass? OriginClass { get; set; }
     public virtual ExtractionClass? DestinationClass { get; set; }
     public virtual ICollection<ExtractionEdge> Edges { get; set; } = [];
