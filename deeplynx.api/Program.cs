@@ -6,22 +6,26 @@ using deeplynx.helpers;
 using deeplynx.helpers.BigData;
 using deeplynx.helpers.Hubs;
 using deeplynx.interfaces;
+using deeplynx.api.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
+using Apache.Arrow.Flight.Server;
 using Npgsql;
 using Scalar.AspNetCore;
 using Serilog;
 using Log = Serilog.Log;
-
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.WebHost.ConfigureKestrel(options => { options.Limits.MaxRequestBodySize = 2L * 1024 * 1024 * 1024; });
 
 builder.Services.Configure<FormOptions>(options => { options.MultipartBodyLengthLimit = 2L * 1024 * 1024 * 1024; });
+
+builder.Services.AddGrpc().AddFlightServer<NexusFlightServer>();
+builder.Services.AddGrpcReflection();
 
 var connectionString = ConnectionStringsProvider.GetPostgresConnectionString(builder.Configuration);
 
@@ -504,7 +508,7 @@ try
        ║      Check DB Version      ║
        ╚════════════════════════════╝ */
     await DatabaseVersionChecker.CheckDatabaseVersion(connectionString);
-    
+
     /* ╔════════════════════════════╗
        ║   Check Encryption Keys    ║
        ╚════════════════════════════╝ */
@@ -514,6 +518,16 @@ try
        ║      App Configurations    ║
        ╚════════════════════════════╝ */
     var app = builder.Build();
+
+    /* ╔════════════════════════════╗
+       ║      gRPC Configurations   ║
+       ╚════════════════════════════╝ */
+    app.MapFlightEndpoint();
+
+    if (app.Environment.IsDevelopment())
+    {
+        app.MapGrpcReflectionService();
+    }
 
     /* ╔════════════════════════════╗
        ║      Apply Migrations      ║
@@ -554,7 +568,7 @@ try
         app.MapHub<EventNotificationHub>("/eventNotificationHub"); // endpoint for real-time notifications with SignalR
 
     /* ╔════════════════════════════╗
-       ║   Scalar Configuration     ║
+       ║    Scalar Configuration    ║
        ╚════════════════════════════╝ */
     // Always using scalar:
     //if (app.Environment.IsDevelopment()) { ...
