@@ -49,8 +49,8 @@ public class InsightServiceClient
         string llmModelName,
         object queryInfo)
     {
-        var requestParams = new { mode = "lattice", prompt, llm_model_name = llmModelName, query_info = queryInfo };
-        var response = await _client.PostAsJsonAsync("/query", requestParams);
+        var requestParams = new { prompt, llm_model_name = llmModelName, query_info = queryInfo };
+        var response = await _client.PostAsJsonAsync("/lattice_query", requestParams);
         response.EnsureSuccessStatusCode();
         return response;
     }
