@@ -9,6 +9,8 @@ public interface ISavedSearchBusiness
 
     Task<PaginatedResponse<SavedSearchResponseDto>> GetSavedSearches(long userId, SavedSearchRequestDtos.FilterSavedQueryRequestDto? searchFilters = null);
 
+    Task<SavedSearchResponseDto> GetSavedSearchById(long currentUserId, long savedSearchId);
+
     Task<IEnumerable<HistoricalRecordResponseDto>> ExecuteSavedSearch(
         long savedSearchId, long currentUserId, long organizationId, long[] projectIds,
         bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false);

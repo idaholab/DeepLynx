@@ -289,6 +289,77 @@ public class SavedSearchBusinessTests : IntegrationTestBase
 
     #endregion
 
+    #region GetSavedSearchById Tests
+
+    [Fact]
+    public async Task GetSavedSearchById_Success_ReturnsCorrectSearch()
+    {
+        // Arrange
+        var filters = new[]
+        {
+        new CustomQueryDtos.CustomQueryRequestDto
+        {
+            Connector = "AND",
+            Filter = "name",
+            Operator = "LIKE",
+            Value = "Rex"
+        }
+    };
+        await _savedSearchBusiness.SaveSearch(uid1, "My Search", "rex", filters);
+
+        var savedSearch = await Context.SavedSearches
+            .FirstAsync(s => s.UserId == uid1 && s.Name == "My Search");
+
+        // Act
+        var result = await _savedSearchBusiness.GetSavedSearchById(uid1, savedSearch.Id);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(savedSearch.Id, result.Id);
+        Assert.Equal("My Search", result.Name);
+        Assert.Equal("rex", result.Query.TextSearch);
+        Assert.Single(result.Query.Filter);
+        Assert.Equal("Rex", result.Query.Filter[0].Value);
+    }
+
+    [Fact]
+    public async Task GetSavedSearchById_InvalidId_ThrowsKeyNotFoundException()
+    {
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            _savedSearchBusiness.GetSavedSearchById(uid1, 99999));
+
+        Assert.Contains("Saved Search not found", exception.Message);
+    }
+
+    [Fact]
+    public async Task GetSavedSearchById_WrongUser_ThrowsKeyNotFoundException()
+    {
+        // Arrange - Save a search under uid1
+        var filters = new[]
+        {
+        new CustomQueryDtos.CustomQueryRequestDto
+        {
+            Connector = "AND",
+            Filter = "name",
+            Operator = "=",
+            Value = "Cody"
+        }
+    };
+        await _savedSearchBusiness.SaveSearch(uid1, "User 1 Search", "cody", filters);
+
+        var savedSearch = await Context.SavedSearches
+            .FirstAsync(s => s.UserId == uid1 && s.Name == "User 1 Search");
+
+        // Act & Assert - uid2 attempts to fetch uid1's saved search
+        var exception = await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            _savedSearchBusiness.GetSavedSearchById(uid2, savedSearch.Id));
+
+        Assert.Contains("Saved Search not found", exception.Message);
+    }
+
+    #endregion
+
     #region GetSavedSearches Tests
 
     [Fact]

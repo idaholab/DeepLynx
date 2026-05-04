@@ -121,6 +121,32 @@ public class SavedSearchBusiness : ISavedSearchBusiness
     }
 
     /// <summary>
+    ///     Get a saved search by ID
+    /// </summary>
+    /// <param name="currentUserId">The ID of the user</param>
+    /// <param name="savedSearchId">The ID of the saved search to be fetched</param>
+    /// <returns>The saved search with the matching user and ID</returns>
+    public async Task<SavedSearchResponseDto> GetSavedSearchById(long currentUserId, long savedSearchId)
+    {
+        var savedSearch = await _context.SavedSearches.FirstOrDefaultAsync(s => s.Id == savedSearchId && s.UserId == currentUserId);
+
+        if (savedSearch == null)
+            throw new KeyNotFoundException("Saved Search not found");
+
+        var customQuery = JsonSerializer.Deserialize<CustomQueryDtos.CustomQueryResponseDto>(
+            savedSearch.Search, new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
+            ?? throw new InvalidOperationException($"Saved search '{savedSearch.Id}' contains invalid or null query data.");
+
+        return new SavedSearchResponseDto
+        {
+            Id = savedSearch.Id,
+            Name = savedSearch.Name,
+            LastUpdatedAt = savedSearch.LastUpdatedAt,
+            Query = customQuery
+        };
+    }
+
+    /// <summary>
     ///     Execute a saved search
     /// </summary>
     /// <param name="savedSearchId">The ID of the saved search that will be executed</param>
