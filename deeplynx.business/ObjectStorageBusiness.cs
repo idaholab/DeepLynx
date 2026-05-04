@@ -4,7 +4,6 @@ using deeplynx.interfaces;
 using deeplynx.models;
 using DotNetEnv;
 using Microsoft.EntityFrameworkCore;
-using Newtonsoft.Json;
 
 namespace deeplynx.business;
 
@@ -611,15 +610,12 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
     // Private Helpers
     private String SerializeAndEncryptConfig(ObjectStorageConfigDto config)
     {
-        var encrypted = _encryptionHelper.Encrypt(JsonConvert.SerializeObject(config));
-        return encrypted;
+        return _encryptionHelper.SerializeAndEncrypt(config);
     }
-    
+
     private ObjectStorageConfigDto DeserializeAndDecryptConfig(string encryptedConfig)
     {
-        var decrypted = _encryptionHelper.Decrypt(encryptedConfig);
-        return JsonConvert.DeserializeObject<ObjectStorageConfigDto>(decrypted)
-               ?? throw new InvalidOperationException("Config data for object storage is null or invalid");
+        return _encryptionHelper.DeserializeAndDecrypt<ObjectStorageConfigDto>(encryptedConfig);
     }
     
     private async Task ResetProjectDefaults(long projectId, long newDefaultId)
