@@ -194,6 +194,7 @@ try
     builder.Services.AddTransient<IInsightBusiness, InsightBusiness>();
     builder.Services.AddTransient<ILatticeExtractionBusiness, LatticeExtractionBusiness>();
     builder.Services.AddHttpClient<InsightServiceClient>();
+    builder.Services.AddSingleton<EncryptionHelper>();
 
     //OpenApi Documentation
     builder.Services.AddOpenApi(options =>
