@@ -77,22 +77,14 @@ public class OlapBusiness : IOlapBusiness
         if (string.IsNullOrWhiteSpace(record.Uri))
             throw new ArgumentException("Record has no URI.");
 
-        var objectStorage = _context.ObjectStorages.FirstOrDefault(os =>
-            os.OrganizationId == organizationId &&
-            (os.ProjectId == projectId || os.ProjectId == null) &&
-            os.Id == record.ObjectStorageId);
-
-        if (objectStorage == null)
-            throw new ArgumentException($"Object storage not found for project {projectId}.");
+        var realObjectStorageId = await ResolveObjectStorageId(organizationId, projectId, record.ObjectStorageId);
+        var objectStorage = await _objectStorageBusiness.GetDecryptedObjectStorage(realObjectStorageId);
 
         if (objectStorage.Type != "azure_object" && objectStorage.Type != "filesystem")
             throw new InvalidOperationException($"Unsupported object storage type: {objectStorage.Type}");
 
-        var objectStorageConfig = JsonConvert.DeserializeObject<ObjectStorageConfigDto>(objectStorage.Config)
-                                  ?? throw new InvalidOperationException("Object storage config is null or invalid.");
-
         if (objectStorage.Type == "azure_object")
-            await AppendToAzureBlob(record, objectStorageConfig, file, partNumber);
+            await AppendToAzureBlob(record, objectStorage.Config, file, partNumber);
         else
             await AppendToFilesystemAsync(record, file, partNumber);
     }
@@ -226,18 +218,9 @@ public class OlapBusiness : IOlapBusiness
         if (string.IsNullOrWhiteSpace(record.Uri))
             throw new ArgumentException("File path is required", nameof(record.Uri));
 
-        var objectStorage = _context.ObjectStorages.FirstOrDefault(os => os.OrganizationId == organizationId &&
-                                                                         (os.ProjectId == projectId ||
-                                                                          os.ProjectId == null) &&
-                                                                         os.Id == record.ObjectStorageId);
-
-        if (objectStorage == null)
-            throw new ArgumentException(
-                $"Object storage with ID {record.ObjectStorageId} does not exist for project with ID of {projectId}");
-
-        var objectStorageConfig = JsonConvert.DeserializeObject<ObjectStorageConfigDto>(objectStorage.Config);
-        if (objectStorageConfig == null)
-            throw new InvalidOperationException("Config data for object storage is null or invalid");
+        
+        var realObjectStorageId = await ResolveObjectStorageId(organizationId, projectId, record.ObjectStorageId);
+        var objectStorage = await _objectStorageBusiness.GetDecryptedObjectStorage(realObjectStorageId);
 
         // Sanitize viewName - only allow alphanumeric and underscore
         if (!Regex.IsMatch(viewName, @"^[a-zA-Z_][a-zA-Z0-9_]*$"))
@@ -251,11 +234,11 @@ public class OlapBusiness : IOlapBusiness
         if (objectStorage.Type == "azure_object")
         {
             // Azure Blob Storage
-            var containerName = objectStorageConfig.AzureObjectConfig?.AzureContainerName;
+            var containerName = objectStorage.Config.AzureObjectConfig?.AzureContainerName;
             if (string.IsNullOrWhiteSpace(containerName))
                 throw new ArgumentException("Container name is required for Azure storage");
 
-            connection = await GetAzureDuckDbConnection(objectStorageConfig);
+            connection = await GetAzureDuckDbConnection(objectStorage.Config);
 
             var escapedContainer = containerName.Replace("'", "''");
             var escapedPath = record.Uri.Replace("'", "''");
@@ -373,25 +356,17 @@ public class OlapBusiness : IOlapBusiness
             return 0;
         }
 
-        var objectStorage = _context.ObjectStorages.FirstOrDefault(os =>
-            os.OrganizationId == organizationId &&
-            (os.ProjectId == projectId || os.ProjectId == null) &&
-            os.Id == record.ObjectStorageId);
-
-        if (objectStorage == null)
-            throw new ArgumentException($"Object storage not found for project {projectId}.");
-
-        var objectStorageConfig = JsonConvert.DeserializeObject<ObjectStorageConfigDto>(objectStorage.Config)
-                                  ?? throw new InvalidOperationException("Object storage config is null or invalid.");
+        var realObjectStorageId = await ResolveObjectStorageId(organizationId, projectId, record.ObjectStorageId);
+        var objectStorage = await _objectStorageBusiness.GetDecryptedObjectStorage(realObjectStorageId);
 
         IEnumerable<long> partNumbers;
 
         if (objectStorage.Type == "azure_object")
         {
-            var containerName = objectStorageConfig.AzureObjectConfig?.AzureContainerName
+            var containerName = objectStorage.Config.AzureObjectConfig?.AzureContainerName
                                 ?? throw new ArgumentException("Azure container name is required.");
 
-            var containerClient = new BlobServiceClient(objectStorageConfig.AzureObjectConfig!.AzureConnectionString)
+            var containerClient = new BlobServiceClient(objectStorage.Config.AzureObjectConfig!.AzureConnectionString)
                 .GetBlobContainerClient(containerName);
 
             partNumbers = containerClient
@@ -556,18 +531,8 @@ public class OlapBusiness : IOlapBusiness
         if (string.IsNullOrWhiteSpace(record.Uri))
             throw new ArgumentException($"Record {recordId} does not have a URI");
 
-        var objectStorage = _context.ObjectStorages.FirstOrDefault(os => os.OrganizationId == organizationId &&
-                                                                         (os.ProjectId == projectId ||
-                                                                          os.ProjectId == null) &&
-                                                                         os.Id == record.ObjectStorageId);
-
-        if (objectStorage == null)
-            throw new ArgumentException(
-                $"Object storage with ID {record.ObjectStorageId} does not exist for project with ID of {projectId}");
-
-        var objectStorageConfig = JsonConvert.DeserializeObject<ObjectStorageConfigDto>(objectStorage.Config);
-        if (objectStorageConfig == null)
-            throw new InvalidOperationException("Config data for object storage is null or invalid");
+        var realObjectStorageId = await ResolveObjectStorageId(organizationId, projectId, record.ObjectStorageId);
+        var objectStorage = await _objectStorageBusiness.GetDecryptedObjectStorage(realObjectStorageId);
 
         // Determine storage type and get appropriate connection
         DuckDBConnection connection;
@@ -577,11 +542,11 @@ public class OlapBusiness : IOlapBusiness
         if (objectStorage.Type == "azure_object")
         {
             // Azure Blob Storage
-            var containerName = objectStorageConfig.AzureObjectConfig?.AzureContainerName;
+            var containerName = objectStorage.Config.AzureObjectConfig?.AzureContainerName;
             if (string.IsNullOrWhiteSpace(containerName))
                 throw new ArgumentException("Container name is required for Azure storage");
 
-            connection = await GetAzureDuckDbConnection(objectStorageConfig);
+            connection = await GetAzureDuckDbConnection(objectStorage.Config);
 
             var escapedContainer = containerName.Replace("'", "''");
             var escapedPath = record.Uri.Replace("'", "''");
@@ -1081,5 +1046,26 @@ public class OlapBusiness : IOlapBusiness
             points.Reverse();
 
         return new PlotDataDto { Columns = columns, Data = [.. points] };
+    }
+    
+    /// <summary>
+    ///     Find the default object storage if the supplied ID cannot be found.
+    /// </summary>
+    /// <param name="organizationId">The org ID of the object storage to be found.</param>
+    /// <param name="projectId">The project ID of the object storage to be found.</param>
+    /// <param name="objectStorageId">The ID of the object storage (return if supplied)</param>
+    /// <returns></returns>
+    /// <exception cref="KeyNotFoundException"></exception>
+    private async Task<long> ResolveObjectStorageId(long organizationId, long projectId, long? objectStorageId)
+    {
+        if (objectStorageId.HasValue)
+        {
+            // object storage could be org-level so just return object storage, don't check for project existence
+            return objectStorageId.Value;
+        }
+
+        var defaultObjectStorage = await _objectStorageBusiness.GetDefaultObjectStorage(organizationId, projectId)
+                                   ?? throw new KeyNotFoundException("Default object storage not found");
+        return defaultObjectStorage.Id;
     }
 }

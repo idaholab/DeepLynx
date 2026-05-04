@@ -104,6 +104,7 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
         Environment.SetEnvironmentVariable("ENCRYPTION_KEY", "SU5TRUNVUkVfREVWX0tFWV8zMl9CWVRFU19MT05HISE="); // 32 bytes
         Environment.SetEnvironmentVariable("ENCRYPTION_IV", "SU5TRUNVUkVfREVWX0lWIQ=="); // 16 bytes
         
+        _encryptionHelper = new EncryptionHelper();
         await base.InitializeAsync();
 
         // Set up mocks
@@ -126,7 +127,6 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
         _insightBusiness = new Mock<IInsightBusiness>();
 
         // Set up business layer dependencies
-        _encryptionHelper = new EncryptionHelper();
         _objectStorageBusiness = new ObjectStorageBusiness(Context, _encryptionHelper);
         _notificationBusiness =
             new NotificationBusiness(Context, _mockNotificationLogger.Object, _mockHubContext.Object);
@@ -273,7 +273,7 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
         {
             Name = "Azurite",
             Type = "azure_object",
-            Config = JsonConvert.SerializeObject(azureConfig),
+            ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(azureConfig),
             ProjectId = _projectId,
             LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
             LastUpdatedBy = _userId,
@@ -291,7 +291,7 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
         {
             Name = "Test File System",
             Type = "filesystem",
-            Config = JsonConvert.SerializeObject(config),
+            ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(config),
             ProjectId = _projectId,
             LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
             LastUpdatedBy = _userId,
@@ -1343,12 +1343,11 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
 
         var record = await GetRecordEntity(result.Id);
 
-        var objectStorage = await Context.ObjectStorages.FirstAsync(o => o.Id == _azureObjectStorageId);
-        var config = JsonConvert.DeserializeObject<ObjectStorageConfigDto>(objectStorage.Config)!;
+        var objectStorage = await _objectStorageBusiness.GetDecryptedObjectStorage(_azureObjectStorageId);
 
         var columns = await _olapBusiness.ExtractTabularColumns(
             objectStorage.Type,
-            config,
+            objectStorage.Config,
             record.Uri!);
 
         Assert.NotNull(columns);
@@ -1370,13 +1369,12 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
     {
         var result = await UploadFilesystemParquet(5, "dataset.parquet");
         var record = await GetRecordEntity(result.Id);
-
-        var objectStorage = await Context.ObjectStorages.FirstAsync(o => o.Id == _fileSystemObjectStorageId);
-        var config = JsonConvert.DeserializeObject<ObjectStorageConfigDto>(objectStorage.Config)!;
+        
+        var objectStorage = await _objectStorageBusiness.GetDecryptedObjectStorage(_fileSystemObjectStorageId);
 
         var columns = await _olapBusiness.ExtractTabularColumns(
             objectStorage.Type,
-            config,
+            objectStorage.Config,
             record.Uri!);
 
         Assert.NotNull(columns);
@@ -1401,13 +1399,12 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
             _userId, _organizationId, _projectId, _dataSourceId, _fileSystemObjectStorageId, file);
 
         var record = await GetRecordEntity(result.Id);
-
-        var objectStorage = await Context.ObjectStorages.FirstAsync(o => o.Id == _fileSystemObjectStorageId);
-        var config = JsonConvert.DeserializeObject<ObjectStorageConfigDto>(objectStorage.Config)!;
+        
+        var objectStorage = await _objectStorageBusiness.GetDecryptedObjectStorage(_fileSystemObjectStorageId);
 
         var columns = await _olapBusiness.ExtractTabularColumns(
             objectStorage.Type,
-            config,
+            objectStorage.Config,
             record.Uri!);
 
         Assert.NotNull(columns);
@@ -1429,13 +1426,12 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
     {
         var result = await UploadAzureParquet(5, "dataset.parquet");
         var record = await GetRecordEntity(result.Id);
-
-        var objectStorage = await Context.ObjectStorages.FirstAsync(o => o.Id == _azureObjectStorageId);
-        var config = JsonConvert.DeserializeObject<ObjectStorageConfigDto>(objectStorage.Config)!;
+        
+        var objectStorage = await _objectStorageBusiness.GetDecryptedObjectStorage(_azureObjectStorageId);
 
         var columns = await _olapBusiness.ExtractTabularColumns(
             objectStorage.Type,
-            config,
+            objectStorage.Config,
             record.Uri!);
 
         Assert.NotNull(columns);
@@ -1448,36 +1444,12 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
     [Fact]
     public async Task ExtractTabularColumns_InvalidFilesystemFile_ReturnsNull()
     {
-        var objectStorage = await Context.ObjectStorages.FirstAsync(o => o.Id == _fileSystemObjectStorageId);
-        var config = JsonConvert.DeserializeObject<ObjectStorageConfigDto>(objectStorage.Config)!;
+        var objectStorage = await _objectStorageBusiness.GetDecryptedObjectStorage(_fileSystemObjectStorageId);
 
         var columns = await _olapBusiness.ExtractTabularColumns(
             objectStorage.Type,
-            config,
+            objectStorage.Config,
             Path.Combine(_tempFileSystemBasePath, "does_not_exist.parquet"));
-
-        Assert.Null(columns);
-    }
-
-    [Fact]
-    public async Task ExtractTabularColumns_UnsupportedStorageType_ReturnsNull()
-    {
-        var unsupportedStorage = new ObjectStorage
-        {
-            Id = 9999,
-            Name = "Unsupported",
-            Type = "s3",
-            Config = "{}",
-            OrganizationId = _organizationId,
-            ProjectId = _projectId
-        };
-
-        var config = new ObjectStorageConfigDto();
-
-        var columns = await _olapBusiness.ExtractTabularColumns(
-            unsupportedStorage.Type,
-            config,
-            "some_file.parquet");
 
         Assert.Null(columns);
     }

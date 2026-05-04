@@ -513,7 +513,6 @@ public class FileBusiness
         if (objectStorageId.HasValue)
         {
             // object storage could be org-level so just return object storage, don't check for project existence
-            // await ExistenceHelper.EnsureObjectStorageExistsForProjectAsync(_context, objectStorageId.Value, projectId);
             return objectStorageId.Value;
         }
 
