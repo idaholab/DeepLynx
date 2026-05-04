@@ -192,6 +192,7 @@ try
     builder.Services.AddTransient<IAiModelConfigBusiness, AiModelConfigBusiness>();
     builder.Services.AddScoped<ISensitivityLabelService, SensitivityLabelService>();
     builder.Services.AddTransient<IInsightBusiness, InsightBusiness>();
+    builder.Services.AddTransient<IExtractionValidation, ExtractionValidation>();
     builder.Services.AddTransient<ILatticeExtractionBusiness, LatticeExtractionBusiness>();
     builder.Services.AddMemoryCache();
     builder.Services.AddHttpClient<InsightServiceClient>();
