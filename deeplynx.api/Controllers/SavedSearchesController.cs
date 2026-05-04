@@ -84,6 +84,30 @@ public class SavedSearchController : ControllerBase
     }
 
     /// <summary>
+    ///     Get a saved search by ID
+    /// </summary>
+    /// <param name="savedSearchId">The ID of the saved search to be fetched</param>
+    /// <returns>The saved search with the matching user and ID</returns>
+    [HttpGet(Name = "api_query_get_saved_search_by_id")]
+    public async Task<ActionResult<SavedSearchResponseDto>> GetSavedSearchById(
+        [FromQuery] long savedSearchId
+    )
+    {
+        try
+        {
+            var currentUserId = UserContextStorage.UserId;
+            var savedSearch = await _savedSearchBusiness.GetSavedSearchById(currentUserId, savedSearchId);
+            return Ok(savedSearch);
+        }
+        catch (Exception exc)
+        {
+            var message = $"An unexpected error occurred while fetching a saved search by ID.: {exc}";
+            _logger.LogError(message);
+            return StatusCode(StatusCodes.Status500InternalServerError, message);
+        }
+    }
+
+    /// <summary>
     ///     Execute a saved search
     /// </summary>
     /// <param name="savedSearchId">The ID of the saved search that will be executed</param>

@@ -289,6 +289,77 @@ public class SavedSearchBusinessTests : IntegrationTestBase
 
     #endregion
 
+    #region GetSavedSearchById Tests
+
+    [Fact]
+    public async Task GetSavedSearchById_Success_ReturnsCorrectSearch()
+    {
+        // Arrange
+        var filters = new[]
+        {
+        new CustomQueryDtos.CustomQueryRequestDto
+        {
+            Connector = "AND",
+            Filter = "name",
+            Operator = "LIKE",
+            Value = "Rex"
+        }
+    };
+        await _savedSearchBusiness.SaveSearch(uid1, "My Search", "rex", filters);
+
+        var savedSearch = await Context.SavedSearches
+            .FirstAsync(s => s.UserId == uid1 && s.Name == "My Search");
+
+        // Act
+        var result = await _savedSearchBusiness.GetSavedSearchById(uid1, savedSearch.Id);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(savedSearch.Id, result.Id);
+        Assert.Equal("My Search", result.Name);
+        Assert.Equal("rex", result.Query.TextSearch);
+        Assert.Single(result.Query.Filter);
+        Assert.Equal("Rex", result.Query.Filter[0].Value);
+    }
+
+    [Fact]
+    public async Task GetSavedSearchById_InvalidId_ThrowsKeyNotFoundException()
+    {
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            _savedSearchBusiness.GetSavedSearchById(uid1, 99999));
+
+        Assert.Contains("Saved Search not found", exception.Message);
+    }
+
+    [Fact]
+    public async Task GetSavedSearchById_WrongUser_ThrowsKeyNotFoundException()
+    {
+        // Arrange - Save a search under uid1
+        var filters = new[]
+        {
+        new CustomQueryDtos.CustomQueryRequestDto
+        {
+            Connector = "AND",
+            Filter = "name",
+            Operator = "=",
+            Value = "Cody"
+        }
+    };
+        await _savedSearchBusiness.SaveSearch(uid1, "User 1 Search", "cody", filters);
+
+        var savedSearch = await Context.SavedSearches
+            .FirstAsync(s => s.UserId == uid1 && s.Name == "User 1 Search");
+
+        // Act & Assert - uid2 attempts to fetch uid1's saved search
+        var exception = await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            _savedSearchBusiness.GetSavedSearchById(uid2, savedSearch.Id));
+
+        Assert.Contains("Saved Search not found", exception.Message);
+    }
+
+    #endregion
+
     #region GetSavedSearches Tests
 
     [Fact]
@@ -323,11 +394,11 @@ public class SavedSearchBusinessTests : IntegrationTestBase
         var result = await _savedSearchBusiness.GetSavedSearches(uid1);
 
         // Assert
-        Assert.NotNull(result);
-        Assert.Equal(2, result.Count);
+        Assert.NotNull(result.Items);
+        Assert.Equal(2, result.Items.Count);
 
-        Assert.Contains(result, s => s.Query.TextSearch == "captain");
-        Assert.Contains(result, s => s.Query.TextSearch == "clone");
+        Assert.Contains(result.Items, s => s.Query.TextSearch == "captain");
+        Assert.Contains(result.Items, s => s.Query.TextSearch == "clone");
     }
 
     [Fact]
@@ -353,8 +424,8 @@ public class SavedSearchBusinessTests : IntegrationTestBase
 
         // Assert
         Assert.NotNull(result);
-        Assert.Single(result);
-        Assert.Equal("test1", result[0].Query.TextSearch);
+        Assert.Single(result.Items);
+        Assert.Equal("test1", result.Items[0].Query.TextSearch);
     }
 
     [Fact]
@@ -364,8 +435,8 @@ public class SavedSearchBusinessTests : IntegrationTestBase
         var result = await _savedSearchBusiness.GetSavedSearches(uid1);
 
         // Assert
-        Assert.NotNull(result);
-        Assert.Empty(result);
+        Assert.NotNull(result.Items);
+        Assert.Empty(result.Items);
     }
 
     [Fact]
@@ -396,10 +467,10 @@ public class SavedSearchBusinessTests : IntegrationTestBase
         var result = await _savedSearchBusiness.GetSavedSearches(uid1);
 
         // Assert
-        Assert.NotNull(result);
-        Assert.Single(result);
+        Assert.NotNull(result.Items);
+        Assert.Single(result.Items);
 
-        var savedSearch = result[0];
+        var savedSearch = result.Items[0];
         Assert.Equal("search text", savedSearch.Query.TextSearch);
         Assert.NotNull(savedSearch.Query.Filter);
         Assert.Equal(2, savedSearch.Query.Filter.Length);
@@ -429,11 +500,11 @@ public class SavedSearchBusinessTests : IntegrationTestBase
         var result = await _savedSearchBusiness.GetSavedSearches(uid1);
 
         // Assert
-        Assert.NotNull(result);
-        Assert.Single(result);
-        Assert.Equal("just text", result[0].Query.TextSearch);
-        Assert.NotNull(result[0].Query.Filter);
-        Assert.Empty(result[0].Query.Filter);
+        Assert.NotNull(result.Items);
+        Assert.Single(result.Items);
+        Assert.Equal("just text", result.Items[0].Query.TextSearch);
+        Assert.NotNull(result.Items[0].Query.Filter);
+        Assert.Empty(result.Items[0].Query.Filter);
     }
 
     #endregion
@@ -466,10 +537,10 @@ public class SavedSearchBusinessTests : IntegrationTestBase
 
         // Assert
         Assert.NotNull(result);
-        Assert.Equal(2, result.Count);
-        Assert.Contains(result, s => s.Query.TextSearch == "rex");
-        Assert.Contains(result, s => s.Query.TextSearch == "cody");
-        Assert.DoesNotContain(result, s => s.Query.TextSearch == "yoda");
+        Assert.Equal(2, result.Items.Count);
+        Assert.Contains(result.Items, s => s.Query.TextSearch == "rex");
+        Assert.Contains(result.Items, s => s.Query.TextSearch == "cody");
+        Assert.DoesNotContain(result.Items, s => s.Query.TextSearch == "yoda");
     }
 
     [Fact]
@@ -496,8 +567,8 @@ public class SavedSearchBusinessTests : IntegrationTestBase
         var result = await _savedSearchBusiness.GetSavedSearches(uid1, searchFilters);
 
         // Assert
-        Assert.Single(result);
-        Assert.Equal("rex", result[0].Query.TextSearch);
+        Assert.Single(result.Items);
+        Assert.Equal("rex", result.Items[0].Query.TextSearch);
     }
 
     [Fact]
@@ -523,8 +594,8 @@ public class SavedSearchBusinessTests : IntegrationTestBase
         var result = await _savedSearchBusiness.GetSavedSearches(uid1, searchFilters);
 
         // Assert
-        Assert.NotNull(result);
-        Assert.Empty(result);
+        Assert.NotNull(result.Items);
+        Assert.Empty(result.Items);
     }
 
     [Fact]
@@ -552,9 +623,9 @@ public class SavedSearchBusinessTests : IntegrationTestBase
         var result = await _savedSearchBusiness.GetSavedSearches(uid1, searchFilters);
 
         // Assert
-        Assert.Equal(2, result.Count);
-        Assert.Contains(result, s => s.Query.TextSearch == "clone trooper");
-        Assert.Contains(result, s => s.Query.TextSearch == "clone commander");
+        Assert.Equal(2, result.Items.Count);
+        Assert.Contains(result.Items, s => s.Query.TextSearch == "clone trooper");
+        Assert.Contains(result.Items, s => s.Query.TextSearch == "clone commander");
     }
 
     [Fact]
@@ -581,8 +652,8 @@ public class SavedSearchBusinessTests : IntegrationTestBase
         var result = await _savedSearchBusiness.GetSavedSearches(uid1, searchFilters);
 
         // Assert
-        Assert.Single(result);
-        Assert.Equal("Clone Trooper", result[0].Query.TextSearch);
+        Assert.Single(result.Items);
+        Assert.Equal("Clone Trooper", result.Items[0].Query.TextSearch);
     }
 
     [Fact]
@@ -620,8 +691,8 @@ public class SavedSearchBusinessTests : IntegrationTestBase
         var result = await _savedSearchBusiness.GetSavedSearches(uid1, searchFilters);
 
         // Assert
-        Assert.Single(result);
-        Assert.Equal("old", result[0].Query.TextSearch);
+        Assert.Single(result.Items);
+        Assert.Equal("old", result.Items[0].Query.TextSearch);
     }
 
     [Fact]
@@ -656,8 +727,8 @@ public class SavedSearchBusinessTests : IntegrationTestBase
         var result = await _savedSearchBusiness.GetSavedSearches(uid1, searchFilters);
 
         // Assert
-        Assert.Single(result);
-        Assert.Equal("new", result[0].Query.TextSearch);
+        Assert.Single(result.Items);
+        Assert.Equal("new", result.Items[0].Query.TextSearch);
     }
 
     [Fact]
@@ -695,8 +766,8 @@ public class SavedSearchBusinessTests : IntegrationTestBase
         var result = await _savedSearchBusiness.GetSavedSearches(uid1, searchFilters);
 
         // Assert
-        Assert.Single(result);
-        Assert.Equal("clone trooper", result[0].Query.TextSearch);
+        Assert.Single(result.Items);
+        Assert.Equal("clone trooper", result.Items[0].Query.TextSearch);
     }
 
     [Fact]
@@ -721,7 +792,79 @@ public class SavedSearchBusinessTests : IntegrationTestBase
         var result = await _savedSearchBusiness.GetSavedSearches(uid1, null);
 
         // Assert
-        Assert.Equal(2, result.Count);
+        Assert.Equal(2, result.Items.Count);
+    }
+
+    [Fact]
+    public async Task GetSavedSearches_Pagination_ReturnsCorrectPage()
+    {
+        // Arrange
+        var filters = new[]
+        {
+            new CustomQueryDtos.CustomQueryRequestDto
+            {
+                Connector = "AND",
+                Filter = "name",
+                Operator = "=",
+                Value = "test"
+            }
+        };
+
+        await _savedSearchBusiness.SaveSearch(uid1, "Search 1", "text1", filters);
+        await _savedSearchBusiness.SaveSearch(uid1, "Search 2", "text2", filters);
+        await _savedSearchBusiness.SaveSearch(uid1, "Search 3", "text3", filters);
+        await _savedSearchBusiness.SaveSearch(uid1, "Search 4", "text4", filters);
+        await _savedSearchBusiness.SaveSearch(uid1, "Search 5", "text5", filters);
+
+        var searchFilters = new SavedSearchRequestDtos.FilterSavedQueryRequestDto
+        {
+            PageNumber = 2,
+            PageSize = 2
+        };
+
+        // Act
+        var result = await _savedSearchBusiness.GetSavedSearches(uid1, searchFilters);
+
+        // Assert
+        Assert.Equal(5, result.TotalCount);
+        Assert.Equal(2, result.Items.Count);
+        Assert.Equal(2, result.PageNumber);
+        Assert.Equal(2, result.PageSize);
+    }
+
+    [Fact]
+    public async Task GetSavedSearches_Pagination_LastPageReturnsRemainder()
+    {
+        // Arrange
+        var filters = new[]
+        {
+            new CustomQueryDtos.CustomQueryRequestDto
+            {
+                Connector = "AND",
+                Filter = "name",
+                Operator = "=",
+                Value = "test"
+            }
+        };
+
+        await _savedSearchBusiness.SaveSearch(uid1, "Search 1", "text1", filters);
+        await _savedSearchBusiness.SaveSearch(uid1, "Search 2", "text2", filters);
+        await _savedSearchBusiness.SaveSearch(uid1, "Search 3", "text3", filters);
+
+        var searchFilters = new SavedSearchRequestDtos.FilterSavedQueryRequestDto
+        {
+            PageNumber = 2,
+            PageSize = 2
+        };
+
+        // Act
+        var result = await _savedSearchBusiness.GetSavedSearches(uid1, searchFilters);
+
+        // Assert
+        Assert.Equal(3, result.TotalCount);
+        Assert.Single(result.Items);
+        Assert.Equal(2, result.PageNumber);
+        Assert.Equal(2, result.PageSize);
     }
 
     #endregion

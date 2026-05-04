@@ -63,7 +63,7 @@ public class SavedSearchBusiness : ISavedSearchBusiness
     /// <param name="userId">The ID of the user</param>
     /// <param name="searchFilters">Optional filters to query for specific saved searches</param>
     /// <returns>List of saved searches for the user</returns>
-    public async Task<List<SavedSearchResponseDto>> GetSavedSearches(long userId, SavedSearchRequestDtos.FilterSavedQueryRequestDto? searchFilters = null)
+    public async Task<PaginatedResponse<SavedSearchResponseDto>> GetSavedSearches(long userId, SavedSearchRequestDtos.FilterSavedQueryRequestDto? searchFilters = null)
     {
         var query = _context.SavedSearches
             .Where(s => s.UserId == userId);
@@ -80,27 +80,70 @@ public class SavedSearchBusiness : ISavedSearchBusiness
                 query = query.Where(s => s.LastUpdatedAt >= searchFilters.LastUpdatedAfter);
         }
 
-        var savedSearches = await query.ToListAsync();
+        var pageNumber = searchFilters?.PageNumber ?? 1;
+        var pageSize = searchFilters?.GetValidatedPageSize() ?? 25;
 
-        return savedSearches
-        .Select(s =>
-        {
-            var query = JsonSerializer.Deserialize<CustomQueryDtos.CustomQueryResponseDto>(
-                s.Search, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-            if (query == null) return null;
-            return new SavedSearchResponseDto
+        var totalCount = await query.CountAsync();
+
+        var savedSearches = await query
+            .OrderByDescending(s => s.LastUpdatedAt)
+            .Skip((pageNumber - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync();
+
+        var results = savedSearches
+            .Select(s =>
             {
-                Id = s.Id,
-                Name = s.Name,
-                LastUpdatedAt = s.LastUpdatedAt,
-                Query = query
-            };
-        })
-        .Where(s => s != null)
-        .Where(s => string.IsNullOrWhiteSpace(searchFilters?.TextSearch) ||
-            (s!.Query.TextSearch != null &&
-            s.Query.TextSearch.Contains(searchFilters.TextSearch, StringComparison.OrdinalIgnoreCase)))
-        .ToList()!;
+                var customQuery = JsonSerializer.Deserialize<CustomQueryDtos.CustomQueryResponseDto>(
+                    s.Search, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                if (customQuery == null) return null;
+                return new SavedSearchResponseDto
+                {
+                    Id = s.Id,
+                    Name = s.Name,
+                    LastUpdatedAt = s.LastUpdatedAt,
+                    Query = customQuery
+                };
+            })
+            .Where(s => s != null)
+            .Where(s => string.IsNullOrWhiteSpace(searchFilters?.TextSearch) ||
+                (s!.Query.TextSearch != null &&
+                 s.Query.TextSearch.Contains(searchFilters.TextSearch, StringComparison.OrdinalIgnoreCase)))
+            .ToList()!;
+
+        return new PaginatedResponse<SavedSearchResponseDto>
+        {
+            Items = results!,
+            TotalCount = totalCount,
+            PageNumber = pageNumber,
+            PageSize = pageSize,
+        };
+    }
+
+    /// <summary>
+    ///     Get a saved search by ID
+    /// </summary>
+    /// <param name="currentUserId">The ID of the user</param>
+    /// <param name="savedSearchId">The ID of the saved search to be fetched</param>
+    /// <returns>The saved search with the matching user and ID</returns>
+    public async Task<SavedSearchResponseDto> GetSavedSearchById(long currentUserId, long savedSearchId)
+    {
+        var savedSearch = await _context.SavedSearches.FirstOrDefaultAsync(s => s.Id == savedSearchId && s.UserId == currentUserId);
+
+        if (savedSearch == null)
+            throw new KeyNotFoundException("Saved Search not found");
+
+        var customQuery = JsonSerializer.Deserialize<CustomQueryDtos.CustomQueryResponseDto>(
+            savedSearch.Search, new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
+            ?? throw new InvalidOperationException($"Saved search '{savedSearch.Id}' contains invalid or null query data.");
+
+        return new SavedSearchResponseDto
+        {
+            Id = savedSearch.Id,
+            Name = savedSearch.Name,
+            LastUpdatedAt = savedSearch.LastUpdatedAt,
+            Query = customQuery
+        };
     }
 
     /// <summary>
