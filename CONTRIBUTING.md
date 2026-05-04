@@ -4,6 +4,7 @@
 ## Coding Guidelines
 * Follow the .NET Core coding conventions.
 * Write clear and concise commit messages.
+* For backend architecture, see [backend architecture](documentation/architecture.md).
 * Ensure your code is well-documented and includes necessary comments.
 * Maintain consistency with the existing codebase.
 ### Testing
