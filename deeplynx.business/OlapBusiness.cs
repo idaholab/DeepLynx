@@ -14,13 +14,24 @@ using Parquet;
 
 namespace deeplynx.business;
 
-public class OlapBusiness(
-    DeeplynxContext context,
-    IRecordBusiness recordBusiness,
-    ILogger<OlapBusiness> logger) : IOlapBusiness
+public class OlapBusiness : IOlapBusiness
 {
-    private readonly DeeplynxContext _context = context;
-    private readonly IRecordBusiness _recordBusiness = recordBusiness;
+    private readonly DeeplynxContext _context;
+    private readonly IRecordBusiness _recordBusiness;
+    private readonly ILogger<OlapBusiness> _logger;
+    private readonly IObjectStorageBusiness _objectStorageBusiness;
+    
+    public OlapBusiness(
+        DeeplynxContext context, 
+        IRecordBusiness recordBusiness,
+        IObjectStorageBusiness objectStorageBusiness,
+        ILogger<OlapBusiness> logger)
+    {
+        _recordBusiness = recordBusiness;
+        _context = context;
+        _logger = logger;
+        _objectStorageBusiness = objectStorageBusiness;
+    }
 
     /// <summary>
     ///     Appends a new Parquet part file to an existing Parquet dataset in Azure Blob Storage
@@ -417,12 +428,12 @@ public class OlapBusiness(
     ///     For Parquet files, reads only the file footer via Parquet.Net — no row data is loaded into memory.
     ///     For CSV files, uses DuckDB to infer column types from the file content.
     /// </summary>
-    /// <param name="objectStorage">Object storage entity</param>
+    /// <param name="objectStorageType">Type of object storage entity</param>
     /// <param name="objectStorageConfig">Object storage configuration</param>
     /// <param name="fileUri">URI/path to the file</param>
     /// <returns>JsonArray of { name, type } objects, or null if extraction fails</returns>
     public async Task<JsonArray?> ExtractTabularColumns(
-        ObjectStorage objectStorage,
+        string objectStorageType,
         ObjectStorageConfigDto objectStorageConfig,
         string fileUri)
     {
@@ -435,7 +446,7 @@ public class OlapBusiness(
                 // Use Parquet.Net to read only the file footer — no row data loaded regardless of file size
                 Stream parquetStream;
 
-                if (objectStorage.Type == "azure_object")
+                if (objectStorageType == "azure_object")
                 {
                     var containerName = objectStorageConfig.AzureObjectConfig?.AzureContainerName;
                     if (string.IsNullOrWhiteSpace(containerName))
@@ -449,13 +460,13 @@ public class OlapBusiness(
                         .GetBlobClient(fileUri)
                         .OpenReadAsync();
                 }
-                else if (objectStorage.Type == "filesystem")
+                else if (objectStorageType == "filesystem")
                 {
                     parquetStream = File.OpenRead(fileUri);
                 }
                 else
                 {
-                    logger.LogDebug("Unsupported object storage type for Parquet column extraction");
+                    _logger.LogDebug("Unsupported object storage type for Parquet column extraction");
                     return null;
                 }
 
@@ -476,7 +487,7 @@ public class OlapBusiness(
             DuckDBConnection connection;
             string fileUrl;
 
-            if (objectStorage.Type == "azure_object")
+            if (objectStorageType == "azure_object")
             {
                 var containerName = objectStorageConfig.AzureObjectConfig?.AzureContainerName;
                 if (string.IsNullOrWhiteSpace(containerName))
@@ -488,7 +499,7 @@ public class OlapBusiness(
                 var escapedPath = fileUri.Replace("'", "''");
                 fileUrl = $"az://{escapedContainer}/{escapedPath}";
             }
-            else if (objectStorage.Type == "filesystem")
+            else if (objectStorageType == "filesystem")
             {
                 connection = await GetLocalDuckDbConnection();
 
@@ -497,7 +508,7 @@ public class OlapBusiness(
             }
             else
             {
-                logger.LogDebug("Unsupported object storage type for CSV column extraction");
+                _logger.LogDebug("Unsupported object storage type for CSV column extraction");
                 return null;
             }
 
@@ -523,7 +534,7 @@ public class OlapBusiness(
         }
         catch (Exception ex)
         {
-            logger.LogError($"Error while extracting columns: {ex.Message}");
+            _logger.LogError($"Error while extracting columns: {ex.Message}");
             return null;
         }
     }

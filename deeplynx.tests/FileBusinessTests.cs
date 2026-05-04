@@ -35,7 +35,7 @@ public class FileBusinessTests : IntegrationTestBase
     private INotificationBusiness _notificationBusiness = null!;
     private ObjectStorageBusiness _objectStorageBusiness = null!;
     private RecordBusiness _recordBusiness = null!;
-    private OlapBusiness _timeseriesBusiness = null!;
+    private OlapBusiness _olapBusiness = null!;
     private Mock<IRelationshipBusiness> _relationshipBusiness = null!;
     private SensitivityLabelBusiness _sensitivityLabelBusiness = null!;
     private ISensitivityLabelService _sensitivityLabelService = null!;
@@ -60,6 +60,7 @@ public class FileBusinessTests : IntegrationTestBase
         Environment.SetEnvironmentVariable("ENCRYPTION_KEY", "SU5TRUNVUkVfREVWX0tFWV8zMl9CWVRFU19MT05HISE="); // 32 bytes
         Environment.SetEnvironmentVariable("ENCRYPTION_IV", "SU5TRUNVUkVfREVWX0lWIQ=="); // 16 bytes
         
+        _encryptionHelper = new EncryptionHelper();
         await base.InitializeAsync();
         Directory.CreateDirectory(_testDirectory);
         Directory.CreateDirectory(_orgDefaultDirectory);
@@ -69,7 +70,6 @@ public class FileBusinessTests : IntegrationTestBase
         _relationshipBusiness = new Mock<IRelationshipBusiness>();
         _mockNotificationLogger = new Mock<ILogger<NotificationBusiness>>();
         _mockTimeseriesLogger = new Mock<ILogger<OlapBusiness>>();
-        _encryptionHelper = new EncryptionHelper();
         _notificationBusiness =
             new NotificationBusiness(Context, _mockNotificationLogger.Object, _mockHubContext.Object);
         _mockBulkCopyExecutor = new BulkCopyUpsertExecutor();
@@ -91,7 +91,7 @@ public class FileBusinessTests : IntegrationTestBase
         _dataSourceBusiness =
             new DataSourceBusiness(Context, _edgeBusiness.Object, _recordBusiness, _eventBusiness);
         _objectStorageBusiness = new ObjectStorageBusiness(Context, _encryptionHelper);
-        _timeseriesBusiness = new OlapBusiness(Context, _recordBusiness, _mockTimeseriesLogger.Object);
+        _olapBusiness = new OlapBusiness(Context, _recordBusiness, _objectStorageBusiness, _mockTimeseriesLogger.Object);
         _classBusiness = new ClassBusiness(Context, _recordBusiness, _relationshipBusiness.Object, _eventBusiness);
 
         var realFileFilesystemBusiness =
@@ -108,7 +108,8 @@ public class FileBusinessTests : IntegrationTestBase
             _classBusiness,
             _recordBusiness,
             _insightBusiness.Object,
-            _timeseriesBusiness
+            _olapBusiness,
+            _objectStorageBusiness
         );
     }
 
@@ -151,9 +152,9 @@ public class FileBusinessTests : IntegrationTestBase
         await Context.SaveChangesAsync();
         did = dataSource.Id;
 
-        var osConfig = new JsonObject
+        var osConfig = new ObjectStorageConfigDto
         {
-            ["mountPath"] = _testDirectory
+            MountPath = _testDirectory
         };
 
         var objectStorage = new ObjectStorage
@@ -162,7 +163,7 @@ public class FileBusinessTests : IntegrationTestBase
             ProjectId = pid,
             OrganizationId = oid,
             Type = "filesystem",
-            Config = osConfig.ToString(),
+            ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(osConfig),
             Default = true
         };
 
@@ -250,9 +251,9 @@ public class FileBusinessTests : IntegrationTestBase
     public async Task UploadFile_WithOrgLevelObjectStorageId_UsesOrgStorage()
     {
         // Arrange: Create org-level storage
-        var orgOsConfig = new JsonObject
+        var orgOsConfig = new ObjectStorageConfigDto
         {
-            ["mountPath"] = _orgDefaultDirectory
+            MountPath = _orgDefaultDirectory
         };
 
         var orgObjectStorage = new ObjectStorage
@@ -261,7 +262,7 @@ public class FileBusinessTests : IntegrationTestBase
             ProjectId = null, // Org-level storage
             OrganizationId = oid,
             Type = "filesystem",
-            Config = orgOsConfig.ToString(),
+            ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(orgOsConfig),
             Default = true
         };
 
@@ -302,9 +303,9 @@ public class FileBusinessTests : IntegrationTestBase
     public async Task UploadFile_WithProjectStorageId_IgnoresOrgDefault()
     {
         // Arrange: Create org default
-        var orgOsConfig = new JsonObject
+        var orgOsConfig = new ObjectStorageConfigDto
         {
-            ["mountPath"] = _orgDefaultDirectory
+            MountPath = _orgDefaultDirectory
         };
 
         var orgObjectStorage = new ObjectStorage
@@ -313,7 +314,7 @@ public class FileBusinessTests : IntegrationTestBase
             ProjectId = null,
             OrganizationId = oid,
             Type = "filesystem",
-            Config = orgOsConfig.ToString(),
+            ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(orgOsConfig),
             Default = true
         };
 
@@ -350,9 +351,9 @@ public class FileBusinessTests : IntegrationTestBase
     public async Task UploadFile_WithNonDefaultStorageId_UsesSpecifiedStorage()
     {
         // Arrange: Create a second project-level storage (not default)
-        var secondaryOsConfig = new JsonObject
+        var secondaryOsConfig = new ObjectStorageConfigDto
         {
-            ["mountPath"] = Path.Combine(Path.GetTempPath(), "SecondaryStorage")
+            MountPath = Path.Combine(Path.GetTempPath(), "SecondaryStorage")
         };
 
         var secondaryObjectStorage = new ObjectStorage
@@ -361,7 +362,7 @@ public class FileBusinessTests : IntegrationTestBase
             ProjectId = pid,
             OrganizationId = oid,
             Type = "filesystem",
-            Config = secondaryOsConfig.ToString(),
+            ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(secondaryOsConfig),
             Default = false // Not the default
         };
 
@@ -427,7 +428,7 @@ public class FileBusinessTests : IntegrationTestBase
             _fileBusiness.UploadFile(uid, oid, pid, did, invalidStorageId, file)
         );
 
-        Assert.Contains("No object storage found", exception.Message);
+        Assert.Contains("not found", exception.Message);
     }
 
     [Fact]
@@ -438,9 +439,9 @@ public class FileBusinessTests : IntegrationTestBase
         Context.Organizations.Add(otherOrg);
         await Context.SaveChangesAsync();
 
-        var otherOrgOsConfig = new JsonObject
+        var otherOrgOsConfig = new ObjectStorageConfigDto
         {
-            ["mountPath"] = _testDirectory
+            MountPath = _testDirectory
         };
 
         var otherOrgStorage = new ObjectStorage
@@ -449,7 +450,7 @@ public class FileBusinessTests : IntegrationTestBase
             ProjectId = null,
             OrganizationId = otherOrg.Id, // Different org
             Type = "filesystem",
-            Config = otherOrgOsConfig.ToString(),
+            ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(otherOrgOsConfig),
             Default = true
         };
 
@@ -469,25 +470,25 @@ public class FileBusinessTests : IntegrationTestBase
             _fileBusiness.UploadFile(uid, oid, pid, did, otherOrgStorage.Id, file)
         );
 
-        Assert.Contains("No object storage found", exception.Message);
+        Assert.Contains("does not exist", exception.Message);
     }
 
     [Fact]
     public async Task UploadFile_MultipleFilesWithDifferentStorages_WorksCorrectly()
     {
         // Arrange: Create org storage
-        var orgOsConfig = new JsonObject
+        var orgOsConfig = new ObjectStorageConfigDto
         {
-            ["mountPath"] = _orgDefaultDirectory
+            MountPath = _orgDefaultDirectory
         };
 
         var orgObjectStorage = new ObjectStorage
         {
             Name = "Org Storage",
-            ProjectId = null,
+            ProjectId = pid,
             OrganizationId = oid,
             Type = "filesystem",
-            Config = orgOsConfig.ToString(),
+            ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(orgOsConfig),
             Default = false
         };
 
@@ -533,9 +534,9 @@ public class FileBusinessTests : IntegrationTestBase
     public async Task UploadFile_CustomMetadata_WorksCorrectly()
     {
         // Arrange: Create org storage
-        var orgOsConfig = new JsonObject
+        var orgOsConfig = new ObjectStorageConfigDto
         {
-            ["mountPath"] = _orgDefaultDirectory
+            MountPath = _orgDefaultDirectory
         };
 
         var orgObjectStorage = new ObjectStorage
@@ -544,7 +545,7 @@ public class FileBusinessTests : IntegrationTestBase
             ProjectId = null,
             OrganizationId = oid,
             Type = "filesystem",
-            Config = orgOsConfig.ToString(),
+            ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(orgOsConfig),
             Default = false
         };
 
@@ -877,9 +878,9 @@ public class FileBusinessTests : IntegrationTestBase
     public async Task UpdateFile_WithOrgDefault_WorksCorrectly()
     {
         // Arrange: Create org default, disable project default
-        var orgOsConfig = new JsonObject
+        var orgOsConfig = new ObjectStorageConfigDto
         {
-            ["mountPath"] = _orgDefaultDirectory
+            MountPath = _orgDefaultDirectory
         };
 
         var orgObjectStorage = new ObjectStorage
@@ -888,7 +889,7 @@ public class FileBusinessTests : IntegrationTestBase
             ProjectId = null,
             OrganizationId = oid,
             Type = "filesystem",
-            Config = orgOsConfig.ToString(),
+            ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(orgOsConfig),
             Default = true
         };
 
@@ -965,9 +966,9 @@ public class FileBusinessTests : IntegrationTestBase
     public async Task DownloadFile_WorksWithOrgDefault()
     {
         // Arrange: Create org default, disable project default
-        var orgOsConfig = new JsonObject
+        var orgOsConfig = new ObjectStorageConfigDto
         {
-            ["mountPath"] = _orgDefaultDirectory
+            MountPath = _orgDefaultDirectory
         };
 
         var orgObjectStorage = new ObjectStorage
@@ -976,7 +977,7 @@ public class FileBusinessTests : IntegrationTestBase
             ProjectId = null,
             OrganizationId = oid,
             Type = "filesystem",
-            Config = orgOsConfig.ToString(),
+            ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(orgOsConfig),
             Default = true
         };
 
@@ -1070,9 +1071,9 @@ public class FileBusinessTests : IntegrationTestBase
     public async Task DeleteFile_WorksWithOrgDefault()
     {
         // Arrange: Create org default, disable project default
-        var orgOsConfig = new JsonObject
+        var orgOsConfig = new ObjectStorageConfigDto
         {
-            ["mountPath"] = _orgDefaultDirectory
+            MountPath = _orgDefaultDirectory
         };
 
         var orgObjectStorage = new ObjectStorage
@@ -1081,7 +1082,7 @@ public class FileBusinessTests : IntegrationTestBase
             ProjectId = null,
             OrganizationId = oid,
             Type = "filesystem",
-            Config = orgOsConfig.ToString(),
+            ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(orgOsConfig),
             Default = true
         };
 
@@ -1179,9 +1180,9 @@ public class FileBusinessTests : IntegrationTestBase
     public async Task CancelUpload_NoObjectStorageId_FallsBackToOrgDefault()
     {
         // Arrange: Org default with different directory
-        var orgOsConfig = new JsonObject
+        var orgOsConfig = new ObjectStorageConfigDto
         {
-            ["mountPath"] = _orgDefaultDirectory
+            MountPath = _orgDefaultDirectory
         };
 
         var orgObjectStorage = new ObjectStorage
@@ -1190,7 +1191,7 @@ public class FileBusinessTests : IntegrationTestBase
             ProjectId = null,
             OrganizationId = oid,
             Type = "filesystem",
-            Config = orgOsConfig.ToString(),
+            ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(orgOsConfig),
             Default = true
         };
 
@@ -1830,9 +1831,9 @@ public class FileBusinessTests : IntegrationTestBase
     public async Task StartUpload_NoObjectStorageId_FallsBackToOrgDefault()
     {
         // Arrange: Create org-level default storage with different directory
-        var orgOsConfig = new JsonObject
+        var orgOsConfig = new ObjectStorageConfigDto
         {
-            ["mountPath"] = _orgDefaultDirectory // Use org-specific directory
+            MountPath = _orgDefaultDirectory // Use org-specific directory
         };
 
         var orgObjectStorage = new ObjectStorage
@@ -1841,7 +1842,7 @@ public class FileBusinessTests : IntegrationTestBase
             ProjectId = null, // Organization-level (no project)
             OrganizationId = oid,
             Type = "filesystem",
-            Config = orgOsConfig.ToString(),
+            ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(orgOsConfig),
             Default = true
         };
 
@@ -1898,9 +1899,9 @@ public class FileBusinessTests : IntegrationTestBase
     public async Task StartUpload_NoObjectStorageId_PrioritizesProjectOverOrg()
     {
         // Arrange: Create both project and org defaults with different directories
-        var orgOsConfig = new JsonObject
+        var orgOsConfig = new ObjectStorageConfigDto
         {
-            ["mountPath"] = _orgDefaultDirectory // Org-specific directory
+            MountPath = _orgDefaultDirectory // Org-specific directory
         };
 
         var orgObjectStorage = new ObjectStorage
@@ -1909,7 +1910,7 @@ public class FileBusinessTests : IntegrationTestBase
             ProjectId = null, // Organization-level
             OrganizationId = oid,
             Type = "filesystem",
-            Config = orgOsConfig.ToString(),
+            ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(orgOsConfig),
             Default = true
         };
 
@@ -2030,9 +2031,9 @@ public class FileBusinessTests : IntegrationTestBase
     public async Task CompleteUpload_NoObjectStorageId_UsesOrgDefault()
     {
         // Arrange: Create org default, disable project default
-        var orgOsConfig = new JsonObject
+        var orgOsConfig = new ObjectStorageConfigDto
         {
-            ["mountPath"] = _orgDefaultDirectory
+            MountPath = _orgDefaultDirectory
         };
 
         var orgObjectStorage = new ObjectStorage
@@ -2041,7 +2042,7 @@ public class FileBusinessTests : IntegrationTestBase
             ProjectId = null,
             OrganizationId = oid,
             Type = "filesystem",
-            Config = orgOsConfig.ToString(),
+            ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(orgOsConfig),
             Default = true
         };
 
@@ -2115,9 +2116,9 @@ public class FileBusinessTests : IntegrationTestBase
     public async Task UploadFile_NoObjectStorageId_FallsBackToOrgDefault()
     {
         // Arrange: Create org-level default with different directory
-        var orgOsConfig = new JsonObject
+        var orgOsConfig = new ObjectStorageConfigDto
         {
-            ["mountPath"] = _orgDefaultDirectory
+            MountPath = _orgDefaultDirectory
         };
 
         var orgObjectStorage = new ObjectStorage
@@ -2126,7 +2127,7 @@ public class FileBusinessTests : IntegrationTestBase
             ProjectId = null,
             OrganizationId = oid,
             Type = "filesystem",
-            Config = orgOsConfig.ToString(),
+            ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(orgOsConfig),
             Default = true
         };
 
@@ -2186,7 +2187,7 @@ public class FileBusinessTests : IntegrationTestBase
             _fileBusiness.StartUpload(oid, pid, did, null, request)
         );
 
-        Assert.Contains("No default object storage found", exception.Message);
+        Assert.Contains("Default object storage not found", exception.Message);
     }
 
     #endregion

@@ -154,6 +154,7 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
         _olapBusiness = new OlapBusiness(
             Context,
             _recordBusiness,
+            _objectStorageBusiness,
             _mockTimeseriesLogger.Object);
         _connectionString = _azuriteFixture.AzuriteConnectionString;
 
@@ -164,7 +165,8 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
             _classBusiness,
             _recordBusiness,
             _insightBusiness.Object,
-            _olapBusiness
+            _olapBusiness,
+            _objectStorageBusiness
         );
     }
 
@@ -1345,7 +1347,7 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
         var config = JsonConvert.DeserializeObject<ObjectStorageConfigDto>(objectStorage.Config)!;
 
         var columns = await _olapBusiness.ExtractTabularColumns(
-            objectStorage,
+            objectStorage.Type,
             config,
             record.Uri!);
 
@@ -1373,7 +1375,7 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
         var config = JsonConvert.DeserializeObject<ObjectStorageConfigDto>(objectStorage.Config)!;
 
         var columns = await _olapBusiness.ExtractTabularColumns(
-            objectStorage,
+            objectStorage.Type,
             config,
             record.Uri!);
 
@@ -1404,7 +1406,7 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
         var config = JsonConvert.DeserializeObject<ObjectStorageConfigDto>(objectStorage.Config)!;
 
         var columns = await _olapBusiness.ExtractTabularColumns(
-            objectStorage,
+            objectStorage.Type,
             config,
             record.Uri!);
 
@@ -1432,7 +1434,7 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
         var config = JsonConvert.DeserializeObject<ObjectStorageConfigDto>(objectStorage.Config)!;
 
         var columns = await _olapBusiness.ExtractTabularColumns(
-            objectStorage,
+            objectStorage.Type,
             config,
             record.Uri!);
 
@@ -1450,7 +1452,7 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
         var config = JsonConvert.DeserializeObject<ObjectStorageConfigDto>(objectStorage.Config)!;
 
         var columns = await _olapBusiness.ExtractTabularColumns(
-            objectStorage,
+            objectStorage.Type,
             config,
             Path.Combine(_tempFileSystemBasePath, "does_not_exist.parquet"));
 
@@ -1473,7 +1475,7 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
         var config = new ObjectStorageConfigDto();
 
         var columns = await _olapBusiness.ExtractTabularColumns(
-            unsupportedStorage,
+            unsupportedStorage.Type,
             config,
             "some_file.parquet");
 
