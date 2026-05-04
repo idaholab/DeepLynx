@@ -16,12 +16,11 @@ public class Extraction
     [Column("created_by")]
     public long? CreatedBy { get; set; }
 
-    /// <summary>
-    ///     Tracks the lifecycle of a Lattice-triggered extraction.
-    ///     Manually staged extractions (via LatticeEntityStaging) are set to complete on creation.
-    /// </summary>
     [Column("status")]
     public string Status { get; set; } = ExtractionStatus.Complete;
+
+    [Column("mode")]
+    public string? Mode { get; set; }
 
     [ForeignKey("CreatedBy")]
     public virtual User? CreatedByUser { get; set; }
