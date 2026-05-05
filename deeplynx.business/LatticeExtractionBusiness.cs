@@ -630,18 +630,18 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
                 {text}
                   
                 Return ONLY valid JSON (no markdown, no explanations):
-                  
-                {{
+
+                {
                     "classes": [
-                        {{"class": "RAF Mildenhall", "class_type": "Air Force Base", "confidence": 0.95, "attributes": {{"location": "United Kingdom", "unit": "100th Air Refueling Wing"}}}},
-                        {{"class": "100th Air Refueling Wing", "class_type": "Military Organization", "confidence": 0.92, "attributes": {{"role": "air refueling", "commander": "Col. Johnny Galbert"}}}}
+                        {"class": "RAF Mildenhall", "class_type": "Air Force Base", "confidence": 0.95, "attributes": {"location": "United Kingdom", "unit": "100th Air Refueling Wing"}},
+                        {"class": "100th Air Refueling Wing", "class_type": "Military Organization", "confidence": 0.92, "attributes": {"role": "air refueling", "commander": "Col. Johnny Galbert"}}
                     ],
                     "relationships": [
-                        {{"subject": "100th Air Refueling Wing", "subject_type": "Military Organization",
-                        "relationship_type": "located at", "object": "RAF Mildenhall", "object_type": "Air Force Base", "confidence": 0.90}}
+                        {"subject": "100th Air Refueling Wing", "subject_type": "Military Organization",
+                        "relationship_type": "located at", "object": "RAF Mildenhall", "object_type": "Air Force Base", "confidence": 0.90}
                     ]
-                }}
-                  
+                }
+
                 CRITICAL: Use EXACT class type names from the ontology schema. Be thorough - extract all relevant classes and relationships from the document.
                 """;
             
@@ -696,20 +696,20 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
                 {text}
                 
                 Return ONLY valid JSON (no markdown, no explanations):
-                
-                {{
+
+                {
                     "classes": [
-                        {{"class": "RAF Mildenhall", "class_type": "Air Force Base", "confidence": 0.95, "attributes": {{"location": "United Kingdom", "unit": "100th Air Refueling Wing"}}}},
-                        {{"class": "Tactical Operations Center", "class_type": "CommandControlFacility", "confidence": 0.72, "attributes": {{"role": "command and control", "location": "operations center"}}}}
+                        {"class": "RAF Mildenhall", "class_type": "Air Force Base", "confidence": 0.95, "attributes": {"location": "United Kingdom", "unit": "100th Air Refueling Wing"}},
+                        {"class": "Tactical Operations Center", "class_type": "CommandControlFacility", "confidence": 0.72, "attributes": {"role": "command and control", "location": "operations center"}}
                     ],
                     "relationships": [
-                        {{"subject": "100th Air Refueling Wing", "subject_type": "Military Organization",
-                        "relationship_type": "stationed at", "object": "RAF Mildenhall", "object_type": "Air Force Base", "confidence": 0.90}},
-                        {{"subject": "Tactical Operations Center", "subject_type": "CommandControlFacility",
-                        "relationship_type": "coordinates", "object": "100th Air Refueling Wing", "object_type": "Military Organization", "confidence": 0.75}}
+                        {"subject": "100th Air Refueling Wing", "subject_type": "Military Organization",
+                        "relationship_type": "stationed at", "object": "RAF Mildenhall", "object_type": "Air Force Base", "confidence": 0.90},
+                        {"subject": "Tactical Operations Center", "subject_type": "CommandControlFacility",
+                        "relationship_type": "coordinates", "object": "100th Air Refueling Wing", "object_type": "Military Organization", "confidence": 0.75}
                     ]
-                }}
-                
+                }
+
                 IMPORTANT: Balance ontology compliance with discovery. Extract comprehensively across all domains while preferring standard types when applicable.
                 """;
             
