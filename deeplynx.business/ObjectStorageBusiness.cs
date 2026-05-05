@@ -580,7 +580,7 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
         else
             query = query.Where(os => os.ProjectId == null);
 
-        if (objectStorageIds.Any())
+        if (objectStorageIds != null && objectStorageIds.Any())
             query = query.Where(os => objectStorageIds.Contains(os.Id));
         
         var objectStorages = await query.ToListAsync();
