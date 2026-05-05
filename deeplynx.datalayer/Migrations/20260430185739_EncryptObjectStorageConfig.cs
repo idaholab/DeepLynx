@@ -26,6 +26,8 @@ namespace deeplynx.datalayer.Migrations
                 type: "text",
                 nullable: true);
 
+			migrationBuilder.Sql("CREATE EXTENSION IF NOT EXISTS pgcrypto;");
+
             var encryptionKey = Environment.GetEnvironmentVariable("ENCRYPTION_KEY");
             var encryptionIv = Environment.GetEnvironmentVariable("ENCRYPTION_IV");
 
