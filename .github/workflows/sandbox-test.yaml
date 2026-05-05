@@ -390,6 +390,9 @@ jobs:
           ENCRYPTION_KEY: ${{ vars.ENCRYPTION_KEY }}
           ENCRYPTION_IV: ${{ vars.ENCRYPTION_IV }}
           POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          AIRFLOW_BASE_URL: ${{ vars.AIRFLOW_BASE_URL }}
+          AIRFLOW_USERNAME: ${{ vars.AIRFLOW_USERNAME }}
+          AIRFLOW_PASSWORD: ${{ secrets.AIRFLOW_PASSWORD }}
         run: |
           cd $GITHUB_WORKSPACE/kubernetes
           envsubst < sandbox.yaml > manifest.yaml
