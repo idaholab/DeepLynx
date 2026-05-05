@@ -1139,6 +1139,131 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
     }
 
     [Fact]
+    public async Task QueryTabularFile_RequestDto_WindowAndColumnsWithoutQuery_ReturnsRequestedProjection()
+    {
+        var result = await UploadFilesystemParquet(10, "dataset.parquet");
+
+        var queryResult = await _olapBusiness.QueryTabularFile(
+            _userId,
+            _organizationId,
+            _projectId,
+            result.Id,
+            new OlapQueryRequestDto
+            {
+                StartRow = 3,
+                StopRow = 6,
+                RowStride = 2,
+                Columns = ["timestamp", "value"]
+            },
+            "data");
+
+        Assert.Equal(["timestamp", "value"], queryResult.Columns);
+        Assert.Equal(2, queryResult.Data.Length);
+
+        var timestampIndex = (int)FindColumnIndex(queryResult, "timestamp");
+        var timestamps = queryResult.Data
+            .Select(r => Convert.ToDateTime(r[timestampIndex]))
+            .ToArray();
+
+        Assert.Equal(new DateTime(2024, 1, 1, 0, 0, 3), timestamps[0]);
+        Assert.Equal(new DateTime(2024, 1, 1, 0, 0, 5), timestamps[1]);
+    }
+
+    [Fact]
+    public async Task QueryTabularFile_RequestDto_QueryUsesWindowedView()
+    {
+        var result = await UploadFilesystemParquet(10, "dataset.parquet");
+
+        var queryResult = await _olapBusiness.QueryTabularFile(
+            _userId,
+            _organizationId,
+            _projectId,
+            result.Id,
+            new OlapQueryRequestDto
+            {
+                Query = "SELECT COUNT(*) AS total FROM data",
+                Limit = 3
+            },
+            "data");
+
+        Assert.Single(queryResult.Data);
+        Assert.Equal(3L, Convert.ToInt64(queryResult.Data[0][0]));
+    }
+
+    [Fact]
+    public async Task QueryTabularFile_RequestDto_QueryUsesColumnSelection()
+    {
+        var result = await UploadFilesystemParquet(10, "dataset.parquet");
+
+        var queryResult = await _olapBusiness.QueryTabularFile(
+            _userId,
+            _organizationId,
+            _projectId,
+            result.Id,
+            new OlapQueryRequestDto
+            {
+                Query = "SELECT * FROM data",
+                Limit = 2,
+                Columns = ["timestamp,pressure"]
+            },
+            "data");
+
+        Assert.Equal(["timestamp", "pressure"], queryResult.Columns);
+        Assert.Equal(2, queryResult.Data.Length);
+
+        var timestampIndex = (int)FindColumnIndex(queryResult, "timestamp");
+        var timestamps = queryResult.Data
+            .Select(r => Convert.ToDateTime(r[timestampIndex]))
+            .ToArray();
+
+        Assert.Equal(new DateTime(2024, 1, 1, 0, 0, 8), timestamps[0]);
+        Assert.Equal(new DateTime(2024, 1, 1, 0, 0, 9), timestamps[1]);
+    }
+
+    [Fact]
+    public async Task QueryTabularFile_RequestDto_StartRowGreaterThanStopRow_Throws()
+    {
+        var result = await UploadFilesystemParquet(10, "dataset.parquet");
+
+        var ex = await Assert.ThrowsAsync<ArgumentException>(() =>
+            _olapBusiness.QueryTabularFile(
+                _userId,
+                _organizationId,
+                _projectId,
+                result.Id,
+                new OlapQueryRequestDto
+                {
+                    Query = "SELECT * FROM data",
+                    StartRow = 6,
+                    StopRow = 3
+                },
+                "data"));
+
+        Assert.Contains("Start row cannot be greater than stop row", ex.Message);
+    }
+
+    [Fact]
+    public async Task QueryTabularFile_RequestDto_MissingColumn_Throws()
+    {
+        var result = await UploadFilesystemParquet(10, "dataset.parquet");
+
+        var ex = await Assert.ThrowsAsync<ArgumentException>(() =>
+            _olapBusiness.QueryTabularFile(
+                _userId,
+                _organizationId,
+                _projectId,
+                result.Id,
+                new OlapQueryRequestDto
+                {
+                    Query = "SELECT * FROM data",
+                    Columns = ["timestamp", "missing_column"]
+                },
+                "data"));
+
+        Assert.Contains("Column(s) not found: missing_column", ex.Message);
+    }
+
+    [Fact]
     public async Task QueryTablularFile_Success_ReturnsData()
     {
         var rows = 100;
@@ -1276,6 +1401,103 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
         Assert.Equal(new DateTime(2024, 1, 1, 0, 0, 5), timestamps[2]);
         Assert.Equal(new DateTime(2024, 1, 1, 0, 0, 7), timestamps[3]);
         Assert.Equal(new DateTime(2024, 1, 1, 0, 0, 9), timestamps[4]);
+    }
+
+    [Fact]
+    public async Task GetPlotData_RequestDto_WindowAndColumns_ReturnsRequestedProjection()
+    {
+        var result = await UploadFilesystemParquet(10, "dataset.parquet");
+
+        var plotData = await _olapBusiness.GetPlotData(
+            _userId,
+            _organizationId,
+            _projectId,
+            result.Id,
+            new OlapQueryRequestDto
+            {
+                StartRow = 3,
+                StopRow = 6,
+                RowStride = 2,
+                Columns = ["timestamp", "value"]
+            });
+
+        Assert.Equal(["timestamp", "value"], plotData.Columns);
+        Assert.Equal(2, plotData.Data.Length);
+
+        var timestampIndex = (int)FindColumnIndex(plotData, "timestamp");
+        var timestamps = plotData.Data
+            .Select(r => Convert.ToDateTime(r[timestampIndex]))
+            .ToArray();
+
+        Assert.Equal(new DateTime(2024, 1, 1, 0, 0, 3), timestamps[0]);
+        Assert.Equal(new DateTime(2024, 1, 1, 0, 0, 5), timestamps[1]);
+    }
+
+    [Fact]
+    public async Task GetPlotData_RequestDto_CommaSeparatedColumns_ReturnsRequestedProjection()
+    {
+        var result = await UploadFilesystemParquet(10, "dataset.parquet");
+
+        var plotData = await _olapBusiness.GetPlotData(
+            _userId,
+            _organizationId,
+            _projectId,
+            result.Id,
+            new OlapQueryRequestDto
+            {
+                Limit = 2,
+                Columns = ["timestamp,pressure"]
+            });
+
+        Assert.Equal(["timestamp", "pressure"], plotData.Columns);
+        Assert.Equal(2, plotData.Data.Length);
+
+        var timestampIndex = (int)FindColumnIndex(plotData, "timestamp");
+        var timestamps = plotData.Data
+            .Select(r => Convert.ToDateTime(r[timestampIndex]))
+            .ToArray();
+
+        Assert.Equal(new DateTime(2024, 1, 1, 0, 0, 8), timestamps[0]);
+        Assert.Equal(new DateTime(2024, 1, 1, 0, 0, 9), timestamps[1]);
+    }
+
+    [Fact]
+    public async Task GetPlotData_RequestDto_StartRowGreaterThanStopRow_Throws()
+    {
+        var result = await UploadFilesystemParquet(10, "dataset.parquet");
+
+        var ex = await Assert.ThrowsAsync<ArgumentException>(() =>
+            _olapBusiness.GetPlotData(
+                _userId,
+                _organizationId,
+                _projectId,
+                result.Id,
+                new OlapQueryRequestDto
+                {
+                    StartRow = 6,
+                    StopRow = 3
+                }));
+
+        Assert.Contains("Start row cannot be greater than stop row", ex.Message);
+    }
+
+    [Fact]
+    public async Task GetPlotData_RequestDto_MissingColumn_Throws()
+    {
+        var result = await UploadFilesystemParquet(10, "dataset.parquet");
+
+        var ex = await Assert.ThrowsAsync<ArgumentException>(() =>
+            _olapBusiness.GetPlotData(
+                _userId,
+                _organizationId,
+                _projectId,
+                result.Id,
+                new OlapQueryRequestDto
+                {
+                    Columns = ["timestamp", "missing_column"]
+                }));
+
+        Assert.Contains("Column(s) not found: missing_column", ex.Message);
     }
 
     [Fact]

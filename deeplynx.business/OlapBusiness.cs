@@ -169,56 +169,66 @@ public class OlapBusiness : IOlapBusiness
         long organizationId,
         long projectId,
         long recordId,
-        string userQuery,
+        OlapQueryRequestDto request,
         string viewName)
     {
-        if (string.IsNullOrWhiteSpace(viewName))
-            throw new ArgumentException("View name is required", nameof(viewName));
-        if (string.IsNullOrWhiteSpace(userQuery))
-            throw new ArgumentException("Query is required, must not be empty or missing");
+        ArgumentNullException.ThrowIfNull(request);
 
-        // Check view is referenced
-        if (!userQuery.Contains(viewName, StringComparison.OrdinalIgnoreCase))
-            throw new InvalidOperationException($"Query must reference the view '{viewName}'");
+        var hasUserQuery = !string.IsNullOrWhiteSpace(request.Query);
+        var queryOptions = ValidateTabularQueryRequest(request, hasUserQuery);
+        var userQuery = hasUserQuery
+            ? request.Query!
+            : $"SELECT * FROM {viewName}";
 
-        // Block file access patterns only
-        var dangerousPatterns = new[]
-        {
-            "COPY", // Prevent writing files
-            "EXPORT", // Prevent exporting database/data
-            "IMPORT", // Prevent importing
-            "INSERT", // Prevent inserting to other tables
-            "UPDATE", // Prevent updates
-            "DELETE", // Prevent deletes  
-            "DROP", // Prevent dropping objects
-            "ALTER", // Prevent schema changes
-            "CREATE TABLE", // Prevent creating tables
-            "CREATE VIEW", // Prevent creating views (besides temp view we control)
-            "az://", // Azure blob paths
-            "read_parquet(", // File reading functions
-            "read_csv(",
-            "read_json(",
-            "ATTACH", // Database attachment
-            "CREATE SECRET", // Secret manipulation
-            ".parquet'", // File extensions in quotes
-            ".csv'",
-            ".json'"
-        };
+        if (hasUserQuery)
+            ValidateUserQuery(userQuery, viewName);
+        else
+            ValidateViewName(viewName);
 
-        foreach (var pattern in dangerousPatterns)
-            if (userQuery.Contains(pattern, StringComparison.OrdinalIgnoreCase))
-                throw new InvalidOperationException($"Query contains unauthorized pattern: {pattern}");
+        return await QueryTabularFile(
+            currentUserId,
+            organizationId,
+            projectId,
+            recordId,
+            userQuery,
+            viewName,
+            queryOptions);
+    }
 
-        // Block multi-statement queries
-        if (userQuery.Count(c => c == ';') > 0)
-            throw new InvalidOperationException("Multi-statement queries are not allowed");
+    public async Task<PlotDataDto> QueryTabularFile(
+        long currentUserId,
+        long organizationId,
+        long projectId,
+        long recordId,
+        string? userQuery,
+        string viewName)
+    {
+        ValidateUserQuery(userQuery, viewName);
 
+        return await QueryTabularFile(
+            currentUserId,
+            organizationId,
+            projectId,
+            recordId,
+            userQuery!,
+            viewName,
+            null);
+    }
+
+    private async Task<PlotDataDto> QueryTabularFile(
+        long currentUserId,
+        long organizationId,
+        long projectId,
+        long recordId,
+        string userQuery,
+        string viewName,
+        TabularQueryRequestOptions? queryOptions)
+    {
         var record = await _recordBusiness.GetRecord(currentUserId, organizationId, projectId, recordId, true);
 
         if (string.IsNullOrWhiteSpace(record.Uri))
             throw new ArgumentException("File path is required", nameof(record.Uri));
 
-        
         var realObjectStorageId = await ResolveObjectStorageId(organizationId, projectId, record.ObjectStorageId);
         var objectStorage = await _objectStorageBusiness.GetDecryptedObjectStorage(realObjectStorageId);
 
@@ -275,6 +285,9 @@ public class OlapBusiness : IOlapBusiness
 
         await using (connection)
         {
+            if (queryOptions?.ShouldShapeView == true)
+                viewSourceSql = await BuildWindowedSourceSql(connection, viewSourceSql, queryOptions);
+
             // Create a temporary view pointing to the file or glob dataset
             await using (var createViewCmd = connection.CreateCommand())
             {
@@ -523,9 +536,44 @@ public class OlapBusiness : IOlapBusiness
     /// <param name="limit">Maximum number of data points to include</param>
     /// <param name="rowStride">every nth row to get (row number 4 = every 4th row)</param>
     /// <returns>A json array of plot data</returns>
-    public async Task<PlotDataDto> GetPlotData(long currentUserId, long organizationId, long projectId, long recordId,
-        long limit, long rowStride)
+    public async Task<PlotDataDto> GetPlotData(
+        long currentUserId,
+        long organizationId,
+        long projectId,
+        long recordId,
+        long limit,
+        long rowStride)
     {
+        return await GetPlotData(
+            currentUserId,
+            organizationId,
+            projectId,
+            recordId,
+            new OlapQueryRequestDto
+            {
+                Limit = limit,
+                RowStride = rowStride
+            });
+    }
+
+    /// <summary>
+    ///     Get a view of data points from a parquet/csv file stored in Azure Blob or local filesystem.
+    ///     Supports latest-row windows, explicit row windows, row strides, and column projection.
+    /// </summary>
+    /// <param name="currentUserId">ID of the user requesting data</param>
+    /// <param name="organizationId">ID of organization that timeseries data is associated with</param>
+    /// <param name="projectId">ID of project that timeseries data is associated with</param>
+    /// <param name="recordId">ID of record pointing to the parquet/csv file</param>
+    /// <param name="request">Plot query options</param>
+    /// <returns>A json array of plot data</returns>
+    public async Task<PlotDataDto> GetPlotData(
+        long currentUserId,
+        long organizationId,
+        long projectId,
+        long recordId,
+        OlapQueryRequestDto request)
+    {
+        var plotOptions = ValidatePlotRequest(request);
         var record = await _recordBusiness.GetRecord(currentUserId, organizationId, projectId, recordId, true);
 
         if (string.IsNullOrWhiteSpace(record.Uri))
@@ -580,22 +628,36 @@ public class OlapBusiness : IOlapBusiness
 
         await using (connection)
         {
-            // Query the file directly with rowStride and limit
+            var selectedColumns = await ResolveSelectedColumns(connection, fromClause, plotOptions.Columns);
+            var selectClause = selectedColumns.Length > 0
+                ? string.Join(", ", selectedColumns.Select(QuoteIdentifier))
+                : "* EXCLUDE rn";
+
+            var conditions = new List<string> { $"rn % {plotOptions.RowStride} = 0" };
+
+            if (plotOptions.StartRow.HasValue)
+                conditions.Add($"rn >= {plotOptions.StartRow.Value}");
+
+            if (plotOptions.StopRow.HasValue)
+                conditions.Add($"rn <= {plotOptions.StopRow.Value}");
+
+            var rowOrder = plotOptions.HasExplicitWindow ? "ASC" : "DESC";
+
             await using var cmd = connection.CreateCommand();
             cmd.CommandText = $@"
                                 WITH numbered AS (
                                     SELECT *, row_number() OVER () as rn 
                                     FROM {fromClause}
                                 )
-                                SELECT * EXCLUDE rn
+                                SELECT {selectClause}
                                 FROM numbered 
-                                WHERE rn % {rowStride} = 0 
-                                ORDER BY rn DESC 
-                                LIMIT {limit}";
+                                WHERE {string.Join(" AND ", conditions)}
+                                ORDER BY rn {rowOrder}
+                                LIMIT {plotOptions.Limit}";
 
             await using var reader = await cmd.ExecuteReaderAsync();
 
-            return await ReaderToPlotData(reader, true);
+            return await ReaderToPlotData(reader, !plotOptions.HasExplicitWindow);
         }
     }
 
@@ -1020,6 +1082,277 @@ public class OlapBusiness : IOlapBusiness
         return connection;
     }
 
+    private sealed record PlotRequestOptions(
+        long Limit,
+        long RowStride,
+        long? StartRow,
+        long? StopRow,
+        bool HasExplicitWindow,
+        string[] Columns);
+
+    private sealed record TabularQueryRequestOptions(
+        long? Limit,
+        long RowStride,
+        long? StartRow,
+        long? StopRow,
+        bool HasExplicitWindow,
+        bool ShouldShapeView,
+        string[] Columns);
+
+    private static TabularQueryRequestOptions ValidateTabularQueryRequest(
+        OlapQueryRequestDto request,
+        bool hasUserQuery)
+    {
+        var hasExplicitWindow = request.StartRow.HasValue || request.StopRow.HasValue;
+        var hasRequestedWindowing = request.Limit.HasValue || request.RowStride.HasValue || hasExplicitWindow;
+        var columns = NormalizeColumns(request.Columns);
+        var limit = request.Limit;
+
+        if (!limit.HasValue)
+        {
+            if (hasExplicitWindow)
+                limit = OlapQueryRequestDto.MaxLimit;
+            else if (!hasUserQuery)
+                limit = OlapQueryRequestDto.DefaultLimit;
+        }
+
+        var rowStride = request.RowStride ?? OlapQueryRequestDto.DefaultRowStride;
+
+        if (limit.HasValue && (limit.Value < 1 || limit.Value > OlapQueryRequestDto.MaxLimit))
+            throw new ArgumentException($"Limit must be between 1 and {OlapQueryRequestDto.MaxLimit}.",
+                nameof(request.Limit));
+
+        if (rowStride < 1)
+            throw new ArgumentException("Row stride must be 1 or greater.", nameof(request.RowStride));
+
+        if (request.StartRow is < 1)
+            throw new ArgumentException("Start row must be 1 or greater.", nameof(request.StartRow));
+
+        if (request.StopRow is < 1)
+            throw new ArgumentException("Stop row must be 1 or greater.", nameof(request.StopRow));
+
+        if (request.StartRow.HasValue &&
+            request.StopRow.HasValue &&
+            request.StartRow.Value > request.StopRow.Value)
+            throw new ArgumentException("Start row cannot be greater than stop row.");
+
+        return new TabularQueryRequestOptions(
+            limit,
+            rowStride,
+            request.StartRow,
+            request.StopRow,
+            hasExplicitWindow,
+            !hasUserQuery || hasRequestedWindowing || columns.Length > 0,
+            columns);
+    }
+
+    private static PlotRequestOptions ValidatePlotRequest(OlapQueryRequestDto? request)
+    {
+        request ??= new OlapQueryRequestDto();
+
+        var hasExplicitWindow = request.StartRow.HasValue || request.StopRow.HasValue;
+        var limit = request.Limit ?? (hasExplicitWindow
+            ? OlapQueryRequestDto.MaxLimit
+            : OlapQueryRequestDto.DefaultLimit);
+        var rowStride = request.RowStride ?? OlapQueryRequestDto.DefaultRowStride;
+
+        if (limit < 1 || limit > OlapQueryRequestDto.MaxLimit)
+            throw new ArgumentException($"Limit must be between 1 and {OlapQueryRequestDto.MaxLimit}.",
+                nameof(request.Limit));
+
+        if (rowStride < 1)
+            throw new ArgumentException("Row stride must be 1 or greater.", nameof(request.RowStride));
+
+        if (request.StartRow is < 1)
+            throw new ArgumentException("Start row must be 1 or greater.", nameof(request.StartRow));
+
+        if (request.StopRow is < 1)
+            throw new ArgumentException("Stop row must be 1 or greater.", nameof(request.StopRow));
+
+        if (request.StartRow.HasValue &&
+            request.StopRow.HasValue &&
+            request.StartRow.Value > request.StopRow.Value)
+            throw new ArgumentException("Start row cannot be greater than stop row.");
+
+        return new PlotRequestOptions(
+            limit,
+            rowStride,
+            request.StartRow,
+            request.StopRow,
+            hasExplicitWindow,
+            NormalizeColumns(request.Columns));
+    }
+
+    private static void ValidateUserQuery(string? userQuery, string viewName)
+    {
+        if (string.IsNullOrWhiteSpace(viewName))
+            throw new ArgumentException("View name is required", nameof(viewName));
+
+        if (string.IsNullOrWhiteSpace(userQuery))
+            throw new ArgumentException("Query is required, must not be empty or missing");
+
+        if (!userQuery.Contains(viewName, StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException($"Query must reference the view '{viewName}'");
+
+        var dangerousPatterns = new[]
+        {
+            "COPY", // Prevent writing files
+            "EXPORT", // Prevent exporting database/data
+            "IMPORT", // Prevent importing
+            "INSERT", // Prevent inserting to other tables
+            "UPDATE", // Prevent updates
+            "DELETE", // Prevent deletes
+            "DROP", // Prevent dropping objects
+            "ALTER", // Prevent schema changes
+            "CREATE TABLE", // Prevent creating tables
+            "CREATE VIEW", // Prevent creating views (besides temp view we control)
+            "az://", // Azure blob paths
+            "read_parquet(", // File reading functions
+            "read_csv(",
+            "read_json(",
+            "ATTACH", // Database attachment
+            "CREATE SECRET", // Secret manipulation
+            ".parquet'", // File extensions in quotes
+            ".csv'",
+            ".json'"
+        };
+
+        foreach (var pattern in dangerousPatterns)
+            if (userQuery.Contains(pattern, StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException($"Query contains unauthorized pattern: {pattern}");
+
+        if (userQuery.Count(c => c == ';') > 0)
+            throw new InvalidOperationException("Multi-statement queries are not allowed");
+
+        ValidateViewName(viewName);
+    }
+
+    private static void ValidateViewName(string viewName)
+    {
+        if (string.IsNullOrWhiteSpace(viewName))
+            throw new ArgumentException("View name is required", nameof(viewName));
+
+        if (!Regex.IsMatch(viewName, OlapQueryRequestDto.ColumnNamePattern))
+            throw new ArgumentException("View name contains invalid characters", nameof(viewName));
+    }
+
+    private static async Task<string> BuildWindowedSourceSql(
+        DuckDBConnection connection,
+        string sourceSql,
+        TabularQueryRequestOptions queryOptions)
+    {
+        var fromClause = $"({sourceSql})";
+        var selectedColumns = await ResolveSelectedColumns(connection, fromClause, queryOptions.Columns);
+        var selectClause = selectedColumns.Length > 0
+            ? string.Join(", ", selectedColumns.Select(QuoteIdentifier))
+            : "* EXCLUDE rn";
+
+        var conditions = new List<string> { $"rn % {queryOptions.RowStride} = 0" };
+
+        if (queryOptions.StartRow.HasValue)
+            conditions.Add($"rn >= {queryOptions.StartRow.Value}");
+
+        if (queryOptions.StopRow.HasValue)
+            conditions.Add($"rn <= {queryOptions.StopRow.Value}");
+
+        var rowOrder = queryOptions.Limit.HasValue && !queryOptions.HasExplicitWindow
+            ? "DESC"
+            : "ASC";
+        var limitClause = queryOptions.Limit.HasValue
+            ? $"LIMIT {queryOptions.Limit.Value}"
+            : "";
+
+        return $@"
+                WITH numbered AS (
+                    SELECT *, row_number() OVER () as rn
+                    FROM {fromClause}
+                ),
+                windowed AS (
+                    SELECT *
+                    FROM numbered
+                    WHERE {string.Join(" AND ", conditions)}
+                    ORDER BY rn {rowOrder}
+                    {limitClause}
+                )
+                SELECT {selectClause}
+                FROM windowed
+                ORDER BY rn ASC";
+    }
+
+    private static string[] NormalizeColumns(string[]? columns)
+    {
+        if (columns == null || columns.Length == 0)
+            return [];
+
+        var normalized = columns
+            .Where(column => !string.IsNullOrWhiteSpace(column))
+            .SelectMany(column => column.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            .ToArray();
+
+        if (normalized.Length == 0)
+            return [];
+
+        if (normalized.Length > OlapQueryRequestDto.MaxColumnCount)
+            throw new ArgumentException($"No more than {OlapQueryRequestDto.MaxColumnCount} columns can be selected.",
+                nameof(columns));
+
+        var selectedColumns = new List<string>();
+        var seenColumns = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var column in normalized)
+        {
+            if (column.Length > OlapQueryRequestDto.MaxColumnNameLength)
+                throw new ArgumentException(
+                    $"Column names cannot exceed {OlapQueryRequestDto.MaxColumnNameLength} characters.",
+                    nameof(columns));
+
+            if (!Regex.IsMatch(column, OlapQueryRequestDto.ColumnNamePattern))
+                throw new ArgumentException($"Column name contains invalid characters: {column}", nameof(columns));
+
+            if (seenColumns.Add(column))
+                selectedColumns.Add(column);
+        }
+
+        return [.. selectedColumns];
+    }
+
+    private static async Task<string[]> ResolveSelectedColumns(
+        DuckDBConnection connection,
+        string fromClause,
+        string[] requestedColumns)
+    {
+        if (requestedColumns.Length == 0)
+            return [];
+
+        await using var cmd = connection.CreateCommand();
+        cmd.CommandText = $"SELECT * FROM {fromClause} LIMIT 0";
+
+        await using var reader = await cmd.ExecuteReaderAsync();
+        var availableColumns = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        for (var i = 0; i < reader.FieldCount; i++)
+        {
+            var columnName = reader.GetName(i);
+            availableColumns.TryAdd(columnName, columnName);
+        }
+
+        var missingColumns = requestedColumns
+            .Where(column => !availableColumns.ContainsKey(column))
+            .ToArray();
+
+        if (missingColumns.Length > 0)
+            throw new ArgumentException($"Column(s) not found: {string.Join(", ", missingColumns)}");
+
+        return requestedColumns
+            .Select(column => availableColumns[column])
+            .ToArray();
+    }
+
+    private static string QuoteIdentifier(string identifier)
+    {
+        return $"\"{identifier.Replace("\"", "\"\"")}\"";
+    }
+
     /// <summary>
     ///     Converts a DbDataReader to PlotDataDto format
     /// </summary>
@@ -1047,7 +1380,7 @@ public class OlapBusiness : IOlapBusiness
 
         return new PlotDataDto { Columns = columns, Data = [.. points] };
     }
-    
+
     /// <summary>
     ///     Find the default object storage if the supplied ID cannot be found.
     /// </summary>
