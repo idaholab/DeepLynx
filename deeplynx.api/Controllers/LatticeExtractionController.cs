@@ -160,12 +160,39 @@ public class LatticeExtractionController : ControllerBase
 
     private static InsightExtractionCallbackDto ParseCallbackBody(string rawBody)
     {
-        // Strip markdown code fences the LLM may wrap around the JSON
-        var fenced = Regex.Match(rawBody, @"```(?:json)?\s*([\s\S]*?)```", RegexOptions.Singleline);
-        var json = fenced.Success ? fenced.Groups[1].Value.Trim() : rawBody.Trim();
-
+        var json = ExtractJson(rawBody);
         return JsonSerializer.Deserialize<InsightExtractionCallbackDto>(json, _callbackJsonOptions)
                ?? throw new JsonException("Deserialization returned null");
+    }
+
+    /// <summary>
+    ///     Extracts a JSON object from raw LLM output that may contain surrounding prose or markdown.
+    ///     Tries markdown code fences first, then falls back to finding the outermost { } pair.
+    /// </summary>
+    private static string ExtractJson(string rawBody)
+    {
+        var trimmed = rawBody.Trim();
+
+        // Try markdown code fence first: ```json ... ``` or ``` ... ```
+        var fenced = Regex.Match(trimmed, @"```(?:json)?\s*([\s\S]*?)```", RegexOptions.Singleline);
+        if (fenced.Success)
+            return fenced.Groups[1].Value.Trim();
+
+        // Fall back to outermost { } pair — handles preamble text from the LLM
+        var start = trimmed.IndexOf('{');
+        if (start == -1)
+            throw new JsonException($"No JSON object found in LLM output. Body was: {trimmed[..Math.Min(500, trimmed.Length)]}");
+
+        var depth = 0;
+        for (var i = start; i < trimmed.Length; i++)
+        {
+            if (trimmed[i] == '{') depth++;
+            else if (trimmed[i] == '}') depth--;
+            if (depth == 0)
+                return trimmed[start..(i + 1)];
+        }
+
+        throw new JsonException("Unclosed JSON object in LLM output");
     }
 
     /// <summary>
