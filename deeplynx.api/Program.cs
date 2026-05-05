@@ -149,6 +149,7 @@ try
     builder.Services.AddSignalR(); // Used for event system pub/sub and notifications
 
     builder.Services.AddTransient<IRecordBusiness, RecordBusiness>();
+    builder.Services.AddTransient<IRecordCollectionBusiness, RecordCollectionBusiness>();
     builder.Services.AddTransient<IObjectStorageBusiness, ObjectStorageBusiness>();
     builder.Services.AddTransient<IClassBusiness, ClassBusiness>();
     builder.Services.AddTransient<IProjectBusiness, ProjectBusiness>();
@@ -281,6 +282,7 @@ try
 
                 // Data
                 new() { Name = "Record", Description = "Record management" },
+                new() { Name = "Record Collection", Description = "Record Collection management"},
                 new() { Name = "File", Description = "File operations" },
                 new() { Name = "Metadata", Description = "Metadata operations" },
                 new() { Name = "Historical Record", Description = "Record history" },
@@ -366,7 +368,7 @@ try
                 {
                     ["name"] = "Data",
                     ["tags"] = new JsonArray
-                        { "Record", "Historical Record", "Edge", "Historical Edge", "File", "Metadata" }
+                        { "Record", "Record Collection", "Historical Record", "Edge", "Historical Edge", "File", "Metadata" }
                 },
                 new JsonObject
                 {
