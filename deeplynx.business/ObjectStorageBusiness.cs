@@ -568,13 +568,6 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
         long? projectId,
         List<long>? objectStorageIds)
     {
-        if (!organizationId.HasValue && !projectId.HasValue && 
-            (objectStorageIds == null || !objectStorageIds.Any()))
-        {
-            throw new InvalidOperationException(
-                $"At least one organization, project or object storage filter must be set.");
-        }
-
         // filter out archived by default instead of providing a param
         var query = _context.ObjectStorages
             .Where(os => !os.IsArchived);

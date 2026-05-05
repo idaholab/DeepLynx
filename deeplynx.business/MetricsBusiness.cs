@@ -12,16 +12,21 @@ public class MetricsBusiness : IMetricsBusiness
 {
     private readonly DeeplynxContext _context;
     private readonly IFileBusinessFactory _fileBusinessFactory;
+    private readonly IObjectStorageBusiness _objectStorageBusiness;
 
     /// <summary>
     ///     Initializes a new instance of the <see cref="MetricsBusiness" /> class.
     /// </summary>
     /// <param name="context">The database context used for database retrieval</param>
     /// <param name="fileBusinessFactory">Factory to create storage-specific file business instances</param>
-    public MetricsBusiness(DeeplynxContext context, IFileBusinessFactory fileBusinessFactory)
+    public MetricsBusiness(
+        DeeplynxContext context, 
+        IFileBusinessFactory fileBusinessFactory, 
+        IObjectStorageBusiness objectStorageBusiness)
     {
         _context = context;
         _fileBusinessFactory = fileBusinessFactory;
+        _objectStorageBusiness = objectStorageBusiness;
     }
 
     // -------------------------------------------------------------------------
@@ -39,31 +44,14 @@ public class MetricsBusiness : IMetricsBusiness
         long? projectId,
         long objectStorageId)
     {
-        var objectStorage = await _context.ObjectStorages
-            .FirstOrDefaultAsync(os => os.Id == objectStorageId 
-                                    && os.OrganizationId == organizationId
-                                    && !os.IsArchived);
-        
-        if (objectStorage == null)
-            throw new KeyNotFoundException($"Object storage {objectStorageId} not found");
-        
-        // Validate project scope if provided
-        if (projectId.HasValue)
-        {
-            await ExistenceHelper.EnsureProjectExistsAsync(_context, projectId.Value);
-
-            if (objectStorage.ProjectId.HasValue && objectStorage.ProjectId != projectId)
-                throw new InvalidOperationException(
-                    $"Object storage {objectStorageId} does not belong to project {projectId}");
-        }
+        var objectStorage = await _objectStorageBusiness.GetDecryptedObjectStorage(objectStorageId);
 
         // Build prefix based on scope and storage type
         long? effectiveProjectId = projectId ?? objectStorage.ProjectId;
         var fileBusiness = _fileBusinessFactory.CreateFileBusiness(objectStorage.Type);
         var prefix = fileBusiness.BuildPrefix(organizationId, effectiveProjectId);
         
-        var configData = DeserializeConfig(objectStorage.Config);
-        var totalBytes = await fileBusiness.GetStorageSize(prefix, configData);
+        var totalBytes = await fileBusiness.GetStorageSize(prefix, objectStorage.Config);
         return new StorageSizeDto{ Bytes = totalBytes };
     }
 
@@ -86,11 +74,8 @@ public class MetricsBusiness : IMetricsBusiness
         
         long totalBytes = 0;
         
-        var objectStorages = await _context.ObjectStorages
-            .Where(os => os.OrganizationId == organizationId 
-                      && (os.ProjectId == projectId || os.ProjectId == null)
-                      && !os.IsArchived)
-            .ToListAsync();
+        var objectStorages = await _objectStorageBusiness.GetDecryptedObjectStorages(
+            organizationId, projectId, null);
         
         foreach (var objectStorage in objectStorages)
         {
@@ -99,8 +84,7 @@ public class MetricsBusiness : IMetricsBusiness
                 var fileBusiness = _fileBusinessFactory.CreateFileBusiness(objectStorage.Type);
                 var prefix = fileBusiness.BuildPrefix(organizationId, projectId);
                 
-                var configData = DeserializeConfig(objectStorage.Config);
-                var osBytes = await fileBusiness.GetStorageSize(prefix, configData);
+                var osBytes = await fileBusiness.GetStorageSize(prefix, objectStorage.Config);
                 totalBytes += osBytes;
             }
             catch (Exception ex)
@@ -124,9 +108,8 @@ public class MetricsBusiness : IMetricsBusiness
 
         long totalBytes = 0;
         
-        var objectStorages = await _context.ObjectStorages
-            .Where(os => os.OrganizationId == organizationId && !os.IsArchived)
-            .ToListAsync();
+        var objectStorages = await _objectStorageBusiness.GetDecryptedObjectStorages(
+            organizationId, null, null);
         
         foreach (var objectStorage in objectStorages)
         {
@@ -135,8 +118,7 @@ public class MetricsBusiness : IMetricsBusiness
                 var fileBusiness = _fileBusinessFactory.CreateFileBusiness(objectStorage.Type);
                 var prefix = fileBusiness.BuildPrefix(organizationId, null);
                 
-                var configData = DeserializeConfig(objectStorage.Config);
-                var osBytes = await fileBusiness.GetStorageSize(prefix, configData);
+                var osBytes = await fileBusiness.GetStorageSize(prefix, objectStorage.Config);
                 totalBytes += osBytes;
             }
             catch (Exception ex)
@@ -157,11 +139,8 @@ public class MetricsBusiness : IMetricsBusiness
         long totalBytes = 0;
         
         // select only the first of each unique config in order to eliminate duplicates
-        var objectStorages = await _context.ObjectStorages
-            .Where(os => !os.IsArchived)
-            .GroupBy(os => os.Config)
-            .Select(g => g.First())
-            .ToListAsync();
+        var objectStorages = await _objectStorageBusiness.GetDecryptedObjectStorages(
+            null, null, null);
         
         foreach (var objectStorage in objectStorages)
         {
@@ -171,8 +150,7 @@ public class MetricsBusiness : IMetricsBusiness
                 // Empty prefix for system-wide (get everything in this storage)
                 var prefix = "";
                 
-                var configData = DeserializeConfig(objectStorage.Config);
-                var osBytes = await fileBusiness.GetStorageSize(prefix, configData);
+                var osBytes = await fileBusiness.GetStorageSize(prefix, objectStorage.Config);
                 totalBytes += osBytes;
             }
             catch (Exception ex)
@@ -203,7 +181,6 @@ public class MetricsBusiness : IMetricsBusiness
 
         return await dsQuery.CountAsync();
     }
-
 
     /// <summary>
     ///     Gets datasource count for organization
@@ -250,11 +227,5 @@ public class MetricsBusiness : IMetricsBusiness
             dsQuery = dsQuery.Where(d => !d.IsArchived);
 
         return await dsQuery.CountAsync();
-    }
-    
-    private static ObjectStorageConfigDto DeserializeConfig(string config)
-    {
-        return JsonConvert.DeserializeObject<ObjectStorageConfigDto>(config)
-               ?? throw new InvalidOperationException("Config data for object storage is null or invalid");
     }
 }

@@ -33,7 +33,7 @@ public class FileBusinessTests : IntegrationTestBase
     private Mock<ILogger<NotificationBusiness>> _mockNotificationLogger = null!;
     private Mock<ILogger<OlapBusiness>> _mockTimeseriesLogger = null!;
     private INotificationBusiness _notificationBusiness = null!;
-    private ObjectStorageBusiness _objectStorageBusiness = null!;
+    private IObjectStorageBusiness _objectStorageBusiness = null!;
     private RecordBusiness _recordBusiness = null!;
     private OlapBusiness _olapBusiness = null!;
     private Mock<IRelationshipBusiness> _relationshipBusiness = null!;
