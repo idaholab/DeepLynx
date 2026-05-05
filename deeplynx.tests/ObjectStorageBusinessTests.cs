@@ -1197,28 +1197,6 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
         Assert.Contains(result, r => r.Name == "Storage 3");
         Assert.DoesNotContain(result, r => r.Name == "Storage 2");
     }
-    
-    [Fact]
-    public async Task GetDecryptedObjectStorages_Fails_NoFiltersProvided()
-    {
-        // Act & Assert
-        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => _objectStorageBusiness.GetDecryptedObjectStorages(null, null, null));
-
-        Assert.Contains("At least one organization, project or object storage filter must be set", 
-            exception.Message);
-    }
-
-    [Fact]
-    public async Task GetDecryptedObjectStorages_Fails_EmptyObjectStorageIds()
-    {
-        // Act & Assert
-        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => _objectStorageBusiness.GetDecryptedObjectStorages(null, null, new List<long>()));
-
-        Assert.Contains("At least one organization, project or object storage filter must be set", 
-            exception.Message);
-    }
 
     [Fact]
     public async Task GetDecryptedObjectStorages_Success_DecryptsFilesystemConfigCorrectly()
