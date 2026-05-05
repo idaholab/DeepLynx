@@ -1,6 +1,6 @@
 using System.Text.Json;
-using System.Text.RegularExpressions;
 using deeplynx.helpers.Context;
+using deeplynx.helpers.json;
 using deeplynx.interfaces;
 using deeplynx.models;
 using Microsoft.AspNetCore.Authorization;
@@ -99,9 +99,6 @@ public class LatticeExtractionController : ControllerBase
 
     /// <summary>
     ///     Receive the LLM extraction result from Insight and stage it.
-    ///     Called by Insight once the async extraction completes. The payload shape matches
-    ///     the prompt defined in LatticeExtractionBusiness: a "classes" array of extracted
-    ///     entity instances and a "relationships" array of directed connections between them.
     /// </summary>
     /// <param name="organizationId">The ID of the organization.</param>
     /// <param name="projectId">The ID of the project.</param>
@@ -123,7 +120,7 @@ public class LatticeExtractionController : ControllerBase
         InsightExtractionCallbackDto dto;
         try
         {
-            dto = ParseCallbackBody(rawBody);
+            dto = LlmJsonParser.Deserialize<InsightExtractionCallbackDto>(rawBody);
         }
         catch (JsonException exc)
         {
@@ -150,49 +147,6 @@ public class LatticeExtractionController : ControllerBase
             _logger.LogError(message);
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
-    }
-
-    private static readonly JsonSerializerOptions _callbackJsonOptions = new()
-    {
-        AllowTrailingCommas = true,
-        PropertyNameCaseInsensitive = true,
-    };
-
-    private static InsightExtractionCallbackDto ParseCallbackBody(string rawBody)
-    {
-        var json = ExtractJson(rawBody);
-        return JsonSerializer.Deserialize<InsightExtractionCallbackDto>(json, _callbackJsonOptions)
-               ?? throw new JsonException("Deserialization returned null");
-    }
-
-    /// <summary>
-    ///     Extracts a JSON object from raw LLM output that may contain surrounding prose or markdown.
-    ///     Tries markdown code fences first, then falls back to finding the outermost { } pair.
-    /// </summary>
-    private static string ExtractJson(string rawBody)
-    {
-        var trimmed = rawBody.Trim();
-
-        // Try markdown code fence first: ```json ... ``` or ``` ... ```
-        var fenced = Regex.Match(trimmed, @"```(?:json)?\s*([\s\S]*?)```", RegexOptions.Singleline);
-        if (fenced.Success)
-            return fenced.Groups[1].Value.Trim();
-
-        // Fall back to outermost { } pair — handles preamble text from the LLM
-        var start = trimmed.IndexOf('{');
-        if (start == -1)
-            throw new JsonException($"No JSON object found in LLM output. Body was: {trimmed[..Math.Min(500, trimmed.Length)]}");
-
-        var depth = 0;
-        for (var i = start; i < trimmed.Length; i++)
-        {
-            if (trimmed[i] == '{') depth++;
-            else if (trimmed[i] == '}') depth--;
-            if (depth == 0)
-                return trimmed[start..(i + 1)];
-        }
-
-        throw new JsonException("Unclosed JSON object in LLM output");
     }
 
     /// <summary>
@@ -227,10 +181,7 @@ public class LatticeExtractionController : ControllerBase
     }
 
     /// <summary>
-    ///     Approve or reject a completed extraction. On approval, all valid and novel-discovery
-    ///     staged items are promoted into the deeplynx schema tables (classes, records,
-    ///     relationships, edges). On rejection the extraction is marked rejected and no data
-    ///     is written to the deeplynx schema.
+    ///     Approve or reject a completed extraction.
     /// </summary>
     /// <param name="organizationId">The ID of the organization.</param>
     /// <param name="projectId">The ID of the project.</param>
