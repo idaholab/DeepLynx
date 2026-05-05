@@ -2,7 +2,6 @@ using deeplynx.datalayer.Models;
 using deeplynx.interfaces;
 using deeplynx.models;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
 namespace deeplynx.business;
@@ -20,8 +19,7 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
     public LatticeExtractionBusiness(DeeplynxContext context, LatticeContext latticeContext,
         IInsightBusiness insightBusiness, InsightServiceClient insightServiceClient,
         IExtractionValidation validationBusiness,
-        ILogger<LatticeExtractionBusiness> logger,
-        IConfiguration configuration)
+        ILogger<LatticeExtractionBusiness> logger)
     {
         _context = context;
         _latticeContext = latticeContext;
@@ -29,7 +27,7 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
         _insightServiceClient = insightServiceClient;
         _validationBusiness = validationBusiness;
         _logger = logger;
-        _latticeModel = configuration["LatticeModel"];
+        _latticeModel = Environment.GetEnvironmentVariable("LATTICE_MODEL");
     }
 
     /// <summary>
