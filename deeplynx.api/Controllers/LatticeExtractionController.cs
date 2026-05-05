@@ -1,3 +1,5 @@
+using System.Text.Json;
+using System.Text.RegularExpressions;
 using deeplynx.helpers.Context;
 using deeplynx.interfaces;
 using deeplynx.models;
@@ -112,9 +114,25 @@ public class LatticeExtractionController : ControllerBase
         long organizationId,
         long projectId,
         long extractionId,
-        [FromQuery] long dataSourceId,
-        [FromBody] InsightExtractionCallbackDto dto)
+        [FromQuery] long dataSourceId)
     {
+        string rawBody;
+        using (var reader = new StreamReader(Request.Body))
+            rawBody = await reader.ReadToEndAsync();
+
+        InsightExtractionCallbackDto dto;
+        try
+        {
+            dto = ParseCallbackBody(rawBody);
+        }
+        catch (JsonException exc)
+        {
+            _logger.LogError(
+                "Failed to parse Insight callback for extraction {ExtractionId}: {Error}. Raw body: {RawBody}",
+                extractionId, exc.Message, rawBody);
+            return BadRequest($"Invalid JSON in callback body: {exc.Message}");
+        }
+
         try
         {
             var result = await _latticeExtractionBusiness.ProcessInsightExtractionCallback(
@@ -132,6 +150,22 @@ public class LatticeExtractionController : ControllerBase
             _logger.LogError(message);
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
+    }
+
+    private static readonly JsonSerializerOptions _callbackJsonOptions = new()
+    {
+        AllowTrailingCommas = true,
+        PropertyNameCaseInsensitive = true,
+    };
+
+    private static InsightExtractionCallbackDto ParseCallbackBody(string rawBody)
+    {
+        // Strip markdown code fences the LLM may wrap around the JSON
+        var fenced = Regex.Match(rawBody, @"```(?:json)?\s*([\s\S]*?)```", RegexOptions.Singleline);
+        var json = fenced.Success ? fenced.Groups[1].Value.Trim() : rawBody.Trim();
+
+        return JsonSerializer.Deserialize<InsightExtractionCallbackDto>(json, _callbackJsonOptions)
+               ?? throw new JsonException("Deserialization returned null");
     }
 
     /// <summary>
