@@ -85,10 +85,7 @@ public partial class User
 
     [InverseProperty("LastUpdatedByUser")]
     public virtual ICollection<RecordCollection> LastUpdatedRecordCollections { get; set; } = new List<RecordCollection>();
-    
-    [InverseProperty("LastUpdatedByUser")]
-    public virtual ICollection<RecordCollection> LastUpdatedRecordCollections { get; set; } = new List<RecordCollection>();
-    
+
     [InverseProperty("LastUpdatedByUser")]
     public virtual ICollection<Permission> LastUpdatedPermissions { get; set; } = new List<Permission>();
     

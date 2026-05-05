@@ -44,10 +44,6 @@ public partial class Tag
     [InverseProperty("Tags")]
     public virtual ICollection<RecordCollection> RecordCollections { get; set; } = new List<RecordCollection>();
 
-    [ForeignKey("TagId")]
-    [InverseProperty("Tags")]
-    public virtual ICollection<RecordCollection> RecordCollections { get; set; } = new List<RecordCollection>();
-
     [InverseProperty("LastUpdatedTags")]
     public virtual User? LastUpdatedByUser { get; set; }
 }
