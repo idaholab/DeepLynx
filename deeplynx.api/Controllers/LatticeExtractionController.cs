@@ -169,6 +169,74 @@ public class LatticeExtractionController : ControllerBase
     }
 
     /// <summary>
+    ///     Returns all staged items for an extraction — classes, records, relationships, and edges —
+    ///     with their validation statuses and scores, for human review before approve/reject.
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization.</param>
+    /// <param name="projectId">The ID of the project.</param>
+    /// <param name="extractionId">The extraction to retrieve staging data for.</param>
+    [HttpGet("{extractionId:long}/staging", Name = "api_get_extraction_staging")]
+    public async Task<IActionResult> GetExtractionStaging(
+        long organizationId,
+        long projectId,
+        long extractionId)
+    {
+        try
+        {
+            var result = await _latticeExtractionBusiness.GetExtractionStaging(extractionId);
+            return Ok(result);
+        }
+        catch (InvalidOperationException exc)
+        {
+            _logger.LogWarning(exc.Message);
+            return NotFound(exc.Message);
+        }
+        catch (Exception exc)
+        {
+            var message = $"An error occurred while retrieving staging data for extraction {extractionId}: {exc}";
+            _logger.LogError(message);
+            return StatusCode(StatusCodes.Status500InternalServerError, message);
+        }
+    }
+
+    /// <summary>
+    ///     Approve or reject a completed extraction. On approval, all valid and novel-discovery
+    ///     staged items are promoted into the deeplynx schema tables (classes, records,
+    ///     relationships, edges). On rejection the extraction is marked rejected and no data
+    ///     is written to the deeplynx schema.
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization.</param>
+    /// <param name="projectId">The ID of the project.</param>
+    /// <param name="extractionId">The extraction to promote.</param>
+    /// <param name="approve">True to promote all staged items; false to reject.</param>
+    [HttpPost("{extractionId:long}/promote", Name = "api_promote_extraction")]
+    public async Task<IActionResult> PromoteExtraction(
+        long organizationId,
+        long projectId,
+        long extractionId,
+        [FromQuery] bool approve)
+    {
+        try
+        {
+            var currentUserId = UserContextStorage.UserId;
+            var result = await _latticeExtractionBusiness.PromoteExtraction(
+                currentUserId, organizationId, projectId, extractionId, approve);
+            return Ok(result);
+        }
+        catch (InvalidOperationException exc)
+        {
+            _logger.LogWarning(exc.Message);
+            return BadRequest(exc.Message);
+        }
+        catch (Exception exc)
+        {
+            var message = $"An error occurred while promoting extraction {extractionId}: {exc}";
+            _logger.LogError(message);
+            return StatusCode(StatusCodes.Status500InternalServerError, message);
+        }
+    }
+
+    /// <summary>
     ///     Trigger asynchronous Lattice extraction
     /// </summary>
     /// <param name="organizationId">The ID of the organization.</param>

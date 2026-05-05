@@ -13,6 +13,15 @@ public interface ILatticeExtractionBusiness
 
     Task MarkExtractionFailed(long extractionId, string? errorMessage = null);
 
+    Task<ExtractionStagingResponseDto> GetExtractionStaging(long extractionId);
+
+    Task<ExtractionResponseDto> PromoteExtraction(
+        long currentUserId,
+        long organizationId,
+        long projectId,
+        long extractionId,
+        bool approve);
+
     Task<List<OntologySimilarityResultDto>> SearchOntologySimilarity(
         long recordId,
         long projectId, 

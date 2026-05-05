@@ -32,6 +32,8 @@ public static class ExtractionStatus
     public const string Running = "running";
     public const string Complete = "complete";
     public const string Failed = "failed";
+    public const string Promoted = "promoted";
+    public const string Rejected = "rejected";
 }
 
 public static class ExtractionMode
