@@ -386,21 +386,24 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
             .Where(r => relationshipIds.Contains(r.Id))
             .ToDictionaryAsync(r => r.Id, r => r.ValidationStatus);
 
-        var extractionEdges = edges.Select(edge =>
+        var extractionEdges = new List<ExtractionEdge>();
+        foreach (var edge in edges)
         {
+            // Skip edges whose subject or object wasn't staged as a record — this can happen when
+            // the LLM references an entity in a relationship that it didn't include in the classes array
+            if (!instanceNameToRecordId.TryGetValue(edge.Subject, out var originRecordId)) continue;
+            if (!instanceNameToRecordId.TryGetValue(edge.Object, out var destRecordId)) continue;
+
             relSimilarities.TryGetValue(edge.RelationshipType, out var relMatch);
             var patternKey = $"{edge.SubjectType}|{edge.RelationshipType}|{edge.ObjectType}";
             relationshipKeyToId.TryGetValue(patternKey, out var relId);
-            instanceNameToRecordId.TryGetValue(edge.Subject, out var originRecordId);
-            instanceNameToRecordId.TryGetValue(edge.Object, out var destRecordId);
             relValidationById.TryGetValue(relId, out var validationStatus);
 
             var embeddingPlausibility = relMatch?.Score ?? 0.0;
             var statFreq = maxFrequency > 0 ? (double)edge.Frequency / maxFrequency : 0.0;
-            // Pattern exists in ontology only when the relationship is valid (not novel_discovery)
             var structuralConsistency = validationStatus == ExtractionValidationStatus.Valid ? 1.0 : 0.0;
 
-            return new ExtractionEdge
+            extractionEdges.Add(new ExtractionEdge
             {
                 ExtractionId = extractionId,
                 ExtractionRelationshipId = relId,
@@ -417,8 +420,8 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
                 StructuralConsistency = structuralConsistency,
                 EnsembleScore = _validationBusiness.CalculateEnsembleScore(
                     edge.Confidence, embeddingPlausibility, statFreq, structuralConsistency)
-            };
-        }).ToList();
+            });
+        }
 
         _latticeContext.ExtractionEdges.AddRange(extractionEdges);
         await _latticeContext.SaveChangesAsync();
