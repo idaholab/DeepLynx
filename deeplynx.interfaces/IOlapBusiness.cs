@@ -19,10 +19,30 @@ public interface IOlapBusiness
         long organizationId,
         long projectId,
         long recordId,
-        string userQuery,
+        OlapQueryRequestDto request,
         string viewName);
 
-    Task<PlotDataDto> GetPlotData(long currentUserId, long organizationId, long projectId, long recordId, long limit,
+    Task<PlotDataDto> QueryTabularFile(
+        long currentUserId,
+        long organizationId,
+        long projectId,
+        long recordId,
+        string? userQuery,
+        string viewName);
+
+    Task<PlotDataDto> GetPlotData(
+        long currentUserId,
+        long organizationId,
+        long projectId,
+        long recordId,
+        OlapQueryRequestDto request);
+
+    Task<PlotDataDto> GetPlotData(
+        long currentUserId,
+        long organizationId,
+        long projectId,
+        long recordId,
+        long limit,
         long rowNumber);
 
     Task<long> GetHighestPartNumber(
