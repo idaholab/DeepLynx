@@ -2,6 +2,7 @@ using deeplynx.datalayer.Models;
 using deeplynx.interfaces;
 using deeplynx.models;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
 namespace deeplynx.business;
@@ -14,11 +15,13 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
     private readonly InsightServiceClient _insightServiceClient;
     private readonly IExtractionValidation _validationBusiness;
     private readonly ILogger<LatticeExtractionBusiness> _logger;
+    private readonly string? _latticeModel;
 
     public LatticeExtractionBusiness(DeeplynxContext context, LatticeContext latticeContext,
         IInsightBusiness insightBusiness, InsightServiceClient insightServiceClient,
         IExtractionValidation validationBusiness,
-        ILogger<LatticeExtractionBusiness> logger)
+        ILogger<LatticeExtractionBusiness> logger,
+        IConfiguration configuration)
     {
         _context = context;
         _latticeContext = latticeContext;
@@ -26,6 +29,7 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
         _insightServiceClient = insightServiceClient;
         _validationBusiness = validationBusiness;
         _logger = logger;
+        _latticeModel = configuration["LatticeModel"];
     }
 
     /// <summary>
@@ -83,10 +87,11 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
 
             var filledPrompt = await ConstructPrompt(recordId, projectId, mode);
 
-            var llmConfig = await _insightBusiness.ResolveModelConfig(
-                currentUserId, organizationId, projectId, null, "llm");
+            if (string.IsNullOrWhiteSpace(_latticeModel))
+                throw new InvalidOperationException(
+                    "LatticeModel configuration is not set. Set the LatticeModel environment variable.");
             var response =
-                await _insightServiceClient.LatticeExtraction(filledPrompt, llmConfig.ModelName, queryInfo);
+                await _insightServiceClient.LatticeExtraction(filledPrompt, _latticeModel, queryInfo);
 
             if (response.IsSuccessStatusCode)
             {
