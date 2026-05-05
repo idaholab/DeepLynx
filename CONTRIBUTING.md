@@ -5,6 +5,7 @@
 * Follow the .NET Core coding conventions.
 * For backend API, dependency injection, error handling, and solution structure conventions, see [DeepLynx Nexus Backend Development Style Guide](documentation/development-code-style-guide.md).
 * Write clear and concise commit messages.
+* For backend architecture, see [backend architecture](documentation/architecture.md).
 * Ensure your code is well-documented and includes necessary comments.
 * Maintain consistency with the existing codebase.
 ### Testing
