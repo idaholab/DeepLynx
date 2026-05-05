@@ -111,7 +111,13 @@ public class MetricsBusiness : IMetricsBusiness
         var objectStorages = await _objectStorageBusiness.GetDecryptedObjectStorages(
             organizationId, null, null);
         
-        foreach (var objectStorage in objectStorages)
+        // Group by unique config to avoid counting shared storage backends multiple times
+        var uniqueStorages = objectStorages
+            .GroupBy(os => new { os.Type, ConfigJson = JsonConvert.SerializeObject(os.Config) })
+            .Select(g => g.First())
+            .ToList();
+        
+        foreach (var objectStorage in uniqueStorages)
         {
             try
             {
@@ -142,7 +148,13 @@ public class MetricsBusiness : IMetricsBusiness
         var objectStorages = await _objectStorageBusiness.GetDecryptedObjectStorages(
             null, null, null);
         
-        foreach (var objectStorage in objectStorages)
+        // Group by unique config to avoid counting shared storage backends multiple times
+        var uniqueStorages = objectStorages
+            .GroupBy(os => new { os.Type, ConfigJson = JsonConvert.SerializeObject(os.Config) })
+            .Select(g => g.First())
+            .ToList();
+        
+        foreach (var objectStorage in uniqueStorages)
         {
             try
             {

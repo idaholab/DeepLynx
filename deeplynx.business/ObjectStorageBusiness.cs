@@ -577,8 +577,6 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
 
         if (projectId.HasValue)
             query = query.Where(os => os.ProjectId == projectId || os.ProjectId == null);
-        else
-            query = query.Where(os => os.ProjectId == null);
 
         if (objectStorageIds != null && objectStorageIds.Any())
             query = query.Where(os => objectStorageIds.Contains(os.Id));

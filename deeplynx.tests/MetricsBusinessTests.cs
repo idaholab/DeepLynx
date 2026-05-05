@@ -1,105 +1,3 @@
-
-//
-//     #region GetProjectStorageSize Tests
-//
-//     [Fact]
-//     public async Task GetProjectStorageSize_ReturnsAllStorages_InProject()
-//     {
-//         // Arrange
-//         _mockFilesystemBusiness
-//             .Setup(f => f.GetStorageSize(It.IsAny<string>(), It.IsAny<ObjectStorageConfigDto>()))
-//             .ReturnsAsync(1000L);
-//         
-//         _mockAzureBusiness
-//             .Setup(f => f.GetStorageSize(It.IsAny<string>(), It.IsAny<ObjectStorageConfigDto>()))
-//             .ReturnsAsync(2000L);
-//
-//         // Act
-//         var result = await _metricsBusiness.GetProjectStorageSize(_org2Id, _org2Proj1Id);
-//
-//         // Assert
-//         Assert.NotNull(result);
-//         // 2 project storages (fs + azure) + 2 org storages = 4 total
-//         // Each filesystem storage = 1000, each azure storage = 2000
-//         // Total = 1000 + 2000 + 1000 + 2000 = 6000
-//         Assert.Equal(6000L, result.Bytes);
-//     }
-//
-
-//
-
-//
-//     #endregion
-//
-//     #region GetOrganizationStorageSize Tests
-//
-//     [Fact]
-//     public async Task GetOrganizationStorageSize_ReturnsAllStorages_InOrganization()
-//     {
-//         // Arrange
-//         _mockFilesystemBusiness
-//             .Setup(f => f.GetStorageSize(It.IsAny<string>(), It.IsAny<ObjectStorageConfigDto>()))
-//             .ReturnsAsync(3000L);
-//         
-//         _mockAzureBusiness
-//             .Setup(f => f.GetStorageSize(It.IsAny<string>(), It.IsAny<ObjectStorageConfigDto>()))
-//             .ReturnsAsync(2000L);
-//
-//         // Act
-//         var result = await _metricsBusiness.GetOrganizationStorageSize(_oid);
-//
-//         // Assert
-//         Assert.NotNull(result);
-//         // 2 filesystem (3000 each) + 2 azure (2000 each) = 10000
-//         Assert.Equal(10000L, result.Bytes);
-//     }
-//
-//
-//     [Fact]
-//     public async Task GetOrganizationStorageSize_ReturnsZeroBytes_WhenNoStorages()
-//     {
-//         // Arrange - Use org 2 which has no storages
-//         
-//         // Act
-//         var result = await _metricsBusiness.GetOrganizationStorageSize(_org1Id);
-//
-//         // Assert
-//         Assert.NotNull(result);
-//         Assert.Equal(0L, result.Bytes);
-//     }
-//
-//     #endregion
-//
-//     #region GetSystemStorageSize Tests
-//
-//     [Fact]
-//     public async Task GetSystemStorageSize_ReturnsAllStorages_SystemWide()
-//     {
-//         // Arrange
-//         _mockFilesystemBusiness
-//             .Setup(f => f.GetStorageSize(It.IsAny<string>(), It.IsAny<ObjectStorageConfigDto>()))
-//             .ReturnsAsync(5000L);
-//         
-//         _mockAzureBusiness
-//             .Setup(f => f.GetStorageSize(It.IsAny<string>(), It.IsAny<ObjectStorageConfigDto>()))
-//             .ReturnsAsync(3000L);
-//
-//         // Act
-//         var result = await _metricsBusiness.GetSystemStorageSize();
-//
-//         // Assert
-//         Assert.NotNull(result);
-//         // Due to grouping by config, we should get unique configs
-//         // 2 unique filesystem configs + 2 unique azure configs = 4 total
-//         Assert.Equal(16000L, result.Bytes); // 2*5000 + 2*3000
-//     }
-//
-
-//
-
-//
-//     #endregion
-
 using Azure.Storage.Blobs;
 using deeplynx.business;
 using deeplynx.datalayer.Models;
@@ -232,7 +130,7 @@ public class MetricsBusinessTests : IntegrationTestBase, IClassFixture<MetricsAz
     protected override async Task SeedTestDataAsync()
     {
         await base.SeedTestDataAsync();
- 
+
         // Create user
         var user = new User
         {
@@ -244,7 +142,7 @@ public class MetricsBusinessTests : IntegrationTestBase, IClassFixture<MetricsAz
         Context.Users.Add(user);
         await Context.SaveChangesAsync();
         _userId = user.Id;
- 
+
         // Create Organization 1
         var org1 = new Organization
         {
@@ -254,8 +152,8 @@ public class MetricsBusinessTests : IntegrationTestBase, IClassFixture<MetricsAz
         };
         Context.Organizations.Add(org1);
         await Context.SaveChangesAsync();
-        _org2Id = org1.Id;
- 
+        _org1Id = org1.Id;
+
         // Create Organization 2
         var org2 = new Organization
         {
@@ -266,19 +164,19 @@ public class MetricsBusinessTests : IntegrationTestBase, IClassFixture<MetricsAz
         Context.Organizations.Add(org2);
         await Context.SaveChangesAsync();
         _org2Id = org2.Id;
- 
+
         // Create Project 1 for Org 1
         var org1Proj1 = new Project
         {
             Name = "Org1 Project1",
-            OrganizationId = _org2Id,
+            OrganizationId = _org1Id,
             LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
             LastUpdatedBy = _userId
         };
         Context.Projects.Add(org1Proj1);
         await Context.SaveChangesAsync();
         _org1Proj1Id = org1Proj1.Id;
- 
+
         // Create Project 1 for Org 2
         var org2Proj1 = new Project
         {
@@ -290,7 +188,7 @@ public class MetricsBusinessTests : IntegrationTestBase, IClassFixture<MetricsAz
         Context.Projects.Add(org2Proj1);
         await Context.SaveChangesAsync();
         _org2Proj1Id = org2Proj1.Id;
- 
+
         // Create Project 2 for Org 2
         var org2Proj2 = new Project
         {
@@ -302,9 +200,9 @@ public class MetricsBusinessTests : IntegrationTestBase, IClassFixture<MetricsAz
         Context.Projects.Add(org2Proj2);
         await Context.SaveChangesAsync();
         _org2Proj2Id = org2Proj2.Id;
- 
+
         // ========== FILESYSTEM OBJECT STORAGES ==========
- 
+
         // Filesystem storage for Org1 Project1
         var fsOrg1Proj1Config = new ObjectStorageConfigDto
         {
@@ -314,7 +212,7 @@ public class MetricsBusinessTests : IntegrationTestBase, IClassFixture<MetricsAz
         {
             Name = "FS Org1 Proj1 Storage",
             ProjectId = _org1Proj1Id,
-            OrganizationId = _org2Id,
+            OrganizationId = _org1Id,
             Type = "filesystem",
             ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(fsOrg1Proj1Config),
             LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
@@ -323,7 +221,7 @@ public class MetricsBusinessTests : IntegrationTestBase, IClassFixture<MetricsAz
         Context.ObjectStorages.Add(fsOrg1Proj1Storage);
         await Context.SaveChangesAsync();
         _fsOrg1Proj1StorageId = fsOrg1Proj1Storage.Id;
- 
+
         // Filesystem storage for Org2 Project1
         var fsOrg2Proj1Config = new ObjectStorageConfigDto
         {
@@ -342,7 +240,7 @@ public class MetricsBusinessTests : IntegrationTestBase, IClassFixture<MetricsAz
         Context.ObjectStorages.Add(fsOrg2Proj1Storage);
         await Context.SaveChangesAsync();
         _fsOrg2Proj1StorageId = fsOrg2Proj1Storage.Id;
- 
+
         // Filesystem storage for Org2 Project2
         var fsOrg2Proj2Config = new ObjectStorageConfigDto
         {
@@ -361,9 +259,9 @@ public class MetricsBusinessTests : IntegrationTestBase, IClassFixture<MetricsAz
         Context.ObjectStorages.Add(fsOrg2Proj2Storage);
         await Context.SaveChangesAsync();
         _fsOrg2Proj2StorageId = fsOrg2Proj2Storage.Id;
- 
+
         // ========== AZURE OBJECT STORAGES ==========
- 
+
         // Azure storage for Org1 Project1
         var azureOrg1Proj1Config = new ObjectStorageConfigDto
         {
@@ -377,7 +275,7 @@ public class MetricsBusinessTests : IntegrationTestBase, IClassFixture<MetricsAz
         {
             Name = "Azure Org1 Proj1 Storage",
             ProjectId = _org1Proj1Id,
-            OrganizationId = _org2Id,
+            OrganizationId = _org1Id,
             Type = "azure_object",
             ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(azureOrg1Proj1Config),
             LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
@@ -386,7 +284,7 @@ public class MetricsBusinessTests : IntegrationTestBase, IClassFixture<MetricsAz
         Context.ObjectStorages.Add(azureOrg1Proj1Storage);
         await Context.SaveChangesAsync();
         _azureOrg1Proj1StorageId = azureOrg1Proj1Storage.Id;
- 
+
         // Azure storage for Org2 Project1
         var azureOrg2Proj1Config = new ObjectStorageConfigDto
         {
@@ -409,7 +307,7 @@ public class MetricsBusinessTests : IntegrationTestBase, IClassFixture<MetricsAz
         Context.ObjectStorages.Add(azureOrg2Proj1Storage);
         await Context.SaveChangesAsync();
         _azureOrg2Proj1StorageId = azureOrg2Proj1Storage.Id;
- 
+
         // Azure storage for Org2 Project2
         var azureOrg2Proj2Config = new ObjectStorageConfigDto
         {
@@ -432,37 +330,37 @@ public class MetricsBusinessTests : IntegrationTestBase, IClassFixture<MetricsAz
         Context.ObjectStorages.Add(azureOrg2Proj2Storage);
         await Context.SaveChangesAsync();
         _azureOrg2Proj2StorageId = azureOrg2Proj2Storage.Id;
- 
+
         // ========== CREATE FILESYSTEM DIRECTORY STRUCTURES WITH FILES ==========
- 
+
         // Org1 Project1 files (3KB total)
-        var org1Proj1Path = Path.Combine(_filesystemBasePath, $"org_{_org2Id}", $"project_{_org1Proj1Id}");
+        var org1Proj1Path = Path.Combine(_filesystemBasePath, $"org_{_org1Id}", $"project_{_org1Proj1Id}");
         Directory.CreateDirectory(org1Proj1Path);
         await File.WriteAllBytesAsync(Path.Combine(org1Proj1Path, "file1.txt"), new byte[1024]); // 1KB
         await File.WriteAllBytesAsync(Path.Combine(org1Proj1Path, "file2.txt"), new byte[2048]); // 2KB
- 
+
         // Org2 Project1 files (5KB total)
         var org2Proj1Path = Path.Combine(_filesystemBasePath, $"org_{_org2Id}", $"project_{_org2Proj1Id}");
         Directory.CreateDirectory(org2Proj1Path);
         await File.WriteAllBytesAsync(Path.Combine(org2Proj1Path, "file1.txt"), new byte[2048]); // 2KB
         await File.WriteAllBytesAsync(Path.Combine(org2Proj1Path, "file2.txt"), new byte[3072]); // 3KB
- 
+
         // Org2 Project2 files (7KB total)
         var org2Proj2Path = Path.Combine(_filesystemBasePath, $"org_{_org2Id}", $"project_{_org2Proj2Id}");
         Directory.CreateDirectory(org2Proj2Path);
         await File.WriteAllBytesAsync(Path.Combine(org2Proj2Path, "file1.txt"), new byte[3072]); // 3KB
         await File.WriteAllBytesAsync(Path.Combine(org2Proj2Path, "file2.txt"), new byte[4096]); // 4KB
- 
+
         // ========== CREATE AZURE BLOBS ==========
- 
+
         // Org1 Project1 blobs (4KB total)
         var org1Proj1Container = new BlobContainerClient(
             _azuriteFixture.AzuriteConnectionString, 
             "org1-proj1-container");
         await org1Proj1Container.CreateIfNotExistsAsync();
-        await UploadBlobAsync(org1Proj1Container, $"organization_{_org2Id}/project_{_org1Proj1Id}/file1.txt", 2048); // 2KB
-        await UploadBlobAsync(org1Proj1Container, $"organization_{_org2Id}/project_{_org1Proj1Id}/file2.txt", 2048); // 2KB
- 
+        await UploadBlobAsync(org1Proj1Container, $"organization_{_org1Id}/project_{_org1Proj1Id}/file1.txt", 2048); // 2KB
+        await UploadBlobAsync(org1Proj1Container, $"organization_{_org1Id}/project_{_org1Proj1Id}/file2.txt", 2048); // 2KB
+
         // Org2 Project1 blobs (6KB total)
         var org2Proj1Container = new BlobContainerClient(
             _azuriteFixture.AzuriteConnectionString, 
@@ -470,7 +368,7 @@ public class MetricsBusinessTests : IntegrationTestBase, IClassFixture<MetricsAz
         await org2Proj1Container.CreateIfNotExistsAsync();
         await UploadBlobAsync(org2Proj1Container, $"organization_{_org2Id}/project_{_org2Proj1Id}/file1.txt", 3072); // 3KB
         await UploadBlobAsync(org2Proj1Container, $"organization_{_org2Id}/project_{_org2Proj1Id}/file2.txt", 3072); // 3KB
- 
+
         // Org2 Project2 blobs (9KB total)
         var org2Proj2Container = new BlobContainerClient(
             _azuriteFixture.AzuriteConnectionString, 
@@ -478,6 +376,60 @@ public class MetricsBusinessTests : IntegrationTestBase, IClassFixture<MetricsAz
         await org2Proj2Container.CreateIfNotExistsAsync();
         await UploadBlobAsync(org2Proj2Container, $"organization_{_org2Id}/project_{_org2Proj2Id}/file1.txt", 4096); // 4KB
         await UploadBlobAsync(org2Proj2Container, $"organization_{_org2Id}/project_{_org2Proj2Id}/file2.txt", 5120); // 5KB
+
+        // ========== DATA SOURCES ==========
+
+        // Data source for Org1 Project1
+        var dsOrg1Proj1 = new DataSource
+        {
+            Name = "DS Org1 Project1",
+            OrganizationId = _org1Id,
+            ProjectId = _org1Proj1Id,
+            IsArchived = false
+        };
+        Context.DataSources.Add(dsOrg1Proj1);
+
+        // Data source for Org2 Project1
+        var dsOrg2Proj1 = new DataSource
+        {
+            Name = "DS Org2 Project1",
+            OrganizationId = _org2Id,
+            ProjectId = _org2Proj1Id,
+            IsArchived = false
+        };
+        Context.DataSources.Add(dsOrg2Proj1);
+        
+        // Archived data source for Org2 Project1
+        var arcOrg2Proj1Id = new DataSource
+        {
+            Name = "Archived Org2 Project1",
+            OrganizationId = _org2Id,
+            ProjectId = _org2Proj1Id,
+            IsArchived = true
+        };
+        Context.DataSources.Add(arcOrg2Proj1Id);
+
+        // Data source for Org2 Project2
+        var dsOrg2Proj2 = new DataSource
+        {
+            Name = "DS Org2 Project2",
+            OrganizationId = _org2Id,
+            ProjectId = _org2Proj2Id,
+            IsArchived = false
+        };
+        Context.DataSources.Add(dsOrg2Proj2);
+
+        // Org-level data source for Org1
+        var dsOrg1OrgLevel = new DataSource
+        {
+            Name = "DS Org1 OrgLevel",
+            OrganizationId = _org1Id,
+            ProjectId = null,
+            IsArchived = false
+        };
+        Context.DataSources.Add(dsOrg1OrgLevel);
+
+        await Context.SaveChangesAsync();
     }
  
     #region Helper Methods
@@ -493,10 +445,10 @@ public class MetricsBusinessTests : IntegrationTestBase, IClassFixture<MetricsAz
  
     #endregion
  
-    #region Project Level Storage Tests
+    #region Get_StorageSize Tests
  
     [Fact]
-    public async Task GetProjectStorageSize_Org2Project1_AggregatesAllStorageTypes()
+    public async Task GetProjectStorageSize_AggregatesAllStorageTypes()
     {
         // Arrange
         // Org2 Project1 has:
@@ -511,6 +463,48 @@ public class MetricsBusinessTests : IntegrationTestBase, IClassFixture<MetricsAz
         Assert.NotNull(result);
         Assert.Equal(11264, result.Bytes); // Filesystem: 5120 + Azure: 6144 = 11264 bytes
     }
+    
+    [Fact]
+    public async Task GetOrganizationStorageSize_ReturnsAllStorages_InOrganization()
+    {
+        // Arrange
+        // Org2 has:
+        // - Project1 Filesystem: 5KB (2KB + 3KB)
+        // - Project1 Azure: 6KB (3KB + 3KB)
+        // - Project2 Filesystem: 7KB (3KB + 4KB)
+        // - Project2 Azure: 9KB (4KB + 5KB)
+        // Total: 27KB
+
+        // Act
+        var result = await _metricsBusiness.GetOrganizationStorageSize(_org2Id);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(27648, result.Bytes); // (5120 + 6144) + (7168 + 9216) = 27648 bytes
+    }
+
+    [Fact]
+    public async Task GetSystemStorageSize_ReturnsAllStorages_SystemWide()
+    {
+        // Arrange
+        // System-wide storage across all organizations:
+        // Org1:
+        // - Project1 Filesystem: 3KB (1KB + 2KB)
+        // - Project1 Azure: 4KB (2KB + 2KB)
+        // Org2:
+        // - Project1 Filesystem: 5KB (2KB + 3KB)
+        // - Project1 Azure: 6KB (3KB + 3KB)
+        // - Project2 Filesystem: 7KB (3KB + 4KB)
+        // - Project2 Azure: 9KB (4KB + 5KB)
+        // Total: 34KB
+
+        // Act
+        var result = await _metricsBusiness.GetSystemStorageSize();
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(34816, result.Bytes); // Org1: (3072 + 4096) + Org2: (5120 + 6144 + 7168 + 9216) = 34816 bytes
+    }
  
     #endregion
     
@@ -519,6 +513,11 @@ public class MetricsBusinessTests : IntegrationTestBase, IClassFixture<MetricsAz
     [Fact]
     public async Task GetSystemDataSourceCount_ReturnsZero_WhenNoDataSources()
     {
+        // Arrange - delete existing data sources
+        var dataSources = Context.DataSources.ToList();
+        Context.DataSources.RemoveRange(dataSources);
+        await Context.SaveChangesAsync();
+        
         // Act
         var count = await _metricsBusiness.GetSystemDataSourceCount();
 
@@ -529,312 +528,128 @@ public class MetricsBusinessTests : IntegrationTestBase, IClassFixture<MetricsAz
     [Fact]
     public async Task GetSystemDataSourceCount_ReturnsAllNonArchived_SystemWide()
     {
-        // Arrange - create data sources across both orgs
-        Context.DataSources.Add(new DataSource
-        {
-            Name = "DS Org1 Project",
-            OrganizationId = _org2Id,
-            ProjectId = _org2Proj1Id,
-            IsArchived = false
-        });
-        Context.DataSources.Add(new DataSource
-        {
-            Name = "DS Org1 OrgLevel",
-            OrganizationId = _org2Id,
-            ProjectId = null,
-            IsArchived = false
-        });
-        Context.DataSources.Add(new DataSource
-        {
-            Name = "DS Org2",
-            OrganizationId = _org1Id,
-            ProjectId = null,
-            IsArchived = false
-        });
-        Context.DataSources.Add(new DataSource
-        {
-            Name = "DS Archived",
-            OrganizationId = _org2Id,
-            ProjectId = _org2Proj2Id,
-            IsArchived = true
-        });
-        await Context.SaveChangesAsync();
-
         // Act
         var count = await _metricsBusiness.GetSystemDataSourceCount();
 
         // Assert - should include all non-archived across all orgs
-        Assert.Equal(3, count);
+        Assert.Equal(4, count);
     }
 
     [Fact]
     public async Task GetSystemDataSourceCount_HideArchivedFalse_IncludesArchived()
     {
-        // Arrange
-        Context.DataSources.Add(new DataSource
-        {
-            Name = "DS Active",
-            OrganizationId = _org2Id,
-            ProjectId = _org2Proj1Id,
-            IsArchived = false
-        });
-        Context.DataSources.Add(new DataSource
-        {
-            Name = "DS Archived",
-            OrganizationId = _org2Id,
-            ProjectId = _org2Proj1Id,
-            IsArchived = true
-        });
-        await Context.SaveChangesAsync();
-
         // Act
         var countWithArchived = await _metricsBusiness.GetSystemDataSourceCount(hideArchived: false);
         var countWithoutArchived = await _metricsBusiness.GetSystemDataSourceCount(hideArchived: true);
 
         // Assert
-        Assert.Equal(2, countWithArchived);
-        Assert.Equal(1, countWithoutArchived);
+        Assert.Equal(5, countWithArchived);
+        Assert.Equal(4, countWithoutArchived);
     }
 
      #endregion
 
-     #region GetProjectDataSourceCount Tests
+    #region GetProjectDataSourceCount Tests
 
-     [Fact]
-     public async Task GetProjectDataSourceCount_ReturnsCount_ForProject()
-     { 
-         // Arrange
-         Context.DataSources.Add(new DataSource
-         {
-             Name = "DS Project1 A",
-             OrganizationId = _org2Id,
-             ProjectId = _org2Proj1Id,
-             IsArchived = false
-         });
-         Context.DataSources.Add(new DataSource
-         {
-             Name = "DS Project1 B",
-             OrganizationId = _org2Id,
-             ProjectId = _org2Proj1Id,
-             IsArchived = false
-         });
-         Context.DataSources.Add(new DataSource
-         {
-             Name = "DS Project2",
-             OrganizationId = _org2Id,
-             ProjectId = _org2Proj2Id,
-             IsArchived = false
-         });
-         await Context.SaveChangesAsync();
+    [Fact]
+    public async Task GetProjectDataSourceCount_ReturnsCount_ForProject()
+    { 
+        // Act
+        var count = await _metricsBusiness.GetProjectDataSourceCount(_org2Proj1Id);
 
-         // Act
-         var count = await _metricsBusiness.GetProjectDataSourceCount(_org2Proj1Id);
+        // Assert - only one non-archived data source for org 2 project 1
+        Assert.Equal(1, count);
+    }
 
-         // Assert - only data sources for project 1
-         Assert.Equal(2, count);
-     }
+    [Fact]
+    public async Task GetProjectDataSourceCount_IncludesArchived_WhenHideArchivedFalse()
+    {
+        // Act
+        var count = await _metricsBusiness.GetProjectDataSourceCount(_org2Proj1Id, hideArchived: false);
 
-     [Fact]
-     public async Task GetProjectDataSourceCount_ExcludesArchived_WhenHideArchivedTrue()
-     {
-         // Arrange
-         Context.DataSources.Add(new DataSource
-         {
-             Name = "DS Active",
-             OrganizationId = _org2Id,
-             ProjectId = _org2Proj1Id,
-             IsArchived = false
-         });
-         Context.DataSources.Add(new DataSource
-         {
-             Name = "DS Archived",
-             OrganizationId = _org2Id,
-             ProjectId = _org2Proj1Id,
-             IsArchived = true
-         });
-         await Context.SaveChangesAsync();
+        // Assert - two data sources counting the archived one
+        Assert.Equal(2, count);
+    }
 
-         // Act
-         var count = await _metricsBusiness.GetProjectDataSourceCount(_org2Proj1Id, hideArchived: true);
+    [Fact]
+    public async Task GetProjectDataSourceCount_ReturnsZero_WhenNoDataSources()
+    {
+        // Arrange - delete existing data sources for o2p2 to test this
+        var org2Proj2DataSources = Context.DataSources
+            .Where(ds => ds.ProjectId == _org2Proj2Id)
+            .ToList();
+        Context.DataSources.RemoveRange(org2Proj2DataSources);
+        await Context.SaveChangesAsync();
+        
+        // Act - project 2 has no data sources
+        var count = await _metricsBusiness.GetProjectDataSourceCount(_org2Proj2Id);
 
-         // Assert
-         Assert.Equal(1, count);
-     }
+        // Assert
+        Assert.Equal(0, count);
+    }
 
-     [Fact]
-     public async Task GetProjectDataSourceCount_IncludesArchived_WhenHideArchivedFalse()
-     {
-         // Arrange
-         Context.DataSources.Add(new DataSource
-         {
-             Name = "DS Active",
-             OrganizationId = _org2Id,
-             ProjectId = _org2Proj1Id,
-             IsArchived = false
-         });
-         Context.DataSources.Add(new DataSource
-         {
-             Name = "DS Archived",
-             OrganizationId = _org2Id,
-             ProjectId = _org2Proj1Id,
-             IsArchived = true
-         });
-         await Context.SaveChangesAsync();
+    #endregion
 
-         // Act
-         var count = await _metricsBusiness.GetProjectDataSourceCount(_org2Proj1Id, hideArchived: false);
+    #region GetOrganizationDataSourceCount Tests
 
-         // Assert
-         Assert.Equal(2, count);
-     }
+    [Fact]
+    public async Task GetOrganizationDataSourceCount_NoProjectIds_ReturnsAllForOrganization()
+    {
+        // Act - no projectIds filter, returns all in org
+        var count = await _metricsBusiness.GetOrganizationDataSourceCount(_org2Id, null);
 
-     [Fact]
-     public async Task GetProjectDataSourceCount_ReturnsZero_WhenNoDataSources()
-     {
-         // Act - project 2 has no data sources
-         var count = await _metricsBusiness.GetProjectDataSourceCount(_org2Proj2Id);
+        // Assert - only data sources belonging to org 2
+        Assert.Equal(2, count);
+    }
 
-         // Assert
-         Assert.Equal(0, count);
-     }
+    [Fact]
+    public async Task GetOrganizationDataSourceCount_WithProjectIds_ReturnsProjectAndOrgLevel()
+    {
+        // Act - filter to project 1 only
+        var count = await _metricsBusiness.GetOrganizationDataSourceCount(_org1Id, new[] { _org1Proj1Id });
 
-     #endregion
+        // Assert - project 1 data source + inherited org-level data source
+        Assert.Equal(2, count);
+    }
 
-     #region GetOrganizationDataSourceCount Tests
+    [Fact]
+    public async Task GetOrganizationDataSourceCount_WithProjectIds_ExcludesOtherProjects()
+    {
+        // Act - filter to project 2 only
+        var count = await _metricsBusiness.GetOrganizationDataSourceCount(_org2Id, new[] { _org2Proj2Id });
 
-     [Fact]
-     public async Task GetOrganizationDataSourceCount_NoProjectIds_ReturnsAllForOrganization()
-     {
-         // Arrange - data sources across org 1 (project + org-level) and org 2
-         Context.DataSources.Add(new DataSource
-         {
-             Name = "DS Org1 Project",
-             OrganizationId = _org2Id,
-             ProjectId = _org2Proj1Id,
-             IsArchived = false
-         });
-         Context.DataSources.Add(new DataSource
-         {
-             Name = "DS Org1 OrgLevel",
-             OrganizationId = _org2Id,
-             ProjectId = null,
-             IsArchived = false
-         });
-         Context.DataSources.Add(new DataSource
-         {
-             Name = "DS Org2",
-             OrganizationId = _org1Id,
-             ProjectId = null,
-             IsArchived = false
-         });
-         await Context.SaveChangesAsync();
+        // Assert - only project 2 data source (no org-level exists)
+        Assert.Equal(1, count);
+    }
 
-         // Act - no projectIds filter, returns all in org
-         var count = await _metricsBusiness.GetOrganizationDataSourceCount(_org2Id, null);
+    [Fact]
+    public async Task GetOrganizationDataSourceCount_ExcludesArchived_WhenHideArchivedTrue()
+    {
+        // Act
+        var countWithArchived = await _metricsBusiness.GetOrganizationDataSourceCount(_org2Id, null, hideArchived: false);
+        var countWithoutArchived = await _metricsBusiness.GetOrganizationDataSourceCount(_org2Id, null, hideArchived: true);
 
-         // Assert - only data sources belonging to org 1
-         Assert.Equal(2, count);
-     }
+        // Assert
+        Assert.Equal(3, countWithArchived);
+        Assert.Equal(2, countWithoutArchived);
+    }
 
-     [Fact]
-     public async Task GetOrganizationDataSourceCount_WithProjectIds_ReturnsProjectAndOrgLevel()
-     {
-         // Arrange
-         Context.DataSources.Add(new DataSource
-         {
-             Name = "DS Project1",
-             OrganizationId = _org2Id,
-             ProjectId = _org2Proj1Id,
-             IsArchived = false
-         });
-         Context.DataSources.Add(new DataSource
-         {
-             Name = "DS Project2",
-             OrganizationId = _org2Id,
-             ProjectId = _org2Proj2Id,
-             IsArchived = false
-         });
-         Context.DataSources.Add(new DataSource
-         {
-             Name = "DS OrgLevel",
-             OrganizationId = _org2Id,
-             ProjectId = null,
-             IsArchived = false
-         });
-         await Context.SaveChangesAsync();
+    [Fact]
+    public async Task GetOrganizationDataSourceCount_ReturnsZero_WhenNoDataSources()
+    {
+        // Arrange - delete sources from org 2
+        var org2DataSources = Context.DataSources
+            .Where(ds => ds.OrganizationId == _org2Id)
+            .ToList();
+        Context.DataSources.RemoveRange(org2DataSources);
+        await Context.SaveChangesAsync();
+        
+        // Act - org 2 has no data sources
+        var count = await _metricsBusiness.GetOrganizationDataSourceCount(_org2Id, null);
 
-         // Act - filter to project 1 only
-         var count = await _metricsBusiness.GetOrganizationDataSourceCount(_org2Id, new[] { _org2Proj1Id });
+        // Assert
+        Assert.Equal(0, count);
+    }
 
-         // Assert - project 1 data source + org-level data source (inherited)
-         Assert.Equal(2, count);
-     }
-
-     [Fact]
-     public async Task GetOrganizationDataSourceCount_WithProjectIds_ExcludesOtherProjects()
-     {
-         // Arrange
-         Context.DataSources.Add(new DataSource
-         {
-             Name = "DS Project1",
-             OrganizationId = _org2Id,
-             ProjectId = _org2Proj1Id,
-             IsArchived = false
-         });
-         Context.DataSources.Add(new DataSource
-         {
-             Name = "DS Project2",
-             OrganizationId = _org2Id,
-             ProjectId = _org2Proj2Id,
-             IsArchived = false
-         });
-         await Context.SaveChangesAsync();
-
-         // Act - filter to project 2 only
-         var count = await _metricsBusiness.GetOrganizationDataSourceCount(_org2Id, new[] { _org2Proj2Id });
-
-         // Assert - only project 2 data source (no org-level exists)
-         Assert.Equal(1, count);
-     }
-
-     [Fact]
-     public async Task GetOrganizationDataSourceCount_ExcludesArchived_WhenHideArchivedTrue()
-     {
-         // Arrange
-         Context.DataSources.Add(new DataSource
-         {
-             Name = "DS Active",
-             OrganizationId = _org2Id,
-             ProjectId = _org2Proj1Id,
-             IsArchived = false
-         });
-         Context.DataSources.Add(new DataSource
-         {
-             Name = "DS Archived",
-             OrganizationId = _org2Id,
-             ProjectId = _org2Proj1Id,
-             IsArchived = true
-         });
-         await Context.SaveChangesAsync();
-
-         // Act
-         var countWithArchived = await _metricsBusiness.GetOrganizationDataSourceCount(_org2Id, null, hideArchived: false);
-         var countWithoutArchived = await _metricsBusiness.GetOrganizationDataSourceCount(_org2Id, null, hideArchived: true);
-
-         // Assert
-         Assert.Equal(2, countWithArchived);
-         Assert.Equal(1, countWithoutArchived);
-     }
-
-     [Fact]
-     public async Task GetOrganizationDataSourceCount_ReturnsZero_WhenNoDataSources()
-     {
-         // Act - org 2 has no data sources
-         var count = await _metricsBusiness.GetOrganizationDataSourceCount(_org1Id, null);
-
-         // Assert
-         Assert.Equal(0, count);
-     }
-
-     #endregion
+    #endregion
 }
