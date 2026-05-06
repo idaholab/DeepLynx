@@ -509,7 +509,7 @@ export default function SavedSearchesWidget({ scope, projects = [] }: Props) {
           {/* Header */}
           <div className="flex justify-between items-start mb-1">
             <h2 className="text-xl font-semibold text-base-content">
-              Saved Queries
+              Saved Searches
             </h2>
             {!isCatalog && (
               <Link className="btn btn-secondary btn-sm" href="/data_catalog/query_builder">
@@ -528,7 +528,7 @@ export default function SavedSearchesWidget({ scope, projects = [] }: Props) {
                   type="text"
                   value={textQuery}
                   onChange={(e) => setTextQuery(e.target.value)}
-                  placeholder="Find saved queries by name..."
+                  placeholder="Find saved searches by name..."
                   className="grow bg-transparent outline-none text-sm"
                 />
               </label>
