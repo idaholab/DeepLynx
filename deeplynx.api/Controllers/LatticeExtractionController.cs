@@ -36,6 +36,28 @@ public class LatticeExtractionController : ControllerBase
     }
     
     /// <summary>
+    ///     Returns the ontology embedding status for a project — how many classes and relationships
+    ///     exist and how many have been embedded. Use this to check readiness before triggering extraction.
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization.</param>
+    /// <param name="projectId">The ID of the project.</param>
+    [HttpGet("embedding-status", Name = "api_get_embedding_status")]
+    public async Task<IActionResult> GetEmbeddingStatus(long organizationId, long projectId)
+    {
+        try
+        {
+            var result = await _latticeExtractionBusiness.GetEmbeddingStatus(projectId);
+            return Ok(result);
+        }
+        catch (Exception exc)
+        {
+            var message = $"An error occurred while retrieving embedding status: {exc}";
+            _logger.LogError(message);
+            return StatusCode(StatusCodes.Status500InternalServerError, message);
+        }
+    }
+
+    /// <summary>
     ///     Trigger ontology embedding for all classes and relationships in the project.
     /// </summary>
     /// <param name="organizationId">The ID of the organization.</param>

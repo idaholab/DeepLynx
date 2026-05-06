@@ -22,6 +22,8 @@ public interface ILatticeExtractionBusiness
         long extractionId,
         bool approve);
 
+    Task<EmbeddingStatusResponseDto> GetEmbeddingStatus(long projectId);
+
     Task<List<OntologySimilarityResultDto>> SearchOntologySimilarity(
         long recordId,
         long projectId, 

@@ -507,11 +507,28 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
         Record record)
     {
         var recordEmbedded = await _context.Embeddings.AnyAsync(e => e.RecordId == recordId);
+
+        // Split into two queries — correlated subqueries across schemas don't translate reliably in EF Core
+        var projectClassIds = await _context.Classes
+            .Where(c => c.ProjectId == projectId)
+            .Select(c => c.Id)
+            .ToListAsync();
+        var projectRelationshipIds = await _context.Relationships
+            .Where(r => r.ProjectId == projectId)
+            .Select(r => r.Id)
+            .ToListAsync();
         var ontologyEmbedded = await _context.OntologyVectors
             .AnyAsync(ov =>
-                _context.Classes.Any(c => c.Id == ov.ClassId && c.ProjectId == projectId) ||
-                _context.Relationships.Any(r => r.Id == ov.RelationshipId && r.ProjectId == projectId));
-        
+                (ov.ClassId != null && projectClassIds.Contains(ov.ClassId.Value)) ||
+                (ov.RelationshipId != null && projectRelationshipIds.Contains(ov.RelationshipId.Value)));
+
+        _logger.LogInformation(
+            "Embedding readiness for project {ProjectId}, record {RecordId}: " +
+            "recordEmbedded={RecordEmbedded}, ontologyEmbedded={OntologyEmbedded} " +
+            "({ClassCount} classes, {RelationshipCount} relationships in project)",
+            projectId, recordId, recordEmbedded, ontologyEmbedded,
+            projectClassIds.Count, projectRelationshipIds.Count);
+
         if (recordEmbedded && ontologyEmbedded) return;
     
         if (!recordEmbedded)
@@ -541,6 +558,38 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
     }
     
     
+    public async Task<EmbeddingStatusResponseDto> GetEmbeddingStatus(long projectId)
+    {
+        var classIds = await _context.Classes
+            .Where(c => c.ProjectId == projectId)
+            .Select(c => c.Id)
+            .ToListAsync();
+        var relationshipIds = await _context.Relationships
+            .Where(r => r.ProjectId == projectId)
+            .Select(r => r.Id)
+            .ToListAsync();
+
+        var embeddedClassIds = await _context.OntologyVectors
+            .Where(ov => ov.ClassId != null && classIds.Contains(ov.ClassId.Value))
+            .Select(ov => ov.ClassId!.Value)
+            .Distinct()
+            .ToListAsync();
+        var embeddedRelationshipIds = await _context.OntologyVectors
+            .Where(ov => ov.RelationshipId != null && relationshipIds.Contains(ov.RelationshipId.Value))
+            .Select(ov => ov.RelationshipId!.Value)
+            .Distinct()
+            .ToListAsync();
+
+        return new EmbeddingStatusResponseDto
+        {
+            ClassCount = classIds.Count,
+            EmbeddedClassCount = embeddedClassIds.Count,
+            RelationshipCount = relationshipIds.Count,
+            EmbeddedRelationshipCount = embeddedRelationshipIds.Count,
+            OntologyReady = embeddedClassIds.Count > 0 || embeddedRelationshipIds.Count > 0
+        };
+    }
+
     /// <summary>Throws if the project has fewer than 2 non-default classes or no relationships — the minimum needed for extraction.</summary>
     private async Task EnsureOntologyReady(long projectId)
     {
