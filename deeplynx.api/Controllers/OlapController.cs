@@ -20,7 +20,7 @@ public class OlapController : ControllerBase
     /// <summary>
     ///     Initializes a new instance of the <see cref="OlapController" /> class
     /// </summary>
-    /// <param olapBusiness">The business logic interface for handling time series operations.</param>
+    /// <param name="olapBusiness">The business logic interface for handling time series operations.</param>
     /// <param name="logger">Error/Info logging interface for database log table.</param>
     public OlapController(IOlapBusiness olapBusiness, ILogger<OlapController> logger)
     {
@@ -37,7 +37,7 @@ public class OlapController : ControllerBase
     /// <param name="viewName"> The request containing an sql query string</param>
     /// <param name="recordId"> ID of the record to query from</param>
     /// <returns></returns>
-    [HttpPost("query", Name = "api_execute_olap_query")]
+    [HttpGet("query", Name = "api_execute_olap_query")]
     [Auth("read", "record")]
     [Auth("read", "file")]
     [Sensitivity("download file")]
@@ -102,38 +102,6 @@ public class OlapController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
-
-    /// <summary>
-    ///     Exports Table to File
-    /// </summary>
-    /// <param name="organizationId">ID of organization the tabular data is associated with</param>
-    /// <param name="projectId">ID of project that timeseries data is associated with</param>
-    /// <param name="dataSourceId">ID of data source that timeseries data is associated with</param>
-    /// <param name="tableName">Name of the duckDB table on which the timeseries data is encoded</param>
-    /// <param name="fileType">The type of file to convert query to</param>
-    /// <returns></returns>
-    // [HttpGet("export", Name = "api_export_timeseries_table")]
-    // [Auth("read", "record")]
-    // [Auth("read", "file")]
-    // public async Task<IActionResult> ExportTimeseriesTable(
-    //     long organizationId, long projectId, long dataSourceId, [FromQuery] string tableName, string fileType)
-    // {
-    //     try
-    //     {
-    //         var currentUserId = UserContextStorage.UserId;
-    //         var timeseriesUploadRecord =
-    //             await _timeseriesBusiness.ExportTimeseriesTable(currentUserId, organizationId, projectId, dataSourceId,
-    //                 tableName,
-    //                 fileType);
-    //         return Ok(new { TimeseriesUploadRecord = timeseriesUploadRecord });
-    //     }
-    //     catch (Exception e)
-    //     {
-    //         var message = $"An error occurred while querying a timeseries table {tableName}: {e}";
-    //         _logger.LogError(message);
-    //         return StatusCode(StatusCodes.Status500InternalServerError, message);
-    //     }
-    // }
 
 
     /// <summary>

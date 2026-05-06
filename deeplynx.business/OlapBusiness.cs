@@ -20,9 +20,9 @@ public class OlapBusiness : IOlapBusiness
     private readonly IRecordBusiness _recordBusiness;
     private readonly ILogger<OlapBusiness> _logger;
     private readonly IObjectStorageBusiness _objectStorageBusiness;
-    
+
     public OlapBusiness(
-        DeeplynxContext context, 
+        DeeplynxContext context,
         IRecordBusiness recordBusiness,
         IObjectStorageBusiness objectStorageBusiness,
         ILogger<OlapBusiness> logger)
@@ -90,76 +90,13 @@ public class OlapBusiness : IOlapBusiness
     }
 
     /// <summary>
-    ///     Generic select all for given table
-    /// </summary>
-    /// <param name="currentUserId">ID of the User executing this method</param>
-    /// <param name="projectId">The project ID</param>
-    /// <param name="organizationId">The organization ID</param>
-    /// <param name="dataSourceId">The data source ID</param>
-    /// <param name="tableName">The table to export</param>
-    /// <param name="fileType">The type of file to convert query to</param>
-    /// <returns>All data for given table</returns>
-    // public async Task<RecordResponseDto> ExportTimeseriesTable(long currentUserId, long organizationId, long projectId,
-    //     long dataSourceId,
-    //     string tableName, string fileType)
-    // {
-    // await ExistenceHelper.EnsureDataSourceExistsForProjectAsync(_context, dataSourceId, projectId);
-    // var request = new TimeseriesQueryRequestDto
-    // {
-    //     Query = $"SELECT * FROM '{tableName}'"
-    // };
-    //
-    // var queryId = Guid.NewGuid().ToString();
-    // string fileName;
-    //
-    // if (fileType == "csv")
-    //     fileName = queryId + "_record.csv";
-    // else if (fileType == "parquet")
-    //     fileName = queryId + "_record.parquet";
-    // else
-    //     throw new NotSupportedException($"file type {fileType} not supported");
-    //
-    // var reportClass = await _classBusiness.GetOrCreateClass(
-    //     currentUserId, organizationId, projectId, "Report");
-    // var timeseriesObjectStorageMethod =
-    //     await _context.ObjectStorages.FirstOrDefaultAsync(os =>
-    //         os.ProjectId == projectId && os.Name == "Timeseries Default");
-    // if (timeseriesObjectStorageMethod == null)
-    //     throw new KeyNotFoundException("Default timeseries object storage method not found");
-    //
-    // var recordRequest = new CreateRecordRequestDto
-    // {
-    //     Properties = new JsonObject
-    //     {
-    //         ["status"] = Status.InProgress,
-    //         ["query"] = request.Query
-    //     },
-    //     Name = fileName,
-    //     Description = $"Timeseries result report for {fileName}",
-    //     OriginalId = queryId,
-    //     ClassId = reportClass.Id,
-    //     ClassName = reportClass.Name,
-    //     ObjectStorageId = timeseriesObjectStorageMethod.Id,
-    //     FileType = fileType
-    // };
-    //
-    // var recordResponse =
-    //     await _recordBusiness.CreateRecord(currentUserId, organizationId, projectId, dataSourceId, recordRequest);
-    //
-    // // meant to run in background so don't await!
-    // RunBackgroundJob(recordResponse, request.Query, organizationId, projectId, dataSourceId, fileName, fileType);
-    //     return new RecordResponseDto();
-    // }
-
-
-    /// <summary>
     ///     Queries single tabular files and across multiple files within the same folder
     /// </summary>
     /// <param name="currentUserId"></param>
     /// <param name="organizationId"></param>
     /// <param name="projectId"></param>
     /// <param name="recordId"></param>
-    /// <param name="userQuery"></param>
+    /// <param name="request"></param>
     /// <param name="viewName"></param>
     /// <returns></returns>
     /// <exception cref="ArgumentException"></exception>
@@ -195,6 +132,18 @@ public class OlapBusiness : IOlapBusiness
             queryOptions);
     }
 
+    /// <summary>
+    ///     Queries single tabular files and across multiple files within the same folder
+    /// </summary>
+    /// <param name="currentUserId"></param>
+    /// <param name="organizationId"></param>
+    /// <param name="projectId"></param>
+    /// <param name="recordId"></param>
+    /// <param name="userQuery"></param>
+    /// <param name="viewName"></param>
+    /// <returns></returns>
+    /// <exception cref="ArgumentException"></exception>
+    /// <exception cref="InvalidOperationException"></exception>
     public async Task<PlotDataDto> QueryTabularFile(
         long currentUserId,
         long organizationId,
@@ -530,6 +479,7 @@ public class OlapBusiness : IOlapBusiness
     /// <summary>
     ///     Get a view of data points from a parquet/csv file stored in Azure Blob or local filesystem
     /// </summary>
+    /// <param name="currentUserId">ID of the user requesting data</param>
     /// <param name="organizationId">ID of organization that timeseries data is associated with</param>
     /// <param name="projectId">ID of project that timeseries data is associated with</param>
     /// <param name="recordId">ID of record pointing to the parquet/csv file</param>
