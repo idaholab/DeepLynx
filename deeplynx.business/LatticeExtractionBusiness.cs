@@ -84,7 +84,7 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
             var filledPrompt = await ConstructPrompt(recordId, projectId, mode);
 
             var latticeModel = Environment.GetEnvironmentVariable("LATTICE_MODEL")
-                      ?? throw new InvalidOperationException("LATTICE_MODEL environment variable is not set.");
+                      ?? "Mistral-Small-3.2-24B-Instruct-2506";
             var response =
                 await _insightServiceClient.LatticeExtraction(filledPrompt, latticeModel, queryInfo);
 
