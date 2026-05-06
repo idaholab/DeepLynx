@@ -13,6 +13,7 @@ import {
 } from "@heroicons/react/24/outline";
 import Link from "next/link";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import {
   HistoricalRecordResponseDto,
@@ -129,6 +130,7 @@ interface Props {
 export default function RecordViewClient({ projectId, recordId }: Props) {
   const { t } = useLanguage();
   const { organization, hasLoaded } = useOrganizationSession();
+  const router = useRouter();
 
   // ============= STATE MANAGEMENT =============
   // Record & Tags State
@@ -716,9 +718,12 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
         },
       );
 
-      toast.success(
-        `${t.translations.LATTICE_ANALYSIS_STARTED} ${result.extraction_id}`,
-      );
+      const params = new URLSearchParams({
+        extractionId: String(result.extraction_id),
+        projectId: String(projectId),
+        organizationId: String(organization!.organizationId),
+      });
+      router.push(`/lattice/decisions?${params.toString()}`);
     } catch (error: any) {
       console.error("Error triggering Lattice extraction:", error);
       toast.error("Failed to extract with Lattice.");
@@ -732,6 +737,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
     record?.dataSourceId,
     isRecordInsightEmbedded,
     latticeMode,
+    router,
   ]);
 
   useEffect(() => {
@@ -786,14 +792,6 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
     record?.uri,
     record?.name,
   );
-
-  const latticePreviewQuery = new URLSearchParams({
-    projectId: String(projectId),
-    recordId: String(record.id),
-    recordName: record.name ?? "",
-    recordUri: record.uri ?? "",
-    recordClass: recordClass?.name ?? record.dataSourceName ?? "Unclassified",
-  }).toString();
 
   const hasLatticeRecordRequirements =
     isInsightSupported &&
@@ -949,45 +947,6 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
             )}
           </div>
 
-          <div className="max-w-xl rounded-2xl border border-info/20 bg-gradient-to-r from-base-100 to-info/10 p-4 shadow-sm">
-            <div className="flex items-start gap-3">
-              <div className="rounded-2xl bg-info/15 p-3 text-info">
-                <SparklesIcon className="size-6" />
-              </div>
-              <div className="space-y-3">
-                <div>
-                  <p className="text-sm font-semibold text-base-content">
-                    Lattice extraction mock flow
-                  </p>
-                  <p className="mt-1 text-sm text-base-content/70">
-                    Use this record as the source file and jump into the review
-                    mockups while the extraction endpoint is still pending.
-                  </p>
-                </div>
-
-                <div className="flex flex-wrap gap-2">
-                  <Link
-                    href={`/lattice_mockups/decisions?${latticePreviewQuery}`}
-                    className="btn btn-primary btn-sm"
-                  >
-                    Open Lattice Mockup
-                    <ArrowTopRightOnSquareIcon className="size-4" />
-                  </Link>
-                </div>
-
-                <div className="flex flex-wrap gap-2 text-xs text-base-content/60">
-                  <span className="rounded-full bg-base-200 px-3 py-1">
-                    Record ID {record.id}
-                  </span>
-                  <span className="rounded-full bg-base-200 px-3 py-1">
-                    {isInsightSupported
-                      ? "Insight-supported file"
-                      : "Mock-only preview"}
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
 
@@ -1023,28 +982,28 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
                   <QuestionMarkCircleIcon className="size-6" />
                 </button>
               </div>
-              {/* <div className="join">
-              <button
-                type="button"
-                className={`btn btn-sm join-item ${
-                  latticeMode === "discovery" ? "btn-primary" : "btn-outline"
-                }`}
-                onClick={() => setLatticeMode("discovery")}
-                disabled={isTriggeringLatticeExtraction}
-              >
-                Discovery
-              </button>
-              <button
-                type="button"
-                className={`btn btn-sm join-item ${
-                  latticeMode === "strict" ? "btn-primary" : "btn-outline"
-                }`}
-                onClick={() => setLatticeMode("strict")}
-                disabled={isTriggeringLatticeExtraction}
-              >
-                Strict
-              </button>
-            </div> */}
+              <div className="join">
+                <button
+                  type="button"
+                  className={`btn btn-sm join-item ${
+                    latticeMode === "discovery" ? "btn-primary" : "btn-outline"
+                  }`}
+                  onClick={() => setLatticeMode("discovery")}
+                  disabled={isTriggeringLatticeExtraction}
+                >
+                  Discovery
+                </button>
+                <button
+                  type="button"
+                  className={`btn btn-sm join-item ${
+                    latticeMode === "strict" ? "btn-primary" : "btn-outline"
+                  }`}
+                  onClick={() => setLatticeMode("strict")}
+                  disabled={isTriggeringLatticeExtraction}
+                >
+                  Strict
+                </button>
+              </div>
 
               <button
                 type="button"
@@ -1068,7 +1027,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
                   </>
                 ) : (
                   <>
-                    {t.translations.ANALYZE_RECORD}{" "}
+                    {t.translations.LATTICE_TRIGGER}
                     <ArrowTopRightOnSquareIcon className="size-4" />
                   </>
                 )}

@@ -447,9 +447,9 @@ const SideMenu: React.FC<SideMenuProps> = ({
 
           <li className="mt-2">
             <Link
-              href="/lattice_mockups/decisions"
+              href="/lattice/decisions"
               onClick={() => onMobileClose?.()}
-              className={getItemClass("/lattice_mockups/decisions")}
+              className={getItemClass("/lattice/decisions")}
             >
               <ClipboardDocumentCheckIcon className="size-6" />
               {!isCollapsed && <p className="ml-2">Lattice</p>}
