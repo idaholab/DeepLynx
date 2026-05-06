@@ -504,7 +504,7 @@ export default function SavedSearchesWidget({ scope, projects = [] }: Props) {
         />
       )}
 
-      <div className="card bg-base-200/30 h-full flex flex-col overflow-hidden">
+      <div className="card bg-base-200/30 flex flex-col overflow-hidden">
         <div className="card-body flex flex-col min-h-0">
           {/* Header */}
           <div className="flex justify-between items-start mb-1">
@@ -523,7 +523,7 @@ export default function SavedSearchesWidget({ scope, projects = [] }: Props) {
             {/* Search input  filter button joined */}
             <div className="flex flex-1 min-w-36">
               <label className="input input-sm input-bordered flex items-center gap-2 flex-1 bg-base-100">
-                <MagnifyingGlassIcon className="w-3.5 h-3.5 text-base-content/40 shrink-0" />
+                <MagnifyingGlassIcon className="w-3.5 h-3.5 shrink-0 text-secondary" />
                 <input
                   type="text"
                   value={textQuery}
@@ -626,7 +626,7 @@ export default function SavedSearchesWidget({ scope, projects = [] }: Props) {
           )}
 
           {/* Content */}
-          <div className="mt-3 rounded-lg overflow-y-auto border border-base-300/50 flex-1 min-h-0">
+          <div className="mt-3 rounded-lg overflow-y-auto border border-base-300/50 flex-1 min-h-0 max-h-[420px]">
             {/* Loading */}
             {loading && (
               <div className="bg-base-100 p-8 flex justify-center">
@@ -650,7 +650,7 @@ export default function SavedSearchesWidget({ scope, projects = [] }: Props) {
             {/* Empty */}
             {!loading && !error && displayed.length === 0 && (
               <div className="bg-base-100 p-10 text-center">
-                <MagnifyingGlassIcon className="w-8 h-8 text-base-content/20 mx-auto mb-2" />
+                <MagnifyingGlassIcon className="w-8 h-8 mx-auto mb-2 text-secondary" />
                 <p className="text-sm font-medium text-base-content/50">
                   No saved searches found
                 </p>
@@ -679,8 +679,8 @@ export default function SavedSearchesWidget({ scope, projects = [] }: Props) {
                   >
                     <div className="flex items-center gap-3 px-4 py-3.5">
                       {/* Icon */}
-                      <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                        <MagnifyingGlassIcon className="w-4 h-4 text-primary" />
+                      <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0">
+                        <MagnifyingGlassIcon className="w-4 h-4 text-secondary" />
                       </div>
 
                       {/* Name  meta */}
@@ -720,7 +720,7 @@ export default function SavedSearchesWidget({ scope, projects = [] }: Props) {
                               ? "btn-success btn-outline"
                               : isRunning
                                 ? "btn-ghost btn-disabled"
-                                : "btn-primary"
+                                : "btn-secondary"
                           }`}
                         >
                           {isDone ? (

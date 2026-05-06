@@ -926,10 +926,10 @@ export default function QueryBuilderClient({
 
             <div
               className={`transition-all duration-300 ease-in-out overflow-hidden ${
-                savedSearchesOpen ? "max-h-[600px] opacity-100" : "max-h-0 opacity-0"
+                savedSearchesOpen ? "max-h-[800px] opacity-100" : "max-h-0 opacity-0"
               }`}
             >
-              <div className="px-6 py-4 border border-t-0 border-base-content/10 rounded-b-lg bg-base-100 max-h-[600px]">
+              <div className="px-6 py-4 border border-t-0 border-base-content/10 rounded-b-lg bg-base-100 h-full">
                 <SavedSearchesWidget key={savedSearchesKey} scope="catalog" projects={[]} />
               </div>
             </div>
