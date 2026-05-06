@@ -85,11 +85,10 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
 
             var filledPrompt = await ConstructPrompt(recordId, projectId, mode);
 
-            if (string.IsNullOrWhiteSpace(_latticeModel))
-                throw new InvalidOperationException(
-                    "LatticeModel configuration is not set. Set the LatticeModel environment variable.");
+            var latticeModel = Environment.GetEnvironmentVariable("LATTICE_MODEL")
+                      ?? throw new InvalidOperationException("LATTICE_MODEL environment variable is not set.");
             var response =
-                await _insightServiceClient.LatticeExtraction(filledPrompt, _latticeModel, queryInfo);
+                await _insightServiceClient.LatticeExtraction(filledPrompt, latticeModel, queryInfo);
 
             if (response.IsSuccessStatusCode)
             {
