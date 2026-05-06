@@ -643,6 +643,8 @@ spec:
               value: "false"
             - name: STORAGE_BASE_DIR
               value: "/data/insight"
+            - name: NEXUS_API_URL
+              value: ${NEXUS_API_URL}
           resources:
             requests:
               cpu: "150m"

@@ -394,6 +394,7 @@ jobs:
           AIRFLOW_USERNAME: ${{ vars.AIRFLOW_USERNAME }}
           AIRFLOW_PASSWORD: ${{ secrets.AIRFLOW_PASSWORD }}
           LATTICE_MODEL: ${{ vars.LATTICE_MODEL }}
+          NEXUS_API_URL: ${{ vars.NEXUS_API_URL }}
         run: |
           cd $GITHUB_WORKSPACE/kubernetes
           envsubst < sandbox.yaml > manifest.yaml
