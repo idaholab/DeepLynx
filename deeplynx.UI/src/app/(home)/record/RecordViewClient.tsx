@@ -985,9 +985,8 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
               <div className="join">
                 <button
                   type="button"
-                  className={`btn btn-sm join-item ${
-                    latticeMode === "discovery" ? "btn-primary" : "btn-outline"
-                  }`}
+                  className={`btn btn-sm join-item ${latticeMode === "discovery" ? "btn-primary" : "btn-outline"
+                    }`}
                   onClick={() => setLatticeMode("discovery")}
                   disabled={isTriggeringLatticeExtraction}
                 >
@@ -995,9 +994,8 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
                 </button>
                 <button
                   type="button"
-                  className={`btn btn-sm join-item ${
-                    latticeMode === "strict" ? "btn-primary" : "btn-outline"
-                  }`}
+                  className={`btn btn-sm join-item ${latticeMode === "strict" ? "btn-primary" : "btn-outline"
+                    }`}
                   onClick={() => setLatticeMode("strict")}
                   disabled={isTriggeringLatticeExtraction}
                 >

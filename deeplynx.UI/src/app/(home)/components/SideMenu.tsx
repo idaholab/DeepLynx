@@ -20,6 +20,7 @@ import type { ProjectResponseDto } from "../types/responseDTOs";
 import {
   AdjustmentsHorizontalIcon,
   ArrowUpTrayIcon,
+  ClipboardDocumentCheckIcon,
   BeakerIcon,
   ChevronDownIcon,
   ChevronLeftIcon,
