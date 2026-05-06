@@ -51,6 +51,8 @@ public partial class DeeplynxContext : DbContext
 
     public virtual DbSet<Record> Records { get; set; }
 
+    public virtual DbSet<RecordCollection> RecordCollections { get; set; }
+
     public virtual DbSet<Relationship> Relationships { get; set; }
 
     public virtual DbSet<Role> Roles { get; set; }

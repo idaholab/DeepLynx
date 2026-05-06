@@ -17,6 +17,7 @@ public class ValidationHelper
         "project",
         "edge",
         "record",
+        "record_collection",
         "metadata",
         "user",
         "tag",

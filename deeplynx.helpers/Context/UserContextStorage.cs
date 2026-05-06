@@ -9,7 +9,6 @@ public static class UserContextStorage
     private static AsyncLocal<bool> _isSysAdmin = new();
     private static AsyncLocal<bool> _isOrgAdmin = new();
     private static AsyncLocal<bool> _isProjectAdmin = new();
-    
 
     public static string Email
     {
@@ -34,7 +33,7 @@ public static class UserContextStorage
         get => _token.Value;
         set => _token.Value = value;
     }
-    
+
     public static bool IsSysAdmin
     {
         get => _isSysAdmin.Value;
