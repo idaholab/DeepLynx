@@ -67,7 +67,8 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
         {
             CreatedBy = currentUserId,
             Status = ExtractionStatus.Pending,
-            Mode = mode
+            Mode = mode,
+            ProjectId = projectId
         };
         _context.Extractions.Add(extraction);
         await _context.SaveChangesAsync();
@@ -558,6 +559,21 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
     }
     
     
+    public async Task<List<ExtractionListItemDto>> ListExtractionsByUser(long userId, long projectId)
+    {
+        return await _context.Extractions
+            .Where(e => e.CreatedBy == userId && e.ProjectId == projectId)
+            .OrderByDescending(e => e.Id)
+            .Select(e => new ExtractionListItemDto
+            {
+                Id = e.Id,
+                Status = e.Status,
+                Mode = e.Mode,
+                CreatedBy = e.CreatedBy,
+            })
+            .ToListAsync();
+    }
+
     public async Task<EmbeddingStatusResponseDto> GetEmbeddingStatus(long projectId)
     {
         var classIds = await _context.Classes
