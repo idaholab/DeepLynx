@@ -2,19 +2,19 @@
 
 #nullable disable
 
-namespace deeplynx.datalayer.Migrations.Staging
+namespace deeplynx.datalayer.Migrations
 {
     /// <inheritdoc />
-    public partial class AddFileSizeColumn : Migration
+    public partial class AddExtractionMode : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.AddColumn<long>(
-                name: "file_size",
-                schema: "staging",
-                table: "records",
-                type: "bigint",
+            migrationBuilder.AddColumn<string>(
+                name: "mode",
+                schema: "deeplynx",
+                table: "extractions",
+                type: "text",
                 nullable: true);
         }
 
@@ -22,9 +22,9 @@ namespace deeplynx.datalayer.Migrations.Staging
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropColumn(
-                name: "file_size",
-                schema: "staging",
-                table: "records");
+                name: "mode",
+                schema: "deeplynx",
+                table: "extractions");
         }
     }
 }

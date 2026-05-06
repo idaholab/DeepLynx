@@ -166,6 +166,8 @@ spec:
               value: ${SUPERUSER_EMAIL}
             - name: INSIGHT_FASTAPI_URL
               value: ${INSIGHT_FASTAPI_URL}
+            - name: LATTICE_MODEL
+              value: ${LATTICE_MODEL}
             - name: TENANT_MODE
               value: ${TENANT_MODE}
             - name: OKTA_CLIENT_SECRET
@@ -645,6 +647,8 @@ spec:
               value: "false"
             - name: STORAGE_BASE_DIR
               value: "/data/insight"
+            - name: NEXUS_API_URL
+              value: "http://deeplynxv3-backend-service/api/v1"
           resources:
             requests:
               cpu: "150m"

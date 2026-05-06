@@ -1,4 +1,6 @@
+using System.Text.Json;
 using deeplynx.helpers.Context;
+using deeplynx.helpers.json;
 using deeplynx.interfaces;
 using deeplynx.models;
 using Microsoft.AspNetCore.Authorization;
@@ -34,6 +36,28 @@ public class LatticeExtractionController : ControllerBase
     }
     
     /// <summary>
+    ///     Returns the ontology embedding status for a project — how many classes and relationships
+    ///     exist and how many have been embedded. Use this to check readiness before triggering extraction.
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization.</param>
+    /// <param name="projectId">The ID of the project.</param>
+    [HttpGet("embedding-status", Name = "api_get_embedding_status")]
+    public async Task<IActionResult> GetEmbeddingStatus(long organizationId, long projectId)
+    {
+        try
+        {
+            var result = await _latticeExtractionBusiness.GetEmbeddingStatus(projectId);
+            return Ok(result);
+        }
+        catch (Exception exc)
+        {
+            var message = $"An error occurred while retrieving embedding status: {exc}";
+            _logger.LogError(message);
+            return StatusCode(StatusCodes.Status500InternalServerError, message);
+        }
+    }
+
+    /// <summary>
     ///     Trigger ontology embedding for all classes and relationships in the project.
     /// </summary>
     /// <param name="organizationId">The ID of the organization.</param>
@@ -57,6 +81,156 @@ public class LatticeExtractionController : ControllerBase
         catch (Exception exc)
         {
             var message = $"An error occurred while queuing ontology embedding: {exc}";
+            _logger.LogError(message);
+            return StatusCode(StatusCodes.Status500InternalServerError, message);
+        }
+    }
+
+    /// <summary>
+    ///     Mark an extraction as failed. Called by Insight when async extraction cannot complete.
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization.</param>
+    /// <param name="projectId">The ID of the project.</param>
+    /// <param name="extractionId">The extraction ID returned by the trigger endpoint.</param>
+    /// <param name="errorMessage">Optional error message from Insight describing the failure.</param>
+    [AllowAnonymous]
+    [HttpPost("{extractionId:long}/failure", Name = "api_insight_extraction_failure")]
+    public async Task<IActionResult> InsightExtractionFailure(
+        long organizationId,
+        long projectId,
+        long extractionId,
+        [FromQuery] string? errorMessage = null)
+    {
+        try
+        {
+            await _latticeExtractionBusiness.MarkExtractionFailed(extractionId, errorMessage);
+            return Ok();
+        }
+        catch (InvalidOperationException exc)
+        {
+            _logger.LogWarning(exc.Message);
+            return NotFound(exc.Message);
+        }
+        catch (Exception exc)
+        {
+            var message = $"An error occurred while marking extraction {extractionId} as failed: {exc}";
+            _logger.LogError(message);
+            return StatusCode(StatusCodes.Status500InternalServerError, message);
+        }
+    }
+
+    /// <summary>
+    ///     Receive the LLM extraction result from Insight and stage it.
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization.</param>
+    /// <param name="projectId">The ID of the project.</param>
+    /// <param name="extractionId">The extraction ID returned by the trigger endpoint.</param>
+    /// <param name="dataSourceId">The data source the staged records and edges will belong to.</param>
+    /// <param name="dto">LLM response payload from Insight.</param>
+    [AllowAnonymous]
+    [HttpPost("{extractionId:long}/callback", Name = "api_insight_extraction_callback")]
+    public async Task<IActionResult> InsightExtractionCallback(
+        long organizationId,
+        long projectId,
+        long extractionId,
+        [FromQuery] long dataSourceId)
+    {
+        string rawBody;
+        using (var reader = new StreamReader(Request.Body))
+            rawBody = await reader.ReadToEndAsync();
+
+        InsightExtractionCallbackDto dto;
+        try
+        {
+            dto = LlmJsonParser.Deserialize<InsightExtractionCallbackDto>(rawBody);
+        }
+        catch (JsonException exc)
+        {
+            _logger.LogError(
+                "Failed to parse Insight callback for extraction {ExtractionId}: {Error}. Raw body: {RawBody}",
+                extractionId, exc.Message, rawBody);
+            return BadRequest($"Invalid JSON in callback body: {exc.Message}");
+        }
+
+        try
+        {
+            var result = await _latticeExtractionBusiness.ProcessInsightExtractionCallback(
+                organizationId, projectId, dataSourceId, extractionId, dto);
+            return Ok(result);
+        }
+        catch (InvalidOperationException exc)
+        {
+            _logger.LogWarning(exc.Message);
+            return NotFound(exc.Message);
+        }
+        catch (Exception exc)
+        {
+            var message = $"An error occurred while staging Insight extraction results: {exc}";
+            _logger.LogError(message);
+            return StatusCode(StatusCodes.Status500InternalServerError, message);
+        }
+    }
+
+    /// <summary>
+    ///     Returns all staged items for an extraction — classes, records, relationships, and edges —
+    ///     with their validation statuses and scores, for human review before approve/reject.
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization.</param>
+    /// <param name="projectId">The ID of the project.</param>
+    /// <param name="extractionId">The extraction to retrieve staging data for.</param>
+    [HttpGet("{extractionId:long}/staging", Name = "api_get_extraction_staging")]
+    public async Task<IActionResult> GetExtractionStaging(
+        long organizationId,
+        long projectId,
+        long extractionId)
+    {
+        try
+        {
+            var result = await _latticeExtractionBusiness.GetExtractionStaging(extractionId);
+            return Ok(result);
+        }
+        catch (InvalidOperationException exc)
+        {
+            _logger.LogWarning(exc.Message);
+            return NotFound(exc.Message);
+        }
+        catch (Exception exc)
+        {
+            var message = $"An error occurred while retrieving staging data for extraction {extractionId}: {exc}";
+            _logger.LogError(message);
+            return StatusCode(StatusCodes.Status500InternalServerError, message);
+        }
+    }
+
+    /// <summary>
+    ///     Approve or reject a completed extraction.
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization.</param>
+    /// <param name="projectId">The ID of the project.</param>
+    /// <param name="extractionId">The extraction to promote.</param>
+    /// <param name="approve">True to promote all staged items; false to reject.</param>
+    [HttpPost("{extractionId:long}/promote", Name = "api_promote_extraction")]
+    public async Task<IActionResult> PromoteExtraction(
+        long organizationId,
+        long projectId,
+        long extractionId,
+        [FromQuery] bool approve)
+    {
+        try
+        {
+            var currentUserId = UserContextStorage.UserId;
+            var result = await _latticeExtractionBusiness.PromoteExtraction(
+                currentUserId, organizationId, projectId, extractionId, approve);
+            return Ok(result);
+        }
+        catch (InvalidOperationException exc)
+        {
+            _logger.LogWarning(exc.Message);
+            return BadRequest(exc.Message);
+        }
+        catch (Exception exc)
+        {
+            var message = $"An error occurred while promoting extraction {extractionId}: {exc}";
             _logger.LogError(message);
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }

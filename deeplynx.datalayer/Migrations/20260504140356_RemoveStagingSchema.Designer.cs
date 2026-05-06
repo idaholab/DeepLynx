@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using deeplynx.datalayer.Models;
@@ -11,9 +12,11 @@ using deeplynx.datalayer.Models;
 namespace deeplynx.datalayer.Migrations
 {
     [DbContext(typeof(DeeplynxContext))]
-    partial class DeeplynxContextModelSnapshot : ModelSnapshot
+    [Migration("20260504140356_RemoveStagingSchema")]
+    partial class RemoveStagingSchema
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -756,10 +759,6 @@ namespace deeplynx.datalayer.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("created_by");
 
-                    b.Property<string>("Mode")
-                        .HasColumnType("text")
-                        .HasColumnName("mode");
-
                     b.Property<string>("Properties")
                         .HasColumnType("jsonb")
                         .HasColumnName("properties");
@@ -1200,10 +1199,10 @@ namespace deeplynx.datalayer.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
 
-                    b.Property<string>("ConfigEncrypted")
+                    b.Property<string>("Config")
                         .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("config_encrypted");
+                        .HasColumnType("jsonb")
+                        .HasColumnName("config");
 
                     b.Property<bool>("Default")
                         .HasColumnType("boolean")
@@ -1938,11 +1937,6 @@ namespace deeplynx.datalayer.Migrations
                     b.HasIndex("OrganizationId", "ProjectId", "Name")
                         .IsUnique()
                         .HasDatabaseName("unique_project_relationship_name")
-                        .HasFilter("project_id IS NOT NULL");
-
-                    b.HasIndex("OrganizationId", "ProjectId", "OriginId", "Name", "DestinationId")
-                        .IsUnique()
-                        .HasDatabaseName("unique_project_relationship_origin_name_destination")
                         .HasFilter("project_id IS NOT NULL");
 
                     b.ToTable("relationships", "deeplynx");

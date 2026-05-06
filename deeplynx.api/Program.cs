@@ -141,7 +141,7 @@ try
         ServiceLifetime.Transient
     );
 
-    builder.Services.AddDbContext<StagingContext>(
+    builder.Services.AddDbContext<LatticeContext>(
         options => options.UseNpgsql(connectionString),
         ServiceLifetime.Transient
     );
@@ -192,6 +192,7 @@ try
     builder.Services.AddTransient<IAiModelConfigBusiness, AiModelConfigBusiness>();
     builder.Services.AddScoped<ISensitivityLabelService, SensitivityLabelService>();
     builder.Services.AddTransient<IInsightBusiness, InsightBusiness>();
+    builder.Services.AddTransient<IExtractionValidation, ExtractionValidation>();
     builder.Services.AddTransient<ILatticeExtractionBusiness, LatticeExtractionBusiness>();
     builder.Services.AddMemoryCache();
     builder.Services.AddHttpClient<InsightServiceClient>();
@@ -523,8 +524,8 @@ try
         var dbContext = scope.ServiceProvider.GetRequiredService<DeeplynxContext>();
         await dbContext.Database.MigrateAsync();
 
-        var stagingContext = scope.ServiceProvider.GetRequiredService<StagingContext>();
-        await stagingContext.Database.MigrateAsync();
+        var latticeContext = scope.ServiceProvider.GetRequiredService<LatticeContext>();
+        await latticeContext.Database.MigrateAsync();
     }
 
     Log.Information("Migrations applied successfully.");
