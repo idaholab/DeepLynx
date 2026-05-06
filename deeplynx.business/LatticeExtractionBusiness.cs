@@ -14,7 +14,6 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
     private readonly InsightServiceClient _insightServiceClient;
     private readonly IExtractionValidation _validationBusiness;
     private readonly ILogger<LatticeExtractionBusiness> _logger;
-    private readonly string? _latticeModel;
 
     public LatticeExtractionBusiness(DeeplynxContext context, LatticeContext latticeContext,
         IInsightBusiness insightBusiness, InsightServiceClient insightServiceClient,
@@ -27,7 +26,6 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
         _insightServiceClient = insightServiceClient;
         _validationBusiness = validationBusiness;
         _logger = logger;
-        _latticeModel = Environment.GetEnvironmentVariable("LATTICE_MODEL");
     }
 
     /// <summary>
@@ -86,11 +84,10 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
 
             var filledPrompt = await ConstructPrompt(recordId, projectId, mode);
 
-            if (string.IsNullOrWhiteSpace(_latticeModel))
-                throw new InvalidOperationException(
-                    "LatticeModel configuration is not set. Set the LatticeModel environment variable.");
+            var latticeModel = Environment.GetEnvironmentVariable("LATTICE_MODEL")
+                      ?? "Mistral-Small-3.2-24B-Instruct-2506";
             var response =
-                await _insightServiceClient.LatticeExtraction(filledPrompt, _latticeModel, queryInfo);
+                await _insightServiceClient.LatticeExtraction(filledPrompt, latticeModel, queryInfo);
 
             if (response.IsSuccessStatusCode)
             {
