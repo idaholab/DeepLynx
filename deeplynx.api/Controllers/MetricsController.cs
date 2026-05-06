@@ -53,4 +53,26 @@ public class MetricsController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
+
+    /// <summary>
+    ///     Get System Data Source Count 
+    /// </summary>
+    /// <param name="hideArchived">Flag indicating whether to hide archived data sources from the result (Default true)</param>
+    /// <returns>A count of data sources for the given project.</returns>
+    [HttpGet("datasources/count", Name = "api_datasource_count_system")]
+    [SysAdmin]
+    public async Task<IActionResult> GetSystemDataSourceCount(bool hideArchived = true)
+    {
+        try
+        {
+            var byteSum = await _metricsBusiness.GetSystemDataSourceCount(hideArchived);
+            return Ok(byteSum);
+        }
+        catch (Exception exc)
+        {
+            var message = $"An error occurred while retrieving byte count for the system: {exc}";
+            _logger.LogError(message);
+            return StatusCode(StatusCodes.Status500InternalServerError, message);
+        }
+    }
 }

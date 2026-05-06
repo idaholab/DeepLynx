@@ -589,7 +589,6 @@ export default function DataSchema({ mode }: DataSchemaProps) {
               <thead className="bg-base-200">
                 <tr>
                   <th className="sticky top-0 z-10 bg-base-200">Name</th>
-                  <th className="sticky top-0 z-10 bg-base-200">Links</th>
                   <th className="sticky top-0 z-10 bg-base-200">Status</th>
                   <th className="sticky top-0 z-10 bg-base-200">Updated</th>
                 </tr>
@@ -609,11 +608,7 @@ export default function DataSchema({ mode }: DataSchemaProps) {
                     >
                       <td>
                         <div className="font-medium">{item.name}</div>
-                        <div className="text-xs text-base-content/60">
-                          Database class
-                        </div>
                       </td>
-                      <td>{relationshipCountForClass(item.id)}</td>
                       <td>
                         <span className={statusClass(item.isArchived)}>
                           {item.isArchived ? "Archived" : "Active"}
@@ -701,9 +696,6 @@ export default function DataSchema({ mode }: DataSchemaProps) {
                     >
                       <td>
                         <div className="font-medium">{item.name}</div>
-                        <div className="text-xs text-base-content/60">
-                          Database relationship
-                        </div>
                       </td>
                       <td className="text-sm text-base-content/70">
                         {(item.originId && classLookup.get(item.originId)) ||
@@ -790,15 +782,7 @@ export default function DataSchema({ mode }: DataSchemaProps) {
           />
         </label>
 
-        <div className="grid gap-3 md:grid-cols-2">
-          <div className="rounded-lg border border-base-300 bg-base-200/50 p-3">
-            <div className="text-xs uppercase tracking-wide text-base-content/60">
-              Links
-            </div>
-            <div className="mt-1 text-sm font-medium">
-              {relationshipCountForClass(selectedClass.id)}
-            </div>
-          </div>
+        <div className="grid gap-3">
           <div className="rounded-lg border border-base-300 bg-base-200/50 p-3">
             <div className="text-xs uppercase tracking-wide text-base-content/60">
               Last Updated
