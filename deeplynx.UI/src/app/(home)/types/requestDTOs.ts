@@ -284,9 +284,10 @@ export interface ExecuteSavedSearchRequest {
 }
  
 export interface SavedSearchFilterRequest {
-  name?: string;
-  textSearch?: string;
-  lastUpdatedBefore?: Date;
-  lastUpdatedAfter?: Date;
+  name: string;
+  textSearch: string;
+  lastUpdatedBefore: Date | undefined;
+  lastUpdatedAfter: Date | undefined;
+  pageNumber?: number;
+  pageSize?: number;
 }
- 

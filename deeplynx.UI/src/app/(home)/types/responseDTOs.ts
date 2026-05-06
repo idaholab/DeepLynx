@@ -338,3 +338,11 @@ export interface SavedSearchesResponseDto {
     filter: SearchConditionDto[] | null;
   };
 }
+
+export type PaginatedSavedSearchesResponseDto = {
+  items: SavedSearchesResponseDto[] | [];
+  pageNumber: number;
+  pageSize: number;
+  maxPageSize: number;
+  totalCount: number;
+};

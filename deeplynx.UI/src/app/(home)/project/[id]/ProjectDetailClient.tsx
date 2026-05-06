@@ -21,7 +21,7 @@ type Props = {
   projectId: string;
 };
 
-const PROJECT_WIDGETS: WidgetType[] = ["ProjectOverview", "TeamMembers"];
+const PROJECT_WIDGETS: WidgetType[] = ["ProjectOverview", "TeamMembers", "SavedSearches"];
 
 export default function ProjectDetailClient({
   initialProject,
@@ -72,7 +72,7 @@ export default function ProjectDetailClient({
   if (!project) return <p className="p-4">{t.translations.NO_PROJECT_FOUND}</p>;
 
   return (
-    <div className="min-h-screen bg-base-100">
+    <div className="bg-base-100 overflow-auto">
       {/* Project Header */}
       <div className="bg-base-200/50 border-b border-base-300/30 py-4 px-6 lg:px-12" data-tour="project-header">
        <div className="flex items-center gap-3">
