@@ -3,7 +3,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
-  ArrowLeftIcon,
   ArrowRightIcon,
   CheckCircleIcon,
   ChevronDownIcon,
@@ -41,9 +40,8 @@ function validationBadgeClass(status: string | null) {
 }
 
 function extractionStatusBadgeClass(status: string) {
-  if (status === "complete") return "badge-success";
+  if (status === "complete" || status === "promoted") return "badge-success";
   if (status === "failed" || status === "rejected") return "badge-error";
-  if (status === "promoted") return "badge-success";
   if (status === "running") return "badge-info";
   return "badge-warning";
 }
@@ -121,7 +119,7 @@ function RecordCard({ record }: { record: StagedRecordDTO }) {
 
       {expanded && attrs ? (
         <div className="border-t border-base-300 px-4 py-5">
-          <PropertyTable title="Attributes" rows={parseNestedRows(attrs)} />
+          <PropertyTable title="Properties" rows={parseNestedRows(attrs)} />
         </div>
       ) : null}
     </section>
@@ -141,7 +139,7 @@ function ClassCard({ cls }: { cls: StagedClassDTO }) {
       </div>
       {cls.ontology_class_id && (
         <p className="mt-2 text-xs text-base-content/60">
-          Ontology class ID: {cls.ontology_class_id}
+          Existing Class ID: {cls.ontology_class_id}
         </p>
       )}
     </div>
@@ -187,110 +185,33 @@ function RelationshipCard({ rel }: { rel: StagedRelationshipDTO }) {
         )}
       </div>
       {(rel.origin_class_name || rel.destination_class_name) && (
-        <p className="mt-2 text-xs text-base-content/60">
-          {rel.origin_class_name ?? "?"} → {rel.destination_class_name ?? "?"}
-        </p>
-      )}
-    </div>
-  );
-}
-
-function ExtractionListView() {
-  const router = useRouter();
-  const { organization } = useOrganizationSession();
-  const { project } = useProjectSession();
-  const [items, setItems] = useState<ExtractionListItemDTO[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    const orgId = organization?.organizationId as number | undefined;
-    const projId = project?.projectId as number | undefined;
-    if (!orgId || !projId) return;
-
-    listExtractions(orgId, projId)
-      .then(setItems)
-      .catch(() => setError("Failed to load extractions."))
-      .finally(() => setIsLoading(false));
-  }, [organization?.organizationId, project?.projectId]);
-
-  const handleOpen = (item: ExtractionListItemDTO) => {
-    const orgId = organization?.organizationId as number;
-    const projId = project?.projectId as number;
-    const params = new URLSearchParams({
-      extractionId: String(item.id),
-      projectId: String(projId),
-      organizationId: String(orgId),
-    });
-    router.push(`/lattice/decisions?${params.toString()}`);
-  };
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <span className="loading loading-spinner loading-lg" />
-      </div>
-    );
-  }
-
-  if (error) {
-    return <div className="p-6"><p className="text-error">{error}</p></div>;
-  }
-
-  return (
-    <div className="mx-3 space-y-6 pb-8 sm:mx-4 lg:mx-0 p-6">
-      <div>
-        <h1 className="text-2xl font-bold">My Extractions</h1>
-        <p className="mt-1 text-sm text-base-content/70">
-          Lattice extractions you have triggered.
-        </p>
-      </div>
-
-      {items.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-base-300 bg-base-100 p-8 text-center text-sm text-base-content/65">
-          No extractions yet. Trigger one from a record page.
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {items.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              className="w-full rounded-2xl border border-base-300 bg-base-100 px-5 py-4 text-left shadow-sm hover:bg-base-200/60 transition"
-              onClick={() => handleOpen(item)}
-            >
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="font-semibold">Extraction #{item.id}</span>
-                  <span className={`badge ${extractionStatusBadgeClass(item.status)}`}>
-                    {item.status}
-                  </span>
-                  {item.mode && (
-                    <span className="rounded-full bg-base-200 px-3 py-1 text-xs text-base-content/60">
-                      {item.mode}
-                    </span>
-                  )}
-                </div>
-                <ArrowRightIcon className="size-4 text-base-content/40" />
-              </div>
-            </button>
-          ))}
+        <div className="mt-3 flex items-center gap-2 text-xs">
+          <div>
+            <p className="text-base-content/40 uppercase tracking-wide" style={{ fontSize: "0.625rem" }}>Origin</p>
+            <p className="mt-0.5 font-medium text-base-content/70">{rel.origin_class_name ?? "?"}</p>
+          </div>
+          <span className="mt-3 text-base-content/30">→</span>
+          <div>
+            <p className="text-base-content/40 uppercase tracking-wide" style={{ fontSize: "0.625rem" }}>Destination</p>
+            <p className="mt-0.5 font-medium text-base-content/70">{rel.destination_class_name ?? "?"}</p>
+          </div>
         </div>
       )}
     </div>
   );
 }
 
-function ExtractionDetailView({
+function ExtractionDetailPanel({
   extractionId,
+  organizationId,
   projectId,
+  onStatusChange,
 }: {
   extractionId: number;
+  organizationId: number;
   projectId: number;
+  onStatusChange?: () => void;
 }) {
-  const router = useRouter();
-  const { organization } = useOrganizationSession();
-
   const [staging, setStaging] = useState<ExtractionStagingResponseDTO | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -299,14 +220,8 @@ function ExtractionDetailView({
   const pollingRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const fetchStaging = useCallback(async () => {
-    if (!organization?.organizationId || !extractionId || !projectId) return;
-
     try {
-      const data = await getExtractionStaging(
-        organization.organizationId as number,
-        projectId,
-        extractionId,
-      );
+      const data = await getExtractionStaging(organizationId, projectId, extractionId);
       setStaging(data);
       setError(null);
 
@@ -318,9 +233,13 @@ function ExtractionDetailView({
     } finally {
       setIsLoading(false);
     }
-  }, [organization?.organizationId, extractionId, projectId]);
+  }, [organizationId, projectId, extractionId]);
 
   useEffect(() => {
+    setIsLoading(true);
+    setStaging(null);
+    setError(null);
+    setActiveTab("records");
     void fetchStaging();
     return () => {
       if (pollingRef.current) clearTimeout(pollingRef.current);
@@ -328,18 +247,13 @@ function ExtractionDetailView({
   }, [fetchStaging]);
 
   const handlePromote = async (approve: boolean) => {
-    if (!organization?.organizationId || !staging) return;
-
+    if (!staging) return;
     try {
       setIsPromoting(true);
-      const result = await promoteExtraction(
-        organization.organizationId as number,
-        projectId,
-        extractionId,
-        approve,
-      );
-      setStaging(result);
+      await promoteExtraction(organizationId, projectId, extractionId, approve);
       toast.success(approve ? "Extraction approved." : "Extraction rejected.");
+      await fetchStaging();
+      onStatusChange?.();
     } catch {
       toast.error("Failed to process extraction.");
     } finally {
@@ -349,7 +263,7 @@ function ExtractionDetailView({
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
+      <div className="flex h-64 items-center justify-center">
         <span className="loading loading-spinner loading-lg" />
       </div>
     );
@@ -357,7 +271,7 @@ function ExtractionDetailView({
 
   if (error || !staging) {
     return (
-      <div className="p-6">
+      <div className="p-4">
         <p className="text-error">{error ?? "No extraction data found."}</p>
       </div>
     );
@@ -368,181 +282,295 @@ function ExtractionDetailView({
   const tabs: DetailTab[] = ["records", "classes", "edges", "relationships"];
 
   return (
-    <div className="mx-3 space-y-6 pb-8 sm:mx-4 lg:mx-0 p-6">
-      <button
-        type="button"
-        className="btn btn-ghost btn-sm"
-        onClick={() => router.push("/lattice/decisions")}
-      >
-        <ArrowLeftIcon className="size-4" />
-        All Extractions
-      </button>
-      <section className="grid gap-6 xl:grid-cols-[0.95fr_1.45fr]">
-        <aside className="rounded-3xl border border-base-300 bg-base-100 p-4 shadow-sm">
-          <div className="border-b border-base-300 pb-4">
-            <div className="flex items-center justify-between gap-2">
-              <h2 className="text-lg font-semibold">Extraction #{staging.id}</h2>
-              <span className={`badge ${extractionStatusBadgeClass(staging.status)}`}>
-                {isRunning ? (
-                  <>
-                    <span className="loading loading-spinner loading-xs mr-1" />
-                    {staging.status}
-                  </>
-                ) : (
-                  staging.status
-                )}
-              </span>
-            </div>
+    <div className="flex flex-col gap-4">
+      {/* Header: title + status + approve/reject */}
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="text-lg font-bold">Extraction #{staging.id}</h2>
+            <span className={`badge ${extractionStatusBadgeClass(staging.status)}`}>
+              {isRunning ? (
+                <>
+                  <span className="loading loading-spinner loading-xs mr-1" />
+                  {staging.status}
+                </>
+              ) : (
+                staging.status
+              )}
+            </span>
             {staging.mode && (
-              <p className="mt-1 text-sm text-base-content/60">Mode: {staging.mode}</p>
+              <span className="text-sm font-medium text-base-content/50 capitalize">
+                {staging.mode}
+              </span>
             )}
           </div>
+          <p className="mt-1 text-sm text-base-content/70">
+            {isRunning
+              ? "Extraction is in progress. This page will update automatically."
+              : canDecide
+                ? "Review the staged items below, then approve or reject the entire extraction."
+                : staging.status === "failed"
+                  ? "This extraction failed to complete."
+                  : staging.status === "rejected"
+                    ? "This extraction was rejected."
+                    : `This extraction has been ${staging.status}.`}
+          </p>
+        </div>
 
-          <div className="mt-4 space-y-3">
-            {(
-              [
-                { label: "Records", count: staging.records.length },
-                { label: "Classes", count: staging.classes.length },
-                { label: "Relationships", count: staging.relationships.length },
-                { label: "Edges", count: staging.edges.length },
-              ] as const
-            ).map(({ label, count }) => (
-              <div
-                key={label}
-                className="rounded-2xl border border-base-300 bg-base-200/50 px-4 py-3"
-              >
-                <p className="text-sm font-medium">{label}</p>
-                <p className="text-2xl font-bold">{count}</p>
-              </div>
-            ))}
-          </div>
-        </aside>
-
-        <section className="rounded-3xl border border-base-300 bg-base-100 p-5 shadow-sm">
-          <div className="flex flex-col gap-4 border-b border-base-300 pb-5">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <h2 className="text-2xl font-semibold">Review Extraction</h2>
-                <p className="mt-1 text-sm text-base-content/70">
-                  {isRunning
-                    ? "Extraction is in progress. This page will update automatically."
-                    : canDecide
-                      ? "Review the staged items below, then approve or reject the entire extraction."
-                      : `This extraction has been ${staging.status}.`}
-                </p>
-              </div>
-
-              {canDecide ? (
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    className="btn btn-success btn-sm"
-                    onClick={() => handlePromote(true)}
-                    disabled={isPromoting}
-                  >
-                    {isPromoting ? (
-                      <span className="loading loading-spinner loading-xs" />
-                    ) : (
-                      <CheckCircleIcon className="size-4" />
-                    )}
-                    Approve All
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-outline btn-error btn-sm"
-                    onClick={() => handlePromote(false)}
-                    disabled={isPromoting}
-                  >
-                    {isPromoting ? (
-                      <span className="loading loading-spinner loading-xs" />
-                    ) : (
-                      <XCircleIcon className="size-4" />
-                    )}
-                    Reject All
-                  </button>
-                </div>
-              ) : null}
-            </div>
-          </div>
-
-          <div className="mt-5 flex flex-wrap gap-2">
-            {tabs.map((tab) => (
+        {canDecide && (
+          <div className="flex flex-col items-end gap-1.5">
+            <div className="flex flex-wrap gap-2">
               <button
-                key={tab}
                 type="button"
-                className={`btn btn-sm ${activeTab === tab ? "btn-primary" : "btn-ghost"}`}
-                onClick={() => setActiveTab(tab)}
+                className="btn btn-success btn-sm"
+                onClick={() => handlePromote(true)}
+                disabled={isPromoting}
               >
-                {tab.charAt(0).toUpperCase() + tab.slice(1)}
+                {isPromoting ? (
+                  <span className="loading loading-spinner loading-xs" />
+                ) : (
+                  <CheckCircleIcon className="size-4" />
+                )}
+                Approve All
               </button>
-            ))}
+              <button
+                type="button"
+                className="btn btn-outline btn-error btn-sm"
+                onClick={() => handlePromote(false)}
+                disabled={isPromoting}
+              >
+                {isPromoting ? (
+                  <span className="loading loading-spinner loading-xs" />
+                ) : (
+                  <XCircleIcon className="size-4" />
+                )}
+                Reject All
+              </button>
+            </div>
+            <p className="text-xs text-base-content/50">
+              Approvals are all-or-nothing. Individual item approval coming soon.
+            </p>
           </div>
+        )}
+      </div>
 
-          {activeTab === "records" ? (
-            <div className="mt-5 space-y-3">
-              {staging.records.length === 0 ? (
-                <EmptyState message="No records were staged." />
-              ) : (
-                staging.records.map((record) => (
-                  <RecordCard key={record.id} record={record} />
-                ))
-              )}
+      {/* Summary card */}
+      <div className="rounded-2xl border border-base-300 bg-base-100 p-4 shadow-sm">
+        <h3 className="mb-3 text-sm font-semibold text-base-content/70">Summary</h3>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {(
+            [
+              { label: "Records", count: staging.records.length },
+              { label: "Classes", count: staging.classes.length },
+              { label: "Relationships", count: staging.relationships.length },
+              { label: "Edges", count: staging.edges.length },
+            ] as const
+          ).map(({ label, count }) => (
+            <div
+              key={label}
+              className="rounded-xl border border-base-300 bg-base-200/50 px-4 py-3 text-center"
+            >
+              <p className="text-xs font-medium text-base-content/60">{label}</p>
+              <p className="text-2xl font-bold">{count}</p>
             </div>
-          ) : null}
+          ))}
+        </div>
+      </div>
 
-          {activeTab === "classes" ? (
-            <div className="mt-5 space-y-3">
-              {staging.classes.length === 0 ? (
-                <EmptyState message="No classes were staged." />
-              ) : (
-                staging.classes.map((cls) => (
-                  <ClassCard key={cls.id} cls={cls} />
-                ))
-              )}
-            </div>
-          ) : null}
+      {/* Items card with tabs */}
+      <div className="rounded-2xl border border-base-300 bg-base-100 p-4 shadow-sm">
+        <div className="flex flex-wrap gap-2">
+          {tabs.map((tab) => (
+            <button
+              key={tab}
+              type="button"
+              className={`btn btn-sm ${activeTab === tab ? "btn-primary" : "btn-ghost"}`}
+              onClick={() => setActiveTab(tab)}
+            >
+              {tab.charAt(0).toUpperCase() + tab.slice(1)}
+            </button>
+          ))}
+        </div>
 
-          {activeTab === "edges" ? (
-            <div className="mt-5 space-y-3">
-              {staging.edges.length === 0 ? (
-                <EmptyState message="No edges were staged." />
-              ) : (
-                staging.edges.map((edge) => (
-                  <EdgeCard key={edge.id} edge={edge} />
-                ))
-              )}
-            </div>
-          ) : null}
+        <div className="mt-4 space-y-3">
+          {activeTab === "records" &&
+            (staging.records.length === 0 ? (
+              <EmptyState message="No records were staged." />
+            ) : (
+              staging.records.map((record) => <RecordCard key={record.id} record={record} />)
+            ))}
 
-          {activeTab === "relationships" ? (
-            <div className="mt-5 space-y-3">
-              {staging.relationships.length === 0 ? (
-                <EmptyState message="No relationships were staged." />
-              ) : (
-                staging.relationships.map((rel) => (
-                  <RelationshipCard key={rel.id} rel={rel} />
-                ))
-              )}
-            </div>
-          ) : null}
-        </section>
-      </section>
+          {activeTab === "classes" &&
+            (staging.classes.length === 0 ? (
+              <EmptyState message="No classes were staged." />
+            ) : (
+              staging.classes.map((cls) => <ClassCard key={cls.id} cls={cls} />)
+            ))}
+
+          {activeTab === "edges" &&
+            (staging.edges.length === 0 ? (
+              <EmptyState message="No edges were staged." />
+            ) : (
+              staging.edges.map((edge) => <EdgeCard key={edge.id} edge={edge} />)
+            ))}
+
+          {activeTab === "relationships" &&
+            (staging.relationships.length === 0 ? (
+              <EmptyState message="No relationships were staged." />
+            ) : (
+              staging.relationships.map((rel) => <RelationshipCard key={rel.id} rel={rel} />)
+            ))}
+        </div>
+      </div>
     </div>
   );
 }
 
-export default function LatticeDecisionsPage() {
-  const searchParams = useSearchParams();
-  const extractionIdParam = searchParams.get("extractionId");
+function storageKey(projId: number) {
+  return `lattice_selected_extraction_${projId}`;
+}
 
-  if (!extractionIdParam) {
-    return <ExtractionListView />;
-  }
+export default function LatticeDecisionsPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const { organization } = useOrganizationSession();
+  const { project } = useProjectSession();
+
+  const [items, setItems] = useState<ExtractionListItemDTO[]>([]);
+  const [isListLoading, setIsListLoading] = useState(true);
+  const [listError, setListError] = useState<string | null>(null);
+
+  const selectedId = searchParams.get("extractionId")
+    ? Number(searchParams.get("extractionId"))
+    : null;
+
+  const orgId = organization?.organizationId as number | undefined;
+  const projId = project?.projectId as number | undefined;
+
+  const refreshList = useCallback(() => {
+    if (!orgId || !projId) return;
+    listExtractions(orgId, projId)
+      .then(setItems)
+      .catch(() => setListError("Failed to load extractions."));
+  }, [orgId, projId]);
+
+  useEffect(() => {
+    if (!orgId || !projId) return;
+    setIsListLoading(true);
+    listExtractions(orgId, projId)
+      .then(setItems)
+      .catch(() => setListError("Failed to load extractions."))
+      .finally(() => setIsListLoading(false));
+  }, [orgId, projId]);
+
+  // Restore last selected extraction when arriving without a query param
+  useEffect(() => {
+    if (!projId || selectedId) return;
+    const saved = localStorage.getItem(storageKey(projId));
+    if (saved) router.replace(`/lattice/decisions?extractionId=${saved}`);
+  }, [projId, selectedId, router]);
+
+  const handleSelect = (id: number) => {
+    if (projId) localStorage.setItem(storageKey(projId), String(id));
+    router.replace(`/lattice/decisions?extractionId=${id}`);
+  };
 
   return (
-    <ExtractionDetailView
-      extractionId={Number(extractionIdParam)}
-      projectId={Number(searchParams.get("projectId"))}
-    />
+    <div className="mx-3 sm:mx-4 lg:mr-0 lg:ml-0">
+      {/* Page header */}
+      <div className="bg-base-200/40 px-3 sm:px-6 lg:px-12 p-4">
+        <h1 className="text-xl sm:text-2xl font-bold text-base-content">Lattice</h1>
+        <p className="mt-1 text-sm text-base-content/70">
+          Extractions you have triggered for this project. Each staged item is scored and validated
+          against the project ontology before human review. <span className="font-medium">Valid</span>{" "}
+          items matched an existing ontology class or relationship.{" "}
+          <span className="font-medium">Invalid</span> items could not be reconciled with the schema.
+          For relationships and edges, <span className="font-medium">novel discovery</span> means the
+          individual classes and relationships involved are known to the ontology, but this specific
+          pattern between them has not been defined.
+        </p>
+      </div>
+
+      <div className="px-3 sm:px-6 lg:px-12 py-6">
+        <div className="grid gap-6 lg:grid-cols-[320px_1fr]">
+          {/* Left: extraction list */}
+          <aside className="rounded-2xl border border-base-300 bg-base-100 shadow-sm overflow-hidden self-start">
+            <div className="border-b border-base-300 px-4 py-3">
+              <h2 className="text-sm font-semibold text-base-content/70">Extractions</h2>
+            </div>
+
+            {isListLoading ? (
+              <div className="flex h-32 items-center justify-center">
+                <span className="loading loading-spinner loading-md" />
+              </div>
+            ) : listError ? (
+              <p className="p-4 text-sm text-error">{listError}</p>
+            ) : items.length === 0 ? (
+              <p className="p-4 text-sm text-base-content/60">
+                No extractions yet. Trigger one from a record page.
+              </p>
+            ) : (
+              <ul className="divide-y divide-base-200 max-h-[60vh] overflow-y-auto">
+                {items.map((item) => (
+                  <li key={item.id}>
+                    <button
+                      type="button"
+                      className={`flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition hover:bg-base-200/60 ${selectedId === item.id ? "bg-base-200/80 font-semibold" : ""
+                        }`}
+                      onClick={() => handleSelect(item.id)}
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate text-sm">Extraction #{item.id}</p>
+                        <div className="mt-2 grid grid-cols-2 gap-x-2">
+                          <div>
+                            <p className="text-base-content/40 uppercase tracking-wide" style={{ fontSize: "0.625rem" }}>Status</p>
+                            <div className="mt-0.5 flex h-4 items-center">
+                              <span className={`badge badge-xs ${extractionStatusBadgeClass(item.status)}`}>
+                                {item.status}
+                              </span>
+                            </div>
+                          </div>
+                          {item.mode && (
+                            <div>
+                              <p className="text-base-content/40 uppercase tracking-wide" style={{ fontSize: "0.625rem" }}>Mode</p>
+                              <div className="mt-0.5 flex h-4 items-center">
+                                <p className="text-xs font-medium text-base-content/70 capitalize">{item.mode}</p>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      <ArrowRightIcon
+                        className={`size-4 flex-shrink-0 transition ${selectedId === item.id
+                          ? "text-primary"
+                          : "text-base-content/30"
+                          }`}
+                      />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </aside>
+
+          {/* Right: detail panel */}
+          <div>
+            {selectedId && orgId && projId ? (
+              <ExtractionDetailPanel
+                key={selectedId}
+                extractionId={selectedId}
+                organizationId={orgId}
+                projectId={projId}
+                onStatusChange={refreshList}
+              />
+            ) : (
+              <div className="flex h-64 items-center justify-center rounded-2xl border border-dashed border-base-300 bg-base-100 text-sm text-base-content/50">
+                Select an extraction from the list to review it.
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
