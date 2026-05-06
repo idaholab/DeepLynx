@@ -14,7 +14,6 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
     private readonly InsightServiceClient _insightServiceClient;
     private readonly IExtractionValidation _validationBusiness;
     private readonly ILogger<LatticeExtractionBusiness> _logger;
-    private readonly string? _latticeModel;
 
     public LatticeExtractionBusiness(DeeplynxContext context, LatticeContext latticeContext,
         IInsightBusiness insightBusiness, InsightServiceClient insightServiceClient,
@@ -27,7 +26,6 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
         _insightServiceClient = insightServiceClient;
         _validationBusiness = validationBusiness;
         _logger = logger;
-        _latticeModel = Environment.GetEnvironmentVariable("LATTICE_MODEL");
     }
 
     /// <summary>
