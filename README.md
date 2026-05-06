@@ -139,6 +139,14 @@ If you make changes to the datalayer, create a new database migration with a des
 dotnet ef migrations add UpdateUsersExample -c DeeplynxContext --verbose --project deeplynx.datalayer --startup-project deeplynx.api
 ```
 
+The Lattice feature uses a separate `LatticeContext` with its own migration history stored in the `lattice` schema. If you make changes to the Lattice staging tables (`ExtractionClass`, `ExtractionRecord`, `ExtractionRelationship`, `ExtractionEdge`), create a migration against that context instead:
+
+```
+dotnet ef migrations add UpdateLatticeExample -c LatticeContext --verbose --project deeplynx.datalayer --startup-project deeplynx.api --output-dir Migrations/Lattice
+```
+
+Both contexts are migrated automatically on app startup via `MigrateAsync()`.
+
 See [CONTRIBUTING](./CONTRIBUTING.md) for more details.
 
 ### Additional Notes
