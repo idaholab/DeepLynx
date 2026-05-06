@@ -14,13 +14,24 @@ using Parquet;
 
 namespace deeplynx.business;
 
-public class OlapBusiness(
-    DeeplynxContext context,
-    IRecordBusiness recordBusiness,
-    ILogger<OlapBusiness> logger) : IOlapBusiness
+public class OlapBusiness : IOlapBusiness
 {
-    private readonly DeeplynxContext _context = context;
-    private readonly IRecordBusiness _recordBusiness = recordBusiness;
+    private readonly DeeplynxContext _context;
+    private readonly IRecordBusiness _recordBusiness;
+    private readonly ILogger<OlapBusiness> _logger;
+    private readonly IObjectStorageBusiness _objectStorageBusiness;
+    
+    public OlapBusiness(
+        DeeplynxContext context, 
+        IRecordBusiness recordBusiness,
+        IObjectStorageBusiness objectStorageBusiness,
+        ILogger<OlapBusiness> logger)
+    {
+        _recordBusiness = recordBusiness;
+        _context = context;
+        _logger = logger;
+        _objectStorageBusiness = objectStorageBusiness;
+    }
 
     /// <summary>
     ///     Appends a new Parquet part file to an existing Parquet dataset in Azure Blob Storage
@@ -66,22 +77,14 @@ public class OlapBusiness(
         if (string.IsNullOrWhiteSpace(record.Uri))
             throw new ArgumentException("Record has no URI.");
 
-        var objectStorage = _context.ObjectStorages.FirstOrDefault(os =>
-            os.OrganizationId == organizationId &&
-            (os.ProjectId == projectId || os.ProjectId == null) &&
-            os.Id == record.ObjectStorageId);
-
-        if (objectStorage == null)
-            throw new ArgumentException($"Object storage not found for project {projectId}.");
+        var realObjectStorageId = await ResolveObjectStorageId(organizationId, projectId, record.ObjectStorageId);
+        var objectStorage = await _objectStorageBusiness.GetDecryptedObjectStorage(realObjectStorageId);
 
         if (objectStorage.Type != "azure_object" && objectStorage.Type != "filesystem")
             throw new InvalidOperationException($"Unsupported object storage type: {objectStorage.Type}");
 
-        var objectStorageConfig = JsonConvert.DeserializeObject<ObjectStorageConfigDto>(objectStorage.Config)
-                                  ?? throw new InvalidOperationException("Object storage config is null or invalid.");
-
         if (objectStorage.Type == "azure_object")
-            await AppendToAzureBlob(record, objectStorageConfig, file, partNumber);
+            await AppendToAzureBlob(record, objectStorage.Config, file, partNumber);
         else
             await AppendToFilesystemAsync(record, file, partNumber);
     }
@@ -226,18 +229,12 @@ public class OlapBusiness(
         if (string.IsNullOrWhiteSpace(record.Uri))
             throw new ArgumentException("File path is required", nameof(record.Uri));
 
-        var objectStorage = _context.ObjectStorages.FirstOrDefault(os => os.OrganizationId == organizationId &&
-                                                                         (os.ProjectId == projectId ||
-                                                                          os.ProjectId == null) &&
-                                                                         os.Id == record.ObjectStorageId);
+        var realObjectStorageId = await ResolveObjectStorageId(organizationId, projectId, record.ObjectStorageId);
+        var objectStorage = await _objectStorageBusiness.GetDecryptedObjectStorage(realObjectStorageId);
 
-        if (objectStorage == null)
-            throw new ArgumentException(
-                $"Object storage with ID {record.ObjectStorageId} does not exist for project with ID of {projectId}");
-
-        var objectStorageConfig = JsonConvert.DeserializeObject<ObjectStorageConfigDto>(objectStorage.Config);
-        if (objectStorageConfig == null)
-            throw new InvalidOperationException("Config data for object storage is null or invalid");
+        // Sanitize viewName - only allow alphanumeric and underscore
+        if (!Regex.IsMatch(viewName, @"^[a-zA-Z_][a-zA-Z0-9_]*$"))
+            throw new ArgumentException("View name contains invalid characters", nameof(viewName));
 
         // Determine storage type and get appropriate connection
         DuckDBConnection connection;
@@ -247,11 +244,11 @@ public class OlapBusiness(
         if (objectStorage.Type == "azure_object")
         {
             // Azure Blob Storage
-            var containerName = objectStorageConfig.AzureObjectConfig?.AzureContainerName;
+            var containerName = objectStorage.Config.AzureObjectConfig?.AzureContainerName;
             if (string.IsNullOrWhiteSpace(containerName))
                 throw new ArgumentException("Container name is required for Azure storage");
 
-            connection = await GetAzureDuckDbConnection(objectStorageConfig);
+            connection = await GetAzureDuckDbConnection(objectStorage.Config);
 
             var escapedContainer = containerName.Replace("'", "''");
             var escapedPath = record.Uri.Replace("'", "''");
@@ -372,25 +369,17 @@ public class OlapBusiness(
             return 0;
         }
 
-        var objectStorage = _context.ObjectStorages.FirstOrDefault(os =>
-            os.OrganizationId == organizationId &&
-            (os.ProjectId == projectId || os.ProjectId == null) &&
-            os.Id == record.ObjectStorageId);
-
-        if (objectStorage == null)
-            throw new ArgumentException($"Object storage not found for project {projectId}.");
-
-        var objectStorageConfig = JsonConvert.DeserializeObject<ObjectStorageConfigDto>(objectStorage.Config)
-                                  ?? throw new InvalidOperationException("Object storage config is null or invalid.");
+        var realObjectStorageId = await ResolveObjectStorageId(organizationId, projectId, record.ObjectStorageId);
+        var objectStorage = await _objectStorageBusiness.GetDecryptedObjectStorage(realObjectStorageId);
 
         IEnumerable<long> partNumbers;
 
         if (objectStorage.Type == "azure_object")
         {
-            var containerName = objectStorageConfig.AzureObjectConfig?.AzureContainerName
+            var containerName = objectStorage.Config.AzureObjectConfig?.AzureContainerName
                                 ?? throw new ArgumentException("Azure container name is required.");
 
-            var containerClient = new BlobServiceClient(objectStorageConfig.AzureObjectConfig!.AzureConnectionString)
+            var containerClient = new BlobServiceClient(objectStorage.Config.AzureObjectConfig!.AzureConnectionString)
                 .GetBlobContainerClient(containerName);
 
             partNumbers = containerClient
@@ -427,12 +416,12 @@ public class OlapBusiness(
     ///     For Parquet files, reads only the file footer via Parquet.Net — no row data is loaded into memory.
     ///     For CSV files, uses DuckDB to infer column types from the file content.
     /// </summary>
-    /// <param name="objectStorage">Object storage entity</param>
+    /// <param name="objectStorageType">Type of object storage entity</param>
     /// <param name="objectStorageConfig">Object storage configuration</param>
     /// <param name="fileUri">URI/path to the file</param>
     /// <returns>JsonArray of { name, type } objects, or null if extraction fails</returns>
     public async Task<JsonArray?> ExtractTabularColumns(
-        ObjectStorage objectStorage,
+        string objectStorageType,
         ObjectStorageConfigDto objectStorageConfig,
         string fileUri)
     {
@@ -445,7 +434,7 @@ public class OlapBusiness(
                 // Use Parquet.Net to read only the file footer — no row data loaded regardless of file size
                 Stream parquetStream;
 
-                if (objectStorage.Type == "azure_object")
+                if (objectStorageType == "azure_object")
                 {
                     var containerName = objectStorageConfig.AzureObjectConfig?.AzureContainerName;
                     if (string.IsNullOrWhiteSpace(containerName))
@@ -459,13 +448,13 @@ public class OlapBusiness(
                         .GetBlobClient(fileUri)
                         .OpenReadAsync();
                 }
-                else if (objectStorage.Type == "filesystem")
+                else if (objectStorageType == "filesystem")
                 {
                     parquetStream = File.OpenRead(fileUri);
                 }
                 else
                 {
-                    logger.LogDebug("Unsupported object storage type for Parquet column extraction");
+                    _logger.LogDebug("Unsupported object storage type for Parquet column extraction");
                     return null;
                 }
 
@@ -486,7 +475,7 @@ public class OlapBusiness(
             DuckDBConnection connection;
             string fileUrl;
 
-            if (objectStorage.Type == "azure_object")
+            if (objectStorageType == "azure_object")
             {
                 var containerName = objectStorageConfig.AzureObjectConfig?.AzureContainerName;
                 if (string.IsNullOrWhiteSpace(containerName))
@@ -498,7 +487,7 @@ public class OlapBusiness(
                 var escapedPath = fileUri.Replace("'", "''");
                 fileUrl = $"az://{escapedContainer}/{escapedPath}";
             }
-            else if (objectStorage.Type == "filesystem")
+            else if (objectStorageType == "filesystem")
             {
                 connection = await GetLocalDuckDbConnection();
 
@@ -507,7 +496,7 @@ public class OlapBusiness(
             }
             else
             {
-                logger.LogDebug("Unsupported object storage type for CSV column extraction");
+                _logger.LogDebug("Unsupported object storage type for CSV column extraction");
                 return null;
             }
 
@@ -533,7 +522,7 @@ public class OlapBusiness(
         }
         catch (Exception ex)
         {
-            logger.LogError($"Error while extracting columns: {ex.Message}");
+            _logger.LogError($"Error while extracting columns: {ex.Message}");
             return null;
         }
     }
@@ -590,18 +579,8 @@ public class OlapBusiness(
         if (string.IsNullOrWhiteSpace(record.Uri))
             throw new ArgumentException($"Record {recordId} does not have a URI");
 
-        var objectStorage = _context.ObjectStorages.FirstOrDefault(os => os.OrganizationId == organizationId &&
-                                                                         (os.ProjectId == projectId ||
-                                                                          os.ProjectId == null) &&
-                                                                         os.Id == record.ObjectStorageId);
-
-        if (objectStorage == null)
-            throw new ArgumentException(
-                $"Object storage with ID {record.ObjectStorageId} does not exist for project with ID of {projectId}");
-
-        var objectStorageConfig = JsonConvert.DeserializeObject<ObjectStorageConfigDto>(objectStorage.Config);
-        if (objectStorageConfig == null)
-            throw new InvalidOperationException("Config data for object storage is null or invalid");
+        var realObjectStorageId = await ResolveObjectStorageId(organizationId, projectId, record.ObjectStorageId);
+        var objectStorage = await _objectStorageBusiness.GetDecryptedObjectStorage(realObjectStorageId);
 
         // Determine storage type and get appropriate connection
         DuckDBConnection connection;
@@ -611,11 +590,11 @@ public class OlapBusiness(
         if (objectStorage.Type == "azure_object")
         {
             // Azure Blob Storage
-            var containerName = objectStorageConfig.AzureObjectConfig?.AzureContainerName;
+            var containerName = objectStorage.Config.AzureObjectConfig?.AzureContainerName;
             if (string.IsNullOrWhiteSpace(containerName))
                 throw new ArgumentException("Container name is required for Azure storage");
 
-            connection = await GetAzureDuckDbConnection(objectStorageConfig);
+            connection = await GetAzureDuckDbConnection(objectStorage.Config);
 
             var escapedContainer = containerName.Replace("'", "''");
             var escapedPath = record.Uri.Replace("'", "''");
@@ -1400,5 +1379,26 @@ public class OlapBusiness(
             points.Reverse();
 
         return new PlotDataDto { Columns = columns, Data = [.. points] };
+    }
+
+    /// <summary>
+    ///     Find the default object storage if the supplied ID cannot be found.
+    /// </summary>
+    /// <param name="organizationId">The org ID of the object storage to be found.</param>
+    /// <param name="projectId">The project ID of the object storage to be found.</param>
+    /// <param name="objectStorageId">The ID of the object storage (return if supplied)</param>
+    /// <returns></returns>
+    /// <exception cref="KeyNotFoundException"></exception>
+    private async Task<long> ResolveObjectStorageId(long organizationId, long projectId, long? objectStorageId)
+    {
+        if (objectStorageId.HasValue)
+        {
+            // object storage could be org-level so just return object storage, don't check for project existence
+            return objectStorageId.Value;
+        }
+
+        var defaultObjectStorage = await _objectStorageBusiness.GetDefaultObjectStorage(organizationId, projectId)
+                                   ?? throw new KeyNotFoundException("Default object storage not found");
+        return defaultObjectStorage.Id;
     }
 }
