@@ -96,49 +96,6 @@ public class OlapBusiness : IOlapBusiness
     /// <param name="organizationId"></param>
     /// <param name="projectId"></param>
     /// <param name="recordId"></param>
-    /// <param name="request"></param>
-    /// <param name="viewName"></param>
-    /// <returns></returns>
-    /// <exception cref="ArgumentException"></exception>
-    /// <exception cref="InvalidOperationException"></exception>
-    public async Task<PlotDataDto> QueryTabularFile(
-        long currentUserId,
-        long organizationId,
-        long projectId,
-        long recordId,
-        OlapQueryRequestDto request,
-        string viewName)
-    {
-        ArgumentNullException.ThrowIfNull(request);
-
-        var hasUserQuery = !string.IsNullOrWhiteSpace(request.Query);
-        var queryOptions = ValidateTabularQueryRequest(request, hasUserQuery);
-        var userQuery = hasUserQuery
-            ? request.Query!
-            : $"SELECT * FROM {viewName}";
-
-        if (hasUserQuery)
-            ValidateUserQuery(userQuery, viewName);
-        else
-            ValidateViewName(viewName);
-
-        return await QueryTabularFile(
-            currentUserId,
-            organizationId,
-            projectId,
-            recordId,
-            userQuery,
-            viewName,
-            queryOptions);
-    }
-
-    /// <summary>
-    ///     Queries single tabular files and across multiple files within the same folder
-    /// </summary>
-    /// <param name="currentUserId"></param>
-    /// <param name="organizationId"></param>
-    /// <param name="projectId"></param>
-    /// <param name="recordId"></param>
     /// <param name="userQuery"></param>
     /// <param name="viewName"></param>
     /// <returns></returns>
@@ -152,27 +109,18 @@ public class OlapBusiness : IOlapBusiness
         string? userQuery,
         string viewName)
     {
-        ValidateUserQuery(userQuery, viewName);
+        ArgumentNullException.ThrowIfNull(userQuery);
 
-        return await QueryTabularFile(
-            currentUserId,
-            organizationId,
-            projectId,
-            recordId,
-            userQuery!,
-            viewName,
-            null);
-    }
+        var hasUserQuery = !string.IsNullOrWhiteSpace(userQuery);
+        var query = hasUserQuery
+            ? userQuery!
+            : $"SELECT * FROM {viewName}";
 
-    private async Task<PlotDataDto> QueryTabularFile(
-        long currentUserId,
-        long organizationId,
-        long projectId,
-        long recordId,
-        string userQuery,
-        string viewName,
-        TabularQueryRequestOptions? queryOptions)
-    {
+        if (hasUserQuery)
+            ValidateUserQuery(query, viewName);
+        else
+            ValidateViewName(viewName);
+
         var record = await _recordBusiness.GetRecord(currentUserId, organizationId, projectId, recordId, true);
 
         if (string.IsNullOrWhiteSpace(record.Uri))
@@ -234,9 +182,6 @@ public class OlapBusiness : IOlapBusiness
 
         await using (connection)
         {
-            if (queryOptions?.ShouldShapeView == true)
-                viewSourceSql = await BuildWindowedSourceSql(connection, viewSourceSql, queryOptions);
-
             // Create a temporary view pointing to the file or glob dataset
             await using (var createViewCmd = connection.CreateCommand())
             {
@@ -246,7 +191,7 @@ public class OlapBusiness : IOlapBusiness
 
             // Execute the user query and read results directly
             await using var cmd = connection.CreateCommand();
-            cmd.CommandText = userQuery;
+            cmd.CommandText = query;
 
             await using var reader = await cmd.ExecuteReaderAsync();
 
@@ -1048,53 +993,6 @@ public class OlapBusiness : IOlapBusiness
         bool HasExplicitWindow,
         bool ShouldShapeView,
         string[] Columns);
-
-    private static TabularQueryRequestOptions ValidateTabularQueryRequest(
-        OlapQueryRequestDto request,
-        bool hasUserQuery)
-    {
-        var hasExplicitWindow = request.StartRow.HasValue || request.StopRow.HasValue;
-        var hasRequestedWindowing = request.Limit.HasValue || request.RowStride.HasValue || hasExplicitWindow;
-        var columns = NormalizeColumns(request.Columns);
-        var limit = request.Limit;
-
-        if (!limit.HasValue)
-        {
-            if (hasExplicitWindow)
-                limit = OlapQueryRequestDto.MaxLimit;
-            else if (!hasUserQuery)
-                limit = OlapQueryRequestDto.DefaultLimit;
-        }
-
-        var rowStride = request.RowStride ?? OlapQueryRequestDto.DefaultRowStride;
-
-        if (limit.HasValue && (limit.Value < 1 || limit.Value > OlapQueryRequestDto.MaxLimit))
-            throw new ArgumentException($"Limit must be between 1 and {OlapQueryRequestDto.MaxLimit}.",
-                nameof(request.Limit));
-
-        if (rowStride < 1)
-            throw new ArgumentException("Row stride must be 1 or greater.", nameof(request.RowStride));
-
-        if (request.StartRow is < 1)
-            throw new ArgumentException("Start row must be 1 or greater.", nameof(request.StartRow));
-
-        if (request.StopRow is < 1)
-            throw new ArgumentException("Stop row must be 1 or greater.", nameof(request.StopRow));
-
-        if (request.StartRow.HasValue &&
-            request.StopRow.HasValue &&
-            request.StartRow.Value > request.StopRow.Value)
-            throw new ArgumentException("Start row cannot be greater than stop row.");
-
-        return new TabularQueryRequestOptions(
-            limit,
-            rowStride,
-            request.StartRow,
-            request.StopRow,
-            hasExplicitWindow,
-            !hasUserQuery || hasRequestedWindowing || columns.Length > 0,
-            columns);
-    }
 
     private static PlotRequestOptions ValidatePlotRequest(OlapQueryRequestDto? request)
     {
