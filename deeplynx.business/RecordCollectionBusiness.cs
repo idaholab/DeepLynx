@@ -203,12 +203,15 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
             tagIds.All(tagId => r.Tags.Any(t => t.Id == tagId)));
 
         // if user is not admin, filter out unauthorized labels
-        // if (!isSysAdmin && !isOrgAdmin && !isProjectAdmin)
-        // {
-        //     var userAuthorizedLabels = await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
-        //         currentUserId, organizationId, projectId, "read record");
-        //     recordQuery = recordQuery.WithAuthorizedLabels(userAuthorizedLabels);
-        // }
+        if (!isSysAdmin && !isOrgAdmin && !isProjectAdmin)
+        {
+            var userAuthorizedLabels = await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
+                currentUserId, organizationId, projectId, "read record");
+                
+            recordQuery = recordQuery.Where(r =>
+                r.Labels.Count == 0 ||
+                r.Labels.All(l => userAuthorizedLabels.Contains(l.Id)));
+        }
 
         var records = await recordQuery
             .Include(r => r.Tags)
