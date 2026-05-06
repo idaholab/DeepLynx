@@ -102,7 +102,8 @@ export type UploadProgressEvent = {
 //Widgets
 export type WidgetType =
   | "ProjectOverview"
-  | "TeamMembers";
+  | "TeamMembers"
+  | "SavedSearches";
 
 export type QueryBuilderQuery = {
   id: string;
