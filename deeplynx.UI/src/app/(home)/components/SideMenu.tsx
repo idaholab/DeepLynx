@@ -20,16 +20,14 @@ import type { ProjectResponseDto } from "../types/responseDTOs";
 import {
   AdjustmentsHorizontalIcon,
   ArrowUpTrayIcon,
-  ClipboardDocumentCheckIcon,
+  BeakerIcon,
   ChevronDownIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
   ChevronUpIcon,
   FolderIcon,
   PresentationChartLineIcon,
-  QueueListIcon,
   RectangleGroupIcon,
-  Squares2X2Icon,
   SparklesIcon,
   TableCellsIcon,
   XMarkIcon,
@@ -344,8 +342,8 @@ const SideMenu: React.FC<SideMenuProps> = ({
                       <button
                         onClick={() => handleProjectClick(proj)}
                         className={`w-full text-left py-2 px-4 rounded transition text-sm flex items-center ${isProjectActive(proj.id)
-                            ? "bg-info/30 text-primary-content font-semibold"
-                            : "hover:bg-info/20 text-primary-content"
+                          ? "bg-info/30 text-primary-content font-semibold"
+                          : "hover:bg-info/20 text-primary-content"
                           }`}
                       >
                         <span className="truncate">{proj.name}</span>
@@ -451,7 +449,7 @@ const SideMenu: React.FC<SideMenuProps> = ({
               onClick={() => onMobileClose?.()}
               className={getItemClass("/lattice/decisions")}
             >
-              <ClipboardDocumentCheckIcon className="size-6" />
+              <BeakerIcon className="size-6" />
               {!isCollapsed && <p className="ml-2">Lattice</p>}
             </Link>
           </li>
