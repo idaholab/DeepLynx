@@ -6,6 +6,7 @@ metadata:
   labels:
     name: deeplynxv3-dev
 
+
 # Secret for Azure Storage Account with SAS Token
 ---
 apiVersion: v1
@@ -19,6 +20,7 @@ stringData:
   azurestorageaccountsastoken: ${AZURE_STORAGE_ACCOUNT_SAS_TOKEN}
   azurestorageaccountkey: ${AZURE_STORAGE_ACCOUNT_KEY}
   azurestorageconnectionstring: ${AZURE_OBJECT_CONNECTION_STRING}
+
 
 # Persistent Volume pointing to existing Azure File Share
 ---
@@ -57,6 +59,7 @@ spec:
       name: azure-storage-secret
       namespace: deeplynxv3-dev
 
+
 # Storage Class (simplified for static provisioning)
 ---
 apiVersion: storage.k8s.io/v1
@@ -70,6 +73,7 @@ parameters:
 reclaimPolicy: Retain
 allowVolumeExpansion: true
 volumeBindingMode: Immediate
+
 
 # Persistent Volume Claim
 ---
@@ -269,6 +273,16 @@ spec:
                 secretKeyRef:
                   name: azure-storage-secret
                   key: azurestorageconnectionstring
+            - name: ENCRYPTION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: encryption-key
+            - name: ENCRYPTION_IV
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: encryption-iv
             - name: AZURE_CONTAINER_NAME
               value: ${AZURE_CONTAINER_NAME}
             - name: ConnectionStrings__DefaultConnection
@@ -319,6 +333,12 @@ spec:
               value: ${INSIGHT_FASTAPI_URL}
             - name: SUPERUSER_EMAIL
               value: ${SUPERUSER_EMAIL}
+            - name: AIRFLOW_BASE_URL
+              value: ${AIRFLOW_BASE_URL}
+            - name: AIRFLOW_USERNAME
+              value: ${AIRFLOW_USERNAME}
+            - name: AIRFLOW_PASSWORD
+              value: ${AIRFLOW_PASSWORD}
             - name: OKTA_CLIENT_SECRET
               # Backend may also need these environment variables
 
@@ -388,6 +408,7 @@ spec:
           persistentVolumeClaim:
             claimName: ${AZURE_FILE_SHARE_PVC}
 
+
 #docs
 ---
 apiVersion: apps/v1
@@ -425,6 +446,7 @@ spec:
               memory: "512Mi"
           ports:
             - containerPort: 3001
+
 
 #mcp
 ---
@@ -520,6 +542,7 @@ spec:
             timeoutSeconds: 5
             failureThreshold: 3
 
+
 # insight-storage: scratch volume for the Insight processing pipeline
 ---
 apiVersion: v1
@@ -534,6 +557,7 @@ spec:
     requests:
       storage: 25Gi
   storageClassName: ${AZURE_FILE_SHARE_STORAGE_CLASS}
+
 
 # insight-fastapi
 ---
@@ -642,6 +666,7 @@ spec:
           persistentVolumeClaim:
             claimName: insight-storage
 
+
 # insight-rabbitmq-runner
 ---
 apiVersion: apps/v1
@@ -709,6 +734,16 @@ spec:
                 secretKeyRef:
                   name: app-secrets
                   key: emb-auth-token
+            - name: ENCRYPTION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: encryption-key
+            - name: ENCRYPTION_IV
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: encryption-iv
             - name: LLM_SERVER_URL
               value: "http://deeplynx-api.inl.gov:4000/v1"
             - name: LLM_MODEL_NAME

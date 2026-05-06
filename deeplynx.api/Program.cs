@@ -193,7 +193,10 @@ try
     builder.Services.AddScoped<ISensitivityLabelService, SensitivityLabelService>();
     builder.Services.AddTransient<IInsightBusiness, InsightBusiness>();
     builder.Services.AddTransient<ILatticeExtractionBusiness, LatticeExtractionBusiness>();
+    builder.Services.AddMemoryCache();
     builder.Services.AddHttpClient<InsightServiceClient>();
+    builder.Services.AddHttpClient<AirflowServiceClient>();
+    builder.Services.AddSingleton<EncryptionHelper>();
 
     //OpenApi Documentation
     builder.Services.AddOpenApi(options =>
@@ -326,6 +329,9 @@ try
                 // Metrics
                 new() { Name = "Metrics", Description = "System Statistics" },
 
+                // Integrations
+                new() { Name = "Airflow", Description = "Apache Airflow DAG management" },
+
                 // Other
                 new() { Name = "Notification", Description = "Notifications" }
             };
@@ -420,6 +426,11 @@ try
                 },
                 new JsonObject
                 {
+                    ["name"] = "Integrations",
+                    ["tags"] = new JsonArray { "Airflow" }
+                },
+                new JsonObject
+                {
                     ["name"] = "Other",
                     ["tags"] = new JsonArray { "Notification" }
                 }
@@ -493,6 +504,11 @@ try
        ║      Check DB Version      ║
        ╚════════════════════════════╝ */
     await DatabaseVersionChecker.CheckDatabaseVersion(connectionString);
+    
+    /* ╔════════════════════════════╗
+       ║   Check Encryption Keys    ║
+       ╚════════════════════════════╝ */
+    EncryptionHelper.CheckEncryptionConfig();
 
     /* ╔════════════════════════════╗
        ║      App Configurations    ║
@@ -538,8 +554,8 @@ try
         app.MapHub<EventNotificationHub>("/eventNotificationHub"); // endpoint for real-time notifications with SignalR
 
     /* ╔════════════════════════════╗
-    ║   Scalar Configuration     ║
-    ╚════════════════════════════╝ */
+       ║   Scalar Configuration     ║
+       ╚════════════════════════════╝ */
     // Always using scalar:
     //if (app.Environment.IsDevelopment()) { ...
     // app.UseOpenApi();

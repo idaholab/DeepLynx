@@ -1,71 +1,132 @@
-using System.Text.Json.Nodes;
+using Azure.Storage.Blobs;
 using deeplynx.business;
 using deeplynx.datalayer.Models;
+using deeplynx.helpers;
 using deeplynx.interfaces;
 using deeplynx.models;
 using Moq;
-
+using Testcontainers.Azurite;
+ 
 namespace deeplynx.tests;
-
-[Collection("Test Suite Collection")]
-public class MetricsBusinessTests : IntegrationTestBase
+ 
+// Fixture for Azurite container
+public class MetricsAzuriteFixture : IAsyncLifetime
 {
-    private MetricsBusiness _metricsBusiness = null!;
-    private Mock<IFileBusinessFactory> _mockFileBusinessFactory = null!;
-    private Mock<IFileBusiness> _mockFilesystemBusiness = null!;
-    private Mock<IFileBusiness> _mockAzureBusiness = null!;
-    
-    // Test data IDs
-    private long _oid;
-    private long _oid2;
-    private long _pid;
-    private long _pid2;
-    private long _uid;
-    
-    // Object storage IDs
-    private long _fsOsId; // Filesystem project storage
-    private long _azureOsId; // Azure project storage
-    private long _orgFsOsId; // Filesystem org storage
-    private long _orgAzureOsId; // Azure org storage
-    private long _archivedOsId; // Archived storage
-
-    public MetricsBusinessTests(TestSuiteFixture fixture) : base(fixture)
+    private AzuriteContainer _azuriteContainer = null!;
+ 
+    public string AzuriteConnectionString { get; private set; } = null!;
+ 
+    public async Task InitializeAsync()
     {
+        _azuriteContainer = new AzuriteBuilder()
+            .WithImage("mcr.microsoft.com/azure-storage/azurite:latest")
+            .Build();
+ 
+        await _azuriteContainer.StartAsync();
+        AzuriteConnectionString = _azuriteContainer.GetConnectionString();
     }
-
+ 
+    public async Task DisposeAsync()
+    {
+        await _azuriteContainer.DisposeAsync();
+    }
+}
+ 
+[Collection("Test Suite Collection")]
+public class MetricsBusinessTests : IntegrationTestBase, IClassFixture<MetricsAzuriteFixture>
+{
+    private readonly MetricsAzuriteFixture _azuriteFixture;
+    private readonly string _filesystemBasePath = Path.Combine(Path.GetTempPath(), "MetricsBusinessTests");
+    
+    private MetricsBusiness _metricsBusiness = null!;
+    private IFileBusinessFactory _fileBusinessFactory = null!;
+    private IObjectStorageBusiness _objectStorageBusiness = null!;
+    private EncryptionHelper _encryptionHelper = null!;
+ 
+    // Organization IDs
+    private long _org1Id;
+    private long _org2Id;
+ 
+    // Project IDs
+    private long _org1Proj1Id; // Org1, Project1
+    private long _org2Proj1Id; // Org2, Project1
+    private long _org2Proj2Id; // Org2, Project2
+ 
+    // Filesystem Object Storage IDs
+    private long _fsOrg1Proj1StorageId;
+    private long _fsOrg2Proj1StorageId;
+    private long _fsOrg2Proj2StorageId;
+ 
+    // Azure Object Storage IDs
+    private long _azureOrg1Proj1StorageId;
+    private long _azureOrg2Proj1StorageId;
+    private long _azureOrg2Proj2StorageId;
+ 
+    // User ID
+    private long _userId;
+ 
+    public MetricsBusinessTests(TestSuiteFixture fixture, MetricsAzuriteFixture azuriteFixture) : base(fixture)
+    {
+        _azuriteFixture = azuriteFixture;
+    }
+ 
     public override async Task InitializeAsync()
     {
+        // Set up encryption keys
+        Environment.SetEnvironmentVariable("ENCRYPTION_KEY", "SU5TRUNVUkVfREVWX0tFWV8zMl9CWVRFU19MT05HISE=");
+        Environment.SetEnvironmentVariable("ENCRYPTION_IV", "SU5TRUNVUkVfREVWX0lWIQ==");
+        
+        _encryptionHelper = new EncryptionHelper();
+        
         await base.InitializeAsync();
+ 
+        // Create filesystem directory
+        Directory.CreateDirectory(_filesystemBasePath);
         
-        // Setup mocks
-        _mockFileBusinessFactory = new Mock<IFileBusinessFactory>();
-        _mockFilesystemBusiness = new Mock<IFileBusiness>();
-        _mockAzureBusiness = new Mock<IFileBusiness>();
+        // Ensure all seeded data is committed before initializing business layer
+        await Context.SaveChangesAsync();
+ 
+        // Initialize business layer
+        _objectStorageBusiness = new ObjectStorageBusiness(Context, _encryptionHelper);
         
-        // Configure factory to return appropriate mock based on storage type
-        _mockFileBusinessFactory
-            .Setup(f => f.CreateFileBusiness("filesystem"))
-            .Returns(_mockFilesystemBusiness.Object);
+        var fileBusinessFactory = new Mock<IFileBusinessFactory>();
+        var filesystemBusiness = new FileFilesystemBusiness(Context, _objectStorageBusiness, null!, null!);
+        var azureBusiness = new FileAzureBusiness();
         
-        _mockFileBusinessFactory
-            .Setup(f => f.CreateFileBusiness("azure_object"))
-            .Returns(_mockAzureBusiness.Object);
+        fileBusinessFactory.Setup(x => x.CreateFileBusiness("filesystem")).Returns(filesystemBusiness);
+        fileBusinessFactory.Setup(x => x.CreateFileBusiness("azure_object")).Returns(azureBusiness);
         
-        // Setup BuildPrefix for filesystem (uses "org_" prefix)
-        _mockFilesystemBusiness
-            .Setup(f => f.BuildPrefix(It.IsAny<long>(), It.IsAny<long?>()))
-            .Returns<long, long?>((orgId, projId) => 
-                projId.HasValue ? $"org_{orgId}/project_{projId.Value}/" : $"org_{orgId}/");
+        _fileBusinessFactory = fileBusinessFactory.Object;
         
-        // Setup BuildPrefix for Azure (uses "organization_" prefix)
-        _mockAzureBusiness
-            .Setup(f => f.BuildPrefix(It.IsAny<long>(), It.IsAny<long?>()))
-            .Returns<long, long?>((orgId, projId) => 
-                projId.HasValue ? $"organization_{orgId}/project_{projId.Value}/" : $"organization_{orgId}/");
-        
-        _metricsBusiness = new MetricsBusiness(Context, _mockFileBusinessFactory.Object);
+        _metricsBusiness = new MetricsBusiness(Context, _fileBusinessFactory, _objectStorageBusiness);
     }
-
+ 
+    public override async Task DisposeAsync()
+    {
+        // Clean up filesystem
+        if (Directory.Exists(_filesystemBasePath))
+        {
+            try
+            {
+                Directory.Delete(_filesystemBasePath, true);
+            }
+            catch
+            {
+                // Ignore cleanup errors
+            }
+        }
+ 
+        // Clean up Azure containers
+        var blobServiceClient = new BlobServiceClient(_azuriteFixture.AzuriteConnectionString);
+        await foreach (var containerItem in blobServiceClient.GetBlobContainersAsync())
+        {
+            var container = blobServiceClient.GetBlobContainerClient(containerItem.Name);
+            await container.DeleteIfExistsAsync();
+        }
+ 
+        await base.DisposeAsync();
+    }
+ 
     protected override async Task SeedTestDataAsync()
     {
         await base.SeedTestDataAsync();
@@ -74,639 +135,520 @@ public class MetricsBusinessTests : IntegrationTestBase
         var user = new User
         {
             Name = "Test User",
-            Email = "metrics.test@test.com"
+            Email = "metrics-test@test.com",
+            Password = "test_password",
+            IsArchived = false
         };
         Context.Users.Add(user);
         await Context.SaveChangesAsync();
-        _uid = user.Id;
+        _userId = user.Id;
 
-        // Create organization 1
+        // Create Organization 1
         var org1 = new Organization
         {
-            Name = "Test Org 1",
+            Name = "Organization 1",
             LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
-            LastUpdatedBy = _uid
+            LastUpdatedBy = _userId
         };
         Context.Organizations.Add(org1);
         await Context.SaveChangesAsync();
-        _oid = org1.Id;
+        _org1Id = org1.Id;
 
-        // Create organization 2
+        // Create Organization 2
         var org2 = new Organization
         {
-            Name = "Test Org 2",
+            Name = "Organization 2",
             LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
-            LastUpdatedBy = _uid
+            LastUpdatedBy = _userId
         };
         Context.Organizations.Add(org2);
         await Context.SaveChangesAsync();
-        _oid2 = org2.Id;
+        _org2Id = org2.Id;
 
-        // Create project 1 in org 1
-        var project1 = new Project
+        // Create Project 1 for Org 1
+        var org1Proj1 = new Project
         {
-            Name = "Test Project 1",
-            OrganizationId = _oid,
+            Name = "Org1 Project1",
+            OrganizationId = _org1Id,
             LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
-            LastUpdatedBy = _uid
+            LastUpdatedBy = _userId
         };
-        Context.Projects.Add(project1);
+        Context.Projects.Add(org1Proj1);
         await Context.SaveChangesAsync();
-        _pid = project1.Id;
+        _org1Proj1Id = org1Proj1.Id;
 
-        // Create project 2 in org 1
-        var project2 = new Project
+        // Create Project 1 for Org 2
+        var org2Proj1 = new Project
         {
-            Name = "Test Project 2",
-            OrganizationId = _oid,
+            Name = "Org2 Project1",
+            OrganizationId = _org2Id,
             LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
-            LastUpdatedBy = _uid
+            LastUpdatedBy = _userId
         };
-        Context.Projects.Add(project2);
+        Context.Projects.Add(org2Proj1);
         await Context.SaveChangesAsync();
-        _pid2 = project2.Id;
+        _org2Proj1Id = org2Proj1.Id;
 
-        // Create filesystem storage for project 1
-        var fsConfig = new JsonObject
+        // Create Project 2 for Org 2
+        var org2Proj2 = new Project
         {
-            ["mountPath"] = "/test/path"
+            Name = "Org2 Project2",
+            OrganizationId = _org2Id,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = _userId
         };
-        var fsStorage = new ObjectStorage
+        Context.Projects.Add(org2Proj2);
+        await Context.SaveChangesAsync();
+        _org2Proj2Id = org2Proj2.Id;
+
+        // ========== FILESYSTEM OBJECT STORAGES ==========
+
+        // Filesystem storage for Org1 Project1
+        var fsOrg1Proj1Config = new ObjectStorageConfigDto
         {
-            Name = "Filesystem Project Storage",
-            ProjectId = _pid,
-            OrganizationId = _oid,
+            MountPath = _filesystemBasePath
+        };
+        var fsOrg1Proj1Storage = new ObjectStorage
+        {
+            Name = "FS Org1 Proj1 Storage",
+            ProjectId = _org1Proj1Id,
+            OrganizationId = _org1Id,
             Type = "filesystem",
-            Config = fsConfig.ToString(),
-            Default = true
+            ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(fsOrg1Proj1Config),
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = _userId
         };
-        Context.ObjectStorages.Add(fsStorage);
+        Context.ObjectStorages.Add(fsOrg1Proj1Storage);
         await Context.SaveChangesAsync();
-        _fsOsId = fsStorage.Id;
+        _fsOrg1Proj1StorageId = fsOrg1Proj1Storage.Id;
 
-        // Create Azure storage for project 1
-        var azureConfig = new JsonObject
+        // Filesystem storage for Org2 Project1
+        var fsOrg2Proj1Config = new ObjectStorageConfigDto
         {
-            ["azureObjectConfig"] = new JsonObject
+            MountPath = _filesystemBasePath
+        };
+        var fsOrg2Proj1Storage = new ObjectStorage
+        {
+            Name = "FS Org2 Proj1 Storage",
+            ProjectId = _org2Proj1Id,
+            OrganizationId = _org2Id,
+            Type = "filesystem",
+            ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(fsOrg2Proj1Config),
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = _userId
+        };
+        Context.ObjectStorages.Add(fsOrg2Proj1Storage);
+        await Context.SaveChangesAsync();
+        _fsOrg2Proj1StorageId = fsOrg2Proj1Storage.Id;
+
+        // Filesystem storage for Org2 Project2
+        var fsOrg2Proj2Config = new ObjectStorageConfigDto
+        {
+            MountPath = _filesystemBasePath
+        };
+        var fsOrg2Proj2Storage = new ObjectStorage
+        {
+            Name = "FS Org2 Proj2 Storage",
+            ProjectId = _org2Proj2Id,
+            OrganizationId = _org2Id,
+            Type = "filesystem",
+            ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(fsOrg2Proj2Config),
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = _userId
+        };
+        Context.ObjectStorages.Add(fsOrg2Proj2Storage);
+        await Context.SaveChangesAsync();
+        _fsOrg2Proj2StorageId = fsOrg2Proj2Storage.Id;
+
+        // ========== AZURE OBJECT STORAGES ==========
+
+        // Azure storage for Org1 Project1
+        var azureOrg1Proj1Config = new ObjectStorageConfigDto
+        {
+            AzureObjectConfig = new AzureObjectConfigDto
             {
-                ["azureConnectionString"] = "test-connection-string",
-                ["azureContainerName"] = "test-container"
+                AzureConnectionString = _azuriteFixture.AzuriteConnectionString,
+                AzureContainerName = "org1-proj1-container"
             }
         };
-        var azureStorage = new ObjectStorage
+        var azureOrg1Proj1Storage = new ObjectStorage
         {
-            Name = "Azure Project Storage",
-            ProjectId = _pid,
-            OrganizationId = _oid,
+            Name = "Azure Org1 Proj1 Storage",
+            ProjectId = _org1Proj1Id,
+            OrganizationId = _org1Id,
             Type = "azure_object",
-            Config = azureConfig.ToString(),
-            Default = false
+            ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(azureOrg1Proj1Config),
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = _userId
         };
-        Context.ObjectStorages.Add(azureStorage);
+        Context.ObjectStorages.Add(azureOrg1Proj1Storage);
         await Context.SaveChangesAsync();
-        _azureOsId = azureStorage.Id;
+        _azureOrg1Proj1StorageId = azureOrg1Proj1Storage.Id;
 
-        // Create filesystem org-level storage
-        var orgFsConfig = new JsonObject
+        // Azure storage for Org2 Project1
+        var azureOrg2Proj1Config = new ObjectStorageConfigDto
         {
-            ["mountPath"] = "/org/test/path"
-        };
-        var orgFsStorage = new ObjectStorage
-        {
-            Name = "Filesystem Org Storage",
-            ProjectId = null,
-            OrganizationId = _oid,
-            Type = "filesystem",
-            Config = orgFsConfig.ToString(),
-            Default = false
-        };
-        Context.ObjectStorages.Add(orgFsStorage);
-        await Context.SaveChangesAsync();
-        _orgFsOsId = orgFsStorage.Id;
-
-        // Create Azure org-level storage
-        var orgAzureConfig = new JsonObject
-        {
-            ["azureObjectConfig"] = new JsonObject
+            AzureObjectConfig = new AzureObjectConfigDto
             {
-                ["azureConnectionString"] = "test-connection-string",
-                ["azureContainerName"] = "org-container"
+                AzureConnectionString = _azuriteFixture.AzuriteConnectionString,
+                AzureContainerName = "org2-proj1-container"
             }
         };
-        var orgAzureStorage = new ObjectStorage
+        var azureOrg2Proj1Storage = new ObjectStorage
         {
-            Name = "Azure Org Storage",
-            ProjectId = null,
-            OrganizationId = _oid,
+            Name = "Azure Org2 Proj1 Storage",
+            ProjectId = _org2Proj1Id,
+            OrganizationId = _org2Id,
             Type = "azure_object",
-            Config = orgAzureConfig.ToString(),
-            Default = false
+            ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(azureOrg2Proj1Config),
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = _userId
         };
-        Context.ObjectStorages.Add(orgAzureStorage);
+        Context.ObjectStorages.Add(azureOrg2Proj1Storage);
         await Context.SaveChangesAsync();
-        _orgAzureOsId = orgAzureStorage.Id;
+        _azureOrg2Proj1StorageId = azureOrg2Proj1Storage.Id;
 
-        // Create archived storage
-        var archivedConfig = new JsonObject
+        // Azure storage for Org2 Project2
+        var azureOrg2Proj2Config = new ObjectStorageConfigDto
         {
-            ["mountPath"] = "/archived/path"
+            AzureObjectConfig = new AzureObjectConfigDto
+            {
+                AzureConnectionString = _azuriteFixture.AzuriteConnectionString,
+                AzureContainerName = "org2-proj2-container"
+            }
         };
-        var archivedStorage = new ObjectStorage
+        var azureOrg2Proj2Storage = new ObjectStorage
         {
-            Name = "Archived Storage",
-            ProjectId = _pid,
-            OrganizationId = _oid,
-            Type = "filesystem",
-            Config = archivedConfig.ToString(),
-            Default = false,
+            Name = "Azure Org2 Proj2 Storage",
+            ProjectId = _org2Proj2Id,
+            OrganizationId = _org2Id,
+            Type = "azure_object",
+            ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(azureOrg2Proj2Config),
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = _userId
+        };
+        Context.ObjectStorages.Add(azureOrg2Proj2Storage);
+        await Context.SaveChangesAsync();
+        _azureOrg2Proj2StorageId = azureOrg2Proj2Storage.Id;
+
+        // ========== CREATE FILESYSTEM DIRECTORY STRUCTURES WITH FILES ==========
+
+        // Org1 Project1 files (3KB total)
+        var org1Proj1Path = Path.Combine(_filesystemBasePath, $"org_{_org1Id}", $"project_{_org1Proj1Id}");
+        Directory.CreateDirectory(org1Proj1Path);
+        await File.WriteAllBytesAsync(Path.Combine(org1Proj1Path, "file1.txt"), new byte[1024]); // 1KB
+        await File.WriteAllBytesAsync(Path.Combine(org1Proj1Path, "file2.txt"), new byte[2048]); // 2KB
+
+        // Org2 Project1 files (5KB total)
+        var org2Proj1Path = Path.Combine(_filesystemBasePath, $"org_{_org2Id}", $"project_{_org2Proj1Id}");
+        Directory.CreateDirectory(org2Proj1Path);
+        await File.WriteAllBytesAsync(Path.Combine(org2Proj1Path, "file1.txt"), new byte[2048]); // 2KB
+        await File.WriteAllBytesAsync(Path.Combine(org2Proj1Path, "file2.txt"), new byte[3072]); // 3KB
+
+        // Org2 Project2 files (7KB total)
+        var org2Proj2Path = Path.Combine(_filesystemBasePath, $"org_{_org2Id}", $"project_{_org2Proj2Id}");
+        Directory.CreateDirectory(org2Proj2Path);
+        await File.WriteAllBytesAsync(Path.Combine(org2Proj2Path, "file1.txt"), new byte[3072]); // 3KB
+        await File.WriteAllBytesAsync(Path.Combine(org2Proj2Path, "file2.txt"), new byte[4096]); // 4KB
+
+        // ========== CREATE AZURE BLOBS ==========
+
+        // Org1 Project1 blobs (4KB total)
+        var org1Proj1Container = new BlobContainerClient(
+            _azuriteFixture.AzuriteConnectionString, 
+            "org1-proj1-container");
+        await org1Proj1Container.CreateIfNotExistsAsync();
+        await UploadBlobAsync(org1Proj1Container, $"organization_{_org1Id}/project_{_org1Proj1Id}/file1.txt", 2048); // 2KB
+        await UploadBlobAsync(org1Proj1Container, $"organization_{_org1Id}/project_{_org1Proj1Id}/file2.txt", 2048); // 2KB
+
+        // Org2 Project1 blobs (6KB total)
+        var org2Proj1Container = new BlobContainerClient(
+            _azuriteFixture.AzuriteConnectionString, 
+            "org2-proj1-container");
+        await org2Proj1Container.CreateIfNotExistsAsync();
+        await UploadBlobAsync(org2Proj1Container, $"organization_{_org2Id}/project_{_org2Proj1Id}/file1.txt", 3072); // 3KB
+        await UploadBlobAsync(org2Proj1Container, $"organization_{_org2Id}/project_{_org2Proj1Id}/file2.txt", 3072); // 3KB
+
+        // Org2 Project2 blobs (9KB total)
+        var org2Proj2Container = new BlobContainerClient(
+            _azuriteFixture.AzuriteConnectionString, 
+            "org2-proj2-container");
+        await org2Proj2Container.CreateIfNotExistsAsync();
+        await UploadBlobAsync(org2Proj2Container, $"organization_{_org2Id}/project_{_org2Proj2Id}/file1.txt", 4096); // 4KB
+        await UploadBlobAsync(org2Proj2Container, $"organization_{_org2Id}/project_{_org2Proj2Id}/file2.txt", 5120); // 5KB
+
+        // ========== DATA SOURCES ==========
+
+        // Data source for Org1 Project1
+        var dsOrg1Proj1 = new DataSource
+        {
+            Name = "DS Org1 Project1",
+            OrganizationId = _org1Id,
+            ProjectId = _org1Proj1Id,
+            IsArchived = false
+        };
+        Context.DataSources.Add(dsOrg1Proj1);
+
+        // Data source for Org2 Project1
+        var dsOrg2Proj1 = new DataSource
+        {
+            Name = "DS Org2 Project1",
+            OrganizationId = _org2Id,
+            ProjectId = _org2Proj1Id,
+            IsArchived = false
+        };
+        Context.DataSources.Add(dsOrg2Proj1);
+        
+        // Archived data source for Org2 Project1
+        var arcOrg2Proj1Id = new DataSource
+        {
+            Name = "Archived Org2 Project1",
+            OrganizationId = _org2Id,
+            ProjectId = _org2Proj1Id,
             IsArchived = true
         };
-        Context.ObjectStorages.Add(archivedStorage);
+        Context.DataSources.Add(arcOrg2Proj1Id);
+
+        // Data source for Org2 Project2
+        var dsOrg2Proj2 = new DataSource
+        {
+            Name = "DS Org2 Project2",
+            OrganizationId = _org2Id,
+            ProjectId = _org2Proj2Id,
+            IsArchived = false
+        };
+        Context.DataSources.Add(dsOrg2Proj2);
+
+        // Org-level data source for Org1
+        var dsOrg1OrgLevel = new DataSource
+        {
+            Name = "DS Org1 OrgLevel",
+            OrganizationId = _org1Id,
+            ProjectId = null,
+            IsArchived = false
+        };
+        Context.DataSources.Add(dsOrg1OrgLevel);
+
         await Context.SaveChangesAsync();
-        _archivedOsId = archivedStorage.Id;
     }
-
-    #region GetObjectStorageSize Tests
-
-    [Fact]
-    public async Task GetObjectStorageSize_CallsCorrectFileBusiness_ForFilesystem()
+ 
+    #region Helper Methods
+ 
+    private async Task UploadBlobAsync(BlobContainerClient container, string blobName, long sizeInBytes)
     {
-        // Arrange
-        _mockFilesystemBusiness
-            .Setup(f => f.GetStorageSize(It.IsAny<string>(), It.IsAny<ObjectStorageConfigDto>()))
-            .ReturnsAsync(5000L);
-
-        // Act
-        var result = await _metricsBusiness.GetObjectStorageSize(_oid, _pid, _fsOsId);
-
-        // Assert
-        Assert.NotNull(result);
-        Assert.Equal(5000L, result.Bytes);
-        _mockFileBusinessFactory.Verify(f => f.CreateFileBusiness("filesystem"), Times.Once);
+        var blob = container.GetBlobClient(blobName);
+        var content = new byte[sizeInBytes];
+        new Random().NextBytes(content);
+        using var stream = new MemoryStream(content);
+        await blob.UploadAsync(stream, overwrite: true);
     }
-
-    [Fact]
-    public async Task GetObjectStorageSize_CallsCorrectFileBusiness_ForAzure()
-    {
-        // Arrange
-        _mockAzureBusiness
-            .Setup(f => f.GetStorageSize(It.IsAny<string>(), It.IsAny<ObjectStorageConfigDto>()))
-            .ReturnsAsync(3000L);
-
-        // Act
-        var result = await _metricsBusiness.GetObjectStorageSize(_oid, _pid, _azureOsId);
-
-        // Assert
-        Assert.NotNull(result);
-        Assert.Equal(3000L, result.Bytes);
-        _mockFileBusinessFactory.Verify(f => f.CreateFileBusiness("azure_object"), Times.Once);
-    }
-
-    [Fact]
-    public async Task GetObjectStorageSize_UsesCorrectPrefix_ForProjectStorage()
-    {
-        // Arrange
-        _mockFilesystemBusiness
-            .Setup(f => f.GetStorageSize(It.IsAny<string>(), It.IsAny<ObjectStorageConfigDto>()))
-            .ReturnsAsync(1000L);
-
-        // Act
-        await _metricsBusiness.GetObjectStorageSize(_oid, _pid, _fsOsId);
-
-        // Assert
-        _mockFilesystemBusiness.Verify(
-            f => f.GetStorageSize($"org_{_oid}/project_{_pid}/", It.IsAny<ObjectStorageConfigDto>()), 
-            Times.Once);
-    }
-
-    [Fact]
-    public async Task GetObjectStorageSize_UsesCorrectPrefix_ForOrgStorage()
-    {
-        // Arrange
-        _mockFilesystemBusiness
-            .Setup(f => f.GetStorageSize(It.IsAny<string>(), It.IsAny<ObjectStorageConfigDto>()))
-            .ReturnsAsync(1000L);
-
-        // Act - Call with null projectId for org-level storage
-        await _metricsBusiness.GetObjectStorageSize(_oid, null, _orgFsOsId);
-
-        // Assert
-        _mockFilesystemBusiness.Verify(
-            f => f.GetStorageSize($"org_{_oid}/", It.IsAny<ObjectStorageConfigDto>()), 
-            Times.Once);
-    }
-
-    [Fact]
-    public async Task GetObjectStorageSize_ThrowsKeyNotFoundException_WhenStorageNotFound()
-    {
-        // Arrange
-        var nonExistentId = 99999L;
-
-        // Act & Assert
-        await Assert.ThrowsAsync<KeyNotFoundException>(
-            () => _metricsBusiness.GetObjectStorageSize(_oid, _pid, nonExistentId));
-    }
-
-    [Fact]
-    public async Task GetObjectStorageSize_ThrowsKeyNotFoundException_WhenStorageArchived()
-    {
-        // Act & Assert
-        await Assert.ThrowsAsync<KeyNotFoundException>(
-            () => _metricsBusiness.GetObjectStorageSize(_oid, _pid, _archivedOsId));
-    }
-
-    [Fact]
-    public async Task GetObjectStorageSize_ThrowsInvalidOperationException_WhenProjectMismatch()
-    {
-        // Arrange
-        _mockFilesystemBusiness
-            .Setup(f => f.GetStorageSize(It.IsAny<string>(), It.IsAny<ObjectStorageConfigDto>()))
-            .ReturnsAsync(1000L);
-
-        // Act & Assert - Try to access project 1 storage with project 2 ID
-        await Assert.ThrowsAsync<InvalidOperationException>(
-            () => _metricsBusiness.GetObjectStorageSize(_oid, _pid2, _fsOsId));
-    }
-
-    [Fact]
-    public async Task GetObjectStorageSize_ThrowsKeyNotFoundException_WhenProjectDoesNotExist()
-    {
-        // Arrange
-        var nonExistentProjectId = 99999L;
-
-        // Act & Assert
-        await Assert.ThrowsAsync<KeyNotFoundException>(
-            () => _metricsBusiness.GetObjectStorageSize(_oid, nonExistentProjectId, _fsOsId));
-    }
-
-    [Fact]
-    public async Task GetObjectStorageSize_ExcludesArchivedStorages()
-    {
-        // Act & Assert
-        await Assert.ThrowsAsync<KeyNotFoundException>(
-            () => _metricsBusiness.GetObjectStorageSize(_oid, _pid, _archivedOsId));
-    }
-
+ 
     #endregion
-
-    #region GetProjectStorageSize Tests
-
+ 
+    #region Get_StorageSize Tests
+ 
     [Fact]
-    public async Task GetProjectStorageSize_ReturnsAllStorages_InProject()
+    public async Task GetProjectStorageSize_AggregatesAllStorageTypes()
     {
         // Arrange
-        _mockFilesystemBusiness
-            .Setup(f => f.GetStorageSize(It.IsAny<string>(), It.IsAny<ObjectStorageConfigDto>()))
-            .ReturnsAsync(1000L);
-        
-        _mockAzureBusiness
-            .Setup(f => f.GetStorageSize(It.IsAny<string>(), It.IsAny<ObjectStorageConfigDto>()))
-            .ReturnsAsync(2000L);
-
+        // Org2 Project1 has:
+        // - Filesystem: 5KB (2KB + 3KB)
+        // - Azure: 6KB (3KB + 3KB)
+        // Total: 11KB
+ 
         // Act
-        var result = await _metricsBusiness.GetProjectStorageSize(_oid, _pid);
-
+        var result = await _metricsBusiness.GetProjectStorageSize(_org2Id, _org2Proj1Id);
+ 
         // Assert
         Assert.NotNull(result);
-        // 2 project storages (fs + azure) + 2 org storages = 4 total
-        // Each filesystem storage = 1000, each azure storage = 2000
-        // Total = 1000 + 2000 + 1000 + 2000 = 6000
-        Assert.Equal(6000L, result.Bytes);
+        Assert.Equal(11264, result.Bytes); // Filesystem: 5120 + Azure: 6144 = 11264 bytes
     }
-
-    [Fact]
-    public async Task GetProjectStorageSize_ExcludesArchivedStorages()
-    {
-        // Arrange
-        _mockFilesystemBusiness
-            .Setup(f => f.GetStorageSize(It.IsAny<string>(), It.IsAny<ObjectStorageConfigDto>()))
-            .ReturnsAsync(1000L);
-
-        // Act
-        var result = await _metricsBusiness.GetProjectStorageSize(_oid, _pid);
-
-        // Assert - Verify archived storage wasn't included
-        // Should only process non-archived storages
-        _mockFilesystemBusiness.Verify(
-            f => f.GetStorageSize(It.IsAny<string>(), It.IsAny<ObjectStorageConfigDto>()),
-            Times.Exactly(2)); // 1 project + 1 org level filesystem storage
-    }
-
-    [Fact]
-    public async Task GetProjectStorageSize_IncludesOrgLevelStorages()
-    {
-        // Arrange
-        _mockFilesystemBusiness
-            .Setup(f => f.GetStorageSize(It.IsAny<string>(), It.IsAny<ObjectStorageConfigDto>()))
-            .ReturnsAsync(1000L);
-        
-        _mockAzureBusiness
-            .Setup(f => f.GetStorageSize(It.IsAny<string>(), It.IsAny<ObjectStorageConfigDto>()))
-            .ReturnsAsync(2000L);
-
-        // Act
-        await _metricsBusiness.GetProjectStorageSize(_oid, _pid);
-
-        // Assert - Should call GetStorageSize for both project and org-level storages
-        _mockFilesystemBusiness.Verify(
-            f => f.GetStorageSize(It.IsAny<string>(), It.IsAny<ObjectStorageConfigDto>()), 
-            Times.Exactly(2)); // Project filesystem + org filesystem
-        
-        _mockAzureBusiness.Verify(
-            f => f.GetStorageSize(It.IsAny<string>(), It.IsAny<ObjectStorageConfigDto>()), 
-            Times.Exactly(2)); // Project azure + org azure
-    }
-
-    [Fact]
-    public async Task GetProjectStorageSize_UsesProjectPrefix()
-    {
-        // Arrange
-        _mockFilesystemBusiness
-            .Setup(f => f.GetStorageSize(It.IsAny<string>(), It.IsAny<ObjectStorageConfigDto>()))
-            .ReturnsAsync(1000L);
-        
-        _mockAzureBusiness
-            .Setup(f => f.GetStorageSize(It.IsAny<string>(), It.IsAny<ObjectStorageConfigDto>()))
-            .ReturnsAsync(2000L);
-
-        // Act
-        await _metricsBusiness.GetProjectStorageSize(_oid, _pid);
-
-        // Assert
-        _mockFilesystemBusiness.Verify(
-            f => f.GetStorageSize($"org_{_oid}/project_{_pid}/", It.IsAny<ObjectStorageConfigDto>()), 
-            Times.Exactly(2)); // Called for both filesystem storages
-        
-        _mockAzureBusiness.Verify(
-            f => f.GetStorageSize($"organization_{_oid}/project_{_pid}/", It.IsAny<ObjectStorageConfigDto>()), 
-            Times.Exactly(2)); // Called for both Azure storages
-    }
-
-    [Fact]
-    public async Task GetProjectStorageSize_ContinuesOnError_ExcludesFailedStorage()
-    {
-        // Arrange
-        _mockFilesystemBusiness
-            .SetupSequence(f => f.GetStorageSize(It.IsAny<string>(), It.IsAny<ObjectStorageConfigDto>()))
-            .ReturnsAsync(1000L) // First call succeeds
-            .ThrowsAsync(new Exception("Storage error")); // Second call fails
-        
-        _mockAzureBusiness
-            .Setup(f => f.GetStorageSize(It.IsAny<string>(), It.IsAny<ObjectStorageConfigDto>()))
-            .ReturnsAsync(2000L);
-
-        // Act
-        var result = await _metricsBusiness.GetProjectStorageSize(_oid, _pid);
-
-        // Assert - Should still return a result
-        Assert.NotNull(result);
-        // 1000 (successful fs) + 0 (failed fs) + 2000 + 2000 (both azure) = 5000
-        Assert.Equal(5000L, result.Bytes);
-    }
-
-    [Fact]
-    public async Task GetProjectStorageSize_ThrowsKeyNotFoundException_WhenOrganizationDoesNotExist()
-    {
-        // Arrange
-        var nonExistentOrgId = 99999L;
-
-        // Act & Assert
-        await Assert.ThrowsAsync<KeyNotFoundException>(
-            () => _metricsBusiness.GetProjectStorageSize(nonExistentOrgId, _pid));
-    }
-
-    [Fact]
-    public async Task GetProjectStorageSize_ThrowsKeyNotFoundException_WhenProjectDoesNotExist()
-    {
-        // Arrange
-        var nonExistentProjectId = 99999L;
-
-        // Act & Assert
-        await Assert.ThrowsAsync<KeyNotFoundException>(
-            () => _metricsBusiness.GetProjectStorageSize(_oid, nonExistentProjectId));
-    }
-
-    [Fact]
-    public async Task GetProjectStorageSize_ThrowsInvalidOperationException_WhenProjectDoesNotBelongToOrganization()
-    {
-        // Arrange - project 1 belongs to org 1, try to access with org 2
-        
-        // Act & Assert
-        await Assert.ThrowsAsync<InvalidOperationException>(
-            () => _metricsBusiness.GetProjectStorageSize(_oid2, _pid));
-    }
-
-    #endregion
-
-    #region GetOrganizationStorageSize Tests
-
+    
     [Fact]
     public async Task GetOrganizationStorageSize_ReturnsAllStorages_InOrganization()
     {
         // Arrange
-        _mockFilesystemBusiness
-            .Setup(f => f.GetStorageSize(It.IsAny<string>(), It.IsAny<ObjectStorageConfigDto>()))
-            .ReturnsAsync(3000L);
-        
-        _mockAzureBusiness
-            .Setup(f => f.GetStorageSize(It.IsAny<string>(), It.IsAny<ObjectStorageConfigDto>()))
-            .ReturnsAsync(2000L);
+        // Org2 has:
+        // - Project1 Filesystem: 5KB (2KB + 3KB)
+        // - Project1 Azure: 6KB (3KB + 3KB)
+        // - Project2 Filesystem: 7KB (3KB + 4KB)
+        // - Project2 Azure: 9KB (4KB + 5KB)
+        // Total: 27KB
 
         // Act
-        var result = await _metricsBusiness.GetOrganizationStorageSize(_oid);
+        var result = await _metricsBusiness.GetOrganizationStorageSize(_org2Id);
 
         // Assert
         Assert.NotNull(result);
-        // 2 filesystem (3000 each) + 2 azure (2000 each) = 10000
-        Assert.Equal(10000L, result.Bytes);
+        Assert.Equal(27648, result.Bytes); // (5120 + 6144) + (7168 + 9216) = 27648 bytes
     }
-
-    [Fact]
-    public async Task GetOrganizationStorageSize_ExcludesArchivedStorages()
-    {
-        // Arrange
-        _mockFilesystemBusiness
-            .Setup(f => f.GetStorageSize(It.IsAny<string>(), It.IsAny<ObjectStorageConfigDto>()))
-            .ReturnsAsync(1000L);
-
-        // Act
-        var result = await _metricsBusiness.GetOrganizationStorageSize(_oid);
-
-        // Assert - Should only count non-archived (2 filesystem storages)
-        _mockFilesystemBusiness.Verify(
-            f => f.GetStorageSize(It.IsAny<string>(), It.IsAny<ObjectStorageConfigDto>()),
-            Times.Exactly(2)); // Only non-archived filesystem storages
-    }
-
-    [Fact]
-    public async Task GetOrganizationStorageSize_UsesOrgLevelPrefix()
-    {
-        // Arrange
-        _mockFilesystemBusiness
-            .Setup(f => f.GetStorageSize(It.IsAny<string>(), It.IsAny<ObjectStorageConfigDto>()))
-            .ReturnsAsync(1000L);
-        
-        _mockAzureBusiness
-            .Setup(f => f.GetStorageSize(It.IsAny<string>(), It.IsAny<ObjectStorageConfigDto>()))
-            .ReturnsAsync(2000L);
-
-        // Act
-        await _metricsBusiness.GetOrganizationStorageSize(_oid);
-
-        // Assert - Should use org-level prefix (no project)
-        _mockFilesystemBusiness.Verify(f => f.BuildPrefix(_oid, null), Times.Exactly(2));
-        _mockAzureBusiness.Verify(f => f.BuildPrefix(_oid, null), Times.Exactly(2));
-    }
-
-    [Fact]
-    public async Task GetOrganizationStorageSize_ReturnsZeroBytes_WhenNoStorages()
-    {
-        // Arrange - Use org 2 which has no storages
-        
-        // Act
-        var result = await _metricsBusiness.GetOrganizationStorageSize(_oid2);
-
-        // Assert
-        Assert.NotNull(result);
-        Assert.Equal(0L, result.Bytes);
-    }
-
-    [Fact]
-    public async Task GetOrganizationStorageSize_ThrowsKeyNotFoundException_WhenOrganizationDoesNotExist()
-    {
-        // Arrange
-        var nonExistentOrgId = 99999L;
-
-        // Act & Assert
-        await Assert.ThrowsAsync<KeyNotFoundException>(
-            () => _metricsBusiness.GetOrganizationStorageSize(nonExistentOrgId));
-    }
-
-    #endregion
-
-    #region GetSystemStorageSize Tests
 
     [Fact]
     public async Task GetSystemStorageSize_ReturnsAllStorages_SystemWide()
     {
         // Arrange
-        _mockFilesystemBusiness
-            .Setup(f => f.GetStorageSize(It.IsAny<string>(), It.IsAny<ObjectStorageConfigDto>()))
-            .ReturnsAsync(5000L);
-        
-        _mockAzureBusiness
-            .Setup(f => f.GetStorageSize(It.IsAny<string>(), It.IsAny<ObjectStorageConfigDto>()))
-            .ReturnsAsync(3000L);
+        // System-wide storage across all organizations:
+        // Org1:
+        // - Project1 Filesystem: 3KB (1KB + 2KB)
+        // - Project1 Azure: 4KB (2KB + 2KB)
+        // Org2:
+        // - Project1 Filesystem: 5KB (2KB + 3KB)
+        // - Project1 Azure: 6KB (3KB + 3KB)
+        // - Project2 Filesystem: 7KB (3KB + 4KB)
+        // - Project2 Azure: 9KB (4KB + 5KB)
+        // Total: 34KB
 
         // Act
         var result = await _metricsBusiness.GetSystemStorageSize();
 
         // Assert
         Assert.NotNull(result);
-        // Due to grouping by config, we should get unique configs
-        // 2 unique filesystem configs + 2 unique azure configs = 4 total
-        Assert.Equal(16000L, result.Bytes); // 2*5000 + 2*3000
+        Assert.Equal(34816, result.Bytes); // Org1: (3072 + 4096) + Org2: (5120 + 6144 + 7168 + 9216) = 34816 bytes
     }
+ 
+    #endregion
+    
+    #region GetSystemDataSourceCount Tests
 
     [Fact]
-    public async Task GetSystemStorageSize_ExcludesArchivedStorages()
+    public async Task GetSystemDataSourceCount_ReturnsZero_WhenNoDataSources()
     {
-        // Arrange
-        _mockFilesystemBusiness
-            .Setup(f => f.GetStorageSize(It.IsAny<string>(), It.IsAny<ObjectStorageConfigDto>()))
-            .ReturnsAsync(1000L);
-
-        // Act
-        var result = await _metricsBusiness.GetSystemStorageSize();
-
-        // Assert - Should not include archived storage
-        // Verify the method was called the correct number of times (non-archived only)
-        Assert.NotNull(result);
-    }
-
-    [Fact]
-    public async Task GetSystemStorageSize_UsesEmptyPrefix()
-    {
-        // Arrange
-        _mockFilesystemBusiness
-            .Setup(f => f.GetStorageSize(It.IsAny<string>(), It.IsAny<ObjectStorageConfigDto>()))
-            .ReturnsAsync(1000L);
+        // Arrange - delete existing data sources
+        var dataSources = Context.DataSources.ToList();
+        Context.DataSources.RemoveRange(dataSources);
+        await Context.SaveChangesAsync();
         
-        _mockAzureBusiness
-            .Setup(f => f.GetStorageSize(It.IsAny<string>(), It.IsAny<ObjectStorageConfigDto>()))
-            .ReturnsAsync(2000L);
-
         // Act
-        await _metricsBusiness.GetSystemStorageSize();
+        var count = await _metricsBusiness.GetSystemDataSourceCount();
 
-        // Assert - Should use empty prefix for system-wide
-        _mockFilesystemBusiness.Verify(
-            f => f.GetStorageSize("", It.IsAny<ObjectStorageConfigDto>()), 
-            Times.Exactly(2));
-        _mockAzureBusiness.Verify(
-            f => f.GetStorageSize("", It.IsAny<ObjectStorageConfigDto>()), 
-            Times.Exactly(2));
+        // Assert
+        Assert.Equal(0, count);
     }
 
     [Fact]
-    public async Task GetSystemStorageSize_DoesNotCallBuildPrefix()
+    public async Task GetSystemDataSourceCount_ReturnsAllNonArchived_SystemWide()
     {
-        // Arrange
-        _mockFilesystemBusiness
-            .Setup(f => f.GetStorageSize(It.IsAny<string>(), It.IsAny<ObjectStorageConfigDto>()))
-            .ReturnsAsync(1000L);
-
         // Act
-        await _metricsBusiness.GetSystemStorageSize();
+        var count = await _metricsBusiness.GetSystemDataSourceCount();
 
-        // Assert - BuildPrefix should not be called for system-wide (empty prefix)
-        _mockFilesystemBusiness.Verify(f => f.BuildPrefix(It.IsAny<long>(), It.IsAny<long?>()), Times.Never);
-        _mockAzureBusiness.Verify(f => f.BuildPrefix(It.IsAny<long>(), It.IsAny<long?>()), Times.Never);
+        // Assert - should include all non-archived across all orgs
+        Assert.Equal(4, count);
+    }
+
+    [Fact]
+    public async Task GetSystemDataSourceCount_HideArchivedFalse_IncludesArchived()
+    {
+        // Act
+        var countWithArchived = await _metricsBusiness.GetSystemDataSourceCount(hideArchived: false);
+        var countWithoutArchived = await _metricsBusiness.GetSystemDataSourceCount(hideArchived: true);
+
+        // Assert
+        Assert.Equal(5, countWithArchived);
+        Assert.Equal(4, countWithoutArchived);
+    }
+
+     #endregion
+
+    #region GetProjectDataSourceCount Tests
+
+    [Fact]
+    public async Task GetProjectDataSourceCount_ReturnsCount_ForProject()
+    { 
+        // Act
+        var count = await _metricsBusiness.GetProjectDataSourceCount(_org2Proj1Id);
+
+        // Assert - only one non-archived data source for org 2 project 1
+        Assert.Equal(1, count);
+    }
+
+    [Fact]
+    public async Task GetProjectDataSourceCount_IncludesArchived_WhenHideArchivedFalse()
+    {
+        // Act
+        var count = await _metricsBusiness.GetProjectDataSourceCount(_org2Proj1Id, hideArchived: false);
+
+        // Assert - two data sources counting the archived one
+        Assert.Equal(2, count);
+    }
+
+    [Fact]
+    public async Task GetProjectDataSourceCount_ReturnsZero_WhenNoDataSources()
+    {
+        // Arrange - delete existing data sources for o2p2 to test this
+        var org2Proj2DataSources = Context.DataSources
+            .Where(ds => ds.ProjectId == _org2Proj2Id)
+            .ToList();
+        Context.DataSources.RemoveRange(org2Proj2DataSources);
+        await Context.SaveChangesAsync();
+        
+        // Act - project 2 has no data sources
+        var count = await _metricsBusiness.GetProjectDataSourceCount(_org2Proj2Id);
+
+        // Assert
+        Assert.Equal(0, count);
     }
 
     #endregion
 
-    #region Factory Integration Tests
+    #region GetOrganizationDataSourceCount Tests
 
     [Fact]
-    public async Task MetricsBusiness_UsesFactory_ToGetCorrectImplementation()
+    public async Task GetOrganizationDataSourceCount_NoProjectIds_ReturnsAllForOrganization()
     {
-        // Arrange
-        _mockFilesystemBusiness
-            .Setup(f => f.GetStorageSize(It.IsAny<string>(), It.IsAny<ObjectStorageConfigDto>()))
-            .ReturnsAsync(1000L);
-        
-        _mockAzureBusiness
-            .Setup(f => f.GetStorageSize(It.IsAny<string>(), It.IsAny<ObjectStorageConfigDto>()))
-            .ReturnsAsync(2000L);
+        // Act - no projectIds filter, returns all in org
+        var count = await _metricsBusiness.GetOrganizationDataSourceCount(_org2Id, null);
 
-        // Act
-        await _metricsBusiness.GetObjectStorageSize(_oid, _pid, _fsOsId);
-        await _metricsBusiness.GetObjectStorageSize(_oid, _pid, _azureOsId);
-
-        // Assert
-        _mockFileBusinessFactory.Verify(f => f.CreateFileBusiness("filesystem"), Times.Once);
-        _mockFileBusinessFactory.Verify(f => f.CreateFileBusiness("azure_object"), Times.Once);
+        // Assert - only data sources belonging to org 2
+        Assert.Equal(2, count);
     }
 
     [Fact]
-    public async Task MetricsBusiness_CallsGetStorageSize_WithCorrectConfig()
+    public async Task GetOrganizationDataSourceCount_WithProjectIds_ReturnsProjectAndOrgLevel()
     {
-        // Arrange
-        ObjectStorageConfigDto? capturedConfig = null;
-        
-        _mockFilesystemBusiness
-            .Setup(f => f.GetStorageSize(It.IsAny<string>(), It.IsAny<ObjectStorageConfigDto>()))
-            .Callback<string, ObjectStorageConfigDto>((prefix, config) => capturedConfig = config)
-            .ReturnsAsync(1000L);
+        // Act - filter to project 1 only
+        var count = await _metricsBusiness.GetOrganizationDataSourceCount(_org1Id, new[] { _org1Proj1Id });
 
+        // Assert - project 1 data source + inherited org-level data source
+        Assert.Equal(2, count);
+    }
+
+    [Fact]
+    public async Task GetOrganizationDataSourceCount_WithProjectIds_ExcludesOtherProjects()
+    {
+        // Act - filter to project 2 only
+        var count = await _metricsBusiness.GetOrganizationDataSourceCount(_org2Id, new[] { _org2Proj2Id });
+
+        // Assert - only project 2 data source (no org-level exists)
+        Assert.Equal(1, count);
+    }
+
+    [Fact]
+    public async Task GetOrganizationDataSourceCount_ExcludesArchived_WhenHideArchivedTrue()
+    {
         // Act
-        await _metricsBusiness.GetObjectStorageSize(_oid, _pid, _fsOsId);
+        var countWithArchived = await _metricsBusiness.GetOrganizationDataSourceCount(_org2Id, null, hideArchived: false);
+        var countWithoutArchived = await _metricsBusiness.GetOrganizationDataSourceCount(_org2Id, null, hideArchived: true);
 
         // Assert
-        Assert.NotNull(capturedConfig);
-        Assert.NotNull(capturedConfig.MountPath);
-        Assert.Equal("/test/path", capturedConfig.MountPath);
+        Assert.Equal(3, countWithArchived);
+        Assert.Equal(2, countWithoutArchived);
+    }
+
+    [Fact]
+    public async Task GetOrganizationDataSourceCount_ReturnsZero_WhenNoDataSources()
+    {
+        // Arrange - delete sources from org 2
+        var org2DataSources = Context.DataSources
+            .Where(ds => ds.OrganizationId == _org2Id)
+            .ToList();
+        Context.DataSources.RemoveRange(org2DataSources);
+        await Context.SaveChangesAsync();
+        
+        // Act - org 2 has no data sources
+        var count = await _metricsBusiness.GetOrganizationDataSourceCount(_org2Id, null);
+
+        // Assert
+        Assert.Equal(0, count);
     }
 
     #endregion

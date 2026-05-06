@@ -2,6 +2,7 @@ using System.ComponentModel.DataAnnotations;
 using System.Text.Json;
 using deeplynx.business;
 using deeplynx.datalayer.Models;
+using deeplynx.helpers;
 using deeplynx.helpers.Hubs;
 using deeplynx.interfaces;
 using deeplynx.models;
@@ -27,6 +28,7 @@ public class OrganizationBusinessTests : IntegrationTestBase
     private INotificationBusiness _notificationBusiness = null!;
     private OrganizationBusiness _organizationBusiness = null!;
     private RoleBusiness _roleBusiness = null!;
+    private EncryptionHelper _encryptionHelper = null!;
 
     public long oid; // organization ID
     public long oid2; // second organization ID
@@ -39,6 +41,10 @@ public class OrganizationBusinessTests : IntegrationTestBase
 
     public override async Task InitializeAsync()
     {
+        // Generate valid keys once and reuse them
+        // These are pre-generated valid AES-256 keys for testing
+        Environment.SetEnvironmentVariable("ENCRYPTION_KEY", "SU5TRUNVUkVfREVWX0tFWV8zMl9CWVRFU19MT05HISE="); // 32 bytes
+        Environment.SetEnvironmentVariable("ENCRYPTION_IV", "SU5TRUNVUkVfREVWX0lWIQ=="); // 16 bytes
         await base.InitializeAsync();
 
         // used in multiple contexts
@@ -49,7 +55,8 @@ public class OrganizationBusinessTests : IntegrationTestBase
         _mockBulkCopyUpsertExecutor = new Mock<IBulkCopyUpsertExecutor>();
         _eventBusiness = new EventBusiness(Context, _notificationBusiness, _mockBulkCopyUpsertExecutor.Object);
         _roleBusiness = new RoleBusiness(Context, _eventBusiness);
-        _mockObjectStorage = new ObjectStorageBusiness(Context);
+        _encryptionHelper = new EncryptionHelper();
+        _mockObjectStorage = new ObjectStorageBusiness(Context, _encryptionHelper);
 
         // org business and dependencies
         _mockLoggerOrg = new Mock<ILogger<OrganizationBusiness>>();
