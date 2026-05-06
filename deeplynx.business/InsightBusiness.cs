@@ -304,20 +304,20 @@ public class InsightBusiness : IInsightBusiness
         }
 
         var classEmbeds = await _context.Classes
-            .Where(c => c.ProjectId == projectId && !string.IsNullOrEmpty(c.Description))
+            .Where(c => c.ProjectId == projectId)
             .Select(c => new InsightEmbedStringRequestDto.EmbedStringDto
             {
                 ClassId = c.Id,
-                Text = c.Description!
+                Text = string.IsNullOrEmpty(c.Description) ? c.Name : c.Description
             })
             .ToListAsync();
 
         var relationshipEmbeds = await _context.Relationships
-            .Where(r => r.ProjectId == projectId && !string.IsNullOrEmpty(r.Description))
+            .Where(r => r.ProjectId == projectId)
             .Select(r => new InsightEmbedStringRequestDto.EmbedStringDto
             {
                 RelationshipId = r.Id,
-                Text = r.Description!
+                Text = string.IsNullOrEmpty(r.Description) ? r.Name : r.Description
             })
             .ToListAsync();
 
@@ -328,6 +328,10 @@ public class InsightBusiness : IInsightBusiness
             EmbeddingModelName = modelName,
             EmbeddingModelToken = token,
         };
+
+        _logger.LogInformation(
+            "Queueing ontology embeddings for project {ProjectId}: {ClassCount} classes, {RelationshipCount} relationships",
+            projectId, classEmbeds.Count, relationshipEmbeds.Count);
 
         await _insightServiceClient.EmbedStrings(request);
     }
