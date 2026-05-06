@@ -20,7 +20,7 @@ public class ObjectStorageConfigDto
 {
     public string? MountPath {get; set;}
     
-    [JsonPropertyName("azureObjectConfig")]
+    [JsonPropertyName("AzureObjectConfig")]
     [DefaultValue(null)]
     public AzureObjectConfigDto? AzureObjectConfig { get; set; }
     

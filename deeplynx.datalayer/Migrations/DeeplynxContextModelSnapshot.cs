@@ -756,6 +756,10 @@ namespace deeplynx.datalayer.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("created_by");
 
+                    b.Property<string>("Mode")
+                        .HasColumnType("text")
+                        .HasColumnName("mode");
+
                     b.Property<string>("Properties")
                         .HasColumnType("jsonb")
                         .HasColumnName("properties");
@@ -1196,10 +1200,10 @@ namespace deeplynx.datalayer.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
 
-                    b.Property<string>("Config")
+                    b.Property<string>("ConfigEncrypted")
                         .IsRequired()
-                        .HasColumnType("jsonb")
-                        .HasColumnName("config");
+                        .HasColumnType("text")
+                        .HasColumnName("config_encrypted");
 
                     b.Property<bool>("Default")
                         .HasColumnType("boolean")

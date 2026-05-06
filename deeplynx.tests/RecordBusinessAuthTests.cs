@@ -29,6 +29,7 @@ public class RecordBusinessAuthTests : IntegrationTestBase
     private TagBusiness _tagBusiness = null!;
     private BulkCopyUpsertExecutor _mockBulkCopyUpsertExecutor = null!;
     private ISensitivityLabelService _sensitivityLabelService = null!;
+    private EncryptionHelper _encryptionHelper = null!;
     public long cid; // class ID
     public long did; // datasource ID
     public long did2;
@@ -68,6 +69,7 @@ public class RecordBusinessAuthTests : IntegrationTestBase
 
     public override async Task InitializeAsync()
     {
+        _encryptionHelper = new EncryptionHelper();
         await base.InitializeAsync();
         _mockHubContext = new Mock<IHubContext<EventNotificationHub>>();
         _mockNotificationLogger = new Mock<ILogger<NotificationBusiness>>();
@@ -1988,7 +1990,7 @@ public class RecordBusinessAuthTests : IntegrationTestBase
         {
             Name = "Object Storage 1",
             Type = "filesystem",
-            Config = config.ToString(),
+            ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(config),
             ProjectId = pid,
             LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
             LastUpdatedBy = uid,

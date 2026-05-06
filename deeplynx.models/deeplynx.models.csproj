@@ -18,4 +18,8 @@
       <PackageReference Include="Scalar.AspNetCore.Microsoft" Version="2.12.24" />
     </ItemGroup>
 
+    <ItemGroup>
+      <Folder Include="Lattice\" />
+    </ItemGroup>
+
 </Project>

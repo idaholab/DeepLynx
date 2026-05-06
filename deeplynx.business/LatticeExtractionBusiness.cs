@@ -2,23 +2,30 @@ using deeplynx.datalayer.Models;
 using deeplynx.interfaces;
 using deeplynx.models;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace deeplynx.business;
 
 public class LatticeExtractionBusiness : ILatticeExtractionBusiness
 {
     private readonly DeeplynxContext _context;
-    private readonly StagingContext _stagingContext;
+    private readonly LatticeContext _latticeContext;
     private readonly IInsightBusiness _insightBusiness;
     private readonly InsightServiceClient _insightServiceClient;
+    private readonly IExtractionValidation _validationBusiness;
+    private readonly ILogger<LatticeExtractionBusiness> _logger;
 
-    public LatticeExtractionBusiness(DeeplynxContext context, StagingContext stagingContext,
-        IInsightBusiness insightBusiness, InsightServiceClient insightServiceClient)
+    public LatticeExtractionBusiness(DeeplynxContext context, LatticeContext latticeContext,
+        IInsightBusiness insightBusiness, InsightServiceClient insightServiceClient,
+        IExtractionValidation validationBusiness,
+        ILogger<LatticeExtractionBusiness> logger)
     {
         _context = context;
-        _stagingContext = stagingContext;
+        _latticeContext = latticeContext;
         _insightBusiness = insightBusiness;
         _insightServiceClient = insightServiceClient;
+        _validationBusiness = validationBusiness;
+        _logger = logger;
     }
 
     /// <summary>
@@ -57,18 +64,29 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
         var extraction = new Extraction
         {
             CreatedBy = currentUserId,
-            Status = ExtractionStatus.Pending
+            Status = ExtractionStatus.Pending,
+            Mode = mode
         };
         _context.Extractions.Add(extraction);
         await _context.SaveChangesAsync();
 
         try
         {
+            // IDs necessary for POST back from Insight 
+            var queryInfo = new
+            {
+                organization_id = organizationId,
+                project_id = projectId,
+                extraction_id = extraction.Id,
+                data_source_id = record.DataSourceId
+            };
+
             var filledPrompt = await ConstructPrompt(recordId, projectId, mode);
 
-            //TODO: Fix hard coded model name. 
+            var latticeModel = Environment.GetEnvironmentVariable("LATTICE_MODEL")
+                      ?? "Mistral-Small-3.2-24B-Instruct-2506";
             var response =
-                await _insightServiceClient.LatticeExtraction(filledPrompt, "Mistral-Small-3.2-24B-Instruct-2506");
+                await _insightServiceClient.LatticeExtraction(filledPrompt, latticeModel, queryInfo);
 
             if (response.IsSuccessStatusCode)
             {
@@ -93,249 +111,323 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
         return extraction.Id;
 
     }
+    
 
-    /// <summary>
-    ///     Stage extractions from Lattice. Inserts staged records, classes, edges, and relationships.
-    ///     When <paramref name="extractionId" /> is supplied (Lattice callback flow), the existing
-    ///     Extraction record is updated to Complete on success or Failed on error, rather than creating
-    ///     a new one. When omitted (manual staging flow), a new Extraction is created and immediately
-    ///     marked Complete.
-    /// </summary>
-    /// <param name="currentUserId">ID of the User executing this method.</param>
-    /// <param name="organizationId">
-    ///     The ID of the organization to which the staged classes, records, edges and relationships
-    ///     belong
-    /// </param>
-    /// <param name="projectId">The ID of the project to which the staged classes, records, edges and relationships belong</param>
-    /// <param name="dataSourceId">The ID of the datasource to which the staged records and edges belong</param>
-    /// <param name="dto">
-    ///     CreateExtractionRequestDTO that contains the CreateDTOs for Classes, Records, Edges, and
-    ///     Relationships as well as extraction configurations
-    /// </param>
-    /// <param name="extractionId">
-    ///     When set, ties this payload to an existing Extraction created during trigger.
-    ///     Lattice passes this as a query param on its success callback.
-    /// </param>
-    /// <returns>ExtractionResponseDto which contains counts of staged entities</returns>
-    /// <exception cref="Exception">Returned if error occurs during extraction transaction</exception>
-    public async Task<ExtractionResponseDto> LatticeEntityStaging(
-        long currentUserId,
+    public async Task<ExtractionResponseDto> ProcessInsightExtractionCallback(
         long organizationId,
         long projectId,
         long dataSourceId,
-        CreateStagingRequestDto dto,
-        long? extractionId = null)
+        long extractionId,
+        InsightExtractionCallbackDto dto)
     {
-        // When extractionId is supplied, Lattice is calling back after completing an extraction
-        // we already created. Update that record rather than creating a new one.
-        var isCallback = extractionId.HasValue;
-        Extraction extraction;
-
-        if (isCallback)
-        {
-            extraction = await _context.Extractions.FindAsync(extractionId!.Value)
+        var extraction = await _context.Extractions.FindAsync(extractionId)
                          ?? throw new InvalidOperationException($"Extraction {extractionId} not found.");
-            extraction.Properties = dto.Properties?.ToJsonString();
-        }
-        else
-        {
-            extraction = new Extraction
-            {
-                Properties = dto.Properties?.ToJsonString(),
-                CreatedBy = currentUserId,
-                Status = ExtractionStatus.Complete
-            };
-            _context.Extractions.Add(extraction);
-            await _context.SaveChangesAsync();
-        }
 
-        await using var stagingTransaction = await _stagingContext.Database.BeginTransactionAsync();
+        var mode = extraction.Mode
+                   ?? throw new InvalidOperationException($"Extraction {extractionId} has no mode set.");
+
+        // Validation Logic
+        var (dedupedRecords, dedupedEdges) = _validationBusiness.Deduplicate(dto);
+        
+        var allClassTypes = dedupedRecords.Select(r => r.ClassType)
+            .Concat(dedupedEdges.Select(e => e.SubjectType))
+            .Concat(dedupedEdges.Select(e => e.ObjectType));
+
+        var classSimilarities = await _validationBusiness.NormalizeClassTypes(allClassTypes, projectId);
+        var relSimilarities = await _validationBusiness.NormalizeRelationshipTypes(dedupedEdges, projectId);
+        var ontologyPatterns = await _validationBusiness.GetOntologyPatterns(projectId);
+        
+        // Save to Lattice schema 
+        await using var transaction = await _latticeContext.Database.BeginTransactionAsync();
         try
         {
-            var now = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
+            var classes = await StageClasses(extraction.Id, allClassTypes, classSimilarities, organizationId, projectId, mode);
+            var records = await StageRecords(extraction.Id, dedupedRecords, classSimilarities, ontologyPatterns, classes, organizationId, projectId, dataSourceId, mode);
+            var relationships = await StageRelationships(extraction.Id, dedupedEdges, classSimilarities, relSimilarities, ontologyPatterns, classes, organizationId, projectId, mode);
+            var edgeCount = await StageEdges(extraction.Id, dedupedEdges, relSimilarities, ontologyPatterns, records, relationships, organizationId, projectId, dataSourceId, mode);
 
-            // Maps used to resolve cross-references within this payload
-            var classNameToStagingId = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
-            var relationshipNameToStagingId = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
-            var originalIdToStagingRecordId = new Dictionary<string, long>();
+            await transaction.CommitAsync();
 
-            foreach (var classDto in dto.Classes ?? [])
+            extraction.Status = ExtractionStatus.Complete;
+            try
             {
-                var stagingClass = new Class
-                {
-                    Name = classDto.Name,
-                    Description = classDto.Description,
-                    Properties = classDto.Properties?.ToJsonString(),
-                    OrganizationId = organizationId,
-                    ProjectId = projectId,
-                    LastUpdatedAt = now,
-                    LastUpdatedBy = currentUserId,
-                    ExtractionId = extraction.Id
-                };
-                _stagingContext.Classes.Add(stagingClass);
-                await _stagingContext.SaveChangesAsync();
-                classNameToStagingId[stagingClass.Name] = stagingClass.Id;
-            }
-
-            // OriginId/DestinationId are class IDs — resolve from this payload's staging classes only.
-            // If the class only exists in deeplynx, leave the ID null and store the name as a shadow
-            // property so promotion can resolve it by name.
-            foreach (var relDto in dto.Relationships ?? [])
-            {
-                var originId = relDto.OriginId ?? ResolveClassId(relDto.OriginName, classNameToStagingId);
-                var destinationId =
-                    relDto.DestinationId ?? ResolveClassId(relDto.DestinationName, classNameToStagingId);
-
-                var stagingRelationship = new Relationship
-                {
-                    Name = relDto.Name,
-                    Description = relDto.Description,
-                    Properties = relDto.Properties?.ToJsonString(),
-                    OriginId = originId,
-                    DestinationId = destinationId,
-                    OrganizationId = organizationId,
-                    ProjectId = projectId,
-                    LastUpdatedAt = now,
-                    LastUpdatedBy = currentUserId,
-                    ExtractionId = extraction.Id
-                };
-                _stagingContext.Relationships.Add(stagingRelationship);
-
-                // Store unresolved class names as shadow properties for promotion
-                if (originId == null && relDto.OriginName != null)
-                    _stagingContext.Entry(stagingRelationship).Property("OriginName").CurrentValue = relDto.OriginName;
-                if (destinationId == null && relDto.DestinationName != null)
-                    _stagingContext.Entry(stagingRelationship).Property("DestinationName").CurrentValue =
-                        relDto.DestinationName;
-
-                await _stagingContext.SaveChangesAsync();
-                relationshipNameToStagingId[stagingRelationship.Name] = stagingRelationship.Id;
-            }
-
-            // ClassId is resolved from this payload's staging classes only.
-            // If the class only exists in deeplynx, ClassId stays null and the class name is stored
-            // so promotion can resolve it by name.
-            foreach (var recordDto in dto.Records ?? [])
-            {
-                var classId = recordDto.ClassId;
-                if (classId == null && recordDto.ClassName != null
-                                    && classNameToStagingId.TryGetValue(recordDto.ClassName, out var stagingClassId))
-                    classId = stagingClassId;
-
-                var stagingRecord = new Record
-                {
-                    Name = recordDto.Name,
-                    OriginalId = recordDto.OriginalId,
-                    Properties = recordDto.Properties.ToJsonString(),
-                    Description = recordDto.Description ?? string.Empty,
-                    Uri = recordDto.Uri,
-                    FileType = recordDto.FileType,
-                    ObjectStorageId = recordDto.ObjectStorageId,
-                    ClassId = classId,
-                    DataSourceId = dataSourceId,
-                    OrganizationId = organizationId,
-                    ProjectId = projectId,
-                    LastUpdatedAt = now,
-                    LastUpdatedBy = currentUserId,
-                    ExtractionId = extraction.Id
-                };
-                _stagingContext.Records.Add(stagingRecord);
-
-                // Store unresolved class name as shadow property for promotion
-                if (classId == null && recordDto.ClassName != null)
-                    _stagingContext.Entry(stagingRecord).Property("ClassName").CurrentValue = recordDto.ClassName;
-
-                await _stagingContext.SaveChangesAsync();
-                originalIdToStagingRecordId[stagingRecord.OriginalId] = stagingRecord.Id;
-            }
-
-            // Edges where both endpoints resolve to staging records go into staging.edges (intra-schema FKs enforced).
-            // Edges where either endpoint is a deeplynx-only record go into staging.cross_schema_edges,
-            // which stores original_id strings resolved at promotion time.
-            foreach (var edgeDto in dto.Edges ?? [])
-            {
-                var originId = ResolveRecordId(edgeDto.OriginOriginalId, originalIdToStagingRecordId)
-                               ?? edgeDto.OriginId;
-                var destinationId = ResolveRecordId(edgeDto.DestinationOriginalId, originalIdToStagingRecordId)
-                                    ?? edgeDto.DestinationId;
-                var relationshipId = ResolveRelationshipId(edgeDto.RelationshipName, relationshipNameToStagingId)
-                                     ?? edgeDto.RelationshipId;
-
-                var hasCrossSchemaRef = edgeDto.DeeplynxOriginOriginalId != null
-                                        || edgeDto.DeeplynxDestinationOriginalId != null
-                                        || edgeDto.DeeplynxRelationshipName != null;
-
-                if (originId != null && destinationId != null && !hasCrossSchemaRef)
-                    // Both endpoints resolved to staging records — standard staging edge
-                    _stagingContext.Edges.Add(new Edge
-                    {
-                        OriginId = originId.Value,
-                        DestinationId = destinationId.Value,
-                        RelationshipId = relationshipId,
-                        DataSourceId = dataSourceId,
-                        OrganizationId = organizationId,
-                        ProjectId = projectId,
-                        Properties = edgeDto.Properties?.ToJsonString(),
-                        LastUpdatedAt = now,
-                        LastUpdatedBy = currentUserId,
-                        ExtractionId = extraction.Id
-                    });
-                else if (hasCrossSchemaRef || originId != null || destinationId != null)
-                    // At least one endpoint or relationship references a deeplynx entity — cross-schema edge
-                    _stagingContext.CrossSchemaEdges.Add(new CrossSchemaEdge
-                    {
-                        ExtractionId = extraction.Id,
-                        DataSourceId = dataSourceId,
-                        OrganizationId = organizationId,
-                        ProjectId = projectId,
-                        Properties = edgeDto.Properties?.ToJsonString(),
-                        LastUpdatedAt = now,
-                        LastUpdatedBy = currentUserId,
-                        OriginOriginalId = edgeDto.OriginOriginalId,
-                        DeeplynxOriginOriginalId = edgeDto.DeeplynxOriginOriginalId,
-                        DestinationOriginalId = edgeDto.DestinationOriginalId,
-                        DeeplynxDestinationOriginalId = edgeDto.DeeplynxDestinationOriginalId,
-                        RelationshipName = edgeDto.RelationshipName,
-                        DeeplynxRelationshipName = edgeDto.DeeplynxRelationshipName
-                    });
-                // no origin or destination
-            }
-
-            await _stagingContext.SaveChangesAsync();
-            await stagingTransaction.CommitAsync();
-
-            if (isCallback)
-            {
-                extraction.Status = ExtractionStatus.Complete;
                 await _context.SaveChangesAsync();
+            }
+            catch (Exception ex)
+            {
+                // Lattice data is committed — log and continue rather than leaving status stuck as Running
+                _logger.LogError(ex, "Extraction {ExtractionId} staged successfully but status update to Complete failed", extractionId);
             }
 
             return new ExtractionResponseDto
             {
                 Id = extraction.Id,
-                Properties = extraction.Properties,
-                CreatedBy = currentUserId,
-                ClassCount = dto.Classes?.Count ?? 0,
-                RelationshipCount = dto.Relationships?.Count ?? 0,
-                RecordCount = dto.Records?.Count ?? 0,
-                EdgeCount = dto.Edges?.Count ?? 0
+                CreatedBy = extraction.CreatedBy,
+                ClassCount = classes.Count,
+                RecordCount = records.Count,
+                RelationshipCount = relationships.Count,
+                EdgeCount = edgeCount
             };
         }
         catch
         {
-            await stagingTransaction.RollbackAsync();
-
-            if (isCallback)
-                extraction.Status = ExtractionStatus.Failed;
-            else
-                _context.Extractions.Remove(extraction);
-
+            await transaction.RollbackAsync();
+            extraction.Status = ExtractionStatus.Failed;
             await _context.SaveChangesAsync();
             throw;
         }
     }
 
-   
+    private async Task<Dictionary<string, long>> StageClasses(
+        long extractionId,
+        IEnumerable<string> allClassTypes,
+        Dictionary<string, SimilarityResult?> classSimilarities,
+        long organizationId,
+        long projectId,
+        string mode)
+    {
+        var uniqueClassTypes = allClassTypes
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        var extractionClasses = uniqueClassTypes.Select(classType =>
+        {
+            classSimilarities.TryGetValue(classType, out var match);
+            return new ExtractionClass
+            {
+                ExtractionId = extractionId,
+                Name = match?.OntologyEntityName ?? classType,
+                OntologyClassId = match?.OntologyEntityId,
+                ValidationStatus = match != null
+                    ? ExtractionValidationStatus.Valid
+                    : ExtractionValidationStatus.InvalidSchema,
+                OrganizationId = organizationId,
+                ProjectId = projectId
+            };
+        }).ToList();
+
+        _latticeContext.ExtractionClasses.AddRange(extractionClasses);
+        await _latticeContext.SaveChangesAsync();
+
+        var classTypeToId = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
+        for (var i = 0; i < uniqueClassTypes.Count; i++)
+            classTypeToId[uniqueClassTypes[i]] = extractionClasses[i].Id;
+
+        return classTypeToId;
+    }
+
+    private async Task<Dictionary<string, long>> StageRecords(
+        long extractionId,
+        List<DedupedRecord> records,
+        Dictionary<string, SimilarityResult?> classSimilarities,
+        HashSet<OntologyPattern> ontologyPatterns,
+        Dictionary<string, long> classTypeToId,
+        long organizationId,
+        long projectId,
+        long dataSourceId,
+        string mode)
+    {
+        if (!records.Any()) return new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
+
+        var maxFrequency = records.Max(r => r.Frequency);
+
+        // Batch KG lookup — inherit canonical name if the instance already exists in the graph
+        var recordNames = records.Select(r => r.Name).ToList();
+        var kgMatches = await _context.Records
+            .Where(r => r.ProjectId == projectId && recordNames.Contains(r.Name))
+            .Select(r => new { r.Id, r.Name })
+            .ToListAsync();
+        var nameToKg = kgMatches.ToDictionary(r => r.Name, r => r, StringComparer.OrdinalIgnoreCase);
+
+        var extractionRecords = records.Select(record =>
+        {
+            classSimilarities.TryGetValue(record.ClassType, out var classMatch);
+            nameToKg.TryGetValue(record.Name, out var kgRecord);
+
+            var embeddingPlausibility = classMatch?.Score ?? 0.0;
+            var statFreq = maxFrequency > 0 ? (double)record.Frequency / maxFrequency : 0.0;
+
+            var normalizedClassName = classMatch?.OntologyEntityName;
+            var structuralConsistency = normalizedClassName != null && ontologyPatterns.Any(p =>
+                string.Equals(p.OriginClassName, normalizedClassName, StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(p.DestinationClassName, normalizedClassName, StringComparison.OrdinalIgnoreCase))
+                ? 1.0 : 0.0;
+
+            return new ExtractionRecord
+            {
+                ExtractionId = extractionId,
+                ExtractionClassId = classTypeToId[record.ClassType],
+                Name = kgRecord?.Name ?? record.Name,
+                Attributes = record.Attributes?.ToJsonString(),
+                OrganizationId = organizationId,
+                ProjectId = projectId,
+                DataSourceId = dataSourceId,
+                DeeplynxRecordId = kgRecord?.Id,
+                ValidationStatus = classMatch != null
+                    ? ExtractionValidationStatus.Valid
+                    : ExtractionValidationStatus.InvalidSchema,
+                Frequency = record.Frequency,
+                LlmScore = record.Confidence,
+                EmbeddingPlausibility = embeddingPlausibility,
+                StatisticalFrequency = statFreq,
+                StructuralConsistency = structuralConsistency,
+                EnsembleScore = _validationBusiness.CalculateEnsembleScore(
+                    record.Confidence, embeddingPlausibility, statFreq, structuralConsistency)
+            };
+        }).ToList();
+
+        _latticeContext.ExtractionRecords.AddRange(extractionRecords);
+        await _latticeContext.SaveChangesAsync();
+
+        var nameToId = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
+        for (var i = 0; i < records.Count; i++)
+            nameToId[records[i].Name] = extractionRecords[i].Id;
+
+        return nameToId;
+    }
+
+    private async Task<Dictionary<string, long>> StageRelationships(
+        long extractionId,
+        List<DedupedEdge> edges,
+        Dictionary<string, SimilarityResult?> classSimilarities,
+        Dictionary<string, SimilarityResult?> relSimilarities,
+        HashSet<OntologyPattern> ontologyPatterns,
+        Dictionary<string, long> classTypeToId,
+        long organizationId,
+        long projectId,
+        string mode)
+    {
+        // Unique (subjectType, relType, objectType) patterns — one ExtractionRelationship per pattern
+        var uniquePatterns = edges
+            .GroupBy(e => (
+                e.SubjectType.Trim().ToLowerInvariant(),
+                e.RelationshipType.Trim().ToLowerInvariant(),
+                e.ObjectType.Trim().ToLowerInvariant()))
+            .Select(g => g.First())
+            .ToList();
+
+        var extractionRelationships = new List<ExtractionRelationship>();
+        var patternKeys = new List<string>();
+
+        foreach (var edge in uniquePatterns)
+        {
+            relSimilarities.TryGetValue(edge.RelationshipType, out var relMatch);
+            classSimilarities.TryGetValue(edge.SubjectType, out var subjectMatch);
+            classSimilarities.TryGetValue(edge.ObjectType, out var objectMatch);
+
+            string validationStatus;
+            if (relMatch == null)
+            {
+                validationStatus = ExtractionValidationStatus.InvalidSchema;
+            }
+            else
+            {
+                var normalizedSubject = subjectMatch?.OntologyEntityName ?? edge.SubjectType;
+                var normalizedObject = objectMatch?.OntologyEntityName ?? edge.ObjectType;
+
+                var patternExists = ontologyPatterns.Any(p =>
+                    string.Equals(p.OriginClassName, normalizedSubject, StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(p.RelationshipName, relMatch.OntologyEntityName, StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(p.DestinationClassName, normalizedObject, StringComparison.OrdinalIgnoreCase));
+
+                validationStatus = patternExists
+                    ? ExtractionValidationStatus.Valid
+                    : mode == ExtractionMode.Discovery && subjectMatch != null && objectMatch != null
+                        ? ExtractionValidationStatus.NovelDiscovery
+                        : ExtractionValidationStatus.InvalidSchema;
+            }
+
+            classTypeToId.TryGetValue(edge.SubjectType, out var originClassId);
+            classTypeToId.TryGetValue(edge.ObjectType, out var destinationClassId);
+
+            patternKeys.Add($"{edge.SubjectType}|{edge.RelationshipType}|{edge.ObjectType}");
+
+            extractionRelationships.Add(new ExtractionRelationship
+            {
+                ExtractionId = extractionId,
+                OriginClassId = originClassId,
+                DestinationClassId = destinationClassId,
+                Name = relMatch?.OntologyEntityName ?? edge.RelationshipType,
+                OntologyRelationshipId = relMatch?.OntologyEntityId,
+                ValidationStatus = validationStatus,
+                OrganizationId = organizationId,
+                ProjectId = projectId
+            });
+        }
+
+        _latticeContext.ExtractionRelationships.AddRange(extractionRelationships);
+        await _latticeContext.SaveChangesAsync();
+
+        var keyToId = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
+        for (var i = 0; i < patternKeys.Count; i++)
+            keyToId[patternKeys[i]] = extractionRelationships[i].Id;
+
+        return keyToId;
+    }
+
+    private async Task<int> StageEdges(
+        long extractionId,
+        List<DedupedEdge> edges,
+        Dictionary<string, SimilarityResult?> relSimilarities,
+        HashSet<OntologyPattern> ontologyPatterns,
+        Dictionary<string, long> instanceNameToRecordId,
+        Dictionary<string, long> relationshipKeyToId,
+        long organizationId,
+        long projectId,
+        long dataSourceId,
+        string mode)
+    {
+        if (!edges.Any()) return 0;
+
+        var maxFrequency = edges.Max(e => e.Frequency);
+
+        var relationshipIds = relationshipKeyToId.Values.Distinct().ToList();
+        var relValidationById = await _latticeContext.ExtractionRelationships
+            .Where(r => relationshipIds.Contains(r.Id))
+            .ToDictionaryAsync(r => r.Id, r => r.ValidationStatus);
+
+        var extractionEdges = new List<ExtractionEdge>();
+        foreach (var edge in edges)
+        {
+            // Skip edges whose subject or object wasn't staged as a record — this can happen when
+            // the LLM references an entity in a relationship that it didn't include in the classes array
+            if (!instanceNameToRecordId.TryGetValue(edge.Subject, out var originRecordId)) continue;
+            if (!instanceNameToRecordId.TryGetValue(edge.Object, out var destRecordId)) continue;
+
+            relSimilarities.TryGetValue(edge.RelationshipType, out var relMatch);
+            var patternKey = $"{edge.SubjectType}|{edge.RelationshipType}|{edge.ObjectType}";
+            relationshipKeyToId.TryGetValue(patternKey, out var relId);
+            relValidationById.TryGetValue(relId, out var validationStatus);
+
+            var embeddingPlausibility = relMatch?.Score ?? 0.0;
+            var statFreq = maxFrequency > 0 ? (double)edge.Frequency / maxFrequency : 0.0;
+            var structuralConsistency = validationStatus == ExtractionValidationStatus.Valid ? 1.0 : 0.0;
+
+            extractionEdges.Add(new ExtractionEdge
+            {
+                ExtractionId = extractionId,
+                ExtractionRelationshipId = relId,
+                OriginRecordId = originRecordId,
+                DestinationRecordId = destRecordId,
+                OrganizationId = organizationId,
+                ProjectId = projectId,
+                DataSourceId = dataSourceId,
+                ValidationStatus = validationStatus,
+                Frequency = edge.Frequency,
+                LlmScore = edge.Confidence,
+                EmbeddingPlausibility = embeddingPlausibility,
+                StatisticalFrequency = statFreq,
+                StructuralConsistency = structuralConsistency,
+                EnsembleScore = _validationBusiness.CalculateEnsembleScore(
+                    edge.Confidence, embeddingPlausibility, statFreq, structuralConsistency)
+            });
+        }
+
+        _latticeContext.ExtractionEdges.AddRange(extractionEdges);
+        await _latticeContext.SaveChangesAsync();
+
+        return extractionEdges.Count;
+    }
 
     /// <summary>
     ///     Marks an extraction as failed. Called when Lattice reports an error via its error callback.
@@ -348,6 +440,8 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
                          ?? throw new InvalidOperationException($"Extraction {extractionId} not found.");
         extraction.Status = ExtractionStatus.Failed;
         await _context.SaveChangesAsync();
+        _logger.LogError(errorMessage);
+        
     }
 
     /// <summary>
@@ -395,12 +489,6 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
                                                      """)
             .ToListAsync();
     }
-
-    //TODO: Re-embed classes and relationships if Lattice makes and update to existing items
-    
-    //TODO: Validation Logic 
-    
-    //TODO: Staging promotion logic
     
     /// <summary>
     ///     Checks whether the document record and project ontology are embedded.
@@ -416,11 +504,28 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
         Record record)
     {
         var recordEmbedded = await _context.Embeddings.AnyAsync(e => e.RecordId == recordId);
+
+        // Split into two queries — correlated subqueries across schemas don't translate reliably in EF Core
+        var projectClassIds = await _context.Classes
+            .Where(c => c.ProjectId == projectId)
+            .Select(c => c.Id)
+            .ToListAsync();
+        var projectRelationshipIds = await _context.Relationships
+            .Where(r => r.ProjectId == projectId)
+            .Select(r => r.Id)
+            .ToListAsync();
         var ontologyEmbedded = await _context.OntologyVectors
             .AnyAsync(ov =>
-                _context.Classes.Any(c => c.Id == ov.ClassId && c.ProjectId == projectId) ||
-                _context.Relationships.Any(r => r.Id == ov.RelationshipId && r.ProjectId == projectId));
-        
+                (ov.ClassId != null && projectClassIds.Contains(ov.ClassId.Value)) ||
+                (ov.RelationshipId != null && projectRelationshipIds.Contains(ov.RelationshipId.Value)));
+
+        _logger.LogInformation(
+            "Embedding readiness for project {ProjectId}, record {RecordId}: " +
+            "recordEmbedded={RecordEmbedded}, ontologyEmbedded={OntologyEmbedded} " +
+            "({ClassCount} classes, {RelationshipCount} relationships in project)",
+            projectId, recordId, recordEmbedded, ontologyEmbedded,
+            projectClassIds.Count, projectRelationshipIds.Count);
+
         if (recordEmbedded && ontologyEmbedded) return;
     
         if (!recordEmbedded)
@@ -450,6 +555,38 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
     }
     
     
+    public async Task<EmbeddingStatusResponseDto> GetEmbeddingStatus(long projectId)
+    {
+        var classIds = await _context.Classes
+            .Where(c => c.ProjectId == projectId)
+            .Select(c => c.Id)
+            .ToListAsync();
+        var relationshipIds = await _context.Relationships
+            .Where(r => r.ProjectId == projectId)
+            .Select(r => r.Id)
+            .ToListAsync();
+
+        var embeddedClassIds = await _context.OntologyVectors
+            .Where(ov => ov.ClassId != null && classIds.Contains(ov.ClassId.Value))
+            .Select(ov => ov.ClassId!.Value)
+            .Distinct()
+            .ToListAsync();
+        var embeddedRelationshipIds = await _context.OntologyVectors
+            .Where(ov => ov.RelationshipId != null && relationshipIds.Contains(ov.RelationshipId.Value))
+            .Select(ov => ov.RelationshipId!.Value)
+            .Distinct()
+            .ToListAsync();
+
+        return new EmbeddingStatusResponseDto
+        {
+            ClassCount = classIds.Count,
+            EmbeddedClassCount = embeddedClassIds.Count,
+            RelationshipCount = relationshipIds.Count,
+            EmbeddedRelationshipCount = embeddedRelationshipIds.Count,
+            OntologyReady = embeddedClassIds.Count > 0 || embeddedRelationshipIds.Count > 0
+        };
+    }
+
     /// <summary>Throws if the project has fewer than 2 non-default classes or no relationships — the minimum needed for extraction.</summary>
     private async Task EnsureOntologyReady(long projectId)
     {
@@ -501,7 +638,7 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
             
             //entity list is [(class name, description)]
             //relation_list is [(origin class name, relationship name, destination class name)] 
-            //TODO: context_block is graph context, 2 hops 
+            //TODO: context_block is graph context, 2 hops from record node
             //{text}{truncation} is ["example text", "text"]
             //TODO: {truncation} is for document text chunk truncation, necessary only if it exceeds a certain character limit. Plus the "...truncated" message to the LLM
             var prompt = "";
@@ -544,18 +681,18 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
                 {text}
                   
                 Return ONLY valid JSON (no markdown, no explanations):
-                  
-                {{
+
+                {
                     "classes": [
-                        {{"class": "RAF Mildenhall", "class_type": "Air Force Base", "confidence": 0.95, "attributes": {{"location": "United Kingdom", "unit": "100th Air Refueling Wing"}}}},
-                        {{"class": "100th Air Refueling Wing", "class_type": "Military Organization", "confidence": 0.92, "attributes": {{"role": "air refueling", "commander": "Col. Johnny Galbert"}}}}
+                        {"class": "RAF Mildenhall", "class_type": "Air Force Base", "confidence": 0.95, "attributes": {"location": "United Kingdom", "unit": "100th Air Refueling Wing"}},
+                        {"class": "100th Air Refueling Wing", "class_type": "Military Organization", "confidence": 0.92, "attributes": {"role": "air refueling", "commander": "Col. Johnny Galbert"}}
                     ],
                     "relationships": [
-                        {{"subject": "100th Air Refueling Wing", "subject_type": "Military Organization",
-                        "relationship_type": "located at", "object": "RAF Mildenhall", "object_type": "Air Force Base", "confidence": 0.90}}
+                        {"subject": "100th Air Refueling Wing", "subject_type": "Military Organization",
+                        "relationship_type": "located at", "object": "RAF Mildenhall", "object_type": "Air Force Base", "confidence": 0.90}
                     ]
-                }}
-                  
+                }
+
                 CRITICAL: Use EXACT class type names from the ontology schema. Be thorough - extract all relevant classes and relationships from the document.
                 """;
             
@@ -610,20 +747,20 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
                 {text}
                 
                 Return ONLY valid JSON (no markdown, no explanations):
-                
-                {{
+
+                {
                     "classes": [
-                        {{"class": "RAF Mildenhall", "class_type": "Air Force Base", "confidence": 0.95, "attributes": {{"location": "United Kingdom", "unit": "100th Air Refueling Wing"}}}},
-                        {{"class": "Tactical Operations Center", "class_type": "CommandControlFacility", "confidence": 0.72, "attributes": {{"role": "command and control", "location": "operations center"}}}}
+                        {"class": "RAF Mildenhall", "class_type": "Air Force Base", "confidence": 0.95, "attributes": {"location": "United Kingdom", "unit": "100th Air Refueling Wing"}},
+                        {"class": "Tactical Operations Center", "class_type": "CommandControlFacility", "confidence": 0.72, "attributes": {"role": "command and control", "location": "operations center"}}
                     ],
                     "relationships": [
-                        {{"subject": "100th Air Refueling Wing", "subject_type": "Military Organization",
-                        "relationship_type": "stationed at", "object": "RAF Mildenhall", "object_type": "Air Force Base", "confidence": 0.90}},
-                        {{"subject": "Tactical Operations Center", "subject_type": "CommandControlFacility",
-                        "relationship_type": "coordinates", "object": "100th Air Refueling Wing", "object_type": "Military Organization", "confidence": 0.75}}
+                        {"subject": "100th Air Refueling Wing", "subject_type": "Military Organization",
+                        "relationship_type": "stationed at", "object": "RAF Mildenhall", "object_type": "Air Force Base", "confidence": 0.90},
+                        {"subject": "Tactical Operations Center", "subject_type": "CommandControlFacility",
+                        "relationship_type": "coordinates", "object": "100th Air Refueling Wing", "object_type": "Military Organization", "confidence": 0.75}
                     ]
-                }}
-                
+                }
+
                 IMPORTANT: Balance ontology compliance with discovery. Extract comprehensively across all domains while preferring standard types when applicable.
                 """;
             
@@ -640,25 +777,340 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
                 .Replace("{class_list}", entityList)
                 .Replace("{relationship_list}", relationList)
                 .Replace("{text}", text);
-            
+
             return filledPrompt;
     }
-    
-    /// <summary>Returns the staging class ID for the given name, or null if not found in the current payload.</summary>
-    private static long? ResolveClassId(string? name, Dictionary<string, long> map)
+
+    public async Task<ExtractionStagingResponseDto> GetExtractionStaging(long extractionId)
     {
-        return name != null && map.TryGetValue(name, out var id) ? id : null;
+        var extraction = await _context.Extractions.FindAsync(extractionId)
+                         ?? throw new InvalidOperationException($"Extraction {extractionId} not found.");
+
+        var classes = await _latticeContext.ExtractionClasses
+            .Where(c => c.ExtractionId == extractionId)
+            .ToListAsync();
+
+        var classNameMap = classes.ToDictionary(c => c.Id, c => c.Name);
+
+        var records = await _latticeContext.ExtractionRecords
+            .Where(r => r.ExtractionId == extractionId)
+            .ToListAsync();
+
+        var relationships = await _latticeContext.ExtractionRelationships
+            .Where(r => r.ExtractionId == extractionId)
+            .ToListAsync();
+
+        var edges = await _latticeContext.ExtractionEdges
+            .Where(e => e.ExtractionId == extractionId)
+            .ToListAsync();
+
+        // Build record name map for edge labels
+        var recordNameMap = records.ToDictionary(r => r.Id, r => r.Name);
+
+        // Build relationship name map for edge labels
+        var relNameMap = relationships.ToDictionary(r => r.Id, r => r.Name);
+
+        return new ExtractionStagingResponseDto
+        {
+            Id = extraction.Id,
+            Status = extraction.Status,
+            Mode = extraction.Mode,
+            CreatedBy = extraction.CreatedBy,
+            Classes = classes.Select(c => new StagedClassDto
+            {
+                Id = c.Id,
+                Name = c.Name,
+                ValidationStatus = c.ValidationStatus,
+                OntologyClassId = c.OntologyClassId,
+                PromotedId = c.PromotedId,
+            }).ToList(),
+            Records = records.Select(r => new StagedRecordDto
+            {
+                Id = r.Id,
+                Name = r.Name,
+                ClassName = classNameMap.GetValueOrDefault(r.ExtractionClassId),
+                Attributes = r.Attributes,
+                ValidationStatus = r.ValidationStatus,
+                EnsembleScore = r.EnsembleScore,
+                Frequency = r.Frequency,
+                DeeplynxRecordId = r.DeeplynxRecordId,
+                PromotedId = r.PromotedId,
+            }).ToList(),
+            Relationships = relationships.Select(r => new StagedRelationshipDto
+            {
+                Id = r.Id,
+                Name = r.Name,
+                OriginClassName = classNameMap.GetValueOrDefault(r.OriginClassId),
+                DestinationClassName = classNameMap.GetValueOrDefault(r.DestinationClassId),
+                ValidationStatus = r.ValidationStatus,
+                OntologyRelationshipId = r.OntologyRelationshipId,
+                PromotedId = r.PromotedId,
+            }).ToList(),
+            Edges = edges.Select(e => new StagedEdgeDto
+            {
+                Id = e.Id,
+                OriginRecordName = recordNameMap.GetValueOrDefault(e.OriginRecordId),
+                DestinationRecordName = recordNameMap.GetValueOrDefault(e.DestinationRecordId),
+                RelationshipName = relNameMap.GetValueOrDefault(e.ExtractionRelationshipId),
+                ValidationStatus = e.ValidationStatus,
+                EnsembleScore = e.EnsembleScore,
+                Frequency = e.Frequency,
+                PromotedId = e.PromotedId,
+            }).ToList(),
+        };
     }
 
-    /// <summary>Returns the staging record ID for the given original ID, or null if not found in the current payload.</summary>
-    private static long? ResolveRecordId(string? originalId, Dictionary<string, long> map)
+    /// <summary>
+    ///     Approves or rejects a completed extraction.
+    ///     On approval, all valid and novel-discovery staged items are promoted into the
+    ///     deeplynx schema in dependency order: classes → records → relationships → edges.
+    ///     On rejection, the extraction is marked rejected and no deeplynx rows are written.
+    /// </summary>
+    public async Task<ExtractionResponseDto> PromoteExtraction(
+        long currentUserId,
+        long organizationId,
+        long projectId,
+        long extractionId,
+        bool approve)
     {
-        return originalId != null && map.TryGetValue(originalId, out var id) ? id : null;
+        var extraction = await _context.Extractions.FindAsync(extractionId)
+                         ?? throw new InvalidOperationException($"Extraction {extractionId} not found.");
+
+        if (extraction.Status != ExtractionStatus.Complete)
+            throw new InvalidOperationException(
+                $"Extraction {extractionId} cannot be promoted — status is '{extraction.Status}', expected 'complete'.");
+
+        if (!approve)
+        {
+            extraction.Status = ExtractionStatus.Rejected;
+            await _context.SaveChangesAsync();
+            return new ExtractionResponseDto { Id = extractionId, CreatedBy = extraction.CreatedBy };
+        }
+
+        var now = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
+
+        var stagingClasses = await _latticeContext.ExtractionClasses
+            .Where(c => c.ExtractionId == extractionId)
+            .ToListAsync();
+
+        // invalid_schema records are excluded — they failed ontology validation and must not enter the KG
+        var stagingRecords = await _latticeContext.ExtractionRecords
+            .Where(r => r.ExtractionId == extractionId && r.ValidationStatus != ExtractionValidationStatus.InvalidSchema)
+            .ToListAsync();
+
+        var stagingRelationships = await _latticeContext.ExtractionRelationships
+            .Where(r => r.ExtractionId == extractionId)
+            .ToListAsync();
+
+        var stagingEdges = await _latticeContext.ExtractionEdges
+            .Where(e => e.ExtractionId == extractionId)
+            .ToListAsync();
+
+        await using var transaction = await _context.Database.BeginTransactionAsync();
+        try
+        {
+            var classIdMap = await PromoteClasses(stagingClasses, organizationId, projectId, extractionId, currentUserId, now);
+            var (recordIdMap, newRecordCount) = await PromoteRecords(stagingRecords, classIdMap, organizationId, projectId, extractionId, currentUserId, now);
+            var relIdMap = await PromoteRelationships(stagingRelationships, classIdMap, organizationId, projectId, extractionId, currentUserId, now);
+            var edgeCount = await PromoteEdges(stagingEdges, recordIdMap, relIdMap, organizationId, projectId, extractionId, currentUserId, now);
+
+            await transaction.CommitAsync();
+
+            extraction.Status = ExtractionStatus.Promoted;
+            await _context.SaveChangesAsync();
+
+            return new ExtractionResponseDto
+            {
+                Id = extractionId,
+                CreatedBy = extraction.CreatedBy,
+                ClassCount = stagingClasses.Count(c => c.PromotedId.HasValue && c.OntologyClassId == null),
+                RecordCount = newRecordCount + stagingRecords.Count(r => r.DeeplynxRecordId.HasValue),
+                RelationshipCount = stagingRelationships.Count(r => r.PromotedId.HasValue && r.OntologyRelationshipId == null),
+                EdgeCount = edgeCount,
+            };
+        }
+        catch
+        {
+            await transaction.RollbackAsync();
+            throw;
+        }
     }
 
-    /// <summary>Returns the staging relationship ID for the given name, or null if not found in the current payload.</summary>
-    private static long? ResolveRelationshipId(string? name, Dictionary<string, long> map)
+    /// <summary>
+    ///     Promotes novel_discovery classes that have no existing ontology match into deeplynx.classes.
+    ///     Valid classes already exist in the ontology and are not re-created.
+    ///     Returns a map of ExtractionClass.Id → deeplynx Class id for use in downstream steps.
+    /// </summary>
+    private async Task<Dictionary<long, long?>> PromoteClasses(
+        List<ExtractionClass> stagingClasses,
+        long organizationId, long projectId, long extractionId,
+        long currentUserId, DateTime now)
     {
-        return name != null && map.TryGetValue(name, out var id) ? id : null;
+        foreach (var sc in stagingClasses.Where(c =>
+                     c.ValidationStatus == ExtractionValidationStatus.NovelDiscovery &&
+                     c.OntologyClassId == null &&
+                     c.PromotedId == null))
+        {
+            var newClass = new Class
+            {
+                Name = sc.Name,
+                OrganizationId = organizationId,
+                ProjectId = projectId,
+                IsArchived = false,
+                LastUpdatedAt = now,
+                LastUpdatedBy = currentUserId,
+                ExtractionId = extractionId,
+            };
+            _context.Classes.Add(newClass);
+            await _context.SaveChangesAsync();
+            sc.PromotedId = newClass.Id;
+        }
+        await _latticeContext.SaveChangesAsync();
+
+        // Valid classes resolve to their matched ontology class; novel_discovery to the newly created class
+        return stagingClasses.ToDictionary(c => c.Id, c => c.OntologyClassId ?? c.PromotedId);
     }
+
+    /// <summary>
+    ///     Promotes extraction records into deeplynx.records.
+    ///     Records already matched to a KG entity (deeplynx_record_id set) are linked rather than re-created.
+    ///     Returns a map of ExtractionRecord.Id → deeplynx Record id, and the count of newly created records.
+    /// </summary>
+    private async Task<(Dictionary<long, long> RecordIdMap, int NewRecordCount)> PromoteRecords(
+        List<ExtractionRecord> stagingRecords,
+        Dictionary<long, long?> classIdMap,
+        long organizationId, long projectId, long extractionId,
+        long currentUserId, DateTime now)
+    {
+        int newRecordCount = 0;
+
+        foreach (var sr in stagingRecords)
+        {
+            if (sr.DeeplynxRecordId.HasValue)
+            {
+                // Record already exists in the KG — link promoted_id without creating a duplicate
+                sr.PromotedId = sr.DeeplynxRecordId.Value;
+                continue;
+            }
+
+            classIdMap.TryGetValue(sr.ExtractionClassId, out var resolvedClassId);
+
+            var newRecord = new Record
+            {
+                Name = sr.Name,
+                OriginalId = Guid.NewGuid().ToString(),
+                Description = string.Empty,
+                Properties = sr.Attributes ?? "{}",
+                ClassId = resolvedClassId,
+                DataSourceId = sr.DataSourceId,
+                ProjectId = projectId,
+                OrganizationId = organizationId,
+                IsArchived = false,
+                Embedded = false,
+                LastUpdatedAt = now,
+                LastUpdatedBy = currentUserId,
+                ExtractionId = extractionId,
+            };
+            _context.Records.Add(newRecord);
+            await _context.SaveChangesAsync();
+            sr.PromotedId = newRecord.Id;
+            newRecordCount++;
+        }
+        await _latticeContext.SaveChangesAsync();
+
+        var recordIdMap = stagingRecords
+            .Where(r => r.PromotedId.HasValue)
+            .ToDictionary(r => r.Id, r => r.PromotedId!.Value);
+
+        return (recordIdMap, newRecordCount);
+    }
+
+    /// <summary>
+    ///     Promotes novel_discovery relationships that have no existing ontology match into deeplynx.relationships.
+    ///     Valid relationships already exist in the ontology and are not re-created.
+    ///     Returns a map of ExtractionRelationship.Id → deeplynx Relationship id for use in edge promotion.
+    /// </summary>
+    private async Task<Dictionary<long, long?>> PromoteRelationships(
+        List<ExtractionRelationship> stagingRelationships,
+        Dictionary<long, long?> classIdMap,
+        long organizationId, long projectId, long extractionId,
+        long currentUserId, DateTime now)
+    {
+        foreach (var sr in stagingRelationships.Where(r =>
+                     r.ValidationStatus == ExtractionValidationStatus.NovelDiscovery &&
+                     r.OntologyRelationshipId == null &&
+                     r.PromotedId == null))
+        {
+            classIdMap.TryGetValue(sr.OriginClassId, out var originClassId);
+            classIdMap.TryGetValue(sr.DestinationClassId, out var destClassId);
+
+            var newRel = new Relationship
+            {
+                Name = sr.Name,
+                OriginId = originClassId,
+                DestinationId = destClassId,
+                OrganizationId = organizationId,
+                ProjectId = projectId,
+                IsArchived = false,
+                LastUpdatedAt = now,
+                LastUpdatedBy = currentUserId,
+                ExtractionId = extractionId,
+            };
+            _context.Relationships.Add(newRel);
+            await _context.SaveChangesAsync();
+            sr.PromotedId = newRel.Id;
+        }
+        await _latticeContext.SaveChangesAsync();
+
+        // Valid relationships resolve to their ontology match; novel_discovery to the newly created relationship
+        return stagingRelationships.ToDictionary(r => r.Id, r => r.OntologyRelationshipId ?? r.PromotedId);
+    }
+
+    /// <summary>
+    ///     Promotes extraction edges into deeplynx.edges.
+    ///     Edges whose origin or destination record was excluded (invalid_schema) are skipped.
+    ///     Returns the count of edges created.
+    /// </summary>
+    private async Task<int> PromoteEdges(
+        List<ExtractionEdge> stagingEdges,
+        Dictionary<long, long> recordIdMap,
+        Dictionary<long, long?> relIdMap,
+        long organizationId, long projectId, long extractionId,
+        long currentUserId, DateTime now)
+    {
+        var edgePairs = new List<(ExtractionEdge Staging, Edge Promoted)>();
+
+        foreach (var se in stagingEdges)
+        {
+            // Skip edges where either endpoint was not promoted (e.g. invalid_schema record)
+            if (!recordIdMap.TryGetValue(se.OriginRecordId, out var originRecordId)) continue;
+            if (!recordIdMap.TryGetValue(se.DestinationRecordId, out var destRecordId)) continue;
+            relIdMap.TryGetValue(se.ExtractionRelationshipId, out var relId);
+
+            var newEdge = new Edge
+            {
+                OriginId = originRecordId,
+                DestinationId = destRecordId,
+                RelationshipId = relId,
+                DataSourceId = se.DataSourceId,
+                ProjectId = projectId,
+                OrganizationId = organizationId,
+                IsArchived = false,
+                LastUpdatedAt = now,
+                LastUpdatedBy = currentUserId,
+                ExtractionId = extractionId,
+            };
+            _context.Edges.Add(newEdge);
+            edgePairs.Add((se, newEdge));
+        }
+
+        // Save all edges first so EF Core populates their IDs, then write promoted_id back to staging
+        await _context.SaveChangesAsync();
+        foreach (var (se, newEdge) in edgePairs)
+            se.PromotedId = newEdge.Id;
+        await _latticeContext.SaveChangesAsync();
+
+        return edgePairs.Count;
+    }
+
 }

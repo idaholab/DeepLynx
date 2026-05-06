@@ -51,7 +51,7 @@ public interface IOlapBusiness
         long recordId);
 
     Task<JsonArray?> ExtractTabularColumns(
-        ObjectStorage objectStorage,
+        string objectStorageType,
         ObjectStorageConfigDto objectStorageConfig,
         string fileUri);
 }

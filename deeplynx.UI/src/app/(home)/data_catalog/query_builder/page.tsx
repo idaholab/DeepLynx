@@ -14,7 +14,15 @@ export default async function Page({
   const params = await searchParams;
   const fromProject =
     typeof params.fromProject === "string" ? params.fromProject : "";
+  const projectIdsParam = params.projectIds;
+  const projectIdsFromWidget = Array.isArray(projectIdsParam)
+    ? projectIdsParam
+    : typeof projectIdsParam === "string"
+    ? [projectIdsParam]
+    : [];  
   const initialSearch = typeof params.search === "string" ? params.search : "";
+  const savedSearchId =
+  typeof params.savedSearchId === "string" ? Number(params.savedSearchId) : undefined;
   // Get organization ID - prioritize cookie over session for real-time updates
   const cookieStore = await cookies();
   const orgSessionCookie = cookieStore.get("organizationSession");
@@ -47,7 +55,12 @@ export default async function Page({
   }));
 
   // Let the client fetch records after mount based on the dropdown selection
-  const initialSelectedProjects = fromProject ? [fromProject] : [];
+  const initialSelectedProjects =
+  projectIdsFromWidget.length > 0
+    ? projectIdsFromWidget
+    : fromProject
+    ? [fromProject]
+    : [];
 
   return (
     <QueryBuilderClient
@@ -55,6 +68,7 @@ export default async function Page({
       initialSelectedProjects={initialSelectedProjects}
       initialSearchTerm={initialSearch}
       organizationId={organizationId!}
+      savedSearchId={savedSearchId}
     />
   );
 }

@@ -4,15 +4,25 @@ namespace deeplynx.interfaces;
 
 public interface ILatticeExtractionBusiness
 {
-    Task<ExtractionResponseDto> LatticeEntityStaging(
-        long currentUserId,
+    Task<ExtractionResponseDto> ProcessInsightExtractionCallback(
         long organizationId,
         long projectId,
         long dataSourceId,
-        CreateStagingRequestDto dto,
-        long? extractionId = null);
+        long extractionId,
+        InsightExtractionCallbackDto dto);
 
     Task MarkExtractionFailed(long extractionId, string? errorMessage = null);
+
+    Task<ExtractionStagingResponseDto> GetExtractionStaging(long extractionId);
+
+    Task<ExtractionResponseDto> PromoteExtraction(
+        long currentUserId,
+        long organizationId,
+        long projectId,
+        long extractionId,
+        bool approve);
+
+    Task<EmbeddingStatusResponseDto> GetEmbeddingStatus(long projectId);
 
     Task<List<OntologySimilarityResultDto>> SearchOntologySimilarity(
         long recordId,
