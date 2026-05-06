@@ -22,6 +22,7 @@ public class FileBusiness
     private readonly IRecordBusiness _recordBusiness;
     private readonly IOlapBusiness _olapBusiness;
     private readonly IInsightBusiness _insightBusiness;
+    private readonly IObjectStorageBusiness _objectStorageBusiness;
 
 
     // NOTE: Chunked upload methods currently only support filesystem storage.
@@ -34,7 +35,8 @@ public class FileBusiness
         IClassBusiness classBusiness,
         IRecordBusiness recordBusiness,
         IInsightBusiness insightBusiness,
-        IOlapBusiness olapBusiness)
+        IOlapBusiness olapBusiness,
+        IObjectStorageBusiness objectStorageBusiness)
     {
         _context = context;
         _factory = factory;
@@ -43,7 +45,7 @@ public class FileBusiness
         _recordBusiness = recordBusiness;
         _insightBusiness = insightBusiness;
         _olapBusiness = olapBusiness;
-
+        _objectStorageBusiness = objectStorageBusiness;
 
         var chunkSizeStr = Environment.GetEnvironmentVariable("RECOMMENDED_CHUNK_SIZE")
                            ?? throw new InvalidOperationException(
@@ -93,12 +95,12 @@ public class FileBusiness
             throw new ArgumentException($"Embedding is not supported for file type '{fileType}'.");
 
         var realDataSourceId = await ResolveDataSourceId(organizationId, projectId, dataSourceId);
-        var objectStorage = await GetObjectStorageWithConfig(organizationId, projectId, objectStorageId);
-        var configData = DeserializeConfig(objectStorage.Config);
+        var realObjectStorageId = await ResolveObjectStorageId(organizationId, projectId, objectStorageId);
+        var objectStorage = await _objectStorageBusiness.GetDecryptedObjectStorage(realObjectStorageId);
         var fileBusiness = _factory.CreateFileBusiness(objectStorage.Type);
         var guid = Guid.NewGuid();
 
-        var uri = await fileBusiness.UploadFile(organizationId, projectId, realDataSourceId, configData, file, guid);
+        var uri = await fileBusiness.UploadFile(organizationId, projectId, realDataSourceId, objectStorage.Config, file, guid);
 
         var recordClass = await _classBusiness.GetOrCreateClass(currentUserId, organizationId, projectId, "File");
 
@@ -145,7 +147,7 @@ public class FileBusiness
 
             if (hasContent)
             {
-                var columns = await _olapBusiness.ExtractTabularColumns(objectStorage, configData, uri);
+                var columns = await _olapBusiness.ExtractTabularColumns(objectStorage.Type, objectStorage.Config, uri);
                 if (columns != null && columns.Count > 0)
                 {
                     properties["columns"] = columns;
@@ -211,12 +213,11 @@ public class FileBusiness
 
         if (record.ObjectStorageId == null) throw new KeyNotFoundException("Record needs an object storage id");
 
-        var objectStorage = await GetObjectStorageWithConfig(organizationId, projectId, record.ObjectStorageId.Value);
-        var configData = DeserializeConfig(objectStorage.Config);
+        var objectStorage = await _objectStorageBusiness.GetDecryptedObjectStorage(record.ObjectStorageId.Value);
         var fileBusiness = _factory.CreateFileBusiness(objectStorage.Type);
         var guid = Guid.NewGuid();
 
-        var uri = await fileBusiness.UpdateFile(record, configData, file, guid);
+        var uri = await fileBusiness.UpdateFile(record, objectStorage.Config, file, guid);
 
         var fileSize = file.Length;
 
@@ -262,12 +263,11 @@ public class FileBusiness
         var record = await _recordBusiness.GetRecord(currentUserId, organizationId, projectId, recordId, true);
 
         if (record.ObjectStorageId == null) throw new KeyNotFoundException("Record needs an object storage id");
-
-        var objectStorage = await GetObjectStorageWithConfig(organizationId, projectId, record.ObjectStorageId.Value);
-        var configData = DeserializeConfig(objectStorage.Config);
+        
+        var objectStorage = await _objectStorageBusiness.GetDecryptedObjectStorage(record.ObjectStorageId.Value);
         var fileBusiness = _factory.CreateFileBusiness(objectStorage.Type);
 
-        return await fileBusiness.DownloadFile(record, configData);
+        return await fileBusiness.DownloadFile(record, objectStorage.Config);
     }
 
     /// <summary>
@@ -284,12 +284,11 @@ public class FileBusiness
         var record = await _recordBusiness.GetRecord(currentUserId, organizationId, projectId, recordId, true);
 
         if (record.ObjectStorageId == null) throw new KeyNotFoundException("Record needs an object storage id");
-
-        var objectStorage = await GetObjectStorageWithConfig(organizationId, projectId, record.ObjectStorageId.Value);
-        var configData = DeserializeConfig(objectStorage.Config);
+        
+        var objectStorage = await _objectStorageBusiness.GetDecryptedObjectStorage(record.ObjectStorageId.Value);
         var fileBusiness = _factory.CreateFileBusiness(objectStorage.Type);
 
-        return await fileBusiness.GenerateDownloadUrl(record, configData);
+        return await fileBusiness.GenerateDownloadUrl(record, objectStorage.Config);
     }
 
     /// <summary>
@@ -307,11 +306,11 @@ public class FileBusiness
         if (record == null) throw new KeyNotFoundException("Record not found");
         if (record.ObjectStorageId == null) throw new KeyNotFoundException("Record needs an object storage id");
 
-        var objectStorage = await GetObjectStorageWithConfig(organizationId, projectId, record.ObjectStorageId.Value);
-        var configData = DeserializeConfig(objectStorage.Config);
+        var objectStorage = await _objectStorageBusiness.GetDecryptedObjectStorage(record.ObjectStorageId.Value);
+        
         var fileBusiness = _factory.CreateFileBusiness(objectStorage.Type);
 
-        await fileBusiness.DeleteFile(record, configData);
+        await fileBusiness.DeleteFile(record, objectStorage.Config);
 
         return await _recordBusiness.DeleteRecord(currentUserId, organizationId, projectId, recordId);
 
@@ -335,14 +334,14 @@ public class FileBusiness
         FileUploadInitRequestDto request)
     {
         var realDataSourceId = await ResolveDataSourceId(organizationId, projectId, dataSourceId);
-        var objectStorage = await GetObjectStorageWithConfig(organizationId, projectId, objectStorageId);
+        var realObjectStorageId = await ResolveObjectStorageId(organizationId, projectId, objectStorageId);
+        var objectStorage = await _objectStorageBusiness.GetDecryptedObjectStorage(realObjectStorageId);
 
         request.FileName = SanitizedFormFile.SanitizeFileName(request.FileName);
 
-        var configData = DeserializeConfig(objectStorage.Config);
         var fileBusiness = _factory.CreateFileBusiness(objectStorage.Type);
 
-        var uploadId = await fileBusiness.StartUpload(organizationId, projectId, realDataSourceId, configData);
+        var uploadId = await fileBusiness.StartUpload(organizationId, projectId, realDataSourceId, objectStorage.Config);
         var totalChunks = (int)Math.Ceiling((double)request.FileSize / _recommendedChunkSize);
 
         return new FileUploadSessionResponseDto
@@ -378,12 +377,13 @@ public class FileBusiness
         if (chunk == null) throw new ArgumentException("chunk cannot be null");
         chunk = new SanitizedFormFile(chunk);
 
-        var objectStorage = await GetObjectStorageWithConfig(organizationId, projectId, objectStorageId);
-        var configData = DeserializeConfig(objectStorage.Config);
+        
+        var realObjectStorageId = await ResolveObjectStorageId(organizationId, projectId, objectStorageId);
+        var objectStorage = await _objectStorageBusiness.GetDecryptedObjectStorage(realObjectStorageId);
         var fileBusiness = _factory.CreateFileBusiness(objectStorage.Type);
 
-        await fileBusiness.UploadChunk(organizationId, projectId, realDataSourceId, chunkNumber, uploadId, configData,
-            chunk);
+        await fileBusiness.UploadChunk(organizationId, projectId, realDataSourceId, chunkNumber, uploadId, 
+            objectStorage.Config, chunk);
 
         return "success";
     }
@@ -417,16 +417,16 @@ public class FileBusiness
         long? embeddingModelConfigId = null)
     {
         var realDataSourceId = await ResolveDataSourceId(organizationId, projectId, dataSourceId);
-        var objectStorage = await GetObjectStorageWithConfig(organizationId, projectId, objectStorageId);
+        var realObjectStorageId = await ResolveObjectStorageId(organizationId, projectId, objectStorageId);
+        var objectStorage = await _objectStorageBusiness.GetDecryptedObjectStorage(realObjectStorageId);
 
         request.FileName = SanitizedFormFile.SanitizeFileName(request.FileName);
 
-        var configData = DeserializeConfig(objectStorage.Config);
         var fileBusiness = _factory.CreateFileBusiness(objectStorage.Type);
         var guid = Guid.NewGuid();
 
-        var uri = await fileBusiness.CompleteUpload(organizationId, projectId, realDataSourceId, configData, request,
-            guid);
+        var uri = await fileBusiness.CompleteUpload(organizationId, projectId, realDataSourceId, 
+            objectStorage.Config, request, guid);
 
         var fileClass = await _classBusiness.GetOrCreateClass(currentUserId, organizationId, projectId, "File");
         var fileSize = new FileInfo(uri).Length;
@@ -484,11 +484,11 @@ public class FileBusiness
         string uploadId)
     {
         var realDataSourceId = await ResolveDataSourceId(organizationId, projectId, dataSourceId);
-        var objectStorage = await GetObjectStorageWithConfig(organizationId, projectId, objectStorageId);
-        var configData = DeserializeConfig(objectStorage.Config);
+        var realObjectStorageId = await ResolveObjectStorageId(organizationId, projectId, objectStorageId);
+        var objectStorage = await _objectStorageBusiness.GetDecryptedObjectStorage(realObjectStorageId);
         var fileBusiness = _factory.CreateFileBusiness(objectStorage.Type);
 
-        await fileBusiness.CancelUpload(organizationId, projectId, realDataSourceId, uploadId, configData);
+        await fileBusiness.CancelUpload(organizationId, projectId, realDataSourceId, uploadId, objectStorage.Config);
     }
 
     // -------------------------------------------------------------------------
@@ -504,8 +504,21 @@ public class FileBusiness
         }
 
         var defaultDataSource = await _dataSourceBusiness.GetDefaultDataSource(organizationId, projectId)
-                                ?? throw new KeyNotFoundException("Default data source not found");
+            ?? throw new KeyNotFoundException("Default data source not found");
         return defaultDataSource.Id;
+    }
+    
+    private async Task<long> ResolveObjectStorageId(long organizationId, long projectId, long? objectStorageId)
+    {
+        if (objectStorageId.HasValue)
+        {
+            // object storage could be org-level so just return object storage, don't check for project existence
+            return objectStorageId.Value;
+        }
+
+        var defaultObjectStorage = await _objectStorageBusiness.GetDefaultObjectStorage(organizationId, projectId)
+            ?? throw new KeyNotFoundException("Default object storage not found");
+        return defaultObjectStorage.Id;
     }
 
     private async Task<ObjectStorage> GetObjectStorageWithConfig(long organizationId, long projectId,

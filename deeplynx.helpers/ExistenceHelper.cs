@@ -88,5 +88,17 @@ namespace deeplynx.helpers
                 throw new KeyNotFoundException($"DataSource with id {dataSourceId} not found in project with id {projectId}");
             }
         }
+        
+        public static async Task EnsureObjectStorageExistsForProjectAsync(DeeplynxContext context, long objectStorageId, long projectId, bool hideArchived = true)
+        {
+            var dataSourceExists = hideArchived
+                ? await context.ObjectStorages.AnyAsync(os => os.ProjectId == projectId && os.Id == objectStorageId && os.IsArchived == false)
+                : await context.ObjectStorages.AnyAsync(os => os.ProjectId == projectId && os.Id == objectStorageId);
+
+            if (!dataSourceExists)
+            {
+                throw new KeyNotFoundException($"Object Storage with id {objectStorageId} not found in project with id {projectId}");
+            }
+        }
     }
 }

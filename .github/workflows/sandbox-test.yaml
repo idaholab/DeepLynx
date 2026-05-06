@@ -293,7 +293,16 @@ jobs:
             deeplynx.insight
 
   kubernetes:
-    needs: [build-ui, build-server, build-docs, build-mcp, build-insight-rabbitmq, build-insight-rabbitmq-runner, build-insight-fastapi]
+    needs:
+      [
+        build-ui,
+        build-server,
+        build-docs,
+        build-mcp,
+        build-insight-rabbitmq,
+        build-insight-rabbitmq-runner,
+        build-insight-fastapi,
+      ]
     runs-on: [self-hosted]
     environment: Test
     steps:
@@ -322,6 +331,8 @@ jobs:
             --from-literal=llm-auth-token="${{ secrets.LLM_AUTH_TOKEN }}" \
             --from-literal=mm-auth-token="${{ secrets.MM_AUTH_TOKEN }}" \
             --from-literal=emb-auth-token="${{ secrets.EMB_AUTH_TOKEN }}" \
+            --from-literal=encryption-key="${{ secrets.ENCRYPTION_KEY }}" \
+            --from-literal=encryption-iv="${{ secrets.ENCRYPTION_IV }}" \
             --namespace=deeplynx-test \
             --dry-run=client -o yaml | kubectl apply -f -
 
@@ -376,6 +387,8 @@ jobs:
           JWT_SECRET_KEY: ${{ secrets.JWT_SECRET_KEY }}
           JWT_AUDIENCE: ${{vars.JWT_AUDIENCE}}
           INSIGHT_FASTAPI_URL: ${{ vars.INSIGHT_FASTAPI_URL }}
+          ENCRYPTION_KEY: ${{ vars.ENCRYPTION_KEY }}
+          ENCRYPTION_IV: ${{ vars.ENCRYPTION_IV }}
           POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
           AIRFLOW_BASE_URL: ${{ vars.AIRFLOW_BASE_URL }}
           AIRFLOW_USERNAME: ${{ vars.AIRFLOW_USERNAME }}

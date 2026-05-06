@@ -4,7 +4,6 @@ using deeplynx.interfaces;
 using deeplynx.models;
 using DotNetEnv;
 using Microsoft.EntityFrameworkCore;
-using Newtonsoft.Json;
 
 namespace deeplynx.business;
 
@@ -12,9 +11,11 @@ namespace deeplynx.business;
 public class ObjectStorageBusiness : IObjectStorageBusiness
 {
     private readonly DeeplynxContext _context;
+    private readonly EncryptionHelper _encryptionHelper;
 
-    public ObjectStorageBusiness(DeeplynxContext context)
+    public ObjectStorageBusiness(DeeplynxContext context, EncryptionHelper encryptionHelper)
     {
+        _encryptionHelper = encryptionHelper;
         _context = context;
     }
 
@@ -107,7 +108,6 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
     /// <param name="organizationId">The ID of the organization to which the object storage belongs</param>
     /// <param name="projectId">The ID of the project to which the object storage belongs</param>
     /// <param name="dto">A data transfer object with details on the new object storage to be created.</param>
-    /// <param name="makeDefault"> A boolean that tells whether to make the object storage default or not</param>
     public async Task<ObjectStorageResponseDto> CreateObjectStorage(
         long currentUserId,
         long organizationId,
@@ -119,8 +119,7 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
         var hasFilesystem = dto.Config.MountPath is not null;
         var hasAzure = dto.Config.AzureObjectConfig is not null;
         var hasAws = dto.Config.AwsConnectionString is not null;
-
-
+        
         var populatedCount = new[]
         {
             hasFilesystem,
@@ -175,7 +174,7 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
                 Default = dto.Default,
                 ProjectId = projectId,
                 OrganizationId = organizationId,
-                Config = JsonConvert.SerializeObject(dto.Config),
+                ConfigEncrypted = SerializeAndEncryptConfig(dto.Config),
                 LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
                 LastUpdatedBy = currentUserId
             };
@@ -521,7 +520,94 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
             throw new Exception($"Unable to set object storage {objectStorageId} as default");
         }
     }
+    
+    /// <summary>
+    ///     For internal use only (don't hook an API up to this)- returns a single decrypted object storage config
+    /// </summary>
+    /// <param name="objectStorageId">ID of the object storage to get config for</param>
+    /// <returns>A single object storage with its decrypted config</returns>
+    /// <exception cref="InvalidOperationException"></exception>
+    public async Task<ObjectStorageDecryptedDto> GetDecryptedObjectStorage(long objectStorageId)
+    {
+        // filter out archived by default instead of providing param
+        var query = _context.ObjectStorages
+            .Where(os => os.Id == objectStorageId)
+            .Where(os => !os.IsArchived);
+        
+        var returnedObjectStorage = await query.FirstOrDefaultAsync();
 
+        if (returnedObjectStorage is null)
+            throw new KeyNotFoundException($"Object storage with id {objectStorageId} not found");
+
+        return new ObjectStorageDecryptedDto
+        {
+            Id = returnedObjectStorage.Id,
+            Name = returnedObjectStorage.Name,
+            Type = returnedObjectStorage.Type,
+            ProjectId = returnedObjectStorage.ProjectId,
+            OrganizationId = returnedObjectStorage.OrganizationId,
+            Default = returnedObjectStorage.Default,
+            LastUpdatedAt = returnedObjectStorage.LastUpdatedAt,
+            LastUpdatedBy = returnedObjectStorage.LastUpdatedBy,
+            IsArchived = returnedObjectStorage.IsArchived,
+            Config = DeserializeAndDecryptConfig(returnedObjectStorage.ConfigEncrypted)
+        };
+    }
+
+    /// <summary>
+    ///     For internal use only (don't hook an API up to this)- returns the decrypted object storage config
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization to which the object storage belongs</param>
+    /// <param name="projectId">ID of the project in which the object storage belongs</param>
+    /// <param name="objectStorageIds">IDs of the object storage configs to get configs for</param>
+    /// <returns>A list of object storages, including their decrypted configs</returns>
+    /// <exception cref="InvalidOperationException"></exception>
+    public async Task<List<ObjectStorageDecryptedDto>> GetDecryptedObjectStorages(
+        long? organizationId,
+        long? projectId,
+        List<long>? objectStorageIds)
+    {
+        // filter out archived by default instead of providing a param
+        var query = _context.ObjectStorages
+            .Where(os => !os.IsArchived);
+
+        if (organizationId.HasValue)
+            query = query.Where(os => os.OrganizationId == organizationId);
+
+        if (projectId.HasValue)
+            query = query.Where(os => os.ProjectId == projectId || os.ProjectId == null);
+
+        if (objectStorageIds != null && objectStorageIds.Any())
+            query = query.Where(os => objectStorageIds.Contains(os.Id));
+        
+        var objectStorages = await query.ToListAsync();
+        return objectStorages
+            .Select(os => new ObjectStorageDecryptedDto
+            {
+                Id = os.Id,
+                Name = os.Name,
+                Type = os.Type,
+                ProjectId = os.ProjectId,
+                OrganizationId = os.OrganizationId,
+                Default = os.Default,
+                LastUpdatedAt = os.LastUpdatedAt,
+                LastUpdatedBy = os.LastUpdatedBy,
+                IsArchived = os.IsArchived,
+                Config = DeserializeAndDecryptConfig(os.ConfigEncrypted)
+            }).ToList();
+    }
+    
+    // Private Helpers
+    private String SerializeAndEncryptConfig(ObjectStorageConfigDto config)
+    {
+        return _encryptionHelper.SerializeAndEncrypt(config);
+    }
+
+    private ObjectStorageConfigDto DeserializeAndDecryptConfig(string encryptedConfig)
+    {
+        return _encryptionHelper.DeserializeAndDecrypt<ObjectStorageConfigDto>(encryptedConfig);
+    }
+    
     private async Task ResetProjectDefaults(long projectId, long newDefaultId)
     {
         // check for existing defaults at the project level and remove them from being default

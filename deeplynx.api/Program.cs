@@ -196,6 +196,7 @@ try
     builder.Services.AddMemoryCache();
     builder.Services.AddHttpClient<InsightServiceClient>();
     builder.Services.AddHttpClient<AirflowServiceClient>();
+    builder.Services.AddSingleton<EncryptionHelper>();
 
     //OpenApi Documentation
     builder.Services.AddOpenApi(options =>
@@ -503,6 +504,11 @@ try
        ║      Check DB Version      ║
        ╚════════════════════════════╝ */
     await DatabaseVersionChecker.CheckDatabaseVersion(connectionString);
+    
+    /* ╔════════════════════════════╗
+       ║   Check Encryption Keys    ║
+       ╚════════════════════════════╝ */
+    EncryptionHelper.CheckEncryptionConfig();
 
     /* ╔════════════════════════════╗
        ║      App Configurations    ║
@@ -548,8 +554,8 @@ try
         app.MapHub<EventNotificationHub>("/eventNotificationHub"); // endpoint for real-time notifications with SignalR
 
     /* ╔════════════════════════════╗
-    ║   Scalar Configuration     ║
-    ╚════════════════════════════╝ */
+       ║   Scalar Configuration     ║
+       ╚════════════════════════════╝ */
     // Always using scalar:
     //if (app.Environment.IsDevelopment()) { ...
     // app.UseOpenApi();

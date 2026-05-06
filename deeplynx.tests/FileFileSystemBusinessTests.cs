@@ -2,6 +2,7 @@ using System.Text;
 using System.Text.Json.Nodes;
 using deeplynx.business;
 using deeplynx.datalayer.Models;
+using deeplynx.helpers;
 using deeplynx.interfaces;
 using deeplynx.models;
 using Microsoft.AspNetCore.Http;
@@ -17,6 +18,7 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
     private FileFilesystemBusiness _fileBusiness;
     private Mock<IObjectStorageBusiness> _objectStorageBusiness = null!;
     private Mock<IRecordBusiness> _recordBusiness = null!;
+    private EncryptionHelper _encryptionHelper = null!;
     private long organizationId;
     public long os1;
     public long os2;
@@ -28,6 +30,7 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
 
     public override async Task InitializeAsync()
     {
+        _encryptionHelper = new EncryptionHelper();
         await base.InitializeAsync();
         _recordBusiness = new Mock<IRecordBusiness>();
         _objectStorageBusiness = new Mock<IObjectStorageBusiness>();
@@ -630,7 +633,7 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
             ProjectId = pid,
             OrganizationId = organizationId,
             Type = "filesystem",
-            Config = os1Config.ToString(),
+            ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(os1Config),
             Default = true
         };
 
@@ -642,7 +645,7 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
             Type = "filesystem",
             ProjectId = pid,
             OrganizationId = organizationId,
-            Config = os2Config.ToString()
+            ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(os2Config),
         };
 
         Context.ObjectStorages.Add(objectStorage);
