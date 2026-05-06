@@ -119,8 +119,7 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
         var hasFilesystem = dto.Config.MountPath is not null;
         var hasAzure = dto.Config.AzureObjectConfig is not null;
         var hasAws = dto.Config.AwsConnectionString is not null;
-
-
+        
         var populatedCount = new[]
         {
             hasFilesystem,
