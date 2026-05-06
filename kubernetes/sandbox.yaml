@@ -643,6 +643,8 @@ spec:
               value: "false"
             - name: STORAGE_BASE_DIR
               value: "/data/insight"
+            - name: NEXUS_API_URL
+              value: "http://deeplynx-backend-service/api/v1"
           resources:
             requests:
               cpu: "150m"
