@@ -977,12 +977,45 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
                 sc.PromotedId = null;
         }
 
+        // Pre-load any classes that already exist in the project with the same name,
+        // so we reuse them rather than hitting unique_class_name on create.
+        var namesToCreate = stagingClasses
+            .Where(c => (c.ValidationStatus == ExtractionValidationStatus.NovelDiscovery ||
+                         c.ValidationStatus == ExtractionValidationStatus.InvalidSchema) &&
+                        c.OntologyClassId == null && c.PromotedId == null)
+            .Select(c => c.Name)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        var existingClassByName = namesToCreate.Count > 0
+            ? (await _context.Classes
+                .Where(c => c.ProjectId == projectId && namesToCreate.Contains(c.Name))
+                .Select(c => new { c.Id, c.Name })
+                .ToListAsync())
+              .ToDictionary(c => c.Name, c => c.Id, StringComparer.OrdinalIgnoreCase)
+            : new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
+
+        // Deduplicate within the batch so two staging entries with the same name create one class.
+        var nameToNewClassId = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
+
         foreach (var sc in stagingClasses.Where(c =>
                      (c.ValidationStatus == ExtractionValidationStatus.NovelDiscovery ||
                       c.ValidationStatus == ExtractionValidationStatus.InvalidSchema) &&
                      c.OntologyClassId == null &&
                      c.PromotedId == null))
         {
+            if (existingClassByName.TryGetValue(sc.Name, out var existingId))
+            {
+                sc.PromotedId = existingId;
+                continue;
+            }
+
+            if (nameToNewClassId.TryGetValue(sc.Name, out var batchId))
+            {
+                sc.PromotedId = batchId;
+                continue;
+            }
+
             var newClass = new Class
             {
                 Name = sc.Name,
@@ -996,10 +1029,11 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
             _context.Classes.Add(newClass);
             await _context.SaveChangesAsync();
             sc.PromotedId = newClass.Id;
+            nameToNewClassId[sc.Name] = newClass.Id;
         }
         await _latticeContext.SaveChangesAsync();
 
-        // Valid classes resolve to their matched ontology class; novel_discovery to the newly created class
+        // Valid classes resolve to their matched ontology class; novel/invalid to the newly created class
         return stagingClasses.ToDictionary(c => c.Id, c => c.OntologyClassId ?? c.PromotedId);
     }
 
@@ -1083,12 +1117,40 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
                 sr.PromotedId = null;
         }
 
+        // Multiple staging relationships can share the same name (same rel type, different class pairs).
+        // Also, the name may already exist in the project from a prior approved extraction.
+        // In both cases reuse the existing relationship rather than hitting unique_relationship_name.
+        var relNamesToCreate = stagingRelationships
+            .Where(r => (r.ValidationStatus == ExtractionValidationStatus.NovelDiscovery ||
+                         r.ValidationStatus == ExtractionValidationStatus.InvalidSchema) &&
+                        r.OntologyRelationshipId == null && r.PromotedId == null)
+            .Select(r => r.Name)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        var existingRelByName = relNamesToCreate.Count > 0
+            ? (await _context.Relationships
+                .Where(r => r.ProjectId == projectId && relNamesToCreate.Contains(r.Name))
+                .Select(r => new { r.Id, r.Name })
+                .ToListAsync())
+              .ToDictionary(r => r.Name, r => r.Id, StringComparer.OrdinalIgnoreCase)
+            : new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
+
+        var nameToPromotedRelId = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
+
         foreach (var sr in stagingRelationships.Where(r =>
                      (r.ValidationStatus == ExtractionValidationStatus.NovelDiscovery ||
                       r.ValidationStatus == ExtractionValidationStatus.InvalidSchema) &&
                      r.OntologyRelationshipId == null &&
                      r.PromotedId == null))
         {
+            if (existingRelByName.TryGetValue(sr.Name, out var existingId) ||
+                nameToPromotedRelId.TryGetValue(sr.Name, out existingId))
+            {
+                sr.PromotedId = existingId;
+                continue;
+            }
+
             classIdMap.TryGetValue(sr.OriginClassId, out var originClassId);
             classIdMap.TryGetValue(sr.DestinationClassId, out var destClassId);
 
@@ -1107,6 +1169,7 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
             _context.Relationships.Add(newRel);
             await _context.SaveChangesAsync();
             sr.PromotedId = newRel.Id;
+            nameToPromotedRelId[sr.Name] = newRel.Id;
         }
         await _latticeContext.SaveChangesAsync();
 
