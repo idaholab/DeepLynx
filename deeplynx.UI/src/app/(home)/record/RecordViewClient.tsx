@@ -4,12 +4,9 @@
 import Tabs from "@/app/(home)/components/Tabs";
 import {
   ArrowTopRightOnSquareIcon,
-  CircleStackIcon,
   PencilIcon,
   PlusIcon,
-  QuestionMarkCircleIcon,
-  RocketLaunchIcon,
-  XMarkIcon,
+  SparklesIcon,
 } from "@heroicons/react/24/outline";
 import Link from "next/link";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
@@ -62,7 +59,7 @@ import {
 } from "./hooks/useRecordRelationships";
 import RelatedRecordsCardSkeleton from "./skeletons/RelatedRecordsSkeleton";
 import { triggerLatticeExtraction } from "@/app/lib/client_service/lattice_services.client";
-import { fetchInsightIngestionStatus } from "@/app/lib/client_service/insight_services.client";
+import { fetchInsightIngestionStatus, queueInsightUpload } from "@/app/lib/client_service/insight_services.client";
 
 // ============= HELPER FUNCTIONS =============
 interface PropertyRow {
@@ -159,37 +156,15 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
     [],
   );
   const [isLoadingClasses, setIsLoadingClasses] = useState(false);
-  const [isLatticeIntroOpen, setIsLatticeIntroOpen] = useState(false);
-  const [latticeIntroSlide, setLatticeIntroSlide] = useState(0);
   const [isTriggeringLatticeExtraction, setIsTriggeringLatticeExtraction] =
     useState(false);
   const [isCheckingLatticeReadiness, setIsCheckingLatticeReadiness] =
     useState(false);
   const [isRecordInsightEmbedded, setIsRecordInsightEmbedded] = useState(false);
+  const [isQueuingInsightUpload, setIsQueuingInsightUpload] = useState(false);
   const [latticeMode, setLatticeMode] = useState<"strict" | "discovery">(
     "discovery",
   );
-
-  const latticeIntroSlides = [
-    {
-      title: t.translations.LATTICE_INTRO_ANALYZE_TITLE,
-      icon: RocketLaunchIcon,
-      body: t.translations.LATTICE_INTRO_ANALYZE_BODY,
-    },
-    {
-      title: t.translations.LATTICE_INTRO_STAGE_TITLE,
-      icon: CircleStackIcon,
-      body: t.translations.LATTICE_INTRO_STAGE_BODY,
-    },
-    {
-      title: t.translations.LATTICE_INTRO_REVIEW_TITLE,
-      icon: QuestionMarkCircleIcon,
-      body: t.translations.LATTICE_INTRO_REVIEW_BODY,
-    },
-  ];
-
-  const currentLatticeIntroSlide = latticeIntroSlides[latticeIntroSlide];
-  const CurrentLatticeIntroIcon = currentLatticeIntroSlide.icon;
 
   const {
     originPage,
@@ -740,6 +715,20 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
     router,
   ]);
 
+  const handleQueueInsightUpload = useCallback(async () => {
+    const uri = record?.uri?.trim();
+    if (!uri) return;
+    setIsQueuingInsightUpload(true);
+    try {
+      await queueInsightUpload({ fileInfo: [{ fileId: recordId, fileURI: uri }] });
+      toast.success("Document queued for indexing.");
+    } catch {
+      toast.error("Failed to queue document for indexing.");
+    } finally {
+      setIsQueuingInsightUpload(false);
+    }
+  }, [record?.uri, recordId]);
+
   useEffect(() => {
     if (!recordId) return;
 
@@ -800,13 +789,8 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
     record.uri.trim().length > 0 &&
     record.uri.toLowerCase() !== "null";
 
-  const canTriggerStrictLatticeExtract =
-    hasLatticeRecordRequirements && isRecordInsightEmbedded;
-
   const canTriggerLatticeExtract =
-    latticeMode === "strict"
-      ? canTriggerStrictLatticeExtract
-      : hasLatticeRecordRequirements;
+    hasLatticeRecordRequirements && isRecordInsightEmbedded;
 
   const tabs = [
     {
@@ -814,7 +798,76 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
       content: (
         <div className="flex flex-col xl:flex-row gap-6 mt-4">
           {/* Left Column - Properties */}
-          <div className="w-full xl:w-1/2 space-y-4">
+          <div className="w-full xl:w-1/2 space-y-4 pl-2">
+            {isInsightSupported ? (
+              <div className="rounded-2xl bg-base-100 shadow-sm border-base-300 p-3 flex flex-col gap-2">
+                <div className="flex gap-4 items-start">
+                  <div className="flex-1 min-w-0 p-3">
+                    <p className="text-sm font-semibold">Lattice: AI Knowledge Extraction</p>
+                    <p className="mt-1 text-xs text-base-content/60 leading-relaxed">
+                      Automatically extract records, classes, relationships, and edges from this document.
+                      Results are staged for review before anything is added to the knowledge graph or data schema.
+                    </p>
+                  </div>
+                  <div className="flex flex-col gap-2 items-end shrink-0">
+                    <div className="join">
+                      <div className="tooltip tooltip-left" data-tip="Infers new classes and relationships from the document">
+                        <button
+                          type="button"
+                          className={`btn btn-xs join-item ${latticeMode === "discovery" ? "btn-primary" : "btn-outline"}`}
+                          onClick={() => setLatticeMode("discovery")}
+                          disabled={isTriggeringLatticeExtraction}
+                        >
+                          Discovery
+                        </button>
+                      </div>
+                      <div className="tooltip tooltip-left" data-tip="Maps only to existing classes and relationships in this project">
+                        <button
+                          type="button"
+                          className={`btn btn-xs join-item ${latticeMode === "strict" ? "btn-primary" : "btn-outline"}`}
+                          onClick={() => setLatticeMode("strict")}
+                          disabled={isTriggeringLatticeExtraction}
+                        >
+                          Strict
+                        </button>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      className="btn btn-primary btn-xs"
+                      onClick={handleTriggerLatticeExtraction}
+                      disabled={isTriggeringLatticeExtraction || isCheckingLatticeReadiness || !canTriggerLatticeExtract}
+                    >
+                      {isTriggeringLatticeExtraction ? (
+                        <><span className="loading loading-spinner loading-xs" /> Starting…</>
+                      ) : isCheckingLatticeReadiness ? (
+                        <><span className="loading loading-spinner loading-xs" /> Checking…</>
+                      ) : (
+                        <>Extract <ArrowTopRightOnSquareIcon className="size-3" /></>
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                {!isRecordInsightEmbedded && !isCheckingLatticeReadiness && (
+                  <div className="rounded-xl border border-warning/30 bg-warning/10 px-3 py-1.5 flex items-center justify-between gap-3">
+                    <p className="text-xs text-base-content/70">Document must be embedded before extraction.</p>
+                    <button
+                      type="button"
+                      className="btn btn-warning btn-xs shrink-0"
+                      onClick={handleQueueInsightUpload}
+                      disabled={isQueuingInsightUpload}
+                    >
+                      {isQueuingInsightUpload
+                        ? <span className="loading loading-spinner loading-xs" />
+                        : "Queue for embedding with Insight"
+                      }
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : null}
+
             <PropertyTable
               title={t.translations.SYSTEM_PROPERTIES}
               rows={systemPropertiesRows}
@@ -838,6 +891,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
                 onEmbeddingStatusChange={setIsRecordInsightEmbedded}
               />
             ) : null}
+
             {/* Tags Card */}
             <RecordTagsPanel
               tags={tags}
@@ -957,82 +1011,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
         onTabChange={(label) =>
           setActiveTab(tabs.findIndex((tab) => tab.label === label))
         }
-        rightAction={
-          isInsightSupported ? (
-            <div className="flex gap-2 items-center">
-              <div
-                className="tooltip"
-                data-tip={
-                  !isInsightSupported
-                    ? t.translations.LATTICE_UNSUPPORTED_FILE_TOOLTIP
-                    : isRecordInsightEmbedded
-                      ? t.translations.LATTICE_READY_TOOLTIP
-                      : t.translations.LATTICE_REQUIRES_EMBEDDING_TOOLTIP
-                }
-              >
-                <button
-                  type="button"
-                  className="btn btn-ghost btn-sm btn-circle"
-                  onClick={() => {
-                    setLatticeIntroSlide(0);
-                    setIsLatticeIntroOpen(true);
-                  }}
-                  aria-label={t.translations.LATTICE_LEARN_MORE_ARIA}
-                >
-                  <QuestionMarkCircleIcon className="size-6" />
-                </button>
-              </div>
-              <div className="join">
-                <button
-                  type="button"
-                  className={`btn btn-sm join-item ${latticeMode === "discovery" ? "btn-primary" : "btn-outline"
-                    }`}
-                  onClick={() => setLatticeMode("discovery")}
-                  disabled={isTriggeringLatticeExtraction}
-                >
-                  Discovery
-                </button>
-                <button
-                  type="button"
-                  className={`btn btn-sm join-item ${latticeMode === "strict" ? "btn-primary" : "btn-outline"
-                    }`}
-                  onClick={() => setLatticeMode("strict")}
-                  disabled={isTriggeringLatticeExtraction}
-                >
-                  Strict
-                </button>
-              </div>
-
-              <button
-                type="button"
-                className="btn btn-sm btn-outline btn-primary"
-                onClick={handleTriggerLatticeExtraction}
-                disabled={
-                  isTriggeringLatticeExtraction ||
-                  isCheckingLatticeReadiness ||
-                  !canTriggerLatticeExtract
-                }
-              >
-                {isTriggeringLatticeExtraction ? (
-                  <>
-                    <span className="loading loading-spinner loading-xs" />
-                    {t.translations.STARTING}
-                  </>
-                ) : isCheckingLatticeReadiness ? (
-                  <>
-                    <span className="loading loading-spinner loading-xs" />
-                    {t.translations.CHECKING}
-                  </>
-                ) : (
-                  <>
-                    {t.translations.LATTICE_TRIGGER}
-                    <ArrowTopRightOnSquareIcon className="size-4" />
-                  </>
-                )}
-              </button>
-            </div>
-          ) : null
-        }
+        rightAction={null}
       />
       <ConfirmationModal
         isOpen={modal.isOpen}
@@ -1079,91 +1058,6 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
         onSearchRecords={handleSearchRecords}
         onCreateRelationships={handleCreateRelationships}
       />
-      {isLatticeIntroOpen ? (
-        <dialog className="modal modal-open">
-          <div className="modal-box max-w-xl">
-            <form method="dialog">
-              <button
-                type="button"
-                className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2"
-                onClick={() => setIsLatticeIntroOpen(false)}
-                aria-label={t.translations.CLOSE}
-              >
-                <XMarkIcon className="size-6" />
-              </button>
-            </form>
-
-            <div className="flex flex-col items-center text-center gap-4 pt-4">
-              <div className="rounded-full bg-primary/10 p-4 text-primary">
-                <CurrentLatticeIntroIcon className="size-10" />
-              </div>
-
-              <div>
-                <h3 className="text-lg font-bold">
-                  {currentLatticeIntroSlide.title}
-                </h3>
-                <p className="py-3 text-sm text-base-content/70">
-                  {currentLatticeIntroSlide.body}
-                </p>
-              </div>
-
-              <div className="flex gap-2">
-                {latticeIntroSlides.map((_, index) => (
-                  <button
-                    key={index}
-                    type="button"
-                    className={`h-2.5 w-2.5 rounded-full ${latticeIntroSlide === index ? "bg-primary" : "bg-base-300"
-                      }`}
-                    onClick={() => setLatticeIntroSlide(index)}
-                    aria-label={`${t.translations.LATTICE_GO_TO_SLIDE} ${index + 1}`}
-                  />
-                ))}
-              </div>
-            </div>
-
-            <div className="modal-action justify-between">
-              <button
-                type="button"
-                className="btn btn-ghost"
-                disabled={latticeIntroSlide === 0}
-                onClick={() =>
-                  setLatticeIntroSlide((slide) => Math.max(slide - 1, 0))
-                }
-              >
-                {t.translations.BACK}
-              </button>
-
-              {latticeIntroSlide === latticeIntroSlides.length - 1 ? (
-                <button
-                  type="button"
-                  className="btn btn-primary"
-                  onClick={() => setIsLatticeIntroOpen(false)}
-                >
-                  {t.translations.GOT_IT}
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  className="btn btn-primary"
-                  onClick={() =>
-                    setLatticeIntroSlide((slide) =>
-                      Math.min(slide + 1, latticeIntroSlides.length - 1),
-                    )
-                  }
-                >
-                  {t.translations.NEXT}
-                </button>
-              )}
-            </div>
-          </div>
-
-          <form method="dialog" className="modal-backdrop">
-            <button type="button" onClick={() => setIsLatticeIntroOpen(false)}>
-              close
-            </button>
-          </form>
-        </dialog>
-      ) : null}
     </div>
   );
 }

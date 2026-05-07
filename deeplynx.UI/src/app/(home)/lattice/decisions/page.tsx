@@ -40,10 +40,16 @@ function validationBadgeClass(status: string | null) {
 }
 
 function extractionStatusBadgeClass(status: string) {
-  if (status === "complete" || status === "promoted") return "badge-success";
+  if (status === "complete") return "badge-success";
+  if (status === "promoted") return "badge-primary";
   if (status === "failed" || status === "rejected") return "badge-error";
   if (status === "running") return "badge-info";
   return "badge-warning";
+}
+
+function statusLabel(status: string) {
+  if (status === "promoted") return "approved";
+  return status;
 }
 
 function EmptyState({ message }: { message: string }) {
@@ -294,10 +300,10 @@ function ExtractionDetailPanel({
               {isRunning ? (
                 <>
                   <span className="loading loading-spinner loading-xs mr-1" />
-                  {staging.status}
+                  {statusLabel(staging.status)}
                 </>
               ) : (
-                staging.status
+                statusLabel(staging.status)
               )}
             </span>
             {staging.mode && (
@@ -349,7 +355,7 @@ function ExtractionDetailPanel({
                   ? "This extraction failed to complete."
                   : staging.status === "rejected"
                     ? "This extraction was rejected."
-                    : `This extraction has been ${staging.status}.`}
+                    : `This extraction has been ${statusLabel(staging.status)}.`}
           </p>
           {canDecide && (
             <p className="text-xs text-base-content/50 text-right max-w-[220px]">
@@ -494,7 +500,7 @@ export default function LatticeDecisionsPage() {
           but in an unrecognized pattern.{" "}
           <span className="font-medium">Invalid schema</span> items could not be reconciled with the schema.
           Approving an extraction promotes <span className="font-medium">all</span> staged items into the
-          knowledge graph, regardless of validation status.
+          knowledge graph and data schema, regardless of validation status.
         </p>
         <div className="mt-2">
           <span className="badge badge-warning badge-sm">Coming Soon</span>
@@ -537,7 +543,7 @@ export default function LatticeDecisionsPage() {
                             <p className="text-base-content/40 uppercase tracking-wide" style={{ fontSize: "0.625rem" }}>Status</p>
                             <div className="mt-0.5 flex h-4 items-center">
                               <span className={`badge badge-xs ${extractionStatusBadgeClass(item.status)}`}>
-                                {item.status}
+                                {statusLabel(item.status)}
                               </span>
                             </div>
                           </div>
