@@ -171,6 +171,16 @@ public class LatticeExtractionController : ControllerBase
             _logger.LogError(
                 "Failed to parse Insight callback for extraction {ExtractionId}: {Error}. Raw body: {RawBody}",
                 extractionId, exc.Message, rawBody);
+            try
+            {
+                await _latticeExtractionBusiness.MarkExtractionFailed(
+                    extractionId, $"LLM response could not be parsed: {exc.Message}");
+            }
+            catch (Exception markFailedExc)
+            {
+                _logger.LogError(markFailedExc,
+                    "Failed to mark extraction {ExtractionId} as failed after JSON parse error", extractionId);
+            }
             return BadRequest($"Invalid JSON in callback body: {exc.Message}");
         }
 

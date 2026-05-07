@@ -868,8 +868,15 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
     record.uri.trim().length > 0 &&
     record.uri.toLowerCase() !== "null";
 
+  const ontologyReady =
+    ontologyStatus !== null &&
+    (ontologyStatus.class_count === 0 || ontologyStatus.embedded_class_count >= ontologyStatus.class_count) &&
+    (ontologyStatus.relationship_count === 0 || ontologyStatus.embedded_relationship_count >= ontologyStatus.relationship_count);
+
   const canTriggerLatticeExtract =
-    hasLatticeRecordRequirements && isRecordInsightEmbedded;
+    hasLatticeRecordRequirements &&
+    isRecordInsightEmbedded &&
+    (latticeMode === "discovery" || ontologyReady);
 
   const tabs = [
     {
@@ -1066,12 +1073,14 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
                       )}
                     </div>
                   )}
-                  {ontologyStatus && !ontologyStatus.ontology_ready && ontologyStatus.class_count > 0 && (
+                  {ontologyStatus && (ontologyStatus.class_count > 0 || ontologyStatus.relationship_count > 0) && (
                     <div className="flex items-start justify-between gap-3">
-                      <p className="text-xs text-base-content/50 leading-relaxed flex-1">{t.translations.LATTICE_ONTOLOGY_NOT_READY}</p>
+                      {!ontologyReady && (
+                        <p className="text-xs text-base-content/50 leading-relaxed flex-1">{t.translations.LATTICE_ONTOLOGY_NOT_READY}</p>
+                      )}
                       <button
                         type="button"
-                        className="btn btn-outline btn-xs shrink-0"
+                        className="btn btn-outline btn-xs shrink-0 ml-auto"
                         onClick={handleQueueOntologyEmbeddings}
                         disabled={isQueuingOntologyEmbeddings}
                       >
