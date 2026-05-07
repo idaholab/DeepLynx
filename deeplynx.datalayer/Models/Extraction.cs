@@ -22,6 +22,9 @@ public class Extraction
     [Column("mode")]
     public string? Mode { get; set; }
 
+    [Column("project_id")]
+    public long? ProjectId { get; set; }
+
     [ForeignKey("CreatedBy")]
     public virtual User? CreatedByUser { get; set; }
 }
