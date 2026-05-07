@@ -2,7 +2,7 @@
 
 import { TriggerLatticeExtractionRequestDTO } from "@/app/(home)/types/requestDTOs";
 import { TriggerLatticeExtractionResponseDTO } from "@/app/(home)/types/responseDTOs";
-import { ExtractionListItemDTO, ExtractionStagingResponseDTO } from "@/app/(home)/types/latticeDTOs";
+import { EmbeddingStatusResponseDTO, ExtractionListItemDTO, ExtractionStagingResponseDTO } from "@/app/(home)/types/latticeDTOs";
 import api from "./api";
 
 export async function triggerLatticeExtraction(
@@ -44,6 +44,25 @@ export async function getExtractionStaging(
     `/organizations/${organizationId}/projects/${projectId}/extractions/${extractionId}/staging`,
   );
   return res.data;
+}
+
+export async function getEmbeddingStatus(
+  organizationId: number,
+  projectId: number,
+): Promise<EmbeddingStatusResponseDTO> {
+  const res = await api.get(
+    `/organizations/${organizationId}/projects/${projectId}/extractions/embedding-status`,
+  );
+  return res.data;
+}
+
+export async function queueOntologyEmbeddings(
+  organizationId: number,
+  projectId: number,
+): Promise<void> {
+  await api.post(
+    `/organizations/${organizationId}/projects/${projectId}/extractions/embed-ontology`,
+  );
 }
 
 export async function promoteExtraction(

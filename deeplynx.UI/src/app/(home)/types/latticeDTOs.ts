@@ -56,3 +56,11 @@ export interface ExtractionStagingResponseDTO {
   relationships: StagedRelationshipDTO[];
   edges: StagedEdgeDTO[];
 }
+
+export interface EmbeddingStatusResponseDTO {
+  ontology_ready: boolean;
+  class_count: number;
+  embedded_class_count: number;
+  relationship_count: number;
+  embedded_relationship_count: number;
+}

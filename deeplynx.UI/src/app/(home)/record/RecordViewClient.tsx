@@ -9,7 +9,7 @@ import {
   SparklesIcon,
 } from "@heroicons/react/24/outline";
 import Link from "next/link";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import {
@@ -58,7 +58,8 @@ import {
   useRecordRelationships,
 } from "./hooks/useRecordRelationships";
 import RelatedRecordsCardSkeleton from "./skeletons/RelatedRecordsSkeleton";
-import { triggerLatticeExtraction } from "@/app/lib/client_service/lattice_services.client";
+import { triggerLatticeExtraction, getEmbeddingStatus, queueOntologyEmbeddings } from "@/app/lib/client_service/lattice_services.client";
+import { EmbeddingStatusResponseDTO } from "@/app/(home)/types/latticeDTOs";
 import { fetchInsightIngestionStatus, queueInsightUpload } from "@/app/lib/client_service/insight_services.client";
 
 // ============= HELPER FUNCTIONS =============
@@ -165,6 +166,11 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
   const [latticeMode, setLatticeMode] = useState<"strict" | "discovery">(
     "discovery",
   );
+  const [ontologyStatus, setOntologyStatus] = useState<EmbeddingStatusResponseDTO | null>(null);
+  const [isLoadingOntologyStatus, setIsLoadingOntologyStatus] = useState(false);
+  const [isQueuingOntologyEmbeddings, setIsQueuingOntologyEmbeddings] = useState(false);
+  const [ontologyPollTrigger, setOntologyPollTrigger] = useState(0);
+  const ontologyPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const {
     originPage,
@@ -700,8 +706,12 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
       });
       router.push(`/lattice/decisions?${params.toString()}`);
     } catch (error: any) {
-      console.error("Error triggering Lattice extraction:", error);
-      toast.error(t.translations.LATTICE_FAILED_TO_START_ANALYSIS);
+      if (error?.response?.status === 400) {
+        toast(t.translations.LATTICE_EMBEDDINGS_GENERATING, { icon: "⏳" });
+      } else {
+        console.error("Error triggering Lattice extraction:", error);
+        toast.error(t.translations.LATTICE_FAILED_TO_START_ANALYSIS);
+      }
     } finally {
       setIsTriggeringLatticeExtraction(false);
     }
@@ -729,38 +739,107 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
     }
   }, [record?.uri, recordId]);
 
+  const handleQueueOntologyEmbeddings = useCallback(async () => {
+    if (!organization?.organizationId) return;
+    setIsQueuingOntologyEmbeddings(true);
+    try {
+      await queueOntologyEmbeddings(organization.organizationId as number, projectId);
+      toast.success(t.translations.LATTICE_ONTOLOGY_QUEUED_SUCCESS);
+      setOntologyPollTrigger((n) => n + 1);
+    } catch {
+      toast.error(t.translations.LATTICE_ONTOLOGY_QUEUE_FAILED);
+    } finally {
+      setIsQueuingOntologyEmbeddings(false);
+    }
+  }, [organization?.organizationId, projectId, t.translations.LATTICE_ONTOLOGY_QUEUED_SUCCESS, t.translations.LATTICE_ONTOLOGY_QUEUE_FAILED]);
+
+  const recordEmbedPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
   useEffect(() => {
     if (!recordId) return;
 
+    const POLL_INTERVAL_MS = 5000;
     let cancelled = false;
+    let isInitial = true;
 
     const checkLatticeReadiness = async () => {
       try {
-        setIsCheckingLatticeReadiness(true);
+        if (isInitial) setIsCheckingLatticeReadiness(true);
 
         const status = await fetchInsightIngestionStatus(recordId);
 
         if (cancelled) return;
 
         setIsRecordInsightEmbedded(status.indexed);
+
+        if (status.indexed && recordEmbedPollRef.current) {
+          clearInterval(recordEmbedPollRef.current);
+          recordEmbedPollRef.current = null;
+        }
       } catch (error) {
         if (cancelled) return;
-
         console.error("Failed to check Insight embedding status:", error);
-        setIsRecordInsightEmbedded(false);
+        if (isInitial) setIsRecordInsightEmbedded(false);
       } finally {
-        if (!cancelled) {
+        if (!cancelled && isInitial) {
           setIsCheckingLatticeReadiness(false);
+          isInitial = false;
         }
       }
     };
 
     void checkLatticeReadiness();
 
+    recordEmbedPollRef.current = setInterval(() => {
+      void checkLatticeReadiness();
+    }, POLL_INTERVAL_MS);
+
     return () => {
       cancelled = true;
+      if (recordEmbedPollRef.current) {
+        clearInterval(recordEmbedPollRef.current);
+        recordEmbedPollRef.current = null;
+      }
     };
   }, [recordId]);
+
+  useEffect(() => {
+    if (!organization?.organizationId || !projectId) return;
+
+    const POLL_INTERVAL_MS = 5000;
+
+    const fetchStatus = async () => {
+      try {
+        setIsLoadingOntologyStatus(true);
+        const status = await getEmbeddingStatus(organization.organizationId as number, projectId);
+        setOntologyStatus(status);
+
+        const classesDone = status.class_count === 0 || status.embedded_class_count >= status.class_count;
+        const relsDone = status.relationship_count === 0 || status.embedded_relationship_count >= status.relationship_count;
+        if (classesDone && relsDone && ontologyPollRef.current) {
+          clearInterval(ontologyPollRef.current);
+          ontologyPollRef.current = null;
+        }
+      } catch (error) {
+        console.error("Failed to fetch ontology embedding status:", error);
+      } finally {
+        setIsLoadingOntologyStatus(false);
+      }
+    };
+
+    void fetchStatus();
+
+    ontologyPollRef.current = setInterval(() => {
+      void fetchStatus();
+    }, POLL_INTERVAL_MS);
+
+    return () => {
+      if (ontologyPollRef.current) {
+        clearInterval(ontologyPollRef.current);
+        ontologyPollRef.current = null;
+      }
+    };
+  }, [organization?.organizationId, projectId, ontologyPollTrigger]);
 
   // ============= RENDER HELPERS =============
   if (!hasLoaded || !organization) {
@@ -789,8 +868,15 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
     record.uri.trim().length > 0 &&
     record.uri.toLowerCase() !== "null";
 
+  const ontologyReady =
+    ontologyStatus !== null &&
+    (ontologyStatus.class_count === 0 || ontologyStatus.embedded_class_count >= ontologyStatus.class_count) &&
+    (ontologyStatus.relationship_count === 0 || ontologyStatus.embedded_relationship_count >= ontologyStatus.relationship_count);
+
   const canTriggerLatticeExtract =
-    hasLatticeRecordRequirements && isRecordInsightEmbedded;
+    hasLatticeRecordRequirements &&
+    isRecordInsightEmbedded &&
+    (latticeMode === "discovery" || ontologyReady);
 
   const tabs = [
     {
@@ -956,6 +1042,56 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
                     </button>
                   </div>
                 )}
+
+                {/* Ontology Embedding Status */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-medium">{t.translations.LATTICE_ONTOLOGY_STATUS_TITLE}</p>
+                    {isLoadingOntologyStatus && !ontologyStatus && (
+                      <span className="loading loading-spinner loading-xs text-base-content/40" />
+                    )}
+                  </div>
+                  {ontologyStatus && (
+                    <div className="rounded-lg border border-base-300 divide-y divide-base-300 text-sm">
+                      {ontologyStatus.class_count === 0 && ontologyStatus.relationship_count === 0 ? (
+                        <p className="px-4 py-3 text-base-content/50 text-xs">{t.translations.LATTICE_ONTOLOGY_NO_SCHEMA}</p>
+                      ) : (
+                        <>
+                          <div className="flex items-center justify-between px-4 py-2">
+                            <span className="text-base-content/70">{t.translations.LATTICE_ONTOLOGY_CLASSES}</span>
+                            <span className={ontologyStatus.embedded_class_count === ontologyStatus.class_count ? "text-success font-medium" : "text-warning font-medium"}>
+                              {ontologyStatus.embedded_class_count} {t.translations.LATTICE_ONTOLOGY_EMBEDDED_OF} {ontologyStatus.class_count} {t.translations.LATTICE_ONTOLOGY_EMBEDDED_LABEL}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between px-4 py-2">
+                            <span className="text-base-content/70">{t.translations.LATTICE_ONTOLOGY_RELATIONSHIPS}</span>
+                            <span className={ontologyStatus.embedded_relationship_count === ontologyStatus.relationship_count ? "text-success font-medium" : "text-warning font-medium"}>
+                              {ontologyStatus.embedded_relationship_count} {t.translations.LATTICE_ONTOLOGY_EMBEDDED_OF} {ontologyStatus.relationship_count} {t.translations.LATTICE_ONTOLOGY_EMBEDDED_LABEL}
+                            </span>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  )}
+                  {ontologyStatus && (ontologyStatus.class_count > 0 || ontologyStatus.relationship_count > 0) && (
+                    <div className="flex items-start justify-between gap-3">
+                      {!ontologyReady && (
+                        <p className="text-xs text-base-content/50 leading-relaxed flex-1">{t.translations.LATTICE_ONTOLOGY_NOT_READY}</p>
+                      )}
+                      <button
+                        type="button"
+                        className="btn btn-outline btn-xs shrink-0 ml-auto"
+                        onClick={handleQueueOntologyEmbeddings}
+                        disabled={isQueuingOntologyEmbeddings}
+                      >
+                        {isQueuingOntologyEmbeddings
+                          ? <span className="loading loading-spinner loading-xs" />
+                          : t.translations.LATTICE_QUEUE_ONTOLOGY_EMBEDDINGS
+                        }
+                      </button>
+                    </div>
+                  )}
+                </div>
 
                 <div className="space-y-2">
                   <p className="text-sm font-medium">{t.translations.LATTICE_MODE_HEADER}</p>
