@@ -700,8 +700,12 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
       });
       router.push(`/lattice/decisions?${params.toString()}`);
     } catch (error: any) {
-      console.error("Error triggering Lattice extraction:", error);
-      toast.error(t.translations.LATTICE_FAILED_TO_START_ANALYSIS);
+      if (error?.response?.status === 400) {
+        toast(t.translations.LATTICE_EMBEDDINGS_GENERATING, { icon: "⏳" });
+      } else {
+        console.error("Error triggering Lattice extraction:", error);
+        toast.error(t.translations.LATTICE_FAILED_TO_START_ANALYSIS);
+      }
     } finally {
       setIsTriggeringLatticeExtraction(false);
     }
