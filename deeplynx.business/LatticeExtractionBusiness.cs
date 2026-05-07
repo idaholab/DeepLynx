@@ -111,7 +111,7 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
         return extraction.Id;
 
     }
-    
+
 
     public async Task<ExtractionResponseDto> ProcessInsightExtractionCallback(
         long organizationId,
@@ -128,7 +128,7 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
 
         // Validation Logic
         var (dedupedRecords, dedupedEdges) = _validationBusiness.Deduplicate(dto);
-        
+
         var allClassTypes = dedupedRecords.Select(r => r.ClassType)
             .Concat(dedupedEdges.Select(e => e.SubjectType))
             .Concat(dedupedEdges.Select(e => e.ObjectType));
@@ -136,7 +136,7 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
         var classSimilarities = await _validationBusiness.NormalizeClassTypes(allClassTypes, projectId);
         var relSimilarities = await _validationBusiness.NormalizeRelationshipTypes(dedupedEdges, projectId);
         var ontologyPatterns = await _validationBusiness.GetOntologyPatterns(projectId);
-        
+
         // Save to Lattice schema 
         await using var transaction = await _latticeContext.Database.BeginTransactionAsync();
         try
@@ -441,7 +441,7 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
         extraction.Status = ExtractionStatus.Failed;
         await _context.SaveChangesAsync();
         _logger.LogError(errorMessage);
-        
+
     }
 
     /// <summary>
@@ -489,7 +489,7 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
                                                      """)
             .ToListAsync();
     }
-    
+
     /// <summary>
     ///     Checks whether the document record and project ontology are embedded.
     ///     Any missing embeddings are queued automatically.
@@ -527,10 +527,10 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
             projectClassIds.Count, projectRelationshipIds.Count);
 
         if (recordEmbedded && ontologyEmbedded) return;
-    
+
         if (!recordEmbedded)
         {
-            AiModelConfigResponseDto vlmConfig;
+            AiModelConfigWithTokenResponseDto vlmConfig;
             try
             {
                 vlmConfig = await _insightBusiness.ResolveModelConfig(
@@ -545,16 +545,16 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
                 currentUserId, organizationId, projectId, null, "embedding");
             _insightBusiness.TriggerEmbedding(projectId, recordId, record.Uri!, vlmConfig, embeddingConfig);
         }
-    
+
         if (!ontologyEmbedded)
             await _insightBusiness.QueueInsightEmbedStrings(currentUserId, organizationId, projectId, null);
-    
+
         throw new InvalidOperationException(
             "Embeddings are being generated for this extraction." +
             "Please retry the extraction in a few minutes.");
     }
-    
-    
+
+
     public async Task<EmbeddingStatusResponseDto> GetEmbeddingStatus(long projectId)
     {
         var classIds = await _context.Classes
@@ -612,37 +612,37 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
     /// <summary>Builds the LLM extraction prompt by running a similarity search and injecting the top-ranked ontology context and document text chunks.</summary>
     private async Task<string> ConstructPrompt(long recordId, long projectId, string mode)
     {
-            //Cosine similarity search to retrieve similar ontology data with respect to document text chunk
-            //Specific formatting for LLM prompt construction 
-            var results = await SearchOntologySimilarity(
-                recordId, projectId);
+        //Cosine similarity search to retrieve similar ontology data with respect to document text chunk
+        //Specific formatting for LLM prompt construction 
+        var results = await SearchOntologySimilarity(
+            recordId, projectId);
 
-            var classes = results
-                .Where(r => r.Type == "class")
-                .DistinctBy(r => r.ClassRelationshipId)
-                .Select(r => $"{r.Name}: {r.Description}");
+        var classes = results
+            .Where(r => r.Type == "class")
+            .DistinctBy(r => r.ClassRelationshipId)
+            .Select(r => $"{r.Name}: {r.Description}");
 
-            var relationships = results
-                .Where(r => r.Type == "relationship" && r.RelationshipPattern != null)
-                .DistinctBy(r => r.ClassRelationshipId)
-                .Select(r => $"({r.RelationshipPattern!.OriginClassName}) -{r.RelationshipPattern.RelationshipName}-> ({r.RelationshipPattern.DestinationClassName})");
+        var relationships = results
+            .Where(r => r.Type == "relationship" && r.RelationshipPattern != null)
+            .DistinctBy(r => r.ClassRelationshipId)
+            .Select(r => $"({r.RelationshipPattern!.OriginClassName}) -{r.RelationshipPattern.RelationshipName}-> ({r.RelationshipPattern.DestinationClassName})");
 
-            var textChunks = results
-                .Where(r => !string.IsNullOrEmpty(r.TextChunk))
-                .DistinctBy(r => r.TextChunk)
-                .Select(r => r.TextChunk!);
+        var textChunks = results
+            .Where(r => !string.IsNullOrEmpty(r.TextChunk))
+            .DistinctBy(r => r.TextChunk)
+            .Select(r => r.TextChunk!);
 
-            var entityList   = string.Join("\n", classes);
-            var relationList = string.Join("\n", relationships);
-            var text         = string.Join("\n\n", textChunks);
-            
-            //entity list is [(class name, description)]
-            //relation_list is [(origin class name, relationship name, destination class name)] 
-            //TODO: context_block is graph context, 2 hops from record node
-            //{text}{truncation} is ["example text", "text"]
-            //TODO: {truncation} is for document text chunk truncation, necessary only if it exceeds a certain character limit. Plus the "...truncated" message to the LLM
-            var prompt = "";
-            var strictPrompt = """
+        var entityList = string.Join("\n", classes);
+        var relationList = string.Join("\n", relationships);
+        var text = string.Join("\n\n", textChunks);
+
+        //entity list is [(class name, description)]
+        //relation_list is [(origin class name, relationship name, destination class name)] 
+        //TODO: context_block is graph context, 2 hops from record node
+        //{text}{truncation} is ["example text", "text"]
+        //TODO: {truncation} is for document text chunk truncation, necessary only if it exceeds a certain character limit. Plus the "...truncated" message to the LLM
+        var prompt = "";
+        var strictPrompt = """
                 You are a precise information extraction system for formal ontology-based knowledge graphs.
                   
                 Your task is to extract classes and relationships that MATCH the provided ontology schema.
@@ -695,8 +695,8 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
 
                 CRITICAL: Use EXACT class type names from the ontology schema. Be thorough - extract all relevant classes and relationships from the document.
                 """;
-            
-            var discoveryPrompt = """
+
+        var discoveryPrompt = """
                 You are a knowledge extraction system for formal ontology-based knowledge graphs.
                 
                 Your task is to extract classes and relationships, preferring the provided ontology schema but discovering new types when necessary.
@@ -763,22 +763,22 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
 
                 IMPORTANT: Balance ontology compliance with discovery. Extract comprehensively across all domains while preferring standard types when applicable.
                 """;
-            
-            if (mode == ExtractionMode.Strict)
-            {
-                prompt = strictPrompt; 
-            }
-            else
-            {
-                prompt = discoveryPrompt;
-            }
 
-            var filledPrompt = prompt
-                .Replace("{class_list}", entityList)
-                .Replace("{relationship_list}", relationList)
-                .Replace("{text}", text);
+        if (mode == ExtractionMode.Strict)
+        {
+            prompt = strictPrompt;
+        }
+        else
+        {
+            prompt = discoveryPrompt;
+        }
 
-            return filledPrompt;
+        var filledPrompt = prompt
+            .Replace("{class_list}", entityList)
+            .Replace("{relationship_list}", relationList)
+            .Replace("{text}", text);
+
+        return filledPrompt;
     }
 
     public async Task<ExtractionStagingResponseDto> GetExtractionStaging(long extractionId)

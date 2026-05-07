@@ -36,7 +36,6 @@ public class InsightBusiness : IInsightBusiness
         _insightServiceClient = insightServiceClient;
         _aiModelConfigBusiness = aiModelConfigBusiness;
         _logger = logger;
-        _context = context;
         _sensitivityLabelService = sensitivityLabelService;
     }
 
@@ -117,8 +116,8 @@ public class InsightBusiness : IInsightBusiness
         long projectId,
         long recordId,
         string uri,
-        AiModelConfigResponseDto vlmConfig,
-        AiModelConfigResponseDto embeddingConfig,
+        AiModelConfigWithTokenResponseDto vlmConfig,
+        AiModelConfigWithTokenResponseDto embeddingConfig,
         string? userJwt = null,
         bool overwrite = false)
     {
@@ -229,25 +228,25 @@ public class InsightBusiness : IInsightBusiness
     /// <returns>The resolved <see cref="AiModelConfigResponseDto"/>, with <c>Token</c> populated if applicable.</returns>
     /// <exception cref="KeyNotFoundException">Thrown when the config or its default cannot be found.</exception>
     /// <exception cref="InvalidOperationException">Thrown when a token is required but not found for the user.</exception>
-    public async Task<AiModelConfigResponseDto> ResolveModelConfig(
+    public async Task<AiModelConfigWithTokenResponseDto> ResolveModelConfig(
         long currentUserId,
         long organizationId,
         long projectId,
         long? modelConfigId,
         string modelType)
     {
-        AiModelConfigResponseDto config;
+        AiModelConfigWithTokenResponseDto config;
 
         if (!modelConfigId.HasValue && modelType == "llm")
         {
             try
             {
-                config = await _aiModelConfigBusiness.GetDefaultAiModelConfig(
+                config = await _aiModelConfigBusiness.GetDefaultAiModelConfigWithToken(
                     currentUserId, organizationId, projectId, "llm");
             }
             catch (KeyNotFoundException)
             {
-                config = await _aiModelConfigBusiness.GetDefaultAiModelConfig(
+                config = await _aiModelConfigBusiness.GetDefaultAiModelConfigWithToken(
                     currentUserId, organizationId, projectId, "vlm");
             }
         }
@@ -256,7 +255,7 @@ public class InsightBusiness : IInsightBusiness
             config = modelConfigId.HasValue
                 ? await _aiModelConfigBusiness.GetAiModelConfigWithToken(currentUserId, organizationId, projectId,
                     modelConfigId.Value)
-                : await _aiModelConfigBusiness.GetDefaultAiModelConfig(currentUserId, organizationId, projectId,
+                : await _aiModelConfigBusiness.GetDefaultAiModelConfigWithToken(currentUserId, organizationId, projectId,
                     modelType);
         }
 
@@ -267,7 +266,7 @@ public class InsightBusiness : IInsightBusiness
 
         return config;
     }
-    
+
     /// <summary>
     ///     Queues embedding jobs for all class and relationship descriptions in the project.
     ///     Fetches descriptions from the database, publishes each as an OntologyMessage to Insight's
@@ -337,8 +336,8 @@ public class InsightBusiness : IInsightBusiness
     }
 
     private async IAsyncEnumerable<string> StreamInsightQueryCore(
-        AiModelConfigResponseDto llmConfig,
-        AiModelConfigResponseDto embeddingConfig,
+        AiModelConfigWithTokenResponseDto llmConfig,
+        AiModelConfigWithTokenResponseDto embeddingConfig,
         InsightQueryApiRequestDto payload,
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {

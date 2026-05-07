@@ -39,6 +39,12 @@ public class UserModelTokenBusiness : IUserModelTokenBusiness
 
         var userModelTokens = await query.ToListAsync();
 
+        foreach (var token in userModelTokens)
+        {
+            if (!string.IsNullOrEmpty(token.Token))
+                token.Token = _encryptionHelper.Decrypt(token.Token);
+        }
+
         return userModelTokens.Select(MapToDto).ToList();
     }
 
@@ -57,6 +63,9 @@ public class UserModelTokenBusiness : IUserModelTokenBusiness
         {
             throw new KeyNotFoundException($"No user model token was found");
         }
+
+        if (!string.IsNullOrEmpty(userModelToken.Token))
+            userModelToken.Token = _encryptionHelper.Decrypt(userModelToken.Token);
 
         return MapToDto(userModelToken);
     }
@@ -85,7 +94,7 @@ public class UserModelTokenBusiness : IUserModelTokenBusiness
         if (dto.Token.Length <= 8)
             throw new InvalidOperationException("Token length looks too short to be valid.");
 
-        var encryptedToken = _encryptionHelper.SerializeAndEncrypt(dto.Token);
+        var encryptedToken = _encryptionHelper.Encrypt(dto.Token);
 
         var userModelToken = new UserModelToken
         {
@@ -96,6 +105,9 @@ public class UserModelTokenBusiness : IUserModelTokenBusiness
         };
         _context.UserModelTokens.Add(userModelToken);
         await _context.SaveChangesAsync();
+
+        if (!string.IsNullOrEmpty(userModelToken.Token))
+            userModelToken.Token = _encryptionHelper.Decrypt(userModelToken.Token);
 
         return MapToDto(userModelToken);
     }
@@ -119,12 +131,15 @@ public class UserModelTokenBusiness : IUserModelTokenBusiness
             throw new KeyNotFoundException($"No user model token was found with the ID: {userModelTokenId}");
         }
 
-        var encryptedToken = _encryptionHelper.SerializeAndEncrypt(dto.Token);
+        var encryptedToken = _encryptionHelper.Encrypt(dto.Token);
 
         userModelToken.Token = encryptedToken;
         userModelToken.LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
 
         await _context.SaveChangesAsync();
+
+        if (!string.IsNullOrEmpty(userModelToken.Token))
+            userModelToken.Token = _encryptionHelper.Decrypt(userModelToken.Token);
 
         return MapToDto(userModelToken);
     }

@@ -1,6 +1,6 @@
 namespace deeplynx.models;
 
-public class AiModelConfigResponseDto
+public class AiModelConfigWithTokenResponseDto
 {
     public long Id { get; set; }
     public long OrganizationId { get; set; }
@@ -14,4 +14,5 @@ public class AiModelConfigResponseDto
     public bool IsArchived { get; set; }
     public DateTime LastUpdatedAt { get; set; }
     public long? LastUpdatedBy { get; set; }
+    public string? Token { get; set; }
 }
