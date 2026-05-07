@@ -29,6 +29,14 @@ public class AiModelConfigBusinessTests : IntegrationTestBase
     public override async Task InitializeAsync()
     {
         await base.InitializeAsync();
+
+        if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("ENCRYPTION_KEY")))
+        {
+            var (key, iv) = EncryptionHelper.GenerateKeyAndIV();
+            Environment.SetEnvironmentVariable("ENCRYPTION_KEY", key);
+            Environment.SetEnvironmentVariable("ENCRYPTION_IV", iv);
+        }
+
         _encryptionHelper = new EncryptionHelper();
         _aiModelConfigBusiness = new AiModelConfigBusiness(Context, _encryptionHelper);
     }
