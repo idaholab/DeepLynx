@@ -284,10 +284,12 @@ function ExtractionDetailPanel({
   return (
     <div className="flex flex-col gap-4">
       {/* Header: title + status + approve/reject */}
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
+      <div className="flex flex-col gap-2">
+        <h2 className="text-lg font-bold">Extraction #{staging.id}</h2>
+
+        {/* Row 1: status + mode on left, buttons on right */}
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex flex-wrap items-center gap-2">
-            <h2 className="text-lg font-bold">Extraction #{staging.id}</h2>
             <span className={`badge ${extractionStatusBadgeClass(staging.status)}`}>
               {isRunning ? (
                 <>
@@ -304,21 +306,7 @@ function ExtractionDetailPanel({
               </span>
             )}
           </div>
-          <p className="mt-1 text-sm text-base-content/70">
-            {isRunning
-              ? "Extraction is in progress. This page will update automatically."
-              : canDecide
-                ? "Review the staged items below, then approve or reject the entire extraction."
-                : staging.status === "failed"
-                  ? "This extraction failed to complete."
-                  : staging.status === "rejected"
-                    ? "This extraction was rejected."
-                    : `This extraction has been ${staging.status}.`}
-          </p>
-        </div>
-
-        {canDecide && (
-          <div className="flex flex-col items-end gap-1.5">
+          {canDecide && (
             <div className="flex flex-wrap gap-2">
               <button
                 type="button"
@@ -347,11 +335,29 @@ function ExtractionDetailPanel({
                 Reject All
               </button>
             </div>
-            <p className="text-xs text-base-content/50">
-              Approvals are all-or-nothing. Individual item approval coming soon.
+          )}
+        </div>
+
+        {/* Row 2: description on left, note on right */}
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <p className="text-sm text-base-content/70">
+            {isRunning
+              ? "Extraction is in progress. This page will update automatically."
+              : canDecide
+                ? "Review the staged items below, then approve or reject the entire extraction."
+                : staging.status === "failed"
+                  ? "This extraction failed to complete."
+                  : staging.status === "rejected"
+                    ? "This extraction was rejected."
+                    : `This extraction has been ${staging.status}.`}
+          </p>
+          {canDecide && (
+            <p className="text-xs text-base-content/50 text-right max-w-[220px]">
+              All-or-nothing. All items are promoted on approval, including{" "}
+              <span className="font-medium text-error/70">invalid schema</span> items.
             </p>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       {/* Summary card */}
@@ -484,11 +490,16 @@ export default function LatticeDecisionsPage() {
           Extractions you have triggered for this project. Each staged item is scored and validated
           against the project ontology before human review. <span className="font-medium">Valid</span>{" "}
           items matched an existing ontology class or relationship.{" "}
-          <span className="font-medium">Invalid</span> items could not be reconciled with the schema.
-          For relationships and edges, <span className="font-medium">novel discovery</span> means the
-          individual classes and relationships involved are known to the ontology, but this specific
-          pattern between them has not been defined.
+          <span className="font-medium">Novel discovery</span> items involve known classes and relationships
+          but in an unrecognized pattern.{" "}
+          <span className="font-medium">Invalid schema</span> items could not be reconciled with the schema.
+          Approving an extraction promotes <span className="font-medium">all</span> staged items into the
+          knowledge graph, regardless of validation status.
         </p>
+        <div className="mt-2">
+          <span className="badge badge-warning badge-sm">Coming Soon</span>
+          <span className="ml-2 text-sm text-base-content/70">Individual item approval and bulk approval for different statuses</span>
+        </div>
       </div>
 
       <div className="px-3 sm:px-6 lg:px-12 py-6">
