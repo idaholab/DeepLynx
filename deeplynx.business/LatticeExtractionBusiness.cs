@@ -65,7 +65,8 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
         {
             CreatedBy = currentUserId,
             Status = ExtractionStatus.Pending,
-            Mode = mode
+            Mode = mode,
+            ProjectId = projectId
         };
         _context.Extractions.Add(extraction);
         await _context.SaveChangesAsync();
@@ -555,6 +556,21 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
     }
     
     
+    public async Task<List<ExtractionListItemDto>> ListExtractionsByUser(long userId, long projectId)
+    {
+        return await _context.Extractions
+            .Where(e => e.CreatedBy == userId && e.ProjectId == projectId)
+            .OrderByDescending(e => e.Id)
+            .Select(e => new ExtractionListItemDto
+            {
+                Id = e.Id,
+                Status = e.Status,
+                Mode = e.Mode,
+                CreatedBy = e.CreatedBy,
+            })
+            .ToListAsync();
+    }
+
     public async Task<EmbeddingStatusResponseDto> GetEmbeddingStatus(long projectId)
     {
         var classIds = await _context.Classes
@@ -862,8 +878,8 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
 
     /// <summary>
     ///     Approves or rejects a completed extraction.
-    ///     On approval, all valid and novel-discovery staged items are promoted into the
-    ///     deeplynx schema in dependency order: classes → records → relationships → edges.
+    ///     On approval, all staged items are promoted into the deeplynx schema regardless of
+    ///     validation status, in dependency order: classes → records → relationships → edges.
     ///     On rejection, the extraction is marked rejected and no deeplynx rows are written.
     /// </summary>
     public async Task<ExtractionResponseDto> PromoteExtraction(
@@ -893,9 +909,8 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
             .Where(c => c.ExtractionId == extractionId)
             .ToListAsync();
 
-        // invalid_schema records are excluded — they failed ontology validation and must not enter the KG
         var stagingRecords = await _latticeContext.ExtractionRecords
-            .Where(r => r.ExtractionId == extractionId && r.ValidationStatus != ExtractionValidationStatus.InvalidSchema)
+            .Where(r => r.ExtractionId == extractionId)
             .ToListAsync();
 
         var stagingRelationships = await _latticeContext.ExtractionRelationships
@@ -937,7 +952,7 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
     }
 
     /// <summary>
-    ///     Promotes novel_discovery classes that have no existing ontology match into deeplynx.classes.
+    ///     Promotes novel_discovery and invalid_schema classes that have no existing ontology match into deeplynx.classes.
     ///     Valid classes already exist in the ontology and are not re-created.
     ///     Returns a map of ExtractionClass.Id → deeplynx Class id for use in downstream steps.
     /// </summary>
@@ -947,7 +962,8 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
         long currentUserId, DateTime now)
     {
         foreach (var sc in stagingClasses.Where(c =>
-                     c.ValidationStatus == ExtractionValidationStatus.NovelDiscovery &&
+                     (c.ValidationStatus == ExtractionValidationStatus.NovelDiscovery ||
+                      c.ValidationStatus == ExtractionValidationStatus.InvalidSchema) &&
                      c.OntologyClassId == null &&
                      c.PromotedId == null))
         {
@@ -1026,7 +1042,7 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
     }
 
     /// <summary>
-    ///     Promotes novel_discovery relationships that have no existing ontology match into deeplynx.relationships.
+    ///     Promotes novel_discovery and invalid_schema relationships that have no existing ontology match into deeplynx.relationships.
     ///     Valid relationships already exist in the ontology and are not re-created.
     ///     Returns a map of ExtractionRelationship.Id → deeplynx Relationship id for use in edge promotion.
     /// </summary>
@@ -1037,7 +1053,8 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
         long currentUserId, DateTime now)
     {
         foreach (var sr in stagingRelationships.Where(r =>
-                     r.ValidationStatus == ExtractionValidationStatus.NovelDiscovery &&
+                     (r.ValidationStatus == ExtractionValidationStatus.NovelDiscovery ||
+                      r.ValidationStatus == ExtractionValidationStatus.InvalidSchema) &&
                      r.OntologyRelationshipId == null &&
                      r.PromotedId == null))
         {

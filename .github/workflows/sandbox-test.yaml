@@ -387,13 +387,14 @@ jobs:
           JWT_SECRET_KEY: ${{ secrets.JWT_SECRET_KEY }}
           JWT_AUDIENCE: ${{vars.JWT_AUDIENCE}}
           INSIGHT_FASTAPI_URL: ${{ vars.INSIGHT_FASTAPI_URL }}
-          LATTICE_MODEL: ${{ vars.LATTICE_MODEL }}
           ENCRYPTION_KEY: ${{ vars.ENCRYPTION_KEY }}
           ENCRYPTION_IV: ${{ vars.ENCRYPTION_IV }}
           POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
           AIRFLOW_BASE_URL: ${{ vars.AIRFLOW_BASE_URL }}
           AIRFLOW_USERNAME: ${{ vars.AIRFLOW_USERNAME }}
           AIRFLOW_PASSWORD: ${{ secrets.AIRFLOW_PASSWORD }}
+          LATTICE_MODEL: ${{ vars.LATTICE_MODEL }}
+          NEXUS_API_URL: ${{ vars.NEXUS_API_URL }}
         run: |
           cd $GITHUB_WORKSPACE/kubernetes
           envsubst < sandbox.yaml > manifest.yaml
