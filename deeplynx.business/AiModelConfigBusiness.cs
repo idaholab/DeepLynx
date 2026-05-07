@@ -136,7 +136,7 @@ public class AiModelConfigBusiness : IAiModelConfigBusiness
     /// <returns>A <see cref="AiModelConfigResponseDto"/> containing the model config and optionally the resolved token.</returns>
     /// <exception cref="KeyNotFoundException">Thrown when no config is found for the given ID and scope, or when it is archived.</exception>
     /// <exception cref="InvalidOperationException">Thrown when the model requires a token but none is found for the user.</exception>
-    public async Task<AiModelConfigWithTokenResponseDto> GetAiModelConfigWithToken(
+    public async Task<AiModelConfigResponseDto.WithToken> GetAiModelConfigWithToken(
         long currentUserId,
         long organizationId,
         long? projectId,
@@ -182,7 +182,7 @@ public class AiModelConfigBusiness : IAiModelConfigBusiness
             token = _encryptionHelper.DeserializeAndDecrypt<string>(token);
         }
 
-        return new AiModelConfigWithTokenResponseDto
+        return new AiModelConfigResponseDto.WithToken
         {
             Id = modelConfig.Id,
             OrganizationId = modelConfig.OrganizationId,
@@ -276,7 +276,7 @@ public class AiModelConfigBusiness : IAiModelConfigBusiness
     /// <param name="modelType">The type of model to retrieve (e.g. "llm", "vlm", or "embedding").</param>
     /// <returns>A <see cref="AiModelConfigWithTokenResponseDto"/> containing the model config and the decrypted token if applicable.</returns>
     /// <exception cref="KeyNotFoundException">Thrown when no default config is found for the given model type and scope, or when a required token is not found for the user.</exception>
-    public async Task<AiModelConfigWithTokenResponseDto> GetDefaultAiModelConfigWithToken(
+    public async Task<AiModelConfigResponseDto.WithToken> GetDefaultAiModelConfigWithToken(
         long currentUserId,
         long organizationId,
         long? projectId,
@@ -322,7 +322,7 @@ public class AiModelConfigBusiness : IAiModelConfigBusiness
             token = _encryptionHelper.DeserializeAndDecrypt<string>(rawToken);
         }
 
-        return new AiModelConfigWithTokenResponseDto
+        return new AiModelConfigResponseDto.WithToken
         {
             Id = modelConfig.Id,
             OrganizationId = modelConfig.OrganizationId,

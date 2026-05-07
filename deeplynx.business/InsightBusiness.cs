@@ -116,8 +116,8 @@ public class InsightBusiness : IInsightBusiness
         long projectId,
         long recordId,
         string uri,
-        AiModelConfigWithTokenResponseDto vlmConfig,
-        AiModelConfigWithTokenResponseDto embeddingConfig,
+        AiModelConfigResponseDto.WithToken vlmConfig,
+        AiModelConfigResponseDto.WithToken embeddingConfig,
         string? userJwt = null,
         bool overwrite = false)
     {
@@ -228,14 +228,14 @@ public class InsightBusiness : IInsightBusiness
     /// <returns>The resolved <see cref="AiModelConfigResponseDto"/>, with <c>Token</c> populated if applicable.</returns>
     /// <exception cref="KeyNotFoundException">Thrown when the config or its default cannot be found.</exception>
     /// <exception cref="InvalidOperationException">Thrown when a token is required but not found for the user.</exception>
-    public async Task<AiModelConfigWithTokenResponseDto> ResolveModelConfig(
+    public async Task<AiModelConfigResponseDto.WithToken> ResolveModelConfig(
         long currentUserId,
         long organizationId,
         long projectId,
         long? modelConfigId,
         string modelType)
     {
-        AiModelConfigWithTokenResponseDto config;
+        AiModelConfigResponseDto.WithToken config;
 
         if (!modelConfigId.HasValue && modelType == "llm")
         {
@@ -336,8 +336,8 @@ public class InsightBusiness : IInsightBusiness
     }
 
     private async IAsyncEnumerable<string> StreamInsightQueryCore(
-        AiModelConfigWithTokenResponseDto llmConfig,
-        AiModelConfigWithTokenResponseDto embeddingConfig,
+        AiModelConfigResponseDto.WithToken llmConfig,
+        AiModelConfigResponseDto.WithToken embeddingConfig,
         InsightQueryApiRequestDto payload,
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
