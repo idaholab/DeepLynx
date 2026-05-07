@@ -32,6 +32,7 @@ import ConfirmationModal from "@/app/(home)/components/ConfirmationModal";
 import RelatedRecordsCard, {
   CardColumn,
 } from "./components/RelatedRecordsCard";
+import ArchiveDelete from "../components/ArchiveDelete";
 
 // Types & Context
 import { useLanguage } from "@/app/contexts/Language";
@@ -42,6 +43,7 @@ import {
   getClass,
 } from "@/app/lib/client_service/class_services.client";
 import {
+  deleteRecord,
   getHistoricalRecord,
   getRecord,
   unattachSensitivityLabelFromRecord,
@@ -952,8 +954,8 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
             />
           </div>
 
-          {/* Right Column - Tags & Relations */}
-          <div className="w-full xl:w-1/2 space-y-4">
+          {/* Right Column - Tags, Relations, and Removing */}
+          <div className="w-full xl:flex-1 space-y-4">
             {isInsightSupported ? (
               <RecordInsightChat
                 organizationId={
@@ -1023,6 +1025,22 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
                 />
               </div>
             )}
+            {/* Delete a Record */}
+            <ArchiveDelete
+                actionType="delete"
+                itemType="Record"
+                itemName={record?.name || ""}
+                onConfirm={async () => {
+                  if (organization && projectId && record) {
+                    await deleteRecord(
+                      organization.organizationId as number,
+                      projectId as number,
+                      recordId as number,
+                    );
+                    window.location.href = `/project/${projectId}`;
+                  }
+                }}
+              />
           </div>
         </div>
       ),
