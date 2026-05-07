@@ -961,6 +961,22 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
         long organizationId, long projectId, long extractionId,
         long currentUserId, DateTime now)
     {
+        // PromotedId is persisted to the lattice DB outside the deeplynx transaction, so a prior
+        // rolled-back attempt can leave stale references. Clear any that no longer exist in deeplynx.
+        var pendingIds = stagingClasses
+            .Where(c => c.PromotedId.HasValue && c.OntologyClassId == null)
+            .Select(c => c.PromotedId!.Value)
+            .ToList();
+        if (pendingIds.Count > 0)
+        {
+            var validIds = (await _context.Classes
+                .Where(c => pendingIds.Contains(c.Id))
+                .Select(c => c.Id)
+                .ToListAsync()).ToHashSet();
+            foreach (var sc in stagingClasses.Where(c => c.PromotedId.HasValue && !validIds.Contains(c.PromotedId!.Value)))
+                sc.PromotedId = null;
+        }
+
         foreach (var sc in stagingClasses.Where(c =>
                      (c.ValidationStatus == ExtractionValidationStatus.NovelDiscovery ||
                       c.ValidationStatus == ExtractionValidationStatus.InvalidSchema) &&
@@ -1052,6 +1068,21 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
         long organizationId, long projectId, long extractionId,
         long currentUserId, DateTime now)
     {
+        // Same stale-reference guard as PromoteClasses
+        var pendingRelIds = stagingRelationships
+            .Where(r => r.PromotedId.HasValue && r.OntologyRelationshipId == null)
+            .Select(r => r.PromotedId!.Value)
+            .ToList();
+        if (pendingRelIds.Count > 0)
+        {
+            var validRelIds = (await _context.Relationships
+                .Where(r => pendingRelIds.Contains(r.Id))
+                .Select(r => r.Id)
+                .ToListAsync()).ToHashSet();
+            foreach (var sr in stagingRelationships.Where(r => r.PromotedId.HasValue && !validRelIds.Contains(r.PromotedId!.Value)))
+                sr.PromotedId = null;
+        }
+
         foreach (var sr in stagingRelationships.Where(r =>
                      (r.ValidationStatus == ExtractionValidationStatus.NovelDiscovery ||
                       r.ValidationStatus == ExtractionValidationStatus.InvalidSchema) &&
