@@ -119,7 +119,7 @@ public class AiModelConfigBusiness : IAiModelConfigBusiness
             LastUpdatedBy = returnedAiModelConfig.LastUpdatedBy
         };
     }
-    
+
     /// <summary>
     ///     Retrieves a specific AI Model Configuration by ID and resolves the user's API token if one is required.
     /// </summary>
@@ -142,7 +142,7 @@ public class AiModelConfigBusiness : IAiModelConfigBusiness
         var query = _context.AiModelConfigs
             .Where(x => x.Id == aiModelConfigId && x.OrganizationId == organizationId && !x.IsArchived)
             .AsQueryable();
-        
+
         AiModelConfig? modelConfig;
         if (projectId.HasValue)
         {
@@ -188,7 +188,7 @@ public class AiModelConfigBusiness : IAiModelConfigBusiness
             IsArchived = modelConfig.IsArchived,
             LastUpdatedAt = modelConfig.LastUpdatedAt,
             LastUpdatedBy = modelConfig.LastUpdatedBy,
-            Token = token
+            Token = token != null ? TokenHelper.MaskToken(token) : null
         };
     }
 
@@ -264,7 +264,7 @@ public class AiModelConfigBusiness : IAiModelConfigBusiness
             IsArchived = modelConfig.IsArchived,
             LastUpdatedAt = modelConfig.LastUpdatedAt,
             LastUpdatedBy = modelConfig.LastUpdatedBy,
-            Token = token
+            Token = token != null ? TokenHelper.MaskToken(token) : null
         };
     }
 
