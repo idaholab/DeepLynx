@@ -211,8 +211,8 @@ jobs:
           az account set --subscription "$ACR_SUBSCRIPTION"
           az acr build --registry $ACR_REGISTRY \
             --image $ACR_PATH:insight-rabbitmq-$GITHUB_RUN_NUMBER \
-            --file deeplynx.insight/app/rabbitmq/Dockerfiles/Dockerfile.production \
-            deeplynx.insight/app/rabbitmq
+            --file deeplynx.insight/Dockerfiles/Dockerfile.rabbitmq.production \
+            deeplynx.insight
 
   build-insight-rabbitmq-runner:
     runs-on: [self-hosted]
@@ -250,7 +250,7 @@ jobs:
           az account set --subscription "$ACR_SUBSCRIPTION"
           az acr build --registry $ACR_REGISTRY \
             --image $ACR_PATH:insight-rabbitmq-runner-$GITHUB_RUN_NUMBER \
-            --file deeplynx.insight/app/rabbitmq/Dockerfiles/Dockerfile.runner.production \
+            --file deeplynx.insight/Dockerfiles/Dockerfile.runner.production \
             deeplynx.insight
 
   build-insight-fastapi:
@@ -289,7 +289,7 @@ jobs:
           az account set --subscription "$ACR_SUBSCRIPTION"
           az acr build --registry $ACR_REGISTRY \
             --image $ACR_PATH:insight-fastapi-$GITHUB_RUN_NUMBER \
-            --file deeplynx.insight/app/fastapi/Dockerfiles/Dockerfile.production \
+            --file deeplynx.insight/Dockerfiles/Dockerfile.fastapi.production \
             deeplynx.insight
 
   kubernetes:
