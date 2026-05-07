@@ -701,7 +701,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
       router.push(`/lattice/decisions?${params.toString()}`);
     } catch (error: any) {
       console.error("Error triggering Lattice extraction:", error);
-      toast.error("Failed to extract with Lattice.");
+      toast.error(t.translations.LATTICE_FAILED_TO_START_ANALYSIS);
     } finally {
       setIsTriggeringLatticeExtraction(false);
     }
@@ -721,9 +721,9 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
     setIsQueuingInsightUpload(true);
     try {
       await queueInsightUpload({ fileInfo: [{ fileId: recordId, fileURI: uri }] });
-      toast.success("Document queued for indexing.");
+      toast.success(t.translations.LATTICE_QUEUED_SUCCESS);
     } catch {
-      toast.error("Failed to queue document for indexing.");
+      toast.error(t.translations.LATTICE_QUEUE_FAILED);
     } finally {
       setIsQueuingInsightUpload(false);
     }
@@ -799,75 +799,6 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
         <div className="flex flex-col xl:flex-row gap-6 mt-4">
           {/* Left Column - Properties */}
           <div className="w-full xl:w-1/2 space-y-4 pl-2">
-            {isInsightSupported ? (
-              <div className="rounded-2xl bg-base-100 shadow-sm border-base-300 p-3 flex flex-col gap-2">
-                <div className="flex gap-4 items-start">
-                  <div className="flex-1 min-w-0 p-3">
-                    <p className="text-sm font-semibold">Lattice: AI Knowledge Extraction</p>
-                    <p className="mt-1 text-xs text-base-content/60 leading-relaxed">
-                      Automatically extract records, classes, relationships, and edges from this document.
-                      Results are staged for review before anything is added to the knowledge graph or data schema.
-                    </p>
-                  </div>
-                  <div className="flex flex-col gap-2 items-end shrink-0">
-                    <div className="join">
-                      <div className="tooltip tooltip-left" data-tip="Infers new classes and relationships from the document">
-                        <button
-                          type="button"
-                          className={`btn btn-xs join-item ${latticeMode === "discovery" ? "btn-primary" : "btn-outline"}`}
-                          onClick={() => setLatticeMode("discovery")}
-                          disabled={isTriggeringLatticeExtraction}
-                        >
-                          Discovery
-                        </button>
-                      </div>
-                      <div className="tooltip tooltip-left" data-tip="Maps only to existing classes and relationships in this project">
-                        <button
-                          type="button"
-                          className={`btn btn-xs join-item ${latticeMode === "strict" ? "btn-primary" : "btn-outline"}`}
-                          onClick={() => setLatticeMode("strict")}
-                          disabled={isTriggeringLatticeExtraction}
-                        >
-                          Strict
-                        </button>
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      className="btn btn-primary btn-xs"
-                      onClick={handleTriggerLatticeExtraction}
-                      disabled={isTriggeringLatticeExtraction || isCheckingLatticeReadiness || !canTriggerLatticeExtract}
-                    >
-                      {isTriggeringLatticeExtraction ? (
-                        <><span className="loading loading-spinner loading-xs" /> Starting…</>
-                      ) : isCheckingLatticeReadiness ? (
-                        <><span className="loading loading-spinner loading-xs" /> Checking…</>
-                      ) : (
-                        <>Extract <ArrowTopRightOnSquareIcon className="size-3" /></>
-                      )}
-                    </button>
-                  </div>
-                </div>
-
-                {!isRecordInsightEmbedded && !isCheckingLatticeReadiness && (
-                  <div className="rounded-xl border border-warning/30 bg-warning/10 px-3 py-1.5 flex items-center justify-between gap-3">
-                    <p className="text-xs text-base-content/70">Document must be embedded before extraction.</p>
-                    <button
-                      type="button"
-                      className="btn btn-warning btn-xs shrink-0"
-                      onClick={handleQueueInsightUpload}
-                      disabled={isQueuingInsightUpload}
-                    >
-                      {isQueuingInsightUpload
-                        ? <span className="loading loading-spinner loading-xs" />
-                        : "Queue for embedding with Insight"
-                      }
-                    </button>
-                  </div>
-                )}
-              </div>
-            ) : null}
-
             <PropertyTable
               title={t.translations.SYSTEM_PROPERTIES}
               rows={systemPropertiesRows}
@@ -964,6 +895,129 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
           projectId={projectId}
           recordId={recordId}
         />
+      ),
+    },
+    {
+      label: t.translations.LATTICE_PAGE_TITLE,
+      content: (
+        <div className="mt-4 flex flex-col lg:flex-row gap-8 lg:gap-12 p-6">
+          {/* Left: About Lattice */}
+          <div className="lg:w-2/5 space-y-5">
+            <div className="flex items-center gap-2">
+              <h2 className="text-lg font-semibold">{t.translations.LATTICE_WIDGET_TITLE}</h2>
+            </div>
+            <p className="text-sm text-base-content/60 leading-relaxed">
+              {t.translations.LATTICE_WIDGET_DESCRIPTION}
+            </p>
+            <div className="space-y-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-base-content/40">
+                {t.translations.LATTICE_HOW_IT_WORKS}
+              </p>
+              <ol className="space-y-3">
+                {[
+                  t.translations.LATTICE_STEP_EMBED,
+                  t.translations.LATTICE_STEP_MODE,
+                  t.translations.LATTICE_STEP_TRIGGER,
+                  t.translations.LATTICE_STEP_DECIDE,
+                ].map((step, i) => (
+                  <li key={i} className="flex gap-3 text-sm text-base-content/70">
+                    <span className="size-5 rounded-full bg-base-300 flex items-center justify-center text-xs font-bold shrink-0 mt-0.5">
+                      {i + 1}
+                    </span>
+                    {step}
+                  </li>
+                ))}
+              </ol>
+            </div>
+          </div>
+
+          {/* Right: Controls */}
+          <div className="flex-1 space-y-5">
+            {!isInsightSupported ? (
+              <div className="alert alert-warning">
+                <SparklesIcon className="size-5 shrink-0" />
+                <span>{t.translations.LATTICE_UNSUPPORTED_FILE_TOOLTIP}</span>
+              </div>
+            ) : (
+              <>
+                {!isRecordInsightEmbedded && !isCheckingLatticeReadiness && (
+                  <div className="alert alert-warning">
+                    <span className="flex-1 text-sm">{t.translations.LATTICE_NOT_EMBEDDED_WARNING}</span>
+                    <button
+                      type="button"
+                      className="btn btn-warning btn-sm shrink-0"
+                      onClick={handleQueueInsightUpload}
+                      disabled={isQueuingInsightUpload}
+                    >
+                      {isQueuingInsightUpload
+                        ? <span className="loading loading-spinner loading-sm" />
+                        : t.translations.LATTICE_QUEUE_FOR_EMBEDDING
+                      }
+                    </button>
+                  </div>
+                )}
+
+                <div className="space-y-2">
+                  <p className="text-sm font-medium">{t.translations.LATTICE_MODE_HEADER}</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setLatticeMode("discovery")}
+                      disabled={isTriggeringLatticeExtraction}
+                      className={`rounded-xl border-2 p-4 text-left transition-colors ${latticeMode === "discovery"
+                        ? "border-primary bg-primary/5"
+                        : "border-base-300 hover:border-base-content/30"
+                        }`}
+                    >
+                      <p className="font-semibold text-sm">{t.translations.LATTICE_DISCOVERY}</p>
+                      <p className="mt-1 text-xs text-base-content/60 leading-relaxed">
+                        {t.translations.LATTICE_DISCOVERY_TOOLTIP}
+                      </p>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setLatticeMode("strict")}
+                      disabled={isTriggeringLatticeExtraction}
+                      className={`rounded-xl border-2 p-4 text-left transition-colors ${latticeMode === "strict"
+                        ? "border-primary bg-primary/5"
+                        : "border-base-300 hover:border-base-content/30"
+                        }`}
+                    >
+                      <p className="font-semibold text-sm">{t.translations.LATTICE_STRICT}</p>
+                      <p className="mt-1 text-xs text-base-content/60 leading-relaxed">
+                        {t.translations.LATTICE_STRICT_TOOLTIP}
+                      </p>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-3">
+                  <button
+                    type="button"
+                    className="btn btn-primary btn-sm"
+                    onClick={handleTriggerLatticeExtraction}
+                    disabled={isTriggeringLatticeExtraction || isCheckingLatticeReadiness || !canTriggerLatticeExtract}
+                  >
+                    {isTriggeringLatticeExtraction ? (
+                      <><span className="loading loading-spinner loading-sm" /> {t.translations.STARTING}…</>
+                    ) : isCheckingLatticeReadiness ? (
+                      <><span className="loading loading-spinner loading-sm" /> {t.translations.CHECKING}…</>
+                    ) : (
+                      <>{t.translations.LATTICE_EXTRACT} <ArrowTopRightOnSquareIcon className="size-4" /></>
+                    )}
+                  </button>
+                  <Link
+                    href={`/lattice/decisions?projectId=${projectId}&organizationId=${organization.organizationId}`}
+                    className="btn btn-ghost btn-sm"
+                  >
+                    {t.translations.LATTICE_VIEW_EXTRACTIONS}
+                    <ArrowTopRightOnSquareIcon className="size-4" />
+                  </Link>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
       ),
     },
   ];

@@ -26,6 +26,7 @@ import {
   StagedRelationshipDTO,
 } from "@/app/(home)/types/latticeDTOs";
 import toast from "react-hot-toast";
+import { useLanguage } from "@/app/contexts/Language";
 
 type DetailTab = "records" | "classes" | "edges" | "relationships";
 
@@ -47,8 +48,8 @@ function extractionStatusBadgeClass(status: string) {
   return "badge-warning";
 }
 
-function statusLabel(status: string) {
-  if (status === "promoted") return "approved";
+function statusLabel(status: string, translations: { LATTICE_APPROVED_STATUS: string }) {
+  if (status === "promoted") return translations.LATTICE_APPROVED_STATUS;
   return status;
 }
 
@@ -85,6 +86,7 @@ function parseNestedRows(
 }
 
 function RecordCard({ record }: { record: StagedRecordDTO }) {
+  const { t } = useLanguage();
   const [expanded, setExpanded] = useState(false);
   const attrs = parseAttributes(record.attributes);
 
@@ -109,10 +111,10 @@ function RecordCard({ record }: { record: StagedRecordDTO }) {
           </div>
           <div className="mt-2 flex flex-wrap gap-2 text-xs text-base-content/60">
             <span className="rounded-full bg-base-200 px-3 py-1">
-              Score: {(record.ensemble_score * 100).toFixed(0)}%
+              {t.translations.LATTICE_SCORE}: {(record.ensemble_score * 100).toFixed(0)}%
             </span>
             <span className="rounded-full bg-base-200 px-3 py-1">
-              Frequency: {record.frequency}
+              {t.translations.LATTICE_FREQUENCY}: {record.frequency}
             </span>
           </div>
         </div>
@@ -125,7 +127,7 @@ function RecordCard({ record }: { record: StagedRecordDTO }) {
 
       {expanded && attrs ? (
         <div className="border-t border-base-300 px-4 py-5">
-          <PropertyTable title="Properties" rows={parseNestedRows(attrs)} />
+          <PropertyTable title={t.translations.LATTICE_PROPERTIES_TITLE} rows={parseNestedRows(attrs)} />
         </div>
       ) : null}
     </section>
@@ -133,6 +135,7 @@ function RecordCard({ record }: { record: StagedRecordDTO }) {
 }
 
 function ClassCard({ cls }: { cls: StagedClassDTO }) {
+  const { t } = useLanguage();
   return (
     <div className="rounded-2xl border border-base-300 bg-base-200/50 p-4">
       <div className="flex items-center justify-between gap-2">
@@ -145,7 +148,7 @@ function ClassCard({ cls }: { cls: StagedClassDTO }) {
       </div>
       {cls.ontology_class_id && (
         <p className="mt-2 text-xs text-base-content/60">
-          Existing Class ID: {cls.ontology_class_id}
+          {t.translations.LATTICE_EXISTING_CLASS_ID} {cls.ontology_class_id}
         </p>
       )}
     </div>
@@ -153,6 +156,7 @@ function ClassCard({ cls }: { cls: StagedClassDTO }) {
 }
 
 function EdgeCard({ edge }: { edge: StagedEdgeDTO }) {
+  const { t } = useLanguage();
   return (
     <div className="rounded-2xl border border-base-300 bg-base-200/50 p-4">
       <div className="flex items-center justify-between gap-2">
@@ -169,10 +173,10 @@ function EdgeCard({ edge }: { edge: StagedEdgeDTO }) {
       </div>
       <div className="mt-2 flex flex-wrap gap-2 text-xs text-base-content/60">
         <span className="rounded-full bg-base-200 px-3 py-1">
-          Score: {(edge.ensemble_score * 100).toFixed(0)}%
+          {t.translations.LATTICE_SCORE}: {(edge.ensemble_score * 100).toFixed(0)}%
         </span>
         <span className="rounded-full bg-base-200 px-3 py-1">
-          Frequency: {edge.frequency}
+          {t.translations.LATTICE_FREQUENCY}: {edge.frequency}
         </span>
       </div>
     </div>
@@ -180,6 +184,7 @@ function EdgeCard({ edge }: { edge: StagedEdgeDTO }) {
 }
 
 function RelationshipCard({ rel }: { rel: StagedRelationshipDTO }) {
+  const { t } = useLanguage();
   return (
     <div className="rounded-2xl border border-base-300 bg-base-200/50 p-4">
       <div className="flex items-center justify-between gap-2">
@@ -193,12 +198,12 @@ function RelationshipCard({ rel }: { rel: StagedRelationshipDTO }) {
       {(rel.origin_class_name || rel.destination_class_name) && (
         <div className="mt-3 flex items-center gap-2 text-xs">
           <div>
-            <p className="text-base-content/40 uppercase tracking-wide" style={{ fontSize: "0.625rem" }}>Origin</p>
+            <p className="text-base-content/40 uppercase tracking-wide" style={{ fontSize: "0.625rem" }}>{t.translations.LATTICE_ORIGIN}</p>
             <p className="mt-0.5 font-medium text-base-content/70">{rel.origin_class_name ?? "?"}</p>
           </div>
           <span className="mt-3 text-base-content/30">→</span>
           <div>
-            <p className="text-base-content/40 uppercase tracking-wide" style={{ fontSize: "0.625rem" }}>Destination</p>
+            <p className="text-base-content/40 uppercase tracking-wide" style={{ fontSize: "0.625rem" }}>{t.translations.LATTICE_DESTINATION}</p>
             <p className="mt-0.5 font-medium text-base-content/70">{rel.destination_class_name ?? "?"}</p>
           </div>
         </div>
@@ -224,6 +229,7 @@ function ExtractionDetailPanel({
   const [isPromoting, setIsPromoting] = useState(false);
   const [activeTab, setActiveTab] = useState<DetailTab>("records");
   const pollingRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { t } = useLanguage();
 
   const fetchStaging = useCallback(async () => {
     try {
@@ -235,11 +241,11 @@ function ExtractionDetailPanel({
         pollingRef.current = setTimeout(fetchStaging, POLLING_INTERVAL_MS);
       }
     } catch {
-      setError("Failed to load extraction data.");
+      setError(t.translations.LATTICE_FAILED_LOAD_EXTRACTION);
     } finally {
       setIsLoading(false);
     }
-  }, [organizationId, projectId, extractionId]);
+  }, [organizationId, projectId, extractionId, t.translations.LATTICE_FAILED_LOAD_EXTRACTION]);
 
   useEffect(() => {
     setIsLoading(true);
@@ -257,11 +263,11 @@ function ExtractionDetailPanel({
     try {
       setIsPromoting(true);
       await promoteExtraction(organizationId, projectId, extractionId, approve);
-      toast.success(approve ? "Extraction approved." : "Extraction rejected.");
+      toast.success(approve ? t.translations.LATTICE_EXTRACTION_APPROVED_TOAST : t.translations.LATTICE_EXTRACTION_REJECTED_TOAST);
       await fetchStaging();
       onStatusChange?.();
     } catch {
-      toast.error("Failed to process extraction.");
+      toast.error(t.translations.LATTICE_PROCESS_FAILED);
     } finally {
       setIsPromoting(false);
     }
@@ -278,7 +284,7 @@ function ExtractionDetailPanel({
   if (error || !staging) {
     return (
       <div className="p-4">
-        <p className="text-error">{error ?? "No extraction data found."}</p>
+        <p className="text-error">{error ?? t.translations.LATTICE_NO_EXTRACTION_DATA}</p>
       </div>
     );
   }
@@ -287,11 +293,18 @@ function ExtractionDetailPanel({
   const canDecide = staging.status === "complete";
   const tabs: DetailTab[] = ["records", "classes", "edges", "relationships"];
 
+  const tabLabels: Record<DetailTab, string> = {
+    records: t.translations.RECORDS,
+    classes: t.translations.CLASSES,
+    edges: t.translations.LATTICE_EDGES,
+    relationships: t.translations.RELATIONSHIPS,
+  };
+
   return (
     <div className="flex flex-col gap-4">
       {/* Header: title + status + approve/reject */}
       <div className="flex flex-col gap-2">
-        <h2 className="text-lg font-bold">Extraction #{staging.id}</h2>
+        <h2 className="text-lg font-bold">{t.translations.LATTICE_EXTRACTION_NUMBER}{staging.id}</h2>
 
         {/* Row 1: status + mode on left, buttons on right */}
         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -300,10 +313,10 @@ function ExtractionDetailPanel({
               {isRunning ? (
                 <>
                   <span className="loading loading-spinner loading-xs mr-1" />
-                  {statusLabel(staging.status)}
+                  {statusLabel(staging.status, t.translations)}
                 </>
               ) : (
-                statusLabel(staging.status)
+                statusLabel(staging.status, t.translations)
               )}
             </span>
             {staging.mode && (
@@ -325,7 +338,7 @@ function ExtractionDetailPanel({
                 ) : (
                   <CheckCircleIcon className="size-4" />
                 )}
-                Approve All
+                {t.translations.LATTICE_APPROVE_ALL}
               </button>
               <button
                 type="button"
@@ -338,7 +351,7 @@ function ExtractionDetailPanel({
                 ) : (
                   <XCircleIcon className="size-4" />
                 )}
-                Reject All
+                {t.translations.LATTICE_REJECT_ALL}
               </button>
             </div>
           )}
@@ -348,19 +361,20 @@ function ExtractionDetailPanel({
         <div className="flex flex-wrap items-start justify-between gap-2">
           <p className="text-sm text-base-content/70">
             {isRunning
-              ? "Extraction is in progress. This page will update automatically."
+              ? t.translations.LATTICE_EXTRACTION_RUNNING
               : canDecide
-                ? "Review the staged items below, then approve or reject the entire extraction."
+                ? t.translations.LATTICE_EXTRACTION_REVIEW
                 : staging.status === "failed"
-                  ? "This extraction failed to complete."
+                  ? t.translations.LATTICE_EXTRACTION_FAILED_MSG
                   : staging.status === "rejected"
-                    ? "This extraction was rejected."
-                    : `This extraction has been ${statusLabel(staging.status)}.`}
+                    ? t.translations.LATTICE_EXTRACTION_REJECTED_MSG
+                    : `${t.translations.LATTICE_EXTRACTION_BEEN} ${statusLabel(staging.status, t.translations)}.`}
           </p>
           {canDecide && (
             <p className="text-xs text-base-content/50 text-right max-w-[220px]">
-              All-or-nothing. All items are promoted on approval, including{" "}
-              <span className="font-medium text-error/70">invalid schema</span> items.
+              {t.translations.LATTICE_APPROVE_NOTE_PREFIX}{" "}
+              <span className="font-medium text-error/70">{t.translations.LATTICE_INVALID_SCHEMA_ITEMS}</span>{" "}
+              {t.translations.LATTICE_ITEMS_SUFFIX}
             </p>
           )}
         </div>
@@ -368,14 +382,14 @@ function ExtractionDetailPanel({
 
       {/* Summary card */}
       <div className="rounded-2xl border border-base-300 bg-base-100 p-4 shadow-sm">
-        <h3 className="mb-3 text-sm font-semibold text-base-content/70">Summary</h3>
+        <h3 className="mb-3 text-sm font-semibold text-base-content/70">{t.translations.LATTICE_SUMMARY}</h3>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           {(
             [
-              { label: "Records", count: staging.records.length },
-              { label: "Classes", count: staging.classes.length },
-              { label: "Relationships", count: staging.relationships.length },
-              { label: "Edges", count: staging.edges.length },
+              { label: t.translations.RECORDS, count: staging.records.length },
+              { label: t.translations.CLASSES, count: staging.classes.length },
+              { label: t.translations.RELATIONSHIPS, count: staging.relationships.length },
+              { label: t.translations.LATTICE_EDGES, count: staging.edges.length },
             ] as const
           ).map(({ label, count }) => (
             <div
@@ -399,7 +413,7 @@ function ExtractionDetailPanel({
               className={`btn btn-sm ${activeTab === tab ? "btn-primary" : "btn-ghost"}`}
               onClick={() => setActiveTab(tab)}
             >
-              {tab.charAt(0).toUpperCase() + tab.slice(1)}
+              {tabLabels[tab]}
             </button>
           ))}
         </div>
@@ -407,28 +421,28 @@ function ExtractionDetailPanel({
         <div className="mt-4 space-y-3">
           {activeTab === "records" &&
             (staging.records.length === 0 ? (
-              <EmptyState message="No records were staged." />
+              <EmptyState message={t.translations.LATTICE_NO_RECORDS_STAGED} />
             ) : (
               staging.records.map((record) => <RecordCard key={record.id} record={record} />)
             ))}
 
           {activeTab === "classes" &&
             (staging.classes.length === 0 ? (
-              <EmptyState message="No classes were staged." />
+              <EmptyState message={t.translations.LATTICE_NO_CLASSES_STAGED} />
             ) : (
               staging.classes.map((cls) => <ClassCard key={cls.id} cls={cls} />)
             ))}
 
           {activeTab === "edges" &&
             (staging.edges.length === 0 ? (
-              <EmptyState message="No edges were staged." />
+              <EmptyState message={t.translations.LATTICE_NO_EDGES_STAGED} />
             ) : (
               staging.edges.map((edge) => <EdgeCard key={edge.id} edge={edge} />)
             ))}
 
           {activeTab === "relationships" &&
             (staging.relationships.length === 0 ? (
-              <EmptyState message="No relationships were staged." />
+              <EmptyState message={t.translations.LATTICE_NO_RELATIONSHIPS_STAGED} />
             ) : (
               staging.relationships.map((rel) => <RelationshipCard key={rel.id} rel={rel} />)
             ))}
@@ -445,6 +459,7 @@ function storageKey(projId: number) {
 export default function LatticeDecisionsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { t } = useLanguage();
   const { organization } = useOrganizationSession();
   const { project } = useProjectSession();
 
@@ -463,17 +478,17 @@ export default function LatticeDecisionsPage() {
     if (!orgId || !projId) return;
     listExtractions(orgId, projId)
       .then(setItems)
-      .catch(() => setListError("Failed to load extractions."));
-  }, [orgId, projId]);
+      .catch(() => setListError(t.translations.LATTICE_FAILED_LOAD_EXTRACTIONS));
+  }, [orgId, projId, t.translations.LATTICE_FAILED_LOAD_EXTRACTIONS]);
 
   useEffect(() => {
     if (!orgId || !projId) return;
     setIsListLoading(true);
     listExtractions(orgId, projId)
       .then(setItems)
-      .catch(() => setListError("Failed to load extractions."))
+      .catch(() => setListError(t.translations.LATTICE_FAILED_LOAD_EXTRACTIONS))
       .finally(() => setIsListLoading(false));
-  }, [orgId, projId]);
+  }, [orgId, projId, t.translations.LATTICE_FAILED_LOAD_EXTRACTIONS]);
 
   // Restore last selected extraction when arriving without a query param
   useEffect(() => {
@@ -491,20 +506,20 @@ export default function LatticeDecisionsPage() {
     <div className="mx-3 sm:mx-4 lg:mr-0 lg:ml-0">
       {/* Page header */}
       <div className="bg-base-200/40 px-3 sm:px-6 lg:px-12 p-4">
-        <h1 className="text-xl sm:text-2xl font-bold text-base-content">Lattice</h1>
+        <h1 className="text-xl sm:text-2xl font-bold text-base-content">{t.translations.LATTICE_PAGE_TITLE}</h1>
         <p className="mt-1 text-sm text-base-content/70">
-          Extractions you have triggered for this project. Each staged item is scored and validated
-          against the project ontology before human review. <span className="font-medium">Valid</span>{" "}
-          items matched an existing ontology class or relationship.{" "}
-          <span className="font-medium">Novel discovery</span> items involve known classes and relationships
-          but in an unrecognized pattern.{" "}
-          <span className="font-medium">Invalid schema</span> items could not be reconciled with the schema.
-          Approving an extraction promotes <span className="font-medium">all</span> staged items into the
-          knowledge graph and data schema, regardless of validation status.
+          {t.translations.LATTICE_PAGE_DESCRIPTION_INTRO}{" "}
+          <span className="font-medium">{t.translations.LATTICE_VALID_LABEL}</span>{" "}
+          {t.translations.LATTICE_VALID_DESCRIPTION}{" "}
+          <span className="font-medium">{t.translations.LATTICE_NOVEL_DISCOVERY_LABEL}</span>{" "}
+          {t.translations.LATTICE_NOVEL_DISCOVERY_DESCRIPTION}{" "}
+          <span className="font-medium">{t.translations.LATTICE_INVALID_SCHEMA_LABEL}</span>{" "}
+          {t.translations.LATTICE_INVALID_SCHEMA_DESCRIPTION}{" "}
+          {t.translations.LATTICE_APPROVE_PROMOTES_ALL}
         </p>
         <div className="mt-2">
-          <span className="badge badge-warning badge-sm">Coming Soon</span>
-          <span className="ml-2 text-sm text-base-content/70">Individual item approval and bulk approval for different statuses</span>
+          <span className="badge badge-warning badge-sm">{t.translations.LATTICE_COMING_SOON}</span>
+          <span className="ml-2 text-sm text-base-content/70">{t.translations.LATTICE_COMING_SOON_TEXT}</span>
         </div>
       </div>
 
@@ -513,7 +528,7 @@ export default function LatticeDecisionsPage() {
           {/* Left: extraction list */}
           <aside className="rounded-2xl border border-base-300 bg-base-100 shadow-sm overflow-hidden self-start">
             <div className="border-b border-base-300 px-4 py-3">
-              <h2 className="text-sm font-semibold text-base-content/70">Extractions</h2>
+              <h2 className="text-sm font-semibold text-base-content/70">{t.translations.LATTICE_EXTRACTIONS_PANEL_TITLE}</h2>
             </div>
 
             {isListLoading ? (
@@ -524,7 +539,7 @@ export default function LatticeDecisionsPage() {
               <p className="p-4 text-sm text-error">{listError}</p>
             ) : items.length === 0 ? (
               <p className="p-4 text-sm text-base-content/60">
-                No extractions yet. Trigger one from a record page.
+                {t.translations.LATTICE_NO_EXTRACTIONS}
               </p>
             ) : (
               <ul className="divide-y divide-base-200 max-h-[60vh] overflow-y-auto">
@@ -537,19 +552,19 @@ export default function LatticeDecisionsPage() {
                       onClick={() => handleSelect(item.id)}
                     >
                       <div className="min-w-0">
-                        <p className="truncate text-sm">Extraction #{item.id}</p>
+                        <p className="truncate text-sm">{t.translations.LATTICE_EXTRACTION_NUMBER}{item.id}</p>
                         <div className="mt-2 grid grid-cols-2 gap-x-2">
                           <div>
-                            <p className="text-base-content/40 uppercase tracking-wide" style={{ fontSize: "0.625rem" }}>Status</p>
+                            <p className="text-base-content/40 uppercase tracking-wide" style={{ fontSize: "0.625rem" }}>{t.translations.LATTICE_STATUS_HEADER}</p>
                             <div className="mt-0.5 flex h-4 items-center">
                               <span className={`badge badge-xs ${extractionStatusBadgeClass(item.status)}`}>
-                                {statusLabel(item.status)}
+                                {statusLabel(item.status, t.translations)}
                               </span>
                             </div>
                           </div>
                           {item.mode && (
                             <div>
-                              <p className="text-base-content/40 uppercase tracking-wide" style={{ fontSize: "0.625rem" }}>Mode</p>
+                              <p className="text-base-content/40 uppercase tracking-wide" style={{ fontSize: "0.625rem" }}>{t.translations.LATTICE_MODE_HEADER}</p>
                               <div className="mt-0.5 flex h-4 items-center">
                                 <p className="text-xs font-medium text-base-content/70 capitalize">{item.mode}</p>
                               </div>
@@ -582,7 +597,7 @@ export default function LatticeDecisionsPage() {
               />
             ) : (
               <div className="flex h-64 items-center justify-center rounded-2xl border border-dashed border-base-300 bg-base-100 text-sm text-base-content/50">
-                Select an extraction from the list to review it.
+                {t.translations.LATTICE_SELECT_EXTRACTION_PROMPT}
               </div>
             )}
           </div>
