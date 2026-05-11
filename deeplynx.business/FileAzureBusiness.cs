@@ -548,6 +548,15 @@ public class FileAzureBusiness: IFileBusiness
             return $"organization_{organizationId}/";
     }
 
+    /// <summary>
+    ///     Return the size of a given file. Used to backfill records for files that didn't get file size set on upload.
+    /// </summary>
+    /// <param name="fileUri">URI of the file whose size is to be measured</param>
+    /// <param name="objectStorageConfig">object storage configuration for reaching URI</param>
+    /// <returns></returns>
+    /// <exception cref="Exception"></exception>
+    /// <exception cref="ArgumentException"></exception>
+    /// <exception cref="FileNotFoundException"></exception>
     public async Task<long> GetFileSize(string fileUri, ObjectStorageConfigDto objectStorageConfig)
     {
         if (objectStorageConfig.AzureObjectConfig == null)
@@ -577,6 +586,13 @@ public class FileAzureBusiness: IFileBusiness
         }
     }
 
+    /// <summary>
+    ///     Same as GetFileSize, but using a batch operation to reduce azure API calls.
+    /// </summary>
+    /// <param name="fileUris">URIs of the files whose size is to be measured</param>
+    /// <param name="objectStorageConfig">object storage config for reaching URIs</param>
+    /// <returns></returns>
+    /// <exception cref="Exception">Returned if object storage is null</exception>
     public async Task<Dictionary<string, long>> GetFileSizesBatch(
         List<string> fileUris,
         ObjectStorageConfigDto objectStorageConfig)

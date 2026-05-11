@@ -491,6 +491,12 @@ public class FileBusiness
         await fileBusiness.CancelUpload(organizationId, projectId, realDataSourceId, uploadId, objectStorage.Config);
     }
 
+    /// <summary>
+    ///     Backfill records to include file size for any files pre-dating the file size capture feature.
+    /// </summary>
+    /// <param name="organizationId">ID of the organization in which to backfill file sizes</param>
+    /// <param name="projectId">ID of the project in which to backfill file sizes</param>
+    /// <exception cref="InvalidOperationException">Returned if org ID or project ID not supplied</exception>
     public async Task BackfillFileSizes(
         long? organizationId, 
         long? projectId)

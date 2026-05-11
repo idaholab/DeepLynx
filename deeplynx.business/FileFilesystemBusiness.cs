@@ -406,6 +406,15 @@ public class FileFilesystemBusiness : IFileBusiness
             return $"org_{organizationId}/";
     }
     
+    /// <summary>
+    ///     Return the size of a given file. Used to backfill records for files that didn't get file size set on upload.
+    /// </summary>
+    /// <param name="fileUri">URI of the file whose size is to be measured</param>
+    /// <param name="objectStorageConfig">object storage configuration for reaching URI</param>
+    /// <returns></returns>
+    /// <exception cref="Exception"></exception>
+    /// <exception cref="ArgumentException"></exception>
+    /// <exception cref="FileNotFoundException"></exception>
     public async Task<long> GetFileSize(string fileUri, ObjectStorageConfigDto objectStorageConfig)
     {
         if (objectStorageConfig.MountPath == null)
