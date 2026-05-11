@@ -14,8 +14,6 @@
       <ProjectReference Include="..\deeplynx.models\deeplynx.models.csproj" />
     </ItemGroup>
     <ItemGroup>
-      <PackageReference Include="Apache.Arrow" Version="22.1.0" />
-      <PackageReference Include="Apache.Arrow.Flight" Version="22.1.0" />
       <PackageReference Include="Azure.Storage.Blobs" Version="12.26.0" />
       <PackageReference Include="BCrypt.Net-Next" Version="4.0.3" />
       <PackageReference Include="System.Security.Cryptography.Xml" Version="8.0.3" />
