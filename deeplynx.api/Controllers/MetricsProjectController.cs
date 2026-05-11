@@ -85,4 +85,58 @@ public class MetricsProjectController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
+    
+    /// <summary>
+    ///     Get record count for project
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization the records belong</param>
+    /// <param name="projectId">The ID of the project the records belong</param>
+    /// <param name="hideArchived">Flag indicating whether to hide archived records from the result</param>
+    /// <returns>The record count for the given scope</returns>
+    [HttpGet("records/count", Name = "api_record_count_project")]
+    [SysAdmin]
+    public async Task<IActionResult> GetProjectRecordCount(
+        long organizationId, 
+        long projectId, 
+        [FromQuery] bool hideArchived = true)
+    {
+        try
+        {
+            var count = await _metricsBusiness.GetRecordCount(organizationId, projectId, hideArchived: false);
+            return Ok(count);
+        }
+        catch (Exception exc)
+        {
+            var message = $"An error occurred while retrieving record count for organization: {exc}";
+            _logger.LogError(message);
+            return StatusCode(StatusCodes.Status500InternalServerError, message);
+        }
+    }
+    
+    /// <summary>
+    ///     Get file count for project
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization the files belong</param>
+    /// <param name="projectId">The ID of the project the files belong</param>
+    /// <param name="hideArchived">Flag indicating whether to hide archived files from the result</param>
+    /// <returns>The file count for the given scope</returns>
+    [HttpGet("files/count", Name = "api_file_count_project")]
+    [SysAdmin]
+    public async Task<IActionResult> GetProjectFileCount(
+        long organizationId, 
+        long projectId, 
+        [FromQuery] bool hideArchived = true)
+    {
+        try
+        {
+            var count = await _metricsBusiness.GetFileCount(organizationId, projectId, hideArchived: false);
+            return Ok(count);
+        }
+        catch (Exception exc)
+        {
+            var message = $"An error occurred while retrieving file count for system: {exc}";
+            _logger.LogError(message);
+            return StatusCode(StatusCodes.Status500InternalServerError, message);
+        }
+    }
 }
