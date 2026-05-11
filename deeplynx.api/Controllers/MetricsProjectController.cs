@@ -85,4 +85,29 @@ public class MetricsProjectController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
+    
+    /// <summary>
+    /// Gets the count of data modalities for a project
+    /// </summary>
+    /// <param name="organizationId"></param>
+    /// <param name="projectId"></param>
+    /// <returns></returns>
+    [HttpGet("count", Name = "api_count_data_modality_for_project")]
+    [Auth("read", "data_source")]
+    public async Task<ActionResult<int>> GetProjectDataModalityCount(
+        long organizationId,
+        [FromQuery] long projectId)
+    {
+        try
+        {
+            var dataSources = await _metricsBusiness.GetOrganizationDataModalityCount(organizationId, projectId);
+            return Ok(dataSources);
+        }
+        catch (Exception exc)
+        {
+            var message = $"An error occurred while listing data modalities";
+            _logger.LogError(message);
+            return StatusCode(StatusCodes.Status500InternalServerError, message);
+        }
+    }
 }

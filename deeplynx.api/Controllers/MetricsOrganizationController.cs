@@ -81,4 +81,27 @@ public class MetricsOrganizationController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
+    
+    /// <summary>
+    /// Get Organization Data Modality Count
+    /// </summary>
+    /// <param name="organizationId"></param>
+    /// <returns></returns>
+    [HttpGet("count", Name = "api_count_data_modality_for_organization")]
+    [Auth("read", "data_source")]
+    public async Task<ActionResult<int>> GetOrganizationDataModalityCount(
+        long organizationId)
+    {
+        try
+        {
+            var dataSources = await _metricsBusiness.GetOrganizationDataModalityCount(organizationId, null);
+            return Ok(dataSources);
+        }
+        catch (Exception exc)
+        {
+            var message = $"An error occurred while listing data modalities";
+            _logger.LogError(message);
+            return StatusCode(StatusCodes.Status500InternalServerError, message);
+        }
+    }
 }
