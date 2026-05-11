@@ -19,14 +19,6 @@ public interface IOlapBusiness
         long organizationId,
         long projectId,
         long recordId,
-        OlapQueryRequestDto request,
-        string viewName);
-
-    Task<PlotDataDto> QueryTabularFile(
-        long currentUserId,
-        long organizationId,
-        long projectId,
-        long recordId,
         string? userQuery,
         string viewName);
 
