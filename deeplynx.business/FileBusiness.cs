@@ -491,6 +491,62 @@ public class FileBusiness
         await fileBusiness.CancelUpload(organizationId, projectId, realDataSourceId, uploadId, objectStorage.Config);
     }
 
+    public async Task BackfillFileSizes(
+        long? organizationId, 
+        long? projectId)
+    {
+        if (organizationId == null && projectId == null)
+            throw new InvalidOperationException("At least one of organization or project must be specified.");
+
+        // only backfill for records that have a uri and an object storage id
+        var toBackfill = _context.Records
+            .Where(r => r.Uri != null && r.FileSize == null && r.ObjectStorageId != null);
+        
+        if (organizationId.HasValue)
+            toBackfill = toBackfill.Where(r => r.OrganizationId == organizationId.Value);
+        if (projectId.HasValue)
+            toBackfill = toBackfill.Where(r => r.ProjectId == projectId.Value);
+        
+        var backfillRecords = await toBackfill.ToListAsync();
+        
+        // group by storage to avoid per-record storage lookup
+        var recordsByStorage = backfillRecords
+            .GroupBy(r => r.ObjectStorageId!.Value)
+            .ToList();
+        
+        foreach (var storageGroup in recordsByStorage)
+        {
+            var objectStorageId = storageGroup.Key;
+            var objectStorage = await _objectStorageBusiness.GetDecryptedObjectStorage(objectStorageId);
+            var fileBusiness = _factory.CreateFileBusiness(objectStorage.Type);
+            
+            // for azure, try batch operation first
+            if (objectStorage.Type == "azure" && fileBusiness is FileAzureBusiness azureBusiness)
+            {
+                var uris = storageGroup.Select(r => r.Uri).ToList();
+                var sizes = await azureBusiness.GetFileSizesBatch(uris, objectStorage.Config);
+
+                foreach (var record in storageGroup)
+                {
+                    if (sizes.TryGetValue(record.Uri, out var size))
+                        record.FileSize = size;
+                }
+            }
+            else
+            {
+                // fall back to individual calls for filesystem
+                foreach (var record in storageGroup)
+                {
+                    var fileSize = await fileBusiness.GetFileSize(record.Uri, objectStorage.Config);
+                    record.FileSize = fileSize;
+                }
+            }
+        }
+        
+        // save all changes at once to avoid multiple DB trips
+        await _context.SaveChangesAsync();
+    }
+
     // -------------------------------------------------------------------------
     // Private helpers
     // -------------------------------------------------------------------------
@@ -519,42 +575,5 @@ public class FileBusiness
         var defaultObjectStorage = await _objectStorageBusiness.GetDefaultObjectStorage(organizationId, projectId)
             ?? throw new KeyNotFoundException("Default object storage not found");
         return defaultObjectStorage.Id;
-    }
-
-    private async Task<ObjectStorage> GetObjectStorageWithConfig(long organizationId, long projectId,
-        long? recordObjectStorageId)
-    {
-        ObjectStorage? objectStorage;
-        if (recordObjectStorageId.HasValue)
-        {
-            objectStorage = _context.ObjectStorages.FirstOrDefault(os =>
-                os.OrganizationId == organizationId &&
-                (os.ProjectId == projectId || os.ProjectId == null) &&
-                os.Id == recordObjectStorageId);
-
-            if (objectStorage is null)
-                throw new KeyNotFoundException(
-                    $"No object storage found in your org/project with ID: {recordObjectStorageId}");
-        }
-        else
-        {
-            objectStorage = _context.ObjectStorages
-                .Where(os => os.OrganizationId == organizationId &&
-                             (os.ProjectId == projectId || os.ProjectId == null) &&
-                             os.Default)
-                .OrderByDescending(os => os.ProjectId.HasValue)
-                .FirstOrDefault();
-
-            if (objectStorage is null)
-                throw new KeyNotFoundException("No default object storage found in your org/project");
-        }
-
-        return objectStorage;
-    }
-
-    private static ObjectStorageConfigDto DeserializeConfig(string config)
-    {
-        return JsonConvert.DeserializeObject<ObjectStorageConfigDto>(config)
-               ?? throw new InvalidOperationException("Config data for object storage is null or invalid");
     }
 }

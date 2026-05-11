@@ -405,4 +405,27 @@ public class FileFilesystemBusiness : IFileBusiness
         else
             return $"org_{organizationId}/";
     }
+    
+    public async Task<long> GetFileSize(string fileUri, ObjectStorageConfigDto objectStorageConfig)
+    {
+        if (objectStorageConfig.MountPath == null)
+            throw new Exception("File system mount path not set in object storage");
+        
+        if (string.IsNullOrWhiteSpace(fileUri))
+            throw new ArgumentException("File URI is not specified.");
+
+        try
+        {
+            var fileInfo = new FileInfo(fileUri);
+            return fileInfo.Length;
+        }
+        catch (FileNotFoundException ex)
+        {
+            throw new FileNotFoundException($"File {fileUri} not found", ex);
+        }
+        catch (Exception ex)
+        {
+            throw new Exception($"Failed to get size for file {fileUri}: {ex.Message}");
+        }
+    }
 }

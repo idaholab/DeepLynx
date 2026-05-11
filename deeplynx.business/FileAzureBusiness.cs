@@ -547,4 +547,66 @@ public class FileAzureBusiness: IFileBusiness
         else
             return $"organization_{organizationId}/";
     }
+
+    public async Task<long> GetFileSize(string fileUri, ObjectStorageConfigDto objectStorageConfig)
+    {
+        if (objectStorageConfig.AzureObjectConfig == null)
+            throw new Exception("Azure configuration not set in object storage");
+        
+        if (string.IsNullOrWhiteSpace(fileUri))
+            throw new ArgumentException("File URI is not specified.");
+        
+        try
+        {
+            // Create BlobContainerClient with connection string
+            var containerClient = new BlobContainerClient(
+                objectStorageConfig.AzureObjectConfig.AzureConnectionString, 
+                objectStorageConfig.AzureObjectConfig.AzureContainerName);
+            
+            // Get blob client reference
+            var blobClient = containerClient.GetBlobClient(fileUri);
+            
+            // check for properties- will throw if blob doesn't exist
+            var properties = await blobClient.GetPropertiesAsync();
+            
+            return properties.Value.ContentLength;
+        }
+        catch (Exception ex)
+        {
+            throw new Exception($"Failed to get size for file {fileUri}: {ex.Message}");
+        }
+    }
+
+    public async Task<Dictionary<string, long>> GetFileSizesBatch(
+        List<string> fileUris,
+        ObjectStorageConfigDto objectStorageConfig)
+    {
+        if (objectStorageConfig.AzureObjectConfig == null)
+            throw new Exception("Azure configuration not set in object storage");
+        
+        var results = new Dictionary<string, long>();
+        
+        // Create BlobContainerClient with connection string
+        var containerClient = new BlobContainerClient(
+            objectStorageConfig.AzureObjectConfig.AzureConnectionString, 
+            objectStorageConfig.AzureObjectConfig.AzureContainerName);
+        
+        if (!await containerClient.ExistsAsync())
+            return results;
+        
+        // Get all blobs at once with their properties
+        await foreach (var blob in containerClient.GetBlobsAsync())
+        {
+            if (fileUris.Contains(blob.Name) && blob.Properties.ContentLength.HasValue)
+            {
+                results[blob.Name] = blob.Properties.ContentLength.Value;
+            }
+            
+            // exit once all requested files are found
+            if (results.Count == fileUris.Count)
+                break;
+        }
+        
+        return results;
+    }
 }

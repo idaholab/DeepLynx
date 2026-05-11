@@ -74,4 +74,9 @@ public class FileS3Business:  IFileBusiness
     {
         return "";
     }
+
+    public async Task<long> GetFileSize(string fileUri, ObjectStorageConfigDto objectStorageConfig)
+    {
+        return 0;
+    }
 }
