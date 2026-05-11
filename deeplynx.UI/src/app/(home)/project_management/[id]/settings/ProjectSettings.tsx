@@ -41,11 +41,14 @@ import { ExclamationTriangleIcon } from "@heroicons/react/24/outline";
 
 interface ProjectSettingsProps {
   project: ProjectResponseDto | null;
+  setProject: React.Dispatch<
+    React.SetStateAction<ProjectResponseDto | null>
+  >;
 }
 
 type StorageTab = "default" | "manage";
 
-const ProjectSettings = ({ project }: ProjectSettingsProps) => {
+const ProjectSettings = ({ project, setProject }: ProjectSettingsProps) => {
   const { clearProject } = useProjectSession();
   const { organization } = useOrganizationSession();
   const { t } = useLanguage();
@@ -501,7 +504,9 @@ const ProjectSettings = ({ project }: ProjectSettingsProps) => {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Logo Section */}
           <ProjectSettingsLeftColumn
+            organization={organization}
             project={project}
+            setProject={setProject}
             logoPreview={logoPreview}
             logoFile={logoFile}
             isUploading={isUploading}
