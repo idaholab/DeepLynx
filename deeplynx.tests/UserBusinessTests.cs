@@ -920,6 +920,41 @@ public class UserBusinessTests : IntegrationTestBase
         Assert.DoesNotContain(users, u => u.Id == uid2); // archived user excluded
     }
 
+    [Fact]
+    public async Task GetActiveUserCounts_ReturnsRollingLoginWindows()
+    {
+        // Arrange
+        var now = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
+
+        var active24HourUser = await Context.Users.FindAsync(uid1);
+        var active7DayUser = await Context.Users.FindAsync(uid4);
+        var active30DayUser = await Context.Users.FindAsync(uid5);
+        var archivedUser = await Context.Users.FindAsync(uid2);
+        Assert.NotNull(active24HourUser);
+        Assert.NotNull(active7DayUser);
+        Assert.NotNull(active30DayUser);
+        Assert.NotNull(archivedUser);
+
+        active24HourUser!.IsActive = true;
+        active24HourUser.LastLogin = now.AddHours(-1);
+        active7DayUser!.IsActive = true;
+        active7DayUser.LastLogin = now.AddDays(-3);
+        active30DayUser!.IsActive = true;
+        active30DayUser.LastLogin = now.AddDays(-20);
+        archivedUser!.IsActive = true;
+        archivedUser.LastLogin = now.AddMinutes(-5);
+
+        await Context.SaveChangesAsync();
+
+        // Act
+        var counts = await _userBusiness.GetActiveUserCounts(null, null);
+
+        // Assert
+        Assert.Equal(1, counts.ActiveLast24Hours);
+        Assert.Equal(2, counts.ActiveLast7Days);
+        Assert.Equal(3, counts.ActiveLast30Days);
+    }
+
     #endregion
 
     #region GetUser Tests

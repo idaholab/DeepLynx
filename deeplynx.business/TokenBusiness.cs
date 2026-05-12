@@ -73,6 +73,7 @@ public class TokenBusiness : ITokenBusiness
         var key = Encoding.UTF8.GetBytes(secretCheck);
         double expirationMinutes = expiration > 0 ? (double)expiration : 60;
         var expiresAt = DateTime.UtcNow.AddMinutes(expirationMinutes);
+        var now = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
 
         // Generate a unique token identifier (jti) to store in DB
         var jti = Guid.NewGuid().ToString();
@@ -110,8 +111,10 @@ public class TokenBusiness : ITokenBusiness
             ApplicationId = apiKeyRecord.ApplicationId,
             ExpiresAt = DateTime.SpecifyKind(expiresAt, DateTimeKind.Unspecified),
             Revoked = false,
-            CreatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            CreatedAt = now,
         });
+
+        user.LastLogin = now;
         await _context.SaveChangesAsync();
 
         return tokenString;

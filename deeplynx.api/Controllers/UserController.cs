@@ -269,4 +269,29 @@ public class UserController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
+
+
+    /// <summary>
+    ///     Get rolling active user counts
+    /// </summary>
+    /// <param name="projectId">(Optional) ID of project that users are associated with</param>
+    /// <param name="organizationId">(Optional) ID of organization that users are associated with</param>
+    /// <returns>Active user counts for 24-hour, 7-day, and 30-day windows</returns>
+    [HttpGet("active-counts", Name = "api_get_active_user_counts")]
+    public async Task<ActionResult<UserActivityCountsDto>> GetActiveUserCounts(
+        [FromQuery] long? projectId,
+        [FromQuery] long? organizationId)
+    {
+        try
+        {
+            var counts = await _userBusiness.GetActiveUserCounts(projectId, organizationId);
+            return Ok(counts);
+        }
+        catch (Exception exc)
+        {
+            var message = $"An unexpected error occurred while fetching active user counts.: {exc}";
+            _logger.LogError(message);
+            return StatusCode(StatusCodes.Status500InternalServerError, message);
+        }
+    }
 }

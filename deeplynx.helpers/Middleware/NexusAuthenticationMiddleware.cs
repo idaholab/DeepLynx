@@ -23,6 +23,7 @@ public class NexusAuthenticationMiddleware : JwtBearerHandler
     private static IConfigurationManager<OpenIdConnectConfiguration>? _configManager;
     private static readonly object _configManagerLock = new();
     private readonly IServiceScopeFactory _serviceScopeFactory;
+    private static readonly TimeSpan LastLoginUpdateInterval = TimeSpan.FromMinutes(5);
 
     public NexusAuthenticationMiddleware(
         IOptionsMonitor<JwtBearerOptions> options,
@@ -438,11 +439,15 @@ public class NexusAuthenticationMiddleware : JwtBearerHandler
             var isDefaultSuperUser =
                 normalizedEmail == Environment.GetEnvironmentVariable("SUPERUSER_EMAIL")?.ToLower();
 
+            var now = UtcNowWithoutTimezone();
+
             var existingUser = await dbContext.Users
                 .FirstOrDefaultAsync(u => u.Email.ToLower() == normalizedEmail);
 
             if (existingUser != null)
             {
+                var userChanged = false;
+
                 // Update if admin needs to be set or if SSO ID is improperly configured
                 if ((isDefaultSuperUser && !existingUser.IsSysAdmin)
                     || existingUser.SsoId != ssoId)
@@ -453,8 +458,19 @@ public class NexusAuthenticationMiddleware : JwtBearerHandler
                     existingUser.IsActive = true;
                     existingUser.IsArchived = false;
                     existingUser.IsSysAdmin = isDefaultSuperUser || existingUser.IsSysAdmin;
+                    userChanged = true;
+                }
+
+                if (ShouldUpdateLastLogin(existingUser.LastLogin, now))
+                {
+                    existingUser.LastLogin = now;
+                    userChanged = true;
+                }
+
+                if (userChanged)
+                {
                     await dbContext.SaveChangesAsync();
-                    Log.Information($"Updated SSO ID for existing user {normalizedEmail}");
+                    Log.Information($"Updated user login context for existing user {normalizedEmail}");
                 }
 
                 // Add user to the default org if not already a member
@@ -487,6 +503,7 @@ public class NexusAuthenticationMiddleware : JwtBearerHandler
                     Email = normalizedEmail, // Store normalized email
                     Username = username,
                     SsoId = ssoId,
+                    LastLogin = now,
                     IsActive = true,
                     IsArchived = false,
                     IsSysAdmin = isDefaultSuperUser
@@ -527,6 +544,7 @@ public class NexusAuthenticationMiddleware : JwtBearerHandler
 
             var existingUser = await dbContext.Users
                 .FirstOrDefaultAsync(u => u.Email.ToLower() == email.ToLower());
+            var now = UtcNowWithoutTimezone();
 
             if (existingUser == null)
             {
@@ -536,6 +554,7 @@ public class NexusAuthenticationMiddleware : JwtBearerHandler
                     Email = email,
                     Username = "local-dev",
                     SsoId = ssoId,
+                    LastLogin = now,
                     IsActive = true,
                     IsArchived = false,
                     IsSysAdmin = true
@@ -546,14 +565,28 @@ public class NexusAuthenticationMiddleware : JwtBearerHandler
                 Log.Information($"Local development sys admin created: {email}");
                 existingUser = newUser;
             }
-            else if (!existingUser.IsSysAdmin)
+            else
             {
+                var userChanged = false;
+
                 // if user exists but is not sysadmin, make them admin
-                existingUser.IsSysAdmin = true;
-                existingUser.IsActive = true;
-                existingUser.IsArchived = false;
-                await dbContext.SaveChangesAsync();
-                Log.Information($"Existing user {email} promoted to sys admin for local development");
+                if (!existingUser.IsSysAdmin)
+                {
+                    existingUser.IsSysAdmin = true;
+                    existingUser.IsActive = true;
+                    existingUser.IsArchived = false;
+                    userChanged = true;
+                    Log.Information($"Existing user {email} promoted to sys admin for local development");
+                }
+
+                if (ShouldUpdateLastLogin(existingUser.LastLogin, now))
+                {
+                    existingUser.LastLogin = now;
+                    userChanged = true;
+                }
+
+                if (userChanged)
+                    await dbContext.SaveChangesAsync();
             }
 
             // Add user to the default org if not already a member
@@ -589,5 +622,15 @@ public class NexusAuthenticationMiddleware : JwtBearerHandler
         using var sha256 = SHA256.Create();
         var hashBytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(jti));
         return Convert.ToBase64String(hashBytes);
+    }
+
+    private static DateTime UtcNowWithoutTimezone()
+    {
+        return DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
+    }
+
+    private static bool ShouldUpdateLastLogin(DateTime? lastLogin, DateTime now)
+    {
+        return !lastLogin.HasValue || lastLogin.Value <= now.Subtract(LastLoginUpdateInterval);
     }
 }
