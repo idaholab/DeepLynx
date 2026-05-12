@@ -5,9 +5,10 @@ using deeplynx.helpers;
 using deeplynx.interfaces;
 using deeplynx.models;
 using Moq;
+using DlRecord = deeplynx.datalayer.Models.Record;
 using Testcontainers.Azurite;
 using Record = deeplynx.datalayer.Models.Record;
- 
+
 namespace deeplynx.tests;
  
 // Fixture for Azurite container
@@ -50,6 +51,7 @@ public class MetricsBusinessTests : IntegrationTestBase, IClassFixture<MetricsAz
  
     // Project IDs
     private long _org1Proj1Id; // Org1, Project1
+    private long _org1Proj2Id; // Org1, Project2
     private long _org2Proj1Id; // Org2, Project1
     private long _org2Proj2Id; // Org2, Project2
  
@@ -181,6 +183,18 @@ public class MetricsBusinessTests : IntegrationTestBase, IClassFixture<MetricsAz
         Context.Projects.Add(org1Proj1);
         await Context.SaveChangesAsync();
         _org1Proj1Id = org1Proj1.Id;
+
+        // Create Project 2 for Org 1 (sibling project used by data-modality tests)
+        var org1Proj2 = new Project
+        {
+            Name = "Org1 Project2",
+            OrganizationId = _org1Id,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = _userId
+        };
+        Context.Projects.Add(org1Proj2);
+        await Context.SaveChangesAsync();
+        _org1Proj2Id = org1Proj2.Id;
 
         // Create Project 1 for Org 2
         var org2Proj1 = new Project
@@ -860,6 +874,15 @@ public class MetricsBusinessTests : IntegrationTestBase, IClassFixture<MetricsAz
 
         var count = await _metricsBusiness.GetRecordCount(_org2Id, (long?)_org2Proj2Id, hideArchived: true);
 
+    #region GetOrganizationDataModalityCount Tests
+
+    [Fact]
+    public async Task GetOrganizationDataModalityCount_ReturnsZero_WhenNoRecords()
+    {
+        // Act
+        var count = await _metricsBusiness.GetOrganizationDataModalityCount(_org1Id, null);
+
+        // Assert
         Assert.Equal(0, count);
     }
 
@@ -980,7 +1003,50 @@ public class MetricsBusinessTests : IntegrationTestBase, IClassFixture<MetricsAz
     {
         // Org1 Proj1 has 3 active records but only 2 have a URI
         var count = await _metricsBusiness.GetFileCount(_org1Id, new[] { _org1Proj1Id }, hideArchived: true);
+        Assert.Equal(2, count);
+    }
 
+    public async Task GetOrganizationDataModalityCount_ReturnsDistinctFileTypeCount_NoProjectFilter()
+    {
+        // Arrange
+        var ds = new DataSource { Name = "DS", OrganizationId = _org1Id, ProjectId = _org1Proj1Id, IsArchived = false };
+        Context.DataSources.Add(ds);
+        await Context.SaveChangesAsync();
+
+        Context.Records.AddRange(
+            new DlRecord { Name ="R1", OriginalId = "1", Properties = "{}", Description = "", OrganizationId = _org1Id, ProjectId = _org1Proj1Id, DataSourceId = ds.Id, LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified), FileType = "image/png" },
+            new DlRecord { Name ="R2", OriginalId = "2", Properties = "{}", Description = "", OrganizationId = _org1Id, ProjectId = _org1Proj1Id, DataSourceId = ds.Id, LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified), FileType = "image/png" },
+            new DlRecord { Name ="R3", OriginalId = "3", Properties = "{}", Description = "", OrganizationId = _org1Id, ProjectId = _org1Proj1Id, DataSourceId = ds.Id, LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified), FileType = "text/csv" },
+            new DlRecord { Name ="R4", OriginalId = "4", Properties = "{}", Description = "", OrganizationId = _org1Id, ProjectId = _org1Proj2Id, DataSourceId = ds.Id, LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified), FileType = "application/json" }
+        );
+        await Context.SaveChangesAsync();
+
+        // Act
+        var count = await _metricsBusiness.GetOrganizationDataModalityCount(_org1Id, null);
+
+        // Assert - 3 distinct file types across org (png, csv, json)
+        Assert.Equal(3, count);
+    }
+
+    [Fact]
+    public async Task GetOrganizationDataModalityCount_WithProjectFilter_ReturnsCountForThatProject()
+    {
+        // Arrange
+        var ds = new DataSource { Name = "DS", OrganizationId = _org1Id, ProjectId = _org1Proj1Id, IsArchived = false };
+        Context.DataSources.Add(ds);
+        await Context.SaveChangesAsync();
+
+        Context.Records.AddRange(
+            new DlRecord { Name ="R1", OriginalId = "1", Properties = "{}", Description = "", OrganizationId = _org1Id, ProjectId = _org1Proj1Id, DataSourceId = ds.Id, LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified), FileType = "image/png" },
+            new DlRecord { Name ="R2", OriginalId = "2", Properties = "{}", Description = "", OrganizationId = _org1Id, ProjectId = _org1Proj1Id, DataSourceId = ds.Id, LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified), FileType = "text/csv" },
+            new DlRecord { Name ="R3", OriginalId = "3", Properties = "{}", Description = "", OrganizationId = _org1Id, ProjectId = _org1Proj2Id, DataSourceId = ds.Id, LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified), FileType = "application/json" }
+        );
+        await Context.SaveChangesAsync();
+
+        // Act
+        var count = await _metricsBusiness.GetOrganizationDataModalityCount(_org1Id, _org1Proj1Id);
+
+        // Assert - only records in project 1: png and csv
         Assert.Equal(2, count);
     }
 
@@ -1126,6 +1192,99 @@ public class MetricsBusinessTests : IntegrationTestBase, IClassFixture<MetricsAz
         var recordCount = await _metricsBusiness.GetRecordCount((long?)null, (long[]?)null, hideArchived: true);
 
         Assert.Equal(recordCount, fileCount);
+        Assert.Equal(2, count);
+    }
+
+    [Fact]
+    public async Task GetOrganizationDataModalityCount_ExcludesRecordsWithNullFileType()
+    {
+        // Arrange
+        var ds = new DataSource { Name = "DS", OrganizationId = _org1Id, ProjectId = _org1Proj1Id, IsArchived = false };
+        Context.DataSources.Add(ds);
+        await Context.SaveChangesAsync();
+
+        Context.Records.AddRange(
+            new DlRecord { Name ="R1", OriginalId = "1", Properties = "{}", Description = "", OrganizationId = _org1Id, ProjectId = _org1Proj1Id, DataSourceId = ds.Id, LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified), FileType = "image/png" },
+            new DlRecord { Name ="R2", OriginalId = "2", Properties = "{}", Description = "", OrganizationId = _org1Id, ProjectId = _org1Proj1Id, DataSourceId = ds.Id, LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified), FileType = null }
+        );
+        await Context.SaveChangesAsync();
+
+        // Act
+        var count = await _metricsBusiness.GetOrganizationDataModalityCount(_org1Id, null);
+
+        // Assert - null FileType record excluded
+        Assert.Equal(1, count);
+    }
+
+    [Fact]
+    public async Task GetOrganizationDataModalityCount_ReturnsZero_WhenAllFileTypesAreNull()
+    {
+        // Arrange
+        var ds = new DataSource { Name = "DS", OrganizationId = _org1Id, ProjectId = _org1Proj1Id, IsArchived = false };
+        Context.DataSources.Add(ds);
+        await Context.SaveChangesAsync();
+
+        Context.Records.Add(new DlRecord { Name ="R1", OriginalId = "1", Properties = "{}", Description = "", OrganizationId = _org1Id, ProjectId = _org1Proj1Id, DataSourceId = ds.Id, LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified), FileType = null });
+        await Context.SaveChangesAsync();
+
+        // Act
+        var count = await _metricsBusiness.GetOrganizationDataModalityCount(_org1Id, null);
+
+        // Assert
+        Assert.Equal(0, count);
+    }
+
+    [Fact]
+    public async Task GetOrganizationDataModalityCount_ExcludesOtherOrganizations()
+    {
+        // Arrange
+        var ds1 = new DataSource { Name = "DS Org1", OrganizationId = _org1Id, ProjectId = _org1Proj1Id, IsArchived = false };
+        var ds2 = new DataSource { Name = "DS Org2", OrganizationId = _org2Id, ProjectId = _org1Proj2Id, IsArchived = false };
+        Context.DataSources.AddRange(ds1, ds2);
+        await Context.SaveChangesAsync();
+
+        // Project for org2
+        var proj2 = new Project { Name = "Org2 Project", OrganizationId = _org2Id, LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified), LastUpdatedBy = _userId };
+        Context.Projects.Add(proj2);
+        await Context.SaveChangesAsync();
+
+        Context.Records.AddRange(
+            new DlRecord { Name ="R1", OriginalId = "1", Properties = "{}", Description = "", OrganizationId = _org1Id, ProjectId = _org1Proj1Id, DataSourceId = ds1.Id, LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified), FileType = "image/png" },
+            new DlRecord { Name ="R2", OriginalId = "2", Properties = "{}", Description = "", OrganizationId = _org2Id, ProjectId = proj2.Id, DataSourceId = ds2.Id, LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified), FileType = "text/csv" },
+            new DlRecord { Name ="R3", OriginalId = "3", Properties = "{}", Description = "", OrganizationId = _org2Id, ProjectId = proj2.Id, DataSourceId = ds2.Id, LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified), FileType = "application/json" }
+        );
+        await Context.SaveChangesAsync();
+
+        // Act
+        var count = await _metricsBusiness.GetOrganizationDataModalityCount(_org1Id, null);
+
+        // Assert - only org 1's file type (png)
+        Assert.Equal(1, count);
+    }
+
+    [Fact]
+    public async Task GetOrganizationDataModalityCount_CountsDistinct_NotTotal()
+    {
+        // Arrange
+        var ds = new DataSource { Name = "DS", OrganizationId = _org1Id, ProjectId = _org1Proj1Id, IsArchived = false };
+        Context.DataSources.Add(ds);
+        await Context.SaveChangesAsync();
+
+        // 5 records but only 2 distinct file types
+        Context.Records.AddRange(
+            new DlRecord { Name ="R1", OriginalId = "1", Properties = "{}", Description = "", OrganizationId = _org1Id, ProjectId = _org1Proj1Id, DataSourceId = ds.Id, LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified), FileType = "image/png" },
+            new DlRecord { Name ="R2", OriginalId = "2", Properties = "{}", Description = "", OrganizationId = _org1Id, ProjectId = _org1Proj1Id, DataSourceId = ds.Id, LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified), FileType = "image/png" },
+            new DlRecord { Name ="R3", OriginalId = "3", Properties = "{}", Description = "", OrganizationId = _org1Id, ProjectId = _org1Proj1Id, DataSourceId = ds.Id, LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified), FileType = "image/png" },
+            new DlRecord { Name ="R4", OriginalId = "4", Properties = "{}", Description = "", OrganizationId = _org1Id, ProjectId = _org1Proj1Id, DataSourceId = ds.Id, LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified), FileType = "text/csv" },
+            new DlRecord { Name ="R5", OriginalId = "5", Properties = "{}", Description = "", OrganizationId = _org1Id, ProjectId = _org1Proj1Id, DataSourceId = ds.Id, LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified), FileType = "text/csv" }
+        );
+        await Context.SaveChangesAsync();
+
+        // Act
+        var count = await _metricsBusiness.GetOrganizationDataModalityCount(_org1Id, null);
+
+        // Assert
+        Assert.Equal(2, count);
     }
 
     #endregion

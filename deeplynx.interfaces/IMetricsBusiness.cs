@@ -10,6 +10,7 @@ public interface IMetricsBusiness
     Task<StorageSizeDto> GetOrganizationStorageSize(long organizationId);
     Task<StorageSizeDto> GetSystemStorageSize();
     Task<int> GetProjectDataSourceCount(long projectId, bool hideArchived = true);
+    Task<int> GetOrganizationDataModalityCount(long organizationId, long? projectId);
     Task<int> GetOrganizationDataSourceCount(long organizationId, long[]? projectIds, bool hideArchived = true);
     Task<int> GetSystemDataSourceCount(bool hideArchived = true);
     Task<int> GetRecordCount(long? organizationId, long? projectId, bool hideArchived);
