@@ -49,8 +49,8 @@ public class MetricsOrganizationController : ControllerBase
         }
         catch (Exception exc)
         {
-            var message = $"An error occurred while retrieving byte count for the system: {exc}";
-            _logger.LogError(message);
+            var message = $"An error occurred while retrieving byte count for the system";
+            _logger.LogError(exc.Message);
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
@@ -77,12 +77,66 @@ public class MetricsOrganizationController : ControllerBase
         }
         catch (Exception exc)
         {
-            var message = $"An error occurred while listing all data sources: {exc}";
-            _logger.LogError(message);
+            var message = $"An error occurred while listing all data sources";
+            _logger.LogError(exc.Message);
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
-
+    
+    /// <summary>
+    ///     Get record count for organization
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization the records belong</param>
+    /// <param name="projectIds">The IDs of the projects the records belong</param>
+    /// <param name="hideArchived">Flag indicating whether to hide archived records from the result</param>
+    /// <returns>The record count for the given scope</returns>
+    [HttpGet("records/count", Name = "api_record_count_organization")]
+    [SysAdmin]
+    public async Task<IActionResult> GetOrganizationRecordCount(
+        long organizationId, 
+        [FromQuery] long[]? projectIds, 
+        [FromQuery] bool hideArchived = true)
+    {
+        try
+        {
+            var count = await _metricsBusiness.GetRecordCount(organizationId, projectIds, hideArchived: false);
+            return Ok(count);
+        }
+        catch (Exception exc)
+        {
+            var message = $"An error occurred while retrieving record count for organization";
+            _logger.LogError(exc.Message);
+            return StatusCode(StatusCodes.Status500InternalServerError, message);
+        }
+    }
+    
+    /// <summary>
+    ///     Get file count for organization
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization the files belong</param>
+    /// <param name="projectIds">The IDs of the projects the files belong</param>
+    /// <param name="hideArchived">Flag indicating whether to hide archived files from the result</param>
+    /// <returns>The file count for the given scope</returns>
+    [HttpGet("files/count", Name = "api_file_count_organization")]
+    [SysAdmin]
+    public async Task<IActionResult> GetOrganizationFileCount(
+        long organizationId, 
+        [FromQuery] long[]? projectIds, 
+        [FromQuery] bool hideArchived = true)
+    {
+        try
+        {
+            var count = await _metricsBusiness.GetFileCount(organizationId, projectIds, hideArchived: false);
+            return Ok(count);
+        }
+        catch (Exception exc)
+        {
+            var message = $"An error occurred while retrieving file count for organization";
+            _logger.LogError(exc.Message);
+            return StatusCode(StatusCodes.Status500InternalServerError, message);
+        }
+    }
+    
     /// <summary>
     ///     Get Organization Data Modality Count
     /// </summary>

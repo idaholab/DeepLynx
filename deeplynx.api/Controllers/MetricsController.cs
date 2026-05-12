@@ -70,8 +70,52 @@ public class MetricsController : ControllerBase
         }
         catch (Exception exc)
         {
-            var message = $"An error occurred while retrieving byte count for the system: {exc}";
-            _logger.LogError(message);
+            var message = $"An error occurred while retrieving byte count for the system";
+            _logger.LogError(exc.Message);
+            return StatusCode(StatusCodes.Status500InternalServerError, message);
+        }
+    }
+    
+    /// <summary>
+    ///     Get record count for system
+    /// </summary>
+    /// <param name="hideArchived">Flag indicating whether to hide archived records from the result</param>
+    /// <returns>The record count for the given scope</returns>
+    [HttpGet("records/count", Name = "api_record_count_system")]
+    [SysAdmin]
+    public async Task<IActionResult> GetSystemRecordCount(bool hideArchived = true)
+    {
+        try
+        {
+            var count = await _metricsBusiness.GetRecordCount(organizationId: null, projectIds: null, hideArchived: false);
+            return Ok(count);
+        }
+        catch (Exception exc)
+        {
+            var message = $"An error occurred while retrieving record count for system";
+            _logger.LogError(exc.Message);
+            return StatusCode(StatusCodes.Status500InternalServerError, message);
+        }
+    }
+    
+    /// <summary>
+    ///     Get file count for system
+    /// </summary>
+    /// <param name="hideArchived">Flag indicating whether to hide archived files from the result</param>
+    /// <returns>The file count for the given scope</returns>
+    [HttpGet("files/count", Name = "api_file_count_system")]
+    [SysAdmin]
+    public async Task<IActionResult> GetSystemFileCount(bool hideArchived = true)
+    {
+        try
+        {
+            var count = await _metricsBusiness.GetFileCount(organizationId: null, projectIds: null, hideArchived: false);
+            return Ok(count);
+        }
+        catch (Exception exc)
+        {
+            var message = $"An error occurred while retrieving file count for system";
+            _logger.LogError(exc.Message);
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
