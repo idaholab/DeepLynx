@@ -4,6 +4,7 @@ using deeplynx.business;
 using deeplynx.datalayer.Models;
 using deeplynx.helpers;
 using deeplynx.helpers.BigData;
+using deeplynx.helpers.ExceptionHandlers;
 using deeplynx.helpers.Hubs;
 using deeplynx.interfaces;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -199,6 +200,20 @@ try
     builder.Services.AddHttpClient<InsightServiceClient>();
     builder.Services.AddHttpClient<AirflowServiceClient>();
     builder.Services.AddSingleton<EncryptionHelper>();
+
+    /*
+    ╔════════════════════════════╗
+    ║  Global Exception Handling ║
+    ╚════════════════════════════╝
+    Specific handlers are registered first; the InternalServerError fallback runs
+    last and always handles whatever the others reject. RFC 7807 ProblemDetails
+    is used for the response envelope.
+    */
+    builder.Services.AddProblemDetails();
+    builder.Services.AddExceptionHandler<BadRequestExceptionHandler>();
+    builder.Services.AddExceptionHandler<NotFoundExceptionHandler>();
+    builder.Services.AddExceptionHandler<ConflictExceptionHandler>();
+    builder.Services.AddExceptionHandler<InternalServerErrorExceptionHandler>();
 
     //OpenApi Documentation
     builder.Services.AddOpenApi(options =>
@@ -540,6 +555,7 @@ try
 
     app.UseStaticFiles();
     app.UseRouting();
+    app.UseExceptionHandler(); // Runs registered IExceptionHandlers; must precede middleware that may throw
     app.UseCors("AllowAll");
     app.UseAuthentication(); // Must be first
     app.UseMiddleware<UserContextMiddleware>(); // Second - sets UserId/Email
