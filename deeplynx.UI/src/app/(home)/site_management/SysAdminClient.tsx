@@ -16,6 +16,7 @@ import { getAllUsers } from "@/app/lib/client_service/user_services.client";
 import EventsHistoryClient from "../event_management/EventHistoryClient";
 import UsersTable from "../organization_management/users/UsersTable";
 import { useLanguage } from "@/app/contexts/Language";
+import AdminOverviewCard from "./AdminOverviewCard";
 
 interface SysAdminProps {
   organizations: OrganizationResponseDto[];
@@ -125,13 +126,19 @@ const SysAdminClient = ({
         </div>
       </section>
 
-      <section className="mx-auto w-full max-w-7xl px-3 py-5 sm:px-6 lg:px-8">
-        <Tabs
-          tabs={tabData}
-          className="mx-0"
-          onTabChange={handleTabChange}
-          activeTab={activeTab}
-        />
+      <section className="grid grid-cols-1 gap-4 mx-auto w-full max-w-7xl px-3 py-5 sm:px-6 lg:px-8 lg:grid-cols-3">
+        <div className="lg:col-span-2">
+          <Tabs
+            tabs={tabData}
+            className="mx-0"
+            onTabChange={handleTabChange}
+            activeTab={activeTab}
+          />
+        </div>
+
+        <div className="mx-1 sm:mx-3">
+          <AdminOverviewCard />
+        </div>
       </section>
     </main>
   );
