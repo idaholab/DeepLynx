@@ -503,27 +503,36 @@ export default function LatticeDecisionsPage() {
   };
 
   return (
-    <div className="mx-3 sm:mx-4 lg:mr-0 lg:ml-0">
+    <main className="min-h-screen bg-base-200/30">
       {/* Page header */}
-      <div className="bg-base-200/40 px-3 sm:px-6 lg:px-12 p-4">
-        <h1 className="text-xl sm:text-2xl font-bold text-base-content">{t.translations.LATTICE_PAGE_TITLE}</h1>
-        <p className="mt-1 text-sm text-base-content/70">
-          {t.translations.LATTICE_PAGE_DESCRIPTION_INTRO}{" "}
-          <span className="font-medium">{t.translations.LATTICE_VALID_LABEL}</span>{" "}
-          {t.translations.LATTICE_VALID_DESCRIPTION}{" "}
-          <span className="font-medium">{t.translations.LATTICE_NOVEL_DISCOVERY_LABEL}</span>{" "}
-          {t.translations.LATTICE_NOVEL_DISCOVERY_DESCRIPTION}{" "}
-          <span className="font-medium">{t.translations.LATTICE_INVALID_SCHEMA_LABEL}</span>{" "}
-          {t.translations.LATTICE_INVALID_SCHEMA_DESCRIPTION}{" "}
-          {t.translations.LATTICE_APPROVE_PROMOTES_ALL}
-        </p>
-        <div className="mt-2">
-          <span className="badge badge-warning badge-sm">{t.translations.LATTICE_COMING_SOON}</span>
-          <span className="ml-2 text-sm text-base-content/70">{t.translations.LATTICE_COMING_SOON_TEXT}</span>
+      <section className="border-b border-base-300 bg-base-100">
+        <div className="mx-auto flex w-full max-w-7xl flex-col gap-5 px-3 py-5 sm:px-6 lg:px-8">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-base-content/60">
+              {t.translations.LATTICE_EXTRACTIONS_PANEL_TITLE}
+            </p>
+            <h1 className="text-2xl font-bold text-base-content sm:text-3xl">
+              {t.translations.LATTICE_PAGE_TITLE}
+            </h1>
+            <p className="mt-3 max-w-4xl text-base-content/70">
+              {t.translations.LATTICE_PAGE_DESCRIPTION_INTRO}{" "}
+              <span className="font-medium">{t.translations.LATTICE_VALID_LABEL}</span>{" "}
+              {t.translations.LATTICE_VALID_DESCRIPTION}{" "}
+              <span className="font-medium">{t.translations.LATTICE_NOVEL_DISCOVERY_LABEL}</span>{" "}
+              {t.translations.LATTICE_NOVEL_DISCOVERY_DESCRIPTION}{" "}
+              <span className="font-medium">{t.translations.LATTICE_INVALID_SCHEMA_LABEL}</span>{" "}
+              {t.translations.LATTICE_INVALID_SCHEMA_DESCRIPTION}{" "}
+              {t.translations.LATTICE_APPROVE_PROMOTES_ALL}
+            </p>
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <span className="badge badge-warning badge-sm">{t.translations.LATTICE_COMING_SOON}</span>
+              <span className="text-sm text-base-content/70">{t.translations.LATTICE_COMING_SOON_TEXT}</span>
+            </div>
+          </div>
         </div>
-      </div>
+      </section>
 
-      <div className="px-3 sm:px-6 lg:px-12 py-6">
+      <section className="mx-auto w-full max-w-7xl px-3 py-5 sm:px-6 lg:px-8">
         <div className="grid gap-6 lg:grid-cols-[320px_1fr]">
           {/* Left: extraction list */}
           <aside className="rounded-2xl border border-base-300 bg-base-100 shadow-sm overflow-hidden self-start">
@@ -602,7 +611,7 @@ export default function LatticeDecisionsPage() {
             )}
           </div>
         </div>
-      </div>
-    </div>
+      </section>
+    </main>
   );
 }

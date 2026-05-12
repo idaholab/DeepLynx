@@ -225,32 +225,40 @@ export default function HomeDashboardClient({ initialProjects }: Props) {
   }
  
   return (
-    <div className="h-full bg-base-100">
-      <header className="bg-base-200/50 border-b border-base-300/30 sticky z-10 backdrop-blur-sm">
-        <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-3 px-3 sm:px-6 lg:px-12 py-4">
-          <div className="flex items-center gap-3 min-w-0">
-            <h1 className="text-lg sm:text-2xl font-bold text-base-content truncate">
-              {`${t.translations.WELECOME}, ${formatUserName(displayName)}`}
-            </h1>
-            <button
-              onClick={startTour}
-              className="btn btn-ghost btn-sm btn-circle"
-              title="Start Tour"
-            >
-              <QuestionMarkCircleIcon className="w-5 h-5" />
-            </button>
-          </div>
-          <div data-tour="search-input" className="w-full lg:w-auto">
-            <SearchInput
-              placeholder="Search Projects"
-              className="w-full lg:min-w-[18rem]"
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
+    <main className="min-h-screen bg-base-200/30">
+      <section className="border-b border-base-300 bg-base-100">
+        <div className="mx-auto flex w-full max-w-7xl flex-col gap-5 px-3 py-5 sm:px-6 lg:px-8">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <div className="min-w-0">
+              <p className="text-xs font-semibold uppercase tracking-wide text-base-content/60">
+                {t.translations.YOUR_PROJECTS}
+              </p>
+              <div className="flex flex-wrap items-center gap-3">
+                <h1 className="min-w-0 break-words text-2xl font-bold text-base-content sm:text-3xl">
+                  {`${t.translations.WELECOME}, ${formatUserName(displayName)}`}
+                </h1>
+                <button
+                  onClick={startTour}
+                  className="btn btn-ghost btn-sm btn-circle"
+                  title="Start Tour"
+                >
+                  <QuestionMarkCircleIcon className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            <div data-tour="search-input" className="w-full lg:max-w-xl">
+              <SearchInput
+                placeholder="Search Projects"
+                className="w-full"
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
           </div>
         </div>
-      </header>
+      </section>
  
-      <div className="p-3 sm:p-6">
+      <section className="mx-auto w-full max-w-7xl px-3 py-5 sm:px-6 lg:px-8">
         <div className="">
           {/* Main content: projects table + saved searches side by side */}
           <div className="flex flex-col 2xl:flex-row gap-4 justify-center items-start">
@@ -304,7 +312,7 @@ export default function HomeDashboardClient({ initialProjects }: Props) {
  
           </div>
         </div>
-      </div>
+      </section>
  
       <AddRecordModal
         isOpen={isRecordModalOpen}
@@ -320,6 +328,6 @@ export default function HomeDashboardClient({ initialProjects }: Props) {
         isOpen={widgetModal}
         onClose={() => setWidgetModal(false)}
       />
-    </div>
+    </main>
   );
 }
