@@ -59,6 +59,9 @@ const EMPTY_FILTERS: SavedSearchFilterRequest = {
   lastUpdatedAfter: undefined,
 };
 
+const WIDGET_CARD_CLASS =
+  "card bg-base-200/30 border border-base-300/50 shadow-sm hover:shadow-md transition-all flex flex-col overflow-hidden";
+
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 function ConnectorBadge({ connector }: { connector: string }) {
@@ -504,7 +507,7 @@ export default function SavedSearchesWidget({ scope, projects = [] }: Props) {
         />
       )}
 
-      <div className="card bg-base-200/30 flex flex-col overflow-hidden">
+      <div className={WIDGET_CARD_CLASS}>
         <div className="card-body flex flex-col min-h-0">
           {/* Header */}
           <div className="flex justify-between items-start mb-1">

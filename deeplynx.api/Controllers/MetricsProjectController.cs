@@ -92,7 +92,7 @@ public class MetricsProjectController : ControllerBase
     /// <param name="organizationId"></param>
     /// <param name="projectId"></param>
     /// <returns></returns>
-    [HttpGet("count", Name = "api_count_data_modality_for_project")]
+    [HttpGet("modalities/count", Name = "api_count_data_modality_for_project")]
     [Auth("read", "data_source")]
     public async Task<ActionResult<int>> GetProjectDataModalityCount(
         long organizationId,
