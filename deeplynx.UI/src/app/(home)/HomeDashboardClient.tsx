@@ -4,6 +4,7 @@
 import CreateWidget from "@/app/(home)/components/CreateWidgetsModal";
 import { ExpandableTable } from "@/app/(home)/components/ExpandableTable";
 import ExpandedProjectCard from "@/app/(home)/components/ExpandedProjectCard";
+import OrganizationOverviewCard from "@/app/(home)/components/OrganizationOverviewCard";
 import SavedSearchesWidget from "@/app/(home)/components/SavedSearchesWidget";
 import { PlusIcon, QuestionMarkCircleIcon } from "@heroicons/react/24/outline";
 import Link from "next/link";
@@ -298,8 +299,11 @@ export default function HomeDashboardClient({ initialProjects }: Props) {
               />
             </div>
  
-            <div className="w-full 2xl:w-[420px] 2xl:shrink-0 h-180">
-              <SavedSearchesWidget scope="org" projects={projects} />
+            <div className="w-full 2xl:w-[420px] 2xl:shrink-0 flex flex-col gap-4">
+              <OrganizationOverviewCard />
+              <div className="h-180">
+                <SavedSearchesWidget scope="org" projects={projects} />
+              </div>
             </div>
  
           </div>

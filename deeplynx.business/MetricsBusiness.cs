@@ -229,6 +229,26 @@ public class MetricsBusiness : IMetricsBusiness
 
         return await dsQuery.CountAsync();
     }
+    
+    /// <summary>
+    /// Gets the number of unique data modalities in the organization's records
+    /// </summary>
+    /// <param name="organizationId"></param>
+    /// <param name="projectId"></param>
+    /// <returns></returns>
+    public async Task<int> GetOrganizationDataModalityCount(
+        long organizationId,
+        long? projectId)
+    {
+        return await _context.Records
+            .Where(r => r.FileType != null)
+            .Where(r => r.OrganizationId == organizationId &&
+                        (projectId == null || r.ProjectId == projectId))
+            .Select(r => r.FileType)
+            .Distinct()
+            .CountAsync();
+    }
+
 
     /// <summary>
     ///     Gets datasource count system-wide

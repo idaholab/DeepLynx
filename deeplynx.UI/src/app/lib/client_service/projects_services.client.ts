@@ -179,6 +179,80 @@ export async function getProjectStats(
   }
 }
 
+/**
+ * Get project storage size in bytes
+ * @param organizationId - The ID of the organization
+ * @param projectId - The ID of the project
+ * @returns Promise with the project storage size in bytes
+ */
+export async function getProjectStorageSize(
+  organizationId: number,
+  projectId: number
+): Promise<number> {
+  try {
+    const res = await api.get(
+      `/organizations/${organizationId}/projects/${projectId}/metrics/storage/size`
+    );
+    return res.data;
+  } catch (error) {
+    console.error(
+      `Error getting storage size for project ${projectId}:`,
+      error
+    );
+    throw error;
+  }
+}
+
+/**
+ * Get project data source count
+ * @param organizationId - The ID of the organization
+ * @param projectId - The ID of the project
+ * @returns Promise with the project data source count
+ */
+export async function getProjectDataSourceCount(
+  organizationId: number,
+  projectId: number
+): Promise<number> {
+  try {
+    const res = await api.get(
+      `/organizations/${organizationId}/projects/${projectId}/metrics/count`,
+      { params: { hideArchived: true } }
+    );
+    return res.data;
+  } catch (error) {
+    console.error(
+      `Error getting data source count for project ${projectId}:`,
+      error
+    );
+    throw error;
+  }
+}
+
+/**
+ * Get project data modality count
+ * @param organizationId - The ID of the organization
+ * @param projectId - The ID of the project
+ * @returns Promise with the project data modality count
+ */
+export async function getProjectDataModalityCount(
+  organizationId: number,
+  projectId: number
+): Promise<number> {
+  try {
+    const res = await api.get(
+      `/organizations/${organizationId}/projects/${projectId}/metrics/modalities/count`,
+      { params: { projectId } }
+    );
+    return res.data;
+  } catch (error) {
+    console.error(
+      `Error getting data modality count for project ${projectId}:`,
+      error
+    );
+    throw error;
+  }
+}
+
 /* -------------------------------------------------------------------------- */
 /*                         Project Member Management                          */
 /* -------------------------------------------------------------------------- */
