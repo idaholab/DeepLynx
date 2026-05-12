@@ -229,6 +229,26 @@ public class MetricsBusiness : IMetricsBusiness
 
         return await dsQuery.CountAsync();
     }
+    
+    /// <summary>
+    /// Gets the number of unique data modalities in the organization's records
+    /// </summary>
+    /// <param name="organizationId"></param>
+    /// <param name="projectId"></param>
+    /// <returns></returns>
+    public async Task<int> GetOrganizationDataModalityCount(
+        long organizationId,
+        long? projectId)
+    {
+        return await _context.Records
+            .Where(r => r.FileType != null)
+            .Where(r => r.OrganizationId == organizationId &&
+                        (projectId == null || r.ProjectId == projectId))
+            .Select(r => r.FileType)
+            .Distinct()
+            .CountAsync();
+    }
+
 
     /// <summary>
     ///     Gets datasource count system-wide
@@ -245,5 +265,75 @@ public class MetricsBusiness : IMetricsBusiness
             dsQuery = dsQuery.Where(d => !d.IsArchived);
 
         return await dsQuery.CountAsync();
+    }
+    
+    /// <summary>
+    ///     Get record count for a scope
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization the records belong</param>
+    /// <param name="projectId">The ID of the project the records belong</param>
+    /// <param name="hideArchived">Flag indicating whether to hide archived records from the result</param>
+    /// <returns>The record count for the given scope</returns>
+    public async Task<int> GetRecordCount(long? organizationId, long? projectId, bool hideArchived)
+    {
+        var projectIds = projectId.HasValue ? new[] { projectId.Value } : null;
+        return await GetRecordCount(organizationId, projectIds, hideArchived);
+    }
+    
+    /// <summary>
+    ///     Get record count for a scope
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization the records belong</param>
+    /// <param name="projectIds">The IDs of the projects the records belong</param>
+    /// <param name="hideArchived">Flag indicating whether to hide archived records from the result</param>
+    /// <returns>The record count for the given scope</returns>
+    public async Task<int> GetRecordCount(long? organizationId, long[]? projectIds, bool hideArchived)
+    {
+        var recordQuery = _context.Records.AsQueryable();
+        
+        if (organizationId != null) recordQuery = recordQuery.Where(r => r.OrganizationId == organizationId);
+
+        if (projectIds is { Length: > 0 })
+            recordQuery = recordQuery.Where(r => projectIds.Contains(r.ProjectId));
+        
+        if (hideArchived) recordQuery = recordQuery.Where(r => !r.IsArchived);
+        
+        return await recordQuery.CountAsync();
+    }
+
+    /// <summary>
+    ///     Get Files Count
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization the files belong</param>
+    /// <param name="projectId">The ID of the project the files belong</param>
+    /// <param name="hideArchived">Flag indicating whether to hide archived files from the result</param>
+    /// <returns>The record count for the given scope</returns>
+    public async Task<int> GetFileCount(long? organizationId, long? projectId, bool hideArchived = true)
+    {
+        var projectIds = projectId.HasValue ? new[] { projectId.Value } : null;
+        return await GetFileCount(organizationId, projectIds, hideArchived);
+    }
+    
+    /// <summary>
+    ///     Get Files Count
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization the files belong</param>
+    /// <param name="projectIds">The IDs of the projects the files belong</param>
+    /// <param name="hideArchived">Flag indicating whether to hide archived files from the result</param>
+    /// <returns>The record count for the given scope</returns>
+    public async Task<int> GetFileCount(long? organizationId, long[]? projectIds, bool hideArchived)
+    {
+        var fileQuery = _context.Records
+            .Where(r => r.Uri != null)
+            .AsQueryable();
+        
+        if (organizationId != null) fileQuery = fileQuery.Where(r => r.OrganizationId == organizationId);
+
+        if (projectIds is { Length: > 0 })
+            fileQuery = fileQuery.Where(r => projectIds.Contains(r.ProjectId));
+        
+        if (hideArchived) fileQuery = fileQuery.Where(r => !r.IsArchived);
+        
+        return await fileQuery.CountAsync();
     }
 }
