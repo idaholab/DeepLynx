@@ -1,4 +1,3 @@
-using deeplynx.datalayer.Models;
 using deeplynx.helpers;
 using deeplynx.interfaces;
 using Microsoft.AspNetCore.Authorization;
@@ -18,16 +17,16 @@ namespace deeplynx.api.Controllers;
 [Tags("Project - Metrics")]
 public class MetricsProjectController : ControllerBase
 {
-    private readonly IMetricsBusiness _metricsBusiness;
     private readonly ILogger<MetricsController> _logger;
-    
+    private readonly IMetricsBusiness _metricsBusiness;
+
     /// <summary>
     ///     Initializes a new instance of the <see cref="MetricsProjectController" /> class
     /// </summary>
     /// <param name="metricsBusiness">The business logic interface for handling metrics retrievals</param>
     /// <param name="logger">Error/info logging interface for database log table</param>
     public MetricsProjectController(
-        IMetricsBusiness metricsBusiness, 
+        IMetricsBusiness metricsBusiness,
         ILogger<MetricsController> logger)
     {
         _metricsBusiness = metricsBusiness;
@@ -43,9 +42,9 @@ public class MetricsProjectController : ControllerBase
     [HttpGet("storage/size", Name = "api_storage_size_project")]
     [SysAdmin]
     public async Task<IActionResult> GetProjectStorageSize(
-        long organizationId, 
+        long organizationId,
         long projectId
-        )
+    )
     {
         try
         {
@@ -62,7 +61,7 @@ public class MetricsProjectController : ControllerBase
     }
 
     /// <summary>
-    ///     Get Project Data Source Count 
+    ///     Get Project Data Source Count
     /// </summary>
     /// <param name="projectId">The ID of the project whose data sources are to be retrieved</param>
     /// <param name="hideArchived">Flag indicating whether to hide archived data sources from the result (Default true)</param>
@@ -70,7 +69,7 @@ public class MetricsProjectController : ControllerBase
     [HttpGet("count", Name = "api_count_data_sources_for_project")]
     [Auth("read", "data_source")]
     public async Task<ActionResult<int>> GetDataSourceCount(
-        long projectId, 
+        long projectId,
         [FromQuery] bool hideArchived = true)
     {
         try
@@ -85,9 +84,9 @@ public class MetricsProjectController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
-    
+
     /// <summary>
-    /// Gets the count of data modalities for a project
+    ///     Gets the count of data modalities for a project
     /// </summary>
     /// <param name="organizationId"></param>
     /// <param name="projectId"></param>
@@ -105,8 +104,8 @@ public class MetricsProjectController : ControllerBase
         }
         catch (Exception exc)
         {
-            var message = $"An error occurred while listing data modalities";
-            _logger.LogError(message);
+            var message = "An error occurred while listing data modalities";
+            _logger.LogError(exc.Message);
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }

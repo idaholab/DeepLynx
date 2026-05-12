@@ -17,16 +17,16 @@ namespace deeplynx.api.Controllers;
 [Tags("Organization - Metrics")]
 public class MetricsOrganizationController : ControllerBase
 {
-    private readonly IMetricsBusiness _metricsBusiness;
     private readonly ILogger<MetricsController> _logger;
-    
+    private readonly IMetricsBusiness _metricsBusiness;
+
     /// <summary>
     ///     Initializes a new instance of the <see cref="MetricsOrganizationController" /> class
     /// </summary>
     /// <param name="metricsBusiness">The business logic interface for handling metrics retrievals</param>
     /// <param name="logger">Error/info logging interface for database log table</param>
     public MetricsOrganizationController(
-        IMetricsBusiness metricsBusiness, 
+        IMetricsBusiness metricsBusiness,
         ILogger<MetricsController> logger)
     {
         _metricsBusiness = metricsBusiness;
@@ -56,7 +56,7 @@ public class MetricsOrganizationController : ControllerBase
     }
 
     /// <summary>
-    ///     Get Organization Data Source Count 
+    ///     Get Organization Data Source Count
     /// </summary>
     /// <param name="organizationId">The ID of the organization to which the projectID belongs</param>
     /// <param name="projectIds">(Optional)An array of project IDs within the organization to filter by</param>
@@ -71,7 +71,8 @@ public class MetricsOrganizationController : ControllerBase
     {
         try
         {
-            var dataSources = await _metricsBusiness.GetOrganizationDataSourceCount(organizationId, projectIds, hideArchived);
+            var dataSources =
+                await _metricsBusiness.GetOrganizationDataSourceCount(organizationId, projectIds, hideArchived);
             return Ok(dataSources);
         }
         catch (Exception exc)
@@ -81,9 +82,9 @@ public class MetricsOrganizationController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
-    
+
     /// <summary>
-    /// Get Organization Data Modality Count
+    ///     Get Organization Data Modality Count
     /// </summary>
     /// <param name="organizationId"></param>
     /// <returns></returns>
@@ -99,8 +100,8 @@ public class MetricsOrganizationController : ControllerBase
         }
         catch (Exception exc)
         {
-            var message = $"An error occurred while listing data modalities";
-            _logger.LogError(message);
+            var message = "An error occurred while listing data modalities";
+            _logger.LogError(exc.Message);
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
