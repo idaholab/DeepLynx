@@ -70,8 +70,8 @@ public class MetricsController : ControllerBase
         }
         catch (Exception exc)
         {
-            var message = $"An error occurred while retrieving byte count for the system: {exc}";
-            _logger.LogError(message);
+            var message = $"An error occurred while retrieving byte count for the system";
+            _logger.LogError(exc.Message);
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
@@ -92,8 +92,8 @@ public class MetricsController : ControllerBase
         }
         catch (Exception exc)
         {
-            var message = $"An error occurred while retrieving record count for system: {exc}";
-            _logger.LogError(message);
+            var message = $"An error occurred while retrieving record count for system";
+            _logger.LogError(exc.Message);
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
@@ -114,8 +114,8 @@ public class MetricsController : ControllerBase
         }
         catch (Exception exc)
         {
-            var message = $"An error occurred while retrieving file count for system: {exc}";
-            _logger.LogError(message);
+            var message = $"An error occurred while retrieving file count for system";
+            _logger.LogError(exc.Message);
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }

@@ -873,7 +873,9 @@ public class MetricsBusinessTests : IntegrationTestBase, IClassFixture<MetricsAz
         await Context.SaveChangesAsync();
 
         var count = await _metricsBusiness.GetRecordCount(_org2Id, (long?)_org2Proj2Id, hideArchived: true);
-
+        Assert.Equal(0, count);
+    }
+    #endregion
     #region GetOrganizationDataModalityCount Tests
 
     [Fact]
@@ -1192,7 +1194,6 @@ public class MetricsBusinessTests : IntegrationTestBase, IClassFixture<MetricsAz
         var recordCount = await _metricsBusiness.GetRecordCount((long?)null, (long[]?)null, hideArchived: true);
 
         Assert.Equal(recordCount, fileCount);
-        Assert.Equal(2, count);
     }
 
     [Fact]
