@@ -1112,21 +1112,26 @@ export default function DataSchema({ mode }: DataSchemaProps) {
   } as const;
 
   return (
-    <div>
-      <div className="bg-base-200/40 p-6 px-3 sm:px-6 lg:px-12">
-        <div>
-          <h1 className="text-xl font-bold text-base-content break-words sm:text-2xl">
-            Data Schema
-          </h1>
-          <p className="max-w-4xl text-sm text-base-content/70">
-            {modeDescriptions[mode]}
-          </p>
+    <main className="min-h-screen bg-base-200/30">
+      <section className="border-b border-base-300 bg-base-100">
+        <div className="mx-auto flex w-full max-w-7xl flex-col gap-5 px-3 py-5 sm:px-6 lg:px-8">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-base-content/60">
+              Data Schema
+            </p>
+            <h1 className="break-words text-2xl font-bold text-base-content sm:text-3xl">
+              Data Schema
+            </h1>
+            <p className="mt-3 max-w-4xl text-base-content/70">
+              {modeDescriptions[mode]}
+            </p>
+          </div>
         </div>
-      </div>
+      </section>
 
-      <div className="space-y-6 p-2 sm:p-3">
+      <section className="mx-auto w-full max-w-7xl space-y-6 px-3 py-5 sm:px-6 lg:px-8">
         {contentByMode[mode]}
-      </div>
+      </section>
       
       {isCreateClassModalOpen ? (
         <ModalShell
@@ -1361,6 +1366,6 @@ export default function DataSchema({ mode }: DataSchemaProps) {
           </div>
         </ModalShell>
       ) : null}
-    </div>
+    </main>
   );
 }

@@ -5,7 +5,8 @@ export const translations = {
             _THIS_STORAGE: "this storage?",
             ABBREVIATION: "Abbreviation (optional)",
             ABBREVIATION_REQUIRED: "Abbreviation",
-            ABSOLUTE_PATH_WHERE_FILES_WILL_BE_STORED: "Absolute path where files will be stored",
+            ABSOLUTE_PATH_WHERE_FILES_WILL_BE_STORED:
+                "Absolute path where files will be stored",
             ACCEPTED: "Accepted:",
             ACTION: "Action: ",
             ACTIONS: "Actions",
@@ -22,11 +23,13 @@ export const translations = {
             ADD_A_RECORD: "Add a record",
             ADD_A_TAG: "Add A Tag",
             ADD_CLASS: "Add Class",
-            ADD_EMAIL_ADDRESSES_HELPER_TEXT: "Type email addresses and press Enter, comma, or space to add",
+            ADD_EMAIL_ADDRESSES_HELPER_TEXT:
+                "Type email addresses and press Enter, comma, or space to add",
             ADD_EXISTING_USER: "Add Existing User",
             ADD_GROUP: "Add Group",
             ADD_GROUP_TO_PROJECT: "Add Group to Project",
-            ADD_GROUP_TO_PROJECT_DESCRIPTION: "Select an existing group and assign a role. A role is required to add them to the project.",
+            ADD_GROUP_TO_PROJECT_DESCRIPTION:
+                "Select an existing group and assign a role. A role is required to add them to the project.",
             ADD_GROUPS: "Add Groups",
             ADD_NEW_MEMBER: "Add New Member",
             ADD_NEW_PROPERTY: "Add New Property",
@@ -36,7 +39,8 @@ export const translations = {
             ADD_TO_PROJECT: "Add to Project",
             ADD_USER: "Add User",
             ADD_USER_TO_PROJECT: "Add User to Project",
-            ADD_USER_TO_PROJECT_DESCRIPTION: "Select an existing user and assign a role. A role is required to add them to the project.",
+            ADD_USER_TO_PROJECT_DESCRIPTION:
+                "Select an existing user and assign a role. A role is required to add them to the project.",
             ADD_USERS: "Add Users",
             ADDING: "Adding...",
             ADDITIONAL_FILTERS: "Additional Filters",
@@ -46,14 +50,17 @@ export const translations = {
             ALIAS: "Alias:",
             ALL: "All",
             ALL_AZURE_BLOB_FIELDS_ARE_REQUIRED: "All Azure Blob fields are required",
-            ALL_ORG_USERS_ALREADY_IN_PROJECT: "All organization users are already in this project",
+            ALL_ORG_USERS_ALREADY_IN_PROJECT:
+                "All organization users are already in this project",
             ALL_RECORDS: "All Records",
-            ALL_RECORDS_VALID_READY_TO_UPLOAD: "All {count} records are valid and ready to upload.",
+            ALL_RECORDS_VALID_READY_TO_UPLOAD:
+                "All {count} records are valid and ready to upload.",
             ALL_YOUR_PROJECTS: "All your Projects",
             AND: "and",
             API_KEYPAIRS: "API Keys",
             APP_OWNER_EMAIL: "App Owner Email",
-            APPEAR_ON_TOP_RIGHT_NEXT_TO_ORG_NAME: "Appears next to the organization name in the header. Recommended: PNG, 256×256, transparent background.",
+            APPEAR_ON_TOP_RIGHT_NEXT_TO_ORG_NAME:
+                "Appears next to the organization name in the header. Recommended: PNG, 256×256, transparent background.",
             ARCHIVE: "Archive",
             ARCHIVE_LABEL: "Archive Label",
             ARCHIVE_SELECTED_GROUPS: "Archive selected groups?",
@@ -66,19 +73,24 @@ export const translations = {
             ARCHIVE_USER_ACTION: "Archive user",
             ARCHIVED: "archived",
             ARCHIVED_BADGE: "Archived",
-            ARCHIVED_LABEL_RESTORED_LATER: "This label will no longer be available for new usage, but it can be restored later.",
+            ARCHIVED_LABEL_RESTORED_LATER:
+                "This label will no longer be available for new usage, but it can be restored later.",
             ARCHIVED_STORAGE_CANNOT_BE_EDITED: "Archived storages cannot be edited",
             ARCHIVED_SUFFIX: " [Archived]",
-            ARCHIVED_TAG_RESTORED_LATER: "This tag will no longer be available for new usage, but it can be restored later.",
+            ARCHIVED_TAG_RESTORED_LATER:
+                "This tag will no longer be available for new usage, but it can be restored later.",
             ARCHIVING: "Archiving...",
             ARE_YOU_SURE: "Are you sure you want to unlink?",
-            ARE_YOU_SURE_TO_REMOVE_LOGO_FROM_ORG: "Are you sure you want to remove the organization logo?",
+            ARE_YOU_SURE_TO_REMOVE_LOGO_FROM_ORG:
+                "Are you sure you want to remove the organization logo?",
             ARE_YOU_SURE_YOU_WANT_TO_: "Are you sure you want to",
             ARE_YOU_SURE_YOU_WANT_TO_ARCHIVE: "Are you sure you want to archive",
             ARE_YOU_SURE_YOU_WANT_TO_ARCHIVE_: "Are you sure you want to archive",
-            ARE_YOU_SURE_YOU_WANT_TO_DELETE_THIS_STORAGE: "Are you sure you want to delete this storage? This action cannot be undone.",
+            ARE_YOU_SURE_YOU_WANT_TO_DELETE_THIS_STORAGE:
+                "Are you sure you want to delete this storage? This action cannot be undone.",
             ARE_YOU_SURE_YOU_WANT_TO_REMOVE_: "Are you sure you want to remove",
-            ARE_YOU_SURE_YOU_WANT_TO_REMOVE_LOGO_FROM_PROJECT: "Are you sure you want to remove the logo from this project?",
+            ARE_YOU_SURE_YOU_WANT_TO_REMOVE_LOGO_FROM_PROJECT:
+                "Are you sure you want to remove the logo from this project?",
             ARRAY_VALUE_EXAMPLE: '["value1", "value2"]',
             AVAILABLE: "Available",
             AVAILABLE_TIMESERIES_FILES: "Available Timeseries Files",
@@ -88,16 +100,19 @@ export const translations = {
             AZURE_BLOB_STORAGE: "Azure Blob Storage",
             BACK: "Back",
             BACK_TO_CLASS_SELECTION: "← Back to class selection",
-            BANNER_EXAMPLE_CUI: 'e.g. "This organization space contains CUI/ECI data that must be protected accordingly."',
+            BANNER_EXAMPLE_CUI:
+                'e.g. "This organization space contains CUI/ECI data that must be protected accordingly."',
             BANNER_TEXT: "Banner Text",
-            BANNER_TEXT_MUST_BE_50_CHARACTERS_OR_LESS: "Banner text must be 50 characters or less",
+            BANNER_TEXT_MUST_BE_50_CHARACTERS_OR_LESS:
+                "Banner text must be 50 characters or less",
             BANNER_UPDATED_SUCCESSFULLY: "Banner updated successfully",
             BASE_URL: "Base URL",
             BRANDING_AND_BANNER: "Branding & Banner",
             BRIEF_DESCRIPTION: "Brief description",
             BULK_CSV_UPLOAD: "Bulk CSV Upload",
             BULK_METADATA: "Bulk Metadata",
-            BULK_METADATA_INSTRUCTIONS: "Create multiple records at once by uploading a CSV file with metadata. No actual files are uploaded - only record metadata is created.",
+            BULK_METADATA_INSTRUCTIONS:
+                "Create multiple records at once by uploading a CSV file with metadata. No actual files are uploaded - only record metadata is created.",
             BULK_METADATA_UPLOAD: "Bulk Metadata Upload",
             BULK_UPLOAD_SUCCESS_WITH_COUNT: "Successfully uploaded {count} records!",
             CALLBACK_URL: "Callback URL",
@@ -106,9 +121,12 @@ export const translations = {
             CANCEL_INVITATION: "Cancel Invitation?",
             CANCEL_INVITE: "Cancel Invite",
             CANCELLING_SHORT: "Cancelling...",
-            CANNOT_DEFINE_ADDITIONAL_PROJECT_LABELS: "cannot define additional project labels",
-            CANNOT_DEFINE_ADDITIONAL_PROJECT_TAGS: "cannot define additional project tags",
-            CANNOT_DEFINE_ADDITIONAL_SECURITY_LABELS: "cannot define additional sensitivity labels",
+            CANNOT_DEFINE_ADDITIONAL_PROJECT_LABELS:
+                "cannot define additional project labels",
+            CANNOT_DEFINE_ADDITIONAL_PROJECT_TAGS:
+                "cannot define additional project tags",
+            CANNOT_DEFINE_ADDITIONAL_SECURITY_LABELS:
+                "cannot define additional sensitivity labels",
             CANNOT_DEFINE_NEW_LABELS: "cannot define new labels",
             CANNOT_DEFINE_NEW_TAGS: "cannot define new tags",
             CANT_SWITCH_TO_SINGLE_FILE: "Can't switch to single-file",
@@ -125,11 +143,14 @@ export const translations = {
             CLASS: "Class",
             CLASS_CREATED_AND_APPLIED: "Class created and applied!",
             CLASS_ID: "Class ID",
-            CLASS_ID_DOES_NOT_EXIST_IN_PROJECT: "Class ID {id} does not exist in this project",
+            CLASS_ID_DOES_NOT_EXIST_IN_PROJECT:
+                "Class ID {id} does not exist in this project",
             CLASS_ID_MUST_BE_GREATER_THAN_ZERO: "Class ID must be greater than 0",
             CLASS_ID_MUST_BE_INTEGER: "Class ID must be an integer",
-            CLASS_ID_MUST_BE_NUMBER_NOT_STRING: "Class ID must be a number, not a string.",
-            CLASS_ID_NOT_FOUND_IN_PROJECT_SUGGESTION: "Verify that the class ID exists in the selected project.",
+            CLASS_ID_MUST_BE_NUMBER_NOT_STRING:
+                "Class ID must be a number, not a string.",
+            CLASS_ID_NOT_FOUND_IN_PROJECT_SUGGESTION:
+                "Verify that the class ID exists in the selected project.",
             CLASS_NAME: "Class Name",
             CLASS_NAME_REQUIRED: "Class Name *",
             CLASS_NAME_UPDATED: "Class name updated",
@@ -138,7 +159,7 @@ export const translations = {
             CLEAR: "Clear",
             CLEAR_ALL: "Clear All",
             CLEAR_SEARCH: "Clear search",
-            CLICK_CREATE_STORAGE_TO_ADD_ONE: "Click \"Create Storage\" to add one",
+            CLICK_CREATE_STORAGE_TO_ADD_ONE: 'Click "Create Storage" to add one',
             CLICK_TO_BROWSE: " click to browse",
             CLICK_TO_TOGGLE: "Click to toggle",
             CLICK_UPLOAD_TO_SAVE_YOUR_CHANGES: 'Click "Upload" to save your changes',
@@ -146,9 +167,11 @@ export const translations = {
             COLUMN_VISIBILITY: "Column Visibility",
             COMING_SOON: "Coming Soon",
             CONFIGURE: "Configure",
-            CONFIGURE_AUTHENTICATION_CONNECTED_SERVICE: "Configure authentication and endpoints for connected services.",
+            CONFIGURE_AUTHENTICATION_CONNECTED_SERVICE:
+                "Configure authentication and endpoints for connected services.",
             CONFIGURE_AXES: "Configure Axes",
-            CONFIGURE_BRANDING_AND_MANAGE_YOUR_PROJECT: "Configure branding and manage your project",
+            CONFIGURE_BRANDING_AND_MANAGE_YOUR_PROJECT:
+                "Configure branding and manage your project",
             CONFIRM_BULK_UPLOAD: "Confirm Bulk Upload",
             CONFIRM_UPLOAD: "Confirm Upload",
             CONNECTION_STRING: "Connection String",
@@ -166,7 +189,8 @@ export const translations = {
             COPY_VALUE: "Copy value",
             CREATE: "Create",
             CREATE_AND_APPLY: "Create & Apply",
-            CREATE_EDIT_MANAGE_STORAGE_LOCATIONS: "Create, edit, and manage your storage locations",
+            CREATE_EDIT_MANAGE_STORAGE_LOCATIONS:
+                "Create, edit, and manage your storage locations",
             CREATE_GROUP: "Create Group",
             CREATE_LABEL: "Create Label",
             CREATE_NEW_CLASS: "Create New Class",
@@ -192,7 +216,8 @@ export const translations = {
             CREATED_BUT_FAILED_TO_ATTACH: "created but failed to attach",
             CREATING: "Creating...",
             CSV_PARSING_ERRORS: "CSV Parsing Errors",
-            CSV_UPLOAD_INSTRUCTIONS: "Upload multiple records at once using our CSV template",
+            CSV_UPLOAD_INSTRUCTIONS:
+                "Upload multiple records at once using our CSV template",
             CURRENT: "Current",
             CURRENT_DEFAULT: "Current default:",
             CURRENT_DEFAULT_SUFFIX: " (Current Default)",
@@ -213,15 +238,22 @@ export const translations = {
             DEEPLYNX_ECOSYSTEM_SERVICES: "DeepLynx Ecosystem Services",
             DEFAULT_BADGE: "Default",
             DEFAULT_STORAGE: "Delete Storage",
-            DEFAULT_STORAGE_FOR_DATA_SOURCES_HELPER: "This will be the default storage for data sources in this project",
-            DEFAULT_STORAGE_LOCATION_UPDATED_SUCCESSFULLY: "Default storage location updated successfully",
+            DEFAULT_STORAGE_FOR_DATA_SOURCES_HELPER:
+                "This will be the default storage for data sources in this project",
+            DEFAULT_STORAGE_LOCATION_UPDATED_SUCCESSFULLY:
+                "Default storage location updated successfully",
             DEFAULT_STORAGE_TAB: "Default Storage",
             DEFAULT_UNMOUNT_STORAGE: "Default Unmounted Object Storage",
-            DEFINE_ORGANIZATION_LEVEL_SENSITIVITY_LABEL_DESCRIPTION: "Define an organization-level sensitivity label. Projects inherit this label and can use it across their assets.",
-            DEFINE_ORGANIZATION_LEVEL_TAG_DESCRIPTION: "Define an organization-level tag. Projects inherit this tag and can use it across their assets.",
-            DEFINE_ORGANIZATION_TAGS_AND_SENSITIVITY_LABELS_DESCRIPTION: "Define organization-wide tags and sensitivity labels. Projects inherit these and can optionally add their own.",
-            DEFINE_PROJECT_TAGS_AND_LABELS_DESCRIPTION: "Define project tags and sensitivity labels for classification, workflows, and access control.",
-            DEFINE_PROJECT_TAGS_FOR_CLASSIFICATION_WORKFLOWS_AND_SEARCH: "Define project-level tags for classification, workflows, and search. Organization-level locks determine whether this project can define additional tags beyond those inherited from the organization.",
+            DEFINE_ORGANIZATION_LEVEL_SENSITIVITY_LABEL_DESCRIPTION:
+                "Define an organization-level sensitivity label. Projects inherit this label and can use it across their assets.",
+            DEFINE_ORGANIZATION_LEVEL_TAG_DESCRIPTION:
+                "Define an organization-level tag. Projects inherit this tag and can use it across their assets.",
+            DEFINE_ORGANIZATION_TAGS_AND_SENSITIVITY_LABELS_DESCRIPTION:
+                "Define organization-wide tags and sensitivity labels. Projects inherit these and can optionally add their own.",
+            DEFINE_PROJECT_TAGS_AND_LABELS_DESCRIPTION:
+                "Define project tags and sensitivity labels for classification, workflows, and access control.",
+            DEFINE_PROJECT_TAGS_FOR_CLASSIFICATION_WORKFLOWS_AND_SEARCH:
+                "Define project-level tags for classification, workflows, and search. Organization-level locks determine whether this project can define additional tags beyond those inherited from the organization.",
             DELETE: "Delete",
             DELETE_ALL_FILTERS: "Delete all filters",
             DELETE_ROLE: "Delete Role",
@@ -231,27 +263,33 @@ export const translations = {
             DESCRIPTION_REQUIRED: "Description is required",
             DESCRIPTION_UPDATED: "Description updated",
             DIRECTION: "Direction",
-            DISPLAY_BENEATH_THE_TOP_HEADER_FOR_ALL_PAGES_IN_ORG: "Displayed beneath the top header for all pages in this organization.",
-            DISPLAY_BENEATH_THE_TOP_HEADER_FOR_ALL_PAGES_IN_PROJECT: "Display beneath the top header for all pages in this project",
+            DISPLAY_BENEATH_THE_TOP_HEADER_FOR_ALL_PAGES_IN_ORG:
+                "Displayed beneath the top header for all pages in this organization.",
+            DISPLAY_BENEATH_THE_TOP_HEADER_FOR_ALL_PAGES_IN_PROJECT:
+                "Display beneath the top header for all pages in this project",
             DOWNLOAD_CSV_TEMPLATE: "Download CSV Template",
             DOWNLOAD_FILE: "Download file",
             DOWNLOAD_METADATA_TEMPLATE: "Download Metadata Template",
             DOWNLOAD_STARTED_IN_BROWSER: "Download started in browser",
             DRAG_N_DROP_FILES_HERE: "Drag & drop files here",
-            DUPLICATE_RECORD_SUGGESTION: "Check for duplicate IDs, or verify that the record does not already exist in the system.",
+            DUPLICATE_RECORD_SUGGESTION:
+                "Check for duplicate IDs, or verify that the record does not already exist in the system.",
             EDGE: "Edge",
             EDIT: "Edit",
             EDIT_ADDITIONAL_PROPERTIES: "Edit Additional Properties",
             EDIT_PROPERTIES: "Edit properties",
-            EDIT_ADDITIONAL_PROPERTIES_HELP: "Modify, add, or remove custom properties for this record",
+            EDIT_ADDITIONAL_PROPERTIES_HELP:
+                "Modify, add, or remove custom properties for this record",
             EDIT_CLASS: "Edit class",
             EDIT_LABEL: "Edit Label",
             EDIT_MATRIX: "Edit Matrix",
             EDIT_OAUTH_APP: "Edit OAuth Application",
             EDIT_ORGANIZATION: "Edit Organization",
             EDIT_PERMISSIONS: "Edit Permissions",
-            EDIT_PERMISSIONS_ACROSS_ROLES_MATRIX_VIEW: "Edit permissions across roles in a matrix view.",
-            EDIT_PERMISSIONS_FOR_PROJECT_ROLES_MATRIX_VIEW: "Edit permissions for project roles in matrix view.",
+            EDIT_PERMISSIONS_ACROSS_ROLES_MATRIX_VIEW:
+                "Edit permissions across roles in a matrix view.",
+            EDIT_PERMISSIONS_FOR_PROJECT_ROLES_MATRIX_VIEW:
+                "Edit permissions for project roles in matrix view.",
             EDIT_ROLE: "Edit Role",
             EDIT_STORAGE: "Edit Storage",
             EDIT_TAG: "Edit Tag",
@@ -260,7 +298,8 @@ export const translations = {
             EMAIL: "Email",
             EMAIL_ADDRESS: "Email Address",
             EMAIL_ADDRESSES: "Email Addresses",
-            EMAIL_INVITATION_DESCRIPTION: "An invitation email will be sent with instructions to join the organization. The user will be able to access all organization resources once they accept the invitation.",
+            EMAIL_INVITATION_DESCRIPTION:
+                "An invitation email will be sent with instructions to join the organization. The user will be able to access all organization resources once they accept the invitation.",
             EMAIL_INVITATIONS: "Email invitations",
             EMAIL_NOTIFICATIONS: "Email Notifications",
             ENGLISH: "English",
@@ -303,8 +342,10 @@ export const translations = {
             FAILED_TO_LOAD_PROJECT_TAGS: "Failed to load project tags.",
             FAILED_TO_LOAD_RECENT_RECORDS: "Failed to load recent records.",
             FAILED_TO_LOAD_RECORD_HISTORY: "Failed to load record history.",
-            FAILED_TO_LOAD_SELECTED_POINT_IN_TIME_SNAPSHOT: "Failed to load selected point-in-time snapshot.",
-            FAILED_TO_LOAD_STORAGE_CONFIGURATIONS: "Failed to load storage configurations",
+            FAILED_TO_LOAD_SELECTED_POINT_IN_TIME_SNAPSHOT:
+                "Failed to load selected point-in-time snapshot.",
+            FAILED_TO_LOAD_STORAGE_CONFIGURATIONS:
+                "Failed to load storage configurations",
             FAILED_TO_PARSE_CSV_FILE: "Failed to parse CSV file",
             FAILED_TO_REMOVE_LOGO: "Failed to remove logo",
             FAILED_TO_REMOVE_MEMBER: "Failed to remove member",
@@ -322,7 +363,8 @@ export const translations = {
             FAILED_TO_UPDATE_DEFAULT_STORAGE: "Failed to update default storage",
             FAILED_TO_UPDATE_MEMBER_ROLE: "Failed to update member role",
             FAILED_TO_UPDATE_PROPERTIES: "Failed to update properties",
-            FAILED_TO_UPDATE_SENSITIVITY_LABELS: "Failed to update sensitivity labels",
+            FAILED_TO_UPDATE_SENSITIVITY_LABELS:
+                "Failed to update sensitivity labels",
             FAILED_TO_UPDATE_STORAGE: "Failed to update storage",
             FAILED_TO_UPDATE_TAGS: "Failed to update tags",
             FAILED_TO_UPLOAD_LOGO: "Failed to upload logo",
@@ -359,29 +401,38 @@ export const translations = {
             GRAPH_HOP: "Hop {count}",
             GRAPH_HOPS: "{count} hops",
             GRAPH_NO_DESCRIPTION_AVAILABLE: "No description available.",
-            GRAPH_NO_MULTI_HOP_TRACE: "The selected node is the root, so there is no multi-hop trace yet.",
+            GRAPH_NO_MULTI_HOP_TRACE:
+                "The selected node is the root, so there is no multi-hop trace yet.",
             GRAPH_NO_NODES_FOUND: "No nodes found in the graph data.",
             GRAPH_NO_NODES_MATCH_SEARCH: "No nodes match this search.",
             GRAPH_NO_NODE_SELECTED: "No node selected",
-            GRAPH_NO_PATH_AVAILABLE: "No path is available for the current selection.",
-            GRAPH_NO_RELATIONSHIPS_MATCH_FILTER: "No relationships match the current filter.",
+            GRAPH_NO_PATH_AVAILABLE:
+                "No path is available for the current selection.",
+            GRAPH_NO_RELATIONSHIPS_MATCH_FILTER:
+                "No relationships match the current filter.",
             GRAPH_NO_TRACE: "No trace",
             GRAPH_RECORD_TYPE: "record",
             GRAPH_RELATIONSHIP_TABLE: "Relationship Table",
             GRAPH_SEARCH_NODES_BY_LABEL: "Search nodes by label",
             GRAPH_SELECTED_NODE: "Selected Node",
-            GRAPH_SELECT_NODE_FOR_TRACE: "Select a node to compute and display the traced path from the root.",
-            GRAPH_SELECT_NODE_TO_INSPECT_RELATIONSHIPS: "Select a node to inspect its exact relationships.",
-            GRAPH_SELECT_NODE_TO_POPULATE_SUMMARY: "Choose a node in the graph to populate the summary and relationship table.",
-            GRAPH_SELECT_NODE_TO_POPULATE_TABLE: "Select a node to populate the relationship table.",
+            GRAPH_SELECT_NODE_FOR_TRACE:
+                "Select a node to compute and display the traced path from the root.",
+            GRAPH_SELECT_NODE_TO_INSPECT_RELATIONSHIPS:
+                "Select a node to inspect its exact relationships.",
+            GRAPH_SELECT_NODE_TO_POPULATE_SUMMARY:
+                "Choose a node in the graph to populate the summary and relationship table.",
+            GRAPH_SELECT_NODE_TO_POPULATE_TABLE:
+                "Select a node to populate the relationship table.",
             GRAPH_SHOW_ALL_LABELS: "Show all labels",
             GRAPH_TRACED_PATH: "Traced Path",
             GROUP: "Group",
             GROUP_MEMBERS: "Group Members",
             GROUP_MEMBERSHIP: "Group memberships",
             GROUP_NAME_STAR: "Group Name *",
-            GROUP_NO_LONGER_APPEAR: "The group will no longer appear in group lists. Users will not lose access to the organization itself, only this group association.",
-            GROUP_WILL_BE_ARCHIVED_MEMBERS_WILL_BE_REMOVED: "This group will be archived. Members will be removed from this group but will remain in the organization.",
+            GROUP_NO_LONGER_APPEAR:
+                "The group will no longer appear in group lists. Users will not lose access to the organization itself, only this group association.",
+            GROUP_WILL_BE_ARCHIVED_MEMBERS_WILL_BE_REMOVED:
+                "This group will be archived. Members will be removed from this group but will remain in the organization.",
             GROUPS: "Groups",
             GROUPS_SELECTED: "groups selected",
             HAS_PERMISSION: "Has permission",
@@ -397,7 +448,8 @@ export const translations = {
             INCOMING_: "Incoming (",
             INCOMING_ARROW: " ← Other Records)",
             INDIVIDUAL_MEMBERS: "Individual members",
-            INHERITING_ORGANIZATION_LEVEL_LABELS: "Inheriting organization-level labels",
+            INHERITING_ORGANIZATION_LEVEL_LABELS:
+                "Inheriting organization-level labels",
             INHERITING_ORGANIZATION_LEVEL_TAGS: "Inheriting organization-level tags",
             INSIGHT: "Insight",
             INSIGHT_ASK_PLACEHOLDER: "Ask Insight about this record...",
@@ -409,9 +461,12 @@ export const translations = {
             INSIGHT_EXPAND_HEIGHT: "Expand height",
             INSIGHT_EXPAND_WIDGET: "Expand widget",
             INSIGHT_FILE_SCOPED: "File Scoped",
-            INSIGHT_INTRO_NOT_READY: 'I am ready to help analyze "{recordName}". First queue the record for Insight indexing, then send questions here.',
-            INSIGHT_INTRO_READY: 'I am ready to help analyze "{recordName}". How can I help?',
-            INSIGHT_NOT_READY_MESSAGE: "This record is not ready yet. Queue it first and wait for status to become Ready.",
+            INSIGHT_INTRO_NOT_READY:
+                'I am ready to help analyze "{recordName}". First queue the record for Insight indexing, then send questions here.',
+            INSIGHT_INTRO_READY:
+                'I am ready to help analyze "{recordName}". How can I help?',
+            INSIGHT_NOT_READY_MESSAGE:
+                "This record is not ready yet. Queue it first and wait for status to become Ready.",
             INSIGHT_QUEUEING: "Queueing...",
             INSIGHT_QUEUE_RECORD: "Queue Record For Insight",
             INSIGHT_SEND: "Send",
@@ -426,10 +481,12 @@ export const translations = {
             INTERACTIVE_ZOOM_SLIDER: "Interactive zoom slider",
             INVALID_EMAIL_ERROR: "That doesn’t look like a valid email address",
             INVALID_JASON: "Invalid JSON.",
-            INVALID_JSON_ARRAY_SYNTAX: "Invalid JSON format - must be valid array syntax",
+            INVALID_JSON_ARRAY_SYNTAX:
+                "Invalid JSON format - must be valid array syntax",
             INVALID_LABEL: "Invalid",
             INVALID_SELECTED_DATA_SOURCE: "The selected data source is invalid",
-            INVALID_SELECTED_DATA_SOURCE_SUGGESTION: "Try selecting a different data source from the dropdown.",
+            INVALID_SELECTED_DATA_SOURCE_SUGGESTION:
+                "Try selecting a different data source from the dropdown.",
             INVITATION_CANCELED: "Invitation cancelled",
             INVITATION_RESENT_TO_: "Invitation resent to",
             INVITATION_SENT_TO_: "Invitation sent to",
@@ -456,8 +513,10 @@ export const translations = {
             LABELS_LOCKED_AT_ORG_LEVEL: "Labels are locked at the organization level",
             LABELS_LOCKED_AT_ORG_LEVEL_SHORT: "Labels are locked at the org level",
             LABELS_LOCKED_BY_ORGANIZATION: "Labels are locked by the organization",
-            LABELS_LOCKED_CANNOT_ARCHIVE_PROJECT: "Labels are locked at the organization level. Cannot archive project labels.",
-            LABELS_LOCKED_CANNOT_CREATE_OR_EDIT_PROJECT: "Labels are locked at the organization level. Cannot create or edit project labels.",
+            LABELS_LOCKED_CANNOT_ARCHIVE_PROJECT:
+                "Labels are locked at the organization level. Cannot archive project labels.",
+            LABELS_LOCKED_CANNOT_CREATE_OR_EDIT_PROJECT:
+                "Labels are locked at the organization level. Cannot create or edit project labels.",
             LABELS_LOWER: "labels",
             LANGUAGE: "Language",
             LAST_EDIT: "Last Edited",
@@ -465,44 +524,62 @@ export const translations = {
             LAST_UPDATE: "Last update:",
             LAST_UPDATED: "Last Updated:",
             LAST_UPDATED_AT: "Last Updated At",
+            LAST_UPDATED_LABEL: "Last updated:",
             LATTICE_ANALYSIS_STARTED: "Record analysis started. Extraction ID:",
             LATTICE_FAILED_TO_START_ANALYSIS: "Failed to start record analysis.",
             LATTICE_GO_TO_SLIDE: "Go to slide",
             LATTICE_TRIGGER: "Trigger Lattice",
-            LATTICE_INTRO_ANALYZE_BODY: "Lattice can review this record and identify useful structure, including possible records, classes, relationships, and edges.",
+            LATTICE_INTRO_ANALYZE_BODY:
+                "Lattice can review this record and identify useful structure, including possible records, classes, relationships, and edges.",
             LATTICE_INTRO_ANALYZE_TITLE: "Analyze this record",
-            LATTICE_INTRO_REVIEW_BODY: "You can review, approve, or reject the staged results before they become part of your project data.",
+            LATTICE_INTRO_REVIEW_BODY:
+                "You can review, approve, or reject the staged results before they become part of your project data.",
             LATTICE_INTRO_REVIEW_TITLE: "Review before adding",
-            LATTICE_INTRO_STAGE_BODY: "Extracted results from Lattice are placed in staging first. They are not added directly to the project.",
+            LATTICE_INTRO_STAGE_BODY:
+                "Extracted results from Lattice are placed in staging first. They are not added directly to the project.",
             LATTICE_INTRO_STAGE_TITLE: "Stage suggestions",
             LATTICE_LEARN_MORE_ARIA: "Learn about AI record analysis",
-            LATTICE_READY_TOOLTIP: "Use Lattice to find records, classes, relationships, and edges from this file. Results are staged for review before they are added to the project.",
-            LATTICE_REQUIRES_EMBEDDING_TOOLTIP: "This record must be embedded with Insight before it can be analyzed with Lattice.",
-            LATTICE_STRICT_REQUIRES_EMBEDDING: "This record must be embedded with Insight before strict analysis can start.",
-            LATTICE_EMBEDDINGS_GENERATING: "Embeddings are being generated — please retry the extraction in a few minutes.",
-            LATTICE_UNABLE_TO_START_ANALYSIS: "Unable to start analysis for this record.",
-            LATTICE_UNSUPPORTED_FILE_TOOLTIP: "This file type is not supported for Insight embedding or Lattice analysis.",
+            LATTICE_READY_TOOLTIP:
+                "Use Lattice to find records, classes, relationships, and edges from this file. Results are staged for review before they are added to the project.",
+            LATTICE_REQUIRES_EMBEDDING_TOOLTIP:
+                "This record must be embedded with Insight before it can be analyzed with Lattice.",
+            LATTICE_STRICT_REQUIRES_EMBEDDING:
+                "This record must be embedded with Insight before strict analysis can start.",
+            LATTICE_EMBEDDINGS_GENERATING:
+                "Embeddings are being generated — please retry the extraction in a few minutes.",
+            LATTICE_UNABLE_TO_START_ANALYSIS:
+                "Unable to start analysis for this record.",
+            LATTICE_UNSUPPORTED_FILE_TOOLTIP:
+                "This file type is not supported for Insight embedding or Lattice analysis.",
             LATTICE_WIDGET_TITLE: "Lattice: AI Knowledge Extraction",
-            LATTICE_WIDGET_DESCRIPTION: "Automatically extract records, classes, relationships, and edges from this document. Results are staged for review before anything is added to the knowledge graph or data schema.",
+            LATTICE_WIDGET_DESCRIPTION:
+                "Automatically extract records, classes, relationships, and edges from this document. Results are staged for review before anything is added to the knowledge graph or data schema.",
             LATTICE_HOW_IT_WORKS: "How it works",
             LATTICE_STEP_EMBED: "Queue this document for AI embedding using Insight",
             LATTICE_STEP_MODE: "Choose an extraction mode",
-            LATTICE_STEP_TRIGGER: "Trigger extraction — results are staged for review",
-            LATTICE_STEP_DECIDE: "Approve or reject staged items on the extractions page",
+            LATTICE_STEP_TRIGGER:
+                "Trigger extraction — results are staged for review",
+            LATTICE_STEP_DECIDE:
+                "Approve or reject staged items on the extractions page",
             LATTICE_VIEW_EXTRACTIONS: "View project extractions",
             LATTICE_DISCOVERY: "Discovery",
             LATTICE_STRICT: "Strict",
-            LATTICE_DISCOVERY_TOOLTIP: "Infers new classes and relationships from the document",
-            LATTICE_STRICT_TOOLTIP: "Maps only to existing classes and relationships in this project",
+            LATTICE_DISCOVERY_TOOLTIP:
+                "Infers new classes and relationships from the document",
+            LATTICE_STRICT_TOOLTIP:
+                "Maps only to existing classes and relationships in this project",
             LATTICE_EXTRACT: "Extract",
-            LATTICE_NOT_EMBEDDED_WARNING: "Document must be embedded before extraction.",
+            LATTICE_NOT_EMBEDDED_WARNING:
+                "Document must be embedded before extraction.",
             LATTICE_QUEUE_FOR_EMBEDDING: "Queue for embedding with Insight",
             LATTICE_QUEUED_SUCCESS: "Document queued for indexing.",
             LATTICE_QUEUE_FAILED: "Failed to queue document for indexing.",
             LATTICE_ONTOLOGY_STATUS_TITLE: "Data Schema Embeddings",
             LATTICE_ONTOLOGY_READY: "Data schema ready",
-            LATTICE_ONTOLOGY_NOT_READY: "Data schema not fully embedded. Strict mode requires all classes and relationships to be embedded.",
-            LATTICE_ONTOLOGY_NO_SCHEMA: "No classes or relationships in this project yet.",
+            LATTICE_ONTOLOGY_NOT_READY:
+                "Data schema not fully embedded. Strict mode requires all classes and relationships to be embedded.",
+            LATTICE_ONTOLOGY_NO_SCHEMA:
+                "No classes or relationships in this project yet.",
             LATTICE_QUEUE_ONTOLOGY_EMBEDDINGS: "Queue Data Schema Embeddings",
             LATTICE_ONTOLOGY_QUEUED_SUCCESS: "Data schema embeddings queued.",
             LATTICE_ONTOLOGY_QUEUE_FAILED: "Failed to queue data schema embeddings.",
@@ -511,30 +588,42 @@ export const translations = {
             LATTICE_ONTOLOGY_EMBEDDED_OF: "of",
             LATTICE_ONTOLOGY_EMBEDDED_LABEL: "embedded",
             LATTICE_PAGE_TITLE: "Lattice",
-            LATTICE_PAGE_DESCRIPTION_INTRO: "Extractions you have triggered for this project. Each staged item is scored and validated against the project ontology before human review.",
+            LATTICE_PAGE_DESCRIPTION_INTRO:
+                "Extractions you have triggered for this project. Each staged item is scored and validated against the project ontology before human review.",
             LATTICE_VALID_LABEL: "Valid",
-            LATTICE_VALID_DESCRIPTION: "items matched an existing ontology class or relationship.",
+            LATTICE_VALID_DESCRIPTION:
+                "items matched an existing ontology class or relationship.",
             LATTICE_NOVEL_DISCOVERY_LABEL: "Novel discovery",
-            LATTICE_NOVEL_DISCOVERY_DESCRIPTION: "items involve known classes and relationships but in an unrecognized pattern.",
+            LATTICE_NOVEL_DISCOVERY_DESCRIPTION:
+                "items involve known classes and relationships but in an unrecognized pattern.",
             LATTICE_INVALID_SCHEMA_LABEL: "Invalid schema",
-            LATTICE_INVALID_SCHEMA_DESCRIPTION: "items could not be reconciled with the schema.",
-            LATTICE_APPROVE_PROMOTES_ALL: "Approving an extraction promotes all staged items into the knowledge graph and data schema, regardless of validation status.",
+            LATTICE_INVALID_SCHEMA_DESCRIPTION:
+                "items could not be reconciled with the schema.",
+            LATTICE_APPROVE_PROMOTES_ALL:
+                "Approving an extraction promotes all staged items into the knowledge graph and data schema, regardless of validation status.",
             LATTICE_COMING_SOON: "Coming Soon",
-            LATTICE_COMING_SOON_TEXT: "Individual item approval and bulk approval for different statuses",
+            LATTICE_COMING_SOON_TEXT:
+                "Individual item approval and bulk approval for different statuses",
             LATTICE_EXTRACTIONS_PANEL_TITLE: "Extractions",
-            LATTICE_NO_EXTRACTIONS: "No extractions yet. Trigger one from a record page.",
+            LATTICE_NO_EXTRACTIONS:
+                "No extractions yet. Trigger one from a record page.",
             LATTICE_STATUS_HEADER: "Status",
             LATTICE_MODE_HEADER: "Mode",
-            LATTICE_SELECT_EXTRACTION_PROMPT: "Select an extraction from the list to review it.",
+            LATTICE_SELECT_EXTRACTION_PROMPT:
+                "Select an extraction from the list to review it.",
             LATTICE_APPROVE_ALL: "Approve All",
             LATTICE_REJECT_ALL: "Reject All",
-            LATTICE_EXTRACTION_RUNNING: "Extraction is in progress. This page will update automatically.",
-            LATTICE_EXTRACTION_REVIEW: "Review the staged items below, then approve or reject the entire extraction.",
-            LATTICE_EXTRACTION_FAILED_MSG: "This extraction failed to complete. This can happen when the LLM response has an unexpected structure — please try triggering a new extraction.",
+            LATTICE_EXTRACTION_RUNNING:
+                "Extraction is in progress. This page will update automatically.",
+            LATTICE_EXTRACTION_REVIEW:
+                "Review the staged items below, then approve or reject the entire extraction.",
+            LATTICE_EXTRACTION_FAILED_MSG:
+                "This extraction failed to complete. This can happen when the LLM response has an unexpected structure — please try triggering a new extraction.",
             LATTICE_EXTRACTION_REJECTED_MSG: "This extraction was rejected.",
             LATTICE_EXTRACTION_BEEN: "This extraction has been",
             LATTICE_APPROVED_STATUS: "approved",
-            LATTICE_APPROVE_NOTE_PREFIX: "All-or-nothing. All items are promoted on approval, including",
+            LATTICE_APPROVE_NOTE_PREFIX:
+                "All-or-nothing. All items are promoted on approval, including",
             LATTICE_INVALID_SCHEMA_ITEMS: "invalid schema",
             LATTICE_ITEMS_SUFFIX: "items.",
             LATTICE_SUMMARY: "Summary",
@@ -556,12 +645,8 @@ export const translations = {
             LATTICE_ORIGIN: "Origin",
             LATTICE_DESTINATION: "Destination",
             LATTICE_EXTRACTION_NUMBER: "Extraction #",
-            LAST_UPDATED_LABEL: "Last updated:",
             LEFT: "left",
             LIMIT: "Limit",
-            LOGGED_IN_LAST_24_HOURS: "Logged in last 24 hours",
-            LOGGED_IN_LAST_7_DAYS: "Logged in last 7 days",
-            LOGGED_IN_LAST_30_DAYS: "Logged in last 30 days",
             LINE_CHART_2D: "2D Line Chart",
             LINK_ARCHIVED_SUCCESS: "Link archived successfully",
             LINKED_NEW_SOURCE: "linked a new source ",
@@ -584,22 +669,32 @@ export const translations = {
             LOCKED_AT_ORGANIZATION_LEVEL: "locked at the organization level",
             LOCKED_BY_ORG: "Locked by Org",
             LOCKED_FOR_ALL_PROJECTS: "Locked for all projects",
+            LOGGED_IN_LAST_24_HOURS: "Logged in last 24 hours",
+            LOGGED_IN_LAST_7_DAYS: "Logged in last 7 days",
+            LOGGED_IN_LAST_30_DAYS: "Logged in last 30 days",
             LOGO_GUIDELINES: "Logo Guidelines",
             LOGO_REMOVED_SUCCESSFULLY: "Logo removed successfully!",
             LOGO_UPLOADED_SUCCESSFULLY: "Logo uploaded successfully!",
             LOGOUT: "Logout",
             MANAGE_STORAGES_TAB: "Manage Storages",
             MANAGE: "Manage",
-            MANAGE_USERS_AND_GROUPS_ASSIGNED_TO_THIS_PROJECT_A_ROLE_IS_REQUIRED_FOR_EACH_MEMBER: "Manage users and groups assigned to this project. A role is required for each member.",
-            MANAGE_USERS_AND_GROUPS_WITH_ACCESS_TO_THIS_PROJECT: "Manage users and groups with access to this project",
-            MANAGE_USERS_IN_ORG_DESCRIPTION: "Manage users in your organization. Invite new users via email or add them directly.",
-            MANAGE_USERS_IN_SITE_DESCRIPTION: "Manage users in your site. Invite new users via email or add them directly.",
-            MANAGE_USERS_IN_YOUR_ORG_INVITE_VIA_EMAIL: "Manage users in your organization. Invite new users via email or add them directly.",
+            MANAGE_USERS_AND_GROUPS_ASSIGNED_TO_THIS_PROJECT_A_ROLE_IS_REQUIRED_FOR_EACH_MEMBER:
+                "Manage users and groups assigned to this project. A role is required for each member.",
+            MANAGE_USERS_AND_GROUPS_WITH_ACCESS_TO_THIS_PROJECT:
+                "Manage users and groups with access to this project",
+            MANAGE_USERS_IN_ORG_DESCRIPTION:
+                "Manage users in your organization. Invite new users via email or add them directly.",
+            MANAGE_USERS_IN_SITE_DESCRIPTION:
+                "Manage users in your site. Invite new users via email or add them directly.",
+            MANAGE_USERS_IN_YOUR_ORG_INVITE_VIA_EMAIL:
+                "Manage users in your organization. Invite new users via email or add them directly.",
             MANAGING_SETTINGS_FOR_PROJECT: "Managing settings for project",
             MATCHES: "matches",
             MATCHING_ANY_TERM: "Matching any term",
-            MATRIX_EDIT_REQUIRES_CUSTOM_ORG_ROLES: "Matrix editing is only available when custom (non-standard) roles exist.",
-            MATRIX_EDIT_REQUIRES_CUSTOM_PROJECT_ROLES: "Matrix editing is only available when custom project roles exist.",
+            MATRIX_EDIT_REQUIRES_CUSTOM_ORG_ROLES:
+                "Matrix editing is only available when custom (non-standard) roles exist.",
+            MATRIX_EDIT_REQUIRES_CUSTOM_PROJECT_ROLES:
+                "Matrix editing is only available when custom project roles exist.",
             MATRIX_VIEW: "Matrix View",
             MAX_DATA_POINTS: "Max data points",
             MEMBER: "Member",
@@ -612,37 +707,50 @@ export const translations = {
             MERGE: "Merge",
             METADATA_ALIAS_PLACEHOLDER: "metadata.a",
             METADATA_FILE: "Metadata File",
-            METADATA_FILE_HELP_OPTIONAL: "Leave blank if you do not have a metadata file.",
-            METADATA_FILE_INVALID_JSON_OBJECT: "Metadata file must be a valid JSON object.",
+            METADATA_FILE_HELP_OPTIONAL:
+                "Leave blank if you do not have a metadata file.",
+            METADATA_FILE_INVALID_JSON_OBJECT:
+                "Metadata file must be a valid JSON object.",
             METADATA_FILE_JSON_ONLY: "Only .json metadata files are allowed.",
-            METADATA_FILE_UNAVAILABLE_FOR_LARGE_FILES: "Metadata file is unavailable for large files.",
+            METADATA_FILE_UNAVAILABLE_FOR_LARGE_FILES:
+                "Metadata file is unavailable for large files.",
             METADATA_PREVIEW_CLASS: "Class",
             METADATA_PREVIEW_DESCRIPTION: "Description",
             METADATA_PREVIEW_NAME: "Name",
             METADATA_PREVIEW_ORIGINAL_ID: "Original ID",
             METADATA_PREVIEW_PROPERTIES: "Properties",
-            METADATA_PREVIEW_SELECT_FILE: "Upload a metadata JSON file to preview key values.",
+            METADATA_PREVIEW_SELECT_FILE:
+                "Upload a metadata JSON file to preview key values.",
             METADATA_PREVIEW_TITLE: "Metadata Preview",
             METADATA_TEMPLATE_FILENAME: "file_upload_metadata_template.json",
-            MISSING_PROJECT_OR_RECORD_ID_IN_URL: "Missing projectId or recordId in URL",
+            MISSING_PROJECT_OR_RECORD_ID_IN_URL:
+                "Missing projectId or recordId in URL",
             MIN_MAX_MARKERS: "Min/max markers",
             MINIMIZE_UPLOAD_TOAST: "Minimize upload toast",
             MISSING_ORG_ID: "Missing organization ID",
             MISSING_ORG_OR_PROJECT: "Missing organization or project",
-            MISSING_ORG_OR_PROJECT_CONTEXT_UNABLE_TO_SAVE: "Missing organization or project context. Unable to save.",
+            MISSING_ORG_OR_PROJECT_CONTEXT_UNABLE_TO_SAVE:
+                "Missing organization or project context. Unable to save.",
             MISSING_ORGANIZATION_OR_PROJECT: "Missing organization or project",
             MORE: "more",
             MORE_: "more ...",
-            MULTI_FILE_WARNING: "You currently have multiple files selected. Remove files in Selected files until only one remains.",
-            MULTI_FILES_ONLY_AVAILABLE: "Multiple uploads are only available for New File",
-            MUST_BE_SINGLE_JSON_OBJECT: "Must be a single JSON object (not an array).",
-            MUST_USE_ORG_DEFINED_LABELS_ONLY: "and must use only the labels defined at the organization level.",
-            MUST_USE_ORG_DEFINED_TAGS_ONLY: "and must use only the tags defined at the organization level.",
+            MULTI_FILE_WARNING:
+                "You currently have multiple files selected. Remove files in Selected files until only one remains.",
+            MULTI_FILES_ONLY_AVAILABLE:
+                "Multiple uploads are only available for New File",
+            MUST_BE_SINGLE_JSON_OBJECT:
+                "Must be a single JSON object (not an array).",
+            MUST_USE_ORG_DEFINED_LABELS_ONLY:
+                "and must use only the labels defined at the organization level.",
+            MUST_USE_ORG_DEFINED_TAGS_ONLY:
+                "and must use only the tags defined at the organization level.",
             NAME: "Name",
             NAME_REQUIRED: "Name is required",
             NOT_SET: "Not set",
-            NEED_HELP: "Need Help? Details can be creating or updating a project via an ontology file can be found on our ",
-            NEED_HELP_UPLOADING: "Need Help? Details can be creating or updating a project via an ontology file can be found on our",
+            NEED_HELP:
+                "Need Help? Details can be creating or updating a project via an ontology file can be found on our ",
+            NEED_HELP_UPLOADING:
+                "Need Help? Details can be creating or updating a project via an ontology file can be found on our",
             NEW_CONNECTION: "created a new connection between ",
             NEW_FILE: "New File",
             NEW_LABEL: "New Label",
@@ -662,9 +770,12 @@ export const translations = {
             NO_FILES_AVAILABLE: "No files available.",
             NO_FILES_FOUND: "No files found.",
             NO_FILES_SELECTED_YET: "No files selected yet.",
-            NO_HISTORICAL_VERSIONS_FOUND_FOR_RECORD: "No historical versions were found for this record.",
-            NO_LABELS_ATTACHED_TO_RECORD: "No sensitivity labels attached to this record yet.",
-            NO_LABELS_DEFINED_HELP: "No labels defined. Create labels to standardize access control across all projects.",
+            NO_HISTORICAL_VERSIONS_FOUND_FOR_RECORD:
+                "No historical versions were found for this record.",
+            NO_LABELS_ATTACHED_TO_RECORD:
+                "No sensitivity labels attached to this record yet.",
+            NO_LABELS_DEFINED_HELP:
+                "No labels defined. Create labels to standardize access control across all projects.",
             NO_LABELS_MATCH_SEARCH: "No labels match your search.",
             NO_LOGO: "No Logo",
             NO_MEMBER_SELECTED_TO_REMOVE: "No member selected to remove",
@@ -674,18 +785,23 @@ export const translations = {
             NO_MORE_RECORDS: "No more records",
             NO_OPTIONS: "No options",
             NO_ORG_SELECTED: "No organization selected",
-            NO_ORGANIZATION_SELECTED_UNABLE_TO_SAVE_LABEL: "No organization selected. Unable to save label.",
-            NO_ORGANIZATION_SELECTED_UNABLE_TO_SAVE_TAG: "No organization selected. Unable to save tag.",
+            NO_ORGANIZATION_SELECTED_UNABLE_TO_SAVE_LABEL:
+                "No organization selected. Unable to save label.",
+            NO_ORGANIZATION_SELECTED_UNABLE_TO_SAVE_TAG:
+                "No organization selected. Unable to save tag.",
             NO_PERMISSION: "No permission",
             NO_PERMISSIONS: "No permissions available.",
             NO_PERMISSIONS_AVAILABLE: "No Permissions Available",
             NO_PROJECT: "No Project",
             NO_PROJECT_FOUND: "No Project Found ...",
-            NO_PROJECT_LABELS_DEFINED_WHEN_UNLOCKED: "No project labels defined. When unlocked, you can extend the organization label set with project-specific labels.",
+            NO_PROJECT_LABELS_DEFINED_WHEN_UNLOCKED:
+                "No project labels defined. When unlocked, you can extend the organization label set with project-specific labels.",
             NO_PROJECT_LABELS_MATCH_SEARCH: "No project labels match your search.",
-            NO_PROJECT_SECURITY_LABELS_DEFINED_WHEN_UNLOCKED: "No project labels defined. When unlocked, you can define project-specific sensitivity labels in addition to any organization-level labels.",
+            NO_PROJECT_SECURITY_LABELS_DEFINED_WHEN_UNLOCKED:
+                "No project labels defined. When unlocked, you can define project-specific sensitivity labels in addition to any organization-level labels.",
             NO_PROJECT_SELECTED: "No project selected",
-            NO_PROJECT_TAGS_DEFINED_WHEN_UNLOCKED: "No project tags defined. When unlocked, you can extend the organization tag set with project-specific tags.",
+            NO_PROJECT_TAGS_DEFINED_WHEN_UNLOCKED:
+                "No project tags defined. When unlocked, you can extend the organization tag set with project-specific tags.",
             NO_PROJECT_TAGS_MATCH_SEARCH: "No project tags match your search.",
             NO_PROJECTS: "No projects",
             NO_PROPERTIES_YET_ADD_ONE: "No properties yet. Add one below.",
@@ -694,32 +810,42 @@ export const translations = {
             NO_RECORDS_FOUND: "No records found",
             OPEN: "Open",
             NO_RESULTS_FOUND: "No results found.",
-            NO_SECURITY_LABELS_MATCH_SEARCH: "No sensitivity labels match your search.",
+            NO_SECURITY_LABELS_MATCH_SEARCH:
+                "No sensitivity labels match your search.",
             NO_STATS: "No Stats Found ... ",
-            NO_STORAGE_LOCATIONS_AVAILABLE_CREATE_ONE: "No storage locations available. Create one in the \"Manage Storages\" tab.",
+            NO_STORAGE_LOCATIONS_AVAILABLE_CREATE_ONE:
+                'No storage locations available. Create one in the "Manage Storages" tab.',
             NO_STORAGES_CREATED_YET: "No storages created yet",
             NO_TAGS_ATTACHED_TO_RECORD: "No tags attached to this record yet.",
-            NO_TAGS_DEFINED_HELP: "No tags defined. Create tags to standardize metadata across all projects.",
+            NO_TAGS_DEFINED_HELP:
+                "No tags defined. Create tags to standardize metadata across all projects.",
             NO_TAGS_MATCH_SEARCH: "No tags match your search.",
-            NO_USERS_OR_PENDING_INVITES_GET_STARTED: 'No users or pending invites. Click "Invite User" to get started.',
+            NO_USERS_OR_PENDING_INVITES_GET_STARTED:
+                'No users or pending invites. Click "Invite User" to get started.',
             NOT_AVAILABLE: "N/A",
             NOT_CONNECTED: "Not Connected",
             NOT_FOUND: "Not Found",
             OAUTH_APPLICATION: "OAuth Application",
             OBJECT_STORAGE: "Object Storage",
-            OBJECT_STORAGE_ID_MUST_BE_AN_INTEGER: "object_storage_id must be an integer if provided.",
-            OBJECT_STORAGE_ID_NOT_FOUND_IN_PROJECT: "Object Storage ID {id} does not exist in this project",
-            OBJECT_STORAGE_ID_NOT_FOUND_IN_PROJECT_SUGGESTION: "Check that the selected object storage ID is valid for this project.",
+            OBJECT_STORAGE_ID_MUST_BE_AN_INTEGER:
+                "object_storage_id must be an integer if provided.",
+            OBJECT_STORAGE_ID_NOT_FOUND_IN_PROJECT:
+                "Object Storage ID {id} does not exist in this project",
+            OBJECT_STORAGE_ID_NOT_FOUND_IN_PROJECT_SUGGESTION:
+                "Check that the selected object storage ID is valid for this project.",
             OBJECT_STORAGES: "Object storages",
             OF: "of",
             OKAY: "Okay, got it",
-            ONLY_ONE_LARGE_FILE_ALLOWED: "Only one file 500MB or larger can be selected at a time.",
-            ONLY_STANDARD_ROLES_NO_CUSTOM_TO_EDIT: "Only standard roles exist; no custom roles to edit.",
+            ONLY_ONE_LARGE_FILE_ALLOWED:
+                "Only one file 500MB or larger can be selected at a time.",
+            ONLY_STANDARD_ROLES_NO_CUSTOM_TO_EDIT:
+                "Only standard roles exist; no custom roles to edit.",
             ONSITE_DB: "Onsite Database",
             OPERATOR: "Operator",
             OPTIMAL_SIZE_FOR_LOGO: "Optimal size: 256×256 pixels",
             OPTIONAL: "Optional",
-            OPTIONAL_DESCRIPTION_FOR_THIS_LABEL: "Optional description for this label",
+            OPTIONAL_DESCRIPTION_FOR_THIS_LABEL:
+                "Optional description for this label",
             OPTIONAL_FIELDS: "Optional fields",
             OPTIONS: "Options",
             OR: "OR",
@@ -737,24 +863,31 @@ export const translations = {
             ORGANIZATION_NOT_FOUND: "Organization not found",
             ORGANIZATION_OVERVIEW: "Organization Overview",
             ORGANIZATION_ROLE: "Organization Role",
-            ORGANIZATION_ROLE_PERMISSIONS_CANNOT_BE_MODIFIED_AT_PROJECT_LEVEL: "Organization role permissions cannot be modified at project level.",
-            ORGANIZATION_ROLES_CANNOT_BE_EDITED_AT_PROJECT_LEVEL: "Organization roles cannot be edited at project level.",
+            ORGANIZATION_ROLE_PERMISSIONS_CANNOT_BE_MODIFIED_AT_PROJECT_LEVEL:
+                "Organization role permissions cannot be modified at project level.",
+            ORGANIZATION_ROLES_CANNOT_BE_EDITED_AT_PROJECT_LEVEL:
+                "Organization roles cannot be edited at project level.",
             ORGANIZATION_SECURITY_LABELS: "Organization Sensitivity Labels",
-            ORGANIZATION_SECURITY_LABELS_DESCRIPTION: "Sensitivity labels for attribute-based access control. All projects inherit these and can optionally add their own.",
+            ORGANIZATION_SECURITY_LABELS_DESCRIPTION:
+                "Sensitivity labels for attribute-based access control. All projects inherit these and can optionally add their own.",
             ORGANIZATION_SETTINGS: "Organization Settings",
-            ORGANIZATION_SETTINGS_DESCRIPTION: "Configure branding, storage, and ecosystem service settings for this organization",
+            ORGANIZATION_SETTINGS_DESCRIPTION:
+                "Configure branding, storage, and ecosystem service settings for this organization",
             ORGANIZATION_TAG: "Organization Tag",
             ORGANIZATION_TAG_CREATED: "Organization tag created.",
             ORGANIZATION_TAG_MANAGEMENT: "Organization Tag Management",
             ORGANIZATION_TAG_UPDATED: "Organization tag updated.",
             ORGANIZATION_TAGS: "Organization Tags",
-            ORGANIZATION_TAGS_DESCRIPTION: "Tags for classification, workflows, and search. All projects inherit these and can optionally add their own.",
+            ORGANIZATION_TAGS_DESCRIPTION:
+                "Tags for classification, workflows, and search. All projects inherit these and can optionally add their own.",
             ORGANIZATION_USERS: "Organization Users",
             ORGANIZATION_WARNING_BANNER: "Organization Warning Banner",
             ORGANIZATIONS: "Organizations",
             ORIGINAL_ID: "Original ID",
-            ORIGINAL_ID_ALREADY_IN_USE: "Original ID is already in use. Each uploaded file must have a unique Original ID.",
-            ORIGINAL_ID_ALREADY_IN_USE_SUGGESTION: "Update the metadata with a unique Original ID, or remove Original ID to let the system generate one.",
+            ORIGINAL_ID_ALREADY_IN_USE:
+                "Original ID is already in use. Each uploaded file must have a unique Original ID.",
+            ORIGINAL_ID_ALREADY_IN_USE_SUGGESTION:
+                "Update the metadata with a unique Original ID, or remove Original ID to let the system generate one.",
             ORIGINAL_ID_REQUIRED: "Original ID is required",
             ORIGINAL_ID_UPDATED: "Original ID updated",
             OUTGOING: "Outgoing",
@@ -769,7 +902,8 @@ export const translations = {
             PEOPLE: "people",
             PERMISSION: "Permission",
             PERMISSION_MATRIX: "Permission Matrix",
-            PERMISSION_REQUIRED_SUGGESTION: "Contact your project administrator to request the necessary permissions.",
+            PERMISSION_REQUIRED_SUGGESTION:
+                "Contact your project administrator to request the necessary permissions.",
             PERMISSIONS: "Permissions",
             PERMISSIONS_STILL_LOADING: "Permissions are still loading.",
             PERSON: "person",
@@ -777,19 +911,25 @@ export const translations = {
             PLEASE_ENTER_CLASS_NAME: "Please enter a class name",
             PLEASE_ENTER_EMAIL_ADDRESS: "Please enter an email address",
             PLEASE_ENTER_VALID_EMAIL_ADDRESS: "Please enter a valid email address",
-            PLEASE_FIX_VALIDATION_ERRORS_BEFORE_UPLOADING: "Please fix validation errors before uploading",
+            PLEASE_FIX_VALIDATION_ERRORS_BEFORE_UPLOADING:
+                "Please fix validation errors before uploading",
             PLEASE_SELECT_A_DATA_SOURCE: "Please select a data source.",
             PLEASE_SELECT_A_GROUP: "Please select a group",
             PLEASE_SELECT_A_PROJECT: "Please select a project.",
             PLEASE_SELECT_A_ROLE: "Please select a role",
             PLEASE_SELECT_A_ROLE_FOR_MEMBER: "Please select a role for this member",
-            PLEASE_SELECT_A_ROLE_FOR_THIS_MEMBER: "Please select a role for this member",
+            PLEASE_SELECT_A_ROLE_FOR_THIS_MEMBER:
+                "Please select a role for this member",
             PLEASE_SELECT_A_STORAGE_LOCATION: "Please select a storage location",
             PLEASE_SELECT_A_USER: "Please select a user",
-            PLEASE_SELECT_PROJECT_AND_DATASOURCE: "Please select project and data source first",
-            PLEASE_SELECT_RECORD_TO_UPDATE: "Please select an existing record to update.",
-            PLEASE_UPLOAD_VALID_IMAGE: "Please upload a valid image file (PNG recommended).",
-            PLEASE_WAIT_DO_NOT_CLOSE_WINDOW: "Please wait, do not close this window...",
+            PLEASE_SELECT_PROJECT_AND_DATASOURCE:
+                "Please select project and data source first",
+            PLEASE_SELECT_RECORD_TO_UPDATE:
+                "Please select an existing record to update.",
+            PLEASE_UPLOAD_VALID_IMAGE:
+                "Please upload a valid image file (PNG recommended).",
+            PLEASE_WAIT_DO_NOT_CLOSE_WINDOW:
+                "Please wait, do not close this window...",
             PLOT_OPTIONS: "Plot Options",
             PREFERENCES: "Preferences",
             PREPARING_UPLOAD: "Preparing upload...",
@@ -806,43 +946,64 @@ export const translations = {
             PROJECT_ASSIGNMENT: "Project Assignment",
             PROJECT_CONTACTS: "Project Contacts",
             PROJECT_CLASSES_AND_IDS: "Project Classes and IDs",
-            PROJECT_CLASSES_AND_IDS_HELP: "Use one of these class IDs in your metadata file when setting ClassId.",
+            PROJECT_CLASSES_AND_IDS_HELP:
+                "Use one of these class IDs in your metadata file when setting ClassId.",
             PROJECT_DASHBOARD: "Project Dashboard",
-            PROJECT_INSIGHT_CHAT_INTRO_EMPTY: 'There are no embedded files in scope for "{projectName}" yet. Adjust filters or queue files for Insight below.',
-            PROJECT_INSIGHT_CHAT_INTRO_READY: 'I can answer questions across {recordCount} embedded files in "{projectName}". Ask a project-level question to begin.',
-            PROJECT_INSIGHT_CHAT_PLACEHOLDER: "Ask Insight about the embedded project files in scope...",
+            PROJECT_INSIGHT_CHAT_INTRO_EMPTY:
+                'There are no embedded files in scope for "{projectName}" yet. Adjust filters or queue files for Insight below.',
+            PROJECT_INSIGHT_CHAT_INTRO_READY:
+                'I can answer questions across {recordCount} embedded files in "{projectName}". Ask a project-level question to begin.',
+            PROJECT_INSIGHT_CHAT_PLACEHOLDER:
+                "Ask Insight about the embedded project files in scope...",
             PROJECT_INSIGHT_CLEAR_SELECTION: "Clear Selection",
-            PROJECT_INSIGHT_DESCRIPTION: 'Ask project-level questions across embedded files in "{projectName}". Search brings the right documents into scope fast, and filters stay available when you need them.',
+            PROJECT_INSIGHT_DESCRIPTION:
+                'Ask project-level questions across embedded files in "{projectName}". Search brings the right documents into scope fast, and filters stay available when you need them.',
             PROJECT_INSIGHT_EMBED_SELECTED: "Embed Selected",
-            PROJECT_INSIGHT_EMBEDDED_EMPTY: "No embedded files are currently in scope.",
+            PROJECT_INSIGHT_EMBEDDED_EMPTY:
+                "No embedded files are currently in scope.",
             PROJECT_INSIGHT_EMBEDDED_TITLE: "Embedded Files",
             PROJECT_INSIGHT_FAILED_SUMMARY: "{count} record(s) could not be queued.",
             PROJECT_INSIGHT_FILTERS: "Project Scope Filters",
-            PROJECT_INSIGHT_FILTERS_DESCRIPTION: "Use class names and tags to narrow the embedded library and the files that still need embedding.",
+            PROJECT_INSIGHT_FILTERS_DESCRIPTION:
+                "Use class names and tags to narrow the embedded library and the files that still need embedding.",
             PROJECT_INSIGHT_FILTERS_RECORDS: "Filtered Records",
             PROJECT_INSIGHT_FILTERS_TAB: "Filters",
-            PROJECT_INSIGHT_LIBRARY_DESCRIPTION: "These embedded files are searchable by Insight and available to the chat.",
+            PROJECT_INSIGHT_LIBRARY_DESCRIPTION:
+                "These embedded files are searchable by Insight and available to the chat.",
             PROJECT_INSIGHT_LIBRARY_TAB: "Embedded Library",
-            PROJECT_INSIGHT_LOADING_RECORDS: "Loading project records and Insight status...",
-            PROJECT_INSIGHT_NO_FILTER_OPTIONS: "No options available for this filter.",
-            PROJECT_INSIGHT_PENDING_DESCRIPTION: "These records still respond to the class and tag filters. Select supported files to queue them for Insight embedding.",
-            PROJECT_INSIGHT_PENDING_EMPTY: "All filtered Insight-supported files are already embedded.",
-            PROJECT_INSIGHT_PENDING_SEARCH_HINT: "Search pending files by name, class, tags, or source, or open filters to narrow the list.",
-            PROJECT_INSIGHT_PENDING_SEARCH_PLACEHOLDER: "Search file name, class, tags, or source...",
-            PROJECT_INSIGHT_PENDING_SEARCH_RESULTS: "Showing {count} file(s) matching the pending-file search.",
+            PROJECT_INSIGHT_LOADING_RECORDS:
+                "Loading project records and Insight status...",
+            PROJECT_INSIGHT_NO_FILTER_OPTIONS:
+                "No options available for this filter.",
+            PROJECT_INSIGHT_PENDING_DESCRIPTION:
+                "These records still respond to the class and tag filters. Select supported files to queue them for Insight embedding.",
+            PROJECT_INSIGHT_PENDING_EMPTY:
+                "All filtered Insight-supported files are already embedded.",
+            PROJECT_INSIGHT_PENDING_SEARCH_HINT:
+                "Search pending files by name, class, tags, or source, or open filters to narrow the list.",
+            PROJECT_INSIGHT_PENDING_SEARCH_PLACEHOLDER:
+                "Search file name, class, tags, or source...",
+            PROJECT_INSIGHT_PENDING_SEARCH_RESULTS:
+                "Showing {count} file(s) matching the pending-file search.",
             PROJECT_INSIGHT_PENDING_TAB: "Need Embedding",
             PROJECT_INSIGHT_PENDING_TITLE: "Not Yet Searchable",
-            PROJECT_INSIGHT_PROJECT_REQUIRED: "Select a project first to use project-level Insight.",
+            PROJECT_INSIGHT_PROJECT_REQUIRED:
+                "Select a project first to use project-level Insight.",
             PROJECT_INSIGHT_QUEUED_SUMMARY: "Queued {count} record(s) for Insight.",
             PROJECT_INSIGHT_READY_BADGE: "Insight Ready",
             PROJECT_INSIGHT_SCOPE: "Project Insight Chat",
             PROJECT_INSIGHT_SCOPE_COUNT: "{count} files in scope",
-            PROJECT_INSIGHT_SCOPE_EMPTY: "No embedded records match the current filters yet. Adjust the filters or embed files below.",
-            PROJECT_INSIGHT_SCOPE_HINT: "Search embedded files above or open filters to narrow the documents available to chat.",
+            PROJECT_INSIGHT_SCOPE_EMPTY:
+                "No embedded records match the current filters yet. Adjust the filters or embed files below.",
+            PROJECT_INSIGHT_SCOPE_HINT:
+                "Search embedded files above or open filters to narrow the documents available to chat.",
             PROJECT_INSIGHT_SEARCHING: "Searching project files...",
-            PROJECT_INSIGHT_SEARCH_PLACEHOLDER: "Search embedded files across this project",
-            PROJECT_INSIGHT_SEARCH_RESULTS: 'Showing {count} embedded file(s) matching "{query}".',
-            PROJECT_INSIGHT_SEARCH_RESULTS_EMPTY: 'No embedded files matched "{query}".',
+            PROJECT_INSIGHT_SEARCH_PLACEHOLDER:
+                "Search embedded files across this project",
+            PROJECT_INSIGHT_SEARCH_RESULTS:
+                'Showing {count} embedded file(s) matching "{query}".',
+            PROJECT_INSIGHT_SEARCH_RESULTS_EMPTY:
+                'No embedded files matched "{query}".',
             PROJECT_INSIGHT_SELECT_ALL_VISIBLE: "Select Visible",
             PROJECT_INSIGHT_SELECTED_COUNT: "{count} selected",
             PROJECT_INSIGHT_STATUS_CHECKING: "Checking Insight status...",
@@ -853,13 +1014,15 @@ export const translations = {
             PROJECT_INSIGHT_STATUS_PENDING: "Ready to embed.",
             PROJECT_INSIGHT_STATUS_PROCESSING: "Embedding in progress.",
             PROJECT_INSIGHT_STATUS_QUEUED: "Queued for embedding.",
-            PROJECT_INSIGHT_STATUS_UNSUPPORTED: "Insight supports PDF, TXT, and HTML files only.",
+            PROJECT_INSIGHT_STATUS_UNSUPPORTED:
+                "Insight supports PDF, TXT, and HTML files only.",
             PROJECT_INSIGHT_UPDATED_FROM: "Updated from",
             PROJECT_INSIGHT_UPDATED_TO: "Updated to",
             PROJECT_LABEL_CREATED: "Project label created.",
             PROJECT_LABEL_UPDATED: "Project label updated.",
             PROJECT_LABELS_LOWER: "project labels",
-            PROJECT_LEVEL_ROLE_CREATION_AND_PERMISSION_MODIFICATION_DESCRIPTION: "Project-level role creation and permission modification is disabled. Contact your organization administrator to unlock.",
+            PROJECT_LEVEL_ROLE_CREATION_AND_PERMISSION_MODIFICATION_DESCRIPTION:
+                "Project-level role creation and permission modification is disabled. Contact your organization administrator to unlock.",
             PROJECT_LEVEL_SECURITY_LABEL: "Project-level sensitivity label",
             PROJECT_LOGO: "Project Logo",
             PROJECT_MANAGED: "Project-managed",
@@ -872,15 +1035,18 @@ export const translations = {
             PROJECT_ROLES: "Project Roles",
             PROJECT_ROLES_AND_PERMISSIONS: "Project Roles & Permissions",
             PROJECT_SECURITY_LABELS: "Project Sensitivity Labels",
-            PROJECT_SECURITY_LABELS_DESCRIPTION: "Labels for attribute-based access control at the project level. This project always inherits labels defined at the organization level and may define additional labels.",
-            PROJECT_SECURITY_LABELS_DESCRIPTION_WITH_CUI: "Sensitivity labels (e.g., CUI) for attribute-based access control at the project level. This project also inherits any labels defined at the organization level.",
+            PROJECT_SECURITY_LABELS_DESCRIPTION:
+                "Labels for attribute-based access control at the project level. This project always inherits labels defined at the organization level and may define additional labels.",
+            PROJECT_SECURITY_LABELS_DESCRIPTION_WITH_CUI:
+                "Sensitivity labels (e.g., CUI) for attribute-based access control at the project level. This project also inherits any labels defined at the organization level.",
             PROJECT_SELECTOR_LABEL: "Select a project",
             PROJECT_SETTINGS: "Project Settings",
             PROJECT_TAG_CREATED: "Project tag created.",
             PROJECT_TAG_MANAGEMENT: "Project Tag Management",
             PROJECT_TAG_UPDATED: "Project tag updated.",
             PROJECT_TAGS: "Project Tags",
-            PROJECT_TAGS_DESCRIPTION: "Tags for classification, workflows, and search at the project level. This project always inherits the tags defined at the organization level and may define additional tags.",
+            PROJECT_TAGS_DESCRIPTION:
+                "Tags for classification, workflows, and search at the project level. This project always inherits the tags defined at the organization level and may define additional tags.",
             PROJECT_TAGS_LOWER: "project tags",
             PROJECT_USAGE_TRACKING_COMING_SOON: "Project usage tracking coming soon",
             PROJECT_WARNING_BANNER: "Project Warning Banner",
@@ -899,7 +1065,8 @@ export const translations = {
             READY: "Ready",
             RECENT_ACTIVITY: "Recent Activity",
             RECENTLY_ADDED_RECORDS: "Recently Added Records",
-            RECOMMENDED_PNG_WITH_TRANSPARENT_BACKGROUND: "Recommended: PNG with transparent background",
+            RECOMMENDED_PNG_WITH_TRANSPARENT_BACKGROUND:
+                "Recommended: PNG with transparent background",
             RECORD: "Record",
             RECORD_: "Record ",
             RECORD_CREATED_SUCCESSFULLY: "Record created successfully!",
@@ -920,14 +1087,17 @@ export const translations = {
             RECORD_HISTORY_FIELD: "Field",
             RECORD_HISTORY_FIELDS: "fields",
             RECORD_HISTORY_LATEST: "Latest",
-            RECORD_HISTORY_LOADING_COMPARISON_SNAPSHOT: "Loading comparison snapshot...",
+            RECORD_HISTORY_LOADING_COMPARISON_SNAPSHOT:
+                "Loading comparison snapshot...",
             RECORD_HISTORY_LOADING_SELECTED_SNAPSHOT: "Loading selected snapshot...",
             RECORD_HISTORY_MANUAL: "Manual",
             RECORD_HISTORY_MANUAL_COMPARE_VERSION: "Manual Compare Version",
             RECORD_HISTORY_NAME_LABEL: "Name:",
             RECORD_HISTORY_NESTED_GROUP: "Nested group",
-            RECORD_HISTORY_NO_COMPARISON_VERSION_SELECTED: "No comparison version selected.",
-            RECORD_HISTORY_NO_DIFFERENCES_FOR_SELECTED_COMPARISON: "No differences for the selected comparison.",
+            RECORD_HISTORY_NO_COMPARISON_VERSION_SELECTED:
+                "No comparison version selected.",
+            RECORD_HISTORY_NO_DIFFERENCES_FOR_SELECTED_COMPARISON:
+                "No differences for the selected comparison.",
             RECORD_HISTORY_NOT_AVAILABLE: "N/A",
             RECORD_HISTORY_PREVIOUS: "Previous",
             RECORD_HISTORY_SAME: "Same",
@@ -951,7 +1121,8 @@ export const translations = {
             RECORDS_VALIDATED_SUCCESSFULLY: "records validated successfully!",
             RELATIONSHIP: "Relationship",
             RELATIONSHIP_DETAILS: "Relationship Details",
-            RELATIONSHIP_ID_NOT_FOUND_SUGGESTION: "Verify that the relationship IDs exist in the selected project.",
+            RELATIONSHIP_ID_NOT_FOUND_SUGGESTION:
+                "Verify that the relationship IDs exist in the selected project.",
             RELATED_TO: "Related to",
             RELATIONSHIPS: "Relationships",
             REMOTE_DB: "Remote Database",
@@ -959,7 +1130,8 @@ export const translations = {
             REMOVE_FROM_ORGANIZATION: "Remove from organization",
             REMOVE_LOGO: "Remove Logo",
             REMOVE_USER: "Remove User?",
-            REPLACES_THE_FOLDER_ICON_NEXT_TO_THE_PROJECT_NAME: "Replaces the folder icon next to the project name",
+            REPLACES_THE_FOLDER_ICON_NEXT_TO_THE_PROJECT_NAME:
+                "Replaces the folder icon next to the project name",
             REPORTS: "Reports",
             RESEND_INVITATION: "Resend invitation",
             RESOURCE_PERMISSIONS: "Resource Permissions",
@@ -996,7 +1168,8 @@ export const translations = {
             SEARCH_AND_SELECT_RECORDS: "Search and select records",
             SEARCH_BY_NAME_OR_EMAIL: "Search by name or email",
             SEARCH_CLASSES: "Search classes",
-            SEARCH_FILES_PLACEHOLDER: "Search files by name, alias, description, or ID",
+            SEARCH_FILES_PLACEHOLDER:
+                "Search files by name, alias, description, or ID",
             SEARCH_FOR_RECORDS: "Search for records...",
             SEARCH_LABELS: "Search labels...",
             SEARCH_RECORDS: "Search Records",
@@ -1004,13 +1177,16 @@ export const translations = {
             SEARCH_TERMS: "Search terms",
             SEARCHING: "Searching...",
             SEARCHING_FILES: "Searching files...",
-            SECURITY_LABELS_LOCKED_AT_ORG_LEVEL: "Sensitivity labels are locked at the organization level",
-            SECURITY_LABELS_LOCKED_BY_ORGANIZATION: "Sensitivity labels are locked by the organization",
+            SECURITY_LABELS_LOCKED_AT_ORG_LEVEL:
+                "Sensitivity labels are locked at the organization level",
+            SECURITY_LABELS_LOCKED_BY_ORGANIZATION:
+                "Sensitivity labels are locked by the organization",
             SEE_MORE: "See more",
             SELECT_A_DATA_SOURCE: "Select a data source...",
             SELECT_A_GROUP: "Select a group",
             SELECT_A_MEMBER: "Select a member",
-            SELECT_A_PROJECT_AND_AT_LEAST_ONE_FILE: "Select a project and at least one file.",
+            SELECT_A_PROJECT_AND_AT_LEAST_ONE_FILE:
+                "Select a project and at least one file.",
             SELECT_A_PROJECT_FIRST: "Select a project first",
             SELECT_A_ROLE: "Select a role",
             SELECT_A_ROLE_: "Select a role...",
@@ -1021,9 +1197,11 @@ export const translations = {
             SELECT_CLASS: "Select Class",
             SELECT_DATA_SOURCE: "Select Data Source",
             SELECT_EXISTING_FILE: "Select an existing file",
-            SELECT_EXISTING_FILE_FROM_DROPDOWN: "Select an existing file from the dropdown.",
+            SELECT_EXISTING_FILE_FROM_DROPDOWN:
+                "Select an existing file from the dropdown.",
             SELECT_EXISTING_RECORD: "Select Existing Record",
-            SELECT_FILE_TO_BEGIN: "Please select a timeseries file from the \"Set Up\" tab to begin",
+            SELECT_FILE_TO_BEGIN:
+                'Please select a timeseries file from the "Set Up" tab to begin',
             SELECT_FILTERS: "Select Filters",
             SELECT_GROUP_TO_VIEW_MEMBERS: "Select a group to view members",
             SELECT_ORGANIZATION_USERS: "Select Organization Users",
@@ -1035,7 +1213,8 @@ export const translations = {
             SELECT_Y_AXIS_COLUMN: "Select at least one Y axis column",
             SELECTED: "Selected",
             SELECTED_FILES: "Selected files",
-            SELECTED_GROUP_WILL_BE_ARCHIVED_MEMBERS_WILL_BE_REMOVED: "The selected groups will be archived. Members will be removed from those groups but will remain in the organization.",
+            SELECTED_GROUP_WILL_BE_ARCHIVED_MEMBERS_WILL_BE_REMOVED:
+                "The selected groups will be archived. Members will be removed from those groups but will remain in the organization.",
             SELECTED_ORGANIZATION_USERS: "Selected Organization Users",
             SELECTED_RECORD: "Selected record:",
             SELECTED_RECORDS: "Selected Records",
@@ -1043,10 +1222,13 @@ export const translations = {
             SEND_INVITATIONS: "Send invitation(s)",
             SENSITIVITY_LABEL_REMOVED: "Sensitivity label removed",
             SENSITIVITY_LABELS: "Sensitivity Labels",
-            SERVER_REJECTED_UPLOAD_FIX_ISSUES: "The server rejected the upload. Please fix the following issues:",
-            SERVICE_CONFIG_WILL_BE_AVAILABLE_SOON: "Service configuration will be available in a future release",
+            SERVER_REJECTED_UPLOAD_FIX_ISSUES:
+                "The server rejected the upload. Please fix the following issues:",
+            SERVICE_CONFIG_WILL_BE_AVAILABLE_SOON:
+                "Service configuration will be available in a future release",
             SET_AS_DEFAULT_STORAGE: "Set as default storage",
-            SET_DEFAULT_UNMOUNTED_OBJECT_STORAGE: "Set the default unmounted object storage location for this organization.",
+            SET_DEFAULT_UNMOUNTED_OBJECT_STORAGE:
+                "Set the default unmounted object storage location for this organization.",
             STORAGE_SIZE: "Storage Size",
             SET_UP: "Set Up",
             SETTINGS: "Settings",
@@ -1055,7 +1237,8 @@ export const translations = {
             SHOW_LESS: "Show Less",
             SHOW_VALUE_MARKERS: "Show value markers",
             SHOWING: "Showing",
-            SHOWING_FIRST_FILES_USE_SEARCH: "Showing first {count} files. Use search to narrow results.",
+            SHOWING_FIRST_FILES_USE_SEARCH:
+                "Showing first {count} files. Use search to narrow results.",
             SHOWING_RECORDS_RANGE: "Showing {visible} of {total} records",
             SORT_BY: "Sort By",
             SORT_DATE_NEWEST: "Date: Newest",
@@ -1067,15 +1250,19 @@ export const translations = {
             SIGN_IN: "Sign In",
             SITE_MANAGEMENT: "Site Management",
             SITE_USERS: "Site Users",
-            SOME_UPLOADS_FAILED_CHECK_FILE_CARDS: "Some uploads failed. Check the file cards.",
+            SOME_UPLOADS_FAILED_CHECK_FILE_CARDS:
+                "Some uploads failed. Check the file cards.",
             SOURCE: "Source: ",
             SPLIT_VIEW: "Split View",
             STANDARD_FILE: "Standard File",
             STANDARD_ROLE: "Standard Role (Read-Only)",
-            STANDARD_ROLE_DESC: "This is a standard role and cannot be modified. Create a custom role if you need different permissions.",
-            STANDARD_ROLE_PERMISSIONS_CANNOT_BE_MODIFIED: "Standard role permissions cannot be modified.",
+            STANDARD_ROLE_DESC:
+                "This is a standard role and cannot be modified. Create a custom role if you need different permissions.",
+            STANDARD_ROLE_PERMISSIONS_CANNOT_BE_MODIFIED:
+                "Standard role permissions cannot be modified.",
             STANDARD_ROLES_CANNOT_BE_EDITED: "Standard roles cannot be edited.",
-            START_UPLOAD_BY_CHOOSING_TYPE: "Start an Upload by Choosing Upload Type and Destination:",
+            START_UPLOAD_BY_CHOOSING_TYPE:
+                "Start an Upload by Choosing Upload Type and Destination:",
             STATUS: "Status",
             STD: "STD",
             STEP_1_DOWNLOAD_TEMPLATE: "Step 1: Download Template",
@@ -1093,12 +1280,13 @@ export const translations = {
             SUCCESSFULLY: "successfully",
             SUCCESSFULLY_PARSED: "Successfully parsed",
             SUPPORTED_FORMATS_FOR_LOGO: "Supported formats: PNG, JPG, SVG, WebP",
-            SURE_YOU_WANT_TO_CANCEL_INVITATION_FOR_: "Are you sure you want to cancel the invitation for",
+            SURE_YOU_WANT_TO_CANCEL_INVITATION_FOR_:
+                "Are you sure you want to cancel the invitation for",
             SWITCH_ORGANIZATION: "Switch Organization",
             SYSTEM_DATASOURCES: "System Datasources",
             SYSTEM_OVERVIEW: "System Overview",
             SYSTEM_STORAGE_SIZE: "System Storage Size",
-            SYSTEM_ADMIN: "System Admin",
+            SYSTEM_ADMIN: "Sys Admin",
             SYSTEM_ADMIN_ACCESS_UPDATED: "System admin access updated.",
             SYSTEM_PROPERTIES: "System Properties",
             TABLE_VIEW: "Table view",
@@ -1115,22 +1303,32 @@ export const translations = {
             TAGS_LOCKED_AT_ORG_LEVEL: "Tags are locked at the organization level",
             TAGS_LOCKED_AT_ORG_LEVEL_SHORT: "Tags are locked at the org level",
             TAGS_LOCKED_BY_ORGANIZATION: "Tags are locked by the organization",
-            TAGS_LOCKED_CANNOT_ARCHIVE_PROJECT: "Tags are locked at the organization level. Cannot archive project tags.",
-            TAGS_LOCKED_CANNOT_CREATE_OR_EDIT_PROJECT: "Tags are locked at the organization level. Cannot create or edit project tags.",
+            TAGS_LOCKED_CANNOT_ARCHIVE_PROJECT:
+                "Tags are locked at the organization level. Cannot archive project tags.",
+            TAGS_LOCKED_CANNOT_CREATE_OR_EDIT_PROJECT:
+                "Tags are locked at the organization level. Cannot create or edit project tags.",
             TAGS_LOWER: "tags",
             TAGS_REMOVED: "Tag(s) removed!",
             ETA: "ETA",
             TAGS_UPDATED_SUCCESS: "Tags updated successfully",
             TEAM_MEMBERS: "Team Members",
-            THEY_WILL_LOSE_ACCESS_FROM_ALL_PROJECTS: "from this organization? They will lose access to all projects.",
-            THEY_WILL_NO_LONGER_BE_ABLE_TO_SIGN_IN_UNTIL_UNARCHIVED: "They will no longer be able to sign in until unarchived.",
-            THEY_WILL_NOT_BE_ABLE_TO_JOIN_WITH_LINK: "They will not be able to join with this invite link.",
-            THIS_IS_A_STANDARD_ROLE: "This is a standard role and cannot be modified. Create a custom project role if you need different permissions.",
-            THIS_ORG_SPACE_MAY_CONTAIN_SENSITIVE_DATA: "This organization space may contain sensitive data that must be protected accordingly.",
-            THIS_ROLE_IS_INHERITED: "This role is inherited from the organization and cannot be modified at the project level. You can view its permissions or create a custom project role.",
-            THIS_STORAGE_IS_ALREADY_SET_AS_DEFAULT: "This storage is already set as default",
+            THEY_WILL_LOSE_ACCESS_FROM_ALL_PROJECTS:
+                "from this organization? They will lose access to all projects.",
+            THEY_WILL_NO_LONGER_BE_ABLE_TO_SIGN_IN_UNTIL_UNARCHIVED:
+                "They will no longer be able to sign in until unarchived.",
+            THEY_WILL_NOT_BE_ABLE_TO_JOIN_WITH_LINK:
+                "They will not be able to join with this invite link.",
+            THIS_IS_A_STANDARD_ROLE:
+                "This is a standard role and cannot be modified. Create a custom project role if you need different permissions.",
+            THIS_ORG_SPACE_MAY_CONTAIN_SENSITIVE_DATA:
+                "This organization space may contain sensitive data that must be protected accordingly.",
+            THIS_ROLE_IS_INHERITED:
+                "This role is inherited from the organization and cannot be modified at the project level. You can view its permissions or create a custom project role.",
+            THIS_STORAGE_IS_ALREADY_SET_AS_DEFAULT:
+                "This storage is already set as default",
             TIMESERIES: "Timeseries",
-            TIMESERIES_FILE_UPLOADED_SUCCESSFULLY: "Timeseries file uploaded successfully!",
+            TIMESERIES_FILE_UPLOADED_SUCCESSFULLY:
+                "Timeseries file uploaded successfully!",
             TIMESERIES_VIEWER: "Timeseries Viewer",
             TO: "To",
             TO_DESTINATION: "To Destination",
@@ -1143,7 +1341,8 @@ export const translations = {
             UNABLE_TO_LOAD_USERS_OR_GROUPS: "Unable to load users or groups",
             UNABLE_TO_LOAD_USERS_TO_GROUPS: "Unable to load users or groups",
             UNARCHIVE: "Unarchive",
-            UNEXPECTED_ERROR_WHILE_PARSING_CSV_FILE: "Unexpected error while parsing CSV file",
+            UNEXPECTED_ERROR_WHILE_PARSING_CSV_FILE:
+                "Unexpected error while parsing CSV file",
             UNKNOWN: "Unknown",
             UNKNOWN_ERROR: "Unknown error",
             UNKNOWN_ERROR_OCCURRED: "Unknown error occurred",
@@ -1157,13 +1356,17 @@ export const translations = {
             UPDATING: "Updating",
             UPLOAD: "Upload",
             UPLOAD_BATCH_SUCCESS: "Uploaded {success} file(s)",
-            UPLOAD_BATCH_SUCCESS_WITH_FAILURES: "Uploaded {success} file(s) • {failed} failed",
+            UPLOAD_BATCH_SUCCESS_WITH_FAILURES:
+                "Uploaded {success} file(s) • {failed} failed",
             UPLOAD_CANCELLED: "Upload cancelled.",
             UPLOAD_CENTER: "Upload Center",
-            UPLOAD_CENTER_DESCRIPTION: "Choose an upload mode, configure destination resources, then upload.",
+            UPLOAD_CENTER_DESCRIPTION:
+                "Choose an upload mode, configure destination resources, then upload.",
             UPLOAD_FAILED_CHECK_FILE_CARD: "Upload failed. Check the file card.",
-            UPLOAD_FAILED_PLEASE_CHECK_ERROR_DETAILS_BELOW: "Upload failed. Please check the error details below.",
-            UPLOAD_FAILED_SEE_CONSOLE_FOR_DETAILS: "Upload failed. See console for details.",
+            UPLOAD_FAILED_PLEASE_CHECK_ERROR_DETAILS_BELOW:
+                "Upload failed. Please check the error details below.",
+            UPLOAD_FAILED_SEE_CONSOLE_FOR_DETAILS:
+                "Upload failed. See console for details.",
             UPLOAD_FAILED_TITLE: "Upload Failed",
             UPLOAD_MODE: "Upload Mode",
             UPLOAD_MULTIPLE_FILES: "Upload Multiple Files",
@@ -1177,12 +1380,15 @@ export const translations = {
             UPLOADING_PERCENT_PREFIX: "Uploading",
             UPLOADING_RECORDS: "Uploading Records...",
             URI: "Uri",
-            USE_DEFAULT_DATA_STORAGE_FOR_NEW_PROJECTS: "Used as the default when creating new data sources for projects.",
+            USE_DEFAULT_DATA_STORAGE_FOR_NEW_PROJECTS:
+                "Used as the default when creating new data sources for projects.",
             USE_SELECTOR_TO_ADD_LABELS: "Use the selector above to add labels.",
             USE_SELECTOR_TO_ADD_TAGS: "Use the selector above to add tags.",
             USER: "User",
-            USER_AND_ORG_ADMIN_ACCESS_UPDATED: "User and organization admin access updated.",
-            USER_AND_SYSTEM_ADMIN_ACCESS_UPDATED: "User and system admin access updated.",
+            USER_AND_ORG_ADMIN_ACCESS_UPDATED:
+                "User and organization admin access updated.",
+            USER_AND_SYSTEM_ADMIN_ACCESS_UPDATED:
+                "User and system admin access updated.",
             USER_ARCHIVED_SUCCESSFULLY: "User archived successfully.",
             USER_MANAGEMENT: "User Management",
             USER_REMOVED_FROM_ORG: "User removed from organization",
@@ -1196,8 +1402,10 @@ export const translations = {
             VALID_LABEL: "Valid",
             VALIDATING_RECORDS: "Validating records...",
             VALIDATION: "Validation",
-            VALIDATION_ERROR_SUGGESTION: "Review the error message and correct the affected fields.",
-            VALIDATION_ERROR_SUMMARY: "{invalid} of {total} records have errors. Please fix the errors below and re-upload.",
+            VALIDATION_ERROR_SUGGESTION:
+                "Review the error message and correct the affected fields.",
+            VALIDATION_ERROR_SUMMARY:
+                "{invalid} of {total} records have errors. Please fix the errors below and re-upload.",
             VALIDATION_ERRORS_FOUND: "Validation Errors Found",
             VALIDATION_FAILED: "Validation failed",
             VALIDATION_SUCCESSFUL: "Validation Successful!",
@@ -1205,16 +1413,19 @@ export const translations = {
             VIEW_ALL_ORGANIZATIONS: "View All Organizations",
             VIEW_AS_JSON: "View as JSON",
             VIEW_LAYOUT: "View Layout",
-            VIEW_PROJECT_LEVEL_ROLES_AND_PERMISSIONS: "View project-level roles and their permissions. Standard roles are defined by the system and are read-only in this release.",
+            VIEW_PROJECT_LEVEL_ROLES_AND_PERMISSIONS:
+                "View project-level roles and their permissions. Standard roles are defined by the system and are read-only in this release.",
             VISIT: "Visit",
             VULNERABILITY_DISCLOSURE: "Click here for the Vulnerability Disclosure",
-            WARNING: "All data contained within DOE computer systems is owned by DOE and may be audited, intercepted, recorded, read, copied, or captured in any manner and disclosed in any manner by authorized personnel. " +
+            WARNING:
+                "All data contained within DOE computer systems is owned by DOE and may be audited, intercepted, recorded, read, copied, or captured in any manner and disclosed in any manner by authorized personnel. " +
                 "THERE IS NO RIGHT OF PRIVACY IN THIS SYSTEM. System personnel may disclose any potential evidence of crime found on DOE computer systems to appropriate authorities. USE OF THIS SYSTEM BY ANY USER, AUTHORIZED OR " +
                 "UNAUTHORIZED, CONSTITUTES CONSENT TO THIS AUDITING, INTERCEPTION, RECORDING, READING, COPYING, CAPTURING, and DISCLOSURE OF COMPUTER ACTIVITY. **WARNING**WARNING**WARNING**WARNING**WARNING**",
             WELECOME: "Welcome Back",
             WHAT_HAPPENS_NEXT: "What happens next?",
             WHEN_LABELS_ARE: "When labels are",
-            WHEN_LOCKED_AT_ORG_LEVEL_PROJECT_ADMINS: "When locked at the organization level, project administrators",
+            WHEN_LOCKED_AT_ORG_LEVEL_PROJECT_ADMINS:
+                "When locked at the organization level, project administrators",
             WHEN_LOCKED_PROJECTS: "When locked, projects",
             WHEN_TAGS_ARE: "When tags are",
             WIDGET: "Widget",
@@ -1222,12 +1433,14 @@ export const translations = {
             X_AXIS: "X Axis",
             Y_AXES_MULTIPLE: "Y Axes (Multiple)",
             YES: "Yes",
-            YOU_HAVE_BEEN_ADDED_TO_A_PROJECT_IN_NEXUS: "You've been added to a project in DeepLynx Nexus",
+            YOU_HAVE_BEEN_ADDED_TO_A_PROJECT_IN_NEXUS:
+                "You've been added to a project in DeepLynx Nexus",
             YOUR_ABOUT_TO_UPLOAD: "You are about to upload",
             YOUR_PROJECTS: "Your Projects",
-            YOUVE_BEEN_ADDED_TO_A_PROJECT_IN_DEEPLYNX_NEXUS: "You've been added to a project in DeepLynx Nexus",
-            ZOOM_CONTROLS: "Zoom controls"
-        }
+            YOUVE_BEEN_ADDED_TO_A_PROJECT_IN_DEEPLYNX_NEXUS:
+                "You've been added to a project in DeepLynx Nexus",
+            ZOOM_CONTROLS: "Zoom controls",
+        },
     },
     es: {
         translations: {
@@ -1235,7 +1448,8 @@ export const translations = {
             _THIS_STORAGE: "este almacenamiento?",
             ABBREVIATION: "Abreviatura (opcional)",
             ABBREVIATION_REQUIRED: "Abreviatura",
-            ABSOLUTE_PATH_WHERE_FILES_WILL_BE_STORED: "Ruta absoluta donde se almacenarán los archivos",
+            ABSOLUTE_PATH_WHERE_FILES_WILL_BE_STORED:
+                "Ruta absoluta donde se almacenarán los archivos",
             ACCEPTED: "Aceptado:",
             ACTION: "Acción: ",
             ACTIONS: "Acciones",
@@ -1252,11 +1466,13 @@ export const translations = {
             ADD_A_RECORD: "Agregar un registro",
             ADD_A_TAG: "Agregar una etiqueta",
             ADD_CLASS: "Agregar clase",
-            ADD_EMAIL_ADDRESSES_HELPER_TEXT: "Escribe direcciones de correo electrónico y presiona Enter, coma o espacio para agregar",
+            ADD_EMAIL_ADDRESSES_HELPER_TEXT:
+                "Escribe direcciones de correo electrónico y presiona Enter, coma o espacio para agregar",
             ADD_EXISTING_USER: "Agregar usuario existente",
             ADD_GROUP: "Agregar grupo",
             ADD_GROUP_TO_PROJECT: "Agregar grupo al proyecto",
-            ADD_GROUP_TO_PROJECT_DESCRIPTION: "Selecciona un grupo existente y asigna un rol. Se requiere un rol para agregarlo al proyecto.",
+            ADD_GROUP_TO_PROJECT_DESCRIPTION:
+                "Selecciona un grupo existente y asigna un rol. Se requiere un rol para agregarlo al proyecto.",
             ADD_GROUPS: "Agregar grupos",
             ADD_NEW_MEMBER: "Agregar nuevo miembro",
             ADD_NEW_PROPERTY: "Agregar nueva propiedad",
@@ -1266,7 +1482,8 @@ export const translations = {
             ADD_TO_PROJECT: "Agregar al proyecto",
             ADD_USER: "Agregar usuario",
             ADD_USER_TO_PROJECT: "Agregar usuario al proyecto",
-            ADD_USER_TO_PROJECT_DESCRIPTION: "Selecciona un usuario existente y asigna un rol. Se requiere un rol para agregarlo al proyecto.",
+            ADD_USER_TO_PROJECT_DESCRIPTION:
+                "Selecciona un usuario existente y asigna un rol. Se requiere un rol para agregarlo al proyecto.",
             ADD_USERS: "Agregar usuarios",
             ADDING: "Agregando...",
             ADDITIONAL_FILTERS: "Filtros adicionales",
@@ -1275,15 +1492,19 @@ export const translations = {
             ADMIN_OVERVIEW: "Resumen de administración",
             ALIAS: "Alias:",
             ALL: "Todos",
-            ALL_AZURE_BLOB_FIELDS_ARE_REQUIRED: "Todos los campos de Azure Blob son obligatorios",
-            ALL_ORG_USERS_ALREADY_IN_PROJECT: "Todos los usuarios de la organización ya están en este proyecto",
+            ALL_AZURE_BLOB_FIELDS_ARE_REQUIRED:
+                "Todos los campos de Azure Blob son obligatorios",
+            ALL_ORG_USERS_ALREADY_IN_PROJECT:
+                "Todos los usuarios de la organización ya están en este proyecto",
             ALL_RECORDS: "Todos los registros",
-            ALL_RECORDS_VALID_READY_TO_UPLOAD: "Los {count} registros son válidos y están listos para cargarse.",
+            ALL_RECORDS_VALID_READY_TO_UPLOAD:
+                "Los {count} registros son válidos y están listos para cargarse.",
             ALL_YOUR_PROJECTS: "Todos tus proyectos",
             AND: "y",
             API_KEYPAIRS: "Claves API",
             APP_OWNER_EMAIL: "Correo del propietario de la aplicación",
-            APPEAR_ON_TOP_RIGHT_NEXT_TO_ORG_NAME: "Aparece junto al nombre de la organización en el encabezado. Recomendado: PNG, 256×256, fondo transparente.",
+            APPEAR_ON_TOP_RIGHT_NEXT_TO_ORG_NAME:
+                "Aparece junto al nombre de la organización en el encabezado. Recomendado: PNG, 256×256, fondo transparente.",
             ARCHIVE: "Archivar",
             ARCHIVE_LABEL: "Archivar etiqueta",
             ARCHIVE_SELECTED_GROUPS: "¿Archivar los grupos seleccionados?",
@@ -1296,19 +1517,27 @@ export const translations = {
             ARCHIVE_USER_ACTION: "Archivar usuario",
             ARCHIVED: "archivada",
             ARCHIVED_BADGE: "Archivado",
-            ARCHIVED_LABEL_RESTORED_LATER: "Esta etiqueta ya no estará disponible para usos nuevos, pero se puede restaurar después.",
-            ARCHIVED_STORAGE_CANNOT_BE_EDITED: "Los almacenamientos archivados no se pueden editar",
+            ARCHIVED_LABEL_RESTORED_LATER:
+                "Esta etiqueta ya no estará disponible para usos nuevos, pero se puede restaurar después.",
+            ARCHIVED_STORAGE_CANNOT_BE_EDITED:
+                "Los almacenamientos archivados no se pueden editar",
             ARCHIVED_SUFFIX: " [Archivado]",
-            ARCHIVED_TAG_RESTORED_LATER: "Esta etiqueta ya no estará disponible para usos nuevos, pero se puede restaurar después.",
+            ARCHIVED_TAG_RESTORED_LATER:
+                "Esta etiqueta ya no estará disponible para usos nuevos, pero se puede restaurar después.",
             ARCHIVING: "Archivando...",
             ARE_YOU_SURE: "¿Estás seguro de que deseas desvincular?",
-            ARE_YOU_SURE_TO_REMOVE_LOGO_FROM_ORG: "¿Estás seguro de que deseas eliminar el logotipo de la organización?",
+            ARE_YOU_SURE_TO_REMOVE_LOGO_FROM_ORG:
+                "¿Estás seguro de que deseas eliminar el logotipo de la organización?",
             ARE_YOU_SURE_YOU_WANT_TO_: "¿Estás seguro de que deseas",
             ARE_YOU_SURE_YOU_WANT_TO_ARCHIVE: "¿Seguro que deseas archivar",
-            ARE_YOU_SURE_YOU_WANT_TO_ARCHIVE_: "¿Estás seguro de que deseas archivar a",
-            ARE_YOU_SURE_YOU_WANT_TO_DELETE_THIS_STORAGE: "¿Estás seguro de que deseas eliminar este almacenamiento? Esta acción no se puede deshacer.",
-            ARE_YOU_SURE_YOU_WANT_TO_REMOVE_: "¿Estás seguro de que deseas eliminar a",
-            ARE_YOU_SURE_YOU_WANT_TO_REMOVE_LOGO_FROM_PROJECT: "¿Estás seguro de que deseas eliminar el logotipo de este proyecto?",
+            ARE_YOU_SURE_YOU_WANT_TO_ARCHIVE_:
+                "¿Estás seguro de que deseas archivar a",
+            ARE_YOU_SURE_YOU_WANT_TO_DELETE_THIS_STORAGE:
+                "¿Estás seguro de que deseas eliminar este almacenamiento? Esta acción no se puede deshacer.",
+            ARE_YOU_SURE_YOU_WANT_TO_REMOVE_:
+                "¿Estás seguro de que deseas eliminar a",
+            ARE_YOU_SURE_YOU_WANT_TO_REMOVE_LOGO_FROM_PROJECT:
+                "¿Estás seguro de que deseas eliminar el logotipo de este proyecto?",
             ARRAY_VALUE_EXAMPLE: '["valor1", "valor2"]',
             AVAILABLE: "Disponible",
             AVAILABLE_TIMESERIES_FILES: "Archivos de Series Temporales Disponibles",
@@ -1318,27 +1547,34 @@ export const translations = {
             AZURE_BLOB_STORAGE: "Azure Blob Storage",
             BACK: "Atrás",
             BACK_TO_CLASS_SELECTION: "← Volver a la seleccion de clase",
-            BANNER_EXAMPLE_CUI: 'Ej. "Este espacio de la organización contiene datos CUI/ECI que deben protegerse adecuadamente."',
+            BANNER_EXAMPLE_CUI:
+                'Ej. "Este espacio de la organización contiene datos CUI/ECI que deben protegerse adecuadamente."',
             BANNER_TEXT: "Texto del banner",
-            BANNER_TEXT_MUST_BE_50_CHARACTERS_OR_LESS: "El texto del banner debe tener 50 caracteres o menos",
+            BANNER_TEXT_MUST_BE_50_CHARACTERS_OR_LESS:
+                "El texto del banner debe tener 50 caracteres o menos",
             BANNER_UPDATED_SUCCESSFULLY: "El banner se actualizó correctamente",
             BASE_URL: "URL base",
             BRANDING_AND_BANNER: "Identidad visual y banner",
             BRIEF_DESCRIPTION: "Descripción breve",
             BULK_CSV_UPLOAD: "Carga masiva de CSV",
             BULK_METADATA: "Metadatos masivos",
-            BULK_METADATA_INSTRUCTIONS: "Cree múltiples registros a la vez cargando un archivo CSV con metadatos. No se cargan archivos reales; solo se crean los metadatos de los registros.",
+            BULK_METADATA_INSTRUCTIONS:
+                "Cree múltiples registros a la vez cargando un archivo CSV con metadatos. No se cargan archivos reales; solo se crean los metadatos de los registros.",
             BULK_METADATA_UPLOAD: "Carga masiva de metadatos",
-            BULK_UPLOAD_SUCCESS_WITH_COUNT: "Se cargaron correctamente {count} registros.",
+            BULK_UPLOAD_SUCCESS_WITH_COUNT:
+                "Se cargaron correctamente {count} registros.",
             CALLBACK_URL: "URL de devolución de llamada",
             CANCEL: "Cancelar",
             CANCEL_DOWNLOAD: "Cancelar descarga",
             CANCEL_INVITATION: "¿Cancelar invitación?",
             CANCEL_INVITE: "Cancelar invitación",
             CANCELLING_SHORT: "Cancelando...",
-            CANNOT_DEFINE_ADDITIONAL_PROJECT_LABELS: "no pueden definir etiquetas adicionales del proyecto",
-            CANNOT_DEFINE_ADDITIONAL_PROJECT_TAGS: "no pueden definir etiquetas adicionales del proyecto",
-            CANNOT_DEFINE_ADDITIONAL_SECURITY_LABELS: "no pueden definir etiquetas de sensitividad adicionales",
+            CANNOT_DEFINE_ADDITIONAL_PROJECT_LABELS:
+                "no pueden definir etiquetas adicionales del proyecto",
+            CANNOT_DEFINE_ADDITIONAL_PROJECT_TAGS:
+                "no pueden definir etiquetas adicionales del proyecto",
+            CANNOT_DEFINE_ADDITIONAL_SECURITY_LABELS:
+                "no pueden definir etiquetas de sensitividad adicionales",
             CANNOT_DEFINE_NEW_LABELS: "no pueden definir nuevas etiquetas",
             CANNOT_DEFINE_NEW_TAGS: "no pueden definir nuevas etiquetas",
             CANT_SWITCH_TO_SINGLE_FILE: "No se puede cambiar a archivo único",
@@ -1355,11 +1591,14 @@ export const translations = {
             CLASS: "Clase: ",
             CLASS_CREATED_AND_APPLIED: "Clase creada y aplicada!",
             CLASS_ID: "ID de clase",
-            CLASS_ID_DOES_NOT_EXIST_IN_PROJECT: "El ID de clase {id} no existe en este proyecto",
+            CLASS_ID_DOES_NOT_EXIST_IN_PROJECT:
+                "El ID de clase {id} no existe en este proyecto",
             CLASS_ID_MUST_BE_GREATER_THAN_ZERO: "El ID de clase debe ser mayor que 0",
             CLASS_ID_MUST_BE_INTEGER: "El ID de clase debe ser un entero",
-            CLASS_ID_MUST_BE_NUMBER_NOT_STRING: "El ID de clase debe ser un número, no una cadena.",
-            CLASS_ID_NOT_FOUND_IN_PROJECT_SUGGESTION: "Verifique que el ID de clase exista en el proyecto seleccionado.",
+            CLASS_ID_MUST_BE_NUMBER_NOT_STRING:
+                "El ID de clase debe ser un número, no una cadena.",
+            CLASS_ID_NOT_FOUND_IN_PROJECT_SUGGESTION:
+                "Verifique que el ID de clase exista en el proyecto seleccionado.",
             CLASS_NAME: "Nombre de la clase",
             CLASS_NAME_REQUIRED: "Nombre de la clase *",
             CLASS_NAME_UPDATED: "Nombre de la clase actualizado",
@@ -1368,17 +1607,21 @@ export const translations = {
             CLEAR: "Borrar",
             CLEAR_ALL: "Limpiar todo",
             CLEAR_SEARCH: "Limpiar búsqueda",
-            CLICK_CREATE_STORAGE_TO_ADD_ONE: "Haz clic en \"Crear almacenamiento\" para agregar uno",
+            CLICK_CREATE_STORAGE_TO_ADD_ONE:
+                'Haz clic en "Crear almacenamiento" para agregar uno',
             CLICK_TO_BROWSE: " haz clic para explorar",
             CLICK_TO_TOGGLE: "Haz clic para alternar",
-            CLICK_UPLOAD_TO_SAVE_YOUR_CHANGES: 'Haz clic en "Subir" para guardar tus cambios',
+            CLICK_UPLOAD_TO_SAVE_YOUR_CHANGES:
+                'Haz clic en "Subir" para guardar tus cambios',
             CLOSE: "Cerrar",
             COLUMN_VISIBILITY: "Visibilidad de columnas",
             COMING_SOON: "Próximamente",
             CONFIGURE: "Configurar",
-            CONFIGURE_AUTHENTICATION_CONNECTED_SERVICE: "Configurar la autenticación y los endpoints de los servicios conectados.",
+            CONFIGURE_AUTHENTICATION_CONNECTED_SERVICE:
+                "Configurar la autenticación y los endpoints de los servicios conectados.",
             CONFIGURE_AXES: "Configurar Ejes",
-            CONFIGURE_BRANDING_AND_MANAGE_YOUR_PROJECT: "Configura la identidad visual y administra tu proyecto",
+            CONFIGURE_BRANDING_AND_MANAGE_YOUR_PROJECT:
+                "Configura la identidad visual y administra tu proyecto",
             CONFIRM_BULK_UPLOAD: "Confirmar carga masiva",
             CONFIRM_UPLOAD: "Confirmar carga",
             CONNECTION_STRING: "Cadena de conexión",
@@ -1396,7 +1639,8 @@ export const translations = {
             COPY_VALUE: "Copiar valor",
             CREATE: "Crear",
             CREATE_AND_APPLY: "Crear y aplicar",
-            CREATE_EDIT_MANAGE_STORAGE_LOCATIONS: "Crear, editar y administrar tus ubicaciones de almacenamiento",
+            CREATE_EDIT_MANAGE_STORAGE_LOCATIONS:
+                "Crear, editar y administrar tus ubicaciones de almacenamiento",
             CREATE_GROUP: "Crear grupo",
             CREATE_LABEL: "Crear etiqueta",
             CREATE_NEW_CLASS: "Crear nueva clase",
@@ -1422,7 +1666,8 @@ export const translations = {
             CREATED_BUT_FAILED_TO_ATTACH: "creado pero no se pudo adjuntar",
             CREATING: "Creando...",
             CSV_PARSING_ERRORS: "Errores al analizar CSV",
-            CSV_UPLOAD_INSTRUCTIONS: "Cargue múltiples registros a la vez usando nuestra plantilla CSV",
+            CSV_UPLOAD_INSTRUCTIONS:
+                "Cargue múltiples registros a la vez usando nuestra plantilla CSV",
             CURRENT: "Actual",
             CURRENT_DEFAULT: "Predeterminado actual:",
             CURRENT_DEFAULT_SUFFIX: " (Predeterminado actual)",
@@ -1443,15 +1688,23 @@ export const translations = {
             DEEPLYNX_ECOSYSTEM_SERVICES: "Servicios del ecosistema DeepLynx",
             DEFAULT_BADGE: "Predeterminado",
             DEFAULT_STORAGE: "Eliminar almacenamiento",
-            DEFAULT_STORAGE_FOR_DATA_SOURCES_HELPER: "Este será el almacenamiento predeterminado para las fuentes de datos en este proyecto",
-            DEFAULT_STORAGE_LOCATION_UPDATED_SUCCESSFULLY: "La ubicación de almacenamiento predeterminada se actualizó correctamente",
+            DEFAULT_STORAGE_FOR_DATA_SOURCES_HELPER:
+                "Este será el almacenamiento predeterminado para las fuentes de datos en este proyecto",
+            DEFAULT_STORAGE_LOCATION_UPDATED_SUCCESSFULLY:
+                "La ubicación de almacenamiento predeterminada se actualizó correctamente",
             DEFAULT_STORAGE_TAB: "Almacenamiento predeterminado",
-            DEFAULT_UNMOUNT_STORAGE: "Almacenamiento de objetos no montado predeterminado",
-            DEFINE_ORGANIZATION_LEVEL_SENSITIVITY_LABEL_DESCRIPTION: "Define una etiqueta de sensitividad a nivel de organización. Los proyectos heredan esta etiqueta y pueden usarla en sus activos.",
-            DEFINE_ORGANIZATION_LEVEL_TAG_DESCRIPTION: "Define una etiqueta a nivel de organización. Los proyectos heredan esta etiqueta y pueden usarla en sus activos.",
-            DEFINE_ORGANIZATION_TAGS_AND_SENSITIVITY_LABELS_DESCRIPTION: "Define etiquetas de toda la organización y etiquetas de sensitividad. Los proyectos las heredan y opcionalmente pueden agregar las suyas.",
-            DEFINE_PROJECT_TAGS_AND_LABELS_DESCRIPTION: "Define etiquetas del proyecto y etiquetas de sensitividad para clasificación, flujos de trabajo y control de acceso.",
-            DEFINE_PROJECT_TAGS_FOR_CLASSIFICATION_WORKFLOWS_AND_SEARCH: "Define etiquetas a nivel de proyecto para clasificación, flujos de trabajo y búsqueda. Los bloqueos a nivel de organización determinan si este proyecto puede definir etiquetas adicionales además de las heredadas de la organización.",
+            DEFAULT_UNMOUNT_STORAGE:
+                "Almacenamiento de objetos no montado predeterminado",
+            DEFINE_ORGANIZATION_LEVEL_SENSITIVITY_LABEL_DESCRIPTION:
+                "Define una etiqueta de sensitividad a nivel de organización. Los proyectos heredan esta etiqueta y pueden usarla en sus activos.",
+            DEFINE_ORGANIZATION_LEVEL_TAG_DESCRIPTION:
+                "Define una etiqueta a nivel de organización. Los proyectos heredan esta etiqueta y pueden usarla en sus activos.",
+            DEFINE_ORGANIZATION_TAGS_AND_SENSITIVITY_LABELS_DESCRIPTION:
+                "Define etiquetas de toda la organización y etiquetas de sensitividad. Los proyectos las heredan y opcionalmente pueden agregar las suyas.",
+            DEFINE_PROJECT_TAGS_AND_LABELS_DESCRIPTION:
+                "Define etiquetas del proyecto y etiquetas de sensitividad para clasificación, flujos de trabajo y control de acceso.",
+            DEFINE_PROJECT_TAGS_FOR_CLASSIFICATION_WORKFLOWS_AND_SEARCH:
+                "Define etiquetas a nivel de proyecto para clasificación, flujos de trabajo y búsqueda. Los bloqueos a nivel de organización determinan si este proyecto puede definir etiquetas adicionales además de las heredadas de la organización.",
             DELETE: "Eliminar",
             DELETE_ALL_FILTERS: "Eliminar todos los filtros",
             DELETE_ROLE: "Eliminar Rol",
@@ -1461,27 +1714,33 @@ export const translations = {
             DESCRIPTION_REQUIRED: "La descripción es obligatoria",
             DESCRIPTION_UPDATED: "Descripción actualizada",
             DIRECTION: "Direccion",
-            DISPLAY_BENEATH_THE_TOP_HEADER_FOR_ALL_PAGES_IN_ORG: "Se muestra debajo del encabezado superior en todas las páginas de esta organización.",
-            DISPLAY_BENEATH_THE_TOP_HEADER_FOR_ALL_PAGES_IN_PROJECT: "Se muestra debajo del encabezado superior en todas las páginas de este proyecto",
+            DISPLAY_BENEATH_THE_TOP_HEADER_FOR_ALL_PAGES_IN_ORG:
+                "Se muestra debajo del encabezado superior en todas las páginas de esta organización.",
+            DISPLAY_BENEATH_THE_TOP_HEADER_FOR_ALL_PAGES_IN_PROJECT:
+                "Se muestra debajo del encabezado superior en todas las páginas de este proyecto",
             DOWNLOAD_CSV_TEMPLATE: "Descargar plantilla CSV",
             DOWNLOAD_FILE: "Descargar archivo",
             DOWNLOAD_METADATA_TEMPLATE: "Descargar plantilla de metadatos",
             DOWNLOAD_STARTED_IN_BROWSER: "La descarga se inició en el navegador",
             DRAG_N_DROP_FILES_HERE: "Arrastra y suelta archivos aquí",
-            DUPLICATE_RECORD_SUGGESTION: "Verifique si hay IDs duplicados o confirme que el registro no exista ya en el sistema.",
+            DUPLICATE_RECORD_SUGGESTION:
+                "Verifique si hay IDs duplicados o confirme que el registro no exista ya en el sistema.",
             EDGE: "Arista",
             EDIT: "Editar",
             EDIT_ADDITIONAL_PROPERTIES: "Editar propiedades adicionales",
             EDIT_PROPERTIES: "Editar propiedades",
-            EDIT_ADDITIONAL_PROPERTIES_HELP: "Modifica, agrega o elimina propiedades personalizadas para este registro",
+            EDIT_ADDITIONAL_PROPERTIES_HELP:
+                "Modifica, agrega o elimina propiedades personalizadas para este registro",
             EDIT_CLASS: "Editar clase",
             EDIT_LABEL: "Editar etiqueta",
             EDIT_MATRIX: "Editar matriz",
             EDIT_OAUTH_APP: "Editar aplicación OAuth",
             EDIT_ORGANIZATION: "Editar organización",
             EDIT_PERMISSIONS: "Editar Permisos",
-            EDIT_PERMISSIONS_ACROSS_ROLES_MATRIX_VIEW: "Edita permisos entre roles en una vista de matriz.",
-            EDIT_PERMISSIONS_FOR_PROJECT_ROLES_MATRIX_VIEW: "Edita permisos para roles del proyecto en una vista de matriz.",
+            EDIT_PERMISSIONS_ACROSS_ROLES_MATRIX_VIEW:
+                "Edita permisos entre roles en una vista de matriz.",
+            EDIT_PERMISSIONS_FOR_PROJECT_ROLES_MATRIX_VIEW:
+                "Edita permisos para roles del proyecto en una vista de matriz.",
             EDIT_ROLE: "Editar Rol",
             EDIT_STORAGE: "Editar almacenamiento",
             EDIT_TAG: "Editar etiqueta",
@@ -1490,11 +1749,13 @@ export const translations = {
             EMAIL: "Correo electrónico",
             EMAIL_ADDRESS: "Correo electrónico",
             EMAIL_ADDRESSES: "Correos electrónicos",
-            EMAIL_INVITATION_DESCRIPTION: "Se enviará un correo de invitación con instrucciones para unirse a la organización. El usuario podrá acceder a todos los recursos de la organización una vez que acepte la invitación.",
+            EMAIL_INVITATION_DESCRIPTION:
+                "Se enviará un correo de invitación con instrucciones para unirse a la organización. El usuario podrá acceder a todos los recursos de la organización una vez que acepte la invitación.",
             EMAIL_INVITATIONS: "Invitaciones por correo electrónico",
             EMAIL_NOTIFICATIONS: "Notificaciones por correo",
             ENGLISH: "English",
-            ENTER_CLASS_DESCRIPTION_OPTIONAL: "Ingresa la descripcion de la clase (opcional)",
+            ENTER_CLASS_DESCRIPTION_OPTIONAL:
+                "Ingresa la descripcion de la clase (opcional)",
             ENTER_CLASS_NAME: "Ingresa el nombre de la clase",
             ENTER_EMAIL_ADDRESSES: "Ingresa direcciones de correo electrónico...",
             ERROR_DETAILS: "Detalles del error:",
@@ -1525,34 +1786,49 @@ export const translations = {
             FAILED_TO_DELETE_STORAGE: "No se pudo eliminar el almacenamiento",
             FAILED_TO_FETCH_CLASSES: "No se pudieron obtener las clases",
             FAILED_TO_FETCH_RECORD: "Error al obtener el registro",
-            FAILED_TO_LOAD_COMPARISON_SNAPSHOT: "Error al cargar la instantánea de comparación.",
+            FAILED_TO_LOAD_COMPARISON_SNAPSHOT:
+                "Error al cargar la instantánea de comparación.",
             FAILED_TO_LOAD_DATA_SOURCE: "No se pudo cargar las fuentes de datos",
-            FAILED_TO_LOAD_ORGANIZATION_LABELS: "No se pudieron cargar las etiquetas de la organización.",
-            FAILED_TO_LOAD_ORGANIZATION_TAGS: "No se pudieron cargar las etiquetas de la organización.",
-            FAILED_TO_LOAD_PROJECT_LABELS: "No se pudieron cargar las etiquetas del proyecto.",
-            FAILED_TO_LOAD_PROJECT_TAGS: "No se pudieron cargar las etiquetas del proyecto.",
-            FAILED_TO_LOAD_RECENT_RECORDS: "No se pudieron cargar los registros recientes.",
-            FAILED_TO_LOAD_RECORD_HISTORY: "Error al cargar el historial del registro.",
-            FAILED_TO_LOAD_SELECTED_POINT_IN_TIME_SNAPSHOT: "Error al cargar la instantánea del punto en el tiempo seleccionado.",
-            FAILED_TO_LOAD_STORAGE_CONFIGURATIONS: "No se pudieron cargar las configuraciones de almacenamiento",
+            FAILED_TO_LOAD_ORGANIZATION_LABELS:
+                "No se pudieron cargar las etiquetas de la organización.",
+            FAILED_TO_LOAD_ORGANIZATION_TAGS:
+                "No se pudieron cargar las etiquetas de la organización.",
+            FAILED_TO_LOAD_PROJECT_LABELS:
+                "No se pudieron cargar las etiquetas del proyecto.",
+            FAILED_TO_LOAD_PROJECT_TAGS:
+                "No se pudieron cargar las etiquetas del proyecto.",
+            FAILED_TO_LOAD_RECENT_RECORDS:
+                "No se pudieron cargar los registros recientes.",
+            FAILED_TO_LOAD_RECORD_HISTORY:
+                "Error al cargar el historial del registro.",
+            FAILED_TO_LOAD_SELECTED_POINT_IN_TIME_SNAPSHOT:
+                "Error al cargar la instantánea del punto en el tiempo seleccionado.",
+            FAILED_TO_LOAD_STORAGE_CONFIGURATIONS:
+                "No se pudieron cargar las configuraciones de almacenamiento",
             FAILED_TO_PARSE_CSV_FILE: "No se pudo analizar el archivo CSV",
             FAILED_TO_REMOVE_LOGO: "No se pudo eliminar el logotipo",
             FAILED_TO_REMOVE_MEMBER: "No se pudo eliminar al miembro",
             FAILED_TO_REMOVE_USER: "No se pudo eliminar al usuario",
             FAILED_TO_RESEND_INVITATION: "No se pudo reenviar la invitación",
-            FAILED_TO_SAVE_ORGANIZATION_LABEL: "No se pudo guardar la etiqueta de la organización.",
-            FAILED_TO_SAVE_ORGANIZATION_TAG: "No se pudo guardar la etiqueta de la organización.",
-            FAILED_TO_SAVE_PROJECT_LABEL: "No se pudo guardar la etiqueta del proyecto.",
-            FAILED_TO_SAVE_PROJECT_TAG: "No se pudo guardar la etiqueta del proyecto.",
+            FAILED_TO_SAVE_ORGANIZATION_LABEL:
+                "No se pudo guardar la etiqueta de la organización.",
+            FAILED_TO_SAVE_ORGANIZATION_TAG:
+                "No se pudo guardar la etiqueta de la organización.",
+            FAILED_TO_SAVE_PROJECT_LABEL:
+                "No se pudo guardar la etiqueta del proyecto.",
+            FAILED_TO_SAVE_PROJECT_TAG:
+                "No se pudo guardar la etiqueta del proyecto.",
             FAILED_TO_SEARCH_RECORDS: "No se pudo realizar la búsqueda de registros",
             FAILED_TO_SEND_INVITATION: "No se pudo enviar la invitación",
             FAILED_TO_UPDATE: "Error al actualizar ",
             FAILED_TO_UPDATE_BANNER: "No se pudo actualizar el banner",
             FAILED_TO_UPDATE_CLASS: "No se pudo actualizar la clase",
-            FAILED_TO_UPDATE_DEFAULT_STORAGE: "No se pudo actualizar el almacenamiento predeterminado",
+            FAILED_TO_UPDATE_DEFAULT_STORAGE:
+                "No se pudo actualizar el almacenamiento predeterminado",
             FAILED_TO_UPDATE_MEMBER_ROLE: "No se pudo actualizar el rol del miembro",
             FAILED_TO_UPDATE_PROPERTIES: "No se pudieron actualizar las propiedades",
-            FAILED_TO_UPDATE_SENSITIVITY_LABELS: "Error al actualizar las etiquetas de sensibilidad",
+            FAILED_TO_UPDATE_SENSITIVITY_LABELS:
+                "Error al actualizar las etiquetas de sensibilidad",
             FAILED_TO_UPDATE_STORAGE: "No se pudo actualizar el almacenamiento",
             FAILED_TO_UPDATE_TAGS: "Error al actualizar las etiquetas",
             FAILED_TO_UPLOAD_LOGO: "No se pudo subir el logotipo",
@@ -1568,7 +1844,8 @@ export const translations = {
             FILES_LABEL: "archivos",
             FILESYSTEM: "Sistema de archivos",
             FILESYSTEM_PATH: "Ruta del sistema de archivos",
-            FILESYSTEM_PATH_IS_REQUIRED: "La ruta del sistema de archivos es obligatoria",
+            FILESYSTEM_PATH_IS_REQUIRED:
+                "La ruta del sistema de archivos es obligatoria",
             FILTER: "Filtro",
             FILTER_BY: "Filtrar por",
             FILTERED_BY: "Filtrado por: ",
@@ -1589,29 +1866,38 @@ export const translations = {
             GRAPH_HOP: "Salto {count}",
             GRAPH_HOPS: "{count} saltos",
             GRAPH_NO_DESCRIPTION_AVAILABLE: "No hay descripción disponible.",
-            GRAPH_NO_MULTI_HOP_TRACE: "El nodo seleccionado es la raíz, por lo que todavía no hay una ruta de varios saltos.",
+            GRAPH_NO_MULTI_HOP_TRACE:
+                "El nodo seleccionado es la raíz, por lo que todavía no hay una ruta de varios saltos.",
             GRAPH_NO_NODES_FOUND: "No se encontraron nodos en los datos del grafo.",
             GRAPH_NO_NODES_MATCH_SEARCH: "Ningún nodo coincide con esta búsqueda.",
             GRAPH_NO_NODE_SELECTED: "Ningún nodo seleccionado",
-            GRAPH_NO_PATH_AVAILABLE: "No hay una ruta disponible para la selección actual.",
-            GRAPH_NO_RELATIONSHIPS_MATCH_FILTER: "Ninguna relación coincide con el filtro actual.",
+            GRAPH_NO_PATH_AVAILABLE:
+                "No hay una ruta disponible para la selección actual.",
+            GRAPH_NO_RELATIONSHIPS_MATCH_FILTER:
+                "Ninguna relación coincide con el filtro actual.",
             GRAPH_NO_TRACE: "Sin ruta",
             GRAPH_RECORD_TYPE: "registro",
             GRAPH_RELATIONSHIP_TABLE: "Tabla de relaciones",
             GRAPH_SEARCH_NODES_BY_LABEL: "Buscar nodos por etiqueta",
             GRAPH_SELECTED_NODE: "Nodo seleccionado",
-            GRAPH_SELECT_NODE_FOR_TRACE: "Seleccione un nodo para calcular y mostrar la ruta desde la raíz.",
-            GRAPH_SELECT_NODE_TO_INSPECT_RELATIONSHIPS: "Seleccione un nodo para inspeccionar sus relaciones exactas.",
-            GRAPH_SELECT_NODE_TO_POPULATE_SUMMARY: "Elija un nodo en el grafo para completar el resumen y la tabla de relaciones.",
-            GRAPH_SELECT_NODE_TO_POPULATE_TABLE: "Seleccione un nodo para completar la tabla de relaciones.",
+            GRAPH_SELECT_NODE_FOR_TRACE:
+                "Seleccione un nodo para calcular y mostrar la ruta desde la raíz.",
+            GRAPH_SELECT_NODE_TO_INSPECT_RELATIONSHIPS:
+                "Seleccione un nodo para inspeccionar sus relaciones exactas.",
+            GRAPH_SELECT_NODE_TO_POPULATE_SUMMARY:
+                "Elija un nodo en el grafo para completar el resumen y la tabla de relaciones.",
+            GRAPH_SELECT_NODE_TO_POPULATE_TABLE:
+                "Seleccione un nodo para completar la tabla de relaciones.",
             GRAPH_SHOW_ALL_LABELS: "Mostrar todas las etiquetas",
             GRAPH_TRACED_PATH: "Ruta trazada",
             GROUP: "Grupo",
             GROUP_MEMBERS: "Miembros del grupo",
             GROUP_MEMBERSHIP: "Membresías de grupo",
             GROUP_NAME_STAR: "Nombre del grupo *",
-            GROUP_NO_LONGER_APPEAR: "El grupo ya no aparecerá en las listas de grupos. Los usuarios no perderán acceso a la organización, solo a la asociación con este grupo.",
-            GROUP_WILL_BE_ARCHIVED_MEMBERS_WILL_BE_REMOVED: "Este grupo será archivado. Los miembros serán removidos de este grupo, pero permanecerán en la organización.",
+            GROUP_NO_LONGER_APPEAR:
+                "El grupo ya no aparecerá en las listas de grupos. Los usuarios no perderán acceso a la organización, solo a la asociación con este grupo.",
+            GROUP_WILL_BE_ARCHIVED_MEMBERS_WILL_BE_REMOVED:
+                "Este grupo será archivado. Los miembros serán removidos de este grupo, pero permanecerán en la organización.",
             GROUPS: "Grupos",
             GROUPS_SELECTED: "grupos seleccionados",
             HAS_PERMISSION: "Tiene permiso",
@@ -1627,8 +1913,10 @@ export const translations = {
             INCOMING_: "Entrantes (",
             INCOMING_ARROW: " ← Otros registros)",
             INDIVIDUAL_MEMBERS: "Miembros individuales",
-            INHERITING_ORGANIZATION_LEVEL_LABELS: "Heredando etiquetas de sensitividad de nivel organización",
-            INHERITING_ORGANIZATION_LEVEL_TAGS: "Heredando etiquetas de nivel organización",
+            INHERITING_ORGANIZATION_LEVEL_LABELS:
+                "Heredando etiquetas de sensitividad de nivel organización",
+            INHERITING_ORGANIZATION_LEVEL_TAGS:
+                "Heredando etiquetas de nivel organización",
             INSIGHT: "Insight",
             INSIGHT_ASK_PLACEHOLDER: "Pregúntale a Insight sobre este registro...",
             INSIGHT_CONVERSATION_NOT_SAVED: "La conversación no se guardará.",
@@ -1639,9 +1927,12 @@ export const translations = {
             INSIGHT_EXPAND_HEIGHT: "Expandir altura",
             INSIGHT_EXPAND_WIDGET: "Expandir widget",
             INSIGHT_FILE_SCOPED: "Alcance del archivo",
-            INSIGHT_INTRO_NOT_READY: 'Estoy listo para ayudarte a analizar "{recordName}". Primero pon el registro en cola para la indexación de Insight y luego envía tus preguntas aquí.',
-            INSIGHT_INTRO_READY: 'Estoy listo para ayudarte a analizar "{recordName}". ¿En qué puedo ayudarte?',
-            INSIGHT_NOT_READY_MESSAGE: "Este registro aún no está listo. Ponlo en cola primero y espera a que el estado cambie a Listo.",
+            INSIGHT_INTRO_NOT_READY:
+                'Estoy listo para ayudarte a analizar "{recordName}". Primero pon el registro en cola para la indexación de Insight y luego envía tus preguntas aquí.',
+            INSIGHT_INTRO_READY:
+                'Estoy listo para ayudarte a analizar "{recordName}". ¿En qué puedo ayudarte?',
+            INSIGHT_NOT_READY_MESSAGE:
+                "Este registro aún no está listo. Ponlo en cola primero y espera a que el estado cambie a Listo.",
             INSIGHT_QUEUEING: "Encolando...",
             INSIGHT_QUEUE_RECORD: "Poner registro en cola para Insight",
             INSIGHT_SEND: "Enviar",
@@ -1654,19 +1945,25 @@ export const translations = {
             INSIGHT_UNKNOWN_ERROR: "Error desconocido de Insight",
             INSIGHT_YOU: "Tú",
             INTERACTIVE_ZOOM_SLIDER: "Control deslizante de zoom interactivo",
-            INVALID_EMAIL_ERROR: "Eso no parece una dirección de correo electrónico válida",
+            INVALID_EMAIL_ERROR:
+                "Eso no parece una dirección de correo electrónico válida",
             INVALID_JASON: "JSON inválido.",
-            INVALID_JSON_ARRAY_SYNTAX: "Formato JSON invalido - debe ser una sintaxis valida de arreglo",
+            INVALID_JSON_ARRAY_SYNTAX:
+                "Formato JSON invalido - debe ser una sintaxis valida de arreglo",
             INVALID_LABEL: "Inválidos",
-            INVALID_SELECTED_DATA_SOURCE: "La fuente de datos seleccionada no es válida",
-            INVALID_SELECTED_DATA_SOURCE_SUGGESTION: "Intente seleccionar una fuente de datos diferente en el menú desplegable.",
+            INVALID_SELECTED_DATA_SOURCE:
+                "La fuente de datos seleccionada no es válida",
+            INVALID_SELECTED_DATA_SOURCE_SUGGESTION:
+                "Intente seleccionar una fuente de datos diferente en el menú desplegable.",
             INVITATION_CANCELED: "Invitación cancelada",
             INVITATION_RESENT_TO_: "Invitación reenviada a",
             INVITATION_SENT_TO_: "Invitación enviada a",
             INVITATIONS_FAILED: "La(s) invitación(es) falló/fallaron",
-            INVITATIONS_SENT_INFO: "Se enviarán invitaciones a cada dirección que agregues",
+            INVITATIONS_SENT_INFO:
+                "Se enviarán invitaciones a cada dirección que agregues",
             INVITE: "Invitar",
-            INVITE_EXTERNAL_USERS_VIA_EMAIL: "Invitar usuarios externos por correo electrónico",
+            INVITE_EXTERNAL_USERS_VIA_EMAIL:
+                "Invitar usuarios externos por correo electrónico",
             INVITE_PEOPLE: "Invitar personas",
             INVITE_USER: "Invitar usuario",
             INVITE_USER_TO_PROJECT: "Invitar usuario al proyecto",
@@ -1683,88 +1980,129 @@ export const translations = {
             LABEL_NAME: "Nombre de la etiqueta",
             LABEL_NAME_PLACEHOLDER: "p. ej., CUI, ITAR, Pública",
             LABELS_ARE_LOCKED: "Las etiquetas de sensibilidad están bloqueadas",
-            LABELS_LOCKED_AT_ORG_LEVEL: "Las etiquetas están bloqueadas a nivel de organización",
-            LABELS_LOCKED_AT_ORG_LEVEL_SHORT: "Las etiquetas están bloqueadas a nivel de organización",
-            LABELS_LOCKED_BY_ORGANIZATION: "Las etiquetas están bloqueadas por la organización",
-            LABELS_LOCKED_CANNOT_ARCHIVE_PROJECT: "Las etiquetas están bloqueadas a nivel de organización. No se pueden archivar etiquetas del proyecto.",
-            LABELS_LOCKED_CANNOT_CREATE_OR_EDIT_PROJECT: "Las etiquetas están bloqueadas a nivel de organización. No se pueden crear ni editar etiquetas del proyecto.",
+            LABELS_LOCKED_AT_ORG_LEVEL:
+                "Las etiquetas están bloqueadas a nivel de organización",
+            LABELS_LOCKED_AT_ORG_LEVEL_SHORT:
+                "Las etiquetas están bloqueadas a nivel de organización",
+            LABELS_LOCKED_BY_ORGANIZATION:
+                "Las etiquetas están bloqueadas por la organización",
+            LABELS_LOCKED_CANNOT_ARCHIVE_PROJECT:
+                "Las etiquetas están bloqueadas a nivel de organización. No se pueden archivar etiquetas del proyecto.",
+            LABELS_LOCKED_CANNOT_CREATE_OR_EDIT_PROJECT:
+                "Las etiquetas están bloqueadas a nivel de organización. No se pueden crear ni editar etiquetas del proyecto.",
             LABELS_LOWER: "etiquetas",
             LANGUAGE: "Idioma",
             LAST_EDIT: "Última edición",
-            LAST_LOGIN: "Último inicio de sesión",
             LAST_UPDATE: "Última actualización:",
             LAST_UPDATED: "Última actualización:",
             LAST_UPDATED_AT: "Última Actualización en",
-            LATTICE_ANALYSIS_STARTED: "Análisis del registro iniciado. ID de extracción:",
-            LATTICE_FAILED_TO_START_ANALYSIS: "No se pudo iniciar el análisis del registro.",
+            LATTICE_ANALYSIS_STARTED:
+                "Análisis del registro iniciado. ID de extracción:",
+            LATTICE_FAILED_TO_START_ANALYSIS:
+                "No se pudo iniciar el análisis del registro.",
             LATTICE_GO_TO_SLIDE: "Ir a la diapositiva",
             LATTICE_TRIGGER: "Activar Lattice",
-            LATTICE_INTRO_ANALYZE_BODY: "Lattice puede revisar este registro e identificar estructura útil, incluidos posibles registros, clases, relaciones y aristas.",
+            LATTICE_INTRO_ANALYZE_BODY:
+                "Lattice puede revisar este registro e identificar estructura útil, incluidos posibles registros, clases, relaciones y aristas.",
             LATTICE_INTRO_ANALYZE_TITLE: "Analizar este registro",
-            LATTICE_INTRO_REVIEW_BODY: "Puedes revisar, aprobar o rechazar los resultados preparados antes de que pasen a formar parte de los datos de tu proyecto.",
+            LATTICE_INTRO_REVIEW_BODY:
+                "Puedes revisar, aprobar o rechazar los resultados preparados antes de que pasen a formar parte de los datos de tu proyecto.",
             LATTICE_INTRO_REVIEW_TITLE: "Revisar antes de agregar",
-            LATTICE_INTRO_STAGE_BODY: "Los resultados extraídos por Lattice se colocan primero en staging. No se agregan directamente al proyecto.",
+            LATTICE_INTRO_STAGE_BODY:
+                "Los resultados extraídos por Lattice se colocan primero en staging. No se agregan directamente al proyecto.",
             LATTICE_INTRO_STAGE_TITLE: "Preparar sugerencias",
-            LATTICE_LEARN_MORE_ARIA: "Más información sobre el análisis con IA del registro",
-            LATTICE_READY_TOOLTIP: "Usa Lattice para encontrar registros, clases, relaciones y aristas de este archivo. Los resultados se preparan para revisión antes de agregarse al proyecto.",
-            LATTICE_REQUIRES_EMBEDDING_TOOLTIP: "Este registro debe estar incrustado con Insight antes de poder analizarse con Lattice.",
-            LATTICE_STRICT_REQUIRES_EMBEDDING: "Este registro debe estar incrustado con Insight antes de que pueda comenzar el análisis estricto.",
-            LATTICE_EMBEDDINGS_GENERATING: "Se están generando incrustaciones — vuelve a intentar la extracción en unos minutos.",
-            LATTICE_UNABLE_TO_START_ANALYSIS: "No se puede iniciar el análisis para este registro.",
-            LATTICE_UNSUPPORTED_FILE_TOOLTIP: "Este tipo de archivo no es compatible con la incrustación de Insight ni con el análisis de Lattice.",
+            LATTICE_LEARN_MORE_ARIA:
+                "Más información sobre el análisis con IA del registro",
+            LATTICE_READY_TOOLTIP:
+                "Usa Lattice para encontrar registros, clases, relaciones y aristas de este archivo. Los resultados se preparan para revisión antes de agregarse al proyecto.",
+            LATTICE_REQUIRES_EMBEDDING_TOOLTIP:
+                "Este registro debe estar incrustado con Insight antes de poder analizarse con Lattice.",
+            LATTICE_STRICT_REQUIRES_EMBEDDING:
+                "Este registro debe estar incrustado con Insight antes de que pueda comenzar el análisis estricto.",
+            LATTICE_EMBEDDINGS_GENERATING:
+                "Se están generando incrustaciones — vuelve a intentar la extracción en unos minutos.",
+            LATTICE_UNABLE_TO_START_ANALYSIS:
+                "No se puede iniciar el análisis para este registro.",
+            LATTICE_UNSUPPORTED_FILE_TOOLTIP:
+                "Este tipo de archivo no es compatible con la incrustación de Insight ni con el análisis de Lattice.",
             LATTICE_WIDGET_TITLE: "Lattice: Extracción de Conocimiento con IA",
-            LATTICE_WIDGET_DESCRIPTION: "Extrae automáticamente registros, clases, relaciones y aristas de este documento. Los resultados se colocan en preparación para revisión antes de añadirse al grafo de conocimiento o esquema de datos.",
+            LATTICE_WIDGET_DESCRIPTION:
+                "Extrae automáticamente registros, clases, relaciones y aristas de este documento. Los resultados se colocan en preparación para revisión antes de añadirse al grafo de conocimiento o esquema de datos.",
             LATTICE_HOW_IT_WORKS: "Cómo funciona",
-            LATTICE_STEP_EMBED: "Poner este documento en cola para incrustación con IA",
+            LATTICE_STEP_EMBED:
+                "Poner este documento en cola para incrustación con IA",
             LATTICE_STEP_MODE: "Elegir un modo de extracción",
-            LATTICE_STEP_TRIGGER: "Activar extracción — los resultados se preparan para revisión",
-            LATTICE_STEP_DECIDE: "Aprobar o rechazar elementos en preparación en la página de extracciones",
+            LATTICE_STEP_TRIGGER:
+                "Activar extracción — los resultados se preparan para revisión",
+            LATTICE_STEP_DECIDE:
+                "Aprobar o rechazar elementos en preparación en la página de extracciones",
             LATTICE_VIEW_EXTRACTIONS: "Ver extracciones del proyecto",
             LATTICE_DISCOVERY: "Descubrimiento",
             LATTICE_STRICT: "Estricto",
-            LATTICE_DISCOVERY_TOOLTIP: "Infiere nuevas clases y relaciones del documento",
-            LATTICE_STRICT_TOOLTIP: "Mapea solo a clases y relaciones existentes en este proyecto",
+            LATTICE_DISCOVERY_TOOLTIP:
+                "Infiere nuevas clases y relaciones del documento",
+            LATTICE_STRICT_TOOLTIP:
+                "Mapea solo a clases y relaciones existentes en este proyecto",
             LATTICE_EXTRACT: "Extraer",
-            LATTICE_NOT_EMBEDDED_WARNING: "El documento debe estar incrustado antes de la extracción.",
+            LATTICE_NOT_EMBEDDED_WARNING:
+                "El documento debe estar incrustado antes de la extracción.",
             LATTICE_QUEUE_FOR_EMBEDDING: "Poner en cola para incrustar con Insight",
             LATTICE_QUEUED_SUCCESS: "Documento en cola para indexación.",
-            LATTICE_QUEUE_FAILED: "Error al poner el documento en cola para indexación.",
+            LATTICE_QUEUE_FAILED:
+                "Error al poner el documento en cola para indexación.",
             LATTICE_ONTOLOGY_STATUS_TITLE: "Incrustaciones del esquema de datos",
             LATTICE_ONTOLOGY_READY: "Esquema de datos listo",
-            LATTICE_ONTOLOGY_NOT_READY: "El esquema de datos no está completamente incrustado. El modo estricto requiere que todas las clases y relaciones estén incrustadas.",
-            LATTICE_ONTOLOGY_NO_SCHEMA: "Aún no hay clases ni relaciones en este proyecto.",
-            LATTICE_QUEUE_ONTOLOGY_EMBEDDINGS: "Poner en cola las incrustaciones del esquema de datos",
-            LATTICE_ONTOLOGY_QUEUED_SUCCESS: "Incrustaciones del esquema de datos en cola.",
-            LATTICE_ONTOLOGY_QUEUE_FAILED: "Error al poner en cola las incrustaciones del esquema de datos.",
+            LATTICE_ONTOLOGY_NOT_READY:
+                "El esquema de datos no está completamente incrustado. El modo estricto requiere que todas las clases y relaciones estén incrustadas.",
+            LATTICE_ONTOLOGY_NO_SCHEMA:
+                "Aún no hay clases ni relaciones en este proyecto.",
+            LATTICE_QUEUE_ONTOLOGY_EMBEDDINGS:
+                "Poner en cola las incrustaciones del esquema de datos",
+            LATTICE_ONTOLOGY_QUEUED_SUCCESS:
+                "Incrustaciones del esquema de datos en cola.",
+            LATTICE_ONTOLOGY_QUEUE_FAILED:
+                "Error al poner en cola las incrustaciones del esquema de datos.",
             LATTICE_ONTOLOGY_CLASSES: "clases",
             LATTICE_ONTOLOGY_RELATIONSHIPS: "relaciones",
             LATTICE_ONTOLOGY_EMBEDDED_OF: "de",
             LATTICE_ONTOLOGY_EMBEDDED_LABEL: "incrustados",
             LATTICE_PAGE_TITLE: "Lattice",
-            LATTICE_PAGE_DESCRIPTION_INTRO: "Extracciones que has iniciado para este proyecto. Cada elemento preparado se puntúa y valida con la ontología del proyecto antes de la revisión humana.",
+            LATTICE_PAGE_DESCRIPTION_INTRO:
+                "Extracciones que has iniciado para este proyecto. Cada elemento preparado se puntúa y valida con la ontología del proyecto antes de la revisión humana.",
             LATTICE_VALID_LABEL: "Válido",
-            LATTICE_VALID_DESCRIPTION: "los elementos coincidieron con una clase u relación de ontología existente.",
+            LATTICE_VALID_DESCRIPTION:
+                "los elementos coincidieron con una clase u relación de ontología existente.",
             LATTICE_NOVEL_DISCOVERY_LABEL: "Descubrimiento novedoso",
-            LATTICE_NOVEL_DISCOVERY_DESCRIPTION: "los elementos involucran clases y relaciones conocidas pero en un patrón no reconocido.",
+            LATTICE_NOVEL_DISCOVERY_DESCRIPTION:
+                "los elementos involucran clases y relaciones conocidas pero en un patrón no reconocido.",
             LATTICE_INVALID_SCHEMA_LABEL: "Esquema inválido",
-            LATTICE_INVALID_SCHEMA_DESCRIPTION: "los elementos no pudieron reconciliarse con el esquema.",
-            LATTICE_APPROVE_PROMOTES_ALL: "Aprobar una extracción promueve todos los elementos preparados al grafo de conocimiento y esquema de datos, independientemente del estado de validación.",
+            LATTICE_INVALID_SCHEMA_DESCRIPTION:
+                "los elementos no pudieron reconciliarse con el esquema.",
+            LATTICE_APPROVE_PROMOTES_ALL:
+                "Aprobar una extracción promueve todos los elementos preparados al grafo de conocimiento y esquema de datos, independientemente del estado de validación.",
             LATTICE_COMING_SOON: "Próximamente",
-            LATTICE_COMING_SOON_TEXT: "Aprobación de elementos individuales y aprobación masiva para diferentes estados",
+            LATTICE_COMING_SOON_TEXT:
+                "Aprobación de elementos individuales y aprobación masiva para diferentes estados",
             LATTICE_EXTRACTIONS_PANEL_TITLE: "Extracciones",
-            LATTICE_NO_EXTRACTIONS: "Aún no hay extracciones. Inicia una desde una página de registro.",
+            LATTICE_NO_EXTRACTIONS:
+                "Aún no hay extracciones. Inicia una desde una página de registro.",
             LATTICE_STATUS_HEADER: "Estado",
             LATTICE_MODE_HEADER: "Modo",
-            LATTICE_SELECT_EXTRACTION_PROMPT: "Selecciona una extracción de la lista para revisarla.",
+            LATTICE_SELECT_EXTRACTION_PROMPT:
+                "Selecciona una extracción de la lista para revisarla.",
             LATTICE_APPROVE_ALL: "Aprobar todo",
             LATTICE_REJECT_ALL: "Rechazar todo",
-            LATTICE_EXTRACTION_RUNNING: "La extracción está en progreso. Esta página se actualizará automáticamente.",
-            LATTICE_EXTRACTION_REVIEW: "Revisa los elementos preparados a continuación, luego aprueba o rechaza la extracción completa.",
-            LATTICE_EXTRACTION_FAILED_MSG: "Esta extracción no pudo completarse. Esto puede ocurrir cuando la respuesta del LLM tiene una estructura inesperada — intenta activar una nueva extracción.",
+            LATTICE_EXTRACTION_RUNNING:
+                "La extracción está en progreso. Esta página se actualizará automáticamente.",
+            LATTICE_EXTRACTION_REVIEW:
+                "Revisa los elementos preparados a continuación, luego aprueba o rechaza la extracción completa.",
+            LATTICE_EXTRACTION_FAILED_MSG:
+                "Esta extracción no pudo completarse. Esto puede ocurrir cuando la respuesta del LLM tiene una estructura inesperada — intenta activar una nueva extracción.",
             LATTICE_EXTRACTION_REJECTED_MSG: "Esta extracción fue rechazada.",
             LATTICE_EXTRACTION_BEEN: "Esta extracción ha sido",
             LATTICE_APPROVED_STATUS: "aprobado",
-            LATTICE_APPROVE_NOTE_PREFIX: "Todo o nada. Todos los elementos se promueven al aprobar, incluidos los de",
+            LATTICE_APPROVE_NOTE_PREFIX:
+                "Todo o nada. Todos los elementos se promueven al aprobar, incluidos los de",
             LATTICE_INVALID_SCHEMA_ITEMS: "esquema inválido",
             LATTICE_ITEMS_SUFFIX: "elementos.",
             LATTICE_SUMMARY: "Resumen",
@@ -1786,12 +2124,10 @@ export const translations = {
             LATTICE_ORIGIN: "Origen",
             LATTICE_DESTINATION: "Destino",
             LATTICE_EXTRACTION_NUMBER: "Extracción #",
+            LAST_LOGIN: "Último inicio de sesión",
             LAST_UPDATED_LABEL: "Última actualización:",
             LEFT: "restantes",
             LIMIT: "Límite",
-            LOGGED_IN_LAST_24_HOURS: "Iniciaron sesión en las últimas 24 horas",
-            LOGGED_IN_LAST_7_DAYS: "Iniciaron sesión en los últimos 7 días",
-            LOGGED_IN_LAST_30_DAYS: "Iniciaron sesión en los últimos 30 días",
             LINE_CHART_2D: "Gráfico de Líneas 2D",
             LINK_ARCHIVED_SUCCESS: "Enlace archivado correctamente",
             LINKED_NEW_SOURCE: "vinculó una nueva fuente ",
@@ -1806,7 +2142,8 @@ export const translations = {
             LOADING_ORGANIZATION_TAGS: "Cargando etiquetas de la organización...",
             LOADING_PERMISSIONS: "Cargando permisos...",
             LOADING_PROJECT_LABELS: "Cargando etiquetas del proyecto...",
-            LOADING_PROJECT_SECURITY_LABELS: "Cargando etiquetas de sensitividad del proyecto...",
+            LOADING_PROJECT_SECURITY_LABELS:
+                "Cargando etiquetas de sensitividad del proyecto...",
             LOADING_PROJECT_TAGS: "Cargando etiquetas del proyecto...",
             LOADING_PROJECTS: "Cargando proyectos...",
             LOADING_RECORD_HISTORY: "Cargando historial del registro...",
@@ -1814,22 +2151,33 @@ export const translations = {
             LOCKED_AT_ORGANIZATION_LEVEL: "bloqueadas a nivel de organización",
             LOCKED_BY_ORG: "Bloqueado por la organización",
             LOCKED_FOR_ALL_PROJECTS: "Bloqueado para todos los proyectos",
+            LOGGED_IN_LAST_24_HOURS: "Iniciaron sesión en las últimas 24 horas",
+            LOGGED_IN_LAST_7_DAYS: "Iniciaron sesión en los últimos 7 días",
+            LOGGED_IN_LAST_30_DAYS: "Iniciaron sesión en los últimos 30 días",
             LOGO_GUIDELINES: "Lineamientos del logotipo",
             LOGO_REMOVED_SUCCESSFULLY: "¡El logotipo se eliminó correctamente!",
             LOGO_UPLOADED_SUCCESSFULLY: "¡El logotipo se subió correctamente!",
             LOGOUT: "Cerrar sesión",
             MANAGE_STORAGES_TAB: "Gestionar almacenamientos",
             MANAGE: "Gestionar",
-            MANAGE_USERS_AND_GROUPS_ASSIGNED_TO_THIS_PROJECT_A_ROLE_IS_REQUIRED_FOR_EACH_MEMBER: "Administra los usuarios y grupos asignados a este proyecto. Se requiere un rol para cada miembro.",
-            MANAGE_USERS_AND_GROUPS_WITH_ACCESS_TO_THIS_PROJECT: "Administra los usuarios y grupos con acceso a este proyecto",
-            MANAGE_USERS_IN_ORG_DESCRIPTION: "Administra los usuarios de tu organización. Invita a nuevos usuarios por correo electrónico o agrégalos directamente.",
-            MANAGE_USERS_IN_SITE_DESCRIPTION: "Administra los usuarios de tu sitio. Invita a nuevos usuarios por correo electrónico o agrégalos directamente.",
-            MANAGE_USERS_IN_YOUR_ORG_INVITE_VIA_EMAIL: "Administra los usuarios de tu organización. Invita a nuevos usuarios por correo electrónico o agrégalos directamente.",
-            MANAGING_SETTINGS_FOR_PROJECT: "Administración de la configuración del proyecto",
+            MANAGE_USERS_AND_GROUPS_ASSIGNED_TO_THIS_PROJECT_A_ROLE_IS_REQUIRED_FOR_EACH_MEMBER:
+                "Administra los usuarios y grupos asignados a este proyecto. Se requiere un rol para cada miembro.",
+            MANAGE_USERS_AND_GROUPS_WITH_ACCESS_TO_THIS_PROJECT:
+                "Administra los usuarios y grupos con acceso a este proyecto",
+            MANAGE_USERS_IN_ORG_DESCRIPTION:
+                "Administra los usuarios de tu organización. Invita a nuevos usuarios por correo electrónico o agrégalos directamente.",
+            MANAGE_USERS_IN_SITE_DESCRIPTION:
+                "Administra los usuarios de tu sitio. Invita a nuevos usuarios por correo electrónico o agrégalos directamente.",
+            MANAGE_USERS_IN_YOUR_ORG_INVITE_VIA_EMAIL:
+                "Administra los usuarios de tu organización. Invita a nuevos usuarios por correo electrónico o agrégalos directamente.",
+            MANAGING_SETTINGS_FOR_PROJECT:
+                "Administración de la configuración del proyecto",
             MATCHES: "coincidencias",
             MATCHING_ANY_TERM: "Coincidiendo con cualquier término",
-            MATRIX_EDIT_REQUIRES_CUSTOM_ORG_ROLES: "La edición de matriz solo está disponible cuando existen roles personalizados (no estándar).",
-            MATRIX_EDIT_REQUIRES_CUSTOM_PROJECT_ROLES: "La edición de matriz solo está disponible cuando existen roles personalizados del proyecto.",
+            MATRIX_EDIT_REQUIRES_CUSTOM_ORG_ROLES:
+                "La edición de matriz solo está disponible cuando existen roles personalizados (no estándar).",
+            MATRIX_EDIT_REQUIRES_CUSTOM_PROJECT_ROLES:
+                "La edición de matriz solo está disponible cuando existen roles personalizados del proyecto.",
             MATRIX_VIEW: "Vista de matriz",
             MAX_DATA_POINTS: "Puntos de datos máximos",
             MEMBER: "Miembro",
@@ -1842,37 +2190,50 @@ export const translations = {
             MERGE: "Combinar",
             METADATA_ALIAS_PLACEHOLDER: "metadata.a",
             METADATA_FILE: "Archivo de metadatos",
-            METADATA_FILE_HELP_OPTIONAL: "Déjalo en blanco si no tienes un archivo de metadatos.",
-            METADATA_FILE_INVALID_JSON_OBJECT: "El archivo de metadatos debe ser un objeto JSON válido.",
+            METADATA_FILE_HELP_OPTIONAL:
+                "Déjalo en blanco si no tienes un archivo de metadatos.",
+            METADATA_FILE_INVALID_JSON_OBJECT:
+                "El archivo de metadatos debe ser un objeto JSON válido.",
             METADATA_FILE_JSON_ONLY: "Solo se permiten archivos de metadatos .json.",
-            METADATA_FILE_UNAVAILABLE_FOR_LARGE_FILES: "El archivo de metadatos no está disponible para archivos grandes.",
+            METADATA_FILE_UNAVAILABLE_FOR_LARGE_FILES:
+                "El archivo de metadatos no está disponible para archivos grandes.",
             METADATA_PREVIEW_CLASS: "Clase",
             METADATA_PREVIEW_DESCRIPTION: "Descripción",
             METADATA_PREVIEW_NAME: "Nombre",
             METADATA_PREVIEW_ORIGINAL_ID: "ID original",
             METADATA_PREVIEW_PROPERTIES: "Propiedades",
-            METADATA_PREVIEW_SELECT_FILE: "Sube un archivo JSON de metadatos para previsualizar valores clave.",
+            METADATA_PREVIEW_SELECT_FILE:
+                "Sube un archivo JSON de metadatos para previsualizar valores clave.",
             METADATA_PREVIEW_TITLE: "Vista previa de metadatos",
             METADATA_TEMPLATE_FILENAME: "plantilla_metadatos_carga_archivo.json",
-            MISSING_PROJECT_OR_RECORD_ID_IN_URL: "Falta projectId o recordId en la URL",
+            MISSING_PROJECT_OR_RECORD_ID_IN_URL:
+                "Falta projectId o recordId en la URL",
             MIN_MAX_MARKERS: "Marcadores mín/máx",
             MINIMIZE_UPLOAD_TOAST: "Minimizar notificación de carga",
             MISSING_ORG_ID: "Falta el ID de la organización",
             MISSING_ORG_OR_PROJECT: "Falta la organización o el proyecto",
-            MISSING_ORG_OR_PROJECT_CONTEXT_UNABLE_TO_SAVE: "Falta el contexto de organización o proyecto. No se puede guardar.",
+            MISSING_ORG_OR_PROJECT_CONTEXT_UNABLE_TO_SAVE:
+                "Falta el contexto de organización o proyecto. No se puede guardar.",
             MISSING_ORGANIZATION_OR_PROJECT: "Falta la organización o el proyecto",
             MORE: "mas",
             MORE_: "más ...",
-            MULTI_FILE_WARNING: "Actualmente tienes múltiples archivos seleccionados. Elimina archivos en Archivos seleccionados hasta que solo quede uno.",
-            MULTI_FILES_ONLY_AVAILABLE: "Las cargas múltiples solo están disponibles para Archivo nuevo",
-            MUST_BE_SINGLE_JSON_OBJECT: "Debe ser un solo objeto JSON (no un arreglo).",
-            MUST_USE_ORG_DEFINED_LABELS_ONLY: "y deben usar solo las etiquetas definidas a nivel de organización.",
-            MUST_USE_ORG_DEFINED_TAGS_ONLY: "y deben usar solo las etiquetas definidas a nivel de organización.",
+            MULTI_FILE_WARNING:
+                "Actualmente tienes múltiples archivos seleccionados. Elimina archivos en Archivos seleccionados hasta que solo quede uno.",
+            MULTI_FILES_ONLY_AVAILABLE:
+                "Las cargas múltiples solo están disponibles para Archivo nuevo",
+            MUST_BE_SINGLE_JSON_OBJECT:
+                "Debe ser un solo objeto JSON (no un arreglo).",
+            MUST_USE_ORG_DEFINED_LABELS_ONLY:
+                "y deben usar solo las etiquetas definidas a nivel de organización.",
+            MUST_USE_ORG_DEFINED_TAGS_ONLY:
+                "y deben usar solo las etiquetas definidas a nivel de organización.",
             NAME: "Nombre",
             NAME_REQUIRED: "El nombre es obligatorio",
             NOT_SET: "No establecido",
-            NEED_HELP: "¿Necesitas ayuda? Los detalles para crear o actualizar un proyecto mediante un archivo de ontología se encuentran en nuestro ",
-            NEED_HELP_UPLOADING: "¿Necesitas ayuda? Los detalles para crear o actualizar un proyecto mediante un archivo de ontología se encuentran en nuestro",
+            NEED_HELP:
+                "¿Necesitas ayuda? Los detalles para crear o actualizar un proyecto mediante un archivo de ontología se encuentran en nuestro ",
+            NEED_HELP_UPLOADING:
+                "¿Necesitas ayuda? Los detalles para crear o actualizar un proyecto mediante un archivo de ontología se encuentran en nuestro",
             NEW_CONNECTION: "creó una nueva conexión entre ",
             NEW_FILE: "Archivo nuevo",
             NEW_LABEL: "Nueva etiqueta",
@@ -1892,64 +2253,87 @@ export const translations = {
             NO_FILES_AVAILABLE: "No hay archivos disponibles.",
             NO_FILES_FOUND: "No se encontraron archivos.",
             NO_FILES_SELECTED_YET: "Aún no se han seleccionado archivos.",
-            NO_HISTORICAL_VERSIONS_FOUND_FOR_RECORD: "No se encontraron versiones históricas para este registro.",
-            NO_LABELS_ATTACHED_TO_RECORD: "Aún no hay etiquetas de sensibilidad adjuntas a este registro.",
-            NO_LABELS_DEFINED_HELP: "No hay etiquetas definidas. Crea etiquetas para estandarizar el control de acceso en todos los proyectos.",
+            NO_HISTORICAL_VERSIONS_FOUND_FOR_RECORD:
+                "No se encontraron versiones históricas para este registro.",
+            NO_LABELS_ATTACHED_TO_RECORD:
+                "Aún no hay etiquetas de sensibilidad adjuntas a este registro.",
+            NO_LABELS_DEFINED_HELP:
+                "No hay etiquetas definidas. Crea etiquetas para estandarizar el control de acceso en todos los proyectos.",
             NO_LABELS_MATCH_SEARCH: "Ninguna etiqueta coincide con tu búsqueda.",
             NO_LOGO: "Sin logotipo",
-            NO_MEMBER_SELECTED_TO_REMOVE: "No se seleccionó ningún miembro para eliminar",
+            NO_MEMBER_SELECTED_TO_REMOVE:
+                "No se seleccionó ningún miembro para eliminar",
             NO_MEMBERS: "Sin miembros",
             NO_MEMBERS_MATCH_SEARCH: "Ningún miembro coincide con tu búsqueda",
             NO_ADMIN_CONTACTS: "No hay contactos administradores",
             NO_MORE_RECORDS: "No hay más registros",
             NO_OPTIONS: "Sin opciones",
             NO_ORG_SELECTED: "Ninguna organización seleccionada",
-            NO_ORGANIZATION_SELECTED_UNABLE_TO_SAVE_LABEL: "No hay una organización seleccionada. No se puede guardar la etiqueta.",
-            NO_ORGANIZATION_SELECTED_UNABLE_TO_SAVE_TAG: "No hay una organización seleccionada. No se puede guardar la etiqueta.",
+            NO_ORGANIZATION_SELECTED_UNABLE_TO_SAVE_LABEL:
+                "No hay una organización seleccionada. No se puede guardar la etiqueta.",
+            NO_ORGANIZATION_SELECTED_UNABLE_TO_SAVE_TAG:
+                "No hay una organización seleccionada. No se puede guardar la etiqueta.",
             NO_PERMISSION: "Sin permiso",
             NO_PERMISSIONS: "No hay permisos disponibles.",
             NO_PERMISSIONS_AVAILABLE: "No hay permisos disponibles",
             NO_PROJECT: "Sin proyecto",
             NO_PROJECT_FOUND: "No se encontró ningún proyecto...",
-            NO_PROJECT_LABELS_DEFINED_WHEN_UNLOCKED: "No hay etiquetas de proyecto definidas. Cuando estén desbloqueadas, puedes ampliar el conjunto de etiquetas de la organización con etiquetas específicas del proyecto.",
-            NO_PROJECT_LABELS_MATCH_SEARCH: "Ninguna etiqueta del proyecto coincide con tu búsqueda.",
-            NO_PROJECT_SECURITY_LABELS_DEFINED_WHEN_UNLOCKED: "No hay etiquetas de proyecto definidas. Cuando estén desbloqueadas, puedes definir etiquetas de sensitividad específicas del proyecto además de las etiquetas de la organización.",
+            NO_PROJECT_LABELS_DEFINED_WHEN_UNLOCKED:
+                "No hay etiquetas de proyecto definidas. Cuando estén desbloqueadas, puedes ampliar el conjunto de etiquetas de la organización con etiquetas específicas del proyecto.",
+            NO_PROJECT_LABELS_MATCH_SEARCH:
+                "Ninguna etiqueta del proyecto coincide con tu búsqueda.",
+            NO_PROJECT_SECURITY_LABELS_DEFINED_WHEN_UNLOCKED:
+                "No hay etiquetas de proyecto definidas. Cuando estén desbloqueadas, puedes definir etiquetas de sensitividad específicas del proyecto además de las etiquetas de la organización.",
             NO_PROJECT_SELECTED: "Ningún proyecto seleccionado",
-            NO_PROJECT_TAGS_DEFINED_WHEN_UNLOCKED: "No hay etiquetas de proyecto definidas. Cuando estén desbloqueadas, puedes ampliar el conjunto de etiquetas de la organización con etiquetas específicas del proyecto.",
-            NO_PROJECT_TAGS_MATCH_SEARCH: "Ninguna etiqueta del proyecto coincide con tu búsqueda.",
+            NO_PROJECT_TAGS_DEFINED_WHEN_UNLOCKED:
+                "No hay etiquetas de proyecto definidas. Cuando estén desbloqueadas, puedes ampliar el conjunto de etiquetas de la organización con etiquetas específicas del proyecto.",
+            NO_PROJECT_TAGS_MATCH_SEARCH:
+                "Ninguna etiqueta del proyecto coincide con tu búsqueda.",
             NO_PROJECTS: "Sin proyectos",
             NO_PROPERTIES_YET_ADD_ONE: "Aun no hay propiedades. Agrega una abajo.",
             NO_RECENT_RECORDS: "No se encontraron registros recientes",
-            NO_RECORDS: "No hay registros que coincidan con tus criterios de búsqueda",
+            NO_RECORDS:
+                "No hay registros que coincidan con tus criterios de búsqueda",
             NO_RECORDS_FOUND: "No se encontraron registros",
             OPEN: "Abrir",
             NO_RESULTS_FOUND: "No se encontraron resultados.",
-            NO_SECURITY_LABELS_MATCH_SEARCH: "Ninguna etiqueta de sensitividad coincide con tu búsqueda.",
+            NO_SECURITY_LABELS_MATCH_SEARCH:
+                "Ninguna etiqueta de sensitividad coincide con tu búsqueda.",
             NO_STATS: "No se encontraron estadísticas...",
-            NO_STORAGE_LOCATIONS_AVAILABLE_CREATE_ONE: "No hay ubicaciones de almacenamiento disponibles. Crea una en la pestaña \"Gestionar almacenamientos\".",
+            NO_STORAGE_LOCATIONS_AVAILABLE_CREATE_ONE:
+                'No hay ubicaciones de almacenamiento disponibles. Crea una en la pestaña "Gestionar almacenamientos".',
             NO_STORAGES_CREATED_YET: "Aún no hay almacenamientos creados",
-            NO_TAGS_ATTACHED_TO_RECORD: "Aún no hay etiquetas adjuntas a este registro.",
-            NO_TAGS_DEFINED_HELP: "No hay etiquetas definidas. Crea etiquetas para estandarizar metadatos en todos los proyectos.",
+            NO_TAGS_ATTACHED_TO_RECORD:
+                "Aún no hay etiquetas adjuntas a este registro.",
+            NO_TAGS_DEFINED_HELP:
+                "No hay etiquetas definidas. Crea etiquetas para estandarizar metadatos en todos los proyectos.",
             NO_TAGS_MATCH_SEARCH: "Ninguna etiqueta coincide con tu búsqueda.",
-            NO_USERS_OR_PENDING_INVITES_GET_STARTED: 'No hay usuarios ni invitaciones pendientes. Haz clic en "Invitar usuario" para comenzar.',
+            NO_USERS_OR_PENDING_INVITES_GET_STARTED:
+                'No hay usuarios ni invitaciones pendientes. Haz clic en "Invitar usuario" para comenzar.',
             NOT_AVAILABLE: "N/D",
             NOT_CONNECTED: "No conectado",
             NOT_FOUND: "No encontrado",
             OAUTH_APPLICATION: "Aplicación OAuth",
             OBJECT_STORAGE: "Almacenamiento de objetos",
-            OBJECT_STORAGE_ID_MUST_BE_AN_INTEGER: "object_storage_id debe ser un número entero si se proporciona.",
-            OBJECT_STORAGE_ID_NOT_FOUND_IN_PROJECT: "El ID de almacenamiento de objetos {id} no existe en este proyecto",
-            OBJECT_STORAGE_ID_NOT_FOUND_IN_PROJECT_SUGGESTION: "Verifique que el ID de almacenamiento de objetos seleccionado sea válido para este proyecto.",
+            OBJECT_STORAGE_ID_MUST_BE_AN_INTEGER:
+                "object_storage_id debe ser un número entero si se proporciona.",
+            OBJECT_STORAGE_ID_NOT_FOUND_IN_PROJECT:
+                "El ID de almacenamiento de objetos {id} no existe en este proyecto",
+            OBJECT_STORAGE_ID_NOT_FOUND_IN_PROJECT_SUGGESTION:
+                "Verifique que el ID de almacenamiento de objetos seleccionado sea válido para este proyecto.",
             OBJECT_STORAGES: "Almacenamientos de objetos",
             OF: "de",
             OKAY: "De acuerdo, entendido",
-            ONLY_ONE_LARGE_FILE_ALLOWED: "Solo se puede seleccionar un archivo de 500 MB o más a la vez.",
-            ONLY_STANDARD_ROLES_NO_CUSTOM_TO_EDIT: "Solo existen roles estándar; no hay roles personalizados para editar.",
+            ONLY_ONE_LARGE_FILE_ALLOWED:
+                "Solo se puede seleccionar un archivo de 500 MB o más a la vez.",
+            ONLY_STANDARD_ROLES_NO_CUSTOM_TO_EDIT:
+                "Solo existen roles estándar; no hay roles personalizados para editar.",
             ONSITE_DB: "Base de datos local",
             OPERATOR: "Operador",
             OPTIMAL_SIZE_FOR_LOGO: "Tamaño óptimo: 256×256 píxeles",
             OPTIONAL: "Opcional",
-            OPTIONAL_DESCRIPTION_FOR_THIS_LABEL: "Descripción opcional para esta etiqueta",
+            OPTIONAL_DESCRIPTION_FOR_THIS_LABEL:
+                "Descripción opcional para esta etiqueta",
             OPTIONAL_FIELDS: "Campos opcionales",
             OPTIONS: "Opciones",
             OR: "O",
@@ -1958,7 +2342,8 @@ export const translations = {
             ORG_SECURITY_LABELS: "Etiquetas de sensitividad de la organización",
             ORG_TAGS: "Etiquetas de la organización",
             ORGANIZATION: "Organización",
-            ORGANIZATION_ADMIN_ACCESS_UPDATED: "Se actualizo el acceso de administrador de la organizacion.",
+            ORGANIZATION_ADMIN_ACCESS_UPDATED:
+                "Se actualizo el acceso de administrador de la organizacion.",
             ORGANIZATION_DEFAULT: "Predeterminado de la organización",
             ORGANIZATION_LABEL: "Etiqueta de la organización",
             ORGANIZATION_LABEL_CREATED: "Etiqueta de la organización creada.",
@@ -1967,24 +2352,33 @@ export const translations = {
             ORGANIZATION_NOT_FOUND: "Organización no encontrada",
             ORGANIZATION_OVERVIEW: "Resumen de la organización",
             ORGANIZATION_ROLE: "Rol de la organización",
-            ORGANIZATION_ROLE_PERMISSIONS_CANNOT_BE_MODIFIED_AT_PROJECT_LEVEL: "Los permisos de roles de organización no se pueden modificar a nivel de proyecto.",
-            ORGANIZATION_ROLES_CANNOT_BE_EDITED_AT_PROJECT_LEVEL: "Los roles de organización no se pueden editar a nivel de proyecto.",
-            ORGANIZATION_SECURITY_LABELS: "Etiquetas de sensitividad de la organización",
-            ORGANIZATION_SECURITY_LABELS_DESCRIPTION: "Etiquetas de sensitividad para control de acceso basado en atributos. Todos los proyectos las heredan y opcionalmente pueden agregar las suyas.",
+            ORGANIZATION_ROLE_PERMISSIONS_CANNOT_BE_MODIFIED_AT_PROJECT_LEVEL:
+                "Los permisos de roles de organización no se pueden modificar a nivel de proyecto.",
+            ORGANIZATION_ROLES_CANNOT_BE_EDITED_AT_PROJECT_LEVEL:
+                "Los roles de organización no se pueden editar a nivel de proyecto.",
+            ORGANIZATION_SECURITY_LABELS:
+                "Etiquetas de sensitividad de la organización",
+            ORGANIZATION_SECURITY_LABELS_DESCRIPTION:
+                "Etiquetas de sensitividad para control de acceso basado en atributos. Todos los proyectos las heredan y opcionalmente pueden agregar las suyas.",
             ORGANIZATION_SETTINGS: "Configuración de la organización",
-            ORGANIZATION_SETTINGS_DESCRIPTION: "Configura la identidad visual, el almacenamiento y los servicios del ecosistema de esta organización",
+            ORGANIZATION_SETTINGS_DESCRIPTION:
+                "Configura la identidad visual, el almacenamiento y los servicios del ecosistema de esta organización",
             ORGANIZATION_TAG: "Etiqueta de la organización",
             ORGANIZATION_TAG_CREATED: "Etiqueta de la organización creada.",
-            ORGANIZATION_TAG_MANAGEMENT: "Administración de etiquetas de la organización",
+            ORGANIZATION_TAG_MANAGEMENT:
+                "Administración de etiquetas de la organización",
             ORGANIZATION_TAG_UPDATED: "Etiqueta de la organización actualizada.",
             ORGANIZATION_TAGS: "Etiquetas de la organización",
-            ORGANIZATION_TAGS_DESCRIPTION: "Etiquetas para clasificación, flujos de trabajo y búsqueda. Todos los proyectos las heredan y opcionalmente pueden agregar las suyas.",
+            ORGANIZATION_TAGS_DESCRIPTION:
+                "Etiquetas para clasificación, flujos de trabajo y búsqueda. Todos los proyectos las heredan y opcionalmente pueden agregar las suyas.",
             ORGANIZATION_USERS: "Usuarios de la organización",
             ORGANIZATION_WARNING_BANNER: "Banner de advertencia de la organización",
             ORGANIZATIONS: "Organizaciones",
             ORIGINAL_ID: "ID original",
-            ORIGINAL_ID_ALREADY_IN_USE: "El ID original ya está en uso. Cada archivo cargado debe tener un ID original único.",
-            ORIGINAL_ID_ALREADY_IN_USE_SUGGESTION: "Actualice los metadatos con un ID original único o elimine el ID original para que el sistema genere uno automáticamente.",
+            ORIGINAL_ID_ALREADY_IN_USE:
+                "El ID original ya está en uso. Cada archivo cargado debe tener un ID original único.",
+            ORIGINAL_ID_ALREADY_IN_USE_SUGGESTION:
+                "Actualice los metadatos con un ID original único o elimine el ID original para que el sistema genere uno automáticamente.",
             ORIGINAL_ID_REQUIRED: "El ID original es obligatorio",
             ORIGINAL_ID_UPDATED: "ID original actaulizado",
             OUTGOING: "Salientes",
@@ -1999,26 +2393,35 @@ export const translations = {
             PEOPLE: "personas",
             PERMISSION: "Permiso",
             PERMISSION_MATRIX: "Matriz de permisos",
-            PERMISSION_REQUIRED_SUGGESTION: "Póngase en contacto con el administrador del proyecto para solicitar los permisos necesarios.",
+            PERMISSION_REQUIRED_SUGGESTION:
+                "Póngase en contacto con el administrador del proyecto para solicitar los permisos necesarios.",
             PERMISSIONS: "Permisos",
             PERMISSIONS_STILL_LOADING: "Los permisos aún se están cargando.",
             PERSON: "persona",
             PIV_CAC_CARD_SIGN_IN: "Iniciar sesión con tarjeta PIV/CAC",
             PLEASE_ENTER_CLASS_NAME: "Por favor ingresa el nombre de la clase",
             PLEASE_ENTER_EMAIL_ADDRESS: "Por favor, ingresa un correo electrónico",
-            PLEASE_ENTER_VALID_EMAIL_ADDRESS: "Por favor, ingresa un correo electrónico válido",
-            PLEASE_FIX_VALIDATION_ERRORS_BEFORE_UPLOADING: "Corrija los errores de validación antes de cargar",
+            PLEASE_ENTER_VALID_EMAIL_ADDRESS:
+                "Por favor, ingresa un correo electrónico válido",
+            PLEASE_FIX_VALIDATION_ERRORS_BEFORE_UPLOADING:
+                "Corrija los errores de validación antes de cargar",
             PLEASE_SELECT_A_DATA_SOURCE: "Por favor selecciona una fuente de datos.",
             PLEASE_SELECT_A_GROUP: "Por favor, selecciona un grupo",
             PLEASE_SELECT_A_PROJECT: "Por favor selecciona un proyecto.",
             PLEASE_SELECT_A_ROLE: "Por favor, selecciona un rol",
-            PLEASE_SELECT_A_ROLE_FOR_MEMBER: "Por favor, selecciona un rol para este miembro",
-            PLEASE_SELECT_A_ROLE_FOR_THIS_MEMEBER: "Por favor, selecciona un rol para este miembro",
-            PLEASE_SELECT_A_STORAGE_LOCATION: "Por favor, selecciona una ubicación de almacenamiento",
+            PLEASE_SELECT_A_ROLE_FOR_MEMBER:
+                "Por favor, selecciona un rol para este miembro",
+            PLEASE_SELECT_A_ROLE_FOR_THIS_MEMEBER:
+                "Por favor, selecciona un rol para este miembro",
+            PLEASE_SELECT_A_STORAGE_LOCATION:
+                "Por favor, selecciona una ubicación de almacenamiento",
             PLEASE_SELECT_A_USER: "Por favor, selecciona un usuario",
-            PLEASE_SELECT_PROJECT_AND_DATASOURCE: "Por favor, seleccione primero el proyecto y la fuente de datos",
-            PLEASE_SELECT_RECORD_TO_UPDATE: "Seleccione un registro existente para actualizar.",
-            PLEASE_UPLOAD_VALID_IMAGE: "Por favor, sube un archivo de imagen válido (se recomienda PNG).",
+            PLEASE_SELECT_PROJECT_AND_DATASOURCE:
+                "Por favor, seleccione primero el proyecto y la fuente de datos",
+            PLEASE_SELECT_RECORD_TO_UPDATE:
+                "Seleccione un registro existente para actualizar.",
+            PLEASE_UPLOAD_VALID_IMAGE:
+                "Por favor, sube un archivo de imagen válido (se recomienda PNG).",
             PLEASE_WAIT_DO_NOT_CLOSE_WINDOW: "Espere, no cierre esta ventana...",
             PLOT_OPTIONS: "Opciones de Gráfico",
             PREFERENCES: "Preferencias",
@@ -2036,64 +2439,92 @@ export const translations = {
             PROJECT_ASSIGNMENT: "Asignacion de proyectos",
             PROJECT_CONTACTS: "Contactos del proyecto",
             PROJECT_CLASSES_AND_IDS: "Clases e IDs del proyecto",
-            PROJECT_CLASSES_AND_IDS_HELP: "Use uno de estos IDs de clase en su archivo de metadatos al establecer ClassId.",
+            PROJECT_CLASSES_AND_IDS_HELP:
+                "Use uno de estos IDs de clase en su archivo de metadatos al establecer ClassId.",
             PROJECT_DASHBOARD: "Tablero del proyecto",
-            PROJECT_INSIGHT_CHAT_INTRO_EMPTY: 'Todavía no hay archivos incrustados dentro del alcance para "{projectName}". Ajusta los filtros o pon archivos en cola para Insight a continuación.',
-            PROJECT_INSIGHT_CHAT_INTRO_READY: 'Puedo responder preguntas sobre {recordCount} archivos incrustados en "{projectName}". Haz una pregunta a nivel de proyecto para comenzar.',
-            PROJECT_INSIGHT_CHAT_PLACEHOLDER: "Pregúntale a Insight sobre los archivos incrustados del proyecto dentro del alcance...",
+            PROJECT_INSIGHT_CHAT_INTRO_EMPTY:
+                'Todavía no hay archivos incrustados dentro del alcance para "{projectName}". Ajusta los filtros o pon archivos en cola para Insight a continuación.',
+            PROJECT_INSIGHT_CHAT_INTRO_READY:
+                'Puedo responder preguntas sobre {recordCount} archivos incrustados en "{projectName}". Haz una pregunta a nivel de proyecto para comenzar.',
+            PROJECT_INSIGHT_CHAT_PLACEHOLDER:
+                "Pregúntale a Insight sobre los archivos incrustados del proyecto dentro del alcance...",
             PROJECT_INSIGHT_CLEAR_SELECTION: "Limpiar selección",
-            PROJECT_INSIGHT_DESCRIPTION: 'Haz preguntas a nivel de proyecto sobre los archivos incrustados en "{projectName}". La búsqueda te ayuda a llevar rápidamente los documentos correctos al alcance del chat y los filtros siguen disponibles cuando los necesites.',
+            PROJECT_INSIGHT_DESCRIPTION:
+                'Haz preguntas a nivel de proyecto sobre los archivos incrustados en "{projectName}". La búsqueda te ayuda a llevar rápidamente los documentos correctos al alcance del chat y los filtros siguen disponibles cuando los necesites.',
             PROJECT_INSIGHT_EMBED_SELECTED: "Incrustar seleccionados",
-            PROJECT_INSIGHT_EMBEDDED_EMPTY: "Actualmente no hay archivos incrustados dentro del alcance.",
+            PROJECT_INSIGHT_EMBEDDED_EMPTY:
+                "Actualmente no hay archivos incrustados dentro del alcance.",
             PROJECT_INSIGHT_EMBEDDED_TITLE: "Archivos incrustados",
-            PROJECT_INSIGHT_FAILED_SUMMARY: "{count} registro(s) no se pudieron poner en cola.",
+            PROJECT_INSIGHT_FAILED_SUMMARY:
+                "{count} registro(s) no se pudieron poner en cola.",
             PROJECT_INSIGHT_FILTERS: "Filtros del alcance del proyecto",
-            PROJECT_INSIGHT_FILTERS_DESCRIPTION: "Usa nombres de clase y etiquetas para reducir la biblioteca incrustada y los archivos que todavía necesitan incrustarse.",
+            PROJECT_INSIGHT_FILTERS_DESCRIPTION:
+                "Usa nombres de clase y etiquetas para reducir la biblioteca incrustada y los archivos que todavía necesitan incrustarse.",
             PROJECT_INSIGHT_FILTERS_RECORDS: "Registros filtrados",
             PROJECT_INSIGHT_FILTERS_TAB: "Filtros",
-            PROJECT_INSIGHT_LIBRARY_DESCRIPTION: "Estos archivos incrustados se pueden buscar con Insight y están disponibles para el chat.",
+            PROJECT_INSIGHT_LIBRARY_DESCRIPTION:
+                "Estos archivos incrustados se pueden buscar con Insight y están disponibles para el chat.",
             PROJECT_INSIGHT_LIBRARY_TAB: "Biblioteca incrustada",
-            PROJECT_INSIGHT_LOADING_RECORDS: "Cargando registros del proyecto y el estado de Insight...",
-            PROJECT_INSIGHT_NO_FILTER_OPTIONS: "No hay opciones disponibles para este filtro.",
-            PROJECT_INSIGHT_PENDING_DESCRIPTION: "Estos registros siguen respondiendo a los filtros de clase y etiquetas. Selecciona los archivos compatibles para ponerlos en cola para la incrustación de Insight.",
-            PROJECT_INSIGHT_PENDING_EMPTY: "Todos los archivos compatibles con Insight que coinciden con los filtros ya están incrustados.",
-            PROJECT_INSIGHT_PENDING_SEARCH_HINT: "Busca archivos pendientes por nombre, clase, etiquetas o fuente, o abre los filtros para reducir la lista.",
-            PROJECT_INSIGHT_PENDING_SEARCH_PLACEHOLDER: "Busca nombre de archivo, clase, etiquetas o fuente...",
-            PROJECT_INSIGHT_PENDING_SEARCH_RESULTS: "Mostrando {count} archivo(s) que coinciden con la búsqueda de archivos pendientes.",
+            PROJECT_INSIGHT_LOADING_RECORDS:
+                "Cargando registros del proyecto y el estado de Insight...",
+            PROJECT_INSIGHT_NO_FILTER_OPTIONS:
+                "No hay opciones disponibles para este filtro.",
+            PROJECT_INSIGHT_PENDING_DESCRIPTION:
+                "Estos registros siguen respondiendo a los filtros de clase y etiquetas. Selecciona los archivos compatibles para ponerlos en cola para la incrustación de Insight.",
+            PROJECT_INSIGHT_PENDING_EMPTY:
+                "Todos los archivos compatibles con Insight que coinciden con los filtros ya están incrustados.",
+            PROJECT_INSIGHT_PENDING_SEARCH_HINT:
+                "Busca archivos pendientes por nombre, clase, etiquetas o fuente, o abre los filtros para reducir la lista.",
+            PROJECT_INSIGHT_PENDING_SEARCH_PLACEHOLDER:
+                "Busca nombre de archivo, clase, etiquetas o fuente...",
+            PROJECT_INSIGHT_PENDING_SEARCH_RESULTS:
+                "Mostrando {count} archivo(s) que coinciden con la búsqueda de archivos pendientes.",
             PROJECT_INSIGHT_PENDING_TAB: "Necesitan incrustarse",
             PROJECT_INSIGHT_PENDING_TITLE: "Aún no buscables",
-            PROJECT_INSIGHT_PROJECT_REQUIRED: "Selecciona primero un proyecto para usar Insight a nivel de proyecto.",
-            PROJECT_INSIGHT_QUEUED_SUMMARY: "Se pusieron {count} registro(s) en cola para Insight.",
+            PROJECT_INSIGHT_PROJECT_REQUIRED:
+                "Selecciona primero un proyecto para usar Insight a nivel de proyecto.",
+            PROJECT_INSIGHT_QUEUED_SUMMARY:
+                "Se pusieron {count} registro(s) en cola para Insight.",
             PROJECT_INSIGHT_READY_BADGE: "Listo para Insight",
             PROJECT_INSIGHT_SCOPE: "Chat de Insight del proyecto",
             PROJECT_INSIGHT_SCOPE_COUNT: "{count} archivos dentro del alcance",
-            PROJECT_INSIGHT_SCOPE_EMPTY: "Ningún registro incrustado coincide todavía con los filtros actuales. Ajusta los filtros o incrusta archivos a continuación.",
-            PROJECT_INSIGHT_SCOPE_HINT: "Busca archivos incrustados arriba o abre los filtros para reducir los documentos disponibles para el chat.",
+            PROJECT_INSIGHT_SCOPE_EMPTY:
+                "Ningún registro incrustado coincide todavía con los filtros actuales. Ajusta los filtros o incrusta archivos a continuación.",
+            PROJECT_INSIGHT_SCOPE_HINT:
+                "Busca archivos incrustados arriba o abre los filtros para reducir los documentos disponibles para el chat.",
             PROJECT_INSIGHT_SEARCHING: "Buscando archivos del proyecto...",
-            PROJECT_INSIGHT_SEARCH_PLACEHOLDER: "Busca archivos incrustados en este proyecto",
-            PROJECT_INSIGHT_SEARCH_RESULTS: 'Mostrando {count} archivo(s) incrustado(s) que coinciden con "{query}".',
-            PROJECT_INSIGHT_SEARCH_RESULTS_EMPTY: 'Ningún archivo incrustado coincidió con "{query}".',
+            PROJECT_INSIGHT_SEARCH_PLACEHOLDER:
+                "Busca archivos incrustados en este proyecto",
+            PROJECT_INSIGHT_SEARCH_RESULTS:
+                'Mostrando {count} archivo(s) incrustado(s) que coinciden con "{query}".',
+            PROJECT_INSIGHT_SEARCH_RESULTS_EMPTY:
+                'Ningún archivo incrustado coincidió con "{query}".',
             PROJECT_INSIGHT_SELECT_ALL_VISIBLE: "Seleccionar visibles",
             PROJECT_INSIGHT_SELECTED_COUNT: "{count} seleccionados",
             PROJECT_INSIGHT_STATUS_CHECKING: "Comprobando el estado de Insight...",
             STARTING: "Iniciando",
             CHECKING: "Comprobando",
             ANALYZE_RECORD: "Analizar registro",
-            PROJECT_INSIGHT_STATUS_ERROR: "Insight necesita atención para este archivo.",
+            PROJECT_INSIGHT_STATUS_ERROR:
+                "Insight necesita atención para este archivo.",
             PROJECT_INSIGHT_STATUS_PENDING: "Listo para incrustar.",
             PROJECT_INSIGHT_STATUS_PROCESSING: "Incrustación en progreso.",
             PROJECT_INSIGHT_STATUS_QUEUED: "En cola para incrustar.",
-            PROJECT_INSIGHT_STATUS_UNSUPPORTED: "Insight solo admite archivos PDF, TXT y HTML.",
+            PROJECT_INSIGHT_STATUS_UNSUPPORTED:
+                "Insight solo admite archivos PDF, TXT y HTML.",
             PROJECT_INSIGHT_UPDATED_FROM: "Actualizado desde",
             PROJECT_INSIGHT_UPDATED_TO: "Actualizado hasta",
             PROJECT_LABEL_CREATED: "Etiqueta del proyecto creada.",
             PROJECT_LABEL_UPDATED: "Etiqueta del proyecto actualizada.",
             PROJECT_LABELS_LOWER: "etiquetas del proyecto",
-            PROJECT_LEVEL_ROLE_CREATION_AND_PERMISSION_MODIFICATION_DESCRIPTION: "La creación de roles a nivel de proyecto y la modificación de permisos están deshabilitadas. Contacta al administrador de tu organización para desbloquearlos.",
-            PROJECT_LEVEL_SECURITY_LABEL: "Etiqueta de sensitividad a nivel de proyecto",
+            PROJECT_LEVEL_ROLE_CREATION_AND_PERMISSION_MODIFICATION_DESCRIPTION:
+                "La creación de roles a nivel de proyecto y la modificación de permisos están deshabilitadas. Contacta al administrador de tu organización para desbloquearlos.",
+            PROJECT_LEVEL_SECURITY_LABEL:
+                "Etiqueta de sensitividad a nivel de proyecto",
             PROJECT_LOGO: "Logotipo del proyecto",
             PROJECT_MANAGED: "Gestionado por proyecto",
-            PROJECT_MANAGED_DELETABLE_HERE: "Gestionadas por el proyecto y eliminables aquí",
+            PROJECT_MANAGED_DELETABLE_HERE:
+                "Gestionadas por el proyecto y eliminables aquí",
             PROJECT_MANAGEMENT: "Gestión de proyectos",
             PROJECT_MEMBERS: "Miembros del proyecto",
             PROJECT_NAME: "Nombre del proyecto ",
@@ -2102,17 +2533,21 @@ export const translations = {
             PROJECT_ROLES: "Roles de Proyecto",
             PROJECT_ROLES_AND_PERMISSIONS: "Roles y permisos del proyecto",
             PROJECT_SECURITY_LABELS: "Etiquetas de sensitividad del proyecto",
-            PROJECT_SECURITY_LABELS_DESCRIPTION: "Etiquetas para control de acceso basado en atributos a nivel de proyecto. Este proyecto siempre hereda las etiquetas definidas a nivel de organización y puede definir etiquetas adicionales cuando no están bloqueadas.",
-            PROJECT_SECURITY_LABELS_DESCRIPTION_WITH_CUI: "Etiquetas de sensitividad (p. ej., CUI) para control de acceso basado en atributos a nivel de proyecto. Este proyecto también hereda cualquier etiqueta definida a nivel de organización.",
+            PROJECT_SECURITY_LABELS_DESCRIPTION:
+                "Etiquetas para control de acceso basado en atributos a nivel de proyecto. Este proyecto siempre hereda las etiquetas definidas a nivel de organización y puede definir etiquetas adicionales cuando no están bloqueadas.",
+            PROJECT_SECURITY_LABELS_DESCRIPTION_WITH_CUI:
+                "Etiquetas de sensitividad (p. ej., CUI) para control de acceso basado en atributos a nivel de proyecto. Este proyecto también hereda cualquier etiqueta definida a nivel de organización.",
             PROJECT_SELECTOR_LABEL: "Seleccione un proyecto",
             PROJECT_SETTINGS: "Configuración del proyecto",
             PROJECT_TAG_CREATED: "Etiqueta del proyecto creada.",
             PROJECT_TAG_MANAGEMENT: "Administración de etiquetas del proyecto",
             PROJECT_TAG_UPDATED: "Etiqueta del proyecto actualizada.",
             PROJECT_TAGS: "Etiquetas del proyecto",
-            PROJECT_TAGS_DESCRIPTION: "Etiquetas para clasificación, flujos de trabajo y búsqueda a nivel de proyecto. Este proyecto siempre hereda las etiquetas definidas a nivel de organización y puede definir etiquetas adicionales cuando no están bloqueadas.",
+            PROJECT_TAGS_DESCRIPTION:
+                "Etiquetas para clasificación, flujos de trabajo y búsqueda a nivel de proyecto. Este proyecto siempre hereda las etiquetas definidas a nivel de organización y puede definir etiquetas adicionales cuando no están bloqueadas.",
             PROJECT_TAGS_LOWER: "etiquetas del proyecto",
-            PROJECT_USAGE_TRACKING_COMING_SOON: "El seguimiento de uso por proyecto llegará pronto",
+            PROJECT_USAGE_TRACKING_COMING_SOON:
+                "El seguimiento de uso por proyecto llegará pronto",
             PROJECT_WARNING_BANNER: "Banner de advertencia del proyecto",
             PROJECTS: "Proyectos",
             PROJECTS_MAY_DEFINE_THEIR_OWN: "Los proyectos pueden definir las suyas",
@@ -2123,18 +2558,21 @@ export const translations = {
             PROPERTIES_COUNT: "{count} propiedades",
             PROPERTIES_LABEL: "propiedades",
             PROPERTIES_SOURCE: "Fuentes de propiedades:",
-            PROPERTIES_UPDATED_SUCCESSFULLY: "Propiedades actualizadas correctamente!",
+            PROPERTIES_UPDATED_SUCCESSFULLY:
+                "Propiedades actualizadas correctamente!",
             PROPERTY_KEY_PLACEHOLDER: "Clave de propiedad (ej., numero_contrato)",
             QUERY_BUILDER: "Constructor de consultas",
             READY: "Listo",
             RECENT_ACTIVITY: "Actividad reciente",
             RECENTLY_ADDED_RECORDS: "Registros añadidos recientemente",
-            RECOMMENDED_PNG_WITH_TRANSPARENT_BACKGROUND: "Recomendado: PNG con fondo transparente",
+            RECOMMENDED_PNG_WITH_TRANSPARENT_BACKGROUND:
+                "Recomendado: PNG con fondo transparente",
             RECORD: "Registro",
             RECORD_: "Registro ",
             RECORD_CREATED_SUCCESSFULLY: "¡Registro creado correctamente!",
             RECORD_DESCRIPTION: "Descripción del registro",
-            RECORD_FILE_UPDATED_SUCCESSFULLY: "El archivo del registro se actualizó correctamente.",
+            RECORD_FILE_UPDATED_SUCCESSFULLY:
+                "El archivo del registro se actualizó correctamente.",
             RECORD_HISTORY: "Historial del registro",
             RECORD_HISTORY_ARCHIVED_LABEL: "Archivado:",
             RECORD_HISTORY_CHANGED: "Cambiado",
@@ -2150,14 +2588,18 @@ export const translations = {
             RECORD_HISTORY_FIELD: "Campo",
             RECORD_HISTORY_FIELDS: "campos",
             RECORD_HISTORY_LATEST: "Más reciente",
-            RECORD_HISTORY_LOADING_COMPARISON_SNAPSHOT: "Cargando instantánea de comparación...",
-            RECORD_HISTORY_LOADING_SELECTED_SNAPSHOT: "Cargando instantánea seleccionada...",
+            RECORD_HISTORY_LOADING_COMPARISON_SNAPSHOT:
+                "Cargando instantánea de comparación...",
+            RECORD_HISTORY_LOADING_SELECTED_SNAPSHOT:
+                "Cargando instantánea seleccionada...",
             RECORD_HISTORY_MANUAL: "Manual",
             RECORD_HISTORY_MANUAL_COMPARE_VERSION: "Versión de comparación manual",
             RECORD_HISTORY_NAME_LABEL: "Nombre:",
             RECORD_HISTORY_NESTED_GROUP: "Grupo anidado",
-            RECORD_HISTORY_NO_COMPARISON_VERSION_SELECTED: "No hay versión de comparación seleccionada.",
-            RECORD_HISTORY_NO_DIFFERENCES_FOR_SELECTED_COMPARISON: "No hay diferencias para la comparación seleccionada.",
+            RECORD_HISTORY_NO_COMPARISON_VERSION_SELECTED:
+                "No hay versión de comparación seleccionada.",
+            RECORD_HISTORY_NO_DIFFERENCES_FOR_SELECTED_COMPARISON:
+                "No hay diferencias para la comparación seleccionada.",
             RECORD_HISTORY_NOT_AVAILABLE: "N/D",
             RECORD_HISTORY_PREVIOUS: "Anterior",
             RECORD_HISTORY_SAME: "Igual",
@@ -2181,7 +2623,8 @@ export const translations = {
             RECORDS_VALIDATED_SUCCESSFULLY: "¡registros validados correctamente!",
             RELATIONSHIP: "Relación",
             RELATIONSHIP_DETAILS: "Detalles de relacion",
-            RELATIONSHIP_ID_NOT_FOUND_SUGGESTION: "Verifique que los IDs de relación existan en el proyecto seleccionado.",
+            RELATIONSHIP_ID_NOT_FOUND_SUGGESTION:
+                "Verifique que los IDs de relación existan en el proyecto seleccionado.",
             RELATED_TO: "Relacionado con",
             RELATIONSHIPS: "Relaciones",
             REMOTE_DB: "Base de datos remota",
@@ -2189,7 +2632,8 @@ export const translations = {
             REMOVE_FROM_ORGANIZATION: "Eliminar de la organizacion",
             REMOVE_LOGO: "Eliminar logotipo",
             REMOVE_USER: "¿Eliminar usuario?",
-            REPLACES_THE_FOLDER_ICON_NEXT_TO_THE_PROJECT_NAME: "Reemplaza el ícono de carpeta junto al nombre del proyecto",
+            REPLACES_THE_FOLDER_ICON_NEXT_TO_THE_PROJECT_NAME:
+                "Reemplaza el ícono de carpeta junto al nombre del proyecto",
             REPORTS: "Reportes",
             RESEND_INVITATION: "Reenviar invitacion",
             RESOURCE_PERMISSIONS: "Permisos de recursos",
@@ -2226,7 +2670,8 @@ export const translations = {
             SEARCH_AND_SELECT_RECORDS: "Busca y selecciona registros",
             SEARCH_BY_NAME_OR_EMAIL: "Buscar por nombre o correo electrónico",
             SEARCH_CLASSES: "Buscar clases",
-            SEARCH_FILES_PLACEHOLDER: "Busque archivos por nombre, alias, descripción o ID",
+            SEARCH_FILES_PLACEHOLDER:
+                "Busque archivos por nombre, alias, descripción o ID",
             SEARCH_FOR_RECORDS: "Buscar registros...",
             SEARCH_LABELS: "Buscar etiquetas de sensibilidad...",
             SEARCH_RECORDS: "Buscar registros",
@@ -2234,13 +2679,16 @@ export const translations = {
             SEARCH_TERMS: "Términos de búsqueda",
             SEARCHING: "Buscando...",
             SEARCHING_FILES: "Buscando archivos...",
-            SECURITY_LABELS_LOCKED_AT_ORG_LEVEL: "Las etiquetas de sensitividad están bloqueadas a nivel de organización",
-            SECURITY_LABELS_LOCKED_BY_ORGANIZATION: "Las etiquetas de sensitividad están bloqueadas por la organización",
+            SECURITY_LABELS_LOCKED_AT_ORG_LEVEL:
+                "Las etiquetas de sensitividad están bloqueadas a nivel de organización",
+            SECURITY_LABELS_LOCKED_BY_ORGANIZATION:
+                "Las etiquetas de sensitividad están bloqueadas por la organización",
             SEE_MORE: "Ver más",
             SELECT_A_DATA_SOURCE: "Selecciona una fuente de datos...",
             SELECT_A_GROUP: "Selecciona un grupo",
             SELECT_A_MEMBER: "Seleccione un miembro",
-            SELECT_A_PROJECT_AND_AT_LEAST_ONE_FILE: "Seleccione un proyecto y al menos un archivo.",
+            SELECT_A_PROJECT_AND_AT_LEAST_ONE_FILE:
+                "Seleccione un proyecto y al menos un archivo.",
             SELECT_A_PROJECT_FIRST: "Seleccione primero un proyecto",
             SELECT_A_ROLE: "Seleccione un rol",
             SELECT_A_ROLE_: "Selecciona un rol...",
@@ -2251,9 +2699,11 @@ export const translations = {
             SELECT_CLASS: "Seleccionar clase",
             SELECT_DATA_SOURCE: "Seleccionar fuente de datos",
             SELECT_EXISTING_FILE: "Selecciona un archivo existente",
-            SELECT_EXISTING_FILE_FROM_DROPDOWN: "Selecciona un archivo existente del menú desplegable.",
+            SELECT_EXISTING_FILE_FROM_DROPDOWN:
+                "Selecciona un archivo existente del menú desplegable.",
             SELECT_EXISTING_RECORD: "Seleccione un registro existente",
-            SELECT_FILE_TO_BEGIN: "Por favor seleccione un archivo de series temporales desde la pestaña \"Configuración\" para comenzar",
+            SELECT_FILE_TO_BEGIN:
+                'Por favor seleccione un archivo de series temporales desde la pestaña "Configuración" para comenzar',
             SELECT_FILTERS: "Seleccionar filtros",
             SELECT_GROUP_TO_VIEW_MEMBERS: "Selecciona un grupo para ver los miembros",
             SELECT_ORGANIZATION_USERS: "Seleccionar usuarios de la organización",
@@ -2265,7 +2715,8 @@ export const translations = {
             SELECT_Y_AXIS_COLUMN: "Seleccione al menos una columna del eje Y",
             SELECTED: "Seleccionado",
             SELECTED_FILES: "Archivos seleccionados",
-            SELECTED_GROUP_WILL_BE_ARCHIVED_MEMBERS_WILL_BE_REMOVED: "Los grupos seleccionados serán archivados. Los miembros serán removidos de esos grupos, pero permanecerán en la organización.",
+            SELECTED_GROUP_WILL_BE_ARCHIVED_MEMBERS_WILL_BE_REMOVED:
+                "Los grupos seleccionados serán archivados. Los miembros serán removidos de esos grupos, pero permanecerán en la organización.",
             SELECTED_ORGANIZATION_USERS: "Usuarios seleccionados de la organización",
             SELECTED_RECORD: "Registro seleccionado:",
             SELECTED_RECORDS: "Registros seleccionados",
@@ -2273,10 +2724,13 @@ export const translations = {
             SEND_INVITATIONS: "Enviar invitación(es)",
             SENSITIVITY_LABEL_REMOVED: "Etiqueta de sensibilidad eliminada",
             SENSITIVITY_LABELS: "Etiquetas de sensibilidad",
-            SERVER_REJECTED_UPLOAD_FIX_ISSUES: "El servidor rechazó la carga. Corrija los siguientes problemas:",
-            SERVICE_CONFIG_WILL_BE_AVAILABLE_SOON: "La configuración del servicio estará disponible en una versión futura",
+            SERVER_REJECTED_UPLOAD_FIX_ISSUES:
+                "El servidor rechazó la carga. Corrija los siguientes problemas:",
+            SERVICE_CONFIG_WILL_BE_AVAILABLE_SOON:
+                "La configuración del servicio estará disponible en una versión futura",
             SET_AS_DEFAULT_STORAGE: "Establecer como almacenamiento predeterminado",
-            SET_DEFAULT_UNMOUNTED_OBJECT_STORAGE: "Establecer la ubicación predeterminada del almacenamiento de objetos no montado para esta organización.",
+            SET_DEFAULT_UNMOUNTED_OBJECT_STORAGE:
+                "Establecer la ubicación predeterminada del almacenamiento de objetos no montado para esta organización.",
             STORAGE_SIZE: "Tamaño de almacenamiento",
             SET_UP: "Configuración",
             SETTINGS: "Configuración",
@@ -2285,7 +2739,8 @@ export const translations = {
             SHOW_LESS: "Mostrar menos",
             SHOW_VALUE_MARKERS: "Mostrar marcadores de valores",
             SHOWING: "Mostrando",
-            SHOWING_FIRST_FILES_USE_SEARCH: "Mostrando los primeros {count} archivos. Use la búsqueda para limitar resultados.",
+            SHOWING_FIRST_FILES_USE_SEARCH:
+                "Mostrando los primeros {count} archivos. Use la búsqueda para limitar resultados.",
             SHOWING_RECORDS_RANGE: "Mostrando {visible} de {total} registros",
             SORT_BY: "Ordenar por",
             SORT_DATE_NEWEST: "Fecha: Más reciente",
@@ -2298,15 +2753,20 @@ export const translations = {
             SINGLE_FILE_UPLOAD: "Carga de un solo archivo",
             SITE_MANAGEMENT: "Administración del sitio",
             SITE_USERS: "Usuarios del sitio",
-            SOME_UPLOADS_FAILED_CHECK_FILE_CARDS: "Algunas cargas fallaron. Revise las tarjetas de los archivos.",
+            SOME_UPLOADS_FAILED_CHECK_FILE_CARDS:
+                "Algunas cargas fallaron. Revise las tarjetas de los archivos.",
             SOURCE: "Fuente: ",
             SPLIT_VIEW: "Vista dividida",
             STANDARD_FILE: "Archivo estándar",
             STANDARD_ROLE: "Rol Estándar (Solo Lectura)",
-            STANDARD_ROLE_DESC: "Este es un rol estándar y no se puede modificar. Cree un rol personalizado si necesita permisos diferentes.",
-            STANDARD_ROLE_PERMISSIONS_CANNOT_BE_MODIFIED: "Los permisos de roles estándar no se pueden modificar.",
-            STANDARD_ROLES_CANNOT_BE_EDITED: "Los roles estándar no se pueden editar.",
-            START_UPLOAD_BY_CHOOSING_TYPE: "Comienza una carga eligiendo el tipo y el destino:",
+            STANDARD_ROLE_DESC:
+                "Este es un rol estándar y no se puede modificar. Cree un rol personalizado si necesita permisos diferentes.",
+            STANDARD_ROLE_PERMISSIONS_CANNOT_BE_MODIFIED:
+                "Los permisos de roles estándar no se pueden modificar.",
+            STANDARD_ROLES_CANNOT_BE_EDITED:
+                "Los roles estándar no se pueden editar.",
+            START_UPLOAD_BY_CHOOSING_TYPE:
+                "Comienza una carga eligiendo el tipo y el destino:",
             STATUS: "Estado",
             STD: "STD",
             STEP_1_DOWNLOAD_TEMPLATE: "Paso 1: Descargar plantilla",
@@ -2320,17 +2780,20 @@ export const translations = {
             STORAGE_SETTINGS: "Configuración de almacenamiento",
             STORAGE_TYPE: "Tipo de almacenamiento",
             STORAGE_TYPE_LABEL: "Tipo:",
-            STORAGE_UPDATED_SUCCESSFULLY: "El almacenamiento se actualizó correctamente",
+            STORAGE_UPDATED_SUCCESSFULLY:
+                "El almacenamiento se actualizó correctamente",
             SUCCESSFULLY: "correctamente",
             SUCCESSFULLY_PARSED: "Analizado correctamente",
             SUPPORTED_FORMATS_FOR_LOGO: "Formatos compatibles: PNG, JPG, SVG, WebP",
-            SURE_YOU_WANT_TO_CANCEL_INVITATION_FOR_: "¿Estás seguro de que deseas cancelar la invitación para",
+            SURE_YOU_WANT_TO_CANCEL_INVITATION_FOR_:
+                "¿Estás seguro de que deseas cancelar la invitación para",
             SWITCH_ORGANIZATION: "Cambiar organización",
             SYSTEM_DATASOURCES: "Fuentes de datos del sistema",
             SYSTEM_OVERVIEW: "Resumen del sistema",
             SYSTEM_STORAGE_SIZE: "Tamaño de almacenamiento del sistema",
             SYSTEM_ADMIN: "Administrador del sistema",
-            SYSTEM_ADMIN_ACCESS_UPDATED: "Se actualizo el acceso de administrador del sistema.",
+            SYSTEM_ADMIN_ACCESS_UPDATED:
+                "Se actualizo el acceso de administrador del sistema.",
             SYSTEM_PROPERTIES: "Propiedades del sistema",
             TABLE_VIEW: "Vista de tabla",
             TAG: "Etiqueta",
@@ -2343,25 +2806,38 @@ export const translations = {
             BIDIRECTIONAL: "Bidireccional",
             DEPTH: "Profundidad",
             TAGS_ARE_LOCKED: "Las etiquetas están bloqueadas",
-            TAGS_LOCKED_AT_ORG_LEVEL: "Las etiquetas están bloqueadas a nivel de organización",
-            TAGS_LOCKED_AT_ORG_LEVEL_SHORT: "Las etiquetas están bloqueadas a nivel de organización",
-            TAGS_LOCKED_BY_ORGANIZATION: "Las etiquetas están bloqueadas por la organización",
-            TAGS_LOCKED_CANNOT_ARCHIVE_PROJECT: "Las etiquetas están bloqueadas a nivel de organización. No se pueden archivar etiquetas del proyecto.",
-            TAGS_LOCKED_CANNOT_CREATE_OR_EDIT_PROJECT: "Las etiquetas están bloqueadas a nivel de organización. No se pueden crear ni editar etiquetas del proyecto.",
+            TAGS_LOCKED_AT_ORG_LEVEL:
+                "Las etiquetas están bloqueadas a nivel de organización",
+            TAGS_LOCKED_AT_ORG_LEVEL_SHORT:
+                "Las etiquetas están bloqueadas a nivel de organización",
+            TAGS_LOCKED_BY_ORGANIZATION:
+                "Las etiquetas están bloqueadas por la organización",
+            TAGS_LOCKED_CANNOT_ARCHIVE_PROJECT:
+                "Las etiquetas están bloqueadas a nivel de organización. No se pueden archivar etiquetas del proyecto.",
+            TAGS_LOCKED_CANNOT_CREATE_OR_EDIT_PROJECT:
+                "Las etiquetas están bloqueadas a nivel de organización. No se pueden crear ni editar etiquetas del proyecto.",
             TAGS_LOWER: "etiquetas",
             TAGS_REMOVED: "Etiqueta(s) eliminada(s)!",
             ETA: "ETA",
             TAGS_UPDATED_SUCCESS: "Etiquetas actualizadas correctamente",
             TEAM_MEMBERS: "Miembros del equipo",
-            THEY_WILL_LOSE_ACCESS_FROM_ALL_PROJECTS: "de esta organización? Perderá acceso a todos los proyectos.",
-            THEY_WILL_NO_LONGER_BE_ABLE_TO_SIGN_IN_UNTIL_UNARCHIVED: "No podrá volver a iniciar sesión hasta que se desarchive.",
-            THEY_WILL_NOT_BE_ABLE_TO_JOIN_WITH_LINK: "No podrá unirse usando este enlace de invitación.",
-            THIS_IS_A_STANDARD_ROLE: "Este es un rol estándar y no se puede modificar. Cree un rol de proyecto personalizado si necesita permisos diferentes.",
-            THIS_ORG_SPACE_MAY_CONTAIN_SENSITIVE_DATA: "Este espacio de la organización puede contener datos sensibles que deben protegerse adecuadamente.",
-            THIS_ROLE_IS_INHERITED: "Este rol se hereda de la organización y no se puede modificar a nivel de proyecto. Puede consultar sus permisos o crear un rol de proyecto personalizado.",
-            THIS_STORAGE_IS_ALREADY_SET_AS_DEFAULT: "Este almacenamiento ya está configurado como predeterminado",
+            THEY_WILL_LOSE_ACCESS_FROM_ALL_PROJECTS:
+                "de esta organización? Perderá acceso a todos los proyectos.",
+            THEY_WILL_NO_LONGER_BE_ABLE_TO_SIGN_IN_UNTIL_UNARCHIVED:
+                "No podrá volver a iniciar sesión hasta que se desarchive.",
+            THEY_WILL_NOT_BE_ABLE_TO_JOIN_WITH_LINK:
+                "No podrá unirse usando este enlace de invitación.",
+            THIS_IS_A_STANDARD_ROLE:
+                "Este es un rol estándar y no se puede modificar. Cree un rol de proyecto personalizado si necesita permisos diferentes.",
+            THIS_ORG_SPACE_MAY_CONTAIN_SENSITIVE_DATA:
+                "Este espacio de la organización puede contener datos sensibles que deben protegerse adecuadamente.",
+            THIS_ROLE_IS_INHERITED:
+                "Este rol se hereda de la organización y no se puede modificar a nivel de proyecto. Puede consultar sus permisos o crear un rol de proyecto personalizado.",
+            THIS_STORAGE_IS_ALREADY_SET_AS_DEFAULT:
+                "Este almacenamiento ya está configurado como predeterminado",
             TIMESERIES: "Series de tiempo",
-            TIMESERIES_FILE_UPLOADED_SUCCESSFULLY: "¡Archivo de series temporales cargado correctamente!",
+            TIMESERIES_FILE_UPLOADED_SUCCESSFULLY:
+                "¡Archivo de series temporales cargado correctamente!",
             TIMESERIES_VIEWER: "Visor de series de tiempo",
             TO: "Hacia",
             TO_DESTINATION: "Hacia el destino",
@@ -2371,10 +2847,13 @@ export const translations = {
             TRENDS: "Tendencias",
             TROUBLE_LOGGING_IN: "¿Problemas para iniciar sesión?",
             UNABLE_TO_LOAD_USERS: "No se pudieron cargar los usuarios",
-            UNABLE_TO_LOAD_USERS_OR_GROUPS: "No se pudieron cargar los usuarios o los grupos",
-            UNABLE_TO_LOAD_USERS_TO_GROUPS: "No se pudieron cargar los usuarios o los grupos",
+            UNABLE_TO_LOAD_USERS_OR_GROUPS:
+                "No se pudieron cargar los usuarios o los grupos",
+            UNABLE_TO_LOAD_USERS_TO_GROUPS:
+                "No se pudieron cargar los usuarios o los grupos",
             UNARCHIVE: "Desarchivar",
-            UNEXPECTED_ERROR_WHILE_PARSING_CSV_FILE: "Error inesperado al analizar el archivo CSV",
+            UNEXPECTED_ERROR_WHILE_PARSING_CSV_FILE:
+                "Error inesperado al analizar el archivo CSV",
             UNKNOWN: "Desconocido",
             UNKNOWN_ERROR: "Error desconocido",
             UNKNOWN_ERROR_OCCURRED: "Ocurrió un error desconocido",
@@ -2388,13 +2867,18 @@ export const translations = {
             UPDATING: "Actualizando...",
             UPLOAD: "Cargar",
             UPLOAD_BATCH_SUCCESS: "Se cargaron {success} archivo(s)",
-            UPLOAD_BATCH_SUCCESS_WITH_FAILURES: "Se cargaron {success} archivo(s) • {failed} con errores",
+            UPLOAD_BATCH_SUCCESS_WITH_FAILURES:
+                "Se cargaron {success} archivo(s) • {failed} con errores",
             UPLOAD_CANCELLED: "Carga cancelada.",
             UPLOAD_CENTER: "Centro de carga",
-            UPLOAD_CENTER_DESCRIPTION: "Elige un modo de carga, configura los recursos de destino y luego carga.",
-            UPLOAD_FAILED_CHECK_FILE_CARD: "La carga falló. Revise la tarjeta del archivo.",
-            UPLOAD_FAILED_PLEASE_CHECK_ERROR_DETAILS_BELOW: "La carga falló. Revise los detalles del error a continuación.",
-            UPLOAD_FAILED_SEE_CONSOLE_FOR_DETAILS: "La carga falló. Consulte la consola para más detalles.",
+            UPLOAD_CENTER_DESCRIPTION:
+                "Elige un modo de carga, configura los recursos de destino y luego carga.",
+            UPLOAD_FAILED_CHECK_FILE_CARD:
+                "La carga falló. Revise la tarjeta del archivo.",
+            UPLOAD_FAILED_PLEASE_CHECK_ERROR_DETAILS_BELOW:
+                "La carga falló. Revise los detalles del error a continuación.",
+            UPLOAD_FAILED_SEE_CONSOLE_FOR_DETAILS:
+                "La carga falló. Consulte la consola para más detalles.",
             UPLOAD_FAILED_TITLE: "La carga falló",
             UPLOAD_MODE: "Modo de carga",
             UPLOAD_MULTIPLE_FILES: "Subir múltiples archivos",
@@ -2408,12 +2892,17 @@ export const translations = {
             UPLOADING_PERCENT_PREFIX: "Subiendo",
             UPLOADING_RECORDS: "Subiendo registros...",
             URI: "Uri",
-            USE_DEFAULT_DATA_STORAGE_FOR_NEW_PROJECTS: "Se usa como valor predeterminado al crear nuevas fuentes de datos para los proyectos.",
-            USE_SELECTOR_TO_ADD_LABELS: "Usa el selector de arriba para agregar etiquetas de sensibilidad.",
-            USE_SELECTOR_TO_ADD_TAGS: "Usa el selector de arriba para agregar etiquetas.",
+            USE_DEFAULT_DATA_STORAGE_FOR_NEW_PROJECTS:
+                "Se usa como valor predeterminado al crear nuevas fuentes de datos para los proyectos.",
+            USE_SELECTOR_TO_ADD_LABELS:
+                "Usa el selector de arriba para agregar etiquetas de sensibilidad.",
+            USE_SELECTOR_TO_ADD_TAGS:
+                "Usa el selector de arriba para agregar etiquetas.",
             USER: "Usuario",
-            USER_AND_ORG_ADMIN_ACCESS_UPDATED: "Se actualizaron el usuario y el acceso de administrador de la organizacion.",
-            USER_AND_SYSTEM_ADMIN_ACCESS_UPDATED: "Se actualizaron el usuario y el acceso de administrador del sistema.",
+            USER_AND_ORG_ADMIN_ACCESS_UPDATED:
+                "Se actualizaron el usuario y el acceso de administrador de la organizacion.",
+            USER_AND_SYSTEM_ADMIN_ACCESS_UPDATED:
+                "Se actualizaron el usuario y el acceso de administrador del sistema.",
             USER_ARCHIVED_SUCCESSFULLY: "Usuario archivado correctamente.",
             USER_MANAGEMENT: "Gestión de usuarios",
             USER_REMOVED_FROM_ORG: "Usuario eliminado de la organización",
@@ -2427,8 +2916,10 @@ export const translations = {
             VALID_LABEL: "Válidos",
             VALIDATING_RECORDS: "Validando registros...",
             VALIDATION: "Validación",
-            VALIDATION_ERROR_SUGGESTION: "Revise el mensaje de error y corrija los campos afectados.",
-            VALIDATION_ERROR_SUMMARY: "{invalid} de {total} registros tienen errores. Corrija los errores a continuación y vuelva a cargar.",
+            VALIDATION_ERROR_SUGGESTION:
+                "Revise el mensaje de error y corrija los campos afectados.",
+            VALIDATION_ERROR_SUMMARY:
+                "{invalid} de {total} registros tienen errores. Corrija los errores a continuación y vuelva a cargar.",
             VALIDATION_ERRORS_FOUND: "Se encontraron errores de validación",
             VALIDATION_FAILED: "La validación falló",
             VALIDATION_SUCCESSFUL: "¡Validación exitosa!",
@@ -2436,15 +2927,19 @@ export const translations = {
             VIEW_ALL_ORGANIZATIONS: "Ver todas las organizaciones",
             VIEW_AS_JSON: "Ver como JSON",
             VIEW_LAYOUT: "Vista",
-            VIEW_PROJECT_LEVEL_ROLES_AND_PERMISSIONS: "Consulta los roles a nivel de proyecto y sus permisos. Los roles estándar están definidos por el sistema y son de solo lectura en esta versión.",
+            VIEW_PROJECT_LEVEL_ROLES_AND_PERMISSIONS:
+                "Consulta los roles a nivel de proyecto y sus permisos. Los roles estándar están definidos por el sistema y son de solo lectura en esta versión.",
             VISIT: "Visitar",
-            VULNERABILITY_DISCLOSURE: "Haz clic aquí para la Divulgación de Vulnerabilidades",
-            WARNING: "Todos los datos contenidos en los sistemas informáticos del DOE son propiedad del DOE y pueden ser auditados, interceptados, registrados, leídos, copiados o capturados de cualquier manera y divulgados de cualquier forma por personal autorizado. " +
+            VULNERABILITY_DISCLOSURE:
+                "Haz clic aquí para la Divulgación de Vulnerabilidades",
+            WARNING:
+                "Todos los datos contenidos en los sistemas informáticos del DOE son propiedad del DOE y pueden ser auditados, interceptados, registrados, leídos, copiados o capturados de cualquier manera y divulgados de cualquier forma por personal autorizado. " +
                 "NO EXISTE DERECHO A LA PRIVACIDAD EN ESTE SISTEMA. El personal del sistema puede divulgar a las autoridades competentes cualquier evidencia potencial de delito encontrada en los sistemas informáticos del DOE. EL USO DE ESTE SISTEMA POR CUALQUIER USUARIO, AUTORIZADO O NO AUTORIZADO, CONSTITUYE CONSENTIMIENTO PARA ESTA AUDITORÍA, INTERCEPCIÓN, REGISTRO, LECTURA, COPIA, CAPTURA Y DIVULGACIÓN DE LA ACTIVIDAD INFORMÁTICA. **ADVERTENCIA**ADVERTENCIA**ADVERTENCIA**ADVERTENCIA**ADVERTENCIA**",
             WELECOME: "Bienvenido de nuevo ",
             WHAT_HAPPENS_NEXT: "¿Qué sigue?",
             WHEN_LABELS_ARE: "Cuando las etiquetas están",
-            WHEN_LOCKED_AT_ORG_LEVEL_PROJECT_ADMINS: "Cuando están bloqueadas a nivel de organización, los administradores del proyecto",
+            WHEN_LOCKED_AT_ORG_LEVEL_PROJECT_ADMINS:
+                "Cuando están bloqueadas a nivel de organización, los administradores del proyecto",
             WHEN_LOCKED_PROJECTS: "Cuando están bloqueadas, los proyectos",
             WHEN_TAGS_ARE: "Cuando las etiquetas están",
             WIDGET: "Widget",
@@ -2452,11 +2947,13 @@ export const translations = {
             X_AXIS: "Eje X",
             Y_AXES_MULTIPLE: "Ejes Y (Múltiples)",
             YES: "Sí",
-            YOU_HAVE_BEEN_ADDED_TO_A_PROJECT_IN_NEXUS: "Has sido agregado a un proyecto en DeepLynx Nexus",
+            YOU_HAVE_BEEN_ADDED_TO_A_PROJECT_IN_NEXUS:
+                "Has sido agregado a un proyecto en DeepLynx Nexus",
             YOUR_ABOUT_TO_UPLOAD: "Está a punto de cargar",
             YOUR_PROJECTS: "Tus proyectos",
-            YOUVE_BEEN_ADDED_TO_A_PROJECT_IN_DEEPLYNX_NEXUS: "Has sido agregado a un proyecto en DeepLynx Nexus",
-            ZOOM_CONTROLS: "Controles de zoom"
-        }
-    }
-}
+            YOUVE_BEEN_ADDED_TO_A_PROJECT_IN_DEEPLYNX_NEXUS:
+                "Has sido agregado a un proyecto en DeepLynx Nexus",
+            ZOOM_CONTROLS: "Controles de zoom",
+        },
+    },
+};

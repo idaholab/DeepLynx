@@ -1160,49 +1160,55 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
 
   // ============= MAIN RENDER =============
   return (
-    <div className="mx-3 sm:mx-4 lg:mr-0 lg:ml-0">
-      <div className="bg-base-200/40 px-3 sm:px-6 lg:px-12 p-4">
-        <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-          <div>
-            <h1 className="text-xl sm:text-2xl font-bold text-base-content break-words">
-              {record.name}
-            </h1>
-            {record.classId ? (
-              <div className="flex flex-wrap gap-2 py-auto items-center">
-                <span className="badge badge-primary">
-                  {recordClass?.name || <div className="loading size-3" />}
-                </span>
+    <main className="min-h-screen bg-base-200/30">
+      <section className="border-b border-base-300 bg-base-100">
+        <div className="mx-auto flex w-full max-w-7xl flex-col gap-5 px-3 py-5 sm:px-6 lg:px-8">
+          <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+            <div className="min-w-0">
+              <p className="text-xs font-semibold uppercase tracking-wide text-base-content/60">
+                {t.translations.RECORD}
+              </p>
+              <h1 className="break-words text-2xl font-bold text-base-content sm:text-3xl">
+                {record.name}
+              </h1>
+              {record.classId ? (
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <span className="badge badge-primary h-auto min-h-6 whitespace-normal break-words px-3 py-1 text-center leading-tight">
+                    {recordClass?.name || <div className="loading size-3" />}
+                  </span>
+                  <button
+                    onClick={() => setIsClassModalOpen(true)}
+                    className="btn btn-ghost btn-xs btn-circle"
+                    title={t.translations.EDIT_CLASS}
+                  >
+                    <PencilIcon className="size-4" />
+                  </button>
+                </div>
+              ) : (
                 <button
                   onClick={() => setIsClassModalOpen(true)}
-                  className="btn btn-ghost btn-xs btn-circle"
-                  title={t.translations.EDIT_CLASS}
+                  className="btn btn-sm btn-outline mt-3"
                 >
-                  <PencilIcon className="size-4" />
+                  <PlusIcon className="w-4 h-4 mr-1" />
+                  {t.translations.ADD_CLASS || "Add Class"}
                 </button>
-              </div>
-            ) : (
-              <button
-                onClick={() => setIsClassModalOpen(true)}
-                className="btn btn-sm btn-outline mt-2"
-              >
-                <PlusIcon className="w-4 h-4 mr-1" />
-                {t.translations.ADD_CLASS || "Add Class"}
-              </button>
-            )}
+              )}
+            </div>
           </div>
-
         </div>
-      </div>
+      </section>
 
-      <Tabs
-        tabs={tabs}
-        className="pt-6"
-        activeTab={tabs[activeTab].label}
-        onTabChange={(label) =>
-          setActiveTab(tabs.findIndex((tab) => tab.label === label))
-        }
-        rightAction={null}
-      />
+      <section className="mx-auto w-full max-w-7xl px-3 py-5 sm:px-6 lg:px-8">
+        <Tabs
+          tabs={tabs}
+          className="mx-0"
+          activeTab={tabs[activeTab].label}
+          onTabChange={(label) =>
+            setActiveTab(tabs.findIndex((tab) => tab.label === label))
+          }
+          rightAction={null}
+        />
+      </section>
       <ConfirmationModal
         isOpen={modal.isOpen}
         onClose={handleCloseModal}
@@ -1248,6 +1254,6 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
         onSearchRecords={handleSearchRecords}
         onCreateRelationships={handleCreateRelationships}
       />
-    </div>
+    </main>
   );
 }
