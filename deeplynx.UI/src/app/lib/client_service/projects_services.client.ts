@@ -253,6 +253,56 @@ export async function getProjectDataModalityCount(
   }
 }
 
+/**
+ * Get project record count
+ * @param organizationId - The ID of the organization
+ * @param projectId - The ID of the project
+ * @returns Promise with the project record count
+ */
+export async function getProjectRecordCount(
+  organizationId: number,
+  projectId: number
+): Promise<number> {
+  try {
+    const res = await api.get(
+      `/organizations/${organizationId}/projects/${projectId}/metrics/records/count`,
+      { params: { hideArchived: true } }
+    );
+    return res.data;
+  } catch (error) {
+    console.error(
+      `Error getting record count for project ${projectId}:`,
+      error
+    );
+    throw error;
+  }
+}
+
+/**
+ * Get project file count
+ * @param organizationId - The ID of the organization
+ * @param projectId - The ID of the project
+ * @returns Promise with the project file count
+ */
+export async function getProjectFileCount(
+  organizationId: number,
+  projectId: number
+): Promise<number> {
+  try {
+    const res = await api.get(
+      `/organizations/${organizationId}/projects/${projectId}/metrics/files/count`,
+      { params: { hideArchived: true } }
+    );
+    return res.data;
+  } catch (error) {
+    console.error(
+      `Error getting file count for project ${projectId}:`,
+      error
+    );
+    throw error;
+  }
+}
+
 /* -------------------------------------------------------------------------- */
 /*                         Project Member Management                          */
 /* -------------------------------------------------------------------------- */

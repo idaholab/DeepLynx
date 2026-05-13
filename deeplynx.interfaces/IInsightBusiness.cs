@@ -29,12 +29,12 @@ public interface IInsightBusiness
         long projectId,
         long recordId,
         string uri,
-        AiModelConfigResponseDto vlmConfig,
-        AiModelConfigResponseDto embeddingConfig,
+        AiModelConfigResponseDto.WithToken vlmConfig,
+        AiModelConfigResponseDto.WithToken embeddingConfig,
         string? userJwt = null,
         bool overwrite = false);
 
-    Task<AiModelConfigResponseDto> ResolveModelConfig(
+    Task<AiModelConfigResponseDto.WithToken> ResolveModelConfig(
         long currentUserId,
         long organizationId,
         long projectId,

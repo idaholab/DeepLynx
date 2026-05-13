@@ -101,8 +101,7 @@ public class AiModelConfigController : ControllerBase
     {
         try
         {
-            var currentUserId = UserContextStorage.UserId;
-            var aiModelConfig = await _aiModelConfigBusiness.GetDefaultAiModelConfig(currentUserId, organizationId, null, modelType);
+            var aiModelConfig = await _aiModelConfigBusiness.GetDefaultAiModelConfig(organizationId, null, modelType);
             return Ok(aiModelConfig);
         }
         catch (KeyNotFoundException exc)

@@ -3,9 +3,16 @@
 import { useLanguage } from "@/app/contexts/Language";
 import {
   getSystemDataSourceCount,
+  getSystemFileCount,
+  getSystemRecordCount,
   getSystemStorageSize,
 } from "@/app/lib/client_service/metrics_services.client";
-import { FolderIcon, ServerStackIcon } from "@heroicons/react/24/outline";
+import {
+  CircleStackIcon,
+  DocumentIcon,
+  FolderIcon,
+  ServerStackIcon,
+} from "@heroicons/react/24/outline";
 import { useEffect, useState } from "react";
 
 const OVERVIEW_CARD_CLASS =
@@ -52,16 +59,21 @@ const AdminOverviewCard = () => {
   const [metrics, setMetrics] = useState({
     storageSize: 0,
     dataSources: 0,
+    records: 0,
+    files: 0,
   });
 
   useEffect(() => {
     let isActive = true;
 
     const fetchMetrics = async () => {
-      const [storageSize, dataSources] = await Promise.allSettled([
-        getSystemStorageSize(),
-        getSystemDataSourceCount(),
-      ]);
+      const [storageSize, dataSources, records, files] =
+        await Promise.allSettled([
+          getSystemStorageSize(),
+          getSystemDataSourceCount(),
+          getSystemRecordCount(),
+          getSystemFileCount(),
+        ]);
 
       if (!isActive) return;
 
@@ -74,6 +86,9 @@ const AdminOverviewCard = () => {
           dataSources.status === "fulfilled"
             ? getMetricNumber(dataSources.value)
             : 0,
+        records:
+          records.status === "fulfilled" ? getMetricNumber(records.value) : 0,
+        files: files.status === "fulfilled" ? getMetricNumber(files.value) : 0,
       });
 
       if (storageSize.status === "rejected") {
@@ -89,6 +104,14 @@ const AdminOverviewCard = () => {
           dataSources.reason,
         );
       }
+
+      if (records.status === "rejected") {
+        console.error("Failed to fetch system record count:", records.reason);
+      }
+
+      if (files.status === "rejected") {
+        console.error("Failed to fetch system file count:", files.reason);
+      }
     };
 
     void fetchMetrics();
@@ -98,7 +121,7 @@ const AdminOverviewCard = () => {
     };
   }, []);
 
-  const overviewMetrics = [
+  const primaryMetrics = [
     {
       title: t.translations.SYSTEM_STORAGE_SIZE,
       value: formatBytes(metrics.storageSize),
@@ -111,6 +134,19 @@ const AdminOverviewCard = () => {
     },
   ];
 
+  const secondaryMetrics = [
+    {
+      title: t.translations.RECORD_COUNT,
+      value: metrics.records,
+      Icon: CircleStackIcon,
+    },
+    {
+      title: t.translations.FILE_COUNT,
+      value: metrics.files,
+      Icon: DocumentIcon,
+    },
+  ];
+
   return (
     <div className={OVERVIEW_CARD_CLASS}>
       <div className="card-body">
@@ -118,18 +154,34 @@ const AdminOverviewCard = () => {
           {t.translations.SYSTEM_OVERVIEW}
         </h2>
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          {overviewMetrics.map(({ title, value, Icon }) => (
-            <div key={title}>
-              <div className="text-base-content opacity-70 text-sm">
-                {title}
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            {primaryMetrics.map(({ title, value, Icon }) => (
+              <div key={title}>
+                <div className="text-base-content opacity-70 text-sm">
+                  {title}
+                </div>
+                <div className="text-secondary flex items-center text-xl font-bold mt-1">
+                  <Icon className="size-7 mr-2 shrink-0" />
+                  <div className="text-base-content break-words">{value}</div>
+                </div>
               </div>
-              <div className="text-secondary flex items-center text-xl font-bold mt-1">
-                <Icon className="size-7 mr-2 shrink-0" />
-                <div className="text-base-content break-words">{value}</div>
+            ))}
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            {secondaryMetrics.map(({ title, value, Icon }) => (
+              <div key={title}>
+                <div className="text-base-content opacity-70 text-sm">
+                  {title}
+                </div>
+                <div className="text-secondary flex items-center text-xl font-bold mt-1">
+                  <Icon className="size-7 mr-2 shrink-0" />
+                  <div className="text-base-content break-words">{value}</div>
+                </div>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       </div>
     </div>

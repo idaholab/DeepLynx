@@ -5,9 +5,13 @@ import { useOrganizationSession } from "@/app/contexts/OrganizationSessionProvid
 import {
   getOrganizationDataModalityCount,
   getOrganizationDataSourceCount,
+  getOrganizationFileCount,
+  getOrganizationRecordCount,
   getOrganizationStorageSize,
 } from "@/app/lib/client_service/organization_services.client";
 import {
+  CircleStackIcon,
+  DocumentIcon,
   FolderIcon,
   ServerStackIcon,
   Squares2X2Icon,
@@ -60,6 +64,8 @@ const OrganizationOverviewCard = () => {
     storageSize: 0,
     dataSources: 0,
     dataModalities: 0,
+    records: 0,
+    files: 0,
   });
 
   useEffect(() => {
@@ -68,6 +74,8 @@ const OrganizationOverviewCard = () => {
         storageSize: 0,
         dataSources: 0,
         dataModalities: 0,
+        records: 0,
+        files: 0,
       });
       return;
     }
@@ -77,11 +85,13 @@ const OrganizationOverviewCard = () => {
     const fetchMetrics = async () => {
       const organizationId = organization.organizationId as number;
 
-      const [storageSize, dataSources, dataModalities] =
+      const [storageSize, dataSources, dataModalities, records, files] =
         await Promise.allSettled([
           getOrganizationStorageSize(organizationId),
           getOrganizationDataSourceCount(organizationId),
           getOrganizationDataModalityCount(organizationId),
+          getOrganizationRecordCount(organizationId),
+          getOrganizationFileCount(organizationId),
         ]);
 
       if (!isActive) return;
@@ -99,6 +109,9 @@ const OrganizationOverviewCard = () => {
           dataModalities.status === "fulfilled"
             ? getMetricNumber(dataModalities.value)
             : 0,
+        records:
+          records.status === "fulfilled" ? getMetricNumber(records.value) : 0,
+        files: files.status === "fulfilled" ? getMetricNumber(files.value) : 0,
       });
 
       if (storageSize.status === "rejected") {
@@ -121,6 +134,17 @@ const OrganizationOverviewCard = () => {
           dataModalities.reason,
         );
       }
+
+      if (records.status === "rejected") {
+        console.error(
+          "Failed to fetch organization record count:",
+          records.reason,
+        );
+      }
+
+      if (files.status === "rejected") {
+        console.error("Failed to fetch organization file count:", files.reason);
+      }
     };
 
     void fetchMetrics();
@@ -130,7 +154,7 @@ const OrganizationOverviewCard = () => {
     };
   }, [organization?.organizationId]);
 
-  const overviewMetrics = [
+  const primaryMetrics = [
     {
       title: t.translations.STORAGE_SIZE,
       value: formatBytes(metrics.storageSize),
@@ -148,6 +172,19 @@ const OrganizationOverviewCard = () => {
     },
   ];
 
+  const secondaryMetrics = [
+    {
+      title: t.translations.RECORD_COUNT,
+      value: metrics.records,
+      Icon: CircleStackIcon,
+    },
+    {
+      title: t.translations.FILE_COUNT,
+      value: metrics.files,
+      Icon: DocumentIcon,
+    },
+  ];
+
   return (
     <div className={OVERVIEW_CARD_CLASS}>
       <div className="card-body">
@@ -155,18 +192,34 @@ const OrganizationOverviewCard = () => {
           {t.translations.ORGANIZATION_OVERVIEW}
         </h2>
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          {overviewMetrics.map(({ title, value, Icon }) => (
-            <div key={title}>
-              <div className="text-base-content opacity-70 text-sm">
-                {title}
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            {primaryMetrics.map(({ title, value, Icon }) => (
+              <div key={title}>
+                <div className="text-base-content opacity-70 text-sm">
+                  {title}
+                </div>
+                <div className="text-secondary flex items-center text-xl font-bold mt-1">
+                  <Icon className="size-7 mr-2 shrink-0" />
+                  <div className="text-base-content break-words">{value}</div>
+                </div>
               </div>
-              <div className="text-secondary flex items-center text-xl font-bold mt-1">
-                <Icon className="size-7 mr-2 shrink-0" />
-                <div className="text-base-content break-words">{value}</div>
+            ))}
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            {secondaryMetrics.map(({ title, value, Icon }) => (
+              <div key={title}>
+                <div className="text-base-content opacity-70 text-sm">
+                  {title}
+                </div>
+                <div className="text-secondary flex items-center text-xl font-bold mt-1">
+                  <Icon className="size-7 mr-2 shrink-0" />
+                  <div className="text-base-content break-words">{value}</div>
+                </div>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       </div>
     </div>

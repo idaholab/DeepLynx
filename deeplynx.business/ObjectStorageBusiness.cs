@@ -119,7 +119,7 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
         var hasFilesystem = dto.Config.MountPath is not null;
         var hasAzure = dto.Config.AzureObjectConfig is not null;
         var hasAws = dto.Config.AwsConnectionString is not null;
-        
+
         var populatedCount = new[]
         {
             hasFilesystem,
@@ -261,7 +261,7 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
                 else
                     await ResetOrganizationDefaults(organizationId, returnedObjectStorage.Id);
             }
-            
+
             returnedObjectStorage.Name = dto.Name;
             returnedObjectStorage.Default = dto.Default;
             returnedObjectStorage.LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
@@ -520,7 +520,7 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
             throw new Exception($"Unable to set object storage {objectStorageId} as default");
         }
     }
-    
+
     /// <summary>
     ///     For internal use only (don't hook an API up to this)- returns a single decrypted object storage config
     /// </summary>
@@ -533,7 +533,7 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
         var query = _context.ObjectStorages
             .Where(os => os.Id == objectStorageId)
             .Where(os => !os.IsArchived);
-        
+
         var returnedObjectStorage = await query.FirstOrDefaultAsync();
 
         if (returnedObjectStorage is null)
@@ -579,7 +579,7 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
 
         if (objectStorageIds != null && objectStorageIds.Any())
             query = query.Where(os => objectStorageIds.Contains(os.Id));
-        
+
         var objectStorages = await query.ToListAsync();
         return objectStorages
             .Select(os => new ObjectStorageDecryptedDto
@@ -596,7 +596,7 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
                 Config = DeserializeAndDecryptConfig(os.ConfigEncrypted)
             }).ToList();
     }
-    
+
     // Private Helpers
     private String SerializeAndEncryptConfig(ObjectStorageConfigDto config)
     {
@@ -607,7 +607,7 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
     {
         return _encryptionHelper.DeserializeAndDecrypt<ObjectStorageConfigDto>(encryptedConfig);
     }
-    
+
     private async Task ResetProjectDefaults(long projectId, long newDefaultId)
     {
         // check for existing defaults at the project level and remove them from being default
