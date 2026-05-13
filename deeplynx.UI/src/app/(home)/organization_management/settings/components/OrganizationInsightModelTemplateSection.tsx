@@ -34,7 +34,7 @@ type ModelEditorMode = "create" | "edit";
 type OrganizationDefaultRole = "query" | "upload" | "embedding";
 
 interface OrganizationInsightModelTemplateSectionProps {
-  organizationId?: number;
+  organizationId?: number | string;
 }
 
 interface ModelTemplateFormState {
@@ -149,6 +149,20 @@ export default function OrganizationInsightModelTemplateSection({
   organizationId,
 }: OrganizationInsightModelTemplateSectionProps) {
   const { t } = useLanguage();
+  const resolvedOrganizationId = useMemo(() => {
+    if (organizationId === undefined || organizationId === null) {
+      return undefined;
+    }
+
+    const parsedOrganizationId =
+      typeof organizationId === "number"
+        ? organizationId
+        : Number(organizationId);
+
+    return Number.isFinite(parsedOrganizationId)
+      ? parsedOrganizationId
+      : undefined;
+  }, [organizationId]);
   const [activeTab, setActiveTab] = useState<ModelTemplateTab>("defaults");
   const [availableModelConfigs, setAvailableModelConfigs] = useState<
     AiModelConfigResponseDto[]
@@ -205,12 +219,12 @@ export default function OrganizationInsightModelTemplateSection({
   );
 
   useEffect(() => {
-    if (!organizationId) {
+    if (!resolvedOrganizationId) {
       setIsLoadingModelConfigs(false);
       return;
     }
 
-    const resolvedOrganizationId = organizationId;
+    const organizationIdForRequest = resolvedOrganizationId;
     let hasCancelled = false;
 
     async function loadOrganizationModelTemplates() {
@@ -218,7 +232,7 @@ export default function OrganizationInsightModelTemplateSection({
 
       try {
         const loadedModelConfigs = await getOrganizationAiModelConfigs(
-          resolvedOrganizationId,
+          organizationIdForRequest,
           false,
         );
 
@@ -253,17 +267,17 @@ export default function OrganizationInsightModelTemplateSection({
       hasCancelled = true;
     };
   }, [
-    organizationId,
+    resolvedOrganizationId,
     t.translations.INSIGHT_ORGANIZATION_TEMPLATES_LOAD_FAILED,
   ]);
 
   async function refreshOrganizationModelTemplates() {
-    if (!organizationId) {
+    if (!resolvedOrganizationId) {
       return [] as AiModelConfigResponseDto[];
     }
 
     const refreshedModelConfigs = await getOrganizationAiModelConfigs(
-      organizationId,
+      resolvedOrganizationId,
       false,
     );
     setAvailableModelConfigs(refreshedModelConfigs);
@@ -304,7 +318,7 @@ export default function OrganizationInsightModelTemplateSection({
   }
 
   async function handleSaveOrganizationDefaults() {
-    if (!organizationId) {
+    if (!resolvedOrganizationId) {
       return;
     }
 
@@ -327,7 +341,7 @@ export default function OrganizationInsightModelTemplateSection({
       await Promise.all(
         changedOrganizationDefaultIds.map((organizationDefaultRole) =>
           updateOrganizationAiModelConfig(
-            organizationId,
+            resolvedOrganizationId,
             selectedOrganizationDefaultIds[organizationDefaultRole] as number,
             { default: true },
           ),
@@ -352,7 +366,7 @@ export default function OrganizationInsightModelTemplateSection({
   }
 
   async function handleSaveModelTemplate() {
-    if (!organizationId) {
+    if (!resolvedOrganizationId) {
       return;
     }
 
@@ -379,7 +393,7 @@ export default function OrganizationInsightModelTemplateSection({
         };
 
         await updateOrganizationAiModelConfig(
-          organizationId,
+          resolvedOrganizationId,
           editingModelConfigId,
           updateModelTemplateRequest,
         );
@@ -394,7 +408,7 @@ export default function OrganizationInsightModelTemplateSection({
         };
 
         await createOrganizationAiModelConfig(
-          organizationId,
+          resolvedOrganizationId,
           createModelTemplateRequest,
         );
       }
@@ -418,7 +432,7 @@ export default function OrganizationInsightModelTemplateSection({
   }
 
   async function handleToggleArchive(modelConfig: AiModelConfigResponseDto) {
-    if (!organizationId) {
+    if (!resolvedOrganizationId) {
       return;
     }
 
@@ -427,7 +441,7 @@ export default function OrganizationInsightModelTemplateSection({
 
     try {
       await archiveOrganizationAiModelConfig(
-        organizationId,
+        resolvedOrganizationId,
         modelConfig.id,
         !modelConfig.isArchived,
       );
@@ -787,7 +801,7 @@ export default function OrganizationInsightModelTemplateSection({
             </label>
 
             {/* Organization templates are connection templates only. User tokens stay in the Insight chat settings flow. */}
-            <label className="form-control rounded-box border border-base-300 p-4">
+            <label className="form-control p-4">
               <span className="label cursor-pointer justify-start gap-3">
                 <input
                   type="checkbox"
@@ -883,7 +897,7 @@ export default function OrganizationInsightModelTemplateSection({
         activeOrganizationDefaultIds[organizationDefaultRole],
   );
 
-  if (!organizationId) {
+  if (!resolvedOrganizationId) {
     return null;
   }
 

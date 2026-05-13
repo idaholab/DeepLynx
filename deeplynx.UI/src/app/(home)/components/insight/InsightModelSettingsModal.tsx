@@ -29,8 +29,8 @@ type InsightSelectionSection = "query" | "upload" | "embedding";
 
 interface InsightModelSettingsModalProps {
   isOpen: boolean;
-  organizationId?: number;
-  projectId?: number;
+  organizationId?: number | string | null;
+  projectId?: number | string | null;
   selectedInsightModels: InsightModelSelection;
   onClose: () => void;
   onSaveSelection: (nextSelection: InsightModelSelection) => void;
@@ -223,6 +223,16 @@ function InsightModelSelectionCard({
   );
 }
 
+function resolveNumericId(id?: number | string | null): number | undefined {
+  if (id === undefined || id === null) {
+    return undefined;
+  }
+
+  const parsedId = typeof id === "number" ? id : Number(id);
+
+  return Number.isFinite(parsedId) ? parsedId : undefined;
+}
+
 export default function InsightModelSettingsModal({
   isOpen,
   organizationId,
@@ -234,6 +244,14 @@ export default function InsightModelSettingsModal({
   const { t } = useLanguage();
   const { user } = useRBAC();
   const currentUserId = user?.id;
+  const resolvedOrganizationId = useMemo(
+    () => resolveNumericId(organizationId),
+    [organizationId],
+  );
+  const resolvedProjectId = useMemo(
+    () => resolveNumericId(projectId),
+    [projectId],
+  );
   const defaultModelLabel = t.translations.INSIGHT_NEXUS_MODEL;
   const [availableModelConfigs, setAvailableModelConfigs] = useState<
     AiModelConfigResponseDto[]
@@ -368,23 +386,32 @@ export default function InsightModelSettingsModal({
   ]);
 
   useEffect(() => {
-    if (!isOpen || !organizationId || !projectId || !currentUserId) {
+    if (!isOpen || !resolvedOrganizationId || !resolvedProjectId) {
       return;
     }
 
-    const resolvedOrganizationId = organizationId;
-    const resolvedProjectId = projectId;
-    const resolvedCurrentUserId = currentUserId;
+    const organizationIdForRequest = resolvedOrganizationId;
+    const projectIdForRequest = resolvedProjectId;
+    const currentUserIdForRequest = currentUserId;
     let hasCancelled = false;
 
     async function loadModelSettings() {
       setIsLoadingModelSettings(true);
 
       try {
-        const [loadedModelConfigs, loadedUserTokens] = await Promise.all([
-          getProjectAiModelConfigs(resolvedOrganizationId, resolvedProjectId),
-          getUserModelTokens(resolvedCurrentUserId),
-        ]);
+        const loadedModelConfigs = await getProjectAiModelConfigs(
+          organizationIdForRequest,
+          projectIdForRequest,
+        );
+
+        let loadedUserTokens: UserModelTokenResponseDto[] = [];
+        if (currentUserIdForRequest) {
+          try {
+            loadedUserTokens = await getUserModelTokens();
+          } catch (error) {
+            console.error("Failed to load Insight user model tokens:", error);
+          }
+        }
 
         if (hasCancelled) {
           return;
@@ -435,8 +462,8 @@ export default function InsightModelSettingsModal({
     currentUserId,
     defaultModelLabel,
     isOpen,
-    organizationId,
-    projectId,
+    resolvedOrganizationId,
+    resolvedProjectId,
     t.translations.INSIGHT_MODEL_CONFIGS_FAILED,
   ]);
 
@@ -505,10 +532,10 @@ export default function InsightModelSettingsModal({
       const existingUserToken =
         savedUserTokensByConfigId[activeTokenEditor.modelConfigId];
       const savedUserToken = existingUserToken
-        ? await updateUserModelToken(currentUserId, existingUserToken.id, {
+        ? await updateUserModelToken(existingUserToken.id, {
             token: trimmedTokenValue,
           })
-        : await createUserModelToken(currentUserId, {
+        : await createUserModelToken({
             aiModelConfigId: activeTokenEditor.modelConfigId,
             token: trimmedTokenValue,
           });
