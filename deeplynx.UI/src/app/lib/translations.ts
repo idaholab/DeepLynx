@@ -1069,6 +1069,7 @@ export const translations = {
                 "Recommended: PNG with transparent background",
             RECORD: "Record",
             RECORD_: "Record ",
+            RECORD_COUNT: "Record Count",
             RECORD_CREATED_SUCCESSFULLY: "Record created successfully!",
             RECORD_DESCRIPTION: "Record Description",
             RECORD_FILE_UPDATED_SUCCESSFULLY: "Record file updated successfully.",
@@ -2569,6 +2570,7 @@ export const translations = {
                 "Recomendado: PNG con fondo transparente",
             RECORD: "Registro",
             RECORD_: "Registro ",
+            RECORD_COUNT: "Conteo de registros",
             RECORD_CREATED_SUCCESSFULLY: "¡Registro creado correctamente!",
             RECORD_DESCRIPTION: "Descripción del registro",
             RECORD_FILE_UPDATED_SUCCESSFULLY:
