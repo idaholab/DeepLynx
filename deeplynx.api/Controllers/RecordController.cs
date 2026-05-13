@@ -77,7 +77,7 @@ public class RecordController : ControllerBase
 
 
     /// <summary>
-    /// GetAllRecords (Paginated!)
+    /// GetAllRecords (Paginated)
     /// </summary>
     /// <param name="organizationId">The id of the organization</param>
     /// <param name="projectId">The id of the project</param>
