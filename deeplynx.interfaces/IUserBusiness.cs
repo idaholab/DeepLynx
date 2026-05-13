@@ -6,6 +6,7 @@ public interface IUserBusiness
 {
     Task<IEnumerable<UserResponseDto>> GetAllUsers(long? projectId, long? organizationId);
     Task<UserActivityCountsDto> GetActiveUserCounts(long? projectId, long? organizationId);
+    Task<UserActivityUsersDto> GetActiveUsers(long? projectId, long? organizationId);
     Task<UserResponseDto> GetUser(long userId);
     Task<UserAdminInfoDto> GetUserAdminInfo(long userId, long? organizationId = null, long? projectId = null);
     Task<UserResponseDto> GetLocalDevUser();

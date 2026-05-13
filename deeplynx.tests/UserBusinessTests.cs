@@ -955,6 +955,52 @@ public class UserBusinessTests : IntegrationTestBase
         Assert.Equal(3, counts.ActiveLast30Days);
     }
 
+    [Fact]
+    public async Task GetActiveUsers_ReturnsUsersInThirtyDayWindow()
+    {
+        // Arrange
+        var now = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
+
+        var active24HourUser = await Context.Users.FindAsync(uid1);
+        var active7DayUser = await Context.Users.FindAsync(uid4);
+        var active30DayUser = await Context.Users.FindAsync(uid5);
+        var staleUser = await Context.Users.FindAsync(ouid1);
+        var archivedUser = await Context.Users.FindAsync(uid2);
+        Assert.NotNull(active24HourUser);
+        Assert.NotNull(active7DayUser);
+        Assert.NotNull(active30DayUser);
+        Assert.NotNull(staleUser);
+        Assert.NotNull(archivedUser);
+
+        active24HourUser!.IsActive = true;
+        active24HourUser.LastLogin = now.AddHours(-1);
+        active7DayUser!.IsActive = true;
+        active7DayUser.LastLogin = now.AddDays(-3);
+        active30DayUser!.IsActive = true;
+        active30DayUser.LastLogin = now.AddDays(-20);
+        staleUser!.IsActive = true;
+        staleUser.LastLogin = now.AddDays(-31);
+        archivedUser!.IsActive = true;
+        archivedUser.LastLogin = now.AddMinutes(-5);
+
+        await Context.SaveChangesAsync();
+
+        // Act
+        var activity = await _userBusiness.GetActiveUsers(null, null);
+        var users = activity.Users.ToList();
+
+        // Assert
+        Assert.Equal(1, activity.ActiveLast24Hours);
+        Assert.Equal(2, activity.ActiveLast7Days);
+        Assert.Equal(3, activity.ActiveLast30Days);
+        Assert.Equal(3, users.Count);
+        Assert.Contains(users, u => u.Id == uid1 && u.Email == "user1@test.com");
+        Assert.Contains(users, u => u.Id == uid4 && u.Username == "user4");
+        Assert.Contains(users, u => u.Id == uid5 && u.Username == "user5");
+        Assert.DoesNotContain(users, u => u.Id == ouid1);
+        Assert.DoesNotContain(users, u => u.Id == uid2);
+    }
+
     #endregion
 
     #region GetUser Tests

@@ -414,21 +414,9 @@ public class UserBusiness : IUserBusiness
     /// <returns>Counts for users active within 24 hours, 7 days, and 30 days</returns>
     public async Task<UserActivityCountsDto> GetActiveUserCounts(long? projectId, long? organizationId)
     {
-        var users = _context.Users.Where(u => !u.IsArchived && u.IsActive);
+        var users = BuildActiveUsersQuery(projectId, organizationId);
 
-        if (projectId != null)
-            users = users.Where(u =>
-                u.ProjectMembers.Any(p => p.ProjectId == projectId && p.UserId == u.Id) ||
-                u.Groups.Any(g => g.ProjectMembers.Any(pm => pm.ProjectId == projectId && pm.GroupId == g.Id))
-            );
-
-        if (organizationId != null)
-            users = users.Where(u =>
-                u.OrganizationUsers.Any(ou => ou.OrganizationId == organizationId && ou.UserId == u.Id) ||
-                u.Groups.Any(g => g.OrganizationId == organizationId)
-            );
-
-        var now = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
+        var now = UtcNowWithoutTimezone();
         var last24Hours = now.AddHours(-24);
         var last7Days = now.AddDays(-7);
         var last30Days = now.AddDays(-30);
@@ -450,5 +438,69 @@ public class UserBusiness : IUserBusiness
             ActiveLast30Days = counts?.ActiveLast30Days ?? 0,
             GeneratedAt = now
         };
+    }
+
+    /// <summary>
+    ///     Retrieves rolling active user counts and users active in the 30-day window.
+    /// </summary>
+    /// <param name="projectId">Optional ID for project</param>
+    /// <param name="organizationId">Optional ID for organization</param>
+    /// <returns>Counts and active user details for the requested scope</returns>
+    public async Task<UserActivityUsersDto> GetActiveUsers(long? projectId, long? organizationId)
+    {
+        var counts = await GetActiveUserCounts(projectId, organizationId);
+        var last30Days = counts.GeneratedAt.AddDays(-30);
+
+        var users = await BuildActiveUsersQuery(projectId, organizationId)
+            .Where(u => u.LastLogin.HasValue && u.LastLogin.Value >= last30Days)
+            .OrderByDescending(u => u.LastLogin)
+            .Select(u => new UserResponseDto
+            {
+                Id = u.Id,
+                Name = u.Name,
+                Username = u.Username,
+                Email = u.Email,
+                IsSysAdmin = u.IsSysAdmin,
+                IsOrgAdmin = organizationId != null
+                    ? u.OrganizationUsers.Any(ou => ou.OrganizationId == organizationId && ou.IsOrgAdmin)
+                    : null,
+                IsArchived = u.IsArchived,
+                IsActive = u.IsActive,
+                LastLogin = u.LastLogin
+            })
+            .ToListAsync();
+
+        return new UserActivityUsersDto
+        {
+            ActiveLast24Hours = counts.ActiveLast24Hours,
+            ActiveLast7Days = counts.ActiveLast7Days,
+            ActiveLast30Days = counts.ActiveLast30Days,
+            GeneratedAt = counts.GeneratedAt,
+            Users = users
+        };
+    }
+
+    private IQueryable<User> BuildActiveUsersQuery(long? projectId, long? organizationId)
+    {
+        var users = _context.Users.Where(u => !u.IsArchived && u.IsActive);
+
+        if (projectId != null)
+            users = users.Where(u =>
+                u.ProjectMembers.Any(p => p.ProjectId == projectId && p.UserId == u.Id) ||
+                u.Groups.Any(g => g.ProjectMembers.Any(pm => pm.ProjectId == projectId && pm.GroupId == g.Id))
+            );
+
+        if (organizationId != null)
+            users = users.Where(u =>
+                u.OrganizationUsers.Any(ou => ou.OrganizationId == organizationId && ou.UserId == u.Id) ||
+                u.Groups.Any(g => g.OrganizationId == organizationId)
+            );
+
+        return users;
+    }
+
+    private static DateTime UtcNowWithoutTimezone()
+    {
+        return DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
     }
 }
