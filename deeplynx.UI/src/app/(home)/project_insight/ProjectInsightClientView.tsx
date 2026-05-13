@@ -671,23 +671,28 @@ export default function ProjectInsightClientView() {
   }
 
   return (
-    <div className="flex h-[calc(100dvh-7rem)] min-h-0 flex-col overflow-hidden bg-base-100">
-      <div className="border-b border-base-300/40 bg-base-200/40 px-6 py-6 lg:px-10">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div className="max-w-4xl">
-            <h1 className="text-2xl font-bold text-base-content">
-              {t.translations.PROJECT_INSIGHT_SCOPE}
-            </h1>
-            <p className="mt-1 text-sm text-base-content/70">
-              {withTokens(t.translations.PROJECT_INSIGHT_DESCRIPTION, {
-                projectName,
-              })}
-            </p>
+    <main className="flex h-[calc(100dvh-7rem)] min-h-0 flex-col overflow-hidden bg-base-200/30">
+      <section className="border-b border-base-300 bg-base-100">
+        <div className="mx-auto flex w-full max-w-7xl flex-col gap-5 px-3 py-5 sm:px-6 lg:px-8">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="max-w-4xl">
+              <p className="text-xs font-semibold uppercase tracking-wide text-base-content/60">
+                {t.translations.PROJECT}
+              </p>
+              <h1 className="text-2xl font-bold text-base-content sm:text-3xl">
+                {t.translations.PROJECT_INSIGHT_SCOPE}
+              </h1>
+              <p className="mt-3 text-base-content/70">
+                {withTokens(t.translations.PROJECT_INSIGHT_DESCRIPTION, {
+                  projectName,
+                })}
+              </p>
+            </div>
           </div>
         </div>
-      </div>
+      </section>
 
-      <div className="flex-1 min-h-0 overflow-hidden p-6 lg:p-8">
+      <section className="mx-auto flex min-h-0 w-full max-w-7xl flex-1 overflow-hidden px-3 py-5 sm:px-6 lg:px-8">
         <div className="grid h-full min-h-0 grid-cols-1 gap-6 overflow-y-auto pr-1 xl:grid-cols-[minmax(0,1.7fr)_minmax(340px,1fr)]">
           <section className="flex min-h-0 flex-col">
             <ProjectInsightChat
@@ -816,7 +821,7 @@ export default function ProjectInsightClientView() {
             </div>
           </aside>
         </div>
-      </div>
+      </section>
 
       {isFiltersOpen && (
         <dialog className="modal modal-open">
@@ -872,6 +877,6 @@ export default function ProjectInsightClientView() {
           </form>
         </dialog>
       )}
-    </div>
+    </main>
   );
 }

@@ -166,7 +166,7 @@ export function ExpandableTable<T>({
   );
 
   return (
-    <div>
+    <div className="flex flex-col h-full">
       {sortOptions?.length ? (
         <SortSelect
           value={sortValue}
@@ -175,7 +175,8 @@ export function ExpandableTable<T>({
           containerClassName="flex items-center justify-end gap-1 mb-4"
         />
       ) : null}
-      <table className="table w-full">
+      <div className="flex-1 overflow-auto">
+        <table className="table w-full">
         {renderHeader()}
 
         <tbody>
@@ -189,10 +190,11 @@ export function ExpandableTable<T>({
                   ? renderExpandedRow(row, rowId)
                   : renderCollapsedRow(row, rowId)}
               </React.Fragment>
-            );
-          })}
-        </tbody>
-      </table>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
 
       {/* Pagination controls */}
       <PaginationControls

@@ -3,6 +3,7 @@ using deeplynx.business;
 using deeplynx.datalayer.Models;
 using deeplynx.models;
 using Microsoft.EntityFrameworkCore;
+using deeplynx.helpers;
 
 namespace deeplynx.tests;
 
@@ -10,6 +11,8 @@ namespace deeplynx.tests;
 public class SavedSearchBusinessTests : IntegrationTestBase
 {
     private SavedSearchBusiness _savedSearchBusiness = null!;
+    private QueryBusiness _queryBusiness = null!;
+    private SensitivityLabelService _sensitivityLabelService = null!;
     private long pid; // project ID
 
     private long uid1; // user IDs
@@ -22,7 +25,9 @@ public class SavedSearchBusinessTests : IntegrationTestBase
     public override async Task InitializeAsync()
     {
         await base.InitializeAsync();
-        _savedSearchBusiness = new SavedSearchBusiness(Context);
+        _sensitivityLabelService = new SensitivityLabelService(Context);
+        _queryBusiness = new QueryBusiness(Context, _sensitivityLabelService);
+        _savedSearchBusiness = new SavedSearchBusiness(Context, _queryBusiness);
     }
 
     protected override async Task SeedTestDataAsync()
@@ -169,7 +174,7 @@ public class SavedSearchBusinessTests : IntegrationTestBase
         // Deserialize and verify filters were saved correctly
         var searchData = JsonSerializer.Deserialize<CustomQueryDtos.CustomQueryResponseDto>(savedSearch.Search);
         Assert.NotNull(searchData);
-        Assert.Equal(textSearch, searchData.textSearch);
+        Assert.Equal(textSearch, searchData.TextSearch);
         Assert.Equal(2, searchData.Filter.Length);
     }
 
@@ -284,6 +289,77 @@ public class SavedSearchBusinessTests : IntegrationTestBase
 
     #endregion
 
+    #region GetSavedSearchById Tests
+
+    [Fact]
+    public async Task GetSavedSearchById_Success_ReturnsCorrectSearch()
+    {
+        // Arrange
+        var filters = new[]
+        {
+        new CustomQueryDtos.CustomQueryRequestDto
+        {
+            Connector = "AND",
+            Filter = "name",
+            Operator = "LIKE",
+            Value = "Rex"
+        }
+    };
+        await _savedSearchBusiness.SaveSearch(uid1, "My Search", "rex", filters);
+
+        var savedSearch = await Context.SavedSearches
+            .FirstAsync(s => s.UserId == uid1 && s.Name == "My Search");
+
+        // Act
+        var result = await _savedSearchBusiness.GetSavedSearchById(uid1, savedSearch.Id);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(savedSearch.Id, result.Id);
+        Assert.Equal("My Search", result.Name);
+        Assert.Equal("rex", result.Query.TextSearch);
+        Assert.Single(result.Query.Filter);
+        Assert.Equal("Rex", result.Query.Filter[0].Value);
+    }
+
+    [Fact]
+    public async Task GetSavedSearchById_InvalidId_ThrowsKeyNotFoundException()
+    {
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            _savedSearchBusiness.GetSavedSearchById(uid1, 99999));
+
+        Assert.Contains("Saved Search not found", exception.Message);
+    }
+
+    [Fact]
+    public async Task GetSavedSearchById_WrongUser_ThrowsKeyNotFoundException()
+    {
+        // Arrange - Save a search under uid1
+        var filters = new[]
+        {
+        new CustomQueryDtos.CustomQueryRequestDto
+        {
+            Connector = "AND",
+            Filter = "name",
+            Operator = "=",
+            Value = "Cody"
+        }
+    };
+        await _savedSearchBusiness.SaveSearch(uid1, "User 1 Search", "cody", filters);
+
+        var savedSearch = await Context.SavedSearches
+            .FirstAsync(s => s.UserId == uid1 && s.Name == "User 1 Search");
+
+        // Act & Assert - uid2 attempts to fetch uid1's saved search
+        var exception = await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            _savedSearchBusiness.GetSavedSearchById(uid2, savedSearch.Id));
+
+        Assert.Contains("Saved Search not found", exception.Message);
+    }
+
+    #endregion
+
     #region GetSavedSearches Tests
 
     [Fact]
@@ -318,11 +394,11 @@ public class SavedSearchBusinessTests : IntegrationTestBase
         var result = await _savedSearchBusiness.GetSavedSearches(uid1);
 
         // Assert
-        Assert.NotNull(result);
-        Assert.Equal(2, result.Count);
+        Assert.NotNull(result.Items);
+        Assert.Equal(2, result.Items.Count);
 
-        Assert.Contains(result, s => s.textSearch == "captain");
-        Assert.Contains(result, s => s.textSearch == "clone");
+        Assert.Contains(result.Items, s => s.Query.TextSearch == "captain");
+        Assert.Contains(result.Items, s => s.Query.TextSearch == "clone");
     }
 
     [Fact]
@@ -348,8 +424,8 @@ public class SavedSearchBusinessTests : IntegrationTestBase
 
         // Assert
         Assert.NotNull(result);
-        Assert.Single(result);
-        Assert.Equal("test1", result[0].textSearch);
+        Assert.Single(result.Items);
+        Assert.Equal("test1", result.Items[0].Query.TextSearch);
     }
 
     [Fact]
@@ -359,8 +435,8 @@ public class SavedSearchBusinessTests : IntegrationTestBase
         var result = await _savedSearchBusiness.GetSavedSearches(uid1);
 
         // Assert
-        Assert.NotNull(result);
-        Assert.Empty(result);
+        Assert.NotNull(result.Items);
+        Assert.Empty(result.Items);
     }
 
     [Fact]
@@ -391,25 +467,25 @@ public class SavedSearchBusinessTests : IntegrationTestBase
         var result = await _savedSearchBusiness.GetSavedSearches(uid1);
 
         // Assert
-        Assert.NotNull(result);
-        Assert.Single(result);
+        Assert.NotNull(result.Items);
+        Assert.Single(result.Items);
 
-        var savedSearch = result[0];
-        Assert.Equal("search text", savedSearch.textSearch);
-        Assert.NotNull(savedSearch.Filter);
-        Assert.Equal(2, savedSearch.Filter.Length);
+        var savedSearch = result.Items[0];
+        Assert.Equal("search text", savedSearch.Query.TextSearch);
+        Assert.NotNull(savedSearch.Query.Filter);
+        Assert.Equal(2, savedSearch.Query.Filter.Length);
 
         // Verify first filter
-        Assert.Null(savedSearch.Filter[0].Connector);
-        Assert.Equal("name", savedSearch.Filter[0].Filter);
-        Assert.Equal("LIKE", savedSearch.Filter[0].Operator);
-        Assert.Equal("Captain", savedSearch.Filter[0].Value);
+        Assert.Null(savedSearch.Query.Filter[0].Connector);
+        Assert.Equal("name", savedSearch.Query.Filter[0].Filter);
+        Assert.Equal("LIKE", savedSearch.Query.Filter[0].Operator);
+        Assert.Equal("Captain", savedSearch.Query.Filter[0].Value);
 
         // Verify second filter
-        Assert.Equal("OR", savedSearch.Filter[1].Connector);
-        Assert.Equal("name", savedSearch.Filter[1].Filter);
-        Assert.Equal("=", savedSearch.Filter[1].Operator);
-        Assert.Equal("Rex", savedSearch.Filter[1].Value);
+        Assert.Equal("OR", savedSearch.Query.Filter[1].Connector);
+        Assert.Equal("name", savedSearch.Query.Filter[1].Filter);
+        Assert.Equal("=", savedSearch.Query.Filter[1].Operator);
+        Assert.Equal("Rex", savedSearch.Query.Filter[1].Value);
     }
 
     [Fact]
@@ -424,11 +500,555 @@ public class SavedSearchBusinessTests : IntegrationTestBase
         var result = await _savedSearchBusiness.GetSavedSearches(uid1);
 
         // Assert
+        Assert.NotNull(result.Items);
+        Assert.Single(result.Items);
+        Assert.Equal("just text", result.Items[0].Query.TextSearch);
+        Assert.NotNull(result.Items[0].Query.Filter);
+        Assert.Empty(result.Items[0].Query.Filter);
+    }
+
+    #endregion
+
+    #region GetSavedSearchesFilters
+
+    [Fact]
+    public async Task GetSavedSearches_FilterOnName_ReturnsMatchingResults()
+    {
+        // Arrange
+        var filters = new[]
+        {
+            new CustomQueryDtos.CustomQueryRequestDto
+            {
+                Connector = "AND",
+                Filter = "name",
+                Operator = "=",
+                Value = "test"
+            }
+        };
+
+        await _savedSearchBusiness.SaveSearch(uid1, "Clone Trooper Search", "rex", filters);
+        await _savedSearchBusiness.SaveSearch(uid1, "Jedi Search", "yoda", filters);
+        await _savedSearchBusiness.SaveSearch(uid1, "Clone Commander Search", "cody", filters);
+
+        var searchFilters = new SavedSearchRequestDtos.FilterSavedQueryRequestDto { Name = "clone" };
+
+        // Act
+        var result = await _savedSearchBusiness.GetSavedSearches(uid1, searchFilters);
+
+        // Assert
         Assert.NotNull(result);
-        Assert.Single(result);
-        Assert.Equal("just text", result[0].textSearch);
-        Assert.NotNull(result[0].Filter);
-        Assert.Empty(result[0].Filter);
+        Assert.Equal(2, result.Items.Count);
+        Assert.Contains(result.Items, s => s.Query.TextSearch == "rex");
+        Assert.Contains(result.Items, s => s.Query.TextSearch == "cody");
+        Assert.DoesNotContain(result.Items, s => s.Query.TextSearch == "yoda");
+    }
+
+    [Fact]
+    public async Task GetSavedSearches_FilterOnName_IsCaseInsensitive()
+    {
+        // Arrange
+        var filters = new[]
+        {
+            new CustomQueryDtos.CustomQueryRequestDto
+            {
+                Connector = "AND",
+                Filter = "name",
+                Operator = "=",
+                Value = "test"
+            }
+        };
+
+        await _savedSearchBusiness.SaveSearch(uid1, "Clone Trooper Search", "rex", filters);
+        await _savedSearchBusiness.SaveSearch(uid1, "Jedi Search", "yoda", filters);
+
+        var searchFilters = new SavedSearchRequestDtos.FilterSavedQueryRequestDto { Name = "CLONE" };
+
+        // Act
+        var result = await _savedSearchBusiness.GetSavedSearches(uid1, searchFilters);
+
+        // Assert
+        Assert.Single(result.Items);
+        Assert.Equal("rex", result.Items[0].Query.TextSearch);
+    }
+
+    [Fact]
+    public async Task GetSavedSearches_FilterOnName_ReturnsEmptyWhenNoMatch()
+    {
+        // Arrange
+        var filters = new[]
+        {
+            new CustomQueryDtos.CustomQueryRequestDto
+            {
+                Connector = "AND",
+                Filter = "name",
+                Operator = "=",
+                Value = "test"
+            }
+        };
+
+        await _savedSearchBusiness.SaveSearch(uid1, "Clone Trooper Search", "rex", filters);
+
+        var searchFilters = new SavedSearchRequestDtos.FilterSavedQueryRequestDto { Name = "Sith" };
+
+        // Act
+        var result = await _savedSearchBusiness.GetSavedSearches(uid1, searchFilters);
+
+        // Assert
+        Assert.NotNull(result.Items);
+        Assert.Empty(result.Items);
+    }
+
+    [Fact]
+    public async Task GetSavedSearches_FilterOnTextSearch_ReturnsMatchingResults()
+    {
+        // Arrange
+        var filters = new[]
+        {
+            new CustomQueryDtos.CustomQueryRequestDto
+            {
+                Connector = "AND",
+                Filter = "name",
+                Operator = "=",
+                Value = "test"
+            }
+        };
+
+        await _savedSearchBusiness.SaveSearch(uid1, "Search 1", "clone trooper", filters);
+        await _savedSearchBusiness.SaveSearch(uid1, "Search 2", "jedi master", filters);
+        await _savedSearchBusiness.SaveSearch(uid1, "Search 3", "clone commander", filters);
+
+        var searchFilters = new SavedSearchRequestDtos.FilterSavedQueryRequestDto { TextSearch = "clone" };
+
+        // Act
+        var result = await _savedSearchBusiness.GetSavedSearches(uid1, searchFilters);
+
+        // Assert
+        Assert.Equal(2, result.Items.Count);
+        Assert.Contains(result.Items, s => s.Query.TextSearch == "clone trooper");
+        Assert.Contains(result.Items, s => s.Query.TextSearch == "clone commander");
+    }
+
+    [Fact]
+    public async Task GetSavedSearches_FilterOnTextSearch_IsCaseInsensitive()
+    {
+        // Arrange
+        var filters = new[]
+        {
+            new CustomQueryDtos.CustomQueryRequestDto
+            {
+                Connector = "AND",
+                Filter = "name",
+                Operator = "=",
+                Value = "test"
+            }
+        };
+
+        await _savedSearchBusiness.SaveSearch(uid1, "Search 1", "Clone Trooper", filters);
+        await _savedSearchBusiness.SaveSearch(uid1, "Search 2", "jedi master", filters);
+
+        var searchFilters = new SavedSearchRequestDtos.FilterSavedQueryRequestDto { TextSearch = "CLONE" };
+
+        // Act
+        var result = await _savedSearchBusiness.GetSavedSearches(uid1, searchFilters);
+
+        // Assert
+        Assert.Single(result.Items);
+        Assert.Equal("Clone Trooper", result.Items[0].Query.TextSearch);
+    }
+
+    [Fact]
+    public async Task GetSavedSearches_FilterOnLastUpdatedBefore_ReturnsMatchingResults()
+    {
+        // Arrange
+        var filters = new[]
+        {
+            new CustomQueryDtos.CustomQueryRequestDto
+            {
+                Connector = "AND",
+                Filter = "name",
+                Operator = "=",
+                Value = "test"
+            }
+        };
+
+        var pastDate = DateTime.UtcNow.AddDays(-10);
+        var futureDate = DateTime.UtcNow.AddDays(10);
+
+        await _savedSearchBusiness.SaveSearch(uid1, "Old Search", "old", filters);
+        await _savedSearchBusiness.SaveSearch(uid1, "New Search", "new", filters);
+
+        // Manually set LastUpdatedAt on the old search to simulate an older record
+        var oldSearch = await Context.SavedSearches.FirstAsync(s => s.UserId == uid1 && s.Name == "Old Search");
+        oldSearch.LastUpdatedAt = DateTime.SpecifyKind(pastDate, DateTimeKind.Unspecified);
+        await Context.SaveChangesAsync();
+
+        var searchFilters = new SavedSearchRequestDtos.FilterSavedQueryRequestDto
+        {
+            LastUpdatedBefore = DateTime.SpecifyKind(DateTime.UtcNow.AddDays(-5), DateTimeKind.Unspecified)
+        };
+
+        // Act
+        var result = await _savedSearchBusiness.GetSavedSearches(uid1, searchFilters);
+
+        // Assert
+        Assert.Single(result.Items);
+        Assert.Equal("old", result.Items[0].Query.TextSearch);
+    }
+
+    [Fact]
+    public async Task GetSavedSearches_FilterOnLastUpdatedAfter_ReturnsMatchingResults()
+    {
+        // Arrange
+        var filters = new[]
+        {
+            new CustomQueryDtos.CustomQueryRequestDto
+            {
+                Connector = "AND",
+                Filter = "name",
+                Operator = "=",
+                Value = "test"
+            }
+        };
+
+        await _savedSearchBusiness.SaveSearch(uid1, "Old Search", "old", filters);
+        await _savedSearchBusiness.SaveSearch(uid1, "New Search", "new", filters);
+
+        // Manually set LastUpdatedAt on the old search to simulate an older record
+        var oldSearch = await Context.SavedSearches.FirstAsync(s => s.UserId == uid1 && s.Name == "Old Search");
+        oldSearch.LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow.AddDays(-10), DateTimeKind.Unspecified);
+        await Context.SaveChangesAsync();
+
+        var searchFilters = new SavedSearchRequestDtos.FilterSavedQueryRequestDto
+        {
+            LastUpdatedAfter = DateTime.SpecifyKind(DateTime.UtcNow.AddDays(-5), DateTimeKind.Unspecified)
+        };
+
+        // Act
+        var result = await _savedSearchBusiness.GetSavedSearches(uid1, searchFilters);
+
+        // Assert
+        Assert.Single(result.Items);
+        Assert.Equal("new", result.Items[0].Query.TextSearch);
+    }
+
+    [Fact]
+    public async Task GetSavedSearches_CombinedFilters_ReturnsMatchingResults()
+    {
+        // Arrange
+        var filters = new[]
+        {
+            new CustomQueryDtos.CustomQueryRequestDto
+            {
+                Connector = "AND",
+                Filter = "name",
+                Operator = "=",
+                Value = "test"
+            }
+        };
+
+        await _savedSearchBusiness.SaveSearch(uid1, "Clone Search", "clone trooper", filters);
+        await _savedSearchBusiness.SaveSearch(uid1, "Clone Old Search", "clone commander", filters);
+        await _savedSearchBusiness.SaveSearch(uid1, "Jedi Search", "jedi master", filters);
+
+        // Age the "Clone Old Search" record
+        var oldSearch = await Context.SavedSearches.FirstAsync(s => s.UserId == uid1 && s.Name == "Clone Old Search");
+        oldSearch.LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow.AddDays(-10), DateTimeKind.Unspecified);
+        await Context.SaveChangesAsync();
+
+        // Filter by name "clone" AND only recently updated records
+        var searchFilters = new SavedSearchRequestDtos.FilterSavedQueryRequestDto
+        {
+            Name = "clone",
+            LastUpdatedAfter = DateTime.SpecifyKind(DateTime.UtcNow.AddDays(-5), DateTimeKind.Unspecified)
+        };
+
+        // Act
+        var result = await _savedSearchBusiness.GetSavedSearches(uid1, searchFilters);
+
+        // Assert
+        Assert.Single(result.Items);
+        Assert.Equal("clone trooper", result.Items[0].Query.TextSearch);
+    }
+
+    [Fact]
+    public async Task GetSavedSearches_NullFilters_ReturnsAllUserSearches()
+    {
+        // Arrange
+        var filters = new[]
+        {
+            new CustomQueryDtos.CustomQueryRequestDto
+            {
+                Connector = "AND",
+                Filter = "name",
+                Operator = "=",
+                Value = "test"
+            }
+        };
+
+        await _savedSearchBusiness.SaveSearch(uid1, "Search 1", "rex", filters);
+        await _savedSearchBusiness.SaveSearch(uid1, "Search 2", "cody", filters);
+
+        // Act
+        var result = await _savedSearchBusiness.GetSavedSearches(uid1, null);
+
+        // Assert
+        Assert.Equal(2, result.Items.Count);
+    }
+
+    [Fact]
+    public async Task GetSavedSearches_Pagination_ReturnsCorrectPage()
+    {
+        // Arrange
+        var filters = new[]
+        {
+            new CustomQueryDtos.CustomQueryRequestDto
+            {
+                Connector = "AND",
+                Filter = "name",
+                Operator = "=",
+                Value = "test"
+            }
+        };
+
+        await _savedSearchBusiness.SaveSearch(uid1, "Search 1", "text1", filters);
+        await _savedSearchBusiness.SaveSearch(uid1, "Search 2", "text2", filters);
+        await _savedSearchBusiness.SaveSearch(uid1, "Search 3", "text3", filters);
+        await _savedSearchBusiness.SaveSearch(uid1, "Search 4", "text4", filters);
+        await _savedSearchBusiness.SaveSearch(uid1, "Search 5", "text5", filters);
+
+        var searchFilters = new SavedSearchRequestDtos.FilterSavedQueryRequestDto
+        {
+            PageNumber = 2,
+            PageSize = 2
+        };
+
+        // Act
+        var result = await _savedSearchBusiness.GetSavedSearches(uid1, searchFilters);
+
+        // Assert
+        Assert.Equal(5, result.TotalCount);
+        Assert.Equal(2, result.Items.Count);
+        Assert.Equal(2, result.PageNumber);
+        Assert.Equal(2, result.PageSize);
+    }
+
+    [Fact]
+    public async Task GetSavedSearches_Pagination_LastPageReturnsRemainder()
+    {
+        // Arrange
+        var filters = new[]
+        {
+            new CustomQueryDtos.CustomQueryRequestDto
+            {
+                Connector = "AND",
+                Filter = "name",
+                Operator = "=",
+                Value = "test"
+            }
+        };
+
+        await _savedSearchBusiness.SaveSearch(uid1, "Search 1", "text1", filters);
+        await _savedSearchBusiness.SaveSearch(uid1, "Search 2", "text2", filters);
+        await _savedSearchBusiness.SaveSearch(uid1, "Search 3", "text3", filters);
+
+        var searchFilters = new SavedSearchRequestDtos.FilterSavedQueryRequestDto
+        {
+            PageNumber = 2,
+            PageSize = 2
+        };
+
+        // Act
+        var result = await _savedSearchBusiness.GetSavedSearches(uid1, searchFilters);
+
+        // Assert
+        Assert.Equal(3, result.TotalCount);
+        Assert.Single(result.Items);
+        Assert.Equal(2, result.PageNumber);
+        Assert.Equal(2, result.PageSize);
+    }
+
+    #endregion
+
+    #region ExecuteSavedSearch Tests
+
+    [Fact]
+    public async Task ExecuteSavedSearch_InvalidId_ThrowsKeyNotFoundException()
+    {
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            _savedSearchBusiness.ExecuteSavedSearch(99999, uid1, pid, [pid]));
+
+        Assert.Contains("Saved Search does not exist", exception.Message);
+    }
+
+    [Fact]
+    public async Task ExecuteSavedSearch_WrongUser_ThrowsKeyNotFoundException()
+    {
+        // Arrange - Save a search under uid1
+        var filters = new[]
+        {
+            new CustomQueryDtos.CustomQueryRequestDto
+            {
+                Connector = "AND",
+                Filter = "name",
+                Operator = "LIKE",
+                Value = "test"
+            }
+        };
+        await _savedSearchBusiness.SaveSearch(uid1, "User 1 Search", "test", filters);
+
+        var savedSearch = await Context.SavedSearches
+            .FirstAsync(s => s.UserId == uid1 && s.Name == "User 1 Search");
+
+        // Act & Assert - uid2 attempts to execute uid1's saved search
+        var exception = await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            _savedSearchBusiness.ExecuteSavedSearch(savedSearch.Id, uid2, pid, [pid]));
+
+        Assert.Contains("Saved Search does not exist", exception.Message);
+    }
+
+    [Fact]
+    public async Task ExecuteSavedSearch_CorruptedSearchJson_ThrowsArgumentException()
+    {
+        // Arrange - Manually insert a saved search with invalid/empty filter JSON
+        var badSearch = new SavedSearch
+        {
+            UserId = uid1,
+            Name = "Bad Search",
+            Search = JsonSerializer.Serialize(new { TextSearch = "test", Filter = (object)null })
+        };
+        Context.SavedSearches.Add(badSearch);
+        await Context.SaveChangesAsync();
+
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<ArgumentException>(() =>
+            _savedSearchBusiness.ExecuteSavedSearch(badSearch.Id, uid1, pid, [pid]));
+
+        Assert.Contains("invalid or empty query", exception.Message);
+    }
+
+    [Fact]
+    public async Task ExecuteSavedSearch_ValidSearch_ReturnsResults()
+    {
+        // Arrange
+        var filters = new[]
+        {
+            new CustomQueryDtos.CustomQueryRequestDto
+            {
+                Connector = "AND",
+                Filter = "name",
+                Operator = "LIKE",
+                Value = "test"
+            }
+        };
+        await _savedSearchBusiness.SaveSearch(uid1, "Valid Search", "test", filters);
+
+        var savedSearch = await Context.SavedSearches
+            .FirstAsync(s => s.UserId == uid1 && s.Name == "Valid Search");
+
+        // Act
+        var result = await _savedSearchBusiness.ExecuteSavedSearch(
+            savedSearch.Id, uid1, pid, [pid], isSysAdmin: true);
+
+        // Assert
+        Assert.NotNull(result);
+    }
+
+    #endregion
+
+    #region DeleteSavedSearch Tests
+
+    [Fact]
+    public async Task DeleteSavedSearch_Success_DeletesSavedSearch()
+    {
+        // Arrange
+        var filters = new[]
+        {
+        new CustomQueryDtos.CustomQueryRequestDto
+        {
+            Connector = "AND",
+            Filter = "name",
+            Operator = "=",
+            Value = "Rex"
+        }
+    };
+        await _savedSearchBusiness.SaveSearch(uid1, "Search To Delete", "rex", filters);
+
+        var savedSearch = await Context.SavedSearches
+            .FirstAsync(s => s.UserId == uid1 && s.Name == "Search To Delete");
+
+        // Act
+        var result = await _savedSearchBusiness.DeleteSavedSearch(uid1, savedSearch.Id);
+
+        // Assert
+        Assert.True(result);
+        var deleted = await Context.SavedSearches.FirstOrDefaultAsync(s => s.Id == savedSearch.Id);
+        Assert.Null(deleted);
+    }
+
+    [Fact]
+    public async Task DeleteSavedSearch_InvalidId_ThrowsKeyNotFoundException()
+    {
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            _savedSearchBusiness.DeleteSavedSearch(uid1, 99999));
+
+        Assert.Contains("Saved search not found", exception.Message);
+    }
+
+    [Fact]
+    public async Task DeleteSavedSearch_WrongUser_ThrowsKeyNotFoundException()
+    {
+        // Arrange - Save a search under uid1
+        var filters = new[]
+        {
+        new CustomQueryDtos.CustomQueryRequestDto
+        {
+            Connector = "AND",
+            Filter = "name",
+            Operator = "=",
+            Value = "Rex"
+        }
+    };
+        await _savedSearchBusiness.SaveSearch(uid1, "User 1 Search", "rex", filters);
+
+        var savedSearch = await Context.SavedSearches
+            .FirstAsync(s => s.UserId == uid1 && s.Name == "User 1 Search");
+
+        // Act & Assert - uid2 attempts to delete uid1's saved search
+        var exception = await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            _savedSearchBusiness.DeleteSavedSearch(uid2, savedSearch.Id));
+
+        Assert.Contains("Saved search not found", exception.Message);
+    }
+
+    [Fact]
+    public async Task DeleteSavedSearch_Success_DoesNotDeleteOtherUserSearches()
+    {
+        // Arrange
+        var filters = new[]
+        {
+        new CustomQueryDtos.CustomQueryRequestDto
+        {
+            Connector = "AND",
+            Filter = "name",
+            Operator = "=",
+            Value = "test"
+        }
+    };
+        await _savedSearchBusiness.SaveSearch(uid1, "User 1 Search", "rex", filters);
+        await _savedSearchBusiness.SaveSearch(uid2, "User 2 Search", "cody", filters);
+
+        var uid1Search = await Context.SavedSearches
+            .FirstAsync(s => s.UserId == uid1 && s.Name == "User 1 Search");
+
+        // Act
+        await _savedSearchBusiness.DeleteSavedSearch(uid1, uid1Search.Id);
+
+        // Assert - uid2's search should be untouched
+        var uid2Search = await Context.SavedSearches
+            .FirstOrDefaultAsync(s => s.UserId == uid2 && s.Name == "User 2 Search");
+        Assert.NotNull(uid2Search);
     }
 
     #endregion

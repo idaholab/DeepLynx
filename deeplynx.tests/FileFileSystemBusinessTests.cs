@@ -2,6 +2,7 @@ using System.Text;
 using System.Text.Json.Nodes;
 using deeplynx.business;
 using deeplynx.datalayer.Models;
+using deeplynx.helpers;
 using deeplynx.interfaces;
 using deeplynx.models;
 using Microsoft.AspNetCore.Http;
@@ -17,6 +18,7 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
     private FileFilesystemBusiness _fileBusiness;
     private Mock<IObjectStorageBusiness> _objectStorageBusiness = null!;
     private Mock<IRecordBusiness> _recordBusiness = null!;
+    private EncryptionHelper _encryptionHelper = null!;
     private long organizationId;
     public long os1;
     public long os2;
@@ -28,6 +30,7 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
 
     public override async Task InitializeAsync()
     {
+        _encryptionHelper = new EncryptionHelper();
         await base.InitializeAsync();
         _recordBusiness = new Mock<IRecordBusiness>();
         _objectStorageBusiness = new Mock<IObjectStorageBusiness>();
@@ -630,7 +633,7 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
             ProjectId = pid,
             OrganizationId = organizationId,
             Type = "filesystem",
-            Config = os1Config.ToString(),
+            ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(os1Config),
             Default = true
         };
 
@@ -642,7 +645,7 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
             Type = "filesystem",
             ProjectId = pid,
             OrganizationId = organizationId,
-            Config = os2Config.ToString()
+            ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(os2Config),
         };
 
         Context.ObjectStorages.Add(objectStorage);
@@ -651,4 +654,255 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
         os1 = objectStorage.Id;
         os2 = objectStorage2.Id;
     }
+    
+    #region GetFileSize Tests
+
+    [Fact]
+    public async Task GetFileSize_ReturnsCorrectSize_ForExistingFile()
+    {
+        // Arrange
+        var config = new ObjectStorageConfigDto { MountPath = _testDirectory };
+        var testFilePath = Path.Combine(_testDirectory, "size-test.txt");
+        Directory.CreateDirectory(_testDirectory);
+        
+        var fileContent = new byte[1024]; // 1KB
+        new Random().NextBytes(fileContent);
+        await File.WriteAllBytesAsync(testFilePath, fileContent);
+
+        try
+        {
+            // Act
+            var result = await _fileBusiness.GetFileSize(testFilePath, config);
+
+            // Assert
+            Assert.Equal(1024, result);
+        }
+        finally
+        {
+            if (Directory.Exists(_testDirectory))
+                Directory.Delete(_testDirectory, true);
+        }
+    }
+
+    [Fact]
+    public async Task GetFileSize_ReturnsZero_ForEmptyFile()
+    {
+        // Arrange
+        var config = new ObjectStorageConfigDto { MountPath = _testDirectory };
+        var testFilePath = Path.Combine(_testDirectory, "empty.txt");
+        Directory.CreateDirectory(_testDirectory);
+        
+        await File.WriteAllBytesAsync(testFilePath, Array.Empty<byte>());
+
+        try
+        {
+            // Act
+            var result = await _fileBusiness.GetFileSize(testFilePath, config);
+
+            // Assert
+            Assert.Equal(0, result);
+        }
+        finally
+        {
+            if (Directory.Exists(_testDirectory))
+                Directory.Delete(_testDirectory, true);
+        }
+    }
+
+    [Fact]
+    public async Task GetFileSize_ThrowsFileNotFoundException_WhenFileDoesNotExist()
+    {
+        // Arrange
+        var config = new ObjectStorageConfigDto { MountPath = _testDirectory };
+        var nonExistentPath = Path.Combine(_testDirectory, "non-existent.txt");
+
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<FileNotFoundException>(() =>
+            _fileBusiness.GetFileSize(nonExistentPath, config)
+        );
+
+        Assert.Contains(nonExistentPath, exception.Message);
+    }
+
+    [Fact]
+    public async Task GetFileSize_ThrowsException_WhenMountPathIsNull()
+    {
+        // Arrange
+        var config = new ObjectStorageConfigDto { MountPath = null };
+        var testFilePath = Path.Combine(_testDirectory, "test.txt");
+
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<Exception>(() =>
+            _fileBusiness.GetFileSize(testFilePath, config)
+        );
+
+        Assert.Contains("File system mount path not set", exception.Message);
+    }
+
+    [Fact]
+    public async Task GetFileSize_ReturnsCorrectSize_ForLargeFile()
+    {
+        // Arrange
+        var config = new ObjectStorageConfigDto { MountPath = _testDirectory };
+        var testFilePath = Path.Combine(_testDirectory, "large-file.bin");
+        Directory.CreateDirectory(_testDirectory);
+        
+        // Create a 5MB file
+        var largeFileSize = 5 * 1024 * 1024;
+        await File.WriteAllBytesAsync(testFilePath, new byte[largeFileSize]);
+
+        try
+        {
+            // Act
+            var result = await _fileBusiness.GetFileSize(testFilePath, config);
+
+            // Assert
+            Assert.Equal(largeFileSize, result);
+        }
+        finally
+        {
+            if (Directory.Exists(_testDirectory))
+                Directory.Delete(_testDirectory, true);
+        }
+    }
+
+    [Fact]
+    public async Task GetFileSize_ReturnsCorrectSize_ForMultipleDifferentFiles()
+    {
+        // Arrange
+        var config = new ObjectStorageConfigDto { MountPath = _testDirectory };
+        Directory.CreateDirectory(_testDirectory);
+        
+        var file1Path = Path.Combine(_testDirectory, "file1.txt");
+        var file2Path = Path.Combine(_testDirectory, "file2.txt");
+        var file3Path = Path.Combine(_testDirectory, "file3.txt");
+        
+        await File.WriteAllBytesAsync(file1Path, new byte[100]);
+        await File.WriteAllBytesAsync(file2Path, new byte[500]);
+        await File.WriteAllBytesAsync(file3Path, new byte[1000]);
+
+        try
+        {
+            // Act
+            var size1 = await _fileBusiness.GetFileSize(file1Path, config);
+            var size2 = await _fileBusiness.GetFileSize(file2Path, config);
+            var size3 = await _fileBusiness.GetFileSize(file3Path, config);
+
+            // Assert
+            Assert.Equal(100, size1);
+            Assert.Equal(500, size2);
+            Assert.Equal(1000, size3);
+        }
+        finally
+        {
+            if (Directory.Exists(_testDirectory))
+                Directory.Delete(_testDirectory, true);
+        }
+    }
+
+    [Fact]
+    public async Task GetFileSize_ThrowsException_WhenFilePathIsInvalid()
+    {
+        // Arrange
+        var config = new ObjectStorageConfigDto { MountPath = _testDirectory };
+        var invalidPath = ""; // Empty path
+
+        // Act & Assert
+        await Assert.ThrowsAsync<ArgumentException>(() =>
+            _fileBusiness.GetFileSize(invalidPath, config)
+        );
+    }
+
+    [Fact]
+    public async Task GetFileSize_HandlesFileInNestedDirectory()
+    {
+        // Arrange
+        var config = new ObjectStorageConfigDto { MountPath = _testDirectory };
+        var nestedPath = Path.Combine(_testDirectory, "level1", "level2", "nested.txt");
+        Directory.CreateDirectory(Path.GetDirectoryName(nestedPath)!);
+        
+        await File.WriteAllBytesAsync(nestedPath, new byte[2048]);
+
+        try
+        {
+            // Act
+            var result = await _fileBusiness.GetFileSize(nestedPath, config);
+
+            // Assert
+            Assert.Equal(2048, result);
+        }
+        finally
+        {
+            if (Directory.Exists(_testDirectory))
+                Directory.Delete(_testDirectory, true);
+        }
+    }
+
+    [Fact]
+    public async Task GetFileSize_ReturnsCorrectSize_AfterFileModification()
+    {
+        // Arrange
+        var config = new ObjectStorageConfigDto { MountPath = _testDirectory };
+        var testFilePath = Path.Combine(_testDirectory, "modified.txt");
+        Directory.CreateDirectory(_testDirectory);
+        
+        // Create initial file
+        await File.WriteAllBytesAsync(testFilePath, new byte[500]);
+
+        try
+        {
+            // Get initial size
+            var initialSize = await _fileBusiness.GetFileSize(testFilePath, config);
+            Assert.Equal(500, initialSize);
+
+            // Modify file
+            await File.WriteAllBytesAsync(testFilePath, new byte[1500]);
+
+            // Act - Get size after modification
+            var newSize = await _fileBusiness.GetFileSize(testFilePath, config);
+
+            // Assert
+            Assert.Equal(1500, newSize);
+            Assert.NotEqual(initialSize, newSize);
+        }
+        finally
+        {
+            if (Directory.Exists(_testDirectory))
+                Directory.Delete(_testDirectory, true);
+        }
+    }
+
+    [Fact]
+    public async Task GetFileSize_WorksWithDifferentFileExtensions()
+    {
+        // Arrange
+        var config = new ObjectStorageConfigDto { MountPath = _testDirectory };
+        Directory.CreateDirectory(_testDirectory);
+        
+        var txtPath = Path.Combine(_testDirectory, "test.txt");
+        var binPath = Path.Combine(_testDirectory, "test.bin");
+        var csvPath = Path.Combine(_testDirectory, "test.csv");
+        var jsonPath = Path.Combine(_testDirectory, "test.json");
+        
+        await File.WriteAllBytesAsync(txtPath, new byte[100]);
+        await File.WriteAllBytesAsync(binPath, new byte[200]);
+        await File.WriteAllBytesAsync(csvPath, new byte[300]);
+        await File.WriteAllBytesAsync(jsonPath, new byte[400]);
+
+        try
+        {
+            // Act & Assert
+            Assert.Equal(100, await _fileBusiness.GetFileSize(txtPath, config));
+            Assert.Equal(200, await _fileBusiness.GetFileSize(binPath, config));
+            Assert.Equal(300, await _fileBusiness.GetFileSize(csvPath, config));
+            Assert.Equal(400, await _fileBusiness.GetFileSize(jsonPath, config));
+        }
+        finally
+        {
+            if (Directory.Exists(_testDirectory))
+                Directory.Delete(_testDirectory, true);
+        }
+    }
+
+    #endregion
 }

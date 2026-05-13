@@ -6,6 +6,7 @@ import {
   archiveEdgeByRelationship,
   createEdge,
   getEdgeByRelationship,
+  updateEdgeByRelationship,
 } from "@/app/lib/client_service/edge_services.client";
 import { fullTextSearch } from "@/app/lib/client_service/query_services.client";
 import { getEdgesByRecord } from "@/app/lib/client_service/record_services.client";
@@ -290,10 +291,25 @@ export function useRecordRelationships({
   const handleCreateRelationships = useCallback(
     async (data: {
       records: RecordSearchResult[];
-      relationship: string;
+      relationshipId: number;
+      relationshipName: string;
       direction: "outgoing" | "incoming";
     }) => {
-      if (organizationId == null || recordDataSourceId == null) return;
+      if (organizationId == null) {
+        const message =
+          translations.FAILED_TO_CREATE_RELATIONSHIPS ||
+          "Failed to create relationships";
+        toast.error(message);
+        throw new Error("Organization ID is required to create relationships");
+      }
+
+      if (recordDataSourceId == null) {
+        const message =
+          translations.FAILED_TO_CREATE_RELATIONSHIPS ||
+          "Failed to create relationships";
+        toast.error(message);
+        throw new Error("Record data source ID is required to create relationships");
+      }
 
       try {
         const promises = data.records.map(async (targetRecord) => {
@@ -302,16 +318,60 @@ export function useRecordRelationships({
           const destination_id =
             data.direction === "outgoing" ? targetRecord.id : recordId;
 
-          return createEdge(
-            Number(organizationId),
-            projectId,
-            Number(recordDataSourceId),
-            {
+          try {
+            return await createEdge(
+              Number(organizationId),
+              projectId,
+              Number(recordDataSourceId),
+              {
+                origin_id,
+                destination_id,
+                relationship_id: data.relationshipId,
+                relationship_name: data.relationshipName,
+              },
+            );
+          } catch (error) {
+            const errorMessage =
+              error instanceof Error
+                ? error.message
+                : typeof error === "string"
+                  ? error
+                  : JSON.stringify(error);
+
+            if (!errorMessage.includes("unique_edge_record_ids")) {
+              throw error;
+            }
+
+            const existingEdge = await getEdgeByRelationship(
+              Number(organizationId),
+              projectId,
               origin_id,
               destination_id,
-              relationship_name: data.relationship,
-            },
-          );
+              false,
+            );
+
+            if (existingEdge.isArchived) {
+              await archiveEdgeByRelationship(
+                Number(organizationId),
+                projectId,
+                origin_id,
+                destination_id,
+                false,
+              );
+            }
+
+            if (existingEdge.relationshipId !== data.relationshipId) {
+              return updateEdgeByRelationship(
+                Number(organizationId),
+                projectId,
+                origin_id,
+                destination_id,
+                { relationshipId: data.relationshipId },
+              );
+            }
+
+            return existingEdge;
+          }
         });
 
         await Promise.all(promises);
@@ -327,7 +387,7 @@ export function useRecordRelationships({
             relatedRecordName: targetRecord.name,
             relatedRecordId: targetRecord.id,
             relatedRecordProjectId: projectId,
-            relationshipName: data.relationship,
+            relationshipName: data.relationshipName,
             actions: (
               <XMarkIcon
                 className="w-5 h-5 cursor-pointer text-error hover:text-error-content"
@@ -335,7 +395,7 @@ export function useRecordRelationships({
                   setModal({
                     isOpen: true,
                     type: "relatedRecord",
-                    nameToRemove: data.relationship || translations.EDGE,
+                    nameToRemove: data.relationshipName || translations.EDGE,
                     recordNameToRemove: recordName,
                     idToRemove: targetRecord.id.toString(),
                     originId:

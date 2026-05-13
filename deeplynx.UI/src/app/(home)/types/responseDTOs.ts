@@ -1,3 +1,5 @@
+import { SearchConditionDto } from "./requestDTOs";
+
 export type ClassResponseDto = {
   id: number;
   name: string;
@@ -15,7 +17,7 @@ export type ClassResponseDto = {
 export type TokenResponseDto = {
   apiKey: string;
   apiSecret: string;
-}
+};
 
 export type DataSourceResponseDto = {
   id: number;
@@ -31,8 +33,8 @@ export type DataSourceResponseDto = {
   lastUpdatedBy: string | null;
   isArchived: boolean;
   createdby: string | null;
-  createdat: string;          // RFC 3339 date-time
-  archivedat: string | null;  // RFC 3339 or null
+  createdat: string; // RFC 3339 date-time
+  archivedat: string | null; // RFC 3339 or null
 };
 
 export type RelatedRecordsResponseDto = {
@@ -40,7 +42,7 @@ export type RelatedRecordsResponseDto = {
   relatedRecordId: number;
   relatedRecordProjectId: number;
   relationshipName: string | null;
-}
+};
 
 export type GroupResponseDto = {
   id: number | string;
@@ -51,7 +53,7 @@ export type GroupResponseDto = {
   isArchived: boolean;
   organizationId: number | string;
   memberCount?: number;
-}
+};
 
 export interface HistoricalRecordResponseDto {
   id: number;
@@ -106,7 +108,7 @@ export type ObjectStorageResponseDto = {
   lastUpdatedAt: string;
   lastUpdatedBy: string;
   isArchived: boolean;
-}
+};
 
 export type OrganizationResponseDto = {
   id: number | string;
@@ -117,7 +119,7 @@ export type OrganizationResponseDto = {
   isArchived: boolean;
   defaultOrg?: boolean;
   banner?: string;
-}
+};
 
 export type PermissionResponseDto = {
   id: number | string;
@@ -132,7 +134,7 @@ export type PermissionResponseDto = {
   isArchived: boolean;
   projectId?: number | string;
   organizationId?: number | string;
-}
+};
 
 export type ProjectMembersDto = {
   name: string;
@@ -142,7 +144,7 @@ export type ProjectMembersDto = {
   roleId?: number | null;
   groupId?: number | null;
   projectId: number;
-}
+};
 
 export type ProjectResponseDto = {
   id: number | string;
@@ -160,7 +162,7 @@ export type ProjectStatResponseDto = {
   classes: number;
   records: number;
   datasources: number;
-}
+};
 
 export type RoleResponseDto = {
   id: number;
@@ -171,7 +173,7 @@ export type RoleResponseDto = {
   isArchived: boolean;
   projectId: number;
   organizationId: number;
-}
+};
 
 export type TagResponseDto = {
   id: number;
@@ -192,20 +194,19 @@ export type SensitivityLabelsDto = {
   isArchived: boolean;
   projectId: number | null;
   organizationId: number | null;
-}
+};
 
-export type UserResponseDto =
-  {
-    id: number;
-    name: string;
-    email: string;
-    username: string;
-    isSysAdmin: boolean;
-    isOrgAdmin?: boolean | null;
-    isArchived: boolean;
-    isActive: boolean;
-    role?: string;
-  }
+export type UserResponseDto = {
+  id: number;
+  name: string;
+  email: string;
+  username: string;
+  isSysAdmin: boolean;
+  isOrgAdmin?: boolean | null;
+  isArchived: boolean;
+  isActive: boolean;
+  role?: string;
+};
 
 export type UserAdminInfoDto = {
   id: number;
@@ -228,8 +229,8 @@ export type PendingInviteDto = {
   projectName?: string;
   roleId?: number;
   roleName?: string;
-  status: 'pending' | 'expired';
-}
+  status: "pending" | "expired";
+};
 
 export type GraphResponseDto = {
   nodes: Array<{
@@ -244,7 +245,7 @@ export type GraphResponseDto = {
     relationshipName: string | null;
     edgeId: number;
   }>;
-}
+};
 
 export type OauthApplicationResponseDto = {
   id: number;
@@ -257,22 +258,21 @@ export type OauthApplicationResponseDto = {
   isArchived: boolean;
   lastUpdatedAt: string;
   lastUpdatedBy?: number;
-}
+};
 
 export type OauthApplicationSecureResponseDto = {
   name: string;
   clientId: string;
   clientSecretRaw: string;
-}
+};
 
-export type PaginatedEventsResponseDto =
-  {
-    items: EventResponseDto[] | [];
-    pageNumber: number;
-    pageSize: number;
-    maxPageSize: number;
-    totalCount: number;
-  };
+export type PaginatedEventsResponseDto = {
+  items: EventResponseDto[] | [];
+  pageNumber: number;
+  pageSize: number;
+  maxPageSize: number;
+  totalCount: number;
+};
 
 export type EventResponseDto = {
   id: number;
@@ -347,4 +347,26 @@ export type UserModelTokenResponseDto = {
   aiModelConfigId: number;
   token: string;
   lastUpdatedAt: string;
+};
+
+export interface TriggerLatticeExtractionResponseDTO {
+  extraction_id: number;
+}
+
+export interface SavedSearchesResponseDto {
+  id: number;
+  name: string;
+  lastUpdatedAt: Date;
+  query: {
+    textSearch?: string;
+    filter: SearchConditionDto[] | null;
+  };
+}
+
+export type PaginatedSavedSearchesResponseDto = {
+  items: SavedSearchesResponseDto[] | [];
+  pageNumber: number;
+  pageSize: number;
+  maxPageSize: number;
+  totalCount: number;
 };

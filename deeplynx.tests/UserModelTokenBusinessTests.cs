@@ -2,20 +2,21 @@ using System.ComponentModel.DataAnnotations;
 using deeplynx.business;
 using deeplynx.datalayer.Models;
 using deeplynx.models;
-
+using deeplynx.helpers;
 namespace deeplynx.tests;
 
 [Collection("Test Suite Collection")]
 public class UserModelTokenBusinessTests : IntegrationTestBase
 {
     private UserModelTokenBusiness _userModelTokenBusiness = null!;
+    private EncryptionHelper _encryptionHelper = null!;
 
-    public long uid;   // primary user ID
-    public long uid2;  // secondary user ID
-    public long oid;   // organization ID
-    public long mcid1; // model config IDs
+    public long uid;
+    public long uid2;
+    public long oid;
+    public long mcid1;
     public long mcid2;
-    public long tid1;  // token IDs
+    public long tid1;
     public long tid2;
     public long tid3;
 
@@ -26,34 +27,25 @@ public class UserModelTokenBusinessTests : IntegrationTestBase
     public override async Task InitializeAsync()
     {
         await base.InitializeAsync();
-        _userModelTokenBusiness = new UserModelTokenBusiness(Context);
+        _encryptionHelper = new EncryptionHelper();
+        _userModelTokenBusiness = new UserModelTokenBusiness(Context, _encryptionHelper);
     }
 
     protected override async Task SeedTestDataAsync()
     {
         await base.SeedTestDataAsync();
 
-        // Create users
-        var user1 = new User
-        {
-            Name = "Test User 1",
-            Email = "user1@test.com",
-            Password = "test_password",
-            IsArchived = false
-        };
-        var user2 = new User
-        {
-            Name = "Test User 2",
-            Email = "user2@test.com",
-            Password = "test_password",
-            IsArchived = false
-        };
+        // EncryptionHelper is safe to construct here because TestSuiteFixture
+        // already set ENCRYPTION_KEY and ENCRYPTION_IV before any test runs
+        var encryptionHelper = new EncryptionHelper();
+
+        var user1 = new User { Name = "Test User 1", Email = "user1@test.com", Password = "test_password", IsArchived = false };
+        var user2 = new User { Name = "Test User 2", Email = "user2@test.com", Password = "test_password", IsArchived = false };
         Context.Users.AddRange(user1, user2);
         await Context.SaveChangesAsync();
         uid = user1.Id;
         uid2 = user2.Id;
 
-        // Create organization
         var org = new Organization
         {
             Name = "Test Org",
@@ -64,7 +56,6 @@ public class UserModelTokenBusinessTests : IntegrationTestBase
         await Context.SaveChangesAsync();
         oid = org.Id;
 
-        // Create AI model configs
         var config1 = new AiModelConfig
         {
             OrganizationId = oid,
@@ -98,29 +89,26 @@ public class UserModelTokenBusinessTests : IntegrationTestBase
         mcid1 = config1.Id;
         mcid2 = config2.Id;
 
-        // Create user model tokens
-        // tid1 - user1, config1
+        // Tokens must be stored encrypted, exactly as the business layer would store them
         var token1 = new UserModelToken
         {
             UserId = uid,
             AiModelConfigId = mcid1,
-            Token = "sk-token-user1-config1",
+            Token = encryptionHelper.Encrypt("sk-token-user1-config1"),
             LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
         };
-        // tid2 - user1, config2
         var token2 = new UserModelToken
         {
             UserId = uid,
             AiModelConfigId = mcid2,
-            Token = "sk-token-user1-config2",
+            Token = encryptionHelper.Encrypt("sk-token-user1-config2"),
             LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
         };
-        // tid3 - user2, config1
         var token3 = new UserModelToken
         {
             UserId = uid2,
             AiModelConfigId = mcid1,
-            Token = "sk-token-user2-config1",
+            Token = encryptionHelper.Encrypt("sk-token-user2-config1"),
             LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
         };
         Context.UserModelTokens.AddRange(token1, token2, token3);
@@ -135,10 +123,8 @@ public class UserModelTokenBusinessTests : IntegrationTestBase
     [Fact]
     public async Task GetUserTokens_ReturnsAllTokensForUser()
     {
-        // Act
         var result = await _userModelTokenBusiness.GetUserTokens(uid);
 
-        // Assert - user1 has tid1 and tid2
         Assert.Equal(2, result.Count);
         Assert.Contains(result, t => t.Id == tid1);
         Assert.Contains(result, t => t.Id == tid2);
@@ -147,20 +133,16 @@ public class UserModelTokenBusinessTests : IntegrationTestBase
     [Fact]
     public async Task GetUserTokens_DoesNotReturnOtherUsersTokens()
     {
-        // Act
         var result = await _userModelTokenBusiness.GetUserTokens(uid);
 
-        // Assert - tid3 belongs to user2
         Assert.DoesNotContain(result, t => t.Id == tid3);
     }
 
     [Fact]
     public async Task GetUserTokens_FilteredByAiModelConfigId_ReturnsCorrectToken()
     {
-        // Act
         var result = await _userModelTokenBusiness.GetUserTokens(uid, mcid1);
 
-        // Assert - user1 only has tid1 for config1
         Assert.Single(result);
         Assert.Equal(tid1, result[0].Id);
         Assert.Equal(mcid1, result[0].AiModelConfigId);
@@ -169,7 +151,6 @@ public class UserModelTokenBusinessTests : IntegrationTestBase
     [Fact]
     public async Task GetUserTokens_FilteredByAiModelConfigId_ReturnsEmpty_WhenNoMatch()
     {
-        // Arrange - create a config that user1 has no token for
         var config3 = new AiModelConfig
         {
             OrganizationId = oid,
@@ -187,17 +168,14 @@ public class UserModelTokenBusinessTests : IntegrationTestBase
         Context.AiModelConfigs.Add(config3);
         await Context.SaveChangesAsync();
 
-        // Act
         var result = await _userModelTokenBusiness.GetUserTokens(uid, config3.Id);
 
-        // Assert
         Assert.Empty(result);
     }
 
     [Fact]
     public async Task GetUserTokens_ReturnsEmpty_WhenUserHasNoTokens()
     {
-        // Arrange - create a user with no tokens
         var userWithNoTokens = new User
         {
             Name = "Tokenless User",
@@ -208,25 +186,22 @@ public class UserModelTokenBusinessTests : IntegrationTestBase
         Context.Users.Add(userWithNoTokens);
         await Context.SaveChangesAsync();
 
-        // Act
         var result = await _userModelTokenBusiness.GetUserTokens(userWithNoTokens.Id);
 
-        // Assert
         Assert.Empty(result);
     }
 
     [Fact]
     public async Task GetUserTokens_ReturnsAllProperties_Correctly()
     {
-        // Act
         var result = await _userModelTokenBusiness.GetUserTokens(uid);
         var token = result.First(t => t.Id == tid1);
 
-        // Assert
         Assert.Equal(tid1, token.Id);
         Assert.Equal(uid, token.UserId);
         Assert.Equal(mcid1, token.AiModelConfigId);
-        Assert.Equal("sk-token-user1-config1", token.Token);
+        // GetUserTokens decrypts then passes through MapToDto which masks
+        Assert.Equal(TokenHelper.MaskToken("sk-token-user1-config1"), token.Token);
         Assert.True(token.LastUpdatedAt > DateTime.MinValue);
     }
 
@@ -237,20 +212,18 @@ public class UserModelTokenBusinessTests : IntegrationTestBase
     [Fact]
     public async Task GetTokenById_Success_WhenExists()
     {
-        // Act
         var result = await _userModelTokenBusiness.GetTokenById(uid, tid1);
 
-        // Assert
         Assert.Equal(tid1, result.Id);
         Assert.Equal(uid, result.UserId);
         Assert.Equal(mcid1, result.AiModelConfigId);
-        Assert.Equal("sk-token-user1-config1", result.Token);
+        // GetTokenById decrypts then passes through MapToDto which masks
+        Assert.Equal(TokenHelper.MaskToken("sk-token-user1-config1"), result.Token);
     }
 
     [Fact]
     public async Task GetTokenById_Fails_IfTokenNotFound()
     {
-        // Act & Assert
         await Assert.ThrowsAsync<KeyNotFoundException>(() =>
             _userModelTokenBusiness.GetTokenById(uid, 99999));
     }
@@ -258,8 +231,8 @@ public class UserModelTokenBusinessTests : IntegrationTestBase
     [Fact]
     public async Task GetTokenById_Fails_IfTokenBelongsToAnotherUser()
     {
-        // Act & Assert - tid3 belongs to user2, but user1 is requesting
-        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+        // The user ID is baked into the query predicate, so wrong-user is indistinguishable from not found
+        await Assert.ThrowsAsync<KeyNotFoundException>(() =>
             _userModelTokenBusiness.GetTokenById(uid, tid3));
     }
 
@@ -270,57 +243,102 @@ public class UserModelTokenBusinessTests : IntegrationTestBase
     [Fact]
     public async Task CreateUserModelToken_Success_ReturnsCorrectValues()
     {
-        // Arrange
+        // Arrange - create a fresh config so uid has no pre-existing token for it
         var now = DateTime.UtcNow;
+        var freshConfig = new AiModelConfig
+        {
+            OrganizationId = oid,
+            ProjectId = null,
+            ServerUrl = "https://api.openai.com",
+            ModelProvider = "openai",
+            ModelName = "gpt-4o-mini",
+            ModelType = "llm",
+            RequiresToken = true,
+            Default = false,
+            IsArchived = false,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid
+        };
+        Context.AiModelConfigs.Add(freshConfig);
+        await Context.SaveChangesAsync();
+
         var dto = new CreateUserModelTokenRequestDto
         {
-            AiModelConfigId = mcid1,
-            Token = "sk-brand-new-token"
+            AiModelConfigId = freshConfig.Id,
+            Token = "sk-brand-new-token-123"
         };
 
-        // Act
         var result = await _userModelTokenBusiness.CreateUserModelToken(uid, dto);
 
-        // Assert
         Assert.True(result.Id > 0);
         Assert.Equal(uid, result.UserId);
-        Assert.Equal(mcid1, result.AiModelConfigId);
-        Assert.Equal("sk-brand-new-token", result.Token);
+        Assert.Equal(freshConfig.Id, result.AiModelConfigId);
+        // CreateUserModelToken decrypts then passes through MapToDto which masks
+        Assert.Equal(TokenHelper.MaskToken("sk-brand-new-token-123"), result.Token);
         Assert.True(result.LastUpdatedAt >= now);
     }
 
     [Fact]
     public async Task CreateUserModelToken_Success_IsPersisted()
     {
-        // Arrange
+        var freshConfig = new AiModelConfig
+        {
+            OrganizationId = oid,
+            ProjectId = null,
+            ServerUrl = "https://api.openai.com",
+            ModelProvider = "openai",
+            ModelName = "gpt-4o-mini",
+            ModelType = "embedding",
+            RequiresToken = true,
+            Default = false,
+            IsArchived = false,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid
+        };
+        Context.AiModelConfigs.Add(freshConfig);
+        await Context.SaveChangesAsync();
+
         var dto = new CreateUserModelTokenRequestDto
         {
-            AiModelConfigId = mcid2,
-            Token = "sk-persisted-token"
+            AiModelConfigId = freshConfig.Id,
+            Token = "sk-persisted-token-456"
         };
 
-        // Act
         var result = await _userModelTokenBusiness.CreateUserModelToken(uid, dto);
 
-        // Assert - verify it's actually in the database
+        // Clear the change tracker so EF fetches the actual persisted value from the DB
+        Context.ChangeTracker.Clear();
+
         var saved = await Context.UserModelTokens.FindAsync(result.Id);
         Assert.NotNull(saved);
-        Assert.Equal("sk-persisted-token", saved.Token);
+        Assert.Equal("sk-persisted-token-456", _encryptionHelper.Decrypt(saved.Token));
         Assert.Equal(uid, saved.UserId);
     }
 
     [Fact]
     public async Task CreateUserModelToken_Fails_IfDtoIsInvalid()
     {
-        // Arrange - missing required fields (Token null/empty, no UserId, etc.)
         var dto = new CreateUserModelTokenRequestDto
         {
             AiModelConfigId = mcid1,
             Token = null
         };
 
-        // Act & Assert
         await Assert.ThrowsAsync<ValidationException>(() =>
+            _userModelTokenBusiness.CreateUserModelToken(uid, dto));
+    }
+
+    [Fact]
+    public async Task CreateUserModelToken_Fails_IfTokenAlreadyExistsForConfig()
+    {
+        // uid already has tid1 for mcid1 from seed data
+        var dto = new CreateUserModelTokenRequestDto
+        {
+            AiModelConfigId = mcid1,
+            Token = "sk-duplicate-token-attempt"
+        };
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
             _userModelTokenBusiness.CreateUserModelToken(uid, dto));
     }
 
@@ -331,10 +349,8 @@ public class UserModelTokenBusinessTests : IntegrationTestBase
     [Fact]
     public async Task DeleteUserModelToken_Success_WhenExists()
     {
-        // Act
         var result = await _userModelTokenBusiness.DeleteUserModelToken(uid, tid1);
 
-        // Assert
         Assert.True(result);
 
         var deleted = await Context.UserModelTokens.FindAsync(tid1);
@@ -344,16 +360,15 @@ public class UserModelTokenBusinessTests : IntegrationTestBase
     [Fact]
     public async Task DeleteUserModelToken_Fails_IfNotFound()
     {
-        // Act & Assert
         await Assert.ThrowsAsync<KeyNotFoundException>(() =>
             _userModelTokenBusiness.DeleteUserModelToken(uid, 99999));
     }
 
     [Fact]
-    public async Task DeleteUserModelToken_DoesNotDeleteOtherTokens()
+    public async Task DeleteUserModelToken_DoesNotDeleteOtherUsersTokens()
     {
-        // Act
-        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => 
+        // uid2 trying to delete tid1 which belongs to uid — wrong-user is indistinguishable from not found
+        await Assert.ThrowsAsync<KeyNotFoundException>(() =>
             _userModelTokenBusiness.DeleteUserModelToken(uid2, tid1));
 
         var tid1Exists = await Context.UserModelTokens.FindAsync(tid1);

@@ -48,13 +48,23 @@ public class OlapController : ControllerBase
         {
             var currentUserId = UserContextStorage.UserId;
             var reportRecordResponse =
-                await _olapBusiness.QueryTabularFile(currentUserId, organizationId, projectId, recordId, request.Query,
+                await _olapBusiness.QueryTabularFile(currentUserId, organizationId, projectId, recordId, request,
                     viewName);
             return Ok(reportRecordResponse);
         }
         catch (NoResultsException nrException)
         {
             return Ok(nrException.Message);
+        }
+        catch (ArgumentException e)
+        {
+            _logger.LogWarning(e, "Invalid OLAP query request");
+            return BadRequest(e.Message);
+        }
+        catch (InvalidOperationException e)
+        {
+            _logger.LogWarning(e, "Invalid OLAP query request");
+            return BadRequest(e.Message);
         }
         catch (Exception e)
         {
@@ -132,21 +142,20 @@ public class OlapController : ControllerBase
     /// <param name="organizationId">ID of organization the tabular data is associated with</param>
     /// <param name="projectId">ID of project the tabular data is associated with</param>
     /// <param name="recordId">ID of the record pointing to the file or folder to plot</param>
-    /// <param name="limit">Maximum number of data points to include</param>
-    /// <param name="rowStride">every nth row to get (row number 4 = every 4th row)</param>
+    /// <param name="request">Windowing, column selection, and downsampling options</param>
     /// <returns>JSON: { PlotData: { columns: [], data: [][] } }</returns>
     [HttpGet("plot", Name = "api_plot_data")]
     [Auth("read", "record")]
     [Auth("read", "file")]
     [Sensitivity("download file")]
     public async Task<IActionResult> GetPlotData(long organizationId, long projectId, long recordId,
-        [FromQuery] long limit, [FromQuery] long rowStride)
+        [FromQuery] OlapQueryRequestDto request)
     {
         try
         {
             var currentUserId = UserContextStorage.UserId;
             var plotData =
-                await _olapBusiness.GetPlotData(currentUserId, organizationId, projectId, recordId, limit, rowStride);
+                await _olapBusiness.GetPlotData(currentUserId, organizationId, projectId, recordId, request);
             return Ok(new { PlotData = plotData });
         }
         catch (ArgumentException e)

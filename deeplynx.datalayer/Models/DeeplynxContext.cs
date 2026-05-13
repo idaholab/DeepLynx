@@ -51,6 +51,8 @@ public partial class DeeplynxContext : DbContext
 
     public virtual DbSet<Record> Records { get; set; }
 
+    public virtual DbSet<RecordCollection> RecordCollections { get; set; }
+
     public virtual DbSet<Relationship> Relationships { get; set; }
 
     public virtual DbSet<Role> Roles { get; set; }
@@ -1048,6 +1050,11 @@ public partial class DeeplynxContext : DbContext
 
             entity.HasIndex(e => new { e.OrganizationId, e.ProjectId, e.Name })
                 .HasDatabaseName("unique_project_relationship_name")
+                .IsUnique()
+                .HasFilter("project_id IS NOT NULL");
+
+            entity.HasIndex(e => new { e.OrganizationId, e.ProjectId, e.OriginId, e.Name, e.DestinationId })
+                .HasDatabaseName("unique_project_relationship_origin_name_destination")
                 .IsUnique()
                 .HasFilter("project_id IS NOT NULL");
 

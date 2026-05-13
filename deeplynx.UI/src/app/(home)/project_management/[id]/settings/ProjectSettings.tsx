@@ -81,8 +81,8 @@ const ProjectSettings = ({ project }: ProjectSettingsProps) => {
 
   // Storage config fields based on type
   const [filesystemPath, setFilesystemPath] = useState("");
-  const [s3Endpoint, setS3Endpoint] = useState("");
-  const [s3BucketName, setS3BucketName] = useState("");
+  const [azureEndpoint, setAzureEndpoint] = useState("");
+  const [azureBucketName, setAzureBucketName] = useState("");
 
   // Delete/Archive modal states
   const [deleteStorageId, setDeleteStorageId] = useState<number | null>(null);
@@ -292,8 +292,8 @@ const ProjectSettings = ({ project }: ProjectSettingsProps) => {
     setStorageFormData({ name: "", config: {}, default: false });
     setStorageType("filesystem");
     setFilesystemPath("");
-    setS3Endpoint("");
-    setS3BucketName("");
+    setAzureEndpoint("");
+    setAzureBucketName("");
   };
 
   const handleCreateStorage = async () => {
@@ -316,13 +316,15 @@ const ProjectSettings = ({ project }: ProjectSettingsProps) => {
         mountPath: filesystemPath,
       };
     } else if (storageType === "azure_blob") {
-      if (!s3Endpoint.trim() || !s3BucketName.trim()) {
+      if (!azureEndpoint.trim() || !azureBucketName.trim()) {
         toast.error(t.translations.ALL_AZURE_BLOB_FIELDS_ARE_REQUIRED);
         return;
       }
       config = {
-        azureConnectionString: s3Endpoint,
-        containerName: s3BucketName,
+        azureObjectConfig: {
+          azureConnectionString: azureEndpoint,
+          azureContainerName: azureBucketName,
+        },
       };
     } else if (storageType === "aws_s3") {
       // TODO: Waiting for backend to finalize AWS S3 config structure
@@ -545,12 +547,13 @@ const ProjectSettings = ({ project }: ProjectSettingsProps) => {
               t={t}
             />
             <ProjectInsightModelTemplateSection
-              organizationId={organization?.organizationId as number | undefined}
+              organizationId={
+                organization?.organizationId as number | undefined
+              }
               projectId={project.id as number | undefined}
             />
           </div>
         </div>
-
       </div>
 
       <CreateStorageModal
@@ -562,10 +565,10 @@ const ProjectSettings = ({ project }: ProjectSettingsProps) => {
         setStorageFormData={setStorageFormData}
         filesystemPath={filesystemPath}
         setFilesystemPath={setFilesystemPath}
-        s3Endpoint={s3Endpoint}
-        setS3Endpoint={setS3Endpoint}
-        s3BucketName={s3BucketName}
-        setS3BucketName={setS3BucketName}
+        azureEndpoint={azureEndpoint}
+        setAzureEndpoint={setAzureEndpoint}
+        azureBucketName={azureBucketName}
+        setAzureBucketName={setAzureBucketName}
         onCreate={handleCreateStorage}
         onResetForm={resetStorageForm}
       />

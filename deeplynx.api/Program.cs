@@ -12,8 +12,6 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
 using Npgsql;
-using Pgvector.EntityFrameworkCore;
-using Pgvector.Npgsql;
 using Scalar.AspNetCore;
 using Serilog;
 using Log = Serilog.Log;
@@ -143,7 +141,7 @@ try
         ServiceLifetime.Transient
     );
 
-    builder.Services.AddDbContext<StagingContext>(
+    builder.Services.AddDbContext<LatticeContext>(
         options => options.UseNpgsql(connectionString),
         ServiceLifetime.Transient
     );
@@ -151,6 +149,7 @@ try
     builder.Services.AddSignalR(); // Used for event system pub/sub and notifications
 
     builder.Services.AddTransient<IRecordBusiness, RecordBusiness>();
+    builder.Services.AddTransient<IRecordCollectionBusiness, RecordCollectionBusiness>();
     builder.Services.AddTransient<IObjectStorageBusiness, ObjectStorageBusiness>();
     builder.Services.AddTransient<IClassBusiness, ClassBusiness>();
     builder.Services.AddTransient<IProjectBusiness, ProjectBusiness>();
@@ -182,7 +181,6 @@ try
     builder.Services.AddTransient<IRoleBusiness, RoleBusiness>();
     builder.Services.AddTransient<ISensitivityLabelBusiness, SensitivityLabelBusiness>();
     builder.Services.AddTransient<IPermissionBusiness, PermissionBusiness>();
-    builder.Services.AddTransient<IExtractionBusiness, ExtractionBusiness>();
     builder.Services.AddTransient<IProjectRolePermissionService, ProjectRolePermissionService>();
     builder.Services.AddTransient<IOrgRolePermissionService, OrgRolePermissionService>();
     builder.Services.AddScoped<IBulkCopyUpsertExecutor, BulkCopyUpsertExecutor>();
@@ -194,9 +192,15 @@ try
     builder.Services.AddTransient<IUserModelTokenBusiness, UserModelTokenBusiness>();
     builder.Services.AddTransient<IAiModelConfigBusiness, AiModelConfigBusiness>();
     builder.Services.AddScoped<ISensitivityLabelService, SensitivityLabelService>();
+    builder.Services.AddScoped<FileBusiness>();
     builder.Services.AddTransient<IInsightBusiness, InsightBusiness>();
+    builder.Services.AddTransient<IExtractionValidation, ExtractionValidation>();
+    builder.Services.AddTransient<ILatticeExtractionBusiness, LatticeExtractionBusiness>();
+    builder.Services.AddMemoryCache();
     builder.Services.AddHttpClient<InsightServiceClient>();
-    
+    builder.Services.AddHttpClient<AirflowServiceClient>();
+    builder.Services.AddSingleton<EncryptionHelper>();
+
     //OpenApi Documentation
     builder.Services.AddOpenApi(options =>
     {
@@ -265,7 +269,6 @@ try
 
                 // AI Services
                 new() { Name = "Lattice", Description = "Useful data views for DeepLynx Lattice use" },
-                new() { Name = "Extraction", Description = "Extraction for DeepLynx Lattice use" },
                 new() { Name = "Organization - AI Model Config", Description = "AI model configuration management" },
                 new() { Name = "Project - AI Model Config", Description = "AI model configuration management" },
                 new() { Name = "User Model Token", Description = "User AI model token management" },
@@ -282,6 +285,7 @@ try
 
                 // Data
                 new() { Name = "Record", Description = "Record management" },
+                new() { Name = "Record Collection", Description = "Record Collection management"},
                 new() { Name = "File", Description = "File operations" },
                 new() { Name = "Metadata", Description = "Metadata operations" },
                 new() { Name = "Historical Record", Description = "Record history" },
@@ -328,9 +332,13 @@ try
 
                 // Metrics
                 new() { Name = "Metrics", Description = "System Statistics" },
-                
+
+                // Integrations
+                new() { Name = "Airflow", Description = "Apache Airflow DAG management" },
+
                 // Other
-                new() { Name = "Notification", Description = "Notifications" }
+                new() { Name = "Notification", Description = "Notifications" },
+                new() { Name = "Maintenance", Description = "Maintenance" }
             };
 
             // Create x-tagGroups for nested folder structure (alphabetized)
@@ -344,7 +352,11 @@ try
                 new JsonObject
                 {
                     ["name"] = "AI Services",
-                    ["tags"] = new JsonArray { "Lattice", "Extraction", "Organization - AI Model Config", "Project - AI Model Config", "User Model Token", "Insight" }
+                    ["tags"] = new JsonArray
+                    {
+                        "Lattice", "Organization - AI Model Config", "Project - AI Model Config", "User Model Token",
+                        "Insight"
+                    }
                 },
                 new JsonObject
                 {
@@ -360,7 +372,7 @@ try
                 {
                     ["name"] = "Data",
                     ["tags"] = new JsonArray
-                        { "Record", "Historical Record", "Edge", "Historical Edge", "File", "Metadata" }
+                        { "Record", "Record Collection", "Historical Record", "Edge", "Historical Edge", "File", "Metadata" }
                 },
                 new JsonObject
                 {
@@ -419,8 +431,13 @@ try
                 },
                 new JsonObject
                 {
+                    ["name"] = "Integrations",
+                    ["tags"] = new JsonArray { "Airflow" }
+                },
+                new JsonObject
+                {
                     ["name"] = "Other",
-                    ["tags"] = new JsonArray { "Notification" }
+                    ["tags"] = new JsonArray { "Notification", "Maintenance" }
                 }
             };
 
@@ -464,12 +481,39 @@ try
 
             return Task.CompletedTask;
         });
+        // Mark non-nullable value-type query parameters as required in the OpenAPI spec.
+        // Path parameters are already required by default; query parameters are not, even when
+        // their C# type is non-nullable (e.g. long, int, bool). Scalar renders this distinction
+        // visually, so this transformer ensures the spec matches the actual binding behaviour.
+        options.AddOperationTransformer((operation, context, cancellationToken) =>
+        {
+            if (operation.Parameters is null) return Task.CompletedTask;
+
+            foreach (var parameter in operation.Parameters.OfType<OpenApiParameter>())
+            {
+                if (parameter.In != ParameterLocation.Query) continue;
+
+                var paramDesc = context.Description.ParameterDescriptions
+                    .FirstOrDefault(p => p.Name == parameter.Name);
+
+                if (paramDesc?.Type is { IsValueType: true } t
+                    && Nullable.GetUnderlyingType(t) is null)
+                    parameter.Required = true;
+            }
+
+            return Task.CompletedTask;
+        });
     });
 
     /* ╔════════════════════════════╗
        ║      Check DB Version      ║
        ╚════════════════════════════╝ */
     await DatabaseVersionChecker.CheckDatabaseVersion(connectionString);
+    
+    /* ╔════════════════════════════╗
+       ║   Check Encryption Keys    ║
+       ╚════════════════════════════╝ */
+    EncryptionHelper.CheckEncryptionConfig();
 
     /* ╔════════════════════════════╗
        ║      App Configurations    ║
@@ -484,8 +528,8 @@ try
         var dbContext = scope.ServiceProvider.GetRequiredService<DeeplynxContext>();
         await dbContext.Database.MigrateAsync();
 
-        var stagingContext = scope.ServiceProvider.GetRequiredService<StagingContext>();
-        await stagingContext.Database.MigrateAsync();
+        var latticeContext = scope.ServiceProvider.GetRequiredService<LatticeContext>();
+        await latticeContext.Database.MigrateAsync();
     }
 
     Log.Information("Migrations applied successfully.");
@@ -515,8 +559,8 @@ try
         app.MapHub<EventNotificationHub>("/eventNotificationHub"); // endpoint for real-time notifications with SignalR
 
     /* ╔════════════════════════════╗
-    ║   Scalar Configuration     ║
-    ╚════════════════════════════╝ */
+       ║   Scalar Configuration     ║
+       ╚════════════════════════════╝ */
     // Always using scalar:
     //if (app.Environment.IsDevelopment()) { ...
     // app.UseOpenApi();

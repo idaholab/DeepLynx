@@ -12,16 +12,21 @@ public class MetricsBusiness : IMetricsBusiness
 {
     private readonly DeeplynxContext _context;
     private readonly IFileBusinessFactory _fileBusinessFactory;
+    private readonly IObjectStorageBusiness _objectStorageBusiness;
 
     /// <summary>
     ///     Initializes a new instance of the <see cref="MetricsBusiness" /> class.
     /// </summary>
     /// <param name="context">The database context used for database retrieval</param>
     /// <param name="fileBusinessFactory">Factory to create storage-specific file business instances</param>
-    public MetricsBusiness(DeeplynxContext context, IFileBusinessFactory fileBusinessFactory)
+    public MetricsBusiness(
+        DeeplynxContext context, 
+        IFileBusinessFactory fileBusinessFactory, 
+        IObjectStorageBusiness objectStorageBusiness)
     {
         _context = context;
         _fileBusinessFactory = fileBusinessFactory;
+        _objectStorageBusiness = objectStorageBusiness;
     }
 
     // -------------------------------------------------------------------------
@@ -39,31 +44,14 @@ public class MetricsBusiness : IMetricsBusiness
         long? projectId,
         long objectStorageId)
     {
-        var objectStorage = await _context.ObjectStorages
-            .FirstOrDefaultAsync(os => os.Id == objectStorageId 
-                                    && os.OrganizationId == organizationId
-                                    && !os.IsArchived);
-        
-        if (objectStorage == null)
-            throw new KeyNotFoundException($"Object storage {objectStorageId} not found");
-        
-        // Validate project scope if provided
-        if (projectId.HasValue)
-        {
-            await ExistenceHelper.EnsureProjectExistsAsync(_context, projectId.Value);
-
-            if (objectStorage.ProjectId.HasValue && objectStorage.ProjectId != projectId)
-                throw new InvalidOperationException(
-                    $"Object storage {objectStorageId} does not belong to project {projectId}");
-        }
+        var objectStorage = await _objectStorageBusiness.GetDecryptedObjectStorage(objectStorageId);
 
         // Build prefix based on scope and storage type
         long? effectiveProjectId = projectId ?? objectStorage.ProjectId;
         var fileBusiness = _fileBusinessFactory.CreateFileBusiness(objectStorage.Type);
         var prefix = fileBusiness.BuildPrefix(organizationId, effectiveProjectId);
         
-        var configData = DeserializeConfig(objectStorage.Config);
-        var totalBytes = await fileBusiness.GetStorageSize(prefix, configData);
+        var totalBytes = await fileBusiness.GetStorageSize(prefix, objectStorage.Config);
         return new StorageSizeDto{ Bytes = totalBytes };
     }
 
@@ -86,21 +74,23 @@ public class MetricsBusiness : IMetricsBusiness
         
         long totalBytes = 0;
         
-        var objectStorages = await _context.ObjectStorages
-            .Where(os => os.OrganizationId == organizationId 
-                      && (os.ProjectId == projectId || os.ProjectId == null)
-                      && !os.IsArchived)
-            .ToListAsync();
+        var objectStorages = await _objectStorageBusiness.GetDecryptedObjectStorages(
+            organizationId, projectId, null);
+
+        // Group by unique config to avoid counting shared storage backends multiple times
+        var uniqueStorages = objectStorages
+            .GroupBy(os => new { os.Type, ConfigJson = JsonConvert.SerializeObject(os.Config) })
+            .Select(g => g.First())
+            .ToList();
         
-        foreach (var objectStorage in objectStorages)
+        foreach (var objectStorage in uniqueStorages)
         {
             try
             {
                 var fileBusiness = _fileBusinessFactory.CreateFileBusiness(objectStorage.Type);
                 var prefix = fileBusiness.BuildPrefix(organizationId, projectId);
                 
-                var configData = DeserializeConfig(objectStorage.Config);
-                var osBytes = await fileBusiness.GetStorageSize(prefix, configData);
+                var osBytes = await fileBusiness.GetStorageSize(prefix, objectStorage.Config);
                 totalBytes += osBytes;
             }
             catch (Exception ex)
@@ -124,19 +114,23 @@ public class MetricsBusiness : IMetricsBusiness
 
         long totalBytes = 0;
         
-        var objectStorages = await _context.ObjectStorages
-            .Where(os => os.OrganizationId == organizationId && !os.IsArchived)
-            .ToListAsync();
+        var objectStorages = await _objectStorageBusiness.GetDecryptedObjectStorages(
+            organizationId, null, null);
         
-        foreach (var objectStorage in objectStorages)
+        // Group by unique config to avoid counting shared storage backends multiple times
+        var uniqueStorages = objectStorages
+            .GroupBy(os => new { os.Type, ConfigJson = JsonConvert.SerializeObject(os.Config) })
+            .Select(g => g.First())
+            .ToList();
+        
+        foreach (var objectStorage in uniqueStorages)
         {
             try
             {
                 var fileBusiness = _fileBusinessFactory.CreateFileBusiness(objectStorage.Type);
                 var prefix = fileBusiness.BuildPrefix(organizationId, null);
                 
-                var configData = DeserializeConfig(objectStorage.Config);
-                var osBytes = await fileBusiness.GetStorageSize(prefix, configData);
+                var osBytes = await fileBusiness.GetStorageSize(prefix, objectStorage.Config);
                 totalBytes += osBytes;
             }
             catch (Exception ex)
@@ -157,13 +151,16 @@ public class MetricsBusiness : IMetricsBusiness
         long totalBytes = 0;
         
         // select only the first of each unique config in order to eliminate duplicates
-        var objectStorages = await _context.ObjectStorages
-            .Where(os => !os.IsArchived)
-            .GroupBy(os => os.Config)
-            .Select(g => g.First())
-            .ToListAsync();
+        var objectStorages = await _objectStorageBusiness.GetDecryptedObjectStorages(
+            null, null, null);
         
-        foreach (var objectStorage in objectStorages)
+        // Group by unique config to avoid counting shared storage backends multiple times
+        var uniqueStorages = objectStorages
+            .GroupBy(os => new { os.Type, ConfigJson = JsonConvert.SerializeObject(os.Config) })
+            .Select(g => g.First())
+            .ToList();
+        
+        foreach (var objectStorage in uniqueStorages)
         {
             try
             {
@@ -171,8 +168,7 @@ public class MetricsBusiness : IMetricsBusiness
                 // Empty prefix for system-wide (get everything in this storage)
                 var prefix = "";
                 
-                var configData = DeserializeConfig(objectStorage.Config);
-                var osBytes = await fileBusiness.GetStorageSize(prefix, configData);
+                var osBytes = await fileBusiness.GetStorageSize(prefix, objectStorage.Config);
                 totalBytes += osBytes;
             }
             catch (Exception ex)
@@ -183,10 +179,161 @@ public class MetricsBusiness : IMetricsBusiness
         
         return new StorageSizeDto{ Bytes = totalBytes };
     }
-    
-    private static ObjectStorageConfigDto DeserializeConfig(string config)
+
+    /// <summary>
+    ///     Gets datasource count for project
+    /// </summary>
+    /// <param name="projectId">The ID of the organization for which the data source belongs to</param>
+    /// <param name="hideArchived">Flag indicating whether to hide archived data sources from the result (Default true)</param>
+    /// <returns>Quantity of data sources system-wide</returns>
+    public async Task<int> GetProjectDataSourceCount(long projectId, bool hideArchived = true)
     {
-        return JsonConvert.DeserializeObject<ObjectStorageConfigDto>(config)
-               ?? throw new InvalidOperationException("Config data for object storage is null or invalid");
+        var dsQuery = _context.DataSources
+            .AsQueryable();
+
+        dsQuery = dsQuery.Where(d => d.ProjectId == projectId);    
+
+        // hide archived data sources
+        if (hideArchived)
+            dsQuery = dsQuery.Where(d => !d.IsArchived);
+
+        return await dsQuery.CountAsync();
+    }
+
+    /// <summary>
+    ///     Gets datasource count for organization
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization for which the data source belongs to</param>
+    /// <param name="projectIds">ID's of the projects whose data sources are to be retrieved</param>
+    /// <param name="hideArchived">Flag indicating whether to hide archived data sources from the result (Default true)</param>
+    /// <returns>Quantity of data sources system-wide</returns>
+    public async Task<int> GetOrganizationDataSourceCount(
+        long organizationId, 
+        long[]? projectIds, 
+        bool hideArchived = true
+        )
+    {
+        var dsQuery = _context.DataSources
+            .AsQueryable();
+
+        dsQuery = dsQuery.Where(d => d.OrganizationId == organizationId);
+
+        // If project ids supplied, inherit org level data sources too 
+        if (projectIds is { Length: > 0 })
+            dsQuery = dsQuery.Where(d =>
+                (d.ProjectId.HasValue && projectIds.Contains(d.ProjectId.Value)) || d.ProjectId == null);
+
+        // hide archived data sources
+        if (hideArchived)
+            dsQuery = dsQuery.Where(d => !d.IsArchived);
+
+        return await dsQuery.CountAsync();
+    }
+    
+    /// <summary>
+    /// Gets the number of unique data modalities in the organization's records
+    /// </summary>
+    /// <param name="organizationId"></param>
+    /// <param name="projectId"></param>
+    /// <returns></returns>
+    public async Task<int> GetOrganizationDataModalityCount(
+        long organizationId,
+        long? projectId)
+    {
+        return await _context.Records
+            .Where(r => r.FileType != null)
+            .Where(r => r.OrganizationId == organizationId &&
+                        (projectId == null || r.ProjectId == projectId))
+            .Select(r => r.FileType)
+            .Distinct()
+            .CountAsync();
+    }
+
+
+    /// <summary>
+    ///     Gets datasource count system-wide
+    /// </summary>
+    /// <param name="hideArchived">Flag indicating whether to hide archived data sources from the result (Default true)</param>
+    /// <returns>Quantity of data sources system-wide</returns>
+    public async Task<int> GetSystemDataSourceCount(bool hideArchived = true)
+    {
+        var dsQuery = _context.DataSources
+            .AsQueryable();
+
+        // hide archived data sources
+        if (hideArchived)
+            dsQuery = dsQuery.Where(d => !d.IsArchived);
+
+        return await dsQuery.CountAsync();
+    }
+    
+    /// <summary>
+    ///     Get record count for a scope
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization the records belong</param>
+    /// <param name="projectId">The ID of the project the records belong</param>
+    /// <param name="hideArchived">Flag indicating whether to hide archived records from the result</param>
+    /// <returns>The record count for the given scope</returns>
+    public async Task<int> GetRecordCount(long? organizationId, long? projectId, bool hideArchived)
+    {
+        var projectIds = projectId.HasValue ? new[] { projectId.Value } : null;
+        return await GetRecordCount(organizationId, projectIds, hideArchived);
+    }
+    
+    /// <summary>
+    ///     Get record count for a scope
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization the records belong</param>
+    /// <param name="projectIds">The IDs of the projects the records belong</param>
+    /// <param name="hideArchived">Flag indicating whether to hide archived records from the result</param>
+    /// <returns>The record count for the given scope</returns>
+    public async Task<int> GetRecordCount(long? organizationId, long[]? projectIds, bool hideArchived)
+    {
+        var recordQuery = _context.Records.AsQueryable();
+        
+        if (organizationId != null) recordQuery = recordQuery.Where(r => r.OrganizationId == organizationId);
+
+        if (projectIds is { Length: > 0 })
+            recordQuery = recordQuery.Where(r => projectIds.Contains(r.ProjectId));
+        
+        if (hideArchived) recordQuery = recordQuery.Where(r => !r.IsArchived);
+        
+        return await recordQuery.CountAsync();
+    }
+
+    /// <summary>
+    ///     Get Files Count
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization the files belong</param>
+    /// <param name="projectId">The ID of the project the files belong</param>
+    /// <param name="hideArchived">Flag indicating whether to hide archived files from the result</param>
+    /// <returns>The record count for the given scope</returns>
+    public async Task<int> GetFileCount(long? organizationId, long? projectId, bool hideArchived = true)
+    {
+        var projectIds = projectId.HasValue ? new[] { projectId.Value } : null;
+        return await GetFileCount(organizationId, projectIds, hideArchived);
+    }
+    
+    /// <summary>
+    ///     Get Files Count
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization the files belong</param>
+    /// <param name="projectIds">The IDs of the projects the files belong</param>
+    /// <param name="hideArchived">Flag indicating whether to hide archived files from the result</param>
+    /// <returns>The record count for the given scope</returns>
+    public async Task<int> GetFileCount(long? organizationId, long[]? projectIds, bool hideArchived)
+    {
+        var fileQuery = _context.Records
+            .Where(r => r.Uri != null)
+            .AsQueryable();
+        
+        if (organizationId != null) fileQuery = fileQuery.Where(r => r.OrganizationId == organizationId);
+
+        if (projectIds is { Length: > 0 })
+            fileQuery = fileQuery.Where(r => projectIds.Contains(r.ProjectId));
+        
+        if (hideArchived) fileQuery = fileQuery.Where(r => !r.IsArchived);
+        
+        return await fileQuery.CountAsync();
     }
 }

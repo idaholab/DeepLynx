@@ -39,6 +39,88 @@ def get_table_name(upload_result, fallback_filename):
     return table_name
 
 
+# ========================================================================
+# OLAP QUERY TESTS
+# ========================================================================
+
+def upload_olap_csv(base_url, auth_token, organization, project, test_datasource_project, cleanup_records):
+    """Upload a CSV file record for OLAP endpoint tests."""
+    file_content = (
+        b"timestamp,value,pressure\n"
+        b"2024-01-01T00:00:00Z,100.0,10.0\n"
+        b"2024-01-01T00:01:00Z,101.0,10.1\n"
+        b"2024-01-01T00:02:00Z,102.0,10.2\n"
+        b"2024-01-01T00:03:00Z,103.0,10.3\n"
+        b"2024-01-01T00:04:00Z,104.0,10.4\n"
+        b"2024-01-01T00:05:00Z,105.0,10.5\n"
+    )
+    files = {"file": ("pytest_olap_query.csv", io.BytesIO(file_content), "text/csv")}
+
+    upload_response = make_multipart_request(
+        base_url, auth_token, "POST",
+        f"/organizations/{organization}/projects/{project}/files",
+        files=files,
+        params={"dataSourceId": test_datasource_project}
+    )
+
+    if upload_response.status_code != 200:
+        pytest.skip(f"Upload failed, skipping OLAP query test: {upload_response.text}")
+
+    upload_result = upload_response.json()
+    record_id = upload_result.get("id") or upload_result.get("recordId")
+
+    if not record_id:
+        pytest.skip("Could not get record ID from upload response")
+
+    cleanup_records.append(record_id)
+    return record_id
+
+
+def get_plot_columns(plot_result):
+    """Get plot result columns regardless of JSON naming policy."""
+    return plot_result.get("columns") or plot_result.get("Columns") or []
+
+
+def get_plot_rows(plot_result):
+    """Get plot result rows regardless of JSON naming policy."""
+    return plot_result.get("data") or plot_result.get("Data") or []
+
+
+def test_execute_olap_query_applies_request_dto_options(
+        client, base_url, auth_token, organization, project, test_datasource_project, cleanup_records):
+    """Test that OLAP query accepts the request DTO fields used by the visualizer."""
+    record_id = upload_olap_csv(
+        base_url, auth_token, organization, project, test_datasource_project, cleanup_records)
+
+    response = client.post(
+        f"/organizations/{organization}/projects/{project}/records/{record_id}/olap/query?viewName=data",
+        json={"limit": 5, "columns": ["timestamp"]}
+    )
+
+    print(f"\nStatus Code: {response.status_code}")
+    print(f"Response Body: {response.text}")
+
+    assert response.status_code == 200, f"OLAP query failed: {response.text}"
+
+    result = response.json()
+    assert get_plot_columns(result) == ["timestamp"]
+    assert len(get_plot_rows(result)) == 5
+
+
+def test_execute_olap_query_validation_error_returns_bad_request(client, organization, project):
+    """Test that OLAP query request validation errors return 400 Bad Request."""
+    response = client.post(
+        f"/organizations/{organization}/projects/{project}/records/999999999/olap/query?viewName=data",
+        json={"startRow": 10, "stopRow": 1}
+    )
+
+    print(f"\nStatus Code: {response.status_code}")
+    print(f"Response Body: {response.text}")
+
+    assert response.status_code == 400
+    assert "Start row cannot be greater than stop row" in response.text
+
+
 def test_query_timeseries(client, base_url, auth_token, organization, project, test_datasource_project, cleanup_timeseries):
     """Test querying timeseries data with SQL."""
     # First upload a file to have data to query

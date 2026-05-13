@@ -155,7 +155,7 @@ const SelectOrgClient = ({ session }: Props) => {
 
   return (
     <>
-      <div className="login min-h-screen flex flex-col items-center justify-center p-4">
+      <div className="login min-h-screen h-[700px] flex flex-col items-center justify-center p-4">
         <div className="flex flex-col items-center gap-4 max-w-4xl w-full flex-1 justify-center">
           <Image
             src="/assets/nexusWhite.png"

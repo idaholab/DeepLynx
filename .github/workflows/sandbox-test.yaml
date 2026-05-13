@@ -211,8 +211,8 @@ jobs:
           az account set --subscription "$ACR_SUBSCRIPTION"
           az acr build --registry $ACR_REGISTRY \
             --image $ACR_PATH:insight-rabbitmq-$GITHUB_RUN_NUMBER \
-            --file deeplynx.insight/app/rabbitmq/Dockerfiles/Dockerfile.production \
-            deeplynx.insight/app/rabbitmq
+            --file deeplynx.insight/Dockerfiles/Dockerfile.rabbitmq.production \
+            deeplynx.insight
 
   build-insight-rabbitmq-runner:
     runs-on: [self-hosted]
@@ -250,7 +250,7 @@ jobs:
           az account set --subscription "$ACR_SUBSCRIPTION"
           az acr build --registry $ACR_REGISTRY \
             --image $ACR_PATH:insight-rabbitmq-runner-$GITHUB_RUN_NUMBER \
-            --file deeplynx.insight/app/rabbitmq/Dockerfiles/Dockerfile.runner.production \
+            --file deeplynx.insight/Dockerfiles/Dockerfile.runner.production \
             deeplynx.insight
 
   build-insight-fastapi:
@@ -289,11 +289,20 @@ jobs:
           az account set --subscription "$ACR_SUBSCRIPTION"
           az acr build --registry $ACR_REGISTRY \
             --image $ACR_PATH:insight-fastapi-$GITHUB_RUN_NUMBER \
-            --file deeplynx.insight/app/fastapi/Dockerfiles/Dockerfile.production \
+            --file deeplynx.insight/Dockerfiles/Dockerfile.fastapi.production \
             deeplynx.insight
 
   kubernetes:
-    needs: [build-ui, build-server, build-docs, build-mcp, build-insight-rabbitmq, build-insight-rabbitmq-runner, build-insight-fastapi]
+    needs:
+      [
+        build-ui,
+        build-server,
+        build-docs,
+        build-mcp,
+        build-insight-rabbitmq,
+        build-insight-rabbitmq-runner,
+        build-insight-fastapi,
+      ]
     runs-on: [self-hosted]
     environment: Test
     steps:
@@ -322,6 +331,8 @@ jobs:
             --from-literal=llm-auth-token="${{ secrets.LLM_AUTH_TOKEN }}" \
             --from-literal=mm-auth-token="${{ secrets.MM_AUTH_TOKEN }}" \
             --from-literal=emb-auth-token="${{ secrets.EMB_AUTH_TOKEN }}" \
+            --from-literal=encryption-key="${{ secrets.ENCRYPTION_KEY }}" \
+            --from-literal=encryption-iv="${{ secrets.ENCRYPTION_IV }}" \
             --namespace=deeplynx-test \
             --dry-run=client -o yaml | kubectl apply -f -
 
@@ -376,7 +387,14 @@ jobs:
           JWT_SECRET_KEY: ${{ secrets.JWT_SECRET_KEY }}
           JWT_AUDIENCE: ${{vars.JWT_AUDIENCE}}
           INSIGHT_FASTAPI_URL: ${{ vars.INSIGHT_FASTAPI_URL }}
+          ENCRYPTION_KEY: ${{ vars.ENCRYPTION_KEY }}
+          ENCRYPTION_IV: ${{ vars.ENCRYPTION_IV }}
           POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          AIRFLOW_BASE_URL: ${{ vars.AIRFLOW_BASE_URL }}
+          AIRFLOW_USERNAME: ${{ vars.AIRFLOW_USERNAME }}
+          AIRFLOW_PASSWORD: ${{ secrets.AIRFLOW_PASSWORD }}
+          LATTICE_MODEL: ${{ vars.LATTICE_MODEL }}
+          NEXUS_API_URL: ${{ vars.NEXUS_API_URL }}
         run: |
           cd $GITHUB_WORKSPACE/kubernetes
           envsubst < sandbox.yaml > manifest.yaml

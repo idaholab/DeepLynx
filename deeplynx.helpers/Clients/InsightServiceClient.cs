@@ -1,3 +1,4 @@
+using System.Net;
 using System.Net.Http.Json;
 using deeplynx.models;
 using Microsoft.AspNetCore.Mvc.Infrastructure;
@@ -41,5 +42,16 @@ public class InsightServiceClient
     {
         var response = await _client.PostAsJsonAsync("/embed_strings", dto);
         response.EnsureSuccessStatusCode();
+    }
+    
+    public async Task<HttpResponseMessage> LatticeExtraction(
+        string prompt,
+        string llmModelName,
+        object queryInfo)
+    {
+        var requestParams = new { prompt, llm_model_name = llmModelName, query_info = queryInfo };
+        var response = await _client.PostAsJsonAsync("/lattice_query", requestParams);
+        response.EnsureSuccessStatusCode();
+        return response;
     }
 }

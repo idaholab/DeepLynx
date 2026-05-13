@@ -74,6 +74,7 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
     private ObjectStorageConfigDto _objectStorageConfig = null!;
     private OlapBusiness _olapBusiness = null!;
     private Mock<IInsightBusiness> _insightBusiness = null!;
+    private EncryptionHelper _encryptionHelper = null!;
 
     private long _organizationId;
     private long _projectId;
@@ -98,6 +99,12 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
 
     public override async Task InitializeAsync()
     {
+        // Generate valid keys once and reuse them
+        // These are pre-generated valid AES-256 keys for testing
+        Environment.SetEnvironmentVariable("ENCRYPTION_KEY", "SU5TRUNVUkVfREVWX0tFWV8zMl9CWVRFU19MT05HISE="); // 32 bytes
+        Environment.SetEnvironmentVariable("ENCRYPTION_IV", "SU5TRUNVUkVfREVWX0lWIQ=="); // 16 bytes
+        
+        _encryptionHelper = new EncryptionHelper();
         await base.InitializeAsync();
 
         // Set up mocks
@@ -120,7 +127,7 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
         _insightBusiness = new Mock<IInsightBusiness>();
 
         // Set up business layer dependencies
-        _objectStorageBusiness = new ObjectStorageBusiness(Context);
+        _objectStorageBusiness = new ObjectStorageBusiness(Context, _encryptionHelper);
         _notificationBusiness =
             new NotificationBusiness(Context, _mockNotificationLogger.Object, _mockHubContext.Object);
         _dataSourceBusiness = new DataSourceBusiness(Context, _edgeBusiness.Object, _recordBusiness, _eventBusiness);
@@ -147,6 +154,7 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
         _olapBusiness = new OlapBusiness(
             Context,
             _recordBusiness,
+            _objectStorageBusiness,
             _mockTimeseriesLogger.Object);
         _connectionString = _azuriteFixture.AzuriteConnectionString;
 
@@ -157,7 +165,8 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
             _classBusiness,
             _recordBusiness,
             _insightBusiness.Object,
-            _olapBusiness
+            _olapBusiness,
+            _objectStorageBusiness
         );
     }
 
@@ -264,7 +273,7 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
         {
             Name = "Azurite",
             Type = "azure_object",
-            Config = JsonConvert.SerializeObject(azureConfig),
+            ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(azureConfig),
             ProjectId = _projectId,
             LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
             LastUpdatedBy = _userId,
@@ -282,7 +291,7 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
         {
             Name = "Test File System",
             Type = "filesystem",
-            Config = JsonConvert.SerializeObject(config),
+            ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(config),
             ProjectId = _projectId,
             LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
             LastUpdatedBy = _userId,
@@ -1130,6 +1139,131 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
     }
 
     [Fact]
+    public async Task QueryTabularFile_RequestDto_WindowAndColumnsWithoutQuery_ReturnsRequestedProjection()
+    {
+        var result = await UploadFilesystemParquet(10, "dataset.parquet");
+
+        var queryResult = await _olapBusiness.QueryTabularFile(
+            _userId,
+            _organizationId,
+            _projectId,
+            result.Id,
+            new OlapQueryRequestDto
+            {
+                StartRow = 3,
+                StopRow = 6,
+                RowStride = 2,
+                Columns = ["timestamp", "value"]
+            },
+            "data");
+
+        Assert.Equal(["timestamp", "value"], queryResult.Columns);
+        Assert.Equal(2, queryResult.Data.Length);
+
+        var timestampIndex = (int)FindColumnIndex(queryResult, "timestamp");
+        var timestamps = queryResult.Data
+            .Select(r => Convert.ToDateTime(r[timestampIndex]))
+            .ToArray();
+
+        Assert.Equal(new DateTime(2024, 1, 1, 0, 0, 3), timestamps[0]);
+        Assert.Equal(new DateTime(2024, 1, 1, 0, 0, 5), timestamps[1]);
+    }
+
+    [Fact]
+    public async Task QueryTabularFile_RequestDto_QueryUsesWindowedView()
+    {
+        var result = await UploadFilesystemParquet(10, "dataset.parquet");
+
+        var queryResult = await _olapBusiness.QueryTabularFile(
+            _userId,
+            _organizationId,
+            _projectId,
+            result.Id,
+            new OlapQueryRequestDto
+            {
+                Query = "SELECT COUNT(*) AS total FROM data",
+                Limit = 3
+            },
+            "data");
+
+        Assert.Single(queryResult.Data);
+        Assert.Equal(3L, Convert.ToInt64(queryResult.Data[0][0]));
+    }
+
+    [Fact]
+    public async Task QueryTabularFile_RequestDto_QueryUsesColumnSelection()
+    {
+        var result = await UploadFilesystemParquet(10, "dataset.parquet");
+
+        var queryResult = await _olapBusiness.QueryTabularFile(
+            _userId,
+            _organizationId,
+            _projectId,
+            result.Id,
+            new OlapQueryRequestDto
+            {
+                Query = "SELECT * FROM data",
+                Limit = 2,
+                Columns = ["timestamp,pressure"]
+            },
+            "data");
+
+        Assert.Equal(["timestamp", "pressure"], queryResult.Columns);
+        Assert.Equal(2, queryResult.Data.Length);
+
+        var timestampIndex = (int)FindColumnIndex(queryResult, "timestamp");
+        var timestamps = queryResult.Data
+            .Select(r => Convert.ToDateTime(r[timestampIndex]))
+            .ToArray();
+
+        Assert.Equal(new DateTime(2024, 1, 1, 0, 0, 8), timestamps[0]);
+        Assert.Equal(new DateTime(2024, 1, 1, 0, 0, 9), timestamps[1]);
+    }
+
+    [Fact]
+    public async Task QueryTabularFile_RequestDto_StartRowGreaterThanStopRow_Throws()
+    {
+        var result = await UploadFilesystemParquet(10, "dataset.parquet");
+
+        var ex = await Assert.ThrowsAsync<ArgumentException>(() =>
+            _olapBusiness.QueryTabularFile(
+                _userId,
+                _organizationId,
+                _projectId,
+                result.Id,
+                new OlapQueryRequestDto
+                {
+                    Query = "SELECT * FROM data",
+                    StartRow = 6,
+                    StopRow = 3
+                },
+                "data"));
+
+        Assert.Contains("Start row cannot be greater than stop row", ex.Message);
+    }
+
+    [Fact]
+    public async Task QueryTabularFile_RequestDto_MissingColumn_Throws()
+    {
+        var result = await UploadFilesystemParquet(10, "dataset.parquet");
+
+        var ex = await Assert.ThrowsAsync<ArgumentException>(() =>
+            _olapBusiness.QueryTabularFile(
+                _userId,
+                _organizationId,
+                _projectId,
+                result.Id,
+                new OlapQueryRequestDto
+                {
+                    Query = "SELECT * FROM data",
+                    Columns = ["timestamp", "missing_column"]
+                },
+                "data"));
+
+        Assert.Contains("Column(s) not found: missing_column", ex.Message);
+    }
+
+    [Fact]
     public async Task QueryTablularFile_Success_ReturnsData()
     {
         var rows = 100;
@@ -1270,6 +1404,103 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
     }
 
     [Fact]
+    public async Task GetPlotData_RequestDto_WindowAndColumns_ReturnsRequestedProjection()
+    {
+        var result = await UploadFilesystemParquet(10, "dataset.parquet");
+
+        var plotData = await _olapBusiness.GetPlotData(
+            _userId,
+            _organizationId,
+            _projectId,
+            result.Id,
+            new OlapQueryRequestDto
+            {
+                StartRow = 3,
+                StopRow = 6,
+                RowStride = 2,
+                Columns = ["timestamp", "value"]
+            });
+
+        Assert.Equal(["timestamp", "value"], plotData.Columns);
+        Assert.Equal(2, plotData.Data.Length);
+
+        var timestampIndex = (int)FindColumnIndex(plotData, "timestamp");
+        var timestamps = plotData.Data
+            .Select(r => Convert.ToDateTime(r[timestampIndex]))
+            .ToArray();
+
+        Assert.Equal(new DateTime(2024, 1, 1, 0, 0, 3), timestamps[0]);
+        Assert.Equal(new DateTime(2024, 1, 1, 0, 0, 5), timestamps[1]);
+    }
+
+    [Fact]
+    public async Task GetPlotData_RequestDto_CommaSeparatedColumns_ReturnsRequestedProjection()
+    {
+        var result = await UploadFilesystemParquet(10, "dataset.parquet");
+
+        var plotData = await _olapBusiness.GetPlotData(
+            _userId,
+            _organizationId,
+            _projectId,
+            result.Id,
+            new OlapQueryRequestDto
+            {
+                Limit = 2,
+                Columns = ["timestamp,pressure"]
+            });
+
+        Assert.Equal(["timestamp", "pressure"], plotData.Columns);
+        Assert.Equal(2, plotData.Data.Length);
+
+        var timestampIndex = (int)FindColumnIndex(plotData, "timestamp");
+        var timestamps = plotData.Data
+            .Select(r => Convert.ToDateTime(r[timestampIndex]))
+            .ToArray();
+
+        Assert.Equal(new DateTime(2024, 1, 1, 0, 0, 8), timestamps[0]);
+        Assert.Equal(new DateTime(2024, 1, 1, 0, 0, 9), timestamps[1]);
+    }
+
+    [Fact]
+    public async Task GetPlotData_RequestDto_StartRowGreaterThanStopRow_Throws()
+    {
+        var result = await UploadFilesystemParquet(10, "dataset.parquet");
+
+        var ex = await Assert.ThrowsAsync<ArgumentException>(() =>
+            _olapBusiness.GetPlotData(
+                _userId,
+                _organizationId,
+                _projectId,
+                result.Id,
+                new OlapQueryRequestDto
+                {
+                    StartRow = 6,
+                    StopRow = 3
+                }));
+
+        Assert.Contains("Start row cannot be greater than stop row", ex.Message);
+    }
+
+    [Fact]
+    public async Task GetPlotData_RequestDto_MissingColumn_Throws()
+    {
+        var result = await UploadFilesystemParquet(10, "dataset.parquet");
+
+        var ex = await Assert.ThrowsAsync<ArgumentException>(() =>
+            _olapBusiness.GetPlotData(
+                _userId,
+                _organizationId,
+                _projectId,
+                result.Id,
+                new OlapQueryRequestDto
+                {
+                    Columns = ["timestamp", "missing_column"]
+                }));
+
+        Assert.Contains("Column(s) not found: missing_column", ex.Message);
+    }
+
+    [Fact]
     public async Task GetPlotData_AppendedFolder_UsesGlobalOrderingAcrossParts()
     {
         var result = await UploadFilesystemParquet(5, "dataset.parquet");
@@ -1334,12 +1565,11 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
 
         var record = await GetRecordEntity(result.Id);
 
-        var objectStorage = await Context.ObjectStorages.FirstAsync(o => o.Id == _azureObjectStorageId);
-        var config = JsonConvert.DeserializeObject<ObjectStorageConfigDto>(objectStorage.Config)!;
+        var objectStorage = await _objectStorageBusiness.GetDecryptedObjectStorage(_azureObjectStorageId);
 
         var columns = await _olapBusiness.ExtractTabularColumns(
-            objectStorage,
-            config,
+            objectStorage.Type,
+            objectStorage.Config,
             record.Uri!);
 
         Assert.NotNull(columns);
@@ -1361,13 +1591,12 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
     {
         var result = await UploadFilesystemParquet(5, "dataset.parquet");
         var record = await GetRecordEntity(result.Id);
-
-        var objectStorage = await Context.ObjectStorages.FirstAsync(o => o.Id == _fileSystemObjectStorageId);
-        var config = JsonConvert.DeserializeObject<ObjectStorageConfigDto>(objectStorage.Config)!;
+        
+        var objectStorage = await _objectStorageBusiness.GetDecryptedObjectStorage(_fileSystemObjectStorageId);
 
         var columns = await _olapBusiness.ExtractTabularColumns(
-            objectStorage,
-            config,
+            objectStorage.Type,
+            objectStorage.Config,
             record.Uri!);
 
         Assert.NotNull(columns);
@@ -1392,13 +1621,12 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
             _userId, _organizationId, _projectId, _dataSourceId, _fileSystemObjectStorageId, file);
 
         var record = await GetRecordEntity(result.Id);
-
-        var objectStorage = await Context.ObjectStorages.FirstAsync(o => o.Id == _fileSystemObjectStorageId);
-        var config = JsonConvert.DeserializeObject<ObjectStorageConfigDto>(objectStorage.Config)!;
+        
+        var objectStorage = await _objectStorageBusiness.GetDecryptedObjectStorage(_fileSystemObjectStorageId);
 
         var columns = await _olapBusiness.ExtractTabularColumns(
-            objectStorage,
-            config,
+            objectStorage.Type,
+            objectStorage.Config,
             record.Uri!);
 
         Assert.NotNull(columns);
@@ -1420,13 +1648,12 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
     {
         var result = await UploadAzureParquet(5, "dataset.parquet");
         var record = await GetRecordEntity(result.Id);
-
-        var objectStorage = await Context.ObjectStorages.FirstAsync(o => o.Id == _azureObjectStorageId);
-        var config = JsonConvert.DeserializeObject<ObjectStorageConfigDto>(objectStorage.Config)!;
+        
+        var objectStorage = await _objectStorageBusiness.GetDecryptedObjectStorage(_azureObjectStorageId);
 
         var columns = await _olapBusiness.ExtractTabularColumns(
-            objectStorage,
-            config,
+            objectStorage.Type,
+            objectStorage.Config,
             record.Uri!);
 
         Assert.NotNull(columns);
@@ -1439,36 +1666,12 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
     [Fact]
     public async Task ExtractTabularColumns_InvalidFilesystemFile_ReturnsNull()
     {
-        var objectStorage = await Context.ObjectStorages.FirstAsync(o => o.Id == _fileSystemObjectStorageId);
-        var config = JsonConvert.DeserializeObject<ObjectStorageConfigDto>(objectStorage.Config)!;
+        var objectStorage = await _objectStorageBusiness.GetDecryptedObjectStorage(_fileSystemObjectStorageId);
 
         var columns = await _olapBusiness.ExtractTabularColumns(
-            objectStorage,
-            config,
+            objectStorage.Type,
+            objectStorage.Config,
             Path.Combine(_tempFileSystemBasePath, "does_not_exist.parquet"));
-
-        Assert.Null(columns);
-    }
-
-    [Fact]
-    public async Task ExtractTabularColumns_UnsupportedStorageType_ReturnsNull()
-    {
-        var unsupportedStorage = new ObjectStorage
-        {
-            Id = 9999,
-            Name = "Unsupported",
-            Type = "s3",
-            Config = "{}",
-            OrganizationId = _organizationId,
-            ProjectId = _projectId
-        };
-
-        var config = new ObjectStorageConfigDto();
-
-        var columns = await _olapBusiness.ExtractTabularColumns(
-            unsupportedStorage,
-            config,
-            "some_file.parquet");
 
         Assert.Null(columns);
     }

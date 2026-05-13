@@ -14,13 +14,24 @@ using Parquet;
 
 namespace deeplynx.business;
 
-public class OlapBusiness(
-    DeeplynxContext context,
-    IRecordBusiness recordBusiness,
-    ILogger<OlapBusiness> logger) : IOlapBusiness
+public class OlapBusiness : IOlapBusiness
 {
-    private readonly DeeplynxContext _context = context;
-    private readonly IRecordBusiness _recordBusiness = recordBusiness;
+    private readonly DeeplynxContext _context;
+    private readonly IRecordBusiness _recordBusiness;
+    private readonly ILogger<OlapBusiness> _logger;
+    private readonly IObjectStorageBusiness _objectStorageBusiness;
+    
+    public OlapBusiness(
+        DeeplynxContext context, 
+        IRecordBusiness recordBusiness,
+        IObjectStorageBusiness objectStorageBusiness,
+        ILogger<OlapBusiness> logger)
+    {
+        _recordBusiness = recordBusiness;
+        _context = context;
+        _logger = logger;
+        _objectStorageBusiness = objectStorageBusiness;
+    }
 
     /// <summary>
     ///     Appends a new Parquet part file to an existing Parquet dataset in Azure Blob Storage
@@ -66,22 +77,14 @@ public class OlapBusiness(
         if (string.IsNullOrWhiteSpace(record.Uri))
             throw new ArgumentException("Record has no URI.");
 
-        var objectStorage = _context.ObjectStorages.FirstOrDefault(os =>
-            os.OrganizationId == organizationId &&
-            (os.ProjectId == projectId || os.ProjectId == null) &&
-            os.Id == record.ObjectStorageId);
-
-        if (objectStorage == null)
-            throw new ArgumentException($"Object storage not found for project {projectId}.");
+        var realObjectStorageId = await ResolveObjectStorageId(organizationId, projectId, record.ObjectStorageId);
+        var objectStorage = await _objectStorageBusiness.GetDecryptedObjectStorage(realObjectStorageId);
 
         if (objectStorage.Type != "azure_object" && objectStorage.Type != "filesystem")
             throw new InvalidOperationException($"Unsupported object storage type: {objectStorage.Type}");
 
-        var objectStorageConfig = JsonConvert.DeserializeObject<ObjectStorageConfigDto>(objectStorage.Config)
-                                  ?? throw new InvalidOperationException("Object storage config is null or invalid.");
-
         if (objectStorage.Type == "azure_object")
-            await AppendToAzureBlob(record, objectStorageConfig, file, partNumber);
+            await AppendToAzureBlob(record, objectStorage.Config, file, partNumber);
         else
             await AppendToFilesystemAsync(record, file, partNumber);
     }
@@ -166,67 +169,68 @@ public class OlapBusiness(
         long organizationId,
         long projectId,
         long recordId,
-        string userQuery,
+        OlapQueryRequestDto request,
         string viewName)
     {
-        if (string.IsNullOrWhiteSpace(viewName))
-            throw new ArgumentException("View name is required", nameof(viewName));
-        if (string.IsNullOrWhiteSpace(userQuery))
-            throw new ArgumentException("Query is required, must not be empty or missing");
+        ArgumentNullException.ThrowIfNull(request);
 
-        // Check view is referenced
-        if (!userQuery.Contains(viewName, StringComparison.OrdinalIgnoreCase))
-            throw new InvalidOperationException($"Query must reference the view '{viewName}'");
+        var hasUserQuery = !string.IsNullOrWhiteSpace(request.Query);
+        var queryOptions = ValidateTabularQueryRequest(request, hasUserQuery);
+        var userQuery = hasUserQuery
+            ? request.Query!
+            : $"SELECT * FROM {viewName}";
 
-        // Block file access patterns only
-        var dangerousPatterns = new[]
-        {
-            "COPY", // Prevent writing files
-            "EXPORT", // Prevent exporting database/data
-            "IMPORT", // Prevent importing
-            "INSERT", // Prevent inserting to other tables
-            "UPDATE", // Prevent updates
-            "DELETE", // Prevent deletes  
-            "DROP", // Prevent dropping objects
-            "ALTER", // Prevent schema changes
-            "CREATE TABLE", // Prevent creating tables
-            "CREATE VIEW", // Prevent creating views (besides temp view we control)
-            "az://", // Azure blob paths
-            "read_parquet(", // File reading functions
-            "read_csv(",
-            "read_json(",
-            "ATTACH", // Database attachment
-            "CREATE SECRET", // Secret manipulation
-            ".parquet'", // File extensions in quotes
-            ".csv'",
-            ".json'"
-        };
+        if (hasUserQuery)
+            ValidateUserQuery(userQuery, viewName);
+        else
+            ValidateViewName(viewName);
 
-        foreach (var pattern in dangerousPatterns)
-            if (userQuery.Contains(pattern, StringComparison.OrdinalIgnoreCase))
-                throw new InvalidOperationException($"Query contains unauthorized pattern: {pattern}");
+        return await QueryTabularFile(
+            currentUserId,
+            organizationId,
+            projectId,
+            recordId,
+            userQuery,
+            viewName,
+            queryOptions);
+    }
 
-        // Block multi-statement queries
-        if (userQuery.Count(c => c == ';') > 0)
-            throw new InvalidOperationException("Multi-statement queries are not allowed");
+    public async Task<PlotDataDto> QueryTabularFile(
+        long currentUserId,
+        long organizationId,
+        long projectId,
+        long recordId,
+        string? userQuery,
+        string viewName)
+    {
+        ValidateUserQuery(userQuery, viewName);
 
+        return await QueryTabularFile(
+            currentUserId,
+            organizationId,
+            projectId,
+            recordId,
+            userQuery!,
+            viewName,
+            null);
+    }
+
+    private async Task<PlotDataDto> QueryTabularFile(
+        long currentUserId,
+        long organizationId,
+        long projectId,
+        long recordId,
+        string userQuery,
+        string viewName,
+        TabularQueryRequestOptions? queryOptions)
+    {
         var record = await _recordBusiness.GetRecord(currentUserId, organizationId, projectId, recordId, true);
 
         if (string.IsNullOrWhiteSpace(record.Uri))
             throw new ArgumentException("File path is required", nameof(record.Uri));
 
-        var objectStorage = _context.ObjectStorages.FirstOrDefault(os => os.OrganizationId == organizationId &&
-                                                                         (os.ProjectId == projectId ||
-                                                                          os.ProjectId == null) &&
-                                                                         os.Id == record.ObjectStorageId);
-
-        if (objectStorage == null)
-            throw new ArgumentException(
-                $"Object storage with ID {record.ObjectStorageId} does not exist for project with ID of {projectId}");
-
-        var objectStorageConfig = JsonConvert.DeserializeObject<ObjectStorageConfigDto>(objectStorage.Config);
-        if (objectStorageConfig == null)
-            throw new InvalidOperationException("Config data for object storage is null or invalid");
+        var realObjectStorageId = await ResolveObjectStorageId(organizationId, projectId, record.ObjectStorageId);
+        var objectStorage = await _objectStorageBusiness.GetDecryptedObjectStorage(realObjectStorageId);
 
         // Sanitize viewName - only allow alphanumeric and underscore
         if (!Regex.IsMatch(viewName, @"^[a-zA-Z_][a-zA-Z0-9_]*$"))
@@ -240,11 +244,11 @@ public class OlapBusiness(
         if (objectStorage.Type == "azure_object")
         {
             // Azure Blob Storage
-            var containerName = objectStorageConfig.AzureObjectConfig?.AzureContainerName;
+            var containerName = objectStorage.Config.AzureObjectConfig?.AzureContainerName;
             if (string.IsNullOrWhiteSpace(containerName))
                 throw new ArgumentException("Container name is required for Azure storage");
 
-            connection = await GetAzureDuckDbConnection(objectStorageConfig);
+            connection = await GetAzureDuckDbConnection(objectStorage.Config);
 
             var escapedContainer = containerName.Replace("'", "''");
             var escapedPath = record.Uri.Replace("'", "''");
@@ -281,6 +285,9 @@ public class OlapBusiness(
 
         await using (connection)
         {
+            if (queryOptions?.ShouldShapeView == true)
+                viewSourceSql = await BuildWindowedSourceSql(connection, viewSourceSql, queryOptions);
+
             // Create a temporary view pointing to the file or glob dataset
             await using (var createViewCmd = connection.CreateCommand())
             {
@@ -362,25 +369,17 @@ public class OlapBusiness(
             return 0;
         }
 
-        var objectStorage = _context.ObjectStorages.FirstOrDefault(os =>
-            os.OrganizationId == organizationId &&
-            (os.ProjectId == projectId || os.ProjectId == null) &&
-            os.Id == record.ObjectStorageId);
-
-        if (objectStorage == null)
-            throw new ArgumentException($"Object storage not found for project {projectId}.");
-
-        var objectStorageConfig = JsonConvert.DeserializeObject<ObjectStorageConfigDto>(objectStorage.Config)
-                                  ?? throw new InvalidOperationException("Object storage config is null or invalid.");
+        var realObjectStorageId = await ResolveObjectStorageId(organizationId, projectId, record.ObjectStorageId);
+        var objectStorage = await _objectStorageBusiness.GetDecryptedObjectStorage(realObjectStorageId);
 
         IEnumerable<long> partNumbers;
 
         if (objectStorage.Type == "azure_object")
         {
-            var containerName = objectStorageConfig.AzureObjectConfig?.AzureContainerName
+            var containerName = objectStorage.Config.AzureObjectConfig?.AzureContainerName
                                 ?? throw new ArgumentException("Azure container name is required.");
 
-            var containerClient = new BlobServiceClient(objectStorageConfig.AzureObjectConfig!.AzureConnectionString)
+            var containerClient = new BlobServiceClient(objectStorage.Config.AzureObjectConfig!.AzureConnectionString)
                 .GetBlobContainerClient(containerName);
 
             partNumbers = containerClient
@@ -417,12 +416,12 @@ public class OlapBusiness(
     ///     For Parquet files, reads only the file footer via Parquet.Net — no row data is loaded into memory.
     ///     For CSV files, uses DuckDB to infer column types from the file content.
     /// </summary>
-    /// <param name="objectStorage">Object storage entity</param>
+    /// <param name="objectStorageType">Type of object storage entity</param>
     /// <param name="objectStorageConfig">Object storage configuration</param>
     /// <param name="fileUri">URI/path to the file</param>
     /// <returns>JsonArray of { name, type } objects, or null if extraction fails</returns>
     public async Task<JsonArray?> ExtractTabularColumns(
-        ObjectStorage objectStorage,
+        string objectStorageType,
         ObjectStorageConfigDto objectStorageConfig,
         string fileUri)
     {
@@ -435,7 +434,7 @@ public class OlapBusiness(
                 // Use Parquet.Net to read only the file footer — no row data loaded regardless of file size
                 Stream parquetStream;
 
-                if (objectStorage.Type == "azure_object")
+                if (objectStorageType == "azure_object")
                 {
                     var containerName = objectStorageConfig.AzureObjectConfig?.AzureContainerName;
                     if (string.IsNullOrWhiteSpace(containerName))
@@ -449,13 +448,13 @@ public class OlapBusiness(
                         .GetBlobClient(fileUri)
                         .OpenReadAsync();
                 }
-                else if (objectStorage.Type == "filesystem")
+                else if (objectStorageType == "filesystem")
                 {
                     parquetStream = File.OpenRead(fileUri);
                 }
                 else
                 {
-                    logger.LogDebug("Unsupported object storage type for Parquet column extraction");
+                    _logger.LogDebug("Unsupported object storage type for Parquet column extraction");
                     return null;
                 }
 
@@ -476,7 +475,7 @@ public class OlapBusiness(
             DuckDBConnection connection;
             string fileUrl;
 
-            if (objectStorage.Type == "azure_object")
+            if (objectStorageType == "azure_object")
             {
                 var containerName = objectStorageConfig.AzureObjectConfig?.AzureContainerName;
                 if (string.IsNullOrWhiteSpace(containerName))
@@ -488,7 +487,7 @@ public class OlapBusiness(
                 var escapedPath = fileUri.Replace("'", "''");
                 fileUrl = $"az://{escapedContainer}/{escapedPath}";
             }
-            else if (objectStorage.Type == "filesystem")
+            else if (objectStorageType == "filesystem")
             {
                 connection = await GetLocalDuckDbConnection();
 
@@ -497,7 +496,7 @@ public class OlapBusiness(
             }
             else
             {
-                logger.LogDebug("Unsupported object storage type for CSV column extraction");
+                _logger.LogDebug("Unsupported object storage type for CSV column extraction");
                 return null;
             }
 
@@ -523,7 +522,7 @@ public class OlapBusiness(
         }
         catch (Exception ex)
         {
-            logger.LogError($"Error while extracting columns: {ex.Message}");
+            _logger.LogError($"Error while extracting columns: {ex.Message}");
             return null;
         }
     }
@@ -537,26 +536,51 @@ public class OlapBusiness(
     /// <param name="limit">Maximum number of data points to include</param>
     /// <param name="rowStride">every nth row to get (row number 4 = every 4th row)</param>
     /// <returns>A json array of plot data</returns>
-    public async Task<PlotDataDto> GetPlotData(long currentUserId, long organizationId, long projectId, long recordId,
-        long limit, long rowStride)
+    public async Task<PlotDataDto> GetPlotData(
+        long currentUserId,
+        long organizationId,
+        long projectId,
+        long recordId,
+        long limit,
+        long rowStride)
     {
+        return await GetPlotData(
+            currentUserId,
+            organizationId,
+            projectId,
+            recordId,
+            new OlapQueryRequestDto
+            {
+                Limit = limit,
+                RowStride = rowStride
+            });
+    }
+
+    /// <summary>
+    ///     Get a view of data points from a parquet/csv file stored in Azure Blob or local filesystem.
+    ///     Supports latest-row windows, explicit row windows, row strides, and column projection.
+    /// </summary>
+    /// <param name="currentUserId">ID of the user requesting data</param>
+    /// <param name="organizationId">ID of organization that timeseries data is associated with</param>
+    /// <param name="projectId">ID of project that timeseries data is associated with</param>
+    /// <param name="recordId">ID of record pointing to the parquet/csv file</param>
+    /// <param name="request">Plot query options</param>
+    /// <returns>A json array of plot data</returns>
+    public async Task<PlotDataDto> GetPlotData(
+        long currentUserId,
+        long organizationId,
+        long projectId,
+        long recordId,
+        OlapQueryRequestDto request)
+    {
+        var plotOptions = ValidatePlotRequest(request);
         var record = await _recordBusiness.GetRecord(currentUserId, organizationId, projectId, recordId, true);
 
         if (string.IsNullOrWhiteSpace(record.Uri))
             throw new ArgumentException($"Record {recordId} does not have a URI");
 
-        var objectStorage = _context.ObjectStorages.FirstOrDefault(os => os.OrganizationId == organizationId &&
-                                                                         (os.ProjectId == projectId ||
-                                                                          os.ProjectId == null) &&
-                                                                         os.Id == record.ObjectStorageId);
-
-        if (objectStorage == null)
-            throw new ArgumentException(
-                $"Object storage with ID {record.ObjectStorageId} does not exist for project with ID of {projectId}");
-
-        var objectStorageConfig = JsonConvert.DeserializeObject<ObjectStorageConfigDto>(objectStorage.Config);
-        if (objectStorageConfig == null)
-            throw new InvalidOperationException("Config data for object storage is null or invalid");
+        var realObjectStorageId = await ResolveObjectStorageId(organizationId, projectId, record.ObjectStorageId);
+        var objectStorage = await _objectStorageBusiness.GetDecryptedObjectStorage(realObjectStorageId);
 
         // Determine storage type and get appropriate connection
         DuckDBConnection connection;
@@ -566,11 +590,11 @@ public class OlapBusiness(
         if (objectStorage.Type == "azure_object")
         {
             // Azure Blob Storage
-            var containerName = objectStorageConfig.AzureObjectConfig?.AzureContainerName;
+            var containerName = objectStorage.Config.AzureObjectConfig?.AzureContainerName;
             if (string.IsNullOrWhiteSpace(containerName))
                 throw new ArgumentException("Container name is required for Azure storage");
 
-            connection = await GetAzureDuckDbConnection(objectStorageConfig);
+            connection = await GetAzureDuckDbConnection(objectStorage.Config);
 
             var escapedContainer = containerName.Replace("'", "''");
             var escapedPath = record.Uri.Replace("'", "''");
@@ -604,22 +628,36 @@ public class OlapBusiness(
 
         await using (connection)
         {
-            // Query the file directly with rowStride and limit
+            var selectedColumns = await ResolveSelectedColumns(connection, fromClause, plotOptions.Columns);
+            var selectClause = selectedColumns.Length > 0
+                ? string.Join(", ", selectedColumns.Select(QuoteIdentifier))
+                : "* EXCLUDE rn";
+
+            var conditions = new List<string> { $"rn % {plotOptions.RowStride} = 0" };
+
+            if (plotOptions.StartRow.HasValue)
+                conditions.Add($"rn >= {plotOptions.StartRow.Value}");
+
+            if (plotOptions.StopRow.HasValue)
+                conditions.Add($"rn <= {plotOptions.StopRow.Value}");
+
+            var rowOrder = plotOptions.HasExplicitWindow ? "ASC" : "DESC";
+
             await using var cmd = connection.CreateCommand();
             cmd.CommandText = $@"
                                 WITH numbered AS (
                                     SELECT *, row_number() OVER () as rn 
                                     FROM {fromClause}
                                 )
-                                SELECT * EXCLUDE rn
+                                SELECT {selectClause}
                                 FROM numbered 
-                                WHERE rn % {rowStride} = 0 
-                                ORDER BY rn DESC 
-                                LIMIT {limit}";
+                                WHERE {string.Join(" AND ", conditions)}
+                                ORDER BY rn {rowOrder}
+                                LIMIT {plotOptions.Limit}";
 
             await using var reader = await cmd.ExecuteReaderAsync();
 
-            return await ReaderToPlotData(reader, true);
+            return await ReaderToPlotData(reader, !plotOptions.HasExplicitWindow);
         }
     }
 
@@ -1044,6 +1082,277 @@ public class OlapBusiness(
         return connection;
     }
 
+    private sealed record PlotRequestOptions(
+        long Limit,
+        long RowStride,
+        long? StartRow,
+        long? StopRow,
+        bool HasExplicitWindow,
+        string[] Columns);
+
+    private sealed record TabularQueryRequestOptions(
+        long? Limit,
+        long RowStride,
+        long? StartRow,
+        long? StopRow,
+        bool HasExplicitWindow,
+        bool ShouldShapeView,
+        string[] Columns);
+
+    private static TabularQueryRequestOptions ValidateTabularQueryRequest(
+        OlapQueryRequestDto request,
+        bool hasUserQuery)
+    {
+        var hasExplicitWindow = request.StartRow.HasValue || request.StopRow.HasValue;
+        var hasRequestedWindowing = request.Limit.HasValue || request.RowStride.HasValue || hasExplicitWindow;
+        var columns = NormalizeColumns(request.Columns);
+        var limit = request.Limit;
+
+        if (!limit.HasValue)
+        {
+            if (hasExplicitWindow)
+                limit = OlapQueryRequestDto.MaxLimit;
+            else if (!hasUserQuery)
+                limit = OlapQueryRequestDto.DefaultLimit;
+        }
+
+        var rowStride = request.RowStride ?? OlapQueryRequestDto.DefaultRowStride;
+
+        if (limit.HasValue && (limit.Value < 1 || limit.Value > OlapQueryRequestDto.MaxLimit))
+            throw new ArgumentException($"Limit must be between 1 and {OlapQueryRequestDto.MaxLimit}.",
+                nameof(request.Limit));
+
+        if (rowStride < 1)
+            throw new ArgumentException("Row stride must be 1 or greater.", nameof(request.RowStride));
+
+        if (request.StartRow is < 1)
+            throw new ArgumentException("Start row must be 1 or greater.", nameof(request.StartRow));
+
+        if (request.StopRow is < 1)
+            throw new ArgumentException("Stop row must be 1 or greater.", nameof(request.StopRow));
+
+        if (request.StartRow.HasValue &&
+            request.StopRow.HasValue &&
+            request.StartRow.Value > request.StopRow.Value)
+            throw new ArgumentException("Start row cannot be greater than stop row.");
+
+        return new TabularQueryRequestOptions(
+            limit,
+            rowStride,
+            request.StartRow,
+            request.StopRow,
+            hasExplicitWindow,
+            !hasUserQuery || hasRequestedWindowing || columns.Length > 0,
+            columns);
+    }
+
+    private static PlotRequestOptions ValidatePlotRequest(OlapQueryRequestDto? request)
+    {
+        request ??= new OlapQueryRequestDto();
+
+        var hasExplicitWindow = request.StartRow.HasValue || request.StopRow.HasValue;
+        var limit = request.Limit ?? (hasExplicitWindow
+            ? OlapQueryRequestDto.MaxLimit
+            : OlapQueryRequestDto.DefaultLimit);
+        var rowStride = request.RowStride ?? OlapQueryRequestDto.DefaultRowStride;
+
+        if (limit < 1 || limit > OlapQueryRequestDto.MaxLimit)
+            throw new ArgumentException($"Limit must be between 1 and {OlapQueryRequestDto.MaxLimit}.",
+                nameof(request.Limit));
+
+        if (rowStride < 1)
+            throw new ArgumentException("Row stride must be 1 or greater.", nameof(request.RowStride));
+
+        if (request.StartRow is < 1)
+            throw new ArgumentException("Start row must be 1 or greater.", nameof(request.StartRow));
+
+        if (request.StopRow is < 1)
+            throw new ArgumentException("Stop row must be 1 or greater.", nameof(request.StopRow));
+
+        if (request.StartRow.HasValue &&
+            request.StopRow.HasValue &&
+            request.StartRow.Value > request.StopRow.Value)
+            throw new ArgumentException("Start row cannot be greater than stop row.");
+
+        return new PlotRequestOptions(
+            limit,
+            rowStride,
+            request.StartRow,
+            request.StopRow,
+            hasExplicitWindow,
+            NormalizeColumns(request.Columns));
+    }
+
+    private static void ValidateUserQuery(string? userQuery, string viewName)
+    {
+        if (string.IsNullOrWhiteSpace(viewName))
+            throw new ArgumentException("View name is required", nameof(viewName));
+
+        if (string.IsNullOrWhiteSpace(userQuery))
+            throw new ArgumentException("Query is required, must not be empty or missing");
+
+        if (!userQuery.Contains(viewName, StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException($"Query must reference the view '{viewName}'");
+
+        var dangerousPatterns = new[]
+        {
+            "COPY", // Prevent writing files
+            "EXPORT", // Prevent exporting database/data
+            "IMPORT", // Prevent importing
+            "INSERT", // Prevent inserting to other tables
+            "UPDATE", // Prevent updates
+            "DELETE", // Prevent deletes
+            "DROP", // Prevent dropping objects
+            "ALTER", // Prevent schema changes
+            "CREATE TABLE", // Prevent creating tables
+            "CREATE VIEW", // Prevent creating views (besides temp view we control)
+            "az://", // Azure blob paths
+            "read_parquet(", // File reading functions
+            "read_csv(",
+            "read_json(",
+            "ATTACH", // Database attachment
+            "CREATE SECRET", // Secret manipulation
+            ".parquet'", // File extensions in quotes
+            ".csv'",
+            ".json'"
+        };
+
+        foreach (var pattern in dangerousPatterns)
+            if (userQuery.Contains(pattern, StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException($"Query contains unauthorized pattern: {pattern}");
+
+        if (userQuery.Count(c => c == ';') > 0)
+            throw new InvalidOperationException("Multi-statement queries are not allowed");
+
+        ValidateViewName(viewName);
+    }
+
+    private static void ValidateViewName(string viewName)
+    {
+        if (string.IsNullOrWhiteSpace(viewName))
+            throw new ArgumentException("View name is required", nameof(viewName));
+
+        if (!Regex.IsMatch(viewName, OlapQueryRequestDto.ColumnNamePattern))
+            throw new ArgumentException("View name contains invalid characters", nameof(viewName));
+    }
+
+    private static async Task<string> BuildWindowedSourceSql(
+        DuckDBConnection connection,
+        string sourceSql,
+        TabularQueryRequestOptions queryOptions)
+    {
+        var fromClause = $"({sourceSql})";
+        var selectedColumns = await ResolveSelectedColumns(connection, fromClause, queryOptions.Columns);
+        var selectClause = selectedColumns.Length > 0
+            ? string.Join(", ", selectedColumns.Select(QuoteIdentifier))
+            : "* EXCLUDE rn";
+
+        var conditions = new List<string> { $"rn % {queryOptions.RowStride} = 0" };
+
+        if (queryOptions.StartRow.HasValue)
+            conditions.Add($"rn >= {queryOptions.StartRow.Value}");
+
+        if (queryOptions.StopRow.HasValue)
+            conditions.Add($"rn <= {queryOptions.StopRow.Value}");
+
+        var rowOrder = queryOptions.Limit.HasValue && !queryOptions.HasExplicitWindow
+            ? "DESC"
+            : "ASC";
+        var limitClause = queryOptions.Limit.HasValue
+            ? $"LIMIT {queryOptions.Limit.Value}"
+            : "";
+
+        return $@"
+                WITH numbered AS (
+                    SELECT *, row_number() OVER () as rn
+                    FROM {fromClause}
+                ),
+                windowed AS (
+                    SELECT *
+                    FROM numbered
+                    WHERE {string.Join(" AND ", conditions)}
+                    ORDER BY rn {rowOrder}
+                    {limitClause}
+                )
+                SELECT {selectClause}
+                FROM windowed
+                ORDER BY rn ASC";
+    }
+
+    private static string[] NormalizeColumns(string[]? columns)
+    {
+        if (columns == null || columns.Length == 0)
+            return [];
+
+        var normalized = columns
+            .Where(column => !string.IsNullOrWhiteSpace(column))
+            .SelectMany(column => column.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            .ToArray();
+
+        if (normalized.Length == 0)
+            return [];
+
+        if (normalized.Length > OlapQueryRequestDto.MaxColumnCount)
+            throw new ArgumentException($"No more than {OlapQueryRequestDto.MaxColumnCount} columns can be selected.",
+                nameof(columns));
+
+        var selectedColumns = new List<string>();
+        var seenColumns = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var column in normalized)
+        {
+            if (column.Length > OlapQueryRequestDto.MaxColumnNameLength)
+                throw new ArgumentException(
+                    $"Column names cannot exceed {OlapQueryRequestDto.MaxColumnNameLength} characters.",
+                    nameof(columns));
+
+            if (!Regex.IsMatch(column, OlapQueryRequestDto.ColumnNamePattern))
+                throw new ArgumentException($"Column name contains invalid characters: {column}", nameof(columns));
+
+            if (seenColumns.Add(column))
+                selectedColumns.Add(column);
+        }
+
+        return [.. selectedColumns];
+    }
+
+    private static async Task<string[]> ResolveSelectedColumns(
+        DuckDBConnection connection,
+        string fromClause,
+        string[] requestedColumns)
+    {
+        if (requestedColumns.Length == 0)
+            return [];
+
+        await using var cmd = connection.CreateCommand();
+        cmd.CommandText = $"SELECT * FROM {fromClause} LIMIT 0";
+
+        await using var reader = await cmd.ExecuteReaderAsync();
+        var availableColumns = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        for (var i = 0; i < reader.FieldCount; i++)
+        {
+            var columnName = reader.GetName(i);
+            availableColumns.TryAdd(columnName, columnName);
+        }
+
+        var missingColumns = requestedColumns
+            .Where(column => !availableColumns.ContainsKey(column))
+            .ToArray();
+
+        if (missingColumns.Length > 0)
+            throw new ArgumentException($"Column(s) not found: {string.Join(", ", missingColumns)}");
+
+        return requestedColumns
+            .Select(column => availableColumns[column])
+            .ToArray();
+    }
+
+    private static string QuoteIdentifier(string identifier)
+    {
+        return $"\"{identifier.Replace("\"", "\"\"")}\"";
+    }
+
     /// <summary>
     ///     Converts a DbDataReader to PlotDataDto format
     /// </summary>
@@ -1070,5 +1379,26 @@ public class OlapBusiness(
             points.Reverse();
 
         return new PlotDataDto { Columns = columns, Data = [.. points] };
+    }
+
+    /// <summary>
+    ///     Find the default object storage if the supplied ID cannot be found.
+    /// </summary>
+    /// <param name="organizationId">The org ID of the object storage to be found.</param>
+    /// <param name="projectId">The project ID of the object storage to be found.</param>
+    /// <param name="objectStorageId">The ID of the object storage (return if supplied)</param>
+    /// <returns></returns>
+    /// <exception cref="KeyNotFoundException"></exception>
+    private async Task<long> ResolveObjectStorageId(long organizationId, long projectId, long? objectStorageId)
+    {
+        if (objectStorageId.HasValue)
+        {
+            // object storage could be org-level so just return object storage, don't check for project existence
+            return objectStorageId.Value;
+        }
+
+        var defaultObjectStorage = await _objectStorageBusiness.GetDefaultObjectStorage(organizationId, projectId)
+                                   ?? throw new KeyNotFoundException("Default object storage not found");
+        return defaultObjectStorage.Id;
     }
 }

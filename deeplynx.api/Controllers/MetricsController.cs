@@ -53,4 +53,70 @@ public class MetricsController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
+
+    /// <summary>
+    ///     Get System Data Source Count 
+    /// </summary>
+    /// <param name="hideArchived">Flag indicating whether to hide archived data sources from the result (Default true)</param>
+    /// <returns>A count of data sources for the given project.</returns>
+    [HttpGet("datasources/count", Name = "api_datasource_count_system")]
+    [SysAdmin]
+    public async Task<IActionResult> GetSystemDataSourceCount(bool hideArchived = true)
+    {
+        try
+        {
+            var byteSum = await _metricsBusiness.GetSystemDataSourceCount(hideArchived);
+            return Ok(byteSum);
+        }
+        catch (Exception exc)
+        {
+            var message = $"An error occurred while retrieving byte count for the system";
+            _logger.LogError(exc.Message);
+            return StatusCode(StatusCodes.Status500InternalServerError, message);
+        }
+    }
+    
+    /// <summary>
+    ///     Get record count for system
+    /// </summary>
+    /// <param name="hideArchived">Flag indicating whether to hide archived records from the result</param>
+    /// <returns>The record count for the given scope</returns>
+    [HttpGet("records/count", Name = "api_record_count_system")]
+    [SysAdmin]
+    public async Task<IActionResult> GetSystemRecordCount(bool hideArchived = true)
+    {
+        try
+        {
+            var count = await _metricsBusiness.GetRecordCount(organizationId: null, projectIds: null, hideArchived: false);
+            return Ok(count);
+        }
+        catch (Exception exc)
+        {
+            var message = $"An error occurred while retrieving record count for system";
+            _logger.LogError(exc.Message);
+            return StatusCode(StatusCodes.Status500InternalServerError, message);
+        }
+    }
+    
+    /// <summary>
+    ///     Get file count for system
+    /// </summary>
+    /// <param name="hideArchived">Flag indicating whether to hide archived files from the result</param>
+    /// <returns>The file count for the given scope</returns>
+    [HttpGet("files/count", Name = "api_file_count_system")]
+    [SysAdmin]
+    public async Task<IActionResult> GetSystemFileCount(bool hideArchived = true)
+    {
+        try
+        {
+            var count = await _metricsBusiness.GetFileCount(organizationId: null, projectIds: null, hideArchived: false);
+            return Ok(count);
+        }
+        catch (Exception exc)
+        {
+            var message = $"An error occurred while retrieving file count for system";
+            _logger.LogError(exc.Message);
+            return StatusCode(StatusCodes.Status500InternalServerError, message);
+        }
+    }
 }

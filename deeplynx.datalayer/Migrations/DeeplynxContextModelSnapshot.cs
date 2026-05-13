@@ -756,9 +756,22 @@ namespace deeplynx.datalayer.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("created_by");
 
+                    b.Property<string>("Mode")
+                        .HasColumnType("text")
+                        .HasColumnName("mode");
+
+                    b.Property<long?>("ProjectId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("project_id");
+
                     b.Property<string>("Properties")
                         .HasColumnType("jsonb")
                         .HasColumnName("properties");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("status");
 
                     b.HasKey("Id")
                         .HasName("extractions_pkey");
@@ -1191,10 +1204,10 @@ namespace deeplynx.datalayer.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
 
-                    b.Property<string>("Config")
+                    b.Property<string>("ConfigEncrypted")
                         .IsRequired()
-                        .HasColumnType("jsonb")
-                        .HasColumnName("config");
+                        .HasColumnType("text")
+                        .HasColumnName("config_encrypted");
 
                     b.Property<bool>("Default")
                         .HasColumnType("boolean")
@@ -1929,6 +1942,11 @@ namespace deeplynx.datalayer.Migrations
                     b.HasIndex("OrganizationId", "ProjectId", "Name")
                         .IsUnique()
                         .HasDatabaseName("unique_project_relationship_name")
+                        .HasFilter("project_id IS NOT NULL");
+
+                    b.HasIndex("OrganizationId", "ProjectId", "OriginId", "Name", "DestinationId")
+                        .IsUnique()
+                        .HasDatabaseName("unique_project_relationship_origin_name_destination")
                         .HasFilter("project_id IS NOT NULL");
 
                     b.ToTable("relationships", "deeplynx");
