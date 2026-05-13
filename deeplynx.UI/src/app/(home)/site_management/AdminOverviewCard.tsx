@@ -25,7 +25,7 @@ const getMetricNumber = (value: unknown): number => {
         record.bytes ??
         record.byteSum ??
         record.size ??
-        record.storageSize
+        record.storageSize,
     );
   }
 
@@ -40,7 +40,7 @@ const formatBytes = (bytes: unknown): string => {
   const sizes = ["B", "KB", "MB", "GB", "TB"];
   const i = Math.min(
     Math.floor(Math.log(normalizedBytes) / Math.log(k)),
-    sizes.length - 1
+    sizes.length - 1,
   );
   const value = normalizedBytes / Math.pow(k, i);
 
@@ -79,14 +79,14 @@ const AdminOverviewCard = () => {
       if (storageSize.status === "rejected") {
         console.error(
           "Failed to fetch system storage size:",
-          storageSize.reason
+          storageSize.reason,
         );
       }
 
       if (dataSources.status === "rejected") {
         console.error(
           "Failed to fetch system data source count:",
-          dataSources.reason
+          dataSources.reason,
         );
       }
     };
@@ -124,8 +124,8 @@ const AdminOverviewCard = () => {
               <div className="text-base-content opacity-70 text-sm">
                 {title}
               </div>
-              <div className="text-secondary flex items-center text-3xl font-bold mt-1">
-                <Icon className="size-8 mr-2 shrink-0" />
+              <div className="text-secondary flex items-center text-xl font-bold mt-1">
+                <Icon className="size-7 mr-2 shrink-0" />
                 <div className="text-base-content break-words">{value}</div>
               </div>
             </div>
