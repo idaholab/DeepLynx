@@ -31,3 +31,35 @@ export const getSystemDataSourceCount = async (): Promise<number> => {
     throw error;
   }
 };
+
+/**
+ * Get system record count.
+ * @returns Promise with the system record count
+ */
+export const getSystemRecordCount = async (): Promise<number> => {
+  try {
+    const res = await api.get<number>("/metrics/records/count", {
+      params: { hideArchived: true },
+    });
+    return res.data;
+  } catch (error) {
+    console.error("Error fetching system record count:", error);
+    throw error;
+  }
+};
+
+/**
+ * Get system file count.
+ * @returns Promise with the system file count
+ */
+export const getSystemFileCount = async (): Promise<number> => {
+  try {
+    const res = await api.get<number>("/metrics/files/count", {
+      params: { hideArchived: true },
+    });
+    return res.data;
+  } catch (error) {
+    console.error("Error fetching system file count:", error);
+    throw error;
+  }
+};

@@ -4,9 +4,13 @@ import { useProjectSession } from "@/app/contexts/ProjectSessionProvider";
 import {
   getProjectDataModalityCount,
   getProjectDataSourceCount,
+  getProjectFileCount,
+  getProjectRecordCount,
   getProjectStorageSize,
 } from "@/app/lib/client_service/projects_services.client";
 import {
+  CircleStackIcon,
+  DocumentIcon,
   FolderIcon,
   ServerStackIcon,
   Squares2X2Icon,
@@ -57,6 +61,8 @@ const ProjectOverviewWidget = () => {
     dataSources: number;
     storageSize: number;
     dataModalities: number;
+    records: number;
+    files: number;
   } | null>(null);
 
   useEffect(() => {
@@ -71,11 +77,13 @@ const ProjectOverviewWidget = () => {
       const organizationId = organization.organizationId as number;
       const projectId = project.projectId as number;
 
-      const [dataSources, storageSize, dataModalities] =
+      const [dataSources, storageSize, dataModalities, records, files] =
         await Promise.allSettled([
           getProjectDataSourceCount(organizationId, projectId),
           getProjectStorageSize(organizationId, projectId),
           getProjectDataModalityCount(organizationId, projectId),
+          getProjectRecordCount(organizationId, projectId),
+          getProjectFileCount(organizationId, projectId),
         ]);
 
       if (!isActive) return;
@@ -93,6 +101,9 @@ const ProjectOverviewWidget = () => {
           dataModalities.status === "fulfilled"
             ? getMetricNumber(dataModalities.value)
             : 0,
+        records:
+          records.status === "fulfilled" ? getMetricNumber(records.value) : 0,
+        files: files.status === "fulfilled" ? getMetricNumber(files.value) : 0,
       });
 
       if (dataSources.status === "rejected") {
@@ -115,6 +126,14 @@ const ProjectOverviewWidget = () => {
           dataModalities.reason,
         );
       }
+
+      if (records.status === "rejected") {
+        console.error("Failed to fetch project record count:", records.reason);
+      }
+
+      if (files.status === "rejected") {
+        console.error("Failed to fetch project file count:", files.reason);
+      }
     };
 
     void fetchStats();
@@ -124,7 +143,7 @@ const ProjectOverviewWidget = () => {
     };
   }, [project?.projectId, organization?.organizationId]);
 
-  const metrics = [
+  const primaryMetrics = [
     {
       title: t.translations.STORAGE_SIZE,
       value: formatBytes(stats?.storageSize ?? 0),
@@ -142,6 +161,19 @@ const ProjectOverviewWidget = () => {
     },
   ];
 
+  const secondaryMetrics = [
+    {
+      title: t.translations.RECORD_COUNT,
+      value: stats?.records ?? 0,
+      Icon: CircleStackIcon,
+    },
+    {
+      title: t.translations.FILE_COUNT,
+      value: stats?.files ?? 0,
+      Icon: DocumentIcon,
+    },
+  ];
+
   return (
     <div className="card-body">
       <div className="flex justify-between">
@@ -153,16 +185,34 @@ const ProjectOverviewWidget = () => {
       </div>
 
       {/* Show project metrics provided by the stats and metrics APIs. */}
-      <div className="grid grid-cols-1 gap-4 p-4 rounded-lg sm:grid-cols-3">
-        {metrics.map(({ title, value, Icon }) => (
-          <div key={title}>
-            <div className="text-base-content opacity-70 text-sm">{title}</div>
-            <div className="text-secondary flex items-center text-xl font-bold mt-1">
-              <Icon className="size-7 mr-2 shrink-0" />
-              <div className="text-base-content break-words">{value}</div>
+      <div className="space-y-4 p-4 rounded-lg">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          {primaryMetrics.map(({ title, value, Icon }) => (
+            <div key={title}>
+              <div className="text-base-content opacity-70 text-sm">
+                {title}
+              </div>
+              <div className="text-secondary flex items-center text-xl font-bold mt-1">
+                <Icon className="size-7 mr-2 shrink-0" />
+                <div className="text-base-content break-words">{value}</div>
+              </div>
             </div>
-          </div>
-        ))}
+          ))}
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          {secondaryMetrics.map(({ title, value, Icon }) => (
+            <div key={title}>
+              <div className="text-base-content opacity-70 text-sm">
+                {title}
+              </div>
+              <div className="text-secondary flex items-center text-xl font-bold mt-1">
+                <Icon className="size-7 mr-2 shrink-0" />
+                <div className="text-base-content break-words">{value}</div>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );

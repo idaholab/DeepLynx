@@ -224,6 +224,52 @@ export const getOrganizationDataModalityCount = async (
     }
 };
 
+/**
+ * Get organization record count
+ * @param organizationId - The ID of the organization
+ * @returns Promise with the organization record count
+ */
+export const getOrganizationRecordCount = async (
+    organizationId: number
+): Promise<number> => {
+    try {
+        const res = await api.get<number>(
+            `/organization/${organizationId}/metrics/records/count`,
+            { params: { hideArchived: true } }
+        );
+        return res.data;
+    } catch (error) {
+        console.error(
+            `Error fetching record count for organization ${organizationId}:`,
+            error
+        );
+        throw error;
+    }
+};
+
+/**
+ * Get organization file count
+ * @param organizationId - The ID of the organization
+ * @returns Promise with the organization file count
+ */
+export const getOrganizationFileCount = async (
+    organizationId: number
+): Promise<number> => {
+    try {
+        const res = await api.get<number>(
+            `/organization/${organizationId}/metrics/files/count`,
+            { params: { hideArchived: true } }
+        );
+        return res.data;
+    } catch (error) {
+        console.error(
+            `Error fetching file count for organization ${organizationId}:`,
+            error
+        );
+        throw error;
+    }
+};
+
 /* -------------------------------------------------------------------------- */
 /*                      Organization User Management                          */
 /* -------------------------------------------------------------------------- */

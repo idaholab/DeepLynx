@@ -91,7 +91,6 @@ public class MetricsOrganizationController : ControllerBase
     /// <param name="hideArchived">Flag indicating whether to hide archived records from the result</param>
     /// <returns>The record count for the given scope</returns>
     [HttpGet("records/count", Name = "api_record_count_organization")]
-    [SysAdmin]
     public async Task<IActionResult> GetOrganizationRecordCount(
         long organizationId, 
         [FromQuery] long[]? projectIds, 
@@ -118,7 +117,6 @@ public class MetricsOrganizationController : ControllerBase
     /// <param name="hideArchived">Flag indicating whether to hide archived files from the result</param>
     /// <returns>The file count for the given scope</returns>
     [HttpGet("files/count", Name = "api_file_count_organization")]
-    [SysAdmin]
     public async Task<IActionResult> GetOrganizationFileCount(
         long organizationId, 
         [FromQuery] long[]? projectIds, 
