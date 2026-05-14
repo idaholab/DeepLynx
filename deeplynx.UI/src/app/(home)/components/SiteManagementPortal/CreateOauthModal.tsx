@@ -27,8 +27,15 @@ const CreateOAuthModal = ({
   const [toastType, setToastType] = useState<
     "success" | "error" | "info" | null
   >(null);
+  const [emailValidated, setEmailValidated] = useState(true);
+  const [baseUrlValidated, setBaseUrlValidated] = useState(true);
+  const [callbackUrlValidated, setCallbackUrlValidated] = useState(false);
 
   const handleSubmit = async () => {
+    if (!emailValidated || !baseUrlValidated || !callbackUrlValidated) {
+      toast.error("Please make sure your information is valid.");
+      return;
+    }
     if (isLoading) return;
     setIsLoading(true);
     try {
@@ -84,6 +91,28 @@ const CreateOAuthModal = ({
     }
   };
 
+  const validateUrl = (urlString: string) => {
+    try {
+      const normalizedUrl = urlString.startsWith("http")
+        ? urlString
+        : `https://${urlString}`
+      const url = new URL(normalizedUrl);
+      return(
+        ["http:", "https:"].includes(url.protocol) && url.hostname.includes(".")
+      );
+    } catch {
+      return false;
+    }
+  }
+
+  const validateEmail = (email: string) => {
+    if (email.includes('@') && email.includes('.') && !email.includes(' ')) {
+      setEmailValidated(true);
+    } else {
+      setEmailValidated(false);
+    }
+  }
+
   return (
     <>
       {/* Toast Message */}
@@ -120,12 +149,20 @@ const CreateOAuthModal = ({
                 </span>
               </div>
 
+              <div>
               <input
                 placeholder={t.translations.CALLBACK_URL}
                 className="input input-bordered input-primary bg-base-100 text-base-content placeholder:text-base-content/40 w-full"
                 value={callbackUrl}
-                onChange={(e) => setCallbackUrl(e.target.value)}
+                onChange={(e) => {
+                  setCallbackUrl(e.target.value)
+                  setCallbackUrlValidated(validateUrl(e.target.value))
+                }}
               />
+              {callbackUrl && !callbackUrlValidated && (
+                <p className="text-xs mt-1 float-right text-error">Please enter a valid url.</p>
+              )}
+              </div>
               <div>
                 <textarea
                   placeholder={t.translations.DESCRIPTION}
@@ -141,19 +178,34 @@ const CreateOAuthModal = ({
                   {description.length}/250
                 </span>
               </div>
-
-              <input
-                placeholder={t.translations.BASE_URL}
-                className="input input-bordered input-primary bg-base-100 text-base-content placeholder:text-base-content/40 w-full"
-                value={baseUrl}
-                onChange={(e) => setBaseUrl(e.target.value)}
-              />
-              <input
-                placeholder={t.translations.APP_OWNER_EMAIL}
-                className="input input-bordered input-primary bg-base-100 text-base-content placeholder:text-base-content/40 w-full"
-                value={appOwnerEmail}
-                onChange={(e) => setAppOwnerEmail(e.target.value)}
-              />
+              <div>
+                <input
+                  placeholder={t.translations.BASE_URL}
+                  className="input input-bordered input-primary bg-base-100 text-base-content placeholder:text-base-content/40 w-full"
+                  value={baseUrl}
+                  onChange={(e) => {
+                    setBaseUrl(e.target.value)
+                    setBaseUrlValidated(validateUrl(e.target.value))
+                  }}
+                />
+                {baseUrl && !baseUrlValidated && (
+                  <p className="text-xs mt-1 float-right text-error">Please enter a valid url.</p>
+                )}
+              </div>
+              <div>
+                <input
+                  placeholder={t.translations.APP_OWNER_EMAIL}
+                  className="input input-bordered input-primary bg-base-100 text-base-content placeholder:text-base-content/40 w-full"
+                  value={appOwnerEmail}
+                  onChange={(e) => {
+                    setAppOwnerEmail(e.target.value)
+                    validateEmail(e.target.value)
+                  }}
+                />
+                {appOwnerEmail && !emailValidated && (
+                  <p className="text-xs mt-1 float-right text-error">Please enter a correct email.</p>
+                )}
+              </div>
             </div>
 
             <div className="modal-action mt-6">
