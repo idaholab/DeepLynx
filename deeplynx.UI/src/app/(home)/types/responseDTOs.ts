@@ -325,6 +325,30 @@ export type ProjectMemberResponseDto = {
   roleId?: number;
 };
 
+export type AiModelConfigResponseDto = {
+  id: number;
+  organizationId: number;
+  projectId?: number | null;
+  serverUrl: string;
+  modelProvider: string;
+  modelName: string;
+  modelType: string;
+  requiresToken: boolean;
+  default: boolean;
+  isArchived: boolean;
+  lastUpdatedAt: string;
+  lastUpdatedBy?: number | null;
+  token?: string | null;
+};
+
+export type UserModelTokenResponseDto = {
+  id: number;
+  userId: number;
+  aiModelConfigId: number;
+  token: string;
+  lastUpdatedAt: string;
+};
+
 export interface TriggerLatticeExtractionResponseDTO {
   extraction_id: number;
 }

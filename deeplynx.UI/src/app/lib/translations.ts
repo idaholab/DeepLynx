@@ -463,19 +463,141 @@ export const translations = {
         'I am ready to help analyze "{recordName}". First queue the record for Insight indexing, then send questions here.',
       INSIGHT_INTRO_READY:
         'I am ready to help analyze "{recordName}". How can I help?',
+      INSIGHT_ARCHIVE_MODEL_CONFIG: "Archive Config",
+      INSIGHT_ARCHIVED_TEMPLATE_CANNOT_BE_EDITED:
+        "Archived templates cannot be edited",
+      INSIGHT_MODEL_CONFIG_ARCHIVED: "Insight model configuration archived.",
+      INSIGHT_MODEL_CONFIG_UNARCHIVED: "Insight model configuration restored.",
+      INSIGHT_MODEL_CONFIG_REQUIRED_FIELDS:
+        "Model name and server URL are required.",
+      INSIGHT_MODEL_CONFIG_SAVED: "Insight model configuration saved.",
+      INSIGHT_MODEL_CONFIGS_FAILED: "Failed to load Insight model settings.",
+      INSIGHT_MODEL_EDITOR_DESCRIPTION:
+        "Choose saved models for query, upload, and embedding. You can also create project-level configs here and store your personal token when a model requires one.",
+      INSIGHT_MODEL_NAME: "Model Name",
+      INSIGHT_MODEL_NAME_PLACEHOLDER: "e.g. GPT-4.1, Mistral Small, bge-m3",
+      INSIGHT_MODEL_PROVIDER: "Model Provider",
+      INSIGHT_MODEL_SETTINGS: "Insight Model Settings",
+      INSIGHT_MODEL_SETTINGS_DESCRIPTION:
+        "Choose the approved model templates Insight should use in this project. Nexus Model uses the backend defaults, and custom templates can use your personal API token when required.",
+      INSIGHT_MODEL_TEMPLATE: "Insight Model Template",
+      INSIGHT_MODEL_TEMPLATE_DESCRIPTION:
+        "Set project-level model templates for Query, Upload / OCR, and Embedding. Users can choose these templates in Insight and attach their own token when needed.",
+      INSIGHT_MODEL_TOKEN_SAVED: "Insight model token saved.",
+      INSIGHT_MODEL_TYPE: "Model Type",
+      INSIGHT_NO_MODEL_SELECTED: "Use backend default",
+      INSIGHT_NO_ACTIVE_TEMPLATE: "No active template",
+      INSIGHT_NO_PROJECT_TEMPLATES_FOR_ROLE:
+        "No project templates exist for this role yet. Create one here to override the inherited organization default.",
+      INSIGHT_NO_TEMPLATES_CREATED_YET: "No templates created yet.",
+      INSIGHT_NO_TOKEN_REQUIRED: "No token required",
+      INSIGHT_NEXUS_MODEL: "Nexus Model",
+      INSIGHT_CREATE_MODEL_CONFIG: "Create Project Model Config",
+      INSIGHT_CREATE_TEMPLATE: "Create Template",
+      INSIGHT_CURRENT_USER_REQUIRED:
+        "Current user information is required to save a model token.",
+      INSIGHT_CURRENT_ACTIVE_TEMPLATE: "Current active template",
+      INSIGHT_DEFAULT_MODEL: "Set as default model for this type",
+      INSIGHT_DEFAULT_TEMPLATE_CANNOT_BE_ARCHIVED:
+        "Default templates cannot be archived",
+      INSIGHT_EDIT_MODEL_CONFIG: "Edit Project Model Config",
+      INSIGHT_EDIT_MODEL_EDITOR_DESCRIPTION:
+        "Update the selected model configuration for this project.",
+      INSIGHT_EDIT_TEMPLATE: "Edit Template",
+      INSIGHT_EDIT_SELECTED_CONFIG: "Edit Selected",
+      INSIGHT_EDITING_EXISTING_CONFIG: "Editing existing config",
+      INSIGHT_EMBEDDING_MODEL: "Embedding Model",
+      INSIGHT_EMBEDDING_MODEL_DESCRIPTION:
+        "Used when Insight embeds document chunks for retrieval.",
+      INSIGHT_NEW_MODEL: "New Model",
+      INSIGHT_ORGANIZATION_CONFIG: "Organization",
+      INSIGHT_ORGANIZATION_DEFAULTS_DESCRIPTION:
+        "Organization defaults set the approved fallback template for each model type across the organization.",
+      INSIGHT_ORGANIZATION_DEFAULTS_SAVED:
+        "Organization Insight defaults saved.",
+      INSIGHT_ORGANIZATION_DEFAULT_TEMPLATE: "Organization default template",
+      INSIGHT_ORGANIZATION_EMBEDDING_DEFAULT_DESCRIPTION:
+        "Organization default template for document embeddings.",
+      INSIGHT_ORGANIZATION_QUERY_DEFAULT_DESCRIPTION:
+        "Organization default language model template used for Insight chat.",
+      INSIGHT_ORGANIZATION_TEMPLATES_LOAD_FAILED:
+        "Failed to load organization Insight templates.",
+      INSIGHT_ORGANIZATION_TEMPLATES_MANAGE_DESCRIPTION:
+        "Create, edit, archive, and review organization templates available to your users.",
+      INSIGHT_ORGANIZATION_TEMPLATE_EDITOR_DESCRIPTION:
+        "Organization templates define approved model connection settings. Users will attach their own token later if the template requires one.",
+      INSIGHT_ORGANIZATION_UPLOAD_DEFAULT_DESCRIPTION:
+        "Organization default vision template used for upload and OCR processing.",
+      INSIGHT_PROJECT_CONFIG: "Project",
+      INSIGHT_PROJECT_CONTEXT_REQUIRED:
+        "Organization and project context are required to save a model config.",
+      INSIGHT_PROJECT_DEFAULTS_DESCRIPTION:
+        "Project defaults override inherited organization templates for the matching model type. If no project override exists, the active template stays inherited.",
+      INSIGHT_PROJECT_DEFAULTS_SAVED: "Project Insight defaults saved.",
+      INSIGHT_PROJECT_DEFAULT_TEMPLATE: "Project default template",
+      INSIGHT_PROJECT_EMBEDDING_DEFAULT_DESCRIPTION:
+        "Project default template for document embeddings.",
+      INSIGHT_PROJECT_QUERY_DEFAULT_DESCRIPTION:
+        "Project default language model template used for Insight chat.",
+      INSIGHT_PROJECT_TEMPLATES_LOAD_FAILED:
+        "Failed to load project Insight templates.",
+      INSIGHT_PROJECT_TEMPLATES_MANAGE_DESCRIPTION:
+        "Create, edit, archive, and review project templates. Inherited organization templates are shown here for reference.",
+      INSIGHT_PROJECT_TEMPLATE_EDITOR_DESCRIPTION:
+        "Project templates define approved model connection settings. Users will attach their own token later if the template requires one.",
+      INSIGHT_PROJECT_UPLOAD_DEFAULT_DESCRIPTION:
+        "Project default vision template used for upload and OCR processing.",
       INSIGHT_NOT_READY_MESSAGE:
         "This record is not ready yet. Queue it first and wait for status to become Ready.",
+      INSIGHT_CLICK_CREATE_TEMPLATE_TO_ADD_ONE:
+        "Click Create Template to add one.",
       INSIGHT_QUEUEING: "Queueing...",
       INSIGHT_QUEUE_RECORD: "Queue Record For Insight",
+      INSIGHT_QUERY_MODEL: "Query Model",
+      INSIGHT_QUERY_MODEL_DESCRIPTION:
+        "Used when you ask Insight a question in chat.",
+      INSIGHT_ACTIVE_MODEL: "Active",
+      INSIGHT_MANAGE_TOKEN: "Manage Token",
+      INSIGHT_NO_ORGANIZATION_TEMPLATES_FOR_ROLE:
+        "No organization templates exist for this role yet. Create one here to set the organization default.",
+      INSIGHT_REQUIRES_TOKEN: "This model requires a user token",
+      INSIGHT_SAVE_ORGANIZATION_DEFAULTS: "Save Organization Defaults",
+      INSIGHT_SAVE_PROJECT_DEFAULTS: "Save Project Defaults",
+      INSIGHT_SAVE_SELECTION: "Save Selection",
+      INSIGHT_SAVE_TOKEN: "Save Token",
       INSIGHT_SEND: "Send",
       INSIGHT_SEND_PROMPT_ARIA: "Send insight prompt",
+      INSIGHT_SERVER_URL: "Server URL",
+      INSIGHT_SERVER_URL_PLACEHOLDER: "https://api.example.com/v1",
+      INSIGHT_SELECT_ORGANIZATION_TEMPLATE: "Select an organization template",
+      INSIGHT_SELECT_PROJECT_TEMPLATE: "Select a project template",
+      INSIGHT_SHARED_CONFIG_READ_ONLY:
+        "This config comes from the organization scope. It can be selected here, but only project-scoped configs can be edited from this modal.",
       INSIGHT_STATUS_ERROR: "Error",
       INSIGHT_STATUS_NOT_QUEUED: "Not queued",
       INSIGHT_STATUS_PROCESSING: "Processing",
       INSIGHT_STATUS_QUEUED: "Queued",
+      INSIGHT_TOKEN_MISSING: "Token missing",
+      INSIGHT_TOKEN_REQUIRED:
+        "This model requires a personal API token before Insight can use it.",
+      INSIGHT_TOKEN_SAVED: "Token saved",
+      INSIGHT_TOKEN_SAVED_DESCRIPTION:
+        "You already have a saved token for this model. Update it here if it changed.",
+      INSIGHT_TOGGLE_TOKEN_VISIBILITY: "Toggle token visibility",
+      INSIGHT_TOKENS_REQUIRED_BEFORE_SAVE:
+        "Save tokens for every selected model that requires one before saving your selection",
       INSIGHT_THIS_RECORD: "this record",
+      INSIGHT_UPDATE_TOKEN: "Update Token",
       INSIGHT_UNKNOWN_ERROR: "Unknown Insight error",
+      INSIGHT_UPLOAD_MODEL: "Upload / OCR Model",
+      INSIGHT_UPLOAD_MODEL_DESCRIPTION:
+        "Used when Insight queues files for ingestion and vision-assisted parsing.",
+      INSIGHT_USER_TOKEN: "Your API Token",
+      INSIGHT_USER_TOKEN_PLACEHOLDER: "Paste your token for this model",
+      INSIGHT_USER_TOKEN_REQUIRED: "Enter a token before saving it.",
       INSIGHT_YOU: "You",
+      INSIGHT_TEMPLATE_DEFAULTS_TAB: "Defaults",
+      INSIGHT_TEMPLATE_MANAGE_TAB: "Manage Templates",
       INTERACTIVE_ZOOM_SLIDER: "Interactive zoom slider",
       INVALID_EMAIL_ERROR: "That doesn’t look like a valid email address",
       INVALID_JASON: "Invalid JSON.",
@@ -1924,19 +2046,152 @@ export const translations = {
         'Estoy listo para ayudarte a analizar "{recordName}". Primero pon el registro en cola para la indexación de Insight y luego envía tus preguntas aquí.',
       INSIGHT_INTRO_READY:
         'Estoy listo para ayudarte a analizar "{recordName}". ¿En qué puedo ayudarte?',
+      INSIGHT_ARCHIVE_MODEL_CONFIG: "Archivar configuración",
+      INSIGHT_ARCHIVED_TEMPLATE_CANNOT_BE_EDITED:
+        "Las plantillas archivadas no se pueden editar",
+      INSIGHT_MODEL_CONFIG_ARCHIVED:
+        "La configuración del modelo de Insight fue archivada.",
+      INSIGHT_MODEL_CONFIG_UNARCHIVED:
+        "La configuración del modelo de Insight fue restaurada.",
+      INSIGHT_MODEL_CONFIG_REQUIRED_FIELDS:
+        "El nombre del modelo y la URL del servidor son obligatorios.",
+      INSIGHT_MODEL_CONFIG_SAVED:
+        "La configuración del modelo de Insight se guardó correctamente.",
+      INSIGHT_MODEL_CONFIGS_FAILED:
+        "No se pudieron cargar las configuraciones de modelos de Insight.",
+      INSIGHT_MODEL_EDITOR_DESCRIPTION:
+        "Elige los modelos para consulta, carga e incrustación. También puedes crear configuraciones de proyecto aquí y guardar tu token personal cuando un modelo lo requiera.",
+      INSIGHT_MODEL_NAME: "Nombre del modelo",
+      INSIGHT_MODEL_NAME_PLACEHOLDER: "p. ej. GPT-4.1, Mistral Small, bge-m3",
+      INSIGHT_MODEL_PROVIDER: "Proveedor del modelo",
+      INSIGHT_MODEL_SETTINGS: "Configuración de modelos de Insight",
+      INSIGHT_MODEL_SETTINGS_DESCRIPTION:
+        "Elige las plantillas de modelo aprobadas que usará Insight en este proyecto. Nexus Model usa los valores predeterminados del backend y las plantillas personalizadas pueden usar tu token de API cuando sea necesario.",
+      INSIGHT_MODEL_TEMPLATE: "Plantilla de modelo de Insight",
+      INSIGHT_MODEL_TEMPLATE_DESCRIPTION:
+        "Configura plantillas de modelo del proyecto para Consulta, Carga / OCR e Incrustación. Los usuarios pueden elegir estas plantillas en Insight y agregar su propio token cuando sea necesario.",
+      INSIGHT_MODEL_TOKEN_SAVED:
+        "El token del modelo de Insight se guardó correctamente.",
+      INSIGHT_MODEL_TYPE: "Tipo de modelo",
+      INSIGHT_NO_MODEL_SELECTED: "Usar el valor predeterminado del backend",
+      INSIGHT_NO_ACTIVE_TEMPLATE: "No hay plantilla activa",
+      INSIGHT_NO_PROJECT_TEMPLATES_FOR_ROLE:
+        "Todavía no existen plantillas de proyecto para este rol. Crea una aquí para reemplazar la plantilla heredada de la organización.",
+      INSIGHT_NO_TEMPLATES_CREATED_YET: "Todavía no se han creado plantillas.",
+      INSIGHT_NO_TOKEN_REQUIRED: "No requiere token",
+      INSIGHT_NEXUS_MODEL: "Nexus Model",
+      INSIGHT_CREATE_MODEL_CONFIG: "Crear configuración de modelo del proyecto",
+      INSIGHT_CREATE_TEMPLATE: "Crear plantilla",
+      INSIGHT_CURRENT_USER_REQUIRED:
+        "Se requiere la información del usuario actual para guardar un token de modelo.",
+      INSIGHT_CURRENT_ACTIVE_TEMPLATE: "Plantilla activa actual",
+      INSIGHT_DEFAULT_MODEL:
+        "Establecer como modelo predeterminado para este tipo",
+      INSIGHT_DEFAULT_TEMPLATE_CANNOT_BE_ARCHIVED:
+        "Las plantillas predeterminadas no se pueden archivar",
+      INSIGHT_EDIT_MODEL_CONFIG: "Editar configuración de modelo del proyecto",
+      INSIGHT_EDIT_MODEL_EDITOR_DESCRIPTION:
+        "Actualiza la configuración del modelo seleccionado para este proyecto.",
+      INSIGHT_EDIT_TEMPLATE: "Editar plantilla",
+      INSIGHT_EDIT_SELECTED_CONFIG: "Editar seleccionado",
+      INSIGHT_EDITING_EXISTING_CONFIG: "Editando configuración existente",
+      INSIGHT_EMBEDDING_MODEL: "Modelo de incrustación",
+      INSIGHT_EMBEDDING_MODEL_DESCRIPTION:
+        "Se usa cuando Insight incrusta fragmentos de documentos para recuperación.",
+      INSIGHT_NEW_MODEL: "Nuevo modelo",
+      INSIGHT_ORGANIZATION_CONFIG: "Organización",
+      INSIGHT_ORGANIZATION_DEFAULTS_DESCRIPTION:
+        "Los valores predeterminados de la organización establecen la plantilla de respaldo aprobada para cada tipo de modelo en toda la organización.",
+      INSIGHT_ORGANIZATION_DEFAULTS_SAVED:
+        "Se guardaron los valores predeterminados de Insight para la organización.",
+      INSIGHT_ORGANIZATION_DEFAULT_TEMPLATE:
+        "Plantilla predeterminada de la organización",
+      INSIGHT_ORGANIZATION_EMBEDDING_DEFAULT_DESCRIPTION:
+        "Plantilla predeterminada de la organización para incrustaciones de documentos.",
+      INSIGHT_ORGANIZATION_QUERY_DEFAULT_DESCRIPTION:
+        "Plantilla predeterminada de la organización para el modelo de lenguaje usado en el chat de Insight.",
+      INSIGHT_ORGANIZATION_TEMPLATES_LOAD_FAILED:
+        "No se pudieron cargar las plantillas de Insight de la organización.",
+      INSIGHT_ORGANIZATION_TEMPLATES_MANAGE_DESCRIPTION:
+        "Crea, edita, archiva y revisa las plantillas de la organización disponibles para tus usuarios.",
+      INSIGHT_ORGANIZATION_TEMPLATE_EDITOR_DESCRIPTION:
+        "Las plantillas de la organización definen configuraciones aprobadas de conexión del modelo. Los usuarios agregarán su propio token después si la plantilla lo requiere.",
+      INSIGHT_ORGANIZATION_UPLOAD_DEFAULT_DESCRIPTION:
+        "Plantilla predeterminada de la organización para el procesamiento de carga y OCR.",
+      INSIGHT_PROJECT_CONFIG: "Proyecto",
+      INSIGHT_PROJECT_CONTEXT_REQUIRED:
+        "Se requiere el contexto de organización y proyecto para guardar una configuración de modelo.",
+      INSIGHT_PROJECT_DEFAULTS_DESCRIPTION:
+        "Los valores predeterminados del proyecto reemplazan las plantillas heredadas de la organización para el mismo tipo de modelo. Si no existe una anulación del proyecto, la plantilla activa sigue siendo la heredada.",
+      INSIGHT_PROJECT_DEFAULTS_SAVED:
+        "Se guardaron los valores predeterminados del proyecto para Insight.",
+      INSIGHT_PROJECT_DEFAULT_TEMPLATE: "Plantilla predeterminada del proyecto",
+      INSIGHT_PROJECT_EMBEDDING_DEFAULT_DESCRIPTION:
+        "Plantilla predeterminada del proyecto para incrustaciones de documentos.",
+      INSIGHT_PROJECT_QUERY_DEFAULT_DESCRIPTION:
+        "Plantilla predeterminada del proyecto para el modelo de lenguaje usado en el chat de Insight.",
+      INSIGHT_PROJECT_TEMPLATES_LOAD_FAILED:
+        "No se pudieron cargar las plantillas de Insight del proyecto.",
+      INSIGHT_PROJECT_TEMPLATES_MANAGE_DESCRIPTION:
+        "Crea, edita, archiva y revisa las plantillas del proyecto. Las plantillas heredadas de la organización se muestran aquí como referencia.",
+      INSIGHT_PROJECT_TEMPLATE_EDITOR_DESCRIPTION:
+        "Las plantillas del proyecto definen configuraciones aprobadas de conexión del modelo. Los usuarios agregarán su propio token después si la plantilla lo requiere.",
+      INSIGHT_PROJECT_UPLOAD_DEFAULT_DESCRIPTION:
+        "Plantilla predeterminada del proyecto para el procesamiento de carga y OCR.",
       INSIGHT_NOT_READY_MESSAGE:
         "Este registro aún no está listo. Ponlo en cola primero y espera a que el estado cambie a Listo.",
+      INSIGHT_CLICK_CREATE_TEMPLATE_TO_ADD_ONE:
+        "Haz clic en Crear plantilla para agregar una.",
       INSIGHT_QUEUEING: "Encolando...",
       INSIGHT_QUEUE_RECORD: "Poner registro en cola para Insight",
+      INSIGHT_QUERY_MODEL: "Modelo de consulta",
+      INSIGHT_QUERY_MODEL_DESCRIPTION:
+        "Se usa cuando haces una pregunta a Insight en el chat.",
+      INSIGHT_ACTIVE_MODEL: "Activo",
+      INSIGHT_MANAGE_TOKEN: "Administrar token",
+      INSIGHT_NO_ORGANIZATION_TEMPLATES_FOR_ROLE:
+        "Todavía no existen plantillas de organización para este rol. Crea una aquí para establecer el valor predeterminado de la organización.",
+      INSIGHT_REQUIRES_TOKEN: "Este modelo requiere un token de usuario",
+      INSIGHT_SAVE_ORGANIZATION_DEFAULTS:
+        "Guardar valores predeterminados de la organización",
+      INSIGHT_SAVE_PROJECT_DEFAULTS:
+        "Guardar valores predeterminados del proyecto",
+      INSIGHT_SAVE_SELECTION: "Guardar selección",
+      INSIGHT_SAVE_TOKEN: "Guardar token",
       INSIGHT_SEND: "Enviar",
       INSIGHT_SEND_PROMPT_ARIA: "Enviar mensaje a Insight",
+      INSIGHT_SERVER_URL: "URL del servidor",
+      INSIGHT_SERVER_URL_PLACEHOLDER: "https://api.example.com/v1",
+      INSIGHT_SELECT_ORGANIZATION_TEMPLATE:
+        "Selecciona una plantilla de la organización",
+      INSIGHT_SELECT_PROJECT_TEMPLATE: "Selecciona una plantilla del proyecto",
+      INSIGHT_SHARED_CONFIG_READ_ONLY:
+        "Esta configuración proviene del alcance de la organización. Puedes seleccionarla aquí, pero solo las configuraciones del proyecto pueden editarse desde este modal.",
       INSIGHT_STATUS_ERROR: "Error",
       INSIGHT_STATUS_NOT_QUEUED: "No en cola",
       INSIGHT_STATUS_PROCESSING: "Procesando",
       INSIGHT_STATUS_QUEUED: "En cola",
+      INSIGHT_TOKEN_MISSING: "Falta el token",
+      INSIGHT_TOKEN_REQUIRED:
+        "Este modelo requiere un token de API personal antes de que Insight pueda usarlo.",
+      INSIGHT_TOKEN_SAVED: "Token guardado",
+      INSIGHT_TOKEN_SAVED_DESCRIPTION:
+        "Ya tienes un token guardado para este modelo. Actualízalo aquí si cambió.",
+      INSIGHT_TOGGLE_TOKEN_VISIBILITY: "Mostrar u ocultar el token",
+      INSIGHT_TOKENS_REQUIRED_BEFORE_SAVE:
+        "Guarda tokens para cada modelo seleccionado que lo requiera antes de guardar tu selección",
       INSIGHT_THIS_RECORD: "este registro",
+      INSIGHT_UPDATE_TOKEN: "Actualizar token",
       INSIGHT_UNKNOWN_ERROR: "Error desconocido de Insight",
+      INSIGHT_UPLOAD_MODEL: "Modelo de carga / OCR",
+      INSIGHT_UPLOAD_MODEL_DESCRIPTION:
+        "Se usa cuando Insight pone archivos en cola para ingestión y análisis asistido por visión.",
+      INSIGHT_USER_TOKEN: "Tu token de API",
+      INSIGHT_USER_TOKEN_PLACEHOLDER: "Pega tu token para este modelo",
+      INSIGHT_USER_TOKEN_REQUIRED: "Ingresa un token antes de guardarlo.",
       INSIGHT_YOU: "Tú",
+      INSIGHT_TEMPLATE_DEFAULTS_TAB: "Predeterminados",
+      INSIGHT_TEMPLATE_MANAGE_TAB: "Administrar plantillas",
       INTERACTIVE_ZOOM_SLIDER: "Control deslizante de zoom interactivo",
       INVALID_EMAIL_ERROR:
         "Eso no parece una dirección de correo electrónico válida",
