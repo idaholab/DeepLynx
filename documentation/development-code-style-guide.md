@@ -640,9 +640,9 @@ For new or touched endpoints, map known exception types to specific status codes
 
 | Exception or condition | Recommended status | Notes |
 |---|---:|---|
-| `ValidationException` | `400 Bad Request` | Request body fails data annotation or long ID validation. |
-| `ArgumentException` | `400 Bad Request` | Invalid query/body values or unsupported operation/entity type. |
-| `InvalidRequestException` | `400 Bad Request` | Domain request is malformed or unsupported. |
+| `ValidationException` | `400 Bad Request` | Request body fails data annotation or long ID validation. Message is passed through to the client unsanitized — keep it client-safe. |
+| `ArgumentException` | `400 Bad Request` | Invalid query/body values or unsupported operation/entity type. **Currently routed to `500` by `BadRequestExceptionHandler`** pending the throw-site audit (see `BadRequestExceptionHandler` remarks); raw message is sanitized in non-Development environments. |
+| `InvalidRequestException` | `400 Bad Request` | Domain request is malformed or unsupported. Message is passed through to the client unsanitized — keep it client-safe (no env-var names, file paths, SQL fragments, internal IDs). |
 | `KeyNotFoundException` | `404 Not Found` | Requested entity does not exist or is hidden by archive filtering. |
 | `NoResultsException` | `404 Not Found` | Query succeeded but no result exists when one is required. |
 | `DependencyDeletionException` | `409 Conflict` | Delete is blocked by dependent records. |

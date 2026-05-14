@@ -12,6 +12,13 @@ dist
 ## VS Code ##
 .vscode
 
+## Visual Studio ##
+.vs/
+*.user
+
+## Claude Code ##
+.claude/
+
 ## Web ##
 /deeplynx.api/.DS_Store
 /deeplynx.api/.idea
@@ -22,11 +29,12 @@ dist
 /**/obj/
 /**/bin/
 
-deeplynx.sln.DotSettings.user
+## Test output ##
+TestResults/
 
 duckdb
 
-- global.json
+global.json
 
 /storage
 
