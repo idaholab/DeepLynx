@@ -10,4 +10,5 @@ public class UserResponseDto
     public bool? IsOrgAdmin { get; set; }
     public bool IsArchived { get; set; }
     public bool IsActive { get; set; }
+    public DateTime? LastLogin { get; set; }
 }

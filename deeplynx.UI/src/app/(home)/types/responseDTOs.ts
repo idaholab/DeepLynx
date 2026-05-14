@@ -205,7 +205,15 @@ export type UserResponseDto = {
   isOrgAdmin?: boolean | null;
   isArchived: boolean;
   isActive: boolean;
+  lastLogin?: string | null;
   role?: string;
+};
+
+export type UserActivityCountsDto = {
+  activeLast24Hours: number;
+  activeLast7Days: number;
+  activeLast30Days: number;
+  generatedAt: string;
 };
 
 export type UserAdminInfoDto = {

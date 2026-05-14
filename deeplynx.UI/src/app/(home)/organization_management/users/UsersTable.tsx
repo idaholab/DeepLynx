@@ -1,11 +1,15 @@
 // src/app/(home)/organization_management/users/UsersTable.tsx
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import toast from "react-hot-toast";
 
 import EditSysUser from "../../components/SiteManagementPortal/EditSysUser";
-import { OrganizationResponseDto, UserResponseDto } from "../../types/responseDTOs";
+import {
+  OrganizationResponseDto,
+  UserActivityCountsDto,
+  UserResponseDto,
+} from "../../types/responseDTOs";
 
 import { useOrganizationSession } from "@/app/contexts/OrganizationSessionProvider";
 import {
@@ -14,6 +18,7 @@ import {
 } from "@/app/lib/client_service/organization_services.client";
 import {
   archiveUser,
+  getActiveUserCounts,
   getAllUsers,
 } from "@/app/lib/client_service/user_services.client";
 import { InviteUserToOrganizationRequestDto } from "../../types/requestDTOs";
@@ -45,6 +50,33 @@ type ConfirmModalState = {
 /*                            Helper: build table rows                        */
 /* -------------------------------------------------------------------------- */
 
+const parseLastLoginTime = (lastLogin?: string | null): number => {
+  if (!lastLogin) return 0;
+
+  const normalized = /Z$|[+-]\d{2}:\d{2}$/.test(lastLogin)
+    ? lastLogin
+    : `${lastLogin}Z`;
+  const time = Date.parse(normalized);
+  return Number.isNaN(time) ? 0 : time;
+};
+
+const buildActivityCounts = (users: UserResponseDto[]): UserActivityCountsDto => {
+  const now = Date.now();
+  const activeUsers = users.filter((user) => user.isActive && !user.isArchived);
+  const countSince = (windowMs: number) =>
+    activeUsers.filter((user) => {
+      const lastLoginTime = parseLastLoginTime(user.lastLogin);
+      return lastLoginTime > 0 && now - lastLoginTime <= windowMs;
+    }).length;
+
+  return {
+    activeLast24Hours: countSince(24 * 60 * 60 * 1000),
+    activeLast7Days: countSince(7 * 24 * 60 * 60 * 1000),
+    activeLast30Days: countSince(30 * 24 * 60 * 60 * 1000),
+    generatedAt: new Date(now).toISOString(),
+  };
+};
+
 const buildTableData = (users: UserResponseDto[]): UsersTableRow[] => {
   const activeUsers: UsersTableRow[] = users.map((user) => ({
     id: user.id,
@@ -55,10 +87,13 @@ const buildTableData = (users: UserResponseDto[]): UsersTableRow[] => {
     isArchived: user.isArchived,
     isSysAdmin: user.isSysAdmin,
     isOrgAdmin: user.isOrgAdmin,
+    lastLogin: user.lastLogin ?? null,
     isPending: false,
   }));
 
-  return [...activeUsers];
+  return [...activeUsers].sort(
+    (a, b) => parseLastLoginTime(b.lastLogin) - parseLastLoginTime(a.lastLogin),
+  );
 };
 
 /* -------------------------------------------------------------------------- */
@@ -77,6 +112,8 @@ const UsersTable = ({
   const [tableData, setTableData] = useState<UsersTableRow[]>(() =>
     buildTableData(members),
   );
+  const [activityCounts, setActivityCounts] =
+    useState<UserActivityCountsDto>(() => buildActivityCounts(members));
   const [loading, setLoading] = useState(false);
   const { t } = useLanguage();
 
@@ -119,24 +156,57 @@ const UsersTable = ({
   /*                        Data Loading / Normalization                      */
   /* ------------------------------------------------------------------------ */
 
-  const loadAllData = async () => {
-    if (scope === "org" && !organization?.organizationId) return;
+  const loadActivityCounts = useCallback(async () => {
+    const organizationId = organization?.organizationId;
+
+    if (scope === "org" && !organizationId) return;
 
     try {
-      const users: UserResponseDto[] =
+      const counts =
         scope === "org"
-          ? await getAllUsers(organization!.organizationId)
-          : await getAllUsers();
+          ? await getActiveUserCounts(organizationId)
+          : await getActiveUserCounts();
+      setActivityCounts(counts);
+    } catch (error) {
+      console.error("Failed to load active user counts:", error);
+    }
+  }, [organization?.organizationId, scope]);
+
+  const loadAllData = useCallback(async () => {
+    const organizationId = organization?.organizationId;
+
+    if (scope === "org" && !organizationId) return;
+
+    try {
+      const usersRequest =
+        scope === "org" ? getAllUsers(organizationId) : getAllUsers();
+      const countsRequest =
+        scope === "org"
+          ? getActiveUserCounts(organizationId)
+          : getActiveUserCounts();
+      const [users, counts] = await Promise.all([usersRequest, countsRequest]);
+
       setTableData(buildTableData(users));
+      setActivityCounts(counts);
     } catch (error) {
       console.error("Failed to load data:", error);
     }
-  };
+  }, [organization?.organizationId, scope]);
 
   // When server-side members prop changes, sync local state
   useEffect(() => {
     setTableData(buildTableData(members));
+    setActivityCounts(buildActivityCounts(members));
   }, [members]);
+
+  useEffect(() => {
+    void loadActivityCounts();
+    const intervalId = window.setInterval(() => {
+      void loadActivityCounts();
+    }, 60_000);
+
+    return () => window.clearInterval(intervalId);
+  }, [loadActivityCounts]);
 
   /* ------------------------------------------------------------------------ */
   /*                        Invite Flow: Open Modal                           */
@@ -348,6 +418,7 @@ const UsersTable = ({
             activeUserCount={activeUserCount}
             pendingCount={pendingCount}
             totalCount={totalCount}
+            activityCounts={activityCounts}
             loading={loading}
             onInviteClick={handleOpenInviteModal}
             scope={scope}

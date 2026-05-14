@@ -1,7 +1,11 @@
 // src/app/lib/user_services.client.ts
 "use client";
 
-import { RecordResponseDto, UserAdminInfoDto, UserResponseDto } from "@/app/(home)/types/responseDTOs";
+import {
+  UserAdminInfoDto,
+  UserResponseDto,
+  UserActivityCountsDto
+} from "@/app/(home)/types/responseDTOs";
 import api from "./api";
 
 /** ---- Browser calls (with session cookies) ---- */
@@ -67,7 +71,7 @@ export async function getLocalDevUser() {
 
 export async function getDataOverview(userId: string) {
   try {
-    const res = await api.get(`/users/${userId}/overview`); 
+    const res = await api.get(`/users/${userId}/overview`);
     return res.data;
   } catch (error) {
     console.error("API call failed:", error);
@@ -97,7 +101,7 @@ export async function updateUser(
 export async function setSysAdmin(
   userId: number,
   isAdmin: boolean
-): Promise<{ message: string}> {
+): Promise<{ message: string }> {
   try {
     const res = await api.patch(`/users/${userId}/admin`, null, {
       params: { isAdmin }
@@ -120,6 +124,31 @@ export async function archiveUser(
     return res.data;
   } catch (error) {
     console.error("API call failed archiving user:", error);
+    throw error;
+  }
+}
+
+export async function getActiveUserCounts(
+  organizationId?: number | string,
+  projectId?: number | string
+): Promise<UserActivityCountsDto> {
+  try {
+    const params: Record<string, string | number | boolean> = {};
+
+    if (organizationId !== undefined) {
+      params.organizationId = organizationId;
+    }
+
+    if (projectId !== undefined) {
+      params.projectId = projectId;
+    }
+
+    const res = await api.get<UserActivityCountsDto>(`/users/active-counts`, {
+      params,
+    });
+    return res.data;
+  } catch (error) {
+    console.error("API call failed getting active user counts:", error);
     throw error;
   }
 }
