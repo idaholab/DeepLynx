@@ -1,6 +1,7 @@
 "use client";
 
 import SearchBar from "@/app/(home)/components/SearchBar";
+import { useInsightModelSelection } from "@/app/(home)/components/insight/useInsightModelSelection";
 import type {
   ClassResponseDto,
   DataSourceResponseDto,
@@ -93,6 +94,8 @@ export default function ProjectInsightClientView() {
     EMPTY_TAB_FILTER_STATE,
   );
   const deferredLibrarySearchQuery = useDeferredValue(libraryState.searchQuery);
+  const { selectedInsightModels, setSelectedInsightModels } =
+    useInsightModelSelection(organizationId, projectId);
 
   // Tab state helpers
   const {
@@ -171,14 +174,18 @@ export default function ProjectInsightClientView() {
         const resolvedStatuses = await Promise.all(
           supportedRecords.map(async (record) => {
             try {
-              const status = await fetchInsightIngestionStatus(record.id);
+              const ingestionStatus = await fetchInsightIngestionStatus({
+                organizationId,
+                projectId,
+                fileId: record.id,
+              });
               return [
                 record.id,
-                status.indexed
+                ingestionStatus.indexed
                   ? {
                       state: "embedded",
-                      chunkCount: status.chunk_count,
-                      pageCount: status.page_count,
+                      chunkCount: ingestionStatus.chunk_count,
+                      pageCount: ingestionStatus.page_count,
                     }
                   : { state: "not_embedded" },
               ] as const;
@@ -236,16 +243,18 @@ export default function ProjectInsightClientView() {
       setLibrarySearchError("");
 
       try {
-        const results = await fullTextSearch(organizationId, searchableQuery, [
-          projectId,
-        ]);
+        const searchResults = await fullTextSearch(
+          organizationId,
+          searchableQuery,
+          [projectId],
+        );
 
         if (cancelled) return;
 
-        const recordIds = [
-          ...new Set(results.map((result) => Number(result.id))),
+        const matchedRecordIds = [
+          ...new Set(searchResults.map((result) => Number(result.id))),
         ].filter((id) => Number.isFinite(id));
-        setLibraryMatchedSearchIds(recordIds);
+        setLibraryMatchedSearchIds(matchedRecordIds);
       } catch (error) {
         console.error("Project Insight full-text search failed:", error);
         if (!cancelled) {
@@ -272,6 +281,8 @@ export default function ProjectInsightClientView() {
   ]);
 
   useEffect(() => {
+    if (!organizationId || !projectId) return;
+
     const pollingIds = Object.entries(statusMap)
       .filter(
         ([, status]) =>
@@ -284,17 +295,21 @@ export default function ProjectInsightClientView() {
     let cancelled = false;
 
     const pollStatuses = async () => {
-      const updates = await Promise.all(
+      const updatedStatuses = await Promise.all(
         pollingIds.map(async (recordId) => {
           try {
-            const status = await fetchInsightIngestionStatus(recordId);
+            const ingestionStatus = await fetchInsightIngestionStatus({
+              organizationId,
+              projectId,
+              fileId: recordId,
+            });
             return [
               recordId,
-              status.indexed
+              ingestionStatus.indexed
                 ? {
                     state: "embedded",
-                    chunkCount: status.chunk_count,
-                    pageCount: status.page_count,
+                    chunkCount: ingestionStatus.chunk_count,
+                    pageCount: ingestionStatus.page_count,
                   }
                 : { state: "processing" },
             ] as const;
@@ -308,7 +323,7 @@ export default function ProjectInsightClientView() {
 
       setStatusMap((current) => ({
         ...current,
-        ...Object.fromEntries(updates),
+        ...Object.fromEntries(updatedStatuses),
       }));
     };
 
@@ -451,67 +466,46 @@ export default function ProjectInsightClientView() {
   // UI event handlers
   async function handleQueueSelected() {
     if (selectedVisiblePendingIds.length === 0) return;
+    if (!organizationId || !projectId) return;
 
     const selectedRecords = visiblePendingRecords.filter((record) =>
       selectedVisiblePendingIds.includes(record.id),
     );
-    const fileInfo = selectedRecords
+    const uploadFileInfo = selectedRecords
       .filter((record) => record.uri)
-      .map((record) => ({
-        fileId: record.id,
-        fileURI: record.uri as string,
-      }));
+      .map((record) => ({ fileId: record.id, fileUri: record.uri as string }));
 
-    if (fileInfo.length === 0) return;
+    if (uploadFileInfo.length === 0) return;
 
     setIsQueueing(true);
     setStatusMap((current) => ({
       ...current,
       ...Object.fromEntries(
-        fileInfo.map((file) => [file.fileId, { state: "queued" }]),
+        uploadFileInfo.map((file) => [file.fileId, { state: "queued" }]),
       ),
     }));
 
     try {
-      const result = await queueInsightUpload({ fileInfo });
-      const queuedCount = result.results.filter(
-        (item) => item.status === "queued",
-      ).length;
-      const failedCount = result.results.length - queuedCount;
-
-      setStatusMap((current) => ({
-        ...current,
-        ...Object.fromEntries(
-          result.results.map((item) => [
-            item.file_id,
-            item.status === "queued"
-              ? { state: "queued" }
-              : { state: "error", error: item.error },
-          ]),
-        ),
-      }));
-
-      if (queuedCount > 0) {
-        toast.success(
-          withTokens(t.translations.PROJECT_INSIGHT_QUEUED_SUMMARY, {
-            count: queuedCount,
-          }),
-        );
-      }
-
-      if (failedCount > 0) {
-        toast.error(
-          withTokens(t.translations.PROJECT_INSIGHT_FAILED_SUMMARY, {
-            count: failedCount,
-          }),
-        );
-      }
+      await queueInsightUpload({
+        organizationId,
+        projectId,
+        fileInfo: uploadFileInfo,
+        vlmModelConfigId:
+          selectedInsightModels.uploadModelConfigId ?? undefined,
+        embeddingModelConfigId:
+          selectedInsightModels.embeddingModelConfigId ?? undefined,
+      });
+      toast.success(
+        withTokens(t.translations.PROJECT_INSIGHT_QUEUED_SUMMARY, {
+          count: uploadFileInfo.length,
+        }),
+      );
     } catch (error) {
       console.error("Failed to queue project Insight uploads:", error);
       setStatusMap((current) => ({
         ...current,
         ...Object.fromEntries(
-          fileInfo.map((file) => [
+          uploadFileInfo.map((file) => [
             file.fileId,
             {
               state: "error",
@@ -525,7 +519,7 @@ export default function ProjectInsightClientView() {
       }));
       toast.error(
         withTokens(t.translations.PROJECT_INSIGHT_FAILED_SUMMARY, {
-          count: fileInfo.length,
+          count: uploadFileInfo.length,
         }),
       );
     } finally {
@@ -702,7 +696,11 @@ export default function ProjectInsightClientView() {
         <div className="grid h-full min-h-0 grid-cols-1 gap-6 overflow-y-auto pr-1 xl:grid-cols-[minmax(0,1.7fr)_minmax(340px,1fr)]">
           <section className="flex min-h-0 flex-col">
             <ProjectInsightChat
+              organizationId={organizationId}
+              projectId={projectId}
               projectName={projectName}
+              selectedInsightModels={selectedInsightModels}
+              onSelectedInsightModelsChange={setSelectedInsightModels}
               scopedRecordIds={visibleEmbeddedRecords.map(
                 (record) => record.id,
               )}

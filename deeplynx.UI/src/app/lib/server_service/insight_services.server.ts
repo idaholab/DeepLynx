@@ -1,79 +1,80 @@
 import "server-only";
+import { auth } from "../../../../auth";
 
-const DEFAULT_INSIGHT_API_URL = "http://localhost:5009";
+type SessionWithNestedAccessToken = {
+  tokens?: { access_token?: unknown };
+};
+type SessionWithDirectAccessToken = { accessToken?: unknown };
+type InsightAuthSession = SessionWithNestedAccessToken &
+  SessionWithDirectAccessToken;
 
 type InsightJsonResult = {
   upstreamResponse: Response;
   responseBody: unknown;
 };
 
-export function getInsightBaseUrl(): string {
-  const raw = process.env.INSIGHT_API_URL || DEFAULT_INSIGHT_API_URL;
-  return raw.replace(/\/+$/, "");
-}
+type InsightModelConfigQuery = {
+  languageModelConfigId?: number;
+  embeddingModelConfigId?: number;
+  vlmModelConfigId?: number;
+};
 
-export function getInsightUrl(path: string): string {
-  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
-  return `${getInsightBaseUrl()}${normalizedPath}`;
-}
+const BASE = (process.env.BACKEND_BASE_URL ?? "").replace(/\/+$/, "");
 
-export async function fetchInsight(
-  path: string,
-  init: RequestInit = {},
-): Promise<Response> {
-  return fetch(getInsightUrl(path), {
-    ...init,
-    cache: "no-store",
-  });
-}
+function extractAccessToken(session: unknown): string | null {
+  if (typeof session !== "object" || session === null) return null;
 
-export async function uploadInsightDocument(
-  body: unknown,
-): Promise<InsightJsonResult> {
-  const upstreamResponse = await fetchInsight("/upload_document", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-
-  const responseBody = await parseInsightBody(upstreamResponse);
-  return { upstreamResponse, responseBody };
-}
-
-export async function queryInsight(body: unknown): Promise<Response> {
-  return fetchInsight("/query", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "text/plain",
-    },
-    body: JSON.stringify(body),
-  });
-}
-
-export async function fetchInsightIngestionStatus(
-  recordId: number,
-): Promise<InsightJsonResult> {
-  const upstreamResponse = await fetchInsight(`/ingestion_status/${recordId}`, {
-    method: "GET",
-    headers: { Accept: "application/json" },
-  });
-
-  const responseBody = await parseInsightBody(upstreamResponse);
-  return { upstreamResponse, responseBody };
-}
-
-export async function parseInsightBody(response: Response): Promise<unknown> {
-  const responseText = await response.text();
-
-  if (!responseText) {
-    return null;
+  const nestedTokenContainer = (session as SessionWithNestedAccessToken).tokens;
+  if (
+    typeof nestedTokenContainer === "object" &&
+    nestedTokenContainer !== null
+  ) {
+    const accessToken = nestedTokenContainer.access_token;
+    if (typeof accessToken === "string") return accessToken;
   }
 
+  const directAccessToken = (session as SessionWithDirectAccessToken)
+    .accessToken;
+  return typeof directAccessToken === "string" ? directAccessToken : null;
+}
+
+async function getAuthHeaders(contentType = true): Promise<HeadersInit> {
+  const session: InsightAuthSession | null = await auth().catch(() => null);
+  const token =
+    extractAccessToken(session) ??
+    process.env.BACKEND_SERVICE_TOKEN ??
+    process.env.SERVICE_TOKEN ??
+    "";
+
+  return {
+    Accept: "application/json",
+    ...(contentType ? { "Content-Type": "application/json" } : {}),
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+}
+
+function buildInsightUrl(
+  organizationId: number,
+  projectId: number,
+  path: string,
+  query?: Record<string, number | undefined>,
+) {
+  const qs = new URLSearchParams();
+  Object.entries(query ?? {}).forEach(([key, value]) => {
+    if (value !== undefined) qs.set(key, String(value));
+  });
+
+  const suffix = qs.toString() ? `?${qs.toString()}` : "";
+  return `${BASE}/organizations/${organizationId}/projects/${projectId}/insight${path}${suffix}`;
+}
+
+async function parseJsonOrTextResponseBody(response: Response) {
+  const text = await response.text();
+  if (!text) return null;
   try {
-    return JSON.parse(responseText);
+    return JSON.parse(text);
   } catch {
-    return { message: responseText };
+    return { message: text };
   }
 }
 
@@ -82,4 +83,83 @@ export function getInsightErrorMessage(
   error: unknown,
 ): string {
   return error instanceof Error ? error.message : fallbackMessage;
+}
+
+export async function queueInsightUpload(
+  organizationId: number,
+  projectId: number,
+  requestBody: unknown,
+  modelConfigQuery?: Pick<
+    InsightModelConfigQuery,
+    "vlmModelConfigId" | "embeddingModelConfigId"
+  >,
+): Promise<InsightJsonResult> {
+  const upstreamResponse = await fetch(
+    buildInsightUrl(organizationId, projectId, "/upload", modelConfigQuery),
+    {
+      method: "POST",
+      headers: await getAuthHeaders(),
+      body: JSON.stringify(requestBody),
+      cache: "no-store",
+    },
+  );
+
+  return {
+    upstreamResponse,
+    responseBody: await parseJsonOrTextResponseBody(upstreamResponse.clone()),
+  };
+}
+
+export async function streamInsightQuery(
+  organizationId: number,
+  projectId: number,
+  requestBody: unknown,
+  modelConfigQuery?: Pick<
+    InsightModelConfigQuery,
+    "languageModelConfigId" | "embeddingModelConfigId"
+  >,
+): Promise<Response> {
+  return fetch(
+    buildInsightUrl(organizationId, projectId, "/query", modelConfigQuery),
+    {
+      method: "POST",
+      headers: await getAuthHeaders(),
+      body: JSON.stringify(requestBody),
+      cache: "no-store",
+    },
+  );
+}
+
+export async function fetchInsightIngestionStatus(
+  organizationId: number,
+  projectId: number,
+  fileId: number,
+): Promise<InsightJsonResult> {
+  const upstreamResponse = await fetch(
+    buildInsightUrl(organizationId, projectId, `/ingestion_status/${fileId}`),
+    { method: "GET", headers: await getAuthHeaders(false), cache: "no-store" },
+  );
+
+  return {
+    upstreamResponse,
+    responseBody: await parseJsonOrTextResponseBody(upstreamResponse.clone()),
+  };
+}
+
+export async function queueInsightEmbedStrings(
+  organizationId: number,
+  projectId: number,
+  embeddingModelConfigId?: number,
+): Promise<InsightJsonResult> {
+  const upstreamResponse = await fetch(
+    buildInsightUrl(organizationId, projectId, "/embed_strings", {
+      embeddingModelConfigId,
+    }),
+    { method: "POST", headers: await getAuthHeaders(false), cache: "no-store" },
+  );
+
+  return {
+    upstreamResponse,
+    responseBody: await parseJsonOrTextResponseBody(upstreamResponse.clone()),
+  };
 }

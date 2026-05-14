@@ -95,13 +95,19 @@ public class AdminService : IAdminService
             return false;
         }
 
-        // Get all project IDs where the user is an admin in this organization
+        // Get all project IDs where the user is a direct admin OR an admin through group membership
         var adminProjectIds = await _dbContext.ProjectMembers
-            .Where(pm => 
-                pm.UserId == userId && 
-                pm.Role.Name == "Admin" && 
-                pm.Role.OrganizationId == organizationId)
+            .Where(pm =>
+                pm.Role.Name == "Admin" &&
+                pm.Role.OrganizationId == organizationId &&
+                (
+                    // Direct membership
+                    pm.UserId == userId ||
+                    // Group membership
+                    pm.Group.Users.Any(gu => gu.Id == userId)
+                ))
             .Select(pm => pm.ProjectId)
+            .Distinct()
             .ToListAsync();
 
         // Check if all requested project IDs are in the user's admin projects

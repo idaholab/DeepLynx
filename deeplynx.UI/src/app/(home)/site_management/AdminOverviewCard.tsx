@@ -51,7 +51,7 @@ const formatBytes = (bytes: unknown): string => {
   );
   const value = normalizedBytes / Math.pow(k, i);
 
-  return `${parseFloat(value.toFixed(2))} ${sizes[i]}`;
+  return `${Math.floor(value)} ${sizes[i]}`;
 };
 
 const AdminOverviewCard = () => {
