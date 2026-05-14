@@ -1,24 +1,58 @@
-import { NextRequest, NextResponse } from "next/server";
 import {
   getInsightErrorMessage,
-  queryInsight,
+  streamInsightQuery,
 } from "@/app/lib/server_service/insight_services.server";
+import { NextRequest, NextResponse } from "next/server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const upstreamResponse = await queryInsight(body);
+    const { searchParams: requestQueryParams } = new URL(request.url);
+    const organizationId = Number(requestQueryParams.get("organizationId"));
+    const projectId = Number(requestQueryParams.get("projectId"));
+
+    if (!Number.isFinite(organizationId) || organizationId <= 0) {
+      return NextResponse.json(
+        { message: "Invalid organizationId" },
+        { status: 400 },
+      );
+    }
+
+    if (!Number.isFinite(projectId) || projectId <= 0) {
+      return NextResponse.json(
+        { message: "Invalid projectId" },
+        { status: 400 },
+      );
+    }
+
+    const queryRequestBody = await request.json();
+    const upstreamResponse = await streamInsightQuery(
+      organizationId,
+      projectId,
+      queryRequestBody,
+      {
+        languageModelConfigId: requestQueryParams.get(
+          "languageModelConfigId",
+        )
+          ? Number(requestQueryParams.get("languageModelConfigId"))
+          : undefined,
+        embeddingModelConfigId: requestQueryParams.get(
+          "embeddingModelConfigId",
+        )
+          ? Number(requestQueryParams.get("embeddingModelConfigId"))
+          : undefined,
+      },
+    );
 
     if (!upstreamResponse.ok) {
-      const errorBody = await upstreamResponse.text();
+      const upstreamErrorText = await upstreamResponse.text();
       return NextResponse.json(
         {
           message: "Insight query failed",
           status: upstreamResponse.status,
-          details: errorBody || null,
+          details: upstreamErrorText || null,
         },
         { status: upstreamResponse.status },
       );
@@ -44,7 +78,10 @@ export async function POST(request: NextRequest) {
     console.error("Insight query proxy error:", error);
     return NextResponse.json(
       {
-        message: getInsightErrorMessage("Unexpected insight proxy error", error),
+        message: getInsightErrorMessage(
+          "Unexpected insight proxy error",
+          error,
+        ),
       },
       { status: 500 },
     );

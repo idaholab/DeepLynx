@@ -760,6 +760,10 @@ namespace deeplynx.datalayer.Migrations
                         .HasColumnType("text")
                         .HasColumnName("mode");
 
+                    b.Property<long?>("ProjectId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("project_id");
+
                     b.Property<string>("Properties")
                         .HasColumnType("jsonb")
                         .HasColumnName("properties");

@@ -65,7 +65,8 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
         {
             CreatedBy = currentUserId,
             Status = ExtractionStatus.Pending,
-            Mode = mode
+            Mode = mode,
+            ProjectId = projectId
         };
         _context.Extractions.Add(extraction);
         await _context.SaveChangesAsync();
@@ -111,7 +112,7 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
         return extraction.Id;
 
     }
-    
+
 
     public async Task<ExtractionResponseDto> ProcessInsightExtractionCallback(
         long organizationId,
@@ -128,7 +129,7 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
 
         // Validation Logic
         var (dedupedRecords, dedupedEdges) = _validationBusiness.Deduplicate(dto);
-        
+
         var allClassTypes = dedupedRecords.Select(r => r.ClassType)
             .Concat(dedupedEdges.Select(e => e.SubjectType))
             .Concat(dedupedEdges.Select(e => e.ObjectType));
@@ -136,7 +137,7 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
         var classSimilarities = await _validationBusiness.NormalizeClassTypes(allClassTypes, projectId);
         var relSimilarities = await _validationBusiness.NormalizeRelationshipTypes(dedupedEdges, projectId);
         var ontologyPatterns = await _validationBusiness.GetOntologyPatterns(projectId);
-        
+
         // Save to Lattice schema 
         await using var transaction = await _latticeContext.Database.BeginTransactionAsync();
         try
@@ -441,7 +442,7 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
         extraction.Status = ExtractionStatus.Failed;
         await _context.SaveChangesAsync();
         _logger.LogError(errorMessage);
-        
+
     }
 
     /// <summary>
@@ -489,7 +490,7 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
                                                      """)
             .ToListAsync();
     }
-    
+
     /// <summary>
     ///     Checks whether the document record and project ontology are embedded.
     ///     Any missing embeddings are queued automatically.
@@ -527,10 +528,10 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
             projectClassIds.Count, projectRelationshipIds.Count);
 
         if (recordEmbedded && ontologyEmbedded) return;
-    
+
         if (!recordEmbedded)
         {
-            AiModelConfigResponseDto vlmConfig;
+            AiModelConfigResponseDto.WithToken vlmConfig;
             try
             {
                 vlmConfig = await _insightBusiness.ResolveModelConfig(
@@ -545,16 +546,31 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
                 currentUserId, organizationId, projectId, null, "embedding");
             _insightBusiness.TriggerEmbedding(projectId, recordId, record.Uri!, vlmConfig, embeddingConfig);
         }
-    
+
         if (!ontologyEmbedded)
             await _insightBusiness.QueueInsightEmbedStrings(currentUserId, organizationId, projectId, null);
-    
+
         throw new InvalidOperationException(
             "Embeddings are being generated for this extraction." +
             "Please retry the extraction in a few minutes.");
     }
-    
-    
+
+
+    public async Task<List<ExtractionListItemDto>> ListExtractionsByUser(long userId, long projectId)
+    {
+        return await _context.Extractions
+            .Where(e => e.CreatedBy == userId && e.ProjectId == projectId)
+            .OrderByDescending(e => e.Id)
+            .Select(e => new ExtractionListItemDto
+            {
+                Id = e.Id,
+                Status = e.Status,
+                Mode = e.Mode,
+                CreatedBy = e.CreatedBy,
+            })
+            .ToListAsync();
+    }
+
     public async Task<EmbeddingStatusResponseDto> GetEmbeddingStatus(long projectId)
     {
         var classIds = await _context.Classes
@@ -612,37 +628,37 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
     /// <summary>Builds the LLM extraction prompt by running a similarity search and injecting the top-ranked ontology context and document text chunks.</summary>
     private async Task<string> ConstructPrompt(long recordId, long projectId, string mode)
     {
-            //Cosine similarity search to retrieve similar ontology data with respect to document text chunk
-            //Specific formatting for LLM prompt construction 
-            var results = await SearchOntologySimilarity(
-                recordId, projectId);
+        //Cosine similarity search to retrieve similar ontology data with respect to document text chunk
+        //Specific formatting for LLM prompt construction 
+        var results = await SearchOntologySimilarity(
+            recordId, projectId);
 
-            var classes = results
-                .Where(r => r.Type == "class")
-                .DistinctBy(r => r.ClassRelationshipId)
-                .Select(r => $"{r.Name}: {r.Description}");
+        var classes = results
+            .Where(r => r.Type == "class")
+            .DistinctBy(r => r.ClassRelationshipId)
+            .Select(r => $"{r.Name}: {r.Description}");
 
-            var relationships = results
-                .Where(r => r.Type == "relationship" && r.RelationshipPattern != null)
-                .DistinctBy(r => r.ClassRelationshipId)
-                .Select(r => $"({r.RelationshipPattern!.OriginClassName}) -{r.RelationshipPattern.RelationshipName}-> ({r.RelationshipPattern.DestinationClassName})");
+        var relationships = results
+            .Where(r => r.Type == "relationship" && r.RelationshipPattern != null)
+            .DistinctBy(r => r.ClassRelationshipId)
+            .Select(r => $"({r.RelationshipPattern!.OriginClassName}) -{r.RelationshipPattern.RelationshipName}-> ({r.RelationshipPattern.DestinationClassName})");
 
-            var textChunks = results
-                .Where(r => !string.IsNullOrEmpty(r.TextChunk))
-                .DistinctBy(r => r.TextChunk)
-                .Select(r => r.TextChunk!);
+        var textChunks = results
+            .Where(r => !string.IsNullOrEmpty(r.TextChunk))
+            .DistinctBy(r => r.TextChunk)
+            .Select(r => r.TextChunk!);
 
-            var entityList   = string.Join("\n", classes);
-            var relationList = string.Join("\n", relationships);
-            var text         = string.Join("\n\n", textChunks);
-            
-            //entity list is [(class name, description)]
-            //relation_list is [(origin class name, relationship name, destination class name)] 
-            //TODO: context_block is graph context, 2 hops from record node
-            //{text}{truncation} is ["example text", "text"]
-            //TODO: {truncation} is for document text chunk truncation, necessary only if it exceeds a certain character limit. Plus the "...truncated" message to the LLM
-            var prompt = "";
-            var strictPrompt = """
+        var entityList = string.Join("\n", classes);
+        var relationList = string.Join("\n", relationships);
+        var text = string.Join("\n\n", textChunks);
+
+        //entity list is [(class name, description)]
+        //relation_list is [(origin class name, relationship name, destination class name)] 
+        //TODO: context_block is graph context, 2 hops from record node
+        //{text}{truncation} is ["example text", "text"]
+        //TODO: {truncation} is for document text chunk truncation, necessary only if it exceeds a certain character limit. Plus the "...truncated" message to the LLM
+        var prompt = "";
+        var strictPrompt = """
                 You are a precise information extraction system for formal ontology-based knowledge graphs.
                   
                 Your task is to extract classes and relationships that MATCH the provided ontology schema.
@@ -695,8 +711,8 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
 
                 CRITICAL: Use EXACT class type names from the ontology schema. Be thorough - extract all relevant classes and relationships from the document.
                 """;
-            
-            var discoveryPrompt = """
+
+        var discoveryPrompt = """
                 You are a knowledge extraction system for formal ontology-based knowledge graphs.
                 
                 Your task is to extract classes and relationships, preferring the provided ontology schema but discovering new types when necessary.
@@ -763,22 +779,22 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
 
                 IMPORTANT: Balance ontology compliance with discovery. Extract comprehensively across all domains while preferring standard types when applicable.
                 """;
-            
-            if (mode == ExtractionMode.Strict)
-            {
-                prompt = strictPrompt; 
-            }
-            else
-            {
-                prompt = discoveryPrompt;
-            }
 
-            var filledPrompt = prompt
-                .Replace("{class_list}", entityList)
-                .Replace("{relationship_list}", relationList)
-                .Replace("{text}", text);
+        if (mode == ExtractionMode.Strict)
+        {
+            prompt = strictPrompt;
+        }
+        else
+        {
+            prompt = discoveryPrompt;
+        }
 
-            return filledPrompt;
+        var filledPrompt = prompt
+            .Replace("{class_list}", entityList)
+            .Replace("{relationship_list}", relationList)
+            .Replace("{text}", text);
+
+        return filledPrompt;
     }
 
     public async Task<ExtractionStagingResponseDto> GetExtractionStaging(long extractionId)
@@ -862,8 +878,8 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
 
     /// <summary>
     ///     Approves or rejects a completed extraction.
-    ///     On approval, all valid and novel-discovery staged items are promoted into the
-    ///     deeplynx schema in dependency order: classes → records → relationships → edges.
+    ///     On approval, all staged items are promoted into the deeplynx schema regardless of
+    ///     validation status, in dependency order: classes → records → relationships → edges.
     ///     On rejection, the extraction is marked rejected and no deeplynx rows are written.
     /// </summary>
     public async Task<ExtractionResponseDto> PromoteExtraction(
@@ -893,9 +909,8 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
             .Where(c => c.ExtractionId == extractionId)
             .ToListAsync();
 
-        // invalid_schema records are excluded — they failed ontology validation and must not enter the KG
         var stagingRecords = await _latticeContext.ExtractionRecords
-            .Where(r => r.ExtractionId == extractionId && r.ValidationStatus != ExtractionValidationStatus.InvalidSchema)
+            .Where(r => r.ExtractionId == extractionId)
             .ToListAsync();
 
         var stagingRelationships = await _latticeContext.ExtractionRelationships
@@ -937,7 +952,7 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
     }
 
     /// <summary>
-    ///     Promotes novel_discovery classes that have no existing ontology match into deeplynx.classes.
+    ///     Promotes novel_discovery and invalid_schema classes that have no existing ontology match into deeplynx.classes.
     ///     Valid classes already exist in the ontology and are not re-created.
     ///     Returns a map of ExtractionClass.Id → deeplynx Class id for use in downstream steps.
     /// </summary>
@@ -946,11 +961,61 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
         long organizationId, long projectId, long extractionId,
         long currentUserId, DateTime now)
     {
+        // PromotedId is persisted to the lattice DB outside the deeplynx transaction, so a prior
+        // rolled-back attempt can leave stale references. Clear any that no longer exist in deeplynx.
+        var pendingIds = stagingClasses
+            .Where(c => c.PromotedId.HasValue && c.OntologyClassId == null)
+            .Select(c => c.PromotedId!.Value)
+            .ToList();
+        if (pendingIds.Count > 0)
+        {
+            var validIds = (await _context.Classes
+                .Where(c => pendingIds.Contains(c.Id))
+                .Select(c => c.Id)
+                .ToListAsync()).ToHashSet();
+            foreach (var sc in stagingClasses.Where(c => c.PromotedId.HasValue && !validIds.Contains(c.PromotedId!.Value)))
+                sc.PromotedId = null;
+        }
+
+        // Pre-load any classes that already exist in the project with the same name,
+        // so we reuse them rather than hitting unique_class_name on create.
+        var namesToCreate = stagingClasses
+            .Where(c => (c.ValidationStatus == ExtractionValidationStatus.NovelDiscovery ||
+                         c.ValidationStatus == ExtractionValidationStatus.InvalidSchema) &&
+                        c.OntologyClassId == null && c.PromotedId == null)
+            .Select(c => c.Name)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        var existingClassByName = namesToCreate.Count > 0
+            ? (await _context.Classes
+                .Where(c => c.ProjectId == projectId && namesToCreate.Contains(c.Name))
+                .Select(c => new { c.Id, c.Name })
+                .ToListAsync())
+              .ToDictionary(c => c.Name, c => c.Id, StringComparer.OrdinalIgnoreCase)
+            : new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
+
+        // Deduplicate within the batch so two staging entries with the same name create one class.
+        var nameToNewClassId = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
+
         foreach (var sc in stagingClasses.Where(c =>
-                     c.ValidationStatus == ExtractionValidationStatus.NovelDiscovery &&
+                     (c.ValidationStatus == ExtractionValidationStatus.NovelDiscovery ||
+                      c.ValidationStatus == ExtractionValidationStatus.InvalidSchema) &&
                      c.OntologyClassId == null &&
                      c.PromotedId == null))
         {
+            if (existingClassByName.TryGetValue(sc.Name, out var existingId))
+            {
+                sc.PromotedId = existingId;
+                continue;
+            }
+
+            if (nameToNewClassId.TryGetValue(sc.Name, out var batchId))
+            {
+                sc.PromotedId = batchId;
+                continue;
+            }
+
             var newClass = new Class
             {
                 Name = sc.Name,
@@ -964,10 +1029,11 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
             _context.Classes.Add(newClass);
             await _context.SaveChangesAsync();
             sc.PromotedId = newClass.Id;
+            nameToNewClassId[sc.Name] = newClass.Id;
         }
         await _latticeContext.SaveChangesAsync();
 
-        // Valid classes resolve to their matched ontology class; novel_discovery to the newly created class
+        // Valid classes resolve to their matched ontology class; novel/invalid to the newly created class
         return stagingClasses.ToDictionary(c => c.Id, c => c.OntologyClassId ?? c.PromotedId);
     }
 
@@ -1026,7 +1092,7 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
     }
 
     /// <summary>
-    ///     Promotes novel_discovery relationships that have no existing ontology match into deeplynx.relationships.
+    ///     Promotes novel_discovery and invalid_schema relationships that have no existing ontology match into deeplynx.relationships.
     ///     Valid relationships already exist in the ontology and are not re-created.
     ///     Returns a map of ExtractionRelationship.Id → deeplynx Relationship id for use in edge promotion.
     /// </summary>
@@ -1036,11 +1102,55 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
         long organizationId, long projectId, long extractionId,
         long currentUserId, DateTime now)
     {
+        // Same stale-reference guard as PromoteClasses
+        var pendingRelIds = stagingRelationships
+            .Where(r => r.PromotedId.HasValue && r.OntologyRelationshipId == null)
+            .Select(r => r.PromotedId!.Value)
+            .ToList();
+        if (pendingRelIds.Count > 0)
+        {
+            var validRelIds = (await _context.Relationships
+                .Where(r => pendingRelIds.Contains(r.Id))
+                .Select(r => r.Id)
+                .ToListAsync()).ToHashSet();
+            foreach (var sr in stagingRelationships.Where(r => r.PromotedId.HasValue && !validRelIds.Contains(r.PromotedId!.Value)))
+                sr.PromotedId = null;
+        }
+
+        // Multiple staging relationships can share the same name (same rel type, different class pairs).
+        // Also, the name may already exist in the project from a prior approved extraction.
+        // In both cases reuse the existing relationship rather than hitting unique_relationship_name.
+        var relNamesToCreate = stagingRelationships
+            .Where(r => (r.ValidationStatus == ExtractionValidationStatus.NovelDiscovery ||
+                         r.ValidationStatus == ExtractionValidationStatus.InvalidSchema) &&
+                        r.OntologyRelationshipId == null && r.PromotedId == null)
+            .Select(r => r.Name)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        var existingRelByName = relNamesToCreate.Count > 0
+            ? (await _context.Relationships
+                .Where(r => r.ProjectId == projectId && relNamesToCreate.Contains(r.Name))
+                .Select(r => new { r.Id, r.Name })
+                .ToListAsync())
+              .ToDictionary(r => r.Name, r => r.Id, StringComparer.OrdinalIgnoreCase)
+            : new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
+
+        var nameToPromotedRelId = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
+
         foreach (var sr in stagingRelationships.Where(r =>
-                     r.ValidationStatus == ExtractionValidationStatus.NovelDiscovery &&
+                     (r.ValidationStatus == ExtractionValidationStatus.NovelDiscovery ||
+                      r.ValidationStatus == ExtractionValidationStatus.InvalidSchema) &&
                      r.OntologyRelationshipId == null &&
                      r.PromotedId == null))
         {
+            if (existingRelByName.TryGetValue(sr.Name, out var existingId) ||
+                nameToPromotedRelId.TryGetValue(sr.Name, out existingId))
+            {
+                sr.PromotedId = existingId;
+                continue;
+            }
+
             classIdMap.TryGetValue(sr.OriginClassId, out var originClassId);
             classIdMap.TryGetValue(sr.DestinationClassId, out var destClassId);
 
@@ -1059,6 +1169,7 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
             _context.Relationships.Add(newRel);
             await _context.SaveChangesAsync();
             sr.PromotedId = newRel.Id;
+            nameToPromotedRelId[sr.Name] = newRel.Id;
         }
         await _latticeContext.SaveChangesAsync();
 

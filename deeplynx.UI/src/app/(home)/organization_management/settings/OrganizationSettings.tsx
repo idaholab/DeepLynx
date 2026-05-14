@@ -1,13 +1,10 @@
 // src/app/(home)/organization_management/settings/OrganizationSettings.tsx
 "use client";
 
-import { useState, useEffect, JSX } from "react";
+import { useState, useEffect } from "react";
 import toast from "react-hot-toast";
 import { useOrganizationSession } from "@/app/contexts/OrganizationSessionProvider";
 import {
-  ChartBarIcon,
-  Squares2X2Icon,
-  EyeIcon,
   LockClosedIcon,
   InformationCircleIcon,
   ExclamationTriangleIcon,
@@ -19,20 +16,8 @@ import {
   updateOrganization,
 } from "@/app/lib/client_service/organization_services.client";
 import { useLanguage } from "@/app/contexts/Language";
-import React from "react";
 import Image from "next/image";
-
-/* -------------------------------------------------------------------------- */
-/*                           Service Interface                                */
-/* -------------------------------------------------------------------------- */
-
-interface Service {
-  id: string;
-  name: string;
-  icon: JSX.Element;
-  description: string;
-  status: "connected" | "disconnected";
-}
+import OrganizationInsightModelTemplateSection from "./components/OrganizationInsightModelTemplateSection";
 
 const OrganizationSettings = () => {
   const { organization } = useOrganizationSession();
@@ -51,34 +36,6 @@ const OrganizationSettings = () => {
 
   // Storage states
   const [storageLocation, setStorageLocation] = useState<string>("org-default");
-
-  // Service states
-  const [expandedService, setExpandedService] = useState<string | null>(null);
-
-  // TODO: This is just place fillers for now
-  const services: Service[] = [
-    {
-      id: "insight",
-      name: "Insight",
-      icon: <ChartBarIcon className="w-5 h-5" />,
-      description: "Advanced analytics and reporting",
-      status: "disconnected",
-    },
-    {
-      id: "lattice",
-      name: "Lattice",
-      icon: <Squares2X2Icon className="w-5 h-5" />,
-      description: "Data mesh and federation",
-      status: "disconnected",
-    },
-    {
-      id: "visualize",
-      name: "Visualize",
-      icon: <EyeIcon className="w-5 h-5" />,
-      description: "3D visualization and rendering",
-      status: "disconnected",
-    },
-  ];
 
   // Load existing logo on mount
   useEffect(() => {
@@ -249,10 +206,6 @@ const OrganizationSettings = () => {
         {t.translations.CHANGES_DISCARDED}
       </div>,
     );
-  };
-
-  const toggleService = (serviceId: string) => {
-    setExpandedService(expandedService === serviceId ? null : serviceId);
   };
 
   if (isCheckingLogo) {
@@ -484,73 +437,9 @@ const OrganizationSettings = () => {
               </div>
             </div>
 
-            {/* ============================================================ */}
-            {/*           ECOSYSTEM SERVICES (COMING SOON)                   */}
-            {/* ============================================================ */}
-            <div className="card bg-base-100 border border-base-300/50 shadow-sm opacity-60">
-              <div className="card-body">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="card-title text-lg flex items-center gap-2">
-                    {t.translations.DEEPLYNX_ECOSYSTEM_SERVICES}
-                    <span className="badge badge-warning badge-sm">
-                      {t.translations.COMING_SOON}
-                    </span>
-                  </h3>
-                  <LockClosedIcon className="w-5 h-5 text-warning" />
-                </div>
-                <p className="text-sm text-base-content/70 mb-4">
-                  {t.translations.CONFIGURE_AUTHENTICATION_CONNECTED_SERVICE}
-                </p>
-
-                {/* Service Cards - Disabled */}
-                <div className="space-y-2 pointer-events-none">
-                  {services.map((service) => (
-                    <div
-                      key={service.id}
-                      className="collapse collapse-arrow border border-base-300 bg-base-100"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={expandedService === service.id}
-                        onChange={() => toggleService(service.id)}
-                        disabled
-                      />
-                      <div className="collapse-title">
-                        <div className="flex items-center gap-4">
-                          <div className="p-2 bg-base-200 rounded-lg">
-                            {service.icon}
-                          </div>
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-1">
-                              <h4 className="font-bold text-base-content">
-                                {service.name}
-                              </h4>
-                              <div className="badge badge-sm badge-ghost">
-                                {t.translations.NOT_CONNECTED}
-                              </div>
-                            </div>
-                            <p className="text-sm text-base-content/70">
-                              {service.description}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="collapse-content">
-                        <div className="pt-4 text-center">
-                          <p className="text-base-content/60 mb-4 text-sm">
-                            {
-                              t.translations
-                                .SERVICE_CONFIG_WILL_BE_AVAILABLE_SOON
-                            }
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
+            <OrganizationInsightModelTemplateSection
+              organizationId={organization?.organizationId as number | undefined}
+            />
           </div>
         </div>
 
@@ -560,8 +449,8 @@ const OrganizationSettings = () => {
           <div>
             <div className="font-bold">Additional Settings Coming Soon</div>
             <div className="text-sm">
-              Banner text, storage configuration, and ecosystem service
-              management features are currently in development.
+              Storage configuration and additional organization management
+              features are currently in development.
             </div>
           </div>
         </div>

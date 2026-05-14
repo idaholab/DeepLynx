@@ -33,4 +33,6 @@ public interface IFileBusiness
     Task<long> GetStorageSize(string prefix, ObjectStorageConfigDto objectStorageConfig);
  
     string BuildPrefix(long organizationId, long? projectId);
+    
+    Task<long> GetFileSize(string fileUri, ObjectStorageConfigDto objectStorageConfig);
 }

@@ -605,15 +605,18 @@ export default function UploadCenterClient() {
   };
 
   return (
-    <div className="min-h-screen bg-base-100">
-      <header className="bg-base-200/50 border-b border-base-300/30">
-        <div className="px-4 sm:px-6 lg:px-12 py-6">
+    <main className="min-h-screen bg-base-200/30">
+      <section className="border-b border-base-300 bg-base-100">
+        <div className="mx-auto flex w-full max-w-7xl flex-col gap-5 px-3 py-5 sm:px-6 lg:px-8">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
             <div>
-              <h1 className="text-2xl font-bold text-base-content">
+              <p className="text-xs font-semibold uppercase tracking-wide text-base-content/60">
+                {t.translations.UPLOAD_MODE}
+              </p>
+              <h1 className="text-2xl font-bold text-base-content sm:text-3xl">
                 {t.translations.UPLOAD_CENTER}
               </h1>
-              <p className="text-sm text-base-content/70 mt-1">
+              <p className="mt-3 max-w-3xl text-base-content/70">
                 {t.translations.UPLOAD_CENTER_DESCRIPTION}
               </p>
             </div>
@@ -630,9 +633,9 @@ export default function UploadCenterClient() {
             </div>
           </div>
         </div>
-      </header>
+      </section>
 
-      <main className="px-4 sm:px-6 lg:px-12 py-6">
+      <section className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-3 py-5 sm:px-6 lg:px-8">
         <div className="mx-auto w-full max-w-5xl">
           <section className="w-full">
             <div className="card bg-base-100 shadow-xl">
@@ -766,7 +769,7 @@ export default function UploadCenterClient() {
             </div>
           </section>
         </div>
-      </main>
+      </section>
 
       {/* MODALS */}
 
@@ -832,7 +835,7 @@ export default function UploadCenterClient() {
             />
           </div>
         )}
-    </div>
+    </main>
   );
 }
 

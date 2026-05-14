@@ -113,7 +113,8 @@ services:
       test:
         [
           "CMD-SHELL",
-          "pg_isready -U postgres && psql -U postgres -d deeplynx -c 'SELECT 1;'",
+          "pg_isready -U postgres && psql -U postgres -d deeplynx -c 'SELECT
+            1;'",
         ]
       interval: 10s
       timeout: 5s
@@ -156,10 +157,10 @@ services:
       - server
 
   insight-rabbitmq:
-    profiles: [insight]
+    profiles: [ insight ]
     build:
-      context: ./deeplynx.insight/app/rabbitmq
-      dockerfile: Dockerfiles/Dockerfile.production
+      context: ./deeplynx.insight
+      dockerfile: Dockerfiles/Dockerfile.rabbitmq.production
     ports:
       - "5672:5672"
       - "15672:15672"
@@ -167,7 +168,7 @@ services:
     env_file:
       - ./deeplynx.insight/.env.production
     healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "-q", "check_port_connectivity"]
+      test: [ "CMD", "rabbitmq-diagnostics", "-q", "check_port_connectivity" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -176,13 +177,21 @@ services:
       - nexus-network
 
   insight-fastapi:
-    profiles: [insight]
+    profiles: [ insight ]
     build:
       context: ./deeplynx.insight
-      dockerfile: app/fastapi/Dockerfiles/Dockerfile.production
+      dockerfile: Dockerfiles/Dockerfile.fastapi.production
     ports:
       - "5009:5009"
-    command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "5009"]
+    command:
+      [
+        "uvicorn",
+        "app.fastapi.main:app",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "5009",
+      ]
     env_file:
       - ./deeplynx.insight/.env.production
     environment:
@@ -196,8 +205,8 @@ services:
     depends_on:
       insight-rabbitmq:
         condition: service_healthy
-      db-version-check:
-        condition: service_completed_successfully
+      nx-postgres:
+        condition: service_healthy
     volumes:
       - object_storage:/data
       - insight_storage:/data/insight
@@ -205,11 +214,11 @@ services:
       - nexus-network
 
   insight-rabbitmq-runner:
-    profiles: [insight]
+    profiles: [ insight ]
     build:
       context: ./deeplynx.insight
-      dockerfile: app/rabbitmq/Dockerfiles/Dockerfile.runner.production
-    command: ["python", "-m", "runner"]
+      dockerfile: Dockerfiles/Dockerfile.runner.production
+    command: [ "python", "-m", "app.rabbitmq.runner" ]
     env_file:
       - ./deeplynx.insight/.env.production
     environment:
@@ -223,8 +232,8 @@ services:
     depends_on:
       insight-rabbitmq:
         condition: service_healthy
-      db-version-check:
-        condition: service_completed_successfully
+      nx-postgres:
+        condition: service_healthy
     volumes:
       - object_storage:/data
       - insight_storage:/data/insight

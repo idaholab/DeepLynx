@@ -109,16 +109,29 @@ test.describe("Insight E2E", () => {
     // Step 4: Wait for embedding to complete
     // ----------------------------------------------------------------
 
-    // Once a record becomes "embedded", it's removed from the "Need Embedding"
-    // tab and moves to "Embedded Library". So we switch tabs and wait for it
-    // to appear there. The UI polls every 5s; embedding takes ~30s.
+    // Rather than waiting on the UI's 5-second polling to eventually render
+    // the file, watch the network directly: wait for a status response that
+    // reports indexed:true, then verify the UI caught up.
+    await page.waitForResponse(
+      async (response) => {
+        if (!response.url().includes("/api/insight/status/")) return false;
+        try {
+          const body = await response.json();
+          return body.indexed === true;
+        } catch {
+          return false;
+        }
+      },
+      { timeout: 120_000 },
+    );
+
     await page
       .locator("button", { hasText: "Embedded Library" })
       .click();
 
     await expect(
       page.locator("article").filter({ hasText: "genesis-mission.pdf" }),
-    ).toBeVisible({ timeout: 120000 });
+    ).toBeVisible({ timeout: 10_000 });
 
     // The chat intro message should now reference 1 embedded file.
     // Type a question in the chat textarea.

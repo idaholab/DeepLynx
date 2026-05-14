@@ -193,6 +193,7 @@ try
     builder.Services.AddTransient<IUserModelTokenBusiness, UserModelTokenBusiness>();
     builder.Services.AddTransient<IAiModelConfigBusiness, AiModelConfigBusiness>();
     builder.Services.AddScoped<ISensitivityLabelService, SensitivityLabelService>();
+    builder.Services.AddScoped<FileBusiness>();
     builder.Services.AddTransient<IInsightBusiness, InsightBusiness>();
     builder.Services.AddTransient<IExtractionValidation, ExtractionValidation>();
     builder.Services.AddTransient<ILatticeExtractionBusiness, LatticeExtractionBusiness>();
@@ -351,7 +352,8 @@ try
                 new() { Name = "Airflow", Description = "Apache Airflow DAG management" },
 
                 // Other
-                new() { Name = "Notification", Description = "Notifications" }
+                new() { Name = "Notification", Description = "Notifications" },
+                new() { Name = "Maintenance", Description = "Maintenance" }
             };
 
             // Create x-tagGroups for nested folder structure (alphabetized)
@@ -450,7 +452,7 @@ try
                 new JsonObject
                 {
                     ["name"] = "Other",
-                    ["tags"] = new JsonArray { "Notification" }
+                    ["tags"] = new JsonArray { "Notification", "Maintenance" }
                 }
             };
 

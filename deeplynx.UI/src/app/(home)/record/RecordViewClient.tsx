@@ -4,15 +4,19 @@
 import Tabs from "@/app/(home)/components/Tabs";
 import {
   ArrowTopRightOnSquareIcon,
-  CircleStackIcon,
   PencilIcon,
   PlusIcon,
-  QuestionMarkCircleIcon,
-  RocketLaunchIcon,
-  XMarkIcon,
+  SparklesIcon,
 } from "@heroicons/react/24/outline";
 import Link from "next/link";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import {
   HistoricalRecordResponseDto,
@@ -60,8 +64,16 @@ import {
   useRecordRelationships,
 } from "./hooks/useRecordRelationships";
 import RelatedRecordsCardSkeleton from "./skeletons/RelatedRecordsSkeleton";
-import { triggerLatticeExtraction } from "@/app/lib/client_service/lattice_services.client";
-import { fetchInsightIngestionStatus } from "@/app/lib/client_service/insight_services.client";
+import {
+  triggerLatticeExtraction,
+  getEmbeddingStatus,
+  queueOntologyEmbeddings,
+} from "@/app/lib/client_service/lattice_services.client";
+import { EmbeddingStatusResponseDTO } from "@/app/(home)/types/latticeDTOs";
+import {
+  fetchInsightIngestionStatus,
+  queueInsightUpload,
+} from "@/app/lib/client_service/insight_services.client";
 
 // ============= HELPER FUNCTIONS =============
 interface PropertyRow {
@@ -129,6 +141,7 @@ interface Props {
 export default function RecordViewClient({ projectId, recordId }: Props) {
   const { t } = useLanguage();
   const { organization, hasLoaded } = useOrganizationSession();
+  const router = useRouter();
 
   // ============= STATE MANAGEMENT =============
   // Record & Tags State
@@ -157,37 +170,22 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
     [],
   );
   const [isLoadingClasses, setIsLoadingClasses] = useState(false);
-  const [isLatticeIntroOpen, setIsLatticeIntroOpen] = useState(false);
-  const [latticeIntroSlide, setLatticeIntroSlide] = useState(0);
   const [isTriggeringLatticeExtraction, setIsTriggeringLatticeExtraction] =
     useState(false);
   const [isCheckingLatticeReadiness, setIsCheckingLatticeReadiness] =
     useState(false);
   const [isRecordInsightEmbedded, setIsRecordInsightEmbedded] = useState(false);
+  const [isQueuingInsightUpload, setIsQueuingInsightUpload] = useState(false);
   const [latticeMode, setLatticeMode] = useState<"strict" | "discovery">(
     "discovery",
   );
-
-  const latticeIntroSlides = [
-    {
-      title: t.translations.LATTICE_INTRO_ANALYZE_TITLE,
-      icon: RocketLaunchIcon,
-      body: t.translations.LATTICE_INTRO_ANALYZE_BODY,
-    },
-    {
-      title: t.translations.LATTICE_INTRO_STAGE_TITLE,
-      icon: CircleStackIcon,
-      body: t.translations.LATTICE_INTRO_STAGE_BODY,
-    },
-    {
-      title: t.translations.LATTICE_INTRO_REVIEW_TITLE,
-      icon: QuestionMarkCircleIcon,
-      body: t.translations.LATTICE_INTRO_REVIEW_BODY,
-    },
-  ];
-
-  const currentLatticeIntroSlide = latticeIntroSlides[latticeIntroSlide];
-  const CurrentLatticeIntroIcon = currentLatticeIntroSlide.icon;
+  const [ontologyStatus, setOntologyStatus] =
+    useState<EmbeddingStatusResponseDTO | null>(null);
+  const [isLoadingOntologyStatus, setIsLoadingOntologyStatus] = useState(false);
+  const [isQueuingOntologyEmbeddings, setIsQueuingOntologyEmbeddings] =
+    useState(false);
+  const [ontologyPollTrigger, setOntologyPollTrigger] = useState(0);
+  const ontologyPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const {
     originPage,
@@ -556,7 +554,11 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
         value: record.name,
         editable: true,
         onEdit: (value: string) =>
-          handleUpdateRecord("name", value, t.translations.RECORD_NAME_UPDATED),
+          handleUpdateRecord(
+            "name",
+            value,
+            t.translations.RECORD_NAME_UPDATED,
+          ),
       },
       {
         label: t.translations.RECORD_DESCRIPTION,
@@ -716,12 +718,19 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
         },
       );
 
-      toast.success(
-        `${t.translations.LATTICE_ANALYSIS_STARTED} ${result.extraction_id}`,
-      );
+      const params = new URLSearchParams({
+        extractionId: String(result.extraction_id),
+        projectId: String(projectId),
+        organizationId: String(organization!.organizationId),
+      });
+      router.push(`/lattice/decisions?${params.toString()}`);
     } catch (error: any) {
-      console.error("Error triggering Lattice extraction:", error);
-      toast.error("Failed to extract with Lattice.");
+      if (error?.response?.status === 400) {
+        toast(t.translations.LATTICE_EMBEDDINGS_GENERATING, { icon: "⏳" });
+      } else {
+        console.error("Error triggering Lattice extraction:", error);
+        toast.error(t.translations.LATTICE_FAILED_TO_START_ANALYSIS);
+      }
     } finally {
       setIsTriggeringLatticeExtraction(false);
     }
@@ -732,40 +741,149 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
     record?.dataSourceId,
     isRecordInsightEmbedded,
     latticeMode,
+    router,
   ]);
 
-  useEffect(() => {
-    if (!recordId) return;
+  const handleQueueInsightUpload = useCallback(async () => {
+    const uri = record?.uri?.trim();
+    if (!uri || !organization?.organizationId) return;
+    setIsQueuingInsightUpload(true);
+    try {
+      await queueInsightUpload({
+        organizationId: organization.organizationId as number,
+        projectId,
+        fileInfo: [{ fileId: recordId, fileUri: uri }],
+      });
+      toast.success(t.translations.LATTICE_QUEUED_SUCCESS);
+    } catch {
+      toast.error(t.translations.LATTICE_QUEUE_FAILED);
+    } finally {
+      setIsQueuingInsightUpload(false);
+    }
+  }, [organization?.organizationId, projectId, record?.uri, recordId]);
 
+  const handleQueueOntologyEmbeddings = useCallback(async () => {
+    if (!organization?.organizationId) return;
+    setIsQueuingOntologyEmbeddings(true);
+    try {
+      await queueOntologyEmbeddings(
+        organization.organizationId as number,
+        projectId,
+      );
+      toast.success(t.translations.LATTICE_ONTOLOGY_QUEUED_SUCCESS);
+      setOntologyPollTrigger((n) => n + 1);
+    } catch {
+      toast.error(t.translations.LATTICE_ONTOLOGY_QUEUE_FAILED);
+    } finally {
+      setIsQueuingOntologyEmbeddings(false);
+    }
+  }, [
+    organization?.organizationId,
+    projectId,
+    t.translations.LATTICE_ONTOLOGY_QUEUED_SUCCESS,
+    t.translations.LATTICE_ONTOLOGY_QUEUE_FAILED,
+  ]);
+
+  const recordEmbedPollRef = useRef<ReturnType<typeof setInterval> | null>(
+    null,
+  );
+
+  useEffect(() => {
+    if (!organization?.organizationId || !projectId || !recordId) return;
+
+    const POLL_INTERVAL_MS = 5000;
     let cancelled = false;
+    let isInitial = true;
 
     const checkLatticeReadiness = async () => {
       try {
-        setIsCheckingLatticeReadiness(true);
+        if (isInitial) setIsCheckingLatticeReadiness(true);
 
-        const status = await fetchInsightIngestionStatus(recordId);
+        const status = await fetchInsightIngestionStatus({
+          organizationId: organization.organizationId as number,
+          projectId,
+          fileId: recordId,
+        });
 
         if (cancelled) return;
 
         setIsRecordInsightEmbedded(status.indexed);
+
+        if (status.indexed && recordEmbedPollRef.current) {
+          clearInterval(recordEmbedPollRef.current);
+          recordEmbedPollRef.current = null;
+        }
       } catch (error) {
         if (cancelled) return;
-
         console.error("Failed to check Insight embedding status:", error);
-        setIsRecordInsightEmbedded(false);
+        if (isInitial) setIsRecordInsightEmbedded(false);
       } finally {
-        if (!cancelled) {
+        if (!cancelled && isInitial) {
           setIsCheckingLatticeReadiness(false);
+          isInitial = false;
         }
       }
     };
 
     void checkLatticeReadiness();
 
+    recordEmbedPollRef.current = setInterval(() => {
+      void checkLatticeReadiness();
+    }, POLL_INTERVAL_MS);
+
     return () => {
       cancelled = true;
+      if (recordEmbedPollRef.current) {
+        clearInterval(recordEmbedPollRef.current);
+        recordEmbedPollRef.current = null;
+      }
     };
-  }, [recordId]);
+  }, [organization?.organizationId, projectId, recordId]);
+
+  useEffect(() => {
+    if (!organization?.organizationId || !projectId) return;
+
+    const POLL_INTERVAL_MS = 5000;
+
+    const fetchStatus = async () => {
+      try {
+        setIsLoadingOntologyStatus(true);
+        const status = await getEmbeddingStatus(
+          organization.organizationId as number,
+          projectId,
+        );
+        setOntologyStatus(status);
+
+        const classesDone =
+          status.class_count === 0 ||
+          status.embedded_class_count >= status.class_count;
+        const relsDone =
+          status.relationship_count === 0 ||
+          status.embedded_relationship_count >= status.relationship_count;
+        if (classesDone && relsDone && ontologyPollRef.current) {
+          clearInterval(ontologyPollRef.current);
+          ontologyPollRef.current = null;
+        }
+      } catch (error) {
+        console.error("Failed to fetch ontology embedding status:", error);
+      } finally {
+        setIsLoadingOntologyStatus(false);
+      }
+    };
+
+    void fetchStatus();
+
+    ontologyPollRef.current = setInterval(() => {
+      void fetchStatus();
+    }, POLL_INTERVAL_MS);
+
+    return () => {
+      if (ontologyPollRef.current) {
+        clearInterval(ontologyPollRef.current);
+        ontologyPollRef.current = null;
+      }
+    };
+  }, [organization?.organizationId, projectId, ontologyPollTrigger]);
 
   // ============= RENDER HELPERS =============
   if (!hasLoaded || !organization) {
@@ -794,13 +912,18 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
     record.uri.trim().length > 0 &&
     record.uri.toLowerCase() !== "null";
 
-  const canTriggerStrictLatticeExtract =
-    hasLatticeRecordRequirements && isRecordInsightEmbedded;
+  const ontologyReady =
+    ontologyStatus !== null &&
+    (ontologyStatus.class_count === 0 ||
+      ontologyStatus.embedded_class_count >= ontologyStatus.class_count) &&
+    (ontologyStatus.relationship_count === 0 ||
+      ontologyStatus.embedded_relationship_count >=
+        ontologyStatus.relationship_count);
 
   const canTriggerLatticeExtract =
-    latticeMode === "strict"
-      ? canTriggerStrictLatticeExtract
-      : hasLatticeRecordRequirements;
+    hasLatticeRecordRequirements &&
+    isRecordInsightEmbedded &&
+    (latticeMode === "discovery" || ontologyReady);
 
   const tabs = [
     {
@@ -808,7 +931,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
       content: (
         <div className="flex flex-col xl:flex-row gap-6 mt-4">
           {/* Left Column - Properties */}
-          <div className="w-full xl:w-1/2 space-y-4">
+          <div className="w-full xl:w-1/2 space-y-4 pl-2">
             <PropertyTable
               title={t.translations.SYSTEM_PROPERTIES}
               rows={systemPropertiesRows}
@@ -826,12 +949,19 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
           <div className="w-full xl:flex-1 space-y-4">
             {isInsightSupported ? (
               <RecordInsightChat
+                organizationId={
+                  organization?.organizationId
+                    ? Number(organization.organizationId)
+                    : undefined
+                }
+                projectId={projectId}
                 recordId={record.id}
                 recordName={record.name}
                 recordUri={record.uri}
                 onEmbeddingStatusChange={setIsRecordInsightEmbedded}
               />
             ) : null}
+
             {/* Tags Card */}
             <RecordTagsPanel
               tags={tags}
@@ -906,125 +1036,295 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
         />
       ),
     },
+    {
+      label: t.translations.LATTICE_PAGE_TITLE,
+      content: (
+        <div className="mt-4 flex flex-col lg:flex-row gap-8 lg:gap-12 p-6">
+          {/* Left: About Lattice */}
+          <div className="lg:w-2/5 space-y-5">
+            <div className="flex items-center gap-2">
+              <h2 className="text-lg font-semibold">
+                {t.translations.LATTICE_WIDGET_TITLE}
+              </h2>
+            </div>
+            <p className="text-sm text-base-content/60 leading-relaxed">
+              {t.translations.LATTICE_WIDGET_DESCRIPTION}
+            </p>
+            <div className="space-y-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-base-content/40">
+                {t.translations.LATTICE_HOW_IT_WORKS}
+              </p>
+              <ol className="space-y-3">
+                {[
+                  t.translations.LATTICE_STEP_EMBED,
+                  t.translations.LATTICE_STEP_MODE,
+                  t.translations.LATTICE_STEP_TRIGGER,
+                  t.translations.LATTICE_STEP_DECIDE,
+                ].map((step, i) => (
+                  <li
+                    key={i}
+                    className="flex gap-3 text-sm text-base-content/70"
+                  >
+                    <span className="size-5 rounded-full bg-base-300 flex items-center justify-center text-xs font-bold shrink-0 mt-0.5">
+                      {i + 1}
+                    </span>
+                    {step}
+                  </li>
+                ))}
+              </ol>
+            </div>
+          </div>
+
+          {/* Right: Controls */}
+          <div className="flex-1 space-y-5">
+            {!isInsightSupported ? (
+              <div className="alert alert-warning">
+                <SparklesIcon className="size-5 shrink-0" />
+                <span>{t.translations.LATTICE_UNSUPPORTED_FILE_TOOLTIP}</span>
+              </div>
+            ) : (
+              <>
+                {!isRecordInsightEmbedded && !isCheckingLatticeReadiness && (
+                  <div className="alert alert-warning">
+                    <span className="flex-1 text-sm">
+                      {t.translations.LATTICE_NOT_EMBEDDED_WARNING}
+                    </span>
+                    <button
+                      type="button"
+                      className="btn btn-warning btn-sm shrink-0"
+                      onClick={handleQueueInsightUpload}
+                      disabled={isQueuingInsightUpload}
+                    >
+                      {isQueuingInsightUpload ? (
+                        <span className="loading loading-spinner loading-sm" />
+                      ) : (
+                        t.translations.LATTICE_QUEUE_FOR_EMBEDDING
+                      )}
+                    </button>
+                  </div>
+                )}
+
+                {/* Ontology Embedding Status */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-medium">
+                      {t.translations.LATTICE_ONTOLOGY_STATUS_TITLE}
+                    </p>
+                    {isLoadingOntologyStatus && !ontologyStatus && (
+                      <span className="loading loading-spinner loading-xs text-base-content/40" />
+                    )}
+                  </div>
+                  {ontologyStatus && (
+                    <div className="rounded-lg border border-base-300 divide-y divide-base-300 text-sm">
+                      {ontologyStatus.class_count === 0 &&
+                      ontologyStatus.relationship_count === 0 ? (
+                        <p className="px-4 py-3 text-base-content/50 text-xs">
+                          {t.translations.LATTICE_ONTOLOGY_NO_SCHEMA}
+                        </p>
+                      ) : (
+                        <>
+                          <div className="flex items-center justify-between px-4 py-2">
+                            <span className="text-base-content/70">
+                              {t.translations.LATTICE_ONTOLOGY_CLASSES}
+                            </span>
+                            <span
+                              className={
+                                ontologyStatus.embedded_class_count ===
+                                ontologyStatus.class_count
+                                  ? "text-success font-medium"
+                                  : "text-warning font-medium"
+                              }
+                            >
+                              {ontologyStatus.embedded_class_count}{" "}
+                              {t.translations.LATTICE_ONTOLOGY_EMBEDDED_OF}{" "}
+                              {ontologyStatus.class_count}{" "}
+                              {t.translations.LATTICE_ONTOLOGY_EMBEDDED_LABEL}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between px-4 py-2">
+                            <span className="text-base-content/70">
+                              {t.translations.LATTICE_ONTOLOGY_RELATIONSHIPS}
+                            </span>
+                            <span
+                              className={
+                                ontologyStatus.embedded_relationship_count ===
+                                ontologyStatus.relationship_count
+                                  ? "text-success font-medium"
+                                  : "text-warning font-medium"
+                              }
+                            >
+                              {ontologyStatus.embedded_relationship_count}{" "}
+                              {t.translations.LATTICE_ONTOLOGY_EMBEDDED_OF}{" "}
+                              {ontologyStatus.relationship_count}{" "}
+                              {t.translations.LATTICE_ONTOLOGY_EMBEDDED_LABEL}
+                            </span>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  )}
+                  {ontologyStatus &&
+                    (ontologyStatus.class_count > 0 ||
+                      ontologyStatus.relationship_count > 0) && (
+                      <div className="flex items-start justify-between gap-3">
+                        {!ontologyReady && (
+                          <p className="text-xs text-base-content/50 leading-relaxed flex-1">
+                            {t.translations.LATTICE_ONTOLOGY_NOT_READY}
+                          </p>
+                        )}
+                        <button
+                          type="button"
+                          className="btn btn-outline btn-xs shrink-0 ml-auto"
+                          onClick={handleQueueOntologyEmbeddings}
+                          disabled={isQueuingOntologyEmbeddings}
+                        >
+                          {isQueuingOntologyEmbeddings ? (
+                            <span className="loading loading-spinner loading-xs" />
+                          ) : (
+                            t.translations.LATTICE_QUEUE_ONTOLOGY_EMBEDDINGS
+                          )}
+                        </button>
+                      </div>
+                    )}
+                </div>
+
+                <div className="space-y-2">
+                  <p className="text-sm font-medium">
+                    {t.translations.LATTICE_MODE_HEADER}
+                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setLatticeMode("discovery")}
+                      disabled={isTriggeringLatticeExtraction}
+                      className={`rounded-xl border-2 p-4 text-left transition-colors ${
+                        latticeMode === "discovery"
+                          ? "border-primary bg-primary/5"
+                          : "border-base-300 hover:border-base-content/30"
+                      }`}
+                    >
+                      <p className="font-semibold text-sm">
+                        {t.translations.LATTICE_DISCOVERY}
+                      </p>
+                      <p className="mt-1 text-xs text-base-content/60 leading-relaxed">
+                        {t.translations.LATTICE_DISCOVERY_TOOLTIP}
+                      </p>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setLatticeMode("strict")}
+                      disabled={isTriggeringLatticeExtraction}
+                      className={`rounded-xl border-2 p-4 text-left transition-colors ${
+                        latticeMode === "strict"
+                          ? "border-primary bg-primary/5"
+                          : "border-base-300 hover:border-base-content/30"
+                      }`}
+                    >
+                      <p className="font-semibold text-sm">
+                        {t.translations.LATTICE_STRICT}
+                      </p>
+                      <p className="mt-1 text-xs text-base-content/60 leading-relaxed">
+                        {t.translations.LATTICE_STRICT_TOOLTIP}
+                      </p>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-3">
+                  <button
+                    type="button"
+                    className="btn btn-primary btn-sm"
+                    onClick={handleTriggerLatticeExtraction}
+                    disabled={
+                      isTriggeringLatticeExtraction ||
+                      isCheckingLatticeReadiness ||
+                      !canTriggerLatticeExtract
+                    }
+                  >
+                    {isTriggeringLatticeExtraction ? (
+                      <>
+                        <span className="loading loading-spinner loading-sm" />{" "}
+                        {t.translations.STARTING}…
+                      </>
+                    ) : isCheckingLatticeReadiness ? (
+                      <>
+                        <span className="loading loading-spinner loading-sm" />{" "}
+                        {t.translations.CHECKING}…
+                      </>
+                    ) : (
+                      <>
+                        {t.translations.LATTICE_EXTRACT}{" "}
+                        <ArrowTopRightOnSquareIcon className="size-4" />
+                      </>
+                    )}
+                  </button>
+                  <Link
+                    href={`/lattice/decisions?projectId=${projectId}&organizationId=${organization.organizationId}`}
+                    className="btn btn-ghost btn-sm"
+                  >
+                    {t.translations.LATTICE_VIEW_EXTRACTIONS}
+                    <ArrowTopRightOnSquareIcon className="size-4" />
+                  </Link>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      ),
+    },
   ];
 
   // ============= MAIN RENDER =============
   return (
-    <div className="mx-3 sm:mx-4 lg:mr-0 lg:ml-0">
-      <div className="bg-base-200/40 px-3 sm:px-6 lg:px-12 p-4">
-        <h1 className="text-xl sm:text-2xl font-bold text-base-content break-words">
-          {record.name}
-        </h1>
-        {record.classId ? (
-          <div className="flex flex-wrap gap-2 py-auto items-center">
-            <span className="badge badge-primary">
-              {recordClass?.name || <div className="loading size-3" />}
-            </span>
-            <button
-              onClick={() => setIsClassModalOpen(true)}
-              className="btn btn-ghost btn-xs btn-circle"
-              title={t.translations.EDIT_CLASS}
-            >
-              <PencilIcon className="size-4" />
-            </button>
-          </div>
-        ) : (
-          <button
-            onClick={() => setIsClassModalOpen(true)}
-            className="btn btn-sm btn-outline mt-2"
-          >
-            <PlusIcon className="w-4 h-4 mr-1" />
-            {t.translations.ADD_CLASS || "Add Class"}
-          </button>
-        )}
-      </div>
-
-      <Tabs
-        tabs={tabs}
-        className="pt-6"
-        activeTab={tabs[activeTab].label}
-        onTabChange={(label) =>
-          setActiveTab(tabs.findIndex((tab) => tab.label === label))
-        }
-        rightAction={
-          isInsightSupported ? (
-            <div className="flex gap-2 items-center">
-              <div
-                className="tooltip"
-                data-tip={
-                  !isInsightSupported
-                    ? t.translations.LATTICE_UNSUPPORTED_FILE_TOOLTIP
-                    : isRecordInsightEmbedded
-                      ? t.translations.LATTICE_READY_TOOLTIP
-                      : t.translations.LATTICE_REQUIRES_EMBEDDING_TOOLTIP
-                }
-              >
+    <main className="min-h-screen bg-base-200/30">
+      <section className="border-b border-base-300 bg-base-100">
+        <div className="mx-auto flex w-full max-w-7xl flex-col gap-5 px-3 py-5 sm:px-6 lg:px-8">
+          <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+            <div className="min-w-0">
+              <p className="text-xs font-semibold uppercase tracking-wide text-base-content/60">
+                {t.translations.RECORD}
+              </p>
+              <h1 className="break-words text-2xl font-bold text-base-content sm:text-3xl">
+                {record.name}
+              </h1>
+              {record.classId ? (
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <span className="badge badge-primary h-auto min-h-6 whitespace-normal break-words px-3 py-1 text-center leading-tight">
+                    {recordClass?.name || <div className="loading size-3" />}
+                  </span>
+                  <button
+                    onClick={() => setIsClassModalOpen(true)}
+                    className="btn btn-ghost btn-xs btn-circle"
+                    title={t.translations.EDIT_CLASS}
+                  >
+                    <PencilIcon className="size-4" />
+                  </button>
+                </div>
+              ) : (
                 <button
-                  type="button"
-                  className="btn btn-ghost btn-sm btn-circle"
-                  onClick={() => {
-                    setLatticeIntroSlide(0);
-                    setIsLatticeIntroOpen(true);
-                  }}
-                  aria-label={t.translations.LATTICE_LEARN_MORE_ARIA}
+                  onClick={() => setIsClassModalOpen(true)}
+                  className="btn btn-sm btn-outline mt-3"
                 >
-                  <QuestionMarkCircleIcon className="size-6" />
+                  <PlusIcon className="w-4 h-4 mr-1" />
+                  {t.translations.ADD_CLASS || "Add Class"}
                 </button>
-              </div>
-              {/* <div className="join">
-              <button
-                type="button"
-                className={`btn btn-sm join-item ${
-                  latticeMode === "discovery" ? "btn-primary" : "btn-outline"
-                }`}
-                onClick={() => setLatticeMode("discovery")}
-                disabled={isTriggeringLatticeExtraction}
-              >
-                Discovery
-              </button>
-              <button
-                type="button"
-                className={`btn btn-sm join-item ${
-                  latticeMode === "strict" ? "btn-primary" : "btn-outline"
-                }`}
-                onClick={() => setLatticeMode("strict")}
-                disabled={isTriggeringLatticeExtraction}
-              >
-                Strict
-              </button>
-            </div> */}
-
-              <button
-                type="button"
-                className="btn btn-sm btn-outline btn-primary"
-                onClick={handleTriggerLatticeExtraction}
-                disabled={
-                  isTriggeringLatticeExtraction ||
-                  isCheckingLatticeReadiness ||
-                  !canTriggerLatticeExtract
-                }
-              >
-                {isTriggeringLatticeExtraction ? (
-                  <>
-                    <span className="loading loading-spinner loading-xs" />
-                    {t.translations.STARTING}
-                  </>
-                ) : isCheckingLatticeReadiness ? (
-                  <>
-                    <span className="loading loading-spinner loading-xs" />
-                    {t.translations.CHECKING}
-                  </>
-                ) : (
-                  <>
-                    {t.translations.ANALYZE_RECORD}{" "}
-                    <ArrowTopRightOnSquareIcon className="size-4" />
-                  </>
-                )}
-              </button>
+              )}
             </div>
-          ) : null
-        }
-      />
+          </div>
+        </div>
+      </section>
+
+      <section className="mx-auto w-full max-w-7xl px-3 py-5 sm:px-6 lg:px-8">
+        <Tabs
+          tabs={tabs}
+          className="mx-0"
+          activeTab={tabs[activeTab].label}
+          onTabChange={(label) =>
+            setActiveTab(tabs.findIndex((tab) => tab.label === label))
+          }
+          rightAction={null}
+        />
+      </section>
       <ConfirmationModal
         isOpen={modal.isOpen}
         onClose={handleCloseModal}
@@ -1070,92 +1370,6 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
         onSearchRecords={handleSearchRecords}
         onCreateRelationships={handleCreateRelationships}
       />
-      {isLatticeIntroOpen ? (
-        <dialog className="modal modal-open">
-          <div className="modal-box max-w-xl">
-            <form method="dialog">
-              <button
-                type="button"
-                className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2"
-                onClick={() => setIsLatticeIntroOpen(false)}
-                aria-label={t.translations.CLOSE}
-              >
-                <XMarkIcon className="size-6" />
-              </button>
-            </form>
-
-            <div className="flex flex-col items-center text-center gap-4 pt-4">
-              <div className="rounded-full bg-primary/10 p-4 text-primary">
-                <CurrentLatticeIntroIcon className="size-10" />
-              </div>
-
-              <div>
-                <h3 className="text-lg font-bold">
-                  {currentLatticeIntroSlide.title}
-                </h3>
-                <p className="py-3 text-sm text-base-content/70">
-                  {currentLatticeIntroSlide.body}
-                </p>
-              </div>
-
-              <div className="flex gap-2">
-                {latticeIntroSlides.map((_, index) => (
-                  <button
-                    key={index}
-                    type="button"
-                    className={`h-2.5 w-2.5 rounded-full ${
-                      latticeIntroSlide === index ? "bg-primary" : "bg-base-300"
-                    }`}
-                    onClick={() => setLatticeIntroSlide(index)}
-                    aria-label={`${t.translations.LATTICE_GO_TO_SLIDE} ${index + 1}`}
-                  />
-                ))}
-              </div>
-            </div>
-
-            <div className="modal-action justify-between">
-              <button
-                type="button"
-                className="btn btn-ghost"
-                disabled={latticeIntroSlide === 0}
-                onClick={() =>
-                  setLatticeIntroSlide((slide) => Math.max(slide - 1, 0))
-                }
-              >
-                {t.translations.BACK}
-              </button>
-
-              {latticeIntroSlide === latticeIntroSlides.length - 1 ? (
-                <button
-                  type="button"
-                  className="btn btn-primary"
-                  onClick={() => setIsLatticeIntroOpen(false)}
-                >
-                  {t.translations.GOT_IT}
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  className="btn btn-primary"
-                  onClick={() =>
-                    setLatticeIntroSlide((slide) =>
-                      Math.min(slide + 1, latticeIntroSlides.length - 1),
-                    )
-                  }
-                >
-                  {t.translations.NEXT}
-                </button>
-              )}
-            </div>
-          </div>
-
-          <form method="dialog" className="modal-backdrop">
-            <button type="button" onClick={() => setIsLatticeIntroOpen(false)}>
-              close
-            </button>
-          </form>
-        </dialog>
-      ) : null}
-    </div>
+    </main>
   );
 }

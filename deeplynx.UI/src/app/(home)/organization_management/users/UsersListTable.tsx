@@ -91,12 +91,12 @@ const UsersListTable: React.FC<UsersListTableProps> = ({
                         <>
                           <div className="font-medium">{row.name}</div>
                           {row.isSysAdmin && (
-                            <div className="badge badge-warning badge-sm">
+                            <div className="badge badge-warning badge-sm h-auto min-h-6 px-3 py-1 text-center leading-tight">
                               {t.translations.SYSTEM_ADMIN}
                             </div>
                           )}
                           {scope === "org" && row.isOrgAdmin && (
-                            <div className="badge badge-info badge-sm">
+                            <div className="badge badge-info badge-sm h-auto min-h-6 px-3 py-1 text-center leading-tight">
                               {t.translations.ORG_ADMIN}
                             </div>
                           )}
@@ -165,8 +165,7 @@ const UsersListTable: React.FC<UsersListTableProps> = ({
                         ))}
                         {row.projects.length > 2 && (
                           <div className="badge badge-sm badge-ghost">
-                            +{row.projects.length - 2}{" "}
-                            {t.translations.MORE}
+                            +{row.projects.length - 2} {t.translations.MORE}
                           </div>
                         )}
                       </div>
@@ -227,9 +226,7 @@ const UsersListTable: React.FC<UsersListTableProps> = ({
                           {scope === "org" && (
                             <button
                               className="btn btn-ghost btn-sm text-error"
-                              title={
-                                t.translations.REMOVE_FROM_ORGANIZATION
-                              }
+                              title={t.translations.REMOVE_FROM_ORGANIZATION}
                               onClick={() =>
                                 onOpenConfirm({
                                   isOpen: true,

@@ -288,7 +288,7 @@ public class FileController : ControllerBase
     /// <returns>Record response DTO containing file information</returns>
     [HttpPost("upload/complete", Name = "api_complete_file_upload")]
     [Auth("write", "file")]
-    [Sensitivity("write file")]
+    [Sensitivity("upload file")]
     public async Task<ActionResult<RecordResponseDto>> CompleteUpload(
         long organizationId,
         long projectId,

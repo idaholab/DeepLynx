@@ -2,7 +2,6 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import Image from "next/image";
 import toast from "react-hot-toast";
 import { useProjectSession } from "@/app/contexts/ProjectSessionProvider";
 import { useOrganizationSession } from "@/app/contexts/OrganizationSessionProvider";
@@ -10,7 +9,6 @@ import {
   archiveProject,
   getProjectLogoUrl,
   removeProjectLogo,
-  updateProject,
   uploadProjectLogo,
 } from "@/app/lib/client_service/projects_services.client";
 import {
@@ -22,7 +20,6 @@ import {
   deleteProjectObjectStorage,
   archiveProjectObjectStorage,
 } from "@/app/lib/client_service/object_storage_services.client";
-import ArchiveDelete from "@/app/(home)/components/ArchiveDelete";
 import {
   ProjectResponseDto,
   ObjectStorageResponseDto,
@@ -33,6 +30,7 @@ import {
 } from "@/app/(home)/types/requestDTOs";
 import ProjectSettingsLeftColumn from "./components/ProjectSettingsLeftColumn";
 import StorageSettingsSection from "./components/StorageSettingsSection";
+import ProjectInsightModelTemplateSection from "./components/ProjectInsightModelTemplateSection";
 import CreateStorageModal from "./components/CreateStorageModal";
 import EditStorageModal from "./components/EditStorageModal";
 import DeleteStorageModal from "./components/DeleteStorageModal";
@@ -91,10 +89,6 @@ const ProjectSettings = ({ project }: ProjectSettingsProps) => {
   const [archiveStorageId, setArchiveStorageId] = useState<number | null>(null);
   const [archiveAction, setArchiveAction] = useState<boolean>(true);
 
-  const [bannerText, setBannerText] = useState<string>("");
-  const [originalBannerText, setOriginalBannerText] = useState<string>("");
-  const [isSavingBanner, setIsSavingBanner] = useState(false);
-
   // Load existing logo on mount
   useEffect(() => {
     const loadExistingLogo = async () => {
@@ -119,72 +113,6 @@ const ProjectSettings = ({ project }: ProjectSettingsProps) => {
 
     loadExistingLogo();
   }, [project?.id]);
-
-  useEffect(() => {
-    if (project?.banner !== undefined) {
-      const banner = project.banner || "";
-      setBannerText(banner);
-      setOriginalBannerText(banner);
-    }
-  }, [project?.banner]);
-
-  const handleSaveBanner = async () => {
-    if (!organization?.banner || !project?.id) {
-      toast.error(t.translations.NO_PROJECT_SELECTED);
-      return;
-    }
-
-    if (bannerText === originalBannerText) {
-      toast.custom(
-        <div className="text-info">
-          <ExclamationTriangleIcon className="size-4" />
-          {t.translations.NO_CHANGES_TO_SAVE}
-        </div>,
-      );
-      return;
-    }
-
-    if (bannerText.length > 50) {
-      toast.error(t.translations.BANNER_TEXT_MUST_BE_50_CHARACTERS_OR_LESS);
-      return;
-    }
-
-    try {
-      setIsSavingBanner(true);
-
-      await updateProject(
-        organization.organizationId as number,
-        project.id as number,
-        {
-          organizationId: organization.organizationId as number,
-          banner: bannerText.trim() || null,
-        },
-      );
-
-      setOriginalBannerText(bannerText);
-
-      toast.success(t.translations.BANNER_UPDATED_SUCCESSFULLY);
-    } catch (error) {
-      console.error("Failed to update Project Banner: ", error);
-      toast.error(
-        error instanceof Error
-          ? error.message
-          : t.translations.FAILED_TO_UPDATE_BANNER,
-      );
-    } finally {
-      setIsSavingBanner(false);
-    }
-  };
-
-  const handleCancelBanner = () => {
-    setBannerText(originalBannerText);
-    toast.custom(
-      <div className="text-info">
-        <ExclamationTriangleIcon className="size-4" />
-        {t.translations.CHANGES_DISCARDED}
-      </div>,
-    );
-  };
 
   // Load available storages and default storage
   const loadStorages = useCallback(async () => {
@@ -396,7 +324,7 @@ const ProjectSettings = ({ project }: ProjectSettingsProps) => {
         azureObjectConfig: {
           azureConnectionString: azureEndpoint,
           azureContainerName: azureBucketName,
-        }
+        },
       };
     } else if (storageType === "aws_s3") {
       // TODO: Waiting for backend to finalize AWS S3 config structure
@@ -577,21 +505,26 @@ const ProjectSettings = ({ project }: ProjectSettingsProps) => {
             logoPreview={logoPreview}
             logoFile={logoFile}
             isUploading={isUploading}
-            bannerText={bannerText}
-            setBannerText={setBannerText}
-            isSavingBanner={isSavingBanner}
-            originalBannerText={originalBannerText}
-            onSaveBanner={handleSaveBanner}
-            onCancelBanner={handleCancelBanner}
             onLogoChange={handleLogoChange}
             onUploadLogo={handleUploadLogo}
             onCancelSelection={handleCancelSelection}
             onLogoError={() => setLogoPreview(null)}
+            onArchiveProject={async () => {
+              if (organization && project) {
+                await archiveProject(
+                  organization.organizationId as number,
+                  project.id as number,
+                  true,
+                );
+              }
+              clearProject();
+              window.location.href = "/";
+            }}
             t={t}
           />
 
           {/* Storage Settings Section with Tabs */}
-          <div className="self-start">
+          <div className="self-start space-y-6">
             <StorageSettingsSection
               activeTab={activeTab}
               onChangeTab={setActiveTab}
@@ -613,27 +546,13 @@ const ProjectSettings = ({ project }: ProjectSettingsProps) => {
               onDeleteStorage={(storageId) => setDeleteStorageId(storageId)}
               t={t}
             />
-          </div>
-        </div>
-
-        {/* Archive Project Section */}
-        <div className="mt-8">
-          <ArchiveDelete
-            actionType="archive"
-            itemType="Project"
-            itemName={project?.name || ""}
-            onConfirm={async () => {
-              if (organization && project) {
-                await archiveProject(
-                  organization.organizationId as number,
-                  project.id as number,
-                  true,
-                );
+            <ProjectInsightModelTemplateSection
+              organizationId={
+                organization?.organizationId as number | undefined
               }
-              clearProject();
-              window.location.href = "/";
-            }}
-          />
+              projectId={project.id as number | undefined}
+            />
+          </div>
         </div>
       </div>
 

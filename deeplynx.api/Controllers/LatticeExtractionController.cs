@@ -36,6 +36,28 @@ public class LatticeExtractionController : ControllerBase
     }
     
     /// <summary>
+    ///     Returns all extractions created by the current user, ordered newest first.
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization.</param>
+    /// <param name="projectId">The ID of the project.</param>
+    [HttpGet(Name = "api_list_extractions")]
+    public async Task<IActionResult> ListExtractions(long organizationId, long projectId)
+    {
+        try
+        {
+            var currentUserId = UserContextStorage.UserId;
+            var result = await _latticeExtractionBusiness.ListExtractionsByUser(currentUserId, projectId);
+            return Ok(result);
+        }
+        catch (Exception exc)
+        {
+            var message = $"An error occurred while listing extractions: {exc}";
+            _logger.LogError(message);
+            return StatusCode(StatusCodes.Status500InternalServerError, message);
+        }
+    }
+
+    /// <summary>
     ///     Returns the ontology embedding status for a project — how many classes and relationships
     ///     exist and how many have been embedded. Use this to check readiness before triggering extraction.
     /// </summary>
@@ -149,6 +171,16 @@ public class LatticeExtractionController : ControllerBase
             _logger.LogError(
                 "Failed to parse Insight callback for extraction {ExtractionId}: {Error}. Raw body: {RawBody}",
                 extractionId, exc.Message, rawBody);
+            try
+            {
+                await _latticeExtractionBusiness.MarkExtractionFailed(
+                    extractionId, $"LLM response could not be parsed: {exc.Message}");
+            }
+            catch (Exception markFailedExc)
+            {
+                _logger.LogError(markFailedExc,
+                    "Failed to mark extraction {ExtractionId} as failed after JSON parse error", extractionId);
+            }
             return BadRequest($"Invalid JSON in callback body: {exc.Message}");
         }
 
