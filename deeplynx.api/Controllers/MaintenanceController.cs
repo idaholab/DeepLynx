@@ -39,50 +39,21 @@ public class MaintenanceController : ControllerBase
     }
 
     /// <summary>
-    ///     Backfill file size properties
+    ///     Get Timeseries Migration Record
     /// </summary>
-    /// <remarks>
-    ///     For a given org and/or project, backfill the file size property for
-    ///     existing files.
-    /// </remarks>
-    /// <param name="organizationId"></param>
-    /// <param name="projectId"></param>
-    /// <returns></returns>
-    [HttpPut("backfill-file-sizes", Name = "api_backfill_file_sizes")]
-    [SysAdmin]
-    public async Task<IActionResult> BackfillFileSizes(
-        long? organizationId,
-        long? projectId)
-    {
-        try
-        {
-            await _fileBusiness.BackfillFileSizes(organizationId, projectId);
-            return Ok(new { message = $"Backfilled file sizes for org {organizationId}, project {projectId}" });
-        }
-        catch (Exception ex)
-        {
-            var message = $"Error while backfilling file sizes: {ex.Message}";
-            _logger.LogError(ex, message);
-            return StatusCode(StatusCodes.Status500InternalServerError, message);
-        }
-    }
-
-    /// <summary>
-    ///     Get Timeseries Record IDs
-    /// </summary>
-    /// <returns>The ids of the records pointing to timeseries duckdb tables</returns>
+    /// <returns>The total number of bytes of file data stored in Nexus-registered object storages.</returns>
     [HttpGet("timeseries/records", Name = "api_get_timeseries_record_ids")]
     [SysAdmin]
-    public async Task<IActionResult> GetTimeseriesRecordIds()
+    public async Task<IActionResult> GetTimeseriesMigrationRecords()
     {
         try
         {
-            var recordIds = await _maintenanceBusiness.GetTimeseriesRecordIds();
-            return Ok(recordIds);
+            var records = await _maintenanceBusiness.GetTimeseriesMigrationRecords();
+            return Ok(records);
         }
         catch (Exception exc)
         {
-            var message = $"An error occurred while retrieving timeseries record ids: {exc}";
+            var message = $"An error occurred while retrieving timeseries migration records: {exc}";
             _logger.LogError(message);
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }

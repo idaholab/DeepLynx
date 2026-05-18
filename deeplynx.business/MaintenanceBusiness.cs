@@ -2,6 +2,7 @@ using Azure.Storage.Blobs;
 using deeplynx.datalayer.Models;
 using deeplynx.helpers.exceptions;
 using deeplynx.interfaces;
+using deeplynx.models;
 using DotNetEnv;
 using DuckDB.NET.Data;
 using Microsoft.EntityFrameworkCore;
@@ -26,20 +27,29 @@ public class MaintenanceBusiness : IMaintenanceBusiness
         _fileAzureBusiness = fileAzureBusiness;
     }
     /// <summary>
-    /// Gets the ids of the records that have been uploaded using our old timeseries methods
+    /// Gets the records that have been uploaded using our old timeseries methods,
+    /// enriched with project and datasource info so callers can group/select before migrating.
     /// </summary>
-    /// <returns>List of ids</returns>
-    public async Task<List<long>> GetTimeseriesRecordIds()
+    /// <returns>List of records needing migration</returns>
+    public async Task<List<TimeseriesMigrationRecordDto>> GetTimeseriesMigrationRecords()
     {
-        var recordIds = await _context.Records.Include(r => r.Class)
+        return await _context.Records
+            .Include(r => r.Class)
+            .Include(r => r.Project)
             .Where(r => r.Class != null && r.Class.Name == "Timeseries"
                                         && r.ObjectStorageId == null
-                                        && r.Uri != null 
+                                        && r.Uri != null
                                         && r.Uri.Contains("duckdb://"))
-            .Select(r => r.Id)
+            .Select(r => new TimeseriesMigrationRecordDto
+            {
+                RecordId = r.Id,
+                Uri = r.Uri!,
+                OrganizationId = r.OrganizationId,
+                ProjectId = r.ProjectId,
+                ProjectName = r.Project.Name,
+                DataSourceId = r.DataSourceId
+            })
             .ToListAsync();
-        
-        return recordIds;
     }
     
     
