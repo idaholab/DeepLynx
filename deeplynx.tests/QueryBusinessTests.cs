@@ -1383,6 +1383,60 @@ public class QueryBusinessTests : IntegrationTestBase
         Assert.Equal("Tech", records.First().Name);
     }
 
+
+
+
+    [Fact]
+    public async Task QueryBuilder_Success_FiltersRecordsByDateEqualityOperator()
+    {
+        // Arrange
+        // Grab the last_updated_at date from the already-seeded "Tech" record
+        var techRecord = await Context.Records.FirstAsync(r => r.Name == "Tech");
+        var targetDate = techRecord.LastUpdatedAt.Date;
+
+        var dto = new CustomQueryDtos.CustomQueryRequestDto
+        {
+            Connector = "AND",
+            Filter = "last_updated_at",
+            Operator = "=",
+            Value = targetDate.ToString("yyyy-MM-dd")
+        };
+
+        // Act
+        var result = await _queryBusiness.QueryBuilder(uid, [dto], organizationId, [pid]);
+        var records = result.ToList();
+
+        // Assert - all returned records should fall within that day
+        Assert.NotEmpty(records);
+        Assert.All(records, r =>
+        {
+            Assert.True(r.LastUpdatedAt >= targetDate);
+            Assert.True(r.LastUpdatedAt < targetDate.AddDays(1));
+        });
+    }
+
+    [Fact]
+    public async Task QueryBuilder_Success_ExcludesRecordsOutsideDateRange()
+    {
+        // Arrange - use a date far in the past that no seeded records fall on
+        var emptyDate = DateTime.Today.AddYears(-10);
+
+        var dto = new CustomQueryDtos.CustomQueryRequestDto
+        {
+            Connector = "AND",
+            Filter = "last_updated_at",
+            Operator = "=",
+            Value = emptyDate.ToString("yyyy-MM-dd")
+        };
+
+        // Act
+        var result = await _queryBusiness.QueryBuilder(uid, [dto], organizationId, [pid]);
+
+        // Assert
+        Assert.Empty(result);
+    }
+
+
     [Fact]
     public async Task QueryBuilder_Success_FiltersRecordsByLikeOperatorCaseInsensitive()
     {
