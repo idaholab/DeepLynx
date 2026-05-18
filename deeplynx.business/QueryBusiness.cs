@@ -45,14 +45,6 @@ public class QueryBusiness : IQueryBusiness
         string? textSearch = null, bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false)
     {
         if (request == null) throw new ArgumentException("Custom query request dto cannot be null");
-
-
-    Console.WriteLine($"QueryBuilder called. Request count: {request?.Length}");
-    foreach (var r in request ?? Array.Empty<CustomQueryDtos.CustomQueryRequestDto>())
-        Console.WriteLine($"  filter='{r.Filter}' operator='{r.Operator}' value='{r.Value}'");
-
-
-
         try
         {
             var authorizedLabelIds = new List<long>();
