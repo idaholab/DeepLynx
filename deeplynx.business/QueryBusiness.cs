@@ -148,7 +148,7 @@ public class QueryBusiness : IQueryBusiness
                     }
                     else if (query.Operator == "=")
                     {
-                        
+                        // Check if this is a JSONB column that needs special handling
                         var jsonbColumns = new[] { "properties", "tags" };
 
                         if (jsonbColumns.Contains(query.Filter.ToLower()))
