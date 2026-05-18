@@ -8,35 +8,55 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ recordId: string }> },
 ) {
   try {
-    const { recordId } = await params;
-    const recordIdNum = Number(recordId);
+    const { searchParams: requestQueryParams } = new URL(request.url);
+    const organizationId = Number(requestQueryParams.get("organizationId"));
+    const projectId = Number(requestQueryParams.get("projectId"));
 
-    if (!Number.isFinite(recordIdNum) || recordIdNum <= 0) {
+    if (!Number.isFinite(organizationId) || organizationId <= 0) {
+      return NextResponse.json(
+        { message: "Invalid organizationId" },
+        { status: 400 },
+      );
+    }
+
+    if (!Number.isFinite(projectId) || projectId <= 0) {
+      return NextResponse.json(
+        { message: "Invalid projectId" },
+        { status: 400 },
+      );
+    }
+
+    const { recordId: recordIdParam } = await params;
+    const recordId = Number(recordIdParam);
+
+    if (!Number.isFinite(recordId) || recordId <= 0) {
       return NextResponse.json(
         { message: "Invalid recordId" },
         { status: 400 },
       );
     }
 
-    const { upstreamResponse, responseBody } =
-      await fetchInsightIngestionStatus(recordIdNum);
+    const { upstreamResponse, responseBody: upstreamResponseBody } =
+      await fetchInsightIngestionStatus(organizationId, projectId, recordId);
 
     if (!upstreamResponse.ok) {
       return NextResponse.json(
         {
           message: "Insight status check failed",
           status: upstreamResponse.status,
-          details: responseBody,
+          details: upstreamResponseBody,
         },
         { status: upstreamResponse.status },
       );
     }
 
-    return NextResponse.json(responseBody, { status: upstreamResponse.status });
+    return NextResponse.json(upstreamResponseBody, {
+      status: upstreamResponse.status,
+    });
   } catch (error) {
     console.error("Insight status proxy error:", error);
     return NextResponse.json(

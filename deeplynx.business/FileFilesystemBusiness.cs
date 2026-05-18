@@ -350,4 +350,91 @@ public class FileFilesystemBusiness : IFileBusiness
         if (Directory.Exists(uploadPath))
             Directory.Delete(uploadPath, true);
     }
+    
+    /// <summary>
+    /// Gets the total storage size in bytes for files matching the given prefix in the filesystem.
+    /// </summary>
+    /// <param name="prefix">The directory prefix to search (e.g., "org_1/project_2/")</param>
+    /// <param name="objectStorageConfig">Filesystem storage configuration</param>
+    /// <returns>Total bytes used by files in directories matching the prefix</returns>
+    public async Task<long> GetStorageSize(string prefix, ObjectStorageConfigDto objectStorageConfig)
+    {
+        if (objectStorageConfig.MountPath == null)
+            return 0;
+        
+        var directoryPath = string.IsNullOrEmpty(prefix)
+            ? objectStorageConfig.MountPath
+            : Path.Combine(objectStorageConfig.MountPath, prefix.Replace('/', Path.DirectorySeparatorChar));
+        
+        if (!Directory.Exists(directoryPath))
+            return 0;
+        
+        long totalSize = 0;
+        
+        // EnumerateFiles is more efficient than GetFiles for large directories
+        var files = Directory.EnumerateFiles(directoryPath, "*", SearchOption.AllDirectories);
+        
+        foreach (var file in files)
+        {
+            try
+            {
+                var fileInfo = new FileInfo(file);
+                totalSize += fileInfo.Length;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Failed to get size for file {file}: {ex.Message}");
+            }
+        }
+        
+        return totalSize;
+    }
+ 
+    /// <summary>
+    /// Builds the filesystem-specific path prefix.
+    /// Filesystem uses the format: org_{id}/project_{id}/
+    /// </summary>
+    /// <param name="organizationId">The organization ID</param>
+    /// <param name="projectId">Optional project ID</param>
+    /// <returns>Filesystem path prefix string</returns>
+    public string BuildPrefix(long organizationId, long? projectId)
+    {
+        // Filesystem format: org_1/project_2/
+        if (projectId.HasValue)
+            return $"org_{organizationId}/project_{projectId.Value}/";
+        else
+            return $"org_{organizationId}/";
+    }
+    
+    /// <summary>
+    ///     Return the size of a given file. Used to backfill records for files that didn't get file size set on upload.
+    /// </summary>
+    /// <param name="fileUri">URI of the file whose size is to be measured</param>
+    /// <param name="objectStorageConfig">object storage configuration for reaching URI</param>
+    /// <returns></returns>
+    /// <exception cref="Exception"></exception>
+    /// <exception cref="ArgumentException"></exception>
+    /// <exception cref="FileNotFoundException"></exception>
+    public async Task<long> GetFileSize(string fileUri, ObjectStorageConfigDto objectStorageConfig)
+    {
+        if (objectStorageConfig.MountPath == null)
+            throw new Exception("File system mount path not set in object storage");
+        
+        if (string.IsNullOrWhiteSpace(fileUri))
+            throw new ArgumentException("File URI is not specified.");
+
+        try
+        {
+            var fileInfo = new FileInfo(fileUri);
+            return fileInfo.Length;
+        }
+        catch (FileNotFoundException ex)
+        {
+            throw new FileNotFoundException($"File {fileUri} not found", ex);
+        }
+        catch (Exception ex)
+        {
+            throw new Exception($"Failed to get size for file {fileUri}: {ex.Message}");
+        }
+    }
 }

@@ -1,13 +1,12 @@
 "use client";
 
-import React, { useDeferredValue, useEffect, useState } from "react";
-import toast from "react-hot-toast";
-import {
-  AdjustmentsHorizontalIcon,
-  ChatBubbleLeftRightIcon,
-  XMarkIcon,
-} from "@heroicons/react/24/outline";
 import SearchBar from "@/app/(home)/components/SearchBar";
+import { useInsightModelSelection } from "@/app/(home)/components/insight/useInsightModelSelection";
+import type {
+  ClassResponseDto,
+  DataSourceResponseDto,
+  TagResponseDto,
+} from "@/app/(home)/types/responseDTOs";
 import { useLanguage } from "@/app/contexts/Language";
 import { useOrganizationSession } from "@/app/contexts/OrganizationSessionProvider";
 import { useProjectSession } from "@/app/contexts/ProjectSessionProvider";
@@ -20,13 +19,15 @@ import {
 import { fullTextSearch } from "@/app/lib/client_service/query_services.client";
 import { getAllRecords } from "@/app/lib/client_service/record_services.client";
 import { getAllTags } from "@/app/lib/client_service/tag_services.client";
-import type {
-  ClassResponseDto,
-  DataSourceResponseDto,
-  TagResponseDto,
-} from "@/app/(home)/types/responseDTOs";
+import {
+  AdjustmentsHorizontalIcon,
+  XMarkIcon,
+} from "@heroicons/react/24/outline";
+import { useDeferredValue, useEffect, useState } from "react";
+import toast from "react-hot-toast";
 import ProjectInsightChat from "./components/ProjectInsightChat";
 import ProjectInsightFilters from "./components/ProjectInsightFilters";
+import ProjectInsightLoadingSkeleton from "./components/ProjectInsightLoadingSkeleton";
 import ProjectInsightRecordCard from "./components/ProjectInsightRecordCard";
 import ProjectInsightRecordSection from "./components/ProjectInsightRecordSection";
 import type {
@@ -93,6 +94,8 @@ export default function ProjectInsightClientView() {
     EMPTY_TAB_FILTER_STATE,
   );
   const deferredLibrarySearchQuery = useDeferredValue(libraryState.searchQuery);
+  const { selectedInsightModels, setSelectedInsightModels } =
+    useInsightModelSelection(organizationId, projectId);
 
   // Tab state helpers
   const {
@@ -171,14 +174,18 @@ export default function ProjectInsightClientView() {
         const resolvedStatuses = await Promise.all(
           supportedRecords.map(async (record) => {
             try {
-              const status = await fetchInsightIngestionStatus(record.id);
+              const ingestionStatus = await fetchInsightIngestionStatus({
+                organizationId,
+                projectId,
+                fileId: record.id,
+              });
               return [
                 record.id,
-                status.indexed
+                ingestionStatus.indexed
                   ? {
                       state: "embedded",
-                      chunkCount: status.chunk_count,
-                      pageCount: status.page_count,
+                      chunkCount: ingestionStatus.chunk_count,
+                      pageCount: ingestionStatus.page_count,
                     }
                   : { state: "not_embedded" },
               ] as const;
@@ -236,16 +243,18 @@ export default function ProjectInsightClientView() {
       setLibrarySearchError("");
 
       try {
-        const results = await fullTextSearch(organizationId, searchableQuery, [
-          projectId,
-        ]);
+        const searchResults = await fullTextSearch(
+          organizationId,
+          searchableQuery,
+          [projectId],
+        );
 
         if (cancelled) return;
 
-        const recordIds = [
-          ...new Set(results.map((result) => Number(result.id))),
+        const matchedRecordIds = [
+          ...new Set(searchResults.map((result) => Number(result.id))),
         ].filter((id) => Number.isFinite(id));
-        setLibraryMatchedSearchIds(recordIds);
+        setLibraryMatchedSearchIds(matchedRecordIds);
       } catch (error) {
         console.error("Project Insight full-text search failed:", error);
         if (!cancelled) {
@@ -272,6 +281,8 @@ export default function ProjectInsightClientView() {
   ]);
 
   useEffect(() => {
+    if (!organizationId || !projectId) return;
+
     const pollingIds = Object.entries(statusMap)
       .filter(
         ([, status]) =>
@@ -284,17 +295,21 @@ export default function ProjectInsightClientView() {
     let cancelled = false;
 
     const pollStatuses = async () => {
-      const updates = await Promise.all(
+      const updatedStatuses = await Promise.all(
         pollingIds.map(async (recordId) => {
           try {
-            const status = await fetchInsightIngestionStatus(recordId);
+            const ingestionStatus = await fetchInsightIngestionStatus({
+              organizationId,
+              projectId,
+              fileId: recordId,
+            });
             return [
               recordId,
-              status.indexed
+              ingestionStatus.indexed
                 ? {
                     state: "embedded",
-                    chunkCount: status.chunk_count,
-                    pageCount: status.page_count,
+                    chunkCount: ingestionStatus.chunk_count,
+                    pageCount: ingestionStatus.page_count,
                   }
                 : { state: "processing" },
             ] as const;
@@ -308,7 +323,7 @@ export default function ProjectInsightClientView() {
 
       setStatusMap((current) => ({
         ...current,
-        ...Object.fromEntries(updates),
+        ...Object.fromEntries(updatedStatuses),
       }));
     };
 
@@ -451,67 +466,46 @@ export default function ProjectInsightClientView() {
   // UI event handlers
   async function handleQueueSelected() {
     if (selectedVisiblePendingIds.length === 0) return;
+    if (!organizationId || !projectId) return;
 
     const selectedRecords = visiblePendingRecords.filter((record) =>
       selectedVisiblePendingIds.includes(record.id),
     );
-    const fileInfo = selectedRecords
+    const uploadFileInfo = selectedRecords
       .filter((record) => record.uri)
-      .map((record) => ({
-        fileId: record.id,
-        fileURI: record.uri as string,
-      }));
+      .map((record) => ({ fileId: record.id, fileUri: record.uri as string }));
 
-    if (fileInfo.length === 0) return;
+    if (uploadFileInfo.length === 0) return;
 
     setIsQueueing(true);
     setStatusMap((current) => ({
       ...current,
       ...Object.fromEntries(
-        fileInfo.map((file) => [file.fileId, { state: "queued" }]),
+        uploadFileInfo.map((file) => [file.fileId, { state: "queued" }]),
       ),
     }));
 
     try {
-      const result = await queueInsightUpload({ fileInfo });
-      const queuedCount = result.results.filter(
-        (item) => item.status === "queued",
-      ).length;
-      const failedCount = result.results.length - queuedCount;
-
-      setStatusMap((current) => ({
-        ...current,
-        ...Object.fromEntries(
-          result.results.map((item) => [
-            item.file_id,
-            item.status === "queued"
-              ? { state: "queued" }
-              : { state: "error", error: item.error },
-          ]),
-        ),
-      }));
-
-      if (queuedCount > 0) {
-        toast.success(
-          withTokens(t.translations.PROJECT_INSIGHT_QUEUED_SUMMARY, {
-            count: queuedCount,
-          }),
-        );
-      }
-
-      if (failedCount > 0) {
-        toast.error(
-          withTokens(t.translations.PROJECT_INSIGHT_FAILED_SUMMARY, {
-            count: failedCount,
-          }),
-        );
-      }
+      await queueInsightUpload({
+        organizationId,
+        projectId,
+        fileInfo: uploadFileInfo,
+        vlmModelConfigId:
+          selectedInsightModels.uploadModelConfigId ?? undefined,
+        embeddingModelConfigId:
+          selectedInsightModels.embeddingModelConfigId ?? undefined,
+      });
+      toast.success(
+        withTokens(t.translations.PROJECT_INSIGHT_QUEUED_SUMMARY, {
+          count: uploadFileInfo.length,
+        }),
+      );
     } catch (error) {
       console.error("Failed to queue project Insight uploads:", error);
       setStatusMap((current) => ({
         ...current,
         ...Object.fromEntries(
-          fileInfo.map((file) => [
+          uploadFileInfo.map((file) => [
             file.fileId,
             {
               state: "error",
@@ -525,7 +519,7 @@ export default function ProjectInsightClientView() {
       }));
       toast.error(
         withTokens(t.translations.PROJECT_INSIGHT_FAILED_SUMMARY, {
-          count: fileInfo.length,
+          count: uploadFileInfo.length,
         }),
       );
     } finally {
@@ -659,17 +653,7 @@ export default function ProjectInsightClientView() {
   );
 
   if (!hasProjectLoaded || !hasOrganizationLoaded || isLoadingRecords) {
-    return (
-      <div className="px-4 py-10 lg:px-6">
-        <div className="card border border-base-300/60 bg-base-100 shadow-lg">
-          <div className="card-body">
-            <p className="text-sm text-base-content/70">
-              {t.translations.PROJECT_INSIGHT_LOADING_RECORDS}
-            </p>
-          </div>
-        </div>
-      </div>
-    );
+    return <ProjectInsightLoadingSkeleton />;
   }
 
   if (!projectId || !organizationId) {
@@ -687,27 +671,36 @@ export default function ProjectInsightClientView() {
   }
 
   return (
-    <div className="flex h-[calc(100dvh-7rem)] min-h-0 flex-col overflow-hidden bg-base-100">
-      <div className="border-b border-base-300/40 bg-base-200/40 px-6 py-6 lg:px-10">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div className="max-w-4xl">
-            <h1 className="text-2xl font-bold text-base-content">
-              {t.translations.PROJECT_INSIGHT_SCOPE}
-            </h1>
-            <p className="mt-1 text-sm text-base-content/70">
-              {withTokens(t.translations.PROJECT_INSIGHT_DESCRIPTION, {
-                projectName,
-              })}
-            </p>
+    <main className="flex h-[calc(100dvh-7rem)] min-h-0 flex-col overflow-hidden bg-base-200/30">
+      <section className="border-b border-base-300 bg-base-100">
+        <div className="mx-auto flex w-full max-w-7xl flex-col gap-5 px-3 py-5 sm:px-6 lg:px-8">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="max-w-4xl">
+              <p className="text-xs font-semibold uppercase tracking-wide text-base-content/60">
+                {t.translations.PROJECT}
+              </p>
+              <h1 className="text-2xl font-bold text-base-content sm:text-3xl">
+                {t.translations.PROJECT_INSIGHT_SCOPE}
+              </h1>
+              <p className="mt-3 text-base-content/70">
+                {withTokens(t.translations.PROJECT_INSIGHT_DESCRIPTION, {
+                  projectName,
+                })}
+              </p>
+            </div>
           </div>
         </div>
-      </div>
+      </section>
 
-      <div className="flex-1 min-h-0 overflow-hidden p-6 lg:p-8">
+      <section className="mx-auto flex min-h-0 w-full max-w-7xl flex-1 overflow-hidden px-3 py-5 sm:px-6 lg:px-8">
         <div className="grid h-full min-h-0 grid-cols-1 gap-6 overflow-y-auto pr-1 xl:grid-cols-[minmax(0,1.7fr)_minmax(340px,1fr)]">
           <section className="flex min-h-0 flex-col">
             <ProjectInsightChat
+              organizationId={organizationId}
+              projectId={projectId}
               projectName={projectName}
+              selectedInsightModels={selectedInsightModels}
+              onSelectedInsightModelsChange={setSelectedInsightModels}
               scopedRecordIds={visibleEmbeddedRecords.map(
                 (record) => record.id,
               )}
@@ -828,7 +821,7 @@ export default function ProjectInsightClientView() {
             </div>
           </aside>
         </div>
-      </div>
+      </section>
 
       {isFiltersOpen && (
         <dialog className="modal modal-open">
@@ -884,6 +877,6 @@ export default function ProjectInsightClientView() {
           </form>
         </dialog>
       )}
-    </div>
+    </main>
   );
 }

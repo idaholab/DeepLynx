@@ -92,7 +92,7 @@ public class AiModelConfigController : ControllerBase
     ///     Get the default AI Model Configuration for a given model type at the organization level.
     /// </summary>
     /// <param name="organizationId">The ID of the organization whose default AI Model Configuration is being retrieved.</param>
-    /// <param name="modelType">The type of model to retrieve the default configuration for (e.g. "language" or "embedding").</param>
+    /// <param name="modelType">The type of model to retrieve the default configuration for (e.g. "llm", "vlm" or "embedding").</param>
     /// <returns>The default AI Model Configuration DTO for the specified model type.</returns>
     [HttpGet("default", Name = "api_get_default_ai_model_config_organization")]
     public async Task<ActionResult<AiModelConfigResponseDto>> GetDefaultAiModelConfig(
@@ -101,8 +101,7 @@ public class AiModelConfigController : ControllerBase
     {
         try
         {
-            var currentUserId = UserContextStorage.UserId;
-            var aiModelConfig = await _aiModelConfigBusiness.GetDefaultAiModelConfig(currentUserId, organizationId, null, modelType);
+            var aiModelConfig = await _aiModelConfigBusiness.GetDefaultAiModelConfig(organizationId, null, modelType);
             return Ok(aiModelConfig);
         }
         catch (KeyNotFoundException exc)
@@ -117,7 +116,8 @@ public class AiModelConfigController : ControllerBase
     }
 
     /// <summary>
-    ///     Create a new AI Model Configuration for an organization.
+    ///     Create a new AI Model Configuration for an organization. Model Types include LLM, VLM, and Embedding
+    ///     Insight Features require a VLM and an Embedding Model (LLM is optional)
     /// </summary>
     /// <param name="organizationId">The ID of the organization under which the AI Model Configuration will be created.</param>
     /// <param name="dto">The data transfer object containing the details of the AI Model Configuration to create.</param>

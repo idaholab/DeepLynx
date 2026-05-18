@@ -9,15 +9,16 @@
     "dev:docs": "npm --prefix ../deeplynx.docs run dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "test": "npx playwright test"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.0",
     "@heroicons/react": "^2.2.0",
     "@mui/material": "^7.0.2",
-    "@okta/okta-auth-js": "^7.12.1",
-    "@okta/okta-react": "^6.10.0",
+    "@okta/okta-auth-js": "7.12.1",
+    "@okta/okta-react": "6.10.0",
     "@react-sigma/core": "^5.0.4",
     "axios": "^1.10.0",
     "data-fns": "^1.1.0",
@@ -27,13 +28,13 @@
     "graphology": "^0.26.0",
     "graphology-layout-forceatlas2": "^0.10.1",
     "graphology-types": "^0.24.8",
-    "jsonwebtoken": "^9.0.2",
+    "jsonwebtoken": "9.0.2",
     "motion": "^12.18.1",
-    "next": "^16.2.1",
-    "next-auth": "^5.0.0-beta.30",
+    "next": "16.2.6",
+    "next-auth": "5.0.0-beta.30",
     "papaparse": "^5.5.3",
-    "react": "^19.2.4",
-    "react-dom": "^19.2.4",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
     "react-hot-toast": "^2.5.2",
     "react-loading-skeleton": "^3.5.0",
     "react-router-dom": "^7.6.1",
@@ -47,8 +48,10 @@
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
+    "@playwright/test": "^1.59.1",
     "@tailwindcss/postcss": "^4",
     "@types/jsonwebtoken": "^9.0.10",
+    "@types/node": "^25.5.2",
     "@types/papaparse": "^5.5.2",
     "@types/react": "^19",
     "@types/react-dom": "^19",
@@ -61,11 +64,5 @@
     "postcss": "^8.5.3",
     "tailwindcss": "^4.1.1",
     "typescript": "^5"
-  },
-  "overrides": {
-    "minimatch": "^10.2.4",
-    "broadcast-channel": {
-      "@babel/runtime": "7.26.10"
-    }
   }
 }

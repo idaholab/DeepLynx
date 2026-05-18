@@ -499,4 +499,130 @@ public class FileAzureBusiness: IFileBusiness
         // Delete the blob - this automatically removes all uncommitted blocks associated with it
         await blockBlobClient.DeleteIfExistsAsync();
     }
+    
+    /// <summary>
+    /// Gets the total storage size in bytes for files matching the given prefix in Azure Blob Storage.
+    /// </summary>
+    /// <param name="prefix">The blob prefix to search (e.g., "organization_1/project_2/")</param>
+    /// <param name="objectStorageConfig">Azure storage configuration</param>
+    /// <returns>Total bytes used by blobs matching the prefix</returns>
+    public async Task<long> GetStorageSize(string prefix, ObjectStorageConfigDto objectStorageConfig)
+    {
+        if (objectStorageConfig.AzureObjectConfig == null)
+            return 0;
+        
+        long totalSize = 0;
+        
+        var container = new BlobContainerClient(
+            objectStorageConfig.AzureObjectConfig.AzureConnectionString,
+            objectStorageConfig.AzureObjectConfig.AzureContainerName);
+        
+        if (!await container.ExistsAsync())
+            return 0;
+        
+        await foreach (var blobItem in container.GetBlobsAsync(
+                           prefix: string.IsNullOrEmpty(prefix) ? null : prefix))
+        {
+            if (blobItem.Properties.ContentLength.HasValue)
+            {
+                totalSize += blobItem.Properties.ContentLength.Value;
+            }
+        }
+        
+        return totalSize;
+    }
+ 
+    /// <summary>
+    /// Builds the Azure-specific blob prefix.
+    /// Azure uses the format: organization_{id}/project_{id}/
+    /// </summary>
+    /// <param name="organizationId">The organization ID</param>
+    /// <param name="projectId">Optional project ID</param>
+    /// <returns>Azure blob prefix string</returns>
+    public string BuildPrefix(long organizationId, long? projectId)
+    {
+        // Azure format: organization_1/project_2/
+        if (projectId.HasValue)
+            return $"organization_{organizationId}/project_{projectId.Value}/";
+        else
+            return $"organization_{organizationId}/";
+    }
+
+    /// <summary>
+    ///     Return the size of a given file. Used to backfill records for files that didn't get file size set on upload.
+    /// </summary>
+    /// <param name="fileUri">URI of the file whose size is to be measured</param>
+    /// <param name="objectStorageConfig">object storage configuration for reaching URI</param>
+    /// <returns></returns>
+    /// <exception cref="Exception"></exception>
+    /// <exception cref="ArgumentException"></exception>
+    /// <exception cref="FileNotFoundException"></exception>
+    public async Task<long> GetFileSize(string fileUri, ObjectStorageConfigDto objectStorageConfig)
+    {
+        if (objectStorageConfig.AzureObjectConfig == null)
+            throw new Exception("Azure configuration not set in object storage");
+        
+        if (string.IsNullOrWhiteSpace(fileUri))
+            throw new ArgumentException("File URI is not specified.");
+        
+        try
+        {
+            // Create BlobContainerClient with connection string
+            var containerClient = new BlobContainerClient(
+                objectStorageConfig.AzureObjectConfig.AzureConnectionString, 
+                objectStorageConfig.AzureObjectConfig.AzureContainerName);
+            
+            // Get blob client reference
+            var blobClient = containerClient.GetBlobClient(fileUri);
+            
+            // check for properties- will throw if blob doesn't exist
+            var properties = await blobClient.GetPropertiesAsync();
+            
+            return properties.Value.ContentLength;
+        }
+        catch (Exception ex)
+        {
+            throw new Exception($"Failed to get size for file {fileUri}: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    ///     Same as GetFileSize, but using a batch operation to reduce azure API calls.
+    /// </summary>
+    /// <param name="fileUris">URIs of the files whose size is to be measured</param>
+    /// <param name="objectStorageConfig">object storage config for reaching URIs</param>
+    /// <returns></returns>
+    /// <exception cref="Exception">Returned if object storage is null</exception>
+    public async Task<Dictionary<string, long>> GetFileSizesBatch(
+        List<string> fileUris,
+        ObjectStorageConfigDto objectStorageConfig)
+    {
+        if (objectStorageConfig.AzureObjectConfig == null)
+            throw new Exception("Azure configuration not set in object storage");
+        
+        var results = new Dictionary<string, long>();
+        
+        // Create BlobContainerClient with connection string
+        var containerClient = new BlobContainerClient(
+            objectStorageConfig.AzureObjectConfig.AzureConnectionString, 
+            objectStorageConfig.AzureObjectConfig.AzureContainerName);
+        
+        if (!await containerClient.ExistsAsync())
+            return results;
+        
+        // Get all blobs at once with their properties
+        await foreach (var blob in containerClient.GetBlobsAsync())
+        {
+            if (fileUris.Contains(blob.Name) && blob.Properties.ContentLength.HasValue)
+            {
+                results[blob.Name] = blob.Properties.ContentLength.Value;
+            }
+            
+            // exit once all requested files are found
+            if (results.Count == fileUris.Count)
+                break;
+        }
+        
+        return results;
+    }
 }

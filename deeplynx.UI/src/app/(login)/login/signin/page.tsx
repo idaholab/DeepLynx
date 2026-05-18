@@ -17,7 +17,6 @@ function SigninContent() {
   const [isChecked, setChecked] = useState(true);
   const [isSigningIn, setIsSigningIn] = useState(false);
   const [hasAcknowledged, setHasAcknowledged] = useState(false);
-  const [showModal, setShowModal] = useState(true);
   const { data: session, status } = useSafeSession();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -125,7 +124,6 @@ function SigninContent() {
 
   const handleAcknowledge = () => {
     setHasAcknowledged(true);
-    setShowModal(false);
   };
 
   return (
@@ -134,82 +132,92 @@ function SigninContent() {
       <TopBanner />
 
       <div className="flex flex-col items-center justify-center login min-h-screen gap-4 sm:p-22 font-[family-name:var(--font-roboto-sans)] pt-10">
-        {/* Acknowledgment Modal */}
-        {showModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center login">
-            <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full mx-4 p-6">
-              <h2 className="text-2xl font-bold text-gray-800 mb-4">
-                System Use Notification
-              </h2>
-              <div className="text-gray-700 mb-6 space-y-3 text-sm max-h-96 overflow-y-auto">
-                <p>
-                  This is a DOE computer system. DOE computer systems are
-                  provided for the processing of official U.S. Government
-                  information only.
-                </p>
-                <p>
-                  All data contained within DOE computer systems is owned by DOE
-                  and may be audited, intercepted, recorded, read, copied, or
-                  captured in any manner and disclosed in any manner by
-                  authorized personnel.
-                </p>
-                <p>
-                  THERE IS NO RIGHT OF PRIVACY IN THIS SYSTEM. System personnel
-                  may disclose any potential evidence of crime found on DOE
-                  computer systems to appropriate authorities.
-                </p>
-                <p>
-                  USE OF THIS SYSTEM BY ANY USER, AUTHORIZED OR UNAUTHORIZED,
-                  CONSTITUTES CONSENT TO THIS AUDITING, INTERCEPTION, RECORDING,
-                  READING, COPYING, CAPTURING, and DISCLOSURE OF COMPUTER
-                  ACTIVITY.
-                </p>
-                <p className="font-bold text-red-600 text-center text-base mt-4">
-                  **WARNING**WARNING**WARNING**WARNING**WARNING**
-                </p>
-              </div>
-              <button
-                onClick={handleAcknowledge}
-                className="w-full py-4 text-sm text-center text-gray-50 bg-gray-700 border-2 border-black rounded-xl hover:bg-gray-600 transition-colors"
+        <Image
+          src="/assets/nexusWhite.png"
+          alt="DeepLynx logo"
+          width={265.8}
+          height={113.9}
+          priority
+        />
+        <main className="flex flex-col items-center w-full max-w-lg">
+          <div className="w-full bg-white rounded-2xl shadow-2xl overflow-hidden">
+            {/* Swappable body */}
+            <div className="relative overflow-hidden">
+              {/* Acknowledgement panel */}
+              <div
+                className="p-6 transition-all duration-500"
+                style={{
+                  opacity: hasAcknowledged ? 0 : 1,
+                  transform: hasAcknowledged ? "translateX(-100%)" : "translateX(0)",
+                  position: hasAcknowledged ? "absolute" : "relative",
+                  width: "100%",
+                }}
               >
-                I Acknowledge
-              </button>
-            </div>
-          </div>
-        )}
-
-        <div className="flex flex-col items-center sm:items-start mb-0">
-          <Image
-            src="/assets/nexusWhite.png"
-            alt="DeepLynx logo"
-            width={265.8}
-            height={113.9}
-            priority
-          />
-        </div>
-        <main className="flex flex-col items-center w-full max-w-lg mt-0 mb-2">
-          <div className="w-full p-2 bg-white border-2 border-solid rounded-3xl">
-            <div className="fieldset m-5">
-              <div className="flex flex-col items-center">
-                <button
-                  onClick={handleOktaSignIn}
-                  disabled={isSigningIn || !hasAcknowledged}
-                  className="w-full sm:w-70 py-4 mx-0 sm:mx-5 text-sm text-center text-gray-50 bg-gray-700 border-2 border-black rounded-xl hover:bg-gray-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                >
-                  {isSigningIn && (
-                    <span className="loading loading-spinner loading-sm"></span>
-                  )}
-                  {t.translations.PIV_CAC_CARD_SIGN_IN}
-                </button>
-                {!hasAcknowledged && (
-                  <p className="mt-2 text-sm text-gray-600">
-                    Please acknowledge the notice to continue
+                <h2 className="text-2xl font-bold text-gray-800 mb-4 text-center">
+                  System Use Notification
+                </h2>
+                <div className="text-gray-700 mb-6 space-y-3 text-sm">
+                  <p>
+                    This is a DOE computer system. DOE computer systems are
+                    provided for the processing of official U.S. Government
+                    information only.
                   </p>
-                )}
+                  <p>
+                    All data contained within DOE computer systems is owned by DOE
+                    and may be audited, intercepted, recorded, read, copied, or
+                    captured in any manner and disclosed in any manner by
+                    authorized personnel.
+                  </p>
+                  <p>
+                    THERE IS NO RIGHT OF PRIVACY IN THIS SYSTEM. System personnel
+                    may disclose any potential evidence of crime found on DOE
+                    computer systems to appropriate authorities.
+                  </p>
+                  <p>
+                    USE OF THIS SYSTEM BY ANY USER, AUTHORIZED OR UNAUTHORIZED,
+                    CONSTITUTES CONSENT TO THIS AUDITING, INTERCEPTION, RECORDING,
+                    READING, COPYING, CAPTURING, and DISCLOSURE OF COMPUTER
+                    ACTIVITY.
+                  </p>
+                  <p className="font-bold text-red-600 text-center text-base mt-4">
+                    **WARNING**WARNING**WARNING**WARNING**WARNING**
+                  </p>
+                </div>
+                <button
+                  onClick={handleAcknowledge}
+                  className="w-full py-4 text-sm text-center text-gray-50 bg-gray-700 border-2 border-black rounded-xl hover:bg-gray-600 transition-colors"
+                >
+                  I Acknowledge
+                </button>
+              </div>
+
+              {/* Sign-in panel */}
+              <div
+                className="p-6 transition-all duration-500"
+                style={{
+                  opacity: hasAcknowledged ? 1 : 0,
+                  transform: hasAcknowledged ? "translateX(0)" : "translateX(100%)",
+                  position: hasAcknowledged ? "relative" : "absolute",
+                  width: "100%",
+                }}
+              >
+                <div className="flex flex-col items-center gap-4">
+                  <button
+                    onClick={handleOktaSignIn}
+                    disabled={isSigningIn}
+                    className="w-full py-4 text-sm text-center text-gray-50 bg-gray-700 border-2 border-black rounded-xl hover:bg-gray-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  >
+                    {isSigningIn && (
+                      <span className="loading loading-spinner loading-sm"></span>
+                    )}
+                    {t.translations.SIGN_IN}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
         </main>
+
         <Link
           className="text-white hover:bg-[#383838] dark:hover:bg-[#ccc]"
           href="https://inl.gov/privacy-and-accessibility/"

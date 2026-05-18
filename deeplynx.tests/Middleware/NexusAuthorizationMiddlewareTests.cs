@@ -457,6 +457,11 @@ namespace deeplynx.tests.Middleware
             Assert.True(result.Succeeded);
             Assert.NotNull(result.Principal);
 
+            Context.ChangeTracker.Clear();
+            var updatedUser = await Context.Users.FindAsync(uid1);
+            Assert.NotNull(updatedUser);
+            Assert.NotNull(updatedUser!.LastLogin);
+
             // Cleanup
             Environment.SetEnvironmentVariable("DISABLE_BACKEND_AUTHENTICATION", null);
         }

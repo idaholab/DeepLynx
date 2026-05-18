@@ -106,8 +106,7 @@ public class AiModelConfigProjectController : ControllerBase
     {
         try
         {
-            var currentUserId = UserContextStorage.UserId;
-            var aiModelConfig = await _aiModelConfigBusiness.GetDefaultAiModelConfig(currentUserId, organizationId, projectId, modelType);
+            var aiModelConfig = await _aiModelConfigBusiness.GetDefaultAiModelConfig(organizationId, projectId, modelType);
             return Ok(aiModelConfig);
         }
         catch (KeyNotFoundException exc)
@@ -123,6 +122,7 @@ public class AiModelConfigProjectController : ControllerBase
 
     /// <summary>
     ///     Create a new AI Model Configuration for a project.
+    ///     Insight Features require a VLM and an Embedding Model (LLM is optional)
     /// </summary>
     /// <param name="organizationId">The ID of the organization under which the AI Model Configuration will be created.</param>
     /// <param name="projectId">The ID of the project under which the AI Model Configuration will be created.</param>
