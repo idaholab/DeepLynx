@@ -85,14 +85,23 @@ const EditOAuthApplication = ({
             <label className="font-semibold text-sm text-neutral">
               {t.translations.NAME}
             </label>
-            <input
-              type="text"
-              placeholder="Name"
-              className="input input-primary w-full"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              required
-            />
+            <div>
+              <input
+                type="text"
+                placeholder="Name"
+                className="input input-primary w-full"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                maxLength={50}
+                required
+              />
+              <span className={`text-xs mt-1 float-right ${name.length >= 50 ? "text-error" :
+                name.length >= 40 ? "text-warning" :
+                  "text-base-content"
+                }`}>
+                {name.length}/50
+              </span>
+            </div>
             <label className="font-semibold text-sm text-neutral">
               {t.translations.CALLBACK_URL}
             </label>
@@ -107,12 +116,21 @@ const EditOAuthApplication = ({
             <label className="font-semibold text-sm text-neutral">
               {t.translations.DESCRIPTION}
             </label>
-            <textarea
-              placeholder={t.translations.DESCRIPTION}
-              className="textarea textarea-bordered textarea-primary bg-base-100 text-base-content placeholder:text-base-content/40 min-h-[100px] w-full"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-            />
+            <div>
+              <textarea
+                placeholder={t.translations.DESCRIPTION}
+                className="textarea textarea-bordered textarea-primary bg-base-100 text-base-content placeholder:text-base-content/40 min-h-[100px] w-full"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                maxLength={250}
+              />
+              <span className={`text-xs mt-1 float-right ${description.length >= 250 ? "text-error" :
+                description.length >= 240 ? "text-warning" :
+                  "text-base-content"
+                }`}>
+                {description.length}/250
+              </span>
+            </div>
             <label className="font-semibold text-sm text-neutral">
               {t.translations.BASE_URL}
             </label>

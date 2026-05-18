@@ -102,26 +102,46 @@ const CreateOAuthModal = ({
             </h3>
 
             <div className="flex flex-col gap-4">
-              <input
-                type="text"
-                placeholder={t.translations.NAME}
-                className="input input-bordered input-primary bg-base-100 text-base-content placeholder:text-base-content/40 w-full"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                required
-              />
+              <div>
+                <input
+                  type="text"
+                  placeholder={t.translations.NAME}
+                  className="input input-bordered input-primary bg-base-100 text-base-content placeholder:text-base-content/40 w-full"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  maxLength={50}
+                  required
+                />
+                <span className={`text-xs mt-1 float-right ${name.length >= 50 ? "text-error" :
+                  name.length >= 40 ? "text-warning" :
+                    "text-base-content"
+                  }`}>
+                  {name.length}/50
+                </span>
+              </div>
+
               <input
                 placeholder={t.translations.CALLBACK_URL}
                 className="input input-bordered input-primary bg-base-100 text-base-content placeholder:text-base-content/40 w-full"
                 value={callbackUrl}
                 onChange={(e) => setCallbackUrl(e.target.value)}
               />
-              <textarea
-                placeholder={t.translations.DESCRIPTION}
-                className="textarea textarea-bordered textarea-primary bg-base-100 text-base-content placeholder:text-base-content/40 min-h-[100px] w-full"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-              />
+              <div>
+                <textarea
+                  placeholder={t.translations.DESCRIPTION}
+                  className="textarea textarea-bordered textarea-primary bg-base-100 text-base-content placeholder:text-base-content/40 min-h-[100px] w-full"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  maxLength={250}
+                />
+                <span className={`text-xs mt-1 float-right ${description.length >= 250 ? "text-error" :
+                  description.length >= 240 ? "text-warning" :
+                    "text-base-content"
+                  }`}>
+                  {description.length}/250
+                </span>
+              </div>
+
               <input
                 placeholder={t.translations.BASE_URL}
                 className="input input-bordered input-primary bg-base-100 text-base-content placeholder:text-base-content/40 w-full"
