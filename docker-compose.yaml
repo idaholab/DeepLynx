@@ -78,6 +78,12 @@ services:
       SUPPORT_EMAIL: jaren.brownlee@inl.gov
       DISABLE_BACKEND_AUTHENTICATION: true # change to false if supplying okta info on lines 12-13, 25-26
       SUPERUSER_EMAIL: jaren.brownlee@inl.gov
+      INSIGHT_FASTAPI_URL: http://insight-fastapi:5009
+      ENCRYPTION_KEY: SU5TRUNVUkVfREVWX0tFWV8zMl9CWVRFU19MT05HISE= # base64 encoded from the string "INSECURE_DEV_KEY_32_BYTES_LONG!!"
+      ENCRYPTION_IV: SU5TRUNVUkVfREVWX0lWIQ== # base64 encoded from the string "INSECURE_DEV_IV!"
+      AIRFLOW_BASE_URL: http://localhost:8080
+      AIRFLOW_USERNAME: admin
+      AIRFLOW_PASSWORD: admin
     entrypoint: /usr/local/bin/entrypoint.sh
     ports:
       - "5000:5000"
@@ -107,7 +113,8 @@ services:
       test:
         [
           "CMD-SHELL",
-          "pg_isready -U postgres && psql -U postgres -d deeplynx -c 'SELECT 1;'",
+          "pg_isready -U postgres && psql -U postgres -d deeplynx -c 'SELECT
+            1;'",
         ]
       interval: 10s
       timeout: 5s
@@ -150,10 +157,10 @@ services:
       - server
 
   insight-rabbitmq:
-    profiles: [insight]
+    profiles: [ insight ]
     build:
-      context: ./deeplynx.insight/app/rabbitmq
-      dockerfile: Dockerfiles/Dockerfile.production
+      context: ./deeplynx.insight
+      dockerfile: Dockerfiles/Dockerfile.rabbitmq.production
     ports:
       - "5672:5672"
       - "15672:15672"
@@ -161,7 +168,7 @@ services:
     env_file:
       - ./deeplynx.insight/.env.production
     healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "-q", "check_port_connectivity"]
+      test: [ "CMD", "rabbitmq-diagnostics", "-q", "check_port_connectivity" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -170,13 +177,21 @@ services:
       - nexus-network
 
   insight-fastapi:
-    profiles: [insight]
+    profiles: [ insight ]
     build:
       context: ./deeplynx.insight
-      dockerfile: app/fastapi/Dockerfiles/Dockerfile.production
+      dockerfile: Dockerfiles/Dockerfile.fastapi.production
     ports:
       - "5009:5009"
-    command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "5009"]
+    command:
+      [
+        "uvicorn",
+        "app.fastapi.main:app",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "5009",
+      ]
     env_file:
       - ./deeplynx.insight/.env.production
     environment:
@@ -190,8 +205,8 @@ services:
     depends_on:
       insight-rabbitmq:
         condition: service_healthy
-      db-version-check:
-        condition: service_completed_successfully
+      nx-postgres:
+        condition: service_healthy
     volumes:
       - object_storage:/data
       - insight_storage:/data/insight
@@ -199,11 +214,11 @@ services:
       - nexus-network
 
   insight-rabbitmq-runner:
-    profiles: [insight]
+    profiles: [ insight ]
     build:
       context: ./deeplynx.insight
-      dockerfile: app/rabbitmq/Dockerfiles/Dockerfile.runner.production
-    command: ["python", "-m", "runner"]
+      dockerfile: Dockerfiles/Dockerfile.runner.production
+    command: [ "python", "-m", "app.rabbitmq.runner" ]
     env_file:
       - ./deeplynx.insight/.env.production
     environment:
@@ -217,13 +232,25 @@ services:
     depends_on:
       insight-rabbitmq:
         condition: service_healthy
-      db-version-check:
-        condition: service_completed_successfully
+      nx-postgres:
+        condition: service_healthy
     volumes:
       - object_storage:/data
       - insight_storage:/data/insight
     networks:
       - nexus-network
+
+  # lattice:
+  #   build:
+  #     context: ./deeplynx.lattice/postgres_rag_llm
+  #     dockerfile: Dockerfile
+  #   env_file: ./deeplynx.lattice/postgres_rag_llm/.env
+  #   ports:
+  #     - "8080:8080"
+  #   networks:
+  #     - nexus-network
+  #   depends_on:
+  #       - server
 
 networks:
   nexus-network:

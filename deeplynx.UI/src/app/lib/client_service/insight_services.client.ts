@@ -6,44 +6,37 @@ export interface InsightSamplingParameters {
   topP: number;
 }
 
-export interface InsightQueryPayload {
+export interface InsightUploadFileInfo {
+  fileId: number;
+  fileUri: string;
+}
+
+export interface QueueInsightUploadArgs {
+  organizationId: number;
+  projectId: number;
+  fileInfo: InsightUploadFileInfo[];
+  vlmModelConfigId?: number;
+  embeddingModelConfigId?: number;
+}
+
+export interface StreamInsightQueryArgs {
+  organizationId: number;
+  projectId: number;
   question: string;
   fileIds?: number[];
   samplingParameters?: InsightSamplingParameters;
-  llmServerUrl?: string;
-  llmModelName?: string;
-  llmAuthToken?: string;
-  embeddingServerUrl?: string;
-  embeddingModelName?: string;
-  embeddingAuthToken?: string;
+  languageModelConfigId?: number;
+  embeddingModelConfigId?: number;
 }
 
-export interface InsightUploadFileInfo {
+export interface FetchInsightStatusArgs {
+  organizationId: number;
+  projectId: number;
   fileId: number;
-  fileURI: string;
-}
-
-export interface InsightUploadPayload {
-  fileInfo: InsightUploadFileInfo[];
-  llmServerUrl?: string;
-  llmModelName?: string;
-  llmAuthToken?: string;
-  embeddingServerUrl?: string;
-  embeddingModelName?: string;
-  embeddingAuthToken?: string;
-}
-
-export interface InsightUploadResultItem {
-  file_id: number;
-  status: "queued" | "error";
-  pdf_url?: string;
-  file_type?: string;
-  queue_name?: string;
-  error?: string;
 }
 
 export interface InsightUploadResponse {
-  results: InsightUploadResultItem[];
+  message?: string;
 }
 
 export interface InsightIngestionStatusResponse {
@@ -61,22 +54,13 @@ interface InsightQueryRequestBody {
     max_tokens: number;
     top_p: number;
   };
-  llm_server_url?: string;
-  llm_model_name?: string;
-  llm_auth_token?: string;
-  embedding_server_url?: string;
-  embedding_model_name?: string;
-  embedding_auth_token?: string;
 }
 
 interface InsightUploadRequestBody {
-  file_info: InsightUploadFileInfo[];
-  llm_server_url?: string;
-  llm_model_name?: string;
-  llm_auth_token?: string;
-  embedding_server_url?: string;
-  embedding_model_name?: string;
-  embedding_auth_token?: string;
+  fileInfo: Array<{
+    fileId: number;
+    fileUri: string;
+  }>;
 }
 
 const DEFAULT_SAMPLING_PARAMETERS: InsightSamplingParameters = {
@@ -93,41 +77,31 @@ type InsightErrorPayload = {
   results?: Array<{ error?: unknown }>;
 };
 
-function toRequestBody(payload: InsightQueryPayload): InsightQueryRequestBody {
+function toInsightQueryRequestBody(
+  queryRequest: StreamInsightQueryArgs,
+): InsightQueryRequestBody {
   const samplingParameters =
-    payload.samplingParameters ?? DEFAULT_SAMPLING_PARAMETERS;
+    queryRequest.samplingParameters ?? DEFAULT_SAMPLING_PARAMETERS;
 
   return {
-    question: payload.question,
-    file_ids: payload.fileIds,
+    question: queryRequest.question,
+    file_ids: queryRequest.fileIds,
     sampling_parameters: {
       temperature: samplingParameters.temperature,
       max_tokens: samplingParameters.maxTokens,
       top_p: samplingParameters.topP,
     },
-    llm_server_url: payload.llmServerUrl,
-    llm_model_name: payload.llmModelName,
-    llm_auth_token: payload.llmAuthToken,
-    embedding_server_url: payload.embeddingServerUrl,
-    embedding_model_name: payload.embeddingModelName,
-    embedding_auth_token: payload.embeddingAuthToken,
   };
 }
 
-function toUploadRequestBody(
-  payload: InsightUploadPayload,
+function toInsightUploadRequestBody(
+  uploadRequest: QueueInsightUploadArgs,
 ): InsightUploadRequestBody {
   return {
-    file_info: payload.fileInfo.map((file) => ({
-      ...file,
-      fileURI: normalizeInsightFileUri(file.fileURI),
+    fileInfo: uploadRequest.fileInfo.map((file) => ({
+      fileId: file.fileId,
+      fileUri: normalizeInsightFileUri(file.fileUri),
     })),
-    llm_server_url: payload.llmServerUrl,
-    llm_model_name: payload.llmModelName,
-    llm_auth_token: payload.llmAuthToken,
-    embedding_server_url: payload.embeddingServerUrl,
-    embedding_model_name: payload.embeddingModelName,
-    embedding_auth_token: payload.embeddingAuthToken,
   };
 }
 
@@ -155,11 +129,11 @@ function normalizeInsightFileUri(fileUri: string): string {
   return trimmed;
 }
 
-function parseInsightResponse(text: string): unknown {
+function parseJsonOrTextResponseBody(responseText: string): unknown {
   try {
-    return text ? JSON.parse(text) : null;
+    return responseText ? JSON.parse(responseText) : null;
   } catch {
-    return text;
+    return responseText;
   }
 }
 
@@ -167,50 +141,92 @@ function extractInsightErrorMessage(value: unknown): string {
   if (typeof value === "string") return value.trim();
   if (!value || typeof value !== "object") return "";
 
-  const payload = value as InsightErrorPayload;
+  const errorPayload = value as InsightErrorPayload;
   return (
-    extractInsightErrorMessage(payload.details) ||
-    extractInsightErrorMessage(payload.detail) ||
-    extractInsightErrorMessage(payload.error) ||
-    extractInsightErrorMessage(payload.results?.[0]?.error) ||
-    extractInsightErrorMessage(payload.message)
+    extractInsightErrorMessage(errorPayload.details) ||
+    extractInsightErrorMessage(errorPayload.detail) ||
+    extractInsightErrorMessage(errorPayload.error) ||
+    extractInsightErrorMessage(errorPayload.results?.[0]?.error) ||
+    extractInsightErrorMessage(errorPayload.message)
   );
 }
 
+function appendOptionalNumberParam(
+  queryParams: URLSearchParams,
+  paramName: string,
+  paramValue?: number,
+) {
+  if (typeof paramValue === "number" && Number.isFinite(paramValue)) {
+    queryParams.set(paramName, String(paramValue));
+  }
+}
+
 export async function queueInsightUpload(
-  payload: InsightUploadPayload,
+  uploadRequest: QueueInsightUploadArgs,
 ): Promise<InsightUploadResponse> {
-  const response = await fetch("/api/insight/upload", {
+  const queryParams = new URLSearchParams({
+    organizationId: String(uploadRequest.organizationId),
+    projectId: String(uploadRequest.projectId),
+  });
+  appendOptionalNumberParam(
+    queryParams,
+    "vlmModelConfigId",
+    uploadRequest.vlmModelConfigId,
+  );
+  appendOptionalNumberParam(
+    queryParams,
+    "embeddingModelConfigId",
+    uploadRequest.embeddingModelConfigId,
+  );
+
+  const response = await fetch(`/api/insight/upload?${queryParams.toString()}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(toUploadRequestBody(payload)),
+    body: JSON.stringify(toInsightUploadRequestBody(uploadRequest)),
   });
 
-  const text = await response.text();
-  const body = parseInsightResponse(text);
+  const responseText = await response.text();
+  const responseBody = parseJsonOrTextResponseBody(responseText);
 
   if (!response.ok) {
     throw new Error(
-      extractInsightErrorMessage(body) || text || "Insight upload failed",
+      extractInsightErrorMessage(responseBody) ||
+        responseText ||
+        "Insight upload failed",
     );
   }
 
-  return body as InsightUploadResponse;
+  return responseBody as InsightUploadResponse;
 }
 
 export async function streamInsightQuery(
-  payload: InsightQueryPayload,
-  onChunk: (chunk: string) => void,
+  queryRequest: StreamInsightQueryArgs,
+  onResponseChunk: (chunk: string) => void,
 ): Promise<string> {
-  const response = await fetch("/api/insight/query", {
+  const queryParams = new URLSearchParams({
+    organizationId: String(queryRequest.organizationId),
+    projectId: String(queryRequest.projectId),
+  });
+  appendOptionalNumberParam(
+    queryParams,
+    "languageModelConfigId",
+    queryRequest.languageModelConfigId,
+  );
+  appendOptionalNumberParam(
+    queryParams,
+    "embeddingModelConfigId",
+    queryRequest.embeddingModelConfigId,
+  );
+
+  const response = await fetch(`/api/insight/query?${queryParams.toString()}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(toRequestBody(payload)),
+    body: JSON.stringify(toInsightQueryRequestBody(queryRequest)),
   });
 
   if (!response.ok) {
-    const errorBody = await response.text();
-    throw new Error(errorBody || "Insight query failed");
+    const errorResponseText = await response.text();
+    throw new Error(errorResponseText || "Insight query failed");
   }
 
   if (!response.body) {
@@ -230,35 +246,40 @@ export async function streamInsightQuery(
     if (!chunk) continue;
 
     fullText += chunk;
-    onChunk(chunk);
+    onResponseChunk(chunk);
   }
 
   const trailing = decoder.decode();
   if (trailing) {
     fullText += trailing;
-    onChunk(trailing);
+    onResponseChunk(trailing);
   }
 
   return fullText;
 }
 
 export async function fetchInsightIngestionStatus(
-  recordId: number,
+  statusRequest: FetchInsightStatusArgs,
 ): Promise<InsightIngestionStatusResponse> {
-  const response = await fetch(`/api/insight/status/${recordId}`, {
-    method: "GET",
-    headers: { Accept: "application/json" },
-    cache: "no-store",
-  });
+  const response = await fetch(
+    `/api/insight/status/${statusRequest.fileId}?organizationId=${statusRequest.organizationId}&projectId=${statusRequest.projectId}`,
+    {
+      method: "GET",
+      headers: { Accept: "application/json" },
+      cache: "no-store",
+    },
+  );
 
-  const text = await response.text();
-  const body = parseInsightResponse(text);
+  const responseText = await response.text();
+  const responseBody = parseJsonOrTextResponseBody(responseText);
 
   if (!response.ok) {
     throw new Error(
-      extractInsightErrorMessage(body) || text || "Insight status check failed",
+      extractInsightErrorMessage(responseBody) ||
+        responseText ||
+        "Insight status check failed",
     );
   }
 
-  return body as InsightIngestionStatusResponse;
+  return responseBody as InsightIngestionStatusResponse;
 }

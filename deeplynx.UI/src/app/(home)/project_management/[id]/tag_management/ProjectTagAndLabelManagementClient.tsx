@@ -30,11 +30,11 @@ import {
 
 import ConfirmArchiveTagModal from "@/app/(home)/organization_management/tag_management/ConfirmArchiveTagModal";
 import TagEditModal from "@/app/(home)/organization_management/tag_management/TagEditModal";
-import TagOverviewStrip from "@/app/(home)/organization_management/tag_management/TagOverviewStrip";
 import ConfirmArchiveLabelModal from "@/app/(home)/organization_management/tag_management/ConfirmArchiveLabelModal";
 import LabelEditModal from "@/app/(home)/organization_management/tag_management/LabelEditModal";
 import { useLanguage } from "@/app/contexts/Language";
 import ProjectsSecurityLabels from "./ProjectsSecurityLabels";
+import ProjectTagOverviewStrip from "./ProjectTagOverviewStrip";
 import ProjectTagsPanel from "./ProjectTagsPanel";
 
 /* -------------------------------------------------------------------------- */
@@ -430,17 +430,23 @@ const ProjectTagAndLabelManagementClient: React.FC<Props> = ({
   /*                               Derived Data                               */
   /* ------------------------------------------------------------------------ */
 
-  const tagCount = tags.length;
+  const inheritedOrganizationTagCount = tags.filter(
+    (tag) => !tag.projectId,
+  ).length;
+  const projectManagedTagCount = tags.filter(
+    (tag) => !!tag.projectId,
+  ).length;
+  const totalVisibleTagCount = tags.length;
   const filteredTagCount = filteredTags.length;
 
-  const labelCount = labels.length;
+  const inheritedOrganizationLabelCount = labels.filter(
+    (label) => !label.projectId,
+  ).length;
+  const projectManagedLabelCount = labels.filter(
+    (label) => !!label.projectId,
+  ).length;
+  const totalVisibleLabelCount = labels.length;
   const filteredLabelCount = filteredLabels.length;
-
-  // For this project context, 1 if this project has labels, else 0
-  const projectsWithLabels = labelCount > 0 ? 1 : 0;
-
-  // For this project context, 1 if this project has tags, else 0
-  const projectsWithTags = tagCount > 0 ? 1 : 0;
 
   /* ------------------------------------------------------------------------ */
   /*                               Main Render                                */
@@ -458,14 +464,14 @@ const ProjectTagAndLabelManagementClient: React.FC<Props> = ({
         </p>
       </div>
 
-      {/* Overview Strip (reuses org component, labels fixed to zero for now) */}
-      <TagOverviewStrip
-        labelCount={labelCount}
-        projectsWithLabels={projectsWithLabels}
-        tagCount={tagCount}
-        projectsWithTags={projectsWithTags}
-        tagsLocked={orgTagsLocked}
-        labelsLocked={orgLabelsLocked}
+      {/* Overview Strip */}
+      <ProjectTagOverviewStrip
+        inheritedOrganizationLabelCount={inheritedOrganizationLabelCount}
+        projectManagedLabelCount={projectManagedLabelCount}
+        inheritedOrganizationTagCount={inheritedOrganizationTagCount}
+        projectManagedTagCount={projectManagedTagCount}
+        organizationTagsLocked={orgTagsLocked}
+        organizationLabelsLocked={orgLabelsLocked}
       />
 
       {/* Layout – Tags column only */}
@@ -480,7 +486,7 @@ const ProjectTagAndLabelManagementClient: React.FC<Props> = ({
           labelSearch={labelSearch}
           setLabelSearch={setLabelSearch}
           filteredCount={filteredLabelCount}
-          labelCount={labelCount}
+          labelCount={totalVisibleLabelCount}
           projectId={projectId}
           archivingLabelId={archivingLabelId}
           onCreateLabel={openCreateLabelModal}
@@ -498,7 +504,7 @@ const ProjectTagAndLabelManagementClient: React.FC<Props> = ({
           tagSearch={tagSearch}
           setTagSearch={setTagSearch}
           filteredCount={filteredTagCount}
-          tagCount={tagCount}
+          tagCount={totalVisibleTagCount}
           projectId={projectId}
           archivingTagId={archivingTagId}
           onCreateTag={openCreateTagModal}

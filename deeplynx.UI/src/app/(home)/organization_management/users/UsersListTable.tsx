@@ -45,6 +45,22 @@ const UsersListTable: React.FC<UsersListTableProps> = ({
 }) => {
   const { t } = useLanguage();
 
+  const formatLastLogin = (lastLogin?: string | null) => {
+    if (!lastLogin) return "—";
+
+    const normalized = /Z$|[+-]\d{2}:\d{2}$/.test(lastLogin)
+      ? lastLogin
+      : `${lastLogin}Z`;
+    const date = new Date(normalized);
+
+    if (Number.isNaN(date.getTime())) return "—";
+
+    return new Intl.DateTimeFormat(undefined, {
+      dateStyle: "medium",
+      timeStyle: "short",
+    }).format(date);
+  };
+
   return (
     <div className="overflow-x-auto">
       <table className="table">
@@ -54,6 +70,7 @@ const UsersListTable: React.FC<UsersListTableProps> = ({
             <th>{t.translations.EMAIL}</th>
             <th>{t.translations.USERNAME}</th>
             <th>{t.translations.STATUS}</th>
+            <th>{t.translations.LAST_LOGIN}</th>
             <th>{t.translations.PROJECT_ASSIGNMENT}</th>
             <th>{t.translations.ACTIONS}</th>
           </tr>
@@ -61,7 +78,7 @@ const UsersListTable: React.FC<UsersListTableProps> = ({
         <tbody>
           {tableData.length === 0 ? (
             <tr>
-              <td colSpan={6} className="text-center py-8 text-base-content/70">
+              <td colSpan={7} className="text-center py-8 text-base-content/70">
                 {t.translations.NO_USERS_OR_PENDING_INVITES_GET_STARTED}
               </td>
             </tr>
@@ -91,12 +108,12 @@ const UsersListTable: React.FC<UsersListTableProps> = ({
                         <>
                           <div className="font-medium">{row.name}</div>
                           {row.isSysAdmin && (
-                            <div className="badge badge-warning badge-sm">
+                            <div className="badge badge-warning badge-sm h-auto min-h-6 px-3 py-1 text-center leading-tight">
                               {t.translations.SYSTEM_ADMIN}
                             </div>
                           )}
                           {scope === "org" && row.isOrgAdmin && (
-                            <div className="badge badge-info badge-sm">
+                            <div className="badge badge-info badge-sm h-auto min-h-6 px-3 py-1 text-center leading-tight">
                               {t.translations.ORG_ADMIN}
                             </div>
                           )}
@@ -135,6 +152,10 @@ const UsersListTable: React.FC<UsersListTableProps> = ({
                     )}
                   </td>
 
+                  <td className="text-base-content/70">
+                    {formatLastLogin(row.lastLogin)}
+                  </td>
+
                   {/* Project Assignment Column */}
                   <td>
                     {row.isPending ? (
@@ -165,8 +186,7 @@ const UsersListTable: React.FC<UsersListTableProps> = ({
                         ))}
                         {row.projects.length > 2 && (
                           <div className="badge badge-sm badge-ghost">
-                            +{row.projects.length - 2}{" "}
-                            {t.translations.MORE}
+                            +{row.projects.length - 2} {t.translations.MORE}
                           </div>
                         )}
                       </div>
@@ -227,9 +247,7 @@ const UsersListTable: React.FC<UsersListTableProps> = ({
                           {scope === "org" && (
                             <button
                               className="btn btn-ghost btn-sm text-error"
-                              title={
-                                t.translations.REMOVE_FROM_ORGANIZATION
-                              }
+                              title={t.translations.REMOVE_FROM_ORGANIZATION}
                               onClick={() =>
                                 onOpenConfirm({
                                   isOpen: true,

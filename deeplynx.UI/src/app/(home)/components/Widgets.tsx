@@ -4,14 +4,18 @@ import React from "react";
 import { WidgetType } from "../types/types";
 import ProjectOverviewWidget from "./WidgetCards/ProjectOverview";
 import TeamMembersWidget from "./WidgetCards/TeamMembers";
+import SavedSearchesWidget from "./SavedSearchesWidget";
 
 interface WidgetCardProps {
   widgets: WidgetType[];
 }
 
+const SavedSearchesWidgetProject = () => <SavedSearchesWidget scope="project" />;
+
 const WIDGET_COMPONENTS: Record<WidgetType, React.ComponentType> = {
   ProjectOverview: ProjectOverviewWidget,
   TeamMembers: TeamMembersWidget,
+  SavedSearches: SavedSearchesWidgetProject,
 };
 
 const BASE_WIDGET_CARD_CLASS =

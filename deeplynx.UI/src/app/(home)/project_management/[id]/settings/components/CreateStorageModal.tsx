@@ -19,10 +19,10 @@ interface CreateStorageModalProps {
   setStorageFormData: (value: StorageFormData) => void;
   filesystemPath: string;
   setFilesystemPath: (value: string) => void;
-  s3Endpoint: string;
-  setS3Endpoint: (value: string) => void;
-  s3BucketName: string;
-  setS3BucketName: (value: string) => void;
+  azureEndpoint: string;
+  setAzureEndpoint: (value: string) => void;
+  azureBucketName: string;
+  setAzureBucketName: (value: string) => void;
   onCreate: () => void;
   onResetForm: () => void;
 }
@@ -36,10 +36,10 @@ const CreateStorageModal = ({
   setStorageFormData,
   filesystemPath,
   setFilesystemPath,
-  s3Endpoint,
-  setS3Endpoint,
-  s3BucketName,
-  setS3BucketName,
+  azureEndpoint,
+  setAzureEndpoint,
+  azureBucketName,
+  setAzureBucketName,
   onCreate,
   onResetForm,
 }: CreateStorageModalProps) => {
@@ -146,8 +146,8 @@ const CreateStorageModal = ({
                   type="text"
                   placeholder="DefaultEndpointsProtocol=https;AccountName=..."
                   className="input input-bordered"
-                  value={s3Endpoint}
-                  onChange={(e) => setS3Endpoint(e.target.value)}
+                  value={azureEndpoint}
+                  onChange={(e) => setAzureEndpoint(e.target.value)}
                 />
               </div>
 
@@ -161,8 +161,8 @@ const CreateStorageModal = ({
                   type="text"
                   placeholder="my-container"
                   className="input input-bordered"
-                  value={s3BucketName}
-                  onChange={(e) => setS3BucketName(e.target.value)}
+                  value={azureBucketName}
+                  onChange={(e) => setAzureBucketName(e.target.value)}
                 />
               </div>
             </>

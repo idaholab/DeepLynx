@@ -16,7 +16,7 @@ namespace deeplynx.api.Controllers;
 ///     scoped to the currently authenticated user.
 /// </remarks>
 [ApiController]
-[Route("users/{userId:long}/model-tokens")]
+[Route("model-tokens")]
 [Authorize]
 [Tags("User Model Token")]
 public class UserModelTokenController : ControllerBase
@@ -119,7 +119,7 @@ public class UserModelTokenController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
-    
+
     /// <summary>
     ///     Update the token string of an existing User Model Token.
     /// </summary>
