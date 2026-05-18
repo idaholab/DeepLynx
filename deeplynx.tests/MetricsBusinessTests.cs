@@ -5,8 +5,10 @@ using deeplynx.helpers;
 using deeplynx.interfaces;
 using deeplynx.models;
 using Moq;
+using DlRecord = deeplynx.datalayer.Models.Record;
 using Testcontainers.Azurite;
- 
+using Record = deeplynx.datalayer.Models.Record;
+
 namespace deeplynx.tests;
  
 // Fixture for Azurite container
@@ -49,6 +51,7 @@ public class MetricsBusinessTests : IntegrationTestBase, IClassFixture<MetricsAz
  
     // Project IDs
     private long _org1Proj1Id; // Org1, Project1
+    private long _org1Proj2Id; // Org1, Project2
     private long _org2Proj1Id; // Org2, Project1
     private long _org2Proj2Id; // Org2, Project2
  
@@ -64,6 +67,10 @@ public class MetricsBusinessTests : IntegrationTestBase, IClassFixture<MetricsAz
  
     // User ID
     private long _userId;
+    
+    private long _dsOrg1Proj1Id;
+    private long _dsOrg2Proj1Id;
+    private long _dsOrg2Proj2Id;
  
     public MetricsBusinessTests(TestSuiteFixture fixture, MetricsAzuriteFixture azuriteFixture) : base(fixture)
     {
@@ -176,6 +183,18 @@ public class MetricsBusinessTests : IntegrationTestBase, IClassFixture<MetricsAz
         Context.Projects.Add(org1Proj1);
         await Context.SaveChangesAsync();
         _org1Proj1Id = org1Proj1.Id;
+
+        // Create Project 2 for Org 1 (sibling project used by data-modality tests)
+        var org1Proj2 = new Project
+        {
+            Name = "Org1 Project2",
+            OrganizationId = _org1Id,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = _userId
+        };
+        Context.Projects.Add(org1Proj2);
+        await Context.SaveChangesAsync();
+        _org1Proj2Id = org1Proj2.Id;
 
         // Create Project 1 for Org 2
         var org2Proj1 = new Project
@@ -430,6 +449,174 @@ public class MetricsBusinessTests : IntegrationTestBase, IClassFixture<MetricsAz
         Context.DataSources.Add(dsOrg1OrgLevel);
 
         await Context.SaveChangesAsync();
+        
+        _dsOrg1Proj1Id = dsOrg1Proj1.Id;
+        _dsOrg2Proj1Id = dsOrg2Proj1.Id;
+        _dsOrg2Proj2Id = dsOrg2Proj2.Id;
+        
+        // ========== RECORDS ==========
+        var records = new List<Record>
+        {
+            // Org1 Project1: 2 active with URI (files), 1 active without URI, 1 archived with URI
+            new Record
+            {
+                Name = "Org1 Proj1 Record 1 (file)",
+                Description = "Active record with file",
+                OriginalId = Guid.NewGuid().ToString(),
+                Properties = "{}",
+                ProjectId = _org1Proj1Id,
+                DataSourceId = _dsOrg1Proj1Id,
+                OrganizationId = _org1Id,
+                IsArchived = false,
+                Uri = "localhost:8090/file1.pdf",
+                LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+                LastUpdatedBy = _userId
+            },
+            new Record
+            {
+                Name = "Org1 Proj1 Record 2 (file)",
+                Description = "Active record with file",
+                OriginalId = Guid.NewGuid().ToString(),
+                Properties = "{}",
+                ProjectId = _org1Proj1Id,
+                DataSourceId = _dsOrg1Proj1Id,
+                OrganizationId = _org1Id,
+                IsArchived = false,
+                Uri = "localhost:8090/file2.pdf",
+                LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+                LastUpdatedBy = _userId
+            },
+            new Record
+            {
+                Name = "Org1 Proj1 Record 3 (no file)",
+                Description = "Active record without file",
+                OriginalId = Guid.NewGuid().ToString(),
+                Properties = "{}",
+                ProjectId = _org1Proj1Id,
+                DataSourceId = _dsOrg1Proj1Id,
+                OrganizationId = _org1Id,
+                IsArchived = false,
+                Uri = null,
+                LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+                LastUpdatedBy = _userId
+            },
+            new Record
+            {
+                Name = "Org1 Proj1 Record 4 (archived file)",
+                Description = "Archived record with file",
+                OriginalId = Guid.NewGuid().ToString(),
+                Properties = "{}",
+                ProjectId = _org1Proj1Id,
+                DataSourceId = _dsOrg1Proj1Id,
+                OrganizationId = _org1Id,
+                IsArchived = true,
+                Uri = "localhost:8090/file4.pdf",
+                LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+                LastUpdatedBy = _userId
+            },
+            // Org2 Project1: 3 active with URI, 1 active without URI, 1 archived with URI
+            new Record
+            {
+                Name = "Org2 Proj1 Record 1 (file)",
+                Description = "Active record with file",
+                OriginalId = Guid.NewGuid().ToString(),
+                Properties = "{}",
+                ProjectId = _org2Proj1Id,
+                DataSourceId = _dsOrg2Proj1Id,
+                OrganizationId = _org2Id,
+                IsArchived = false,
+                Uri = "localhost:8090/file1.pdf",
+                LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+                LastUpdatedBy = _userId
+            },
+            new Record
+            {
+                Name = "Org2 Proj1 Record 2 (file)",
+                Description = "Active record with file",
+                OriginalId = Guid.NewGuid().ToString(),
+                Properties = "{}",
+                ProjectId = _org2Proj1Id,
+                DataSourceId = _dsOrg2Proj1Id,
+                OrganizationId = _org2Id,
+                IsArchived = false,
+                Uri = "localhost:8090/file2.pdf",
+                LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+                LastUpdatedBy = _userId
+            },
+            new Record
+            {
+                Name = "Org2 Proj1 Record 3 (file)",
+                Description = "Active record with file",
+                OriginalId = Guid.NewGuid().ToString(),
+                Properties = "{}",
+                ProjectId = _org2Proj1Id,
+                DataSourceId = _dsOrg2Proj1Id,
+                OrganizationId = _org2Id,
+                IsArchived = false,
+                Uri = "localhost:8090/file3.pdf",
+                LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+                LastUpdatedBy = _userId
+            },
+            new Record
+            {
+                Name = "Org2 Proj1 Record 4 (no file)",
+                Description = "Active record without file",
+                OriginalId = Guid.NewGuid().ToString(),
+                Properties = "{}",
+                ProjectId = _org2Proj1Id,
+                DataSourceId = _dsOrg2Proj1Id,
+                OrganizationId = _org2Id,
+                IsArchived = false,
+                Uri = null,
+                LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+                LastUpdatedBy = _userId
+            },
+            new Record
+            {
+                Name = "Org2 Proj1 Record 5 (archived file)",
+                Description = "Archived record with file",
+                OriginalId = Guid.NewGuid().ToString(),
+                Properties = "{}",
+                ProjectId = _org2Proj1Id,
+                DataSourceId = _dsOrg2Proj1Id,
+                OrganizationId = _org2Id,
+                IsArchived = true,
+                Uri = "localhost:8090/file5.pdf",
+                LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+                LastUpdatedBy = _userId
+            },
+            // Org2 Project2: 2 active with URI, 0 archived
+            new Record
+            {
+                Name = "Org2 Proj2 Record 1 (file)",
+                Description = "Active record with file",
+                OriginalId = Guid.NewGuid().ToString(),
+                Properties = "{}",
+                ProjectId = _org2Proj2Id,
+                DataSourceId = _dsOrg2Proj2Id,
+                OrganizationId = _org2Id,
+                IsArchived = false,
+                Uri = "localhost:8090/file1.pdf",
+                LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+                LastUpdatedBy = _userId
+            },
+            new Record
+            {
+                Name = "Org2 Proj2 Record 2 (file)",
+                Description = "Active record with file",
+                OriginalId = Guid.NewGuid().ToString(),
+                Properties = "{}",
+                ProjectId = _org2Proj2Id,
+                DataSourceId = _dsOrg2Proj2Id,
+                OrganizationId = _org2Id,
+                IsArchived = false,
+                Uri = "localhost:8090/file2.pdf",
+                LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+                LastUpdatedBy = _userId
+            }
+        };
+        Context.Records.AddRange(records);
+        await Context.SaveChangesAsync();
     }
  
     #region Helper Methods
@@ -649,6 +836,456 @@ public class MetricsBusinessTests : IntegrationTestBase, IClassFixture<MetricsAz
 
         // Assert
         Assert.Equal(0, count);
+    }
+
+    #endregion
+    
+    #region GetRecordCount Tests
+
+    // ── Single projectId overload ─────────────────────────────────────────────
+
+    [Fact]
+    public async Task GetRecordCount_SingleProject_ReturnsActiveOnly_ByDefault()
+    {
+        // Org1 Project1 has 3 active records (archived one excluded)
+        var count = await _metricsBusiness.GetRecordCount(_org1Id, (long?)_org1Proj1Id, hideArchived: true);
+
+        Assert.Equal(3, count);
+    }
+
+    [Fact]
+    public async Task GetRecordCount_SingleProject_IncludesArchived_WhenHideArchivedFalse()
+    {
+        // Org1 Project1: 3 active + 1 archived = 4
+        var countActive = await _metricsBusiness.GetRecordCount(_org1Id, (long?)_org1Proj1Id, hideArchived: true);
+        var countAll    = await _metricsBusiness.GetRecordCount(_org1Id, (long?)_org1Proj1Id, hideArchived: false);
+
+        Assert.Equal(3, countActive);
+        Assert.Equal(4, countAll);
+    }
+
+    [Fact]
+    public async Task GetRecordCount_SingleProject_ReturnsZero_WhenProjectHasNoRecords()
+    {
+        // Arrange - remove all records for Org2 Project2
+        var records = Context.Records.Where(r => r.ProjectId == _org2Proj2Id).ToList();
+        Context.Records.RemoveRange(records);
+        await Context.SaveChangesAsync();
+
+        var count = await _metricsBusiness.GetRecordCount(_org2Id, (long?)_org2Proj2Id, hideArchived: true);
+        Assert.Equal(0, count);
+    }
+    #endregion
+    #region GetOrganizationDataModalityCount Tests
+
+    [Fact]
+    public async Task GetOrganizationDataModalityCount_ReturnsZero_WhenNoRecords()
+    {
+        // Act
+        var count = await _metricsBusiness.GetOrganizationDataModalityCount(_org1Id, null);
+
+        // Assert
+        Assert.Equal(0, count);
+    }
+
+    [Fact]
+    public async Task GetRecordCount_SingleProject_NullProjectId_ReturnsAllActiveForOrg()
+    {
+        // Null projectId with a valid orgId returns all active records in that org.
+        // Org2: Proj1 (4 active) + Proj2 (2 active) = 6
+        var count = await _metricsBusiness.GetRecordCount(_org2Id, (long?)null, hideArchived: true);
+
+        Assert.Equal(6, count);
+    }
+
+    // ── projectIds[] overload ─────────────────────────────────────────────────
+
+    [Fact]
+    public async Task GetRecordCount_MultipleProjectIds_AggregatesAcrossProjects()
+    {
+        // Org2 Proj1 (4 active) + Org2 Proj2 (2 active) = 6
+        var count = await _metricsBusiness.GetRecordCount(
+            _org2Id,
+            new[] { _org2Proj1Id, _org2Proj2Id },
+            hideArchived: true);
+
+        Assert.Equal(6, count);
+    }
+
+    [Fact]
+    public async Task GetRecordCount_MultipleProjectIds_IncludesArchived_WhenHideArchivedFalse()
+    {
+        // Org2 Proj1: 4 active + 1 archived; Org2 Proj2: 2 active + 0 archived
+        var countActive = await _metricsBusiness.GetRecordCount(
+            _org2Id, new[] { _org2Proj1Id, _org2Proj2Id }, hideArchived: true);
+        var countAll = await _metricsBusiness.GetRecordCount(
+            _org2Id, new[] { _org2Proj1Id, _org2Proj2Id }, hideArchived: false);
+
+        Assert.Equal(6, countActive);
+        Assert.Equal(7, countAll);
+    }
+
+    [Fact]
+    public async Task GetRecordCount_MultipleProjectIds_SingleEntry_MatchesSingleProjectOverload()
+    {
+        // Array overload with one project ID must agree with the single-ID overload
+        var countArray  = await _metricsBusiness.GetRecordCount(_org2Id, new[] { _org2Proj1Id }, hideArchived: true);
+        var countSingle = await _metricsBusiness.GetRecordCount(_org2Id, (long?)_org2Proj1Id, hideArchived: true);
+
+        Assert.Equal(countSingle, countArray);
+    }
+
+    [Fact]
+    public async Task GetRecordCount_MultipleProjectIds_EmptyArray_ReturnsAllActiveForOrg()
+    {
+        // An empty array (Length == 0) skips the projectIds filter, returning the whole org.
+        // Org1: 3 active records
+        var count = await _metricsBusiness.GetRecordCount(_org1Id, Array.Empty<long>(), hideArchived: true);
+
+        Assert.Equal(3, count);
+    }
+
+    // ── Null / system-wide scoping ────────────────────────────────────────────
+
+    [Fact]
+    public async Task GetRecordCount_NullOrgAndNullProjectIds_ReturnsSystemWideActiveCount()
+    {
+        // No org or project filter = all active records system-wide.
+        // Org1 Proj1: 3 + Org2 Proj1: 4 + Org2 Proj2: 2 = 9
+        var count = await _metricsBusiness.GetRecordCount(
+            (long?)null, (long[]?)null, hideArchived: true);
+
+        Assert.Equal(9, count);
+    }
+
+    [Fact]
+    public async Task GetRecordCount_NullOrgAndNullProjectIds_IncludesArchived_WhenHideArchivedFalse()
+    {
+        // Active (9) + archived (Org1 Proj1: 1, Org2 Proj1: 1) = 11
+        var countActive = await _metricsBusiness.GetRecordCount((long?)null, (long[]?)null, hideArchived: true);
+        var countAll    = await _metricsBusiness.GetRecordCount((long?)null, (long[]?)null, hideArchived: false);
+
+        Assert.Equal(9, countActive);
+        Assert.Equal(11, countAll);
+    }
+
+    [Fact]
+    public async Task GetRecordCount_NullOrgAndNullProjectIds_ReturnsZero_WhenNoRecordsExist()
+    {
+        Context.Records.RemoveRange(Context.Records.ToList());
+        await Context.SaveChangesAsync();
+
+        var count = await _metricsBusiness.GetRecordCount((long?)null, (long[]?)null, hideArchived: true);
+
+        Assert.Equal(0, count);
+    }
+
+    // ── Cross-org isolation ───────────────────────────────────────────────────
+
+    [Fact]
+    public async Task GetRecordCount_OrgScoped_DoesNotLeakAcrossOrganizations()
+    {
+        // Each org query must return only its own records
+        var org1Count = await _metricsBusiness.GetRecordCount(_org1Id, (long[]?)null, hideArchived: true);
+        var org2Count = await _metricsBusiness.GetRecordCount(_org2Id, (long[]?)null, hideArchived: true);
+
+        Assert.Equal(3, org1Count); // only Org1 Proj1's 2 active records
+        Assert.Equal(6, org2Count); // Org2 Proj1 (3) + Org2 Proj2 (2)
+        Assert.NotEqual(org1Count, org2Count);
+    }
+
+    #endregion
+    
+    #region GetFileCount Tests
+
+    // ── Single project ────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task GetFileCount_SingleProject_ReturnsOnlyRecordsWithUri()
+    {
+        // Org1 Proj1 has 3 active records but only 2 have a URI
+        var count = await _metricsBusiness.GetFileCount(_org1Id, new[] { _org1Proj1Id }, hideArchived: true);
+        Assert.Equal(2, count);
+    }
+
+    public async Task GetOrganizationDataModalityCount_ReturnsDistinctFileTypeCount_NoProjectFilter()
+    {
+        // Arrange
+        var ds = new DataSource { Name = "DS", OrganizationId = _org1Id, ProjectId = _org1Proj1Id, IsArchived = false };
+        Context.DataSources.Add(ds);
+        await Context.SaveChangesAsync();
+
+        Context.Records.AddRange(
+            new DlRecord { Name ="R1", OriginalId = "1", Properties = "{}", Description = "", OrganizationId = _org1Id, ProjectId = _org1Proj1Id, DataSourceId = ds.Id, LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified), FileType = "image/png" },
+            new DlRecord { Name ="R2", OriginalId = "2", Properties = "{}", Description = "", OrganizationId = _org1Id, ProjectId = _org1Proj1Id, DataSourceId = ds.Id, LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified), FileType = "image/png" },
+            new DlRecord { Name ="R3", OriginalId = "3", Properties = "{}", Description = "", OrganizationId = _org1Id, ProjectId = _org1Proj1Id, DataSourceId = ds.Id, LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified), FileType = "text/csv" },
+            new DlRecord { Name ="R4", OriginalId = "4", Properties = "{}", Description = "", OrganizationId = _org1Id, ProjectId = _org1Proj2Id, DataSourceId = ds.Id, LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified), FileType = "application/json" }
+        );
+        await Context.SaveChangesAsync();
+
+        // Act
+        var count = await _metricsBusiness.GetOrganizationDataModalityCount(_org1Id, null);
+
+        // Assert - 3 distinct file types across org (png, csv, json)
+        Assert.Equal(3, count);
+    }
+
+    [Fact]
+    public async Task GetOrganizationDataModalityCount_WithProjectFilter_ReturnsCountForThatProject()
+    {
+        // Arrange
+        var ds = new DataSource { Name = "DS", OrganizationId = _org1Id, ProjectId = _org1Proj1Id, IsArchived = false };
+        Context.DataSources.Add(ds);
+        await Context.SaveChangesAsync();
+
+        Context.Records.AddRange(
+            new DlRecord { Name ="R1", OriginalId = "1", Properties = "{}", Description = "", OrganizationId = _org1Id, ProjectId = _org1Proj1Id, DataSourceId = ds.Id, LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified), FileType = "image/png" },
+            new DlRecord { Name ="R2", OriginalId = "2", Properties = "{}", Description = "", OrganizationId = _org1Id, ProjectId = _org1Proj1Id, DataSourceId = ds.Id, LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified), FileType = "text/csv" },
+            new DlRecord { Name ="R3", OriginalId = "3", Properties = "{}", Description = "", OrganizationId = _org1Id, ProjectId = _org1Proj2Id, DataSourceId = ds.Id, LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified), FileType = "application/json" }
+        );
+        await Context.SaveChangesAsync();
+
+        // Act
+        var count = await _metricsBusiness.GetOrganizationDataModalityCount(_org1Id, _org1Proj1Id);
+
+        // Assert - only records in project 1: png and csv
+        Assert.Equal(2, count);
+    }
+
+    [Fact]
+    public async Task GetFileCount_SingleProject_IncludesArchived_WhenHideArchivedFalse()
+    {
+        // Org1 Proj1: 2 active files + 1 archived file = 3
+        var countActive = await _metricsBusiness.GetFileCount(_org1Id, new[] { _org1Proj1Id }, hideArchived: true);
+        var countAll    = await _metricsBusiness.GetFileCount(_org1Id, new[] { _org1Proj1Id }, hideArchived: false);
+
+        Assert.Equal(2, countActive);
+        Assert.Equal(3, countAll);
+    }
+
+    [Fact]
+    public async Task GetFileCount_SingleProject_NeverCountsRecordsWithNullUri()
+    {
+        // Even with hideArchived: false, records without a URI must never appear
+        var fileCount   = await _metricsBusiness.GetFileCount(_org2Id, new[] { _org2Proj1Id }, hideArchived: false);
+        var recordCount = await _metricsBusiness.GetRecordCount(_org2Id, new[] { _org2Proj1Id }, hideArchived: false);
+
+        // file count must be strictly less than record count because Org2 Proj1 has null-URI records
+        Assert.True(fileCount < recordCount);
+    }
+
+    [Fact]
+    public async Task GetFileCount_SingleProject_ReturnsZero_WhenNoFilesExist()
+    {
+        // Arrange - clear all URIs for Org2 Proj2
+        var proj2Records = Context.Records.Where(r => r.ProjectId == _org2Proj2Id).ToList();
+        foreach (var r in proj2Records) r.Uri = null;
+        await Context.SaveChangesAsync();
+
+        var count = await _metricsBusiness.GetFileCount(_org2Id, new[] { _org2Proj2Id }, hideArchived: true);
+
+        Assert.Equal(0, count);
+    }
+
+    // ── Multiple projects ─────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task GetFileCount_MultipleProjects_AggregatesAcrossProjects()
+    {
+        // Org2 Proj1 (3 active files) + Org2 Proj2 (2 active files) = 5
+        var count = await _metricsBusiness.GetFileCount(
+            _org2Id, new[] { _org2Proj1Id, _org2Proj2Id }, hideArchived: true);
+
+        Assert.Equal(5, count);
+    }
+
+    [Fact]
+    public async Task GetFileCount_MultipleProjects_IncludesArchived_WhenHideArchivedFalse()
+    {
+        // Org2 Proj1: 3 active + 1 archived; Org2 Proj2: 2 active + 0 archived = 6 total files
+        var countActive = await _metricsBusiness.GetFileCount(
+            _org2Id, new[] { _org2Proj1Id, _org2Proj2Id }, hideArchived: true);
+        var countAll = await _metricsBusiness.GetFileCount(
+            _org2Id, new[] { _org2Proj1Id, _org2Proj2Id }, hideArchived: false);
+
+        Assert.Equal(5, countActive);
+        Assert.Equal(6, countAll);
+    }
+
+    [Fact]
+    public async Task GetFileCount_MultipleProjects_EmptyArray_ReturnsAllActiveFilesForOrg()
+    {
+        // Empty projectIds array falls through filter — returns all files in the org.
+        // Org2: Proj1 (3) + Proj2 (2) = 5 active files
+        var count = await _metricsBusiness.GetFileCount(_org2Id, Array.Empty<long>(), hideArchived: true);
+
+        Assert.Equal(5, count);
+    }
+
+    // ── Null / system-wide scoping ────────────────────────────────────────────
+
+    [Fact]
+    public async Task GetFileCount_NullOrgAndNullProjectIds_ReturnsSystemWideActiveFileCount()
+    {
+        // Org1 Proj1 (2) + Org2 Proj1 (3) + Org2 Proj2 (2) = 7 active files
+        var count = await _metricsBusiness.GetFileCount((long?)null, (long[]?)null, hideArchived: true);
+
+        Assert.Equal(7, count);
+    }
+
+    [Fact]
+    public async Task GetFileCount_NullOrgAndNullProjectIds_IncludesArchived_WhenHideArchivedFalse()
+    {
+        // Active (7) + archived files (Org1 Proj1: 1, Org2 Proj1: 1) = 9
+        var countActive = await _metricsBusiness.GetFileCount((long?)null, (long[]?)null, hideArchived: true);
+        var countAll    = await _metricsBusiness.GetFileCount((long?)null, (long[]?)null, hideArchived: false);
+
+        Assert.Equal(7, countActive);
+        Assert.Equal(9, countAll);
+    }
+
+    [Fact]
+    public async Task GetFileCount_NullOrgAndNullProjectIds_ReturnsZero_WhenNoFilesExist()
+    {
+        // Strip all URIs system-wide
+        var allRecords = Context.Records.ToList();
+        foreach (var r in allRecords) r.Uri = null;
+        await Context.SaveChangesAsync();
+
+        var count = await _metricsBusiness.GetFileCount((long?)null, (long[]?)null, hideArchived: true);
+
+        Assert.Equal(0, count);
+    }
+
+    // ── Cross-org isolation ───────────────────────────────────────────────────
+
+    [Fact]
+    public async Task GetFileCount_OrgScoped_DoesNotLeakAcrossOrganizations()
+    {
+        var org1Count = await _metricsBusiness.GetFileCount(_org1Id, (long[]?)null, hideArchived: true);
+        var org2Count = await _metricsBusiness.GetFileCount(_org2Id, (long[]?)null, hideArchived: true);
+
+        Assert.Equal(2, org1Count); // only Org1 Proj1's 2 active files
+        Assert.Equal(5, org2Count); // Org2 Proj1 (3) + Org2 Proj2 (2)
+        Assert.NotEqual(org1Count, org2Count);
+    }
+
+    // ── File count vs record count ────────────────────────────────────────────
+
+    [Fact]
+    public async Task GetFileCount_IsAlwaysLessThanOrEqualToRecordCount()
+    {
+        // File count can never exceed record count since it is a strict subset
+        var fileCount   = await _metricsBusiness.GetFileCount((long?)null, (long[]?)null, hideArchived: true);
+        var recordCount = await _metricsBusiness.GetRecordCount((long?)null, (long[]?)null, hideArchived: true);
+
+        Assert.True(fileCount <= recordCount);
+    }
+
+    [Fact]
+    public async Task GetFileCount_EqualsRecordCount_WhenAllRecordsHaveUri()
+    {
+        // Force every record to have a URI, then file count must equal record count
+        var allRecords = Context.Records.Where(r => !r.IsArchived).ToList();
+        foreach (var r in allRecords) r.Uri ??= "localhost:8090/backfilled.pdf";
+        await Context.SaveChangesAsync();
+
+        var fileCount   = await _metricsBusiness.GetFileCount((long?)null, (long[]?)null, hideArchived: true);
+        var recordCount = await _metricsBusiness.GetRecordCount((long?)null, (long[]?)null, hideArchived: true);
+
+        Assert.Equal(recordCount, fileCount);
+    }
+
+    [Fact]
+    public async Task GetOrganizationDataModalityCount_ExcludesRecordsWithNullFileType()
+    {
+        // Arrange
+        var ds = new DataSource { Name = "DS", OrganizationId = _org1Id, ProjectId = _org1Proj1Id, IsArchived = false };
+        Context.DataSources.Add(ds);
+        await Context.SaveChangesAsync();
+
+        Context.Records.AddRange(
+            new DlRecord { Name ="R1", OriginalId = "1", Properties = "{}", Description = "", OrganizationId = _org1Id, ProjectId = _org1Proj1Id, DataSourceId = ds.Id, LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified), FileType = "image/png" },
+            new DlRecord { Name ="R2", OriginalId = "2", Properties = "{}", Description = "", OrganizationId = _org1Id, ProjectId = _org1Proj1Id, DataSourceId = ds.Id, LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified), FileType = null }
+        );
+        await Context.SaveChangesAsync();
+
+        // Act
+        var count = await _metricsBusiness.GetOrganizationDataModalityCount(_org1Id, null);
+
+        // Assert - null FileType record excluded
+        Assert.Equal(1, count);
+    }
+
+    [Fact]
+    public async Task GetOrganizationDataModalityCount_ReturnsZero_WhenAllFileTypesAreNull()
+    {
+        // Arrange
+        var ds = new DataSource { Name = "DS", OrganizationId = _org1Id, ProjectId = _org1Proj1Id, IsArchived = false };
+        Context.DataSources.Add(ds);
+        await Context.SaveChangesAsync();
+
+        Context.Records.Add(new DlRecord { Name ="R1", OriginalId = "1", Properties = "{}", Description = "", OrganizationId = _org1Id, ProjectId = _org1Proj1Id, DataSourceId = ds.Id, LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified), FileType = null });
+        await Context.SaveChangesAsync();
+
+        // Act
+        var count = await _metricsBusiness.GetOrganizationDataModalityCount(_org1Id, null);
+
+        // Assert
+        Assert.Equal(0, count);
+    }
+
+    [Fact]
+    public async Task GetOrganizationDataModalityCount_ExcludesOtherOrganizations()
+    {
+        // Arrange
+        var ds1 = new DataSource { Name = "DS Org1", OrganizationId = _org1Id, ProjectId = _org1Proj1Id, IsArchived = false };
+        var ds2 = new DataSource { Name = "DS Org2", OrganizationId = _org2Id, ProjectId = _org1Proj2Id, IsArchived = false };
+        Context.DataSources.AddRange(ds1, ds2);
+        await Context.SaveChangesAsync();
+
+        // Project for org2
+        var proj2 = new Project { Name = "Org2 Project", OrganizationId = _org2Id, LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified), LastUpdatedBy = _userId };
+        Context.Projects.Add(proj2);
+        await Context.SaveChangesAsync();
+
+        Context.Records.AddRange(
+            new DlRecord { Name ="R1", OriginalId = "1", Properties = "{}", Description = "", OrganizationId = _org1Id, ProjectId = _org1Proj1Id, DataSourceId = ds1.Id, LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified), FileType = "image/png" },
+            new DlRecord { Name ="R2", OriginalId = "2", Properties = "{}", Description = "", OrganizationId = _org2Id, ProjectId = proj2.Id, DataSourceId = ds2.Id, LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified), FileType = "text/csv" },
+            new DlRecord { Name ="R3", OriginalId = "3", Properties = "{}", Description = "", OrganizationId = _org2Id, ProjectId = proj2.Id, DataSourceId = ds2.Id, LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified), FileType = "application/json" }
+        );
+        await Context.SaveChangesAsync();
+
+        // Act
+        var count = await _metricsBusiness.GetOrganizationDataModalityCount(_org1Id, null);
+
+        // Assert - only org 1's file type (png)
+        Assert.Equal(1, count);
+    }
+
+    [Fact]
+    public async Task GetOrganizationDataModalityCount_CountsDistinct_NotTotal()
+    {
+        // Arrange
+        var ds = new DataSource { Name = "DS", OrganizationId = _org1Id, ProjectId = _org1Proj1Id, IsArchived = false };
+        Context.DataSources.Add(ds);
+        await Context.SaveChangesAsync();
+
+        // 5 records but only 2 distinct file types
+        Context.Records.AddRange(
+            new DlRecord { Name ="R1", OriginalId = "1", Properties = "{}", Description = "", OrganizationId = _org1Id, ProjectId = _org1Proj1Id, DataSourceId = ds.Id, LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified), FileType = "image/png" },
+            new DlRecord { Name ="R2", OriginalId = "2", Properties = "{}", Description = "", OrganizationId = _org1Id, ProjectId = _org1Proj1Id, DataSourceId = ds.Id, LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified), FileType = "image/png" },
+            new DlRecord { Name ="R3", OriginalId = "3", Properties = "{}", Description = "", OrganizationId = _org1Id, ProjectId = _org1Proj1Id, DataSourceId = ds.Id, LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified), FileType = "image/png" },
+            new DlRecord { Name ="R4", OriginalId = "4", Properties = "{}", Description = "", OrganizationId = _org1Id, ProjectId = _org1Proj1Id, DataSourceId = ds.Id, LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified), FileType = "text/csv" },
+            new DlRecord { Name ="R5", OriginalId = "5", Properties = "{}", Description = "", OrganizationId = _org1Id, ProjectId = _org1Proj1Id, DataSourceId = ds.Id, LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified), FileType = "text/csv" }
+        );
+        await Context.SaveChangesAsync();
+
+        // Act
+        var count = await _metricsBusiness.GetOrganizationDataModalityCount(_org1Id, null);
+
+        // Assert
+        Assert.Equal(2, count);
     }
 
     #endregion

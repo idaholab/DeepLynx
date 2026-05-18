@@ -2324,6 +2324,10 @@ namespace deeplynx.datalayer.Migrations
                         .HasDefaultValue(false)
                         .HasColumnName("is_sys_admin");
 
+                    b.Property<DateTime?>("LastLogin")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("last_login");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("text")

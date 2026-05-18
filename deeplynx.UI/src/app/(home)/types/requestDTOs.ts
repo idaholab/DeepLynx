@@ -252,6 +252,40 @@ export type UpdateSensitivityLabelDto = {
   description?: string | null;
 };
 
+export type AiModelProvider =
+  | "openai"
+  | "anthropic"
+  | "hpc"
+  | "ollama";
+
+export type AiModelType = "llm" | "vlm" | "embedding";
+
+export type CreateAiModelConfigRequestDto = {
+  server_url: string;
+  model_type: AiModelType;
+  model_provider: AiModelProvider;
+  model_name: string;
+  requires_token: boolean;
+  default: boolean;
+}
+
+export type UpdateAiModelConfigRequestDto = {
+  model_name?: string;
+  model_type?: AiModelType;
+  server_url?: string;
+  requires_token?: boolean;
+  default?: boolean;
+}
+
+export type CreateUserModelTokenRequestDto = {
+  token: string;
+  aiModelConfigId: number;
+}
+
+export type UpdateUserModelTokenRequestDto = {
+  token: string;
+}
+
 export interface InviteUserToOrganizationRequestDto {
   userEmail: string;
   userName?: string;

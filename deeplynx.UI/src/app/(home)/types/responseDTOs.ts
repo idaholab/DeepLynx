@@ -205,7 +205,15 @@ export type UserResponseDto = {
   isOrgAdmin?: boolean | null;
   isArchived: boolean;
   isActive: boolean;
+  lastLogin?: string | null;
   role?: string;
+};
+
+export type UserActivityCountsDto = {
+  activeLast24Hours: number;
+  activeLast7Days: number;
+  activeLast30Days: number;
+  generatedAt: string;
 };
 
 export type UserAdminInfoDto = {
@@ -323,6 +331,30 @@ export type ProjectMemberResponseDto = {
   email: string;
   role?: string;
   roleId?: number;
+};
+
+export type AiModelConfigResponseDto = {
+  id: number;
+  organizationId: number;
+  projectId?: number | null;
+  serverUrl: string;
+  modelProvider: string;
+  modelName: string;
+  modelType: string;
+  requiresToken: boolean;
+  default: boolean;
+  isArchived: boolean;
+  lastUpdatedAt: string;
+  lastUpdatedBy?: number | null;
+  token?: string | null;
+};
+
+export type UserModelTokenResponseDto = {
+  id: number;
+  userId: number;
+  aiModelConfigId: number;
+  token: string;
+  lastUpdatedAt: string;
 };
 
 export interface TriggerLatticeExtractionResponseDTO {

@@ -874,14 +874,19 @@ export default function QueryBuilderClient({
 
   // ---- Render ---------------------------------------------------------------
   return (
-    <div className="min-h-screen bg-base-100 text-base-content">
+    <main className="min-h-screen bg-base-200/30 text-base-content">
       {/* Header */}
-      <div className="bg-base-200 border-b border-base-content/10 px-12 py-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-base-content mb-2">
-              {t.DATA_CATALOG}
-            </h1>
+      <section className="border-b border-base-300 bg-base-100">
+        <div className="mx-auto flex w-full max-w-7xl flex-col gap-5 px-3 py-5 sm:px-6 lg:px-8">
+          <div className="space-y-3">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-base-content/60">
+                {t.DATA_CATALOG}
+              </p>
+              <h1 className="text-2xl font-bold text-base-content sm:text-3xl">
+                {t.SEARCH_RECORDS}
+              </h1>
+            </div>
             <ProjectDropdown
               projects={projects}
               onSelectionChange={(newProjects) => {
@@ -896,11 +901,11 @@ export default function QueryBuilderClient({
             />
           </div>
         </div>
-      </div>
+      </section>
 
       {/* Main Content */}
-      <div className="px-8 py-8">
-        <div className="max-w-7xl mx-auto">
+      <section className="mx-auto w-full max-w-7xl px-3 py-5 sm:px-6 lg:px-8">
+        <div>
 
           {/* Saved Searches Collapsible Bar */}
           <div className="mb-2">
@@ -1012,7 +1017,7 @@ export default function QueryBuilderClient({
             records && <EmptyResultsState />
           )}
         </div>
-      </div>
+      </section>
 
       {/* Save Search Modal */}
       <SaveSearchModal
@@ -1026,6 +1031,6 @@ export default function QueryBuilderClient({
           setSaveAlias("");
         }}
       />
-    </div>
+    </main>
   );
 }
