@@ -147,7 +147,7 @@ public class MetricsProjectController : ControllerBase
     [Auth("read", "data_source")]
     public async Task<ActionResult<int>> GetProjectDataModalityCount(
         long organizationId,
-        [FromQuery] long projectId)
+        long projectId)
     {
         try
         {
