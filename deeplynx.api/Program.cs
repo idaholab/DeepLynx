@@ -160,6 +160,7 @@ try
     builder.Services.AddTransient<ITagBusiness, TagBusiness>();
     builder.Services.AddTransient<IOlapBusiness, OlapBusiness>();
     builder.Services.AddTransient<IMetricsBusiness, MetricsBusiness>();
+    builder.Services.AddTransient<IMaintenanceBusiness, MaintenanceBusiness>();
     builder.Services.AddTransient<IUserBusiness, UserBusiness>();
     builder.Services.AddTransient<INotificationBusiness, NotificationBusiness>();
     builder.Services.AddTransient<IInvitationBusiness, InvitationBusiness>();
