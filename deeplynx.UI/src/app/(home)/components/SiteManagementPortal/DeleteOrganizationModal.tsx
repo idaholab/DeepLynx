@@ -74,7 +74,6 @@ const DeleteOrganization = ({
                         <strong>
                             {organizationList()}
                         </strong>
-                    {/* <span className="font-bold text-red-500">This action cannot be undone.</span> */}
                 </h4>
                 <div className="modal-action">
                 <button type="button" className="btn" onClick={onClose}>
@@ -82,7 +81,7 @@ const DeleteOrganization = ({
                 </button>
                 <button
                     type="submit"
-                    className="btn bg-red-600 text-gray-200 font-semibold border-red-100 hover:bg-red-700"
+                    className="btn btn-error"
                     onClick={handleDelete}
                 >
                     {t.translations.DELETE}
