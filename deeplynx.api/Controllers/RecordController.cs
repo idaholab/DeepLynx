@@ -83,7 +83,7 @@ public class RecordController : ControllerBase
     /// <param name="projectId">The id of the project</param>
     /// <param name="hideArchived">Whether to hide archived records</param>
     /// <param name="queryDto">Pagination parameters</param>
-    /// <returns></returns>
+    /// <returns>A paginated list of records based on applied filters</returns>
     [HttpGet("GetAllRecordsPaginated", Name = "api_get_all_records_paginated")]
     public async Task<ActionResult<PaginatedResponse<RecordResponseDto>>> GetAllRecordsPaginated(
         long organizationId,
