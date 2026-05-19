@@ -1,7 +1,7 @@
 import { Column } from "../../types/types";
 import { useState } from "react";
 import PaginationControls from "../PaginationControls"
-type SiteManagementTableProps<T extends { id: string | number }> = {
+type SiteManagementTableProps<T extends { id: number }> = {
     columns: Column<T>[];
     data: T[];
     expandableKey?: keyof T;
@@ -42,7 +42,7 @@ const ExpandableCell = ({
     );
 };
 
-export const SiteManagementTable = <T extends { id: string | number }>({
+export const SiteManagementTable = <T extends { id: number }>({
     columns,
     data,
     expandableKey,
@@ -53,7 +53,7 @@ export const SiteManagementTable = <T extends { id: string | number }>({
 }: SiteManagementTableProps<T>) => {
     const [currentPage, setCurrentPage] = useState(1);
     const [pageSize, setPageSize] = useState(5);
-    const [expandedRow, setExpandedRow] = useState<string | null>(null);
+    const [expandedRow, setExpandedRow] = useState<number | null>(null);
 
     const totalPages = Math.max(1, Math.ceil(data.length / pageSize));
     const firstRowIndex = (currentPage - 1) * pageSize;
@@ -82,8 +82,8 @@ export const SiteManagementTable = <T extends { id: string | number }>({
                                             ? <ExpandableCell
                                                 value={String(row[expandableKey])}
                                                 truncateLength={truncateLength}
-                                                isExpanded={expandedRow === String(row.id)}
-                                                onToggle={() => setExpandedRow(expandedRow === String(row.id) ? null : String(row.id))}
+                                                isExpanded={expandedRow === row.id}
+                                                onToggle={() => setExpandedRow(expandedRow === row.id ? null : row.id)}
                                             />
                                             : (row[col.data as keyof T] as React.ReactNode)}
                                 </td>
