@@ -1066,7 +1066,6 @@ export const translations = {
       PROFILE_PICTURE: "Profile Picture",
       PROJECT: "Project",
       PROJECT_ADMINISTRATORS: "project administrators",
-      PROJECT_ASSIGNMENT: "Project Assignment",
       PROJECT_CONTACTS: "Project Contacts",
       PROJECT_CLASSES_AND_IDS: "Project Classes and IDs",
       PROJECT_CLASSES_AND_IDS_HELP:
@@ -2694,7 +2693,6 @@ export const translations = {
       PROFILE_PICTURE: "Foto de perfil",
       PROJECT: "Proyecto",
       PROJECT_ADMINISTRATORS: "los administradores del proyecto",
-      PROJECT_ASSIGNMENT: "Asignacion de proyectos",
       PROJECT_CONTACTS: "Contactos del proyecto",
       PROJECT_CLASSES_AND_IDS: "Clases e IDs del proyecto",
       PROJECT_CLASSES_AND_IDS_HELP:
