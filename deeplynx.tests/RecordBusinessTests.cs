@@ -510,6 +510,91 @@ public class RecordBusinessTests : IntegrationTestBase
 
     #endregion
 
+
+    #region GetAllRecordsPaginated Tests
+
+    [Fact]
+    public async Task GetAllRecordsPaginated_ValidProjectId_ReturnsRecords()
+    {
+        // Act
+        var result = await _recordBusiness.GetAllRecordsPaginated(uid, organizationId, pid, true, null, isProjectAdmin: true);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(4, result.TotalCount);
+        Assert.Equal(4, result.Items.Count);
+        
+    }
+
+    [Fact]
+    public async Task GetAllRecordsPaginated_Pagination_ReturnsCorrectPageAndCount()
+    {
+        // Act
+        var result = await _recordBusiness.GetAllRecordsPaginated(uid, organizationId, pid, true,
+            new RecordQueryRequestDto { PageNumber = 1, PageSize = 2 }, isProjectAdmin: true);
+
+        // Assert
+        Assert.Equal(4, result.TotalCount);
+        Assert.Equal(2, result.Items.Count);
+    }
+
+    [Fact]
+    public async Task GetAllRecordsPaginated_HideArchived_ExcludesArchivedRecords()
+    {
+        // Arrange
+        var record = await Context.Records.FindAsync(rid);
+        record!.IsArchived = true;
+        await Context.SaveChangesAsync();
+
+        // Act
+        var result = await _recordBusiness.GetAllRecordsPaginated(uid, organizationId, pid, true, null, isProjectAdmin: true);
+
+        // Assert
+        Assert.Equal(3, result.TotalCount);
+        Assert.DoesNotContain(result.Items, r => r.Id == rid);
+    }
+
+    [Fact]
+    public async Task GetAllRecordsPaginated_FilterByDateRange_ReturnsRecordsWithinRange()
+    {
+        // Act
+        var result = await _recordBusiness.GetAllRecordsPaginated(uid, organizationId, pid, true,
+            new RecordQueryRequestDto {
+                StartDate = DateTime.SpecifyKind(DateTime.UtcNow.AddDays(-1), DateTimeKind.Unspecified), 
+                EndDate = DateTime.SpecifyKind(DateTime.UtcNow.AddDays(1), DateTimeKind.Unspecified)
+             },
+            isProjectAdmin: true);
+
+        // Assert
+        Assert.Equal(4, result.TotalCount);
+    }
+
+    [Fact]
+    public async Task GetAllRecordsPaginated_FilterByFileType_StripsLeadingDot()
+    {
+        // Act
+        var result = await _recordBusiness.GetAllRecordsPaginated(uid, organizationId, pid, true,
+            new RecordQueryRequestDto { FileType = ".pdf" }, isProjectAdmin: true);
+
+        // Assert
+        Assert.Equal(3, result.TotalCount);
+        Assert.All(result.Items, r => Assert.Equal("pdf", r.FileType));
+    }
+
+    [Fact]
+    public async Task GetAllRecordsPaginated_FilterByDataSourceId_ReturnsFilteredRecords()
+    {
+        // Act
+        var result = await _recordBusiness.GetAllRecordsPaginated(uid, organizationId, pid, true, 
+            new RecordQueryRequestDto { DataSourceId = did2 }, isProjectAdmin: true);
+
+        // Assert
+        Assert.Equal(1, result.TotalCount);
+        Assert.All(result.Items, r => Assert.Equal(did2, r.DataSourceId));
+    }
+
+    #endregion
+
     #region GetRecordsByTags Tests
 
     [Fact]
