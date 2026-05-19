@@ -74,6 +74,7 @@ import {
   fetchInsightIngestionStatus,
   queueInsightUpload,
 } from "@/app/lib/client_service/insight_services.client";
+import { isInsightHidden } from "@/app/lib/feature_flags";
 
 // ============= HELPER FUNCTIONS =============
 interface PropertyRow {
@@ -947,7 +948,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
 
           {/* Right Column - Tags & Relations */}
           <div className="w-full xl:flex-1 space-y-4">
-            {isInsightSupported ? (
+            {isInsightSupported && !isInsightHidden() ? (
               <RecordInsightChat
                 organizationId={
                   organization?.organizationId
@@ -1036,7 +1037,8 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
         />
       ),
     },
-    {
+    // conditionally include lattice tab
+    ...(!isInsightHidden() ? [{
       label: t.translations.LATTICE_PAGE_TITLE,
       content: (
         <div className="mt-4 flex flex-col lg:flex-row gap-8 lg:gap-12 p-6">
@@ -1271,7 +1273,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
           </div>
         </div>
       ),
-    },
+    }] : []),
   ];
 
   // ============= MAIN RENDER =============

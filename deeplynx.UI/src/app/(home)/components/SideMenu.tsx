@@ -5,7 +5,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-
+import { isInsightHidden } from "@/app/lib/feature_flags";
 import { useLanguage } from "@/app/contexts/Language";
 import { useOrganizationSession } from "@/app/contexts/OrganizationSessionProvider";
 import { useProjectSession } from "@/app/contexts/ProjectSessionProvider";
@@ -431,29 +431,35 @@ const SideMenu: React.FC<SideMenuProps> = ({
             </li>
           </ProjectAdminRoute>
 
-          {/* Project Insight */}
-          <li className="mt-2">
-            <Link
-              href="/project_insight"
-              onClick={() => onMobileClose?.()}
-              className={getItemClass("/project_insight")}
-            >
-              <SparklesIcon className="size-6" />
-              {!isCollapsed && <p className="ml-2">Insight</p>}
-            </Link>
-          </li>
+          {!isInsightHidden() && (
+            <>
+              {/* Project Insight */}
+              <li className="mt-2">
+                <Link
+                  href="/project_insight"
+                  onClick={() => onMobileClose?.()}
+                  className={getItemClass("/project_insight")}
+                >
+                  <SparklesIcon className="size-6" />
+                  {!isCollapsed && <p className="ml-2">Insight</p>}
+                </Link>
+              </li>
 
-          <li className="mt-2">
-            <Link
-              href="/lattice/decisions"
-              onClick={() => onMobileClose?.()}
-              className={getItemClass("/lattice/decisions")}
-            >
-              <BeakerIcon className="size-6" />
-              {!isCollapsed && <p className="ml-2">Lattice</p>}
-            </Link>
-          </li>
+              {/* Lattice */}
+              <li className="mt-2">
+                <Link
+                  href="/lattice/decisions"
+                  onClick={() => onMobileClose?.()}
+                  className={getItemClass("/lattice/decisions")}
+                >
+                  <BeakerIcon className="size-6" />
+                  {!isCollapsed && <p className="ml-2">Lattice</p>}
+                </Link>
+              </li>
+            </>
+          )}
 
+          {/* Ontology */}
           <li className="mt-2">
             <Link
               href="/data_schema/"
