@@ -971,7 +971,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
               />
           </div>
 
-          {/* Right Column - Tags, Relations, and Removing */}
+          {/* Right Column - Tags & Relations */}
           <div className="w-full xl:flex-1 space-y-4">
             {isInsightSupported ? (
               <RecordInsightChat
@@ -1041,7 +1041,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
                   onAddRelationship={() => openAddEdgeModal("incoming")}
                 />
               </div>
-            )}  
+            )}
           </div>
         </div>
       ),
