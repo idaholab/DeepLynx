@@ -51,8 +51,8 @@ public class MaintenanceBusiness : IMaintenanceBusiness
             })
             .ToListAsync();
     }
-    
-    
+
+
     /// <summary>
     /// Exports a ducktb file table to a file and changes the record to point to it
     /// </summary>
@@ -93,50 +93,58 @@ public class MaintenanceBusiness : IMaintenanceBusiness
 
         if (fileExtension != ".csv" && fileExtension != ".parquet")
             throw new NotSupportedException($"Unsupported file extension '{fileExtension}' for record {recordId}. Only .csv and .parquet are supported.");
-        
+
         var folderPath = Path.Combine(duckDbBasePath, "organization_" + organizationId, "project_" + projectId, "datasource_" + datasourceId);
         var fullFileName = $"{guid}_{fileName}";
         var newFilePath = Path.Combine(folderPath, fullFileName);
 
         var query = $"SELECT * FROM '{tableName}'";
 
+        var dbPath = Path.Combine(duckDbBasePath, "org_" + organizationId, "project_" + projectId, "datasource_" + datasourceId, "timeseries.duckdb");
+
+        if (!File.Exists(dbPath))
+            throw new FileNotFoundException($"DuckDB file not found for record {recordId}: {dbPath}");
+
         try
         {
             Directory.CreateDirectory(folderPath);
-    
-            await using var readOnlyConnection = await GetReadOnlyDuckDbConnection(organizationId, projectId, datasourceId, duckDbBasePath);
 
-            var command = readOnlyConnection.CreateCommand();
+            // Single read-write connection for the whole flow: COPY (export), DROP, then count
+            // remaining tables. DuckDB.NET's underlying handles can keep an attachment alive
+            // across separate connections in the same process, so mixing read-only + read-write
+            // was producing "attached in read-only mode" on the DROP.
+            await using var connection = new DuckDBConnection($"Data Source={dbPath}");
+            await connection.OpenAsync();
 
+            var copyCommand = connection.CreateCommand();
             if (fileExtension == ".csv")
-                command.CommandText = $"COPY ({query}) TO '{newFilePath}' (HEADER, DELIMITER ',');";
+                copyCommand.CommandText = $"COPY ({query}) TO '{newFilePath}' (HEADER, DELIMITER ',');";
             else if (fileExtension == ".parquet")
-                command.CommandText = $"COPY ({query}) TO '{newFilePath}' (FORMAT parquet);";
+                copyCommand.CommandText = $"COPY ({query}) TO '{newFilePath}' (FORMAT parquet);";
 
-            await command.ExecuteNonQueryAsync();
+            await copyCommand.ExecuteNonQueryAsync();
 
             record.Uri = newFilePath;
             record.ObjectStorageId = instanceDefaultObjectStorageId;
+            record.Description = "";
 
             await _context.SaveChangesAsync();
 
-            // Drop the table using a read-write connection
-            var dbPath = Path.Combine(duckDbBasePath, "org_" + organizationId, "project_" + projectId, "datasource_" + datasourceId, "timeseries.duckdb");
-            var rwConnectionString = $"Data Source={dbPath}";
-            await using var readWriteConnection = new DuckDBConnection(rwConnectionString);
-            await readWriteConnection.OpenAsync();
-
-            var dropCommand = readWriteConnection.CreateCommand();
+            var dropCommand = connection.CreateCommand();
             dropCommand.CommandText = $"DROP TABLE IF EXISTS \"{tableName}\";";
             await dropCommand.ExecuteNonQueryAsync();
 
             // Check if any tables remain, delete the file if not
-            var countCommand = readWriteConnection.CreateCommand();
+            var countCommand = connection.CreateCommand();
             countCommand.CommandText = "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'main';";
             var remainingTableCount = Convert.ToInt64(await countCommand.ExecuteScalarAsync());
 
-            if (remainingTableCount == 0 && File.Exists(dbPath))
-                File.Delete(dbPath);
+            if (remainingTableCount == 0)
+            {
+                await connection.CloseAsync();
+                if (File.Exists(dbPath))
+                    File.Delete(dbPath);
+            }
 
             return true;
         }
@@ -148,24 +156,6 @@ public class MaintenanceBusiness : IMaintenanceBusiness
             throw new Exception($"Failed to export record {recordId} to file: {ex.Message}", ex);
         }
     }
-    
-    private static async Task<DuckDBConnection> GetReadOnlyDuckDbConnection(long organizationId, long projectId,
-        long dataSourceId, string duckDbBasePath)
-    {
-        var baseDir = Path.Combine(duckDbBasePath, "org_" + organizationId, "project_" + projectId,
-            "datasource_" + dataSourceId);
-        var dbPath = Path.Combine(baseDir, "timeseries.duckdb");
 
-        if (!File.Exists(dbPath))
-            throw new FileNotFoundException(
-                $"DuckDB file not found for project {projectId}, datasource {dataSourceId}: {dbPath}");
 
-        var connectionString = $"Data Source={dbPath};ACCESS_MODE=READ_ONLY";
-        var connection = new DuckDBConnection(connectionString);
-        await connection.OpenAsync();
-
-        return connection;
-    }
-    
-    
 }
