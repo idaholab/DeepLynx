@@ -120,6 +120,116 @@ public class RecordBusiness : IRecordBusiness
         }).ToList();
     }
 
+/// <summary>
+///     Retrieves all records for a specific project with pagination.
+/// </summary>
+/// <param name="currentUserId">The ID of current user</param>
+/// <param name="organizationId">The ID of the organization to which the project belongs</param>
+/// <param name="projectId">The ID of the project whose records are to be retrieved</param>
+/// <param name="hideArchived">Flag indicating whether to hide archived records from the result</param>
+/// <param name="queryDto">Filter criteria and pagination parameters</param>
+/// <param name="isSysAdmin">Optional param determining if the requesting user is a system admin</param>
+/// <param name="isOrgAdmin">Optional param determining if the requesting user is an organization admin</param>
+/// <param name="isProjectAdmin">Optional param determining if the requesting user is a project admin</param>
+/// <returns>Paginated response containing records and pagination metadata</returns>
+public async Task<PaginatedResponse<RecordResponseDto>> GetAllRecordsPaginated(
+    long currentUserId, long organizationId, long projectId, bool hideArchived,
+    RecordQueryRequestDto? queryDto,
+    bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false)
+{
+    var recordQuery = _context.Records
+        .Where(r => r.ProjectId == projectId && r.OrganizationId == organizationId)
+        .AsQueryable();
+
+    if (hideArchived) recordQuery = recordQuery.Where(r => !r.IsArchived);
+
+    if (queryDto != null)
+    {
+        if (queryDto.DataSourceId.HasValue)
+            recordQuery = recordQuery.Where(r => r.DataSourceId == queryDto.DataSourceId);
+
+        if (!string.IsNullOrWhiteSpace(queryDto.FileType))
+        {
+            var formattedFileType = queryDto.FileType.TrimStart('.').ToLower();
+            recordQuery = recordQuery.Where(r => r.FileType == formattedFileType);
+        }
+
+        if (!string.IsNullOrWhiteSpace(queryDto.Name))
+            recordQuery = recordQuery.Where(r => EF.Functions.ILike(r.Name, $"%{queryDto.Name.Trim()}%"));
+
+        if (queryDto.ClassId.HasValue)
+            recordQuery = recordQuery.Where(r => r.ClassId == queryDto.ClassId);
+
+        if (queryDto.StartDate.HasValue)
+            recordQuery = recordQuery.Where(r => r.LastUpdatedAt >= queryDto.StartDate.Value);
+
+        if (queryDto.EndDate.HasValue)
+            recordQuery = recordQuery.Where(r => r.LastUpdatedAt <= queryDto.EndDate.Value);
+    }
+
+    // if user is not admin, filter out unauthorized labels
+    if (!isSysAdmin && !isOrgAdmin && !isProjectAdmin)
+    {
+        var userAuthorizedLabels = await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
+            currentUserId, organizationId, projectId, "read record");
+        recordQuery = recordQuery.WithAuthorizedLabels(userAuthorizedLabels);
+    }
+
+    // Get total count before pagination
+    var totalCount = await recordQuery.CountAsync();
+
+    // Get pagination values
+    var pageNumber = queryDto?.PageNumber ?? 1;
+    var pageSize = queryDto?.GetValidatedPageSize() ?? 25;
+
+    // Apply pagination and execute query
+    var items = await recordQuery
+        .Include(r => r.Tags)
+        .Include(r => r.Labels)
+        .OrderByDescending(r => r.LastUpdatedAt)
+        .Skip((pageNumber - 1) * pageSize)
+        .Take(pageSize)
+        .Select(r => new RecordResponseDto
+        {
+            Id = r.Id,
+            Description = r.Description,
+            Uri = r.Uri,
+            Properties = r.Properties,
+            OriginalId = r.OriginalId,
+            Name = r.Name,
+            ClassId = r.ClassId,
+            DataSourceId = r.DataSourceId,
+            ProjectId = r.ProjectId,
+            OrganizationId = r.OrganizationId,
+            LastUpdatedBy = r.LastUpdatedBy,
+            LastUpdatedAt = r.LastUpdatedAt,
+            IsArchived = r.IsArchived,
+            FileType = r.FileType,
+            FileSize = r.FileSize,
+            Tags = r.Tags.Select(t => new RecordTagDto
+            {
+                Id = t.Id,
+                Name = t.Name
+            }).ToList(),
+            Labels = r.Labels.Select(l => new RecordLabelDto
+            {
+                Id = l.Id,
+                Name = l.Name
+            }).ToList()
+        })
+        .ToListAsync();
+
+    return new PaginatedResponse<RecordResponseDto>
+    {
+        Items = items,
+        PageNumber = pageNumber,
+        PageSize = pageSize,
+        TotalCount = totalCount
+    };
+}
+
+    
+
     /// <summary>
     ///     Get all records that contain all given tags
     /// </summary>

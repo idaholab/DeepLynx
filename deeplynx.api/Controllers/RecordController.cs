@@ -75,6 +75,53 @@ public class RecordController : ControllerBase
         }
     }
 
+
+    /// <summary>
+    /// GetAllRecords (Paginated)
+    /// </summary>
+    /// <param name="organizationId">The id of the organization</param>
+    /// <param name="projectId">The id of the project</param>
+    /// <param name="hideArchived">Whether to hide archived records</param>
+    /// <param name="queryDto">Pagination parameters</param>
+    /// <returns>A paginated list of records based on applied filters</returns>
+    [HttpGet("GetAllRecordsPaginated", Name = "api_get_all_records_paginated")]
+    public async Task<ActionResult<PaginatedResponse<RecordResponseDto>>> GetAllRecordsPaginated(
+        long organizationId,
+        long projectId,
+        bool hideArchived,
+        [FromQuery] RecordQueryRequestDto? queryDto
+    )
+    {
+        try
+        {
+            var currentUserID  = UserContextStorage.UserId;
+            var isSysAdmin     = UserContextStorage.IsSysAdmin;
+            var isOrgAdmin     = UserContextStorage.IsOrgAdmin;
+            var isProjectAdmin = UserContextStorage.IsProjectAdmin;
+
+            var records = await _recordBusiness.GetAllRecordsPaginated(
+                currentUserID,
+                organizationId,
+                projectId,
+                hideArchived,
+                queryDto,
+                isSysAdmin,
+                isOrgAdmin,
+                isProjectAdmin
+            );
+
+            return Ok(records);
+        }
+        catch (Exception e)
+        {
+            var message = $"An unexpected error occurred while fetching records: {e}";
+            _logger.LogError(message);
+            return StatusCode(StatusCodes.Status500InternalServerError, message);
+        }
+    }
+
+
+
     /// <summary>
     ///     Get Records by Tags
     /// </summary>

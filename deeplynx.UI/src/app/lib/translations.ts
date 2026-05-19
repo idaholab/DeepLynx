@@ -256,6 +256,7 @@ export const translations = {
         "Define project-level tags for classification, workflows, and search. Organization-level locks determine whether this project can define additional tags beyond those inherited from the organization.",
       DELETE: "Delete",
       DELETE_ALL_FILTERS: "Delete all filters",
+      DELETE_ORGANIZATION: "Delete Organization",
       DELETE_ROLE: "Delete Role",
       DELETING: "Deleting...",
       DESCRIPTION: "Description",
@@ -1066,7 +1067,6 @@ export const translations = {
       PROFILE_PICTURE: "Profile Picture",
       PROJECT: "Project",
       PROJECT_ADMINISTRATORS: "project administrators",
-      PROJECT_ASSIGNMENT: "Project Assignment",
       PROJECT_CONTACTS: "Project Contacts",
       PROJECT_CLASSES_AND_IDS: "Project Classes and IDs",
       PROJECT_CLASSES_AND_IDS_HELP:
@@ -1831,6 +1831,7 @@ export const translations = {
         "Define etiquetas a nivel de proyecto para clasificación, flujos de trabajo y búsqueda. Los bloqueos a nivel de organización determinan si este proyecto puede definir etiquetas adicionales además de las heredadas de la organización.",
       DELETE: "Eliminar",
       DELETE_ALL_FILTERS: "Eliminar todos los filtros",
+      DELETE_ORGANIZATION: "Eliminar Organización",
       DELETE_ROLE: "Eliminar Rol",
       DELETING: "Eliminando...",
       DESCRIPTION: "Descripción",
@@ -2694,7 +2695,6 @@ export const translations = {
       PROFILE_PICTURE: "Foto de perfil",
       PROJECT: "Proyecto",
       PROJECT_ADMINISTRATORS: "los administradores del proyecto",
-      PROJECT_ASSIGNMENT: "Asignacion de proyectos",
       PROJECT_CONTACTS: "Contactos del proyecto",
       PROJECT_CLASSES_AND_IDS: "Clases e IDs del proyecto",
       PROJECT_CLASSES_AND_IDS_HELP:
