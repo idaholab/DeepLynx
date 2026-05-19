@@ -10,6 +10,7 @@ import {
   getAllOauthApplications,
   archiveOauthApplication,
 } from "@/app/lib/client_service/oauth_services.client";
+import { SiteManagementTable } from "./SiteManagementTable";
 
 interface Props {
   initialApplications: OauthApplicationResponseDto[];
@@ -127,6 +128,9 @@ const OAuthManagement = ({ initialApplications, onApplicationsChange }: Props) =
     setSelectedOAuthApplicationAppOwnerEmail(appOwnerEmail);
     setEditOAuthApplicationModal(true);
   };
+  console.log("Data",
+    data
+  )
 
   const columns: Column<OauthApplicationResponseDto>[] = [
     {
@@ -150,7 +154,14 @@ const OAuthManagement = ({ initialApplications, onApplicationsChange }: Props) =
     },
     {
       header: t.translations.NAME,
-      data: "name" as keyof OauthApplicationResponseDto,
+      cell: (row) => {
+        const name = (row as OauthApplicationResponseDto).name;
+        return (
+          <span title={name}>
+            {name.length > 20 ? name.slice(0, 20) + "..." : name}
+          </span>
+        );
+      },
     },
     {
       header: t.translations.DESCRIPTION,
@@ -234,7 +245,9 @@ const OAuthManagement = ({ initialApplications, onApplicationsChange }: Props) =
         </button>
       </div>
       {error && <div className="p-4 text-red-500">{error}</div>}
-      <GenericTable columns={columns} data={data} enablePagination />
+
+      <SiteManagementTable columns={columns} data={data} expandableKey="description" rowKey="id" border />
+
       <CreateOAuthModal
         isOpen={isOAuthApplicationModalOpen}
         onClose={() => setIsOAuthApplicationModalOpen(false)}
