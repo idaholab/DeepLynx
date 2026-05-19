@@ -37,6 +37,35 @@ public class MaintenanceController : ControllerBase
         _fileBusiness = fileBusiness;
         _logger = logger;
     }
+    
+    /// <summary>
+    ///     Backfill file size properties
+    /// </summary>
+    /// <remarks>
+    ///     For a given org and/or project, backfill the file size property for
+    ///     existing files.
+    /// </remarks>
+    /// <param name="organizationId"></param>
+    /// <param name="projectId"></param>
+    /// <returns></returns>
+    [HttpPut("backfill-file-sizes", Name = "api_backfill_file_sizes")]
+    [SysAdmin]
+    public async Task<IActionResult> BackfillFileSizes(
+        long? organizationId,
+        long? projectId)
+    {
+        try
+        {
+            await _fileBusiness.BackfillFileSizes(organizationId, projectId);
+            return Ok(new { message = $"Backfilled file sizes for org {organizationId}, project {projectId}" });
+        }
+        catch (Exception ex)
+        {
+            var message = $"Error while backfilling file sizes: {ex.Message}";
+            _logger.LogError(ex, message);
+            return StatusCode(StatusCodes.Status500InternalServerError, message);
+        }
+    }
 
     /// <summary>
     ///     Get Timeseries Migration Record
