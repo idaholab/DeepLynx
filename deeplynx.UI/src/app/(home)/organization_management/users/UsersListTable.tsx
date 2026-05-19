@@ -4,7 +4,6 @@ import React from "react";
 import {
   ArrowPathIcon,
   EnvelopeIcon,
-  FolderIcon,
   PencilIcon,
   TrashIcon,
   XMarkIcon,
@@ -71,14 +70,13 @@ const UsersListTable: React.FC<UsersListTableProps> = ({
             <th>{t.translations.USERNAME}</th>
             <th>{t.translations.STATUS}</th>
             <th>{t.translations.LAST_LOGIN}</th>
-            <th>{t.translations.PROJECT_ASSIGNMENT}</th>
             <th>{t.translations.ACTIONS}</th>
           </tr>
         </thead>
         <tbody>
           {tableData.length === 0 ? (
             <tr>
-              <td colSpan={7} className="text-center py-8 text-base-content/70">
+              <td colSpan={6} className="text-center py-8 text-base-content/70">
                 {t.translations.NO_USERS_OR_PENDING_INVITES_GET_STARTED}
               </td>
             </tr>
@@ -154,47 +152,6 @@ const UsersListTable: React.FC<UsersListTableProps> = ({
 
                   <td className="text-base-content/70">
                     {formatLastLogin(row.lastLogin)}
-                  </td>
-
-                  {/* Project Assignment Column */}
-                  <td>
-                    {row.isPending ? (
-                      row.projectName ? (
-                        <div className="flex items-center gap-2 text-sm">
-                          <FolderIcon className="w-4 h-4 text-base-content/50" />
-                          <span>{row.projectName}</span>
-                          {row.roleName && (
-                            <span className="badge badge-sm badge-outline">
-                              {row.roleName}
-                            </span>
-                          )}
-                        </div>
-                      ) : (
-                        <span className="text-base-content/50 text-sm">—</span>
-                      )
-                    ) : row.projects && row.projects.length > 0 ? (
-                      <div className="flex flex-wrap gap-1">
-                        {row.projects.slice(0, 2).map((project) => (
-                          <div
-                            key={project.id}
-                            className="badge badge-sm badge-primary gap-1"
-                            title={`${project.name} (${project.role})`}
-                          >
-                            <FolderIcon className="w-3 h-3" />
-                            {project.name}
-                          </div>
-                        ))}
-                        {row.projects.length > 2 && (
-                          <div className="badge badge-sm badge-ghost">
-                            +{row.projects.length - 2} {t.translations.MORE}
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      <span className="text-base-content/50 text-sm">
-                        {t.translations.NO_PROJECTS}
-                      </span>
-                    )}
                   </td>
 
                   {/* Actions Column */}
