@@ -38,8 +38,9 @@ public class FeatureFlagMiddleware
             return;
         }
 
-        var hideInsight = bool.TryParse(Environment.GetEnvironmentVariable("HIDE_INSIGHT"), out var result) && result;
-        if (insightAttr != null)
+        // HIDE_INSIGHT env var. Defaults to true if not supplied.
+        var hideInsight = !bool.TryParse(Environment.GetEnvironmentVariable("HIDE_INSIGHT"), out var result) || result;
+        if (insightAttr != null) // this is redundant now but won't be once more feature flags are added
         {
             if (hideInsight)
             {

@@ -39,6 +39,7 @@ public class InsightController : ControllerBase
     /// <returns>202 Accepted once Insight has acknowledged the request.</returns>
     [HttpPost("upload", Name = "api_insight_upload")]
     [Auth("write", "insight")]
+    [InsightEnabled]
     public async Task<IActionResult> Upload(
         long organizationId,
         long projectId,
@@ -88,6 +89,7 @@ public class InsightController : ControllerBase
     [HttpPost("query", Name = "api_insight_query")]
     [Auth("read", "insight")]
     [Sensitivity("read record")]
+    [InsightEnabled]
     public async Task Query(
         long organizationId,
         long projectId,
@@ -155,6 +157,7 @@ public class InsightController : ControllerBase
     /// <param name="fileId">The Insight file ID to check.</param>
     /// <returns>Ingestion status including chunk count and page count.</returns>
     [HttpGet("ingestion_status/{fileId:long}", Name = "api_insight_ingestion_status")]
+    [InsightEnabled]
     public async Task<ActionResult<InsightIngestionStatusResponseDto>> IngestionStatus(
         long organizationId,
         long projectId,
@@ -190,6 +193,7 @@ public class InsightController : ControllerBase
     /// <param name="embeddingModelConfigId">Optional explicit embedding model config ID. Defaults to the project/org default. If no default is configured, Insight falls back to its own environment defaults.</param>
     /// <returns>202 Accepted once all items have been queued.</returns>
     [HttpPost("embed_strings", Name = "api_insight_embed_strings")]
+    [InsightEnabled]
     public async Task<IActionResult> EmbedStrings(
         long organizationId,
         long projectId,
