@@ -28,6 +28,7 @@ interface PropertyRow {
   value: React.ReactNode;
   editable?: boolean;
   onEdit?: (newValue: string) => void;
+  maxCharacterLimit?: number;
   isNested?: boolean;
   nestedRows?: PropertyRow[];
   copyValue?: string;
@@ -318,12 +319,25 @@ const PropertyTable: React.FC<PropertyTableProps> = ({
           </div>
           <div className="col-span-7 p-3 text-sm text-base-content break-words">
             {editingIndex === index ? (
-              <input
-                type="text"
-                value={editValue}
-                onChange={(e) => setEditValue(e.target.value)}
-                className="input input-sm input-bordered w-full"
-              />
+              <div className="flex items-center gap-1">
+                <input
+                  type="text"
+                  value={editValue}
+                  maxLength={row.maxCharacterLimit}
+                  onChange={(e) => setEditValue(e.target.value)}
+                  className="input input-sm input-bordered w-full"
+                />
+                {row.maxCharacterLimit && (
+                  <span className={`text-xs float-right mt-1 ${
+                      !row.maxCharacterLimit ? "text-base-content" :
+                      editValue.length == row.maxCharacterLimit ? "text-error" :
+                      editValue.length >= row.maxCharacterLimit - 10 ? "text-warning" :
+                      "text-base-content"
+                    }`}>
+                      {editValue.length}/{row.maxCharacterLimit}
+                  </span>
+                )}
+                </div>
             ) : (
               <div className="break-words">
                 {hasNested ? (

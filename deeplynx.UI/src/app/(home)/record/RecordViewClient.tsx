@@ -554,11 +554,8 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
         value: record.name,
         editable: true,
         onEdit: (value: string) =>
-          handleUpdateRecord(
-            "name",
-            value,
-            t.translations.RECORD_NAME_UPDATED,
-          ),
+          handleUpdateRecord("name", value, t.translations.RECORD_NAME_UPDATED),
+        maxCharacterLimit: 50,
       },
       {
         label: t.translations.RECORD_DESCRIPTION,
@@ -570,6 +567,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
             value,
             t.translations.RECORD_NAME_UPDATED,
           ),
+        maxCharacterLimit: 250
       },
       {
         label: t.translations.URI,
