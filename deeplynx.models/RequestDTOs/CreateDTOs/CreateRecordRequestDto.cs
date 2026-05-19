@@ -8,10 +8,12 @@ public class CreateRecordRequestDto
 {
     [Required]
     [JsonPropertyName("name")]
+    [MaxLength(50)]
     public string Name { get; set; }
 
     [JsonPropertyName("description")]
     [Required]
+    [MaxLength(250)]
     public string Description { get; set; }
 
     [JsonPropertyName("object_storage_id")]
