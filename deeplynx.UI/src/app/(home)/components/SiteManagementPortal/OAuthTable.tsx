@@ -128,9 +128,6 @@ const OAuthManagement = ({ initialApplications, onApplicationsChange }: Props) =
     setSelectedOAuthApplicationAppOwnerEmail(appOwnerEmail);
     setEditOAuthApplicationModal(true);
   };
-  console.log("Data",
-    data
-  )
 
   const columns: Column<OauthApplicationResponseDto>[] = [
     {
