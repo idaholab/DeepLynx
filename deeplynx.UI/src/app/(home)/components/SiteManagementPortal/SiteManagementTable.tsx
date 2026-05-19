@@ -1,7 +1,7 @@
 import { Column } from "../../types/types";
 import { useState } from "react";
 import PaginationControls from "../PaginationControls"
-type SiteManagementTableProps<T extends object> = {
+type SiteManagementTableProps<T extends { id: string | number }> = {
     columns: Column<T>[];
     data: T[];
     expandableKey?: keyof T;
@@ -10,7 +10,39 @@ type SiteManagementTableProps<T extends object> = {
     border?: boolean;
 }
 
-export const SiteManagementTable = <T extends object>({
+const ExpandableCell = ({
+    value,
+    truncateLength,
+    isExpanded,
+    onToggle,
+}: {
+    value: string;
+    truncateLength: number;
+    isExpanded: boolean;
+    onToggle: () => void;
+}) => {
+    const isTruncatable = value.length > truncateLength;
+
+    return (
+        <div>
+            <span className="break-words">
+                {isExpanded || !isTruncatable
+                    ? value
+                    : value.slice(0, truncateLength) + "..."}
+            </span>
+            {isTruncatable && (
+                <button
+                    className="btn btn-xs btn-ghost ml-1"
+                    onClick={onToggle}
+                >
+                    {isExpanded ? "See less" : "See more"}
+                </button>
+            )}
+        </div>
+    );
+};
+
+export const SiteManagementTable = <T extends { id: string | number }>({
     columns,
     data,
     expandableKey,
@@ -47,25 +79,12 @@ export const SiteManagementTable = <T extends object>({
                                     {col.cell
                                         ? col.cell(row, rowIndex)
                                         : col.data === expandableKey && expandableKey !== undefined
-                                            ? (
-                                                <div>
-                                                    <span className="break-words">
-                                                        {expandedRow === (row[rowKey as keyof T] as string)
-                                                            ? String(row[expandableKey])
-                                                            : String(row[expandableKey]).length > truncateLength
-                                                                ? String(row[expandableKey]).slice(0, truncateLength) + "..."
-                                                                : String(row[expandableKey])}
-                                                    </span>
-                                                    {String(row[expandableKey]).length > truncateLength && (
-                                                        <button
-                                                            className="btn btn-xs btn-ghost ml-1"
-                                                            onClick={() => setExpandedRow(expandedRow === (row[rowKey as keyof T] as string) ? null : (row[rowKey as keyof T] as string))}
-                                                        >
-                                                            {expandedRow === (row[rowKey as keyof T] as string) ? "See less" : "See more"}
-                                                        </button>
-                                                    )}
-                                                </div>
-                                            )
+                                            ? <ExpandableCell
+                                                value={String(row[expandableKey])}
+                                                truncateLength={truncateLength}
+                                                isExpanded={expandedRow === String(row.id)}
+                                                onToggle={() => setExpandedRow(expandedRow === String(row.id) ? null : String(row.id))}
+                                            />
                                             : (row[col.data as keyof T] as React.ReactNode)}
                                 </td>
                             ))}
