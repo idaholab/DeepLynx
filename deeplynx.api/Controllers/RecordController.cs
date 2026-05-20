@@ -3,6 +3,7 @@ using deeplynx.helpers.Context;
 using deeplynx.interfaces;
 using deeplynx.models;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 
 namespace deeplynx.api.Controllers;
@@ -496,6 +497,46 @@ public class RecordController : ControllerBase
         }
     }
 
+    /// <summary>
+    ///     Bulk Attach Tags to Records
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <param name="projectId">The ID of the project to which the record belongs</param>
+    /// <param name="dtos">List of record/tag pairs to attach</param>
+    /// <returns></returns>
+    [HttpPost("bulk-attach-tags-to-records", Name = "api_bulk_attach_tags_to_records")]
+    [Auth("update", "record")]
+    [Auth("read", "tag")]
+    [Sensitivity("update record")]
+    public async Task<IActionResult> BulkAttachTagsToRecords(
+        long organizationId,
+        long projectId,
+        [FromBody] List<RecordTagLinkDto> dtos)
+    {
+        try
+        {
+            var currentUserId = UserContextStorage.UserId;
+
+            await _recordBusiness.BulkAttachTagsToRecords(currentUserId, organizationId, projectId, dtos);
+
+            return Ok(new { message = "Successfully bulk attached tags to records" });
+        }
+        catch (ArgumentException exc)
+        {
+            return BadRequest(exc.Message);
+        }
+        catch (KeyNotFoundException exc)
+        {
+            return NotFound(exc.Message);
+        }
+        catch (Exception exc)
+        {
+            var message = $"An error occurred while bulk attaching tags to records: {exc}";
+            _logger.LogError(message);
+            return StatusCode(StatusCodes.Status500InternalServerError, message);
+        }
+    }
+    
     /// <summary>
     ///     Attach a Sensitivity Label to a Record
     /// </summary>
