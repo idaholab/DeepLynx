@@ -2,6 +2,7 @@
 
 "use client";
 import Tabs from "@/app/(home)/components/Tabs";
+import { BetaBadge } from "@/app/(home)/components/BetaBadge";
 import {
   ArrowTopRightOnSquareIcon,
   PencilIcon,
@@ -1038,6 +1039,12 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
     },
     {
       label: t.translations.LATTICE_PAGE_TITLE,
+      displayLabel: (
+        <span className="inline-flex items-center gap-2">
+          {t.translations.LATTICE_PAGE_TITLE}
+          <BetaBadge size="xs" />
+        </span>
+      ),
       content: (
         <div className="mt-4 flex flex-col lg:flex-row gap-8 lg:gap-12 p-6">
           {/* Left: About Lattice */}
