@@ -27,6 +27,7 @@ import {
 } from "@/app/(home)/types/latticeDTOs";
 import toast from "react-hot-toast";
 import { useLanguage } from "@/app/contexts/Language";
+import { BetaBadge } from "@/app/(home)/components/BetaBadge";
 
 type DetailTab = "records" | "classes" | "edges" | "relationships";
 
@@ -511,9 +512,12 @@ export default function LatticeDecisionsPage() {
             <p className="text-xs font-semibold uppercase tracking-wide text-base-content/60">
               {t.translations.LATTICE_EXTRACTIONS_PANEL_TITLE}
             </p>
-            <h1 className="text-2xl font-bold text-base-content sm:text-3xl">
-              {t.translations.LATTICE_PAGE_TITLE}
-            </h1>
+            <div className="flex flex-wrap items-center gap-3">
+              <h1 className="text-2xl font-bold text-base-content sm:text-3xl">
+                {t.translations.LATTICE_PAGE_TITLE}
+              </h1>
+              <BetaBadge size="sm" />
+            </div>
             <p className="mt-3 max-w-4xl text-base-content/70">
               {t.translations.LATTICE_PAGE_DESCRIPTION_INTRO}{" "}
               <span className="font-medium">{t.translations.LATTICE_VALID_LABEL}</span>{" "}
