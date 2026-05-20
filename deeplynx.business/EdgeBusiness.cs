@@ -297,7 +297,6 @@ public class EdgeBusiness : IEdgeBusiness
         last_updated_at = EXCLUDED.last_updated_at
     RETURNING id, properties, organization_id, project_id, data_source_id, origin_id, destination_id, relationship_id;";
 
-   
 
         var result = await _bulkCopyUpsertExecutor.CopyUpsertAsync(
             conn, tx,
