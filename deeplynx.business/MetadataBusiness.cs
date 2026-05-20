@@ -273,9 +273,11 @@ public class MetadataBusiness : IMetadataBusiness
     }
 
     /// <summary>
-    ///     Throw error if records are specified by an edge but not specified by a record
-    ///     TODO: eventually fetch records from DB by original ID (DL-533)
+    ///     Checks for original id specified in record map or in the DB
+    ///     Throws an exception if referenced records cannot be resolved.
     /// </summary>
+    /// <param name="projectId"></param>
+    /// <param name="dataSourceId"></param>
     /// <param name="recordMap"></param>
     /// <param name="edges"></param>
     /// <returns>A list of relationships to be inserted</returns>
