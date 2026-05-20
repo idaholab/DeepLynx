@@ -73,7 +73,7 @@ export const SiteManagementTable = <T extends { id: string | number }>({
                 </thead>
                 <tbody>
                     {currentData.map((row, rowIndex) => (
-                        <tr key={rowIndex}>
+                        <tr key={row.id}>
                             {columns.map((col, colIndex) => (
                                 <td key={colIndex}>
                                     {col.cell
