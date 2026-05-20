@@ -1551,6 +1551,55 @@ public async Task<PaginatedResponse<RecordResponseDto>> GetAllRecordsPaginated(
     }
 
     /// <summary>
+    ///     Validate and bulk attach tags to records for public API use.
+    /// </summary>
+    /// <param name="currentUserId">The ID of current user</param>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <param name="projectId"> Shared project ID of the object storages</param>
+    /// <param name="dtos">A list of record_id/tag_id pairs to be inserted</param>
+    /// <exception cref="ArgumentException"> Thrown if no record,tag pairs are provided</exception>
+    /// <exception cref="KeyNotFoundException">Returned if one or more records or tags are not found or archived</exception>
+    /// <returns>True if successful</returns>
+    public async Task<bool> BulkAttachTagsToRecords(long currentUserId, long organizationId, 
+        long projectId, List<RecordTagLinkDto> dtos)
+    {
+        if (dtos.Count == 0)
+            throw new ArgumentException("Record,tag pairs cannot be null or empty", nameof(dtos));
+        
+        var recordIds = dtos
+            .Select(r => r.RecordId)
+            .Distinct().
+            ToList();
+        
+        var tagIds = dtos
+            .Select(r => r.TagId)
+            .Distinct()
+            .ToList();
+        
+        // Validate records belong to this organization/project and are not archived 
+        var records = await _context.Records
+            .Where(r => recordIds.Contains(r.Id) && r.OrganizationId == organizationId && r.ProjectId == projectId && !r.IsArchived)
+            .Select(r => r.Id)
+            .ToListAsync();
+
+        if (records.Count != recordIds.Count)
+            throw new KeyNotFoundException("One or more records were not found or archived.");
+
+        // Validate tags belong to this organization/project and are not archived 
+        var tags = await _context.Tags
+            .Where(t => tagIds.Contains(t.Id) && t.OrganizationId == organizationId && t.ProjectId == projectId && !t.IsArchived)
+            .Select(t => t.Id)
+            .ToListAsync();
+        
+        if (tags.Count != tagIds.Count)
+            throw new KeyNotFoundException("One or more tags were not found or archived.");
+
+        await BulkAttachTags(dtos);
+
+        return true;
+    }
+
+    /// <summary>
     ///     Map an NPGSQL data reader to a return DTO usually during high scale read operations
     /// </summary>
     /// <param name="r">NPGSQL reader object containing DTO params</param>

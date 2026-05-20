@@ -46,4 +46,6 @@ public interface IRecordBusiness
     Task<List<RecordResponseDto>> GetRecordsByOriginalId(long currentUserId, long organizationId, long projectId, long dataSourceId, List<string> originalIds, 
         bool hideArchived, bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false);
     Task<List<LatticeRecordDto>> GetLatticeRecords(long organizationId, long projectId);
+    Task<bool> BulkAttachTagsToRecords(long currentUserId, long organizationId, long projectId,
+        List<RecordTagLinkDto> dtos);
 }
