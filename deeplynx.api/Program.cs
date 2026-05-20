@@ -1,10 +1,10 @@
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using deeplynx.business;
-using deeplynx.datalayer.MigrationRunner;
 using deeplynx.datalayer.Models;
 using deeplynx.helpers;
 using deeplynx.helpers.BigData;
+using deeplynx.helpers.ExceptionHandlers;
 using deeplynx.helpers.Hubs;
 using deeplynx.interfaces;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -12,6 +12,7 @@ using Microsoft.AspNetCore.Http.Features;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
+using Npgsql;
 using Scalar.AspNetCore;
 using Serilog;
 using Log = Serilog.Log;
@@ -132,7 +133,16 @@ try
     */
     builder.Services.AddHttpContextAccessor();
 
+    var dataSourceBuilder = new NpgsqlDataSourceBuilder(connectionString);
+    dataSourceBuilder.UseVector();
+    var dataSource = dataSourceBuilder.Build();
+
     builder.Services.AddDbContext<DeeplynxContext>(
+        options => options.UseNpgsql(dataSource),
+        ServiceLifetime.Transient
+    );
+
+    builder.Services.AddDbContext<LatticeContext>(
         options => options.UseNpgsql(connectionString),
         ServiceLifetime.Transient
     );
@@ -140,6 +150,7 @@ try
     builder.Services.AddSignalR(); // Used for event system pub/sub and notifications
 
     builder.Services.AddTransient<IRecordBusiness, RecordBusiness>();
+    builder.Services.AddTransient<IRecordCollectionBusiness, RecordCollectionBusiness>();
     builder.Services.AddTransient<IObjectStorageBusiness, ObjectStorageBusiness>();
     builder.Services.AddTransient<IClassBusiness, ClassBusiness>();
     builder.Services.AddTransient<IProjectBusiness, ProjectBusiness>();
@@ -147,7 +158,9 @@ try
     builder.Services.AddTransient<IDataSourceBusiness, DataSourceBusiness>();
     builder.Services.AddTransient<IRelationshipBusiness, RelationshipBusiness>();
     builder.Services.AddTransient<ITagBusiness, TagBusiness>();
-    builder.Services.AddTransient<ITimeseriesBusiness, TimeseriesBusiness>();
+    builder.Services.AddTransient<IOlapBusiness, OlapBusiness>();
+    builder.Services.AddTransient<IMetricsBusiness, MetricsBusiness>();
+    builder.Services.AddTransient<IMaintenanceBusiness, MaintenanceBusiness>();
     builder.Services.AddTransient<IUserBusiness, UserBusiness>();
     builder.Services.AddTransient<INotificationBusiness, NotificationBusiness>();
     builder.Services.AddTransient<IInvitationBusiness, InvitationBusiness>();
@@ -181,7 +194,28 @@ try
     builder.Services.AddTransient<IUserModelTokenBusiness, UserModelTokenBusiness>();
     builder.Services.AddTransient<IAiModelConfigBusiness, AiModelConfigBusiness>();
     builder.Services.AddScoped<ISensitivityLabelService, SensitivityLabelService>();
+    builder.Services.AddScoped<FileBusiness>();
+    builder.Services.AddTransient<IInsightBusiness, InsightBusiness>();
+    builder.Services.AddTransient<IExtractionValidation, ExtractionValidation>();
+    builder.Services.AddTransient<ILatticeExtractionBusiness, LatticeExtractionBusiness>();
+    builder.Services.AddMemoryCache();
+    builder.Services.AddHttpClient<InsightServiceClient>();
+    builder.Services.AddHttpClient<AirflowServiceClient>();
+    builder.Services.AddSingleton<EncryptionHelper>();
 
+    /*
+    ╔════════════════════════════╗
+    ║  Global Exception Handling ║
+    ╚════════════════════════════╝
+    Specific handlers are registered first; the InternalServerError fallback runs
+    last and always handles whatever the others reject. RFC 7807 ProblemDetails
+    is used for the response envelope.
+    */
+    builder.Services.AddProblemDetails();
+    builder.Services.AddExceptionHandler<BadRequestExceptionHandler>();
+    builder.Services.AddExceptionHandler<NotFoundExceptionHandler>();
+    builder.Services.AddExceptionHandler<ConflictExceptionHandler>();
+    builder.Services.AddExceptionHandler<InternalServerErrorExceptionHandler>();
 
     //OpenApi Documentation
     builder.Services.AddOpenApi(options =>
@@ -254,6 +288,7 @@ try
                 new() { Name = "Organization - AI Model Config", Description = "AI model configuration management" },
                 new() { Name = "Project - AI Model Config", Description = "AI model configuration management" },
                 new() { Name = "User Model Token", Description = "User AI model token management" },
+                new() { Name = "Insight", Description = "Deeplynx Insight management" },
 
                 // Authentication
                 new() { Name = "OauthHandshake", Description = "OAuth2 authorization flow" },
@@ -266,6 +301,7 @@ try
 
                 // Data
                 new() { Name = "Record", Description = "Record management" },
+                new() { Name = "Record Collection", Description = "Record Collection management"},
                 new() { Name = "File", Description = "File operations" },
                 new() { Name = "Metadata", Description = "Metadata operations" },
                 new() { Name = "Historical Record", Description = "Record history" },
@@ -308,10 +344,17 @@ try
                 new() { Name = "Project - Tag", Description = "Project-level tags" },
 
                 // Timeseries
-                new() { Name = "Timeseries", Description = "Time-series data" },
+                new() { Name = "Olap", Description = "OLAP tabular file operations" },
+
+                // Metrics
+                new() { Name = "Metrics", Description = "System Statistics" },
+
+                // Integrations
+                new() { Name = "Airflow", Description = "Apache Airflow DAG management" },
 
                 // Other
-                new() { Name = "Notification", Description = "Notifications" }
+                new() { Name = "Notification", Description = "Notifications" },
+                new() { Name = "Maintenance", Description = "Maintenance" }
             };
 
             // Create x-tagGroups for nested folder structure (alphabetized)
@@ -325,7 +368,11 @@ try
                 new JsonObject
                 {
                     ["name"] = "AI Services",
-                    ["tags"] = new JsonArray { "Lattice", "Organization - AI Model Config", "Project - AI Model Config", "User Model Token" }
+                    ["tags"] = new JsonArray
+                    {
+                        "Lattice", "Organization - AI Model Config", "Project - AI Model Config", "User Model Token",
+                        "Insight"
+                    }
                 },
                 new JsonObject
                 {
@@ -341,7 +388,7 @@ try
                 {
                     ["name"] = "Data",
                     ["tags"] = new JsonArray
-                        { "Record", "Historical Record", "Edge", "Historical Edge", "File", "Metadata" }
+                        { "Record", "Record Collection", "Historical Record", "Edge", "Historical Edge", "File", "Metadata" }
                 },
                 new JsonObject
                 {
@@ -390,13 +437,23 @@ try
                 },
                 new JsonObject
                 {
-                    ["name"] = "Timeseries",
-                    ["tags"] = new JsonArray { "Timeseries" }
+                    ["name"] = "Olap",
+                    ["tags"] = new JsonArray { "Olap" }
+                },
+                new JsonObject
+                {
+                    ["name"] = "Metrics",
+                    ["tags"] = new JsonArray { "Metrics", "Organization - Metrics", "Project - Metrics" }
+                },
+                new JsonObject
+                {
+                    ["name"] = "Integrations",
+                    ["tags"] = new JsonArray { "Airflow" }
                 },
                 new JsonObject
                 {
                     ["name"] = "Other",
-                    ["tags"] = new JsonArray { "Notification" }
+                    ["tags"] = new JsonArray { "Notification", "Maintenance" }
                 }
             };
 
@@ -440,22 +497,58 @@ try
 
             return Task.CompletedTask;
         });
+        // Mark non-nullable value-type query parameters as required in the OpenAPI spec.
+        // Path parameters are already required by default; query parameters are not, even when
+        // their C# type is non-nullable (e.g. long, int, bool). Scalar renders this distinction
+        // visually, so this transformer ensures the spec matches the actual binding behaviour.
+        options.AddOperationTransformer((operation, context, cancellationToken) =>
+        {
+            if (operation.Parameters is null) return Task.CompletedTask;
+
+            foreach (var parameter in operation.Parameters.OfType<OpenApiParameter>())
+            {
+                if (parameter.In != ParameterLocation.Query) continue;
+
+                var paramDesc = context.Description.ParameterDescriptions
+                    .FirstOrDefault(p => p.Name == parameter.Name);
+
+                if (paramDesc?.Type is { IsValueType: true } t
+                    && Nullable.GetUnderlyingType(t) is null)
+                    parameter.Required = true;
+            }
+
+            return Task.CompletedTask;
+        });
     });
 
     /* ╔════════════════════════════╗
        ║      Check DB Version      ║
        ╚════════════════════════════╝ */
     await DatabaseVersionChecker.CheckDatabaseVersion(connectionString);
-
+    
     /* ╔════════════════════════════╗
-       ║      Apply Migrations      ║
+       ║   Check Encryption Keys    ║
        ╚════════════════════════════╝ */
-    await MigrationRunner.ApplyMigrations(connectionString);
+    EncryptionHelper.CheckEncryptionConfig();
 
     /* ╔════════════════════════════╗
        ║      App Configurations    ║
        ╚════════════════════════════╝ */
     var app = builder.Build();
+
+    /* ╔════════════════════════════╗
+       ║      Apply Migrations      ║
+       ╚════════════════════════════╝ */
+    using (var scope = app.Services.CreateScope())
+    {
+        var dbContext = scope.ServiceProvider.GetRequiredService<DeeplynxContext>();
+        await dbContext.Database.MigrateAsync();
+
+        var latticeContext = scope.ServiceProvider.GetRequiredService<LatticeContext>();
+        await latticeContext.Database.MigrateAsync();
+    }
+
+    Log.Information("Migrations applied successfully.");
 
     /* ╔════════════════════════════╗
        ║      App Base Path         ║
@@ -465,6 +558,7 @@ try
 
     app.UseStaticFiles();
     app.UseRouting();
+    app.UseExceptionHandler(); // Runs registered IExceptionHandlers; must precede middleware that may throw
     app.UseCors("AllowAll");
     app.UseAuthentication(); // Must be first
     app.UseMiddleware<UserContextMiddleware>(); // Second - sets UserId/Email
@@ -482,8 +576,8 @@ try
         app.MapHub<EventNotificationHub>("/eventNotificationHub"); // endpoint for real-time notifications with SignalR
 
     /* ╔════════════════════════════╗
-    ║   Scalar Configuration     ║
-    ╚════════════════════════════╝ */
+       ║   Scalar Configuration     ║
+       ╚════════════════════════════╝ */
     // Always using scalar:
     //if (app.Environment.IsDevelopment()) { ...
     // app.UseOpenApi();

@@ -4,6 +4,7 @@
 *.zip
 dist
 
+
 ## Mac OS ##
 .DS_Store
 .idea
@@ -11,22 +12,31 @@ dist
 ## VS Code ##
 .vscode
 
+## Visual Studio ##
+.vs/
+*.user
+
+## Claude Code ##
+.claude/
+
 ## Web ##
 /deeplynx.api/.DS_Store
 /deeplynx.api/.idea
+/deeplynx.api/bin*
+/deeplynx.datalayer/bin*
 
 ## Web ##
 /**/obj/
 /**/bin/
 
-deeplynx.sln.DotSettings.user
-
-package-lock.json
+## Test output ##
+TestResults/
 
 duckdb
 
-- global.json
+global.json
 
 /storage
 
 .continue
+

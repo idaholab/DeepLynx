@@ -74,19 +74,17 @@ public class OrganizationBusiness : IOrganizationBusiness
     /// </summary>
     /// <param name="hideArchived">Flag indicating whether to hide archived organizations from the result</param>
     /// <param name="userId">ID of the User executing this method.</param>
+    /// <param name="isSysAdmin">Boolean value determining if the requesting user is a system admin</param>
     /// <returns>A list of organizations</returns>
     public async Task<IEnumerable<OrganizationResponseDto>> GetAllOrganizationsForUser(long userId,
-        bool hideArchived = true)
+        bool hideArchived = true, bool isSysAdmin = false)
     {
-        // First, get all organization IDs for the user
-        var organizationIds = await _context.OrganizationUsers
-            .Where(ou => ou.UserId == userId)
-            .Select(ou => ou.OrganizationId)
-            .ToListAsync();
+        var query = _context.Organizations.AsQueryable();
 
-        // Then query organizations using those IDs
-        var query = _context.Organizations
-            .Where(o => organizationIds.Contains(o.Id));
+        if (!isSysAdmin)
+        {
+            query = query.Where(o => o.OrganizationUsers.Any(ou => ou.UserId == userId));
+        }
 
         if (hideArchived)
         {

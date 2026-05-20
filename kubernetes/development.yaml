@@ -6,6 +6,7 @@ metadata:
   labels:
     name: deeplynxv3-dev
 
+
 # Secret for Azure Storage Account with SAS Token
 ---
 apiVersion: v1
@@ -19,6 +20,7 @@ stringData:
   azurestorageaccountsastoken: ${AZURE_STORAGE_ACCOUNT_SAS_TOKEN}
   azurestorageaccountkey: ${AZURE_STORAGE_ACCOUNT_KEY}
   azurestorageconnectionstring: ${AZURE_OBJECT_CONNECTION_STRING}
+
 
 # Persistent Volume pointing to existing Azure File Share
 ---
@@ -57,6 +59,7 @@ spec:
       name: azure-storage-secret
       namespace: deeplynxv3-dev
 
+
 # Storage Class (simplified for static provisioning)
 ---
 apiVersion: storage.k8s.io/v1
@@ -70,6 +73,7 @@ parameters:
 reclaimPolicy: Retain
 allowVolumeExpansion: true
 volumeBindingMode: Immediate
+
 
 # Persistent Volume Claim
 ---
@@ -106,6 +110,8 @@ spec:
           image: ${CI_REGISTRY}/${CI_REGISTRY_PATH}:deeplynxv3-ui-${GITHUB_RUN_NUMBER}
           imagePullPolicy: Always
           env:
+            - name: NODE_ENV
+              value: "production"
             - name: AWS_S3_CONNECTION_STRING
               value: ${AWS_S3_CONNECTION_STRING}
             - name: AZURE_OBJECT_CONNECTION_STRING
@@ -139,7 +145,6 @@ spec:
               value: ${JWT_AUDIENCE}
             - name: DUCKDB_BASE_PATH
               # DuckDB Configuration
-
               value: ${DUCKDB_BASE_PATH}
             - name: SMTP_SERVER
               value: ${SMTP_SERVER}
@@ -161,11 +166,12 @@ spec:
               value: ${SUPERUSER_EMAIL}
             - name: INSIGHT_FASTAPI_URL
               value: ${INSIGHT_FASTAPI_URL}
+            - name: LATTICE_MODEL
+              value: ${LATTICE_MODEL}
             - name: TENANT_MODE
               value: ${TENANT_MODE}
             - name: OKTA_CLIENT_SECRET
               # Runtime environment variables from secrets (sensitive)
-
               valueFrom:
                 secretKeyRef:
                   name: app-secrets
@@ -227,9 +233,12 @@ spec:
                   name: app-config
                   key: backend-base-url
           resources:
+            requests:
+              cpu: "250m"
+              memory: "384Mi"
             limits:
-              memory: "4Gi"
-              cpu: "1500m"
+              cpu: "1000m"
+              memory: "1Gi"
           ports:
             - containerPort: 3000
           volumeMounts:
@@ -266,6 +275,16 @@ spec:
                 secretKeyRef:
                   name: azure-storage-secret
                   key: azurestorageconnectionstring
+            - name: ENCRYPTION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: encryption-key
+            - name: ENCRYPTION_IV
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: encryption-iv
             - name: AZURE_CONTAINER_NAME
               value: ${AZURE_CONTAINER_NAME}
             - name: ConnectionStrings__DefaultConnection
@@ -316,6 +335,12 @@ spec:
               value: ${INSIGHT_FASTAPI_URL}
             - name: SUPERUSER_EMAIL
               value: ${SUPERUSER_EMAIL}
+            - name: AIRFLOW_BASE_URL
+              value: ${AIRFLOW_BASE_URL}
+            - name: AIRFLOW_USERNAME
+              value: ${AIRFLOW_USERNAME}
+            - name: AIRFLOW_PASSWORD
+              value: ${AIRFLOW_PASSWORD}
             - name: OKTA_CLIENT_SECRET
               # Backend may also need these environment variables
 
@@ -369,9 +394,12 @@ spec:
                   name: app-config
                   key: hosted-link
           resources:
+            requests:
+              cpu: "500m"
+              memory: "512Mi"
             limits:
-              memory: "4Gi"
-              cpu: "1500m"
+              cpu: "2000m"
+              memory: "2Gi"
           ports:
             - containerPort: 5000
           volumeMounts:
@@ -381,6 +409,7 @@ spec:
         - name: duckdb-storage
           persistentVolumeClaim:
             claimName: ${AZURE_FILE_SHARE_PVC}
+
 
 #docs
 ---
@@ -403,6 +432,8 @@ spec:
           image: ${CI_REGISTRY}/${CI_REGISTRY_PATH}:deeplynxv3-docs-${GITHUB_RUN_NUMBER}
           imagePullPolicy: Always
           env:
+            - name: NODE_ENV
+              value: "production"
             - name: HOSTED_LINK
               valueFrom:
                 configMapKeyRef:
@@ -417,6 +448,7 @@ spec:
               memory: "512Mi"
           ports:
             - containerPort: 3001
+
 
 #mcp
 ---
@@ -492,8 +524,8 @@ spec:
                   key: rabbitmq-default-pass
           resources:
             requests:
-              memory: "2Gi"
-              cpu: "1000m"
+              cpu: "250m"
+              memory: "512Mi"
             limits:
               memory: "2Gi"
               cpu: "1000m"
@@ -512,6 +544,7 @@ spec:
             timeoutSeconds: 5
             failureThreshold: 3
 
+
 # insight-storage: scratch volume for the Insight processing pipeline
 ---
 apiVersion: v1
@@ -526,6 +559,7 @@ spec:
     requests:
       storage: 25Gi
   storageClassName: ${AZURE_FILE_SHARE_STORAGE_CLASS}
+
 
 # insight-fastapi
 ---
@@ -613,10 +647,15 @@ spec:
               value: "false"
             - name: STORAGE_BASE_DIR
               value: "/data/insight"
+            - name: NEXUS_API_URL
+              value: ${NEXUS_API_URL}
           resources:
+            requests:
+              cpu: "150m"
+              memory: "256Mi"
             limits:
-              memory: "4Gi"
-              cpu: "1500m"
+              cpu: "750m"
+              memory: "768Mi"
           volumeMounts:
             - name: nexus-storage
               mountPath: /data/duckdb
@@ -630,6 +669,7 @@ spec:
         - name: insight-storage
           persistentVolumeClaim:
             claimName: insight-storage
+
 
 # insight-rabbitmq-runner
 ---
@@ -698,6 +738,16 @@ spec:
                 secretKeyRef:
                   name: app-secrets
                   key: emb-auth-token
+            - name: ENCRYPTION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: encryption-key
+            - name: ENCRYPTION_IV
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: encryption-iv
             - name: LLM_SERVER_URL
               value: "http://deeplynx-api.inl.gov:4000/v1"
             - name: LLM_MODEL_NAME
@@ -729,9 +779,12 @@ spec:
             - name: STORAGE_BASE_DIR
               value: "/data/insight"
           resources:
-            limits:
-              memory: "4Gi"
+            requests:
+              memory: "512Mi"
               cpu: "1500m"
+            limits:
+              memory: "12Gi"
+              cpu: "10000m"
           volumeMounts:
             - name: nexus-storage
               mountPath: /data/duckdb
@@ -844,10 +897,13 @@ metadata:
   annotations:
     kubernetes.io/ingress.class: nginx
     nginx.ingress.kubernetes.io/configuration-snippet: |
-      more_clear_headers "strict-transport-security";
-      more_clear_headers "x-content-type-options";
-      more_clear_headers "x-frame-options";
-      more_clear_headers "content-security-policy";
+      more_set_headers "Referrer-Policy: strict-origin";
+      more_set_headers "X-Content-Type-Options: nosniff";
+      more_set_headers "X-Frame-Options: SAMEORIGIN";
+      more_clear_headers "X-Powered-By";
+      more_clear_headers "x-nextjs-cache";
+      more_clear_headers "x-nextjs-prerender";
+      more_clear_headers "x-nextjs-stale-time";
     nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
     nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
 spec:

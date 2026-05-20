@@ -14,7 +14,6 @@ import { updateFile } from "@/app/lib/client_service/file_services.client";
 import { uploadBulkMetadata } from "@/app/lib/client_service/metadata_service.client";
 import { fullTextSearch } from "@/app/lib/client_service/query_services.client";
 import { getAllRecords } from "@/app/lib/client_service/record_services.client";
-import { uploadTimeseriesFile } from "@/app/lib/client_service/timeseries_services.client";
 import { parseBackendErrors } from "@/app/lib/error_parser";
 import { createUploadToastManager } from "@/app/lib/uploadToastManager";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -223,21 +222,16 @@ export default function UploadCenterClient() {
   const selectedMetadata = selectedFiles.map(
     (_, idx) => fileUploadState.filesMetadata[idx] ?? {},
   );
-  const hasAnyNonTimeseriesNewFiles = selectedMetadata.some(
-    (metadata) =>
-      (metadata.recordMode ?? "new") === "new" && !metadata.isTimeSeries,
-  );
   const hasUpdateRecordsMissingTarget = selectedMetadata.some(
     (metadata) =>
       (metadata.recordMode ?? "new") === "update" && !metadata.targetRecordId,
   );
-  const requiresObjectStorage = hasAnyNonTimeseriesNewFiles;
 
   const canUpload =
     selectedFiles.length > 0 &&
     !!projectId &&
     !!dataSourceId &&
-    (!requiresObjectStorage || !!objectStorageId) &&
+    !!objectStorageId &&
     !hasUpdateRecordsMissingTarget &&
     (!needsTarget || !!fileUploadState.targetFileId);
 
@@ -264,7 +258,6 @@ export default function UploadCenterClient() {
       selectedFiles.length === 1 &&
       !!selectedSingleFile &&
       selectedMetadata?.recordMode !== "update" &&
-      !selectedMetadata?.isTimeSeries &&
       selectedSingleFile.size > CHUNK_THRESHOLD;
     const uploadContext = {
       organizationId,
@@ -317,9 +310,8 @@ export default function UploadCenterClient() {
     const showProgressToast = (progress: UploadProgressEvent) => {
       uploadToastManager.show({
         title: t.translations.UPLOADING_FILE,
-        message: `${progress.chunksCompleted} / ${progress.totalChunks} ${
-          t.translations.CHUNKS
-        }`,
+        message: `${progress.chunksCompleted} / ${progress.totalChunks} ${t.translations.CHUNKS
+          }`,
         percent: progress.percentComplete,
         chunksCompleted: progress.chunksCompleted,
         totalChunks: progress.totalChunks,
@@ -385,14 +377,6 @@ export default function UploadCenterClient() {
                   Number(organizationId),
                   Number(projectId),
                   Number(metadata.targetRecordId),
-                  file,
-                );
-                results[currentIndex] = { status: "fulfilled", value };
-              } else if (metadata.isTimeSeries) {
-                const value = await uploadTimeseriesFile(
-                  Number(organizationId),
-                  Number(projectId),
-                  Number(dataSourceId),
                   file,
                 );
                 results[currentIndex] = { status: "fulfilled", value };
@@ -496,16 +480,6 @@ export default function UploadCenterClient() {
         );
         uploadToastManager.success(
           t.translations.RECORD_FILE_UPDATED_SUCCESSFULLY,
-        );
-      } else if (metadata.isTimeSeries) {
-        await uploadTimeseriesFile(
-          Number(organizationId),
-          Number(projectId),
-          Number(dataSourceId),
-          file,
-        );
-        uploadToastManager.success(
-          t.translations.TIMESERIES_FILE_UPLOADED_SUCCESSFULLY,
         );
       } else {
         await uploadFile({
@@ -631,15 +605,18 @@ export default function UploadCenterClient() {
   };
 
   return (
-    <div className="min-h-screen bg-base-100">
-      <header className="bg-base-200/50 border-b border-base-300/30">
-        <div className="px-4 sm:px-6 lg:px-12 py-6">
+    <main className="min-h-screen bg-base-200/30">
+      <section className="border-b border-base-300 bg-base-100">
+        <div className="mx-auto flex w-full max-w-7xl flex-col gap-5 px-3 py-5 sm:px-6 lg:px-8">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
             <div>
-              <h1 className="text-2xl font-bold text-base-content">
+              <p className="text-xs font-semibold uppercase tracking-wide text-base-content/60">
+                {t.translations.UPLOAD_MODE}
+              </p>
+              <h1 className="text-2xl font-bold text-base-content sm:text-3xl">
                 {t.translations.UPLOAD_CENTER}
               </h1>
-              <p className="text-sm text-base-content/70 mt-1">
+              <p className="mt-3 max-w-3xl text-base-content/70">
                 {t.translations.UPLOAD_CENTER_DESCRIPTION}
               </p>
             </div>
@@ -656,9 +633,9 @@ export default function UploadCenterClient() {
             </div>
           </div>
         </div>
-      </header>
+      </section>
 
-      <main className="px-4 sm:px-6 lg:px-12 py-6">
+      <section className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-3 py-5 sm:px-6 lg:px-8">
         <div className="mx-auto w-full max-w-5xl">
           <section className="w-full">
             <div className="card bg-base-100 shadow-xl">
@@ -680,11 +657,10 @@ export default function UploadCenterClient() {
                       type="button"
                       role="radio"
                       aria-checked={fileUploadState.uploadMode === "file"}
-                      className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition ${
-                        fileUploadState.uploadMode === "file"
-                          ? "bg-base-100 text-base-content shadow-sm"
-                          : "text-base-content/70 hover:text-base-content"
-                      }`}
+                      className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition ${fileUploadState.uploadMode === "file"
+                        ? "bg-base-100 text-base-content shadow-sm"
+                        : "text-base-content/70 hover:text-base-content"
+                        }`}
                       onClick={() => {
                         fileUploadState.setUploadMode("file");
                         bulkUploadState.setCsvFile(null);
@@ -698,11 +674,10 @@ export default function UploadCenterClient() {
                       type="button"
                       role="radio"
                       aria-checked={fileUploadState.uploadMode === "bulk"}
-                      className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition ${
-                        fileUploadState.uploadMode === "bulk"
-                          ? "bg-base-100 text-base-content shadow-sm"
-                          : "text-base-content/70 hover:text-base-content"
-                      }`}
+                      className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition ${fileUploadState.uploadMode === "bulk"
+                        ? "bg-base-100 text-base-content shadow-sm"
+                        : "text-base-content/70 hover:text-base-content"
+                        }`}
                       onClick={() => {
                         fileUploadState.setUploadMode("bulk");
                         fileUploadState.resetFileUpload();
@@ -794,7 +769,7 @@ export default function UploadCenterClient() {
             </div>
           </section>
         </div>
-      </main>
+      </section>
 
       {/* MODALS */}
 
@@ -860,7 +835,7 @@ export default function UploadCenterClient() {
             />
           </div>
         )}
-    </div>
+    </main>
   );
 }
 

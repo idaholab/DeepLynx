@@ -157,6 +157,119 @@ export const archiveOrganization = async (
     }
 };
 
+/**
+ * Get organization storage size in bytes
+ * @param organizationId - The ID of the organization
+ * @returns Promise with the organization storage size in bytes
+ */
+export const getOrganizationStorageSize = async (
+    organizationId: number
+): Promise<number> => {
+    try {
+        const res = await api.get<number>(
+            `/organization/${organizationId}/metrics/storage/size`
+        );
+        return res.data;
+    } catch (error) {
+        console.error(
+            `Error fetching storage size for organization ${organizationId}:`,
+            error
+        );
+        throw error;
+    }
+};
+
+/**
+ * Get organization data source count
+ * @param organizationId - The ID of the organization
+ * @returns Promise with the organization data source count
+ */
+export const getOrganizationDataSourceCount = async (
+    organizationId: number
+): Promise<number> => {
+    try {
+        const res = await api.get<number>(
+            `/organization/${organizationId}/metrics/count`,
+            { params: { hideArchived: true } }
+        );
+        return res.data;
+    } catch (error) {
+        console.error(
+            `Error fetching data source count for organization ${organizationId}:`,
+            error
+        );
+        throw error;
+    }
+};
+
+/**
+ * Get organization data modality count
+ * @param organizationId - The ID of the organization
+ * @returns Promise with the organization data modality count
+ */
+export const getOrganizationDataModalityCount = async (
+    organizationId: number
+): Promise<number> => {
+    try {
+        const res = await api.get<number>(
+            `/organization/${organizationId}/metrics/modalities/count`
+        );
+        return res.data;
+    } catch (error) {
+        console.error(
+            `Error fetching data modality count for organization ${organizationId}:`,
+            error
+        );
+        throw error;
+    }
+};
+
+/**
+ * Get organization record count
+ * @param organizationId - The ID of the organization
+ * @returns Promise with the organization record count
+ */
+export const getOrganizationRecordCount = async (
+    organizationId: number
+): Promise<number> => {
+    try {
+        const res = await api.get<number>(
+            `/organization/${organizationId}/metrics/records/count`,
+            { params: { hideArchived: true } }
+        );
+        return res.data;
+    } catch (error) {
+        console.error(
+            `Error fetching record count for organization ${organizationId}:`,
+            error
+        );
+        throw error;
+    }
+};
+
+/**
+ * Get organization file count
+ * @param organizationId - The ID of the organization
+ * @returns Promise with the organization file count
+ */
+export const getOrganizationFileCount = async (
+    organizationId: number
+): Promise<number> => {
+    try {
+        const res = await api.get<number>(
+            `/organization/${organizationId}/metrics/files/count`,
+            { params: { hideArchived: true } }
+        );
+        return res.data;
+    } catch (error) {
+        console.error(
+            `Error fetching file count for organization ${organizationId}:`,
+            error
+        );
+        throw error;
+    }
+};
+
 /* -------------------------------------------------------------------------- */
 /*                      Organization User Management                          */
 /* -------------------------------------------------------------------------- */

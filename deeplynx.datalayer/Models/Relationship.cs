@@ -32,6 +32,8 @@ public class Relationship
 
     [Column("is_archived")] public bool IsArchived { get; set; }
 
+    [Column("extraction_id")] public long? ExtractionId { get; set; }
+
     [ForeignKey("DestinationId")]
     [InverseProperty("RelationshipDestinations")]
     public virtual Class? Destination { get; set; }
@@ -52,4 +54,7 @@ public class Relationship
 
     [InverseProperty("LastUpdatedRelationships")]
     public virtual User? LastUpdatedByUser { get; set; }
+    
+    [InverseProperty("Relationship")]
+    public virtual ICollection<OntologyVector> OntologyVectors { get; set; } = new List<OntologyVector>();
 }

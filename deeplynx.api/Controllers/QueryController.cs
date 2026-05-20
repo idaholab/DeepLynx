@@ -46,7 +46,12 @@ public class QueryController : ControllerBase
         try
         {
             var currentUserId = UserContextStorage.UserId;
-            var records = await _queryBusiness.Search(currentUserId, userQuery,organizationId, projectIds);
+            var isSysAdmin = UserContextStorage.IsSysAdmin;
+            var isOrgAdmin = UserContextStorage.IsOrgAdmin;
+            var isProjectAdmin = UserContextStorage.IsProjectAdmin;
+            var records = await _queryBusiness.Search(
+                currentUserId, userQuery, organizationId, projectIds,
+                isSysAdmin, isOrgAdmin, isProjectAdmin);
             return Ok(records);
         }
         catch (Exception exc)
@@ -74,7 +79,11 @@ public class QueryController : ControllerBase
         try
         {
             var currentUserId = UserContextStorage.UserId;
-            var records = await _queryBusiness.QueryBuilder(currentUserId, filterArray, organizationId, projectIds, textSearch);
+            var isSysAdmin = UserContextStorage.IsSysAdmin;
+            var isOrgAdmin = UserContextStorage.IsOrgAdmin;
+            var isProjectAdmin = UserContextStorage.IsProjectAdmin;
+            var records = await _queryBusiness.QueryBuilder(currentUserId, filterArray, organizationId, projectIds,
+                textSearch, isSysAdmin, isOrgAdmin, isProjectAdmin);
             return Ok(records);
         }
         catch (Exception exc)
@@ -88,7 +97,7 @@ public class QueryController : ControllerBase
     /// <summary>
     ///     Get Recent Records
     /// </summary>
-    /// <param name="organizationId"> Orginization Id of projects</param>
+    /// <param name="organizationId"> Organization Id of projects</param>
     /// <param name="projectIds">Array of project ids</param>
     /// <returns>List of record response DTOs sorted by most recent</returns>
     [HttpGet("recent", Name = "api_get_recent_records")]
@@ -99,7 +108,11 @@ public class QueryController : ControllerBase
         try
         {
             var currentUserId = UserContextStorage.UserId;
-            var records = await _queryBusiness.GetRecentlyAddedRecords(currentUserId, organizationId, projectIds);
+            var isSysAdmin = UserContextStorage.IsSysAdmin;
+            var isOrgAdmin = UserContextStorage.IsOrgAdmin;
+            var isProjectAdmin = UserContextStorage.IsProjectAdmin;
+            var records = await _queryBusiness.GetRecentlyAddedRecords(currentUserId, organizationId, projectIds,
+                isSysAdmin, isOrgAdmin, isProjectAdmin);
             return Ok(records);
         }
         catch (Exception exc)
@@ -128,7 +141,11 @@ public class QueryController : ControllerBase
         try
         {
             var currentUserId = UserContextStorage.UserId;
-            var records = await _queryBusiness.GetMultiProjectRecords(currentUserId, organizationId, projects, hideArchived);
+            var isSysAdmin = UserContextStorage.IsSysAdmin;
+            var isOrgAdmin = UserContextStorage.IsOrgAdmin;
+            var isProjectAdmin = UserContextStorage.IsProjectAdmin;
+            var records = await _queryBusiness.GetMultiProjectRecords(currentUserId, organizationId, projects,
+                hideArchived, isSysAdmin, isOrgAdmin, isProjectAdmin);
             return Ok(records);
         }
         catch (Exception exc)

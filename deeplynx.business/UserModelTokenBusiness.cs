@@ -9,14 +9,16 @@ namespace deeplynx.business;
 public class UserModelTokenBusiness : IUserModelTokenBusiness
 {
     private readonly DeeplynxContext _context;
+    private readonly EncryptionHelper _encryptionHelper;
 
     /// <summary>
     ///     Initializes a new instance of the <see cref="UserModelTokenBusiness" /> class.
     /// </summary>
     /// <param name="context">The database context used for operations.</param>
-    public UserModelTokenBusiness(DeeplynxContext context)
+    public UserModelTokenBusiness(DeeplynxContext context, EncryptionHelper encryptionHelper)
     {
         _context = context;
+        _encryptionHelper = encryptionHelper;
     }
 
     /// <summary>
@@ -37,6 +39,12 @@ public class UserModelTokenBusiness : IUserModelTokenBusiness
 
         var userModelTokens = await query.ToListAsync();
 
+        foreach (var token in userModelTokens)
+        {
+            if (!string.IsNullOrEmpty(token.Token))
+                token.Token = _encryptionHelper.Decrypt(token.Token);
+        }
+
         return userModelTokens.Select(MapToDto).ToList();
     }
 
@@ -49,17 +57,15 @@ public class UserModelTokenBusiness : IUserModelTokenBusiness
     public async Task<UserModelTokenResponseDto> GetTokenById(long currentUserId, long userModelTokenId)
     {
         var userModelToken = await _context.UserModelTokens
-            .FirstOrDefaultAsync(x => x.Id == userModelTokenId);
+            .FirstOrDefaultAsync(x => x.Id == userModelTokenId && x.UserId == currentUserId);
 
         if (userModelToken is null)
         {
-            throw new KeyNotFoundException($"No user model token was found with the ID: {userModelTokenId}");
+            throw new KeyNotFoundException($"No user model token was found");
         }
 
-        if (currentUserId != userModelToken.UserId)
-        {
-            throw new UnauthorizedAccessException("Action denied, cannot access another users Tokens");
-        }
+        if (!string.IsNullOrEmpty(userModelToken.Token))
+            userModelToken.Token = _encryptionHelper.Decrypt(userModelToken.Token);
 
         return MapToDto(userModelToken);
     }
@@ -74,19 +80,38 @@ public class UserModelTokenBusiness : IUserModelTokenBusiness
     {
         ValidationHelper.ValidateModel(dto);
 
+        var aiModelConfig = await _context.AiModelConfigs.FirstOrDefaultAsync(c => c.Id == dto.AiModelConfigId);
+
+        if (aiModelConfig is null)
+            throw new KeyNotFoundException($"No AI Model Config found with ID: {dto.AiModelConfigId}");
+
+        var tokenExists = await _context.UserModelTokens
+            .AnyAsync(x => x.UserId == currentUserId && x.AiModelConfigId == dto.AiModelConfigId);
+
+        if (tokenExists)
+            throw new InvalidOperationException("A token for this AI Model Config already exists.");
+
+        if (dto.Token.Length <= 8)
+            throw new InvalidOperationException("Token length looks too short to be valid.");
+
+        var encryptedToken = _encryptionHelper.Encrypt(dto.Token);
+
         var userModelToken = new UserModelToken
         {
             UserId = currentUserId,
-            AiModelConfigId = dto.AiModelConfigId,
-            Token = dto.Token,
+            AiModelConfigId = aiModelConfig.Id,
+            Token = encryptedToken,
             LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
         };
         _context.UserModelTokens.Add(userModelToken);
         await _context.SaveChangesAsync();
 
+        if (!string.IsNullOrEmpty(userModelToken.Token))
+            userModelToken.Token = _encryptionHelper.Decrypt(userModelToken.Token);
+
         return MapToDto(userModelToken);
     }
-    
+
     /// <summary>
     ///     Update the token string of an existing User Model Token.
     /// </summary>
@@ -99,44 +124,39 @@ public class UserModelTokenBusiness : IUserModelTokenBusiness
         ValidationHelper.ValidateModel(dto);
 
         var userModelToken = await _context.UserModelTokens
-            .FirstOrDefaultAsync(x => x.Id == userModelTokenId);
+            .FirstOrDefaultAsync(x => x.Id == userModelTokenId && x.UserId == currentUserId);
 
         if (userModelToken is null)
         {
             throw new KeyNotFoundException($"No user model token was found with the ID: {userModelTokenId}");
         }
 
-        if (currentUserId != userModelToken.UserId)
-        {
-            throw new UnauthorizedAccessException("Action denied, cannot modify another user's tokens");
-        }
+        var encryptedToken = _encryptionHelper.Encrypt(dto.Token);
 
-        userModelToken.Token = dto.Token;
+        userModelToken.Token = encryptedToken;
         userModelToken.LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
 
         await _context.SaveChangesAsync();
 
+        if (!string.IsNullOrEmpty(userModelToken.Token))
+            userModelToken.Token = _encryptionHelper.Decrypt(userModelToken.Token);
+
         return MapToDto(userModelToken);
     }
-    
+
     /// <summary>
     ///     Permanently delete a User Model Token.
     /// </summary>
     /// <param name="currentUserId">The ID of the user to which the token belongs.</param>
     /// <param name="userModelTokenId">The ID of the User Model Token to delete.</param>
-    /// <returns>A message confirming the User Model Token was successfully deleted.</returns>
+    /// <returns>A boolean value determining if the User Model Token was successfully deleted.</returns>
     public async Task<bool> DeleteUserModelToken(long currentUserId, long userModelTokenId)
     {
         var tokenToBeDeleted = await _context.UserModelTokens
-            .FirstOrDefaultAsync(x => x.Id == userModelTokenId);
+            .FirstOrDefaultAsync(x => x.Id == userModelTokenId && x.UserId == currentUserId);
 
         if (tokenToBeDeleted is null)
             throw new KeyNotFoundException($"User Model Token with ID: {userModelTokenId} not found");
-
-        if (tokenToBeDeleted.UserId != currentUserId)
-        {
-            throw new UnauthorizedAccessException("Action denied, cannot delete another user's tokens");
-        }
 
         _context.Remove(tokenToBeDeleted);
         await _context.SaveChangesAsync();
@@ -149,7 +169,15 @@ public class UserModelTokenBusiness : IUserModelTokenBusiness
         Id = x.Id,
         UserId = x.UserId,
         AiModelConfigId = x.AiModelConfigId,
-        Token = x.Token,
+        Token = TokenHelper.MaskToken(x.Token),
         LastUpdatedAt = x.LastUpdatedAt
     };
+}
+
+public static class TokenHelper
+{
+    public static string MaskToken(string token)
+    {
+        return new string('*', token.Length - 4) + token[^4..];
+    }
 }
