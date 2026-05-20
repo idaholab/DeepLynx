@@ -7,18 +7,18 @@ namespace deeplynx.helpers;
 [AttributeUsage(AttributeTargets.Class | AttributeTargets.Method, AllowMultiple = true)]
 public class AuthAttribute : Attribute
 {
-    public AuthAttribute(string action, string resource, bool includeArchived = false, bool allowWithoutContext = false)
+    public AuthAttribute(string action, string resource, bool includeArchived = false, bool scopeException = false)
     {
         Action = action;
         Resource = resource;
         IncludeArchived = includeArchived;
-        AllowWithoutContext = allowWithoutContext;
+        scopeException = scopeException;
     }
 
     public string Action { get; set; }
     public string Resource { get; set; }
     public bool IncludeArchived { get; set; }
-    public bool AllowWithoutContext { get; set; }
+    public bool scopeException { get; set; }
 }
 
 /// <summary>
@@ -36,10 +36,12 @@ public class SysAdminAttribute : Attribute
 public class OrgAdminAttribute : Attribute
 {
     public bool IncludeArchived { get; set; }
+    public bool ScopeException { get; set; }
 
-    public OrgAdminAttribute(bool includeArchived = false)
+    public OrgAdminAttribute(bool includeArchived = false, bool scopeException = false)
     {
         IncludeArchived = includeArchived;
+        ScopeException = scopeException;
     }
 }
 
@@ -86,7 +88,7 @@ public class AuthMiddleware
 
         var isSysAdmin = await adminService.SysAdminCheck(userId);
         UserContextStorage.IsSysAdmin = isSysAdmin;
-        
+
         // Handle SysAdmin attribute
         if (sysAdminAttr != null)
         {
@@ -129,6 +131,15 @@ public class AuthMiddleware
         {
             if (!organizationId.HasValue)
             {
+                if (orgAdminAttr.ScopeException)
+                {
+                    // check to see if the user is an org admin in any org
+                    // if true pass
+                    var isOrgAdminInSystem = await adminService.OrgAdminInSystemCheck(userId);
+                    await _next(context);
+                    return;
+                }
+
                 context.Response.StatusCode = StatusCodes.Status400BadRequest;
                 await context.Response.WriteAsJsonAsync(new { error = "Bad Request: Organization ID required for organization admin check" });
                 return;
@@ -141,7 +152,7 @@ public class AuthMiddleware
                 orgAdminAttr.IncludeArchived
             );
 
-            if (capturedOrgId.HasValue) 
+            if (capturedOrgId.HasValue)
                 UserContextStorage.OrganizationId = capturedOrgId.Value;
 
             // System admins automatically pass
@@ -154,7 +165,7 @@ public class AuthMiddleware
             // Check if user is org admin (using permission check)
             var isOrgAdmin = await adminService.OrgAdminCheck(userId, organizationId.Value);
             UserContextStorage.IsOrgAdmin = isOrgAdmin;
-            
+
             if (!isOrgAdmin)
             {
                 context.Response.StatusCode = StatusCodes.Status403Forbidden;
@@ -165,14 +176,14 @@ public class AuthMiddleware
             await _next(context);
             return;
         }
-        
-        var allowWithoutContext = authAttributes.Any(a => a.AllowWithoutContext);
-            
-        if (!isSysAdmin && !organizationId.HasValue && !projectIds.Any() && !allowWithoutContext)
+
+        var scopeException = authAttributes.Any(a => a.scopeException);
+
+        if (!isSysAdmin && !organizationId.HasValue && !projectIds.Any() && !scopeException)
         {
             context.Response.StatusCode = StatusCodes.Status400BadRequest;
             await context.Response.WriteAsJsonAsync(new
-                { error = "Forbidden: Non-admin users require organization or project context" });
+            { error = "Forbidden: Non-admin users require organization or project context" });
             return;
         }
 
@@ -197,7 +208,7 @@ public class AuthMiddleware
 
             if (capturedOrgId.HasValue) UserContextStorage.OrganizationId = capturedOrgId.Value;
 
-            var isProjectAdmin = organizationId.HasValue && 
+            var isProjectAdmin = organizationId.HasValue &&
                                  await adminService.ProjectAdminCheck(userId, organizationId.Value, projectIds);
             UserContextStorage.IsProjectAdmin = isProjectAdmin;
         }
@@ -243,7 +254,7 @@ public class AuthMiddleware
                     authAttr.Resource
                 );
             }
-            else if (allowWithoutContext)
+            else if (scopeException)
             {
                 hasPermission = true;
             }
