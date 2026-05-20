@@ -503,7 +503,7 @@ public class RecordController : ControllerBase
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
     /// <param name="projectId">The ID of the project to which the record belongs</param>
     /// <param name="dtos">List of record/tag pairs to attach</param>
-    /// <returns></returns>
+    /// <returns>A message stating the tags were successfully attached to the records.</returns>
     [HttpPost("bulk-attach-tags-to-records", Name = "api_bulk_attach_tags_to_records")]
     [Auth("update", "record")]
     [Auth("read", "tag")]
