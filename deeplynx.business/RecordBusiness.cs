@@ -590,7 +590,7 @@ public async Task<PaginatedResponse<RecordResponseDto>> GetAllRecordsPaginated(
             return true;
         
         // Bulk delete from record_tags
-        var sql = @"DELETE FROM deeplynx.record_tags WHERE (record_id, tag_id) IN  ({0})";
+        var sql = @"DELETE FROM deeplynx.record_tags WHERE (record_id, tag_id) IN  ({0});";
         
         // establish parameters
         var parameters = new List<NpgsqlParameter>();
