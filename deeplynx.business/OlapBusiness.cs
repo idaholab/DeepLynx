@@ -53,8 +53,8 @@ public class OlapBusiness : IOlapBusiness
         IFormFile file)
     {
         var fileType = Path.GetExtension(file.FileName).TrimStart('.').ToLower();
-        if (fileType != "parquet")
-            throw new ArgumentException("Only Parquet files are supported for append.");
+        if (fileType != "parquet" || fileType != "parquet")
+            throw new ArgumentException("Only Parquet or CSV files are supported for append.");
 
         if (file.Length == 0)
             throw new ArgumentException("Cannot append an empty file.");
