@@ -1588,7 +1588,7 @@ public async Task<PaginatedResponse<RecordResponseDto>> GetAllRecordsPaginated(
     /// </summary>
     /// <param name="currentUserId">The ID of current user</param>
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
-    /// <param name="projectId"> Shared project ID of the object storages</param>
+    /// <param name="projectId"> The ID of the project to which the records belong</param>
     /// <param name="dtos">A list of record_id/tag_id pairs to be inserted</param>
     /// <exception cref="ArgumentException"> Thrown if no record,tag pairs are provided</exception>
     /// <exception cref="KeyNotFoundException">Returned if one or more records or tags are not found or archived</exception>
@@ -1620,7 +1620,7 @@ public async Task<PaginatedResponse<RecordResponseDto>> GetAllRecordsPaginated(
 
         // Validate tags belong to this organization/project and are not archived 
         var tags = await _context.Tags
-            .Where(t => tagIds.Contains(t.Id) && t.OrganizationId == organizationId && t.ProjectId == projectId && !t.IsArchived)
+            .Where(t => tagIds.Contains(t.Id) && t.OrganizationId == organizationId && (t.ProjectId == projectId || t.ProjectId == null) && !t.IsArchived)
             .Select(t => t.Id)
             .ToListAsync();
         
@@ -1637,7 +1637,7 @@ public async Task<PaginatedResponse<RecordResponseDto>> GetAllRecordsPaginated(
     /// </summary>
     /// <param name="currentUserId">The ID of current user</param>
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
-    /// <param name="projectId"> The ID of the project to which the records belongs</param>
+    /// <param name="projectId"> The ID of the project to which the records belong</param>
     /// <param name="dtos">A list of record_id/tag_id pairs to be deleted</param>
     /// <exception cref="ArgumentException"> Thrown if no record,tag pairs are provided</exception>
     /// <exception cref="KeyNotFoundException">Returned if one or more records or tags are not found or archived</exception>
