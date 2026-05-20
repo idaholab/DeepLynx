@@ -43,8 +43,6 @@ public class OrgAdminAttribute : Attribute
 
 /// <summary>
 /// Allows an endpoint to be invoked without organization or project context.
-/// When present, auth checks fall back to a scope-exception branch (e.g. system-wide org-admin lookup)
-/// instead of rejecting the request for missing context.
 /// </summary>
 [AttributeUsage(AttributeTargets.Class | AttributeTargets.Method, AllowMultiple = false)]
 public class AllowWithoutContextAttribute : Attribute
