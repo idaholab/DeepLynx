@@ -536,6 +536,47 @@ public class RecordController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
+
+    /// <summary>
+    ///     Bulk Unattach Tags From Records
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <param name="projectId">The ID of the project to which the record belongs</param>
+    /// <param name="dtos">List of record/tag pairs to unattach</param>
+    /// <returns>A message stating the tags were successfully unattached from the records.</returns>
+    [HttpDelete("bulk-unattach-tags-from-records", Name = "api_bulk_unattach_tags_from_records")]
+    [Auth("update", "record")]
+    [Auth("read", "tag")]
+    [Sensitivity("update record")]
+    public async Task<IActionResult> BulkUnattachTagsFromRecords(
+        long organizationId,
+        long projectId,
+        [FromBody] List<RecordTagLinkDto> dtos)
+    {
+        try
+        {
+            var currentUserId = UserContextStorage.UserId;
+
+            await _recordBusiness.BulkUnattachTagsFromRecords(currentUserId, organizationId, projectId, dtos);
+
+            return Ok(new { message = "Successfully bulk unattached tags from records" });
+        }
+        catch (ArgumentException exc)
+        {
+            return BadRequest(exc.Message);
+        }
+        catch (KeyNotFoundException exc)
+        {
+            return NotFound(exc.Message);
+        }
+        catch (Exception exc)
+        {
+            var message = $"An error occurred while bulk unattaching tags from records: {exc}";
+            _logger.LogError(message);
+            return StatusCode(StatusCodes.Status500InternalServerError, message);
+        }
+    }
+
     
     /// <summary>
     ///     Attach a Sensitivity Label to a Record
