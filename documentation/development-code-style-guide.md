@@ -253,7 +253,7 @@ Most resources are scoped at one of these levels:
 |---|---|
 | Organization | `organizations/{organizationId:long}/...` |
 | Project | `organizations/{organizationId:long}/projects/{projectId:long}/...` |
-| User/global | Resource-specific routes with `[Auth(..., AllowWithoutContextAttribute: true)]` when organization or project context is not required. |
+| User/global | Resource-specific routes with `[Auth(..., AllowWithoutContext: true)]` when organization or project context is not required. |
 
 When a route needs authorization based on organization or project membership, include the relevant route IDs so `AuthMiddleware` can evaluate permissions.
 
@@ -300,7 +300,7 @@ Do not put `projectId` in the route when:
 - The resource is organization-scoped and may not belong to a project.
 - The endpoint lists or searches across multiple projects.
 - The endpoint acts on project membership itself under `organizations/{organizationId:long}/projects`.
-- The endpoint is user/global and intentionally uses `AllowWithoutContextAttribute: true`.
+- The endpoint is user/global and intentionally uses `AllowWithoutContext: true`.
 
 For multi-project operations, use query parameters such as `projectIds` so `AuthMiddleware` can validate every requested project:
 
@@ -440,7 +440,7 @@ Common resources match domain names such as:
 - `permission`
 - `role`
 
-Use `AllowWithoutContextAttribute: true` only when the endpoint is intentionally available without an organization or project route context.
+Use `AllowWithoutContext: true` only when the endpoint is intentionally available without an organization or project route context.
 
 Use `includeArchived: true` only when the endpoint must operate on archived records, such as archive/unarchive operations.
 
