@@ -3,6 +3,7 @@ using deeplynx.datalayer.Models;
 using deeplynx.interfaces;
 using deeplynx.models;
 using Microsoft.AspNetCore.Http;
+using Microsoft.EntityFrameworkCore;
 
 namespace deeplynx.business;
 
@@ -206,7 +207,7 @@ public class MetadataBusiness : IMetadataBusiness
         if (edges.Any())
         {
             // ensure all origin/destination records exist in the record map; if not, check DB
-            CheckRecordsByOriginalId(recordMap, edges);
+            await CheckRecordsByOriginalId(projectId, dataSourceId, recordMap, edges);
             // load relationship, origin and destination IDs into classes before insert
             UpdateEdgesWithIds(edges, relMap, recordMap);
             metadataResponseDto.Edges =
@@ -278,43 +279,57 @@ public class MetadataBusiness : IMetadataBusiness
     /// <param name="recordMap"></param>
     /// <param name="edges"></param>
     /// <returns>A list of relationships to be inserted</returns>
-    private void CheckRecordsByOriginalId(
+    private async Task CheckRecordsByOriginalId(
+        long projectId,
+        long dataSourceId,
         Dictionary<string, long> recordMap,
         List<CreateEdgeRequestDto> edges)
     {
-        // Check if recordMap is null
-        if (recordMap == null) throw new ArgumentNullException(nameof(recordMap), "Record map cannot be null");
+        if (recordMap == null)
+            throw new ArgumentNullException(nameof(recordMap), "Record map cannot be null");
 
-        // Print the contents of recordMap for debugging
-        Console.WriteLine("Contents of recordMap:");
-        foreach (var kvp in recordMap) Console.WriteLine($"Key: {kvp.Key}, Value: {kvp.Value}");
+        if (edges == null || !edges.Any())
+            throw new ArgumentException("Edges cannot be null or empty", nameof(edges));
 
-        var missingOriginalIds = new HashSet<string>();
-
-        // Check if edges are null or empty
-        if (edges == null || !edges.Any()) throw new ArgumentException("Edges cannot be null or empty", nameof(edges));
+        var requestedOriginalIds = new HashSet<string>();
 
         foreach (var edge in edges)
         {
-            // Check for null or empty values for OriginOid and DestinationOid
             if (string.IsNullOrEmpty(edge.OriginOid))
-                throw new ArgumentNullException("Origin ID cannot be null or empty");
+                throw new ArgumentNullException(nameof(edge.OriginOid), "Origin ID cannot be null or empty");
 
             if (string.IsNullOrEmpty(edge.DestinationOid))
-                throw new ArgumentNullException("Destination ID cannot be null or empty");
+                throw new ArgumentNullException(nameof(edge.DestinationOid), "Destination ID cannot be null or empty");
 
-            // Print the keys being checked
-            Console.WriteLine($"Checking Origin ID: {edge.OriginOid}, Destination ID: {edge.DestinationOid}");
-
-            // Check existence in the recordMap
-            if (!recordMap.ContainsKey(edge.OriginOid)) missingOriginalIds.Add(edge.OriginOid);
-            if (!recordMap.ContainsKey(edge.DestinationOid)) missingOriginalIds.Add(edge.DestinationOid);
+            requestedOriginalIds.Add(edge.OriginOid);
+            requestedOriginalIds.Add(edge.DestinationOid);
         }
 
-        if (missingOriginalIds.Any())
-            throw new Exception($"Records not found matching Original IDs ({string.Join(", ", missingOriginalIds)})");
-    }
+        var missingFromCurrentBatch = requestedOriginalIds
+            .Where(id => !recordMap.ContainsKey(id))
+            .ToList();
 
+        if (missingFromCurrentBatch.Any())
+        {
+            var existingRecords = await _context.Records
+                .Where(r =>
+                    r.ProjectId == projectId &&
+                    r.DataSourceId == dataSourceId &&
+                    missingFromCurrentBatch.Contains(r.OriginalId))
+                .Select(r => new { r.OriginalId, r.Id })
+                .ToListAsync();
+
+            foreach (var record in existingRecords)
+                recordMap.TryAdd(record.OriginalId, record.Id);
+        }
+
+        var stillMissing = requestedOriginalIds
+            .Where(id => !recordMap.ContainsKey(id))
+            .ToList();
+
+        if (stillMissing.Any())
+            throw new Exception($"Records not found matching Original IDs ({string.Join(", ", stillMissing)})");
+    }
     /// <summary>
     ///     Creates a list of record-tag pairs to be inserted into the linking table
     /// </summary>
