@@ -445,7 +445,7 @@ Use `includeArchived: true` only when the endpoint must operate on archived reco
 
 ### AllowWithoutContext Attribute
 
-`[AllowWithoutContext]` is a separate attribute (not an argument on `[Auth]` or `[OrgAdmin]`) that marks an endpoint as intentionally callable without an `organizationId` or `projectId` in the route. Apply it alongside `[Auth]`, `[OrgAdmin]`, or `[SysAdmin]` when the endpoint operates outside organization or project scope.
+`[AllowWithoutContext]` is a separate attribute that marks an endpoint as intentionally callable without an `organizationId` or `projectId` in the route. Apply it alongside `[Auth]` or `[OrgAdmin]` when the endpoint operates outside organization or project scope.
 
 ```csharp
 [HttpGet(Name = "api_list_my_organizations")]
@@ -463,7 +463,6 @@ Use `[AllowWithoutContext]` when:
 Do not use `[AllowWithoutContext]` when:
 
 - The route already includes `{organizationId}` or `{projectId}`.
-- The endpoint requires `AuthMiddleware` to evaluate organization or project membership before authorizing.
 - The endpoint should reject calls that lack scope. Without this attribute, non-admin users without organization or project context receive `400 Bad Request`.
 
 ### UserContextStorage
