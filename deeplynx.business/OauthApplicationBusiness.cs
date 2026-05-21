@@ -247,8 +247,28 @@ public class OauthApplicationBusiness : IOauthApplicationBusiness
         if (application == null || application.IsArchived)
             throw new KeyNotFoundException($"Oauth application with id {applicationId} not found");
 
+        // grab event-relevant details before deletion
+        var appId = application.Id;
+        var appName = application.Name;
+        var appClientId = application.ClientId;        
+
         _context.OauthApplications.Remove(application);
         await _context.SaveChangesAsync();
+
+        // Log the OAuth application deletion event
+        await _eventBusiness.CreateEvent(userId, null, null,
+            new CreateEventRequestDto
+            {
+                Operation = "delete",
+                EntityType = "oauth_application",
+                EntityId = appId,
+                EntityName = appName,
+                Properties = JsonSerializer.Serialize(new
+                {
+                    appName,
+                    appClientId
+                })
+            });
 
         return true;
     }
