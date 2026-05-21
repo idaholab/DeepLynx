@@ -31,15 +31,17 @@ public class UserController : ControllerBase
     /// </summary>
     /// <param name="projectId">(Optional) ID of project that users are associated with</param>
     /// <param name="organizationId">(Optional) ID of organization that users are associated with</param>
+    /// <param name="includeArchived">Whether to include archived users (default: false)</param>
     /// <returns>List of user response DTOs</returns>
     [HttpGet(Name = "api_get_all_users")]
     public async Task<ActionResult<IEnumerable<UserResponseDto>>> GetAllUsers(
         [FromQuery] long? projectId,
-        [FromQuery] long? organizationId)
+        [FromQuery] long? organizationId,
+        [FromQuery] bool includeArchived = false)
     {
         try
         {
-            var users = await _userBusiness.GetAllUsers(projectId, organizationId);
+            var users = await _userBusiness.GetAllUsers(projectId, organizationId, includeArchived);
             return Ok(users);
         }
         catch (Exception exc)

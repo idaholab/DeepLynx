@@ -249,6 +249,17 @@ public class EdgeBusiness : IEdgeBusiness
         long dataSourceId,
         List<CreateEdgeRequestDto> edges)
     {
+
+        if (edges == null)
+            throw new NullReferenceException("Edges cannot be null or empty");
+
+        var invalidEdges = edges
+            .Where(e => !e.OriginId.HasValue || !e.DestinationId.HasValue)
+            .ToList();
+
+        if (invalidEdges.Any())
+            throw new ArgumentException("All edges must have valid OriginId and DestinationId before bulk creation.");
+
         await ExistenceHelper.EnsureDataSourceExistsForProjectAsync(_context, dataSourceId, projectId);
         var conn = (NpgsqlConnection)_context.Database.GetDbConnection();
         if (conn.State != ConnectionState.Open) await conn.OpenAsync();
