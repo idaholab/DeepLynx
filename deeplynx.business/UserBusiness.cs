@@ -25,9 +25,11 @@ public class UserBusiness : IUserBusiness
     /// <param name="projectId">Optional ID for project</param>
     /// <param name="organizationId">Optional ID for organization</param>
     /// <returns>A list of users, optionally filtered by project or organization</returns>
-    public async Task<IEnumerable<UserResponseDto>> GetAllUsers(long? projectId, long? organizationId)
+    public async Task<IEnumerable<UserResponseDto>> GetAllUsers(long? projectId, long? organizationId, bool includeArchived = false)
     {
-        var users = _context.Users.Where(p => !p.IsArchived);
+        var users = includeArchived 
+        ? _context.Users.AsQueryable()
+        : _context.Users.Where(p => !p.IsArchived);
 
         if (projectId != null)
             users = users.Where(u =>
