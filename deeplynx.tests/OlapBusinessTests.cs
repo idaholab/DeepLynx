@@ -84,6 +84,7 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
     private ISensitivityLabelService _sensitivityLabelService = null!;
     private TagBusiness _tagBusiness = null!;
     private long _userId;
+    private const string CsvHeaders = "timestamp,sensor_id,value,temperature,pressure";
 
     // Static constructor runs before anything else, ensuring env var is set
     // before TimeseriesBusiness static field is initialized
@@ -370,6 +371,30 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
             Headers = new HeaderDictionary(),
             ContentType = "application/octet-stream"
         };
+    }
+    
+    private static IFormFile CreateTestCsvFile(string headers, int rowCount, string fileName = "test.csv")
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine(headers);
+        for (var i = 0; i < rowCount; i++)
+            sb.AppendLine($"2024-01-01T00:00:0{i},sensor_{i % 5},{i}.{i},{20 + i}.0,{1000 + i}.0");
+
+        return CreateTestCsvFile(sb.ToString(), fileName);
+    }
+
+    private async Task<RecordResponseDto> UploadFilesystemCsv(string headers, int rowCount, string fileName = "base.csv")
+    {
+        var file = CreateTestCsvFile(headers, rowCount, fileName);
+        return await _fileBusiness.UploadFile(
+            _userId, _organizationId, _projectId, _dataSourceId, _fileSystemObjectStorageId, file);
+    }
+
+    private async Task<RecordResponseDto> UploadAzureCsv(string headers, int rowCount, string fileName = "base.csv")
+    {
+        var file = CreateTestCsvFile(headers, rowCount, fileName);
+        return await _fileBusiness.UploadFile(
+            _userId, _organizationId, _projectId, _dataSourceId, _azureObjectStorageId, file);
     }
 
     private static async Task<IFormFile> CreateParquetFileWithSchema(
@@ -782,7 +807,7 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
         var ex = await Assert.ThrowsAsync<ArgumentException>(() =>
             _olapBusiness.AppendTabularBlob(_organizationId, _projectId, result.Id, 1, csv));
 
-        Assert.Contains("Only Parquet files are supported", ex.Message);
+        Assert.Contains("File types differ: csv/parquet", ex.Message);
     }
 
     [Fact]
@@ -999,9 +1024,268 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
         Assert.True(await container.GetBlobClient($"{folderPrefix}1.parquet").ExistsAsync());
     }
 
+    // ── Happy path ────────────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task AppendTabularBlob_FirstAppend_Filesystem_Csv_MigratesToFolderAndQueriesAllRows()
+    {
+        var result = await UploadFilesystemCsv(CsvHeaders, 5, "dataset.csv");
+        var appendFile = CreateTestCsvFile(CsvHeaders, 3, "append.csv");
+
+        await _olapBusiness.AppendTabularBlob(
+            _organizationId, _projectId, result.Id, 1, appendFile);
+
+        var record = await GetRecordEntity(result.Id);
+        Assert.EndsWith(Path.DirectorySeparatorChar.ToString(), record.Uri);
+        Assert.True(File.Exists(Path.Combine(record.Uri!, "0.csv")));
+        Assert.True(File.Exists(Path.Combine(record.Uri!, "1.csv")));
+
+        var queryResult = await _olapBusiness.QueryTabularFile(
+            _userId, _organizationId, _projectId, result.Id,
+            "SELECT * FROM data", "data");
+
+        Assert.Equal(8, queryResult.Data.Length); // 5 + 3
+    }
+
+    [Fact]
+    public async Task AppendTabularBlob_SecondAppend_Filesystem_Csv_AddsNewPartWithoutChangingUri()
+    {
+        var result = await UploadFilesystemCsv(CsvHeaders, 5, "dataset.csv");
+
+        await _olapBusiness.AppendTabularBlob(
+            _organizationId, _projectId, result.Id, 1,
+            CreateTestCsvFile(CsvHeaders, 3, "append1.csv"));
+
+        var afterFirstAppend = await GetRecordEntity(result.Id);
+        var folderUri = afterFirstAppend.Uri!;
+
+        await _olapBusiness.AppendTabularBlob(
+            _organizationId, _projectId, result.Id, 2,
+            CreateTestCsvFile(CsvHeaders, 4, "append2.csv"));
+
+        var afterSecondAppend = await GetRecordEntity(result.Id);
+        Assert.Equal(folderUri, afterSecondAppend.Uri);
+        Assert.True(File.Exists(Path.Combine(folderUri, "0.csv")));
+        Assert.True(File.Exists(Path.Combine(folderUri, "1.csv")));
+        Assert.True(File.Exists(Path.Combine(folderUri, "2.csv")));
+
+        var queryResult = await _olapBusiness.QueryTabularFile(
+            _userId, _organizationId, _projectId, result.Id,
+            "SELECT COUNT(*) AS total FROM data", "data");
+
+        Assert.Equal(12L, Convert.ToInt64(queryResult.Data[0][0]));
+    }
+
+    [Fact]
+    public async Task AppendTabularBlob_FirstAppend_Azure_Csv_MigratesToFolderAndQueriesAllRows()
+    {
+        var result = await UploadAzureCsv(CsvHeaders, 5, "dataset.csv");
+        var appendFile = CreateTestCsvFile(CsvHeaders, 3, "append.csv");
+
+        await _olapBusiness.AppendTabularBlob(
+            _organizationId, _projectId, result.Id, 1, appendFile);
+
+        var record = await GetRecordEntity(result.Id);
+        Assert.EndsWith("/", record.Uri);
+
+        var container = new BlobServiceClient(_connectionString).GetBlobContainerClient(_containerName);
+        Assert.True(await container.GetBlobClient($"{record.Uri}0.csv").ExistsAsync());
+        Assert.True(await container.GetBlobClient($"{record.Uri}1.csv").ExistsAsync());
+        Assert.False(await container.GetBlobClient("dataset.csv").ExistsAsync());
+
+        var queryResult = await _olapBusiness.QueryTabularFile(
+            _userId, _organizationId, _projectId, result.Id,
+            "SELECT * FROM data", "data");
+
+        Assert.Equal(8, queryResult.Data.Length);
+    }
+
+    [Fact]
+    public async Task AppendTabularBlob_SecondAppend_Azure_Csv_AddsNewPartWithoutChangingUri()
+    {
+        var result = await UploadAzureCsv(CsvHeaders, 5, "dataset.csv");
+
+        await _olapBusiness.AppendTabularBlob(
+            _organizationId, _projectId, result.Id, 1,
+            CreateTestCsvFile(CsvHeaders, 3, "append1.csv"));
+
+        var afterFirstAppend = await GetRecordEntity(result.Id);
+        var folderUri = afterFirstAppend.Uri!;
+        Assert.EndsWith("/", folderUri);
+
+        await _olapBusiness.AppendTabularBlob(
+            _organizationId, _projectId, result.Id, 2,
+            CreateTestCsvFile(CsvHeaders, 4, "append2.csv"));
+
+        var afterSecondAppend = await GetRecordEntity(result.Id);
+        Assert.Equal(folderUri, afterSecondAppend.Uri);
+
+        var container = new BlobServiceClient(_connectionString).GetBlobContainerClient(_containerName);
+        Assert.True(await container.GetBlobClient($"{folderUri}0.csv").ExistsAsync());
+        Assert.True(await container.GetBlobClient($"{folderUri}1.csv").ExistsAsync());
+        Assert.True(await container.GetBlobClient($"{folderUri}2.csv").ExistsAsync());
+
+        var queryResult = await _olapBusiness.QueryTabularFile(
+            _userId, _organizationId, _projectId, result.Id,
+            "SELECT COUNT(*) AS total FROM data", "data");
+
+        Assert.Equal(12L, Convert.ToInt64(queryResult.Data[0][0]));
+    }
+
+    // ── Schema validation ─────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task AppendTabularBlob_Csv_ExtraColumn_LeavesOriginalIntact()
+    {
+        var result = await UploadFilesystemCsv(CsvHeaders, 5, "dataset.csv");
+        var originalRecord = await Context.Records.AsNoTracking().FirstAsync(r => r.Id == result.Id);
+        var originalUri = originalRecord.Uri!;
+
+        var appendFile = CreateTestCsvFile("timestamp,sensor_id,value,temperature,pressure,unexpected", 3, "extra_col.csv");
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            _olapBusiness.AppendTabularBlob(_organizationId, _projectId, result.Id, 1, appendFile));
+
+        Assert.Contains("unexpected column", ex.Message);
+
+        var recordAfter = await Context.Records.AsNoTracking().FirstAsync(r => r.Id == result.Id);
+        Assert.Equal(originalUri, recordAfter.Uri);
+        Assert.True(File.Exists(originalUri));
+
+        var folderPrefix = originalUri[..^".csv".Length] + Path.DirectorySeparatorChar;
+        Assert.False(File.Exists(Path.Combine(folderPrefix, "0.csv")));
+    }
+
+    [Fact]
+    public async Task AppendTabularBlob_Csv_MissingColumn_LeavesOriginalIntact()
+    {
+        var result = await UploadFilesystemCsv(CsvHeaders, 5, "dataset.csv");
+        var originalRecord = await Context.Records.AsNoTracking().FirstAsync(r => r.Id == result.Id);
+        var originalUri = originalRecord.Uri!;
+
+        var appendFile = CreateTestCsvFile("timestamp,sensor_id,value", 3, "missing_col.csv");
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            _olapBusiness.AppendTabularBlob(_organizationId, _projectId, result.Id, 1, appendFile));
+
+        Assert.Contains("missing column", ex.Message);
+
+        var recordAfter = await Context.Records.AsNoTracking().FirstAsync(r => r.Id == result.Id);
+        Assert.Equal(originalUri, recordAfter.Uri);
+        Assert.True(File.Exists(originalUri));
+    }
+
+    [Fact]
+    public async Task AppendTabularBlob_Csv_NoStoredColumns_Throws()
+    {
+        var result = await UploadFilesystemCsv(CsvHeaders, 5, "dataset.csv");
+
+        var record = await GetRecordEntity(result.Id);
+        record.Properties = "{}";
+        await Context.SaveChangesAsync();
+
+        var appendFile = CreateTestCsvFile(CsvHeaders, 3, "append.csv");
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            _olapBusiness.AppendTabularBlob(_organizationId, _projectId, result.Id, 1, appendFile));
+
+        Assert.Contains("no stored column schema", ex.Message);
+    }
+
+    // ── Duplicate part ────────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task AppendTabularBlob_Csv_DuplicatePartOnSecondAppend_LeavesExistingPartsUntouched()
+    {
+        var result = await UploadFilesystemCsv(CsvHeaders, 5, "dataset.csv");
+
+        await _olapBusiness.AppendTabularBlob(
+            _organizationId, _projectId, result.Id, 1,
+            CreateTestCsvFile(CsvHeaders, 3, "append1.csv"));
+
+        var record = await GetRecordEntity(result.Id);
+        var folderUri = record.Uri!;
+
+        var ex = await Assert.ThrowsAsync<ArgumentException>(() =>
+            _olapBusiness.AppendTabularBlob(
+                _organizationId, _projectId, result.Id, 1,
+                CreateTestCsvFile(CsvHeaders, 4, "append_dup.csv")));
+
+        Assert.Contains("Part 1 already exists", ex.Message);
+
+        Assert.True(File.Exists(Path.Combine(folderUri, "0.csv")));
+        Assert.True(File.Exists(Path.Combine(folderUri, "1.csv")));
+        Assert.False(File.Exists(Path.Combine(folderUri, "2.csv")));
+
+        var queryResult = await _olapBusiness.QueryTabularFile(
+            _userId, _organizationId, _projectId, result.Id,
+            "SELECT COUNT(*) AS total FROM data", "data");
+
+        Assert.Equal(8L, Convert.ToInt64(queryResult.Data[0][0]));
+    }
+
     #endregion
 
     #region Query Tabular File
+    
+    [Fact]
+    public async Task QueryTabularFile_AppendedCsvFolder_Filesystem_ReadsAcrossAllParts()
+    {
+        var result = await UploadFilesystemCsv(CsvHeaders, 5, "dataset.csv");
+
+        await _olapBusiness.AppendTabularBlob(
+            _organizationId, _projectId, result.Id, 1,
+            CreateTestCsvFile(CsvHeaders, 3, "append1.csv"));
+
+        await _olapBusiness.AppendTabularBlob(
+            _organizationId, _projectId, result.Id, 2,
+            CreateTestCsvFile(CsvHeaders, 2, "append2.csv"));
+
+        var queryResult = await _olapBusiness.QueryTabularFile(
+            _userId, _organizationId, _projectId, result.Id,
+            "SELECT COUNT(*) AS total FROM data", "data");
+
+        Assert.Single(queryResult.Data);
+        Assert.Equal(10L, Convert.ToInt64(queryResult.Data[0][0]));
+    }
+
+    [Fact]
+    public async Task QueryTabularFile_AppendedCsvFolder_Filesystem_CorrectColumnCount()
+    {
+        var result = await UploadFilesystemCsv(CsvHeaders, 5, "dataset.csv");
+
+        await _olapBusiness.AppendTabularBlob(
+            _organizationId, _projectId, result.Id, 1,
+            CreateTestCsvFile(CsvHeaders, 3, "append1.csv"));
+
+        var queryResult = await _olapBusiness.QueryTabularFile(
+            _userId, _organizationId, _projectId, result.Id,
+            "SELECT * FROM data", "data");
+
+        Assert.Equal(8, queryResult.Data.Length);
+        Assert.Equal(5, queryResult.Columns.Length);
+    }
+
+    [Fact]
+    public async Task QueryTabularFile_AppendedCsvFolder_Azure_ReadsAcrossAllParts()
+    {
+        var result = await UploadAzureCsv(CsvHeaders, 5, "dataset.csv");
+
+        await _olapBusiness.AppendTabularBlob(
+            _organizationId, _projectId, result.Id, 1,
+            CreateTestCsvFile(CsvHeaders, 3, "append1.csv"));
+
+        await _olapBusiness.AppendTabularBlob(
+            _organizationId, _projectId, result.Id, 2,
+            CreateTestCsvFile(CsvHeaders, 2, "append2.csv"));
+
+        var queryResult = await _olapBusiness.QueryTabularFile(
+            _userId, _organizationId, _projectId, result.Id,
+            "SELECT COUNT(*) AS total FROM data", "data");
+
+        Assert.Single(queryResult.Data);
+        Assert.Equal(10L, Convert.ToInt64(queryResult.Data[0][0]));
+    }
 
     [Fact]
     public async Task QueryTabularFile_SingleCsv_Success_ReturnsData()
@@ -1290,6 +1574,61 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
     #endregion
 
     #region Get Plot Data
+    
+    [Fact]
+    public async Task GetPlotData_AppendedCsvFolder_Filesystem_ReturnsCorrectRowCount()
+    {
+        var result = await UploadFilesystemCsv(CsvHeaders, 5, "dataset.csv");
+
+        await _olapBusiness.AppendTabularBlob(
+            _organizationId, _projectId, result.Id, 1,
+            CreateTestCsvFile(CsvHeaders, 3, "append1.csv"));
+
+        var plotData = await _olapBusiness.GetPlotData(
+            _userId, _organizationId, _projectId, result.Id, 4, 1);
+
+        Assert.Equal(4, plotData.Data.Length);
+        Assert.Equal(5, plotData.Columns.Length);
+    }
+
+    [Fact]
+    public async Task GetPlotData_AppendedCsvFolder_Filesystem_UsesGlobalOrderingAcrossParts()
+    {
+        var result = await UploadFilesystemCsv(CsvHeaders, 5, "dataset.csv");
+
+        await _olapBusiness.AppendTabularBlob(
+            _organizationId, _projectId, result.Id, 1,
+            CreateTestCsvFile(CsvHeaders, 3, "append1.csv"));
+
+        // Request all 8 rows to verify part 0 rows come before part 1 rows
+        var plotData = await _olapBusiness.GetPlotData(
+            _userId, _organizationId, _projectId, result.Id, 8, 1);
+
+        Assert.Equal(8, plotData.Data.Length);
+
+        var sensorIdIndex = (int)FindColumnIndex(plotData, "sensor_id");
+
+        // Part 0 rows use sensor_0..sensor_4, part 1 rows use sensor_0..sensor_2.
+        // If ordering is wrong the rows from different parts will be interleaved incorrectly.
+        Assert.Equal("sensor_0", plotData.Data[0][sensorIdIndex].ToString());
+        Assert.Equal("sensor_0", plotData.Data[5][sensorIdIndex].ToString());
+    }
+
+    [Fact]
+    public async Task GetPlotData_AppendedCsvFolder_Azure_ReturnsCorrectRowCount()
+    {
+        var result = await UploadAzureCsv(CsvHeaders, 5, "dataset.csv");
+
+        await _olapBusiness.AppendTabularBlob(
+            _organizationId, _projectId, result.Id, 1,
+            CreateTestCsvFile(CsvHeaders, 3, "append1.csv"));
+
+        var plotData = await _olapBusiness.GetPlotData(
+            _userId, _organizationId, _projectId, result.Id, 4, 1);
+
+        Assert.Equal(4, plotData.Data.Length);
+        Assert.Equal(5, plotData.Columns.Length);
+    }
 
     [Fact]
     public async Task GetPlotData_RecordDoesNotExist_Throws()
@@ -1721,19 +2060,6 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
     }
 
     [Fact]
-    public async Task GetHighestPartNumber_NonParquetExtension_Throws()
-    {
-        var csv = CreateTestCsvFile("timestamp,value\n2024-01-01T00:00:00,1", "data.csv");
-        var uploaded = await _fileBusiness.UploadFile(
-            _userId, _organizationId, _projectId, _dataSourceId, _fileSystemObjectStorageId, csv);
-
-        var ex = await Assert.ThrowsAsync<ArgumentException>(() =>
-            _olapBusiness.GetHighestPartNumber(_organizationId, _projectId, uploaded.Id));
-
-        Assert.Contains("Only Parquet files are supported", ex.Message);
-    }
-
-    [Fact]
     public async Task GetHighestPartNumber_Filesystem_AfterFirstAppend_ReturnsOne()
     {
         var result = await UploadFilesystemParquet(5, "dataset.parquet");
@@ -1859,7 +2185,89 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
             _organizationId, _projectId, result.Id);
         Assert.Equal(2L, highest);
     }
+    
+    [Fact]
+    public async Task GetHighestPartNumber_FlatCsvFile_ReturnsZero()
+    {
+        var result = await UploadFilesystemCsv(CsvHeaders, 5, "dataset.csv");
 
+        var highest = await _olapBusiness.GetHighestPartNumber(
+            _organizationId, _projectId, result.Id);
+
+        Assert.Equal(0L, highest);
+    }
+
+    [Fact]
+    public async Task GetHighestPartNumber_Filesystem_Csv_AfterFirstAppend_ReturnsOne()
+    {
+        var result = await UploadFilesystemCsv(CsvHeaders, 5, "dataset.csv");
+
+        await _olapBusiness.AppendTabularBlob(
+            _organizationId, _projectId, result.Id, 1,
+            CreateTestCsvFile(CsvHeaders, 3, "append1.csv"));
+
+        var highest = await _olapBusiness.GetHighestPartNumber(
+            _organizationId, _projectId, result.Id);
+
+        Assert.Equal(1L, highest);
+    }
+
+    [Fact]
+    public async Task GetHighestPartNumber_Filesystem_Csv_AfterMultipleAppends_ReturnsHighest()
+    {
+        var result = await UploadFilesystemCsv(CsvHeaders, 3, "dataset.csv");
+
+        await _olapBusiness.AppendTabularBlob(
+            _organizationId, _projectId, result.Id, 1,
+            CreateTestCsvFile(CsvHeaders, 2, "append1.csv"));
+
+        await _olapBusiness.AppendTabularBlob(
+            _organizationId, _projectId, result.Id, 2,
+            CreateTestCsvFile(CsvHeaders, 2, "append2.csv"));
+
+        await _olapBusiness.AppendTabularBlob(
+            _organizationId, _projectId, result.Id, 3,
+            CreateTestCsvFile(CsvHeaders, 2, "append3.csv"));
+
+        var highest = await _olapBusiness.GetHighestPartNumber(
+            _organizationId, _projectId, result.Id);
+
+        Assert.Equal(3L, highest);
+    }
+
+    [Fact]
+    public async Task GetHighestPartNumber_Azure_Csv_AfterFirstAppend_ReturnsOne()
+    {
+        var result = await UploadAzureCsv(CsvHeaders, 5, "dataset.csv");
+
+        await _olapBusiness.AppendTabularBlob(
+            _organizationId, _projectId, result.Id, 1,
+            CreateTestCsvFile(CsvHeaders, 3, "append1.csv"));
+
+        var highest = await _olapBusiness.GetHighestPartNumber(
+            _organizationId, _projectId, result.Id);
+
+        Assert.Equal(1L, highest);
+    }
+
+    [Fact]
+    public async Task GetHighestPartNumber_Azure_Csv_AfterMultipleAppends_ReturnsHighest()
+    {
+        var result = await UploadAzureCsv(CsvHeaders, 3, "dataset.csv");
+
+        await _olapBusiness.AppendTabularBlob(
+            _organizationId, _projectId, result.Id, 1,
+            CreateTestCsvFile(CsvHeaders, 2, "append1.csv"));
+
+        await _olapBusiness.AppendTabularBlob(
+            _organizationId, _projectId, result.Id, 2,
+            CreateTestCsvFile(CsvHeaders, 2, "append2.csv"));
+
+        var highest = await _olapBusiness.GetHighestPartNumber(
+            _organizationId, _projectId, result.Id);
+
+        Assert.Equal(2L, highest);
+    }
     #endregion
 
     #region Ecosystem
