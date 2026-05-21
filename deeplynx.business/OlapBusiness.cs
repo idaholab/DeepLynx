@@ -34,9 +34,10 @@ public class OlapBusiness : IOlapBusiness
     }
 
     /// <summary>
-    ///     Appends a new Parquet part file to an existing Parquet dataset in Azure Blob Storage
+    ///     Appends a new part file to an existing tabular dataset in Azure Blob Storage
     ///     or the local filesystem, validating schema compatibility before writing.
     ///     On the first append, migrates the original flat file into a folder-based part structure.
+    ///     Supports Parquet and CSV files.
     /// </summary>
     /// <param name="organizationId"></param>
     /// <param name="projectId"></param>
@@ -53,8 +54,8 @@ public class OlapBusiness : IOlapBusiness
         IFormFile file)
     {
         var fileType = Path.GetExtension(file.FileName).TrimStart('.').ToLower();
-        if (fileType != "parquet")
-            throw new ArgumentException("Only Parquet files are supported for append.");
+        if (fileType != "parquet" && fileType != "csv")
+            throw new ArgumentException("Only Parquet or CSV files are supported for append.");
 
         if (file.Length == 0)
             throw new ArgumentException("Cannot append an empty file.");
@@ -77,8 +78,12 @@ public class OlapBusiness : IOlapBusiness
         if (string.IsNullOrWhiteSpace(record.Uri))
             throw new ArgumentException("Record has no URI.");
 
-        var realObjectStorageId = await ResolveObjectStorageId(organizationId, projectId, record.ObjectStorageId);
-        var objectStorage = await _objectStorageBusiness.GetDecryptedObjectStorage(realObjectStorageId);
+        if (!record.ObjectStorageId.HasValue)
+        {
+            throw new InvalidOperationException($"Object storage id is required on record to append.");
+        }
+        
+        var objectStorage = await _objectStorageBusiness.GetDecryptedObjectStorage(record.ObjectStorageId.Value);
 
         if (objectStorage.Type != "azure_object" && objectStorage.Type != "filesystem")
             throw new InvalidOperationException($"Unsupported object storage type: {objectStorage.Type}");
@@ -279,9 +284,12 @@ public class OlapBusiness : IOlapBusiness
         // For a folder (appended-blob dataset) we glob all part files and union by name so
         // the schema is resolved across every part even if columns were added over time.
         // For a single file we keep the simple quoted-path form.
+        var fileExtension = record.FileType?.ToLower() == "csv" ? "csv" : "parquet";
+        var readFunction = fileExtension == "csv" ? "read_csv" : "read_parquet";
         var viewSourceSql = isFolder
-            ? $"SELECT * EXCLUDE filename FROM read_parquet(['{fileUrl.TrimEnd('/')}/*.parquet'], union_by_name = true, filename = true) ORDER BY CAST(regexp_extract(filename, '(\\d+)\\.parquet$', 1) AS BIGINT)"
+            ? $"SELECT * EXCLUDE filename FROM {readFunction}(['{fileUrl.TrimEnd('/')}/*.{fileExtension}'], union_by_name = true, filename = true) ORDER BY CAST(regexp_extract(filename, '(\\d+)\\.{fileExtension}$', 1) AS BIGINT)"
             : $"SELECT * FROM '{fileUrl}'";
+
 
         await using (connection)
         {
@@ -359,9 +367,10 @@ public class OlapBusiness : IOlapBusiness
 
         if (!string.IsNullOrEmpty(extension))
         {
-            if (!extension.Equals(".parquet", StringComparison.OrdinalIgnoreCase))
+            if (!extension.Equals(".parquet", StringComparison.OrdinalIgnoreCase) &&
+                !extension.Equals(".csv", StringComparison.OrdinalIgnoreCase))
                 throw new ArgumentException(
-                    $"Only Parquet files are supported for part number tracking. Record URI has extension '{extension}'.");
+                    $"Only Parquet and CSV files are supported for part number tracking. Record URI has extension '{extension}'.");
 
             // Flat file — no appends have been made yet. Return 0 because the original
             // file is conceptually part 0 (the value AppendTabularBlob uses when it
@@ -384,7 +393,7 @@ public class OlapBusiness : IOlapBusiness
 
             partNumbers = containerClient
                 .GetBlobs(prefix: record.Uri)
-                .Where(b => b.Name.EndsWith(".parquet", StringComparison.OrdinalIgnoreCase))
+                .Where(b => b.Name.EndsWith($".{record.FileType}", StringComparison.OrdinalIgnoreCase))
                 .Select(b => Path.GetFileNameWithoutExtension(b.Name))
                 .Where(stem => long.TryParse(stem, out _))
                 .Select(long.Parse);
@@ -392,7 +401,7 @@ public class OlapBusiness : IOlapBusiness
         else if (objectStorage.Type == "filesystem")
         {
             partNumbers = Directory
-                .EnumerateFiles(record.Uri, "*.parquet")
+                .EnumerateFiles(record.Uri, $"*.{record.FileType}")
                 .Select(p => Path.GetFileNameWithoutExtension(p))
                 .Where(stem => long.TryParse(stem, out _))
                 .Select(long.Parse);
@@ -622,8 +631,10 @@ public class OlapBusiness : IOlapBusiness
         // For folders, read all part files ordered by part number first so that
         // row_number() reflects true insertion order across all parts, and the
         // final ORDER BY rn DESC + LIMIT gives the correct last N rows globally.
+        var fileExtension = record.FileType?.ToLower() == "csv" ? "csv" : "parquet";
+        var readFunction = fileExtension == "csv" ? "read_csv" : "read_parquet";
         var fromClause = isFolder
-            ? $"(SELECT * EXCLUDE filename FROM read_parquet(['{fileUrl.TrimEnd('/')}/*.parquet'], union_by_name = true, filename = true) ORDER BY CAST(regexp_extract(filename, '(\\d+)\\.parquet$', 1) AS BIGINT))"
+            ? $"(SELECT * EXCLUDE filename FROM {readFunction}(['{fileUrl.TrimEnd('/')}/*.{fileExtension}'], union_by_name = true, filename = true) ORDER BY CAST(regexp_extract(filename, '(\\d+)\\.{fileExtension}$', 1) AS BIGINT))"
             : $"'{fileUrl}'";
 
         await using (connection)
@@ -686,28 +697,27 @@ public class OlapBusiness : IOlapBusiness
     ///     </para>
     /// </summary>
     private async Task AppendToAzureBlob(
-        Record record,
-        ObjectStorageConfigDto objectStorageConfig,
-        IFormFile file,
-        long partNumber)
+    Record record,
+    ObjectStorageConfigDto objectStorageConfig,
+    IFormFile file,
+    long partNumber)
     {
+        var fileExtension = $".{record.FileType}";
+
         var containerName = objectStorageConfig.AzureObjectConfig?.AzureContainerName
                             ?? throw new ArgumentException("Azure container name is required.");
 
         var containerClient = new BlobServiceClient(objectStorageConfig.AzureObjectConfig!.AzureConnectionString)
             .GetBlobContainerClient(containerName);
 
-        if (string.IsNullOrWhiteSpace(record.Uri))
-            throw new ArgumentException("Record has no URI.");
-
-        var isFirstAppend = record.Uri.EndsWith(".parquet", StringComparison.OrdinalIgnoreCase);
+        var isFirstAppend = record.Uri.EndsWith(fileExtension, StringComparison.OrdinalIgnoreCase);
 
         string folderUri;
         string schemaSourceBlobName;
 
         if (isFirstAppend)
         {
-            folderUri = record.Uri[..^".parquet".Length] + "/";
+            folderUri = record.Uri[..^fileExtension.Length] + "/";
             schemaSourceBlobName = record.Uri;
         }
         else
@@ -716,36 +726,40 @@ public class OlapBusiness : IOlapBusiness
             schemaSourceBlobName = containerClient
                                        .GetBlobs(prefix: record.Uri)
                                        .FirstOrDefault(b =>
-                                           b.Name.EndsWith(".parquet", StringComparison.OrdinalIgnoreCase))
+                                           b.Name.EndsWith(fileExtension, StringComparison.OrdinalIgnoreCase))
                                        ?.Name
                                    ?? throw new InvalidOperationException(
-                                       "No existing Parquet files found in the dataset folder.");
+                                       $"No existing {fileExtension} files found in the dataset folder.");
         }
 
-        // Validate schema — Parquet.Net reads only the file footer; no row data is loaded
-        // into memory regardless of file size.
-        await using var existingStream = await containerClient
-            .GetBlobClient(schemaSourceBlobName)
-            .OpenReadAsync();
-
         await using var incomingStream = file.OpenReadStream();
-        await ValidateParquetSchema(existingStream, incomingStream);
+
+        if (record.FileType == "parquet")
+        {
+            await using var existingStream = await containerClient
+                .GetBlobClient(schemaSourceBlobName)
+                .OpenReadAsync();
+            await ValidateParquetSchema(existingStream, incomingStream);
+        }
+        else if (record.FileType == "csv")
+        {
+            var storedColumns = JsonNode.Parse(record.Properties)?["columns"]?.AsArray()
+                                ?? throw new InvalidOperationException("Record has no stored column schema to validate against.");
+            
+            await ValidateCsvSchema(storedColumns, incomingStream);
+        }
 
         BlobClient? firstPartBlobClient = null;
-        var newPartBlobClient = containerClient.GetBlobClient($"{folderUri}{partNumber}.parquet");
+        var newPartBlobClient = containerClient.GetBlobClient($"{folderUri}{partNumber}{fileExtension}");
 
         var wroteFirstPart = false;
         var wroteNewPart = false;
 
-        // Wrap all storage writes together so that a failure mid-upload triggers cleanup of
-        // any blobs already written in this operation.
         try
         {
-            // First append: COPY the original blob into the folder as part 0.
-            // The original is left untouched here; it is only deleted after the DB commit succeeds.
             if (isFirstAppend)
             {
-                firstPartBlobClient = containerClient.GetBlobClient($"{folderUri}0.parquet");
+                firstPartBlobClient = containerClient.GetBlobClient($"{folderUri}0{fileExtension}");
 
                 if (await firstPartBlobClient.ExistsAsync())
                     throw new ArgumentException($"Part 0 already exists in folder {folderUri}.");
@@ -765,9 +779,6 @@ public class OlapBusiness : IOlapBusiness
         }
         catch
         {
-            // Compensate: delete any blobs written before the failure.
-            // Only delete blobs that were created by this operation so that we do not
-            // remove pre-existing parts when the failure was caused by a duplicate.
             if (wroteFirstPart && firstPartBlobClient is not null)
                 await firstPartBlobClient.DeleteIfExistsAsync();
 
@@ -777,7 +788,6 @@ public class OlapBusiness : IOlapBusiness
             throw;
         }
 
-        // Commit the URI change only after all storage writes have succeeded.
         if (isFirstAppend)
         {
             var originalUri = record.Uri;
@@ -790,7 +800,6 @@ public class OlapBusiness : IOlapBusiness
             {
                 record.Uri = originalUri;
 
-                // Roll back only the blobs created by this operation.
                 if (wroteFirstPart && firstPartBlobClient is not null)
                     await firstPartBlobClient.DeleteIfExistsAsync();
 
@@ -800,8 +809,6 @@ public class OlapBusiness : IOlapBusiness
                 throw;
             }
 
-            // Original blob deleted only after the DB commit is confirmed.
-            // A failure here leaves an orphaned blob but causes no data loss or broken record state.
             await containerClient.GetBlobClient(schemaSourceBlobName).DeleteIfExistsAsync();
         }
     }
@@ -836,53 +843,59 @@ public class OlapBusiness : IOlapBusiness
     ///     </para>
     /// </summary>
     private async Task AppendToFilesystemAsync(
-        Record record,
-        IFormFile file,
-        long partNumber)
+    Record record,
+    IFormFile file,
+    long partNumber)
     {
         if (string.IsNullOrWhiteSpace(record.Uri))
             throw new InvalidOperationException("Record has null or empty URI.");
 
+        var fileExtension = $".{record.FileType}";
         var fullPath = record.Uri;
-        var isFirstAppend = record.Uri.EndsWith(".parquet", StringComparison.OrdinalIgnoreCase);
+        var isFirstAppend = record.Uri.EndsWith(fileExtension, StringComparison.OrdinalIgnoreCase);
 
         string folderPath;
         string schemaSourcePath;
 
         if (isFirstAppend)
         {
-            folderPath = fullPath[..^".parquet".Length] + Path.DirectorySeparatorChar;
+            folderPath = fullPath[..^fileExtension.Length] + Path.DirectorySeparatorChar;
             schemaSourcePath = fullPath;
         }
         else
         {
             folderPath = fullPath;
             schemaSourcePath = Directory
-                                   .EnumerateFiles(fullPath, "*.parquet")
+                                   .EnumerateFiles(fullPath, $"*{fileExtension}")
                                    .FirstOrDefault()
                                ?? throw new InvalidOperationException(
-                                   "No existing Parquet files found in the dataset folder.");
+                                   $"No existing {fileExtension} files found in the dataset folder.");
         }
 
-        // Validate schema — Parquet.Net reads only the file footer; no row data is loaded
-        // into memory regardless of file size.
-        await using var existingStream = File.OpenRead(schemaSourcePath);
         await using var incomingStream = file.OpenReadStream();
-        await ValidateParquetSchema(existingStream, incomingStream);
+
+        if (record.FileType == "parquet")
+        {
+            await using var existingStream = File.OpenRead(schemaSourcePath);
+            await ValidateParquetSchema(existingStream, incomingStream);
+        }
+        else if (record.FileType == "csv")
+        {
+            var storedColumns = JsonNode.Parse(record.Properties ?? "")
+                                    ?["columns"]?.AsArray()
+                                ?? throw new InvalidOperationException(
+                                    "Record has no stored column schema to validate against.");
+            await ValidateCsvSchema(storedColumns, incomingStream);
+        }
 
         string? firstPartPath = null;
-        var newPartPath = Path.Combine(folderPath, $"{partNumber}.parquet");
+        var newPartPath = Path.Combine(folderPath, $"{partNumber}{fileExtension}");
         var directoryCreated = false;
         var wroteFirstPart = false;
         var wroteNewPart = false;
 
-        // Wrap all storage writes together so that a failure mid-write triggers cleanup of
-        // any files already written in this operation.
         try
         {
-            // First append: COPY the original into the folder as part 0 by streaming through
-            // the already-open handle. Using the open stream rather than File.Copy avoids a
-            // Windows file-lock error. The original file is left untouched until the DB commit succeeds.
             if (isFirstAppend)
             {
                 if (!Directory.Exists(folderPath))
@@ -891,14 +904,14 @@ public class OlapBusiness : IOlapBusiness
                     directoryCreated = true;
                 }
 
-                firstPartPath = Path.Combine(folderPath, "0.parquet");
+                firstPartPath = Path.Combine(folderPath, $"0{fileExtension}");
 
                 if (File.Exists(firstPartPath))
                     throw new ArgumentException($"Part 0 already exists in folder {folderPath}.");
 
-                existingStream.Seek(0, SeekOrigin.Begin);
+                await using var sourceStream = File.OpenRead(schemaSourcePath);
                 await using var firstPartStream = File.Create(firstPartPath);
-                await existingStream.CopyToAsync(firstPartStream);
+                await sourceStream.CopyToAsync(firstPartStream);
                 wroteFirstPart = true;
             }
 
@@ -912,17 +925,12 @@ public class OlapBusiness : IOlapBusiness
         }
         catch
         {
-            // Compensate: delete any files written before the failure.
-            // Only delete files that were created by this operation so that we do not
-            // remove pre-existing parts when the failure was caused by a duplicate.
             if (wroteFirstPart && firstPartPath is not null && File.Exists(firstPartPath))
                 File.Delete(firstPartPath);
 
             if (wroteNewPart && File.Exists(newPartPath))
                 File.Delete(newPartPath);
 
-            // Use recursive: true so a spurious file in the folder can't mask the original
-            // exception. Only attempt deletion if this operation created the directory.
             if (directoryCreated && Directory.Exists(folderPath))
                 try
                 {
@@ -936,7 +944,6 @@ public class OlapBusiness : IOlapBusiness
             throw;
         }
 
-        // Commit the URI change only after all storage writes have succeeded.
         if (isFirstAppend)
         {
             var originalUri = record.Uri;
@@ -949,7 +956,6 @@ public class OlapBusiness : IOlapBusiness
             {
                 record.Uri = originalUri;
 
-                // Roll back only the files created by this operation.
                 if (wroteFirstPart && firstPartPath is not null && File.Exists(firstPartPath))
                     File.Delete(firstPartPath);
 
@@ -969,8 +975,6 @@ public class OlapBusiness : IOlapBusiness
                 throw;
             }
 
-            // Original file deleted only after the DB commit is confirmed.
-            // A failure here leaves an orphaned file but causes no data loss or broken record state.
             File.Delete(fullPath);
         }
     }
@@ -1017,6 +1021,36 @@ public class OlapBusiness : IOlapBusiness
                 throw new InvalidOperationException(
                     $"Column '{name}' type mismatch: existing is '{type}', incoming is '{incomingType}'.");
         }
+    }
+    
+    /// <summary>
+    ///     Validates that the incoming CSV file's headers are compatible with the existing CSV dataset.
+    /// </summary>
+    /// <param name="storedColumns">The column schema stored on the record at upload time, used as the validation baseline.</param>
+    /// <param name="incomingStream">A stream over the newly uploaded CSV file.</param>
+    /// <exception cref="ArgumentException">Thrown when the headers do not match.</exception>
+    private static async Task ValidateCsvSchema(JsonArray storedColumns, Stream incomingStream)
+    {
+        var existingNames = storedColumns
+            .Select(col => col!["name"]!.GetValue<string>())
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        using var reader = new StreamReader(incomingStream, leaveOpen: true);
+
+        var headerLine = await reader.ReadLineAsync()
+                         ?? throw new InvalidOperationException("Incoming CSV file is empty or has no headers.");
+
+        var incomingNames = headerLine.Split(',').Select(h => h.Trim()).ToArray();
+
+        foreach (var name in incomingNames)
+            if (!existingNames.Contains(name))
+                throw new InvalidOperationException(
+                    $"Incoming file has unexpected column '{name}' not present in the existing schema.");
+
+        foreach (var name in existingNames)
+            if (!incomingNames.Contains(name))
+                throw new InvalidOperationException(
+                    $"Incoming file is missing column '{name}'.");
     }
 
     /// <summary>
