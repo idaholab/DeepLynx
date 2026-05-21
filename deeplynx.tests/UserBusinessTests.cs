@@ -1001,6 +1001,33 @@ public class UserBusinessTests : IntegrationTestBase
         Assert.DoesNotContain(users, u => u.Id == uid2);
     }
 
+    [Fact]
+    public async Task GetAllUsers_IncludeArchived_ReturnsAllUsers()
+    {
+        // Act
+        var result = await _userBusiness.GetAllUsers(null, null, includeArchived: true);
+        var users = result.ToList();
+
+        // Assert
+        Assert.Equal(10, users.Count); 
+        Assert.Contains(users, u => u.Id == uid2); 
+        Assert.DoesNotContain(users, u => u.Id == uid3);
+    }
+
+    [Fact]
+    public async Task GetAllUsers_ExcludeArchived_OmitsArchivedUsers()
+    {
+        // Act
+        var result = await _userBusiness.GetAllUsers(null, null, includeArchived: false);
+        var users = result.ToList();
+
+        // Assert
+        Assert.Equal(9, users.Count);
+        Assert.All(users, u => Assert.False(u.IsArchived));
+        Assert.DoesNotContain(users, u => u.Id == uid2); 
+        Assert.DoesNotContain(users, u => u.Id == uid3); 
+    }
+
     #endregion
 
     #region GetUser Tests
