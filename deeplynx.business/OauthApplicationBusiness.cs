@@ -250,25 +250,26 @@ public class OauthApplicationBusiness : IOauthApplicationBusiness
         // grab event-relevant details before deletion
         var appId = application.Id;
         var appName = application.Name;
-        var appClientId = application.ClientId;        
+        var appClientId = application.ClientId;
+        var lastUpdatedBy = application.LastUpdatedBy;
 
         _context.OauthApplications.Remove(application);
         await _context.SaveChangesAsync();
 
-        // Log the OAuth application deletion event
-        await _eventBusiness.CreateEvent(userId, null, null,
-            new CreateEventRequestDto
+        // null is passed for organizationId and projectId, because an OAuth application is a system scoped entity and doesn't belong to either
+        await _eventBusiness.CreateEvent(userId, null, null, new CreateEventRequestDto
+        {
+            Operation = "delete",
+            EntityType = "oauth_application",
+            EntityId = appId,
+            EntityName = appName,
+            Properties = JsonSerializer.Serialize(new
             {
-                Operation = "delete",
-                EntityType = "oauth_application",
-                EntityId = appId,
-                EntityName = appName,
-                Properties = JsonSerializer.Serialize(new
-                {
-                    appName,
-                    appClientId
-                })
-            });
+                AppName = appName,
+                AppClientId = appClientId,
+                LastUpdatedBy = lastUpdatedBy
+            })
+        });
 
         return true;
     }
