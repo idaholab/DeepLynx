@@ -419,6 +419,23 @@ const UsersTable = ({
   };
 
   /* ------------------------------------------------------------------------ */
+  /*                               Unarchive User                             */
+  /* ------------------------------------------------------------------------ */
+
+  const handleUnarchive = async (userId: number) => {
+    setLoading(true);
+    try {
+      await archiveUser(userId, false);
+      await Promise.all([loadArchivedUsers(), loadAllData()]);
+      void loadArchivedUsers();
+    } catch (error) {
+      console.error("Failed to unarchive user:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  /* ------------------------------------------------------------------------ */
   /*                               Derived Stats                              */
   /* ------------------------------------------------------------------------ */
 
@@ -483,6 +500,8 @@ const UsersTable = ({
               setEditUserIsSysAdmin(isSysAdmin);
             }}
             onOpenConfirm={(item: ConfirmModalState) => setConfirmModal(item)}
+            isArchivedTab={activeTab === "archived"}  
+            onUnarchive={handleUnarchive} 
           />
         </div>
       </div>
