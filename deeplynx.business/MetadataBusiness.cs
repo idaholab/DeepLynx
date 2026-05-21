@@ -207,9 +207,14 @@ public class MetadataBusiness : IMetadataBusiness
         if (edges.Any())
         {
             // ensure all origin/destination records exist in the record map; if not, check DB
-            await CheckRecordsByOriginalId(projectId, dataSourceId, recordMap, edges);
+            var resolvedRecordMap = await CheckRecordsByOriginalId(
+                projectId,
+                dataSourceId,
+                recordMap,
+                edges);
+
             // load relationship, origin and destination IDs into classes before insert
-            UpdateEdgesWithIds(edges, relMap, recordMap);
+            UpdateEdgesWithIds(edges, relMap, resolvedRecordMap);
             metadataResponseDto.Edges =
                 await _edgeBusiness.BulkCreateEdges(currentUserId, organizationId, projectId, dataSourceId, edges);
         }
@@ -273,18 +278,22 @@ public class MetadataBusiness : IMetadataBusiness
     }
 
     /// <summary>
-    ///     Checks for original id specified in record map or in the DB
-    ///     Throws an exception if referenced records cannot be resolved.
+    ///     Resolves records by original ID, checking the current batch record map first,
+    ///     then falling back to the database for any missing IDs.
+    ///     Returns a new enriched record map containing all original entries plus any
+    ///     additional records found in the database.
+    ///     The current batch record map. Will not be mutated.
+    ///     Throws an exception if any referenced records cannot be resolved.
     /// </summary>
     /// <param name="projectId"></param>
     /// <param name="dataSourceId"></param>
     /// <param name="recordMap"></param>
     /// <param name="edges"></param>
-    /// <returns>A list of relationships to be inserted</returns>
-    private async Task CheckRecordsByOriginalId(
+    /// <returns>A new dictionary containing all resolved original IDs mapped to their record IDs</returns>
+    private async Task<IReadOnlyDictionary<string, long>> CheckRecordsByOriginalId(
         long projectId,
         long dataSourceId,
-        Dictionary<string, long> recordMap,
+        IReadOnlyDictionary<string, long> recordMap,
         List<CreateEdgeRequestDto> edges)
     {
         if (recordMap == null)
@@ -306,9 +315,11 @@ public class MetadataBusiness : IMetadataBusiness
             requestedOriginalIds.Add(edge.OriginOid);
             requestedOriginalIds.Add(edge.DestinationOid);
         }
+        
+        var enrichedMap = new Dictionary<string, long>(recordMap);
 
         var missingFromCurrentBatch = requestedOriginalIds
-            .Where(id => !recordMap.ContainsKey(id))
+            .Where(id => !enrichedMap.ContainsKey(id))
             .ToList();
 
         if (missingFromCurrentBatch.Any())
@@ -322,15 +333,17 @@ public class MetadataBusiness : IMetadataBusiness
                 .ToListAsync();
 
             foreach (var record in existingRecords)
-                recordMap.TryAdd(record.OriginalId, record.Id);
+                enrichedMap.TryAdd(record.OriginalId, record.Id);
         }
 
         var stillMissing = requestedOriginalIds
-            .Where(id => !recordMap.ContainsKey(id))
+            .Where(id => !enrichedMap.ContainsKey(id))
             .ToList();
 
         if (stillMissing.Any())
             throw new Exception($"Records not found matching Original IDs ({string.Join(", ", stillMissing)})");
+
+        return enrichedMap;
     }
     /// <summary>
     ///     Creates a list of record-tag pairs to be inserted into the linking table
@@ -471,7 +484,7 @@ public class MetadataBusiness : IMetadataBusiness
     private void UpdateEdgesWithIds(
         List<CreateEdgeRequestDto> edges,
         Dictionary<string, long> relMap,
-        Dictionary<string, long> recordMap)
+        IReadOnlyDictionary<string, long> recordMap)
     {
         foreach (var edge in edges)
         {
