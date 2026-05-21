@@ -260,7 +260,6 @@ public class EdgeBusiness : IEdgeBusiness
         if (invalidEdges.Any())
             throw new ArgumentException("All edges must have valid OriginId and DestinationId before bulk creation.");
 
-
         await ExistenceHelper.EnsureDataSourceExistsForProjectAsync(_context, dataSourceId, projectId);
         var conn = (NpgsqlConnection)_context.Database.GetDbConnection();
         if (conn.State != ConnectionState.Open) await conn.OpenAsync();
@@ -299,7 +298,6 @@ public class EdgeBusiness : IEdgeBusiness
         properties = COALESCE(EXCLUDED.properties, edges.properties),
         last_updated_at = EXCLUDED.last_updated_at
     RETURNING id, properties, organization_id, project_id, data_source_id, origin_id, destination_id, relationship_id;";
-
 
         var result = await _bulkCopyUpsertExecutor.CopyUpsertAsync(
             conn, tx,

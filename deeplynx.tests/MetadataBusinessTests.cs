@@ -617,7 +617,6 @@ public class MetadataBusinessTests : IntegrationTestBase
         Assert.Equal(5, eventList.Count);
     }
 
-
     [Fact]
     public async Task CreateMetadata_EdgeCanReferenceExistingRecordByOriginalId()
     {
@@ -667,6 +666,7 @@ public class MetadataBusinessTests : IntegrationTestBase
         Assert.NotNull(result.Edges);
         Assert.Single(result.Edges);
     }
+
     [Fact]
     public async Task CreateMetadata_ValidMetadataPersists_WhenEdgeReferencesMissingRecord()
     {
@@ -766,8 +766,7 @@ public class MetadataBusinessTests : IntegrationTestBase
 
         Assert.Null(createdEdge);
     }
-
-    
+  
     [Fact]
     public async Task CreateMetadata_Success_WithLargeRecordAndEdgeBatch()
     {
