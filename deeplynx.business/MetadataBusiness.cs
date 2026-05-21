@@ -197,7 +197,7 @@ public class MetadataBusiness : IMetadataBusiness
             var recordTags = BuildRecordTags(records, tagMap, recordMap);
             if (recordTags.Any())
             {
-                await _recordBusiness.BulkAttachTags(recordTags);
+                await _recordBusiness.BulkInsertRecordTagLinks(recordTags);
                 AttachTagsToRecordDtos(metadataResponseDto, recordTags, tagMap);
             }
         }
