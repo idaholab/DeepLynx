@@ -507,7 +507,6 @@ public class RecordController : ControllerBase
     [HttpPost("bulk-attach-tags-to-records", Name = "api_bulk_attach_tags_to_records")]
     [Auth("update", "record")]
     [Auth("read", "tag")]
-    [Sensitivity("update record")]
     public async Task<IActionResult> BulkAttachTagsToRecords(
         long organizationId,
         long projectId,
@@ -547,7 +546,6 @@ public class RecordController : ControllerBase
     [HttpPost("bulk-unattach-tags-from-records", Name = "api_bulk_unattach_tags_from_records")]
     [Auth("update", "record")]
     [Auth("read", "tag")]
-    [Sensitivity("update record")]
     public async Task<IActionResult> BulkUnattachTagsFromRecords(
         long organizationId,
         long projectId,

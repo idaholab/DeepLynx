@@ -1590,7 +1590,7 @@ public async Task<PaginatedResponse<RecordResponseDto>> GetAllRecordsPaginated(
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
     /// <param name="projectId"> The ID of the project to which the records belong</param>
     /// <param name="dtos">A list of record_id/tag_id pairs to be inserted</param>
-    /// <exception cref="ArgumentException"> Thrown if no record,tag pairs are provided</exception>
+    /// <exception cref="ArgumentException"> Thrown if no record/tag pairs are provided or if no authorized record/tag pairs remain after filtering</exception>
     /// <exception cref="KeyNotFoundException">Returned if one or more records or tags are not found or archived</exception>
     /// <returns>True if successful</returns>
     public async Task<bool> BulkAttachTagsToRecords(long currentUserId, long organizationId, 
@@ -1626,7 +1626,17 @@ public async Task<PaginatedResponse<RecordResponseDto>> GetAllRecordsPaginated(
         
         if (tags.Count != tagIds.Count)
             throw new KeyNotFoundException("One or more tags were not found or archived.");
-
+        
+        var authorizedRecordIds = await _sensitivityLabelService
+            .FilterAuthorizedRecordIds(currentUserId, organizationId, projectId, recordIds, _context);
+        
+        dtos = dtos
+            .Where(dto => authorizedRecordIds.Contains(dto.RecordId))
+            .ToList();
+        
+        if (dtos.Count == 0)
+            throw new ArgumentException("User does not have access to any provided records", nameof(dtos));
+        
         await BulkAttachTags(dtos);
 
         return true;
@@ -1639,7 +1649,7 @@ public async Task<PaginatedResponse<RecordResponseDto>> GetAllRecordsPaginated(
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
     /// <param name="projectId"> The ID of the project to which the records belong</param>
     /// <param name="dtos">A list of record_id/tag_id pairs to be deleted</param>
-    /// <exception cref="ArgumentException"> Thrown if no record,tag pairs are provided</exception>
+    /// <exception cref="ArgumentException"> Thrown if no record/tag pairs are provided or if no authorized record/tag pairs remain after filtering</exception>
     /// <exception cref="KeyNotFoundException">Returned if one or more records or tags are not found or archived</exception>
     /// <returns>True if successful</returns>
     public async Task<bool> BulkUnattachTagsFromRecords(long currentUserId, long organizationId,
@@ -1676,6 +1686,16 @@ public async Task<PaginatedResponse<RecordResponseDto>> GetAllRecordsPaginated(
         if (tags.Count != tagIds.Count)
             throw new KeyNotFoundException("One or more tags were not found or archived.");
 
+        var authorizedRecordIds = await _sensitivityLabelService
+            .FilterAuthorizedRecordIds(currentUserId, organizationId, projectId, recordIds, _context);
+        
+        dtos = dtos
+            .Where(dto => authorizedRecordIds.Contains(dto.RecordId))
+            .ToList();
+        
+        if (dtos.Count == 0)
+            throw new ArgumentException("User does not have access to any provided records", nameof(dtos));
+        
         await BulkUnattachTags(dtos);
         
         return true;
