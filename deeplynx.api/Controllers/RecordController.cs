@@ -544,7 +544,7 @@ public class RecordController : ControllerBase
     /// <param name="projectId">The ID of the project to which the record belongs</param>
     /// <param name="dtos">List of record/tag pairs to unattach</param>
     /// <returns>A message stating the tags were successfully unattached from the records.</returns>
-    [HttpDelete("bulk-unattach-tags-from-records", Name = "api_bulk_unattach_tags_from_records")]
+    [HttpPost("bulk-unattach-tags-from-records", Name = "api_bulk_unattach_tags_from_records")]
     [Auth("update", "record")]
     [Auth("read", "tag")]
     [Sensitivity("update record")]
