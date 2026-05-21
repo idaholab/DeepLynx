@@ -253,7 +253,7 @@ Most resources are scoped at one of these levels:
 |---|---|
 | Organization | `organizations/{organizationId:long}/...` |
 | Project | `organizations/{organizationId:long}/projects/{projectId:long}/...` |
-| User/global | Resource-specific routes with `[Auth(..., AllowWithoutContext: true)]` when organization or project context is not required. |
+| User/global | Resource-specific routes with the attribute `[AllowWithoutContext]` when organization or project context is not required. |
 
 When a route needs authorization based on organization or project membership, include the relevant route IDs so `AuthMiddleware` can evaluate permissions.
 
@@ -300,7 +300,7 @@ Do not put `projectId` in the route when:
 - The resource is organization-scoped and may not belong to a project.
 - The endpoint lists or searches across multiple projects.
 - The endpoint acts on project membership itself under `organizations/{organizationId:long}/projects`.
-- The endpoint is user/global and intentionally uses `AllowWithoutContext: true`.
+- The endpoint is user/global and intentionally uses the attribute `[AllowWithoutContext]`.
 
 For multi-project operations, use query parameters such as `projectIds` so `AuthMiddleware` can validate every requested project:
 
@@ -412,6 +412,7 @@ Authorization is mostly handled through custom attributes and middleware:
 [Auth("update", "user")]
 [SysAdmin]
 [OrgAdmin]
+[AllowWithoutContext]
 ```
 
 ### Auth Attribute
@@ -440,9 +441,30 @@ Common resources match domain names such as:
 - `permission`
 - `role`
 
-Use `AllowWithoutContext: true` only when the endpoint is intentionally available without an organization or project route context.
-
 Use `includeArchived: true` only when the endpoint must operate on archived records, such as archive/unarchive operations.
+
+### AllowWithoutContext Attribute
+
+`[AllowWithoutContext]` is a separate attribute (not an argument on `[Auth]` or `[OrgAdmin]`) that marks an endpoint as intentionally callable without an `organizationId` or `projectId` in the route. Apply it alongside `[Auth]`, `[OrgAdmin]`, or `[SysAdmin]` when the endpoint operates outside organization or project scope.
+
+```csharp
+[HttpGet(Name = "api_list_my_organizations")]
+[Auth("read", "organization")]
+[AllowWithoutContext]
+public async Task<ActionResult<IEnumerable<OrganizationResponseDto>>> ListMyOrganizations()
+```
+
+Use `[AllowWithoutContext]` when:
+
+- The endpoint is user- or system-global and does not belong to a single organization or project.
+- The caller may be an authenticated user with no organization or project context yet (for example, listing the organizations they belong to).
+- An `[OrgAdmin]` endpoint needs to allow system admins or org admins to act without a specific organization ID in the route.
+
+Do not use `[AllowWithoutContext]` when:
+
+- The route already includes `{organizationId}` or `{projectId}`.
+- The endpoint requires `AuthMiddleware` to evaluate organization or project membership before authorizing.
+- The endpoint should reject calls that lack scope. Without this attribute, non-admin users without organization or project context receive `400 Bad Request`.
 
 ### UserContextStorage
 
