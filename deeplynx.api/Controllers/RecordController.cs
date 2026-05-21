@@ -516,7 +516,7 @@ public class RecordController : ControllerBase
         {
             var currentUserId = UserContextStorage.UserId;
 
-            await _recordBusiness.BulkAttachTagsToRecords(currentUserId, organizationId, projectId, dtos);
+            await _recordBusiness.BulkAttachTags(currentUserId, organizationId, projectId, dtos);
 
             return Ok(new { message = "Successfully bulk attached tags to records" });
         }
@@ -555,7 +555,7 @@ public class RecordController : ControllerBase
         {
             var currentUserId = UserContextStorage.UserId;
 
-            await _recordBusiness.BulkUnattachTagsFromRecords(currentUserId, organizationId, projectId, dtos);
+            await _recordBusiness.BulkUnattachTags(currentUserId, organizationId, projectId, dtos);
 
             return Ok(new { message = "Successfully bulk unattached tags from records" });
         }
@@ -574,7 +574,6 @@ public class RecordController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
-
     
     /// <summary>
     ///     Attach a Sensitivity Label to a Record

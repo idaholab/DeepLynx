@@ -40,15 +40,15 @@ public interface IRecordBusiness
     Task<bool> AttachLabel(long currentUserId, long organizationId, long projectId, long recordId, long labelId);
     Task<bool> UnattachTag(long currentUserId, long organizationId, long projectId, long recordId, long tagId);
     Task<bool> UnattachLabel(long currentUserId, long organizationId, long projectId, long recordId, long labelId);
-    Task<bool> BulkAttachTags(List<RecordTagLinkDto> dtos);
-    Task<bool> BulkUnattachTags(List<RecordTagLinkDto> dtos);
+    Task<bool> BulkInsertRecordTagLinks(List<RecordTagLinkDto> dtos);
+    Task<bool> BulkDeleteRecordTagLinks(List<RecordTagLinkDto> dtos);
     Task<bool> BulkAttachLabels(
         long currentUserId, long organizationId, long projectId, List<long> recordIds, List<long> sensitiityLabelIds);
     Task<List<RecordResponseDto>> GetRecordsByOriginalId(long currentUserId, long organizationId, long projectId, long dataSourceId, List<string> originalIds, 
         bool hideArchived, bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false);
     Task<List<LatticeRecordDto>> GetLatticeRecords(long organizationId, long projectId);
-    Task<bool> BulkAttachTagsToRecords(long currentUserId, long organizationId, long projectId,
+    Task<bool> BulkAttachTags(long currentUserId, long organizationId, long projectId,
         List<RecordTagLinkDto> dtos);
-    Task<bool> BulkUnattachTagsFromRecords(long currentUserId, long organizationId, long projectId,
+    Task<bool> BulkUnattachTags(long currentUserId, long organizationId, long projectId,
         List<RecordTagLinkDto> dtos);
 }

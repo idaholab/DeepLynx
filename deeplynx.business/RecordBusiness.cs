@@ -551,7 +551,7 @@ public async Task<PaginatedResponse<RecordResponseDto>> GetAllRecordsPaginated(
     /// <param name="dtos">A list of record_id/tag_id pairs to be inserted</param>
     /// <returns>True if successful</returns>
     /// <exception cref="Exception">Thrown if tags unable to be attached</exception>
-    public async Task<bool> BulkAttachTags(List<RecordTagLinkDto> dtos)
+    public async Task<bool> BulkInsertRecordTagLinks(List<RecordTagLinkDto> dtos)
     {
         if (!dtos.Any())
             return true;
@@ -584,7 +584,7 @@ public async Task<PaginatedResponse<RecordResponseDto>> GetAllRecordsPaginated(
     /// <param name="dtos">A list of record_id/tag_id pairs to be inserted</param>
     /// <returns>True if successful</returns>
     /// <exception cref="Exception">Thrown if tags unable to be unattached</exception>
-    public async Task<bool> BulkUnattachTags(List<RecordTagLinkDto> dtos)
+    public async Task<bool> BulkDeleteRecordTagLinks(List<RecordTagLinkDto> dtos)
     {
         if (!dtos.Any())
             return true;
@@ -1560,7 +1560,7 @@ public async Task<PaginatedResponse<RecordResponseDto>> GetAllRecordsPaginated(
             })
             .ToList();
 
-        if (recordTags.Any()) await BulkAttachTags(recordTags);
+        if (recordTags.Any()) await BulkInsertRecordTagLinks(recordTags);
 
         // Convert tagMap to RecordTagDto collection
         return distinctTags
@@ -1593,7 +1593,7 @@ public async Task<PaginatedResponse<RecordResponseDto>> GetAllRecordsPaginated(
     /// <exception cref="ArgumentException"> Thrown if no record/tag pairs are provided or if no authorized record/tag pairs remain after filtering</exception>
     /// <exception cref="KeyNotFoundException">Returned if one or more records or tags are not found or archived</exception>
     /// <returns>True if successful</returns>
-    public async Task<bool> BulkAttachTagsToRecords(long currentUserId, long organizationId, 
+    public async Task<bool> BulkAttachTags(long currentUserId, long organizationId, 
         long projectId, List<RecordTagLinkDto> dtos)
     {
         if (dtos.Count == 0)
@@ -1637,7 +1637,7 @@ public async Task<PaginatedResponse<RecordResponseDto>> GetAllRecordsPaginated(
         if (dtos.Count == 0)
             throw new ArgumentException("User does not have access to any provided records", nameof(dtos));
         
-        await BulkAttachTags(dtos);
+        await BulkInsertRecordTagLinks(dtos);
 
         return true;
     }
@@ -1652,7 +1652,7 @@ public async Task<PaginatedResponse<RecordResponseDto>> GetAllRecordsPaginated(
     /// <exception cref="ArgumentException"> Thrown if no record/tag pairs are provided or if no authorized record/tag pairs remain after filtering</exception>
     /// <exception cref="KeyNotFoundException">Returned if one or more records or tags are not found or archived</exception>
     /// <returns>True if successful</returns>
-    public async Task<bool> BulkUnattachTagsFromRecords(long currentUserId, long organizationId,
+    public async Task<bool> BulkUnattachTags(long currentUserId, long organizationId,
         long projectId, List<RecordTagLinkDto> dtos)
     {
         if (dtos.Count == 0)
@@ -1696,7 +1696,7 @@ public async Task<PaginatedResponse<RecordResponseDto>> GetAllRecordsPaginated(
         if (dtos.Count == 0)
             throw new ArgumentException("User does not have access to any provided records", nameof(dtos));
         
-        await BulkUnattachTags(dtos);
+        await BulkDeleteRecordTagLinks(dtos);
         
         return true;
     }
