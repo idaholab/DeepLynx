@@ -225,3 +225,13 @@ export type ExpandableTableColumn<T> = {
   data: (row: T) => ReactNode;
   isExpandTrigger?: (row: T) => boolean;
 };
+
+export type PaginatedResponse<T> = {
+  items: T[];
+  pageNumber: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
+  hasPrevious: boolean;
+  hasNext: boolean;
+};

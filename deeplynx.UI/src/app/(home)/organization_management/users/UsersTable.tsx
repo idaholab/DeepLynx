@@ -115,6 +115,8 @@ const UsersTable = ({
   const [activityCounts, setActivityCounts] =
     useState<UserActivityCountsDto>(() => buildActivityCounts(members));
   const [loading, setLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState<"active" | "archived">("active");
+  const [archivedUsers, setArchivedUsers] = useState<UsersTableRow[]>([]);
   const { t } = useLanguage();
 
   /* ------------------------------------------------------------------------ */
@@ -193,6 +195,21 @@ const UsersTable = ({
     }
   }, [organization?.organizationId, scope]);
 
+
+  const loadArchivedUsers = useCallback(async () => {
+  const organizationId = organization?.organizationId;
+  if (scope === "org" && !organizationId) return;
+
+  try {
+    const users = scope === "org"
+      ? await getAllUsers(organizationId, undefined, true)
+      : await getAllUsers(undefined, undefined, true);
+    setArchivedUsers(buildTableData(users).filter((u) => u.isArchived));
+  } catch (error) {
+    console.error("Failed to load archived users:", error);
+  }
+  }, [organization?.organizationId, scope]);
+
   // When server-side members prop changes, sync local state
   useEffect(() => {
     setTableData(buildTableData(members));
@@ -207,6 +224,12 @@ const UsersTable = ({
 
     return () => window.clearInterval(intervalId);
   }, [loadActivityCounts]);
+
+  useEffect(() => {
+  if (activeTab === "archived") {
+    void loadArchivedUsers();
+  }
+  }, [activeTab, loadArchivedUsers]);
 
   /* ------------------------------------------------------------------------ */
   /*                        Invite Flow: Open Modal                           */
@@ -424,9 +447,27 @@ const UsersTable = ({
             scope={scope}
           />
 
+          {/* Tabs */}
+          <div role="tablist" className="tabs tabs-bordered mb-4">
+            <button
+              role="tab"
+              className={`tab ${activeTab === "active" ? "tab-active" : ""}`}
+              onClick={() => setActiveTab("active")}
+            >
+              {t.translations.ACTIVE_USERS}
+            </button>
+            <button
+              role="tab"
+              className={`tab ${activeTab === "archived" ? "tab-active" : ""}`}
+              onClick={() => setActiveTab("archived")}
+          >
+              Archived Users
+          </button>
+          </div>
+
           {/* Combined Users & Pending Invites Table */}
           <UsersListTable
-            tableData={tableData}
+            tableData={activeTab === "active" ? tableData : archivedUsers}
             scope={scope}
             loading={loading}
             onResendInvite={handleResendInvite}
