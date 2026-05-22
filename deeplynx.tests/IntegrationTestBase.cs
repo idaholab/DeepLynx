@@ -90,7 +90,7 @@ public class TestSuiteFixture : IAsyncLifetime
 
 // Defines a test collection named "Test Suite Collection".
 // This collection uses the TestSuiteFixture class for setup and teardown.
-[CollectionDefinition("Test Suite Collection")]
+[CollectionDefinition("Test Suite Collection", DisableParallelization = true)]
 public class TestSuiteCollection : ICollectionFixture<TestSuiteFixture>
 {
     // This class has no code, and is never created. Its purpose is simply
