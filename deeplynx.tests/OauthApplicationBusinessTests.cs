@@ -606,6 +606,36 @@ public class OauthApplicationBusinessTests : IntegrationTestBase
     }
 
     [Fact]
+    public async Task DeleteOauthApplication_Success_LogsDeletionEvent()
+    {
+        // Act
+        var result = await _oauthApplicationBusiness.DeleteOauthApplication(appid1, uid);
+
+        // Assert — deletion itself succeeded
+        Assert.True(result);
+
+        // Assert — exactly one audit event was written for this deletion
+        var events = await Context.Events.ToListAsync();
+        var deletionEvent = Assert.Single(events);
+
+        // Assert — event captures the OAuth deletion with the pre-delete identifiers
+        Assert.Equal("delete", deletionEvent.Operation);
+        Assert.Equal("oauth_application", deletionEvent.EntityType);
+        Assert.Equal(appid1, deletionEvent.EntityId);
+        Assert.Equal("App 1", deletionEvent.EntityName);
+        Assert.Equal(uid, deletionEvent.LastUpdatedBy);
+
+        // Assert — OAuth applications are system-scoped, so the event must have no org/project
+        Assert.Null(deletionEvent.OrganizationId);
+        Assert.Null(deletionEvent.ProjectId);
+
+        // Assert — properties payload preserved the app name and client ID for forensics
+        Assert.NotNull(deletionEvent.Properties);
+        Assert.Contains("App 1", deletionEvent.Properties);
+        Assert.Contains("test-client-id-1", deletionEvent.Properties);
+    }
+
+    [Fact]
     public async Task DeleteOauthApplication_Fails_IfNotFound()
     {
         // Act
@@ -615,6 +645,18 @@ public class OauthApplicationBusinessTests : IntegrationTestBase
 
         // Assert
         Assert.Contains($"Oauth application with id {appid3} not found", exception.Message);
+    }
+
+    [Fact]
+    public async Task DeleteOauthApplication_Fails_IfNotFound_DoesNotLogEvent()
+    {
+        // Act — attempt to delete an app that was already removed in seed
+        await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            _oauthApplicationBusiness.DeleteOauthApplication(appid3, uid));
+
+        // Assert — no event should be written when the precondition check throws
+        var eventList = Context.Events.ToList();
+        Assert.Empty(eventList);
     }
 
     [Fact]

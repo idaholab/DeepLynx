@@ -14,6 +14,7 @@ import {
   getProjectLogoUrl,
 } from "@/app/lib/client_service/projects_services.client";
 import { ProjectAdminRoute } from "../rbac/RBACComponents";
+import { BetaBadge } from "./BetaBadge";
 
 import type { ProjectResponseDto } from "../types/responseDTOs";
 
@@ -439,7 +440,12 @@ const SideMenu: React.FC<SideMenuProps> = ({
               className={getItemClass("/project_insight")}
             >
               <SparklesIcon className="size-6" />
-              {!isCollapsed && <p className="ml-2">Insight</p>}
+              {!isCollapsed && (
+                <>
+                  <p className="ml-2">Insight</p>
+                  <BetaBadge size="xs" className="ml-auto" />
+                </>
+              )}
             </Link>
           </li>
 
@@ -450,7 +456,12 @@ const SideMenu: React.FC<SideMenuProps> = ({
               className={getItemClass("/lattice/decisions")}
             >
               <BeakerIcon className="size-6" />
-              {!isCollapsed && <p className="ml-2">Lattice</p>}
+              {!isCollapsed && (
+                <>
+                  <p className="ml-2">Lattice</p>
+                  <BetaBadge size="xs" className="ml-auto" />
+                </>
+              )}
             </Link>
           </li>
 

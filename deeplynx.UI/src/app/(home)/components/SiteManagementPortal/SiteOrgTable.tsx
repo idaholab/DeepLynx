@@ -11,6 +11,7 @@ import {
   archiveOrganization,
   getAllOrganizations,
 } from "@/app/lib/client_service/organization_services.client";
+import { SiteManagementTable } from "./SiteManagementTable";
 
 interface OrganizationManagementProps {
   initialOrganizations: OrganizationResponseDto[];
@@ -89,7 +90,7 @@ const SiteOrganizationManagement = ({
 
   const openDeleteModal = (
     organizations: OrganizationResponseDto[] | null
-) => {
+  ) => {
     setSelectedForDeletion(organizations);
     setDeleteOrganizationModal(true);
   };
@@ -116,7 +117,14 @@ const SiteOrganizationManagement = ({
     },
     {
       header: t.translations.NAME,
-      data: "name" as keyof OrganizationResponseDto,
+      cell: (row) => {
+        const name = (row as OrganizationResponseDto).name;
+        return (
+          <span title={name}>
+            {name.length > 20 ? name.slice(0, 20) + "..." : name}
+          </span>
+        );
+      },
     },
     {
       header: t.translations.DESCRIPTION,
@@ -146,10 +154,11 @@ const SiteOrganizationManagement = ({
         <div className="flex">
           {multipleSelected() && (
             <button className="btn btn-ghost btn-sm"
-            onClick={() => {
-              const selectedOrgs = data
-                .filter((_, i) => selectedOrganizations[i]);
-              openDeleteModal(selectedOrgs)}}>
+              onClick={() => {
+                const selectedOrgs = data
+                  .filter((_, i) => selectedOrganizations[i]);
+                openDeleteModal(selectedOrgs)
+              }}>
               <TrashIcon className="size-6 text-red-500" />
             </button>
           )}
@@ -158,8 +167,9 @@ const SiteOrganizationManagement = ({
       cell: (_row, index) => (
         <div className="flex">
           <button className="btn btn-ghost btn-sm"
-          onClick={() => {
-            openDeleteModal([_row])}}>
+            onClick={() => {
+              openDeleteModal([_row])
+            }}>
             <TrashIcon className="size-6 text-red-500" />
           </button>
         </div>
@@ -191,7 +201,9 @@ const SiteOrganizationManagement = ({
         </button>
       </div>
       {error && <div className="p-4 text-red-500">{error}</div>}
-      <GenericTable columns={columns} data={data} enablePagination />
+
+      <SiteManagementTable columns={columns} data={data} expandableKey="description" rowKey="id" border />
+
       <CreateOrganization
         isOpen={isOrganizationModalOpen}
         onClose={() => setIsOrganizationModalOpen(false)}

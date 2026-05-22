@@ -51,6 +51,7 @@ import {
   withTokens,
 } from "./components/projectInsight.view-utils";
 import { useProjectInsightTabState } from "./hooks/useProjectInsightTabState";
+import { BetaBadge } from "@/app/(home)/components/BetaBadge";
 
 const STATUS_POLL_INTERVAL_MS = 5000;
 
@@ -679,9 +680,12 @@ export default function ProjectInsightClientView() {
               <p className="text-xs font-semibold uppercase tracking-wide text-base-content/60">
                 {t.translations.PROJECT}
               </p>
-              <h1 className="text-2xl font-bold text-base-content sm:text-3xl">
-                {t.translations.PROJECT_INSIGHT_SCOPE}
-              </h1>
+              <div className="flex flex-wrap items-center gap-3">
+                <h1 className="text-2xl font-bold text-base-content sm:text-3xl">
+                  {t.translations.PROJECT_INSIGHT_SCOPE}
+                </h1>
+                <BetaBadge size="sm" />
+              </div>
               <p className="mt-3 text-base-content/70">
                 {withTokens(t.translations.PROJECT_INSIGHT_DESCRIPTION, {
                   projectName,

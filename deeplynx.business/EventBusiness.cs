@@ -516,7 +516,7 @@ public class EventBusiness : IEventBusiness
     /// <param name="dto">A data transfer object with details on the new event to be created.</param>
     /// <param name="count">A data transfer object with details on the new event to be created.</param>
     /// <returns>The new Event which was just created.</returns>
-    public async Task<EventResponseDto> CreateEvent(long currentUserId, long organizationId, long? projectId,
+    public async Task<EventResponseDto> CreateEvent(long currentUserId, long? organizationId, long? projectId,
         CreateEventRequestDto dto, long? count = 1)
     {
         ValidationHelper.ValidateModel(dto);
@@ -527,7 +527,9 @@ public class EventBusiness : IEventBusiness
             ? await _context.Projects.FindAsync(projectId)
             : null;
 
-        var organization = await _context.Organizations.FindAsync(organizationId);
+        var organization = organizationId != null
+            ? await _context.Organizations.FindAsync(organizationId)
+            : null;
 
         var dataSource = dto.DataSourceId.HasValue
             ? await _context.DataSources.FindAsync(dto.DataSourceId.Value)
