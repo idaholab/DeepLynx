@@ -33,7 +33,8 @@ public class TestSuiteFixture : IAsyncLifetime
     public string RedisConnectionString { get; private set; }
     public NpgsqlDataSource PostgresDataSource { get; private set; }
 
-    public DeeplynxContext Context { get; private set; }
+    public DeeplynxContext DeeplynxContext { get; private set; }
+    public LatticeContext LatticeContext { get; private set; }
 
     // Runs at the beginning of every test suite
     public async Task InitializeAsync()
@@ -54,22 +55,20 @@ public class TestSuiteFixture : IAsyncLifetime
             dataSourceBuilder.UseVector();
             PostgresDataSource = dataSourceBuilder.Build();
 
-            var options = new DbContextOptionsBuilder<DeeplynxContext>()
+            var deeplynxContextOptions = new DbContextOptionsBuilder<DeeplynxContext>()
                 .UseNpgsql(PostgresDataSource, o => o.UseVector())
                 .Options;
 
-            Context = new DeeplynxContext(options);
+            var latticeContextOptions = new DbContextOptionsBuilder<LatticeContext>()
+                .UseNpgsql(PostgresDataSource, o => o.UseVector())
+                .Options;
+
+            DeeplynxContext = new DeeplynxContext(deeplynxContextOptions);
+            LatticeContext = new LatticeContext(latticeContextOptions);
 
             // Apply migrations only once
-            await Context.Database.MigrateAsync();
-
-            // Run LatticeContext migrations against the same container.
-            // A short-lived context is sufficient — migrations only need to execute once.
-            var latticeOptions = new DbContextOptionsBuilder<LatticeContext>()
-                .UseNpgsql(PostgresDataSource)
-                .Options;
-            await using var latticeCtx = new LatticeContext(latticeOptions);
-            await latticeCtx.Database.MigrateAsync();
+            await DeeplynxContext.Database.MigrateAsync();
+            await LatticeContext.Database.MigrateAsync();
 
             // Apply env variables without exposing values in tests
             var projectRoot =
@@ -91,8 +90,10 @@ public class TestSuiteFixture : IAsyncLifetime
     // Runs at the end of every test suite
     public async Task DisposeAsync()
     {
-        if (Context != null) await Context.DisposeAsync();
+        if (DeeplynxContext != null) await DeeplynxContext.DisposeAsync();
+        if (LatticeContext != null) await LatticeContext.DisposeAsync();
         if (_postgresContainer != null) await _postgresContainer.DisposeAsync();
+        //if (PostgresDataSource != null) await PostgresDataSource.DisposeAsync();
         if (_redisContainer != null) await _redisContainer.DisposeAsync();
     }
 }
