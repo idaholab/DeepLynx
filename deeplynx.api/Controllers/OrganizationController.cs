@@ -37,14 +37,15 @@ public class OrganizationController : ControllerBase
     /// <param name="hideArchived">Flag indicating whether to hide or show archived orgs</param>
     /// <returns></returns>
     [HttpGet(Name = "api_get_all_organizations")]
-    [Auth("read", "organization", scopeException: true)]
     public async Task<ActionResult<IEnumerable<OrganizationResponseDto>>> GetAllOrganizations(
         [FromQuery] bool hideArchived = true)
     {
         try
         {
+            var userId = UserContextStorage.UserId;
+            var isSysAdmin = UserContextStorage.IsSysAdmin;
             var organizations = await _organizationBusiness
-                .GetAllOrganizations(hideArchived);
+                .GetAllOrganizations(userId, hideArchived, isSysAdmin);
             return Ok(organizations);
         }
         catch (Exception exc)
@@ -61,7 +62,6 @@ public class OrganizationController : ControllerBase
     /// <param name="hideArchived">Flag indicating whether to hide or show archived orgs</param>
     /// <returns></returns>
     [HttpGet("user", Name = "api_get_organizations_for_user")]
-    [Auth("read", "organization", scopeException: true)]
     public async Task<ActionResult<IEnumerable<OrganizationResponseDto>>> GetAllOrganizationsForUser(
         [FromQuery] bool hideArchived = true)
     {
@@ -112,7 +112,7 @@ public class OrganizationController : ControllerBase
     /// <param name="dto">Data structure of organization to create</param>
     /// <returns></returns>
     [HttpPost(Name = "api_create_organization")]
-    [Auth("write", "organization", scopeException: true)]
+    [SysAdmin]
     public async Task<ActionResult<OrganizationResponseDto>> CreateOrganization(
         [FromBody] CreateOrganizationRequestDto dto)
     {

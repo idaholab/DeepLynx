@@ -140,7 +140,16 @@ public class OrganizationBusinessTests : IntegrationTestBase
             UserId = uid,
             IsOrgAdmin = false
         };
+
+        var testOrg2User = new OrganizationUser
+        {
+            OrganizationId = oid2,
+            UserId = uid,
+            IsOrgAdmin = false
+        };
+
         Context.OrganizationUsers.Add(testOrgUser);
+        Context.OrganizationUsers.Add(testOrg2User);
         await Context.SaveChangesAsync();
     }
 
@@ -179,7 +188,7 @@ public class OrganizationBusinessTests : IntegrationTestBase
     public async Task GetAllOrganizations_ExcludesArchived()
     {
         // Act
-        var result = await _organizationBusiness.GetAllOrganizations();
+        var result = await _organizationBusiness.GetAllOrganizations(uid);
         var organizations = result.ToList();
 
         // Assert
@@ -192,7 +201,7 @@ public class OrganizationBusinessTests : IntegrationTestBase
     public async Task GetAllOrganizations_WithHideArchivedFalse_IncludesArchived()
     {
         // Act
-        var result = await _organizationBusiness.GetAllOrganizations(false);
+        var result = await _organizationBusiness.GetAllOrganizations(uid, hideArchived: false);
         var organizations = result.ToList();
 
         // Assert
@@ -741,7 +750,7 @@ public class OrganizationBusinessTests : IntegrationTestBase
         Context.DataSources.Add(dataSource);
         await Context.SaveChangesAsync();
         var did = dataSource.Id;
-        
+
         var record = new Record
         {
             Name = "Test Record",
@@ -756,19 +765,19 @@ public class OrganizationBusinessTests : IntegrationTestBase
             DataSourceId = did,
             OrganizationId = oid,
         };
-        
+
         Context.Records.Add(record);
         await Context.SaveChangesAsync();
-        
-        
+
+
         var dto = new UpdateOrganizationRequestDto
         {
             RequireSensitivityLabel = true
         };
-        
+
         await Assert.ThrowsAsync<InvalidOperationException>(() => _organizationBusiness.UpdateOrganization(uid, oid, dto));
     }
-    
+
     [Fact]
     public async Task UpdateOrganization_Success_RequireSensitivityLabels()
     {
@@ -783,7 +792,7 @@ public class OrganizationBusinessTests : IntegrationTestBase
         };
         Context.Organizations.Add(otherOrg);
         await Context.SaveChangesAsync();
-        
+
         var project = new Project
         {
             Name = "Test Project",
@@ -808,7 +817,7 @@ public class OrganizationBusinessTests : IntegrationTestBase
         Context.DataSources.Add(dataSource);
         await Context.SaveChangesAsync();
         var did = dataSource.Id;
-        
+
         var testLabel = new SensitivityLabel
         {
             Name = "Test Label",
@@ -817,7 +826,7 @@ public class OrganizationBusinessTests : IntegrationTestBase
         };
         Context.SensitivityLabels.Add(testLabel);
         await Context.SaveChangesAsync();
-        
+
         var record = new Record
         {
             Name = "Test Record",
@@ -831,16 +840,16 @@ public class OrganizationBusinessTests : IntegrationTestBase
             FileType = "pdf",
             DataSourceId = did,
             OrganizationId = otherOrg.Id,
-            Labels = new List<SensitivityLabel>{testLabel}
+            Labels = new List<SensitivityLabel> { testLabel }
         };
         Context.Records.Add(record);
         await Context.SaveChangesAsync();
-        
+
         var dto = new UpdateOrganizationRequestDto
         {
             RequireSensitivityLabel = true
         };
-        
+
         var updateResult = await _organizationBusiness.UpdateOrganization(uid, oid, dto);
         Assert.NotNull(updateResult);
         Assert.NotNull(updateResult.RequireSensitivityLabel);

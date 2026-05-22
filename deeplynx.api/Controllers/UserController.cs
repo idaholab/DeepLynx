@@ -99,7 +99,7 @@ public class UserController : ControllerBase
     /// <param name="dto">User request DTO</param>
     /// <returns>User response DTO</returns>
     [HttpPost(Name = "api_create_a_user")]
-    [OrgAdmin(scopeException: true)]
+    [OrgAdmin(unscoped: true)]
     public async Task<ActionResult<UserResponseDto>> CreateUser([FromBody] CreateUserRequestDto dto)
     {
         try
@@ -123,7 +123,7 @@ public class UserController : ControllerBase
     /// <param name="dto">User request DTO</param>
     /// <returns>User response DTO</returns>
     [HttpPut("{userId:long}", Name = "api_update_a_user")]
-    [OrgAdmin(scopeException: true)]
+    [OrgAdmin(unscoped: true)]
     public async Task<ActionResult<UserResponseDto>> UpdateUser(long userId, [FromBody] UpdateUserRequestDto dto)
     {
         try

@@ -801,6 +801,7 @@ export const translations = {
       LOGO_REMOVED_SUCCESSFULLY: "Logo removed successfully!",
       LOGO_UPLOADED_SUCCESSFULLY: "Logo uploaded successfully!",
       LOGOUT: "Logout",
+      MAIN_PROJECT_SETTINGS: "Main Project Settings",
       MANAGE_STORAGES_TAB: "Manage Storages",
       MANAGE: "Manage",
       MANAGE_USERS_AND_GROUPS_ASSIGNED_TO_THIS_PROJECT_A_ROLE_IS_REQUIRED_FOR_EACH_MEMBER:
@@ -1073,6 +1074,9 @@ export const translations = {
       PROJECT_CLASSES_AND_IDS_HELP:
         "Use one of these class IDs in your metadata file when setting ClassId.",
       PROJECT_DASHBOARD: "Project Dashboard",
+      PROJECT_DESCRIPTION: "Project Description",
+      PROJECT_DESCRIPTION_UPDATED: "Project Description Updated",
+      PROJECT_ID: "Project ID",
       PROJECT_INSIGHT_CHAT_INTRO_EMPTY:
         'There are no embedded files in scope for "{projectName}" yet. Adjust filters or queue files for Insight below.',
       PROJECT_INSIGHT_CHAT_INTRO_READY:
@@ -1154,6 +1158,7 @@ export const translations = {
       PROJECT_MANAGEMENT: "Project Management",
       PROJECT_MEMBERS: "Project Members",
       PROJECT_NAME: "Project Name ",
+      PROJECT_NAME_UPDATED: "Project Name Updated",
       PROJECT_OVERVIEW: "Project Overview",
       PROJECT_ROLE: "Project Role",
       PROJECT_ROLES: "Project Roles",
@@ -2419,6 +2424,7 @@ export const translations = {
       LOGO_REMOVED_SUCCESSFULLY: "¡El logotipo se eliminó correctamente!",
       LOGO_UPLOADED_SUCCESSFULLY: "¡El logotipo se subió correctamente!",
       LOGOUT: "Cerrar sesión",
+      MAIN_PROJECT_SETTINGS: "Configuración principal del proyecto",
       MANAGE_STORAGES_TAB: "Gestionar almacenamientos",
       MANAGE: "Gestionar",
       MANAGE_USERS_AND_GROUPS_ASSIGNED_TO_THIS_PROJECT_A_ROLE_IS_REQUIRED_FOR_EACH_MEMBER:
@@ -2702,6 +2708,9 @@ export const translations = {
       PROJECT_CLASSES_AND_IDS_HELP:
         "Use uno de estos IDs de clase en su archivo de metadatos al establecer ClassId.",
       PROJECT_DASHBOARD: "Tablero del proyecto",
+      PROJECT_DESCRIPTION: "Descripción del proyecto",
+      PROJECT_DESCRIPTION_UPDATED: "Descripción del proyecto actualizada",
+      PROJECT_ID: "ID de proyecto",
       PROJECT_INSIGHT_CHAT_INTRO_EMPTY:
         'Todavía no hay archivos incrustados dentro del alcance para "{projectName}". Ajusta los filtros o pon archivos en cola para Insight a continuación.',
       PROJECT_INSIGHT_CHAT_INTRO_READY:
@@ -2788,6 +2797,7 @@ export const translations = {
       PROJECT_MANAGEMENT: "Gestión de proyectos",
       PROJECT_MEMBERS: "Miembros del proyecto",
       PROJECT_NAME: "Nombre del proyecto ",
+      PROJECT_NAME_UPDATED: "Nombre del proyecto actualizado",
       PROJECT_OVERVIEW: "Resumen del proyecto",
       PROJECT_ROLE: "Rol del proyecto",
       PROJECT_ROLES: "Roles de Proyecto",
