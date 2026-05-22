@@ -764,6 +764,9 @@ export default function DataCatalogClient({
                     key={`${record.projectId}-${record.id}`}
                     record={record}
                     activeSearchTerms={activeSearchTerms}
+                    isBulkMode={isBulkMode}
+                    isSelected={selectedRecordKeys.includes(getRecordKey(record))}
+                    onToggleSelected={toggleRecordSelection}
                   />
                 ))}
               </div>
