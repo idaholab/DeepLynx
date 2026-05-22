@@ -86,8 +86,7 @@ public class AuthMiddleware
             return;
         }
 
-        var isSysAdmin = await adminService.SysAdminCheck(userId);
-        UserContextStorage.IsSysAdmin = isSysAdmin;
+        var isSysAdmin = UserContextStorage.IsSysAdmin;
 
         // Handle SysAdmin attribute
         if (sysAdminAttr != null)
@@ -166,11 +165,8 @@ public class AuthMiddleware
                 return;
             }
 
-            // Check if user is org admin (using permission check)
-            var isOrgAdmin = await adminService.OrgAdminCheck(userId, organizationId.Value);
-            UserContextStorage.IsOrgAdmin = isOrgAdmin;
-
-            if (!isOrgAdmin)
+            // IsOrgAdmin is pre-populated by UserContextMiddleware
+            if (!UserContextStorage.IsOrgAdmin)
             {
                 context.Response.StatusCode = StatusCodes.Status403Forbidden;
                 await context.Response.WriteAsJsonAsync(new { error = "Forbidden: Organization administrator access required" });
@@ -209,10 +205,7 @@ public class AuthMiddleware
                 );
 
             if (capturedOrgId.HasValue) UserContextStorage.OrganizationId = capturedOrgId.Value;
-
-            var isProjectAdmin = organizationId.HasValue &&
-                                 await adminService.ProjectAdminCheck(userId, organizationId.Value, projectIds);
-            UserContextStorage.IsProjectAdmin = isProjectAdmin;
+            // IsProjectAdmin is pre-populated by UserContextMiddleware
         }
 
         if (isSysAdmin)
