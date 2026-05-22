@@ -112,7 +112,7 @@ public class OrganizationController : ControllerBase
     /// <param name="dto">Data structure of organization to create</param>
     /// <returns></returns>
     [HttpPost(Name = "api_create_organization")]
-    [OrgAdmin(unscoped: true)]
+    [SysAdmin]
     public async Task<ActionResult<OrganizationResponseDto>> CreateOrganization(
         [FromBody] CreateOrganizationRequestDto dto)
     {
