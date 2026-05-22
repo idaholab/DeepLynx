@@ -699,6 +699,19 @@ export default function DataCatalogClient({
             {pageStart}-{pageEnd} {t.translations.OF} {scopedRecords.length}
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              className="cursor-pointer text-sm font-semibold underline underline-offset-2 hover:text-primary"
+              onClick={() => {
+                if (isBulkMode) {
+                  handleCancelBulkTags();
+                } else {
+                  setIsBulkMode(true);
+                }
+              }}
+            >
+              {isBulkMode ? "Cancel Selection" : "Select Records"}
+            </button>
             {activeFilters.length > 0 && (
               <button
                 type="button"
