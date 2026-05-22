@@ -418,40 +418,62 @@ public async Task<PaginatedResponse<RecordResponseDto>> GetAllRecordsPaginated(
     /// <exception cref="KeyNotFoundException">Thrown if the record or label are not found</exception>
     /// <exception cref="Exception">Thrown if the label is already attached to the record</exception>
     public async Task<bool> AttachLabel(long currentUserId, long organizationId, long projectId, long recordId,
-        long labelId)
+    long labelId)
     {
-        var record = await _context.Records
-            .Where(r => r.ProjectId == projectId
-                        && r.Id == recordId
-                        && r.OrganizationId == organizationId
-                        && !r.IsArchived)
-            .Include(r => r.Labels)
-            .FirstOrDefaultAsync();
+        await using var transaction = await _context.Database.BeginTransactionAsync();
+        try
+        {
+            var record = await _context.Records
+                .Where(r => r.ProjectId == projectId
+                            && r.Id == recordId
+                            && r.OrganizationId == organizationId
+                            && !r.IsArchived)
+                .Include(r => r.Labels)
+                .FirstOrDefaultAsync();
 
-        if (record == null)
-            throw new KeyNotFoundException($"Record with id {recordId} not found or is archived.");
+            if (record == null)
+                throw new KeyNotFoundException($"Record with id {recordId} not found or is archived.");
 
-        // Check if already attached
-        var alreadyAttached = record.Labels.Any(t => t.Id == labelId);
-        if (alreadyAttached)
-            throw new InvalidOperationException($"Label with id {labelId} is already attached to record {recordId}");
+            var alreadyAttached = record.Labels.Any(t => t.Id == labelId);
+            if (alreadyAttached)
+                throw new InvalidOperationException($"Label with id {labelId} is already attached to record {recordId}");
 
-        // Fetch and validate label in one query with all conditions
-        var label = await _context.SensitivityLabels
-            .Where(t => t.Id == labelId
-                        && t.OrganizationId == organizationId
-                        && (t.ProjectId == projectId || t.ProjectId == null)
-                        && !t.IsArchived)
-            .FirstOrDefaultAsync();
+            var label = await _context.SensitivityLabels
+                .Where(t => t.Id == labelId
+                            && t.OrganizationId == organizationId
+                            && (t.ProjectId == projectId || t.ProjectId == null)
+                            && !t.IsArchived)
+                .FirstOrDefaultAsync();
 
-        if (label == null)
-            throw new KeyNotFoundException(
-                $"Label with id {labelId} not found, is archived, or does not belong to this organization/project.");
+            if (label == null)
+                throw new KeyNotFoundException(
+                    $"Label with id {labelId} not found, is archived, or does not belong to this organization/project.");
 
-        record.Labels.Add(label);
-        await _context.SaveChangesAsync();
+            var collectionsWithRecord = await _context.RecordCollections
+                .Where(c => c.ProjectId == projectId
+                            && c.OrganizationId == organizationId
+                            && !c.IsArchived
+                            && c.Records.Any(r => r.Id == recordId))
+                .Include(c => c.Labels)
+                .ToListAsync();
 
-        return true;
+            record.Labels.Add(label);
+
+            foreach (var collection in collectionsWithRecord)
+            {
+                if (collection.Labels.All(l => l.Id != labelId))
+                    collection.Labels.Add(label);
+            }
+
+            await _context.SaveChangesAsync();
+            await transaction.CommitAsync();
+            return true;
+        }
+        catch
+        {
+            await transaction.RollbackAsync();
+            throw;
+        }
     }
 
     /// <summary>
@@ -590,8 +612,8 @@ public async Task<PaginatedResponse<RecordResponseDto>> GetAllRecordsPaginated(
     /// <exception cref="UnauthorizedAccessException">Thrown if user doesn't have access to the labels</exception>
     /// <exception cref="ArgumentException">Thrown if recordIds or sensitivityLabelIds are empty</exception>
     public async Task<bool> BulkAttachLabels(
-        long currentUserId, long organizationId, long projectId,
-        List<long> recordIds, List<long> sensitivityLabelIds)
+    long currentUserId, long organizationId, long projectId,
+    List<long> recordIds, List<long> sensitivityLabelIds)
     {
         if (recordIds == null || !recordIds.Any())
             throw new ArgumentException("Record IDs list cannot be null or empty", nameof(recordIds));
@@ -600,17 +622,18 @@ public async Task<PaginatedResponse<RecordResponseDto>> GetAllRecordsPaginated(
             throw new ArgumentException("Sensitivity label IDs list cannot be null or empty",
                 nameof(sensitivityLabelIds));
 
+        var distinctRecordIds = recordIds.Distinct().ToList();
+        var distinctLabelIds = sensitivityLabelIds.Distinct().ToList();
+
         // Create list of record and label ID pairs
-        var recordLabelPairs = new List<(long recordId, long labelId)>();
-        foreach (var recordId in recordIds.Distinct())
-        foreach (var labelId in sensitivityLabelIds.Distinct())
-            recordLabelPairs.Add((recordId, labelId));
+        var recordLabelPairs = distinctRecordIds
+            .SelectMany(recordId => distinctLabelIds.Select(labelId => (recordId, labelId)))
+            .ToList();
 
         // Bulk insert into record_labels using raw SQL
         var sql = @"INSERT INTO deeplynx.record_labels (record_id, label_id) 
                     VALUES {0} ON CONFLICT (record_id, label_id) DO NOTHING;";
 
-        // Establish parameters
         var parameters = new List<NpgsqlParameter>();
         parameters.AddRange(recordLabelPairs.SelectMany((pair, i) => new[]
         {
@@ -619,10 +642,53 @@ public async Task<PaginatedResponse<RecordResponseDto>> GetAllRecordsPaginated(
         }));
 
         var valueTuples = string.Join(", ", recordLabelPairs.Select((_, i) => $"(@record{i}_id, @label{i}_id)"));
-
         sql = string.Format(sql, valueTuples);
 
-        await _context.Database.ExecuteSqlRawAsync(sql, parameters.ToArray());
+        await using var transaction = await _context.Database.BeginTransactionAsync();
+        try
+        {
+            await _context.Database.ExecuteSqlRawAsync(sql, parameters.ToArray());
+            
+            // Clear tracker so EF fetches fresh state after the raw SQL
+            _context.ChangeTracker.Clear();
+
+
+            // Fetch labels to attach to collections
+            var labels = await _context.SensitivityLabels
+                .Where(l => distinctLabelIds.Contains(l.Id))
+                .ToListAsync();
+
+            // Find all collections containing any of the records
+            var collectionsWithRecords = await _context.RecordCollections
+                .Where(c => c.ProjectId == projectId
+                            && c.OrganizationId == organizationId
+                            && !c.IsArchived
+                            && c.Records.Any(r => distinctRecordIds.Contains(r.Id)))
+                .Include(c => c.Labels)
+                .ToListAsync();
+
+            foreach (var collection in collectionsWithRecords)
+            {
+                foreach (var label in labels)
+                {
+                    if (collection.Labels.All(l => l.Id != label.Id))
+                    {
+                        collection.Labels.Add(label);
+                    }
+                }
+
+                collection.LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
+                collection.LastUpdatedBy = currentUserId;
+            }
+
+            await _context.SaveChangesAsync();
+            await transaction.CommitAsync();
+        }
+        catch
+        {
+            await transaction.RollbackAsync();
+            throw;
+        }
 
         return true;
     }
@@ -1061,25 +1127,45 @@ public async Task<PaginatedResponse<RecordResponseDto>> GetAllRecordsPaginated(
         if (returnedRecord is null)
             throw new KeyNotFoundException($"Record with id {recordId} not found or is archived.");
 
-        // set lastUpdatedAt timestamp
         var lastUpdatedAt = DateTime.UtcNow;
 
-        // run archive procedure in a transaction to roll back any errors
         using (var transaction = await _context.Database.BeginTransactionAsync())
         {
             try
             {
-                // run the archive record procedure, which archives this record
-                // and all child objects with record_id as a foreign key
                 var archived = await _context.Database.ExecuteSqlRawAsync(
                     "CALL deeplynx.archive_record({0}::INTEGER, {1}::TIMESTAMP WITHOUT TIME ZONE, {2}::INTEGER)",
                     recordId, lastUpdatedAt, currentUserId
                 );
 
-                if (archived == 0) // if 0 records were updated, assume a failure
+                if (archived == 0)
                     throw new DependencyDeletionException(
                         $"unable to archive record {recordId} or its downstream dependents.");
+                
+                // Clear the change tracker so EF fetches fresh state after the procedure
+                _context.ChangeTracker.Clear();
 
+                // Remove record from all collections it belongs to
+                var collectionsWithRecord = await _context.RecordCollections
+                    .Where(c => c.ProjectId == projectId
+                                && c.OrganizationId == organizationId
+                                && !c.IsArchived
+                                && c.Records.Any(r => r.Id == recordId))
+                    .Include(c => c.Records)
+                    .ToListAsync();
+
+                foreach (var collection in collectionsWithRecord)
+                {
+                    var recordToRemove = collection.Records.FirstOrDefault(r => r.Id == recordId);
+                    if (recordToRemove != null)
+                    {
+                        collection.Records.Remove(recordToRemove);
+                        collection.LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
+                        collection.LastUpdatedBy = currentUserId;
+                    }
+                }
+
+                await _context.SaveChangesAsync();
                 await transaction.CommitAsync();
             }
             catch (Exception exc)
@@ -1090,7 +1176,6 @@ public async Task<PaginatedResponse<RecordResponseDto>> GetAllRecordsPaginated(
             }
         }
 
-        // Log record soft delete event
         await _eventBusiness.CreateEvent(currentUserId, organizationId, projectId, new CreateEventRequestDto
         {
             Operation = "archive",

@@ -17,7 +17,8 @@ namespace deeplynx.datalayer.Migrations
                 INSERT INTO deeplynx.permissions (name, description, action, resource, label_id, is_archived, is_default, organization_id, project_id)
                 VALUES
                     ('Read Record Collection', 'Permission to read a record collection', 'read', 'record_collection', NULL, false, true, NULL, NULL),
-                    ('Write Record Collection', 'Permission to write a record collection', 'write', 'record_collection', NULL, false, true, NULL, NULL);
+                    ('Write Record Collection', 'Permission to write a record collection', 'write', 'record_collection', NULL, false, true, NULL, NULL),
+                    ('Update Record Collection', 'Permission to update a record collection', 'update', 'record_collection', NULL, false, true, NULL, NULL);
             ");
             
             // ====================================================================
@@ -41,7 +42,7 @@ namespace deeplynx.datalayer.Migrations
                     AND p.organization_id IS NULL
                     AND p.label_id IS NULL
                     AND p.resource = 'record_collection'
-                    AND p.action IN ('read', 'write');
+                    AND p.action IN ('read', 'write', 'update');
             ");
             
             // ====================================================================
@@ -65,7 +66,7 @@ namespace deeplynx.datalayer.Migrations
                     AND p.organization_id IS NULL
                     AND p.label_id IS NULL
                     AND p.resource = 'record_collection'
-                    AND p.action IN ('read', 'write');
+                    AND p.action IN ('read', 'write', 'update');
             ");
         }
 
@@ -89,7 +90,7 @@ namespace deeplynx.datalayer.Migrations
             // ====================================================================
             migrationBuilder.Sql(@"
                 DELETE FROM deeplynx.permissions
-                WHERE name IN ('Read Record Collection', 'Write Record Collection');
+                WHERE name IN ('Read Record Collection', 'Write Record Collection',  'Update Record Collection');
             ");
         }
     }

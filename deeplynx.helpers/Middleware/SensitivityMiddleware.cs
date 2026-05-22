@@ -140,6 +140,12 @@ public class SensitivityMiddleware
                             providedLabelIds.Add(parsedId);
                 }
         }
+        
+        // For operations on existing record collections
+        long? recordCollectionId = null;
+        var routeRecordCollectionId = context.GetRouteValue("recordCollectionId")?.ToString();
+        if (!string.IsNullOrEmpty(routeRecordCollectionId) && long.TryParse(routeRecordCollectionId, out var tempRecordCollectionId))
+            recordCollectionId = tempRecordCollectionId;
 
         // For operations on existing records check user permissions
         long? recordId = null;
@@ -199,46 +205,93 @@ public class SensitivityMiddleware
 
         // READ & DELETE ACTIONS
         // Check if user has permission for existing labels on the record
-        if (_checkExistingLabels.Contains(sensitivityAttr.Action) && recordId != null)
+        if (_checkExistingLabels.Contains(sensitivityAttr.Action))
         {
-            var existingLabelIds = await sensitivityLabelService.GetRecordSensitivityLabels(recordId.Value);
-
-            // If record has labels, user must have permission for ALL of them
-            if (existingLabelIds.Count > 0)
+            if (recordId != null)
             {
-                var unauthorizedLabels = existingLabelIds.Except(authorizedLabelIds).ToList();
-                if (unauthorizedLabels.Any())
+                var recordExistingLabelIds = await sensitivityLabelService.GetRecordSensitivityLabels(recordId.Value);
+
+                // If record has labels, user must have permission for ALL of them
+                if (recordExistingLabelIds.Count > 0)
                 {
-                    context.Response.StatusCode = StatusCodes.Status403Forbidden;
-                    await context.Response.WriteAsJsonAsync(new
+                    var unauthorizedLabels = recordExistingLabelIds.Except(authorizedLabelIds).ToList();
+                    if (unauthorizedLabels.Any())
                     {
-                        error = "User does not have permission to access record with current sensitivity labels",
-                        unauthorizedLabelIds = unauthorizedLabels
-                    });
-                    return;
+                        context.Response.StatusCode = StatusCodes.Status403Forbidden;
+                        await context.Response.WriteAsJsonAsync(new
+                        {
+                            error = "User does not have permission to access record with current sensitivity labels",
+                            unauthorizedLabelIds = unauthorizedLabels
+                        });
+                        return;
+                    }
+                }
+            }
+            
+            if (recordCollectionId != null)
+            {
+                var existingLabelIds = await sensitivityLabelService.GetRecordCollectionSensitivityLabels(recordCollectionId.Value);
+                // If record has labels, user must have permission for ALL of them
+                if (existingLabelIds.Count > 0)
+                {
+                    var unauthorizedLabels = existingLabelIds.Except(authorizedLabelIds).ToList();
+                    if (unauthorizedLabels.Any())
+                    {
+                        context.Response.StatusCode = StatusCodes.Status403Forbidden;
+                        await context.Response.WriteAsJsonAsync(new
+                        {
+                            error = "User does not have permission to access record with current sensitivity labels",
+                            unauthorizedLabelIds = unauthorizedLabels
+                        });
+                        return;
+                    }
                 }
             }
         }
 
         // UPDATE ACTIONS
         // Check both existing labels and any new labels being added
-        if (_checkNewAndExistingLabels.Contains(sensitivityAttr.Action) && recordId != null)
+        if (_checkNewAndExistingLabels.Contains(sensitivityAttr.Action))
         {
-            var existingLabelIds = await sensitivityLabelService.GetRecordSensitivityLabels(recordId.Value);
-
-            // User must have permission for existing labels to update the record
-            if (existingLabelIds.Count > 0)
+            if (recordId != null)
             {
-                var unauthorizedExistingLabels = existingLabelIds.Except(authorizedLabelIds).ToList();
-                if (unauthorizedExistingLabels.Any())
+                var recordExistingLabelIds = await sensitivityLabelService.GetRecordSensitivityLabels(recordId.Value);
+
+                // User must have permission for existing labels to update the record
+                if (recordExistingLabelIds.Count > 0)
                 {
-                    context.Response.StatusCode = StatusCodes.Status403Forbidden;
-                    await context.Response.WriteAsJsonAsync(new
+                    var unauthorizedExistingLabels = recordExistingLabelIds.Except(authorizedLabelIds).ToList();
+                    if (unauthorizedExistingLabels.Any())
                     {
-                        error = "User does not have permission to update record with current sensitivity labels",
-                        unauthorizedLabelIds = unauthorizedExistingLabels
-                    });
-                    return;
+                        context.Response.StatusCode = StatusCodes.Status403Forbidden;
+                        await context.Response.WriteAsJsonAsync(new
+                        {
+                            error = "User does not have permission to update record with current sensitivity labels",
+                            unauthorizedLabelIds = unauthorizedExistingLabels
+                        });
+                        return;
+                    }
+                }
+            }
+
+            if (recordCollectionId != null)
+            {
+                var recordCollectionExistingLabelIds = await sensitivityLabelService.GetRecordCollectionSensitivityLabels(recordCollectionId.Value);
+
+                // User must have permission for existing labels to update the record
+                if (recordCollectionExistingLabelIds.Count > 0)
+                {
+                    var unauthorizedExistingLabels = recordCollectionExistingLabelIds.Except(authorizedLabelIds).ToList();
+                    if (unauthorizedExistingLabels.Any())
+                    {
+                        context.Response.StatusCode = StatusCodes.Status403Forbidden;
+                        await context.Response.WriteAsJsonAsync(new
+                        {
+                            error = "User does not have permission to update record with current sensitivity labels",
+                            unauthorizedLabelIds = unauthorizedExistingLabels
+                        });
+                        return;
+                    }
                 }
             }
 

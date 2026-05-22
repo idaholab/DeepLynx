@@ -108,26 +108,36 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
     }
 
     /// <summary>
-    ///     Retrieves all authorized records in a specific record collection.
+    /// Retrieves all authorized records in a specific record collection.
     /// </summary>
+    /// <param name="currentUserId"></param>
+    /// <param name="organizationId"></param>
+    /// <param name="projectId"></param>
+    /// <param name="recordCollectionId"></param>
+    /// <param name="hideArchived"></param>
+    /// <param name="isSysAdmin"></param>
+    /// <param name="isOrgAdmin"></param>
+    /// <param name="isProjectAdmin"></param>
+    /// <returns></returns>
+    /// <exception cref="KeyNotFoundException"></exception>
     public async Task<List<RecordResponseDto>> GetRecordsInRecordCollection(
-        long currentUserId, long organizationId, long projectId, long collectionId, bool hideArchived,
+        long currentUserId, long organizationId, long projectId, long recordCollectionId, bool hideArchived,
         bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false)
     {
         var collectionExists = await _context.RecordCollections.AnyAsync(c =>
-            c.Id == collectionId &&
+            c.Id == recordCollectionId &&
             c.OrganizationId == organizationId &&
             c.ProjectId == projectId &&
             (!hideArchived || !c.IsArchived));
 
         if (!collectionExists)
-            throw new KeyNotFoundException($"Record collection with id {collectionId} not found");
+            throw new KeyNotFoundException($"Record collection with id {recordCollectionId} not found");
 
         var recordQuery = _context.Records
             .Where(r =>
                 r.OrganizationId == organizationId &&
                 r.ProjectId == projectId &&
-                r.RecordCollections.Any(c => c.Id == collectionId));
+                r.RecordCollections.Any(c => c.Id == recordCollectionId));
 
         if (hideArchived)
             recordQuery = recordQuery.Where(r => !r.IsArchived);
@@ -193,13 +203,13 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
         long currentUserId, long organizationId, long projectId, long[] tagIds, bool hideArchived,
         bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false)
     {
-        var recordQuery = _context.RecordCollections
+        var recordCollectionQuery = _context.RecordCollections
             .Where(r => r.ProjectId == projectId && r.OrganizationId == organizationId);
 
-        if (hideArchived) recordQuery = recordQuery.Where(r => !r.IsArchived);
+        if (hideArchived) recordCollectionQuery = recordCollectionQuery.Where(r => !r.IsArchived);
 
         // Only return records that contain ALL given IDs
-        recordQuery = recordQuery.Where(r =>
+        recordCollectionQuery = recordCollectionQuery.Where(r =>
             tagIds.All(tagId => r.Tags.Any(t => t.Id == tagId)));
 
         // if user is not admin, filter out unauthorized labels
@@ -208,12 +218,12 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
             var userAuthorizedLabels = await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
                 currentUserId, organizationId, projectId, "read record");
                 
-            recordQuery = recordQuery.Where(r =>
+            recordCollectionQuery = recordCollectionQuery.Where(r =>
                 r.Labels.Count == 0 ||
                 r.Labels.All(l => userAuthorizedLabels.Contains(l.Id)));
         }
 
-        var records = await recordQuery
+        var records = await recordCollectionQuery
             .Include(r => r.Tags)
             .Include(r => r.Labels)
             .ToListAsync();
@@ -250,32 +260,34 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
     /// <param name="currentUserId">The ID of current user</param>
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
     /// <param name="projectId">The ID of the project whose records and collections belong</param>
-    /// <param name="collectionId">The ID of the collection where the records will be added</param>
+    /// <param name="recordCollectionId">The ID of the collection where the records will be added</param>
     /// <param name="recordIds">The IDs for the records to be added to the collection</param>
     /// <param name="isSysAdmin">Optional param determining if the requesting user is a system admin</param>
     /// <param name="isOrgAdmin">Optional param determining if the requesting user is an organization admin</param>
     /// <param name="isProjectAdmin">Optional param determining if the requesting user is a project admin</param>
     /// <returns></returns>
     public async Task<bool> AddRecordsToRecordCollection(long currentUserId, long organizationId,
-    long projectId, long collectionId, List<long> recordIds, bool isSysAdmin = false,
+    long projectId, long recordCollectionId, long[] recordIds, bool isSysAdmin = false,
     bool isOrgAdmin = false, bool isProjectAdmin = false)
     {
-        if (recordIds == null || !recordIds.Any())
+        if (recordIds.Length == 0)
             throw new ArgumentException("Record IDs list cannot be null or empty", nameof(recordIds));
 
         var distinctRecordIds = recordIds.Distinct().ToList();
-
+        
+        // no need to search record collections by authorized labels since middleware checks it using id
         var collection = await _context.RecordCollections
             .Where(c =>
-                c.Id == collectionId &&
+                c.Id == recordCollectionId &&
                 c.OrganizationId == organizationId &&
                 c.ProjectId == projectId &&
                 !c.IsArchived)
             .Include(c => c.Records)
+            .Include(c => c.Labels)
             .FirstOrDefaultAsync();
 
         if (collection == null)
-            throw new KeyNotFoundException($"Record collection with id {collectionId} not found or is archived.");
+            throw new KeyNotFoundException($"Record collection with id {recordCollectionId} not found or is archived.");
         
         var authorizedRecordIds = distinctRecordIds.ToHashSet();
         if (!isSysAdmin && !isOrgAdmin && !isProjectAdmin)
@@ -301,11 +313,10 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
                     $"These records do not exist, or you do not have access to them: {string.Join(", ", unauthorizedRecordIds)}");
         }
 
-
         var records = await _context.Records
+            .Include(r => r.Labels)
             .Where(r =>
                 distinctRecordIds.Contains(r.Id) &&
-                authorizedRecordIds.Contains(r.Id) &&
                 r.OrganizationId == organizationId &&
                 r.ProjectId == projectId &&
                 !r.IsArchived)
@@ -320,13 +331,20 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
 
         foreach (var record in records)
         {
-            if (!collection.Records.Any(existing => existing.Id == record.Id))
+            if (collection.Records.All(existing => existing.Id != record.Id))
+            {
                 collection.Records.Add(record);
-        }
 
-        // TODO: This might be worthwhile to include later, but without ledger its confusing.
-        // collection.LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
-        // collection.LastUpdatedBy = currentUserId;
+                foreach (var label in record.Labels.Except(collection.Labels))
+                {
+                    collection.Labels.Add(label);
+                }
+            }
+                
+        }
+        
+        collection.LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
+        collection.LastUpdatedBy = currentUserId;
 
         await _context.SaveChangesAsync();
 
@@ -339,7 +357,7 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
     /// <param name="currentUserId">The ID of current user</param>
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
     /// <param name="projectId">The ID of the project whose records and collections belong</param>
-    /// <param name="collectionId">The ID of the collection where the records will be removed</param>
+    /// <param name="recordCollectionId">The ID of the collection where the records will be removed</param>
     /// <param name="recordIds">The IDs for the records to be removed from the collection</param>
     /// <param name="isSysAdmin">Optional param determining if the requesting user is a system admin</param>
     /// <param name="isOrgAdmin">Optional param determining if the requesting user is an organization admin</param>
@@ -349,37 +367,36 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
     long currentUserId,
     long organizationId,
     long projectId,
-    long collectionId,
-    List<long> recordIds,
+    long recordCollectionId,
+    long[] recordIds,
     bool isSysAdmin = false,
     bool isOrgAdmin = false,
     bool isProjectAdmin = false)
     {
+        // 1. Validate input
         if (recordIds == null || !recordIds.Any())
             throw new ArgumentException("Record IDs list cannot be null or empty", nameof(recordIds));
 
         var distinctRecordIds = recordIds.Distinct().ToList();
 
+        // 2. Check collection exists first
         var collection = await _context.RecordCollections
-            .Where(c =>
-                c.Id == collectionId &&
-                c.OrganizationId == organizationId &&
-                c.ProjectId == projectId &&
-                !c.IsArchived)
+            .Where(c => c.Id == recordCollectionId && c.OrganizationId == organizationId &&
+                        c.ProjectId == projectId && !c.IsArchived)
             .Include(c => c.Records)
             .FirstOrDefaultAsync();
 
         if (collection == null)
-            throw new KeyNotFoundException($"Record collection with id {collectionId} not found or is archived.");
+            throw new KeyNotFoundException($"Record collection with id {recordCollectionId} not found or is archived.");
 
-
-        var recordIdsToRemove = distinctRecordIds.ToHashSet();
+        // 3. Check authorization
+        var authorizedRecordIds = distinctRecordIds.ToHashSet();
         if (!isSysAdmin && !isOrgAdmin && !isProjectAdmin)
         {
             var userAuthorizedLabels = await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
                 currentUserId, organizationId, projectId, "read record");
 
-            recordIdsToRemove = await _context.Records
+            authorizedRecordIds = await _context.Records
                 .Where(r => distinctRecordIds.Contains(r.Id) &&
                             r.OrganizationId == organizationId &&
                             r.ProjectId == projectId &&
@@ -387,9 +404,9 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
                             (!r.Labels.Any() || r.Labels.All(l => userAuthorizedLabels.Contains(l.Id))))
                 .Select(r => r.Id)
                 .ToHashSetAsync();
-            
+
             var unauthorizedRecordIds = distinctRecordIds
-                .Where(id => !recordIdsToRemove.Contains(id))
+                .Where(id => !authorizedRecordIds.Contains(id))
                 .ToList();
 
             if (unauthorizedRecordIds.Any())
@@ -397,26 +414,24 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
                     $"These records do not exist, or you do not have access to them: {string.Join(", ", unauthorizedRecordIds)}");
         }
 
-        var recordsToRemove = collection.Records
-            .Where(record => recordIdsToRemove.Contains(record.Id))
-            .ToList();
+        // 4. Check all records exist on the collection
+        var collectionRecordIds = collection.Records.Select(r => r.Id).ToHashSet();
+        var notInCollectionIds = distinctRecordIds.Where(id => !collectionRecordIds.Contains(id)).ToList();
 
-        if (recordsToRemove.Count == 0)
+        if (notInCollectionIds.Any())
             throw new KeyNotFoundException(
-                $"Records not found in collection: {string.Join(", ", distinctRecordIds)}");
+                $"Records not found in collection: {string.Join(", ", notInCollectionIds)}");
 
-
-        foreach (var record in recordsToRemove)
+        // 5. Remove
+        foreach (var record in collection.Records.Where(r => authorizedRecordIds.Contains(r.Id)).ToList())
         {
             collection.Records.Remove(record);
         }
 
-        // TODO: This might be worthwhile to include later, but without ledger its confusing.
-        // collection.LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
-        // collection.LastUpdatedBy = currentUserId;
+        collection.LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
+        collection.LastUpdatedBy = currentUserId;
 
         await _context.SaveChangesAsync();
-
         return true;
     }
 
@@ -460,10 +475,11 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
     /// <param name="projectId">The ID of the project under which to create the record</param>
     /// <param name="dto">The data transfer object containing details on the record to be created</param>
+    /// <param name="sensitivityLabelIds">sensitivity labels to apply to the collection on creation</param>
     /// <returns>The newly created metadata record</returns>
     /// <exception cref="KeyNotFoundException">Returned if the project or datasource are not found</exception>
     /// <exception cref="Exception">Returned if the metadata is too deeply nested</exception>
-    public async Task<RecordCollectionResponseDto> CreateRecordCollection(long currentUserId, long organizationId, long projectId,
+    public async Task<RecordCollectionResponseDto> CreateRecordCollection(long currentUserId, long organizationId, long projectId, List<long>? sensitivityLabelIds,
      CreateRecordCollectionRequestDto dto)
     {
         var maxDepth = CalculateJsonMaxDepth(dto.Properties);
@@ -473,6 +489,25 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
 
         await using var transaction = await _context.Database.BeginTransactionAsync();
 
+        List<SensitivityLabel> sensitivityLabelsToAdd= new List<SensitivityLabel>();
+
+        if (sensitivityLabelIds != null && sensitivityLabelIds.Any())
+        {
+            sensitivityLabelsToAdd = await _context.SensitivityLabels
+                .Where(sl => sensitivityLabelIds.Contains(sl.Id) &&
+                             (sl.ProjectId == projectId ||
+                              (sl.ProjectId == null && sl.OrganizationId == organizationId)))
+                .ToListAsync();
+
+            var missingLabelIds = sensitivityLabelIds
+                .Where(id => sensitivityLabelsToAdd.All(sl => sl.Id != id))
+                .ToList();
+
+            if (missingLabelIds.Any())
+                throw new KeyNotFoundException(
+                    $"Sensitivity labels not found inside this organization/project: {string.Join(", ", missingLabelIds)}");
+        }
+        
         try
         {
             var collection = new RecordCollection
@@ -484,6 +519,7 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
                 LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
                 LastUpdatedBy = currentUserId,
                 OrganizationId = organizationId,
+                Labels = sensitivityLabelsToAdd
             };
 
             _context.RecordCollections.Add(collection);
@@ -547,7 +583,7 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
     /// <returns>True if successful</returns>
     /// <exception cref="KeyNotFoundException">Thrown if the record collection is not found</exception>
     /// <exception cref="Exception">Thrown if the property depth is too large</exception>
-    public async Task<RecordResponseDto> UpdateRecordCollection(
+    public async Task<RecordCollectionResponseDto> UpdateRecordCollection(
         long currentUserId, long organizationId, long projectId, long recordCollectionId, UpdateRecordCollectionRequestDto dto)
     {
         ValidationHelper.ValidateModel(dto);
@@ -584,7 +620,7 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
             Properties = "{}",
         });
 
-        return new RecordResponseDto
+        return new RecordCollectionResponseDto
         {
             Id = returnedRecordCollection.Id,
             Description = returnedRecordCollection.Description,
@@ -609,7 +645,7 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
     /// <returns>True if successful</returns>
     /// <exception cref="KeyNotFoundException">Thrown if the record or tag are not found</exception>
     /// <exception cref="Exception">Thrown if the tag is already attached to the record</exception>
-    public async Task<bool> AttachTag(long currentUserId, long organizationId, long projectId, long recordCollectionId,
+    public async Task<bool> AttachTag(long organizationId, long projectId, long recordCollectionId,
         long tagId)
     {
         var recordCollection = await _context.RecordCollections
@@ -618,7 +654,6 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
                         && c.OrganizationId == organizationId
                         && !c.IsArchived)
             .Include(r => r.Tags)
-            .Include(r => r.Labels)
             .FirstOrDefaultAsync();
 
         if (recordCollection == null)
@@ -647,7 +682,17 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
         return true;
     }
 
-    public async Task<bool> AttachLabel(long currentUserId, long organizationId, long projectId, long recordCollectionId,
+    /// <summary>
+    /// Attach a label to a record collection
+    /// </summary>
+    /// <param name="organizationId"></param>
+    /// <param name="projectId"></param>
+    /// <param name="recordCollectionId"></param>
+    /// <param name="labelId"></param>
+    /// <returns></returns>
+    /// <exception cref="KeyNotFoundException"></exception>
+    /// <exception cref="InvalidOperationException"></exception>
+    public async Task<bool> AttachLabel(long organizationId, long projectId, long recordCollectionId,
         long labelId)
     {
         var recordCollection = await _context.RecordCollections
@@ -685,14 +730,13 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
     /// <summary>
     ///     Unattach a tag from a record collection
     /// </summary>
-    /// <param name="currentUserId">The ID of current user</param>
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
     /// <param name="projectId">Project ID for the record and tag</param>
     /// <param name="recordCollectionId">The ID of the record collection</param>
     /// <param name="tagId">The ID of the tag</param>
     /// <returns>True if successful</returns>
     /// <exception cref="KeyNotFoundException">Thrown if the record collection or tag are not found</exception>
-    public async Task<bool> UnattachTag(long currentUserId, long organizationId, long projectId, long recordCollectionId,
+    public async Task<bool> UnattachTag(long organizationId, long projectId, long recordCollectionId,
         long tagId)
     {
         var recordCollection = await _context.RecordCollections
@@ -701,23 +745,16 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
                         && c.OrganizationId == organizationId
                         && !c.IsArchived)
             .Include(c => c.Tags)
-            .Include(c => c.Labels)
             .FirstOrDefaultAsync();
 
         if (recordCollection == null)
             throw new KeyNotFoundException($"Record collection with id {recordCollectionId} not found or is archived.");
 
-        // Find the tag
         var tag = recordCollection.Tags.FirstOrDefault(t => t.Id == tagId);
 
         if (tag == null)
-            throw new KeyNotFoundException($"Tag with id {tagId} is not attached to record collection {recordCollectionId}");
-
-        if (tag.IsArchived ||
-            tag.OrganizationId != organizationId ||
-            (tag.ProjectId.HasValue && tag.ProjectId != projectId))
-            throw new InvalidOperationException(
-                $"Tag with id {tagId} is archived or does not belong to this organization/project.");
+            throw new KeyNotFoundException(
+                $"Tag with id {tagId} is not attached to record collection {recordCollectionId}");
 
         recordCollection.Tags.Remove(tag);
         await _context.SaveChangesAsync();
@@ -728,14 +765,13 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
     /// <summary>
     ///     Unattach a sensitivity label from a record collection
     /// </summary>
-    /// <param name="currentUserId">The ID of current user</param>
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
     /// <param name="projectId">Project ID for the record and sensitivity label</param>
     /// <param name="recordCollectionId">The ID of the record</param>
     /// <param name="labelId">The ID of the label</param>
     /// <returns>True if successful</returns>
     /// <exception cref="KeyNotFoundException">Thrown if the record or sensitivity label are not found</exception>
-    public async Task<bool> UnattachLabel(long currentUserId, long organizationId, long projectId, long recordCollectionId,
+    public async Task<bool> UnattachLabel(long organizationId, long projectId, long recordCollectionId,
         long labelId)
     {
         var sensitivityLabelRequired =
@@ -784,12 +820,10 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
     /// <exception cref="KeyNotFoundException">Returned if the record to archive was not found.</exception>
     public async Task<bool> ArchiveRecordCollection(long currentUserId, long organizationId, long projectId, long recordCollectionId)
     {
-        var query = _context.RecordCollections
+        var returnedRecordCollection = await _context.RecordCollections
             .Include(c => c.Labels)
             .Where(c => c.Id == recordCollectionId && c.OrganizationId == organizationId && c.ProjectId == projectId &&
-                        !c.IsArchived);
-
-        var returnedRecordCollection = await query.FirstOrDefaultAsync();
+                        !c.IsArchived).FirstOrDefaultAsync();
 
         if (returnedRecordCollection is null)
             throw new KeyNotFoundException($"Record collection with id {recordCollectionId} not found or is already archived.");
@@ -821,12 +855,10 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
     /// <exception cref="KeyNotFoundException">Returned if the record collection to unarchive was not found.</exception>
     public async Task<bool> UnarchiveRecordCollection(long currentUserId, long organizationId, long projectId, long recordCollectionId)
     {
-        var query = _context.RecordCollections
+        var returnedRecordCollection = await _context.RecordCollections
             .Include(c => c.Labels)
             .Where(c => c.Id == recordCollectionId && c.OrganizationId == organizationId && c.ProjectId == projectId &&
-                        c.IsArchived);
-
-        var returnedRecordCollection = await query.FirstOrDefaultAsync();
+                        c.IsArchived).FirstOrDefaultAsync();
 
         if (returnedRecordCollection is null)
             throw new KeyNotFoundException($"Record collection with id {recordCollectionId} not found or is not archived.");
@@ -860,15 +892,12 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
     /// <param name="recordCollectionId">The record collection to delete</param>
     /// <returns>Boolean indicating record was deleted</returns>
     /// <exception cref="KeyNotFoundException">Returned if the record to delete was not found.</exception>
-    /// TODO: return warning that historical data will be entirely wiped with this action
     public async Task<bool> DeleteRecordCollection(long currentUserId, long organizationId, long projectId, long recordCollectionId)
     {
-        var query = _context.RecordCollections
+        var returnedRecordCollection = await _context.RecordCollections
             .Where(c => c.Id == recordCollectionId
                         && c.OrganizationId == organizationId
-                        && c.ProjectId == projectId);
-
-        var returnedRecordCollection = await query.FirstOrDefaultAsync();
+                        && c.ProjectId == projectId).FirstOrDefaultAsync();
 
         if (returnedRecordCollection is null)
             throw new KeyNotFoundException($"Record Collection with id {recordCollectionId} is not found");

@@ -22,7 +22,7 @@ public class RecordCollectionResponseDto
 
     [Column("description")] public string Description { get; set; }
 
-    [Column("properties")] public string Properties { get; set; } = null!;
+    [Column("properties")] public string? Properties { get; set; } = null!;
 
     [Column("project_id")] public long ProjectId { get; set; }
 
