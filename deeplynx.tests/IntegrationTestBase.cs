@@ -21,7 +21,7 @@ public class TestSuiteFixture : IAsyncLifetime
     public TestSuiteFixture()
     {
         _postgresContainer = new PostgreSqlBuilder()
-            .WithImage("pgvector/pgvector:pg18") 
+            .WithImage("pgvector/pgvector:pg18")
             .Build();
 
         _redisContainer = new RedisBuilder()
@@ -38,7 +38,8 @@ public class TestSuiteFixture : IAsyncLifetime
     // Runs at the beginning of every test suite
     public async Task InitializeAsync()
     {
-        try {
+        try
+        {
             // Start containers
             await _postgresContainer.StartAsync();
             await _redisContainer.StartAsync();
@@ -62,6 +63,14 @@ public class TestSuiteFixture : IAsyncLifetime
             // Apply migrations only once
             await Context.Database.MigrateAsync();
 
+            // Run LatticeContext migrations against the same container.
+            // A short-lived context is sufficient — migrations only need to execute once.
+            var latticeOptions = new DbContextOptionsBuilder<LatticeContext>()
+                .UseNpgsql(PostgresDataSource)
+                .Options;
+            await using var latticeCtx = new LatticeContext(latticeOptions);
+            await latticeCtx.Database.MigrateAsync();
+
             // Apply env variables without exposing values in tests
             var projectRoot =
                 Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", ".."));
@@ -76,7 +85,7 @@ public class TestSuiteFixture : IAsyncLifetime
             await DisposeAsync();
             throw new InvalidOperationException("Failed to initialize test suite", ex);
         }
-        
+
     }
 
     // Runs at the end of every test suite
@@ -127,7 +136,7 @@ public class IntegrationTestBase : IAsyncLifetime
         await Context.DisposeAsync();
         await CacheService.Instance.FlushAsync();
     }
-    
+
     /// <summary>
     /// Switch cache type for testing - just create a new instance
     /// </summary>
@@ -182,7 +191,7 @@ public class IntegrationTestBase : IAsyncLifetime
         var relationships = await Context.Relationships.ToListAsync();
         Context.Relationships.RemoveRange(relationships);
         await Context.SaveChangesAsync();
-        
+
         var sensitivityLabels = await Context.SensitivityLabels.ToListAsync();
         Context.SensitivityLabels.RemoveRange(sensitivityLabels);
         await Context.SaveChangesAsync();
