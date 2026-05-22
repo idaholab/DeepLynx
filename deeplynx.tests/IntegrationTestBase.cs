@@ -213,6 +213,10 @@ public class IntegrationTestBase : IAsyncLifetime
         Context.DataSources.RemoveRange(dataSources);
         await Context.SaveChangesAsync();
 
+        var extractions = await Context.Extractions.ToListAsync();
+        Context.Extractions.RemoveRange(extractions);
+        await Context.SaveChangesAsync();
+
         var projectMembers = await Context.ProjectMembers.ToListAsync();
         Context.ProjectMembers.RemoveRange(projectMembers);
         await Context.SaveChangesAsync();
