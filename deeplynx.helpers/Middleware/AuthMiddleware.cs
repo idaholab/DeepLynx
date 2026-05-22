@@ -28,25 +28,21 @@ public class SysAdminAttribute : Attribute
 }
 
 /// <summary>
-/// Requires the user to be an organization administrator
+/// Requires the user to be an organization administrator. Set <paramref name="unscoped"/>
+/// when the route does not include an organization ID; the caller must then be a system admin or
+/// an organization admin in at least one organization in the system.
 /// </summary>
 [AttributeUsage(AttributeTargets.Class | AttributeTargets.Method, AllowMultiple = false)]
 public class OrgAdminAttribute : Attribute
 {
     public bool IncludeArchived { get; set; }
+    public bool Unscoped { get; set; }
 
-    public OrgAdminAttribute(bool includeArchived = false)
+    public OrgAdminAttribute(bool includeArchived = false, bool unscoped = false)
     {
         IncludeArchived = includeArchived;
+        Unscoped = unscoped;
     }
-}
-
-/// <summary>
-/// Allows an endpoint to be invoked without organization or project context.
-/// </summary>
-[AttributeUsage(AttributeTargets.Class | AttributeTargets.Method, AllowMultiple = false)]
-public class AllowWithoutContextAttribute : Attribute
-{
 }
 
 public class AuthMiddleware
@@ -73,7 +69,6 @@ public class AuthMiddleware
         var sysAdminAttr = endpoint.Metadata.GetMetadata<SysAdminAttribute>();
         var orgAdminAttr = endpoint.Metadata.GetMetadata<OrgAdminAttribute>();
         var authAttributes = endpoint.Metadata.GetOrderedMetadata<AuthAttribute>();
-        var allowWithoutContext = endpoint.Metadata.GetMetadata<AllowWithoutContextAttribute>() != null;
 
         // If no auth attributes at all, continue
         if (sysAdminAttr == null && orgAdminAttr == null && !authAttributes.Any())
@@ -136,7 +131,7 @@ public class AuthMiddleware
         {
             if (!organizationId.HasValue)
             {
-                if (allowWithoutContext)
+                if (orgAdminAttr.Unscoped)
                 {
                     if (isSysAdmin || await adminService.OrgAdminInSystemCheck(userId))
                     {
@@ -186,7 +181,7 @@ public class AuthMiddleware
             return;
         }
 
-        if (!isSysAdmin && !organizationId.HasValue && !projectIds.Any() && !allowWithoutContext)
+        if (!isSysAdmin && !organizationId.HasValue && !projectIds.Any())
         {
             context.Response.StatusCode = StatusCodes.Status400BadRequest;
             await context.Response.WriteAsJsonAsync(new
@@ -260,10 +255,6 @@ public class AuthMiddleware
                     authAttr.Action,
                     authAttr.Resource
                 );
-            }
-            else if (allowWithoutContext)
-            {
-                hasPermission = true;
             }
 
             if (!hasPermission)
