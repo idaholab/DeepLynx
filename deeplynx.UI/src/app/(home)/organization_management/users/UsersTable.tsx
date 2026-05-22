@@ -28,6 +28,7 @@ import UsersHeaderStats from "./UsersHeaderStats";
 import UsersListTable from "./UsersListTable";
 import { UsersTableRow } from "../../types/types";
 import { useLanguage } from "@/app/contexts/Language";
+import Tabs from "@/app/(home)/components/Tabs";
 
 /* -------------------------------------------------------------------------- */
 /*                                   Types                                    */
@@ -115,9 +116,9 @@ const UsersTable = ({
   const [activityCounts, setActivityCounts] =
     useState<UserActivityCountsDto>(() => buildActivityCounts(members));
   const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<"active" | "archived">("active");
   const [archivedUsers, setArchivedUsers] = useState<UsersTableRow[]>([]);
   const { t } = useLanguage();
+  const [activeTab, setActiveTab] = useState("active");
 
   /* ------------------------------------------------------------------------ */
   /*                           Invite Modal State                             */
@@ -445,6 +446,33 @@ const UsersTable = ({
   const pendingCount = tableData.filter((u) => u.isActive === false).length;
   const totalCount = activeUserCount + pendingCount;
 
+  const userContent = (
+            <UsersListTable
+            tableData={activeTab === "active" ? tableData : archivedUsers}
+            scope={scope}
+            loading={loading}
+            onResendInvite={handleResendInvite}
+            onEditUser={(
+              id: number,
+              name: string,
+              isOrgAdmin: boolean,
+              isSysAdmin: boolean,
+            ) => {
+              setEditingUserId(id);
+              setEditUserName(name);
+              setEditUserIsOrgAdmin(isOrgAdmin);
+              setEditUserIsSysAdmin(isSysAdmin);
+            }}
+            onOpenConfirm={(item: ConfirmModalState) => setConfirmModal(item)}
+            isArchivedTab={activeTab === "archived"}  
+            onUnarchive={handleUnarchive} 
+          />);
+
+  const tabs = [
+  { label: "active", displayLabel: t.translations.ACTIVE_USERS, content: userContent },
+  { label: "archived", displayLabel: t.translations.ARCHIVED_USERS, content: userContent },
+];
+
   /* ------------------------------------------------------------------------ */
   /*                               Main Render                                */
   /* ------------------------------------------------------------------------ */
@@ -465,44 +493,15 @@ const UsersTable = ({
           />
 
           {/* Tabs */}
-          <div role="tablist" className="tabs tabs-bordered mb-4">
-            <button
-              role="tab"
-              className={`tab ${activeTab === "active" ? "tab-active" : ""}`}
-              onClick={() => setActiveTab("active")}
-            >
-              {t.translations.ACTIVE_USERS}
-            </button>
-            <button
-              role="tab"
-              className={`tab ${activeTab === "archived" ? "tab-active" : ""}`}
-              onClick={() => setActiveTab("archived")}
-          >
-              Archived Users
-          </button>
-          </div>
+          <Tabs
+          activeTab={activeTab}
+          onTabChange={(label) => setActiveTab(label)}
+          tabs={tabs}
+        />
 
           {/* Combined Users & Pending Invites Table */}
-          <UsersListTable
-            tableData={activeTab === "active" ? tableData : archivedUsers}
-            scope={scope}
-            loading={loading}
-            onResendInvite={handleResendInvite}
-            onEditUser={(
-              id: number,
-              name: string,
-              isOrgAdmin: boolean,
-              isSysAdmin: boolean,
-            ) => {
-              setEditingUserId(id);
-              setEditUserName(name);
-              setEditUserIsOrgAdmin(isOrgAdmin);
-              setEditUserIsSysAdmin(isSysAdmin);
-            }}
-            onOpenConfirm={(item: ConfirmModalState) => setConfirmModal(item)}
-            isArchivedTab={activeTab === "archived"}  
-            onUnarchive={handleUnarchive} 
-          />
+          
+
         </div>
       </div>
 

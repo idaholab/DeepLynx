@@ -74,14 +74,14 @@ const UsersListTable: React.FC<UsersListTableProps> = ({
             <th>{t.translations.USERNAME}</th>
             <th>{t.translations.STATUS}</th>
             <th>{t.translations.LAST_LOGIN}</th>
-            <th>{isArchivedTab ? "Unarchive" : t.translations.ACTIONS}</th>
+            <th>{isArchivedTab ? t.translations.UNARCHIVE_USER : t.translations.ACTIONS}</th>
           </tr>
         </thead>
         <tbody>
           {tableData.length === 0 ? (
             <tr>
               <td colSpan={6} className="text-center py-8 text-base-content/70">
-                {isArchivedTab ? "No archived users." : t.translations.NO_USERS_OR_PENDING_INVITES_GET_STARTED}
+                {isArchivedTab ? t.translations.NO_ARCHIVED_USERS : t.translations.NO_USERS_OR_PENDING_INVITES_GET_STARTED}
               </td>
             </tr>
           ) : (
