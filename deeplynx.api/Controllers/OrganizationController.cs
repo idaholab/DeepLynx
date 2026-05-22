@@ -37,14 +37,15 @@ public class OrganizationController : ControllerBase
     /// <param name="hideArchived">Flag indicating whether to hide or show archived orgs</param>
     /// <returns></returns>
     [HttpGet(Name = "api_get_all_organizations")]
-    [SysAdmin]
     public async Task<ActionResult<IEnumerable<OrganizationResponseDto>>> GetAllOrganizations(
         [FromQuery] bool hideArchived = true)
     {
         try
         {
+            var userId = UserContextStorage.UserId;
+            var isSysAdmin = UserContextStorage.IsSysAdmin;
             var organizations = await _organizationBusiness
-                .GetAllOrganizations(hideArchived);
+                .GetAllOrganizations(userId, hideArchived, isSysAdmin);
             return Ok(organizations);
         }
         catch (Exception exc)
