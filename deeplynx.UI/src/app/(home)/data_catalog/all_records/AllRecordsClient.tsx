@@ -123,6 +123,14 @@ export default function DataCatalogClient({
   // not the records themselves).
   const [classFacetQuery, setClassFacetQuery] = useState("");
   const [tagFacetQuery, setTagFacetQuery] = useState("");
+  
+  // Bulk tag management state
+  const [selectedRecordKeys, setSelectedRecordKeys] = useState<string[]>([]);
+  const [tagsToAttach, setTagsToAttach] = useState<string[]>([]);
+  const [tagsToUnattach, setTagsToUnattach] = useState<string[]>([]);
+  const [bulkTagQuery, setBulkTagQuery] = useState("");
+  const [isApplyingBulkTags, setIsApplyingBulkTags] = useState(false);
+  const [isBulkMode, setIsBulkMode] = useState(false);
 
   /**
    * Guard ref that prevents the initial URL search term from being re-submitted
@@ -149,6 +157,13 @@ export default function DataCatalogClient({
     () => selectedProjects.join("|"),
     [selectedProjects],
   );
+
+  /**
+   * Builds a unique selection key for records across multiple projects.
+   */
+  const getRecordKey = useCallback((record: RecordTableRow) => {
+    return `${record.projectId}-${record.id}`;
+  }, []);
 
   /**
    * Resolve the effective project IDs to fetch records for.
@@ -530,6 +545,14 @@ export default function DataCatalogClient({
     firstRecordIndex,
     firstRecordIndex + RECORDS_PER_PAGE,
   );
+  const selectedRecords = useMemo(() => {
+    const selected = new Set(selectedRecordKeys);
+    
+    return tableData.filter((record) =>
+      selected.has(getRecordKey(record)),
+    );
+  }, [getRecordKey, tableData, selectedRecordKeys]);
+  const selectedRecordCount = selectedRecords.length;
   const pageStart = scopedRecords.length === 0 ? 0 : firstRecordIndex + 1;
   const pageEnd = Math.min(
     firstRecordIndex + RECORDS_PER_PAGE,
@@ -567,6 +590,27 @@ export default function DataCatalogClient({
         ? prev.filter((item) => item !== value)
         : [...prev, value],
     );
+  }, []);
+  
+  const toggleRecordSelection = useCallback(
+      (record: RecordTableRow) => {
+        const recordKey = getRecordKey(record);
+        
+        setSelectedRecordKeys((prev) =>
+          prev.includes(recordKey)
+            ? prev.filter((item) => item !== recordKey)
+            : [...prev, recordKey],  
+        );
+      },
+      [getRecordKey],
+  );
+  
+  const handleCancelBulkTags = useCallback(() => {
+    setIsBulkMode(false);
+    setSelectedRecordKeys([]);
+    setTagsToAttach([]);
+    setTagsToUnattach([]);
+    setBulkTagQuery("");
   }, []);
 
   /** Resets all facet filters and clears both sidebar search inputs. */
