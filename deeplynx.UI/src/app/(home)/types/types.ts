@@ -225,3 +225,8 @@ export type ExpandableTableColumn<T> = {
   data: (row: T) => ReactNode;
   isExpandTrigger?: (row: T) => boolean;
 };
+
+export type RecordTagLinkDto = {
+  record_id: number;
+  tag_id: number;
+}

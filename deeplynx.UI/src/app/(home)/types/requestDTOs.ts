@@ -325,8 +325,3 @@ export interface SavedSearchFilterRequest {
   pageNumber?: number;
   pageSize?: number;
 }
-
-export type RecordTagLinkDto = {
-  record_id: number;
-  tag_id: number;
-}
