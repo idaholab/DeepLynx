@@ -290,7 +290,8 @@ public class RelationshipBusinessTests : IntegrationTestBase
         // Arrange
         var dto = new CreateRelationshipRequestDto
         {
-            Name = null!, Description = "Test Description"
+            Name = null!,
+            Description = "Test Description"
         };
 
         // Act & Assert
@@ -308,7 +309,8 @@ public class RelationshipBusinessTests : IntegrationTestBase
         // Arrange
         var dto = new CreateRelationshipRequestDto
         {
-            Name = "", Description = "Test Description"
+            Name = "",
+            Description = "Test Description"
         };
 
         // Act & Assert
@@ -425,7 +427,7 @@ public class RelationshipBusinessTests : IntegrationTestBase
         // Assert.Equal(result[1].Id, secondEvent.EntityId);
         // Assert.Equal(result[1].ProjectId, secondEvent.ProjectId);
     }
-    
+
     [Fact]
     public async Task BulkCreateRelationships_Success_ReturnsMultipleRelationshipsOrganization()
     {
@@ -1088,5 +1090,73 @@ public class RelationshipBusinessTests : IntegrationTestBase
         Assert.Equal("Updated Description", updatedRelationship.Description);
     }
 
+    [Fact]
+    public async Task CreateRelationship_Fails_WhenClassesBelongToDifferentProjects()
+    {
+        // Arrange
+        var projectA = new Project
+        {
+            
+            Name = $"Project A1 {DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}",
+            OrganizationId = oid,
+            IsArchived = false
+        };
+
+        var projectB = new Project
+        {
+          
+            Name = $"Project B1 {DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}",
+            OrganizationId = oid,
+            IsArchived = false
+        };
+
+        Context.Projects.Add(projectA);
+        Context.Projects.Add(projectB);
+        await Context.SaveChangesAsync();
+
+        var projectAClass1 = new Class
+        {
+            Name = $"Project A Class1 {DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}",
+            Description = "Project A Test Class1",
+            OrganizationId = oid,
+            ProjectId = projectA.Id,
+            IsArchived = false
+        };
+
+        var projectBClass1 = new Class
+        {
+            Name = $"Project B Class1 {DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}",
+            Description = "Project B Test Class1",
+            OrganizationId = oid,
+            ProjectId = projectB.Id,
+            IsArchived = false
+        };
+
+        Context.Classes.Add(projectAClass1);
+        Context.Classes.Add(projectBClass1);
+
+        await Context.SaveChangesAsync();
+
+        var dto = new CreateRelationshipRequestDto
+        {
+            Name = $"Cross Project Relationship1 {DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}",
+            Description = "Should fail",
+            OriginId = projectAClass1.Id,
+            DestinationId = projectBClass1.Id
+        };
+
+        // Act + Assert
+
+        await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+        {
+            await _relationshipBusiness.CreateRelationship(
+                uid,
+                oid,
+                projectA.Id,
+                dto
+            );
+        });
+    }
+    
     #endregion
 }

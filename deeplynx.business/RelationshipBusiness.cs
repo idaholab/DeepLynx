@@ -150,19 +150,48 @@ public class RelationshipBusiness : IRelationshipBusiness
         CreateRelationshipRequestDto dto)
     {
         ValidationHelper.ValidateModel(dto);
+        Class? originClass = null;
+        Class? destinationClass = null;
 
         if (dto.OriginId != null)
         {
-            var originClass = await _context.Classes.FirstOrDefaultAsync(c => c.Id == dto.OriginId && !c.IsArchived);
-            if (originClass == null) throw new KeyNotFoundException($"Origin class with ID {dto.OriginId} not found.");
+            originClass = await _context.Classes
+                .FirstOrDefaultAsync(c => c.Id == dto.OriginId && !c.IsArchived);
+
+            if (originClass == null)
+                throw new KeyNotFoundException(
+                    $"Origin class with ID {dto.OriginId} not found.");
         }
 
         if (dto.DestinationId != null)
         {
-            var destinationClass =
-                await _context.Classes.FirstOrDefaultAsync(c => c.Id == dto.DestinationId && !c.IsArchived);
+            destinationClass = await _context.Classes
+                .FirstOrDefaultAsync(c => c.Id == dto.DestinationId && !c.IsArchived);
+
             if (destinationClass == null)
-                throw new KeyNotFoundException($"Destination class with ID {dto.DestinationId} not found.");
+                throw new KeyNotFoundException(
+                    $"Destination class with ID {dto.DestinationId} not found.");
+        }
+
+        if (originClass != null && destinationClass != null)
+        {
+            if (originClass.ProjectId != destinationClass.ProjectId)
+            {
+                throw new InvalidOperationException(
+                    "Origin and destination classes must belong to the same project.");
+            }
+
+            if (originClass.ProjectId != projectId)
+            {
+                throw new InvalidOperationException(
+                    "Origin class does not belong to the specified project.");
+            }
+
+            if (destinationClass.ProjectId != projectId)
+            {
+                throw new InvalidOperationException(
+                    "Destination class does not belong to the specified project.");
+            }
         }
 
         var relationship = new Relationship
