@@ -138,6 +138,7 @@ public class RelationshipBusiness : IRelationshipBusiness
 
     /// <summary>
     ///     Creates a new relationship based on the data transfer object supplied.
+    ///     Does not allow relationship between different projects.
     /// </summary>
     /// <param name="currentUserId">ID of the User executing this method.</param>
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
