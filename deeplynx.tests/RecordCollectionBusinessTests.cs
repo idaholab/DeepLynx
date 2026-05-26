@@ -1043,4 +1043,70 @@ public class RecordCollectionBusinessTests : IntegrationTestBase
     }
     
     #endregion
+    
+    #region GetSensitivityLabelsForRecordCollection Tests
+
+    [Fact]
+    public async Task GetSensitivityLabelsForRecordCollection_ReturnsLabels()
+    {
+        // _collectionId is seeded with _labelId in seed data
+        var result = await _recordCollectionBusiness.GetSensitivityLabelsForRecordCollection(
+            _organizationId, _projectId, _collectionId);
+
+        Assert.NotNull(result);
+        Assert.NotEmpty(result);
+        Assert.Contains(result, l => l.Id == _labelId);
+    }
+
+    [Fact]
+    public async Task GetSensitivityLabelsForRecordCollection_NoLabels_ReturnsEmptyList()
+    {
+        // Create a collection with no labels
+        var collection = new RecordCollection
+        {
+            Name = "No Label Collection",
+            Description = "Has no labels",
+            Properties = "{}",
+            ProjectId = _projectId,
+            OrganizationId = _organizationId,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = _userId,
+            IsArchived = false,
+            Labels = new List<SensitivityLabel>()
+        };
+        Context.RecordCollections.Add(collection);
+        await Context.SaveChangesAsync();
+
+        var result = await _recordCollectionBusiness.GetSensitivityLabelsForRecordCollection(
+            _organizationId, _projectId, collection.Id);
+
+        Assert.NotNull(result);
+        Assert.Empty(result);
+    }
+
+    [Fact]
+    public async Task GetSensitivityLabelsForRecordCollection_NotFound_ThrowsKeyNotFoundException()
+    {
+        await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            _recordCollectionBusiness.GetSensitivityLabelsForRecordCollection(
+                _organizationId, _projectId, long.MaxValue));
+    }
+
+    [Fact]
+    public async Task GetSensitivityLabelsForRecordCollection_ArchivedCollection_ThrowsKeyNotFoundException()
+    {
+        await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            _recordCollectionBusiness.GetSensitivityLabelsForRecordCollection(
+                _organizationId, _projectId, _archivedCollectionId));
+    }
+
+    [Fact]
+    public async Task GetSensitivityLabelsForRecordCollection_WrongProject_ThrowsKeyNotFoundException()
+    {
+        await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            _recordCollectionBusiness.GetSensitivityLabelsForRecordCollection(
+                _organizationId, _projectId2, _collectionId));
+    }
+
+    #endregion
 }

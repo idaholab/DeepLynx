@@ -247,6 +247,22 @@ public class SensitivityMiddleware
                     }
                 }
             }
+            
+            // If a new label is being provided, check the user has permission for it too
+            if (providedLabelIds.Count > 0)
+            {
+                var unauthorizedNewLabels = providedLabelIds.Except(authorizedLabelIds).ToList();
+                if (unauthorizedNewLabels.Any())
+                {
+                    context.Response.StatusCode = StatusCodes.Status403Forbidden;
+                    await context.Response.WriteAsJsonAsync(new
+                    {
+                        error = "User does not have permission to use one or more provided sensitivity labels",
+                        unauthorizedLabelIds = unauthorizedNewLabels
+                    });
+                    return;
+                }
+            }
         }
 
         // UPDATE ACTIONS

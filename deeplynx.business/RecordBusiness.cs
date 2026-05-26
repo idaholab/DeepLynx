@@ -651,8 +651,7 @@ public async Task<PaginatedResponse<RecordResponseDto>> GetAllRecordsPaginated(
             
             // Clear tracker so EF fetches fresh state after the raw SQL
             _context.ChangeTracker.Clear();
-
-
+            
             // Fetch labels to attach to collections
             var labels = await _context.SensitivityLabels
                 .Where(l => distinctLabelIds.Contains(l.Id))

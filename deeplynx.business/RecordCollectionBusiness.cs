@@ -255,7 +255,7 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
 
 
     /// <summary>
-    ///     Add Records to Data Collection
+    ///     Add Records to Record Collection
     /// </summary>
     /// <param name="currentUserId">The ID of current user</param>
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
@@ -919,6 +919,31 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
 
         return true;
     }
+    
+    /// <summary>
+    /// Get Sensitivity Labels for Record Collection
+    /// </summary>
+    /// <param name="organizationId"></param>
+    /// <param name="projectId"></param>
+    /// <param name="recordCollectionId"></param>
+    /// <returns></returns>
+    /// <exception cref="KeyNotFoundException"></exception>
+    public async Task<List<SensitivityLabel>> GetSensitivityLabelsForRecordCollection(long organizationId,
+        long projectId, long recordCollectionId)
+    {
+        var recordCollection = await _context.RecordCollections
+            .Include(rc => rc.Labels)
+            .Where(rc => rc.Id == recordCollectionId
+                         && rc.OrganizationId == organizationId
+                         && rc.ProjectId == projectId
+                         && !rc.IsArchived)
+            .FirstOrDefaultAsync();
+
+        if (recordCollection is null)
+            throw new KeyNotFoundException($"Record collection with id {recordCollectionId} not found or is archived.");
+
+        return recordCollection.Labels.ToList();
+    }
 
     /// <summary>
     ///     Private method used to calculate json depth of properties (should be less than three)
@@ -956,6 +981,12 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
     {
         // Handle tags if provided
         if (tags == null || !tags.Any())
+            return new List<RecordCollectionTagDto>();
+        
+        // Filter out empty or whitespace strings
+        tags = tags.Where(t => !string.IsNullOrWhiteSpace(t)).ToList();
+
+        if (!tags.Any())
             return new List<RecordCollectionTagDto>();
 
         // Deduplicate tags before processing

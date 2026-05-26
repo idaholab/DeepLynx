@@ -1,3 +1,4 @@
+using deeplynx.datalayer.Models;
 using deeplynx.models;
 
 namespace deeplynx.interfaces;
@@ -38,4 +39,6 @@ public interface IRecordCollectionBusiness
     Task<bool> AttachLabel(long organizationId, long projectId, long recordCollectionId, long labelId);
     Task<bool> UnattachTag(long organizationId, long projectId, long recordCollectionId, long tagId);
     Task<bool> UnattachLabel(long organizationId, long projectId, long recordCollectionId, long labelId);
+    Task<List<SensitivityLabel>> GetSensitivityLabelsForRecordCollection(long organizationId, long projectId,
+        long recordCollectionId);
 }

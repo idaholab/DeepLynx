@@ -205,9 +205,9 @@ public class RecordCollectionController : ControllerBase
             var isSysAdmin = UserContextStorage.IsSysAdmin;
             var isOrgAdmin = UserContextStorage.IsOrgAdmin;
             var isProjectAdmin = UserContextStorage.IsProjectAdmin;
-            var records = await _recordCollectionBusiness.AddRecordsToRecordCollection(currentUserId, organizationId, projectId,
+            await _recordCollectionBusiness.AddRecordsToRecordCollection(currentUserId, organizationId, projectId,
                 recordCollectionId, recordIds, isSysAdmin, isOrgAdmin, isProjectAdmin);
-            return Ok(records);
+            return Ok(new { message = $"Successfully added records to record collection {recordCollectionId}" });
         }
         catch (ArgumentException exc)
         {
@@ -252,7 +252,7 @@ public class RecordCollectionController : ControllerBase
             var isSysAdmin = UserContextStorage.IsSysAdmin;
             var isOrgAdmin = UserContextStorage.IsOrgAdmin;
             var isProjectAdmin = UserContextStorage.IsProjectAdmin;
-            var records = await _recordCollectionBusiness.RemoveRecordsFromRecordCollection(
+            await _recordCollectionBusiness.RemoveRecordsFromRecordCollection(
                 currentUserId,
                 organizationId,
                 projectId,
@@ -261,7 +261,7 @@ public class RecordCollectionController : ControllerBase
                 isSysAdmin,
                 isOrgAdmin,
                 isProjectAdmin);
-            return Ok(records);
+            return Ok(new { message = $"Successfully removed records to record collection {recordCollectionId}" });
         }
         catch (ArgumentException exc)
         {
@@ -293,6 +293,7 @@ public class RecordCollectionController : ControllerBase
     /// <returns>The created Record Collection</returns>
     [HttpPost(Name = "api_create_a_record_collection")]
     [Auth("write", "record_collection")]
+    [Sensitivity("read record")]
     public async Task<ActionResult<RecordCollectionResponseDto>> CreateRecordCollection(
         long organizationId,
         long projectId,
@@ -302,10 +303,10 @@ public class RecordCollectionController : ControllerBase
         try
         {
             var currentUserId = UserContextStorage.UserId;
-            var record =
+            var recordCollection =
                 await _recordCollectionBusiness.CreateRecordCollection(currentUserId, organizationId, projectId,
                     sensitivityLabelIds, dto);
-            return Ok(record);
+            return Ok(recordCollection);
         }
         catch (KeyNotFoundException exc)
         {
@@ -434,7 +435,7 @@ public class RecordCollectionController : ControllerBase
     }
     
     /// <summary>
-    ///     Unattach a Tag from a Record
+    ///     Unattach a Tag from a Record Collection
     /// </summary>
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
     /// <param name="projectId">The ID of the project to which the record belongs</param>
@@ -541,6 +542,40 @@ public class RecordCollectionController : ControllerBase
         catch (Exception exc)
         {
             var message = $"An error occurred while unattaching sensitivity label {sensitivityLabelId} from record collection {recordCollectionId}: {exc}";
+            _logger.LogError(message);
+            return StatusCode(StatusCodes.Status500InternalServerError, message);
+        }
+    }
+    
+    
+    /// <summary>
+    ///     Get Sensitivity Labels for a Record Collection
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <param name="projectId">The ID of the project to which the record collectionbelongs</param>
+    /// <param name="recordCollectionId">The ID of the record collection</param>
+    /// <returns>A message stating the label was successfully attached to the record.</returns>
+    [HttpGet("{recordCollectionId:long}/sensitivity-labels", Name = "api_get_sensitivity_labels_for_record_collection")]
+    [Auth("read", "record_collection")]
+    [Auth("read", "sensitivity_label")]
+    [Sensitivity("read record")]
+    public async Task<IActionResult> GetSensitivityLabelsForRecordCollection(
+        long organizationId,
+        long projectId,
+        long recordCollectionId)
+    {
+        try
+        {
+            var sensitivityLabels = await _recordCollectionBusiness.GetSensitivityLabelsForRecordCollection(organizationId, projectId, recordCollectionId);
+            return Ok(sensitivityLabels);
+        }
+        catch (KeyNotFoundException exc)
+        {
+            return NotFound(exc.Message);
+        }
+        catch (Exception exc)
+        {
+            var message = $"An error occurred while retrieving sensitivity labels for record collection {recordCollectionId}: {exc}";
             _logger.LogError(message);
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
