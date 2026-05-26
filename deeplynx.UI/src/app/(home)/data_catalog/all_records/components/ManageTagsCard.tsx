@@ -7,9 +7,7 @@ type AvailableTag = {
     name: string;
 };
 
-/**
- *
- */
+// Props for the bulk tag management card shown while record selection mode is active.
 type Props = {
     selectedRecordCount: number;
     bulkTagQuery: string;
@@ -23,7 +21,8 @@ type Props = {
 type BulkTagState = "checked" | "unchecked" | "indeterminate";
 
 /**
- *
+ *  Displays available tags for the selected records and lets the user stage
+ *  bulk tag attach/unattach changes before applying them.
  */
 export default function ManageTagsCard({
     selectedRecordCount,

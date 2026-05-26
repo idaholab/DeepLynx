@@ -67,6 +67,13 @@ type Props = {
   initialRecords: RecordTableRow[];
 };
 
+/**
+ * Represents how a tag applies across the currently selected records.
+ * 
+ * checked - Every selected record already has the tag, or the tag is pending attach
+ * unchecked - No selected records have the tag, or the tag is pending unattach
+ * indeterminate - Only some selected records currently have the tag
+ */
 type BulkTagState = "checked" | "unchecked" | "indeterminate";
 
 /** Number of records shown per page in the paginated list. */
@@ -127,8 +134,14 @@ export default function DataCatalogClient({
   // not the records themselves).
   const [classFacetQuery, setClassFacetQuery] = useState("");
   const [tagFacetQuery, setTagFacetQuery] = useState("");
-  
-  // Bulk tag management state
+
+  /**
+   * Bulk tag management state.
+   * 
+   * selectedRecordKeys stores selected records as `${projectId}-${recordId}`, so selections remain unique.
+   * 
+   * tagsToAttach and tagsToUnattach store pending tag IDs only. Actual API call happens when the user clicks apply.
+   */
   const [selectedRecordKeys, setSelectedRecordKeys] = useState<string[]>([]);
   const [tagsToAttach, setTagsToAttach] = useState<number[]>([]);
   const [tagsToUnattach, setTagsToUnattach] = useState<number[]>([]);
@@ -420,7 +433,7 @@ export default function DataCatalogClient({
   ]);
 
   /**
-   * 
+   * Fetches available tags for the selected project scope.
    */
   useEffect(() => {
     if (!hasLoaded) return;
@@ -632,7 +645,13 @@ export default function DataCatalogClient({
       },
       [getRecordKey],
   );
-  
+
+  /**
+   * Calculates the visual checkbox state for a tag across selected records.
+   * 
+   * Checked tags are marked for unattach. Unchecked or indeterminate tags are
+   * marked for attach so all selected records will receive the tag on Apply.
+   */
   const getBulkTagState = useCallback(
       (tagName: string): BulkTagState => {
         const tag = availableTags.find((availableTag) => availableTag.name === tagName);
@@ -667,7 +686,13 @@ export default function DataCatalogClient({
       },
       [availableTags, selectedRecords, tagsToAttach, tagsToUnattach],
   );
-  
+
+  /**
+   * Tracks pendig bulk tag changes.
+   * 
+   * Checked tags are marked for unattach. Unchecked or indeterminate tags are
+   * marked for attach so all selected records will receive the tag on apply.
+   */
   const toggleBulkTag = useCallback(
       (tagId: number, tagName: string) => {
         const state = getBulkTagState(tagName);
