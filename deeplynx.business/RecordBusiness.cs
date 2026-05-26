@@ -301,6 +301,7 @@ public async Task<PaginatedResponse<RecordResponseDto>> GetAllRecordsPaginated(
 
     /// <summary>
     ///     Retrieves a specific record by its ID
+    ///     Will return null for URI if the current user does not have download access for the record's sensitivity labels.
     /// </summary>
     /// <param name="currentUserId">The ID of current user</param>
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
