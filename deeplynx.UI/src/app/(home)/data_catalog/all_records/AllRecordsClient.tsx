@@ -440,7 +440,7 @@ export default function DataCatalogClient({
         .catch((error) => {
           console.error("Failed to fetch available tags:", error);
         });
-  }), [hasLoaded, organization?.organizationId, effectiveProjectIds]
+  }, [hasLoaded, organization?.organizationId, effectiveProjectIds]);
   
   /** Bridge between the SearchBar's onSubmit callback shape and handleSearch. */
   const handleSubmit = useCallback(
