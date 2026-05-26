@@ -446,6 +446,10 @@ const UsersTable = ({
   const pendingCount = tableData.filter((u) => u.isActive === false).length;
   const totalCount = activeUserCount + pendingCount;
 
+  /* ------------------------------------------------------------------------ */
+  /*                               User Conent Tabs                           */
+  /* ------------------------------------------------------------------------ */
+
   const userContent = (
             <UsersListTable
             tableData={activeTab === "active" ? tableData : archivedUsers}
@@ -492,16 +496,27 @@ const UsersTable = ({
             scope={scope}
           />
 
-          {/* Tabs */}
+          {scope === "site" ? (
           <Tabs
-          activeTab={activeTab}
-          onTabChange={(label) => setActiveTab(label)}
-          tabs={tabs}
-        />
-
-          {/* Combined Users & Pending Invites Table */}
-          
-
+            activeTab={activeTab}
+            onTabChange={(label) => setActiveTab(label)}
+            tabs={tabs}
+          />
+        ) : (
+          <UsersListTable
+            tableData={tableData}
+            scope={scope}
+            loading={loading}
+            onResendInvite={handleResendInvite}
+            onEditUser={(id, name, isOrgAdmin, isSysAdmin) => {
+              setEditingUserId(id);
+              setEditUserName(name);
+              setEditUserIsOrgAdmin(isOrgAdmin);
+              setEditUserIsSysAdmin(isSysAdmin);
+            }}
+            onOpenConfirm={(item) => setConfirmModal(item)}
+          />
+        )}
         </div>
       </div>
 
