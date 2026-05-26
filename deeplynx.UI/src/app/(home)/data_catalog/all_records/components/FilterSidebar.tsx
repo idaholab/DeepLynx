@@ -99,7 +99,7 @@ export default function FilterSidebar({
   ];
 
   return (
-    <aside className="lg:sticky lg:top-4 lg:self-start">
+    <aside>
       <div className="rounded-box border border-base-300 bg-base-100 shadow-sm">
         <div className="flex items-center justify-between border-b border-base-300 px-4 py-3">
           <div className="flex items-center gap-2 font-semibold">
