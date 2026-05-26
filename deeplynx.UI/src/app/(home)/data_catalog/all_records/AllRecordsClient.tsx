@@ -76,6 +76,18 @@ type Props = {
  */
 type BulkTagState = "checked" | "unchecked" | "indeterminate";
 
+/**
+ * Tag returned for the current project scope.
+ * 
+ * projectId is null for organization-level tags.
+ * projectId is set when the tag belongs to a specific project.
+ */
+type AvailableTag = {
+  id: number;
+  name: string;
+  projectId: number | null;
+}
+
 /** Number of records shown per page in the paginated list. */
 const RECORDS_PER_PAGE = 12;
 
@@ -148,7 +160,7 @@ export default function DataCatalogClient({
   const [bulkTagQuery, setBulkTagQuery] = useState("");
   const [isApplyingBulkTags, setIsApplyingBulkTags] = useState(false);
   const [isBulkMode, setIsBulkMode] = useState(false);
-  const [availableTags, setAvailableTags] = useState<{ id: number; name: string }[]>([]);
+  const [availableTags, setAvailableTags] = useState<AvailableTag[]>([]);
   
   /**
    * Guard ref that prevents the initial URL search term from being re-submitted
@@ -433,26 +445,38 @@ export default function DataCatalogClient({
   ]);
 
   /**
-   * Fetches available tags for the selected project scope.
+   * Fetches tags available to the current project scope.
+   * 
+   * The organization tag endpoint returns organization-level tags by default.
+   * When projectIds are provided, it also includes tags scoped to those projects.
    */
   useEffect(() => {
     if (!hasLoaded) return;
     if (!organization?.organizationId) return;
     
-    const projectIds = effectiveProjectIds.map(Number).filter(Number.isFinite);
+    const fetchTagsForProjectScope = async () => {
+      const projectIds = effectiveProjectIds
+          .map(Number)
+          .filter(Number.isFinite);
+      
+      const tags = await getAllTagsOrg(
+          organization.organizationId,
+          projectIds,
+          true,
+      );
+      
+      setAvailableTags(
+          tags.map((tag) => ({
+            id: tag.id,
+            name: tag.name,
+            projectId: tag.projectId ?? null,
+          })),
+      );
+    };
     
-    getAllTagsOrg(organization.organizationId, projectIds, true)
-        .then((tags) => {
-          setAvailableTags(
-              tags.map((tag) => ({
-                id: tag.id,
-                name: tag.name,
-              })),
-          );
-        })
-        .catch((error) => {
-          console.error("Failed to fetch available tags:", error);
-        });
+    fetchTagsForProjectScope().catch((error) => {
+      console.error("Failed to fetch available tags:", error);
+    });
   }, [hasLoaded, organization?.organizationId, selectedProjectsToken]);
   
   /** Bridge between the SearchBar's onSubmit callback shape and handleSearch. */
@@ -593,6 +617,16 @@ export default function DataCatalogClient({
       selected.has(getRecordKey(record)),
     );
   }, [getRecordKey, tableData, selectedRecordKeys]);
+  const visibleAvailableTags = useMemo(() => {
+    if (effectiveProjectIds.length === 1) {
+      const projectId = Number(effectiveProjectIds[0]);
+      
+      return availableTags.filter(
+          (tag) => tag.projectId === null || tag.projectId === projectId,
+      );
+    }
+    return availableTags.filter((tag) => tag.projectId === null);
+  }, [availableTags, effectiveProjectIds]);
   const selectedRecordCount = selectedRecords.length;
   const pageStart = scopedRecords.length === 0 ? 0 : firstRecordIndex + 1;
   const pageEnd = Math.min(
@@ -653,9 +687,7 @@ export default function DataCatalogClient({
    * marked for attach so all selected records will receive the tag on Apply.
    */
   const getBulkTagState = useCallback(
-      (tagName: string): BulkTagState => {
-        const tag = availableTags.find((availableTag) => availableTag.name === tagName);
-        
+      (tag: AvailableTag): BulkTagState => {
         if (!tag || selectedRecords.length === 0) {
           return "unchecked";
         }
@@ -671,7 +703,7 @@ export default function DataCatalogClient({
         const matchingCount = selectedRecords.filter((record) => {
           const tags = parseRecordTags(record.tags);
           
-          return tags.includes(tagName);
+          return tags.includes(tag.name);
         }).length;
         
         if (matchingCount === 0) {
@@ -684,7 +716,7 @@ export default function DataCatalogClient({
         
         return "indeterminate";
       },
-      [availableTags, selectedRecords, tagsToAttach, tagsToUnattach],
+      [selectedRecords, tagsToAttach, tagsToUnattach],
   );
 
   /**
@@ -694,20 +726,20 @@ export default function DataCatalogClient({
    * reflects what will happen on apply, even before the records are refreshed.
    */
   const toggleBulkTag = useCallback(
-      (tagId: number, tagName: string) => {
-        const state = getBulkTagState(tagName);
+      (tag: AvailableTag) => {
+        const state = getBulkTagState(tag);
         
         if (state === "checked") {
-          setTagsToAttach((prev) => prev.filter((id) => id !== tagId));
+          setTagsToAttach((prev) => prev.filter((id) => id !== tag.id));
           
           setTagsToUnattach((prev) =>
-            prev.includes(tagId) ? prev : [...prev, tagId],
+            prev.includes(tag.id) ? prev : [...prev, tag.id],
           );
         } else {
-          setTagsToUnattach((prev) => prev.filter((id) => id !== tagId));
+          setTagsToUnattach((prev) => prev.filter((id) => id !== tag.id));
           
           setTagsToAttach((prev) =>
-              prev.includes(tagId) ? prev : [...prev, tagId],
+              prev.includes(tag.id) ? prev : [...prev, tag.id],
           );
         }
       },
@@ -781,6 +813,7 @@ export default function DataCatalogClient({
                     ? initialSelectedProjects
                     : undefined
                 }
+                disabled={isBulkMode}
               />
             </div>
 
@@ -871,7 +904,7 @@ export default function DataCatalogClient({
                   selectedRecordCount={selectedRecordCount}
                   bulkTagQuery={bulkTagQuery}
                   onBulkTagQueryChange={setBulkTagQuery}
-                  availableTags={availableTags}
+                  availableTags={visibleAvailableTags}
                   onCancelBulkTags={handleCancelBulkTags}
                   getBulkTagState={getBulkTagState}
                   onToggleBulkTag={toggleBulkTag}

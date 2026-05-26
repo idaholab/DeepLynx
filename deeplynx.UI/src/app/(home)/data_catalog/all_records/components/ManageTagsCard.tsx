@@ -5,6 +5,7 @@ import { useLanguage } from "@/app/contexts/Language";
 type AvailableTag = {
     id: number;
     name: string;
+    projectId: number | null;
 };
 
 // Props for the bulk tag management card shown while record selection mode is active.
@@ -14,8 +15,8 @@ type Props = {
     onBulkTagQueryChange: (value: string) => void;
     availableTags: AvailableTag[];
     onCancelBulkTags: () => void;
-    getBulkTagState: (tagName: string) => BulkTagState;
-    onToggleBulkTag: (tagId: number, tagName: string) => void;
+    getBulkTagState: (tag: AvailableTag) => BulkTagState;
+    onToggleBulkTag: (tag: AvailableTag) => void;
 };
 
 type BulkTagState = "checked" | "unchecked" | "indeterminate";
@@ -66,7 +67,7 @@ export default function ManageTagsCard({
                     ) : (
                         <div className="space-y-2">
                             {filteredTags.map((tag) => {
-                                const state = getBulkTagState(tag.name);
+                                const state = getBulkTagState(tag);
 
                                 return (
                                     <div key={tag.id}
@@ -80,7 +81,7 @@ export default function ManageTagsCard({
                                                     input.indeterminate = state === "indeterminate";
                                                 }
                                             }}
-                                            onChange={() => onToggleBulkTag(tag.id, tag.name)}
+                                            onChange={() => onToggleBulkTag(tag)}
                                         />
 
                                         <span>{tag.name}</span>
