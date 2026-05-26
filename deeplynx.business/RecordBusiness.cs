@@ -326,11 +326,20 @@ public async Task<PaginatedResponse<RecordResponseDto>> GetAllRecordsPaginated(
 
         if (hideArchived && record.IsArchived) throw new KeyNotFoundException($"Record with id {recordId} is archived");
 
+        var authorizedLabels = await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
+            currentUserId,
+            organizationId,
+            projectId,
+            "download file");
+
+        var canDownloadUri = record.Labels.Count == 0 ||
+                        record.Labels.All(l => authorizedLabels.Contains(l.Id));
+
         return new RecordResponseDto
         {
             Id = record.Id,
             Description = record.Description,
-            Uri = record.Uri,
+            Uri = canDownloadUri ? record.Uri : null,
             Properties = record.Properties,
             OriginalId = record.OriginalId,
             ObjectStorageId = record.ObjectStorageId,

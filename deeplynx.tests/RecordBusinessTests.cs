@@ -3458,5 +3458,126 @@ public class RecordBusinessTests : IntegrationTestBase
         Assert.True(count >= 2);
     }
 
+    [Fact]
+    public async Task GetRecord_ReturnsUriOnlyWhenUserCanDownload()
+    {
+        // Arrange
+        var adminUser = new User
+        {
+            Name = "Admin",
+            Email = $"admin-{Guid.NewGuid()}@test.com",
+            IsSysAdmin = true,
+            IsActive = true
+        };
+
+        var restrictedUser = new User
+        {
+            Name = "Restricted",
+            Email = $"restricted-{Guid.NewGuid()}@test.com",
+            IsSysAdmin = false,
+            IsActive = true
+        };
+
+        Context.Users.Add(adminUser);
+        Context.Users.Add(restrictedUser);
+        await Context.SaveChangesAsync();
+
+        var label = new SensitivityLabel
+        {
+            Name = $"Test Label {Guid.NewGuid()}",
+            Description = "Test label for download permission",
+            OrganizationId = organizationId,
+            ProjectId = pid,
+            LastUpdatedBy = adminUser.Id,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),
+            IsArchived = false
+        };
+
+        Context.SensitivityLabels.Add(label);
+        await Context.SaveChangesAsync();
+
+        var permission = new Permission
+        {
+            Name = $"Download File Permission {Guid.NewGuid()}",
+            Description = "Allows file download for this label",
+            Action = "download file",
+            LabelId = label.Id,
+            OrganizationId = organizationId,
+            ProjectId = pid,
+            LastUpdatedBy = adminUser.Id,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),
+            IsArchived = false,
+            IsDefault = false
+        };
+
+        var role = new Role
+        {
+            Name = $"Download Role {Guid.NewGuid()}",
+            Description = "Role with download file permission",
+            OrganizationId = organizationId,
+            ProjectId = pid,
+            LastUpdatedBy = adminUser.Id,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),
+            IsArchived = false,
+            Permissions = new List<Permission> { permission }
+        };
+
+        Context.Roles.Add(role);
+        await Context.SaveChangesAsync();
+
+        var projectMember = new ProjectMember
+        {
+            UserId = adminUser.Id,
+            ProjectId = pid,
+            RoleId = role.Id
+        };
+
+        Context.ProjectMembers.Add(projectMember);
+        await Context.SaveChangesAsync();
+
+        var expectedUri = $"../data/test/{Guid.NewGuid()}_protected-file.txt";
+
+        var record = new Record
+        {
+            OrganizationId = organizationId,
+            ProjectId = pid,
+            DataSourceId = did,
+            ClassId = cid,
+            Name = "Protected file record",
+            Description = "Protected file record",
+            Uri = expectedUri,
+            Properties = "{}",
+            OriginalId = Guid.NewGuid().ToString(),
+            LastUpdatedBy = adminUser.Id,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),
+            IsArchived = false,
+            FileType = "txt",
+            FileSize = 1,
+            Labels = new List<SensitivityLabel> { label }
+        };
+
+        Context.Records.Add(record);
+        await Context.SaveChangesAsync();
+
+        // Act
+        var adminResult = await _recordBusiness.GetRecord(
+            adminUser.Id,
+            organizationId,
+            pid,
+            record.Id,
+            hideArchived: true);
+
+        var restrictedUserResult = await _recordBusiness.GetRecord(
+            restrictedUser.Id,
+            organizationId,
+            pid,
+            record.Id,
+            hideArchived: true);
+
+        // Assert
+        Assert.Equal(expectedUri, adminResult.Uri);
+        Assert.Null(restrictedUserResult.Uri);
+    }
+    
     #endregion
 }
