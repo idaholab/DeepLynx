@@ -35,6 +35,7 @@ import {
   fullTextSearch,
   getMultiProjectRecords,
 } from "@/app/lib/client_service/query_services.client";
+import { getAllTagsOrg } from "@/app/lib/client_service/tag_services.client";
 import { HistoricalRecordResponseDto } from "@/app/(home)/types/responseDTOs";
 import ProjectDropdown from "@/app/(home)/components/ProjectDropdown";
 import { useLanguage } from "@/app/contexts/Language";
@@ -50,6 +51,7 @@ import FilterSidebar, {
   RecordStatusFilter,
 } from "./components/FilterSidebar";
 import RecordCard from "./components/RecordCard";
+import ManageTagsCard from "./components/ManageTagsCard";
 import { countFacet, parseRecordTags } from "./components/utils";
 
 /* ─── Types ──────────────────────────────────────────────────────────────── */
@@ -64,6 +66,8 @@ type Props = {
   /** Records fetched server-side for the initial render to avoid a loading flash. */
   initialRecords: RecordTableRow[];
 };
+
+type BulkTagState = "checked" | "unchecked" | "indeterminate";
 
 /** Number of records shown per page in the paginated list. */
 const RECORDS_PER_PAGE = 12;
@@ -131,7 +135,8 @@ export default function DataCatalogClient({
   const [bulkTagQuery, setBulkTagQuery] = useState("");
   const [isApplyingBulkTags, setIsApplyingBulkTags] = useState(false);
   const [isBulkMode, setIsBulkMode] = useState(false);
-
+  const [availableTags, setAvailableTags] = useState<{ id: number; name: string }[]>([]);
+  
   /**
    * Guard ref that prevents the initial URL search term from being re-submitted
    * every time the component re-renders. We use a ref (not state) so that
@@ -414,6 +419,29 @@ export default function DataCatalogClient({
     fetchRecordsForSelection,
   ]);
 
+  /**
+   * 
+   */
+  useEffect(() => {
+    if (!hasLoaded) return;
+    if (!organization?.organizationId) return;
+    
+    const projectIds = effectiveProjectIds.map(Number).filter(Number.isFinite);
+    
+    getAllTagsOrg(organization.organizationId, projectIds, true)
+        .then((tags) => {
+          setAvailableTags(
+              tags.map((tag) => ({
+                id: tag.id,
+                name: tag.name,
+              })),
+          );
+        })
+        .catch((error) => {
+          console.error("Failed to fetch available tags:", error);
+        });
+  }), [hasLoaded, organization?.organizationId, effectiveProjectIds]
+  
   /** Bridge between the SearchBar's onSubmit callback shape and handleSearch. */
   const handleSubmit = useCallback(
     async ({ query }: { query: string }) => {
@@ -605,6 +633,31 @@ export default function DataCatalogClient({
       [getRecordKey],
   );
   
+  const getBulkTagState = useCallback(
+      (tagName: string): BulkTagState => {
+        if (selectedRecords.length === 0) {
+          return "unchecked";
+        }
+        
+        const matchingCount = selectedRecords.filter((record) => {
+          const tags = parseRecordTags(record.tags);
+          
+          return tags.includes(tagName);
+        }).length;
+        
+        if (matchingCount === 0) {
+          return "unchecked";
+        }
+        
+        if (matchingCount === selectedRecords.length) {
+          return "checked";
+        }
+        
+        return "indeterminate";
+      },
+      [selectedRecords],
+  );
+  
   const handleCancelBulkTags = useCallback(() => {
     setIsBulkMode(false);
     setSelectedRecordKeys([]);
@@ -738,23 +791,36 @@ export default function DataCatalogClient({
 
         {/* Two-column layout: sidebar on left, record list on right */}
         <div className="grid grid-cols-1 gap-5 lg:grid-cols-[18rem_minmax(0,1fr)]">
-          <FilterSidebar
-            projectScopedRecords={projectScopedRecords}
-            statusFilter={statusFilter}
-            onStatusFilterChange={setStatusFilter}
-            selectedClassFilters={selectedClassFilters}
-            onToggleClassFilter={toggleClassFilter}
-            filteredClassFacetOptions={filteredClassFacetOptions}
-            classFacetQuery={classFacetQuery}
-            onClassFacetQueryChange={setClassFacetQuery}
-            selectedTagFilters={selectedTagFilters}
-            onToggleTagFilter={toggleTagFilter}
-            filteredTagFacetOptions={filteredTagFacetOptions}
-            tagFacetQuery={tagFacetQuery}
-            onTagFacetQueryChange={setTagFacetQuery}
-            activeFacetCount={activeFacetCount}
-            onClearFacetFilters={clearFacetFilters}
-          />
+          <div className="space-y-4 lg:sticky lg:top-4 lg:self-start">
+            <FilterSidebar
+                projectScopedRecords={projectScopedRecords}
+                statusFilter={statusFilter}
+                onStatusFilterChange={setStatusFilter}
+                selectedClassFilters={selectedClassFilters}
+                onToggleClassFilter={toggleClassFilter}
+                filteredClassFacetOptions={filteredClassFacetOptions}
+                classFacetQuery={classFacetQuery}
+                onClassFacetQueryChange={setClassFacetQuery}
+                selectedTagFilters={selectedTagFilters}
+                onToggleTagFilter={toggleTagFilter}
+                filteredTagFacetOptions={filteredTagFacetOptions}
+                tagFacetQuery={tagFacetQuery}
+                onTagFacetQueryChange={setTagFacetQuery}
+                activeFacetCount={activeFacetCount}
+                onClearFacetFilters={clearFacetFilters}
+            />
+
+            {isBulkMode && (
+                <ManageTagsCard
+                  selectedRecordCount={selectedRecordCount}
+                  bulkTagQuery={bulkTagQuery}
+                  onBulkTagQueryChange={setBulkTagQuery}
+                  availableTags={availableTags}
+                  onCancelBulkTags={handleCancelBulkTags}
+                  getBulkTagState={getBulkTagState}
+                />
+            )}
+          </div>
 
           {/* Record list */}
           <div className="min-w-0">

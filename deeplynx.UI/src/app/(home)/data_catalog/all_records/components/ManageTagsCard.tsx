@@ -5,7 +5,7 @@ import { useLanguage } from "@/app/contexts/Language";
 type AvailableTag = {
     id: number;
     name: string;
-}
+};
 
 /**
  *
@@ -16,7 +16,11 @@ type Props = {
     onBulkTagQueryChange: (value: string) => void;
     availableTags: AvailableTag[];
     onCancelBulkTags: () => void;
-}
+    
+    getBulkTagState: (tagName: string) => BulkTagState;
+};
+
+type BulkTagState = "checked" | "unchecked" | "indeterminate";
 
 /**
  *
@@ -27,6 +31,7 @@ export default function ManageTagsCard({
     onBulkTagQueryChange,
     availableTags,
     onCancelBulkTags,
+    getBulkTagState,
 }:  Props){
     const {t} = useLanguage();
     
@@ -60,17 +65,28 @@ export default function ManageTagsCard({
                         </p>
                     ) : (
                         <div className="space-y-2">
-                            {filteredTags.map((tag) => (
-                                <div key = {tag.id} className="flex items-center gap-2 text-sm">
-                                    <input
-                                        type="checkbox"
-                                        className="checkbox checkbox-primary checkbox-xs"
-                                        disabled
-                                    />
-                                    
-                                    <span>{tag.name}</span>
-                                </div>
-                            ))}
+                            {filteredTags.map((tag) => {
+                                const state = getBulkTagState(tag.name);
+
+                                return (
+                                    <div key={tag.id}
+                                         className="flex items-center gap-2 text-sm">
+                                        <input
+                                            type="checkbox"
+                                            className="checkbox checkbox-primary checkbox-xs"
+                                            checked={state === "checked"}
+                                            ref={(input) => {
+                                                if (input) {
+                                                    input.indeterminate = state === "indeterminate";
+                                                }
+                                            }}
+                                            readOnly
+                                        />
+
+                                        <span>{tag.name}</span>
+                                    </div>
+                                );
+                            })}
                         </div>
                     )}
                 </div>
