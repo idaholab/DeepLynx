@@ -688,10 +688,10 @@ export default function DataCatalogClient({
   );
 
   /**
-   * Tracks pendig bulk tag changes.
+   * Tracks pending bulk tag changes.
    * 
-   * Checked tags are marked for unattach. Unchecked or indeterminate tags are
-   * marked for attach so all selected records will receive the tag on apply.
+   * Pending attach/unattach changes are checked first so the UI immediately
+   * reflects what will happen on apply, even before the records are refreshed.
    */
   const toggleBulkTag = useCallback(
       (tagId: number, tagName: string) => {
