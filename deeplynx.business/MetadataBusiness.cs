@@ -3,6 +3,7 @@ using deeplynx.datalayer.Models;
 using deeplynx.interfaces;
 using deeplynx.models;
 using Microsoft.AspNetCore.Http;
+using Microsoft.EntityFrameworkCore;
 
 namespace deeplynx.business;
 
@@ -197,7 +198,7 @@ public class MetadataBusiness : IMetadataBusiness
             var recordTags = BuildRecordTags(records, tagMap, recordMap);
             if (recordTags.Any())
             {
-                await _recordBusiness.BulkAttachTags(recordTags);
+                await _recordBusiness.BulkInsertRecordTagLinks(recordTags);
                 AttachTagsToRecordDtos(metadataResponseDto, recordTags, tagMap);
             }
         }
@@ -206,9 +207,14 @@ public class MetadataBusiness : IMetadataBusiness
         if (edges.Any())
         {
             // ensure all origin/destination records exist in the record map; if not, check DB
-            CheckRecordsByOriginalId(recordMap, edges);
+            var resolvedRecordMap = await CheckRecordsByOriginalId(
+                projectId,
+                dataSourceId,
+                recordMap,
+                edges);
+
             // load relationship, origin and destination IDs into classes before insert
-            UpdateEdgesWithIds(edges, relMap, recordMap);
+            UpdateEdgesWithIds(edges, relMap, resolvedRecordMap);
             metadataResponseDto.Edges =
                 await _edgeBusiness.BulkCreateEdges(currentUserId, organizationId, projectId, dataSourceId, edges);
         }
@@ -272,49 +278,73 @@ public class MetadataBusiness : IMetadataBusiness
     }
 
     /// <summary>
-    ///     Throw error if records are specified by an edge but not specified by a record
-    ///     TODO: eventually fetch records from DB by original ID (DL-533)
+    ///     Resolves records by original ID, checking the current batch record map first,
+    ///     then falling back to the database for any missing IDs.
+    ///     Returns a new enriched record map containing all original entries plus any
+    ///     additional records found in the database.
+    ///     The current batch record map. Will not be mutated.
+    ///     Throws an exception if any referenced records cannot be resolved.
     /// </summary>
+    /// <param name="projectId"></param>
+    /// <param name="dataSourceId"></param>
     /// <param name="recordMap"></param>
     /// <param name="edges"></param>
-    /// <returns>A list of relationships to be inserted</returns>
-    private void CheckRecordsByOriginalId(
-        Dictionary<string, long> recordMap,
+    /// <returns>A new dictionary containing all resolved original IDs mapped to their record IDs</returns>
+    private async Task<IReadOnlyDictionary<string, long>> CheckRecordsByOriginalId(
+        long projectId,
+        long dataSourceId,
+        IReadOnlyDictionary<string, long> recordMap,
         List<CreateEdgeRequestDto> edges)
     {
-        // Check if recordMap is null
-        if (recordMap == null) throw new ArgumentNullException(nameof(recordMap), "Record map cannot be null");
+        if (recordMap == null)
+            throw new ArgumentNullException(nameof(recordMap), "Record map cannot be null");
 
-        // Print the contents of recordMap for debugging
-        Console.WriteLine("Contents of recordMap:");
-        foreach (var kvp in recordMap) Console.WriteLine($"Key: {kvp.Key}, Value: {kvp.Value}");
+        if (edges == null || !edges.Any())
+            throw new ArgumentException("Edges cannot be null or empty", nameof(edges));
 
-        var missingOriginalIds = new HashSet<string>();
-
-        // Check if edges are null or empty
-        if (edges == null || !edges.Any()) throw new ArgumentException("Edges cannot be null or empty", nameof(edges));
+        var requestedOriginalIds = new HashSet<string>();
 
         foreach (var edge in edges)
         {
-            // Check for null or empty values for OriginOid and DestinationOid
             if (string.IsNullOrEmpty(edge.OriginOid))
-                throw new ArgumentNullException("Origin ID cannot be null or empty");
+                throw new ArgumentNullException(nameof(edge.OriginOid), "Origin ID cannot be null or empty");
 
             if (string.IsNullOrEmpty(edge.DestinationOid))
-                throw new ArgumentNullException("Destination ID cannot be null or empty");
+                throw new ArgumentNullException(nameof(edge.DestinationOid), "Destination ID cannot be null or empty");
 
-            // Print the keys being checked
-            Console.WriteLine($"Checking Origin ID: {edge.OriginOid}, Destination ID: {edge.DestinationOid}");
+            requestedOriginalIds.Add(edge.OriginOid);
+            requestedOriginalIds.Add(edge.DestinationOid);
+        }
+        
+        var enrichedMap = new Dictionary<string, long>(recordMap);
 
-            // Check existence in the recordMap
-            if (!recordMap.ContainsKey(edge.OriginOid)) missingOriginalIds.Add(edge.OriginOid);
-            if (!recordMap.ContainsKey(edge.DestinationOid)) missingOriginalIds.Add(edge.DestinationOid);
+        var missingFromCurrentBatch = requestedOriginalIds
+            .Where(id => !enrichedMap.ContainsKey(id))
+            .ToList();
+
+        if (missingFromCurrentBatch.Any())
+        {
+            var existingRecords = await _context.Records
+                .Where(r =>
+                    r.ProjectId == projectId &&
+                    r.DataSourceId == dataSourceId &&
+                    missingFromCurrentBatch.Contains(r.OriginalId))
+                .Select(r => new { r.OriginalId, r.Id })
+                .ToListAsync();
+
+            foreach (var record in existingRecords)
+                enrichedMap.TryAdd(record.OriginalId, record.Id);
         }
 
-        if (missingOriginalIds.Any())
-            throw new Exception($"Records not found matching Original IDs ({string.Join(", ", missingOriginalIds)})");
-    }
+        var stillMissing = requestedOriginalIds
+            .Where(id => !enrichedMap.ContainsKey(id))
+            .ToList();
 
+        if (stillMissing.Any())
+            throw new Exception($"Records not found matching Original IDs ({string.Join(", ", stillMissing)})");
+
+        return enrichedMap;
+    }
     /// <summary>
     ///     Creates a list of record-tag pairs to be inserted into the linking table
     /// </summary>
@@ -454,7 +484,7 @@ public class MetadataBusiness : IMetadataBusiness
     private void UpdateEdgesWithIds(
         List<CreateEdgeRequestDto> edges,
         Dictionary<string, long> relMap,
-        Dictionary<string, long> recordMap)
+        IReadOnlyDictionary<string, long> recordMap)
     {
         foreach (var edge in edges)
         {

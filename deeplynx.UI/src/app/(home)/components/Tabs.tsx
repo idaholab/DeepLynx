@@ -3,6 +3,7 @@ import React, { useState, useEffect } from "react";
 interface Tab {
   label: string;
   content: React.ReactNode;
+  displayLabel?: React.ReactNode;
 }
 
 interface TabsProps {
@@ -48,7 +49,7 @@ const Tabs: React.FC<TabsProps> = ({
               }`}
               onClick={() => handleTabClick(index, tab.label)}
             >
-              {tab.label}
+              {tab.displayLabel ?? tab.label}
             </a>
           ))}
         </div>
