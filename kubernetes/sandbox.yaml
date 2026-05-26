@@ -399,6 +399,7 @@ spec:
               memory: "2Gi"
           ports:
             - containerPort: 5000
+            - containerPort: 50051
           volumeMounts:
             - name: duckdb-storage
               mountPath: /data/duckdb
@@ -538,7 +539,6 @@ spec:
             timeoutSeconds: 5
             failureThreshold: 3
 
-
 # insight-storage: scratch volume for the Insight processing pipeline
 ---
 apiVersion: v1
@@ -553,7 +553,6 @@ spec:
     requests:
       storage: 25Gi
   storageClassName: ${AZURE_FILE_SHARE_STORAGE_CLASS}
-
 
 # insight-fastapi
 ---
@@ -822,6 +821,9 @@ spec:
     - name: http
       port: 80
       targetPort: 5000
+    - name: grpc
+      port: 50051
+      targetPort: 50051
   selector:
     app: deeplynxbackend
 
