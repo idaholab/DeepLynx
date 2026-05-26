@@ -16,8 +16,8 @@ type Props = {
     onBulkTagQueryChange: (value: string) => void;
     availableTags: AvailableTag[];
     onCancelBulkTags: () => void;
-    
     getBulkTagState: (tagName: string) => BulkTagState;
+    onToggleBulkTag: (tagId: number, tagName: string) => void;
 };
 
 type BulkTagState = "checked" | "unchecked" | "indeterminate";
@@ -32,6 +32,7 @@ export default function ManageTagsCard({
     availableTags,
     onCancelBulkTags,
     getBulkTagState,
+    onToggleBulkTag,
 }:  Props){
     const {t} = useLanguage();
     
@@ -80,7 +81,7 @@ export default function ManageTagsCard({
                                                     input.indeterminate = state === "indeterminate";
                                                 }
                                             }}
-                                            readOnly
+                                            onChange={() => onToggleBulkTag(tag.id, tag.name)}
                                         />
 
                                         <span>{tag.name}</span>

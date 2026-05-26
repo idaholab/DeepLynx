@@ -130,8 +130,8 @@ export default function DataCatalogClient({
   
   // Bulk tag management state
   const [selectedRecordKeys, setSelectedRecordKeys] = useState<string[]>([]);
-  const [tagsToAttach, setTagsToAttach] = useState<string[]>([]);
-  const [tagsToUnattach, setTagsToUnattach] = useState<string[]>([]);
+  const [tagsToAttach, setTagsToAttach] = useState<number[]>([]);
+  const [tagsToUnattach, setTagsToUnattach] = useState<number[]>([]);
   const [bulkTagQuery, setBulkTagQuery] = useState("");
   const [isApplyingBulkTags, setIsApplyingBulkTags] = useState(false);
   const [isBulkMode, setIsBulkMode] = useState(false);
@@ -440,7 +440,7 @@ export default function DataCatalogClient({
         .catch((error) => {
           console.error("Failed to fetch available tags:", error);
         });
-  }, [hasLoaded, organization?.organizationId, effectiveProjectIds]);
+  }, [hasLoaded, organization?.organizationId, selectedProjectsToken]);
   
   /** Bridge between the SearchBar's onSubmit callback shape and handleSearch. */
   const handleSubmit = useCallback(
@@ -635,7 +635,17 @@ export default function DataCatalogClient({
   
   const getBulkTagState = useCallback(
       (tagName: string): BulkTagState => {
-        if (selectedRecords.length === 0) {
+        const tag = availableTags.find((availableTag) => availableTag.name === tagName);
+        
+        if (!tag || selectedRecords.length === 0) {
+          return "unchecked";
+        }
+        
+        if (tagsToAttach.includes(tag.id)) {
+          return "checked";
+        }
+        
+        if (tagsToUnattach.includes(tag.id)) {
           return "unchecked";
         }
         
@@ -655,7 +665,28 @@ export default function DataCatalogClient({
         
         return "indeterminate";
       },
-      [selectedRecords],
+      [availableTags, selectedRecords, tagsToAttach, tagsToUnattach],
+  );
+  
+  const toggleBulkTag = useCallback(
+      (tagId: number, tagName: string) => {
+        const state = getBulkTagState(tagName);
+        
+        if (state === "checked") {
+          setTagsToAttach((prev) => prev.filter((id) => id !== tagId));
+          
+          setTagsToUnattach((prev) =>
+            prev.includes(tagId) ? prev : [...prev, tagId],
+          );
+        } else {
+          setTagsToUnattach((prev) => prev.filter((id) => id !== tagId));
+          
+          setTagsToAttach((prev) =>
+              prev.includes(tagId) ? prev : [...prev, tagId],
+          );
+        }
+      },
+      [getBulkTagState],
   );
   
   const handleCancelBulkTags = useCallback(() => {
@@ -818,6 +849,7 @@ export default function DataCatalogClient({
                   availableTags={availableTags}
                   onCancelBulkTags={handleCancelBulkTags}
                   getBulkTagState={getBulkTagState}
+                  onToggleBulkTag={toggleBulkTag}
                 />
             )}
           </div>
