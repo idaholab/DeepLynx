@@ -229,4 +229,4 @@ export type ExpandableTableColumn<T> = {
 export type RecordTagLinkDto = {
   record_id: number;
   tag_id: number;
-}
+};
