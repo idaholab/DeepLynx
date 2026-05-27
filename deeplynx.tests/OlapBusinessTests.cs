@@ -104,7 +104,7 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
         // These are pre-generated valid AES-256 keys for testing
         Environment.SetEnvironmentVariable("ENCRYPTION_KEY", "SU5TRUNVUkVfREVWX0tFWV8zMl9CWVRFU19MT05HISE="); // 32 bytes
         Environment.SetEnvironmentVariable("ENCRYPTION_IV", "SU5TRUNVUkVfREVWX0lWIQ=="); // 16 bytes
-        
+
         _encryptionHelper = new EncryptionHelper();
         await base.InitializeAsync();
 
@@ -372,7 +372,7 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
             ContentType = "application/octet-stream"
         };
     }
-    
+
     private static IFormFile CreateTestCsvFile(string headers, int rowCount, string fileName = "test.csv")
     {
         var sb = new StringBuilder();
@@ -542,7 +542,7 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
 
         // First append — migrates to folder
         await _olapBusiness.AppendTabularBlob(
-            _organizationId, _projectId, result.Id, 1,
+            _userId, _organizationId, _projectId, result.Id, 1,
             await CreateLargeTestParquetFile(3, "append1.parquet"));
 
         var afterFirstAppend = await GetRecordEntity(result.Id);
@@ -551,7 +551,7 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
 
         // Second append — should add part 2 without touching the URI
         await _olapBusiness.AppendTabularBlob(
-            _organizationId, _projectId, result.Id, 2,
+            _userId, _organizationId, _projectId, result.Id, 2,
             await CreateLargeTestParquetFile(4, "append2.parquet"));
 
         var afterSecondAppend = await GetRecordEntity(result.Id);
@@ -578,7 +578,7 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
         var result = await UploadAzureParquet(5, "dataset.parquet");
 
         await _olapBusiness.AppendTabularBlob(
-            _organizationId, _projectId, result.Id, 1,
+            _userId, _organizationId, _projectId, result.Id, 1,
             await CreateLargeTestParquetFile(3, "append1.parquet"));
 
         var record = await GetRecordEntity(result.Id);
@@ -589,7 +589,7 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
         // Attempt to append to a part number that already exists
         var ex = await Assert.ThrowsAsync<ArgumentException>(() =>
             _olapBusiness.AppendTabularBlob(
-                _organizationId, _projectId, result.Id, 1,
+                _userId, _organizationId, _projectId, result.Id, 1,
                 testFile));
 
         Assert.Contains("Part 1 already exists", ex.Message);
@@ -624,7 +624,7 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
         var appendFile = await CreateSchemaMismatchParquetFile_ExtraColumn(3);
 
         var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            _olapBusiness.AppendTabularBlob(_organizationId, _projectId, result.Id, 1, appendFile));
+            _olapBusiness.AppendTabularBlob(_userId, _organizationId, _projectId, result.Id, 1, appendFile));
 
         Assert.Contains("unexpected column", ex.Message);
 
@@ -651,7 +651,7 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
         var appendFile = await CreateSchemaMismatchParquetFile_MissingColumn(3);
 
         var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            _olapBusiness.AppendTabularBlob(_organizationId, _projectId, result.Id, 1, appendFile));
+            _olapBusiness.AppendTabularBlob(_userId, _organizationId, _projectId, result.Id, 1, appendFile));
 
         Assert.Contains("missing column", ex.Message);
 
@@ -677,7 +677,7 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
         var appendFile = await CreateSchemaMismatchParquetFile_TypeMismatch(3);
 
         var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            _olapBusiness.AppendTabularBlob(_organizationId, _projectId, result.Id, 1, appendFile));
+            _olapBusiness.AppendTabularBlob(_userId, _organizationId, _projectId, result.Id, 1, appendFile));
 
         Assert.Contains("type mismatch", ex.Message);
 
@@ -703,7 +703,7 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
         var appendFile = await CreateLargeTestParquetFile(appendRows, "append.parquet");
 
         await _olapBusiness.AppendTabularBlob(
-            _organizationId, _projectId, result.Id, 1, appendFile);
+            _userId, _organizationId, _projectId, result.Id, 1, appendFile);
 
         var record = await GetRecordEntity(result.Id);
 
@@ -730,14 +730,14 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
         var result = await UploadFilesystemParquet(5, "dataset.parquet");
 
         await _olapBusiness.AppendTabularBlob(
-            _organizationId, _projectId, result.Id, 1,
+            _userId, _organizationId, _projectId, result.Id, 1,
             await CreateLargeTestParquetFile(3, "append1.parquet"));
 
         var afterFirstAppend = await GetRecordEntity(result.Id);
         var folderUri = afterFirstAppend.Uri!;
 
         await _olapBusiness.AppendTabularBlob(
-            _organizationId, _projectId, result.Id, 2,
+            _userId, _organizationId, _projectId, result.Id, 2,
             await CreateLargeTestParquetFile(4, "append2.parquet"));
 
         var afterSecondAppend = await GetRecordEntity(result.Id);
@@ -765,7 +765,7 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
         var appendFile = await CreateLargeTestParquetFile(appendRows, "append.parquet");
 
         await _olapBusiness.AppendTabularBlob(
-            _organizationId, _projectId, result.Id, 1, appendFile);
+            _userId, _organizationId, _projectId, result.Id, 1, appendFile);
 
         var record = await GetRecordEntity(result.Id);
 
@@ -787,13 +787,32 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
     }
 
     [Fact]
+    public async Task AppendTabularBlob_Azure_UpdatesLastUpdatedAt()
+    {
+        var result = await UploadAzureParquet(5, "dataset.parquet");
+        var initUpdatedAt = result.LastUpdatedAt;
+
+        // for mitigating potential low precision failures
+        await Task.Delay(1000);
+
+        await _olapBusiness.AppendTabularBlob(
+            _userId, _organizationId, _projectId, result.Id, 1,
+            await CreateLargeTestParquetFile(3, "append1.parquet"));
+
+        var afterAppend = await GetRecordEntity(result.Id);
+        var afterUpdatedAt = afterAppend.LastUpdatedAt;
+
+        Assert.True(initUpdatedAt < afterUpdatedAt);
+    }
+
+    [Fact]
     public async Task AppendTabularBlob_PartZero_Throws()
     {
         var result = await UploadFilesystemParquet(5, "dataset.parquet");
         var appendFile = await CreateLargeTestParquetFile(3, "append.parquet");
 
         var ex = await Assert.ThrowsAsync<ArgumentException>(() =>
-            _olapBusiness.AppendTabularBlob(_organizationId, _projectId, result.Id, 0, appendFile));
+            _olapBusiness.AppendTabularBlob(_userId, _organizationId, _projectId, result.Id, 0, appendFile));
 
         Assert.Contains("Part number 0 is reserved", ex.Message);
     }
@@ -805,7 +824,7 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
         var csv = CreateTestCsvFile("timestamp,value\n2024-01-01T00:00:00,1", "append.csv");
 
         var ex = await Assert.ThrowsAsync<ArgumentException>(() =>
-            _olapBusiness.AppendTabularBlob(_organizationId, _projectId, result.Id, 1, csv));
+            _olapBusiness.AppendTabularBlob(_userId, _organizationId, _projectId, result.Id, 1, csv));
 
         Assert.Contains("File types differ: csv/parquet", ex.Message);
     }
@@ -823,7 +842,7 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
         };
 
         var ex = await Assert.ThrowsAsync<ArgumentException>(() =>
-            _olapBusiness.AppendTabularBlob(_organizationId, _projectId, result.Id, 1, empty));
+            _olapBusiness.AppendTabularBlob(_userId, _organizationId, _projectId, result.Id, 1, empty));
 
         Assert.Contains("Cannot append an empty file", ex.Message);
     }
@@ -834,7 +853,7 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
         var appendFile = await CreateLargeTestParquetFile(3, "append.parquet");
 
         var ex = await Assert.ThrowsAsync<ArgumentException>(() =>
-            _olapBusiness.AppendTabularBlob(_organizationId, _projectId, -999, 1, appendFile));
+            _olapBusiness.AppendTabularBlob(_userId, _organizationId, _projectId, -999, 1, appendFile));
 
         Assert.Contains("does not exist", ex.Message);
     }
@@ -849,7 +868,7 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
         var appendFile = await CreateLargeTestParquetFile(3, "append.parquet");
 
         var ex = await Assert.ThrowsAsync<ArgumentException>(() =>
-            _olapBusiness.AppendTabularBlob(_organizationId, _projectId, uploaded.Id, 1, appendFile));
+            _olapBusiness.AppendTabularBlob(_userId, _organizationId, _projectId, uploaded.Id, 1, appendFile));
 
         Assert.Contains("File types differ", ex.Message);
     }
@@ -866,7 +885,7 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
         var appendFile = await CreateLargeTestParquetFile(3, "append.parquet");
 
         var ex = await Assert.ThrowsAsync<ArgumentException>(() =>
-            _olapBusiness.AppendTabularBlob(_organizationId, _projectId, result.Id, 1, appendFile));
+            _olapBusiness.AppendTabularBlob(_userId, _organizationId, _projectId, result.Id, 1, appendFile));
 
         Assert.Contains("Record has no URI", ex.Message);
     }
@@ -885,7 +904,7 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
         var appendFile = await CreateLargeTestParquetFile(3, "append.parquet");
 
         var ex = await Assert.ThrowsAsync<ArgumentException>(() =>
-            _olapBusiness.AppendTabularBlob(_organizationId, _projectId, result.Id, 1, appendFile));
+            _olapBusiness.AppendTabularBlob(_userId, _organizationId, _projectId, result.Id, 1, appendFile));
 
         Assert.Contains("Part 1 already exists", ex.Message);
 
@@ -903,7 +922,7 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
         var result = await UploadFilesystemParquet(5, "dataset.parquet");
 
         await _olapBusiness.AppendTabularBlob(
-            _organizationId, _projectId, result.Id, 1,
+            _userId, _organizationId, _projectId, result.Id, 1,
             await CreateLargeTestParquetFile(3, "append1.parquet"));
 
         var record = await GetRecordEntity(result.Id);
@@ -912,7 +931,7 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
         var testFile = await CreateLargeTestParquetFile(4, "append_duplicate.parquet");
         var ex = await Assert.ThrowsAsync<ArgumentException>(() =>
             _olapBusiness.AppendTabularBlob(
-                _organizationId, _projectId, result.Id, 1,
+                _userId, _organizationId, _projectId, result.Id, 1,
                 testFile));
 
         Assert.Contains("Part 1 already exists", ex.Message);
@@ -938,7 +957,7 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
         var appendFile = await CreateSchemaMismatchParquetFile_ExtraColumn(3);
 
         var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            _olapBusiness.AppendTabularBlob(_organizationId, _projectId, result.Id, 1, appendFile));
+            _olapBusiness.AppendTabularBlob(_userId, _organizationId, _projectId, result.Id, 1, appendFile));
 
         Assert.Contains("unexpected column", ex.Message);
 
@@ -960,7 +979,7 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
         var appendFile = await CreateSchemaMismatchParquetFile_MissingColumn(3);
 
         var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            _olapBusiness.AppendTabularBlob(_organizationId, _projectId, result.Id, 1, appendFile));
+            _olapBusiness.AppendTabularBlob(_userId, _organizationId, _projectId, result.Id, 1, appendFile));
 
         Assert.Contains("missing column", ex.Message);
 
@@ -979,7 +998,7 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
         var appendFile = await CreateSchemaMismatchParquetFile_TypeMismatch(3);
 
         var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            _olapBusiness.AppendTabularBlob(_organizationId, _projectId, result.Id, 1, appendFile));
+            _olapBusiness.AppendTabularBlob(_userId, _organizationId, _projectId, result.Id, 1, appendFile));
 
         Assert.Contains("type mismatch", ex.Message);
 
@@ -1012,7 +1031,7 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
         var appendFile = await CreateLargeTestParquetFile(3, "append.parquet");
 
         var ex = await Assert.ThrowsAsync<ArgumentException>(() =>
-            _olapBusiness.AppendTabularBlob(_organizationId, _projectId, result.Id, 1, appendFile));
+            _olapBusiness.AppendTabularBlob(_userId, _organizationId, _projectId, result.Id, 1, appendFile));
 
         Assert.Contains("Part 1 already exists", ex.Message);
 
@@ -1033,7 +1052,7 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
         var appendFile = CreateTestCsvFile(CsvHeaders, 3, "append.csv");
 
         await _olapBusiness.AppendTabularBlob(
-            _organizationId, _projectId, result.Id, 1, appendFile);
+            _userId, _organizationId, _projectId, result.Id, 1, appendFile);
 
         var record = await GetRecordEntity(result.Id);
         Assert.EndsWith(Path.DirectorySeparatorChar.ToString(), record.Uri);
@@ -1053,14 +1072,14 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
         var result = await UploadFilesystemCsv(CsvHeaders, 5, "dataset.csv");
 
         await _olapBusiness.AppendTabularBlob(
-            _organizationId, _projectId, result.Id, 1,
+            _userId, _organizationId, _projectId, result.Id, 1,
             CreateTestCsvFile(CsvHeaders, 3, "append1.csv"));
 
         var afterFirstAppend = await GetRecordEntity(result.Id);
         var folderUri = afterFirstAppend.Uri!;
 
         await _olapBusiness.AppendTabularBlob(
-            _organizationId, _projectId, result.Id, 2,
+            _userId, _organizationId, _projectId, result.Id, 2,
             CreateTestCsvFile(CsvHeaders, 4, "append2.csv"));
 
         var afterSecondAppend = await GetRecordEntity(result.Id);
@@ -1083,7 +1102,7 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
         var appendFile = CreateTestCsvFile(CsvHeaders, 3, "append.csv");
 
         await _olapBusiness.AppendTabularBlob(
-            _organizationId, _projectId, result.Id, 1, appendFile);
+            _userId, _organizationId, _projectId, result.Id, 1, appendFile);
 
         var record = await GetRecordEntity(result.Id);
         Assert.EndsWith("/", record.Uri);
@@ -1106,7 +1125,7 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
         var result = await UploadAzureCsv(CsvHeaders, 5, "dataset.csv");
 
         await _olapBusiness.AppendTabularBlob(
-            _organizationId, _projectId, result.Id, 1,
+            _userId, _organizationId, _projectId, result.Id, 1,
             CreateTestCsvFile(CsvHeaders, 3, "append1.csv"));
 
         var afterFirstAppend = await GetRecordEntity(result.Id);
@@ -1114,7 +1133,7 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
         Assert.EndsWith("/", folderUri);
 
         await _olapBusiness.AppendTabularBlob(
-            _organizationId, _projectId, result.Id, 2,
+            _userId, _organizationId, _projectId, result.Id, 2,
             CreateTestCsvFile(CsvHeaders, 4, "append2.csv"));
 
         var afterSecondAppend = await GetRecordEntity(result.Id);
@@ -1144,7 +1163,7 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
         var appendFile = CreateTestCsvFile("timestamp,sensor_id,value,temperature,pressure,unexpected", 3, "extra_col.csv");
 
         var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            _olapBusiness.AppendTabularBlob(_organizationId, _projectId, result.Id, 1, appendFile));
+            _olapBusiness.AppendTabularBlob(_userId, _organizationId, _projectId, result.Id, 1, appendFile));
 
         Assert.Contains("unexpected column", ex.Message);
 
@@ -1166,7 +1185,7 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
         var appendFile = CreateTestCsvFile("timestamp,sensor_id,value", 3, "missing_col.csv");
 
         var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            _olapBusiness.AppendTabularBlob(_organizationId, _projectId, result.Id, 1, appendFile));
+            _olapBusiness.AppendTabularBlob(_userId, _organizationId, _projectId, result.Id, 1, appendFile));
 
         Assert.Contains("missing column", ex.Message);
 
@@ -1187,7 +1206,7 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
         var appendFile = CreateTestCsvFile(CsvHeaders, 3, "append.csv");
 
         var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            _olapBusiness.AppendTabularBlob(_organizationId, _projectId, result.Id, 1, appendFile));
+            _olapBusiness.AppendTabularBlob(_userId, _organizationId, _projectId, result.Id, 1, appendFile));
 
         Assert.Contains("no stored column schema", ex.Message);
     }
@@ -1200,7 +1219,7 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
         var result = await UploadFilesystemCsv(CsvHeaders, 5, "dataset.csv");
 
         await _olapBusiness.AppendTabularBlob(
-            _organizationId, _projectId, result.Id, 1,
+            _userId, _organizationId, _projectId, result.Id, 1,
             CreateTestCsvFile(CsvHeaders, 3, "append1.csv"));
 
         var record = await GetRecordEntity(result.Id);
@@ -1208,7 +1227,7 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
 
         var ex = await Assert.ThrowsAsync<ArgumentException>(() =>
             _olapBusiness.AppendTabularBlob(
-                _organizationId, _projectId, result.Id, 1,
+                _userId, _organizationId, _projectId, result.Id, 1,
                 CreateTestCsvFile(CsvHeaders, 4, "append_dup.csv")));
 
         Assert.Contains("Part 1 already exists", ex.Message);
@@ -1227,18 +1246,18 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
     #endregion
 
     #region Query Tabular File
-    
+
     [Fact]
     public async Task QueryTabularFile_AppendedCsvFolder_Filesystem_ReadsAcrossAllParts()
     {
         var result = await UploadFilesystemCsv(CsvHeaders, 5, "dataset.csv");
 
         await _olapBusiness.AppendTabularBlob(
-            _organizationId, _projectId, result.Id, 1,
+            _userId, _organizationId, _projectId, result.Id, 1,
             CreateTestCsvFile(CsvHeaders, 3, "append1.csv"));
 
         await _olapBusiness.AppendTabularBlob(
-            _organizationId, _projectId, result.Id, 2,
+            _userId, _organizationId, _projectId, result.Id, 2,
             CreateTestCsvFile(CsvHeaders, 2, "append2.csv"));
 
         var queryResult = await _olapBusiness.QueryTabularFile(
@@ -1255,7 +1274,7 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
         var result = await UploadFilesystemCsv(CsvHeaders, 5, "dataset.csv");
 
         await _olapBusiness.AppendTabularBlob(
-            _organizationId, _projectId, result.Id, 1,
+            _userId, _organizationId, _projectId, result.Id, 1,
             CreateTestCsvFile(CsvHeaders, 3, "append1.csv"));
 
         var queryResult = await _olapBusiness.QueryTabularFile(
@@ -1272,11 +1291,11 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
         var result = await UploadAzureCsv(CsvHeaders, 5, "dataset.csv");
 
         await _olapBusiness.AppendTabularBlob(
-            _organizationId, _projectId, result.Id, 1,
+            _userId, _organizationId, _projectId, result.Id, 1,
             CreateTestCsvFile(CsvHeaders, 3, "append1.csv"));
 
         await _olapBusiness.AppendTabularBlob(
-            _organizationId, _projectId, result.Id, 2,
+            _userId, _organizationId, _projectId, result.Id, 2,
             CreateTestCsvFile(CsvHeaders, 2, "append2.csv"));
 
         var queryResult = await _olapBusiness.QueryTabularFile(
@@ -1315,11 +1334,11 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
         var result = await UploadFilesystemParquet(5, "dataset.parquet");
 
         await _olapBusiness.AppendTabularBlob(
-            _organizationId, _projectId, result.Id, 1,
+            _userId, _organizationId, _projectId, result.Id, 1,
             await CreateLargeTestParquetFile(3, "append1.parquet"));
 
         await _olapBusiness.AppendTabularBlob(
-            _organizationId, _projectId, result.Id, 2,
+            _userId, _organizationId, _projectId, result.Id, 2,
             await CreateLargeTestParquetFile(4, "append2.parquet"));
 
         var queryResult = await _olapBusiness.QueryTabularFile(
@@ -1574,14 +1593,14 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
     #endregion
 
     #region Get Plot Data
-    
+
     [Fact]
     public async Task GetPlotData_AppendedCsvFolder_Filesystem_ReturnsCorrectRowCount()
     {
         var result = await UploadFilesystemCsv(CsvHeaders, 5, "dataset.csv");
 
         await _olapBusiness.AppendTabularBlob(
-            _organizationId, _projectId, result.Id, 1,
+            _userId, _organizationId, _projectId, result.Id, 1,
             CreateTestCsvFile(CsvHeaders, 3, "append1.csv"));
 
         var plotData = await _olapBusiness.GetPlotData(
@@ -1597,7 +1616,7 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
         var result = await UploadFilesystemCsv(CsvHeaders, 5, "dataset.csv");
 
         await _olapBusiness.AppendTabularBlob(
-            _organizationId, _projectId, result.Id, 1,
+            _userId, _organizationId, _projectId, result.Id, 1,
             CreateTestCsvFile(CsvHeaders, 3, "append1.csv"));
 
         // Request all 8 rows to verify part 0 rows come before part 1 rows
@@ -1620,7 +1639,7 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
         var result = await UploadAzureCsv(CsvHeaders, 5, "dataset.csv");
 
         await _olapBusiness.AppendTabularBlob(
-            _organizationId, _projectId, result.Id, 1,
+            _userId, _organizationId, _projectId, result.Id, 1,
             CreateTestCsvFile(CsvHeaders, 3, "append1.csv"));
 
         var plotData = await _olapBusiness.GetPlotData(
@@ -1669,11 +1688,11 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
         var result = await UploadAzureParquet(5, "dataset.parquet");
 
         await _olapBusiness.AppendTabularBlob(
-            _organizationId, _projectId, result.Id, 1,
+            _userId, _organizationId, _projectId, result.Id, 1,
             await CreateLargeTestParquetFile(3, "append1.parquet"));
 
         await _olapBusiness.AppendTabularBlob(
-            _organizationId, _projectId, result.Id, 2,
+            _userId, _organizationId, _projectId, result.Id, 2,
             await CreateLargeTestParquetFile(4, "append2.parquet"));
 
         var plotData = await _olapBusiness.GetPlotData(
@@ -1845,11 +1864,11 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
         var result = await UploadFilesystemParquet(5, "dataset.parquet");
 
         await _olapBusiness.AppendTabularBlob(
-            _organizationId, _projectId, result.Id, 1,
+            _userId, _organizationId, _projectId, result.Id, 1,
             await CreateLargeTestParquetFile(3, "append1.parquet"));
 
         await _olapBusiness.AppendTabularBlob(
-            _organizationId, _projectId, result.Id, 2,
+            _userId, _organizationId, _projectId, result.Id, 2,
             await CreateLargeTestParquetFile(4, "append2.parquet"));
 
         var plotData = await _olapBusiness.GetPlotData(
@@ -1930,7 +1949,7 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
     {
         var result = await UploadFilesystemParquet(5, "dataset.parquet");
         var record = await GetRecordEntity(result.Id);
-        
+
         var objectStorage = await _objectStorageBusiness.GetDecryptedObjectStorage(_fileSystemObjectStorageId);
 
         var columns = await _olapBusiness.ExtractTabularColumns(
@@ -1960,7 +1979,7 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
             _userId, _organizationId, _projectId, _dataSourceId, _fileSystemObjectStorageId, file);
 
         var record = await GetRecordEntity(result.Id);
-        
+
         var objectStorage = await _objectStorageBusiness.GetDecryptedObjectStorage(_fileSystemObjectStorageId);
 
         var columns = await _olapBusiness.ExtractTabularColumns(
@@ -1987,7 +2006,7 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
     {
         var result = await UploadAzureParquet(5, "dataset.parquet");
         var record = await GetRecordEntity(result.Id);
-        
+
         var objectStorage = await _objectStorageBusiness.GetDecryptedObjectStorage(_azureObjectStorageId);
 
         var columns = await _olapBusiness.ExtractTabularColumns(
@@ -2021,7 +2040,7 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
         var result = await UploadFilesystemParquet(6, "dataset.parquet");
 
         await _olapBusiness.AppendTabularBlob(
-            _organizationId, _projectId, result.Id, 1,
+            _userId, _organizationId, _projectId, result.Id, 1,
             await CreateLargeTestParquetFile(4, "append1.parquet"));
 
         var countResult = await _olapBusiness.QueryTabularFile(
@@ -2065,7 +2084,7 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
         var result = await UploadFilesystemParquet(5, "dataset.parquet");
 
         await _olapBusiness.AppendTabularBlob(
-            _organizationId, _projectId, result.Id, 1,
+            _userId, _organizationId, _projectId, result.Id, 1,
             await CreateLargeTestParquetFile(3, "append1.parquet"));
 
         var highest = await _olapBusiness.GetHighestPartNumber(
@@ -2080,15 +2099,15 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
         var result = await UploadFilesystemParquet(5, "dataset.parquet");
 
         await _olapBusiness.AppendTabularBlob(
-            _organizationId, _projectId, result.Id, 1,
+            _userId, _organizationId, _projectId, result.Id, 1,
             await CreateLargeTestParquetFile(3, "append1.parquet"));
 
         await _olapBusiness.AppendTabularBlob(
-            _organizationId, _projectId, result.Id, 2,
+            _userId, _organizationId, _projectId, result.Id, 2,
             await CreateLargeTestParquetFile(4, "append2.parquet"));
 
         await _olapBusiness.AppendTabularBlob(
-            _organizationId, _projectId, result.Id, 3,
+            _userId, _organizationId, _projectId, result.Id, 3,
             await CreateLargeTestParquetFile(2, "append3.parquet"));
 
         var highest = await _olapBusiness.GetHighestPartNumber(
@@ -2103,7 +2122,7 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
         var result = await UploadAzureParquet(5, "dataset.parquet");
 
         await _olapBusiness.AppendTabularBlob(
-            _organizationId, _projectId, result.Id, 1,
+            _userId, _organizationId, _projectId, result.Id, 1,
             await CreateLargeTestParquetFile(3, "append1.parquet"));
 
         var highest = await _olapBusiness.GetHighestPartNumber(
@@ -2118,11 +2137,11 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
         var result = await UploadAzureParquet(5, "dataset.parquet");
 
         await _olapBusiness.AppendTabularBlob(
-            _organizationId, _projectId, result.Id, 1,
+            _userId, _organizationId, _projectId, result.Id, 1,
             await CreateLargeTestParquetFile(3, "append1.parquet"));
 
         await _olapBusiness.AppendTabularBlob(
-            _organizationId, _projectId, result.Id, 2,
+            _userId, _organizationId, _projectId, result.Id, 2,
             await CreateLargeTestParquetFile(4, "append2.parquet"));
 
         var highest = await _olapBusiness.GetHighestPartNumber(
@@ -2168,7 +2187,7 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
         Assert.Equal(0L, highest);
 
         await _olapBusiness.AppendTabularBlob(
-            _organizationId, _projectId, result.Id, highest + 1,
+            _userId, _organizationId, _projectId, result.Id, highest + 1,
             await CreateLargeTestParquetFile(3, "append1.parquet"));
 
         // After first append: returns 1, so next part = 2
@@ -2177,7 +2196,7 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
         Assert.Equal(1L, highest);
 
         await _olapBusiness.AppendTabularBlob(
-            _organizationId, _projectId, result.Id, highest + 1,
+            _userId, _organizationId, _projectId, result.Id, highest + 1,
             await CreateLargeTestParquetFile(2, "append2.parquet"));
 
         // After second append: returns 2, so next part = 3
@@ -2185,7 +2204,7 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
             _organizationId, _projectId, result.Id);
         Assert.Equal(2L, highest);
     }
-    
+
     [Fact]
     public async Task GetHighestPartNumber_FlatCsvFile_ReturnsZero()
     {
@@ -2203,7 +2222,7 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
         var result = await UploadFilesystemCsv(CsvHeaders, 5, "dataset.csv");
 
         await _olapBusiness.AppendTabularBlob(
-            _organizationId, _projectId, result.Id, 1,
+            _userId, _organizationId, _projectId, result.Id, 1,
             CreateTestCsvFile(CsvHeaders, 3, "append1.csv"));
 
         var highest = await _olapBusiness.GetHighestPartNumber(
@@ -2218,15 +2237,15 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
         var result = await UploadFilesystemCsv(CsvHeaders, 3, "dataset.csv");
 
         await _olapBusiness.AppendTabularBlob(
-            _organizationId, _projectId, result.Id, 1,
+            _userId, _organizationId, _projectId, result.Id, 1,
             CreateTestCsvFile(CsvHeaders, 2, "append1.csv"));
 
         await _olapBusiness.AppendTabularBlob(
-            _organizationId, _projectId, result.Id, 2,
+            _userId, _organizationId, _projectId, result.Id, 2,
             CreateTestCsvFile(CsvHeaders, 2, "append2.csv"));
 
         await _olapBusiness.AppendTabularBlob(
-            _organizationId, _projectId, result.Id, 3,
+            _userId, _organizationId, _projectId, result.Id, 3,
             CreateTestCsvFile(CsvHeaders, 2, "append3.csv"));
 
         var highest = await _olapBusiness.GetHighestPartNumber(
@@ -2241,7 +2260,7 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
         var result = await UploadAzureCsv(CsvHeaders, 5, "dataset.csv");
 
         await _olapBusiness.AppendTabularBlob(
-            _organizationId, _projectId, result.Id, 1,
+            _userId, _organizationId, _projectId, result.Id, 1,
             CreateTestCsvFile(CsvHeaders, 3, "append1.csv"));
 
         var highest = await _olapBusiness.GetHighestPartNumber(
@@ -2256,11 +2275,11 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
         var result = await UploadAzureCsv(CsvHeaders, 3, "dataset.csv");
 
         await _olapBusiness.AppendTabularBlob(
-            _organizationId, _projectId, result.Id, 1,
+            _userId, _organizationId, _projectId, result.Id, 1,
             CreateTestCsvFile(CsvHeaders, 2, "append1.csv"));
 
         await _olapBusiness.AppendTabularBlob(
-            _organizationId, _projectId, result.Id, 2,
+            _userId, _organizationId, _projectId, result.Id, 2,
             CreateTestCsvFile(CsvHeaders, 2, "append2.csv"));
 
         var highest = await _olapBusiness.GetHighestPartNumber(
@@ -2288,7 +2307,7 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
 
         // ── Step 2: Append part 1 (3 rows, timestamps continue from row 5) ───
         await _olapBusiness.AppendTabularBlob(
-            _organizationId, _projectId, uploadResult.Id, 1,
+            _userId, _organizationId, _projectId, uploadResult.Id, 1,
             await CreateLargeTestParquetFile(3, "append1.parquet", 5));
 
         var recordAfterFirstAppend = await GetRecordEntity(uploadResult.Id);
@@ -2330,7 +2349,7 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
 
         // ── Step 6: Append using the derived part number (4 rows, timestamps continue from row 8) ──
         await _olapBusiness.AppendTabularBlob(
-            _organizationId, _projectId, uploadResult.Id, nextPart,
+            _userId, _organizationId, _projectId, uploadResult.Id, nextPart,
             await CreateLargeTestParquetFile(4, "append2.parquet", 8));
 
         Assert.True(File.Exists(Path.Combine(recordAfterFirstAppend.Uri!, "2.parquet")));
@@ -2359,7 +2378,7 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
 
         // ── Step 2: Append part 1 (3 rows, timestamps continue from row 5) ───
         await _olapBusiness.AppendTabularBlob(
-            _organizationId, _projectId, uploadResult.Id, 1,
+            _userId, _organizationId, _projectId, uploadResult.Id, 1,
             await CreateLargeTestParquetFile(3, "append1.parquet", 5));
 
         var recordAfterFirstAppend = await GetRecordEntity(uploadResult.Id);
@@ -2404,7 +2423,7 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
 
         // ── Step 6: Append using the derived part number (4 rows, timestamps continue from row 8) ──
         await _olapBusiness.AppendTabularBlob(
-            _organizationId, _projectId, uploadResult.Id, nextPart,
+            _userId, _organizationId, _projectId, uploadResult.Id, nextPart,
             await CreateLargeTestParquetFile(4, "append2.parquet", 8));
 
         Assert.True(await container.GetBlobClient($"{recordAfterFirstAppend.Uri}2.parquet").ExistsAsync());
