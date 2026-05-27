@@ -14,7 +14,6 @@ type Props = {
     bulkTagQuery: string;
     onBulkTagQueryChange: (value: string) => void;
     availableTags: AvailableTag[];
-    onCancelBulkTags: () => void;
     getBulkTagState: (tag: AvailableTag) => BulkTagState;
     onToggleBulkTag: (tag: AvailableTag) => void;
 };
@@ -30,7 +29,6 @@ export default function ManageTagsCard({
     bulkTagQuery,
     onBulkTagQueryChange,
     availableTags,
-    onCancelBulkTags,
     getBulkTagState,
     onToggleBulkTag,
 }:  Props){
@@ -90,16 +88,6 @@ export default function ManageTagsCard({
                             })}
                         </div>
                     )}
-                </div>
-                
-                <div className="mt-4 flex justify-end">
-                    <button
-                        type="button"
-                        className="btn btn-sm btn-ghost"
-                        onClick={onCancelBulkTags}
-                    >
-                        Cancel
-                    </button>
                 </div>
             </div>
         </div>

@@ -54,6 +54,10 @@ import RecordCard from "./components/RecordCard";
 import ManageTagsCard from "./components/ManageTagsCard";
 import { countFacet, parseRecordTags } from "./components/utils";
 
+import {
+  bulkAttachTagsToRecords,
+  bulkUnattachTagsFromRecords,
+} from "@/app/lib/client_service/record_services.client";
 /* ─── Types ──────────────────────────────────────────────────────────────── */
 
 type Props = {
@@ -628,6 +632,7 @@ export default function DataCatalogClient({
     return availableTags.filter((tag) => tag.projectId === null);
   }, [availableTags, effectiveProjectIds]);
   const selectedRecordCount = selectedRecords.length;
+  const hasPendingBulkTagChanges = tagsToAttach.length > 0 || tagsToUnattach.length > 0;
   const pageStart = scopedRecords.length === 0 ? 0 : firstRecordIndex + 1;
   const pageEnd = Math.min(
     firstRecordIndex + RECORDS_PER_PAGE,
@@ -754,6 +759,96 @@ export default function DataCatalogClient({
     setBulkTagQuery("");
   }, []);
 
+  const handleApplyBulkTags = useCallback(async () => {
+    if (selectedRecords.length === 0) return;
+    if (!hasPendingBulkTagChanges) return;
+    if (!organization?.organizationId) return;
+
+    setIsApplyingBulkTags(true);
+
+    try {
+      const recordsByProject = new Map<number, RecordTableRow[]>();
+
+      // Bulk record-tag APIs are project-scoped, so selected records must be grouped by projectId.
+      selectedRecords.forEach((record) => {
+        if (record.projectId === undefined) return;
+
+        const projectId = Number(record.projectId);
+        const records = recordsByProject.get(projectId) ?? [];
+
+        records.push(record);
+        recordsByProject.set(projectId, records);
+      });
+
+      await Promise.all(
+          Array.from(recordsByProject.entries()).flatMap(([projectId, records]) => {
+            const requests: Promise<unknown>[] = [];
+
+            // API expects one record/tag pair per operation, using keys.
+            const attachDtos = records.flatMap((record) =>
+                tagsToAttach.map((tagId) => ({
+                  record_id: Number(record.id),
+                  tag_id: tagId,
+                })),
+            );
+
+            const unattachDtos = records.flatMap((record) =>
+                tagsToUnattach.map((tagId) => ({
+                  record_id: Number(record.id),
+                  tag_id: tagId,
+                })),
+            );
+
+            if (attachDtos.length > 0) {
+              requests.push(
+                  bulkAttachTagsToRecords(
+                      organization.organizationId,
+                      projectId,
+                      attachDtos,
+                  ),
+              );
+            }
+
+            if (unattachDtos.length > 0) {
+              requests.push(
+                  bulkUnattachTagsFromRecords(
+                      organization.organizationId,
+                      projectId,
+                      unattachDtos,
+                  ),
+              );
+            }
+
+            return requests;
+          }),
+      );
+
+      // Refresh whichever data mode the page is currently in.
+      if (activeFilters.length > 0) {
+        await runSearchTerms(activeFilters.map((filter) => filter.term));
+      } else {
+        await fetchRecordsForSelection();
+      }
+
+      // Only clear selection and staged changes after every API request succeeds.
+      handleCancelBulkTags();
+    } catch (error) {
+      console.error("Failed to apply bulk tag changes:", error);
+    } finally {
+      setIsApplyingBulkTags(false);
+    }
+  }, [
+    activeFilters,
+    fetchRecordsForSelection,
+    handleCancelBulkTags,
+    hasPendingBulkTagChanges,
+    organization?.organizationId,
+    runSearchTerms,
+    selectedRecords,
+    tagsToAttach,
+    tagsToUnattach,
+  ]);
+
   /** Resets all facet filters and clears both sidebar search inputs. */
   const clearFacetFilters = useCallback(() => {
     setSelectedClassFilters([]);
@@ -843,7 +938,8 @@ export default function DataCatalogClient({
           <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
-              className="cursor-pointer text-sm font-semibold underline underline-offset-2 hover:text-primary"
+              disabled={isApplyingBulkTags}
+              className="cursor-pointer text-sm font-semibold underline underline-offset-2 hover:text-primary disabled:cursor-not-allowed disabled:opacity-50"
               onClick={() => {
                 if (isBulkMode) {
                   handleCancelBulkTags();
@@ -854,6 +950,20 @@ export default function DataCatalogClient({
             >
               {isBulkMode ? "Cancel Selection" : "Select Records"}
             </button>
+            {isBulkMode && (
+              <button
+                type="button"  
+                className="btn btn-sm btn-primary"
+                onClick={handleApplyBulkTags}
+                disabled={
+                  selectedRecordCount === 0 ||
+                  !hasPendingBulkTagChanges ||
+                  isApplyingBulkTags
+                }
+              >
+                {isApplyingBulkTags ? "Applying..." : "Apply Changes"}
+              </button>
+            )}
             {activeFilters.length > 0 && (
               <button
                 type="button"
@@ -905,7 +1015,6 @@ export default function DataCatalogClient({
                   bulkTagQuery={bulkTagQuery}
                   onBulkTagQueryChange={setBulkTagQuery}
                   availableTags={visibleAvailableTags}
-                  onCancelBulkTags={handleCancelBulkTags}
                   getBulkTagState={getBulkTagState}
                   onToggleBulkTag={toggleBulkTag}
                 />
