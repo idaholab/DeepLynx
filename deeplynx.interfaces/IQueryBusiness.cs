@@ -15,4 +15,7 @@ public interface IQueryBusiness
 
     Task<IEnumerable<HistoricalRecordResponseDto>> GetMultiProjectRecords(long currentUserId, long organizationId, long[] projects,
         bool hideArchived, bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false);
+    
+    Task<IEnumerable<RecordResponseDto>> GetSortedRecords(long currentUserId, long organizationId,
+        long[] projectId, bool hideArchived, bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false);
 }

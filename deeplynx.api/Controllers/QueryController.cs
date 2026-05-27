@@ -155,4 +155,36 @@ public class QueryController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
+    
+    /// <summary>
+    ///     Get Sorted Records
+    /// </summary>
+    /// <param name="organizationId"> Organization Id of projects</param>
+    /// <param name="projectIds">Array of project ids</param>
+    /// <param name="hideArchived">Flag indicating whether to hide archived records from the result</param>
+    /// <returns>List of record response DTOs sorted by most recent</returns>
+    [HttpGet("sorted", Name = "api_get_sorted_records")]
+    [Auth("read", "record")]
+    public async Task<ActionResult<IEnumerable<RecordResponseDto>>> GetSortedRecords(
+        long organizationId, 
+        [FromQuery] long[] projectIds,
+        [FromQuery] bool hideArchived = true)
+    {
+        try
+        {
+            var currentUserId = UserContextStorage.UserId;
+            var isSysAdmin = UserContextStorage.IsSysAdmin;
+            var isOrgAdmin = UserContextStorage.IsOrgAdmin;
+            var isProjectAdmin = UserContextStorage.IsProjectAdmin;
+            var records = await _queryBusiness.GetSortedRecords(currentUserId, organizationId, projectIds, hideArchived,
+                isSysAdmin, isOrgAdmin, isProjectAdmin);
+            return Ok(records);
+        }
+        catch (Exception exc)
+        {
+            var message = $"An error occurred while listing records: {exc}";
+            _logger.LogError(message);
+            return StatusCode(StatusCodes.Status500InternalServerError, message);
+        }
+    }
 }

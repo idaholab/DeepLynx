@@ -560,4 +560,79 @@ public class QueryBusiness : IQueryBusiness
                 Tags = r.Tags
             });
     }
+    
+    /// <summary>
+    ///     Retrieves current records for projects, ordered by last_updated_at first
+    /// </summary>
+    /// <param name="currentUserId">The ID of current user</param>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <param name="projectIds">An array of project ids</param>
+    /// <param name="hideArchived">Flag indicating whether to hide archived request from the user.</param>
+    /// <param name="isSysAdmin">Optional param determining if the requesting user is a system admin</param>
+    /// <param name="isOrgAdmin">Optional param determining if the requesting user is an organization admin</param>
+    /// <param name="isProjectAdmin">Optional param determining if the requesting user is a project admin</param>
+    /// <returns>An array of records</returns>
+    public async Task<IEnumerable<RecordResponseDto>> GetSortedRecords(
+        long currentUserId, long organizationId, long[] projectIds, bool hideArchived,
+        bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false)
+    {
+        if (projectIds.Length == 0)
+            return new List<RecordResponseDto>();
+
+        var query = _context.Records
+            .Where(r => r.OrganizationId == organizationId)
+            .Where(r => projectIds.Contains(r.ProjectId));
+        
+        if (hideArchived) query = query.Where(r => !r.IsArchived);
+
+        if (!isSysAdmin && !isOrgAdmin && !isProjectAdmin)
+        {
+            var authorizedLabelIds = await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
+                currentUserId, organizationId, projectIds, "read record");
+
+            var authorizedRecordIds = await _context.Records
+                .WithAuthorizedLabels(authorizedLabelIds)
+                .Select(rec => rec.Id)
+                .ToListAsync();
+
+            query = query.Where(r => authorizedRecordIds.Contains(r.Id));
+        }
+
+        var records = await query
+            .Include(r => r.Tags)
+            .Include(r => r.Labels)
+            .GroupBy(r => r.Id)
+            .Select(g => g.OrderByDescending(r => r.LastUpdatedAt).First())
+            .ToListAsync();
+
+        return records.Select(r => new RecordResponseDto
+        {
+            Id = r.Id,
+            Uri = r.Uri,
+            Properties = r.Properties,
+            OriginalId = r.OriginalId,
+            Name = r.Name,
+            ClassId = r.ClassId,
+            DataSourceId = r.DataSourceId,
+            ObjectStorageId = r.ObjectStorageId,
+            Tags = r.Tags.Select(t => new RecordTagDto
+            {
+                Id = t.Id,
+                Name = t.Name
+            }).ToList(),
+            Labels = r.Labels.Select(l => new RecordLabelDto
+            {
+                Id = l.Id,
+                Name = l.Name
+            }).ToList(),
+            ProjectId = r.ProjectId,
+            OrganizationId = r.OrganizationId,
+            Description = r.Description,
+            FileType = r.FileType,
+            FileSize = r.FileSize,
+            LastUpdatedBy = r.LastUpdatedBy,
+            IsArchived = r.IsArchived,
+            LastUpdatedAt = r.LastUpdatedAt
+        });
+    }
 }
