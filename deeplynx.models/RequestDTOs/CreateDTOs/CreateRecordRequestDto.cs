@@ -8,7 +8,7 @@ public class CreateRecordRequestDto
 {
     [Required]
     [JsonPropertyName("name")]
-    [MaxLength(100)] // Same max length as `FileUploadInitRequestDto.FileName` and `CreateRecordFileUploadRequestDto.Name` to avoid errors in `FileBusiness`
+    [MaxLength(100)]
     public string Name { get; set; }
 
     [JsonPropertyName("description")]

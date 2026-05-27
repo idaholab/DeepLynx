@@ -5,7 +5,7 @@ namespace deeplynx.models;
 public class FileUploadInitRequestDto
 {
     [Required]
-    [MaxLength(100)] // Same max length as `CreateRecordRequestDto.Name` and `CreateRecordFileUploadRequestDto.Name` to avoid errors in `FileBusiness`
+    [MaxLength(100)]
     public string FileName { get; set; }
     public long FileSize { get; set; }
 }
