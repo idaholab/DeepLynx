@@ -179,7 +179,7 @@ public class AiModelConfigBusiness : IAiModelConfigBusiness
             if (token == null)
                 throw new KeyNotFoundException("No token found");
 
-            token = _encryptionHelper.DeserializeAndDecrypt<string>(token);
+            token = _encryptionHelper.Decrypt(token);
         }
 
         return new AiModelConfigResponseDto.WithToken
@@ -319,7 +319,7 @@ public class AiModelConfigBusiness : IAiModelConfigBusiness
                 throw new KeyNotFoundException(
                     $"No token found for user {currentUserId} on model configuration {modelConfig.Id}.");
 
-            token = _encryptionHelper.DeserializeAndDecrypt<string>(rawToken);
+            token = _encryptionHelper.Decrypt(rawToken);
         }
 
         return new AiModelConfigResponseDto.WithToken
