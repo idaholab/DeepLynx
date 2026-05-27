@@ -11,4 +11,5 @@ public class OrganizationResponseDto
     public bool DefaultOrg { get; set; } = false;
     public string? Banner { get; set; }
     public bool? RequireSensitivityLabel { get; set; }
+    public string ThemeName { get; set; } = "default";
 }

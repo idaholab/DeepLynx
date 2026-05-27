@@ -9,8 +9,15 @@ public class UpdateOrganizationRequestDto
     [MaxLength(250)] public string? Description { get; set; }
 
     public bool? DefaultOrg { get; set; }
-    
+
     public string? Banner { get; set; }
-    
-    public bool? RequireSensitivityLabel {get; set;}
+
+    public bool? RequireSensitivityLabel { get; set; }
+
+    [MaxLength(50)]
+    [RegularExpression(
+        "^(default|blue|green|red|purple|slate|highContrast)$",
+        ErrorMessage = "Invalid theme name."
+    )]
+    public string? ThemeName { get; set; }
 }

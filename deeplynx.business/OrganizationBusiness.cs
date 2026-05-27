@@ -86,7 +86,8 @@ public class OrganizationBusiness : IOrganizationBusiness
                 LastUpdatedBy = o.LastUpdatedBy,
                 IsArchived = o.IsArchived,
                 DefaultOrg = o.DefaultOrg,
-                Banner = o.Banner
+                Banner = o.Banner,
+                ThemeName = o.ThemeName
             })
             .ToListAsync();
     }
@@ -119,7 +120,8 @@ public class OrganizationBusiness : IOrganizationBusiness
             LastUpdatedBy = organization.LastUpdatedBy,
             IsArchived = organization.IsArchived,
             DefaultOrg = organization.DefaultOrg,
-            Banner = organization.Banner
+            Banner = organization.Banner,
+            ThemeName = organization.ThemeName
         };
     }
 
@@ -142,7 +144,8 @@ public class OrganizationBusiness : IOrganizationBusiness
             LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
             LastUpdatedBy = currentUserId,
             Banner = dto.Banner,
-            RequireSensitivityLabel = dto.RequireSensitivityLabel ?? false
+            RequireSensitivityLabel = dto.RequireSensitivityLabel ?? false,
+            ThemeName = "default"
         };
 
         _context.Organizations.Add(organization);
@@ -185,7 +188,8 @@ public class OrganizationBusiness : IOrganizationBusiness
             IsArchived = organization.IsArchived,
             DefaultOrg = organization.DefaultOrg,
             Banner = organization.Banner,
-            RequireSensitivityLabel = organization.RequireSensitivityLabel
+            RequireSensitivityLabel = organization.RequireSensitivityLabel,
+            ThemeName = organization.ThemeName
         };
     }
 
@@ -200,6 +204,8 @@ public class OrganizationBusiness : IOrganizationBusiness
     public async Task<OrganizationResponseDto> UpdateOrganization(long currentUserId, long organizationId,
         UpdateOrganizationRequestDto dto)
     {
+        ValidationHelper.ValidateModel(dto);
+
         var organization = await _context.Organizations.FindAsync(organizationId);
 
         if (organization == null || organization.IsArchived)
@@ -221,6 +227,11 @@ public class OrganizationBusiness : IOrganizationBusiness
 
         if (dto.RequireSensitivityLabel != null)
             organization.RequireSensitivityLabel = dto.RequireSensitivityLabel.Value;
+
+        if (dto.ThemeName != null)
+        {
+            organization.ThemeName = dto.ThemeName;
+        }
 
         organization.Name = dto.Name ?? organization.Name;
         organization.Description = dto.Description ?? organization.Description;
@@ -259,7 +270,8 @@ public class OrganizationBusiness : IOrganizationBusiness
             IsArchived = organization.IsArchived,
             DefaultOrg = organization.DefaultOrg,
             Banner = organization.Banner,
-            RequireSensitivityLabel = organization.RequireSensitivityLabel
+            RequireSensitivityLabel = organization.RequireSensitivityLabel,
+            ThemeName = organization.ThemeName
         };
     }
 
