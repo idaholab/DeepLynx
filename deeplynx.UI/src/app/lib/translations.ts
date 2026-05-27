@@ -1570,6 +1570,9 @@ export const translations = {
       YOUVE_BEEN_ADDED_TO_A_PROJECT_IN_DEEPLYNX_NEXUS:
         "You've been added to a project in DeepLynx Nexus",
       ZOOM_CONTROLS: "Zoom controls",
+      ARCHIVED_USERS: "Archived Users",
+      UNARCHIVE_USER: "Unarchive",
+      NO_ARCHIVED_USERS: "No archived users."
     },
   },
   es: {
@@ -3225,6 +3228,9 @@ export const translations = {
       YOUVE_BEEN_ADDED_TO_A_PROJECT_IN_DEEPLYNX_NEXUS:
         "Has sido agregado a un proyecto en DeepLynx Nexus",
       ZOOM_CONTROLS: "Controles de zoom",
+      ARCHIVED_USERS: "Usuarios Archivados",
+      UNARCHIVE_USER: "Desarchivar",
+      NO_ARCHIVED_USERS: "No hay usuarios archivados."
     },
   },
 };

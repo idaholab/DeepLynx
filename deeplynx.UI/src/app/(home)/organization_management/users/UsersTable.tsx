@@ -28,6 +28,7 @@ import UsersHeaderStats from "./UsersHeaderStats";
 import UsersListTable from "./UsersListTable";
 import { UsersTableRow } from "../../types/types";
 import { useLanguage } from "@/app/contexts/Language";
+import Tabs from "@/app/(home)/components/Tabs";
 
 /* -------------------------------------------------------------------------- */
 /*                                   Types                                    */
@@ -115,7 +116,9 @@ const UsersTable = ({
   const [activityCounts, setActivityCounts] =
     useState<UserActivityCountsDto>(() => buildActivityCounts(members));
   const [loading, setLoading] = useState(false);
+  const [archivedUsers, setArchivedUsers] = useState<UsersTableRow[]>([]);
   const { t } = useLanguage();
+  const [activeTab, setActiveTab] = useState("active");
 
   /* ------------------------------------------------------------------------ */
   /*                           Invite Modal State                             */
@@ -193,6 +196,21 @@ const UsersTable = ({
     }
   }, [organization?.organizationId, scope]);
 
+
+  const loadArchivedUsers = useCallback(async () => {
+  const organizationId = organization?.organizationId;
+  if (scope === "org" && !organizationId) return;
+
+  try {
+    const users = scope === "org"
+      ? await getAllUsers(organizationId, undefined, true)
+      : await getAllUsers(undefined, undefined, true);
+    setArchivedUsers(buildTableData(users).filter((u) => u.isArchived));
+  } catch (error) {
+    console.error("Failed to load archived users:", error);
+  }
+  }, [organization?.organizationId, scope]);
+
   // When server-side members prop changes, sync local state
   useEffect(() => {
     setTableData(buildTableData(members));
@@ -207,6 +225,12 @@ const UsersTable = ({
 
     return () => window.clearInterval(intervalId);
   }, [loadActivityCounts]);
+
+  useEffect(() => {
+  if (activeTab === "archived") {
+    void loadArchivedUsers();
+  }
+  }, [activeTab, loadArchivedUsers]);
 
   /* ------------------------------------------------------------------------ */
   /*                        Invite Flow: Open Modal                           */
@@ -396,6 +420,23 @@ const UsersTable = ({
   };
 
   /* ------------------------------------------------------------------------ */
+  /*                               Unarchive User                             */
+  /* ------------------------------------------------------------------------ */
+
+  const handleUnarchive = async (userId: number) => {
+    setLoading(true);
+    try {
+      await archiveUser(userId, false);
+      await Promise.all([loadArchivedUsers(), loadAllData()]);
+      void loadArchivedUsers();
+    } catch (error) {
+      console.error("Failed to unarchive user:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  /* ------------------------------------------------------------------------ */
   /*                               Derived Stats                              */
   /* ------------------------------------------------------------------------ */
 
@@ -404,6 +445,37 @@ const UsersTable = ({
   ).length;
   const pendingCount = tableData.filter((u) => u.isActive === false).length;
   const totalCount = activeUserCount + pendingCount;
+
+  /* ------------------------------------------------------------------------ */
+  /*                               User Conent Tabs                           */
+  /* ------------------------------------------------------------------------ */
+
+  const userContent = (
+            <UsersListTable
+            tableData={activeTab === "active" ? tableData : archivedUsers}
+            scope={scope}
+            loading={loading}
+            onResendInvite={handleResendInvite}
+            onEditUser={(
+              id: number,
+              name: string,
+              isOrgAdmin: boolean,
+              isSysAdmin: boolean,
+            ) => {
+              setEditingUserId(id);
+              setEditUserName(name);
+              setEditUserIsOrgAdmin(isOrgAdmin);
+              setEditUserIsSysAdmin(isSysAdmin);
+            }}
+            onOpenConfirm={(item: ConfirmModalState) => setConfirmModal(item)}
+            isArchivedTab={activeTab === "archived"}  
+            onUnarchive={handleUnarchive} 
+          />);
+
+  const tabs = [
+  { label: "active", displayLabel: t.translations.ACTIVE_USERS, content: userContent },
+  { label: "archived", displayLabel: t.translations.ARCHIVED_USERS, content: userContent },
+];
 
   /* ------------------------------------------------------------------------ */
   /*                               Main Render                                */
@@ -424,25 +496,27 @@ const UsersTable = ({
             scope={scope}
           />
 
-          {/* Combined Users & Pending Invites Table */}
+          {scope === "site" ? (
+          <Tabs
+            activeTab={activeTab}
+            onTabChange={(label) => setActiveTab(label)}
+            tabs={tabs}
+          />
+        ) : (
           <UsersListTable
             tableData={tableData}
             scope={scope}
             loading={loading}
             onResendInvite={handleResendInvite}
-            onEditUser={(
-              id: number,
-              name: string,
-              isOrgAdmin: boolean,
-              isSysAdmin: boolean,
-            ) => {
+            onEditUser={(id, name, isOrgAdmin, isSysAdmin) => {
               setEditingUserId(id);
               setEditUserName(name);
               setEditUserIsOrgAdmin(isOrgAdmin);
               setEditUserIsSysAdmin(isSysAdmin);
             }}
-            onOpenConfirm={(item: ConfirmModalState) => setConfirmModal(item)}
+            onOpenConfirm={(item) => setConfirmModal(item)}
           />
+        )}
         </div>
       </div>
 
