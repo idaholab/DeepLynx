@@ -187,7 +187,7 @@ const RecentRecordsCard: React.FC<Props> = ({
             className="border-b border-base-content/40 cursor-pointer hover:bg-base-100/40 p-3 -mx-1 transition-colors"
             onClick={() => handleRecordClick(record)}
           >
-            <div className="font-medium text-base-content mb-2">
+            <div className="font-medium text-base-content mb-2 line-clamp-1 overflow-hidden break-all">
               {record.name}
             </div>
 
