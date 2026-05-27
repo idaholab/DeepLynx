@@ -20,9 +20,9 @@ public class OlapBusiness : IOlapBusiness
     private readonly IRecordBusiness _recordBusiness;
     private readonly ILogger<OlapBusiness> _logger;
     private readonly IObjectStorageBusiness _objectStorageBusiness;
-    
+
     public OlapBusiness(
-        DeeplynxContext context, 
+        DeeplynxContext context,
         IRecordBusiness recordBusiness,
         IObjectStorageBusiness objectStorageBusiness,
         ILogger<OlapBusiness> logger)
@@ -39,6 +39,7 @@ public class OlapBusiness : IOlapBusiness
     ///     On the first append, migrates the original flat file into a folder-based part structure.
     ///     Supports Parquet and CSV files.
     /// </summary>
+    /// <param name="currentUserId"></param>
     /// <param name="organizationId"></param>
     /// <param name="projectId"></param>
     /// <param name="recordId"></param>
@@ -47,6 +48,7 @@ public class OlapBusiness : IOlapBusiness
     /// <exception cref="ArgumentException"></exception>
     /// <exception cref="InvalidOperationException"></exception>
     public async Task AppendTabularBlob(
+        long currentUserId,
         long organizationId,
         long projectId,
         long recordId,
@@ -82,7 +84,7 @@ public class OlapBusiness : IOlapBusiness
         {
             throw new InvalidOperationException($"Object storage id is required on record to append.");
         }
-        
+
         var objectStorage = await _objectStorageBusiness.GetDecryptedObjectStorage(record.ObjectStorageId.Value);
 
         if (objectStorage.Type != "azure_object" && objectStorage.Type != "filesystem")
@@ -92,6 +94,15 @@ public class OlapBusiness : IOlapBusiness
             await AppendToAzureBlob(record, objectStorage.Config, file, partNumber);
         else
             await AppendToFilesystemAsync(record, file, partNumber);
+
+        var originalLastUpdatedAt = record.LastUpdatedAt;
+        record.LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
+
+        var originalLastUpdatedBy = record.LastUpdatedBy;
+        record.LastUpdatedBy = currentUserId;
+
+        _context.Records.Update(record);
+        await _context.SaveChangesAsync();
     }
 
     /// <summary>
@@ -745,7 +756,7 @@ public class OlapBusiness : IOlapBusiness
         {
             var storedColumns = JsonNode.Parse(record.Properties)?["columns"]?.AsArray()
                                 ?? throw new InvalidOperationException("Record has no stored column schema to validate against.");
-            
+
             await ValidateCsvSchema(storedColumns, incomingStream);
         }
 
@@ -1022,7 +1033,7 @@ public class OlapBusiness : IOlapBusiness
                     $"Column '{name}' type mismatch: existing is '{type}', incoming is '{incomingType}'.");
         }
     }
-    
+
     /// <summary>
     ///     Validates that the incoming CSV file's headers are compatible with the existing CSV dataset.
     /// </summary>
