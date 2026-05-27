@@ -459,12 +459,13 @@ export default function DataCatalogClient({
     if (!organization?.organizationId) return;
     
     const fetchTagsForProjectScope = async () => {
+      const organizationId = Number(organization.organizationId);
       const projectIds = effectiveProjectIds
           .map(Number)
           .filter(Number.isFinite);
       
       const tags = await getAllTagsOrg(
-          organization.organizationId,
+          organizationId,
           projectIds,
           true,
       );
@@ -766,6 +767,8 @@ export default function DataCatalogClient({
 
     setIsApplyingBulkTags(true);
 
+    const organizationId = Number(organization.organizationId);
+
     try {
       const recordsByProject = new Map<number, RecordTableRow[]>();
 
@@ -802,7 +805,7 @@ export default function DataCatalogClient({
             if (attachDtos.length > 0) {
               requests.push(
                   bulkAttachTagsToRecords(
-                      organization.organizationId,
+                      organizationId,
                       projectId,
                       attachDtos,
                   ),
@@ -812,7 +815,7 @@ export default function DataCatalogClient({
             if (unattachDtos.length > 0) {
               requests.push(
                   bulkUnattachTagsFromRecords(
-                      organization.organizationId,
+                      organizationId,
                       projectId,
                       unattachDtos,
                   ),
