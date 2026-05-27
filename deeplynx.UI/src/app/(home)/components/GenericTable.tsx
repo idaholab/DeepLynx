@@ -11,8 +11,7 @@ import {
   TrashIcon,
   AdjustmentsHorizontalIcon,
 } from "@heroicons/react/24/outline";
-import React, { useState, useEffect, useRef } from "react";
-import { createPortal } from "react-dom";
+import React, { useState, useEffect } from "react";
 import SearchInput from "./SearchInput";
 
 type PaginationMetadata = {
@@ -92,22 +91,10 @@ const GenericTable = <T extends object>({
 
   const [showFilters, setShowFilters] = useState(false);
   const [initialFilters] = useState(filterValues);
-  const filterButtonRef = useRef<HTMLButtonElement>(null);
-  const [filterPanelPos, setFilterPanelPos] = useState({ top: 0, left: 0 });
   const [tempFilters, setTempFilters] = useState<
     Record<string, string | number | number[] | undefined>
   >({});
 
-
-  useEffect(() => {
-    if (showFilters && filterButtonRef.current) {
-      const rect = filterButtonRef.current.getBoundingClientRect();
-      setFilterPanelPos({
-        top: rect.bottom + 8,
-        left: rect.left,
-      });
-    }
-  }, [showFilters]);
   // Sync local page state with backend pagination metadata
   useEffect(() => {
     if (backendPagination && paginationMetadata) {
@@ -121,6 +108,17 @@ const GenericTable = <T extends object>({
       setTempFilters(filterValues || {});
     }
   }, [filterValues, filters.length]);
+
+  useEffect(() => {
+    if (showFilters) {
+      document.body.style.overflowX = "visible";
+    } else {
+      document.body.style.overflowX = "";
+    }
+    return () => {
+      document.body.style.overflowX = "";
+    };
+  }, [showFilters]);
 
   // Filter data based on the search input
   const filteredData = React.useMemo(() => {
@@ -344,11 +342,7 @@ const GenericTable = <T extends object>({
     : filteredData.length > currentDisplayedRows;
 
   return (
-    <div
-      className={`overflow-x-auto ${
-        bordered ? "rounded-box border border-base-300" : ""
-      } p-4`}
-    >
+    <div className={`${bordered ? "rounded-box border border-base-300" : ""} p-4`}>
       {title && (
         <h2 className="text-xl font-bold text-base-content">{title}</h2>
       )}
@@ -364,7 +358,6 @@ const GenericTable = <T extends object>({
             {filters && filters.length > 0 && (
               <div className="relative">
                 <button
-                  ref={filterButtonRef}
                   onClick={() => setShowFilters(!showFilters)}
                   className="btn bg-base-100 btn-sm gap-2 py-4.5"
                 >
@@ -387,17 +380,9 @@ const GenericTable = <T extends object>({
                 </button>
 
                 {/* Dropdown Panel */}
-                {showFilters && typeof document !== "undefined" && createPortal(
-                   <div
-                      style={{
-                        position: "fixed",
-                        top: filterPanelPos.top,
-                        left: filterPanelPos.left,
-                        zIndex: 9999,
-                        width: "24rem",
-                      }}
-                      className="bg-base-100 border border-base-300 rounded-lg shadow-lg p-4"
-                    >
+                
+                {showFilters && (
+                  <div className="absolute left-0 mt-2 w-96 bg-base-100 border border-base-300 rounded-lg shadow-lg z-50 p-4 max-h-[80vh] overflow-y-auto">
                     <div className="flex justify-between mb-4">
                       <h3 className="font-semibold text-base-content">
                         Filter Options
@@ -411,7 +396,7 @@ const GenericTable = <T extends object>({
                     </div>
 
                     {/* Filter Inputs */}
-                    <div className="space-y-3 max-h-96 overflow-y-auto pb-4">
+                    <div className="space-y-3 max-h-full overflow-y-auto pb-4">
                       {filters.map((filter) => {
                         const inputType = filter.type || "text";
 
@@ -461,8 +446,7 @@ const GenericTable = <T extends object>({
                         Apply Filters
                       </button>
                     </div>
-                  </div>,
-                  document.body
+                  </div>
                 )}
               </div>
             )}
@@ -498,6 +482,7 @@ const GenericTable = <T extends object>({
           </div>
         )}
       </div>
+      <div className="overflow-x-auto">
       <table
         className={`table table-pin-cols ${bordered ? "table-bordered" : ""} ${
           tableClassName ?? ""
@@ -591,6 +576,7 @@ const GenericTable = <T extends object>({
           })}
         </tbody>
       </table>
+      </div>
 
       <div className="flex justify-between">
         {showPageNavigation && (
