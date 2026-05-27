@@ -141,12 +141,13 @@ public class GraphBusiness : IGraphBusiness
 
         if (rootRecord == null) throw new KeyNotFoundException($"Record with id {recordId} not found");
 
-        var isAdmin = await AdminHelper.IsAnyAdmin(_context, userId, organizationId, projectId);
+        var isSysAdmin = await AdminHelper.IsSysAdmin(_context, userId);
+        var isAdmin = isSysAdmin || await AdminHelper.IsAnyAdmin(_context, userId, organizationId, projectId);
 
         List<long> userProjectIds;
         List<long>? userAuthorizedLabels = null;
 
-        if (isAdmin)
+        if (isSysAdmin)
         {
             userProjectIds = await _context.Projects
                 .Select(p => p.Id)
@@ -197,8 +198,8 @@ public class GraphBusiness : IGraphBusiness
 
                 visitedRecords.Add(currentLevelRecordId);
 
-                var outgoingEdges = await GetGraphEdges(currentLevelRecordId, userProjectIds, userAuthorizedLabels, isAdmin, true);
-                var incomingEdges = await GetGraphEdges(currentLevelRecordId, userProjectIds, userAuthorizedLabels, isAdmin, false);
+                var outgoingEdges = await GetGraphEdges(currentLevelRecordId, userProjectIds, userAuthorizedLabels, isSysAdmin, true);
+                var incomingEdges = await GetGraphEdges(currentLevelRecordId, userProjectIds, userAuthorizedLabels, isSysAdmin, false);
 
                 ProcessEdges(outgoingEdges, nodes, links, visitedEdges, nextLevelRecordIds, true);
                 ProcessEdges(incomingEdges, nodes, links, visitedEdges, nextLevelRecordIds, false);
@@ -236,16 +237,19 @@ public class GraphBusiness : IGraphBusiness
             .Include(e => e.Destination).ThenInclude(r => r.Labels)
             .Include(e => e.Destination).ThenInclude(r => r.Class)
             .Include(e => e.Relationship)
-            .Where(e =>
-                userProjectIds.Contains(e.ProjectId) &&
-                userProjectIds.Contains(e.Origin.ProjectId) &&
-                userProjectIds.Contains(e.Destination.ProjectId) &&
-                !e.IsArchived);
+            .Where(e => !e.IsArchived);
 
         if (!isAdmin)
+        {
+            query = query.Where(e =>
+                userProjectIds.Contains(e.ProjectId) &&
+                userProjectIds.Contains(e.Origin.ProjectId) &&
+                userProjectIds.Contains(e.Destination.ProjectId));
+
             query = query.Where(e =>
                 (!e.Origin.Labels.Any() || e.Origin.Labels.All(l => userAuthorizedLabels!.Contains(l.Id))) &&
                 (!e.Destination.Labels.Any() || e.Destination.Labels.All(l => userAuthorizedLabels!.Contains(l.Id))));
+        }
 
         query = isOutgoing
             ? query.Where(e => e.OriginId == recordId)
