@@ -95,10 +95,7 @@ public class OlapBusiness : IOlapBusiness
         else
             await AppendToFilesystemAsync(record, file, partNumber);
 
-        var originalLastUpdatedAt = record.LastUpdatedAt;
         record.LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
-
-        var originalLastUpdatedBy = record.LastUpdatedBy;
         record.LastUpdatedBy = currentUserId;
 
         _context.Records.Update(record);
