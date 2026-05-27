@@ -247,8 +247,9 @@ const SideMenu: React.FC<SideMenuProps> = ({
   };
 
   const isProjectActive = (projectId: string | number) => {
-    const isOnProjectPage = pathname.includes(`/project/${projectId}`);
-    const isSessionProject = project?.projectId === projectId.toString();
+    const projectIdString = projectId.toString();
+    const isOnProjectPage = pathname.match(/^\/project\/([^/]+)(?:\/|$)/)?.[1] === projectIdString;
+    const isSessionProject = project?.projectId === projectIdString;
     return isOnProjectPage || isSessionProject;
   };
 
