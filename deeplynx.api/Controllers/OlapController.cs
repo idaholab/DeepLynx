@@ -90,9 +90,11 @@ public class OlapController : ControllerBase
     public async Task<ActionResult<string>> AppendTabularFile(
         long organizationId, long projectId, long recordId, [FromQuery] long partNumber, IFormFile file)
     {
+        var currentUserId = UserContextStorage.UserId;
+
         try
         {
-            await _olapBusiness.AppendTabularBlob(organizationId, projectId, recordId, partNumber, file);
+            await _olapBusiness.AppendTabularBlob(currentUserId, organizationId, projectId, recordId, partNumber, file);
             return Ok("Data appended");
         }
         catch (Exception e)
