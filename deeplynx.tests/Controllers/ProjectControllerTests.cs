@@ -8,6 +8,8 @@ using Moq;
 
 namespace deeplynx.tests.Controllers;
 
+[Collection("Test Suite Collection")]
+
 /// <summary>
 ///     Unit tests for <see cref="ProjectController"/>.
 ///     All business dependencies are mocked with Moq.
@@ -16,7 +18,6 @@ namespace deeplynx.tests.Controllers;
 ///     Implements IDisposable to reset UserContextStorage statics after every test,
 ///     preventing static state leaking across classes when the runner reuses threads.
 /// </summary>
-[Collection("Test Suite Collection")]
 
 public class ProjectControllerTests : IDisposable
 {
