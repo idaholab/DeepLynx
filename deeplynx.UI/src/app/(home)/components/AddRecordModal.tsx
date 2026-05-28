@@ -13,9 +13,8 @@ import {
   ProjectResponseDto,
 } from "../types/responseDTOs";
 
-import { getAllDataSourcesOrg } from "@/app/lib/client_service/data_source_services.client";
+import { getAllDataSources } from "@/app/lib/client_service/data_source_services.client";
 import { createRecord } from "@/app/lib/client_service/record_services.client";
-import { getDefaultDataSource } from "@/app/lib/client_service/data_source_services.client";
 
 /* -------------------------------------------------------------------------- */
 /*                                   Types                                    */
@@ -268,21 +267,12 @@ const AddRecordModal: React.FC<Props> = ({
         setDsError(null);
         setSelectedDataSourceId(undefined);
 
-        const list = await getAllDataSourcesOrg(
-          organization?.organizationId as number,
-          [selectedProjectId],
+        const list = await getAllDataSources(
+          
+          selectedProjectId
         );
 
-        
-
-        const defaultDs = await getDefaultDataSource(selectedProjectId);
-
-        const merged = list ?? [];
-        if (defaultDs && !merged.find((ds) => ds.id === defaultDs.id)) {
-          merged.push(defaultDs);
-        }
-
-        if (!cancelled) setDataSources(merged);
+        if (!cancelled) setDataSources(list ?? []);
       } catch (err: unknown) {
         const fallback = t.translations.FAILED_TO_LOAD_DATA_SOURCE;
         let message = fallback;
