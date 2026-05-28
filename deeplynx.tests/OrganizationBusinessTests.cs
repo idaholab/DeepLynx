@@ -2,6 +2,7 @@ using System.ComponentModel.DataAnnotations;
 using System.Text.Json;
 using deeplynx.business;
 using deeplynx.datalayer.Models;
+using deeplynx.helpers;
 using deeplynx.helpers.Hubs;
 using deeplynx.interfaces;
 using deeplynx.models;
@@ -27,6 +28,7 @@ public class OrganizationBusinessTests : IntegrationTestBase
     private INotificationBusiness _notificationBusiness = null!;
     private OrganizationBusiness _organizationBusiness = null!;
     private RoleBusiness _roleBusiness = null!;
+    private EncryptionHelper _encryptionHelper = null!;
 
     public long oid; // organization ID
     public long oid2; // second organization ID
@@ -39,6 +41,10 @@ public class OrganizationBusinessTests : IntegrationTestBase
 
     public override async Task InitializeAsync()
     {
+        // Generate valid keys once and reuse them
+        // These are pre-generated valid AES-256 keys for testing
+        Environment.SetEnvironmentVariable("ENCRYPTION_KEY", "SU5TRUNVUkVfREVWX0tFWV8zMl9CWVRFU19MT05HISE="); // 32 bytes
+        Environment.SetEnvironmentVariable("ENCRYPTION_IV", "SU5TRUNVUkVfREVWX0lWIQ=="); // 16 bytes
         await base.InitializeAsync();
 
         // used in multiple contexts
@@ -49,7 +55,8 @@ public class OrganizationBusinessTests : IntegrationTestBase
         _mockBulkCopyUpsertExecutor = new Mock<IBulkCopyUpsertExecutor>();
         _eventBusiness = new EventBusiness(Context, _notificationBusiness, _mockBulkCopyUpsertExecutor.Object);
         _roleBusiness = new RoleBusiness(Context, _eventBusiness);
-        _mockObjectStorage = new ObjectStorageBusiness(Context);
+        _encryptionHelper = new EncryptionHelper();
+        _mockObjectStorage = new ObjectStorageBusiness(Context, _encryptionHelper);
 
         // org business and dependencies
         _mockLoggerOrg = new Mock<ILogger<OrganizationBusiness>>();
@@ -133,7 +140,16 @@ public class OrganizationBusinessTests : IntegrationTestBase
             UserId = uid,
             IsOrgAdmin = false
         };
+
+        var testOrg2User = new OrganizationUser
+        {
+            OrganizationId = oid2,
+            UserId = uid,
+            IsOrgAdmin = false
+        };
+
         Context.OrganizationUsers.Add(testOrgUser);
+        Context.OrganizationUsers.Add(testOrg2User);
         await Context.SaveChangesAsync();
     }
 
@@ -172,7 +188,7 @@ public class OrganizationBusinessTests : IntegrationTestBase
     public async Task GetAllOrganizations_ExcludesArchived()
     {
         // Act
-        var result = await _organizationBusiness.GetAllOrganizations();
+        var result = await _organizationBusiness.GetAllOrganizations(uid);
         var organizations = result.ToList();
 
         // Assert
@@ -185,7 +201,7 @@ public class OrganizationBusinessTests : IntegrationTestBase
     public async Task GetAllOrganizations_WithHideArchivedFalse_IncludesArchived()
     {
         // Act
-        var result = await _organizationBusiness.GetAllOrganizations(false);
+        var result = await _organizationBusiness.GetAllOrganizations(uid, hideArchived: false);
         var organizations = result.ToList();
 
         // Assert
@@ -734,7 +750,7 @@ public class OrganizationBusinessTests : IntegrationTestBase
         Context.DataSources.Add(dataSource);
         await Context.SaveChangesAsync();
         var did = dataSource.Id;
-        
+
         var record = new Record
         {
             Name = "Test Record",
@@ -749,19 +765,19 @@ public class OrganizationBusinessTests : IntegrationTestBase
             DataSourceId = did,
             OrganizationId = oid,
         };
-        
+
         Context.Records.Add(record);
         await Context.SaveChangesAsync();
-        
-        
+
+
         var dto = new UpdateOrganizationRequestDto
         {
             RequireSensitivityLabel = true
         };
-        
+
         await Assert.ThrowsAsync<InvalidOperationException>(() => _organizationBusiness.UpdateOrganization(uid, oid, dto));
     }
-    
+
     [Fact]
     public async Task UpdateOrganization_Success_RequireSensitivityLabels()
     {
@@ -776,7 +792,7 @@ public class OrganizationBusinessTests : IntegrationTestBase
         };
         Context.Organizations.Add(otherOrg);
         await Context.SaveChangesAsync();
-        
+
         var project = new Project
         {
             Name = "Test Project",
@@ -801,7 +817,7 @@ public class OrganizationBusinessTests : IntegrationTestBase
         Context.DataSources.Add(dataSource);
         await Context.SaveChangesAsync();
         var did = dataSource.Id;
-        
+
         var testLabel = new SensitivityLabel
         {
             Name = "Test Label",
@@ -810,7 +826,7 @@ public class OrganizationBusinessTests : IntegrationTestBase
         };
         Context.SensitivityLabels.Add(testLabel);
         await Context.SaveChangesAsync();
-        
+
         var record = new Record
         {
             Name = "Test Record",
@@ -824,16 +840,16 @@ public class OrganizationBusinessTests : IntegrationTestBase
             FileType = "pdf",
             DataSourceId = did,
             OrganizationId = otherOrg.Id,
-            Labels = new List<SensitivityLabel>{testLabel}
+            Labels = new List<SensitivityLabel> { testLabel }
         };
         Context.Records.Add(record);
         await Context.SaveChangesAsync();
-        
+
         var dto = new UpdateOrganizationRequestDto
         {
             RequireSensitivityLabel = true
         };
-        
+
         var updateResult = await _organizationBusiness.UpdateOrganization(uid, oid, dto);
         Assert.NotNull(updateResult);
         Assert.NotNull(updateResult.RequireSensitivityLabel);

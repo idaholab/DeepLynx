@@ -1,8 +1,8 @@
 using System.Text.Json;
 using deeplynx.datalayer.Models;
+using deeplynx.helpers;
 using deeplynx.interfaces;
 using deeplynx.models;
-using deeplynx.helpers;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using NpgsqlTypes;
@@ -21,6 +21,7 @@ public class QueryBusiness : IQueryBusiness
     ///     Filter record request
     /// </summary>
     /// <param name="context">The database context to be used for filter operations.</param>
+    /// <param name="sensitivityLabelService">Helper service for Sensitivity Label Authorization.</param>
     public QueryBusiness(DeeplynxContext context, ISensitivityLabelService sensitivityLabelService)
     {
         _context = context;
@@ -30,78 +31,83 @@ public class QueryBusiness : IQueryBusiness
     /// <summary>
     ///     Build a query
     /// </summary>
+    /// <param name="currentUserId">The ID of current user</param>
     /// <param name="request">Array of query component dtos, initial connector string will be null</param>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
     /// <param name="textSearch">Full text search phrase</param>
-    /// ///
     /// <param name="projectIds">Project ids that a user has access to</param>
+    /// <param name="isSysAdmin">Optional param determining if the requesting user is a system admin</param>
+    /// <param name="isOrgAdmin">Optional param determining if the requesting user is an organization admin</param>
+    /// <param name="isProjectAdmin">Optional param determining if the requesting user is a project admin</param>
     /// <returns>A list of historical record response dtos that match provided filters</returns>
     public async Task<IEnumerable<HistoricalRecordResponseDto>> QueryBuilder(
-        long currentUserId, CustomQueryDtos.CustomQueryRequestDto[] request, long organizationId,
-        long[] projectIds, string? textSearch = null)
+        long currentUserId, CustomQueryDtos.CustomQueryRequestDto[] request, long organizationId, long[] projectIds,
+        string? textSearch = null, bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false)
     {
         if (request == null) throw new ArgumentException("Custom query request dto cannot be null");
         try
         {
-            // Get authorized sensitivity labels for the user
-            var authorizedLabelIds = await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
-                currentUserId, organizationId, projectIds, "read record");
-
-            var sql = @"
-            SELECT DISTINCT ON (hr.record_id)
-                hr.*,
-                hr.class_id as ClassId,
-                hr.class_name as ClassName,
-                hr.original_id as OriginalId,
-                hr.data_source_name as DataSourceName,
-                hr.data_source_id as DataSourceId,
-                hr.project_name as ProjectName,
-                hr.project_id as ProjectId,
-                hr.last_updated_at as LastUpdatedAt,
-                hr.last_updated_by as LastUpdatedBy,
-                hr.object_storage_name as ObjectStorageName,
-                hr.object_storage_id as ObjectStorageId,
-                hr.record_id as RecordId,
-                hr.is_archived as IsArchived
-            FROM deeplynx.historical_records hr
-            LEFT JOIN deeplynx.record_labels rl ON hr.record_id = rl.record_id
-            WHERE hr.is_archived = false
-            AND hr.project_id = ANY(@projectIds)
-            AND hr.organization_id = @organizationId
-            AND (
-                -- Either the record has no labels (unlabeled records are accessible)
-                NOT EXISTS (
-                    SELECT 1 
-                    FROM deeplynx.record_labels 
-                    WHERE record_id = hr.record_id
-                )
-                OR
-                NOT EXISTS (
-                    SELECT 1
-                    FROM deeplynx.record_labels rl2
-                    WHERE rl2.record_id = hr.record_id
-                    AND rl2.label_id != ALL(@authorizedLabelIds)
-                )
-            )";
-
-            var parameters = new List<NpgsqlParameter>();
-            var conditions = new List<string>();
-
-            var projectIdsParam = new NpgsqlParameter("projectIds", NpgsqlDbType.Array | NpgsqlDbType.Bigint)
+            var authorizedLabelIds = new List<long>();
+            if (!isSysAdmin && !isOrgAdmin && !isProjectAdmin)
             {
-                Value = projectIds
+                authorizedLabelIds = await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
+                    currentUserId, organizationId, projectIds, "read record");
+            }
+
+            var authorizationFilter = (!isSysAdmin && !isOrgAdmin && !isProjectAdmin) ? @"
+                AND (
+                    NOT EXISTS (
+                        SELECT 1 
+                        FROM deeplynx.record_labels 
+                        WHERE record_id = hr.record_id
+                    )
+                    OR
+                    NOT EXISTS (
+                        SELECT 1
+                        FROM deeplynx.record_labels rl2
+                        WHERE rl2.record_id = hr.record_id
+                        AND rl2.label_id != ALL(@authorizedLabelIds)
+                    )
+                )" : "";
+
+            var sql = $@"
+                SELECT DISTINCT ON (hr.record_id)
+                    hr.*,
+                    hr.class_id as ClassId,
+                    hr.class_name as ClassName,
+                    hr.original_id as OriginalId,
+                    hr.data_source_name as DataSourceName,
+                    hr.data_source_id as DataSourceId,
+                    hr.project_name as ProjectName,
+                    hr.project_id as ProjectId,
+                    hr.last_updated_at as LastUpdatedAt,
+                    hr.last_updated_by as LastUpdatedBy,
+                    hr.object_storage_name as ObjectStorageName,
+                    hr.object_storage_id as ObjectStorageId,
+                    hr.record_id as RecordId,
+                    hr.is_archived as IsArchived
+                FROM deeplynx.historical_records hr
+                WHERE hr.is_archived = false
+                AND hr.project_id = ANY(@projectIds)
+                AND hr.organization_id = @organizationId
+                {authorizationFilter}";
+
+            var parameters = new List<NpgsqlParameter>
+            {
+                new NpgsqlParameter("projectIds", NpgsqlDbType.Array | NpgsqlDbType.Bigint) { Value = projectIds },
+                new NpgsqlParameter("organizationId", organizationId)
             };
-            var orgIdsParam = new NpgsqlParameter("organizationId", organizationId);
-            var authorizedLabelIdsParam =
-                new NpgsqlParameter("authorizedLabelIds", NpgsqlDbType.Array | NpgsqlDbType.Bigint)
+
+            if (!isSysAdmin && !isOrgAdmin && !isProjectAdmin)
+            {
+                parameters.Add(new NpgsqlParameter("authorizedLabelIds", NpgsqlDbType.Array | NpgsqlDbType.Bigint)
                 {
                     Value = authorizedLabelIds.ToArray()
-                };
-
-            parameters.Add(projectIdsParam);
-            parameters.Add(orgIdsParam);
-            parameters.Add(authorizedLabelIdsParam);
+                });
+            }
 
             // Build individual conditions
+            var conditions = new List<string>();
             if (request?.Length > 0)
                 for (var i = 0; i < request.Length; i++)
                 {
@@ -123,10 +129,21 @@ public class QueryBusiness : IQueryBusiness
                         var jsonbColumns = new[] { "properties", "tags" };
 
                         if (jsonbColumns.Contains(query.Filter.ToLower()))
-                            // For JSONB columns, convert to text and search
-                            condition = $"jsonb_pretty(hr.{query.Filter}) ILIKE @{paramName}";
+                        {
+                            if (query.Filter.ToLower() == "tags")
+                                // Tags are an array of objects - flatten and search only the name values
+                                condition =
+                                    $"EXISTS (SELECT 1 FROM jsonb_array_elements(hr.{query.Filter}) elem WHERE elem->>'name' ILIKE @{paramName})";
+                            else
+                                // Properties is a flat object already - we can just search the values
+                                condition =
+                                    $"EXISTS (SELECT 1 FROM jsonb_each_text(hr.{query.Filter}) WHERE value ILIKE @{paramName})";
+                        }
                         else
+                        {
                             condition = $"hr.{query.Filter} ILIKE @{paramName}";
+                        }
+
                         parameters.Add(new NpgsqlParameter(paramName, $"%{query.Value}%"));
                     }
                     else if (query.Operator == "=")
@@ -136,24 +153,30 @@ public class QueryBusiness : IQueryBusiness
 
                         if (jsonbColumns.Contains(query.Filter.ToLower()))
                         {
-                            // For JSONB columns, convert to text for exact match
                             condition = $"jsonb_pretty(hr.{query.Filter}) ILIKE @{paramName}";
                             parameters.Add(new NpgsqlParameter(paramName, $"%{query.Value}%"));
                         }
                         else
                         {
                             condition = $"hr.{query.Filter} = @{paramName}";
-
                             if (int.TryParse(query.Value, out var intVal))
                                 parameters.Add(new NpgsqlParameter(paramName, intVal));
                             else if (DateTime.TryParse(query.Value, out var dateVal))
-                                parameters.Add(new NpgsqlParameter(paramName, dateVal));
+                                {
+                                    var startOfDay = dateVal.Date;
+                                    var startOfNextDay = dateVal.Date.AddDays(1);
+                                    var paramName2 = $"p{parameters.Count + 1}";
+                                    condition = $"hr.{query.Filter} >= @{paramName} AND hr.{query.Filter} < @{paramName2}";
+                                    parameters.Add(new NpgsqlParameter(paramName, startOfDay));
+                                    parameters.Add(new NpgsqlParameter(paramName2, startOfNextDay));
+                                }
                             else
                                 parameters.Add(new NpgsqlParameter(paramName, query.Value));
                         }
                     }
                     else if (query.Operator == ">")
                     {
+                        
                         condition = $"hr.{query.Filter} > @{paramName}";
 
                         if (DateTime.TryParse(query.Value, out var dateVal))
@@ -287,95 +310,109 @@ public class QueryBusiness : IQueryBusiness
     /// <summary>
     ///     Full text records search
     /// </summary>
+    /// <param name="currentUserId">The ID of current user</param>
     /// <param name="userQuery">String query</param>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
     /// <param name="projectIds">Project ids that a user has access to</param>
+    /// <param name="isSysAdmin">Optional param determining if the requesting user is a system admin</param>
+    /// <param name="isOrgAdmin">Optional param determining if the requesting user is an organization admin</param>
+    /// <param name="isProjectAdmin">Optional param determining if the requesting user is a project admin</param>
     /// <returns>A list of historical record response dtos that match provided query parameters</returns>
     public async Task<IEnumerable<HistoricalRecordResponseDto>> Search(
-        long currentUserId, string userQuery, long organizationId, long[] projectIds)
+        long currentUserId, string userQuery, long organizationId, long[] projectIds,
+        bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false)
     {
         if (string.IsNullOrWhiteSpace(userQuery))
             throw new Exception("Search query is required.");
 
-        // Get authorized sensitivity labels for the user
-        var authorizedLabelIds = await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
-            currentUserId, organizationId, projectIds, "read record");
+        // if user is not admin, filter out unauthorized labels
+        var authorizedLabelIds = new List<long>();
+        if (!isSysAdmin && !isOrgAdmin && !isProjectAdmin)
+        {
+            authorizedLabelIds = await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
+                    currentUserId, organizationId, projectIds, "read record");
+        }
 
-        // Process query for full-text search (prefix matching)
         var processedQuery = string.Join(" & ",
             userQuery.Split(' ', StringSplitOptions.RemoveEmptyEntries)
                 .Select(word => word.Trim() + ":*"));
 
-        var sql = @"
-        SELECT DISTINCT ON (hr.record_id)
-        hr.*,
-        hr.class_id as ClassId,
-        hr.class_name as ClassName,
-        hr.original_id as OriginalId,
-        hr.data_source_name as DataSourceName,
-        hr.data_source_id as DataSourceId,
-        hr.project_name as ProjectName,
-        hr.project_id as ProjectId,
-        hr.last_updated_at as LastUpdatedAt,
-        hr.last_updated_by as LastUpdatedBy,
-        hr.object_storage_name as ObjectStorageName,
-        hr.object_storage_id as ObjectStorageId,
-        hr.record_id as RecordId,
-        hr.is_archived as IsArchived
-    FROM deeplynx.historical_records hr
-    LEFT JOIN deeplynx.record_labels rl ON hr.record_id = rl.record_id
-    WHERE hr.is_archived = false
-    AND hr.project_id = ANY(@project_ids)
-    AND hr.organization_id = @organization_id
-    AND (
-        -- Authorization: unlabeled records OR records with authorized labels
-        NOT EXISTS (
-            SELECT 1 
-            FROM deeplynx.record_labels 
-            WHERE record_id = hr.record_id
-        )
-        OR
-        NOT EXISTS (
-            SELECT 1
-            FROM deeplynx.record_labels rl2
-            WHERE rl2.record_id = hr.record_id
-            AND rl2.label_id != ALL(@authorized_label_ids)
+        var authorizationFilter = (!isSysAdmin && !isOrgAdmin && !isProjectAdmin) ? @"
+            AND (
+                NOT EXISTS (
+                    SELECT 1 
+                    FROM deeplynx.record_labels 
+                    WHERE record_id = hr.record_id
                 )
-    ) 
-    AND (
-        -- Search conditions
-        to_tsvector('english',
-                coalesce(name, '') || ' ' ||
-                coalesce(description, '') || ' ' ||
-                coalesce(class_name, '') || ' ' ||
-                coalesce(uri, '') || ' ' ||
-                coalesce(original_id, '') || ' ' ||
-                coalesce(data_source_name, '') || ' ' ||
-                coalesce(project_name, '') || ' ' ||
-                coalesce(properties::text, '') || ' ' ||
-                coalesce(tags::text, '')
-            )@@ to_tsquery('english', @processed_query)
-        OR hr.name ILIKE '%' || @original_query || '%'
-        OR hr.description ILIKE '%' || @original_query || '%'
-        OR hr.original_id ILIKE '%' || @original_query || '%'
-        OR hr.data_source_name ILIKE '%' || @original_query || '%'
-        OR hr.project_name ILIKE '%' || @original_query || '%'
-        OR hr.class_name ILIKE '%' || @original_query || '%'
-    )
-    ORDER BY hr.record_id, hr.last_updated_at DESC";
+                OR
+                NOT EXISTS (
+                    SELECT 1
+                    FROM deeplynx.record_labels rl2
+                    WHERE rl2.record_id = hr.record_id
+                    AND rl2.label_id != ALL(@authorized_label_ids)
+                )
+            )" : "";
 
-        var param1 = new NpgsqlParameter("processed_query", processedQuery);
-        var param2 = new NpgsqlParameter("original_query", userQuery);
-        var param3 = new NpgsqlParameter("project_ids", NpgsqlDbType.Array | NpgsqlDbType.Bigint)
+        var sql = $@"
+            SELECT DISTINCT ON (hr.record_id)
+            hr.*,
+            hr.class_id as ClassId,
+            hr.class_name as ClassName,
+            hr.original_id as OriginalId,
+            hr.data_source_name as DataSourceName,
+            hr.data_source_id as DataSourceId,
+            hr.project_name as ProjectName,
+            hr.project_id as ProjectId,
+            hr.last_updated_at as LastUpdatedAt,
+            hr.last_updated_by as LastUpdatedBy,
+            hr.object_storage_name as ObjectStorageName,
+            hr.object_storage_id as ObjectStorageId,
+            hr.record_id as RecordId,
+            hr.is_archived as IsArchived
+        FROM deeplynx.historical_records hr
+        WHERE hr.is_archived = false
+        AND hr.project_id = ANY(@project_ids)
+        AND hr.organization_id = @organization_id
+        {authorizationFilter}
+        AND (
+            to_tsvector('english',
+                    coalesce(name, '') || ' ' ||
+                    coalesce(description, '') || ' ' ||
+                    coalesce(class_name, '') || ' ' ||
+                    coalesce(uri, '') || ' ' ||
+                    coalesce(original_id, '') || ' ' ||
+                    coalesce(data_source_name, '') || ' ' ||
+                    coalesce(project_name, '') || ' ' ||
+                    coalesce(properties::text, '') || ' ' ||
+                    coalesce(tags::text, '')
+                ) @@ to_tsquery('english', @processed_query)
+            OR hr.name ILIKE '%' || @original_query || '%'
+            OR hr.description ILIKE '%' || @original_query || '%'
+            OR hr.original_id ILIKE '%' || @original_query || '%'
+            OR hr.data_source_name ILIKE '%' || @original_query || '%'
+            OR hr.project_name ILIKE '%' || @original_query || '%'
+            OR hr.class_name ILIKE '%' || @original_query || '%'
+        )
+        ORDER BY hr.record_id, hr.last_updated_at DESC";
+
+        var parameters = new List<NpgsqlParameter>
         {
-            Value = projectIds
-        };
-        var param4 = new NpgsqlParameter("organization_id", organizationId);
-        var param5 = new NpgsqlParameter("authorized_label_ids", NpgsqlDbType.Array | NpgsqlDbType.Bigint)
-        {
-            Value = authorizedLabelIds.ToArray()
+            new NpgsqlParameter("processed_query", processedQuery),
+            new NpgsqlParameter("original_query", userQuery),
+            new NpgsqlParameter("project_ids", NpgsqlDbType.Array | NpgsqlDbType.Bigint) { Value = projectIds },
+            new NpgsqlParameter("organization_id", organizationId)
         };
 
-        var historicalRecordsResults = _context.HistoricalRecords.FromSqlRaw(sql, param1, param2, param3, param4, param5);
+        if (!isSysAdmin && !isOrgAdmin && !isProjectAdmin)
+        {
+            parameters.Add(new NpgsqlParameter("authorized_label_ids", NpgsqlDbType.Array | NpgsqlDbType.Bigint)
+            {
+                Value = authorizedLabelIds.ToArray()
+            });
+        }
+
+        var historicalRecordsResults =
+            _context.HistoricalRecords.FromSqlRaw(sql, parameters.ToArray());
 
         return await historicalRecordsResults
             .Select(r => new HistoricalRecordResponseDto
@@ -403,41 +440,37 @@ public class QueryBusiness : IQueryBusiness
     /// <summary>
     ///     Retrieves current records for projects, ordered by last_updated_at first
     /// </summary>
-    /// <param name="organizationId"> Orginization Id of projects</param>
+    /// <param name="currentUserId">The ID of current user</param>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
     /// <param name="projectIds">An array of project ids</param>
+    /// <param name="isSysAdmin">Optional param determining if the requesting user is a system admin</param>
+    /// <param name="isOrgAdmin">Optional param determining if the requesting user is an organization admin</param>
+    /// <param name="isProjectAdmin">Optional param determining if the requesting user is a project admin</param>
     /// <returns>An array of records</returns>
     public async Task<IEnumerable<HistoricalRecordResponseDto>> GetRecentlyAddedRecords(
-        long currentUserId, long organizationId, long[] projectIds)
+        long currentUserId, long organizationId, long[] projectIds,
+        bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false)
     {
-        // Get authorized sensitivity labels for the user
-        var authorizedLabelIds = await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
-            currentUserId, organizationId, projectIds, "read record");
-    
-        var query = _context.HistoricalRecords
-            .Where(r => r.OrganizationId == organizationId && !r.IsArchived);
-
-        if (projectIds.Length > 0)
-            query = query.Where(r => projectIds.Contains(r.ProjectId));
-        else
-        {
+        if (projectIds.Length == 0)
             return new List<HistoricalRecordResponseDto>();
+
+        var query = _context.HistoricalRecords
+            .Where(r => r.OrganizationId == organizationId && !r.IsArchived)
+            .Where(r => projectIds.Contains(r.ProjectId));
+
+        if (!isSysAdmin && !isOrgAdmin && !isProjectAdmin)
+        {
+            var authorizedLabelIds = await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
+                currentUserId, organizationId, projectIds, "read record");
+
+            var authorizedRecordIds = await _context.Records
+                .WithAuthorizedLabels(authorizedLabelIds)
+                .Select(rec => rec.Id)
+                .ToListAsync();
+
+            query = query.Where(r => authorizedRecordIds.Contains(r.RecordId));
         }
 
-        var authorizedRecordIds = await _context.Records
-            .Where(rec =>
-                // Either the record has no labels
-                !rec.Labels.Any()
-                ||
-                // Or the user is authorized to access All of the records labels
-                rec.Labels.All(label => authorizedLabelIds.Contains(label.Id))
-            )
-            .Select(rec => rec.Id)
-            .ToListAsync();
-        
-        // Filter historical records by authorized record IDs
-        query = query.Where(r => authorizedRecordIds.Contains(r.RecordId));
-
-        
         var records = await query
             .GroupBy(r => r.RecordId)
             .Select(g => g.OrderByDescending(r => r.LastUpdatedAt).First())
@@ -463,48 +496,52 @@ public class QueryBusiness : IQueryBusiness
             LastUpdatedAt = r.LastUpdatedAt
         });
     }
-    
+
     /// <summary>
     ///     Retrieves all records for multiple projects.
     /// </summary>
+    /// <param name="currentUserId">The ID of current user</param>
     /// <param name="organizationId"> Orginization Id of projects</param>
     /// <param name="projects">Array of project ids whose records are to be retrieved</param>
     /// <param name="hideArchived">Flag indicating whether to hide archived records from the result</param>
+    /// <param name="isSysAdmin">Optional param determining if the requesting user is a system admin</param>
+    /// <param name="isOrgAdmin">Optional param determining if the requesting user is an organization admin</param>
+    /// <param name="isProjectAdmin">Optional param determining if the requesting user is a project admin</param>
     /// <returns>A list of records based on the applied filters.</returns>
     public async Task<IEnumerable<HistoricalRecordResponseDto>> GetMultiProjectRecords(
-        long currentUserId, long organizationId, long[] projects, bool hideArchived)
+        long currentUserId, long organizationId, long[] projects, bool hideArchived,
+        bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false)
     {
-        var authorizedLabelIds = await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
-            currentUserId, organizationId, projects, "read record");   
-        
+        if (projects.Length == 0)
+            return new List<HistoricalRecordResponseDto>();
+
         var projectSet = new HashSet<long>(projects);
 
         var recordQuery = _context.HistoricalRecords
             .Where(r => projectSet.Contains(r.ProjectId) && r.OrganizationId == organizationId);
-        
-        var authorizedRecordIds = await _context.Records
-            .Where(rec =>
-                // Either the record has no labels
-                !rec.Labels.Any()
-                ||
-                // Or the user is authorized to access all the records labels
-                rec.Labels.All(label => authorizedLabelIds.Contains(label.Id))
-            )
-            .Select(rec => rec.Id)
-            .ToListAsync();
-        
-        // Filter historical records by authorized record IDs
-        recordQuery = recordQuery.Where(r => authorizedRecordIds.Contains(r.RecordId));
 
         if (hideArchived) recordQuery = recordQuery.Where(r => !r.IsArchived);
 
+        if (!isSysAdmin && !isOrgAdmin && !isProjectAdmin)
+        {
+            var authorizedLabelIds = await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
+                currentUserId, organizationId, projects, "read record");
+
+            var authorizedRecordIds = await _context.Records
+                .WithAuthorizedLabels(authorizedLabelIds)
+                .Select(rec => rec.Id)
+                .ToListAsync();
+
+            recordQuery = recordQuery.Where(r => authorizedRecordIds.Contains(r.RecordId));
+        }
+
         var records = await recordQuery
             .GroupBy(e => e.RecordId)
-            .Select(g => g
-                .OrderByDescending(r => r.LastUpdatedAt).FirstOrDefault())
+            .Select(g => g.OrderByDescending(r => r.LastUpdatedAt).FirstOrDefault())
             .ToListAsync();
 
         return records
+            .Where(r => r != null)
             .Select(r => new HistoricalRecordResponseDto
             {
                 Id = r.RecordId,

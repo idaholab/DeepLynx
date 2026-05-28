@@ -52,7 +52,8 @@ public class EdgeController : ControllerBase
     {
         try
         {
-            var edges = await _edgeBusiness.GetAllEdges(organizationId, projectId, dataSourceId, hideArchived);
+            var currentUserId = UserContextStorage.UserId;
+            var edges = await _edgeBusiness.GetAllEdges(currentUserId, organizationId, projectId, dataSourceId, hideArchived);
             return Ok(edges);
         }
         catch (Exception exc)
@@ -82,7 +83,8 @@ public class EdgeController : ControllerBase
     {
         try
         {
-            var edge = await _edgeBusiness.GetEdge(organizationId, projectId, edgeId, null, null, hideArchived);
+            var currentUserId = UserContextStorage.UserId;
+            var edge = await _edgeBusiness.GetEdge(currentUserId, organizationId, projectId, edgeId, null, null, hideArchived);
             return Ok(edge);
         }
         catch (Exception exc)
@@ -114,7 +116,8 @@ public class EdgeController : ControllerBase
     {
         try
         {
-            var edge = await _edgeBusiness.GetEdge(organizationId, projectId, null, originId, destinationId,
+            var currentUserId = UserContextStorage.UserId;
+            var edge = await _edgeBusiness.GetEdge(currentUserId, organizationId, projectId, null, originId, destinationId,
                 hideArchived);
             return Ok(edge);
         }

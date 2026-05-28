@@ -2,11 +2,14 @@
 
 import React from "react";
 import {
+  CalendarDaysIcon,
+  ClockIcon,
   EnvelopeIcon,
   UserGroupIcon,
   UserIcon,
 } from "@heroicons/react/24/outline";
 import { useLanguage } from "@/app/contexts/Language";
+import { UserActivityCountsDto } from "../../types/responseDTOs";
 
 /* -------------------------------------------------------------------------- */
 /*                             Header & Stats Block                           */
@@ -16,16 +19,20 @@ interface UsersHeaderStatsProps {
   activeUserCount: number;
   pendingCount: number;
   totalCount: number;
+  activityCounts: UserActivityCountsDto;
   loading: boolean;
   onInviteClick: () => void;
+  scope: "org" | "site";
 }
 
 const UsersHeaderStats: React.FC<UsersHeaderStatsProps> = ({
   activeUserCount,
   pendingCount,
   totalCount,
+  activityCounts,
   loading,
   onInviteClick,
+  scope,
 }) => {
   const { t } = useLanguage();
   return (
@@ -34,10 +41,14 @@ const UsersHeaderStats: React.FC<UsersHeaderStatsProps> = ({
       <div className="flex justify-between items-center mb-6">
         <div>
           <h2 className="text-2xl font-bold">
-            {t.translations.ORGANIZATION_USERS}
+            {scope === "org"
+              ? t.translations.ORGANIZATION_USERS
+              : t.translations.SITE_USERS}
           </h2>
           <p className="text-base-content/70 text-sm mt-1">
-            {t.translations.MANAGE_USERS_IN_ORG_DESCRIPTION}
+            {scope === "org"
+              ? t.translations.MANAGE_USERS_IN_ORG_DESCRIPTION
+              : t.translations.MANAGE_USERS_IN_SITE_DESCRIPTION}
           </p>
         </div>
         <button
@@ -77,6 +88,51 @@ const UsersHeaderStats: React.FC<UsersHeaderStatsProps> = ({
           <div className="stat-title">{t.translations.TOTAL}</div>
           <div className="stat-value text-primary">{totalCount}</div>
           <div className="stat-desc">{t.translations.ACTIVE_PLUS_PENDING}</div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <div className="stat bg-base-200 rounded-lg">
+          <div className="stat-figure text-primary">
+            <ClockIcon className="w-8 h-8" />
+          </div>
+          <div className="stat-title">
+            {t.translations.ACTIVE_LAST_24_HOURS}
+          </div>
+          <div className="stat-value text-primary">
+            {activityCounts.activeLast24Hours}
+          </div>
+          <div className="stat-desc">
+            {t.translations.LOGGED_IN_LAST_24_HOURS}
+          </div>
+        </div>
+        <div className="stat bg-base-200 rounded-lg">
+          <div className="stat-figure text-primary">
+            <CalendarDaysIcon className="w-8 h-8" />
+          </div>
+          <div className="stat-title">
+            {t.translations.ACTIVE_LAST_7_DAYS}
+          </div>
+          <div className="stat-value text-primary">
+            {activityCounts.activeLast7Days}
+          </div>
+          <div className="stat-desc">
+            {t.translations.LOGGED_IN_LAST_7_DAYS}
+          </div>
+        </div>
+        <div className="stat bg-base-200 rounded-lg">
+          <div className="stat-figure text-primary">
+            <UserGroupIcon className="w-8 h-8" />
+          </div>
+          <div className="stat-title">
+            {t.translations.ACTIVE_LAST_30_DAYS}
+          </div>
+          <div className="stat-value text-primary">
+            {activityCounts.activeLast30Days}
+          </div>
+          <div className="stat-desc">
+            {t.translations.LOGGED_IN_LAST_30_DAYS}
+          </div>
         </div>
       </div>
     </>

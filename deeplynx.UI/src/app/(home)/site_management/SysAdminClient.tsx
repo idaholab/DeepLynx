@@ -16,6 +16,7 @@ import { getAllUsers } from "@/app/lib/client_service/user_services.client";
 import EventsHistoryClient from "../event_management/EventHistoryClient";
 import UsersTable from "../organization_management/users/UsersTable";
 import { useLanguage } from "@/app/contexts/Language";
+import AdminOverviewCard from "./AdminOverviewCard";
 
 interface SysAdminProps {
   organizations: OrganizationResponseDto[];
@@ -68,7 +69,7 @@ const SysAdminClient = ({
 
   const tabData = [
     {
-      label: "Organization Management",
+      label: t.translations.ORGANIZATION_MANAGEMENT,
       content: (
         <SiteOrganizationManagement
           initialOrganizations={organizations}
@@ -77,7 +78,7 @@ const SysAdminClient = ({
       ),
     },
     {
-      label: "Oauth Application",
+      label: t.translations.OAUTH_APPLICATION,
       content: (
         <OAuthManagement
           initialApplications={applications}
@@ -86,11 +87,17 @@ const SysAdminClient = ({
       ),
     },
     {
-      label: "Member Management",
-      content: <UsersTable members={members} />,
+      label: t.translations.MEMBER_MANAGEMENT,
+      content: (
+        <UsersTable
+          members={members}
+          scope="site"
+          availableOrganizations={organizations}
+        />
+      ),
     },
     {
-      label: "Event History",
+      label: t.translations.EVENT_HISTORY,
       content: (
         <EventsHistoryClient
           initialProjects={initialProjects}
@@ -105,21 +112,35 @@ const SysAdminClient = ({
   };
 
   return (
-    <div>
-      <div className="bg-base-200/40 px-3 sm:px-6 lg:px-12 p-6">
-        <h1 className="text-xl sm:text-2xl font-bold text-base-content">
-          {t.translations.SITE_MANAGEMENT}
-        </h1>
-      </div>
-      <div className="p-2 sm:p-3">
-        <Tabs
-          tabs={tabData}
-          className="mx-1 sm:mx-3"
-          onTabChange={handleTabChange}
-          activeTab={activeTab}
-        />
-      </div>
-    </div>
+    <main className="min-h-screen bg-base-200/30">
+      <section className="border-b border-base-300 bg-base-100">
+        <div className="mx-auto flex w-full max-w-7xl flex-col gap-5 px-3 py-5 sm:px-6 lg:px-8">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-base-content/60">
+              Site
+            </p>
+            <h1 className="text-2xl font-bold text-base-content sm:text-3xl">
+              {t.translations.SITE_MANAGEMENT}
+            </h1>
+          </div>
+        </div>
+      </section>
+
+      <section className="grid grid-cols-1 gap-4 mx-auto w-full max-w-7xl px-3 py-5 sm:px-6 lg:px-8 lg:grid-cols-3">
+        <div className="lg:col-span-2">
+          <Tabs
+            tabs={tabData}
+            className="mx-0"
+            onTabChange={handleTabChange}
+            activeTab={activeTab}
+          />
+        </div>
+
+        <div className="mx-1 sm:mx-3">
+          <AdminOverviewCard />
+        </div>
+      </section>
+    </main>
   );
 };
 

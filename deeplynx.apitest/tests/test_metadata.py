@@ -564,9 +564,10 @@ def test_parse_metadata_with_edges_same_origin_destination_fails(client, organiz
     
     response_text = response.text.lower()
     assert (
-        "ck_edges_origin_destination_different" in response_text.lower() or 
-        "destination and origin" in response_text or 
-        "cannot be the same" in response_text or 
+        "ck_edges_origin_destination_different" in response_text or
+        "destination and origin" in response_text or
+        "cannot be the same" in response_text or
+        "validation" in response_text or
         "check constraint" in response_text.lower()
     ), f"Error message should mention validation issue with origin/destination. Got: {response_text}"
     

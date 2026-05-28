@@ -3,6 +3,7 @@ using deeplynx.helpers.Context;
 using deeplynx.interfaces;
 using deeplynx.models;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 
 namespace deeplynx.api.Controllers;
@@ -60,8 +61,11 @@ public class RecordController : ControllerBase
         try
         {
             var currentUserId = UserContextStorage.UserId;
+            var isSysAdmin = UserContextStorage.IsSysAdmin;
+            var isOrgAdmin = UserContextStorage.IsOrgAdmin;
+            var isProjectAdmin = UserContextStorage.IsProjectAdmin;
             var records =
-                await _recordBusiness.GetAllRecords(currentUserId, organizationId, projectId, dataSourceId, hideArchived, fileType);
+                await _recordBusiness.GetAllRecords(currentUserId, organizationId, projectId, dataSourceId, hideArchived, fileType, isSysAdmin, isOrgAdmin, isProjectAdmin);
             return Ok(records);
         }
         catch (Exception exc)
@@ -71,6 +75,53 @@ public class RecordController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
+
+
+    /// <summary>
+    /// GetAllRecords (Paginated)
+    /// </summary>
+    /// <param name="organizationId">The id of the organization</param>
+    /// <param name="projectId">The id of the project</param>
+    /// <param name="hideArchived">Whether to hide archived records</param>
+    /// <param name="queryDto">Pagination parameters</param>
+    /// <returns>A paginated list of records based on applied filters</returns>
+    [HttpGet("GetAllRecordsPaginated", Name = "api_get_all_records_paginated")]
+    public async Task<ActionResult<PaginatedResponse<RecordResponseDto>>> GetAllRecordsPaginated(
+        long organizationId,
+        long projectId,
+        bool hideArchived,
+        [FromQuery] RecordQueryRequestDto? queryDto
+    )
+    {
+        try
+        {
+            var currentUserID  = UserContextStorage.UserId;
+            var isSysAdmin     = UserContextStorage.IsSysAdmin;
+            var isOrgAdmin     = UserContextStorage.IsOrgAdmin;
+            var isProjectAdmin = UserContextStorage.IsProjectAdmin;
+
+            var records = await _recordBusiness.GetAllRecordsPaginated(
+                currentUserID,
+                organizationId,
+                projectId,
+                hideArchived,
+                queryDto,
+                isSysAdmin,
+                isOrgAdmin,
+                isProjectAdmin
+            );
+
+            return Ok(records);
+        }
+        catch (Exception e)
+        {
+            var message = $"An unexpected error occurred while fetching records: {e}";
+            _logger.LogError(message);
+            return StatusCode(StatusCodes.Status500InternalServerError, message);
+        }
+    }
+
+
 
     /// <summary>
     ///     Get Records by Tags
@@ -93,12 +144,60 @@ public class RecordController : ControllerBase
         try
         {
             var currentUserId = UserContextStorage.UserId;
-            var records = await _recordBusiness.GetRecordsByTags(currentUserId, organizationId, projectId, tagIds, hideArchived);
+            var isSysAdmin = UserContextStorage.IsSysAdmin;
+            var isOrgAdmin = UserContextStorage.IsOrgAdmin;
+            var isProjectAdmin = UserContextStorage.IsProjectAdmin;
+            var records = await _recordBusiness.GetRecordsByTags(currentUserId, organizationId, projectId, tagIds, hideArchived, isSysAdmin, isOrgAdmin, isProjectAdmin);
             return Ok(records);
         }
         catch (Exception exc)
         {
             var message = $"An error occurred while listing records by tags: {exc}";
+            _logger.LogError(message);
+            return StatusCode(StatusCodes.Status500InternalServerError, message);
+        }
+    }
+    
+    /// <summary>
+    ///     Get Records by Original IDs
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <param name="projectId">The ID of the project to search within</param>
+    /// <param name="dataSourceId">The ID of the data source to search within</param>
+    /// <param name="originalIds">List of original IDs to retrieve records for</param>
+    /// <param name="hideArchived">Flag indicating whether to hide archived records from the result (Default true)</param>
+    /// <returns>A list of records matching the provided original IDs.</returns>
+    [HttpPost("by-original-ids", Name = "api_get_records_by_original_ids")]
+    [Auth("read", "record")]
+    [Sensitivity("read record")]
+    public async Task<ActionResult<IEnumerable<RecordResponseDto>>> GetRecordsByOriginalId(
+        long organizationId,
+        long projectId,
+        [FromQuery] long dataSourceId,
+        [FromBody] List<string> originalIds,
+        [FromQuery] bool hideArchived = true)
+    {
+        try
+        {
+            var currentUserId = UserContextStorage.UserId;
+            var isSysAdmin = UserContextStorage.IsSysAdmin;
+            var isOrgAdmin = UserContextStorage.IsOrgAdmin;
+            var isProjectAdmin = UserContextStorage.IsProjectAdmin;
+            var records = await _recordBusiness.GetRecordsByOriginalId(
+                currentUserId, organizationId, projectId, dataSourceId, originalIds, hideArchived, isSysAdmin, isOrgAdmin, isProjectAdmin);
+            return Ok(records);
+        }
+        catch (ArgumentException exc)
+        {
+            return BadRequest(exc.Message);
+        }
+        catch (KeyNotFoundException exc)
+        {
+            return NotFound(exc.Message);
+        }
+        catch (Exception exc)
+        {
+            var message = $"An error occurred while retrieving records by original ID: {exc}";
             _logger.LogError(message);
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
@@ -212,6 +311,7 @@ public class RecordController : ControllerBase
     /// <returns>The created records</returns>
     [HttpPost("bulk", Name = "api_create_many_records")]
     [Auth("write", "record")]
+    [Sensitivity("write record")]
     public async Task<ActionResult<List<RecordResponseDto>>> BulkCreateRecords(
         long organizationId,
         long projectId,
@@ -396,8 +496,86 @@ public class RecordController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
+
+    /// <summary>
+    ///     Bulk Attach Tags to Records
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <param name="projectId">The ID of the project to which the record belongs</param>
+    /// <param name="dtos">List of record/tag pairs to attach</param>
+    /// <returns>A message stating the tags were successfully attached to the records.</returns>
+    [HttpPost("bulk-attach-tags-to-records", Name = "api_bulk_attach_tags_to_records")]
+    [Auth("update", "record")]
+    [Auth("read", "tag")]
+    public async Task<IActionResult> BulkAttachTagsToRecords(
+        long organizationId,
+        long projectId,
+        [FromBody] List<RecordTagLinkDto> dtos)
+    {
+        try
+        {
+            var currentUserId = UserContextStorage.UserId;
+
+            await _recordBusiness.BulkAttachTags(currentUserId, organizationId, projectId, dtos);
+
+            return Ok(new { message = "Successfully bulk attached tags to records" });
+        }
+        catch (ArgumentException exc)
+        {
+            return BadRequest(exc.Message);
+        }
+        catch (KeyNotFoundException exc)
+        {
+            return NotFound(exc.Message);
+        }
+        catch (Exception exc)
+        {
+            var message = $"An error occurred while bulk attaching tags to records: {exc}";
+            _logger.LogError(message);
+            return StatusCode(StatusCodes.Status500InternalServerError, message);
+        }
+    }
+
+    /// <summary>
+    ///     Bulk Unattach Tags From Records
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <param name="projectId">The ID of the project to which the record belongs</param>
+    /// <param name="dtos">List of record/tag pairs to unattach</param>
+    /// <returns>A message stating the tags were successfully unattached from the records.</returns>
+    [HttpPost("bulk-unattach-tags-from-records", Name = "api_bulk_unattach_tags_from_records")]
+    [Auth("update", "record")]
+    [Auth("read", "tag")]
+    public async Task<IActionResult> BulkUnattachTagsFromRecords(
+        long organizationId,
+        long projectId,
+        [FromBody] List<RecordTagLinkDto> dtos)
+    {
+        try
+        {
+            var currentUserId = UserContextStorage.UserId;
+
+            await _recordBusiness.BulkUnattachTags(currentUserId, organizationId, projectId, dtos);
+
+            return Ok(new { message = "Successfully bulk unattached tags from records" });
+        }
+        catch (ArgumentException exc)
+        {
+            return BadRequest(exc.Message);
+        }
+        catch (KeyNotFoundException exc)
+        {
+            return NotFound(exc.Message);
+        }
+        catch (Exception exc)
+        {
+            var message = $"An error occurred while bulk unattaching tags from records: {exc}";
+            _logger.LogError(message);
+            return StatusCode(StatusCodes.Status500InternalServerError, message);
+        }
+    }
     
-        /// <summary>
+    /// <summary>
     ///     Attach a Sensitivity Label to a Record
     /// </summary>
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
@@ -521,8 +699,9 @@ public class RecordController : ControllerBase
     {
         try
         {
+            var currentUserId = UserContextStorage.UserId;
             var edges = await _graphBusiness.GetEdgesByRecord(
-                organizationId, projectId, recordId, isOrigin, page, pageSize);
+                currentUserId, organizationId, projectId, recordId, isOrigin, page, pageSize);
             return Ok(edges);
         }
         catch (Exception exc)

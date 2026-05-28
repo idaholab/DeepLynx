@@ -28,16 +28,20 @@ public class SysAdminAttribute : Attribute
 }
 
 /// <summary>
-/// Requires the user to be an organization administrator
+/// Requires the user to be an organization administrator. Set <paramref name="unscoped"/>
+/// when the route does not include an organization ID; the caller must then be a system admin or
+/// an organization admin in at least one organization in the system.
 /// </summary>
 [AttributeUsage(AttributeTargets.Class | AttributeTargets.Method, AllowMultiple = false)]
 public class OrgAdminAttribute : Attribute
 {
     public bool IncludeArchived { get; set; }
+    public bool Unscoped { get; set; }
 
-    public OrgAdminAttribute(bool includeArchived = false)
+    public OrgAdminAttribute(bool includeArchived = false, bool unscoped = false)
     {
         IncludeArchived = includeArchived;
+        Unscoped = unscoped;
     }
 }
 
@@ -82,7 +86,7 @@ public class AuthMiddleware
             return;
         }
 
-        var isSysAdmin = await adminService.SysAdminCheck(userId);
+        var isSysAdmin = UserContextStorage.IsSysAdmin;
 
         // Handle SysAdmin attribute
         if (sysAdminAttr != null)
@@ -99,16 +103,16 @@ public class AuthMiddleware
         }
 
         // Extract organization and project IDs
-        int? organizationId = null;
-        var projectIds = new List<int>();
+        long? organizationId = null;
+        var projectIds = new List<long>();
         long? capturedOrgId = null;
 
         var routeOrgId = context.GetRouteValue("organizationId")?.ToString();
-        if (!string.IsNullOrEmpty(routeOrgId) && int.TryParse(routeOrgId, out var tempOrgId))
+        if (!string.IsNullOrEmpty(routeOrgId) && long.TryParse(routeOrgId, out var tempOrgId))
             organizationId = tempOrgId;
 
         var routeProjectId = context.GetRouteValue("projectId")?.ToString();
-        if (!string.IsNullOrEmpty(routeProjectId) && int.TryParse(routeProjectId, out var tempProjectId))
+        if (!string.IsNullOrEmpty(routeProjectId) && long.TryParse(routeProjectId, out var tempProjectId))
             projectIds.Add(tempProjectId);
 
         if (context.Request.Query.TryGetValue("projectIds", out var queryProjectIds))
@@ -117,7 +121,7 @@ public class AuthMiddleware
                 {
                     var ids = idValue.Split(',', StringSplitOptions.RemoveEmptyEntries);
                     foreach (var id in ids)
-                        if (int.TryParse(id.Trim(), out var parsedId) && !projectIds.Contains(parsedId))
+                        if (long.TryParse(id.Trim(), out var parsedId) && !projectIds.Contains(parsedId))
                             projectIds.Add(parsedId);
                 }
 
@@ -126,6 +130,19 @@ public class AuthMiddleware
         {
             if (!organizationId.HasValue)
             {
+                if (orgAdminAttr.Unscoped)
+                {
+                    if (isSysAdmin || await adminService.OrgAdminInSystemCheck(userId))
+                    {
+                        await _next(context);
+                        return;
+                    }
+
+                    context.Response.StatusCode = StatusCodes.Status403Forbidden;
+                    await context.Response.WriteAsJsonAsync(new { error = "Forbidden: Organization administrator access required" });
+                    return;
+                }
+
                 context.Response.StatusCode = StatusCodes.Status400BadRequest;
                 await context.Response.WriteAsJsonAsync(new { error = "Bad Request: Organization ID required for organization admin check" });
                 return;
@@ -138,7 +155,7 @@ public class AuthMiddleware
                 orgAdminAttr.IncludeArchived
             );
 
-            if (capturedOrgId.HasValue) 
+            if (capturedOrgId.HasValue)
                 UserContextStorage.OrganizationId = capturedOrgId.Value;
 
             // System admins automatically pass
@@ -148,10 +165,8 @@ public class AuthMiddleware
                 return;
             }
 
-            // Check if user is org admin (using permission check)
-            var isOrgAdmin = await adminService.OrgAdminCheck(userId, organizationId.Value);
-
-            if (!isOrgAdmin)
+            // IsOrgAdmin is pre-populated by UserContextMiddleware
+            if (!UserContextStorage.IsOrgAdmin)
             {
                 context.Response.StatusCode = StatusCodes.Status403Forbidden;
                 await context.Response.WriteAsJsonAsync(new { error = "Forbidden: Organization administrator access required" });
@@ -162,12 +177,11 @@ public class AuthMiddleware
             return;
         }
 
-        // Original AuthAttribute logic
         if (!isSysAdmin && !organizationId.HasValue && !projectIds.Any())
         {
             context.Response.StatusCode = StatusCodes.Status400BadRequest;
             await context.Response.WriteAsJsonAsync(new
-                { error = "Forbidden: Non-admin users require organization or project context" });
+            { error = "Forbidden: Non-admin users require organization or project context" });
             return;
         }
 
@@ -191,6 +205,7 @@ public class AuthMiddleware
                 );
 
             if (capturedOrgId.HasValue) UserContextStorage.OrganizationId = capturedOrgId.Value;
+            // IsProjectAdmin is pre-populated by UserContextMiddleware
         }
 
         if (isSysAdmin)

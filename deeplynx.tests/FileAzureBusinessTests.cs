@@ -10,7 +10,7 @@ using Record = deeplynx.datalayer.Models.Record;
 namespace deeplynx.tests;
 
 // Fixture specifically for this test class only
-public class AzuriteFixture : IAsyncLifetime
+public class FileAzuriteFixture : IAsyncLifetime
 {
     private AzuriteContainer _azuriteContainer = null!;
     
@@ -33,10 +33,10 @@ public class AzuriteFixture : IAsyncLifetime
 }
 
 [Collection("Test Suite Collection")]
-public class FileAzureBusinessTests : IntegrationTestBase, IClassFixture<AzuriteFixture>
+public class FileAzureBusinessTests : IntegrationTestBase, IClassFixture<FileAzuriteFixture>
 {
     private FileAzureBusiness _fileAzureBusiness = null!;
-    private readonly AzuriteFixture _azuriteFixture;
+    private readonly FileAzuriteFixture _azuriteFixture;
     private string _connectionString = null!;
     private string _containerName = "test-container";
     private ObjectStorageConfigDto _objectStorageConfig = null!;
@@ -48,7 +48,7 @@ public class FileAzureBusinessTests : IntegrationTestBase, IClassFixture<Azurite
     private long _uid;
     private long _recordId;
 
-    public FileAzureBusinessTests(TestSuiteFixture fixture, AzuriteFixture azuriteFixture) : base(fixture)
+    public FileAzureBusinessTests(TestSuiteFixture fixture, FileAzuriteFixture azuriteFixture) : base(fixture)
     {
         _azuriteFixture = azuriteFixture;
     }
@@ -1800,5 +1800,1021 @@ public class FileAzureBusinessTests : IntegrationTestBase, IClassFixture<Azurite
 
     #endregion
     
+    #region GetStorageSize Tests
+ 
+    [Fact]
+    public async Task GetStorageSize_ReturnsZero_WhenAzureConfigIsNull()
+    {
+        // Arrange
+        var invalidConfig = new ObjectStorageConfigDto
+        {
+            AzureObjectConfig = null
+        };
+        var prefix = "organization_1/project_1/";
+ 
+        // Act
+        var result = await _fileAzureBusiness.GetStorageSize(prefix, invalidConfig);
+ 
+        // Assert
+        Assert.Equal(0, result);
+    }
+ 
+    [Fact]
+    public async Task GetStorageSize_ReturnsZero_WhenContainerDoesNotExist()
+    {
+        // Arrange
+        var nonExistentConfig = new ObjectStorageConfigDto
+        {
+            AzureObjectConfig = new AzureObjectConfigDto
+            {
+                AzureConnectionString = _connectionString,
+                AzureContainerName = "non-existent-container"
+            }
+        };
+        var prefix = "organization_1/project_1/";
+ 
+        // Act
+        var result = await _fileAzureBusiness.GetStorageSize(prefix, nonExistentConfig);
+ 
+        // Assert
+        Assert.Equal(0, result);
+    }
+ 
+    [Fact]
+    public async Task GetStorageSize_ReturnsZero_WhenContainerIsEmpty()
+    {
+        // Arrange
+        var container = new BlobContainerClient(_connectionString, _containerName);
+        await container.CreateIfNotExistsAsync();
+        var prefix = "organization_1/project_1/";
+ 
+        // Act
+        var result = await _fileAzureBusiness.GetStorageSize(prefix, _objectStorageConfig);
+ 
+        // Assert
+        Assert.Equal(0, result);
+    }
+ 
+    [Fact]
+    public async Task GetStorageSize_ReturnsCorrectSize_ForSingleBlob()
+    {
+        // Arrange
+        var container = new BlobContainerClient(_connectionString, _containerName);
+        await container.CreateIfNotExistsAsync();
+        
+        var blobName = "organization_1/project_1/datasource_1/test-blob.txt";
+        var blob = container.GetBlobClient(blobName);
+        var content = new byte[1024]; // 1KB
+        new Random().NextBytes(content);
+        using var stream = new MemoryStream(content);
+        await blob.UploadAsync(stream, overwrite: true);
+ 
+        var prefix = "organization_1/project_1/";
+ 
+        // Act
+        var result = await _fileAzureBusiness.GetStorageSize(prefix, _objectStorageConfig);
+ 
+        // Assert
+        Assert.Equal(1024, result);
+    }
+ 
+    [Fact]
+    public async Task GetStorageSize_ReturnsCorrectSize_ForMultipleBlobs()
+    {
+        // Arrange
+        var container = new BlobContainerClient(_connectionString, _containerName);
+        await container.CreateIfNotExistsAsync();
+        
+        // Create 3 blobs of different sizes
+        await UploadBlobAsync(container, "organization_1/project_1/datasource_1/blob1.txt", 500);
+        await UploadBlobAsync(container, "organization_1/project_1/datasource_1/blob2.txt", 1000);
+        await UploadBlobAsync(container, "organization_1/project_1/datasource_2/blob3.txt", 1500);
+ 
+        var prefix = "organization_1/project_1/";
+ 
+        // Act
+        var result = await _fileAzureBusiness.GetStorageSize(prefix, _objectStorageConfig);
+ 
+        // Assert
+        Assert.Equal(3000, result); // 500 + 1000 + 1500
+    }
+ 
+    [Fact]
+    public async Task GetStorageSize_ReturnsCorrectSize_WithEmptyPrefix()
+    {
+        // Arrange
+        var container = new BlobContainerClient(_connectionString, _containerName);
+        await container.CreateIfNotExistsAsync();
+        
+        // Create blobs across multiple organizations and projects
+        await UploadBlobAsync(container, "organization_1/project_1/datasource_1/file1.txt", 1000);
+        await UploadBlobAsync(container, "organization_1/project_2/datasource_1/file2.txt", 2000);
+        await UploadBlobAsync(container, "organization_2/project_1/datasource_1/file3.txt", 3000);
+ 
+        var prefix = "";
+ 
+        // Act - Empty prefix should count everything
+        var result = await _fileAzureBusiness.GetStorageSize(prefix, _objectStorageConfig);
+ 
+        // Assert
+        Assert.Equal(6000, result); // All blobs counted
+    }
+ 
+    [Fact]
+    public async Task GetStorageSize_OnlyCountsBlobsWithSpecificPrefix()
+    {
+        // Arrange
+        var container = new BlobContainerClient(_connectionString, _containerName);
+        await container.CreateIfNotExistsAsync();
+        
+        // Create blobs in different projects
+        await UploadBlobAsync(container, "organization_1/project_1/datasource_1/file1.txt", 1000);
+        await UploadBlobAsync(container, "organization_1/project_2/datasource_1/file2.txt", 2000);
+        await UploadBlobAsync(container, "organization_2/project_1/datasource_1/file3.txt", 3000);
+ 
+        var prefix = "organization_1/project_1/";
+ 
+        // Act - Only count project 1 in org 1
+        var result = await _fileAzureBusiness.GetStorageSize(prefix, _objectStorageConfig);
+ 
+        // Assert
+        Assert.Equal(1000, result); // Only project 1 blob
+    }
+ 
+    [Fact]
+    public async Task GetStorageSize_HandlesNestedPaths()
+    {
+        // Arrange
+        var container = new BlobContainerClient(_connectionString, _containerName);
+        await container.CreateIfNotExistsAsync();
+        
+        var prefix = "organization_1/project_1/";
+        
+        // Create blobs at different nested levels
+        await UploadBlobAsync(container, "organization_1/project_1/datasource_1/file1.txt", 100);
+        await UploadBlobAsync(container, "organization_1/project_1/datasource_1/subfolder/file2.txt", 200);
+        await UploadBlobAsync(container, "organization_1/project_1/datasource_2/file3.txt", 300);
+        await UploadBlobAsync(container, "organization_1/project_1/datasource_2/deep/nested/file4.txt", 400);
+ 
+        // Act
+        var result = await _fileAzureBusiness.GetStorageSize(prefix, _objectStorageConfig);
+ 
+        // Assert
+        Assert.Equal(1000, result); // All nested blobs counted
+    }
+ 
+    [Fact]
+    public async Task GetStorageSize_OnlyCountsBlobsInCorrectOrganization()
+    {
+        // Arrange
+        var container = new BlobContainerClient(_connectionString, _containerName);
+        await container.CreateIfNotExistsAsync();
+        
+        // Create blobs for different organizations
+        await UploadBlobAsync(container, "organization_1/project_1/datasource_1/file1.txt", 5000);
+        await UploadBlobAsync(container, "organization_2/project_1/datasource_1/file2.txt", 7000);
+        await UploadBlobAsync(container, "organization_3/project_1/datasource_1/file3.txt", 9000);
+ 
+        var prefix = "organization_1/";
+ 
+        // Act - Get size for org 1 only
+        var result = await _fileAzureBusiness.GetStorageSize(prefix, _objectStorageConfig);
+ 
+        // Assert
+        Assert.Equal(5000, result); // Only org 1 blobs
+    }
+ 
+    [Fact]
+    public async Task GetStorageSize_ReturnsCorrectSize_ForLargeBlob()
+    {
+        // Arrange
+        var container = new BlobContainerClient(_connectionString, _containerName);
+        await container.CreateIfNotExistsAsync();
+        
+        // Create a 5MB blob
+        var largeFileSize = 5 * 1024 * 1024;
+        await UploadBlobAsync(container, "organization_1/project_1/datasource_1/large-file.bin", largeFileSize);
+ 
+        var prefix = "organization_1/project_1/";
+ 
+        // Act
+        var result = await _fileAzureBusiness.GetStorageSize(prefix, _objectStorageConfig);
+ 
+        // Assert
+        Assert.Equal(largeFileSize, result);
+    }
+ 
+    [Fact]
+    public async Task GetStorageSize_ReturnsZero_ForEmptyBlobs()
+    {
+        // Arrange
+        var container = new BlobContainerClient(_connectionString, _containerName);
+        await container.CreateIfNotExistsAsync();
+        
+        // Create empty blob
+        await UploadBlobAsync(container, "organization_1/project_1/datasource_1/empty.txt", 0);
+ 
+        var prefix = "organization_1/project_1/";
+ 
+        // Act
+        var result = await _fileAzureBusiness.GetStorageSize(prefix, _objectStorageConfig);
+ 
+        // Assert
+        Assert.Equal(0, result);
+    }
+ 
+    [Fact]
+    public async Task GetStorageSize_HandlesBlobsWithoutContentLength()
+    {
+        // Arrange
+        var container = new BlobContainerClient(_connectionString, _containerName);
+        await container.CreateIfNotExistsAsync();
+        
+        // Create normal blobs
+        await UploadBlobAsync(container, "organization_1/project_1/datasource_1/file1.txt", 1000);
+        await UploadBlobAsync(container, "organization_1/project_1/datasource_1/file2.txt", 2000);
+ 
+        var prefix = "organization_1/project_1/";
+ 
+        // Act
+        var result = await _fileAzureBusiness.GetStorageSize(prefix, _objectStorageConfig);
+ 
+        // Assert - Should count blobs that have ContentLength
+        Assert.Equal(3000, result);
+    }
+ 
+    [Fact]
+    public async Task GetStorageSize_WorksWithDifferentContainers()
+    {
+        // Arrange
+        var container1Name = "container-1";
+        var container2Name = "container-2";
+        
+        var container1 = new BlobContainerClient(_connectionString, container1Name);
+        var container2 = new BlobContainerClient(_connectionString, container2Name);
+        
+        await container1.CreateIfNotExistsAsync();
+        await container2.CreateIfNotExistsAsync();
+        
+        // Add blobs to both containers
+        await UploadBlobAsync(container1, "organization_1/project_1/datasource_1/file1.txt", 3000);
+        await UploadBlobAsync(container2, "organization_1/project_1/datasource_1/file2.txt", 5000);
+ 
+        var config1 = new ObjectStorageConfigDto
+        {
+            AzureObjectConfig = new AzureObjectConfigDto
+            {
+                AzureConnectionString = _connectionString,
+                AzureContainerName = container1Name
+            }
+        };
+ 
+        var config2 = new ObjectStorageConfigDto
+        {
+            AzureObjectConfig = new AzureObjectConfigDto
+            {
+                AzureConnectionString = _connectionString,
+                AzureContainerName = container2Name
+            }
+        };
+ 
+        var prefix = "organization_1/project_1/";
+ 
+        // Act
+        var result1 = await _fileAzureBusiness.GetStorageSize(prefix, config1);
+        var result2 = await _fileAzureBusiness.GetStorageSize(prefix, config2);
+ 
+        // Assert
+        Assert.Equal(3000, result1);
+        Assert.Equal(5000, result2);
+    }
+ 
+    [Fact]
+    public async Task GetStorageSize_IgnoresBlobsOutsidePrefix()
+    {
+        // Arrange
+        var container = new BlobContainerClient(_connectionString, _containerName);
+        await container.CreateIfNotExistsAsync();
+        
+        // Create blobs - some matching prefix, some not
+        await UploadBlobAsync(container, "organization_1/project_1/datasource_1/file1.txt", 1000);
+        await UploadBlobAsync(container, "organization_1/project_2/datasource_1/file2.txt", 2000);
+        await UploadBlobAsync(container, "organization_10/project_1/datasource_1/file3.txt", 3000); // Similar but different org
+        await UploadBlobAsync(container, "organization_1/project_10/datasource_1/file4.txt", 4000); // Similar but different project
+ 
+        var prefix = "organization_1/project_1/";
+ 
+        // Act
+        var result = await _fileAzureBusiness.GetStorageSize(prefix, _objectStorageConfig);
+ 
+        // Assert
+        Assert.Equal(1000, result); // Only exact prefix match
+    }
+ 
+    #endregion
+ 
+    #region BuildPrefix Tests
+ 
+    [Fact]
+    public void BuildPrefix_ReturnsCorrectFormat_WithProjectId()
+    {
+        // Arrange
+        long orgId = 123;
+        long? projectId = 456;
+ 
+        // Act
+        var result = _fileAzureBusiness.BuildPrefix(orgId, projectId);
+ 
+        // Assert
+        Assert.Equal("organization_123/project_456/", result);
+    }
+ 
+    [Fact]
+    public void BuildPrefix_ReturnsCorrectFormat_WithoutProjectId()
+    {
+        // Arrange
+        long orgId = 789;
+        long? projectId = null;
+ 
+        // Act
+        var result = _fileAzureBusiness.BuildPrefix(orgId, projectId);
+ 
+        // Assert
+        Assert.Equal("organization_789/", result);
+    }
+ 
+    [Fact]
+    public void BuildPrefix_UsesCorrectNamingConvention()
+    {
+        // Arrange & Act
+        var withProject = _fileAzureBusiness.BuildPrefix(1, 2);
+        var withoutProject = _fileAzureBusiness.BuildPrefix(1, null);
+ 
+        // Assert
+        // Azure uses "organization_" prefix (not "org_" like filesystem)
+        Assert.StartsWith("organization_", withProject);
+        Assert.StartsWith("organization_", withoutProject);
+        
+        // Should use "project_" for project
+        Assert.Contains("project_", withProject);
+        Assert.DoesNotContain("project_", withoutProject);
+    }
+ 
+    [Fact]
+    public void BuildPrefix_EndsWithSlash()
+    {
+        // Arrange & Act
+        var withProject = _fileAzureBusiness.BuildPrefix(1, 2);
+        var withoutProject = _fileAzureBusiness.BuildPrefix(1, null);
+ 
+        // Assert
+        Assert.EndsWith("/", withProject);
+        Assert.EndsWith("/", withoutProject);
+    }
+ 
+    [Fact]
+    public void BuildPrefix_MultipleCallsWithSameInput_ReturnsSameResult()
+    {
+        // Arrange
+        long orgId = 100;
+        long? projectId = 200;
+ 
+        // Act
+        var result1 = _fileAzureBusiness.BuildPrefix(orgId, projectId);
+        var result2 = _fileAzureBusiness.BuildPrefix(orgId, projectId);
+        var result3 = _fileAzureBusiness.BuildPrefix(orgId, projectId);
+ 
+        // Assert
+        Assert.Equal(result1, result2);
+        Assert.Equal(result2, result3);
+    }
+ 
+    [Fact]
+    public void BuildPrefix_DifferentFromFilesystemFormat()
+    {
+        // Arrange
+        long orgId = 1;
+        long? projectId = 2;
+ 
+        // Act
+        var azurePrefix = _fileAzureBusiness.BuildPrefix(orgId, projectId);
+ 
+        // Assert
+        // Azure format uses "organization_" not "org_"
+        Assert.StartsWith("organization_", azurePrefix);
+        Assert.Equal("organization_1/project_2/", azurePrefix);
+        
+        // Filesystem would be "org_1/project_2/"
+        Assert.NotEqual("org_1/project_2/", azurePrefix);
+    }
+ 
+    #endregion
+ 
+    #region Integration Tests - GetStorageSize with BuildPrefix
+ 
+    [Fact]
+    public async Task GetStorageSize_WithBuildPrefix_WorksCorrectly()
+    {
+        // Arrange
+        var container = new BlobContainerClient(_connectionString, _containerName);
+        await container.CreateIfNotExistsAsync();
+        
+        long orgId = 5;
+        long projectId = 10;
+        
+        // Use BuildPrefix to get the prefix
+        var prefix = _fileAzureBusiness.BuildPrefix(orgId, projectId);
+        
+        // Create blob matching the prefix
+        await UploadBlobAsync(container, $"organization_{orgId}/project_{projectId}/datasource_1/file.txt", 2500);
+ 
+        // Act
+        var result = await _fileAzureBusiness.GetStorageSize(prefix, _objectStorageConfig);
+ 
+        // Assert
+        Assert.Equal(2500, result);
+    }
+ 
+    [Fact]
+    public async Task GetStorageSize_WithBuildPrefix_OrganizationLevel_AggregatesAllProjects()
+    {
+        // Arrange
+        var container = new BlobContainerClient(_connectionString, _containerName);
+        await container.CreateIfNotExistsAsync();
+        
+        long orgId = 4;
+        
+        // Create blobs across multiple projects in the same organization
+        await UploadBlobAsync(container, $"organization_{orgId}/project_1/datasource_1/file1.txt", 1000);
+        await UploadBlobAsync(container, $"organization_{orgId}/project_2/datasource_1/file2.txt", 2000);
+        await UploadBlobAsync(container, $"organization_{orgId}/project_3/datasource_1/file3.txt", 3000);
+ 
+        // Act - Get organization-level prefix (no project)
+        var prefix = _fileAzureBusiness.BuildPrefix(orgId, null);
+        var result = await _fileAzureBusiness.GetStorageSize(prefix, _objectStorageConfig);
+ 
+        // Assert
+        Assert.Equal(6000, result); // All projects in org
+    }
+ 
+    #endregion
     
+    #region GetFileSize Tests
+
+    [Fact]
+    public async Task GetFileSize_ReturnsCorrectSize_ForExistingBlob()
+    {
+        // Arrange
+        var container = new BlobContainerClient(_connectionString, _containerName);
+        await container.CreateIfNotExistsAsync();
+    
+        var blobName = $"organization_{_oid}/project_{_pid}/datasource_{_dsid}/size-test.txt";
+        var content = new byte[1024]; // 1KB
+        new Random().NextBytes(content);
+    
+        var blob = container.GetBlobClient(blobName);
+        using var stream = new MemoryStream(content);
+        await blob.UploadAsync(stream, overwrite: true);
+
+        // Act
+        var result = await _fileAzureBusiness.GetFileSize(blobName, _objectStorageConfig);
+
+        // Assert
+        Assert.Equal(1024, result);
+    }
+
+    [Fact]
+    public async Task GetFileSize_ReturnsZero_ForEmptyBlob()
+    {
+        // Arrange
+        var guid = Guid.NewGuid();
+        var fileName = "empty.txt";
+        var mockFile = CreateMockFile(fileName, "");
+
+        var uri = await _fileAzureBusiness.UploadFile(
+            _oid, _pid, _dsid, _objectStorageConfig, mockFile, guid);
+
+        // Act
+        var result = await _fileAzureBusiness.GetFileSize(uri, _objectStorageConfig);
+
+        // Assert
+        Assert.Equal(0, result);
+    }
+
+    [Fact]
+    public async Task GetFileSize_ThrowsException_WhenBlobDoesNotExist()
+    {
+        // Arrange
+        var nonExistentUri = "organization_1/project_1/datasource_1/non-existent-file.txt";
+
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<Exception>(() =>
+            _fileAzureBusiness.GetFileSize(nonExistentUri, _objectStorageConfig));
+
+        Assert.Contains("Failed to get size for file", exception.Message);
+    }
+
+    [Fact]
+    public async Task GetFileSize_ThrowsException_WhenAzureConfigIsNull()
+    {
+        // Arrange
+        var invalidConfig = new ObjectStorageConfigDto
+        {
+            AzureObjectConfig = null
+        };
+        var testUri = "some-uri";
+
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<Exception>(() =>
+            _fileAzureBusiness.GetFileSize(testUri, invalidConfig));
+
+        Assert.Contains("Azure configuration not set", exception.Message);
+    }
+
+    [Fact]
+    public async Task GetFileSize_ThrowsArgumentException_WhenFileUriIsNull()
+    {
+        // Arrange
+        string nullUri = null!;
+
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<ArgumentException>(() =>
+            _fileAzureBusiness.GetFileSize(nullUri, _objectStorageConfig));
+
+        Assert.Contains("File URI is not specified", exception.Message);
+    }
+
+    [Fact]
+    public async Task GetFileSize_ThrowsArgumentException_WhenFileUriIsEmpty()
+    {
+        // Arrange
+        var emptyUri = "";
+
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<ArgumentException>(() =>
+            _fileAzureBusiness.GetFileSize(emptyUri, _objectStorageConfig));
+
+        Assert.Contains("File URI is not specified", exception.Message);
+    }
+
+    [Fact]
+    public async Task GetFileSize_ReturnsCorrectSize_ForLargeBlob()
+    {
+        // Arrange
+        var guid = Guid.NewGuid();
+        var fileName = "large-file.bin";
+        var largeFileSize = 5 * 1024 * 1024; // 5MB
+        var content = new byte[largeFileSize];
+        new Random().NextBytes(content);
+        
+        var container = new BlobContainerClient(_connectionString, _containerName);
+        await container.CreateIfNotExistsAsync();
+        
+        var blobName = $"organization_{_oid}/project_{_pid}/datasource_{_dsid}/{guid}_{fileName}";
+        var blob = container.GetBlobClient(blobName);
+        using var stream = new MemoryStream(content);
+        await blob.UploadAsync(stream, overwrite: true);
+
+        // Act
+        var result = await _fileAzureBusiness.GetFileSize(blobName, _objectStorageConfig);
+
+        // Assert
+        Assert.Equal(largeFileSize, result);
+    }
+
+    [Fact]
+    public async Task GetFileSize_ReturnsCorrectSize_ForMultipleDifferentBlobs()
+    {
+        // Arrange
+        var container = new BlobContainerClient(_connectionString, _containerName);
+        await container.CreateIfNotExistsAsync();
+
+        var blob1Name = $"organization_{_oid}/project_{_pid}/datasource_{_dsid}/file1.txt";
+        var blob2Name = $"organization_{_oid}/project_{_pid}/datasource_{_dsid}/file2.txt";
+        var blob3Name = $"organization_{_oid}/project_{_pid}/datasource_{_dsid}/file3.txt";
+
+        await UploadBlobAsync(container, blob1Name, 100);
+        await UploadBlobAsync(container, blob2Name, 500);
+        await UploadBlobAsync(container, blob3Name, 1000);
+
+        // Act
+        var size1 = await _fileAzureBusiness.GetFileSize(blob1Name, _objectStorageConfig);
+        var size2 = await _fileAzureBusiness.GetFileSize(blob2Name, _objectStorageConfig);
+        var size3 = await _fileAzureBusiness.GetFileSize(blob3Name, _objectStorageConfig);
+
+        // Assert
+        Assert.Equal(100, size1);
+        Assert.Equal(500, size2);
+        Assert.Equal(1000, size3);
+    }
+
+    [Fact]
+    public async Task GetFileSize_ThrowsException_WhenContainerDoesNotExist()
+    {
+        // Arrange
+        var invalidConfig = new ObjectStorageConfigDto
+        {
+            AzureObjectConfig = new AzureObjectConfigDto
+            {
+                AzureConnectionString = _connectionString,
+                AzureContainerName = "non-existent-container"
+            }
+        };
+        var testUri = "some-uri";
+
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<Exception>(() =>
+            _fileAzureBusiness.GetFileSize(testUri, invalidConfig));
+
+        Assert.Contains("Failed to get size for file", exception.Message);
+    }
+
+    [Fact]
+    public async Task GetFileSize_HandlesNestedBlobPaths()
+    {
+        // Arrange
+        var container = new BlobContainerClient(_connectionString, _containerName);
+        await container.CreateIfNotExistsAsync();
+
+        var nestedPath = $"organization_{_oid}/project_{_pid}/datasource_{_dsid}/level1/level2/nested.txt";
+        await UploadBlobAsync(container, nestedPath, 2048);
+
+        // Act
+        var result = await _fileAzureBusiness.GetFileSize(nestedPath, _objectStorageConfig);
+
+        // Assert
+        Assert.Equal(2048, result);
+    }
+
+    [Fact]
+    public async Task GetFileSize_ReturnsCorrectSize_AfterBlobUpdate()
+    {
+        // Arrange
+        var guid = Guid.NewGuid();
+        var fileName = "modified.txt";
+        var initialFile = CreateMockFile(fileName, "initial content");
+
+        var uri = await _fileAzureBusiness.UploadFile(
+            _oid, _pid, _dsid, _objectStorageConfig, initialFile, guid);
+
+        var initialSize = await _fileAzureBusiness.GetFileSize(uri, _objectStorageConfig);
+
+        // Update the blob with larger content
+        var container = new BlobContainerClient(_connectionString, _containerName);
+        var blob = container.GetBlobClient(uri);
+        var newContent = new byte[1500];
+        new Random().NextBytes(newContent);
+        using var stream = new MemoryStream(newContent);
+        await blob.UploadAsync(stream, overwrite: true);
+
+        // Act
+        var newSize = await _fileAzureBusiness.GetFileSize(uri, _objectStorageConfig);
+
+        // Assert
+        Assert.Equal(1500, newSize);
+        Assert.NotEqual(initialSize, newSize);
+    }
+
+    [Fact]
+    public async Task GetFileSize_WorksWithDifferentFileExtensions()
+    {
+        // Arrange
+        var container = new BlobContainerClient(_connectionString, _containerName);
+        await container.CreateIfNotExistsAsync();
+
+        var txtPath = $"organization_{_oid}/project_{_pid}/test.txt";
+        var binPath = $"organization_{_oid}/project_{_pid}/test.bin";
+        var csvPath = $"organization_{_oid}/project_{_pid}/test.csv";
+        var jsonPath = $"organization_{_oid}/project_{_pid}/test.json";
+
+        await UploadBlobAsync(container, txtPath, 100);
+        await UploadBlobAsync(container, binPath, 200);
+        await UploadBlobAsync(container, csvPath, 300);
+        await UploadBlobAsync(container, jsonPath, 400);
+
+        // Act & Assert
+        Assert.Equal(100, await _fileAzureBusiness.GetFileSize(txtPath, _objectStorageConfig));
+        Assert.Equal(200, await _fileAzureBusiness.GetFileSize(binPath, _objectStorageConfig));
+        Assert.Equal(300, await _fileAzureBusiness.GetFileSize(csvPath, _objectStorageConfig));
+        Assert.Equal(400, await _fileAzureBusiness.GetFileSize(jsonPath, _objectStorageConfig));
+    }
+
+    #endregion
+
+    #region GetFileSizesBatch Tests
+
+    [Fact]
+    public async Task GetFileSizesBatch_ReturnsCorrectSizes_ForMultipleBlobs()
+    {
+        // Arrange
+        var container = new BlobContainerClient(_connectionString, _containerName);
+        await container.CreateIfNotExistsAsync();
+
+        var blob1Name = $"organization_{_oid}/project_{_pid}/batch1.txt";
+        var blob2Name = $"organization_{_oid}/project_{_pid}/batch2.txt";
+        var blob3Name = $"organization_{_oid}/project_{_pid}/batch3.txt";
+
+        await UploadBlobAsync(container, blob1Name, 1024);
+        await UploadBlobAsync(container, blob2Name, 2048);
+        await UploadBlobAsync(container, blob3Name, 3072);
+
+        var fileUris = new List<string> { blob1Name, blob2Name, blob3Name };
+
+        // Act
+        var results = await _fileAzureBusiness.GetFileSizesBatch(fileUris, _objectStorageConfig);
+
+        // Assert
+        Assert.Equal(3, results.Count);
+        Assert.Equal(1024, results[blob1Name]);
+        Assert.Equal(2048, results[blob2Name]);
+        Assert.Equal(3072, results[blob3Name]);
+    }
+
+    [Fact]
+    public async Task GetFileSizesBatch_ReturnsEmptyDictionary_WhenContainerDoesNotExist()
+    {
+        // Arrange
+        var invalidConfig = new ObjectStorageConfigDto
+        {
+            AzureObjectConfig = new AzureObjectConfigDto
+            {
+                AzureConnectionString = _connectionString,
+                AzureContainerName = "non-existent-container"
+            }
+        };
+        var fileUris = new List<string> { "file1.txt", "file2.txt" };
+
+        // Act
+        var results = await _fileAzureBusiness.GetFileSizesBatch(fileUris, invalidConfig);
+
+        // Assert
+        Assert.Empty(results);
+    }
+
+    [Fact]
+    public async Task GetFileSizesBatch_ThrowsException_WhenAzureConfigIsNull()
+    {
+        // Arrange
+        var invalidConfig = new ObjectStorageConfigDto
+        {
+            AzureObjectConfig = null
+        };
+        var fileUris = new List<string> { "file1.txt" };
+
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<Exception>(() =>
+            _fileAzureBusiness.GetFileSizesBatch(fileUris, invalidConfig));
+
+        Assert.Contains("Azure configuration not set", exception.Message);
+    }
+
+    [Fact]
+    public async Task GetFileSizesBatch_ReturnsOnlyExistingBlobs()
+    {
+        // Arrange
+        var container = new BlobContainerClient(_connectionString, _containerName);
+        await container.CreateIfNotExistsAsync();
+
+        var existingBlob1 = $"organization_{_oid}/project_{_pid}/existing1.txt";
+        var existingBlob2 = $"organization_{_oid}/project_{_pid}/existing2.txt";
+        var nonExistentBlob = $"organization_{_oid}/project_{_pid}/non-existent.txt";
+
+        await UploadBlobAsync(container, existingBlob1, 500);
+        await UploadBlobAsync(container, existingBlob2, 1000);
+
+        var fileUris = new List<string> { existingBlob1, existingBlob2, nonExistentBlob };
+
+        // Act
+        var results = await _fileAzureBusiness.GetFileSizesBatch(fileUris, _objectStorageConfig);
+
+        // Assert
+        Assert.Equal(2, results.Count);
+        Assert.Equal(500, results[existingBlob1]);
+        Assert.Equal(1000, results[existingBlob2]);
+        Assert.False(results.ContainsKey(nonExistentBlob));
+    }
+
+    [Fact]
+    public async Task GetFileSizesBatch_ReturnsEmptyDictionary_ForEmptyList()
+    {
+        // Arrange
+        var fileUris = new List<string>();
+
+        // Act
+        var results = await _fileAzureBusiness.GetFileSizesBatch(fileUris, _objectStorageConfig);
+
+        // Assert
+        Assert.Empty(results);
+    }
+
+    [Fact]
+    public async Task GetFileSizesBatch_HandlesLargeNumberOfBlobs()
+    {
+        // Arrange
+        var container = new BlobContainerClient(_connectionString, _containerName);
+        await container.CreateIfNotExistsAsync();
+
+        var fileUris = new List<string>();
+        var expectedSizes = new Dictionary<string, long>();
+
+        // Create 20 blobs
+        for (int i = 0; i < 20; i++)
+        {
+            var blobName = $"organization_{_oid}/project_{_pid}/batch_file_{i}.txt";
+            var size = (i + 1) * 100; // 100, 200, 300, etc.
+            await UploadBlobAsync(container, blobName, size);
+            fileUris.Add(blobName);
+            expectedSizes[blobName] = size;
+        }
+
+        // Act
+        var results = await _fileAzureBusiness.GetFileSizesBatch(fileUris, _objectStorageConfig);
+
+        // Assert
+        Assert.Equal(20, results.Count);
+        foreach (var kvp in expectedSizes)
+        {
+            Assert.Equal(kvp.Value, results[kvp.Key]);
+        }
+    }
+
+    [Fact]
+    public async Task GetFileSizesBatch_ExitsEarly_WhenAllRequestedFilesFound()
+    {
+        // Arrange
+        var container = new BlobContainerClient(_connectionString, _containerName);
+        await container.CreateIfNotExistsAsync();
+
+        // Create requested blobs
+        var blob1 = $"organization_{_oid}/project_{_pid}/requested1.txt";
+        var blob2 = $"organization_{_oid}/project_{_pid}/requested2.txt";
+        await UploadBlobAsync(container, blob1, 1000);
+        await UploadBlobAsync(container, blob2, 2000);
+
+        // Create extra blobs that shouldn't be in results
+        for (int i = 0; i < 50; i++)
+        {
+            var extraBlob = $"organization_{_oid}/project_{_pid}/extra_{i}.txt";
+            await UploadBlobAsync(container, extraBlob, 500);
+        }
+
+        var fileUris = new List<string> { blob1, blob2 };
+
+        // Act
+        var results = await _fileAzureBusiness.GetFileSizesBatch(fileUris, _objectStorageConfig);
+
+        // Assert
+        Assert.Equal(2, results.Count);
+        Assert.Equal(1000, results[blob1]);
+        Assert.Equal(2000, results[blob2]);
+    }
+
+    [Fact]
+    public async Task GetFileSizesBatch_HandlesZeroSizeBlobs()
+    {
+        // Arrange
+        var container = new BlobContainerClient(_connectionString, _containerName);
+        await container.CreateIfNotExistsAsync();
+
+        var emptyBlob = $"organization_{_oid}/project_{_pid}/empty.txt";
+        var normalBlob = $"organization_{_oid}/project_{_pid}/normal.txt";
+
+        await UploadBlobAsync(container, emptyBlob, 0);
+        await UploadBlobAsync(container, normalBlob, 1024);
+
+        var fileUris = new List<string> { emptyBlob, normalBlob };
+
+        // Act
+        var results = await _fileAzureBusiness.GetFileSizesBatch(fileUris, _objectStorageConfig);
+
+        // Assert
+        Assert.Equal(2, results.Count);
+        Assert.Equal(0, results[emptyBlob]);
+        Assert.Equal(1024, results[normalBlob]);
+    }
+
+    [Fact]
+    public async Task GetFileSizesBatch_HandlesDuplicateUris()
+    {
+        // Arrange
+        var container = new BlobContainerClient(_connectionString, _containerName);
+        await container.CreateIfNotExistsAsync();
+
+        var blobName = $"organization_{_oid}/project_{_pid}/duplicate.txt";
+        await UploadBlobAsync(container, blobName, 2048);
+
+        // Request same blob multiple times
+        var fileUris = new List<string> { blobName, blobName, blobName };
+
+        // Act
+        var results = await _fileAzureBusiness.GetFileSizesBatch(fileUris, _objectStorageConfig);
+
+        // Assert
+        Assert.Single(results); // Should only have one entry
+        Assert.Equal(2048, results[blobName]);
+    }
+
+    [Fact]
+    public async Task GetFileSizesBatch_WorksAcrossDifferentPaths()
+    {
+        // Arrange
+        var container = new BlobContainerClient(_connectionString, _containerName);
+        await container.CreateIfNotExistsAsync();
+
+        var blob1 = $"organization_{_oid}/project_{_pid}/datasource_1/file.txt";
+        var blob2 = $"organization_{_oid}/project_{_pid}/datasource_2/file.txt";
+        var blob3 = $"organization_{_oid}/project_{_pid}/nested/deep/file.txt";
+
+        await UploadBlobAsync(container, blob1, 1024);
+        await UploadBlobAsync(container, blob2, 2048);
+        await UploadBlobAsync(container, blob3, 3072);
+
+        var fileUris = new List<string> { blob1, blob2, blob3 };
+
+        // Act
+        var results = await _fileAzureBusiness.GetFileSizesBatch(fileUris, _objectStorageConfig);
+
+        // Assert
+        Assert.Equal(3, results.Count);
+        Assert.Equal(1024, results[blob1]);
+        Assert.Equal(2048, results[blob2]);
+        Assert.Equal(3072, results[blob3]);
+    }
+
+    [Fact]
+    public async Task GetFileSizesBatch_IgnoresBlobsWithoutContentLength()
+    {
+        // Arrange
+        var container = new BlobContainerClient(_connectionString, _containerName);
+        await container.CreateIfNotExistsAsync();
+
+        var normalBlob = $"organization_{_oid}/project_{_pid}/normal.txt";
+        await UploadBlobAsync(container, normalBlob, 1024);
+
+        var fileUris = new List<string> { normalBlob };
+
+        // Act
+        var results = await _fileAzureBusiness.GetFileSizesBatch(fileUris, _objectStorageConfig);
+
+        // Assert
+        Assert.Single(results);
+        Assert.Equal(1024, results[normalBlob]);
+    }
+
+    [Fact]
+    public async Task GetFileSizesBatch_PerformanceTest_IsFasterThanIndividualCalls()
+    {
+        // Arrange
+        var container = new BlobContainerClient(_connectionString, _containerName);
+        await container.CreateIfNotExistsAsync();
+
+        var fileUris = new List<string>();
+        for (int i = 0; i < 10; i++)
+        {
+            var blobName = $"organization_{_oid}/project_{_pid}/perf_test_{i}.txt";
+            await UploadBlobAsync(container, blobName, 1000 * (i + 1));
+            fileUris.Add(blobName);
+        }
+
+        // Act - Batch call
+        var batchStart = DateTime.UtcNow;
+        var batchResults = await _fileAzureBusiness.GetFileSizesBatch(fileUris, _objectStorageConfig);
+        var batchDuration = DateTime.UtcNow - batchStart;
+
+        // Act - Individual calls
+        var individualStart = DateTime.UtcNow;
+        var individualResults = new Dictionary<string, long>();
+        foreach (var uri in fileUris)
+        {
+            var size = await _fileAzureBusiness.GetFileSize(uri, _objectStorageConfig);
+            individualResults[uri] = size;
+        }
+        var individualDuration = DateTime.UtcNow - individualStart;
+
+        // Assert
+        Assert.Equal(10, batchResults.Count);
+        Assert.Equal(10, individualResults.Count);
+        
+        // Batch should generally be faster or comparable
+        // Note: This is a loose assertion as timing can vary in test environments
+        Assert.True(batchDuration <= individualDuration.Add(TimeSpan.FromSeconds(1)));
+    }
+
+    #endregion
+ 
+    #region Helper Methods
+ 
+    /// <summary>
+    /// Helper method to upload a blob with specified size
+    /// </summary>
+    private async Task UploadBlobAsync(BlobContainerClient container, string blobName, long sizeInBytes)
+    {
+        var blob = container.GetBlobClient(blobName);
+        var content = new byte[sizeInBytes];
+        new Random().NextBytes(content);
+        using var stream = new MemoryStream(content);
+        await blob.UploadAsync(stream, overwrite: true);
+    }
+    
+    #endregion
 }

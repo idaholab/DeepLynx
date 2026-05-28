@@ -3,6 +3,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using deeplynx.business;
 using deeplynx.datalayer.Models;
+using deeplynx.helpers;
 using deeplynx.helpers.BigData;
 using deeplynx.helpers.Hubs;
 using deeplynx.interfaces;
@@ -57,11 +58,10 @@ public class MetadataBusinessTests : IntegrationTestBase
         // Build leaf dependencies first
         _tagBusiness = new TagBusiness(Context, _eventBusiness);
         _sensitivityLabelBusiness = new SensitivityLabelBusiness(Context, _eventBusiness);
-    
-        // Mock the interface that was never assigned
-        _sensitivityLabelService = new Mock<ISensitivityLabelService>().Object;
 
-        _edgeBusiness = new EdgeBusiness(Context, _eventBusiness, _mockBulkCopyUpsertExecutor);
+        _sensitivityLabelService = new SensitivityLabelService(Context);
+
+        _edgeBusiness = new EdgeBusiness(Context, _eventBusiness, _mockBulkCopyUpsertExecutor, _sensitivityLabelService);
         _recordBusiness = new RecordBusiness(
             Context, _eventBusiness, _mockBulkCopyUpsertExecutor, _tagBusiness, _sensitivityLabelBusiness, _sensitivityLabelService);
         _relationshipBusiness = new RelationshipBusiness(Context, _edgeBusiness, _eventBusiness);
@@ -616,6 +616,238 @@ public class MetadataBusinessTests : IntegrationTestBase
         var eventList = await Context.Events.ToListAsync();
         Assert.Equal(5, eventList.Count);
     }
+
+    [Fact]
+    public async Task CreateMetadata_EdgeCanReferenceExistingRecordByOriginalId()
+    {
+        // Arrange: first upload creates record A
+        var firstDto = new CreateMetadataRequestDto
+        {
+            Records = new List<CreateRecordRequestDto>
+            {
+                new()
+                {
+                    Name = "Record A",
+                    OriginalId = "record-a",
+                    Description = "Record A description",
+                    Properties = JsonObject.Parse("{}") as JsonObject
+                }
+            }
+        };
+
+        await _metadataBusiness.CreateMetadata(uid, pid, organizationId, did, firstDto);
+
+        // Act: second upload creates record B and edge A -> B
+        var secondDto = new CreateMetadataRequestDto
+        {
+            Records = new List<CreateRecordRequestDto>
+            {
+                new()
+                {
+                    Name = "Record B",
+                    OriginalId = "record-b",
+                    Description = "Record B description",
+                    Properties = JsonObject.Parse("{}") as JsonObject
+                }
+            },
+            Edges = new List<CreateEdgeRequestDto>
+            {
+                new()
+                {
+                    OriginOid = "record-a",
+                    DestinationOid = "record-b"
+                }
+            }
+        };
+
+        var result = await _metadataBusiness.CreateMetadata(uid, pid, organizationId, did, secondDto);
+
+        // Assert
+        Assert.NotNull(result.Edges);
+        Assert.Single(result.Edges);
+    }
+
+    [Fact]
+    public async Task CreateMetadata_ValidMetadataPersists_WhenEdgeReferencesMissingRecord()
+    {
+        // Arrange
+        var dto = new CreateMetadataRequestDto
+        {
+            Classes = new List<CreateClassRequestDto>
+            {
+                new()
+                {
+                    Name = "Independent Class",
+                    Description = "Class should persist"
+                }
+            },
+            Relationships = new List<CreateRelationshipRequestDto>
+            {
+                new()
+                {
+                    Name = "Independent Relationship"
+                }
+            },
+            Tags = new List<CreateTagRequestDto>
+            {
+                new()
+                {
+                    Name = "Independent Tag"
+                }
+            },
+            Records = new List<CreateRecordRequestDto>
+            {
+                new()
+                {
+                    Name = "Record Independent",
+                    OriginalId = "record-independent",
+                    Description = "Record should persist",
+                    ClassName = "Independent Class",
+                    Tags = new List<string> { "Independent Tag" },
+                    Properties = JsonObject.Parse("{}") as JsonObject
+                }
+            },
+            Edges = new List<CreateEdgeRequestDto>
+            {
+                new()
+                {
+                    RelationshipName = "Independent Relationship",
+                    OriginOid = "record-independent",
+                    DestinationOid = "missing-record"
+                }
+            }
+        };
+
+        // Act
+        var exception = await Assert.ThrowsAnyAsync<Exception>(() =>
+            _metadataBusiness.CreateMetadata(uid, pid, organizationId, did, dto));
+
+        // Assert
+        Assert.Contains("missing-record", exception.Message);
+
+        var createdClass = await Context.Classes
+            .FirstOrDefaultAsync(c =>
+                c.ProjectId == pid &&
+                c.OrganizationId == organizationId &&
+                c.Name == "Independent Class");
+
+        Assert.NotNull(createdClass);
+
+        var createdRelationship = await Context.Relationships
+            .FirstOrDefaultAsync(r =>
+                r.ProjectId == pid &&
+                r.OrganizationId == organizationId &&
+                r.Name == "Independent Relationship");
+
+        Assert.NotNull(createdRelationship);
+
+        var createdTag = await Context.Tags
+            .FirstOrDefaultAsync(t =>
+                t.ProjectId == pid &&
+                t.OrganizationId == organizationId &&
+                t.Name == "Independent Tag");
+
+        Assert.NotNull(createdTag);
+
+        var createdRecord = await Context.Records
+            .FirstOrDefaultAsync(r =>
+                r.ProjectId == pid &&
+                r.DataSourceId == did &&
+                r.OriginalId == "record-independent");
+
+        Assert.NotNull(createdRecord);
+        Assert.Equal(createdClass.Id, createdRecord.ClassId);
+
+        var createdEdge = await Context.Edges
+            .FirstOrDefaultAsync(e =>
+                e.ProjectId == pid &&
+                e.DataSourceId == did &&
+                e.OriginId == createdRecord.Id);
+
+        Assert.Null(createdEdge);
+    }
+  
+    [Fact]
+    public async Task CreateMetadata_Success_WithLargeRecordAndEdgeBatch()
+    {
+        const int count = 500;
+
+        var records = Enumerable.Range(1, count)
+            .Select(i => new CreateRecordRequestDto
+            {
+                Name = $"Record {i}",
+                OriginalId = $"large-record-{i}",
+                Description = $"Record {i} description",
+                Properties = JsonObject.Parse("{}") as JsonObject
+            })
+            .ToList();
+
+        var edges = Enumerable.Range(1, count - 1)
+            .Select(i => new CreateEdgeRequestDto
+            {
+                OriginOid = $"large-record-{i}",
+                DestinationOid = $"large-record-{i + 1}"
+            })
+            .ToList();
+
+        var dto = new CreateMetadataRequestDto
+        {
+            Records = records,
+            Edges = edges
+        };
+
+        var result = await _metadataBusiness.CreateMetadata(uid, pid, organizationId, did, dto);
+
+        Assert.Equal(count, result.Records.Count);
+        Assert.Equal(count - 1, result.Edges.Count);
+    }
+
+[Fact]
+    public async Task CreateMetadata_Success_WithLargeCrossBatchEdges()
+    {
+        const int count = 500;
+
+        var firstBatch = new CreateMetadataRequestDto
+        {
+            Records = Enumerable.Range(1, count)
+                .Select(i => new CreateRecordRequestDto
+                {
+                    Name = $"Existing Record {i}",
+                    OriginalId = $"existing-record-{i}",
+                    Description = $"Existing Record {i} description",
+                    Properties = JsonObject.Parse("{}") as JsonObject
+                })
+                .ToList()
+        };
+
+        await _metadataBusiness.CreateMetadata(uid, pid, organizationId, did, firstBatch);
+
+        var secondBatch = new CreateMetadataRequestDto
+        {
+            Records = Enumerable.Range(1, count)
+                .Select(i => new CreateRecordRequestDto
+                {
+                    Name = $"New Record {i}",
+                    OriginalId = $"new-record-{i}",
+                    Description = $"New Record {i} description",
+                    Properties = JsonObject.Parse("{}") as JsonObject
+                })
+                .ToList(),
+
+            Edges = Enumerable.Range(1, count)
+                .Select(i => new CreateEdgeRequestDto
+                {
+                    OriginOid = $"existing-record-{i}",
+                    DestinationOid = $"new-record-{i}"
+                })
+                .ToList()
+        };
+
+        var result = await _metadataBusiness.CreateMetadata(uid, pid, organizationId, did, secondBatch);
+
+        Assert.Equal(count, result.Records.Count);
+        Assert.Equal(count, result.Edges.Count);
+    }    
 
     #endregion
 }

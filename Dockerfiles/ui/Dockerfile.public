@@ -1,72 +1,66 @@
 # Stage 1: Build the frontend
-FROM node:lts-alpine AS frontend-build
+FROM node:22-alpine AS frontend-build
 
 # Set working directory
 WORKDIR /usr/src/app
 
-# Install versioned os packages
-RUN apk update && apk upgrade --no-cache && \
-    apk add --no-cache \
-    busybox
-
-# Install latest global npm version and packages
-RUN npm install -g npm@latest
-
-# Copy package.json first
-COPY deeplynx.UI/package*.json ./
+# Copy dependency metadata first for better cache reuse
+COPY deeplynx.UI/package.json deeplynx.UI/package-lock.json ./
 
 # Install frontend dependencies
-RUN npm install
+RUN npm ci
 
 # Copy the rest of the frontend source code
-COPY deeplynx.UI .
+COPY deeplynx.UI ./
+
+# Patch 2026-33671
+RUN set -eux; \
+    target="/usr/src/app/node_modules/next/dist/compiled/picomatch"; \
+    test -d "$target"; \
+    tmp="$(mktemp -d)" && cd "$tmp"; \
+    npm pack picomatch@4.0.4; \
+    rm -rf "$target"/*; \
+    tar -xzf picomatch-4.0.4.tgz --strip-components=1 -C "$target"; \
+    test -f "$target/package.json" && grep -q '"version": "4.0.4"' "$target/package.json"; \
+    cd / && rm -rf "$tmp"
 
 # Build the frontend
 RUN npm run build
 
 # Stage 2: Create the final image
-FROM node:lts-alpine AS final
+FROM node:22-alpine AS final
 
 # Set working directory
 WORKDIR /usr/src/app
 
-# Install versioned os packages
-RUN apk update && apk upgrade --no-cache && \
-    apk add --no-cache \
-    busybox
+# Run time env vars
+ENV NODE_ENV=production
 
-# Install latest global npm version and packages
-RUN npm install -g npm@latest \
-    && ( \
-    set -e; \
-    tmp="$(mktemp -d)"; \
-    cd "$tmp"; \
-    npm pack minimatch@10.2.4 >/dev/null 2>&1 || npm pack minimatch@10.2.3 >/dev/null 2>&1; \
-    tar -xzf minimatch-*.tgz; \
-    rm -rf /usr/local/lib/node_modules/npm/node_modules/minimatch; \
-    mv package /usr/local/lib/node_modules/npm/node_modules/minimatch; \
-    cd /; rm -rf "$tmp"; \
-    ) || true \
-    && node -e "try{console.log('npm-bundled minimatch now:', require('/usr/local/lib/node_modules/npm/node_modules/minimatch/package.json').version)}catch(e){console.log('npm-bundled minimatch not found')}"
-
-# Copy package files first
-COPY --from=frontend-build /usr/src/app/package*.json ./
-
-# Install production dependencies BEFORE copying build artifacts
-RUN npm install --omit-dev
-
-# NOW copy the built application (including .next folder)
-COPY --from=frontend-build /usr/src/app/.next ./.next
+# Copy standalone runtime output and 
+USER root
+COPY --from=frontend-build /usr/src/app/.next/standalone ./
+COPY --from=frontend-build /usr/src/app/.next/static ./.next/static
 COPY --from=frontend-build /usr/src/app/public ./public
-# COPY --from=frontend-build /usr/src/app/next.config.js ./next.config.js
 
-# Explicitly set user
-RUN addgroup -S nexus && adduser -S nexus -G nexus
-RUN chown -R nexus:nexus /usr/src/app
-USER nexus
+# Allow runtime cache in case of (future) dhi perm blocking
+RUN mkdir -p /usr/src/app/.next/cache \
+    && chown -R node:node /usr/src/app
+
+# RM bundled npm as we use standalone out. Delete if application runtime npm required 
+RUN rm -rf /usr/local/lib/node_modules/npm && rm -rf /usr/local/lib/node_modules/corepack \
+    && rm -f /usr/local/bin/npm && rm -f /usr/local/bin/corepack
+
+# Update openssl
+RUN set -eux; \
+    apk update; \
+    apk upgrade --no-cache openssl libcrypto3 libssl3; \
+    rm -rf /var/cache/apk/*
+
+# User account
+USER node
 
 # Expose the port the app runs on
 EXPOSE 3000
 
 # Set the command to run the application
-CMD ["npm", "start"]
+CMD ["node", "server.js"]

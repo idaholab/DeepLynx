@@ -4,43 +4,126 @@
 import { InformationCircleIcon } from "@heroicons/react/24/outline";
 import { ProjectResponseDto } from "@/app/(home)/types/responseDTOs";
 import Image from "next/image";
+import ArchiveDelete from "@/app/(home)/components/ArchiveDelete";
+import ProjectSettingsTable from "./ProjectSettingsTable";
+import { useCallback, useMemo } from "react";
+import { formatLocalDateTime } from "@/app/lib/date_time";
+import toast from "react-hot-toast";
+import { OrganizationSession } from "@/app/contexts/OrganizationSessionProvider";
+import { updateProject } from "@/app/lib/client_service/projects_services.client";
 
 interface ProjectLogoSectionProps {
-  project: ProjectResponseDto;
+  organization: OrganizationSession | null;
+  project: ProjectResponseDto | null;
+  setProject: React.Dispatch<React.SetStateAction<ProjectResponseDto | null>>;
   logoPreview: string | null;
   logoFile: File | null;
   isUploading: boolean;
-  bannerText: string;
-  setBannerText: (value: string) => void;
-  isSavingBanner: boolean;
-  originalBannerText: string;
-  onSaveBanner: () => void;
-  onCancelBanner: () => void;
   onLogoChange: (fileList: FileList | null) => void;
   onUploadLogo: () => void;
   onCancelSelection: () => void;
   onLogoError: () => void;
+  onArchiveProject: () => void | Promise<void>;
   t: { translations: Record<string, string> };
 }
 
+interface informationTableProps {
+  organization: OrganizationSession | null;
+  project: ProjectResponseDto | null;
+  t: { translations: Record<string, string> }; 
+  setProject: React.Dispatch<React.SetStateAction<ProjectResponseDto | null>>;
+}
+
+function projectInformationTable({ organization, project, t, setProject }: informationTableProps) {  
+  const handleUpdateProject = useCallback(
+    async (field: string, value: string, successMessage: string) => {
+      if (!organization?.organizationId) return;
+
+      try {
+        const update = await updateProject(
+          organization.organizationId as number,
+          project?.id as number,
+          { [field]: value, organizationId: Number(organization.organizationId) },
+        );
+        setProject((prev) => {
+          if (!prev) return prev;
+
+          return {
+            ...prev,
+            name: update.name ?? prev.name,
+            description: update.description ?? prev.description,
+            abbreviation: update.abbreviation ?? prev.abbreviation,
+            lastUpdatedAt: update.lastUpdatedAt ?? prev.lastUpdatedAt,
+            lastUpdatedBy: update.lastUpdatedBy ?? prev.lastUpdatedBy,
+            isArchived: update.isArchived ?? prev.isArchived,
+            organizationId: update.organizationId ?? prev.organizationId,
+            banner: update.banner ?? prev.banner,
+          };
+        });
+        toast.success(successMessage);
+      } catch (error) {
+        toast.error(`${t.translations.FAILED_TO_UPDATE} ${field}`);
+      }
+    },
+    [
+      organization?.organizationId,
+      project?.id,
+      t.translations.FAILED_TO_UPDATE,
+    ],
+  );
+  
+  const projectInfoRows = useMemo(() => {
+    if (!project) return [];
+    return [
+      { key: t.translations.PROJECT_ID, value: project.id },
+      { 
+        key: t.translations.PROJECT_NAME,
+        value: project.name, 
+        editable: true, 
+        onEdit: (value: string) => 
+          handleUpdateProject(
+            "name", 
+            value, 
+            t.translations.PROJECT_NAME_UPDATED),
+        maxCharacters: 50,
+      },
+      {
+        key: t.translations.PROJECT_DESCRIPTION,
+        value: project.description,
+        editable: true,
+        onEdit: (value: string) => 
+          handleUpdateProject(
+            "description", 
+            value, 
+            t.translations.PROJECT_DESCRIPTION_UPDATED),
+          maxCharacters: 250,
+      },
+      {
+        key: t.translations.LAST_UPDATED_AT,
+        value: formatLocalDateTime(String(project.lastUpdatedAt))
+      }
+    ];
+  }, [project, handleUpdateProject, t.translations])
+  return (
+    <ProjectSettingsTable projectRows={ projectInfoRows }/>
+  );
+}
+
 const ProjectSettingsLeftColumn = ({
+  organization,
   project,
+  setProject,
   logoPreview,
   logoFile,
   isUploading,
-  bannerText,
-  setBannerText,
-  isSavingBanner,
-  originalBannerText,
-  onSaveBanner,
-  onCancelBanner,
   onLogoChange,
   onUploadLogo,
   onCancelSelection,
   onLogoError,
+  onArchiveProject,
   t,
 }: ProjectLogoSectionProps) => (
-  <div className="card bg-base-100 border border-primary/40 shadow-sm">
+  <div className="card self-start bg-base-100 border border-primary/40 shadow-sm">
     <div className="card-body">
       <h3 className="card-title text-lg mb-4">{t.translations.PROJECT_LOGO}</h3>
 
@@ -135,80 +218,27 @@ const ProjectSettingsLeftColumn = ({
           )}
         </div>
       </div>
-    </div>
 
-    {/* <div className="divider px-4"></div> */}
-
-    {/* Banner */}
-    {/* <div className="card bg-base-100 shadow-sm">
-      <div className="card-body">
+      {/* Main Project Settings */}
+      <div className="border-t border-base-300 pt-6 pb-6">
         <h3 className="card-title text-lg mb-4">
-          {t.translations.PROJECT_WARNING_BANNER}
+          {t.translations.MAIN_PROJECT_SETTINGS} 
         </h3>
-
-        <div className="form-control">
-          <div>
-            <label className="label mr-4">
-              <span className="label-text font-semibold">
-                {t.translations.BANNER_TEXT}
-              </span>
-            </label>
-            <textarea
-              className="textarea textarea-bordered min-h-20"
-              placeholder={t.translations.BANNER_EXAMPLE_CUI}
-              value={bannerText}
-              onChange={(e) => setBannerText(e.target.value)}
-              disabled={isSavingBanner}
-              maxLength={240}
-            />
-          </div>
-
-          <label className="label">
-            <span className="label-text-alt text-base-content/60">
-              {
-                t.translations
-                  .DISPLAY_BENEATH_THE_TOP_HEADER_FOR_ALL_PAGES_IN_PROJECT
-              }
-            </span>
-            <span
-              className={`label-text-alt mt-4 ${bannerText.length > 50 ? "text-error" : "text-base-content/40"}`}
-            >
-              {bannerText.length} / 50
-            </span>
-          </label>
-        </div> */}
-
-    {/* Action Buttons */}
-    {/* <div className="flex gap-2 mt-4">
-          <button
-            type="button"
-            className="btn btn-primary btn-sm"
-            onClick={onSaveBanner}
-            disabled={
-              isSavingBanner ||
-              bannerText === originalBannerText ||
-              bannerText.length > 240
-            }
-          >
-            {isSavingBanner && (
-              <span className="loading loading-spinner loading-xs" />
-            )}
-            {t.translations.SAVE}
-          </button>
-
-          {bannerText !== originalBannerText && (
-            <button
-              type="button"
-              className="btn btn-ghost btn-sm"
-              onClick={onCancelBanner}
-              disabled={isSavingBanner}
-            >
-              {t.translations.CANCEL}
-            </button>
-          )}
+        <div>
+          {projectInformationTable({organization, project, t, setProject})}
         </div>
       </div>
-    </div> */}
+
+      <div className="border-t border-base-300 pt-6">
+        <ArchiveDelete
+          actionType="archive"
+          itemType="Project"
+          itemName={project?.name || ""}
+          onConfirm={onArchiveProject}
+        />
+      </div>
+    </div> 
+    
   </div>
 );
 

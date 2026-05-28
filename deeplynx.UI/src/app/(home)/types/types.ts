@@ -60,7 +60,6 @@ export type DatePickerQuery = {
 export type FileMetadata = {
   name: string;
   description: string;
-  isTimeSeries: boolean;
   recordMode?: "new" | "update";
   targetRecordId?: string;
   updateAction?: "merge" | "overwrite";
@@ -102,12 +101,9 @@ export type UploadProgressEvent = {
 
 //Widgets
 export type WidgetType =
-  | "DataOverview"
-  | "Links"
-  | "Graph"
-  | "RecentActivity"
   | "ProjectOverview"
-  | "TeamMembers";
+  | "TeamMembers"
+  | "SavedSearches";
 
 export type QueryBuilderQuery = {
   id: string;
@@ -184,6 +180,8 @@ export type GraphNode = {
   id: number;
   label: string;
   type: string;
+  classId: number | null;
+  className: string | null;
 };
 
 export type GraphLink = {
@@ -208,6 +206,8 @@ export type UsersTableRow = {
   isActive: boolean;
   isArchived: boolean;
   isSysAdmin: boolean;
+  isOrgAdmin?: boolean | null;
+  lastLogin?: string | null;
   isPending?: boolean;
   invitedAt?: string;
   projectName?: string;
@@ -219,3 +219,10 @@ export type Project = {
   id: string,
   name: string
 }
+
+export type ExpandableTableColumn<T> = {
+  header: string;
+  data: (row: T) => ReactNode;
+  isExpandTrigger?: (row: T) => boolean;
+};
+

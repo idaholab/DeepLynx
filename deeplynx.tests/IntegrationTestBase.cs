@@ -5,6 +5,9 @@ using deeplynx.interfaces;
 using deeplynx.tests;
 using DotNetEnv;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
+using Pgvector.EntityFrameworkCore;
+using Pgvector.Npgsql;
 using Testcontainers.Azurite;
 using Testcontainers.PostgreSql;
 using Testcontainers.Redis;
@@ -28,51 +31,66 @@ public class TestSuiteFixture : IAsyncLifetime
 
     public string PostgresConnectionString { get; private set; }
     public string RedisConnectionString { get; private set; }
-    
+    public NpgsqlDataSource PostgresDataSource { get; private set; }
+
     public DeeplynxContext Context { get; private set; }
 
     // Runs at the beginning of every test suite
     public async Task InitializeAsync()
     {
-        // Start containers
-        await _postgresContainer.StartAsync();
-        await _redisContainer.StartAsync();
+        try {
+            // Start containers
+            await _postgresContainer.StartAsync();
+            await _redisContainer.StartAsync();
 
-        // Set up configuration for redis cache tests
-        RedisConnectionString = _redisContainer.GetConnectionString();
-        Environment.SetEnvironmentVariable("REDIS_CONNECTION_STRING", RedisConnectionString);
+            // Set up configuration for redis cache tests
+            RedisConnectionString = _redisContainer.GetConnectionString();
+            Environment.SetEnvironmentVariable("REDIS_CONNECTION_STRING", RedisConnectionString);
 
-        PostgresConnectionString = _postgresContainer.GetConnectionString();
+            PostgresConnectionString = _postgresContainer.GetConnectionString();
 
-        var options = new DbContextOptionsBuilder<DeeplynxContext>()
-            .UseNpgsql(PostgresConnectionString)
-            .Options;
+            var dataSourceBuilder = new NpgsqlDataSourceBuilder(PostgresConnectionString);
+            dataSourceBuilder.UseVector();
+            PostgresDataSource = dataSourceBuilder.Build();
 
-        Context = new DeeplynxContext(options);
+            var options = new DbContextOptionsBuilder<DeeplynxContext>()
+                .UseNpgsql(PostgresDataSource, o => o.UseVector())
+                .Options;
 
-        // Apply migrations only once
-        await Context.Database.MigrateAsync();
+            Context = new DeeplynxContext(options);
 
-        // Apply env variables without exposing values in tests
-        var projectRoot = Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", ".."));
-        var envFilePath = Path.Combine(projectRoot, ".env");
-        Env.Load(envFilePath);
-        // ensure the notification service is tested
-        Environment.SetEnvironmentVariable("ENABLE_NOTIFICATION_SERVICE", "true");
+            // Apply migrations only once
+            await Context.Database.MigrateAsync();
+
+            // Apply env variables without exposing values in tests
+            var projectRoot =
+                Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", ".."));
+            var envFilePath = Path.Combine(projectRoot, ".env");
+            Env.Load(envFilePath);
+            // ensure the notification service is tested
+            Environment.SetEnvironmentVariable("ENABLE_NOTIFICATION_SERVICE", "true");
+        }
+        catch (Exception ex)
+        {
+            // clean up any partially initialized resources
+            await DisposeAsync();
+            throw new InvalidOperationException("Failed to initialize test suite", ex);
+        }
+        
     }
 
     // Runs at the end of every test suite
     public async Task DisposeAsync()
     {
-        await Context.DisposeAsync();
-        await _postgresContainer.DisposeAsync();
-        await _redisContainer.DisposeAsync();
+        if (Context != null) await Context.DisposeAsync();
+        if (_postgresContainer != null) await _postgresContainer.DisposeAsync();
+        if (_redisContainer != null) await _redisContainer.DisposeAsync();
     }
 }
 
 // Defines a test collection named "Test Suite Collection".
 // This collection uses the TestSuiteFixture class for setup and teardown.
-[CollectionDefinition("Test Suite Collection")]
+[CollectionDefinition("Test Suite Collection", DisableParallelization = true)] // Note: this may be changed in the future. Just testing serialized tests as we share one DB
 public class TestSuiteCollection : ICollectionFixture<TestSuiteFixture>
 {
     // This class has no code, and is never created. Its purpose is simply
@@ -90,7 +108,7 @@ public class IntegrationTestBase : IAsyncLifetime
     {
         _fixture = fixture;
         Context = new DeeplynxContext(new DbContextOptionsBuilder<DeeplynxContext>()
-            .UseNpgsql(_fixture.PostgresConnectionString)
+            .UseNpgsql(_fixture.PostgresDataSource, o => o.UseVector())
             .Options);
     }
 

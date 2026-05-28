@@ -17,38 +17,65 @@ public class EdgeBusiness : IEdgeBusiness
     private readonly DeeplynxContext _context;
     private readonly IEventBusiness _eventBusiness;
 
+    private readonly ISensitivityLabelService _sensitivityLabelService;
+
     /// <summary>
     ///     Initializes a new instance of the <see cref="EdgeBusiness" /> class.
     /// </summary>
     /// <param name="context">The database context used for the edge operations.</param>
     /// <param name="eventBusiness">Used for logging events during create, update, and delete Operations.</param>
+    /// <param name="bulkCopyUpsertExecutor">Used for bulk database operations.</param>
+    /// <param name="sensitivityLabelService">Used for sensitivity label record authorization.</param>
     public EdgeBusiness(
         DeeplynxContext context, IEventBusiness eventBusiness,
-        IBulkCopyUpsertExecutor bulkCopyUpsertExecutor)
+        IBulkCopyUpsertExecutor bulkCopyUpsertExecutor,
+        ISensitivityLabelService sensitivityLabelService)
     {
         _context = context;
         _eventBusiness = eventBusiness;
         _bulkCopyUpsertExecutor = bulkCopyUpsertExecutor;
+        _sensitivityLabelService = sensitivityLabelService;
     }
 
     /// <summary>
     ///     Retrieves all edges for a specific project and (optionally) datasource
     /// </summary>
+    /// <param name="currentUserId">The ID of the currentUser making the request</param>
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
     /// <param name="projectId">The ID of the project whose edges are to be retrieved</param>
     /// <param name="dataSourceId">(Optional) The ID of the datasource by which to filter edges</param>
     /// <param name="hideArchived">Flag indicating whether to hide archived edges from the result</param>
     /// <returns>A list of edges based on the applied filters.</returns>
     public async Task<List<EdgeResponseDto>> GetAllEdges(
+        long currentUserId,
         long organizationId,
         long projectId,
         long? dataSourceId,
         bool hideArchived)
     {
+        var isAdmin = await AdminHelper.IsAnyAdmin(_context, currentUserId, organizationId, projectId);
+
         var edgeQuery = _context.Edges
             .Where(e => e.ProjectId == projectId && e.OrganizationId == organizationId);
 
-        if (hideArchived) edgeQuery = edgeQuery.Where(e => e.IsArchived == false);
+        if (!isAdmin)
+        {
+            var userAuthorizedLabels = await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
+                currentUserId, organizationId, projectId, "read record");
+
+            edgeQuery = edgeQuery
+                .Include(e => e.Origin).ThenInclude(r => r.Labels)
+                .Include(e => e.Destination).ThenInclude(r => r.Labels)
+                .Where(e =>
+                    (!e.Origin.Labels.Any() || e.Origin.Labels.All(l => userAuthorizedLabels.Contains(l.Id))) &&
+                    (!e.Destination.Labels.Any() || e.Destination.Labels.All(l => userAuthorizedLabels.Contains(l.Id))));
+        }
+
+        if (dataSourceId.HasValue)
+            edgeQuery = edgeQuery.Where(e => e.DataSourceId == dataSourceId);
+
+        if (hideArchived)
+            edgeQuery = edgeQuery.Where(e => !e.IsArchived);
 
         var edges = await edgeQuery.ToListAsync();
 
@@ -73,6 +100,7 @@ public class EdgeBusiness : IEdgeBusiness
     ///     Retrieves a specific edge by its origin and destination IDs
     ///     OR Retrieves an edge by its id
     /// </summary>
+    /// <param name="currentUserId">The ID of the currentUser making the request</param>
     /// <param name="projectId">The project of the edge to retrieve</param>
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
     /// <param name="edgeId">The id whereby to fetch the edge</param>
@@ -82,6 +110,7 @@ public class EdgeBusiness : IEdgeBusiness
     /// <returns>The edge associated with the given id or origin/destination combo</returns>
     /// <exception cref="KeyNotFoundException">Returned if edge not found or is archived</exception>
     public async Task<EdgeResponseDto> GetEdge(
+        long currentUserId,
         long organizationId,
         long projectId,
         long? edgeId,
@@ -91,12 +120,22 @@ public class EdgeBusiness : IEdgeBusiness
     {
         var edge = await FindEdge(organizationId, edgeId, originId, destinationId);
 
-        if (edge == null) throw new KeyNotFoundException($"Edge with id {edgeId} not found");
+        if (edge == null || edge.ProjectId != projectId || (hideArchived && edge.IsArchived))
+            throw new KeyNotFoundException($"Edge not found");
 
-        if (edge.ProjectId != projectId)
-            throw new KeyNotFoundException($"Edge with id {edgeId} not found in project {projectId}");
+        var isAdmin = await AdminHelper.IsAnyAdmin(_context, currentUserId, organizationId, projectId);
 
-        if (hideArchived && edge.IsArchived) throw new KeyNotFoundException($"Edge with id {edgeId} is archived");
+        if (!isAdmin)
+        {
+            var userAuthorizedLabels = await _sensitivityLabelService
+                .GetAuthorizedSensitivityLabels(currentUserId, organizationId, projectId, "read record");
+
+            var originBlocked = edge.Origin != null && edge.Origin.Labels.Any() && !edge.Origin.Labels.All(l => userAuthorizedLabels.Contains(l.Id));
+            var destinationBlocked = edge.Destination != null && edge.Destination.Labels.Any() && !edge.Destination.Labels.All(l => userAuthorizedLabels.Contains(l.Id));
+
+            if (originBlocked || destinationBlocked)
+                throw new KeyNotFoundException($"Edge not found");
+        }
 
         return new EdgeResponseDto
         {
@@ -210,6 +249,17 @@ public class EdgeBusiness : IEdgeBusiness
         long dataSourceId,
         List<CreateEdgeRequestDto> edges)
     {
+
+        if (edges == null)
+            throw new NullReferenceException("Edges cannot be null or empty");
+
+        var invalidEdges = edges
+            .Where(e => !e.OriginId.HasValue || !e.DestinationId.HasValue)
+            .ToList();
+
+        if (invalidEdges.Any())
+            throw new ArgumentException("All edges must have valid OriginId and DestinationId before bulk creation.");
+
         await ExistenceHelper.EnsureDataSourceExistsForProjectAsync(_context, dataSourceId, projectId);
         var conn = (NpgsqlConnection)_context.Database.GetDbConnection();
         if (conn.State != ConnectionState.Open) await conn.OpenAsync();
@@ -566,10 +616,10 @@ public class EdgeBusiness : IEdgeBusiness
     /// <returns>The edge associated with the given id or origin/destination combo</returns>
     /// <exception cref="KeyNotFoundException">Returned if edge not found or if ids missing</exception>
     private async Task<Edge> FindEdge(
-        long organizationId,
-        long? edgeId,
-        long? originId,
-        long? destinationId
+    long organizationId,
+    long? edgeId,
+    long? originId,
+    long? destinationId
     )
     {
         if (edgeId == null && (originId == null || destinationId == null))
@@ -577,22 +627,22 @@ public class EdgeBusiness : IEdgeBusiness
 
         Edge edge = null;
 
-        // search for edge either by id or origin + destination
         if (edgeId != null)
             edge = await _context.Edges
+                .Include(e => e.Origin).ThenInclude(r => r.Labels)
+                .Include(e => e.Destination).ThenInclude(r => r.Labels)
                 .FirstOrDefaultAsync(e => e.Id == edgeId && e.OrganizationId == organizationId);
         else
             edge = await _context.Edges
+                .Include(e => e.Origin).ThenInclude(r => r.Labels)
+                .Include(e => e.Destination).ThenInclude(r => r.Labels)
                 .FirstOrDefaultAsync(e =>
                     e.OriginId == originId && e.DestinationId == destinationId && e.OrganizationId == organizationId);
 
-        // throw an error if edge not found
         if (edge == null)
         {
             if (edgeId != null) throw new KeyNotFoundException($"Edge with id {edgeId} not found");
-
-            throw new KeyNotFoundException(
-                $"Edge with origin {originId} and destination {destinationId} not found");
+            throw new KeyNotFoundException($"Edge with origin {originId} and destination {destinationId} not found");
         }
 
         return edge;

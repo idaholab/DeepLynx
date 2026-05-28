@@ -45,28 +45,13 @@ public class OrganizationBusiness : IOrganizationBusiness
     /// <summary>
     ///     Retrieves all organizations
     /// </summary>
+    /// <param name="userId">The ID of the requesting user</param>
+    /// <param name="isSysAdmin">Boolean determining if the requesting user is a system admin</param>
     /// <param name="hideArchived">Flag indicating whether to hide archived organizations from the result</param>
     /// <returns>A list of organizations</returns>
-    public async Task<IEnumerable<OrganizationResponseDto>> GetAllOrganizations(bool hideArchived = true)
+    public async Task<IEnumerable<OrganizationResponseDto>> GetAllOrganizations(long userId, bool hideArchived = true, bool isSysAdmin = false)
     {
-        var organizationQuery = _context.Organizations.AsQueryable();
-
-        if (hideArchived) organizationQuery = organizationQuery.Where(o => !o.IsArchived);
-
-        var organizations = await organizationQuery.ToListAsync();
-
-        return organizations
-            .Select(o => new OrganizationResponseDto
-            {
-                Id = o.Id,
-                Name = o.Name,
-                Description = o.Description,
-                LastUpdatedAt = o.LastUpdatedAt,
-                LastUpdatedBy = o.LastUpdatedBy,
-                IsArchived = o.IsArchived,
-                DefaultOrg = o.DefaultOrg,
-                Banner = o.Banner
-            });
+        return await GetAllOrganizationsForUser(userId, hideArchived, isSysAdmin);
     }
 
     /// <summary>
@@ -74,19 +59,17 @@ public class OrganizationBusiness : IOrganizationBusiness
     /// </summary>
     /// <param name="hideArchived">Flag indicating whether to hide archived organizations from the result</param>
     /// <param name="userId">ID of the User executing this method.</param>
+    /// <param name="isSysAdmin">Boolean value determining if the requesting user is a system admin</param>
     /// <returns>A list of organizations</returns>
     public async Task<IEnumerable<OrganizationResponseDto>> GetAllOrganizationsForUser(long userId,
-        bool hideArchived = true)
+        bool hideArchived = true, bool isSysAdmin = false)
     {
-        // First, get all organization IDs for the user
-        var organizationIds = await _context.OrganizationUsers
-            .Where(ou => ou.UserId == userId)
-            .Select(ou => ou.OrganizationId)
-            .ToListAsync();
+        var query = _context.Organizations.AsQueryable();
 
-        // Then query organizations using those IDs
-        var query = _context.Organizations
-            .Where(o => organizationIds.Contains(o.Id));
+        if (!isSysAdmin)
+        {
+            query = query.Where(o => o.OrganizationUsers.Any(ou => ou.UserId == userId));
+        }
 
         if (hideArchived)
         {
@@ -180,9 +163,9 @@ public class OrganizationBusiness : IOrganizationBusiness
 
         // Log create Organization event
         await _eventBusiness.CreateEvent(
-            currentUserId, 
-            organization.Id, 
-            null, 
+            currentUserId,
+            organization.Id,
+            null,
             new CreateEventRequestDto
             {
                 Operation = "create",
@@ -229,13 +212,13 @@ public class OrganizationBusiness : IOrganizationBusiness
                 .Include(r => r.Labels)
                 .Where(r => r.OrganizationId == organizationId)
                 .AnyAsync(r => !r.Labels.Any());
-        
+
             if (hasUnlabeledRecords)
                 throw new InvalidOperationException(
                     "Cannot require sensitivity labels: organization contains records without labels. " +
                     "Please label all existing records before enabling this requirement.");
         }
-        
+
         if (dto.RequireSensitivityLabel != null)
             organization.RequireSensitivityLabel = dto.RequireSensitivityLabel.Value;
 
@@ -244,7 +227,7 @@ public class OrganizationBusiness : IOrganizationBusiness
         organization.DefaultOrg = dto.DefaultOrg ?? organization.DefaultOrg;
         organization.LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
         organization.LastUpdatedBy = currentUserId;
-        organization.Banner = dto.Banner; 
+        organization.Banner = dto.Banner;
 
         _context.Organizations.Update(organization);
 
@@ -254,9 +237,9 @@ public class OrganizationBusiness : IOrganizationBusiness
 
         // log update Organization event
         await _eventBusiness.CreateEvent(
-            currentUserId, 
-            organization.Id, 
-            null, 
+            currentUserId,
+            organization.Id,
+            null,
             new CreateEventRequestDto
             {
                 Operation = "update",
@@ -303,9 +286,9 @@ public class OrganizationBusiness : IOrganizationBusiness
 
         // Log organization archive event
         await _eventBusiness.CreateEvent(
-            currentUserId, 
-            organizationId, 
-            null, 
+            currentUserId,
+            organizationId,
+            null,
             new CreateEventRequestDto
             {
                 Operation = "archive",
@@ -340,9 +323,9 @@ public class OrganizationBusiness : IOrganizationBusiness
 
         // Log organization archive event
         await _eventBusiness.CreateEvent(
-            currentUserId, 
-            organization.Id, 
-            null, 
+            currentUserId,
+            organization.Id,
+            null,
             new CreateEventRequestDto
             {
                 Operation = "unarchive",
@@ -489,10 +472,10 @@ public class OrganizationBusiness : IOrganizationBusiness
         {
             var mountPath =
                 Environment.GetEnvironmentVariable("STORAGE_DIRECTORY");
-            
+
             if (string.IsNullOrWhiteSpace(mountPath))
                 throw new ArgumentException($"STORAGE_DIRECTORY is null or white space, please check your environment variables.");
-            
+
             configDto.MountPath = mountPath;
         }
         else if (defaultObjectStorageMethod == "azure_object")
@@ -504,7 +487,7 @@ public class OrganizationBusiness : IOrganizationBusiness
             var azureContainerName = Environment.GetEnvironmentVariable("AZURE_CONTAINER_NAME");
             if (string.IsNullOrWhiteSpace(azureContainerName))
                 throw new ArgumentException("AZURE_CONTAINER_NAME is null or white space, please check your environment variables.");
-            
+
             configDto.AzureObjectConfig = new AzureObjectConfigDto()
             {
                 AzureConnectionString = azureConnectionString,
@@ -517,7 +500,7 @@ public class OrganizationBusiness : IOrganizationBusiness
                 Environment.GetEnvironmentVariable("AWS_S3_CONNECTION_STRING");
             if (string.IsNullOrWhiteSpace(awsConnectionString))
                 throw new ArgumentException("AWS_S3_CONNECTION_STRING is null or white space, please check your environment variables.");
-            
+
             configDto.AwsConnectionString = awsConnectionString;
         }
         else
@@ -534,7 +517,7 @@ public class OrganizationBusiness : IOrganizationBusiness
         };
         await _objectStorageBusiness.CreateObjectStorage(
             currentUserId, organizationId, null, objectStorageRequestDto);
-        
+
         // ===============================
         // CREATE DEFAULT ROLES
         // ===============================

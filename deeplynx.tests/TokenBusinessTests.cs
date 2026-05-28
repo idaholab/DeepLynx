@@ -62,6 +62,10 @@ namespace deeplynx.tests
             Assert.Equal(uid1, savedToken!.UserId);
             Assert.Equal(applicationId, savedToken.ApplicationId);
             Assert.False(savedToken.Revoked);
+
+            var tokenUser = await Context.Users.FindAsync(uid1);
+            Assert.NotNull(tokenUser);
+            Assert.NotNull(tokenUser!.LastLogin);
         }
 
         [Fact]

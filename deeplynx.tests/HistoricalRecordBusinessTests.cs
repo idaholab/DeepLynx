@@ -28,6 +28,7 @@ public class HistoricalRecordBusinessTests : IntegrationTestBase
     private TagBusiness _tagBusiness = null!;
     private IBulkCopyUpsertExecutor _bulkCopyUpsertExecutor = null!;
     private ISensitivityLabelService _sensitivityLabelService = null!;
+    private EncryptionHelper _encryptionHelper = null!;
     
     public long cid;
     public long did;
@@ -53,6 +54,7 @@ public class HistoricalRecordBusinessTests : IntegrationTestBase
 
     public override async Task InitializeAsync()
     {
+        _encryptionHelper = new EncryptionHelper();
         await base.InitializeAsync();
         _sensitivityLabelService = new SensitivityLabelService(Context);
         _historicalRecordBusiness = new HistoricalRecordBusiness(Context, _sensitivityLabelService);
@@ -187,7 +189,7 @@ public class HistoricalRecordBusinessTests : IntegrationTestBase
         {
             Name = "Object Storage 1",
             Type = "filesystem",
-            Config = config.ToString(),
+            ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(config),
             ProjectId = pid,
             LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
             OrganizationId = organizationId

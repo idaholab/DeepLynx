@@ -284,12 +284,79 @@ public class TagBusinessTests : IntegrationTestBase
         await Context.SaveChangesAsync();
 
         // Act
-        var result = await _tagBusiness.GetTagsByName(oid, null, new List<string> { "Org Tag By Name" });
+        var result = await _tagBusiness.GetTagsByName(oid, null, new List<string> { "Org Tag By Name" }, true);
 
         // Assert
         Assert.Single(result);
         Assert.Null(result[0].ProjectId);
         Assert.Equal(oid, result[0].OrganizationId);
+        Assert.Equal("Org Tag By Name", result[0].Name);
+    }
+    
+    [Fact]
+    public async Task GetTagsByName_Success_WithProjectId()
+    {
+        // Arrange
+        var projectTag = new Tag
+        {
+            Name = "Project Tag By Name",
+            ProjectId = pid,
+            OrganizationId = oid,
+            LastUpdatedBy = uid,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            IsArchived = false
+        };
+        Context.Tags.Add(projectTag);
+        await Context.SaveChangesAsync();
+
+        // Act
+        var result = await _tagBusiness.GetTagsByName(oid, pid, new List<string> { "Project Tag By Name" }, true);
+
+        // Assert
+        Assert.Single(result);
+        Assert.Equal(pid, result[0].ProjectId);
+        Assert.Equal(oid, result[0].OrganizationId);
+        Assert.Equal("Project Tag By Name", result[0].Name);
+    }
+
+    [Fact]
+    public async Task GetTagsByName_ReturnsArchivedTags_WhenHideArchivedFalse()
+    {
+        // Arrange
+        var archivedTag = new Tag
+        {
+            Name = "Archived Tag",
+            ProjectId = pid,
+            OrganizationId = oid,
+            LastUpdatedBy = uid,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            IsArchived = true
+        };
+        Context.Tags.Add(archivedTag);
+        await Context.SaveChangesAsync();
+
+        // Act
+        var result = await _tagBusiness.GetTagsByName(oid, pid, new List<string> { "Archived Tag" }, false);
+
+        // Assert
+        Assert.Single(result);
+        Assert.True(result[0].IsArchived);
+    }
+
+    [Fact]
+    public async Task GetTagsByName_ThrowsKeyNotFoundException_WhenTagNotFound()
+    {
+        // Act & Assert
+        await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            _tagBusiness.GetTagsByName(oid, pid, new List<string> { "Nonexistent Tag" }, true));
+    }
+
+    [Fact]
+    public async Task GetTagsByName_ThrowsArgumentException_WhenTagNamesEmpty()
+    {
+        // Act & Assert
+        await Assert.ThrowsAsync<ArgumentException>(() =>
+            _tagBusiness.GetTagsByName(oid, pid, new List<string>(), true));
     }
 
     #endregion

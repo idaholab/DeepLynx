@@ -4,7 +4,9 @@ namespace deeplynx.interfaces;
 
 public interface IUserBusiness
 {
-    Task<IEnumerable<UserResponseDto>> GetAllUsers(long? projectId, long? organizationId);
+    Task<IEnumerable<UserResponseDto>> GetAllUsers(long? projectId, long? organizationId, bool includeArchived = false);
+    Task<UserActivityCountsDto> GetActiveUserCounts(long? projectId, long? organizationId);
+    Task<UserActivityUsersDto> GetActiveUsers(long? projectId, long? organizationId);
     Task<UserResponseDto> GetUser(long userId);
     Task<UserAdminInfoDto> GetUserAdminInfo(long userId, long? organizationId = null, long? projectId = null);
     Task<UserResponseDto> GetLocalDevUser();
@@ -14,7 +16,7 @@ public interface IUserBusiness
     Task<bool> ArchiveUser(long userId);
     Task<DataOverviewDto> GetUserOverview(long userId);
     Task<bool> UnarchiveUser(long userId);
-    Task<bool> SetSysAdmin(long authorizerId, long candidateId);
+    Task<bool> SetSysAdmin(long authorizerId, long candidateId, bool? isAdmin = true);
     Task<UserResponseDto> GetUserBySsoId(string ssoId);
     Task<UserResponseDto> GetUserByEmail(string email);
 }

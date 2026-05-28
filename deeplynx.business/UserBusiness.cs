@@ -25,9 +25,11 @@ public class UserBusiness : IUserBusiness
     /// <param name="projectId">Optional ID for project</param>
     /// <param name="organizationId">Optional ID for organization</param>
     /// <returns>A list of users, optionally filtered by project or organization</returns>
-    public async Task<IEnumerable<UserResponseDto>> GetAllUsers(long? projectId, long? organizationId)
+    public async Task<IEnumerable<UserResponseDto>> GetAllUsers(long? projectId, long? organizationId, bool includeArchived = false)
     {
-        var users = _context.Users.Where(p => !p.IsArchived);
+        var users = includeArchived 
+        ? _context.Users.AsQueryable()
+        : _context.Users.Where(p => !p.IsArchived);
 
         if (projectId != null)
             users = users.Where(u =>
@@ -48,8 +50,12 @@ public class UserBusiness : IUserBusiness
             Username = p.Username,
             Email = p.Email,
             IsSysAdmin = p.IsSysAdmin,
+            IsOrgAdmin = organizationId != null
+                ? p.OrganizationUsers.Any(ou => ou.OrganizationId == organizationId && ou.IsOrgAdmin)
+                : null,
             IsArchived = p.IsArchived,
-            IsActive = p.IsActive
+            IsActive = p.IsActive,
+            LastLogin = p.LastLogin
         });
     }
 
@@ -75,7 +81,8 @@ public class UserBusiness : IUserBusiness
             Email = user.Email,
             IsSysAdmin = user.IsSysAdmin,
             IsArchived = user.IsArchived,
-            IsActive = user.IsActive
+            IsActive = user.IsActive,
+            LastLogin = user.LastLogin
         };
     }
 
@@ -108,7 +115,7 @@ public class UserBusiness : IUserBusiness
             )
             .FirstOrDefaultAsync();
 
-        if (user == null || user.IsArchived) 
+        if (user == null || user.IsArchived)
             throw new KeyNotFoundException($"User with id {userId} not found");
 
         return user;
@@ -141,7 +148,8 @@ public class UserBusiness : IUserBusiness
             Email = user.Email,
             IsSysAdmin = user.IsSysAdmin,
             IsArchived = user.IsArchived,
-            IsActive = user.IsActive
+            IsActive = user.IsActive,
+            LastLogin = user.LastLogin
         };
     }
 
@@ -176,7 +184,8 @@ public class UserBusiness : IUserBusiness
             Email = user.Email,
             IsSysAdmin = user.IsSysAdmin,
             IsArchived = user.IsArchived,
-            IsActive = user.IsActive
+            IsActive = user.IsActive,
+            LastLogin = user.LastLogin
         };
     }
 
@@ -212,7 +221,8 @@ public class UserBusiness : IUserBusiness
             Email = user.Email,
             IsSysAdmin = user.IsSysAdmin,
             IsArchived = user.IsArchived,
-            IsActive = user.IsActive
+            IsActive = user.IsActive,
+            LastLogin = user.LastLogin
         };
     }
 
@@ -285,8 +295,10 @@ public class UserBusiness : IUserBusiness
     /// <param name="candidateId">ID of the user who is being granted admin privileges</param>
     /// <returns>Boolean true if successful</returns>
     /// <exception cref="KeyNotFoundException">Returned if authorizer or candidate is not found or lacks privileges</exception>
-    public async Task<bool> SetSysAdmin(long authorizerId, long candidateId)
+    public async Task<bool> SetSysAdmin(long authorizerId, long candidateId, bool? isAdmin = true)
     {
+        var userIsAdmin = isAdmin ?? true;
+
         var authorizer = await _context.Users
             .Where(a => a.Id == authorizerId && !a.IsArchived && a.IsSysAdmin)
             .FirstOrDefaultAsync();
@@ -299,7 +311,10 @@ public class UserBusiness : IUserBusiness
         if (candidate == null)
             throw new KeyNotFoundException($"User with ID {candidateId} not found.");
 
-        candidate.IsSysAdmin = true;
+        if (authorizerId == candidateId && !userIsAdmin)
+            throw new InvalidOperationException("You cannot remove your own system administrator access.");
+
+        candidate.IsSysAdmin = userIsAdmin;
 
         _context.Users.Update(candidate);
         await _context.SaveChangesAsync();
@@ -362,7 +377,8 @@ public class UserBusiness : IUserBusiness
             Username = user.Username,
             IsSysAdmin = user.IsSysAdmin,
             IsArchived = user.IsArchived,
-            IsActive = user.IsActive
+            IsActive = user.IsActive,
+            LastLogin = user.LastLogin
         };
     }
 
@@ -387,7 +403,106 @@ public class UserBusiness : IUserBusiness
             Username = user.Username,
             IsSysAdmin = user.IsSysAdmin,
             IsArchived = user.IsArchived,
-            IsActive = user.IsActive
+            IsActive = user.IsActive,
+            LastLogin = user.LastLogin
         };
+    }
+
+    /// <summary>
+    ///     Retrieves rolling active user counts using the users' most recent successful login timestamp.
+    /// </summary>
+    /// <param name="projectId">Optional ID for project</param>
+    /// <param name="organizationId">Optional ID for organization</param>
+    /// <returns>Counts for users active within 24 hours, 7 days, and 30 days</returns>
+    public async Task<UserActivityCountsDto> GetActiveUserCounts(long? projectId, long? organizationId)
+    {
+        var users = BuildActiveUsersQuery(projectId, organizationId);
+
+        var now = UtcNowWithoutTimezone();
+        var last24Hours = now.AddHours(-24);
+        var last7Days = now.AddDays(-7);
+        var last30Days = now.AddDays(-30);
+
+        var counts = await users
+            .GroupBy(_ => 1)
+            .Select(g => new
+            {
+                ActiveLast24Hours = g.Count(u => u.LastLogin.HasValue && u.LastLogin.Value >= last24Hours),
+                ActiveLast7Days = g.Count(u => u.LastLogin.HasValue && u.LastLogin.Value >= last7Days),
+                ActiveLast30Days = g.Count(u => u.LastLogin.HasValue && u.LastLogin.Value >= last30Days)
+            })
+            .FirstOrDefaultAsync();
+
+        return new UserActivityCountsDto
+        {
+            ActiveLast24Hours = counts?.ActiveLast24Hours ?? 0,
+            ActiveLast7Days = counts?.ActiveLast7Days ?? 0,
+            ActiveLast30Days = counts?.ActiveLast30Days ?? 0,
+            GeneratedAt = now
+        };
+    }
+
+    /// <summary>
+    ///     Retrieves rolling active user counts and users active in the 30-day window.
+    /// </summary>
+    /// <param name="projectId">Optional ID for project</param>
+    /// <param name="organizationId">Optional ID for organization</param>
+    /// <returns>Counts and active user details for the requested scope</returns>
+    public async Task<UserActivityUsersDto> GetActiveUsers(long? projectId, long? organizationId)
+    {
+        var counts = await GetActiveUserCounts(projectId, organizationId);
+        var last30Days = counts.GeneratedAt.AddDays(-30);
+
+        var users = await BuildActiveUsersQuery(projectId, organizationId)
+            .Where(u => u.LastLogin.HasValue && u.LastLogin.Value >= last30Days)
+            .OrderByDescending(u => u.LastLogin)
+            .Select(u => new UserResponseDto
+            {
+                Id = u.Id,
+                Name = u.Name,
+                Username = u.Username,
+                Email = u.Email,
+                IsSysAdmin = u.IsSysAdmin,
+                IsOrgAdmin = organizationId != null
+                    ? u.OrganizationUsers.Any(ou => ou.OrganizationId == organizationId && ou.IsOrgAdmin)
+                    : null,
+                IsArchived = u.IsArchived,
+                IsActive = u.IsActive,
+                LastLogin = u.LastLogin
+            })
+            .ToListAsync();
+
+        return new UserActivityUsersDto
+        {
+            ActiveLast24Hours = counts.ActiveLast24Hours,
+            ActiveLast7Days = counts.ActiveLast7Days,
+            ActiveLast30Days = counts.ActiveLast30Days,
+            GeneratedAt = counts.GeneratedAt,
+            Users = users
+        };
+    }
+
+    private IQueryable<User> BuildActiveUsersQuery(long? projectId, long? organizationId)
+    {
+        var users = _context.Users.Where(u => !u.IsArchived && u.IsActive);
+
+        if (projectId != null)
+            users = users.Where(u =>
+                u.ProjectMembers.Any(p => p.ProjectId == projectId && p.UserId == u.Id) ||
+                u.Groups.Any(g => g.ProjectMembers.Any(pm => pm.ProjectId == projectId && pm.GroupId == g.Id))
+            );
+
+        if (organizationId != null)
+            users = users.Where(u =>
+                u.OrganizationUsers.Any(ou => ou.OrganizationId == organizationId && ou.UserId == u.Id) ||
+                u.Groups.Any(g => g.OrganizationId == organizationId)
+            );
+
+        return users;
+    }
+
+    private static DateTime UtcNowWithoutTimezone()
+    {
+        return DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
     }
 }

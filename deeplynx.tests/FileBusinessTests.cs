@@ -13,6 +13,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Logging;
 using Moq;
+using Record = deeplynx.datalayer.Models.Record;
 
 namespace deeplynx.tests;
 
@@ -31,13 +32,17 @@ public class FileBusinessTests : IntegrationTestBase
     private BulkCopyUpsertExecutor _mockBulkCopyExecutor = null!;
     private Mock<IHubContext<EventNotificationHub>> _mockHubContext = null!;
     private Mock<ILogger<NotificationBusiness>> _mockNotificationLogger = null!;
+    private Mock<ILogger<OlapBusiness>> _mockTimeseriesLogger = null!;
     private INotificationBusiness _notificationBusiness = null!;
-    private ObjectStorageBusiness _objectStorageBusiness = null!;
+    private IObjectStorageBusiness _objectStorageBusiness = null!;
     private RecordBusiness _recordBusiness = null!;
+    private OlapBusiness _olapBusiness = null!;
     private Mock<IRelationshipBusiness> _relationshipBusiness = null!;
     private SensitivityLabelBusiness _sensitivityLabelBusiness = null!;
     private ISensitivityLabelService _sensitivityLabelService = null!;
     private TagBusiness _tagBusiness = null!;
+    private Mock<IInsightBusiness> _insightBusiness = null!;
+    private EncryptionHelper _encryptionHelper = null!;
 
     public long did; // datasource ID
     public long oid; // organization ID
@@ -51,6 +56,12 @@ public class FileBusinessTests : IntegrationTestBase
 
     public override async Task InitializeAsync()
     {
+        // Generate valid keys once and reuse them
+        // These are pre-generated valid AES-256 keys for testing
+        Environment.SetEnvironmentVariable("ENCRYPTION_KEY", "SU5TRUNVUkVfREVWX0tFWV8zMl9CWVRFU19MT05HISE="); // 32 bytes
+        Environment.SetEnvironmentVariable("ENCRYPTION_IV", "SU5TRUNVUkVfREVWX0lWIQ=="); // 16 bytes
+        
+        _encryptionHelper = new EncryptionHelper();
         await base.InitializeAsync();
         Directory.CreateDirectory(_testDirectory);
         Directory.CreateDirectory(_orgDefaultDirectory);
@@ -59,29 +70,34 @@ public class FileBusinessTests : IntegrationTestBase
         _edgeBusiness = new Mock<IEdgeBusiness>();
         _relationshipBusiness = new Mock<IRelationshipBusiness>();
         _mockNotificationLogger = new Mock<ILogger<NotificationBusiness>>();
+        _mockTimeseriesLogger = new Mock<ILogger<OlapBusiness>>();
         _notificationBusiness =
             new NotificationBusiness(Context, _mockNotificationLogger.Object, _mockHubContext.Object);
         _mockBulkCopyExecutor = new BulkCopyUpsertExecutor();
         _eventBusiness = new EventBusiness(Context, _notificationBusiness, _mockBulkCopyExecutor);
 
-
+        _insightBusiness = new Mock<IInsightBusiness>();
         _fileBusinessFactory = new Mock<IFileBusinessFactory>();
 
         _dataSourceBusiness =
             new DataSourceBusiness(Context, _edgeBusiness.Object, _recordBusiness, _eventBusiness);
-        _objectStorageBusiness = new ObjectStorageBusiness(Context);
+        _objectStorageBusiness = new ObjectStorageBusiness(Context, _encryptionHelper);
 
         _tagBusiness = new TagBusiness(Context, _eventBusiness);
         _sensitivityLabelBusiness = new SensitivityLabelBusiness(Context, _eventBusiness);
         _sensitivityLabelService = new SensitivityLabelService(Context);
         _recordBusiness = new RecordBusiness(Context, _eventBusiness, _mockBulkCopyExecutor, _tagBusiness,
             _sensitivityLabelBusiness, _sensitivityLabelService);
+
+        _dataSourceBusiness =
+            new DataSourceBusiness(Context, _edgeBusiness.Object, _recordBusiness, _eventBusiness);
+        _objectStorageBusiness = new ObjectStorageBusiness(Context, _encryptionHelper);
+        _olapBusiness = new OlapBusiness(Context, _recordBusiness, _objectStorageBusiness, _mockTimeseriesLogger.Object);
         _classBusiness = new ClassBusiness(Context, _recordBusiness, _relationshipBusiness.Object, _eventBusiness);
 
         var realFileFilesystemBusiness =
             new FileFilesystemBusiness(Context, _objectStorageBusiness, _classBusiness, _recordBusiness);
 
-        // Object storage should also determine this implicitly - but we can also add this failsafe for now
         _fileBusinessFactory
             .Setup(x => x.CreateFileBusiness("filesystem"))
             .Returns(realFileFilesystemBusiness);
@@ -91,7 +107,10 @@ public class FileBusinessTests : IntegrationTestBase
             _fileBusinessFactory.Object,
             _dataSourceBusiness,
             _classBusiness,
-            _recordBusiness
+            _recordBusiness,
+            _insightBusiness.Object,
+            _olapBusiness,
+            _objectStorageBusiness
         );
     }
 
@@ -134,9 +153,9 @@ public class FileBusinessTests : IntegrationTestBase
         await Context.SaveChangesAsync();
         did = dataSource.Id;
 
-        var osConfig = new JsonObject
+        var osConfig = new ObjectStorageConfigDto
         {
-            ["mountPath"] = _testDirectory
+            MountPath = _testDirectory
         };
 
         var objectStorage = new ObjectStorage
@@ -145,7 +164,7 @@ public class FileBusinessTests : IntegrationTestBase
             ProjectId = pid,
             OrganizationId = oid,
             Type = "filesystem",
-            Config = osConfig.ToString(),
+            ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(osConfig),
             Default = true
         };
 
@@ -233,9 +252,9 @@ public class FileBusinessTests : IntegrationTestBase
     public async Task UploadFile_WithOrgLevelObjectStorageId_UsesOrgStorage()
     {
         // Arrange: Create org-level storage
-        var orgOsConfig = new JsonObject
+        var orgOsConfig = new ObjectStorageConfigDto
         {
-            ["mountPath"] = _orgDefaultDirectory
+            MountPath = _orgDefaultDirectory
         };
 
         var orgObjectStorage = new ObjectStorage
@@ -244,7 +263,7 @@ public class FileBusinessTests : IntegrationTestBase
             ProjectId = null, // Org-level storage
             OrganizationId = oid,
             Type = "filesystem",
-            Config = orgOsConfig.ToString(),
+            ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(orgOsConfig),
             Default = true
         };
 
@@ -285,9 +304,9 @@ public class FileBusinessTests : IntegrationTestBase
     public async Task UploadFile_WithProjectStorageId_IgnoresOrgDefault()
     {
         // Arrange: Create org default
-        var orgOsConfig = new JsonObject
+        var orgOsConfig = new ObjectStorageConfigDto
         {
-            ["mountPath"] = _orgDefaultDirectory
+            MountPath = _orgDefaultDirectory
         };
 
         var orgObjectStorage = new ObjectStorage
@@ -296,7 +315,7 @@ public class FileBusinessTests : IntegrationTestBase
             ProjectId = null,
             OrganizationId = oid,
             Type = "filesystem",
-            Config = orgOsConfig.ToString(),
+            ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(orgOsConfig),
             Default = true
         };
 
@@ -333,9 +352,9 @@ public class FileBusinessTests : IntegrationTestBase
     public async Task UploadFile_WithNonDefaultStorageId_UsesSpecifiedStorage()
     {
         // Arrange: Create a second project-level storage (not default)
-        var secondaryOsConfig = new JsonObject
+        var secondaryOsConfig = new ObjectStorageConfigDto
         {
-            ["mountPath"] = Path.Combine(Path.GetTempPath(), "SecondaryStorage")
+            MountPath = Path.Combine(Path.GetTempPath(), "SecondaryStorage")
         };
 
         var secondaryObjectStorage = new ObjectStorage
@@ -344,7 +363,7 @@ public class FileBusinessTests : IntegrationTestBase
             ProjectId = pid,
             OrganizationId = oid,
             Type = "filesystem",
-            Config = secondaryOsConfig.ToString(),
+            ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(secondaryOsConfig),
             Default = false // Not the default
         };
 
@@ -410,7 +429,7 @@ public class FileBusinessTests : IntegrationTestBase
             _fileBusiness.UploadFile(uid, oid, pid, did, invalidStorageId, file)
         );
 
-        Assert.Contains("No object storage found", exception.Message);
+        Assert.Contains("not found", exception.Message);
     }
 
     [Fact]
@@ -421,9 +440,9 @@ public class FileBusinessTests : IntegrationTestBase
         Context.Organizations.Add(otherOrg);
         await Context.SaveChangesAsync();
 
-        var otherOrgOsConfig = new JsonObject
+        var otherOrgOsConfig = new ObjectStorageConfigDto
         {
-            ["mountPath"] = _testDirectory
+            MountPath = _testDirectory
         };
 
         var otherOrgStorage = new ObjectStorage
@@ -432,7 +451,7 @@ public class FileBusinessTests : IntegrationTestBase
             ProjectId = null,
             OrganizationId = otherOrg.Id, // Different org
             Type = "filesystem",
-            Config = otherOrgOsConfig.ToString(),
+            ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(otherOrgOsConfig),
             Default = true
         };
 
@@ -452,25 +471,25 @@ public class FileBusinessTests : IntegrationTestBase
             _fileBusiness.UploadFile(uid, oid, pid, did, otherOrgStorage.Id, file)
         );
 
-        Assert.Contains("No object storage found", exception.Message);
+        Assert.Contains("does not exist", exception.Message);
     }
 
     [Fact]
     public async Task UploadFile_MultipleFilesWithDifferentStorages_WorksCorrectly()
     {
         // Arrange: Create org storage
-        var orgOsConfig = new JsonObject
+        var orgOsConfig = new ObjectStorageConfigDto
         {
-            ["mountPath"] = _orgDefaultDirectory
+            MountPath = _orgDefaultDirectory
         };
 
         var orgObjectStorage = new ObjectStorage
         {
             Name = "Org Storage",
-            ProjectId = null,
+            ProjectId = pid,
             OrganizationId = oid,
             Type = "filesystem",
-            Config = orgOsConfig.ToString(),
+            ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(orgOsConfig),
             Default = false
         };
 
@@ -516,9 +535,9 @@ public class FileBusinessTests : IntegrationTestBase
     public async Task UploadFile_CustomMetadata_WorksCorrectly()
     {
         // Arrange: Create org storage
-        var orgOsConfig = new JsonObject
+        var orgOsConfig = new ObjectStorageConfigDto
         {
-            ["mountPath"] = _orgDefaultDirectory
+            MountPath = _orgDefaultDirectory
         };
 
         var orgObjectStorage = new ObjectStorage
@@ -527,7 +546,7 @@ public class FileBusinessTests : IntegrationTestBase
             ProjectId = null,
             OrganizationId = oid,
             Type = "filesystem",
-            Config = orgOsConfig.ToString(),
+            ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(orgOsConfig),
             Default = false
         };
 
@@ -602,6 +621,185 @@ public class FileBusinessTests : IntegrationTestBase
         // Act & Assert
         await Assert.ThrowsAsync<ValidationException>(() =>
             _fileBusiness.UploadFile(uid, oid, pid, did, osid, file, null, metadataFile));
+    }
+
+    [Fact]
+    public async Task UploadFile_CsvFile_AssignsTimeseriesClassAndExtractsColumns()
+    {
+        // Arrange
+        var csvContent = "timestamp,temperature,humidity\n2024-01-01,22.5,60.1\n2024-01-02,23.0,58.3";
+        var ms = new MemoryStream(Encoding.UTF8.GetBytes(csvContent));
+        var file = new FormFile(ms, 0, ms.Length, "file", "sensor-data.csv")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "text/csv"
+        };
+
+        // Act
+        var result = await _fileBusiness.UploadFile(uid, oid, pid, did, osid, file);
+
+        // Assert: Class should be upgraded to Timeseries
+        Assert.NotNull(result);
+        var resultClass = Context.Classes.First(c => c.Id == result.ClassId);
+        Assert.Equal("Timeseries", resultClass.Name);
+
+        // Assert: Columns should be present in the properties JSON
+        Assert.NotNull(result.Properties);
+        var properties = JsonNode.Parse(result.Properties)?.AsObject();
+        Assert.NotNull(properties);
+
+        var columnsArray = properties!["columns"]?.AsArray();
+        Assert.NotNull(columnsArray);
+        Assert.NotEmpty(columnsArray);
+        Assert.Contains(columnsArray, c => c!.AsObject()["name"]?.ToString() == "timestamp");
+        Assert.Contains(columnsArray, c => c!.AsObject()["name"]?.ToString() == "temperature");
+        Assert.Contains(columnsArray, c => c!.AsObject()["name"]?.ToString() == "humidity");
+    }
+
+    [Fact]
+    public async Task UploadFile_NonTabularFile_KeepsFileClassAndHasNoColumns()
+    {
+        // Arrange
+        var content = "This is a plain text document, not tabular data.";
+        var ms = new MemoryStream(Encoding.UTF8.GetBytes(content));
+        var file = new FormFile(ms, 0, ms.Length, "file", "notes.txt")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "text/plain"
+        };
+
+        // Act
+        var result = await _fileBusiness.UploadFile(uid, oid, pid, did, osid, file);
+
+        // Assert: Class should remain "File" and no columns should be written to properties
+        Assert.NotNull(result);
+        var resultClass = Context.Classes.First(c => c.Id == result.ClassId);
+        Assert.Equal("File", resultClass.Name);
+
+        if (result.Properties != null)
+        {
+            var properties = JsonNode.Parse(result.Properties)?.AsObject();
+            Assert.Null(properties?["columns"]);
+        }
+    }
+
+    [Fact]
+    public async Task UploadFile_CsvOnlyWhitespace_KeepsFileClass()
+    {
+        // Arrange: Empty CSV produces no parseable headers,
+        // so ExtractTabularColumns should return null/empty and the class should stay "File"
+        var csvContent = "                                                         " +
+                         "            \n                                                      " +
+                         "                                                                    " +
+                         "                                                                    " +
+                         "                                                                     " +
+                         "                                  ";
+        var ms = new MemoryStream(Encoding.UTF8.GetBytes(csvContent));
+        var file = new FormFile(ms, 0, ms.Length, "file", "empty-headers.csv")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "text/csv"
+        };
+
+        // Act
+        var result = await _fileBusiness.UploadFile(uid, oid, pid, did, osid, file);
+
+        // Assert: Without extractable columns the record should fall back to "File"
+        Assert.NotNull(result);
+        var resultClass = Context.Classes.First(c => c.Id == result.ClassId);
+        Assert.Equal("File", resultClass.Name);
+
+        if (result.Properties != null)
+        {
+            var properties = JsonNode.Parse(result.Properties)?.AsObject();
+            Assert.Null(properties?["columns"]);
+        }
+    }
+
+    [Fact]
+    public async Task UploadFile_CsvFile_MetadataClassIdOverridesTimeseriesClass()
+    {
+        // Arrange: A CSV that would normally resolve to Timeseries, but explicit metadata
+        // supplies a ClassId which takes precedence via the null-coalescing assignment
+        var csvContent = "id,value\n1,100\n2,200";
+        var ms = new MemoryStream(Encoding.UTF8.GetBytes(csvContent));
+        var file = new FormFile(ms, 0, ms.Length, "file", "data.csv")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "text/csv"
+        };
+
+        var fileClass = Context.Classes.First(c => c.Name == "File" && c.ProjectId == pid);
+
+        var metadata = new CreateRecordFileUploadRequestDto
+        {
+            Name = "Override Name",
+            Description = "Override Description",
+            Properties = new JsonObject(),
+            OriginalId = "override-original-id",
+            ClassId = fileClass.Id,
+            ClassName = fileClass.Name
+        };
+
+        var metadataJson = JsonSerializer.Serialize(metadata);
+        var metadataBytes = Encoding.UTF8.GetBytes(metadataJson);
+        var metadataStream = new MemoryStream(metadataBytes);
+        var metadataFile = new FormFile(metadataStream, 0, metadataStream.Length, "metadataFile", "metadata.json")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "application/json"
+        };
+
+        // Act
+        var result = await _fileBusiness.UploadFile(uid, oid, pid, did, osid, file, null, metadataFile);
+
+        // Assert: Explicit ClassId in metadata wins over the Timeseries upgrade
+        Assert.NotNull(result);
+        Assert.Equal(fileClass.Id, result.ClassId);
+    }
+
+    [Fact]
+    public async Task UploadFile_CsvFile_ColumnsAreMergedWithExistingMetadataProperties()
+    {
+        // Arrange: Metadata carries pre-existing properties; columns should be added alongside them
+        var csvContent = "voltage,current\n5.0,1.2\n3.3,0.8";
+        var ms = new MemoryStream(Encoding.UTF8.GetBytes(csvContent));
+        var file = new FormFile(ms, 0, ms.Length, "file", "measurements.csv")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "text/csv"
+        };
+
+        var metadata = new CreateRecordFileUploadRequestDto
+        {
+            Name = "Measurements",
+            Description = "Electrical measurements",
+            Properties = new JsonObject { ["source"] = "lab-bench-1" },
+            OriginalId = "measurements-001"
+        };
+
+        var metadataJson = JsonSerializer.Serialize(metadata);
+        var metadataBytes = Encoding.UTF8.GetBytes(metadataJson);
+        var metadataStream = new MemoryStream(metadataBytes);
+        var metadataFile = new FormFile(metadataStream, 0, metadataStream.Length, "metadataFile", "metadata.json")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "application/json"
+        };
+
+        // Act
+        var result = await _fileBusiness.UploadFile(uid, oid, pid, did, osid, file, null, metadataFile);
+
+        // Assert: Both the original metadata property and the extracted columns should be present
+        Assert.NotNull(result);
+        var resultClass = Context.Classes.First(c => c.Id == result.ClassId);
+        Assert.Equal("Timeseries", resultClass.Name);
+
+        Assert.NotNull(result.Properties);
+        var properties = JsonNode.Parse(result.Properties)?.AsObject();
+        Assert.NotNull(properties);
+        Assert.NotNull(properties!["columns"]);
+        Assert.Equal("lab-bench-1", properties["source"]!.GetValue<string>());
     }
 
     #endregion
@@ -681,9 +879,9 @@ public class FileBusinessTests : IntegrationTestBase
     public async Task UpdateFile_WithOrgDefault_WorksCorrectly()
     {
         // Arrange: Create org default, disable project default
-        var orgOsConfig = new JsonObject
+        var orgOsConfig = new ObjectStorageConfigDto
         {
-            ["mountPath"] = _orgDefaultDirectory
+            MountPath = _orgDefaultDirectory
         };
 
         var orgObjectStorage = new ObjectStorage
@@ -692,7 +890,7 @@ public class FileBusinessTests : IntegrationTestBase
             ProjectId = null,
             OrganizationId = oid,
             Type = "filesystem",
-            Config = orgOsConfig.ToString(),
+            ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(orgOsConfig),
             Default = true
         };
 
@@ -769,9 +967,9 @@ public class FileBusinessTests : IntegrationTestBase
     public async Task DownloadFile_WorksWithOrgDefault()
     {
         // Arrange: Create org default, disable project default
-        var orgOsConfig = new JsonObject
+        var orgOsConfig = new ObjectStorageConfigDto
         {
-            ["mountPath"] = _orgDefaultDirectory
+            MountPath = _orgDefaultDirectory
         };
 
         var orgObjectStorage = new ObjectStorage
@@ -780,7 +978,7 @@ public class FileBusinessTests : IntegrationTestBase
             ProjectId = null,
             OrganizationId = oid,
             Type = "filesystem",
-            Config = orgOsConfig.ToString(),
+            ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(orgOsConfig),
             Default = true
         };
 
@@ -874,9 +1072,9 @@ public class FileBusinessTests : IntegrationTestBase
     public async Task DeleteFile_WorksWithOrgDefault()
     {
         // Arrange: Create org default, disable project default
-        var orgOsConfig = new JsonObject
+        var orgOsConfig = new ObjectStorageConfigDto
         {
-            ["mountPath"] = _orgDefaultDirectory
+            MountPath = _orgDefaultDirectory
         };
 
         var orgObjectStorage = new ObjectStorage
@@ -885,7 +1083,7 @@ public class FileBusinessTests : IntegrationTestBase
             ProjectId = null,
             OrganizationId = oid,
             Type = "filesystem",
-            Config = orgOsConfig.ToString(),
+            ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(orgOsConfig),
             Default = true
         };
 
@@ -983,9 +1181,9 @@ public class FileBusinessTests : IntegrationTestBase
     public async Task CancelUpload_NoObjectStorageId_FallsBackToOrgDefault()
     {
         // Arrange: Org default with different directory
-        var orgOsConfig = new JsonObject
+        var orgOsConfig = new ObjectStorageConfigDto
         {
-            ["mountPath"] = _orgDefaultDirectory
+            MountPath = _orgDefaultDirectory
         };
 
         var orgObjectStorage = new ObjectStorage
@@ -994,7 +1192,7 @@ public class FileBusinessTests : IntegrationTestBase
             ProjectId = null,
             OrganizationId = oid,
             Type = "filesystem",
-            Config = orgOsConfig.ToString(),
+            ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(orgOsConfig),
             Default = true
         };
 
@@ -1279,6 +1477,8 @@ public class FileBusinessTests : IntegrationTestBase
         };
 
         var result = await _fileBusiness.CompleteUpload(uid, oid, pid, did, osid, completeRequest);
+
+
 
         // Assert: Should use SECOND upload (last write wins)
         var finalFilePath = result.Uri;
@@ -1632,9 +1832,9 @@ public class FileBusinessTests : IntegrationTestBase
     public async Task StartUpload_NoObjectStorageId_FallsBackToOrgDefault()
     {
         // Arrange: Create org-level default storage with different directory
-        var orgOsConfig = new JsonObject
+        var orgOsConfig = new ObjectStorageConfigDto
         {
-            ["mountPath"] = _orgDefaultDirectory // Use org-specific directory
+            MountPath = _orgDefaultDirectory // Use org-specific directory
         };
 
         var orgObjectStorage = new ObjectStorage
@@ -1643,7 +1843,7 @@ public class FileBusinessTests : IntegrationTestBase
             ProjectId = null, // Organization-level (no project)
             OrganizationId = oid,
             Type = "filesystem",
-            Config = orgOsConfig.ToString(),
+            ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(orgOsConfig),
             Default = true
         };
 
@@ -1700,9 +1900,9 @@ public class FileBusinessTests : IntegrationTestBase
     public async Task StartUpload_NoObjectStorageId_PrioritizesProjectOverOrg()
     {
         // Arrange: Create both project and org defaults with different directories
-        var orgOsConfig = new JsonObject
+        var orgOsConfig = new ObjectStorageConfigDto
         {
-            ["mountPath"] = _orgDefaultDirectory // Org-specific directory
+            MountPath = _orgDefaultDirectory // Org-specific directory
         };
 
         var orgObjectStorage = new ObjectStorage
@@ -1711,7 +1911,7 @@ public class FileBusinessTests : IntegrationTestBase
             ProjectId = null, // Organization-level
             OrganizationId = oid,
             Type = "filesystem",
-            Config = orgOsConfig.ToString(),
+            ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(orgOsConfig),
             Default = true
         };
 
@@ -1832,9 +2032,9 @@ public class FileBusinessTests : IntegrationTestBase
     public async Task CompleteUpload_NoObjectStorageId_UsesOrgDefault()
     {
         // Arrange: Create org default, disable project default
-        var orgOsConfig = new JsonObject
+        var orgOsConfig = new ObjectStorageConfigDto
         {
-            ["mountPath"] = _orgDefaultDirectory
+            MountPath = _orgDefaultDirectory
         };
 
         var orgObjectStorage = new ObjectStorage
@@ -1843,7 +2043,7 @@ public class FileBusinessTests : IntegrationTestBase
             ProjectId = null,
             OrganizationId = oid,
             Type = "filesystem",
-            Config = orgOsConfig.ToString(),
+            ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(orgOsConfig),
             Default = true
         };
 
@@ -1917,9 +2117,9 @@ public class FileBusinessTests : IntegrationTestBase
     public async Task UploadFile_NoObjectStorageId_FallsBackToOrgDefault()
     {
         // Arrange: Create org-level default with different directory
-        var orgOsConfig = new JsonObject
+        var orgOsConfig = new ObjectStorageConfigDto
         {
-            ["mountPath"] = _orgDefaultDirectory
+            MountPath = _orgDefaultDirectory
         };
 
         var orgObjectStorage = new ObjectStorage
@@ -1928,7 +2128,7 @@ public class FileBusinessTests : IntegrationTestBase
             ProjectId = null,
             OrganizationId = oid,
             Type = "filesystem",
-            Config = orgOsConfig.ToString(),
+            ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(orgOsConfig),
             Default = true
         };
 
@@ -1988,7 +2188,645 @@ public class FileBusinessTests : IntegrationTestBase
             _fileBusiness.StartUpload(oid, pid, did, null, request)
         );
 
-        Assert.Contains("No default object storage found", exception.Message);
+        Assert.Contains("Default object storage not found", exception.Message);
+    }
+
+    #endregion
+
+    #region FileSize Tests
+
+    [Fact]
+    public async Task UploadFile_CapturesFileSize()
+    {
+        // Arrange
+        var content = "Test file content with some length";
+        var expectedSize = System.Text.Encoding.UTF8.GetBytes(content).Length;
+        var ms = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(content));
+        var file = new FormFile(ms, 0, ms.Length, "file", "filesize-test.txt")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "text/plain"
+        };
+
+        // Act
+        var result = await _fileBusiness.UploadFile(
+            uid, oid, pid, did, osid, file
+        );
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.NotNull(result.FileSize);
+        Assert.Equal(expectedSize, result.FileSize);
+
+        // Verify file size persisted in database
+        var dbRecord = await Context.Records.FindAsync(result.Id);
+        Assert.NotNull(dbRecord);
+        Assert.Equal(expectedSize, dbRecord.FileSize);
+    }
+
+    [Fact]
+    public async Task UploadFile_LargeFile_CapturesCorrectFileSize()
+    {
+        // Arrange - Create a 1MB file
+        var content = new string('A', 1024 * 1024); // 1MB of 'A' characters
+        var expectedSize = System.Text.Encoding.UTF8.GetBytes(content).Length;
+        var ms = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(content));
+        var file = new FormFile(ms, 0, ms.Length, "file", "large-file.txt")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "text/plain"
+        };
+
+        // Act
+        var result = await _fileBusiness.UploadFile(
+            uid, oid, pid, did, osid, file
+        );
+
+        // Assert
+        Assert.NotNull(result.FileSize);
+        Assert.Equal(expectedSize, result.FileSize);
+        Assert.True(result.FileSize > 1000000); // Over 1MB
+    }
+
+    [Fact]
+    public async Task UpdateFile_UpdatesFileSize()
+    {
+        // Arrange - Upload initial file
+        var initialContent = "Initial content";
+        var ms1 = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(initialContent));
+        var file1 = new FormFile(ms1, 0, ms1.Length, "file", "update-size-test.txt")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "text/plain"
+        };
+        var initialRecord = await _fileBusiness.UploadFile(uid, oid, pid, did, osid, file1);
+        var initialSize = initialRecord.FileSize;
+
+        // Act - Update with larger file
+        var newContent = "This is much longer content for the updated file";
+        var expectedNewSize = System.Text.Encoding.UTF8.GetBytes(newContent).Length;
+        var ms2 = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(newContent));
+        var file2 = new FormFile(ms2, 0, ms2.Length, "file", "updated-size.txt")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "text/plain"
+        };
+        var updatedRecord = await _fileBusiness.UpdateFile(uid, oid, pid, initialRecord.Id, file2);
+
+        // Assert
+        Assert.NotNull(updatedRecord.FileSize);
+        Assert.Equal(expectedNewSize, updatedRecord.FileSize);
+        Assert.NotEqual(initialSize, updatedRecord.FileSize);
+        Assert.True(updatedRecord.FileSize > initialSize);
+
+        // Verify in database
+        var dbRecord = await Context.Records.FindAsync(updatedRecord.Id);
+        Assert.Equal(expectedNewSize, dbRecord.FileSize);
+    }
+
+    [Fact]
+    public async Task GetRecord_ReturnsFileSize()
+    {
+        // Arrange
+        var content = "Content for get test";
+        var expectedSize = System.Text.Encoding.UTF8.GetBytes(content).Length;
+        var ms = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(content));
+        var file = new FormFile(ms, 0, ms.Length, "file", "get-size-test.txt")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "text/plain"
+        };
+        var uploadedRecord = await _fileBusiness.UploadFile(uid, oid, pid, did, osid, file);
+
+        // Act
+        var retrievedRecord = await _recordBusiness.GetRecord(uid, oid, pid, uploadedRecord.Id, true);
+
+        // Assert
+        Assert.NotNull(retrievedRecord);
+        Assert.NotNull(retrievedRecord.FileSize);
+        Assert.Equal(expectedSize, retrievedRecord.FileSize);
+    }
+
+    [Fact]
+    public async Task GetAllRecords_ReturnsFileSizes()
+    {
+        // Arrange - Upload multiple files with different sizes
+        var file1Content = "Small file";
+        var file1Size = System.Text.Encoding.UTF8.GetBytes(file1Content).Length;
+        var ms1 = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(file1Content));
+        var file1 = new FormFile(ms1, 0, ms1.Length, "file", "small.txt")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "text/plain"
+        };
+
+        var file2Content = new string('B', 5000); // Larger file
+        var file2Size = System.Text.Encoding.UTF8.GetBytes(file2Content).Length;
+        var ms2 = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(file2Content));
+        var file2 = new FormFile(ms2, 0, ms2.Length, "file", "large.txt")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "text/plain"
+        };
+
+        await _fileBusiness.UploadFile(uid, oid, pid, did, osid, file1);
+        await _fileBusiness.UploadFile(uid, oid, pid, did, osid, file2);
+
+        // Act
+        var allRecords = await _recordBusiness.GetAllRecords(uid, oid, pid, did, true);
+
+        // Assert
+        var uploadedRecords = allRecords.Where(r => r.Name == "small.txt" || r.Name == "large.txt").ToList();
+        Assert.Equal(2, uploadedRecords.Count);
+        Assert.All(uploadedRecords, r => Assert.NotNull(r.FileSize));
+
+        var smallFile = uploadedRecords.First(r => r.Name == "small.txt");
+        var largeFile = uploadedRecords.First(r => r.Name == "large.txt");
+
+        Assert.Equal(file1Size, smallFile.FileSize);
+        Assert.Equal(file2Size, largeFile.FileSize);
+        Assert.True(largeFile.FileSize > smallFile.FileSize);
+    }
+
+    [Fact]
+    public async Task CompleteUpload_ChunkedUpload_CapturesCorrectFileSize()
+    {
+        // Arrange
+        var content = "Chunked upload content with multiple parts that will be merged";
+        var expectedSize = System.Text.Encoding.UTF8.GetBytes(content).Length;
+        var chunks = new[] { "Chunked upload ", "content with ", "multiple parts ", "that will be merged" };
+
+        var session = await _fileBusiness.StartUpload(
+            oid, pid, did, osid,
+            new FileUploadInitRequestDto { FileName = "chunked-size.txt", FileSize = expectedSize }
+        );
+
+        // Act - Upload chunks
+        for (int i = 0; i < chunks.Length; i++)
+        {
+            await _fileBusiness.UploadChunk(oid, pid, did, osid, CreateFormFile(chunks[i]), session.UploadId, i);
+        }
+
+        var completeRequest = new FileUploadCompleteRequestDto
+        {
+            UploadId = session.UploadId,
+            FileName = "chunked-size.txt",
+            TotalChunks = chunks.Length
+        };
+
+        var result = await _fileBusiness.CompleteUpload(uid, oid, pid, did, osid, completeRequest);
+
+        // Assert
+        Assert.NotNull(result.FileSize);
+        Assert.Equal(expectedSize, result.FileSize);
+
+        // Verify actual file size matches
+        var filePath = result.Uri;
+        var actualFileSize = new FileInfo(filePath).Length;
+        Assert.Equal(expectedSize, actualFileSize);
+    }
+
+    [Fact]
+    public async Task UploadFile_EmptyFile_CapturesZeroSize()
+    {
+        // Arrange
+        var ms = new MemoryStream(Array.Empty<byte>());
+        var file = new FormFile(ms, 0, 0, "file", "empty.txt")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "text/plain"
+        };
+
+        // Act & Assert - Should throw because empty files aren't allowed
+        await Assert.ThrowsAsync<ArgumentException>(() =>
+            _fileBusiness.UploadFile(uid, oid, pid, did, osid, file)
+        );
+    }
+
+    #endregion
+    
+    #region BackfillFileSizes Tests
+
+    [Fact]
+    public async Task BackfillFileSizes_ThrowsException_WhenBothOrganizationAndProjectAreNull()
+    {
+        // Arrange & Act & Assert
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            _fileBusiness.BackfillFileSizes(null, null));
+
+        Assert.Contains("At least one of organization or project must be specified", exception.Message);
+    }
+
+    [Fact]
+    public async Task BackfillFileSizes_OnlyBackfillsRecordsWithUriAndObjectStorageId()
+    {
+        // Arrange: Create records with various states
+        var content = "Test content";
+        var ms = new MemoryStream(Encoding.UTF8.GetBytes(content));
+        var file = new FormFile(ms, 0, ms.Length, "file", "valid.txt")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "text/plain"
+        };
+
+        // Upload a valid file (has URI and ObjectStorageId)
+        var validRecord = await _fileBusiness.UploadFile(uid, oid, pid, did, osid, file);
+        
+        // Manually clear FileSize to simulate old record
+        var dbRecord = await Context.Records.FindAsync(validRecord.Id);
+        dbRecord.FileSize = null;
+        await Context.SaveChangesAsync();
+
+        // Create a record without URI
+        var recordWithoutUri = new Record
+        {
+            Name = "No URI",
+            ClassId = Context.Classes.First(c => c.Name == "File" && c.ProjectId == pid).Id,
+            DataSourceId = did,
+            ProjectId = pid,
+            OrganizationId = oid,
+            OriginalId = "greg-123",
+            Description = "fake record with no URI",
+            Properties = "{\"test\":\"value\"}",
+            Uri = null, // No URI
+            ObjectStorageId = osid,
+            FileSize = null,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid
+        };
+        Context.Records.Add(recordWithoutUri);
+
+        // Create a record without ObjectStorageId
+        var recordWithoutStorageId = new Record
+        {
+            Name = "No Storage ID",
+            ClassId = Context.Classes.First(c => c.Name == "File" && c.ProjectId == pid).Id,
+            DataSourceId = did,
+            ProjectId = pid,
+            OrganizationId = oid,
+            OriginalId = "phil-123",
+            Description = "fake record with no object storage",
+            Properties = "{\"test\":\"value\"}",
+            Uri = "some-uri",
+            ObjectStorageId = null, // No ObjectStorageId
+            FileSize = null,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid
+        };
+        Context.Records.Add(recordWithoutStorageId);
+        await Context.SaveChangesAsync();
+
+        // Act
+        await _fileBusiness.BackfillFileSizes(oid, pid);
+
+        // Assert: Only the valid record should have FileSize backfilled
+        var validAfter = await Context.Records.FindAsync(validRecord.Id);
+        var noUriAfter = await Context.Records.FindAsync(recordWithoutUri.Id);
+        var noStorageAfter = await Context.Records.FindAsync(recordWithoutStorageId.Id);
+
+        Assert.NotNull(validAfter.FileSize);
+        Assert.Null(noUriAfter.FileSize);
+        Assert.Null(noStorageAfter.FileSize);
+    }
+
+    [Fact]
+    public async Task BackfillFileSizes_SkipsRecordsWithExistingFileSize()
+    {
+        // Arrange: Upload a file with FileSize already set
+        var content = "Test content";
+        var expectedSize = Encoding.UTF8.GetBytes(content).Length;
+        var ms = new MemoryStream(Encoding.UTF8.GetBytes(content));
+        var file = new FormFile(ms, 0, ms.Length, "file", "existing-size.txt")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "text/plain"
+        };
+
+        var record = await _fileBusiness.UploadFile(uid, oid, pid, did, osid, file);
+        
+        // Verify FileSize is already set
+        var dbRecord = await Context.Records.FindAsync(record.Id);
+        Assert.NotNull(dbRecord.FileSize);
+        var originalSize = dbRecord.FileSize;
+
+        // Act
+        await _fileBusiness.BackfillFileSizes(oid, pid);
+
+        // Assert: FileSize should remain unchanged
+        var afterBackfill = await Context.Records.FindAsync(record.Id);
+        Assert.Equal(originalSize, afterBackfill.FileSize);
+    }
+
+    [Fact]
+    public async Task BackfillFileSizes_FiltersToOrganization_WhenOrganizationIdProvided()
+    {
+        // Arrange: Create second organization
+        var org2 = new Organization { Name = "Organization 2" };
+        Context.Organizations.Add(org2);
+        await Context.SaveChangesAsync();
+        var org2Id = org2.Id;
+
+        var project2 = new Project { Name = "Test Project 2", OrganizationId = org2Id };
+        Context.Projects.Add(project2);
+        await Context.SaveChangesAsync();
+        var pid2 = project2.Id;
+
+        var dataSource2 = new DataSource
+        {
+            Name = "Test Data Source 2",
+            ProjectId = pid2,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            OrganizationId = org2Id
+        };
+        Context.DataSources.Add(dataSource2);
+        await Context.SaveChangesAsync();
+        var did2 = dataSource2.Id;
+
+        var osConfig2 = new ObjectStorageConfigDto { MountPath = _testDirectory };
+        var objectStorage2 = new ObjectStorage
+        {
+            Name = "Test Object Storage 2",
+            ProjectId = pid2,
+            OrganizationId = org2Id,
+            Type = "filesystem",
+            ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(osConfig2)
+        };
+        Context.ObjectStorages.Add(objectStorage2);
+        await Context.SaveChangesAsync();
+        var osid2 = objectStorage2.Id;
+
+        // Upload files to both organizations
+        var content = "Test content";
+        var ms1 = new MemoryStream(Encoding.UTF8.GetBytes(content));
+        var file1 = new FormFile(ms1, 0, ms1.Length, "file", "org1-file.txt")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "text/plain"
+        };
+        var org1Record = await _fileBusiness.UploadFile(uid, oid, pid, did, osid, file1);
+
+        var ms2 = new MemoryStream(Encoding.UTF8.GetBytes(content));
+        var file2 = new FormFile(ms2, 0, ms2.Length, "file", "org2-file.txt")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "text/plain"
+        };
+        var org2Record = await _fileBusiness.UploadFile(uid, org2Id, pid2, did2, osid2, file2);
+
+        // Clear FileSizes
+        var db1 = await Context.Records.FindAsync(org1Record.Id);
+        var db2 = await Context.Records.FindAsync(org2Record.Id);
+        db1.FileSize = null;
+        db2.FileSize = null;
+        await Context.SaveChangesAsync();
+
+        // Act: Backfill only for organization 1
+        await _fileBusiness.BackfillFileSizes(oid, null);
+
+        // Assert: Only org1 record should have FileSize backfilled
+        var org1After = await Context.Records.FindAsync(org1Record.Id);
+        var org2After = await Context.Records.FindAsync(org2Record.Id);
+
+        Assert.NotNull(org1After.FileSize);
+        Assert.Null(org2After.FileSize);
+    }
+
+    [Fact]
+    public async Task BackfillFileSizes_FiltersToProject_WhenProjectIdProvided()
+    {
+        // Arrange: Create second project in same organization
+        var project2 = new Project { Name = "Test Project 2", OrganizationId = oid };
+        Context.Projects.Add(project2);
+        await Context.SaveChangesAsync();
+        var pid2 = project2.Id;
+
+        var dataSource2 = new DataSource
+        {
+            Name = "Test Data Source 2",
+            ProjectId = pid2,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            OrganizationId = oid
+        };
+        Context.DataSources.Add(dataSource2);
+        await Context.SaveChangesAsync();
+        var did2 = dataSource2.Id;
+
+        var osConfig2 = new ObjectStorageConfigDto { MountPath = _testDirectory };
+        var objectStorage2 = new ObjectStorage
+        {
+            Name = "Test Object Storage 2",
+            ProjectId = pid2,
+            OrganizationId = oid,
+            Type = "filesystem",
+            ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(osConfig2)
+        };
+        Context.ObjectStorages.Add(objectStorage2);
+        await Context.SaveChangesAsync();
+        var osid2 = objectStorage2.Id;
+
+        // Upload files to both projects
+        var content = "Test content";
+        var ms1 = new MemoryStream(Encoding.UTF8.GetBytes(content));
+        var file1 = new FormFile(ms1, 0, ms1.Length, "file", "project1-file.txt")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "text/plain"
+        };
+        var project1Record = await _fileBusiness.UploadFile(uid, oid, pid, did, osid, file1);
+
+        var ms2 = new MemoryStream(Encoding.UTF8.GetBytes(content));
+        var file2 = new FormFile(ms2, 0, ms2.Length, "file", "project2-file.txt")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "text/plain"
+        };
+        var project2Record = await _fileBusiness.UploadFile(uid, oid, pid2, did2, osid2, file2);
+
+        // Clear FileSizes
+        var db1 = await Context.Records.FindAsync(project1Record.Id);
+        var db2 = await Context.Records.FindAsync(project2Record.Id);
+        db1.FileSize = null;
+        db2.FileSize = null;
+        await Context.SaveChangesAsync();
+
+        // Act: Backfill only for project 1
+        await _fileBusiness.BackfillFileSizes(oid, pid);
+
+        // Assert: Only project1 record should have FileSize backfilled
+        var project1After = await Context.Records.FindAsync(project1Record.Id);
+        var project2After = await Context.Records.FindAsync(project2Record.Id);
+
+        Assert.NotNull(project1After.FileSize);
+        Assert.Null(project2After.FileSize);
+    }
+
+    [Fact]
+    public async Task BackfillFileSizes_FiltersToOrganizationAndProject_WhenBothProvided()
+    {
+        // Arrange: Create second organization and projects
+        var org2 = new Organization { Name = "Organization 2" };
+        Context.Organizations.Add(org2);
+        await Context.SaveChangesAsync();
+        var org2Id = org2.Id;
+
+        var org1Project2 = new Project { Name = "Org1 Project 2", OrganizationId = oid };
+        var org2Project1 = new Project { Name = "Org2 Project 1", OrganizationId = org2Id };
+        Context.Projects.AddRange(org1Project2, org2Project1);
+        await Context.SaveChangesAsync();
+
+        // Create necessary infrastructure for org1project2
+        var ds1p2 = new DataSource
+        {
+            Name = "DS Org1 Project2",
+            ProjectId = org1Project2.Id,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            OrganizationId = oid
+        };
+        Context.DataSources.Add(ds1p2);
+        await Context.SaveChangesAsync();
+
+        var os1p2Config = new ObjectStorageConfigDto { MountPath = _testDirectory };
+        var os1p2 = new ObjectStorage
+        {
+            Name = "OS Org1 Project2",
+            ProjectId = org1Project2.Id,
+            OrganizationId = oid,
+            Type = "filesystem",
+            ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(os1p2Config)
+        };
+        Context.ObjectStorages.Add(os1p2);
+        await Context.SaveChangesAsync();
+
+        // Create necessary infrastructure for org2project1
+        var ds2p1 = new DataSource
+        {
+            Name = "DS Org2 Project1",
+            ProjectId = org2Project1.Id,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            OrganizationId = org2Id
+        };
+        Context.DataSources.Add(ds2p1);
+        await Context.SaveChangesAsync();
+
+        var os2p1Config = new ObjectStorageConfigDto { MountPath = _testDirectory };
+        var os2p1 = new ObjectStorage
+        {
+            Name = "OS Org2 Project1",
+            ProjectId = org2Project1.Id,
+            OrganizationId = org2Id,
+            Type = "filesystem",
+            ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(os2p1Config)
+        };
+        Context.ObjectStorages.Add(os2p1);
+        await Context.SaveChangesAsync();
+
+        // Upload files
+        var content = "Test content";
+        
+        var ms1 = new MemoryStream(Encoding.UTF8.GetBytes(content));
+        var file1 = new FormFile(ms1, 0, ms1.Length, "file", "org1-proj1.txt")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "text/plain"
+        };
+        var org1proj1Record = await _fileBusiness.UploadFile(uid, oid, pid, did, osid, file1);
+
+        var ms2 = new MemoryStream(Encoding.UTF8.GetBytes(content));
+        var file2 = new FormFile(ms2, 0, ms2.Length, "file", "org1-proj2.txt")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "text/plain"
+        };
+        var org1proj2Record = await _fileBusiness.UploadFile(uid, oid, org1Project2.Id, ds1p2.Id, os1p2.Id, file2);
+
+        var ms3 = new MemoryStream(Encoding.UTF8.GetBytes(content));
+        var file3 = new FormFile(ms3, 0, ms3.Length, "file", "org2-proj1.txt")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "text/plain"
+        };
+        var org2proj1Record = await _fileBusiness.UploadFile(uid, org2Id, org2Project1.Id, ds2p1.Id, os2p1.Id, file3);
+
+        // Clear FileSizes
+        var db1 = await Context.Records.FindAsync(org1proj1Record.Id);
+        var db2 = await Context.Records.FindAsync(org1proj2Record.Id);
+        var db3 = await Context.Records.FindAsync(org2proj1Record.Id);
+        db1.FileSize = null;
+        db2.FileSize = null;
+        db3.FileSize = null;
+        await Context.SaveChangesAsync();
+
+        // Act: Backfill only for org1, project1
+        await _fileBusiness.BackfillFileSizes(oid, pid);
+
+        // Assert: Only org1proj1 record should have FileSize backfilled
+        var after1 = await Context.Records.FindAsync(org1proj1Record.Id);
+        var after2 = await Context.Records.FindAsync(org1proj2Record.Id);
+        var after3 = await Context.Records.FindAsync(org2proj1Record.Id);
+
+        Assert.NotNull(after1.FileSize);
+        Assert.Null(after2.FileSize);
+        Assert.Null(after3.FileSize);
+    }
+    
+    [Fact]
+    public async Task BackfillFileSizes_HandlesMultipleObjectStorages()
+    {
+        // Arrange: Create second storage in same project
+        var osConfig2 = new ObjectStorageConfigDto { MountPath = _testDirectory };
+        var objectStorage2 = new ObjectStorage
+        {
+            Name = "Test Object Storage 2",
+            ProjectId = pid,
+            OrganizationId = oid,
+            Type = "filesystem",
+            ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(osConfig2)
+        };
+        Context.ObjectStorages.Add(objectStorage2);
+        await Context.SaveChangesAsync();
+        var osid2 = objectStorage2.Id;
+
+        // Upload files to both storages
+        var content1 = "Content for storage 1";
+        var ms1 = new MemoryStream(Encoding.UTF8.GetBytes(content1));
+        var file1 = new FormFile(ms1, 0, ms1.Length, "file", "storage1-file.txt")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "text/plain"
+        };
+        var record1 = await _fileBusiness.UploadFile(uid, oid, pid, did, osid, file1);
+
+        var content2 = "Content for storage 2";
+        var ms2 = new MemoryStream(Encoding.UTF8.GetBytes(content2));
+        var file2 = new FormFile(ms2, 0, ms2.Length, "file", "storage2-file.txt")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "text/plain"
+        };
+        var record2 = await _fileBusiness.UploadFile(uid, oid, pid, did, osid2, file2);
+
+        // Clear FileSizes
+        var db1 = await Context.Records.FindAsync(record1.Id);
+        var db2 = await Context.Records.FindAsync(record2.Id);
+        db1.FileSize = null;
+        db2.FileSize = null;
+        await Context.SaveChangesAsync();
+
+        // Act
+        await _fileBusiness.BackfillFileSizes(oid, pid);
+
+        // Assert: Both should be backfilled correctly
+        var after1 = await Context.Records.FindAsync(record1.Id);
+        var after2 = await Context.Records.FindAsync(record2.Id);
+
+        Assert.NotNull(after1.FileSize);
+        Assert.NotNull(after2.FileSize);
+        Assert.Equal(Encoding.UTF8.GetBytes(content1).Length, after1.FileSize);
+        Assert.Equal(Encoding.UTF8.GetBytes(content2).Length, after2.FileSize);
     }
 
     #endregion

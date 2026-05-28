@@ -19,26 +19,26 @@ public class SensitivityAttribute : Attribute
 public class SensitivityMiddleware
 {
     private readonly RequestDelegate _next;
-    
+
     // Sensitivity Labels on records can only be added during record creation
     // or updated through the "attach/unattach label" endpoints
-    
+
     // Actions that require checking new labels
     private static readonly HashSet<string> _checkNewLabels = new()
     {
         "write record",
         "upload file",
     };
-    
+
     // Actions that require checking existing labels
-    private static readonly HashSet<string> _checkExistingLables = new()
+    private static readonly HashSet<string> _checkExistingLabels = new()
     {
         "read record",
         "download file",
         "delete record",
         "delete file"
     };
-    
+
     // Actions that require checking existing and new labels
     private static readonly HashSet<string> _checkNewAndExistingLabels = new()
     {
@@ -64,7 +64,7 @@ public class SensitivityMiddleware
         }
 
         var sensitivityAttr = endpoint.Metadata.GetMetadata<SensitivityAttribute>();
-        
+
         if (sensitivityAttr == null)
         {
             await _next(context);
@@ -72,7 +72,7 @@ public class SensitivityMiddleware
         }
 
         var userId = UserContextStorage.UserId;
-        
+
         if (userId <= 0)
         {
             context.Response.StatusCode = StatusCodes.Status401Unauthorized;
@@ -86,16 +86,16 @@ public class SensitivityMiddleware
             await _next(context);
             return;
         }
-        
+
         var organizationId = UserContextStorage.OrganizationId;
-        
+
         var isOrgAdmin = await adminService.OrgAdminCheck(userId, organizationId);
         if (isOrgAdmin)
         {
             await _next(context);
             return;
         }
-        
+
         var projectIds = new List<long>();
         var routeProjectId = context.GetRouteValue("projectId")?.ToString();
         if (!string.IsNullOrEmpty(routeProjectId) && long.TryParse(routeProjectId, out var tempProjectId))
@@ -122,13 +122,13 @@ public class SensitivityMiddleware
         }
 
         var providedLabelIds = new List<long>();
-        
+
         if (context.Request.Query.TryGetValue("sensitivityLabelId", out var queryLabelId))
         {
             if (long.TryParse(queryLabelId, out var labelId))
                 providedLabelIds.Add(labelId);
         }
-        
+
         if (context.Request.Query.TryGetValue("sensitivityLabelIds", out var queryLabelIds))
         {
             foreach (var idValue in queryLabelIds)
@@ -140,7 +140,7 @@ public class SensitivityMiddleware
                             providedLabelIds.Add(parsedId);
                 }
         }
-        
+
         // For operations on existing records check user permissions
         long? recordId = null;
         var routeRecordId = context.GetRouteValue("recordId")?.ToString();
@@ -167,10 +167,16 @@ public class SensitivityMiddleware
             if (isLabelRequired && providedLabelIds.Count == 0)
             {
                 context.Response.StatusCode = StatusCodes.Status403Forbidden;
-                await context.Response.WriteAsJsonAsync(new 
-                { 
-                    error = "Sensitivity label is required" 
+                await context.Response.WriteAsJsonAsync(new
+                {
+                    error = "Sensitivity label is required"
                 });
+                return;
+            }
+
+            if (providedLabelIds.Count == 0)
+            {
+                await _next(context);
                 return;
             }
 
@@ -181,8 +187,8 @@ public class SensitivityMiddleware
                 if (unauthorizedLabels.Any())
                 {
                     context.Response.StatusCode = StatusCodes.Status403Forbidden;
-                    await context.Response.WriteAsJsonAsync(new 
-                    { 
+                    await context.Response.WriteAsJsonAsync(new
+                    {
                         error = "User does not have permission to use one or more provided sensitivity labels",
                         unauthorizedLabelIds = unauthorizedLabels
                     });
@@ -190,13 +196,13 @@ public class SensitivityMiddleware
                 }
             }
         }
-        
+
         // READ & DELETE ACTIONS
         // Check if user has permission for existing labels on the record
-        if (_checkExistingLables.Contains(sensitivityAttr.Action) && recordId != null)
+        if (_checkExistingLabels.Contains(sensitivityAttr.Action) && recordId != null)
         {
             var existingLabelIds = await sensitivityLabelService.GetRecordSensitivityLabels(recordId.Value);
-            
+
             // If record has labels, user must have permission for ALL of them
             if (existingLabelIds.Count > 0)
             {
@@ -204,8 +210,8 @@ public class SensitivityMiddleware
                 if (unauthorizedLabels.Any())
                 {
                     context.Response.StatusCode = StatusCodes.Status403Forbidden;
-                    await context.Response.WriteAsJsonAsync(new 
-                    { 
+                    await context.Response.WriteAsJsonAsync(new
+                    {
                         error = "User does not have permission to access record with current sensitivity labels",
                         unauthorizedLabelIds = unauthorizedLabels
                     });
@@ -213,13 +219,13 @@ public class SensitivityMiddleware
                 }
             }
         }
-      
+
         // UPDATE ACTIONS
         // Check both existing labels and any new labels being added
         if (_checkNewAndExistingLabels.Contains(sensitivityAttr.Action) && recordId != null)
         {
             var existingLabelIds = await sensitivityLabelService.GetRecordSensitivityLabels(recordId.Value);
-            
+
             // User must have permission for existing labels to update the record
             if (existingLabelIds.Count > 0)
             {
@@ -227,15 +233,15 @@ public class SensitivityMiddleware
                 if (unauthorizedExistingLabels.Any())
                 {
                     context.Response.StatusCode = StatusCodes.Status403Forbidden;
-                    await context.Response.WriteAsJsonAsync(new 
-                    { 
+                    await context.Response.WriteAsJsonAsync(new
+                    {
                         error = "User does not have permission to update record with current sensitivity labels",
                         unauthorizedLabelIds = unauthorizedExistingLabels
                     });
                     return;
                 }
             }
-            
+
             // If new labels are being added, user must have permission for those too
             if (providedLabelIds.Count > 0)
             {
@@ -243,8 +249,8 @@ public class SensitivityMiddleware
                 if (unauthorizedNewLabels.Any())
                 {
                     context.Response.StatusCode = StatusCodes.Status403Forbidden;
-                    await context.Response.WriteAsJsonAsync(new 
-                    { 
+                    await context.Response.WriteAsJsonAsync(new
+                    {
                         error = "User does not have permission to add one or more provided sensitivity labels",
                         unauthorizedLabelIds = unauthorizedNewLabels
                     });

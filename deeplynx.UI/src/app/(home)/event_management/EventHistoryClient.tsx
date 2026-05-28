@@ -91,6 +91,12 @@ const EventsHistoryClient = ({initialProjects, initialSelectedProjects}: Props) 
 
   // Handler for when filters change
   const handleFilterChange = (newFilters: EventFilterParams) => {
+    if (newFilters.startDate) {
+      newFilters.startDate = `${newFilters.startDate}T00:00:00`;
+    }
+    if (newFilters.endDate) {
+      newFilters.endDate = `${newFilters.endDate}T23:59:59`;
+    }
     setFilters(newFilters);
   };
 
@@ -273,24 +279,33 @@ const EventsHistoryClient = ({initialProjects, initialSelectedProjects}: Props) 
   ];
 
   return (
-    <div>
-      <div className="bg-base-200/50 border-b border-base-300/30 pt-4 px-8">
-        <h1 className="text-2xl my-6 font-bold text-info-content">
-          Event History
-        </h1>
-        <ProjectDropdown 
-          projects={projects}
-          onSelectionChange={setSelectedProjects}
-          defaultSelected={
-            initialSelectedProjects.length
-              ? initialSelectedProjects
-              : undefined
-          }
-        />
-      </div>
+    <main className="min-h-screen bg-base-200/30">
+      <section className="border-b border-base-300 bg-base-100">
+        <div className="mx-auto flex w-full max-w-7xl flex-col gap-5 px-3 py-5 sm:px-6 lg:px-8">
+          <div className="space-y-3">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-base-content/60">
+                Events
+              </p>
+              <h1 className="text-2xl font-bold text-base-content sm:text-3xl">
+                Event History
+              </h1>
+            </div>
+            <ProjectDropdown
+              projects={projects}
+              onSelectionChange={setSelectedProjects}
+              defaultSelected={
+                initialSelectedProjects.length
+                  ? initialSelectedProjects
+                  : undefined
+              }
+            />
+          </div>
+        </div>
+      </section>
 
       {loading && (
-        <div className="p-8 bg-base-100 min-h-screen">
+        <section className="mx-auto w-full max-w-7xl px-3 py-5 sm:px-6 lg:px-8">
           <GenericTableSkeleton
             totalColumns={7}
             totalRows={rowsPerPage}
@@ -300,9 +315,9 @@ const EventsHistoryClient = ({initialProjects, initialSelectedProjects}: Props) 
             pagination={true}
             bordered={true}
           />
-        </div>
+        </section>
       )}
-      <div className="flex">
+      <section className="mx-auto flex w-full max-w-7xl px-3 py-5 sm:px-6 lg:px-8">
         <div className="flex-1">
           <GenericTable
             columns={columns}
@@ -324,8 +339,8 @@ const EventsHistoryClient = ({initialProjects, initialSelectedProjects}: Props) 
             onFilterChange={handleFilterChange}
           />
         </div>
-      </div>
-    </div>
+      </section>
+    </main>
   );
 };
 

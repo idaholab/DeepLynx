@@ -62,6 +62,9 @@ public partial class Project
 
     [InverseProperty("Project")]
     public virtual ICollection<Record> Records { get; set; } = new List<Record>();
+    
+    [InverseProperty("Project")]
+    public virtual ICollection<RecordCollection> RecordCollections { get; set; } = new List<RecordCollection>();
 
     [InverseProperty("Project")]
     public virtual ICollection<Relationship> Relationships { get; set; } = new List<Relationship>();
@@ -92,4 +95,7 @@ public partial class Project
     
     [InverseProperty("Project")]
     public virtual ICollection<HistoricalRecord> HistoricalRecords { get; set; } = new List<HistoricalRecord>();
+    
+    [InverseProperty("Project")]
+    public virtual ICollection<AiModelConfig> AiModelConfigs { get; set; } = new List<AiModelConfig>();
 }

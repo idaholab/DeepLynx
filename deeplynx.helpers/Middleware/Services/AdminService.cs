@@ -9,10 +9,12 @@ namespace deeplynx.helpers;
 public interface IAdminService
 {
     Task<bool> SysAdminCheck(long userId);
-    
+
     Task<bool> OrgAdminCheck(long userId, long organizationId);
-    
+
     Task<bool> ProjectAdminCheck(long userId, long organizationId, List<long> projectIds);
+
+    Task<bool> OrgAdminInSystemCheck(long userId);
 }
 
 public class AdminService : IAdminService
@@ -31,7 +33,7 @@ public class AdminService : IAdminService
     public async Task<bool> SysAdminCheck(
         long userId)
     {
-        
+
         //check for whether a user has permission to an action/resource within a organization through group membership
         var hasPermission = _dbContext.Database
             .SqlQuery<bool>($@"
@@ -70,7 +72,7 @@ public class AdminService : IAdminService
                 ) as has_permission")
             .AsEnumerable()
             .FirstOrDefault();
-        
+
         if (hasPermission)
             _logger.LogInformation(
                 "Permission granted - User: {UserId}",
@@ -82,7 +84,7 @@ public class AdminService : IAdminService
 
         return hasPermission;
     }
-    
+
     public async Task<bool> ProjectAdminCheck(
         long userId, long organizationId, List<long> projectIds)
     {
@@ -95,13 +97,19 @@ public class AdminService : IAdminService
             return false;
         }
 
-        // Get all project IDs where the user is an admin in this organization
+        // Get all project IDs where the user is a direct admin OR an admin through group membership
         var adminProjectIds = await _dbContext.ProjectMembers
-            .Where(pm => 
-                pm.UserId == userId && 
-                pm.Role.Name == "Admin" && 
-                pm.Role.OrganizationId == organizationId)
+            .Where(pm =>
+                pm.Role.Name == "Admin" &&
+                pm.Role.OrganizationId == organizationId &&
+                (
+                    // Direct membership
+                    pm.UserId == userId ||
+                    // Group membership
+                    pm.Group.Users.Any(gu => gu.Id == userId)
+                ))
             .Select(pm => pm.ProjectId)
+            .Distinct()
             .ToListAsync();
 
         // Check if all requested project IDs are in the user's admin projects
@@ -117,5 +125,11 @@ public class AdminService : IAdminService
                 userId, organizationId, string.Join(", ", projectIds), string.Join(", ", adminProjectIds));
 
         return hasPermission;
+    }
+
+    public async Task<bool> OrgAdminInSystemCheck(long userId)
+    {
+        return await _dbContext.OrganizationUsers
+            .AnyAsync(ou => ou.UserId == userId && ou.IsOrgAdmin);
     }
 }

@@ -16,6 +16,7 @@ public class UpdateRecordRequestDto
     public string? OriginalId { get; set; }
     
     [JsonPropertyName("name")]
+    [MaxLength(50)]
     public string? Name { get; set; }
     
     [JsonPropertyName("class_id")]
@@ -25,6 +26,7 @@ public class UpdateRecordRequestDto
     public string? ClassName { get; set; }
     
     [JsonPropertyName("description")]
+    [MaxLength(250)]
     public string? Description { get; set; }
     
     [JsonPropertyName("object_storage_id")]
@@ -32,4 +34,7 @@ public class UpdateRecordRequestDto
     
     [JsonPropertyName("file_type")]
     public string? FileType { get; set; }
+
+    [JsonPropertyName("file_size")]
+    public long? FileSize { get; set; }
 }

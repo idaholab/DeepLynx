@@ -31,15 +31,17 @@ public class UserController : ControllerBase
     /// </summary>
     /// <param name="projectId">(Optional) ID of project that users are associated with</param>
     /// <param name="organizationId">(Optional) ID of organization that users are associated with</param>
+    /// <param name="includeArchived">Whether to include archived users (default: false)</param>
     /// <returns>List of user response DTOs</returns>
     [HttpGet(Name = "api_get_all_users")]
     public async Task<ActionResult<IEnumerable<UserResponseDto>>> GetAllUsers(
         [FromQuery] long? projectId,
-        [FromQuery] long? organizationId)
+        [FromQuery] long? organizationId,
+        [FromQuery] bool includeArchived = false)
     {
         try
         {
-            var users = await _userBusiness.GetAllUsers(projectId, organizationId);
+            var users = await _userBusiness.GetAllUsers(projectId, organizationId, includeArchived);
             return Ok(users);
         }
         catch (Exception exc)
@@ -97,7 +99,7 @@ public class UserController : ControllerBase
     /// <param name="dto">User request DTO</param>
     /// <returns>User response DTO</returns>
     [HttpPost(Name = "api_create_a_user")]
-    [OrgAdmin]
+    [OrgAdmin(unscoped: true)]
     public async Task<ActionResult<UserResponseDto>> CreateUser([FromBody] CreateUserRequestDto dto)
     {
         try
@@ -121,7 +123,7 @@ public class UserController : ControllerBase
     /// <param name="dto">User request DTO</param>
     /// <returns>User response DTO</returns>
     [HttpPut("{userId:long}", Name = "api_update_a_user")]
-    [OrgAdmin]
+    [OrgAdmin(unscoped: true)]
     public async Task<ActionResult<UserResponseDto>> UpdateUser(long userId, [FromBody] UpdateUserRequestDto dto)
     {
         try
@@ -198,14 +200,23 @@ public class UserController : ControllerBase
     /// <returns>User response DTO</returns>
     [HttpPatch("{userId:long}/admin", Name = "api_set_sys_admin")]
     [SysAdmin]
-    public async Task<ActionResult<UserResponseDto>> SetSysAdmin(long userId)
+    public async Task<ActionResult<UserResponseDto>> SetSysAdmin(
+        long userId,
+        [FromQuery] bool? isAdmin = true
+    )
     {
         try
         {
             // get the authorizer ID from the middleware context
             var authorizerId = UserContextStorage.UserId;
-            var granted = await _userBusiness.SetSysAdmin(authorizerId, userId);
-            return Ok(new { message = $"Granted sysadmin rights to user {userId}" });
+            var granted = await _userBusiness.SetSysAdmin(authorizerId, userId, isAdmin);
+            var userIsAdmin = isAdmin ?? true;
+            return Ok(new
+            {
+                message = userIsAdmin
+                    ? $"Granted sysadmin rights to user {userId}"
+                    : $"Removed sysAdmin rights from user {userId}"
+            });
         }
         catch (Exception exc)
         {
@@ -256,6 +267,55 @@ public class UserController : ControllerBase
         catch (Exception exc)
         {
             var message = $"An unexpected error occurred while fetching current user: {exc}";
+            _logger.LogError(message);
+            return StatusCode(StatusCodes.Status500InternalServerError, message);
+        }
+    }
+
+
+    /// <summary>
+    ///     Get rolling active user counts
+    /// </summary>
+    /// <param name="projectId">(Optional) ID of project that users are associated with</param>
+    /// <param name="organizationId">(Optional) ID of organization that users are associated with</param>
+    /// <returns>Active user counts for 24-hour, 7-day, and 30-day windows</returns>
+    [HttpGet("active-counts", Name = "api_get_active_user_counts")]
+    public async Task<ActionResult<UserActivityCountsDto>> GetActiveUserCounts(
+        [FromQuery] long? projectId,
+        [FromQuery] long? organizationId)
+    {
+        try
+        {
+            var counts = await _userBusiness.GetActiveUserCounts(projectId, organizationId);
+            return Ok(counts);
+        }
+        catch (Exception exc)
+        {
+            var message = $"An unexpected error occurred while fetching active user counts.: {exc}";
+            _logger.LogError(message);
+            return StatusCode(StatusCodes.Status500InternalServerError, message);
+        }
+    }
+
+    /// <summary>
+    ///     Get rolling active user counts and active user details
+    /// </summary>
+    /// <param name="projectId">(Optional) ID of project that users are associated with</param>
+    /// <param name="organizationId">(Optional) ID of organization that users are associated with</param>
+    /// <returns>Active user counts and users active in the 30-day window</returns>
+    [HttpGet("active-users", Name = "api_get_active_users")]
+    public async Task<ActionResult<UserActivityUsersDto>> GetActiveUsers(
+        [FromQuery] long? projectId,
+        [FromQuery] long? organizationId)
+    {
+        try
+        {
+            var activity = await _userBusiness.GetActiveUsers(projectId, organizationId);
+            return Ok(activity);
+        }
+        catch (Exception exc)
+        {
+            var message = $"An unexpected error occurred while fetching active users.: {exc}";
             _logger.LogError(message);
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }

@@ -6,8 +6,9 @@ metadata:
   labels:
     name: deeplynxv3-dev
 
----
+
 # Secret for Azure Storage Account with SAS Token
+---
 apiVersion: v1
 kind: Secret
 metadata:
@@ -20,8 +21,9 @@ stringData:
   azurestorageaccountkey: ${AZURE_STORAGE_ACCOUNT_KEY}
   azurestorageconnectionstring: ${AZURE_OBJECT_CONNECTION_STRING}
 
----
+
 # Persistent Volume pointing to existing Azure File Share
+---
 apiVersion: v1
 kind: PersistentVolume
 metadata:
@@ -46,7 +48,7 @@ spec:
   csi:
     driver: file.csi.azure.com
     readOnly: false
-    volumeHandle: ${AZURE_FILE_SHARE_VOLUME_HANDLE}  # Unique ID for this volume
+    volumeHandle: ${AZURE_FILE_SHARE_VOLUME_HANDLE} # Unique ID for this volume
     volumeAttributes:
       resourceGroup: ${AZURE_ACCOUNT_RESOURCE_GROUP}
       storageAccount: ${AZURE_STORAGE_ACCOUNT_NAME}
@@ -56,9 +58,10 @@ spec:
     nodeStageSecretRef:
       name: azure-storage-secret
       namespace: deeplynxv3-dev
-      
----
+
+
 # Storage Class (simplified for static provisioning)
+---
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
@@ -71,8 +74,9 @@ reclaimPolicy: Retain
 allowVolumeExpansion: true
 volumeBindingMode: Immediate
 
----
+
 # Persistent Volume Claim
+---
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -86,7 +90,6 @@ spec:
       storage: 60Gi
   storageClassName: ${AZURE_FILE_SHARE_STORAGE_CLASS}
   volumeName: ${AZURE_FILE_SHARE_PERSISTENT_VOLUME} # Bind to the specific PV
-
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -107,6 +110,8 @@ spec:
           image: ${CI_REGISTRY}/${CI_REGISTRY_PATH}:deeplynxv3-ui-${GITHUB_RUN_NUMBER}
           imagePullPolicy: Always
           env:
+            - name: NODE_ENV
+              value: "production"
             - name: AWS_S3_CONNECTION_STRING
               value: ${AWS_S3_CONNECTION_STRING}
             - name: AZURE_OBJECT_CONNECTION_STRING
@@ -138,8 +143,8 @@ spec:
               value: ${JWT_ISSUER}
             - name: JWT_AUDIENCE
               value: ${JWT_AUDIENCE}
-            # DuckDB Configuration
             - name: DUCKDB_BASE_PATH
+              # DuckDB Configuration
               value: ${DUCKDB_BASE_PATH}
             - name: SMTP_SERVER
               value: ${SMTP_SERVER}
@@ -159,10 +164,14 @@ spec:
               value: ${DISABLE_BACKEND_AUTHENTICATION}
             - name: SUPERUSER_EMAIL
               value: ${SUPERUSER_EMAIL}
+            - name: INSIGHT_FASTAPI_URL
+              value: ${INSIGHT_FASTAPI_URL}
+            - name: LATTICE_MODEL
+              value: ${LATTICE_MODEL}
             - name: TENANT_MODE
               value: ${TENANT_MODE}
-            # Runtime environment variables from secrets (sensitive)
             - name: OKTA_CLIENT_SECRET
+              # Runtime environment variables from secrets (sensitive)
               valueFrom:
                 secretKeyRef:
                   name: app-secrets
@@ -172,6 +181,8 @@ spec:
                 secretKeyRef:
                   name: app-secrets
                   key: jwt-secret-key
+            - name: INSIGHT_API_URL
+              value: "http://insight-fastapi-service"
             - name: AUTH_TRUST_HOST
               value: "true"
             - name: AUTH_SECRET
@@ -189,8 +200,9 @@ spec:
                 secretKeyRef:
                   name: app-secrets
                   key: service-token
-            # Runtime environment variables from configmap (non-sensitive)
             - name: NEXT_PUBLIC_DISABLE_FRONTEND_AUTHENTICATION
+              # Runtime environment variables from configmap (non-sensitive)
+
               valueFrom:
                 configMapKeyRef:
                   name: app-config
@@ -221,9 +233,12 @@ spec:
                   name: app-config
                   key: backend-base-url
           resources:
+            requests:
+              cpu: "250m"
+              memory: "384Mi"
             limits:
-              memory: "4Gi"
-              cpu: "1500m"
+              cpu: "1000m"
+              memory: "1Gi"
           ports:
             - containerPort: 3000
           volumeMounts:
@@ -233,7 +248,6 @@ spec:
         - name: duckdb-storage
           persistentVolumeClaim:
             claimName: ${AZURE_FILE_SHARE_PVC}
-
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -261,6 +275,16 @@ spec:
                 secretKeyRef:
                   name: azure-storage-secret
                   key: azurestorageconnectionstring
+            - name: ENCRYPTION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: encryption-key
+            - name: ENCRYPTION_IV
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: encryption-iv
             - name: AZURE_CONTAINER_NAME
               value: ${AZURE_CONTAINER_NAME}
             - name: ConnectionStrings__DefaultConnection
@@ -285,8 +309,9 @@ spec:
               value: ${JWT_SECRET_KEY}
             - name: JWT_AUDIENCE
               value: ${JWT_AUDIENCE}
-            # DuckDB Configuration (same as frontend)
             - name: DUCKDB_BASE_PATH
+              # DuckDB Configuration (same as frontend)
+
               value: ${DUCKDB_BASE_PATH}
             - name: SMTP_SERVER
               value: ${SMTP_SERVER}
@@ -306,10 +331,19 @@ spec:
               value: ${TENANT_MODE}
             - name: DISABLE_BACKEND_AUTHENTICATION
               value: ${DISABLE_BACKEND_AUTHENTICATION}
+            - name: INSIGHT_FASTAPI_URL
+              value: ${INSIGHT_FASTAPI_URL}
             - name: SUPERUSER_EMAIL
               value: ${SUPERUSER_EMAIL}
-            # Backend may also need these environment variables
+            - name: AIRFLOW_BASE_URL
+              value: ${AIRFLOW_BASE_URL}
+            - name: AIRFLOW_USERNAME
+              value: ${AIRFLOW_USERNAME}
+            - name: AIRFLOW_PASSWORD
+              value: ${AIRFLOW_PASSWORD}
             - name: OKTA_CLIENT_SECRET
+              # Backend may also need these environment variables
+
               valueFrom:
                 secretKeyRef:
                   name: app-secrets
@@ -360,9 +394,12 @@ spec:
                   name: app-config
                   key: hosted-link
           resources:
+            requests:
+              cpu: "500m"
+              memory: "512Mi"
             limits:
-              memory: "4Gi"
-              cpu: "1500m"
+              cpu: "2000m"
+              memory: "2Gi"
           ports:
             - containerPort: 5000
           volumeMounts:
@@ -373,8 +410,9 @@ spec:
           persistentVolumeClaim:
             claimName: ${AZURE_FILE_SHARE_PVC}
 
----
+
 #docs
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -394,20 +432,26 @@ spec:
           image: ${CI_REGISTRY}/${CI_REGISTRY_PATH}:deeplynxv3-docs-${GITHUB_RUN_NUMBER}
           imagePullPolicy: Always
           env:
+            - name: NODE_ENV
+              value: "production"
             - name: HOSTED_LINK
               valueFrom:
                 configMapKeyRef:
                   name: app-config
                   key: hosted-link
           resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
             limits:
-              memory: "4Gi"
-              cpu: "1500m"
+              cpu: "500m"
+              memory: "512Mi"
           ports:
             - containerPort: 3001
 
----
+
 #mcp
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -442,6 +486,318 @@ spec:
           ports:
             - containerPort: 43656
 
+
+# insight-rabbitmq
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: insight-rabbitmq
+  namespace: deeplynxv3-dev
+spec:
+  selector:
+    matchLabels:
+      app: insight-rabbitmq
+  template:
+    metadata:
+      labels:
+        app: insight-rabbitmq
+    spec:
+      containers:
+        - name: insight-rabbitmq
+          image: ${CI_REGISTRY}/${CI_REGISTRY_PATH}:insight-rabbitmq-${GITHUB_RUN_NUMBER}
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 5672
+            - containerPort: 15672
+            - containerPort: 15692
+          env:
+            - name: RABBITMQ_DEFAULT_USER
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: rabbitmq-default-user
+            - name: RABBITMQ_DEFAULT_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: rabbitmq-default-pass
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "512Mi"
+            limits:
+              memory: "2Gi"
+              cpu: "1000m"
+          livenessProbe:
+            exec:
+              command: ["rabbitmq-diagnostics", "-q", "check_port_connectivity"]
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 5
+          readinessProbe:
+            exec:
+              command: ["rabbitmq-diagnostics", "-q", "check_port_connectivity"]
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+
+
+# insight-storage: scratch volume for the Insight processing pipeline
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: insight-storage
+  namespace: deeplynxv3-dev
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 25Gi
+  storageClassName: ${AZURE_FILE_SHARE_STORAGE_CLASS}
+
+
+# insight-fastapi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: insight-fastapi
+  namespace: deeplynxv3-dev
+spec:
+  selector:
+    matchLabels:
+      app: insight-fastapi
+  template:
+    metadata:
+      labels:
+        app: insight-fastapi
+    spec:
+      hostAliases:
+        - ip: "10.6.17.82"
+          hostnames:
+            - "deeplynx-api.inl.gov"
+      containers:
+        - name: insight-fastapi
+          image: ${CI_REGISTRY}/${CI_REGISTRY_PATH}:insight-fastapi-${GITHUB_RUN_NUMBER}
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 5009
+          env:
+            - name: LITELLM_LOCAL_MODEL_COST_MAP
+              value: "True"
+            - name: RABBITMQ_HOST
+              value: "insight-rabbitmq-service"
+            - name: RABBITMQ_USERNAME
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: rabbitmq-default-user
+            - name: RABBITMQ_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: rabbitmq-default-pass
+            - name: PG_HOST
+              value: ${POSTGRES_DB_HOST}
+            - name: PG_PORT
+              value: "5432"
+            - name: PG_USER
+              value: ${POSTGRES_USER}
+            - name: PG_PASSWORD
+              value: ${POSTGRES_PASSWORD}
+            - name: PG_DBNAME
+              value: ${POSTGRES_DB_NAME}
+            - name: LLM_AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: llm-auth-token
+            - name: MM_AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: mm-auth-token
+            - name: EMB_AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: emb-auth-token
+            - name: LLM_SERVER_URL
+              value: "http://deeplynx-api.inl.gov:4000/v1"
+            - name: LLM_MODEL_NAME
+              value: "llm"
+            - name: MM_SERVER_URL
+              value: "http://deeplynx-api.inl.gov:4000/v1"
+            - name: MM_MODEL_NAME
+              value: "mmllm"
+            - name: EMB_SERVER_URL
+              value: "http://deeplynx-api.inl.gov:4000/v1"
+            - name: EMB_MODEL_NAME
+              value: "bge-m3"
+            - name: EMB_DIMENSION
+              value: "1024"
+            - name: RAG_MAX_CHUNKS
+              value: "25"
+            - name: LITELLM_HTTP_LOGGING
+              value: "false"
+            - name: STORAGE_BASE_DIR
+              value: "/data/insight"
+            - name: NEXUS_API_URL
+              value: ${NEXUS_API_URL}
+          resources:
+            requests:
+              cpu: "150m"
+              memory: "256Mi"
+            limits:
+              cpu: "750m"
+              memory: "768Mi"
+          volumeMounts:
+            - name: nexus-storage
+              mountPath: /data/duckdb
+              readOnly: true
+            - name: insight-storage
+              mountPath: /data/insight
+      volumes:
+        - name: nexus-storage
+          persistentVolumeClaim:
+            claimName: ${AZURE_FILE_SHARE_PVC}
+        - name: insight-storage
+          persistentVolumeClaim:
+            claimName: insight-storage
+
+
+# insight-rabbitmq-runner
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: insight-rabbitmq-runner
+  namespace: deeplynxv3-dev
+spec:
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: insight-rabbitmq-runner
+  template:
+    metadata:
+      labels:
+        app: insight-rabbitmq-runner
+    spec:
+      terminationGracePeriodSeconds: 120
+      hostAliases:
+        - ip: "10.6.17.82"
+          hostnames:
+            - "deeplynx-api.inl.gov"
+      containers:
+        - name: insight-rabbitmq-runner
+          image: ${CI_REGISTRY}/${CI_REGISTRY_PATH}:insight-rabbitmq-runner-${GITHUB_RUN_NUMBER}
+          imagePullPolicy: Always
+          env:
+            - name: LITELLM_LOCAL_MODEL_COST_MAP
+              value: "True"
+            - name: RABBITMQ_HOST
+              value: "insight-rabbitmq-service"
+            - name: RABBITMQ_USERNAME
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: rabbitmq-default-user
+            - name: RABBITMQ_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: rabbitmq-default-pass
+            - name: PG_HOST
+              value: ${POSTGRES_DB_HOST}
+            - name: PG_PORT
+              value: "5432"
+            - name: PG_USER
+              value: ${POSTGRES_USER}
+            - name: PG_PASSWORD
+              value: ${POSTGRES_PASSWORD}
+            - name: PG_DBNAME
+              value: ${POSTGRES_DB_NAME}
+            - name: LLM_AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: llm-auth-token
+            - name: MM_AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: mm-auth-token
+            - name: EMB_AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: emb-auth-token
+            - name: ENCRYPTION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: encryption-key
+            - name: ENCRYPTION_IV
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: encryption-iv
+            - name: LLM_SERVER_URL
+              value: "http://deeplynx-api.inl.gov:4000/v1"
+            - name: LLM_MODEL_NAME
+              value: "llm"
+            - name: MM_SERVER_URL
+              value: "http://deeplynx-api.inl.gov:4000/v1"
+            - name: MM_MODEL_NAME
+              value: "mmllm"
+            - name: EMB_SERVER_URL
+              value: "http://deeplynx-api.inl.gov:4000/v1"
+            - name: EMB_MODEL_NAME
+              value: "bge-m3"
+            - name: EMB_DIMENSION
+              value: "1024"
+            - name: IMG_TO_TEXT_PROCS
+              value: "2"
+            - name: IMG_TO_TEXT_BATCH_SIZE
+              value: "20"
+            - name: IMG_TO_TEXT_BATCH_TIMEOUT
+              value: "0.5"
+            - name: PDF_TO_IMG_PROCS
+              value: "2"
+            - name: TEXT_TO_CHUNKS_PROCS
+              value: "2"
+            - name: RAG_MAX_CHUNKS
+              value: "25"
+            - name: LITELLM_HTTP_LOGGING
+              value: "false"
+            - name: STORAGE_BASE_DIR
+              value: "/data/insight"
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "1500m"
+            limits:
+              memory: "12Gi"
+              cpu: "10000m"
+          volumeMounts:
+            - name: nexus-storage
+              mountPath: /data/duckdb
+              readOnly: true
+            - name: insight-storage
+              mountPath: /data/insight
+      volumes:
+        - name: nexus-storage
+          persistentVolumeClaim:
+            claimName: ${AZURE_FILE_SHARE_PVC}
+        - name: insight-storage
+          persistentVolumeClaim:
+            claimName: insight-storage
 ---
 apiVersion: v1
 kind: Service
@@ -456,7 +812,6 @@ spec:
       targetPort: 3000
   selector:
     app: deeplynxv3
-
 ---
 apiVersion: v1
 kind: Service
@@ -471,7 +826,6 @@ spec:
       targetPort: 5000
   selector:
     app: deeplynxbackend
-
 ---
 apiVersion: v1
 kind: Service
@@ -486,7 +840,6 @@ spec:
       targetPort: 3001
   selector:
     app: deeplynx-docs
-
 ---
 apiVersion: v1
 kind: Service
@@ -501,7 +854,40 @@ spec:
       targetPort: 43656
   selector:
     app: deeplynx-mcp
-
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: insight-rabbitmq-service
+  namespace: deeplynxv3-dev
+spec:
+  type: ClusterIP
+  ports:
+    - name: amqp
+      port: 5672
+      targetPort: 5672
+    - name: management
+      port: 15672
+      targetPort: 15672
+    - name: prometheus
+      port: 15692
+      targetPort: 15692
+  selector:
+    app: insight-rabbitmq
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: insight-fastapi-service
+  namespace: deeplynxv3-dev
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 80
+      targetPort: 5009
+  selector:
+    app: insight-fastapi
 ---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -511,10 +897,13 @@ metadata:
   annotations:
     kubernetes.io/ingress.class: nginx
     nginx.ingress.kubernetes.io/configuration-snippet: |
-      more_clear_headers "strict-transport-security";
-      more_clear_headers "x-content-type-options";
-      more_clear_headers "x-frame-options";
-      more_clear_headers "content-security-policy";
+      more_set_headers "Referrer-Policy: strict-origin";
+      more_set_headers "X-Content-Type-Options: nosniff";
+      more_set_headers "X-Frame-Options: SAMEORIGIN";
+      more_clear_headers "X-Powered-By";
+      more_clear_headers "x-nextjs-cache";
+      more_clear_headers "x-nextjs-prerender";
+      more_clear_headers "x-nextjs-stale-time";
     nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
     nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
 spec:

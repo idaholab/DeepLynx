@@ -7,13 +7,17 @@ import { TrashIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import {
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type ChangeEvent,
 } from "react";
 import type { ExistingFile } from "../../types/types";
+import type { ClassResponseDto } from "../../types/responseDTOs";
 import SearchBar from "../../components/SearchBar";
 import { formatLocalDateTime } from "@/app/lib/date_time";
+import { createMetadataUploadSchema } from "./metadataUploadSchema";
+import { getClass } from "@/app/lib/client_service/class_services.client";
 
 const MAX_VISIBLE_FILES = 100;
 
@@ -35,7 +39,11 @@ interface NewFileUploadCardProps {
   onMetadataChange: (fileIndex: number, metadata: FileMetadata) => void;
   onRemove?: () => void;
   availableFiles: ExistingFile[];
+  availableClasses: ClassResponseDto[];
+  isLoadingClasses: boolean;
   onSearchFiles: (query: string) => Promise<ExistingFile[]>;
+  projectId: number;
+  uploadError?: string;
 }
 
 export default function NewFileUploadCard({
@@ -45,20 +53,38 @@ export default function NewFileUploadCard({
   onMetadataChange,
   onRemove,
   availableFiles,
+  availableClasses,
+  isLoadingClasses,
   onSearchFiles,
+  projectId,
+  uploadError,
 }: NewFileUploadCardProps) {
   const { t } = useLanguage();
+  const metadataUploadSchema = useMemo(
+    () =>
+      createMetadataUploadSchema({
+        NAME_REQUIRED: t.translations.NAME_REQUIRED,
+        DESCRIPTION_REQUIRED: t.translations.DESCRIPTION_REQUIRED,
+        ORIGINAL_ID_REQUIRED: t.translations.ORIGINAL_ID_REQUIRED,
+        CLASS_ID_MUST_BE_NUMBER_NOT_STRING:
+          t.translations.CLASS_ID_MUST_BE_NUMBER_NOT_STRING,
+        CLASS_ID_MUST_BE_INTEGER: t.translations.CLASS_ID_MUST_BE_INTEGER,
+        CLASS_ID_MUST_BE_GREATER_THAN_ZERO:
+          t.translations.CLASS_ID_MUST_BE_GREATER_THAN_ZERO,
+      }),
+    [t],
+  );
   const [recordMode, setRecordMode] = useState<"new" | "update">("new");
   const [targetRecordId, setTargetRecordId] = useState("");
   const [recordSearchInput, setRecordSearchInput] = useState("");
   const [isSearching, setIsSearching] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
-  const [isTimeSeries, setIsTimeSeries] = useState(false);
   const [metadataFile, setMetadataFile] = useState<File | undefined>(undefined);
   const [metadataPreview, setMetadataPreview] = useState<
     Record<string, unknown> | undefined
   >(undefined);
   const [metadataPreviewError, setMetadataPreviewError] = useState("");
+  const [showClassIdHelp, setShowClassIdHelp] = useState(false);
   const metadataFileInputRef = useRef<HTMLInputElement | null>(null);
   const [displayedFiles, setDisplayedFiles] = useState<ExistingFile[]>(
     initialVisibleFiles(availableFiles),
@@ -70,6 +96,7 @@ export default function NewFileUploadCard({
     setMetadataFile(undefined);
     setMetadataPreview(undefined);
     setMetadataPreviewError("");
+    setShowClassIdHelp(false);
     if (metadataFileInputRef.current) {
       metadataFileInputRef.current.value = "";
     }
@@ -103,13 +130,44 @@ export default function NewFileUploadCard({
 
     try {
       const content = await file.text();
-      const parsed: unknown = JSON.parse(content);
-      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-        throw new Error("Metadata must be a JSON object");
+      const parsedJson: unknown = JSON.parse(content);
+
+      const result = metadataUploadSchema.safeParse(parsedJson);
+
+      if (!result.success) {
+        const message = result.error.issues
+          .map((issue) => {
+            const path = issue.path.join(".") || "metadata";
+            return `${path}: ${issue.message}`;
+          })
+          .join("\n");
+
+        clearMetadataFile();
+        setMetadataPreviewError(message);
+        return;
       }
+
+      const metadata = result.data;
+
+      if (metadata.ClassId != null) {
+        try {
+          await getClass(Number(projectId), metadata.ClassId, true);
+        } catch (error) {
+          clearMetadataFile();
+          setMetadataPreviewError(
+            interpolate(t.translations.CLASS_ID_DOES_NOT_EXIST_IN_PROJECT, {
+              id: metadata.ClassId,
+            }),
+          );
+          setShowClassIdHelp(true);
+          return;
+        }
+      }
+
       setMetadataFile(file);
-      setMetadataPreview(parsed as Record<string, unknown>);
+      setMetadataPreview(metadata as Record<string, unknown>);
       setMetadataPreviewError("");
+      setShowClassIdHelp(false);
     } catch {
       clearMetadataFile();
       setMetadataPreviewError(t.translations.METADATA_FILE_INVALID_JSON_OBJECT);
@@ -119,12 +177,6 @@ export default function NewFileUploadCard({
   const selectedRecord =
     displayedFiles.find((f) => String(f.id) === String(targetRecordId)) ??
     availableFiles.find((f) => String(f.id) === String(targetRecordId));
-  const selectedDataType =
-    recordMode === "update"
-      ? "standard"
-      : isTimeSeries
-        ? "timeseries"
-        : "standard";
 
   const handleSearch = useCallback(
     async ({ query }: { query: string; option?: string }) => {
@@ -147,12 +199,6 @@ export default function NewFileUploadCard({
     },
     [availableFiles, onSearchFiles],
   );
-
-  useEffect(() => {
-    if (recordMode === "update" && isTimeSeries) {
-      setIsTimeSeries(false);
-    }
-  }, [recordMode, isTimeSeries]);
 
   useEffect(() => {
     if (recordMode !== "update") {
@@ -188,7 +234,6 @@ export default function NewFileUploadCard({
     const metadata: FileMetadata = {
       name: defaultName,
       description: "",
-      isTimeSeries: recordMode === "update" ? false : isTimeSeries,
       recordMode,
       ...(recordMode === "update" && targetRecordId ? { targetRecordId } : {}),
       ...(metadataFile && { metadataFile }),
@@ -198,7 +243,6 @@ export default function NewFileUploadCard({
     defaultName,
     recordMode,
     targetRecordId,
-    isTimeSeries,
     metadataFile,
     fileIndex,
     onMetadataChange,
@@ -225,11 +269,10 @@ export default function NewFileUploadCard({
                 type="button"
                 role="radio"
                 aria-checked={recordMode === "new"}
-                className={`rounded-full px-3 py-1 text-xs font-medium transition ${
-                  recordMode === "new"
-                    ? "bg-base-100 text-base-content shadow-sm"
-                    : "text-base-content/70"
-                }`}
+                className={`rounded-full px-3 py-1 text-xs font-medium transition ${recordMode === "new"
+                  ? "bg-base-100 text-base-content shadow-sm"
+                  : "text-base-content/70"
+                  }`}
                 onClick={() => setRecordMode("new")}
               >
                 {t.translations.NEW_RECORD}
@@ -238,11 +281,10 @@ export default function NewFileUploadCard({
                 type="button"
                 role="radio"
                 aria-checked={recordMode === "update"}
-                className={`rounded-full px-3 py-1 text-xs font-medium transition ${
-                  recordMode === "update"
-                    ? "bg-base-100 text-base-content shadow-sm"
-                    : "text-base-content/70"
-                }`}
+                className={`rounded-full px-3 py-1 text-xs font-medium transition ${recordMode === "update"
+                  ? "bg-base-100 text-base-content shadow-sm"
+                  : "text-base-content/70"
+                  }`}
                 onClick={() => setRecordMode("update")}
               >
                 {t.translations.UPDATE_EXISTING_RECORD}
@@ -299,9 +341,8 @@ export default function NewFileUploadCard({
                         key={f.id}
                         type="button"
                         onClick={() => setTargetRecordId(String(f.id))}
-                        className={`w-full border-b border-base-300/60 px-3 py-2 text-left last:border-b-0 transition ${
-                          selected ? "bg-base-200/70" : "hover:bg-base-200/30"
-                        }`}
+                        className={`w-full border-b border-base-300/60 px-3 py-2 text-left last:border-b-0 transition ${selected ? "bg-base-200/70" : "hover:bg-base-200/30"
+                          }`}
                       >
                         <div className="flex items-center justify-between gap-2">
                           <div className="min-w-0">
@@ -347,50 +388,6 @@ export default function NewFileUploadCard({
           )}
           <div className="flex justify-between flex-col-2">
             <div>
-              {/* Row 1: Data Type + Metadata Preview */}
-              <div className="grid gap-4 md:grid-cols-2 md:items-start">
-                <div className="min-w-0 space-y-2">
-                  <span className="label-text block font-semibold">
-                    {t.translations.DATA_TYPE}
-                  </span>
-                  <div
-                    role="radiogroup"
-                    aria-label={t.translations.DATA_TYPE}
-                    className="inline-flex rounded-full border border-base-300/70 bg-base-200/50 p-1"
-                  >
-                    <button
-                      type="button"
-                      role="radio"
-                      aria-checked={selectedDataType === "standard"}
-                      className={`rounded-full px-3 py-1 text-xs font-medium transition ${
-                        selectedDataType === "standard"
-                          ? "bg-base-100 text-base-content shadow-sm"
-                          : "text-base-content/70"
-                      }`}
-                      onClick={() => setIsTimeSeries(false)}
-                    >
-                      {t.translations.STANDARD_FILE}
-                    </button>
-                    <button
-                      type="button"
-                      role="radio"
-                      aria-checked={selectedDataType === "timeseries"}
-                      className={`rounded-full px-3 py-1 text-xs font-medium transition ${
-                        selectedDataType === "timeseries"
-                          ? "bg-base-100 text-base-content shadow-sm"
-                          : "text-base-content/70"
-                      } ${recordMode === "update" ? "cursor-not-allowed opacity-50" : ""}`}
-                      onClick={() => {
-                        if (recordMode === "update") return;
-                        setIsTimeSeries(true);
-                      }}
-                      disabled={recordMode === "update"}
-                    >
-                      {t.translations.TIMESERIES}
-                    </button>
-                  </div>
-                </div>
-              </div>
               {/* Row 2: Metadata File */}
               <div className="flex flex-col gap-1 mt-4">
                 <label
@@ -507,6 +504,50 @@ export default function NewFileUploadCard({
                     </p>
                   )}
                 </div>
+                {uploadError && (
+                  <div className="rounded-md border border-error/30 bg-error/10 p-3 text-sm text-error">
+                    {uploadError}
+                  </div>
+                )}
+                {showClassIdHelp && (
+                  <div className="rounded-md border border-warning/30 bg-warning/10 p-3 text-sm">
+                    <div className="mb-2">
+                      <p className="font-semibold text-base-content">
+                        {t.translations.PROJECT_CLASSES_AND_IDS}
+                      </p>
+                      <p className="text-xs text-base-content/70">
+                        {t.translations.PROJECT_CLASSES_AND_IDS_HELP}
+                      </p>
+                    </div>
+                    <div className="max-h-40 overflow-y-auto rounded-md border border-warning/20 bg-base-100/80">
+                      {isLoadingClasses ? (
+                        <p className="p-3 text-xs text-base-content/70">
+                          {t.translations.LOADING_CLASSES}
+                        </p>
+                      ) : availableClasses.length > 0 ? (
+                        <ul className="divide-y divide-base-300/60">
+                          {availableClasses.map((cls) => (
+                            <li
+                              key={cls.id}
+                              className="flex items-center justify-between gap-3 px-3 py-2 text-xs"
+                            >
+                              <span className="font-mono text-base-content/70">
+                                {cls.id}
+                              </span>
+                              <span className="min-w-0 truncate text-base-content">
+                                {cls.name}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="p-3 text-xs text-base-content/70">
+                          {t.translations.NO_CLASSES_AVAILABLE}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>

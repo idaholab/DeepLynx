@@ -2,40 +2,39 @@
 "use client";
 
 import { useLanguage } from "@/app/contexts/Language";
+import { useOrganizationSession } from "@/app/contexts/OrganizationSessionProvider";
+import { useSafeSession } from "@/app/hooks/useSafeSession";
+import {
+  getAllOrganizationsForUser,
+  getOrganizationLogoUrl,
+} from "@/app/lib/client_service/organization_services.client";
 import {
   AdjustmentsHorizontalIcon,
   ArrowRightStartOnRectangleIcon,
   Bars3Icon,
   BookOpenIcon,
   ChevronDownIcon,
-  ChevronUpIcon,
   Cog6ToothIcon,
+  CommandLineIcon,
   GlobeAmericasIcon,
   QuestionMarkCircleIcon,
   UserCircleIcon,
   UserGroupIcon,
-  CommandLineIcon,
 } from "@heroicons/react/24/outline";
+import { signOut } from "next-auth/react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import React, { useState, useEffect } from "react";
-import SideMenu from "./SideMenu";
-import AvatarCell from "./Avatar";
-import { signOut } from "next-auth/react";
+import { useEffect, useState, type ReactNode } from "react";
 import { OrgAdminRoute, SysAdminRoute } from "../rbac/RBACComponents";
 import { useRBAC } from "../rbac/useRBAC";
-import { useOrganizationSession } from "@/app/contexts/OrganizationSessionProvider";
 import { OrganizationResponseDto } from "../types/responseDTOs";
-import { useSafeSession } from "@/app/hooks/useSafeSession";
-import {
-  getAllOrganizationsForUser,
-  getOrganizationLogoUrl,
-} from "@/app/lib/client_service/organization_services.client";
-import TopBanner from "./VulnerabilityBanner";
+import AvatarCell from "./Avatar";
 import { Banner } from "./Banner";
+import SideMenu from "./SideMenu";
+import TopBanner from "./VulnerabilityBanner";
 
-const LayoutShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+const LayoutShell = ({ children }: { children: ReactNode }) => {
   const { t } = useLanguage();
   const router = useRouter();
   const pathname = usePathname();
@@ -47,18 +46,22 @@ const LayoutShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user } = useRBAC();
   const { organization, setOrganization } = useOrganizationSession();
 
-  const [selectedItem, setSelectedItem] = useState<string>("");
   const [organizations, setOrganizations] = useState<OrganizationResponseDto[]>(
     [],
   );
   const [loadingOrgs, setLoadingOrgs] = useState(false);
-  const [isOrgDropdownOpen, setIsOrgDropdownOpen] = useState(false);
   const [isUserDropdownOpen, setIsUserDropdownOpen] = useState(false);
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const [orgLogoUrl, setOrgLogoUrl] = useState<string | null>(null);
 
   // Handle menu toggle
-  const [isMenuCollapsed, setIsMenuCollapsed] = React.useState(false);
+  const [isMenuCollapsed, setIsMenuCollapsed] = useState(false);
+  const displayName = isAuthDisabled
+    ? (user?.name ?? "")
+    : (session?.user?.name ?? "");
+  const displayEmail = isAuthDisabled
+    ? (user?.email ?? "")
+    : (session?.user?.email ?? "");
 
   // Fetch organizations for the switcher
   useEffect(() => {
@@ -101,7 +104,6 @@ const LayoutShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
   useEffect(() => {
     setIsMobileNavOpen(false);
-    setIsOrgDropdownOpen(false);
     setIsUserDropdownOpen(false);
   }, [pathname]);
 
@@ -133,7 +135,6 @@ const LayoutShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       banner: org.banner ?? null,
     });
 
-    setIsOrgDropdownOpen(false);
     router.push("/");
   };
 
@@ -146,26 +147,7 @@ const LayoutShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     return [firstName, lastName].filter(Boolean).join(" ");
   };
 
-  // When auth is disabled, use RBAC user. When enabled, use session.
-  const displayName = isAuthDisabled
-    ? user?.name || ""
-    : session?.user?.name || "";
-
-  const displayEmail = isAuthDisabled
-    ? user?.email || ""
-    : session?.user?.email || "";
-
   const displayImage = session?.user?.image;
-
-  // Function to handle item click events
-  const handleItemClick = (
-    item: string,
-    event: React.MouseEvent<HTMLElement>,
-  ) => {
-    event.preventDefault();
-    setSelectedItem(item);
-    router.push(item);
-  };
 
   return (
     <div className="flex flex-col min-h-screen bg-base-100 text-base-content">
@@ -183,109 +165,98 @@ const LayoutShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           >
             <Bars3Icon className="size-6" />
           </button>
-          <div className="dropdown min-w-0">
-            <div className="flex items-center min-w-0">
-              <div className="flex items-center py-2 gap-3 min-w-0">
-                {/* Organization Logo (if exists) */}
-                {orgLogoUrl ? (
-                  <div className="avatar">
-                    <div className="w-10 h-10 rounded-lg overflow-hidden bg-base-100 flex items-center justify-center relative">
-                      <Image
-                        src={orgLogoUrl}
-                        alt={organization?.organizationName || "Organization"}
-                        fill
-                        sizes="40px"
-                        className="object-contain p-1"
-                        onError={() => {
-                          // If image fails to load, hide it
-                          setOrgLogoUrl(null);
-                        }}
-                      />
-                    </div>
+          <div className="dropdown min-w-0 group">
+            <div
+              tabIndex={0}
+              role="button"
+              className="flex items-center gap-3 min-w-0 cursor-pointer py-2"
+            >
+              {/* Organization Logo (if exists) */}
+              {orgLogoUrl ? (
+                <div className="avatar">
+                  <div className="w-10 h-10 rounded-lg overflow-hidden bg-base-100 flex items-center justify-center relative">
+                    <Image
+                      src={orgLogoUrl}
+                      alt={organization?.organizationName ?? "No Organization"}
+                      fill
+                      sizes="40px"
+                      className="object-contain p-1"
+                      onError={() => {
+                        // If image fails to load, hide it
+                        setOrgLogoUrl(null);
+                      }}
+                    />
                   </div>
-                ) : (
-                  // Fallback to UserGroupIcon if no logo
-                  <UserGroupIcon className="size-7 sm:size-8 shrink-0" />
-                )}
-
-                <div className="flex flex-col min-w-0">
-                  <span className="text-xs opacity-70">
-                    {t.translations.ORGANIZATION}
-                  </span>
-                  <h1 className="text-base sm:text-lg font-bold truncate max-w-[45vw] sm:max-w-[18rem]">
-                    {organization?.organizationName || "No Organization"}
-                  </h1>
                 </div>
+              ) : (
+                // Fallback to UserGroupIcon if no logo
+                <UserGroupIcon className="size-7 sm:size-8 shrink-0" />
+              )}
+
+              <div className="flex flex-col min-w-0">
+                <span className="text-xs opacity-70">
+                  {t.translations.ORGANIZATION}
+                </span>
+                <h1 className="text-base sm:text-lg font-bold truncate max-w-[45vw] sm:max-w-[18rem]">
+                  {organization?.organizationName ?? "No Organization"}
+                </h1>
               </div>
-              <button
-                tabIndex={0}
-                onClick={() => setIsOrgDropdownOpen(!isOrgDropdownOpen)}
-                className="btn btn-ghost btn-sm btn-circle shrink-0"
-              >
-                {isOrgDropdownOpen ? (
-                  <ChevronUpIcon className="size-5" />
-                ) : (
-                  <ChevronDownIcon className="size-5" />
-                )}
-              </button>
+              <ChevronDownIcon className="size-7 shrink-0 transition-transform group-focus-within:rotate-180" />
             </div>
-            {isOrgDropdownOpen && (
-              <ul
-                tabIndex={0}
-                className="dropdown-content menu bg-base-100 text-base-content rounded-box z-[100] w-72 max-w-[90vw] p-2 shadow-xl border border-base-300 mt-2"
-              >
-                {loadingOrgs ? (
-                  <li>
-                    <div className="flex justify-center p-4">
-                      <span className="loading loading-spinner loading-sm"></span>
-                    </div>
+            <ul
+              tabIndex={0}
+              className="dropdown-content menu bg-base-100 text-base-content rounded-box z-[100] w-72 max-w-[90vw] p-2 shadow-xl border border-base-300 mt-2"
+            >
+              {loadingOrgs ? (
+                <li>
+                  <div className="flex justify-center p-4">
+                    <span className="loading loading-spinner loading-sm"></span>
+                  </div>
+                </li>
+              ) : (
+                <>
+                  <li className="menu-title">
+                    <span className="text-base-content/70">
+                      {t.translations.SWITCH_ORGANIZATION}
+                    </span>
                   </li>
-                ) : (
-                  <>
-                    <li className="menu-title">
-                      <span className="text-base-content/70">
-                        {t.translations.SWITCH_ORGANIZATION}
-                      </span>
-                    </li>
-                    {organizations.map((org) => (
-                      <li key={org.id} className="w-full">
-                        <a
-                          onClick={() => handleOrganizationSwitch(org)}
-                          className={`flex items-center gap-2 w-full max-w-full ${
-                            organization?.organizationId === org.id
-                              ? "active bg-info/60"
-                              : ""
+                  {organizations.map((org) => (
+                    <li key={org.id} className="w-full">
+                      <a
+                        onClick={() => handleOrganizationSwitch(org)}
+                        className={`flex items-center gap-2 w-full max-w-full ${organization?.organizationId === org.id
+                            ? "active bg-info/60"
+                            : ""
                           }`}
-                        >
-                          <div className="min-w-0 flex-1 overflow-hidden">
-                            <div className=" font-medium truncate">
-                              {org.name}
-                            </div>
-                            {org.description && (
-                              <div className="text-xs opacity-70 truncate">
-                                {org.description}
-                              </div>
-                            )}
+                      >
+                        <div className="min-w-0 flex-1 overflow-hidden">
+                          <div className=" font-medium truncate">
+                            {org.name}
                           </div>
-                          {organization?.organizationId === org.id && (
-                            <span className="badge badge-sm shrink-0 whitespace-nowrap !text-base-content">
-                              {t.translations.CURRENT}
-                            </span>
+                          {org.description && (
+                            <div className="text-xs opacity-70 truncate">
+                              {org.description}
+                            </div>
                           )}
-                        </a>
-                      </li>
-                    ))}
-                    <div className="divider my-1"></div>
-                    <li>
-                      <Link href="/select-org" className="hover:bg-base-200">
-                        <UserGroupIcon className="size-5" />
-                        {t.translations.VIEW_ALL_ORGANIZATIONS}
-                      </Link>
+                        </div>
+                        {organization?.organizationId === org.id && (
+                          <span className="badge badge-sm shrink-0 whitespace-nowrap !text-base-content">
+                            {t.translations.CURRENT}
+                          </span>
+                        )}
+                      </a>
                     </li>
-                  </>
-                )}
-              </ul>
-            )}
+                  ))}
+                  <div className="divider my-1"></div>
+                  <li>
+                    <Link href="/select-org" className="hover:bg-base-200">
+                      <UserGroupIcon className="size-5" />
+                      {t.translations.VIEW_ALL_ORGANIZATIONS}
+                    </Link>
+                  </li>
+                </>
+              )}
+            </ul>
           </div>
         </div>
         <div className="shrink-0">
@@ -310,7 +281,10 @@ const LayoutShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           />
         )}
         {/* Side Menu */}
-        <div className="fixed top-20 bottom-0 hidden lg:flex z-40">
+        <div
+          className={`fixed top-20 bottom-0 hidden lg:flex ${isUserDropdownOpen ? "z-[60]" : "z-40"
+            }`}
+        >
           <aside
             className={
               "h-full shadow-xl w-18 login text-primary-content p-4 transition-all duration-300 flex flex-col"
@@ -323,23 +297,13 @@ const LayoutShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                 </Link>
               </li>
               <li className="mt-5">
-                <Link
-                  href="/data_catalog/all_records"
-                  onClick={(e) =>
-                    handleItemClick("/data_catalog/all_records", e)
-                  }
-                >
+                <Link href="/data_catalog/all_records">
                   <BookOpenIcon className="size-10" />
                 </Link>
               </li>
               <OrgAdminRoute>
                 <li className="mt-5">
-                  <Link
-                    href="/organization_management"
-                    onClick={(e) =>
-                      handleItemClick("/organization_management", e)
-                    }
-                  >
+                  <Link href="/organization_management">
                     <AdjustmentsHorizontalIcon className="size-10" />
                   </Link>
                 </li>
@@ -369,15 +333,15 @@ const LayoutShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
               </li>
               <li className="mt-5">
                 <div className="relative flex justify-center">
-                  <div
+                  <button
+                    type="button"
                     className="cursor-pointer"
-                    onClick={() => setIsUserDropdownOpen(!isUserDropdownOpen)}
+                    onClick={() => setIsUserDropdownOpen((open) => !open)}
                   >
                     <UserCircleIcon className="size-10" />
-                  </div>
+                  </button>
                   {isUserDropdownOpen && (
                     <>
-                      {/* Backdrop to close dropdown when clicking outside */}
                       <div
                         className="fixed inset-0 z-[100]"
                         onClick={() => setIsUserDropdownOpen(false)}
@@ -427,17 +391,11 @@ const LayoutShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                 </div>
               </li>
               <li className="mt-5 mb-16">
-                <Link
-                  href={
-                    process.env.NEXT_PUBLIC_DOCS_PATH
-                      ? `${process.env.NEXT_PUBLIC_DOCS_PATH}`
-                      : "/docs"
-                  }
-                >
+                <Link href={process.env.NEXT_PUBLIC_DOCS_PATH ?? "/docs"}>
                   <QuestionMarkCircleIcon className="size-10" />
                 </Link>
               </li>
-              <span className="text-xs font-bold text-base-200/50">v0.4.0</span>
+              <span className="text-xs font-bold text-base-200/50">v0.6.0</span>
             </ul>
           </aside>
         </div>
@@ -447,11 +405,10 @@ const LayoutShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           onMobileClose={() => setIsMobileNavOpen(false)}
         />
         <main
-          className={`transition-all duration-300 w-full mt-20 ml-0 ${
-            isMenuCollapsed ? "lg:ml-40" : "lg:ml-82"
-          }`}
+          className={`transition-all duration-300 w-full mt-20 ml-0 ${isMenuCollapsed ? "lg:ml-40" : "lg:ml-82"
+            }`}
         >
-          {/* Organization Banne */}
+          {/* Organization Banner */}
           <div className="sticky top-25 z-20">
             <Banner />
           </div>

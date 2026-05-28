@@ -7,6 +7,8 @@ public class UserResponseDto
     public string Email { get; set; }
     public string? Username { get; set; }
     public bool IsSysAdmin { get; set; }
+    public bool? IsOrgAdmin { get; set; }
     public bool IsArchived { get; set; }
     public bool IsActive { get; set; }
+    public DateTime? LastLogin { get; set; }
 }
