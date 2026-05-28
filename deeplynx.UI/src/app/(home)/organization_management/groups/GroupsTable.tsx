@@ -60,6 +60,7 @@ interface GroupRowProps {
   isExpanded: boolean;
   isEditing: boolean;
   isLoadingMembers: boolean;
+  hasMembersLoaded: boolean;
   memberSearchTerm: string;
   editName: string;
   editDescription: string;
@@ -171,6 +172,7 @@ const GroupsTable: React.FC<GroupsTableProps> = ({
                   isExpanded={expandedGroup === group.id}
                   isEditing={editingGroup === group.id}
                   isLoadingMembers={isLoadingMembers}
+                  hasMembersLoaded={groupMembers.has(group.id)}
                   memberSearchTerm={memberSearchTerm}
                   editName={editName}
                   editDescription={editDescription}
@@ -209,6 +211,7 @@ const GroupRow: React.FC<GroupRowProps> = ({
   isExpanded,
   isEditing,
   isLoadingMembers,
+  hasMembersLoaded,
   memberSearchTerm,
   editName,
   editDescription,
@@ -254,7 +257,7 @@ const GroupRow: React.FC<GroupRowProps> = ({
           <div className="flex items-center gap-2">
             <UserGroupIcon className="size-6" />
             <span className="badge badge-ghost">
-              {currentMembers.length ?? group.memberCount}
+              {hasMembersLoaded ? currentMembers.length : group.memberCount ?? 0}
             </span>
           </div>
         </td>
