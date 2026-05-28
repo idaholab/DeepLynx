@@ -346,12 +346,12 @@ public class LatticeExtractionBusinessTests : IntegrationTestBase
     public async Task GetEmbeddingStatus_ReturnsOntologyReady_WhenClassesAreEmbedded()
     {
         // OntologyVector.Vector is typed as string in the model but the DB column is
-        // type vector — EF Core cannot bridge that gap. Use raw SQL to insert directly. 
-        // TODO needs to be confirmed if that was intended functionality
-        await Context.Database.ExecuteSqlInterpolatedAsync(
-            $"INSERT INTO dl_vector.ontology_vector (class_id) VALUES ({cid1})");
-        await Context.Database.ExecuteSqlInterpolatedAsync(
-            $"INSERT INTO dl_vector.ontology_vector (class_id) VALUES ({cid2})");
+        // type vector with a NOT NULL constraint — EF Core cannot bridge that gap.
+        // Use raw SQL with a zero vector literal to satisfy the constraint.
+        await Context.Database.ExecuteSqlRawAsync(
+            "INSERT INTO dl_vector.ontology_vector (class_id, vector) VALUES ({0}, '[0]')", cid1);
+        await Context.Database.ExecuteSqlRawAsync(
+            "INSERT INTO dl_vector.ontology_vector (class_id, vector) VALUES ({0}, '[0]')", cid2);
 
         var result = await _business.GetEmbeddingStatus(pid);
 
