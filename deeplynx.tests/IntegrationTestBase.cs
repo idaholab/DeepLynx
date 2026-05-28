@@ -93,7 +93,6 @@ public class TestSuiteFixture : IAsyncLifetime
         if (DeeplynxContext != null) await DeeplynxContext.DisposeAsync();
         if (LatticeContext != null) await LatticeContext.DisposeAsync();
         if (_postgresContainer != null) await _postgresContainer.DisposeAsync();
-        //if (PostgresDataSource != null) await PostgresDataSource.DisposeAsync();
         if (_redisContainer != null) await _redisContainer.DisposeAsync();
     }
 }

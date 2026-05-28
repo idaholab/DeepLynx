@@ -345,10 +345,13 @@ public class LatticeExtractionBusinessTests : IntegrationTestBase
     [Fact]
     public async Task GetEmbeddingStatus_ReturnsOntologyReady_WhenClassesAreEmbedded()
     {
-        Context.OntologyVectors.AddRange(
-            new OntologyVector { ClassId = cid1 },
-            new OntologyVector { ClassId = cid2 });
-        await Context.SaveChangesAsync();
+        // OntologyVector.Vector is typed as string in the model but the DB column is
+        // type vector — EF Core cannot bridge that gap. Use raw SQL to insert directly. 
+        // TODO needs to be confirmed if that was intended functionality
+        await Context.Database.ExecuteSqlInterpolatedAsync(
+            $"INSERT INTO dl_vector.ontology_vector (class_id) VALUES ({cid1})");
+        await Context.Database.ExecuteSqlInterpolatedAsync(
+            $"INSERT INTO dl_vector.ontology_vector (class_id) VALUES ({cid2})");
 
         var result = await _business.GetEmbeddingStatus(pid);
 
@@ -828,12 +831,15 @@ public class LatticeExtractionBusinessTests : IntegrationTestBase
         Context.Projects.Add(proj);
         await Context.SaveChangesAsync();
 
-        var c = new Class { Name = "Only Class", ProjectId = proj.Id, OrganizationId = oid, IsArchived = false, LastUpdatedAt = UnspecifiedNow(), LastUpdatedBy = uid };
-        var rel = new Relationship { Name = "some rel", OriginId = c.Id, ProjectId = proj.Id, OrganizationId = oid, IsArchived = false, LastUpdatedAt = UnspecifiedNow(), LastUpdatedBy = uid };
         var ds = new DataSource { Name = "Sparse DS", ProjectId = proj.Id, OrganizationId = oid, LastUpdatedAt = UnspecifiedNow(), LastUpdatedBy = uid };
-        Context.Classes.Add(c);
-        Context.Relationships.Add(rel);
+        var c = new Class { Name = "Only Class", ProjectId = proj.Id, OrganizationId = oid, IsArchived = false, LastUpdatedAt = UnspecifiedNow(), LastUpdatedBy = uid };
         Context.DataSources.Add(ds);
+        Context.Classes.Add(c);
+        await Context.SaveChangesAsync(); // c.Id is now populated
+
+        // Build the Relationship AFTER saving so OriginId carries the real PK
+        var rel = new Relationship { Name = "some rel", OriginId = c.Id, ProjectId = proj.Id, OrganizationId = oid, IsArchived = false, LastUpdatedAt = UnspecifiedNow(), LastUpdatedBy = uid };
+        Context.Relationships.Add(rel);
         await Context.SaveChangesAsync();
 
         var rec = new DlRecord { Name = "Sparse Rec", ProjectId = proj.Id, OrganizationId = oid, DataSourceId = ds.Id, OriginalId = "sp-1", Description = "", Properties = "{}", IsArchived = false, LastUpdatedAt = UnspecifiedNow(), LastUpdatedBy = uid };
@@ -879,11 +885,14 @@ public class LatticeExtractionBusinessTests : IntegrationTestBase
 
         var ts = new Class { Name = "Timeseries", ProjectId = proj.Id, OrganizationId = oid, IsArchived = false, LastUpdatedAt = UnspecifiedNow(), LastUpdatedBy = uid };
         var file = new Class { Name = "File", ProjectId = proj.Id, OrganizationId = oid, IsArchived = false, LastUpdatedAt = UnspecifiedNow(), LastUpdatedBy = uid };
-        var rel = new Relationship { Name = "some rel", OriginId = ts.Id, DestinationId = file.Id, ProjectId = proj.Id, OrganizationId = oid, IsArchived = false, LastUpdatedAt = UnspecifiedNow(), LastUpdatedBy = uid };
         var ds = new DataSource { Name = "Default DS", ProjectId = proj.Id, OrganizationId = oid, LastUpdatedAt = UnspecifiedNow(), LastUpdatedBy = uid };
         Context.Classes.AddRange(ts, file);
-        Context.Relationships.Add(rel);
         Context.DataSources.Add(ds);
+        await Context.SaveChangesAsync(); // ts.Id and file.Id are now populated
+
+        // Build the Relationship AFTER saving so both FK columns carry real PKs
+        var rel = new Relationship { Name = "some rel", OriginId = ts.Id, DestinationId = file.Id, ProjectId = proj.Id, OrganizationId = oid, IsArchived = false, LastUpdatedAt = UnspecifiedNow(), LastUpdatedBy = uid };
+        Context.Relationships.Add(rel);
         await Context.SaveChangesAsync();
 
         var rec = new DlRecord { Name = "Default Rec", ProjectId = proj.Id, OrganizationId = oid, DataSourceId = ds.Id, OriginalId = "def-1", Description = "", Properties = "{}", IsArchived = false, LastUpdatedAt = UnspecifiedNow(), LastUpdatedBy = uid };
