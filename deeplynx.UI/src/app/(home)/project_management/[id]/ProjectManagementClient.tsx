@@ -37,24 +37,25 @@ const ProjectManagementClient = ({
   const [activeTab, setActiveTab] = useState("");
   const { t } = useLanguage();
   const { project: sessionProject, setProject } = useProjectSession();
+  const [editingProject, setEditingProject] = useState(project); 
 
   useEffect(() => {
-    if (!project?.id || !project?.name) {
+    if (!editingProject?.id || !editingProject?.name) {
       return;
     }
 
     if (
-      sessionProject?.projectId?.toString() === project.id.toString() &&
-      sessionProject.projectName === project.name
+      sessionProject?.projectId?.toString() === editingProject.id.toString() &&
+      sessionProject.projectName === editingProject.name
     ) {
       return;
     }
 
     setProject({
-      projectId: project.id.toString(),
-      projectName: project.name,
+      projectId: editingProject.id.toString(),
+      projectName: editingProject.name,
     });
-  }, [project?.id, project?.name, sessionProject, setProject]);
+  }, [editingProject?.id, editingProject?.name, sessionProject, setProject]);
 
   const handleTabChange = (label: string) => {
     setActiveTab(label);
@@ -67,7 +68,7 @@ const ProjectManagementClient = ({
         <ProjectUsersTable
           members={projectMembers}
           roles={projectRoles}
-          project={project}
+          project={editingProject}
         />
       ),
     },
@@ -77,26 +78,26 @@ const ProjectManagementClient = ({
         <ProjectRolesAndPermissions
           initialRoles={projectRoles}
           initialPermissions={projectPermissions}
-          projectId={project?.id as number}
+          projectId={editingProject?.id as number}
         />
       ),
     },
     {
       label: t.translations.DATA_SOURCES,
-      content: <DataSources projectId={project?.id as number} />,
+      content: <DataSources projectId={editingProject?.id as number} />,
     },
     {
       label: t.translations.TAGS_AND_SECURITY_LABELS,
       content: (
         <ProjectTagAndLabelManagementClient
-          project={project as ProjectResponseDto}
+          project={editingProject as ProjectResponseDto}
           orgTagsLocked={false}
         />
       ),
     },
     {
       label: t.translations.SETTINGS,
-      content: <ProjectSettings project={project} />,
+      content: <ProjectSettings project={editingProject} setProject={setEditingProject} />,
     },
   ];
 
@@ -111,11 +112,11 @@ const ProjectManagementClient = ({
             <h1 className="text-2xl font-bold text-base-content sm:text-3xl">
               {t.translations.PROJECT_MANAGEMENT}
             </h1>
-            {(project || sessionProject) && (
+            {(editingProject || sessionProject) && (
               <p className="mt-3 max-w-3xl text-base-content/70">
                 {t.translations.MANAGING_SETTINGS_FOR_PROJECT}:{" "}
                 <span className="font-semibold">
-                  {project?.name || sessionProject?.projectName}
+                  {editingProject?.name || sessionProject?.projectName}
                 </span>
               </p>
             )}

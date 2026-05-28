@@ -376,14 +376,23 @@ const AddRecordModal: React.FC<Props> = ({
           {/* ------------------------------------------------------------------ */}
           {/*                            Required Fields                         */}
           {/* ------------------------------------------------------------------ */}
-          <input
-            type="text"
-            className="input input-primary w-full"
-            placeholder={t.translations.NAME}
-            required
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-          />
+          <div>
+            <input
+              type="text"
+              className="input input-primary w-full"
+              maxLength={50}
+              placeholder={t.translations.NAME}
+              required
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
+            <span className={`text-xs float-right mt-1 ${name.length >= 50 ? "text-error" :
+              name.length >= 40 ? "text-warning" :
+                "text-base-content"
+              }`}>
+              {name.length}/50
+            </span>
+          </div>
 
           <input
             type="text"
@@ -394,13 +403,22 @@ const AddRecordModal: React.FC<Props> = ({
             onChange={(e) => setAbbreviation(e.target.value)}
           />
 
-          <textarea
-            placeholder={t.translations.DESCRIPTION}
-            className="textarea textarea-primary w-full"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            required
-          />
+          <div>
+            <textarea
+              placeholder={t.translations.DESCRIPTION}
+              className="textarea textarea-primary w-full"
+              maxLength={250}
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              required
+            />
+            <span className={`text-xs float-right mt-1 ${description.length >= 250 ? "text-error" :
+              description.length >= 240 ? "text-warning" :
+                "text-base-content"
+            }`}>
+              {description.length}/250
+            </span>
+          </div>
 
           <textarea
             placeholder={t.translations.PROPERTIES_EXAMPLE}

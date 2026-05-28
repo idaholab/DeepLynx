@@ -9,10 +9,12 @@ namespace deeplynx.helpers;
 public interface IAdminService
 {
     Task<bool> SysAdminCheck(long userId);
-    
+
     Task<bool> OrgAdminCheck(long userId, long organizationId);
-    
+
     Task<bool> ProjectAdminCheck(long userId, long organizationId, List<long> projectIds);
+
+    Task<bool> OrgAdminInSystemCheck(long userId);
 }
 
 public class AdminService : IAdminService
@@ -31,7 +33,7 @@ public class AdminService : IAdminService
     public async Task<bool> SysAdminCheck(
         long userId)
     {
-        
+
         //check for whether a user has permission to an action/resource within a organization through group membership
         var hasPermission = _dbContext.Database
             .SqlQuery<bool>($@"
@@ -70,7 +72,7 @@ public class AdminService : IAdminService
                 ) as has_permission")
             .AsEnumerable()
             .FirstOrDefault();
-        
+
         if (hasPermission)
             _logger.LogInformation(
                 "Permission granted - User: {UserId}",
@@ -82,7 +84,7 @@ public class AdminService : IAdminService
 
         return hasPermission;
     }
-    
+
     public async Task<bool> ProjectAdminCheck(
         long userId, long organizationId, List<long> projectIds)
     {
@@ -123,5 +125,11 @@ public class AdminService : IAdminService
                 userId, organizationId, string.Join(", ", projectIds), string.Join(", ", adminProjectIds));
 
         return hasPermission;
+    }
+
+    public async Task<bool> OrgAdminInSystemCheck(long userId)
+    {
+        return await _dbContext.OrganizationUsers
+            .AnyAsync(ou => ou.UserId == userId && ou.IsOrgAdmin);
     }
 }

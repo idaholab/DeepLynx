@@ -27,8 +27,15 @@ const CreateOAuthModal = ({
   const [toastType, setToastType] = useState<
     "success" | "error" | "info" | null
   >(null);
+  const [emailValidated, setEmailValidated] = useState(true);
+  const [baseUrlValidated, setBaseUrlValidated] = useState(true);
+  const [callbackUrlValidated, setCallbackUrlValidated] = useState(false);
 
   const handleSubmit = async () => {
+    if (!emailValidated || !baseUrlValidated || !callbackUrlValidated) {
+      toast.error("Please make sure your information is valid.");
+      return;
+    }
     if (isLoading) return;
     setIsLoading(true);
     try {
@@ -84,6 +91,28 @@ const CreateOAuthModal = ({
     }
   };
 
+  const validateUrl = (urlString: string) => {
+    try {
+      const normalizedUrl = urlString.startsWith("http")
+        ? urlString
+        : `https://${urlString}`
+      const url = new URL(normalizedUrl);
+      return(
+        ["http:", "https:"].includes(url.protocol) && url.hostname.includes(".")
+      );
+    } catch {
+      return false;
+    }
+  }
+
+  const validateEmail = (email: string) => {
+    if (email.includes('@') && email.includes('.') && !email.includes(' ')) {
+      setEmailValidated(true);
+    } else {
+      setEmailValidated(false);
+    }
+  }
+
   return (
     <>
       {/* Toast Message */}
@@ -102,38 +131,81 @@ const CreateOAuthModal = ({
             </h3>
 
             <div className="flex flex-col gap-4">
-              <input
-                type="text"
-                placeholder={t.translations.NAME}
-                className="input input-bordered input-primary bg-base-100 text-base-content placeholder:text-base-content/40 w-full"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                required
-              />
+              <div>
+                <input
+                  type="text"
+                  placeholder={t.translations.NAME}
+                  className="input input-bordered input-primary bg-base-100 text-base-content placeholder:text-base-content/40 w-full"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  maxLength={50}
+                  required
+                />
+                <span className={`text-xs mt-1 float-right ${name.length >= 50 ? "text-error" :
+                  name.length >= 40 ? "text-warning" :
+                    "text-base-content"
+                  }`}>
+                  {name.length}/50
+                </span>
+              </div>
+
+              <div>
               <input
                 placeholder={t.translations.CALLBACK_URL}
                 className="input input-bordered input-primary bg-base-100 text-base-content placeholder:text-base-content/40 w-full"
                 value={callbackUrl}
-                onChange={(e) => setCallbackUrl(e.target.value)}
+                onChange={(e) => {
+                  setCallbackUrl(e.target.value)
+                  setCallbackUrlValidated(validateUrl(e.target.value))
+                }}
               />
-              <textarea
-                placeholder={t.translations.DESCRIPTION}
-                className="textarea textarea-bordered textarea-primary bg-base-100 text-base-content placeholder:text-base-content/40 min-h-[100px] w-full"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-              />
-              <input
-                placeholder={t.translations.BASE_URL}
-                className="input input-bordered input-primary bg-base-100 text-base-content placeholder:text-base-content/40 w-full"
-                value={baseUrl}
-                onChange={(e) => setBaseUrl(e.target.value)}
-              />
-              <input
-                placeholder={t.translations.APP_OWNER_EMAIL}
-                className="input input-bordered input-primary bg-base-100 text-base-content placeholder:text-base-content/40 w-full"
-                value={appOwnerEmail}
-                onChange={(e) => setAppOwnerEmail(e.target.value)}
-              />
+              {callbackUrl && !callbackUrlValidated && (
+                <p className="text-xs mt-1 float-right text-error">Please enter a valid url.</p>
+              )}
+              </div>
+              <div>
+                <textarea
+                  placeholder={t.translations.DESCRIPTION}
+                  className="textarea textarea-bordered textarea-primary bg-base-100 text-base-content placeholder:text-base-content/40 min-h-[100px] w-full"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  maxLength={250}
+                />
+                <span className={`text-xs mt-1 float-right ${description.length >= 250 ? "text-error" :
+                  description.length >= 240 ? "text-warning" :
+                    "text-base-content"
+                  }`}>
+                  {description.length}/250
+                </span>
+              </div>
+              <div>
+                <input
+                  placeholder={t.translations.BASE_URL}
+                  className="input input-bordered input-primary bg-base-100 text-base-content placeholder:text-base-content/40 w-full"
+                  value={baseUrl}
+                  onChange={(e) => {
+                    setBaseUrl(e.target.value)
+                    setBaseUrlValidated(validateUrl(e.target.value))
+                  }}
+                />
+                {baseUrl && !baseUrlValidated && (
+                  <p className="text-xs mt-1 float-right text-error">Please enter a valid url.</p>
+                )}
+              </div>
+              <div>
+                <input
+                  placeholder={t.translations.APP_OWNER_EMAIL}
+                  className="input input-bordered input-primary bg-base-100 text-base-content placeholder:text-base-content/40 w-full"
+                  value={appOwnerEmail}
+                  onChange={(e) => {
+                    setAppOwnerEmail(e.target.value)
+                    validateEmail(e.target.value)
+                  }}
+                />
+                {appOwnerEmail && !emailValidated && (
+                  <p className="text-xs mt-1 float-right text-error">Please enter a correct email.</p>
+                )}
+              </div>
             </div>
 
             <div className="modal-action mt-6">

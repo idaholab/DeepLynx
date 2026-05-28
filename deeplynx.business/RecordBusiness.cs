@@ -120,6 +120,116 @@ public class RecordBusiness : IRecordBusiness
         }).ToList();
     }
 
+/// <summary>
+///     Retrieves all records for a specific project with pagination.
+/// </summary>
+/// <param name="currentUserId">The ID of current user</param>
+/// <param name="organizationId">The ID of the organization to which the project belongs</param>
+/// <param name="projectId">The ID of the project whose records are to be retrieved</param>
+/// <param name="hideArchived">Flag indicating whether to hide archived records from the result</param>
+/// <param name="queryDto">Filter criteria and pagination parameters</param>
+/// <param name="isSysAdmin">Optional param determining if the requesting user is a system admin</param>
+/// <param name="isOrgAdmin">Optional param determining if the requesting user is an organization admin</param>
+/// <param name="isProjectAdmin">Optional param determining if the requesting user is a project admin</param>
+/// <returns>Paginated response containing records and pagination metadata</returns>
+public async Task<PaginatedResponse<RecordResponseDto>> GetAllRecordsPaginated(
+    long currentUserId, long organizationId, long projectId, bool hideArchived,
+    RecordQueryRequestDto? queryDto,
+    bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false)
+{
+    var recordQuery = _context.Records
+        .Where(r => r.ProjectId == projectId && r.OrganizationId == organizationId)
+        .AsQueryable();
+
+    if (hideArchived) recordQuery = recordQuery.Where(r => !r.IsArchived);
+
+    if (queryDto != null)
+    {
+        if (queryDto.DataSourceId.HasValue)
+            recordQuery = recordQuery.Where(r => r.DataSourceId == queryDto.DataSourceId);
+
+        if (!string.IsNullOrWhiteSpace(queryDto.FileType))
+        {
+            var formattedFileType = queryDto.FileType.TrimStart('.').ToLower();
+            recordQuery = recordQuery.Where(r => r.FileType == formattedFileType);
+        }
+
+        if (!string.IsNullOrWhiteSpace(queryDto.Name))
+            recordQuery = recordQuery.Where(r => EF.Functions.ILike(r.Name, $"%{queryDto.Name.Trim()}%"));
+
+        if (queryDto.ClassId.HasValue)
+            recordQuery = recordQuery.Where(r => r.ClassId == queryDto.ClassId);
+
+        if (queryDto.StartDate.HasValue)
+            recordQuery = recordQuery.Where(r => r.LastUpdatedAt >= queryDto.StartDate.Value);
+
+        if (queryDto.EndDate.HasValue)
+            recordQuery = recordQuery.Where(r => r.LastUpdatedAt <= queryDto.EndDate.Value);
+    }
+
+    // if user is not admin, filter out unauthorized labels
+    if (!isSysAdmin && !isOrgAdmin && !isProjectAdmin)
+    {
+        var userAuthorizedLabels = await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
+            currentUserId, organizationId, projectId, "read record");
+        recordQuery = recordQuery.WithAuthorizedLabels(userAuthorizedLabels);
+    }
+
+    // Get total count before pagination
+    var totalCount = await recordQuery.CountAsync();
+
+    // Get pagination values
+    var pageNumber = queryDto?.PageNumber ?? 1;
+    var pageSize = queryDto?.GetValidatedPageSize() ?? 25;
+
+    // Apply pagination and execute query
+    var items = await recordQuery
+        .Include(r => r.Tags)
+        .Include(r => r.Labels)
+        .OrderByDescending(r => r.LastUpdatedAt)
+        .Skip((pageNumber - 1) * pageSize)
+        .Take(pageSize)
+        .Select(r => new RecordResponseDto
+        {
+            Id = r.Id,
+            Description = r.Description,
+            Uri = r.Uri,
+            Properties = r.Properties,
+            OriginalId = r.OriginalId,
+            Name = r.Name,
+            ClassId = r.ClassId,
+            DataSourceId = r.DataSourceId,
+            ProjectId = r.ProjectId,
+            OrganizationId = r.OrganizationId,
+            LastUpdatedBy = r.LastUpdatedBy,
+            LastUpdatedAt = r.LastUpdatedAt,
+            IsArchived = r.IsArchived,
+            FileType = r.FileType,
+            FileSize = r.FileSize,
+            Tags = r.Tags.Select(t => new RecordTagDto
+            {
+                Id = t.Id,
+                Name = t.Name
+            }).ToList(),
+            Labels = r.Labels.Select(l => new RecordLabelDto
+            {
+                Id = l.Id,
+                Name = l.Name
+            }).ToList()
+        })
+        .ToListAsync();
+
+    return new PaginatedResponse<RecordResponseDto>
+    {
+        Items = items,
+        PageNumber = pageNumber,
+        PageSize = pageSize,
+        TotalCount = totalCount
+    };
+}
+
+    
+
     /// <summary>
     ///     Get all records that contain all given tags
     /// </summary>
@@ -441,7 +551,7 @@ public class RecordBusiness : IRecordBusiness
     /// <param name="dtos">A list of record_id/tag_id pairs to be inserted</param>
     /// <returns>True if successful</returns>
     /// <exception cref="Exception">Thrown if tags unable to be attached</exception>
-    public async Task<bool> BulkAttachTags(List<RecordTagLinkDto> dtos)
+    public async Task<bool> BulkInsertRecordTagLinks(List<RecordTagLinkDto> dtos)
     {
         if (!dtos.Any())
             return true;
@@ -468,6 +578,39 @@ public class RecordBusiness : IRecordBusiness
         return true;
     }
 
+    /// <summary>
+    ///     Bulk unattach tags and records
+    /// </summary>
+    /// <param name="dtos">A list of record_id/tag_id pairs to be inserted</param>
+    /// <returns>True if successful</returns>
+    /// <exception cref="Exception">Thrown if tags unable to be unattached</exception>
+    public async Task<bool> BulkDeleteRecordTagLinks(List<RecordTagLinkDto> dtos)
+    {
+        if (!dtos.Any())
+            return true;
+        
+        // Bulk delete from record_tags
+        var sql = @"DELETE FROM deeplynx.record_tags WHERE (record_id, tag_id) IN ({0});";
+        
+        // establish parameters
+        var parameters = new List<NpgsqlParameter>();
+        parameters.AddRange(dtos.SelectMany((dto, i) => new[]
+        {
+            new NpgsqlParameter($"@record{i}_id", dto.RecordId),
+            new NpgsqlParameter($"@tag{i}_id", dto.TagId)
+        }));
+        
+        // stringify params and comma separate them
+        var valueTuples = string.Join(", ", dtos.Select((_, i) => $"(@record{i}_id, @tag{i}_id)"));
+
+        // put everything together and execute the query
+        sql = string.Format(sql, valueTuples);
+
+        await _context.Database.ExecuteSqlRawAsync(sql, parameters.ToArray());
+
+        return true;
+    }
+    
     /// <summary>
     ///     Bulk attach sensitivity labels and records
     /// </summary>
@@ -1417,7 +1560,7 @@ public class RecordBusiness : IRecordBusiness
             })
             .ToList();
 
-        if (recordTags.Any()) await BulkAttachTags(recordTags);
+        if (recordTags.Any()) await BulkInsertRecordTagLinks(recordTags);
 
         // Convert tagMap to RecordTagDto collection
         return distinctTags
@@ -1440,6 +1583,124 @@ public class RecordBusiness : IRecordBusiness
         return inserted.ToDictionary(t => t.Name, t => t);
     }
 
+    /// <summary>
+    ///     Validate and bulk attach tags to records for public API use.
+    /// </summary>
+    /// <param name="currentUserId">The ID of current user</param>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <param name="projectId"> The ID of the project to which the records belong</param>
+    /// <param name="dtos">A list of record_id/tag_id pairs to be inserted</param>
+    /// <exception cref="ArgumentException"> Thrown if no record/tag pairs are provided or if no authorized record/tag pairs remain after filtering</exception>
+    /// <exception cref="KeyNotFoundException">Returned if one or more records or tags are not found or archived</exception>
+    /// <returns>True if successful</returns>
+    public async Task<bool> BulkAttachTags(long currentUserId, long organizationId, 
+        long projectId, List<RecordTagLinkDto> dtos)
+    {
+        if (dtos.Count == 0)
+            throw new ArgumentException("Record,tag pairs cannot be null or empty", nameof(dtos));
+        
+        var recordIds = dtos
+            .Select(r => r.RecordId)
+            .Distinct()
+            .ToList();
+        
+        var tagIds = dtos
+            .Select(r => r.TagId)
+            .Distinct()
+            .ToList();
+        
+        // Validate records belong to this organization/project and are not archived 
+        var records = await _context.Records
+            .Where(r => recordIds.Contains(r.Id) && r.OrganizationId == organizationId && r.ProjectId == projectId && !r.IsArchived)
+            .Select(r => r.Id)
+            .ToListAsync();
+
+        if (records.Count != recordIds.Count)
+            throw new KeyNotFoundException("One or more records were not found or archived.");
+
+        // Validate tags belong to this organization/project and are not archived 
+        var tags = await _context.Tags
+            .Where(t => tagIds.Contains(t.Id) && t.OrganizationId == organizationId && (t.ProjectId == projectId || t.ProjectId == null) && !t.IsArchived)
+            .Select(t => t.Id)
+            .ToListAsync();
+        
+        if (tags.Count != tagIds.Count)
+            throw new KeyNotFoundException("One or more tags were not found or archived.");
+        
+        var authorizedRecordIds = await _sensitivityLabelService
+            .FilterAuthorizedRecordIds(currentUserId, organizationId, projectId, recordIds, _context);
+        
+        dtos = dtos
+            .Where(dto => authorizedRecordIds.Contains(dto.RecordId))
+            .ToList();
+        
+        if (dtos.Count == 0)
+            throw new ArgumentException("User does not have access to any provided records", nameof(dtos));
+        
+        await BulkInsertRecordTagLinks(dtos);
+
+        return true;
+    }
+
+    /// <summary>
+    ///     Validate and bulk unattach tags from records for public API use.
+    /// </summary>
+    /// <param name="currentUserId">The ID of current user</param>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <param name="projectId"> The ID of the project to which the records belong</param>
+    /// <param name="dtos">A list of record_id/tag_id pairs to be deleted</param>
+    /// <exception cref="ArgumentException"> Thrown if no record/tag pairs are provided or if no authorized record/tag pairs remain after filtering</exception>
+    /// <exception cref="KeyNotFoundException">Returned if one or more records or tags are not found or archived</exception>
+    /// <returns>True if successful</returns>
+    public async Task<bool> BulkUnattachTags(long currentUserId, long organizationId,
+        long projectId, List<RecordTagLinkDto> dtos)
+    {
+        if (dtos.Count == 0)
+            throw new ArgumentException("Record,tag pairs cannot be null or empty", nameof(dtos));
+        
+        var recordIds = dtos
+            .Select(r => r.RecordId)
+            .Distinct()
+            .ToList();
+
+        var tagIds = dtos
+            .Select(r => r.TagId)
+            .Distinct()
+            .ToList();
+        
+        // Validate records belong to this organization/project and are not archived 
+        var records = await _context.Records
+            .Where(r => recordIds.Contains(r.Id) && r.OrganizationId == organizationId && r.ProjectId == projectId && !r.IsArchived)
+            .Select(r => r.Id)
+            .ToListAsync();
+        
+        if (records.Count != recordIds.Count)
+            throw new KeyNotFoundException("One or more records were not found or archived.");
+        
+        // Validate tags belong to this organization/project and are not archived 
+        var tags = await _context.Tags
+            .Where(t => tagIds.Contains(t.Id) && t.OrganizationId == organizationId && (t.ProjectId == projectId || t.ProjectId == null) && !t.IsArchived)
+            .Select(t => t.Id)
+            .ToListAsync();
+        
+        if (tags.Count != tagIds.Count)
+            throw new KeyNotFoundException("One or more tags were not found or archived.");
+
+        var authorizedRecordIds = await _sensitivityLabelService
+            .FilterAuthorizedRecordIds(currentUserId, organizationId, projectId, recordIds, _context);
+        
+        dtos = dtos
+            .Where(dto => authorizedRecordIds.Contains(dto.RecordId))
+            .ToList();
+        
+        if (dtos.Count == 0)
+            throw new ArgumentException("User does not have access to any provided records", nameof(dtos));
+        
+        await BulkDeleteRecordTagLinks(dtos);
+        
+        return true;
+    }
+    
     /// <summary>
     ///     Map an NPGSQL data reader to a return DTO usually during high scale read operations
     /// </summary>

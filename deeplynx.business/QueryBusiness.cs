@@ -153,24 +153,30 @@ public class QueryBusiness : IQueryBusiness
 
                         if (jsonbColumns.Contains(query.Filter.ToLower()))
                         {
-                            // For JSONB columns, convert to text for exact match
                             condition = $"jsonb_pretty(hr.{query.Filter}) ILIKE @{paramName}";
                             parameters.Add(new NpgsqlParameter(paramName, $"%{query.Value}%"));
                         }
                         else
                         {
                             condition = $"hr.{query.Filter} = @{paramName}";
-
                             if (int.TryParse(query.Value, out var intVal))
                                 parameters.Add(new NpgsqlParameter(paramName, intVal));
                             else if (DateTime.TryParse(query.Value, out var dateVal))
-                                parameters.Add(new NpgsqlParameter(paramName, dateVal));
+                                {
+                                    var startOfDay = dateVal.Date;
+                                    var startOfNextDay = dateVal.Date.AddDays(1);
+                                    var paramName2 = $"p{parameters.Count + 1}";
+                                    condition = $"hr.{query.Filter} >= @{paramName} AND hr.{query.Filter} < @{paramName2}";
+                                    parameters.Add(new NpgsqlParameter(paramName, startOfDay));
+                                    parameters.Add(new NpgsqlParameter(paramName2, startOfNextDay));
+                                }
                             else
                                 parameters.Add(new NpgsqlParameter(paramName, query.Value));
                         }
                     }
                     else if (query.Operator == ">")
                     {
+                        
                         condition = $"hr.{query.Filter} > @{paramName}";
 
                         if (DateTime.TryParse(query.Value, out var dateVal))

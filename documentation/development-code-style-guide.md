@@ -253,7 +253,7 @@ Most resources are scoped at one of these levels:
 |---|---|
 | Organization | `organizations/{organizationId:long}/...` |
 | Project | `organizations/{organizationId:long}/projects/{projectId:long}/...` |
-| User/global | Resource-specific routes with `[Auth(..., allowWithoutContext: true)]` when organization or project context is not required. |
+| User/global | Resource-specific routes that do not include `organizationId` or `projectId`. Protected with `[SysAdmin]`, `[OrgAdmin(unscoped: true)]`, or left unauthorized when appropriate. |
 
 When a route needs authorization based on organization or project membership, include the relevant route IDs so `AuthMiddleware` can evaluate permissions.
 
@@ -300,7 +300,7 @@ Do not put `projectId` in the route when:
 - The resource is organization-scoped and may not belong to a project.
 - The endpoint lists or searches across multiple projects.
 - The endpoint acts on project membership itself under `organizations/{organizationId:long}/projects`.
-- The endpoint is user/global and intentionally uses `allowWithoutContext: true`.
+- The endpoint is user/global and intentionally has no organization or project context.
 
 For multi-project operations, use query parameters such as `projectIds` so `AuthMiddleware` can validate every requested project:
 
@@ -412,6 +412,7 @@ Authorization is mostly handled through custom attributes and middleware:
 [Auth("update", "user")]
 [SysAdmin]
 [OrgAdmin]
+[OrgAdmin(unscoped: true)]
 ```
 
 ### Auth Attribute
@@ -440,9 +441,28 @@ Common resources match domain names such as:
 - `permission`
 - `role`
 
-Use `allowWithoutContext: true` only when the endpoint is intentionally available without an organization or project route context.
-
 Use `includeArchived: true` only when the endpoint must operate on archived records, such as archive/unarchive operations.
+
+### OrgAdmin Unscoped Modifier
+
+`[OrgAdmin]` accepts an optional `unscoped` argument. Set it when the endpoint is `[OrgAdmin]`-protected but the route intentionally does not include an `{organizationId}`. With `unscoped: true` and no `organizationId` on the route, `AuthMiddleware` allows the request as long as the caller is a system admin or an org admin in at least one organization in the system. Without it, an `[OrgAdmin]` endpoint with no `organizationId` returns `400 Bad Request`.
+
+```csharp
+[HttpPost(Name = "api_create_a_user")]
+[OrgAdmin(unscoped: true)]
+public async Task<ActionResult<UserResponseDto>> CreateUser([FromBody] CreateUserRequestDto dto)
+```
+
+Use `unscoped: true` when:
+
+- The endpoint is protected by `[OrgAdmin]`.
+- The route has no `{organizationId}` because the operation is not scoped to one specific organization.
+- It is acceptable for the caller to be an org admin in any organization, not a particular one.
+
+Do not use `unscoped: true` when:
+
+- The route already includes `{organizationId}`. The modifier only applies when the org ID is missing.
+- With any other attribute other than `[OrgAdmin]`
 
 ### UserContextStorage
 

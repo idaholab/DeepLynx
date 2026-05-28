@@ -166,8 +166,10 @@ export default function AdditionalPropertiesEditor({
   const [newValue, setNewValue] = useState("");
 
   useEffect(() => {
-    setEditedProperties(properties);
-  }, [properties]);
+    if (isOpen) {
+      setEditedProperties(properties);
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 

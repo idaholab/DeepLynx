@@ -2,6 +2,7 @@
 
 "use client";
 import Tabs from "@/app/(home)/components/Tabs";
+import { BetaBadge } from "@/app/(home)/components/BetaBadge";
 import {
   ArrowTopRightOnSquareIcon,
   PencilIcon,
@@ -555,11 +556,8 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
         value: record.name,
         editable: true,
         onEdit: (value: string) =>
-          handleUpdateRecord(
-            "name",
-            value,
-            t.translations.RECORD_NAME_UPDATED,
-          ),
+          handleUpdateRecord("name", value, t.translations.RECORD_NAME_UPDATED),
+        maxCharacterLimit: 50,
       },
       {
         label: t.translations.RECORD_DESCRIPTION,
@@ -571,6 +569,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
             value,
             t.translations.RECORD_NAME_UPDATED,
           ),
+        maxCharacterLimit: 250
       },
       {
         label: t.translations.URI,
@@ -1040,6 +1039,12 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
     // conditionally include lattice tab
     ...(!isInsightHidden() ? [{
       label: t.translations.LATTICE_PAGE_TITLE,
+      displayLabel: (
+        <span className="inline-flex items-center gap-2">
+          {t.translations.LATTICE_PAGE_TITLE}
+          <BetaBadge size="xs" />
+        </span>
+      ),
       content: (
         <div className="mt-4 flex flex-col lg:flex-row gap-8 lg:gap-12 p-6">
           {/* Left: About Lattice */}

@@ -6,10 +6,12 @@ import { PencilIcon, PlusIcon, TrashIcon } from "@heroicons/react/24/outline";
 import GenericTable from "../GenericTable";
 import CreateOrganization from "./CreateOrganizationModal";
 import EditOrganization from "./EditOrganizationModal";
+import DeleteOrganization from "./DeleteOrganizationModal";
 import {
   archiveOrganization,
   getAllOrganizations,
 } from "@/app/lib/client_service/organization_services.client";
+import { SiteManagementTable } from "./SiteManagementTable";
 
 interface OrganizationManagementProps {
   initialOrganizations: OrganizationResponseDto[];
@@ -25,6 +27,7 @@ const SiteOrganizationManagement = ({
     useState<OrganizationResponseDto[]>(initialOrganizations);
   const [isOrganizationModalOpen, setIsOrganizationModalOpen] = useState(false);
   const [editOrganizationModal, setEditOrganizationModal] = useState(false);
+  const [deleteOrganizationModal, setDeleteOrganizationModal] = useState(false);
   const [selectedOrganizationId, setSelectedOrganizationId] = useState<
     number | null
   >(null);
@@ -35,6 +38,7 @@ const SiteOrganizationManagement = ({
   const [selectedOrganizations, setSelectedOrganizations] = useState<boolean[]>(
     []
   );
+  const [selectedForDeletion, setSelectedForDeletion] = useState<OrganizationResponseDto[] | null>(null);
   const [selectAll, setSelectAll] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -70,32 +74,6 @@ const SiteOrganizationManagement = ({
     setSelectAll(next.every(Boolean));
   };
 
-  const handleDelete = async (index: number) => {
-    const organizationId = data[index].id as number;
-    try {
-      await archiveOrganization(organizationId);
-      setData((prev) => prev.filter((_, i) => i !== index));
-    } catch (err) {
-      console.error("Failed to delete organization:", err);
-      setError("Failed to delete organization.");
-    }
-  };
-
-  const handleDeleteSelected = async () => {
-    const selectedOrgIds = data
-      .filter((_, i) => selectedOrganizations[i])
-      .map((org) => org.id);
-    try {
-      await Promise.all(
-        selectedOrgIds.map((orgId) => archiveOrganization(orgId as number))
-      );
-      setData((prev) => prev.filter((_, i) => !selectedOrganizations[i]));
-    } catch (err) {
-      console.error("Failed to delete selected organizations:", err);
-      setError("Failed to delete selected organizations.");
-    }
-  };
-
   const multipleSelected = () =>
     selectedOrganizations.filter(Boolean).length > 1;
 
@@ -108,6 +86,13 @@ const SiteOrganizationManagement = ({
     setSelectedOrganizationName(organizationName);
     setSelectedOrganizationDescription(organizationDescription);
     setEditOrganizationModal(true);
+  };
+
+  const openDeleteModal = (
+    organizations: OrganizationResponseDto[] | null
+  ) => {
+    setSelectedForDeletion(organizations);
+    setDeleteOrganizationModal(true);
   };
 
   const columns: Column<OrganizationResponseDto>[] = [
@@ -132,7 +117,14 @@ const SiteOrganizationManagement = ({
     },
     {
       header: t.translations.NAME,
-      data: "name" as keyof OrganizationResponseDto,
+      cell: (row) => {
+        const name = (row as OrganizationResponseDto).name;
+        return (
+          <span title={name}>
+            {name.length > 20 ? name.slice(0, 20) + "..." : name}
+          </span>
+        );
+      },
     },
     {
       header: t.translations.DESCRIPTION,
@@ -142,7 +134,7 @@ const SiteOrganizationManagement = ({
       header: "",
       cell: (row) => (
         <div className="flex">
-          <button
+          <button className="btn btn-ghost btn-sm"
             onClick={() =>
               openEditModal(
                 row.id as number,
@@ -161,7 +153,12 @@ const SiteOrganizationManagement = ({
       header: (
         <div className="flex">
           {multipleSelected() && (
-            <button onClick={handleDeleteSelected}>
+            <button className="btn btn-ghost btn-sm"
+              onClick={() => {
+                const selectedOrgs = data
+                  .filter((_, i) => selectedOrganizations[i]);
+                openDeleteModal(selectedOrgs)
+              }}>
               <TrashIcon className="size-6 text-red-500" />
             </button>
           )}
@@ -169,7 +166,10 @@ const SiteOrganizationManagement = ({
       ),
       cell: (_row, index) => (
         <div className="flex">
-          <button onClick={() => handleDelete(index)}>
+          <button className="btn btn-ghost btn-sm"
+            onClick={() => {
+              openDeleteModal([_row])
+            }}>
             <TrashIcon className="size-6 text-red-500" />
           </button>
         </div>
@@ -201,7 +201,9 @@ const SiteOrganizationManagement = ({
         </button>
       </div>
       {error && <div className="p-4 text-red-500">{error}</div>}
-      <GenericTable columns={columns} data={data} enablePagination />
+
+      <SiteManagementTable columns={columns} data={data} expandableKey="description" rowKey="id" border />
+
       <CreateOrganization
         isOpen={isOrganizationModalOpen}
         onClose={() => setIsOrganizationModalOpen(false)}
@@ -215,6 +217,14 @@ const SiteOrganizationManagement = ({
           organizationName={selectedOrganizationName}
           organizationDescription={selectedOrganizationDescription}
           onOrganizationUpdated={refreshOrganizations}
+        />
+      )}
+      {selectedForDeletion !== null && (
+        <DeleteOrganization
+          isOpen={deleteOrganizationModal}
+          onClose={() => setDeleteOrganizationModal(false)}
+          organizations={selectedForDeletion}
+          onOrganizationDeleted={refreshOrganizations}
         />
       )}
     </div>

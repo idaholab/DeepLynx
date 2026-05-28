@@ -31,15 +31,17 @@ public class UserController : ControllerBase
     /// </summary>
     /// <param name="projectId">(Optional) ID of project that users are associated with</param>
     /// <param name="organizationId">(Optional) ID of organization that users are associated with</param>
+    /// <param name="includeArchived">Whether to include archived users (default: false)</param>
     /// <returns>List of user response DTOs</returns>
     [HttpGet(Name = "api_get_all_users")]
     public async Task<ActionResult<IEnumerable<UserResponseDto>>> GetAllUsers(
         [FromQuery] long? projectId,
-        [FromQuery] long? organizationId)
+        [FromQuery] long? organizationId,
+        [FromQuery] bool includeArchived = false)
     {
         try
         {
-            var users = await _userBusiness.GetAllUsers(projectId, organizationId);
+            var users = await _userBusiness.GetAllUsers(projectId, organizationId, includeArchived);
             return Ok(users);
         }
         catch (Exception exc)
@@ -97,7 +99,7 @@ public class UserController : ControllerBase
     /// <param name="dto">User request DTO</param>
     /// <returns>User response DTO</returns>
     [HttpPost(Name = "api_create_a_user")]
-    [OrgAdmin]
+    [OrgAdmin(unscoped: true)]
     public async Task<ActionResult<UserResponseDto>> CreateUser([FromBody] CreateUserRequestDto dto)
     {
         try
@@ -121,7 +123,7 @@ public class UserController : ControllerBase
     /// <param name="dto">User request DTO</param>
     /// <returns>User response DTO</returns>
     [HttpPut("{userId:long}", Name = "api_update_a_user")]
-    [OrgAdmin]
+    [OrgAdmin(unscoped: true)]
     public async Task<ActionResult<UserResponseDto>> UpdateUser(long userId, [FromBody] UpdateUserRequestDto dto)
     {
         try
