@@ -5,9 +5,8 @@ namespace deeplynx.interfaces;
 public interface IOrganizationBusiness
 {
     Task<IEnumerable<OrganizationResponseDto>> GetAllOrganizations(bool hideArchived = true);
-    Task<IEnumerable<OrganizationResponseDto>> GetAllOrganizationsForUser(long currentUserId, bool hideArchived = true);
+    Task<IEnumerable<OrganizationResponseDto>> GetAllOrganizationsForUser(long currentUserId, bool hideArchived = true, bool isSysAdmin = false);
     Task<OrganizationResponseDto> GetOrganization(long organizationId, bool hideArchived = true);
-
     Task<OrganizationResponseDto> CreateOrganization(long currentUserId, CreateOrganizationRequestDto dto,
         bool isDefault = false);
 

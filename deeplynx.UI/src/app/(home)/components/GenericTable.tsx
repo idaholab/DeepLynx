@@ -25,7 +25,7 @@ type FilterConfig = {
   key: string;
   label: string;
   placeholder?: string;
-  type?: 'text' | 'select' | 'date' | 'datetime-local';
+  type?: "text" | "select" | "date" | "datetime-local";
   options?: { value: string; label: string }[];
 };
 
@@ -53,7 +53,9 @@ type GenericTableProps<T extends object> = {
   onPageSizeChange?: (pageSize: number) => void;
   filters?: FilterConfig[];
   filterValues?: Record<string, string | number | number[] | undefined>;
-  onFilterChange?: (filters: Record<string, string | number | number[] | undefined>) => void;
+  onFilterChange?: (
+    filters: Record<string, string | number | number[] | undefined>,
+  ) => void;
 };
 
 const GenericTable = <T extends object>({
@@ -64,7 +66,7 @@ const GenericTable = <T extends object>({
   isAnyRowSelected,
   deleteSelectedRows,
   rowsPerPage = 10,
-  setRowsPerPage = () => { },
+  setRowsPerPage = () => {},
   pageLengthOptions = [10, 25, 50, 100, 500],
   enablePageLengthChange = false,
   enablePagination = false,
@@ -76,7 +78,7 @@ const GenericTable = <T extends object>({
   gridView = false,
   filters = [],
   filterValues = {},
-  onFilterChange = () => { },
+  onFilterChange = () => {},
   backendPagination = false,
   paginationMetadata,
   onPageChange,
@@ -89,7 +91,9 @@ const GenericTable = <T extends object>({
 
   const [showFilters, setShowFilters] = useState(false);
   const [initialFilters] = useState(filterValues);
-  const [tempFilters, setTempFilters] = useState<Record<string, string | number | number[] | undefined>>({});
+  const [tempFilters, setTempFilters] = useState<
+    Record<string, string | number | number[] | undefined>
+  >({});
 
   // Sync local page state with backend pagination metadata
   useEffect(() => {
@@ -113,8 +117,8 @@ const GenericTable = <T extends object>({
           row[column.data as keyof T]
             ?.toString()
             .toLowerCase()
-            .includes(filterText.toLowerCase())
-        )
+            .includes(filterText.toLowerCase()),
+        ),
       ) || []
     );
   }, [data, columns, filterText]);
@@ -156,7 +160,7 @@ const GenericTable = <T extends object>({
   const totalPages =
     backendPagination && paginationMetadata
       ? paginationMetadata.totalPages ||
-      Math.ceil(paginationMetadata.totalCount / paginationMetadata.pageSize)
+        Math.ceil(paginationMetadata.totalCount / paginationMetadata.pageSize)
       : enablePagination
         ? Math.ceil(filteredData.length / rowsPerPage)
         : 1;
@@ -166,9 +170,9 @@ const GenericTable = <T extends object>({
     ? sortedData // Now includes filtered data from current page
     : enablePagination
       ? sortedData.slice(
-        (currentPage - 1) * rowsPerPage,
-        currentPage * rowsPerPage
-      )
+          (currentPage - 1) * rowsPerPage,
+          currentPage * rowsPerPage,
+        )
       : sortedData;
 
   // Handle page click for pagination
@@ -188,12 +192,13 @@ const GenericTable = <T extends object>({
         pagination.push(
           <button
             key={i}
-            className={`join-item btn ${currentPage === i ? "bg-dynamic-blue text-white" : ""
-              }`}
+            className={`join-item btn ${
+              currentPage === i ? "bg-dynamic-blue text-white" : ""
+            }`}
             onClick={() => handlePageClick(i)}
           >
             {i}
-          </button>
+          </button>,
         );
       }
     } else {
@@ -205,7 +210,7 @@ const GenericTable = <T extends object>({
             onClick={() => handlePageClick(currentPage - 1)}
           >
             {t.translations.PREV}
-          </button>
+          </button>,
         );
       }
 
@@ -213,12 +218,13 @@ const GenericTable = <T extends object>({
         pagination.push(
           <button
             key={i}
-            className={`join-item btn ${currentPage === i ? "bg-dynamic-blue text-white" : ""
-              }`}
+            className={`join-item btn ${
+              currentPage === i ? "bg-dynamic-blue text-white" : ""
+            }`}
             onClick={() => handlePageClick(i)}
           >
             {i}
-          </button>
+          </button>,
         );
       }
 
@@ -226,7 +232,7 @@ const GenericTable = <T extends object>({
         pagination.push(
           <span key="ellipsis1" className=" btn join-item btn-disabled">
             ...
-          </span>
+          </span>,
         );
         pagination.push(
           <button
@@ -235,18 +241,18 @@ const GenericTable = <T extends object>({
             onClick={() => handlePageClick(currentPage)}
           >
             {currentPage}
-          </button>
+          </button>,
         );
         pagination.push(
           <span key="ellipsis2" className="btn join-item btn-disabled">
             ...
-          </span>
+          </span>,
         );
       } else if (currentPage >= 3 || currentPage <= 3) {
         pagination.push(
           <span key="ellipsis" className="btn join-item btn-disabled">
             ...
-          </span>
+          </span>,
         );
       }
 
@@ -254,12 +260,13 @@ const GenericTable = <T extends object>({
         pagination.push(
           <button
             key={i}
-            className={`join-item btn ${currentPage === i ? "bg-dynamic-blue text-white" : ""
-              }`}
+            className={`join-item btn ${
+              currentPage === i ? "bg-dynamic-blue text-white" : ""
+            }`}
             onClick={() => handlePageClick(i)}
           >
             {i}
-          </button>
+          </button>,
         );
       }
 
@@ -271,7 +278,7 @@ const GenericTable = <T extends object>({
             onClick={() => handlePageClick(currentPage + 1)}
           >
             {t.translations.NEXT}
-          </button>
+          </button>,
         );
       }
     }
@@ -281,7 +288,7 @@ const GenericTable = <T extends object>({
 
   const handleRowLengthClick = (rowsNumber: number) => {
     setCurrentDisplayedRows(rowsNumber);
-    setRowsPerPage(rowsNumber)
+    setRowsPerPage(rowsNumber);
     setCurrentPage(1); // Reset to first page when changing rows per page
     if (backendPagination && onPageSizeChange) {
       onPageSizeChange(rowsNumber);
@@ -295,14 +302,15 @@ const GenericTable = <T extends object>({
       rowOptions.push(
         <button
           key={i}
-          className={`join-item btn ${currentDisplayedRows === pageLengthOptions[i]
-            ? "bg-dynamic-blue text-white"
-            : ""
-            }`}
+          className={`join-item btn ${
+            currentDisplayedRows === pageLengthOptions[i]
+              ? "bg-dynamic-blue text-white"
+              : ""
+          }`}
           onClick={() => handleRowLengthClick(pageLengthOptions[i])}
         >
           {pageLengthOptions[i]}
-        </button>
+        </button>,
       );
     }
 
@@ -319,13 +327,14 @@ const GenericTable = <T extends object>({
   // Show page navigation only if there are multiple pages
   const showPageNavigation = backendPagination
     ? paginationMetadata &&
-    paginationMetadata.totalCount > paginationMetadata.pageSize
+      paginationMetadata.totalCount > paginationMetadata.pageSize
     : filteredData.length > currentDisplayedRows;
 
   return (
     <div
-      className={`overflow-x-auto min-h-[80vh] ${bordered ? "rounded-box border border-base-300" : ""
-        } p-4`}
+      className={`overflow-x-auto ${
+        bordered ? "rounded-box border border-base-300" : ""
+      } p-4`}
     >
       {title && (
         <h2 className="text-xl font-bold text-base-content">{title}</h2>
@@ -347,19 +356,29 @@ const GenericTable = <T extends object>({
                 >
                   <AdjustmentsHorizontalIcon className="size-5" />
                   Filter All Results
-                  {Object.keys(filterValues || {}).filter(k => filterValues?.[k]).length > 0 && (
+                  {Object.keys(filterValues || {}).filter(
+                    (k) => filterValues?.[k],
+                  ).length > 0 && (
                     <span className="badge bg-dynamic-blue text-white badge-sm border-none">
-                      {Object.keys(filterValues || {}).filter(k => filterValues?.[k]).length}
+                      {
+                        Object.keys(filterValues || {}).filter(
+                          (k) => filterValues?.[k],
+                        ).length
+                      }
                     </span>
                   )}
-                  <ChevronDownIcon className={`size-4 transition-transform ${showFilters ? 'rotate-180' : ''}`} />
+                  <ChevronDownIcon
+                    className={`size-4 transition-transform ${showFilters ? "rotate-180" : ""}`}
+                  />
                 </button>
 
                 {/* Dropdown Panel */}
                 {showFilters && (
                   <div className="absolute left-0 mt-2 w-96 bg-base-100 border border-base-300 rounded-lg shadow-lg z-50 p-4">
                     <div className="flex justify-between mb-4">
-                      <h3 className="font-semibold text-base-content">Filter Options</h3>
+                      <h3 className="font-semibold text-base-content">
+                        Filter Options
+                      </h3>
                       <button
                         onClick={() => setShowFilters(false)}
                         className="btn btn-ghost btn-xs btn-circle"
@@ -371,7 +390,7 @@ const GenericTable = <T extends object>({
                     {/* Filter Inputs */}
                     <div className="space-y-3 max-h-full overflow-y-auto pb-4">
                       {filters.map((filter) => {
-                        const inputType = filter.type || 'text';
+                        const inputType = filter.type || "text";
 
                         return (
                           <div key={filter.key} className="form-control">
@@ -380,10 +399,16 @@ const GenericTable = <T extends object>({
                             </label>
                             <input
                               type={inputType}
-                              placeholder={filter.placeholder || `Enter ${filter.label.toLowerCase()}...`}
-                              value={tempFilters[filter.key]?.toString() || ''}
+                              placeholder={
+                                filter.placeholder ||
+                                `Enter ${filter.label.toLowerCase()}...`
+                              }
+                              value={tempFilters[filter.key]?.toString() || ""}
                               onChange={(e) =>
-                                setTempFilters({ ...tempFilters, [filter.key]: e.target.value })
+                                setTempFilters({
+                                  ...tempFilters,
+                                  [filter.key]: e.target.value,
+                                })
                               }
                               className="input input-md mx-1 bg-base-100 border-base-300 focus:border-dynamic-blue focus:outline-none"
                               id={filter.key}
@@ -437,10 +462,11 @@ const GenericTable = <T extends object>({
             </button>
             <button
               onClick={deleteSelectedRows}
-              className={`transition-colors ${!isAnyRowSelected
-                ? "text-base-300 cursor-not-allowed"
-                : "text-error hover:text-error-focus cursor-pointer"
-                }`}
+              className={`transition-colors ${
+                !isAnyRowSelected
+                  ? "text-base-300 cursor-not-allowed"
+                  : "text-error hover:text-error-focus cursor-pointer"
+              }`}
               disabled={!isAnyRowSelected}
             >
               <TrashIcon className="size-6" />
@@ -449,28 +475,33 @@ const GenericTable = <T extends object>({
         )}
       </div>
       <table
-        className={`table table-pin-cols ${bordered ? "table-bordered" : ""} ${tableClassName ?? ""
-          }`}
+        className={`table table-pin-cols ${bordered ? "table-bordered" : ""} ${
+          tableClassName ?? ""
+        }`}
       >
         <thead>
           <tr
-            className={`text-base-content bg-base-300 ${gridView ? "border" : ""
-              }`}
+            className={`text-base-content bg-base-300 ${
+              gridView ? "border" : ""
+            }`}
           >
             {columns.map((column, index) => (
               <th
                 key={index}
-                className={`${gridView ? "border border-base-300 bg-base-200" : ""
-                  } ${column.sortable !== false
+                className={`${
+                  gridView ? "border border-base-300 bg-base-200" : ""
+                } ${
+                  column.sortable !== false
                     ? "cursor-pointer select-none hover:bg-base-300 transition-colors"
                     : ""
-                  } ${column.data === "id" ? "sticky left-0 z-10 bg-base-300" : ""
-                  }`}
+                } ${
+                  column.data === "id" ? "sticky left-0 z-10 bg-base-300" : ""
+                }`}
                 onClick={() => {
                   if (column.sortable == false || !column.data) return;
                   const direction =
                     sortConfig?.key === column.data &&
-                      sortConfig?.direction === "asc"
+                    sortConfig?.direction === "asc"
                       ? "desc"
                       : "asc";
                   setSortConfig({ key: column.data as keyof T, direction });
@@ -499,21 +530,24 @@ const GenericTable = <T extends object>({
             return (
               <tr
                 key={rowIndex}
-                className={`${typeof rowClassName === "function"
-                  ? rowClassName(row, rowIndex)
-                  : rowClassName || ""
-                  } ${isPrivate
+                className={`${
+                  typeof rowClassName === "function"
+                    ? rowClassName(row, rowIndex)
+                    : rowClassName || ""
+                } ${
+                  isPrivate
                     ? "opacity-60 cursor-not-allowed"
                     : "hover:bg-base-200 transition-colors"
-                  }`}
+                }`}
               >
                 {columns.map((column, colIndex) => (
                   <td
                     key={colIndex}
-                    className={`text-base-content ${column.data === "id"
-                      ? "sticky left-0 z-10 bg-base-100"
-                      : ""
-                      } ${gridView ? "border border-base-200" : ""}`}
+                    className={`text-base-content ${
+                      column.data === "id"
+                        ? "sticky left-0 z-10 bg-base-100"
+                        : ""
+                    } ${gridView ? "border border-base-200" : ""}`}
                   >
                     {column.cell
                       ? column.cell(row, rowIndex)

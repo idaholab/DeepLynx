@@ -14,5 +14,9 @@ public class AiModelConfigResponseDto
     public bool IsArchived { get; set; }
     public DateTime LastUpdatedAt { get; set; }
     public long? LastUpdatedBy { get; set; }
-    public string? Token { get; set; }
+
+    public class WithToken : AiModelConfigResponseDto
+    {
+        public string? Token { get; set; }
+    }
 }

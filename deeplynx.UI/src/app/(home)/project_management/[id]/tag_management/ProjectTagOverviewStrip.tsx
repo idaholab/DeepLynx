@@ -6,99 +6,74 @@ import {
   LockOpenIcon,
   InformationCircleIcon,
 } from "@heroicons/react/24/outline";
+import { useLanguage } from "@/app/contexts/Language";
 
 interface Props {
-  labelCount: number;
-  projectsWithLabels: number;
-  tagCount: number;
-  projectsWithTags: number;
-  orgTagsLocked: boolean;
-  orgSecurityLabelsLocked: boolean;
+  inheritedOrganizationLabelCount: number;
+  projectManagedLabelCount: number;
+  inheritedOrganizationTagCount: number;
+  projectManagedTagCount: number;
+  organizationTagsLocked: boolean;
+  organizationLabelsLocked: boolean;
 }
 
 const ProjectTagOverviewStrip: React.FC<Props> = ({
-  labelCount,
-  projectsWithLabels,
-  tagCount,
-  projectsWithTags,
-  orgTagsLocked,
-  orgSecurityLabelsLocked,
+  inheritedOrganizationLabelCount,
+  projectManagedLabelCount,
+  inheritedOrganizationTagCount,
+  projectManagedTagCount,
+  organizationTagsLocked,
+  organizationLabelsLocked,
 }) => {
+  const { t } = useLanguage();
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-6">
-      {/* Project Security Labels */}
       <div className="stat bg-base-100 border border-base-300 rounded-xl">
         <div className="stat-title flex items-center gap-1 text-xs">
-          <ShieldCheckIcon className="w-4 h-4 text-base-content/70" />
-          Project Security Labels
-        </div>
-        <div className="stat-value text-base-content text-xl">{labelCount}</div>
-        <div className="stat-desc text-xs flex items-center gap-1 text-base-content/70">
-          {orgSecurityLabelsLocked ? (
-            <>
-              <LockClosedIcon className="w-4 h-4 text-error" />
-              <span>Locked by organization – no new labels</span>
-            </>
-          ) : (
-            <>
-              <LockOpenIcon className="w-4 h-4 text-success" />
-              <span>Project may define labels</span>
-            </>
-          )}
-        </div>
-      </div>
-
-      {/* Project usage of labels */}
-      <div className="stat bg-base-100 border border-base-300 rounded-xl">
-        <div className="stat-title flex items-center gap-1 text-xs">
-          <ShieldCheckIcon className="w-4 h-4 text-base-content/50" />
-          Label Usage
-        </div>
-        <div className="stat-value text-base-content text-xl">
-          {projectsWithLabels}
-        </div>
-        <div className="stat-desc text-xs text-base-content/70">
-          Projects using labels (this project: {labelCount > 0 ? "Yes" : "No"})
-        </div>
-      </div>
-
-      {/* Project Tags */}
-      <div className="stat bg-base-100 border border-base-300 rounded-xl">
-        <div className="stat-title flex items-center gap-1 text-xs">
-          <TagIcon className="w-4 h-4 text-primary" />
-          Project Tags
-        </div>
-        <div className="stat-value text-primary text-xl">{tagCount}</div>
-        <div className="stat-desc text-xs flex items-center gap-1">
-          {orgTagsLocked ? (
-            <>
-              <LockClosedIcon className="w-4 h-4 text-error" />
-              <span>Locked by organization – no extra tags</span>
-            </>
-          ) : (
-            <>
-              <LockOpenIcon className="w-4 h-4 text-success" />
-              <span>May extend org tag set</span>
-            </>
-          )}
-        </div>
-      </div>
-
-      {/* Projects with Tags (for this project context this is mostly 0/1 summary) */}
-      <div className="stat bg-base-100 border border-base-300 rounded-xl">
-        <div className="stat-title flex items-center gap-1 text-xs">
-          <TagIcon className="w-4 h-4 text-secondary" />
-          Project Tag Usage
+          <ShieldCheckIcon className="w-4 h-4 text-secondary" />
+          {t.translations.ORGANIZATION_SECURITY_LABELS}
         </div>
         <div className="stat-value text-secondary text-xl">
-          {projectsWithTags}
+          {inheritedOrganizationLabelCount}
         </div>
         <div className="stat-desc text-xs text-base-content/70 flex items-center gap-1">
           <InformationCircleIcon className="w-4 h-4" />
-          <span>
-            This project always inherits organization tags; counts here are
-            project-defined tags only.
-          </span>
+          <span>{t.translations.INHERITED_FROM_ORGANIZATION}</span>
+        </div>
+      </div>
+
+      <div className="stat bg-base-100 border border-base-300 rounded-xl">
+        <div className="stat-title flex items-center gap-1 text-xs">
+          <ShieldCheckIcon className="w-4 h-4 text-secondary" />
+          {t.translations.PROJECT_SECURITY_LABELS}
+        </div>
+        <div className="stat-value text-secondary text-xl">
+          {projectManagedLabelCount}
+        </div>
+      </div>
+
+      <div className="stat bg-base-100 border border-base-300 rounded-xl">
+        <div className="stat-title flex items-center gap-1 text-xs">
+          <TagIcon className="w-4 h-4 text-primary" />
+          {t.translations.ORGANIZATION_TAGS}
+        </div>
+        <div className="stat-value text-primary text-xl">
+          {inheritedOrganizationTagCount}
+        </div>
+        <div className="stat-desc text-xs text-base-content/70 flex items-center gap-1">
+          <InformationCircleIcon className="w-4 h-4" />
+          <span>{t.translations.INHERITED_FROM_ORGANIZATION}</span>
+        </div>
+      </div>
+
+      <div className="stat bg-base-100 border border-base-300 rounded-xl">
+        <div className="stat-title flex items-center gap-1 text-xs">
+          <TagIcon className="w-4 h-4 text-secondary" />
+          {t.translations.PROJECT_TAGS}
+        </div>
+        <div className="stat-value text-secondary text-xl">
+          {projectManagedTagCount}
         </div>
       </div>
     </div>

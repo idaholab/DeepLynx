@@ -32,15 +32,16 @@ docker compose up --build
 The `deeplynx.insight` services are optional and are behind a Docker Compose profile. By default they are excluded from a standard `docker compose up`, so you can run Nexus without them if you don't need the insight functionality.
 
 **Without Insight (default):**
+
 ```bash
 docker compose up
 ```
 
 **With Insight:** (Will run everything including Insight)
+
 ```bash
 docker compose --profile insight up
 ```
-
 
 ### PostgreSQL Configuration
 
@@ -48,14 +49,13 @@ The Insight services connect to the same `nx-postgres` container as the rest of 
 
 The values need to point at the same database. If you change the credentials, make sure both sets match in `docker-compose.yaml`:
 
-| Setting | Nexus (`server`, `nx-postgres`, `db-version-check`) | Insight (`insight-fastapi`, `insight-rabbitmq-runner`) |
-|---|---|---|
-| Host | `POSTGRES_DB_HOST` | `PG_HOST` |
-| Port | `POSTGRES_PORT` | `PG_PORT` |
-| User | `POSTGRES_USER` | `PG_USER` |
-| Password | `POSTGRES_PASSWORD` | `PG_PASSWORD` |
-| Database | `POSTGRES_DB_NAME` | `PG_DBNAME` |
-
+| Setting  | Nexus (`server`, `nx-postgres`, `db-version-check`) | Insight (`insight-fastapi`, `insight-rabbitmq-runner`) |
+| -------- | --------------------------------------------------- | ------------------------------------------------------ |
+| Host     | `POSTGRES_DB_HOST`                                  | `PG_HOST`                                              |
+| Port     | `POSTGRES_PORT`                                     | `PG_PORT`                                              |
+| User     | `POSTGRES_USER`                                     | `PG_USER`                                              |
+| Password | `POSTGRES_PASSWORD`                                 | `PG_PASSWORD`                                          |
+| Database | `POSTGRES_DB_NAME`                                  | `PG_DBNAME`                                            |
 
 ### Developing Insight
 
@@ -63,7 +63,6 @@ The default env file used by `insight-fastapi` and `insight-rabbitmq-runner` in 
 
 - `./deeplynx.insight/.env.hpc.local` -- for HPC-hosted models via the INL API
 - `./deeplynx.insight/.env.ollama.local` -- for local models running via Ollama
-
 
 ```yaml
 env_file:
@@ -114,6 +113,51 @@ Once you have a `.env` file, be sure to periodically check `.env_sample` for upd
    - Install the .NET Entity Framework CLI tool globally:
      - `dotnet tool install --global dotnet-ef`
 
+## Encryption Configuration
+
+DeepLynx requires encryption keys to be configured before startup. These keys are used for encrypting sensitive data.
+
+### Generating Encryption Keys
+
+1. Generate the keys (Mac/Linux):
+
+```bash
+ENCRYPTION_KEY=$(openssl rand -base64 32)
+ENCRYPTION_IV=$(openssl rand -base64 16)
+```
+
+OR
+
+Generate the keys (Windows PowerShell):
+
+```powershell
+$key = [Convert]::ToBase64String((1..32 | ForEach-Object { Get-Random -Minimum 0 -Maximum 256 }))
+$iv = [Convert]::ToBase64String((1..16 | ForEach-Object { Get-Random -Minimum 0 -Maximum 256 }))
+```
+
+2. Replace (or add) these lines in your `.env` file, using the real key/IV you generated:
+
+```bash
+# ================================
+# ENCRYPTION
+# ================================
+ENCRYPTION_KEY=INSECURE_DEV_KEY_32_BYTES_LONG!!
+ENCRYPTION_IV=INSECURE_DEV_IV!
+```
+
+### Requirements
+
+- `ENCRYPTION_KEY` must be a 32-byte (256-bit) base64-encoded string
+- `ENCRYPTION_IV` must be a 16-byte (128-bit) base64-encoded string
+
+### Security Notes
+
+**Important:**
+
+- Keep these keys secure and never commit them to version control
+- Use different keys for each environment (development, staging, production)
+- If you change these keys, any previously encrypted data will become unreadable
+
 ## Development
 
 ### Load the Database
@@ -138,6 +182,14 @@ If you make changes to the datalayer, create a new database migration with a des
 ```
 dotnet ef migrations add UpdateUsersExample -c DeeplynxContext --verbose --project deeplynx.datalayer --startup-project deeplynx.api
 ```
+
+The Lattice feature uses a separate `LatticeContext` with its own migration history stored in the `lattice` schema. If you make changes to the Lattice staging tables (`ExtractionClass`, `ExtractionRecord`, `ExtractionRelationship`, `ExtractionEdge`), create a migration against that context instead:
+
+```
+dotnet ef migrations add UpdateLatticeExample -c LatticeContext --verbose --project deeplynx.datalayer --startup-project deeplynx.api --output-dir Migrations/Lattice
+```
+
+Both contexts are migrated automatically on app startup via `MigrateAsync()`.
 
 See [CONTRIBUTING](./CONTRIBUTING.md) for more details.
 
@@ -218,3 +270,62 @@ git push
 ```
 
 Git tracks submodules as a commit hash, not a branch! When you push changes inside `deeplynx.insight`, Nexus will still point at the old commit until you stage and commit the new hash from the Nexus root.
+
+---
+
+### Running tests with Playwright
+
+## Using bash
+
+Tests are located in deeplynx.UI/tests and organized by page. When running tests, make sure you are in the deeplynx.UI directory
+
+#To run all tests
+npx playwright test
+
+#To run tests in UI mode (This allows to step through tests visually)
+npx playwright test --ui
+
+#To run tests in headed mode
+npx playwright test --headed
+
+#To run a specific file
+npx playwright test tests/organization.spec.ts
+
+#To run a specific test by name (-g with partial name will run all related tests)
+npx playwright test -g "user is automatically assigned an organization on startup"
+
+#To view the HTML report after the test
+npx playwright show-report
+
+#To stop running tests
+Ctrl+C
+
+## Using Playwright plug-in
+
+Go to extensions and search Playwright Test for VSCode. Install plug-in. Detailed instructions can be found in the extension's detail page.
+
+A beaker will appear in the left panel - this is Playwright's main testing area
+Additional settings can be configured under Playwright>Settings at the bottom
+
+#To run all tests
+
+- Go to Testing (beaker) click the play button by the Test Explorer on the top - cursor needs to be in the testing area to show the buttons, OR
+- Right click deeplynx.UI/tests folder in the file explorer and click Run Tests
+
+#To run tests in a specific folder
+
+- Locate the folder in the testing area and click the play button, OR
+- Right click the folder in the file explorer and click Run Tests
+
+#To run tests in a specific file
+
+- Locate the file in the testing area and click the play button, OR
+- Right click the file in the file explorer and click Run Tests - You can also click the first play button in the file
+
+#To run a specific test by name
+
+- Type test name in filter bar in the testing area and click the play button on desired test(s), OR
+- In the file explorer, locate the specific test and click the play button on the left
+
+#To stop a running test
+Click the stop button in the Test Explorer - cursor will need to be in the testing area

@@ -25,71 +25,52 @@ public class HistoricalRecordBusiness : IHistoricalRecordBusiness
     /// <summary>
     ///     Retrieves all Historical Records for a specific project and datasource
     /// </summary>
+    /// <param name="currentUserId">The ID of current user</param>
     /// <param name="projectId">The ID of the project whose records are to be retrieved</param>
     /// <param name="organizationId">The ID of the organization under which project exists</param>
     /// <param name="dataSourceId">(Optional) The ID of the datasource by which to filter records</param>
     /// <param name="pointInTime">(Optional) Find the most current records that existed before this point in time</param>
     /// <param name="hideArchived">(Optional) Flag indicating whether to hide archived records from the result.</param>
+    /// <param name="isSysAdmin">Optional param determining if the requesting user is a system admin</param>
+    /// <param name="isOrgAdmin">Optional param determining if the requesting user is an organization admin</param>
+    /// <param name="isProjectAdmin">Optional param determining if the requesting user is a project admin</param>
     /// <returns>An array of records</returns>
     public async Task<IEnumerable<HistoricalRecordResponseDto>> GetAllHistoricalRecords(
-        long currentUserId,
-        long projectId,
-        long organizationId,
-        long? dataSourceId = null,
-        DateTime? pointInTime = null,
-        bool hideArchived = true)
+        long currentUserId, long projectId, long organizationId, long? dataSourceId = null, DateTime? pointInTime = null,
+        bool hideArchived = true, bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false)
     {
         var recordQuery = _context.HistoricalRecords
             .Where(r => r.ProjectId == projectId && r.OrganizationId == organizationId);
 
         if (dataSourceId.HasValue) recordQuery = recordQuery.Where(r => r.DataSourceId == dataSourceId);
 
-        // specification for "current" should override any supplied pointInTime
         if (pointInTime.HasValue)
         {
-            // convert the point in time to timestamp without timezone
             var unspecifiedPointInTime = DateTime.SpecifyKind(pointInTime.Value, DateTimeKind.Unspecified);
-
-            // compare the timestamp to the most recent update
-            recordQuery = recordQuery
-                .Where(r => r.LastUpdatedAt <= unspecifiedPointInTime)
-                .OrderByDescending(r => r.LastUpdatedAt);
+            recordQuery = recordQuery.Where(r => r.LastUpdatedAt <= unspecifiedPointInTime);
         }
 
         var records = await recordQuery
             .GroupBy(e => e.RecordId)
             .Select(g => g.OrderByDescending(r => r.LastUpdatedAt).FirstOrDefault())
             .ToListAsync();
-        
-        // Get user's authorized labels
-        var userAuthorizedLabels =
-            await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
-                currentUserId, organizationId, projectId, "read record");
 
-        // need to check for archived at after DB retrieval since filtering archived results before querying could
+        // need to check for archived after DB retrieval since filtering before querying could
         // result in inaccurate "most recent" results if a record has been archived
-        if (hideArchived && records.Count > 0) records = records.Where(r => !r.IsArchived).ToList();
+        if (hideArchived && records.Count > 0)
+            records = records.Where(r => !r.IsArchived).ToList();
 
-        var liveRecords = await _context.Records
-            .Include(r => r.Labels)
-            .Where(r => r.ProjectId == projectId && r.OrganizationId == organizationId).ToListAsync();
-    
-        var authorizedHistoricalRecords = records.Where(r => 
+        var recordIds = records.Select(r => r.RecordId).ToList();
+        
+        // if user is not admin, filter out unauthorized labels
+        if (!isSysAdmin && !isOrgAdmin && !isProjectAdmin)
         {
-            // Find the live record that matches this historical record's originalId
-            var liveRecord = liveRecords.FirstOrDefault(lr => lr.Id == r.RecordId);
-    
-            // If no live record found, exclude this historical record
-            if (liveRecord == null) return false;
-    
-            // If the live record has no labels, include this historical record
-            if (liveRecord.Labels == null || !liveRecord.Labels.Any()) return true;
-    
-            // If the live record has labels, check if ALL labels are in the authorized list
-            return liveRecord.Labels.All(label => userAuthorizedLabels.Contains(label.Id));
-        }).ToList();
+            var authorizedIds = await _sensitivityLabelService
+                        .FilterAuthorizedRecordIds(currentUserId, organizationId, projectId, recordIds, _context);
+            records = records.Where(r => authorizedIds.Contains(r.RecordId)).ToList();
+        }
 
-        return authorizedHistoricalRecords
+        return records
             .Select(r => new HistoricalRecordResponseDto
             {
                 Id = r.RecordId,
@@ -109,6 +90,8 @@ public class HistoricalRecordBusiness : IHistoricalRecordBusiness
                 Tags = r.Tags,
                 Labels = r.Labels,
                 LastUpdatedBy = r.LastUpdatedBy,
+                FileType = r.FileType,
+                FileSize = r.FileSize,
                 IsArchived = r.IsArchived,
                 LastUpdatedAt = r.LastUpdatedAt
             });
@@ -117,6 +100,7 @@ public class HistoricalRecordBusiness : IHistoricalRecordBusiness
     /// <summary>
     ///     Show the historical updates of a specific record
     /// </summary>
+    /// <param name="currentUserId">The ID of current user</param>
     /// <param name="recordId">The ID of the record to list history for</param>
     /// <param name="organizationId">The ID of the organization under which project exists</param>
     /// <returns>An array of record instances for the given record</returns>
@@ -148,6 +132,8 @@ public class HistoricalRecordBusiness : IHistoricalRecordBusiness
                 ProjectName = r.ProjectName,
                 Tags = r.Tags,
                 LastUpdatedBy = r.LastUpdatedBy,
+                FileType = r.FileType,
+                FileSize = r.FileSize,
                 IsArchived = r.IsArchived,
                 LastUpdatedAt = r.LastUpdatedAt
             })
@@ -160,6 +146,7 @@ public class HistoricalRecordBusiness : IHistoricalRecordBusiness
     /// <summary>
     ///     Find a record at a given point in time
     /// </summary>
+    /// <param name="currentUserId">The ID of current user</param>
     /// <param name="recordId">The ID of the record to retrieve</param>
     /// <param name="organizationId">The ID of the organization under which project exists</param>
     /// <param name="pointInTime">(Optional) Find the most current record that existed before this point in time</param>
@@ -217,6 +204,8 @@ public class HistoricalRecordBusiness : IHistoricalRecordBusiness
             Tags = record.Tags,
             Labels = record.Labels,
             LastUpdatedBy = record.LastUpdatedBy,
+            FileType = record.FileType,
+            FileSize = record.FileSize,
             IsArchived = record.IsArchived,
             LastUpdatedAt = record.LastUpdatedAt
         };

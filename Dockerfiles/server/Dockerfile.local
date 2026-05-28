@@ -1,5 +1,5 @@
 # Stage 1: Build the C# backend
-FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+FROM mcr.microsoft.com/dotnet/sdk:10.0.202 AS build
 
 # Define build arguments
 ARG OKTA_CLIENT_ID
@@ -8,14 +8,12 @@ ARG REDIRECT_LINK
 ARG NEXTAUTH_URL
 ARG NEXT_PUBLIC_DISABLE_FRONTEND_AUTHENTICATION
 
-
 # Set environment variables
 ENV OKTA_CLIENT_ID=${OKTA_CLIENT_ID}
 ENV OKTA_ISSUER=${OKTA_ISSUER}
 ENV REDIRECT_LINK=${REDIRECT_LINK}
 ENV NEXTAUTH_URL=${NEXTAUTH_URL}
 ENV NEXT_PUBLIC_DISABLE_FRONTEND_AUTHENTICATION=${NEXT_PUBLIC_DISABLE_FRONTEND_AUTHENTICATION}
-
 
 # Configure INL certs and environment variables
 RUN wget -q -P /usr/local/share/ca-certificates/ http://certstore.inl.gov/pki/CAINLROOT_B64.crt
@@ -30,7 +28,6 @@ ENV SSL_CERT_DIR=/etc/ssl/certs/
 WORKDIR /usr/src/app
 
 # Copy the solution file and restore dependencies
-# COPY . .
 COPY deeplynx.sln ./deeplynx.sln
 COPY deeplynx.api ./deeplynx.api
 COPY deeplynx.business ./deeplynx.business
@@ -46,7 +43,7 @@ RUN dotnet restore deeplynx.sln
 RUN dotnet publish deeplynx.sln -c Release -o /app/publish /p:UseAppHost=false
 
 # Stage 2: Create the final .net runtime image 
-FROM mcr.microsoft.com/dotnet/nightly/sdk:10.0 AS final
+FROM mcr.microsoft.com/dotnet/aspnet:10.0.8 AS final
 
 # Set the working directory
 WORKDIR /usr/src/app
@@ -56,7 +53,6 @@ RUN apt-get update && apt-get install -y \
     postgresql-client \
     && apt-get clean
 
-
 # Copy the published backend code from the build stage
 COPY --from=build /app/publish .
 COPY deeplynx.api/moon.css .
@@ -64,14 +60,5 @@ COPY deeplynx.api/moon.css .
 # Copy the entrypoint script
 COPY ./Dockerfiles/server/entrypoint.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/entrypoint.sh
-
-# Configure INL certs and environment variables
-RUN wget -q -P /usr/local/share/ca-certificates/ http://certstore.inl.gov/pki/CAINLROOT_B64.crt
-RUN /usr/sbin/update-ca-certificates
-ENV NODE_EXTRA_CA_CERTS=/etc/ssl/certs/ca-certificates.crt
-ENV REQUESTS_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt
-ENV CURL_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt
-ENV SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
-ENV SSL_CERT_DIR=/etc/ssl/certs/
 
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
