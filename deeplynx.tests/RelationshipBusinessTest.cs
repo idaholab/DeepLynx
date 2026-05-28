@@ -1147,7 +1147,7 @@ public class RelationshipBusinessTests : IntegrationTestBase
 
         // Act + Assert
 
-        await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+        await Assert.ThrowsAsync<KeyNotFoundException>(async () =>
         {
             await _relationshipBusiness.CreateRelationship(
                 uid,
@@ -1157,6 +1157,150 @@ public class RelationshipBusinessTests : IntegrationTestBase
             );
         });
     }
+
+    [Fact]
+    public async Task UpdateRelationship_Fails_WhenDestinationClassBelongsToDifferentProject()
+    {
+        // Arrange
+        var projectA = new Project
+        {
+            Name = $"Project A {DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}",
+            OrganizationId = oid,
+            IsArchived = false
+        };
+
+        var projectB = new Project
+        {
+            Name = $"Project B {DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}",
+            OrganizationId = oid,
+            IsArchived = false
+        };
+
+        Context.Projects.AddRange(projectA, projectB);
+        await Context.SaveChangesAsync();
+
+        var projectAClass1 = new Class
+        {
+            Name = $"Project A Class 1 {DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}",
+            OrganizationId = oid,
+            ProjectId = projectA.Id,
+            IsArchived = false
+        };
+
+        var projectAClass2 = new Class
+        {
+            Name = $"Project A Class 2 {DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}",
+            OrganizationId = oid,
+            ProjectId = projectA.Id,
+            IsArchived = false
+        };
+
+        var projectBClass = new Class
+        {
+            Name = $"Project B Class {DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}",
+            OrganizationId = oid,
+            ProjectId = projectB.Id,
+            IsArchived = false
+        };
+
+        Context.Classes.AddRange(projectAClass1, projectAClass2, projectBClass);
+        await Context.SaveChangesAsync();
+
+        var relationship = new Relationship
+        {
+            Name = $"Valid Project A Relationship {DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}",
+            OrganizationId = oid,
+            ProjectId = projectA.Id,
+            OriginId = projectAClass1.Id,
+            DestinationId = projectAClass2.Id,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            IsArchived = false
+        };
+
+        Context.Relationships.Add(relationship);
+        await Context.SaveChangesAsync();
+
+        var dto = new UpdateRelationshipRequestDto
+        {
+            DestinationId = projectBClass.Id
+        };
+
+        // Act + Assert
+        await Assert.ThrowsAsync<KeyNotFoundException>(async () =>
+        {
+            await _relationshipBusiness.UpdateRelationship(
+                uid,
+                oid,
+                projectA.Id,
+                relationship.Id,
+                dto
+            );
+        });
+    }
+
+   [Fact]
+    public async Task BulkCreateRelationships_Fails_WhenDestinationClassBelongsToDifferentProject()
+    {
+        // Arrange
+        var projectA = new Project
+        {
+            Name = $"Project A {DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}",
+            OrganizationId = oid,
+            IsArchived = false
+        };
+
+        var projectB = new Project
+        {
+            Name = $"Project B {DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}",
+            OrganizationId = oid,
+            IsArchived = false
+        };
+
+        Context.Projects.AddRange(projectA, projectB);
+        await Context.SaveChangesAsync();
+
+        var projectAClass = new Class
+        {
+            Name = $"Project A Class {DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}",
+            OrganizationId = oid,
+            ProjectId = projectA.Id,
+            IsArchived = false
+        };
+
+        var projectBClass = new Class
+        {
+            Name = $"Project B Class {DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}",
+            OrganizationId = oid,
+            ProjectId = projectB.Id,
+            IsArchived = false
+        };
+
+        Context.Classes.AddRange(projectAClass, projectBClass);
+        await Context.SaveChangesAsync();
+
+        var relationships = new List<CreateRelationshipRequestDto>
+        {
+            new()
+            {
+                Name = $"Invalid Bulk Cross Project Relationship {DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}",
+                Description = "Should fail",
+                OriginId = projectAClass.Id,
+                DestinationId = projectBClass.Id
+            }
+        };
+
+        // Act + Assert
+        await Assert.ThrowsAsync<KeyNotFoundException>(async () =>
+        {
+            await _relationshipBusiness.BulkCreateRelationships(
+                uid,
+                oid,
+                projectA.Id,
+                relationships
+            );
+        });
+    } 
     
     #endregion
 }

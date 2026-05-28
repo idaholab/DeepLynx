@@ -151,13 +151,14 @@ public class RelationshipBusiness : IRelationshipBusiness
         CreateRelationshipRequestDto dto)
     {
         ValidationHelper.ValidateModel(dto);
-        Class? originClass = null;
-        Class? destinationClass = null;
 
         if (dto.OriginId != null)
         {
-            originClass = await _context.Classes
-                .FirstOrDefaultAsync(c => c.Id == dto.OriginId && !c.IsArchived);
+            var originClass = await _context.Classes
+                .FirstOrDefaultAsync(c =>
+                    c.Id == dto.OriginId &&
+                    c.ProjectId == projectId &&
+                    !c.IsArchived);
 
             if (originClass == null)
                 throw new KeyNotFoundException(
@@ -166,33 +167,15 @@ public class RelationshipBusiness : IRelationshipBusiness
 
         if (dto.DestinationId != null)
         {
-            destinationClass = await _context.Classes
-                .FirstOrDefaultAsync(c => c.Id == dto.DestinationId && !c.IsArchived);
+            var destinationClass = await _context.Classes
+                .FirstOrDefaultAsync(c =>
+                    c.Id == dto.DestinationId &&
+                    c.ProjectId == projectId &&
+                    !c.IsArchived);
 
             if (destinationClass == null)
                 throw new KeyNotFoundException(
                     $"Destination class with ID {dto.DestinationId} not found.");
-        }
-
-        if (originClass != null && destinationClass != null)
-        {
-            if (originClass.ProjectId != destinationClass.ProjectId)
-            {
-                throw new InvalidOperationException(
-                    "Origin and destination classes must belong to the same project.");
-            }
-
-            if (originClass.ProjectId != projectId)
-            {
-                throw new InvalidOperationException(
-                    "Origin class does not belong to the specified project.");
-            }
-
-            if (destinationClass.ProjectId != projectId)
-            {
-                throw new InvalidOperationException(
-                    "Destination class does not belong to the specified project.");
-            }
         }
 
         var relationship = new Relationship
@@ -271,6 +254,38 @@ public class RelationshipBusiness : IRelationshipBusiness
         long? projectId,
         List<CreateRelationshipRequestDto> relationships)
     {
+
+        ArgumentNullException.ThrowIfNull(relationships);
+
+        if (projectId.HasValue)
+        {
+            var classIds = relationships
+                .SelectMany(r => new long?[] { r.OriginId, r.DestinationId })
+                .Where(id => id.HasValue)
+                .Select(id => id!.Value)
+                .Distinct()
+                .ToList();
+
+            var validClassIds = await _context.Classes
+                .Where(c =>
+                    classIds.Contains(c.Id) &&
+                    c.ProjectId == projectId &&
+                    !c.IsArchived)
+                .Select(c => c.Id)
+                .ToListAsync();
+
+            var validClassIdSet = validClassIds.ToHashSet();
+
+            foreach (var dto in relationships)
+            {
+                if (dto.OriginId.HasValue && !validClassIdSet.Contains(dto.OriginId.Value))
+                    throw new KeyNotFoundException($"Origin class with ID {dto.OriginId} not found.");
+
+                if (dto.DestinationId.HasValue && !validClassIdSet.Contains(dto.DestinationId.Value))
+                    throw new KeyNotFoundException($"Destination class with ID {dto.DestinationId} not found.");
+            }
+        }
+
         // Bulk insert into relationships; if there is a name collision, update the description and uuid if present
         var sql = projectId.HasValue
             ? @"
@@ -364,16 +379,22 @@ public class RelationshipBusiness : IRelationshipBusiness
 
         if (dto.OriginId.HasValue)
         {
-            var originClass =
-                await _context.Classes.FirstOrDefaultAsync(c =>
-                    c.Id == dto.OriginId && !c.IsArchived);
-            if (originClass == null) throw new KeyNotFoundException($"Origin class with ID {dto.OriginId} not found.");
+            var originClass = await _context.Classes.FirstOrDefaultAsync(c =>
+                c.Id == dto.OriginId &&
+                c.ProjectId == relationship.ProjectId &&
+                !c.IsArchived);
+
+            if (originClass == null)
+                throw new KeyNotFoundException($"Origin class with ID {dto.OriginId} not found.");
         }
 
         if (dto.DestinationId.HasValue)
         {
             var destinationClass = await _context.Classes.FirstOrDefaultAsync(c =>
-                c.Id == dto.DestinationId && !c.IsArchived);
+                c.Id == dto.DestinationId &&
+                c.ProjectId == relationship.ProjectId &&
+                !c.IsArchived);
+
             if (destinationClass == null)
                 throw new KeyNotFoundException($"Destination class with ID {dto.DestinationId} not found.");
         }
