@@ -127,7 +127,7 @@ public class FileBusiness
         // Initialize properties
         var properties = metadata?.Properties ?? new JsonObject();
 
-        recordClass = await ResolveTabularRecordClass(
+        recordClass = await ExtractTabularRecordMetadata(
             currentUserId,
             organizationId,
             projectId,
@@ -421,7 +421,7 @@ public class FileBusiness
             ["originalUploadId"] = request.UploadId
         };
 
-        fileClass = await ResolveTabularRecordClass(
+        fileClass = await ExtractTabularRecordMetadata(
             currentUserId,
             organizationId,
             projectId,
@@ -581,7 +581,7 @@ public class FileBusiness
         return defaultObjectStorage.Id;
     }
 
-    private async Task<ClassResponseDto> ResolveTabularRecordClass(
+    private async Task<ClassResponseDto> ExtractTabularRecordMetadata(
         long currentUserId,
         long organizationId,
         long projectId,
