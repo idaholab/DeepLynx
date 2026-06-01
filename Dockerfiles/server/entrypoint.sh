@@ -23,4 +23,4 @@ echo "Ensuring pgvector extension is installed..."
 psql -h "$POSTGRES_DB_HOST" -U "$POSTGRES_USER" -d deeplynx -c "CREATE EXTENSION IF NOT EXISTS vector;" || true
 
 # Execute the dotnet application
-dotnet deeplynx.api.dll --urls http://*:5000
+dotnet deeplynx.api.dll --urls "http://*:5000;http://*:50051"

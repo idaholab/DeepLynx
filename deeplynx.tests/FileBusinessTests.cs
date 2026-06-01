@@ -1604,6 +1604,99 @@ public class FileBusinessTests : IntegrationTestBase
     }
 
     [Fact]
+    public async Task CompleteUpload_CsvFile_AssignsTimeseriesClassAndExtractsColumns()
+    {
+        // Arrange
+        var csvContent = "timestamp,temperature,humidity\n2024-01-01,22.5,60.1\n2024-01-02,23.0,58.3";
+        var fileName = "sensor-data.csv";
+        var session = await _fileBusiness.StartUpload(
+            oid,
+            pid,
+            did,
+            osid,
+            new FileUploadInitRequestDto { FileName = fileName, FileSize = Encoding.UTF8.GetByteCount(csvContent) }
+        );
+
+        await _fileBusiness.UploadChunk(oid, pid, did, osid, CreateFormFile(csvContent[..30]), session.UploadId, 0);
+        await _fileBusiness.UploadChunk(oid, pid, did, osid, CreateFormFile(csvContent[30..]), session.UploadId, 1);
+
+        var completeRequest = new FileUploadCompleteRequestDto
+        {
+            UploadId = session.UploadId,
+            FileName = fileName,
+            TotalChunks = 2
+        };
+
+        // Act
+        var result = await _fileBusiness.CompleteUpload(uid, oid, pid, did, osid, completeRequest);
+
+        // Assert
+        Assert.NotNull(result);
+        var resultClass = Context.Classes.First(c => c.Id == result.ClassId);
+        Assert.Equal("Timeseries", resultClass.Name);
+
+        Assert.NotNull(result.Properties);
+        var properties = JsonNode.Parse(result.Properties)?.AsObject();
+        Assert.NotNull(properties);
+        Assert.True(properties!["uploadedViaChunking"]?.GetValue<bool>());
+        Assert.Equal(session.UploadId, properties["originalUploadId"]?.GetValue<string>());
+
+        var columnsArray = properties["columns"]?.AsArray();
+        Assert.NotNull(columnsArray);
+        Assert.NotEmpty(columnsArray);
+        Assert.Contains(columnsArray, c => c!.AsObject()["name"]?.ToString() == "timestamp");
+        Assert.Contains(columnsArray, c => c!.AsObject()["name"]?.ToString() == "temperature");
+        Assert.Contains(columnsArray, c => c!.AsObject()["name"]?.ToString() == "humidity");
+    }
+
+    [Fact]
+    public async Task CompleteUpload_CsvFile_ColumnsAreMergedWithExistingMetadataProperties()
+    {
+        // Arrange
+        var csvContent = "voltage,current\n5.0,1.2\n3.3,0.8";
+        var fileName = "measurements.csv";
+        var session = await _fileBusiness.StartUpload(
+            oid,
+            pid,
+            did,
+            osid,
+            new FileUploadInitRequestDto { FileName = fileName, FileSize = Encoding.UTF8.GetByteCount(csvContent) }
+        );
+
+        await _fileBusiness.UploadChunk(oid, pid, did, osid, CreateFormFile(csvContent[..10]), session.UploadId, 0);
+        await _fileBusiness.UploadChunk(oid, pid, did, osid, CreateFormFile(csvContent[10..]), session.UploadId, 1);
+
+        var metadata = new CreateRecordFileUploadRequestDto
+        {
+            Name = "Measurements",
+            Description = "Electrical measurements",
+            Properties = new JsonObject { ["source"] = "lab-bench-1" },
+            OriginalId = "measurements-001"
+        };
+
+        var completeRequest = new FileUploadCompleteRequestDto
+        {
+            UploadId = session.UploadId,
+            FileName = fileName,
+            TotalChunks = 2
+        };
+
+        // Act
+        var result = await _fileBusiness.CompleteUpload(uid, oid, pid, did, osid, completeRequest, metadata: metadata);
+
+        // Assert
+        Assert.NotNull(result);
+        var resultClass = Context.Classes.First(c => c.Id == result.ClassId);
+        Assert.Equal("Timeseries", resultClass.Name);
+
+        Assert.NotNull(result.Properties);
+        var properties = JsonNode.Parse(result.Properties)?.AsObject();
+        Assert.NotNull(properties);
+        Assert.Equal("lab-bench-1", properties!["source"]!.GetValue<string>());
+        Assert.NotNull(properties["columns"]);
+    }
+
+    [Fact]
     public async Task CompleteUpload_MissingChunk_ThrowsException()
     {
         // Arrange

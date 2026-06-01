@@ -1,7 +1,7 @@
 // src/app/(home)/organization_management/groups/InlineGroupsTable.tsx
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { PlusIcon, TrashIcon } from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
 
@@ -116,6 +116,53 @@ const InlineGroupsTable: React.FC<InlineGroupsTableProps> = ({
   /*                      Fetching & Syncing Group Members                    */
   /* ------------------------------------------------------------------------ */
 
+  useEffect(() => {
+    const loadGroupData = async () => {
+      const orgId = organization?.organizationId ?? organizationId;
+      
+      if (!orgId || initialGroups.length === 0) return;
+      
+      const preloadedGroupMembers = new Map<
+          string | number,
+          UserResponseDto[]
+      >();
+      
+      // Parallel fetch members from all groups
+      const groupsWithCounts = await Promise.all(
+          initialGroups.map(async (group) => {
+            try {
+              // Check current group's member
+              const members = await getGroupMembers(
+                  Number(orgId),
+                  Number(group.id)
+              );
+              
+              preloadedGroupMembers.set(group.id, members);
+              
+              return {
+                ...group,
+                memberCount: members.length,
+              };
+            } catch (err) {
+              console.error(
+                  `Failed to load members for group ${group.id}`,
+                  err
+              );
+              
+              return {
+                ...group,
+                memberCount: group.memberCount ?? 0,
+              };
+            }
+          })
+      );
+      
+      setGroups(groupsWithCounts);
+      setGroupMembers(preloadedGroupMembers);
+    };
+    loadGroupData();
+  }, [initialGroups, organization?.organizationId, organizationId]);
+  
   const fetchGroupMembers = async (groupId: string | number) => {
     setLoadingMembers((prev) => new Set(prev).add(groupId));
 
@@ -155,7 +202,10 @@ const InlineGroupsTable: React.FC<InlineGroupsTableProps> = ({
     } else {
       setExpandedGroup(groupId);
       setEditingGroup(null);
-      await fetchGroupMembers(groupId);
+      
+      if (!groupMembers.has(groupId)) {
+        await fetchGroupMembers(groupId);
+      }
     }
   };
 

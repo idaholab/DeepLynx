@@ -83,6 +83,17 @@ const ProjectUsersTable = ({ members, roles, project }: Props) => {
   const [groupMembersCache, setGroupMembersCache] = useState<
     Map<number, UserResponseDto[]>
   >(new Map());
+  const [viewGroupMembersModal, setViewGroupMembersModal] = useState<{
+    isOpen: boolean;
+    groupName: string;
+    members: UserResponseDto[];
+    loading: boolean;
+  }>({
+    isOpen: false,
+    groupName: "",
+    members: [],
+    loading: false,
+  });
 
   /* ------------------------------------------------------------------------ */
   /*                        Confirm Remove / Future Use                       */
@@ -252,6 +263,44 @@ const ProjectUsersTable = ({ members, roles, project }: Props) => {
       });
 
     return []; // Return empty while loading
+  };
+  
+  const handleViewGroupMembers = async (row: ProjectMemberTableRow) => {
+    if (!organizationId) {
+      toast.error(t.translations.NO_ORG_SELECTED);
+      return;
+    }
+    
+    setViewGroupMembersModal({
+      isOpen: true,
+      groupName: row.name,
+      members: [],
+      loading: true,
+    });
+    
+    try {
+      // Use members from cache if it exists, if not fetch API
+      const members = groupMembersCache.has(row.memberId)
+        ? groupMembersCache.get(row.memberId)!
+        : await getGroupMembers(organizationId, row.memberId);
+      
+      setGroupMembersCache((prev) => new Map(prev).set(row.memberId, members));
+      
+      setViewGroupMembersModal({
+        isOpen: true,
+        groupName: row.name,
+        members,
+        loading: false,
+      });
+    } catch (error) {
+      console.error(`Failed to load members for group ${row.memberId}:`, error);
+      toast.error(t.translations.UNABLE_TO_LOAD_USERS);
+      
+      setViewGroupMembersModal((prev) => ({
+        ...prev,
+        loading: false,
+      }));
+    }
   };
 
   const handleAddGroup = async () => {
@@ -454,6 +503,7 @@ const ProjectUsersTable = ({ members, roles, project }: Props) => {
             tableData={tableData}
             loading={loading}
             onEditRole={handleOpenEditRoleModal}
+            onViewGroupMembers={handleViewGroupMembers}
             onOpenRemoveModal={({ memberId, memberName, memberType }) =>
               setConfirmModal({
                 isOpen: true,
@@ -531,6 +581,52 @@ const ProjectUsersTable = ({ members, roles, project }: Props) => {
             }}
             onSave={handleSaveMemberRole}
           />
+
+          {/* View Group Members Modal*/}
+          {viewGroupMembersModal.isOpen && (
+              <dialog className="modal modal-open">
+                <div className="modal-box">
+                  <h3 className="font-bold text-lg">
+                    Users in {viewGroupMembersModal.groupName}
+                  </h3>
+
+                  {viewGroupMembersModal.loading ? (
+                      <div className="flex justify-center py-8">
+                        <span className="loading loading-spinner loading-lg" />
+                      </div>
+                  ) : viewGroupMembersModal.members.length === 0 ? (
+                      <p className="py-4 text-base-content/70">
+                        No users in this group.
+                      </p>
+                  ) : (
+                      <div className="py-4 space-y-2 max-h-80 overflow-y-auto">
+                        {viewGroupMembersModal.members.map((user) => (
+                            <div key={user.id} className="p-3 rounded-lg bg-base-200">
+                              <p className="font-semibold">{user.name || user.email}</p>
+                              <p className="text-sm text-base-content/70">{user.email}</p>
+                            </div>
+                        ))}
+                      </div>
+                  )}
+                  
+                  <div className="modal-action">
+                    <button
+                      className="btn"
+                      onClick={() =>
+                        setViewGroupMembersModal({
+                          isOpen: false,
+                          groupName: "",
+                          members: [],
+                          loading: false,
+                        })
+                      }
+                    >
+                      Close
+                    </button>
+                  </div>
+                </div>
+              </dialog>
+          )}
         </div>
       </div>
     </div>

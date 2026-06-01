@@ -399,6 +399,7 @@ spec:
               memory: "2Gi"
           ports:
             - containerPort: 5000
+            - containerPort: 50051
           volumeMounts:
             - name: duckdb-storage
               mountPath: /data/duckdb
@@ -538,7 +539,6 @@ spec:
             timeoutSeconds: 5
             failureThreshold: 3
 
-
 # insight-storage: scratch volume for the Insight processing pipeline
 ---
 apiVersion: v1
@@ -553,7 +553,6 @@ spec:
     requests:
       storage: 25Gi
   storageClassName: ${AZURE_FILE_SHARE_STORAGE_CLASS}
-
 
 # insight-fastapi
 ---
@@ -579,8 +578,6 @@ spec:
         - name: insight-fastapi
           image: ${CI_REGISTRY}/${CI_REGISTRY_PATH}:insight-fastapi-${GITHUB_RUN_NUMBER}
           imagePullPolicy: Always
-          command:
-            ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "5009"]
           ports:
             - containerPort: 5009
           env:
@@ -693,7 +690,6 @@ spec:
         - name: insight-rabbitmq-runner
           image: ${CI_REGISTRY}/${CI_REGISTRY_PATH}:insight-rabbitmq-runner-${GITHUB_RUN_NUMBER}
           imagePullPolicy: Always
-          command: ["python", "-m", "runner"]
           env:
             - name: LITELLM_LOCAL_MODEL_COST_MAP
               value: "True"
@@ -822,6 +818,9 @@ spec:
     - name: http
       port: 80
       targetPort: 5000
+    - name: grpc
+      port: 50051
+      targetPort: 50051
   selector:
     app: deeplynxbackend
 

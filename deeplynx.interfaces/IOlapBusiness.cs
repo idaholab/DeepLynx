@@ -8,6 +8,7 @@ namespace deeplynx.interfaces;
 public interface IOlapBusiness
 {
     Task AppendTabularBlob(
+        long currentUserId,
         long organizationId,
         long projectId,
         long recordId,
