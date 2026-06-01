@@ -55,7 +55,7 @@ function RelatedRecordsCard<T extends object>({
   return (
     <div className="card bg-base-100 shadow-md mt-4 p-2">
       <div className="flex justify-between px-4">
-        <h2 className="text-xl font-bold md-4 text-base-content">
+        <h2 className="text-xl font-bold md-4 text-base-content break-all">
           {cardTitle}
         </h2>
         {onAddRelationship && (
