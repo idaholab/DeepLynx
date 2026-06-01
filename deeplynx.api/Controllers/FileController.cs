@@ -348,4 +348,168 @@ public class FileController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
+
+    [HttpPost("upload", Name = "api_create_file_upload")]
+    [Auth("write", "file")]
+    public async Task<IActionResult> CreateUpload(
+        long organizationId,
+        long projectId,
+        [FromQuery] long? dataSourceId,
+        [FromQuery] long? objectStorageId)
+    {
+        try
+        {
+            if (!Request.Headers.TryGetValue("Tus-Resumable", out var tusResumable) || tusResumable != "1.0.0")
+            {
+                Response.Headers["Tus-Resumable"] = "1.0.0";
+                return StatusCode(412);
+            }
+
+            if (!Request.Headers.TryGetValue("Upload-Length", out var uploadLengthHeader) ||
+                !long.TryParse(uploadLengthHeader, out var uploadLength))
+                return BadRequest("Missing or invalid Upload-Length header");
+
+            if (!Request.Headers.TryGetValue("Upload-Metadata", out var uploadMetadata))
+                return BadRequest("Missing Upload-Metadata header");
+
+            var fileName = ParseMetadataValue(uploadMetadata, "filename");
+            if (string.IsNullOrEmpty(fileName))
+                return BadRequest("Missing filename in Upload-Metadata header");
+
+            var request = new FileUploadInitRequestDto
+            {
+                FileName = fileName,
+                FileSize = uploadLength
+            };
+
+            var uploadSession = await _fileBusiness.CreateUpload(
+                organizationId, projectId, dataSourceId, objectStorageId, request);
+
+            Response.Headers["Tus-Resumable"] = "1.0.0";
+            Response.Headers["Location"] = $"/organizations/{organizationId}/projects/{projectId}/files/upload/{uploadSession.UploadId}";
+
+            return StatusCode(201);
+        }
+        catch (Exception exc)
+        {
+            var message = $"An error occurred while creating upload: {exc}";
+            _logger.LogError(message);
+            return StatusCode(StatusCodes.Status500InternalServerError, message);
+        }
+    }
+
+    [HttpHead("upload/{uploadId}", Name = "api_get_offset_file_upload")]
+    [Auth("write", "file")]
+    public async Task<IActionResult> GetUploadOffset(
+        long organizationId,
+        long projectId,
+        string uploadId,
+        [FromQuery] long? dataSourceId,
+        [FromQuery] long? objectStorageId)
+    {
+        try
+        {
+            if (!Request.Headers.TryGetValue("Tus-Resumable", out var tusResumable) || tusResumable != "1.0.0")
+            {
+                Response.Headers["Tus-Resumable"] = "1.0.0";
+                return StatusCode(412);
+            }
+
+            var (offset, uploadLength) = await _fileBusiness.GetUploadOffset(organizationId, projectId, dataSourceId, objectStorageId, uploadId);
+
+            Response.Headers["Tus-Resumable"] = "1.0.0";
+            Response.Headers["Upload-Offset"] = offset.ToString();
+            Response.Headers["Upload-Length"] = uploadLength.ToString();
+            Response.Headers["Cache-Control"] = "no-store";
+            return NoContent();
+        }
+        catch (Exception exc)
+        {
+            var message = $"An error occurred while getting offset for upload {uploadId}: {exc}";
+            _logger.LogError(message);
+            return StatusCode(StatusCodes.Status500InternalServerError, message);
+        }
+    }
+
+    [HttpPatch("upload/{uploadId}", Name = "api_patch_file_upload")]
+    [Auth("write", "file")]
+    public async Task<IActionResult> UploadPart(
+        long organizationId,
+        long projectId,
+        string uploadId,
+        [FromQuery] long? dataSourceId,
+        [FromQuery] long? objectStorageId)
+    {
+        try
+        {
+            if (!Request.Headers.TryGetValue("Tus-Resumable", out var tusResumable) || tusResumable != "1.0.0")
+            {
+                Response.Headers["Tus-Resumable"] = "1.0.0";
+                return StatusCode(412);
+            }
+
+            if (!Request.Headers.TryGetValue("Upload-Offset", out var offsetHeader) ||
+                !long.TryParse(offsetHeader, out var uploadOffset))
+                return BadRequest("Missing or invalid Upload-Offset header");
+
+            if (!Request.Headers.TryGetValue("Content-Type", out var contentType) ||
+                contentType != "application/offset+octet-stream")
+                return StatusCode(415);
+
+            var newOffset = await _fileBusiness.UploadPart(
+                organizationId, projectId, dataSourceId, objectStorageId, uploadId, uploadOffset, Request.Body);
+
+            Response.Headers["Tus-Resumable"] = "1.0.0";
+            Response.Headers["Upload-Offset"] = newOffset.ToString();
+            return NoContent();
+        }
+        catch (Exception exc)
+        {
+            var message = $"An error occurred while uploading chunk for upload {uploadId}: {exc}";
+            _logger.LogError(message);
+            return StatusCode(StatusCodes.Status500InternalServerError, message);
+        }
+    }
+
+    [HttpDelete("upload/{uploadId}", Name = "api_cancel_tus_file_upload")]
+    [Auth("write", "file")]
+    public async Task<IActionResult> CancelTusUpload(
+        long organizationId,
+        long projectId,
+        string uploadId,
+        [FromQuery] long? dataSourceId,
+        [FromQuery] long? objectStorageId)
+    {
+        try
+        {
+            if (!Request.Headers.TryGetValue("Tus-Resumable", out var tusResumable) || tusResumable != "1.0.0")
+            {
+                Response.Headers["Tus-Resumable"] = "1.0.0";
+                return StatusCode(412);
+            }
+
+            var currentUserId = UserContextStorage.UserId;
+            await _fileBusiness.CancelUpload(currentUserId, organizationId, projectId, dataSourceId, objectStorageId, uploadId);
+
+            Response.Headers["Tus-Resumable"] = "1.0.0";
+            return NoContent();
+        }
+        catch (Exception exc)
+        {
+            var message = $"An error occurred while cancelling upload {uploadId}: {exc}";
+            _logger.LogError(message);
+            return StatusCode(StatusCodes.Status500InternalServerError, message);
+        }
+    }
+
+    private string ParseMetadataValue(string uploadMetadata, string key)
+    {
+        foreach (var pair in uploadMetadata.Split(','))
+        {
+            var parts = pair.Trim().Split(' ');
+            if (parts.Length == 2 && parts[0] == key)
+                return System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(parts[1]));
+        }
+        return null;
+    }
 }

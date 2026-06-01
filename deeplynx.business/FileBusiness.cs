@@ -263,7 +263,7 @@ public class FileBusiness
         var record = await _recordBusiness.GetRecord(currentUserId, organizationId, projectId, recordId, true);
 
         if (record.ObjectStorageId == null) throw new KeyNotFoundException("Record needs an object storage id");
-        
+
         var objectStorage = await _objectStorageBusiness.GetDecryptedObjectStorage(record.ObjectStorageId.Value);
         var fileBusiness = _factory.CreateFileBusiness(objectStorage.Type);
 
@@ -284,7 +284,7 @@ public class FileBusiness
         var record = await _recordBusiness.GetRecord(currentUserId, organizationId, projectId, recordId, true);
 
         if (record.ObjectStorageId == null) throw new KeyNotFoundException("Record needs an object storage id");
-        
+
         var objectStorage = await _objectStorageBusiness.GetDecryptedObjectStorage(record.ObjectStorageId.Value);
         var fileBusiness = _factory.CreateFileBusiness(objectStorage.Type);
 
@@ -307,7 +307,7 @@ public class FileBusiness
         if (record.ObjectStorageId == null) throw new KeyNotFoundException("Record needs an object storage id");
 
         var objectStorage = await _objectStorageBusiness.GetDecryptedObjectStorage(record.ObjectStorageId.Value);
-        
+
         var fileBusiness = _factory.CreateFileBusiness(objectStorage.Type);
 
         await fileBusiness.DeleteFile(record, objectStorage.Config);
@@ -377,12 +377,12 @@ public class FileBusiness
         if (chunk == null) throw new ArgumentException("chunk cannot be null");
         chunk = new SanitizedFormFile(chunk);
 
-        
+
         var realObjectStorageId = await ResolveObjectStorageId(organizationId, projectId, objectStorageId);
         var objectStorage = await _objectStorageBusiness.GetDecryptedObjectStorage(realObjectStorageId);
         var fileBusiness = _factory.CreateFileBusiness(objectStorage.Type);
 
-        await fileBusiness.UploadChunk(organizationId, projectId, realDataSourceId, chunkNumber, uploadId, 
+        await fileBusiness.UploadChunk(organizationId, projectId, realDataSourceId, chunkNumber, uploadId,
             objectStorage.Config, chunk);
 
         return "success";
@@ -425,7 +425,7 @@ public class FileBusiness
         var fileBusiness = _factory.CreateFileBusiness(objectStorage.Type);
         var guid = Guid.NewGuid();
 
-        var uri = await fileBusiness.CompleteUpload(organizationId, projectId, realDataSourceId, 
+        var uri = await fileBusiness.CompleteUpload(organizationId, projectId, realDataSourceId,
             objectStorage.Config, request, guid);
 
         var fileClass = await _classBusiness.GetOrCreateClass(currentUserId, organizationId, projectId, "File");
@@ -498,7 +498,7 @@ public class FileBusiness
     /// <param name="projectId">ID of the project in which to backfill file sizes</param>
     /// <exception cref="InvalidOperationException">Returned if org ID or project ID not supplied</exception>
     public async Task BackfillFileSizes(
-        long? organizationId, 
+        long? organizationId,
         long? projectId)
     {
         if (organizationId == null && projectId == null)
@@ -507,25 +507,25 @@ public class FileBusiness
         // only backfill for records that have a uri and an object storage id
         var toBackfill = _context.Records
             .Where(r => r.Uri != null && r.FileSize == null && r.ObjectStorageId != null);
-        
+
         if (organizationId.HasValue)
             toBackfill = toBackfill.Where(r => r.OrganizationId == organizationId.Value);
         if (projectId.HasValue)
             toBackfill = toBackfill.Where(r => r.ProjectId == projectId.Value);
-        
+
         var backfillRecords = await toBackfill.ToListAsync();
-        
+
         // group by storage to avoid per-record storage lookup
         var recordsByStorage = backfillRecords
             .GroupBy(r => r.ObjectStorageId!.Value)
             .ToList();
-        
+
         foreach (var storageGroup in recordsByStorage)
         {
             var objectStorageId = storageGroup.Key;
             var objectStorage = await _objectStorageBusiness.GetDecryptedObjectStorage(objectStorageId);
             var fileBusiness = _factory.CreateFileBusiness(objectStorage.Type);
-            
+
             // for azure, try batch operation first
             if (objectStorage.Type == "azure" && fileBusiness is FileAzureBusiness azureBusiness)
             {
@@ -548,9 +548,79 @@ public class FileBusiness
                 }
             }
         }
-        
+
         // save all changes at once to avoid multiple DB trips
         await _context.SaveChangesAsync();
+    }
+
+    public async Task<TusFileUploadSessionResponseDto> CreateUpload(
+        long organizationId,
+        long projectId,
+        long? dataSourceId,
+        long? objectStorageId,
+        FileUploadInitRequestDto request)
+    {
+        var realDataSourceId = await ResolveDataSourceId(organizationId, projectId, dataSourceId);
+        var realObjectStorageId = await ResolveObjectStorageId(organizationId, projectId, objectStorageId);
+        var objectStorage = await _objectStorageBusiness.GetDecryptedObjectStorage(realObjectStorageId);
+
+        request.FileName = SanitizedFormFile.SanitizeFileName(request.FileName);
+
+        var fileBusiness = _factory.CreateFileBusiness(objectStorage.Type);
+
+        var uploadId = await fileBusiness.CreateUpload(organizationId, projectId, realDataSourceId, objectStorage.Config, request.FileSize);
+
+        return new TusFileUploadSessionResponseDto
+        {
+            UploadId = uploadId.ToString()
+        };
+    }
+
+    public async Task<(long, long)> GetUploadOffset(
+        long organizationId,
+        long projectId,
+        long? dataSourceId,
+        long? objectStorageId,
+        string uploadId)
+    {
+        var realDataSourceId = await ResolveDataSourceId(organizationId, projectId, dataSourceId);
+
+        var realObjectStorageId = await ResolveObjectStorageId(organizationId, projectId, objectStorageId);
+        var objectStorage = await _objectStorageBusiness.GetDecryptedObjectStorage(realObjectStorageId);
+        var fileBusiness = _factory.CreateFileBusiness(objectStorage.Type);
+        var uploadOffset = await fileBusiness.GetUploadOffset(organizationId, projectId, realDataSourceId, uploadId,
+        objectStorage.Config);
+        var uploadLength = await fileBusiness.GetUploadLength(organizationId, projectId, realDataSourceId, uploadId,
+        objectStorage.Config);
+
+        return (uploadOffset, uploadLength);
+    }
+
+    public async Task<long> UploadPart(
+    long organizationId,
+    long projectId,
+    long? dataSourceId,
+    long? objectStorageId,
+    string uploadId,
+    long uploadOffset,
+    System.IO.Stream uploadBody)
+    {
+        var realDataSourceId = await ResolveDataSourceId(organizationId, projectId, dataSourceId);
+
+        if (uploadBody == null) throw new ArgumentException("uploadBody cannot be null");
+
+        var realObjectStorageId = await ResolveObjectStorageId(organizationId, projectId, objectStorageId);
+        var objectStorage = await _objectStorageBusiness.GetDecryptedObjectStorage(realObjectStorageId);
+        var fileBusiness = _factory.CreateFileBusiness(objectStorage.Type);
+
+        var newOffset = await fileBusiness.UploadPart(organizationId, projectId, realDataSourceId, uploadId, uploadOffset,
+            objectStorage.Config, uploadBody);
+        var uploadLength = await fileBusiness.GetUploadLength(organizationId, projectId, realDataSourceId, uploadId, objectStorage.Config);
+
+        if (newOffset > uploadLength)
+            throw new InvalidOperationException($"Upload offset {newOffset} exceeds declared Upload-Length {uploadLength}");
+
+        return newOffset;
     }
 
     // -------------------------------------------------------------------------
@@ -569,7 +639,7 @@ public class FileBusiness
             ?? throw new KeyNotFoundException("Default data source not found");
         return defaultDataSource.Id;
     }
-    
+
     private async Task<long> ResolveObjectStorageId(long organizationId, long projectId, long? objectStorageId)
     {
         if (objectStorageId.HasValue)
