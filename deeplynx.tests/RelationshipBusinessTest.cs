@@ -508,7 +508,14 @@ public class RelationshipBusinessTests : IntegrationTestBase
     public async Task GetAllRelationships_ReturnsOnlyForProject()
     {
         // Arrange
-        var p2 = new Project { Name = "ExtraProj", OrganizationId = oid };
+        var p2 = new Project
+        {
+            Name = "ExtraProj",
+            OrganizationId = oid,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid
+        };
+
         Context.Projects.Add(p2);
         await Context.SaveChangesAsync();
 
@@ -520,16 +527,40 @@ public class RelationshipBusinessTests : IntegrationTestBase
             DestinationId = cid2
         });
 
-        // Create relationship directly for project 2 (bypass validation)
+        var p2Class1 = new Class
+        {
+            Name = $"P2 Class 1 {DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}",
+            OrganizationId = oid,
+            ProjectId = p2.Id,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            IsArchived = false
+        };
+
+        var p2Class2 = new Class
+        {
+            Name = $"P2 Class 2 {DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}",
+            OrganizationId = oid,
+            ProjectId = p2.Id,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            IsArchived = false
+        };
+
+        Context.Classes.AddRange(p2Class1, p2Class2);
+        await Context.SaveChangesAsync();
+
         var p2Relationship = new Relationship
         {
             Name = "P2 Relationship",
             OrganizationId = oid,
             ProjectId = p2.Id,
-            OriginId = cid,
-            DestinationId = cid2,
-            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
+            OriginId = p2Class1.Id,
+            DestinationId = p2Class2.Id,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid
         };
+
         Context.Relationships.Add(p2Relationship);
         await Context.SaveChangesAsync();
 
@@ -538,6 +569,7 @@ public class RelationshipBusinessTests : IntegrationTestBase
 
         // Assert
         Assert.All(list, r => Assert.Equal(pid, r.ProjectId));
+        Assert.DoesNotContain(list, r => r.Id == p2Relationship.Id);
     }
 
     [Fact]
