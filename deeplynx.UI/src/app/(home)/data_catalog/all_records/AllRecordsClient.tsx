@@ -1020,6 +1020,7 @@ export default function DataCatalogClient({
                   availableTags={visibleAvailableTags}
                   getBulkTagState={getBulkTagState}
                   onToggleBulkTag={toggleBulkTag}
+                  showProjectScopeNotice={effectiveProjectIds.length > 1}
                 />
             )}
           </div>

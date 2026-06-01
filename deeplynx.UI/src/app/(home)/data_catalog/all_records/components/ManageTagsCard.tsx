@@ -16,6 +16,7 @@ type Props = {
     availableTags: AvailableTag[];
     getBulkTagState: (tag: AvailableTag) => BulkTagState;
     onToggleBulkTag: (tag: AvailableTag) => void;
+    showProjectScopeNotice: boolean;
 };
 
 type BulkTagState = "checked" | "unchecked" | "indeterminate";
@@ -31,6 +32,7 @@ export default function ManageTagsCard({
     availableTags,
     getBulkTagState,
     onToggleBulkTag,
+    showProjectScopeNotice,
 }:  Props){
     const {t} = useLanguage();
     
@@ -56,6 +58,13 @@ export default function ManageTagsCard({
                     value={bulkTagQuery}
                     onChange={(e) => onBulkTagQueryChange(e.target.value)}
                 />
+
+                {showProjectScopeNotice && (
+                    <p className="mt-3 text-xs text-base-content/60">
+                        Multiple projects selected. Only organization-level tags are shown for bulk edits.
+                        Select one project to manage project-specific tags.
+                    </p>
+                )}
                 
                 <div className="mt-4 max-h-64 overflow-auto">
                     {filteredTags.length === 0 ? (
@@ -83,6 +92,9 @@ export default function ManageTagsCard({
                                         />
 
                                         <span>{tag.name}</span>
+                                        <span className="badge badge-xs badge-outline">
+                                            {tag.projectId === null ? "Org" : "Project"}
+                                        </span>
                                     </div>
                                 );
                             })}
