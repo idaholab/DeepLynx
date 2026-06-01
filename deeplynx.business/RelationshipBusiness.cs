@@ -257,43 +257,43 @@ public class RelationshipBusiness : IRelationshipBusiness
 
         ArgumentNullException.ThrowIfNull(relationships);
 
-        if (projectId.HasValue)
+        
+        var classIds = relationships
+            .SelectMany(r => new long?[] { r.OriginId, r.DestinationId })
+            .Where(id => id.HasValue)
+            .Select(id => id!.Value)
+            .Distinct()
+            .ToList();
+
+        var validClassIds = await _context.Classes
+            .Where(c =>
+                classIds.Contains(c.Id) &&
+                c.ProjectId == projectId &&
+                !c.IsArchived)
+            .Select(c => c.Id)
+            .ToListAsync();
+
+        var validClassIdSet = validClassIds.ToHashSet();
+
+        foreach (var dto in relationships)
         {
-            var classIds = relationships
-                .SelectMany(r => new long?[] { r.OriginId, r.DestinationId })
-                .Where(id => id.HasValue)
-                .Select(id => id!.Value)
-                .Distinct()
-                .ToList();
+            if (dto.OriginId.HasValue && !validClassIdSet.Contains(dto.OriginId.Value))
+                throw new KeyNotFoundException($"Origin class with ID {dto.OriginId} not found.");
 
-            var validClassIds = await _context.Classes
-                .Where(c =>
-                    classIds.Contains(c.Id) &&
-                    c.ProjectId == projectId &&
-                    !c.IsArchived)
-                .Select(c => c.Id)
-                .ToListAsync();
-
-            var validClassIdSet = validClassIds.ToHashSet();
-
-            foreach (var dto in relationships)
-            {
-                if (dto.OriginId.HasValue && !validClassIdSet.Contains(dto.OriginId.Value))
-                    throw new KeyNotFoundException($"Origin class with ID {dto.OriginId} not found.");
-
-                if (dto.DestinationId.HasValue && !validClassIdSet.Contains(dto.DestinationId.Value))
-                    throw new KeyNotFoundException($"Destination class with ID {dto.DestinationId} not found.");
-            }
+            if (dto.DestinationId.HasValue && !validClassIdSet.Contains(dto.DestinationId.Value))
+                throw new KeyNotFoundException($"Destination class with ID {dto.DestinationId} not found.");
         }
 
         // Bulk insert into relationships; if there is a name collision, update the description and uuid if present
         var sql = projectId.HasValue
             ? @"
           INSERT INTO deeplynx.relationships (organization_id, project_id, name, description, properties,
-                                              uuid, last_updated_at, is_archived, last_updated_by)
+                                    uuid, origin_id, destination_id, last_updated_at, is_archived, last_updated_by)
             VALUES {0}
             ON CONFLICT (organization_id, project_id, name) WHERE project_id IS NOT NULL
             DO UPDATE SET
+                origin_id = COALESCE(EXCLUDED.origin_id, relationships.origin_id),
+                destination_id = COALESCE(EXCLUDED.destination_id, relationships.destination_id),
                 description = COALESCE(EXCLUDED.description, relationships.description),
                 properties = COALESCE(EXCLUDED.properties, relationships.properties),
                 uuid = COALESCE(EXCLUDED.uuid, relationships.uuid),
@@ -302,10 +302,12 @@ public class RelationshipBusiness : IRelationshipBusiness
             RETURNING *;"
             : @"
             INSERT INTO deeplynx.relationships (organization_id, project_id, name, description, properties,
-                                                uuid, last_updated_at, is_archived, last_updated_by)
+                                    uuid, origin_id, destination_id, last_updated_at, is_archived, last_updated_by)
             VALUES {0}
             ON CONFLICT (organization_id, name) WHERE project_id IS NULL
             DO UPDATE SET
+                origin_id = COALESCE(EXCLUDED.origin_id, relationships.origin_id),
+                destination_id = COALESCE(EXCLUDED.destination_id, relationships.destination_id),
                 description = COALESCE(EXCLUDED.description, relationships.description),
                 properties = COALESCE(EXCLUDED.properties, relationships.properties),
                 uuid = COALESCE(EXCLUDED.uuid, relationships.uuid),
@@ -328,12 +330,14 @@ public class RelationshipBusiness : IRelationshipBusiness
             new NpgsqlParameter($"@p{i}_name", dto.Name),
             new NpgsqlParameter($"@p{i}_desc", (object?)dto.Description ?? DBNull.Value),
             new NpgsqlParameter($"@p{i}_props", (object?)dto.Properties ?? DBNull.Value),
-            new NpgsqlParameter($"@p{i}_uuid", (object?)dto.Uuid ?? DBNull.Value)
+            new NpgsqlParameter($"@p{i}_uuid", (object?)dto.Uuid ?? DBNull.Value),
+            new NpgsqlParameter($"@p{i}_origin_id", (object?)dto.OriginId ?? DBNull.Value),
+            new NpgsqlParameter($"@p{i}_destination_id", (object?)dto.DestinationId ?? DBNull.Value)
         }));
 
         // stringify the params and comma separate them
         var valueTuples = string.Join(", ", relationships.Select((dto, i) =>
-            $"(@organizationId, @projectId, @p{i}_name, @p{i}_desc, @p{i}_props, @p{i}_uuid, @now, false, @lastUpdatedBy)"));
+            $"(@organizationId, @projectId, @p{i}_name, @p{i}_desc, @p{i}_props, @p{i}_uuid, @p{i}_origin_id, @p{i}_destination_id, @now, false, @lastUpdatedBy)"));
 
         // put everything together and execute the query
         sql = string.Format(sql, valueTuples);

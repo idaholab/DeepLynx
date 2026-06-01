@@ -433,21 +433,43 @@ public class RelationshipBusinessTests : IntegrationTestBase
     {
         // Arrange
         var now = DateTime.UtcNow;
+
+        var orgClass1 = new Class
+        {
+            Name = $"Org Class 1 {DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}",
+            Description = "Org-level class 1",
+            OrganizationId = oid,
+            ProjectId = null,
+            IsArchived = false
+        };
+
+        var orgClass2 = new Class
+        {
+            Name = $"Org Class 2 {DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}",
+            Description = "Org-level class 2",
+            OrganizationId = oid,
+            ProjectId = null,
+            IsArchived = false
+        };
+
+        Context.Classes.AddRange(orgClass1, orgClass2);
+        await Context.SaveChangesAsync();
+
         var relationshipDtos = new List<CreateRelationshipRequestDto>
         {
             new()
             {
                 Name = "Bulk Relationship 1",
                 Description = "First bulk relationship",
-                OriginId = cid,
-                DestinationId = cid2
+                OriginId = orgClass1.Id,
+                DestinationId = orgClass2.Id
             },
             new()
             {
                 Name = "Bulk Relationship 2",
                 Description = "Second bulk relationship",
-                OriginId = cid2,
-                DestinationId = cid
+                OriginId = orgClass2.Id,
+                DestinationId = orgClass1.Id
             }
         };
 
@@ -459,9 +481,11 @@ public class RelationshipBusinessTests : IntegrationTestBase
         Assert.All(result, r => Assert.True(r.Id > 0));
         Assert.All(result, r => Assert.True(r.LastUpdatedAt >= now));
         Assert.All(result, r => Assert.True(r.LastUpdatedBy >= uid));
-        Assert.All(result, r => Assert.True(r.ProjectId == null));
+        Assert.All(result, r => Assert.Null(r.ProjectId));
         Assert.Equal("Bulk Relationship 1", result.First().Name);
         Assert.Equal("Bulk Relationship 2", result.Last().Name);
+        Assert.Equal(orgClass1.Id, result.First().OriginId);
+        Assert.Equal(orgClass2.Id, result.First().DestinationId);
     }
 
     [Fact]
