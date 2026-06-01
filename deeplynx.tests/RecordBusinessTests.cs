@@ -3579,5 +3579,152 @@ public class RecordBusinessTests : IntegrationTestBase
         Assert.Null(restrictedUserResult.Uri);
     }
     
+    [Fact]
+    public async Task UpdateRecord_OnlyAllowsUriUpdateWhenUserCanUploadForLabel()
+    {
+        // Arrange
+        var adminUser = new User
+        {
+            Name = "Admin",
+            Email = $"admin-{Guid.NewGuid()}@test.com",
+            IsSysAdmin = true,
+            IsActive = true
+        };
+
+        var restrictedUser = new User
+        {
+            Name = "Restricted",
+            Email = $"restricted-{Guid.NewGuid()}@test.com",
+            IsSysAdmin = false,
+            IsActive = true
+        };
+
+        Context.Users.Add(adminUser);
+        Context.Users.Add(restrictedUser);
+        await Context.SaveChangesAsync();
+
+        var label = new SensitivityLabel
+        {
+            Name = $"Test Label {Guid.NewGuid()}",
+            Description = "Test label for upload permission",
+            OrganizationId = organizationId,
+            ProjectId = pid,
+            LastUpdatedBy = adminUser.Id,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),
+            IsArchived = false
+        };
+
+        Context.SensitivityLabels.Add(label);
+        await Context.SaveChangesAsync();
+
+        var uploadPermission = new Permission
+        {
+            Name = $"Upload File Permission {Guid.NewGuid()}",
+            Description = "Allows file upload for this label",
+            Action = "upload file",
+            LabelId = label.Id,
+            OrganizationId = organizationId,
+            ProjectId = pid,
+            LastUpdatedBy = adminUser.Id,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),
+            IsArchived = false,
+            IsDefault = false
+        };
+
+        var downloadPermission = new Permission
+        {
+            Name = $"Download File Permission {Guid.NewGuid()}",
+            Description = "Allows file download for this label",
+            Action = "download file",
+            LabelId = label.Id,
+            OrganizationId = organizationId,
+            ProjectId = pid,
+            LastUpdatedBy = adminUser.Id,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),
+            IsArchived = false,
+            IsDefault = false
+        };
+
+        var role = new Role
+        {
+            Name = $"Upload Download Role {Guid.NewGuid()}",
+            Description = "Role with upload and download file permission",
+            OrganizationId = organizationId,
+            ProjectId = pid,
+            LastUpdatedBy = adminUser.Id,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),
+            IsArchived = false,
+            Permissions = new List<Permission> { uploadPermission, downloadPermission }
+        };
+
+        Context.Roles.Add(role);
+        await Context.SaveChangesAsync();
+
+        Context.ProjectMembers.Add(new ProjectMember
+        {
+            UserId = adminUser.Id,
+            ProjectId = pid,
+            RoleId = role.Id
+        });
+
+        await Context.SaveChangesAsync();
+
+        var originalUri = $"../data/test/{Guid.NewGuid()}_original-file.txt";
+
+        var record = new Record
+        {
+            OrganizationId = organizationId,
+            ProjectId = pid,
+            DataSourceId = did,
+            ClassId = cid,
+            Name = "Protected file record",
+            Description = "Protected file record",
+            Uri = originalUri,
+            Properties = "{}",
+            OriginalId = Guid.NewGuid().ToString(),
+            LastUpdatedBy = adminUser.Id,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),
+            IsArchived = false,
+            FileType = "txt",
+            FileSize = 1,
+            Labels = new List<SensitivityLabel> { label }
+        };
+
+        Context.Records.Add(record);
+        await Context.SaveChangesAsync();
+
+        var restrictedUpdateDto = new UpdateRecordRequestDto
+        {
+            Uri = $"../data/test/{Guid.NewGuid()}_restricted-update.txt",
+            Properties = new JsonObject()
+        };
+
+        // Act / Assert
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            _recordBusiness.UpdateRecord(
+                restrictedUser.Id,
+                organizationId,
+                pid,
+                record.Id,
+                restrictedUpdateDto));
+
+        var adminUpdateUri = $"../data/test/{Guid.NewGuid()}_admin-update.txt";
+
+        var adminUpdateDto = new UpdateRecordRequestDto
+        {
+            Uri = adminUpdateUri,
+            Properties = new JsonObject()
+        };
+
+        var adminResult = await _recordBusiness.UpdateRecord(
+            adminUser.Id,
+            organizationId,
+            pid,
+            record.Id,
+            adminUpdateDto);
+
+        Assert.Equal(adminUpdateUri, adminResult.Uri);
+    }
+
     #endregion
 }
