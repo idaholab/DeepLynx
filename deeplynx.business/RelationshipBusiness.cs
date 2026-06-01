@@ -154,11 +154,17 @@ public class RelationshipBusiness : IRelationshipBusiness
 
         if (dto.OriginId != null)
         {
-            var originClass = await _context.Classes
-                .FirstOrDefaultAsync(c =>
+            var originQuery = _context.Classes
+                .Where(c =>
                     c.Id == dto.OriginId &&
-                    c.ProjectId == projectId &&
-                    !c.IsArchived);
+                    c.OrganizationId == organizationId &&
+                    !c.IsArchived)
+                .AsQueryable();
+
+            if (projectId is not null)
+                originQuery = originQuery.Where(c => c.ProjectId == projectId);
+
+            var originClass = await originQuery.FirstOrDefaultAsync();
 
             if (originClass == null)
                 throw new KeyNotFoundException(
@@ -167,11 +173,17 @@ public class RelationshipBusiness : IRelationshipBusiness
 
         if (dto.DestinationId != null)
         {
-            var destinationClass = await _context.Classes
-                .FirstOrDefaultAsync(c =>
+            var destinationQuery = _context.Classes
+                .Where(c =>
                     c.Id == dto.DestinationId &&
-                    c.ProjectId == projectId &&
-                    !c.IsArchived);
+                    c.OrganizationId == organizationId &&
+                    !c.IsArchived)
+                .AsQueryable();
+
+            if (projectId is not null)
+                destinationQuery = destinationQuery.Where(c => c.ProjectId == projectId);
+
+            var destinationClass = await destinationQuery.FirstOrDefaultAsync();
 
             if (destinationClass == null)
                 throw new KeyNotFoundException(
@@ -265,14 +277,19 @@ public class RelationshipBusiness : IRelationshipBusiness
             .Distinct()
             .ToList();
 
-        var validClassIds = await _context.Classes
+        var validClassQuery = _context.Classes
             .Where(c =>
                 classIds.Contains(c.Id) &&
-                c.ProjectId == projectId &&
+                c.OrganizationId == organizationId &&
                 !c.IsArchived)
+            .AsQueryable();
+
+        if (projectId is not null)
+            validClassQuery = validClassQuery.Where(c => c.ProjectId == projectId);
+
+        var validClassIds = await validClassQuery
             .Select(c => c.Id)
             .ToListAsync();
-
         var validClassIdSet = validClassIds.ToHashSet();
 
         foreach (var dto in relationships)
@@ -383,10 +400,17 @@ public class RelationshipBusiness : IRelationshipBusiness
 
         if (dto.OriginId.HasValue)
         {
-            var originClass = await _context.Classes.FirstOrDefaultAsync(c =>
-                c.Id == dto.OriginId &&
-                c.ProjectId == relationship.ProjectId &&
-                !c.IsArchived);
+            var originQuery = _context.Classes
+                .Where(c =>
+                    c.Id == dto.OriginId &&
+                    c.OrganizationId == organizationId &&
+                    !c.IsArchived)
+                .AsQueryable();
+
+            if (relationship.ProjectId is not null)
+                originQuery = originQuery.Where(c => c.ProjectId == relationship.ProjectId);
+
+            var originClass = await originQuery.FirstOrDefaultAsync();
 
             if (originClass == null)
                 throw new KeyNotFoundException($"Origin class with ID {dto.OriginId} not found.");
@@ -394,10 +418,17 @@ public class RelationshipBusiness : IRelationshipBusiness
 
         if (dto.DestinationId.HasValue)
         {
-            var destinationClass = await _context.Classes.FirstOrDefaultAsync(c =>
-                c.Id == dto.DestinationId &&
-                c.ProjectId == relationship.ProjectId &&
-                !c.IsArchived);
+            var destinationQuery = _context.Classes
+                .Where(c =>
+                    c.Id == dto.DestinationId &&
+                    c.OrganizationId == organizationId &&
+                    !c.IsArchived)
+                .AsQueryable();
+
+            if (relationship.ProjectId is not null)
+                destinationQuery = destinationQuery.Where(c => c.ProjectId == relationship.ProjectId);
+
+            var destinationClass = await destinationQuery.FirstOrDefaultAsync();
 
             if (destinationClass == null)
                 throw new KeyNotFoundException($"Destination class with ID {dto.DestinationId} not found.");
