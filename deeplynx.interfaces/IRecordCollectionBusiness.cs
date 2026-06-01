@@ -1,3 +1,4 @@
+using deeplynx.datalayer.Models;
 using deeplynx.models;
 
 namespace deeplynx.interfaces;
@@ -18,24 +19,26 @@ public interface IRecordCollectionBusiness
 
     Task<bool> AddRecordsToRecordCollection(
         long currentUserID, long organizationId, long projectId, long recordCollectionId,
-        List<long> recordIds, bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false);
+        long[] recordIds, bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false);
 
     Task<bool> RemoveRecordsFromRecordCollection(
         long currentUserID, long organizationId, long projectId, long recordCollectionId,
-        List<long> recordIds, bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false);
+        long[] recordIds, bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false);
 
     Task<RecordCollectionResponseDto> CreateRecordCollection(
-        long currentUserId, long organizationId, long projectId, CreateRecordCollectionRequestDto dto);
+        long currentUserId, long organizationId, long projectId, List<long>? sensitivityLabelIds, CreateRecordCollectionRequestDto dto);
 
-    Task<RecordResponseDto> UpdateRecordCollection(
+    Task<RecordCollectionResponseDto> UpdateRecordCollection(
         long currentUserId, long organizationId, long projectId, long recordCollectionId, UpdateRecordCollectionRequestDto dto);
 
     Task<bool> DeleteRecordCollection(
         long currentUserId, long organizationId, long projectId, long recordCollectionId);
     Task<bool> ArchiveRecordCollection(long currentUserId, long organizationId, long projectId, long recordCollectionId);
     Task<bool> UnarchiveRecordCollection(long currentUserId, long organizationId, long projectId, long recordCollectionId);
-    Task<bool> AttachTag(long currentUserId, long organizationId, long projectId, long recordCollectionId, long tagId);
-    Task<bool> AttachLabel(long currentUserId, long organizationId, long projectId, long recordCollectionId, long labelId);
-    Task<bool> UnattachTag(long currentUserId, long organizationId, long projectId, long recordCollectionId, long tagId);
-    Task<bool> UnattachLabel(long currentUserId, long organizationId, long projectId, long recordCollectionId, long labelId);
+    Task<bool> AttachTag(long organizationId, long projectId, long recordCollectionId, long tagId);
+    Task<bool> AttachLabel(long organizationId, long projectId, long recordCollectionId, long labelId);
+    Task<bool> UnattachTag(long organizationId, long projectId, long recordCollectionId, long tagId);
+    Task<bool> UnattachLabel(long organizationId, long projectId, long recordCollectionId, long labelId);
+    Task<List<SensitivityLabel>> GetSensitivityLabelsForRecordCollection(long organizationId, long projectId,
+        long recordCollectionId);
 }
