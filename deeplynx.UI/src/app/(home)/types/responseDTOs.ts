@@ -119,6 +119,7 @@ export type OrganizationResponseDto = {
   isArchived: boolean;
   defaultOrg?: boolean;
   banner?: string;
+  themeName?: string;
 };
 
 export type PermissionResponseDto = {

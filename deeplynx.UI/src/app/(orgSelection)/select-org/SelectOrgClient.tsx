@@ -83,7 +83,7 @@ const SelectOrgClient = ({ session }: Props) => {
               userCount: 0,
             };
           }
-        })
+        }),
       );
 
       setOrganizations(orgsWithCounts);
@@ -122,6 +122,7 @@ const SelectOrgClient = ({ session }: Props) => {
     setOrganization({
       organizationId: org.id,
       organizationName: org.name,
+      themeName: org.themeName,
     });
 
     router.push("/");
@@ -273,7 +274,9 @@ const SelectOrgClient = ({ session }: Props) => {
         <dialog className="modal modal-open">
           <div className="modal-box max-w-lg">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="font-bold text-lg text-base-content">Create New Organization</h3>
+              <h3 className="font-bold text-lg text-base-content">
+                Create New Organization
+              </h3>
               <button
                 className="btn btn-sm btn-circle btn-ghost"
                 onClick={() => {
@@ -292,7 +295,10 @@ const SelectOrgClient = ({ session }: Props) => {
               </div>
             )}
 
-            <form onSubmit={handleCreateOrganization} className="flex flex-col gap-4">
+            <form
+              onSubmit={handleCreateOrganization}
+              className="flex flex-col gap-4"
+            >
               <input
                 type="text"
                 placeholder="Organization Name"

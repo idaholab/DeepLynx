@@ -1570,6 +1570,8 @@ export const translations = {
       YOUVE_BEEN_ADDED_TO_A_PROJECT_IN_DEEPLYNX_NEXUS:
         "You've been added to a project in DeepLynx Nexus",
       ZOOM_CONTROLS: "Zoom controls",
+      THEME_UPDATE_SUCCESS: "Theme updated successfully",
+      FAILED_TO_UPDATE_THEME: "Failed to update theme",
     },
   },
   es: {
@@ -3225,6 +3227,8 @@ export const translations = {
       YOUVE_BEEN_ADDED_TO_A_PROJECT_IN_DEEPLYNX_NEXUS:
         "Has sido agregado a un proyecto en DeepLynx Nexus",
       ZOOM_CONTROLS: "Controles de zoom",
+      THEME_UPDATE_SUCCESS: "Tema actualizado",
+      FAILED_TO_UPDATE_THEME: "Error al actualizar el tema",
     },
   },
 };

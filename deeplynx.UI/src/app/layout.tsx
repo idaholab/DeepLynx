@@ -11,36 +11,22 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" data-theme="light" suppressHydrationWarning>
+    <html lang="en" data-theme="default" suppressHydrationWarning>
       <head>
         <script
           dangerouslySetInnerHTML={{
             __html: `
 (function () {
   try {
-    var KEY = 'dlx-theme';
+    var KEY = 'dlx-theme-mode';
     var saved = localStorage.getItem(KEY);
-    if (saved) {
-      document.documentElement.setAttribute('data-theme', saved);
-    }
-    document.documentElement.setAttribute('data-theme', saved || 'light');
-    
-    document.addEventListener('change', function (e) {
-      var t = e.target;
-      if (t && t.classList && t.classList.contains('theme-controller')) {
-        var theme = t.value;
-        var checked = t.checked;
-        var next = checked ? theme : 'light';
-        document.documentElement.setAttribute('data-theme', next);
-        localStorage.setItem(KEY, next);
-      }
-    }, { capture: true });
+    document.documentElement.setAttribute('data-theme', saved === 'dark' ? 'default-dark' : 'default');
   } catch (e) {}
 })();
           `,
           }}
         />
-     </head>
+      </head>
       <body className="min-h-screen bg-base-100 text-base-content">
         <ClientProviders>{children}</ClientProviders>
       </body>

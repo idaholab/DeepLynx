@@ -111,7 +111,7 @@ const ProjectDropdown: React.FC<ProjectDropdownProps> = ({
       </button>
 
       {isOpen && (
-        <div className="absolute z-10 mt-2 w-full bg-base-100 shadow shadow-dynamic-shadow rounded-box p-4 max-h-80 overflow-auto">
+        <div className="absolute z-10 mt-2 w-full bg-base-100 shadow shadow-base-content/10 rounded-box p-4 max-h-80 overflow-auto">
           <input
             type="text"
             placeholder="Search"

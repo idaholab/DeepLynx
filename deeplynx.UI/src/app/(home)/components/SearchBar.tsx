@@ -102,7 +102,7 @@ const SearchBar: React.FC<SearchBarProps> = ({
             ref={inputRef}
             type="text"
             placeholder={placeholder}
-            className="w-full pl-12 pr-4 py-2 rounded-full border border-base-content/25 bg-base-100 shadow-sm shadow-dynamic-shadow focus:outline-none focus:ring-2 focus:ring-dynamic-blue text-info-content"
+            className="w-full pl-12 pr-4 py-2 rounded-full border border-base-content/25 bg-base-100 shadow-sm shadow-base-content/10 focus:outline-none focus:ring-2 focus:ring-primary text-info-content"
             onChange={
               isControlled ? onChange : (e) => setInternalValue(e.target.value)
             }
@@ -124,7 +124,7 @@ const SearchBar: React.FC<SearchBarProps> = ({
           <div className="text-right mt-1">
             <a
               href="/data_catalog/query_builder"
-              className="text-sm underline text-dynamic-blue hover:underline"
+              className="text-sm underline text-primary hover:underline"
             >
               {aditionalFilters && t.translations.ADDITIONAL_FILTERS}
             </a>

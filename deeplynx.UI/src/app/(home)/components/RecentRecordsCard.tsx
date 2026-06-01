@@ -150,7 +150,7 @@ const RecentRecordsCard: React.FC<Props> = ({
   if (isLoading) return <CatalogViewSkeleton />;
 
   return (
-    <div className={border ? "shadow-md shadow-dynamic-shadow rounded-xl" : ""}>
+    <div className={border ? "shadow-md shadow-base-content/10 rounded-xl" : ""}>
       {/* Header and sort controls */}
       <div className="flex items-center justify-between p-4">
         <h2 className="text-lg font-semibold text-base-content">

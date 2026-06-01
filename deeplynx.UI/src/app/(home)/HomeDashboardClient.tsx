@@ -266,7 +266,7 @@ export default function HomeDashboardClient({ initialProjects }: Props) {
  
             {/* Projects table */ }
             <div
-              className="max-w-5xl 2xl:flex-1 card card-border shadow-md shadow-dynamic-shadow p-4 overflow-auto"
+              className="max-w-5xl 2xl:flex-1 card card-border shadow-md shadow-base-content/10 p-4 overflow-auto"
               data-tour="projects-section"
             >
               <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4">

@@ -39,6 +39,7 @@ export type UpdateOrganizationRequestDto = {
   description?: string | null;
   defaultOrg?: boolean | null;
   banner?: string | null;
+  themeName?: string | null;
 };
 
 export type CreateOauthApplicationRequestDto = {
@@ -252,11 +253,7 @@ export type UpdateSensitivityLabelDto = {
   description?: string | null;
 };
 
-export type AiModelProvider =
-  | "openai"
-  | "anthropic"
-  | "hpc"
-  | "ollama";
+export type AiModelProvider = "openai" | "anthropic" | "hpc" | "ollama";
 
 export type AiModelType = "llm" | "vlm" | "embedding";
 
@@ -267,7 +264,7 @@ export type CreateAiModelConfigRequestDto = {
   model_name: string;
   requires_token: boolean;
   default: boolean;
-}
+};
 
 export type UpdateAiModelConfigRequestDto = {
   model_name?: string;
@@ -275,16 +272,16 @@ export type UpdateAiModelConfigRequestDto = {
   server_url?: string;
   requires_token?: boolean;
   default?: boolean;
-}
+};
 
 export type CreateUserModelTokenRequestDto = {
   token: string;
   aiModelConfigId: number;
-}
+};
 
 export type UpdateUserModelTokenRequestDto = {
   token: string;
-}
+};
 
 export interface InviteUserToOrganizationRequestDto {
   userEmail: string;
@@ -311,12 +308,12 @@ export interface SearchConditionDto {
   value?: string;
   json?: string;
 }
- 
+
 export interface ExecuteSavedSearchRequest {
   filter: SearchConditionDto[];
   textSearch?: string;
 }
- 
+
 export interface SavedSearchFilterRequest {
   name: string;
   textSearch: string;

@@ -16,7 +16,7 @@ public class UpdateOrganizationRequestDto
 
     [MaxLength(50)]
     [RegularExpression(
-        "^(default|blue|green|red|purple|slate|highContrast)$",
+        "^(default|nric|blue|green|red|purple|slate|highContrast)$",
         ErrorMessage = "Invalid theme name."
     )]
     public string? ThemeName { get; set; }
