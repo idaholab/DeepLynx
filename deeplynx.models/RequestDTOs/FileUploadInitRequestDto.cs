@@ -4,7 +4,9 @@ namespace deeplynx.models;
 
 public class FileUploadInitRequestDto
 {
-    [Required] public string FileName { get; set; }
+    [Required]
+    [MaxLength(100)]
+    public string FileName { get; set; }
     public long FileSize { get; set; }
 }
 

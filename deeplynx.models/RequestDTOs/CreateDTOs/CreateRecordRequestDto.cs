@@ -8,7 +8,7 @@ public class CreateRecordRequestDto
 {
     [Required]
     [JsonPropertyName("name")]
-    [MaxLength(50)]
+    [MaxLength(100)]
     public string Name { get; set; }
 
     [JsonPropertyName("description")]
@@ -38,7 +38,7 @@ public class CreateRecordRequestDto
 
     [JsonPropertyName("file_type")]
     public string? FileType { get; set; }
-    
+
     [JsonPropertyName("file_size")]
     public long? FileSize { get; set; }
 
