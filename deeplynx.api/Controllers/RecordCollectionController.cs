@@ -403,7 +403,7 @@ public class RecordCollectionController : ControllerBase
     /// <param name="recordCollectionId">The ID of the record collection</param>
     /// <param name="tagId">The ID of the tag to attach</param>
     /// <returns>A message stating the tag was successfully attached to the record.</returns>
-    [HttpPost("{recordCollectionId:long}/tags", Name = "api_attach_tag_to_record_collection")]
+    [HttpPost("{recordCollectionId:long}/tags/{tagId:long}", Name = "api_attach_tag_to_record_collection")]
     [Auth("update", "record_collection")]
     [Auth("read", "tag")]
     [Sensitivity("read record")]
@@ -411,7 +411,7 @@ public class RecordCollectionController : ControllerBase
         long organizationId,
         long projectId,
         long recordCollectionId,
-        [FromQuery] long tagId)
+        long tagId)
     {
         try
         {
@@ -442,7 +442,7 @@ public class RecordCollectionController : ControllerBase
     /// <param name="recordCollectionId">The ID of the record collection</param>
     /// <param name="tagId">The ID of the tag to unattach</param>
     /// <returns>A message stating the tag was successfully unattached from the record.</returns>
-    [HttpDelete("{recordCollectionId:long}/tags", Name = "api_unattach_tag_from_record_collection")]
+    [HttpDelete("{recordCollectionId:long}/tags/{tagId:long}", Name = "api_unattach_tag_from_record_collection")]
     [Auth("update", "record_collection")]
     [Auth("read", "tag")]
     [Sensitivity("read record")]
@@ -450,7 +450,7 @@ public class RecordCollectionController : ControllerBase
         long organizationId,
         long projectId,
         long recordCollectionId,
-        [FromQuery] long tagId)
+        long tagId)
     {
         try
         {
@@ -477,7 +477,7 @@ public class RecordCollectionController : ControllerBase
     /// <param name="recordCollectionId">The ID of the record collection</param>
     /// <param name="sensitivityLabelId">The ID of the label to attach</param>
     /// <returns>A message stating the label was successfully attached to the record.</returns>
-    [HttpPost("{recordCollectionId:long}/sensitivity-labels", Name = "api_attach_sensitivity_label_to_record_collection")]
+    [HttpPost("{recordCollectionId:long}/sensitivity-labels/{sensitivityLabelId:long}", Name = "api_attach_sensitivity_label_to_record_collection")]
     [Auth("update", "record_collection")]
     [Auth("read", "sensitivity_label")]
     [Sensitivity("read record")]
@@ -485,7 +485,7 @@ public class RecordCollectionController : ControllerBase
         long organizationId,
         long projectId,
         long recordCollectionId,
-        [FromQuery] long sensitivityLabelId)
+        long sensitivityLabelId)
     {
         try
         {
@@ -516,7 +516,7 @@ public class RecordCollectionController : ControllerBase
     /// <param name="recordCollectionId">The ID of the record collection</param>
     /// <param name="sensitivityLabelId">The ID of the label to unattach</param>
     /// <returns>A message stating the label was successfully unattached from the record.</returns>
-    [HttpDelete("{recordCollectionId:long}/sensitivity-labels", Name = "api_unattach_sensitivity_label_from_record_collection")]
+    [HttpDelete("{recordCollectionId:long}/sensitivity-labels/{sensitivityLabelId:long}", Name = "api_unattach_sensitivity_label_from_record_collection")]
     [Auth("update", "record_collection")]
     [Auth("read", "sensitivity_label")]
     [Sensitivity("read record")]
@@ -524,7 +524,7 @@ public class RecordCollectionController : ControllerBase
         long organizationId,
         long projectId,
         long recordCollectionId,
-        [FromQuery] long sensitivityLabelId)
+        long sensitivityLabelId)
     {
         try
         {
