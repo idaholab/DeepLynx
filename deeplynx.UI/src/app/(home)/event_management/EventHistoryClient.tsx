@@ -91,6 +91,12 @@ const EventsHistoryClient = ({initialProjects, initialSelectedProjects}: Props) 
 
   // Handler for when filters change
   const handleFilterChange = (newFilters: EventFilterParams) => {
+    if (newFilters.startDate) {
+      newFilters.startDate = `${newFilters.startDate}T00:00:00`;
+    }
+    if (newFilters.endDate) {
+      newFilters.endDate = `${newFilters.endDate}T23:59:59`;
+    }
     setFilters(newFilters);
   };
 

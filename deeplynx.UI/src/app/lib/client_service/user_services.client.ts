@@ -10,7 +10,7 @@ import api from "./api";
 
 /** ---- Browser calls (with session cookies) ---- */
 
-export async function getAllUsers(organizationId?: number | string, projectId?: number | string) {
+export async function getAllUsers(organizationId?: number | string, projectId?: number | string, includeArchived: boolean = false) {
   try {
     const params: Record<string, string | number | boolean> = {};
 
@@ -21,6 +21,8 @@ export async function getAllUsers(organizationId?: number | string, projectId?: 
     if (projectId !== undefined) {
       params.projectId = projectId;
     }
+
+    params.includeArchived = includeArchived;
 
     const res = await api.get(`/users`, { params });
     return res.data;

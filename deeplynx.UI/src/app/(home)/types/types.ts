@@ -225,3 +225,4 @@ export type ExpandableTableColumn<T> = {
   data: (row: T) => ReactNode;
   isExpandTrigger?: (row: T) => boolean;
 };
+

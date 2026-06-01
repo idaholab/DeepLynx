@@ -107,6 +107,7 @@ export const translations = {
         "Banner text must be 50 characters or less",
       BANNER_UPDATED_SUCCESSFULLY: "Banner updated successfully",
       BASE_URL: "Base URL",
+      BETA: "Beta",
       BRANDING_AND_BANNER: "Branding & Banner",
       BRIEF_DESCRIPTION: "Brief description",
       BULK_CSV_UPLOAD: "Bulk CSV Upload",
@@ -256,6 +257,7 @@ export const translations = {
         "Define project-level tags for classification, workflows, and search. Organization-level locks determine whether this project can define additional tags beyond those inherited from the organization.",
       DELETE: "Delete",
       DELETE_ALL_FILTERS: "Delete all filters",
+      DELETE_ORGANIZATION: "Delete Organization",
       DELETE_ROLE: "Delete Role",
       DELETING: "Deleting...",
       DESCRIPTION: "Description",
@@ -799,6 +801,7 @@ export const translations = {
       LOGO_REMOVED_SUCCESSFULLY: "Logo removed successfully!",
       LOGO_UPLOADED_SUCCESSFULLY: "Logo uploaded successfully!",
       LOGOUT: "Logout",
+      MAIN_PROJECT_SETTINGS: "Main Project Settings",
       MANAGE_STORAGES_TAB: "Manage Storages",
       MANAGE: "Manage",
       MANAGE_USERS_AND_GROUPS_ASSIGNED_TO_THIS_PROJECT_A_ROLE_IS_REQUIRED_FOR_EACH_MEMBER:
@@ -1066,12 +1069,14 @@ export const translations = {
       PROFILE_PICTURE: "Profile Picture",
       PROJECT: "Project",
       PROJECT_ADMINISTRATORS: "project administrators",
-      PROJECT_ASSIGNMENT: "Project Assignment",
       PROJECT_CONTACTS: "Project Contacts",
       PROJECT_CLASSES_AND_IDS: "Project Classes and IDs",
       PROJECT_CLASSES_AND_IDS_HELP:
         "Use one of these class IDs in your metadata file when setting ClassId.",
       PROJECT_DASHBOARD: "Project Dashboard",
+      PROJECT_DESCRIPTION: "Project Description",
+      PROJECT_DESCRIPTION_UPDATED: "Project Description Updated",
+      PROJECT_ID: "Project ID",
       PROJECT_INSIGHT_CHAT_INTRO_EMPTY:
         'There are no embedded files in scope for "{projectName}" yet. Adjust filters or queue files for Insight below.',
       PROJECT_INSIGHT_CHAT_INTRO_READY:
@@ -1153,6 +1158,7 @@ export const translations = {
       PROJECT_MANAGEMENT: "Project Management",
       PROJECT_MEMBERS: "Project Members",
       PROJECT_NAME: "Project Name ",
+      PROJECT_NAME_UPDATED: "Project Name Updated",
       PROJECT_OVERVIEW: "Project Overview",
       PROJECT_ROLE: "Project Role",
       PROJECT_ROLES: "Project Roles",
@@ -1564,6 +1570,9 @@ export const translations = {
       YOUVE_BEEN_ADDED_TO_A_PROJECT_IN_DEEPLYNX_NEXUS:
         "You've been added to a project in DeepLynx Nexus",
       ZOOM_CONTROLS: "Zoom controls",
+      ARCHIVED_USERS: "Archived Users",
+      UNARCHIVE_USER: "Unarchive",
+      NO_ARCHIVED_USERS: "No archived users."
     },
   },
   es: {
@@ -1678,6 +1687,7 @@ export const translations = {
         "El texto del banner debe tener 50 caracteres o menos",
       BANNER_UPDATED_SUCCESSFULLY: "El banner se actualizó correctamente",
       BASE_URL: "URL base",
+      BETA: "Beta",
       BRANDING_AND_BANNER: "Identidad visual y banner",
       BRIEF_DESCRIPTION: "Descripción breve",
       BULK_CSV_UPLOAD: "Carga masiva de CSV",
@@ -1831,6 +1841,7 @@ export const translations = {
         "Define etiquetas a nivel de proyecto para clasificación, flujos de trabajo y búsqueda. Los bloqueos a nivel de organización determinan si este proyecto puede definir etiquetas adicionales además de las heredadas de la organización.",
       DELETE: "Eliminar",
       DELETE_ALL_FILTERS: "Eliminar todos los filtros",
+      DELETE_ORGANIZATION: "Eliminar Organización",
       DELETE_ROLE: "Eliminar Rol",
       DELETING: "Eliminando...",
       DESCRIPTION: "Descripción",
@@ -2416,6 +2427,7 @@ export const translations = {
       LOGO_REMOVED_SUCCESSFULLY: "¡El logotipo se eliminó correctamente!",
       LOGO_UPLOADED_SUCCESSFULLY: "¡El logotipo se subió correctamente!",
       LOGOUT: "Cerrar sesión",
+      MAIN_PROJECT_SETTINGS: "Configuración principal del proyecto",
       MANAGE_STORAGES_TAB: "Gestionar almacenamientos",
       MANAGE: "Gestionar",
       MANAGE_USERS_AND_GROUPS_ASSIGNED_TO_THIS_PROJECT_A_ROLE_IS_REQUIRED_FOR_EACH_MEMBER:
@@ -2694,12 +2706,14 @@ export const translations = {
       PROFILE_PICTURE: "Foto de perfil",
       PROJECT: "Proyecto",
       PROJECT_ADMINISTRATORS: "los administradores del proyecto",
-      PROJECT_ASSIGNMENT: "Asignacion de proyectos",
       PROJECT_CONTACTS: "Contactos del proyecto",
       PROJECT_CLASSES_AND_IDS: "Clases e IDs del proyecto",
       PROJECT_CLASSES_AND_IDS_HELP:
         "Use uno de estos IDs de clase en su archivo de metadatos al establecer ClassId.",
       PROJECT_DASHBOARD: "Tablero del proyecto",
+      PROJECT_DESCRIPTION: "Descripción del proyecto",
+      PROJECT_DESCRIPTION_UPDATED: "Descripción del proyecto actualizada",
+      PROJECT_ID: "ID de proyecto",
       PROJECT_INSIGHT_CHAT_INTRO_EMPTY:
         'Todavía no hay archivos incrustados dentro del alcance para "{projectName}". Ajusta los filtros o pon archivos en cola para Insight a continuación.',
       PROJECT_INSIGHT_CHAT_INTRO_READY:
@@ -2786,6 +2800,7 @@ export const translations = {
       PROJECT_MANAGEMENT: "Gestión de proyectos",
       PROJECT_MEMBERS: "Miembros del proyecto",
       PROJECT_NAME: "Nombre del proyecto ",
+      PROJECT_NAME_UPDATED: "Nombre del proyecto actualizado",
       PROJECT_OVERVIEW: "Resumen del proyecto",
       PROJECT_ROLE: "Rol del proyecto",
       PROJECT_ROLES: "Roles de Proyecto",
@@ -3213,6 +3228,9 @@ export const translations = {
       YOUVE_BEEN_ADDED_TO_A_PROJECT_IN_DEEPLYNX_NEXUS:
         "Has sido agregado a un proyecto en DeepLynx Nexus",
       ZOOM_CONTROLS: "Controles de zoom",
+      ARCHIVED_USERS: "Usuarios Archivados",
+      UNARCHIVE_USER: "Desarchivar",
+      NO_ARCHIVED_USERS: "No hay usuarios archivados."
     },
   },
 };

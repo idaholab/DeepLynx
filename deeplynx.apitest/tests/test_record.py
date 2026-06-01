@@ -601,6 +601,107 @@ def test_attach_and_unattach_tag_to_record(client, organization, project, origin
         tag_names = [tag.get("name") for tag in record_after["tags"]]
         assert "pytest-attach-tag" not in tag_names, "Tag should not be attached to record"
 
+def test_bulk_attach_and_unattach_tags_to_records(client, organization, project, origin_class, test_datasource_project, cleanup_records, cleanup_project_tags):
+    """Test bulk attaching and unattaching multiple tags to multiple records."""
+    timestamp = int(time.time() * 1000)
+
+    # Create two tags
+    tag_ids = []
+    
+    for i in range(2):
+        tag_payload = {
+            "name": f"pytest-bulk-attach-tag-{i}"
+        }
+            
+        tag_response = client.post(
+            f"/projects/{project}/tags",
+            json=tag_payload
+        )
+        
+        if tag_response.status_code == 200:
+            cleanup_project_tags.append(tag_response.json()["id"])
+
+        assert tag_response.status_code == 200, f"Failed to create tag: {tag_response.text}"
+        tag_ids.append(tag_response.json()["id"])
+        
+    # Create two records without the tag
+    record_ids = []
+    
+    for i in range(2):
+        record_payload = {
+            "name": f"pytest_BulkAttachTagRecord{i}",
+            "description": f"Test record {i} for tag attachment",
+            "original_id": f"{timestamp}-bulk-attach-{i}",
+            "properties": {},
+            "class_id": origin_class
+        }
+    
+        create_response = client.post(
+            f"/organizations/{organization}/projects/{project}/records?dataSourceId={test_datasource_project}",
+            json=record_payload
+        )
+    
+        if create_response.status_code == 200:
+            cleanup_records.append(create_response.json()["id"])
+    
+        assert create_response.status_code == 200, f"Failed to create record: {create_response.text}"
+        record_ids.append(create_response.json()["id"])
+    
+    # Attach multiple record/tag pairs using one request
+    pair_payload = [
+        {"record_id": record_ids[0], "tag_id": tag_ids[0]},
+        {"record_id": record_ids[0], "tag_id": tag_ids[1]},
+        {"record_id": record_ids[1], "tag_id": tag_ids[0]},
+        {"record_id": record_ids[1], "tag_id": tag_ids[1]}
+    ]
+    
+    attach_response = client.post(
+        f"/organizations/{organization}/projects/{project}/records/bulk-attach-tags-to-records",
+        json=pair_payload
+    )
+    
+    print(f"\nStatusCode: {attach_response.status_code}")
+    print(f"Response Body: {attach_response.text}")
+    
+    assert attach_response.status_code == 200, f"Failed to bulk attach tags: {attach_response.text}"
+    
+    # Verify both records have both tags
+    for record_id in record_ids:
+        get_response = client.get(
+            f"/organizations/{organization}/projects/{project}/records/{record_id}?hideArchived=true"
+        )
+        assert get_response.status_code == 200, f"Failed to get record: {get_response.text}"
+        
+        record = get_response.json()
+        tag_ids_on_record = [tag["id"] for tag in record["tags"]]
+        
+        assert tag_ids[0] in tag_ids_on_record, f"Tag {tag_ids[0]} should be attached to record {record_id}"
+        assert tag_ids[1] in tag_ids_on_record, f"Tag {tag_ids[1]} should be attached to record {record_id}"
+
+    # Unattach multiple record/tag pairs using one request
+    unattach_response = client.post(
+        f"/organizations/{organization}/projects/{project}/records/bulk-unattach-tags-from-records",
+        json=pair_payload
+    )
+
+    print(f"\nStatusCode: {unattach_response.status_code}")
+    print(f"Response Body: {unattach_response.text}")
+
+    assert unattach_response.status_code == 200, f"Failed to bulk unattach tags: {unattach_response.text}"
+    
+    # Verify both records no longer have either tag
+    for record_id in record_ids:
+        get_after_response = client.get(
+            f"/organizations/{organization}/projects/{project}/records/{record_id}?hideArchived=true"
+        )
+        assert get_after_response.status_code == 200, f"Failed to get record: {get_after_response.text}"
+
+        record_after = get_after_response.json()
+        tag_ids_on_record_after = [tag["id"] for tag in record_after["tags"]]
+
+        assert tag_ids[0] not in tag_ids_on_record_after, f"Tag {tag_ids[0]} should not be attached to record {record_id}"
+        assert tag_ids[1] not in tag_ids_on_record_after, f"Tag {tag_ids[1]} should not be attached to record {record_id}"
+
 def test_attach_and_unattach_label_to_record(
     client, organization, project, origin_class, test_datasource_project, current_user_id,
     cleanup_records, cleanup_project_labels):

@@ -1,6 +1,7 @@
 using deeplynx.datalayer.Models;
 using deeplynx.helpers.Context;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Routing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -59,6 +60,21 @@ public class UserContextMiddleware
                         {
                             UserContextStorage.UserId = user.Id;
                             _logger.LogInformation($"User found: {user.Email} (ID: {user.Id})");
+
+                            var adminService = scope.ServiceProvider.GetRequiredService<IAdminService>();
+                            UserContextStorage.IsSysAdmin = await adminService.SysAdminCheck(user.Id);
+
+                            var organizationId = ExtractOrganizationId(context);
+                            if (organizationId.HasValue)
+                            {
+                                UserContextStorage.IsOrgAdmin =
+                                    await adminService.OrgAdminCheck(user.Id, organizationId.Value);
+
+                                var projectIds = ExtractProjectIds(context);
+                                if (projectIds.Any())
+                                    UserContextStorage.IsProjectAdmin = await adminService.ProjectAdminCheck(
+                                        user.Id, organizationId.Value, projectIds);
+                            }
                         }
                         else
                         {
@@ -88,6 +104,38 @@ public class UserContextMiddleware
             // Always clear after request completes
             UserContextStorage.Email = null;
             UserContextStorage.UserId = 0;
+            UserContextStorage.IsSysAdmin = false;
+            UserContextStorage.IsOrgAdmin = false;
+            UserContextStorage.IsProjectAdmin = false;
         }
+    }
+
+    private static long? ExtractOrganizationId(HttpContext context)
+    {
+        var routeOrgId = context.GetRouteValue("organizationId")?.ToString();
+        if (!string.IsNullOrEmpty(routeOrgId) && long.TryParse(routeOrgId, out var orgId))
+            return orgId;
+        return null;
+    }
+
+    private static List<long> ExtractProjectIds(HttpContext context)
+    {
+        var projectIds = new List<long>();
+
+        var routeProjectId = context.GetRouteValue("projectId")?.ToString();
+        if (!string.IsNullOrEmpty(routeProjectId) && long.TryParse(routeProjectId, out var parsedRouteId))
+            projectIds.Add(parsedRouteId);
+
+        if (context.Request.Query.TryGetValue("projectIds", out var queryProjectIds))
+            foreach (var idValue in queryProjectIds)
+                if (!string.IsNullOrEmpty(idValue))
+                {
+                    var ids = idValue.Split(',', StringSplitOptions.RemoveEmptyEntries);
+                    foreach (var id in ids)
+                        if (long.TryParse(id.Trim(), out var parsedId) && !projectIds.Contains(parsedId))
+                            projectIds.Add(parsedId);
+                }
+
+        return projectIds;
     }
 }
