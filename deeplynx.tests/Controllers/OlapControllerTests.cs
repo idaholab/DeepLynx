@@ -207,7 +207,7 @@ public class OlapControllerTests : IDisposable
         var file = mockFile.Object;
 
         _mockOlapBusiness.Setup(b => b.AppendTabularBlob(
-                         OrgId, ProjectId, RecordIdConst, partNumber, file))
+                         UserId, OrgId, ProjectId, RecordIdConst, partNumber, file))
                      .Returns(Task.CompletedTask);
 
         var result = (await _olapController.AppendTabularFile(
@@ -230,7 +230,7 @@ public class OlapControllerTests : IDisposable
         var file = mockFile.Object;
 
         _mockOlapBusiness.Setup(b => b.AppendTabularBlob(
-                         OrgId, ProjectId, RecordIdConst, partNumber, file))
+                         UserId, OrgId, ProjectId, RecordIdConst, partNumber, file))
                      .Throws(new Exception("append error"));
 
         var result = (await _olapController.AppendTabularFile(
@@ -255,7 +255,7 @@ public class OlapControllerTests : IDisposable
         var file = mockFile.Object;
 
         _mockOlapBusiness.Setup(b => b.AppendTabularBlob(
-                         OrgId, ProjectId, RecordIdConst, partNumber, file))
+                         UserId, OrgId, ProjectId, RecordIdConst, partNumber, file))
                      .Returns(Task.CompletedTask);
 
         await _olapController.AppendTabularFile(
@@ -266,7 +266,7 @@ public class OlapControllerTests : IDisposable
             file);
 
         _mockOlapBusiness.Verify(b => b.AppendTabularBlob(
-            OrgId, ProjectId, RecordIdConst, partNumber, file), Times.Once);
+            UserId, OrgId, ProjectId, RecordIdConst, partNumber, file), Times.Once);
     }
     #endregion
 
