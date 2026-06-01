@@ -561,6 +561,71 @@ def test_complete_chunked_upload_small_file(client, organization, project, clean
         raise e
 
 
+def test_complete_chunked_csv_upload_assigns_timeseries_class(client, organization, project, cleanup_file_records):
+    """Test that chunked CSV uploads are classified as Timeseries and include columns."""
+    filename = "test-chunked-timeseries.csv"
+    csv_content = b"timestamp,temperature,humidity\n2024-01-01,22.5,60.1\n2024-01-02,23.0,58.3"
+
+    start_response = client.post(
+        f"/organizations/{organization}/projects/{project}/files/upload/start",
+        json={"fileName": filename, "fileSize": len(csv_content)}
+    )
+
+    assert start_response.status_code == 200, f"Start upload failed: {start_response.text}"
+
+    session = start_response.json()
+    upload_id = session["uploadId"]
+
+    try:
+        chunk_url = f"{client.base_url}/organizations/{organization}/projects/{project}/files/upload/chunk"
+        headers = {"Authorization": f"Bearer {client.token}"}
+        files = {"chunk": ("chunk_0.csv", io.BytesIO(csv_content), "text/csv")}
+        data = {"uploadId": upload_id, "chunkNumber": "0"}
+
+        chunk_response = requests.post(chunk_url, files=files, data=data, headers=headers)
+        assert chunk_response.status_code == 200, f"Chunk upload failed: {chunk_response.text}"
+
+        complete_response = client.post(
+            f"/organizations/{organization}/projects/{project}/files/upload/complete",
+            json={
+                "uploadId": upload_id,
+                "fileName": filename,
+                "totalChunks": 1
+            }
+        )
+
+        assert complete_response.status_code == 200, f"Complete upload failed: {complete_response.text}"
+
+        result = complete_response.json()
+        cleanup_file_records.append(result["id"])
+
+        classes_response = client.get(f"/projects/{project}/classes")
+        assert classes_response.status_code == 200, f"Failed to get classes: {classes_response.text}"
+
+        timeseries_class = next(
+            (class_result for class_result in classes_response.json() if class_result["name"] == "Timeseries"),
+            None
+        )
+        assert timeseries_class is not None, "Timeseries class should exist after chunked CSV upload"
+        assert result["classId"] == timeseries_class["id"], "Chunked CSV upload should be classified as Timeseries"
+
+        properties_str = result.get("properties", "{}")
+        properties = json.loads(properties_str) if isinstance(properties_str, str) else properties_str
+        assert properties.get("uploadedViaChunking") is True, "Should be marked as chunked upload"
+        assert properties.get("originalUploadId") == upload_id, "Should contain original upload ID"
+
+        columns = properties.get("columns")
+        assert isinstance(columns, list) and columns, "Chunked CSV upload should include extracted columns"
+        column_names = [column["name"] for column in columns]
+        assert "timestamp" in column_names
+        assert "temperature" in column_names
+        assert "humidity" in column_names
+
+    except Exception as e:
+        client.delete(f"/organizations/{organization}/projects/{project}/files/upload/{upload_id}")
+        raise e
+
+
 def test_cancel_chunked_upload(client, organization, project):
     """Test canceling a chunked upload session."""
     filename = "test-cancel.bin"
