@@ -155,10 +155,10 @@ public class OrganizationControllerTests : IDisposable
     #endregion
 
     // =========================================================================
-    // GetAllOrganizations Tests
+    // GetAllOrganizationsForUser Tests
     // =========================================================================
 
-    #region GetAllOrganizations Tests
+    #region GetAllOrganizationsForUser Tests
 
     [Fact]
     public async Task GetAllOrganizationsForUser_Returns200_WithOrganizations()
@@ -437,6 +437,89 @@ public class OrganizationControllerTests : IDisposable
             "dto");
 
         AssertHasHttpAttribute(method, nameof(HttpPostAttribute));
+    }
+
+    #endregion
+
+    // =========================================================================
+    // UpdateOrganization Tests
+    // =========================================================================
+
+    #region UpdateOrganization Tests
+
+    [Fact]
+    public async Task UpdateOrganization_Returns200_WithOrganization()
+    {
+        // Arrange
+        OrganizationResponseDto expected =
+            new OrganizationResponseDto();
+        UpdateOrganizationRequestDto input = new UpdateOrganizationRequestDto();
+
+        _mockOrganizationBusiness
+            .Setup(b => b.UpdateOrganization(UserId, OrgId, input))
+            .ReturnsAsync(expected);
+
+        // Act
+        var actionResult = await _organizationController.UpdateOrganization(OrgId, input);
+
+        // Assert
+        var result = Assert.IsType<OkObjectResult>(actionResult.Result);
+
+        Assert.Equal(StatusCodes.Status200OK, result.StatusCode);
+        Assert.Equal(expected, result.Value);
+
+        _mockOrganizationBusiness.Verify(
+            b => b.UpdateOrganization(UserId, OrgId, input),
+            Times.Once);
+    }
+
+
+    [Fact]
+    public async Task UpdateOrganization_Returns500_OnUnexpectedException()
+    {
+        _mockOrganizationBusiness
+            .Setup(b => b.UpdateOrganization(It.IsAny<long>(), It.IsAny<long>(), It.IsAny<UpdateOrganizationRequestDto>()))
+            .ThrowsAsync(new Exception("db error"));
+
+        var result = (await _organizationController.UpdateOrganization(It.IsAny<long>(), It.IsAny<UpdateOrganizationRequestDto>())).Result as ObjectResult;
+
+        Assert.NotNull(result);
+        Assert.Equal(500, result.StatusCode);
+    }
+
+    [Fact]
+    public async Task UpdateOrganization_PassesFiltersAndAdminFlagsToBusinessLayer()
+    {
+        // Arrange
+        const bool hideArchived = false;
+        UpdateOrganizationRequestDto input = new UpdateOrganizationRequestDto();
+
+        UserContextStorage.UserId = UserId;
+        UserContextStorage.IsSysAdmin = true;
+
+        var expected = new OrganizationResponseDto();
+
+        _mockOrganizationBusiness
+            .Setup(b => b.UpdateOrganization(UserId, OrgId, input))
+            .ReturnsAsync(expected);
+
+        // Act
+        await _organizationController.UpdateOrganization(OrgId, input);
+
+        // Assert
+        _mockOrganizationBusiness.Verify(
+            b => b.UpdateOrganization(UserId, OrgId, input),
+            Times.Once);
+    }
+
+    [Fact]
+    public void UpdateOrganization_HasHttpPost()
+    {
+        var method = GetControllerMethod(
+            nameof(OrganizationController.UpdateOrganization),
+            "dto");
+
+        AssertHasHttpAttribute(method, nameof(HttpPutAttribute));
     }
 
     #endregion
