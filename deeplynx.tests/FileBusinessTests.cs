@@ -2844,7 +2844,7 @@ public class FileBusinessTests : IntegrationTestBase
         };
 
         // Act
-        var session = await _fileBusiness.CreateUpload(
+        var session = await _fileBusiness.CreateUploadTus(
             oid,
             pid,
             did,
@@ -2904,7 +2904,7 @@ public class FileBusinessTests : IntegrationTestBase
             .ReturnsAsync(expectedLength);
 
         // Act
-        var result = await _fileBusiness.GetUploadOffset(
+        var result = await _fileBusiness.GetUploadOffsetTus(
             oid,
             pid,
             did,
@@ -2971,7 +2971,7 @@ public class FileBusinessTests : IntegrationTestBase
             .ReturnsAsync(expectedLength);
 
         // Act
-        var result = await _fileBusiness.GetUploadOffset(
+        var result = await _fileBusiness.GetUploadOffsetTus(
             oid,
             pid,
             null,
@@ -3025,7 +3025,7 @@ public class FileBusinessTests : IntegrationTestBase
 
         // Act
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            _fileBusiness.GetUploadOffset(
+            _fileBusiness.GetUploadOffsetTus(
                 oid,
                 pid,
                 did,
@@ -3074,7 +3074,7 @@ public class FileBusinessTests : IntegrationTestBase
             .Returns(innerFileBusiness.Object);
 
         innerFileBusiness
-            .Setup(x => x.UploadPart(
+            .Setup(x => x.UploadPartTus(
                 oid,
                 pid,
                 did,
@@ -3094,7 +3094,7 @@ public class FileBusinessTests : IntegrationTestBase
             .ReturnsAsync(uploadLength);
 
         // Act
-        var result = await _fileBusiness.UploadPart(
+        var result = await _fileBusiness.UploadPartTus(
             oid,
             pid,
             did,
@@ -3107,7 +3107,7 @@ public class FileBusinessTests : IntegrationTestBase
         Assert.Equal(expectedNewOffset, result);
 
         innerFileBusiness.Verify(
-            x => x.UploadPart(
+            x => x.UploadPartTus(
                 oid,
                 pid,
                 did,
@@ -3144,7 +3144,7 @@ public class FileBusinessTests : IntegrationTestBase
             .Returns(innerFileBusiness.Object);
 
         innerFileBusiness
-            .Setup(x => x.UploadPart(
+            .Setup(x => x.UploadPartTus(
                 oid,
                 pid,
                 did,
@@ -3164,7 +3164,7 @@ public class FileBusinessTests : IntegrationTestBase
             .ReturnsAsync(uploadLength);
 
         // Act
-        var result = await _fileBusiness.UploadPart(
+        var result = await _fileBusiness.UploadPartTus(
             oid,
             pid,
             null,
@@ -3177,7 +3177,7 @@ public class FileBusinessTests : IntegrationTestBase
         Assert.Equal(expectedNewOffset, result);
 
         innerFileBusiness.Verify(
-            x => x.UploadPart(
+            x => x.UploadPartTus(
                 oid,
                 pid,
                 did,
@@ -3206,7 +3206,7 @@ public class FileBusinessTests : IntegrationTestBase
 
         // Act
         var exception = await Assert.ThrowsAsync<ArgumentException>(() =>
-            _fileBusiness.UploadPart(
+            _fileBusiness.UploadPartTus(
                 oid,
                 pid,
                 did,
@@ -3240,7 +3240,7 @@ public class FileBusinessTests : IntegrationTestBase
             .Returns(innerFileBusiness.Object);
 
         innerFileBusiness
-            .Setup(x => x.UploadPart(
+            .Setup(x => x.UploadPartTus(
                 oid,
                 pid,
                 did,
@@ -3260,7 +3260,7 @@ public class FileBusinessTests : IntegrationTestBase
             .ReturnsAsync(uploadLength);
 
         // Act
-        var result = await _fileBusiness.UploadPart(
+        var result = await _fileBusiness.UploadPartTus(
             oid,
             pid,
             did,
@@ -3290,7 +3290,7 @@ public class FileBusinessTests : IntegrationTestBase
             .Returns(innerFileBusiness.Object);
 
         innerFileBusiness
-            .Setup(x => x.UploadPart(
+            .Setup(x => x.UploadPartTus(
                 oid,
                 pid,
                 did,
@@ -3311,7 +3311,7 @@ public class FileBusinessTests : IntegrationTestBase
 
         // Act
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            _fileBusiness.UploadPart(
+            _fileBusiness.UploadPartTus(
                 oid,
                 pid,
                 did,
@@ -3326,7 +3326,7 @@ public class FileBusinessTests : IntegrationTestBase
             exception.Message);
 
         innerFileBusiness.Verify(
-            x => x.UploadPart(
+            x => x.UploadPartTus(
                 oid,
                 pid,
                 did,
@@ -3361,7 +3361,7 @@ public class FileBusinessTests : IntegrationTestBase
             .Returns(innerFileBusiness.Object);
 
         innerFileBusiness
-            .Setup(x => x.UploadPart(
+            .Setup(x => x.UploadPartTus(
                 oid,
                 pid,
                 did,
@@ -3373,7 +3373,7 @@ public class FileBusinessTests : IntegrationTestBase
 
         // Act
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            _fileBusiness.UploadPart(
+            _fileBusiness.UploadPartTus(
                 oid,
                 pid,
                 did,
@@ -3386,7 +3386,7 @@ public class FileBusinessTests : IntegrationTestBase
         Assert.Equal("Upload failed", exception.Message);
 
         innerFileBusiness.Verify(
-            x => x.UploadPart(
+            x => x.UploadPartTus(
                 oid,
                 pid,
                 did,
