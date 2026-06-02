@@ -1448,14 +1448,14 @@ public async Task<PaginatedResponse<RecordResponseDto>> GetAllRecordsPaginated(
 
         if (!string.IsNullOrWhiteSpace(dto.Uri) && dto.Uri != returnedRecord.Uri)
         {
-            var authorizedUploadLabels = await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
+            var authorizedUpdateLabels = await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
                 currentUserId,
                 organizationId,
                 projectId,
-                "upload file");
+                "update file");
 
             var canUpdateUri = returnedRecord.Labels.Count == 0 ||
-                            returnedRecord.Labels.All(l => authorizedUploadLabels.Contains(l.Id));
+                            returnedRecord.Labels.All(l => authorizedUpdateLabels.Contains(l.Id));
 
             if (!canUpdateUri)
                 throw new UnauthorizedAccessException(

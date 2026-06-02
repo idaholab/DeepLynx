@@ -3621,7 +3621,7 @@ public class RecordBusinessTests : IntegrationTestBase
         {
             Name = $"Upload File Permission {Guid.NewGuid()}",
             Description = "Allows file upload for this label",
-            Action = "upload file",
+            Action = "update file",
             LabelId = label.Id,
             OrganizationId = organizationId,
             ProjectId = pid,
