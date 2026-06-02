@@ -301,7 +301,7 @@ export default function ProjectInsightClientView() {
     let cancelled = false;
 
     const pollStatuses = async () => {
-      const updatedStatuses = await Promise.all(
+      const updatedStatuses: Array<[number, ProjectInsightStatus]> = await Promise.all(
         pollingIds.map(async (recordId) => {
           try {
             const ingestionStatus = await fetchInsightIngestionStatus({
