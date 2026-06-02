@@ -35,9 +35,9 @@ public partial class Organization
     [Column("require_sensitivity_label")]
     public bool RequireSensitivityLabel { get; set; } = false;
 
-    [Column("theme_name")]
+    [Column("theme")]
     [MaxLength(50)]
-    public string ThemeName { get; set; } = "default";
+    public string Theme { get; set; } = "default";
 
     [InverseProperty("Organization")]
     public virtual ICollection<Group> Groups { get; set; } = new List<Group>();

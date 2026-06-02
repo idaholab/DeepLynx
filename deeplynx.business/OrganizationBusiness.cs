@@ -87,7 +87,7 @@ public class OrganizationBusiness : IOrganizationBusiness
                 IsArchived = o.IsArchived,
                 DefaultOrg = o.DefaultOrg,
                 Banner = o.Banner,
-                ThemeName = o.ThemeName
+                Theme = o.Theme
             })
             .ToListAsync();
     }
@@ -121,7 +121,7 @@ public class OrganizationBusiness : IOrganizationBusiness
             IsArchived = organization.IsArchived,
             DefaultOrg = organization.DefaultOrg,
             Banner = organization.Banner,
-            ThemeName = organization.ThemeName
+            Theme = organization.Theme
         };
     }
 
@@ -145,7 +145,7 @@ public class OrganizationBusiness : IOrganizationBusiness
             LastUpdatedBy = currentUserId,
             Banner = dto.Banner,
             RequireSensitivityLabel = dto.RequireSensitivityLabel ?? false,
-            ThemeName = "default"
+            Theme = "default"
         };
 
         _context.Organizations.Add(organization);
@@ -189,7 +189,7 @@ public class OrganizationBusiness : IOrganizationBusiness
             DefaultOrg = organization.DefaultOrg,
             Banner = organization.Banner,
             RequireSensitivityLabel = organization.RequireSensitivityLabel,
-            ThemeName = organization.ThemeName
+            Theme = organization.Theme
         };
     }
 
@@ -228,9 +228,16 @@ public class OrganizationBusiness : IOrganizationBusiness
         if (dto.RequireSensitivityLabel != null)
             organization.RequireSensitivityLabel = dto.RequireSensitivityLabel.Value;
 
-        if (dto.ThemeName != null)
+        if (dto.Theme != null)
         {
-            organization.ThemeName = dto.ThemeName;
+            organization.Theme = dto.Theme.Value switch
+            {
+                OrganizationTheme.Default => "default",
+                OrganizationTheme.Nric => "nric",
+                OrganizationTheme.Nord => "nord",
+                OrganizationTheme.Emerald => "emerald",
+                _ => "default"
+            };
         }
 
         organization.Name = dto.Name ?? organization.Name;
@@ -271,7 +278,7 @@ public class OrganizationBusiness : IOrganizationBusiness
             DefaultOrg = organization.DefaultOrg,
             Banner = organization.Banner,
             RequireSensitivityLabel = organization.RequireSensitivityLabel,
-            ThemeName = organization.ThemeName
+            Theme = organization.Theme
         };
     }
 
