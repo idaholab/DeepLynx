@@ -57,6 +57,8 @@ export const translations = {
         "All {count} records are valid and ready to upload.",
       ALL_YOUR_PROJECTS: "All your Projects",
       AND: "and",
+      API_ID_TOOLTIP_DESCRIPTION:
+        "Use these IDs when using the API scoped to your current organization and project.",
       API_KEYPAIRS: "API Keys",
       APP_OWNER_EMAIL: "App Owner Email",
       APPEAR_ON_TOP_RIGHT_NEXT_TO_ORG_NAME:
@@ -233,6 +235,7 @@ export const translations = {
       DATA_RECORD: "Data Records",
       DATA_SCHEMA: "Data Schema",
       DATA_SOURCE: "Data source",
+      DATA_SOURCE_ID: "Data Source ID",
       DATA_SOURCE_NAME: "Data Source Name",
       DATA_SOURCES: "Data Sources",
       DATA_TYPE: "Data Type",
@@ -953,6 +956,7 @@ export const translations = {
       NOT_FOUND: "Not Found",
       OAUTH_APPLICATION: "OAuth Application",
       OBJECT_STORAGE: "Object Storage",
+      OBJECT_STORAGE_ID: "Object Storage ID",
       OBJECT_STORAGE_ID_MUST_BE_AN_INTEGER:
         "object_storage_id must be an integer if provided.",
       OBJECT_STORAGE_ID_NOT_FOUND_IN_PROJECT:
@@ -982,6 +986,7 @@ export const translations = {
       ORGANIZATION: "Organization",
       ORGANIZATION_ADMIN_ACCESS_UPDATED: "Organization admin access updated.",
       ORGANIZATION_DEFAULT: "Organization Default",
+      ORGANIZATION_ID: "Organization ID",
       ORGANIZATION_LABEL: "Organization Label",
       ORGANIZATION_LABEL_CREATED: "Organization label created.",
       ORGANIZATION_LABEL_UPDATED: "Organization label updated.",
@@ -1634,6 +1639,8 @@ export const translations = {
         "Los {count} registros son válidos y están listos para cargarse.",
       ALL_YOUR_PROJECTS: "Todos tus proyectos",
       AND: "y",
+      API_ID_TOOLTIP_DESCRIPTION:
+        "Usa estos identificadores al usar la API en el ámbito de tu organización y proyecto actuales.",
       API_KEYPAIRS: "Claves API",
       APP_OWNER_EMAIL: "Correo del propietario de la aplicación",
       APPEAR_ON_TOP_RIGHT_NEXT_TO_ORG_NAME:
@@ -1816,6 +1823,7 @@ export const translations = {
       DATA_RECORD: "Registros de datos",
       DATA_SCHEMA: "Esquema de Datos",
       DATA_SOURCE: "Fuente de datos: ",
+      DATA_SOURCE_ID: "ID de la fuente de datos",
       DATA_SOURCE_NAME: "Nombre de la fuente de datos",
       DATA_SOURCES: "Fuentes de datos",
       DATA_TYPE: "Tipo de dato",
@@ -2585,6 +2593,7 @@ export const translations = {
       NOT_FOUND: "No encontrado",
       OAUTH_APPLICATION: "Aplicación OAuth",
       OBJECT_STORAGE: "Almacenamiento de objetos",
+      OBJECT_STORAGE_ID: "ID del almacenamiento de objetos",
       OBJECT_STORAGE_ID_MUST_BE_AN_INTEGER:
         "object_storage_id debe ser un número entero si se proporciona.",
       OBJECT_STORAGE_ID_NOT_FOUND_IN_PROJECT:
@@ -2615,6 +2624,7 @@ export const translations = {
       ORGANIZATION_ADMIN_ACCESS_UPDATED:
         "Se actualizo el acceso de administrador de la organizacion.",
       ORGANIZATION_DEFAULT: "Predeterminado de la organización",
+      ORGANIZATION_ID: "ID de la organización",
       ORGANIZATION_LABEL: "Etiqueta de la organización",
       ORGANIZATION_LABEL_CREATED: "Etiqueta de la organización creada.",
       ORGANIZATION_LABEL_UPDATED: "Etiqueta de la organización actualizada.",

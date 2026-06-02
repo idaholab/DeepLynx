@@ -3,6 +3,7 @@
 
 import { useLanguage } from "@/app/contexts/Language";
 import { useOrganizationSession } from "@/app/contexts/OrganizationSessionProvider";
+import { useProjectSession } from "@/app/contexts/ProjectSessionProvider";
 import { useSafeSession } from "@/app/hooks/useSafeSession";
 import {
   getAllOrganizationsForUser,
@@ -45,6 +46,7 @@ const LayoutShell = ({ children }: { children: ReactNode }) => {
   const { data: session } = useSafeSession();
   const { user } = useRBAC();
   const { organization, setOrganization } = useOrganizationSession();
+  const { project } = useProjectSession();
 
   const [organizations, setOrganizations] = useState<OrganizationResponseDto[]>(
     [],
@@ -225,8 +227,8 @@ const LayoutShell = ({ children }: { children: ReactNode }) => {
                       <a
                         onClick={() => handleOrganizationSwitch(org)}
                         className={`flex items-center gap-2 w-full max-w-full ${organization?.organizationId === org.id
-                            ? "active bg-info/60"
-                            : ""
+                          ? "active bg-info/60"
+                          : ""
                           }`}
                       >
                         <div className="min-w-0 flex-1 overflow-hidden">
@@ -282,7 +284,7 @@ const LayoutShell = ({ children }: { children: ReactNode }) => {
         )}
         {/* Side Menu */}
         <div
-          className={`fixed top-20 bottom-0 hidden lg:flex ${isUserDropdownOpen ? "z-[60]" : "z-40"
+          className={`fixed top-20 bottom-0 hidden lg:flex ${isUserDropdownOpen ? "z-[60]" : "z-50"
             }`}
         >
           <aside
@@ -319,8 +321,9 @@ const LayoutShell = ({ children }: { children: ReactNode }) => {
                   </Link>
                 </SysAdminRoute>
               </li>
-              <li className="mt-5">
+              <li className="mt-5 id-tooltip group relative">
                 <Link
+                  target="_blank"
                   href={
                     process.env.NEXT_PUBLIC_API_URL
                       ? `${process.env.NEXT_PUBLIC_API_URL}/scalar`
@@ -330,6 +333,33 @@ const LayoutShell = ({ children }: { children: ReactNode }) => {
                 >
                   <CommandLineIcon className="size-10" />
                 </Link>
+                <div
+                  role="tooltip"
+                  className="invisible opacity-0 group-hover:visible group-hover:opacity-100 transition-opacity duration-150 absolute left-full top-1/2 -translate-y-1/2 ml-3 z-[60] bg-base-100 text-base-content rounded-box border border-base-300 shadow-xl p-4 min-w-[22rem] pointer-events-none"
+                >
+                  <p className="text-xs text-base-content/70 mb-3 leading-snug">
+                    {t.translations.API_ID_TOOLTIP_DESCRIPTION}
+                  </p>
+                  <div className="flex flex-col gap-2">
+                    <div className="flex items-baseline justify-between gap-3">
+                      <span className="text-xs font-semibold text-base-content/70 uppercase tracking-wide whitespace-nowrap">
+                        {t.translations.ORGANIZATION_ID}
+                      </span>
+                      <span className="text-sm font-mono text-base-content break-all text-right">
+                        {organization?.organizationId ?? "—"}
+                      </span>
+                    </div>
+                    <div className="divider my-0"></div>
+                    <div className="flex items-baseline justify-between gap-3">
+                      <span className="text-xs font-semibold text-base-content/70 uppercase tracking-wide whitespace-nowrap">
+                        {t.translations.PROJECT_ID}
+                      </span>
+                      <span className="text-sm font-mono text-base-content break-all text-right">
+                        {project?.projectId ?? "—"}
+                      </span>
+                    </div>
+                  </div>
+                </div>
               </li>
               <li className="mt-5">
                 <div className="relative flex justify-center">
