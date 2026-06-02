@@ -1363,7 +1363,7 @@ namespace deeplynx.datalayer.Migrations
                         .IsRequired()
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)")
-                        .HasColumnName("theme_name");
+                        .HasColumnName("theme");
 
                     b.HasKey("Id")
                         .HasName("organization_pkey");

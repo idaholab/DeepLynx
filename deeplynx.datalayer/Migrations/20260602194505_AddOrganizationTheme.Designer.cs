@@ -12,8 +12,8 @@ using deeplynx.datalayer.Models;
 namespace deeplynx.datalayer.Migrations
 {
     [DbContext(typeof(DeeplynxContext))]
-    [Migration("20260526174129_AddOrganizationThemeName")]
-    partial class AddOrganizationThemeName
+    [Migration("20260602194505_AddOrganizationTheme")]
+    partial class AddOrganizationTheme
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -1366,7 +1366,7 @@ namespace deeplynx.datalayer.Migrations
                         .IsRequired()
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)")
-                        .HasColumnName("theme_name");
+                        .HasColumnName("theme");
 
                     b.HasKey("Id")
                         .HasName("organization_pkey");

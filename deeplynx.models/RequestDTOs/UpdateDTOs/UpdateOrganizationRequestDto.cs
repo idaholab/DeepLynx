@@ -1,6 +1,15 @@
 using System.ComponentModel.DataAnnotations;
+using System.Text.Json.Serialization;
 
 namespace deeplynx.models;
+
+public enum OrganizationTheme
+{
+    Default,
+    Nric,
+    Nord,
+    Emerald
+}
 
 public class UpdateOrganizationRequestDto
 {
@@ -14,10 +23,6 @@ public class UpdateOrganizationRequestDto
 
     public bool? RequireSensitivityLabel { get; set; }
 
-    [MaxLength(50)]
-    [RegularExpression(
-        "^(default|blue|green|red|purple|slate|highContrast)$",
-        ErrorMessage = "Invalid theme name."
-    )]
-    public string? ThemeName { get; set; }
+    [JsonConverter(typeof(JsonStringEnumConverter<OrganizationTheme>))]
+    public OrganizationTheme? Theme { get; set; }
 }
