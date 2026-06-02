@@ -138,7 +138,7 @@ const SelectOrgClient = ({ session }: Props) => {
 
   if (loading) {
     return (
-      <div className="login min-h-screen flex items-center justify-center">
+      <div className="app-header min-h-screen flex items-center justify-center">
         <span className="loading loading-spinner loading-lg"></span>
       </div>
     );
@@ -146,7 +146,7 @@ const SelectOrgClient = ({ session }: Props) => {
 
   if (error) {
     return (
-      <div className="login min-h-screen flex items-center justify-center">
+      <div className="app-header min-h-screen flex items-center justify-center">
         <div className="alert alert-error max-w-md">
           <span>{error}</span>
         </div>
@@ -156,7 +156,7 @@ const SelectOrgClient = ({ session }: Props) => {
 
   return (
     <>
-      <div className="login min-h-screen h-[700px] flex flex-col items-center justify-center p-4">
+      <div className="app-header min-h-screen h-[700px] flex flex-col items-center justify-center p-4">
         <div className="flex flex-col items-center gap-4 max-w-4xl w-full flex-1 justify-center">
           <Image
             src="/assets/nexusWhite.png"

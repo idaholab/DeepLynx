@@ -366,7 +366,7 @@ const SideMenu: React.FC<SideMenuProps> = ({
         )}
 
         {/* ------------------------------ Menu ------------------------------- */}
-        <ul className="mt-8">
+        <ul className="mt-8 text-secondary-content">
           {/* Project Dashboard */}
           <li>
             <Link
@@ -483,7 +483,7 @@ const SideMenu: React.FC<SideMenuProps> = ({
 
       {/* ---------------------------- Toggle Tab ----------------------------- */}
       <div
-        className="hidden lg:flex h-8 w-4 bg-base-300 brightness-120 text-neutral-content items-center justify-center cursor-pointer rounded-r-md mt-16"
+        className="hidden lg:flex h-8 w-4 app-header brightness-120 text-neutral-content items-center justify-center cursor-pointer rounded-r-md mt-16"
         onClick={toggleMenu}
       >
         {isCollapsed ? (

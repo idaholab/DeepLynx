@@ -16,14 +16,24 @@ export default function RootLayout({
         <script
           dangerouslySetInnerHTML={{
             __html: `
-(function () {
-  try {
-    var KEY = 'dlx-theme-mode';
-    var saved = localStorage.getItem(KEY);
-    document.documentElement.setAttribute('data-theme', saved === 'dark' ? 'default-dark' : 'default');
-  } catch (e) {}
-})();
-          `,
+	(function () {
+	  try {
+	    var KEY = 'dlx-theme-mode';
+	    var saved = localStorage.getItem(KEY);
+	    var orgTheme = 'default';
+	    var storedOrg = localStorage.getItem('organizationSession');
+
+	    if (storedOrg) {
+	      var parsedOrg = JSON.parse(storedOrg);
+	      if (['default', 'nric', 'nord'].indexOf(parsedOrg.themeName) >= 0) {
+	        orgTheme = parsedOrg.themeName;
+	      }
+	    }
+
+	    document.documentElement.setAttribute('data-theme', saved === 'dark' ? orgTheme + '-dark' : orgTheme);
+	  } catch (e) {}
+	})();
+	          `,
           }}
         />
       </head>

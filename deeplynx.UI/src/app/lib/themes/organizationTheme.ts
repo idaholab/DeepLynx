@@ -9,6 +9,16 @@ export const ORGANIZATION_THEMES = [
     label: "NRIC",
     swatches: ["#00bfb2", "#006e97", "#e3d935"],
   },
+  {
+    id: "nord",
+    label: "Nord",
+    swatches: ["#81a1c1", "#88c0d0", "#a3be8c"],
+  },
+  {
+    id: "emerald",
+    label: "Emerald",
+    swatches: ["#42d393", "#3c64ed", "#e67d47"],
+  },
 ] as const;
 
 export type OrganizationThemeName = (typeof ORGANIZATION_THEMES)[number]["id"];
