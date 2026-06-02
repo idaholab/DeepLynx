@@ -34,12 +34,12 @@ public interface IFileBusiness
     string BuildPrefix(long organizationId, long? projectId);
 
     Task<long> GetFileSize(string fileUri, ObjectStorageConfigDto objectStorageConfig);
-    Task<Guid> CreateUpload(long organizationId, long projectId, long realDataSourceId,
+    Task<Guid> CreateUploadTus(long organizationId, long projectId, long realDataSourceId,
         ObjectStorageConfigDto objectStorageConfig, long uploadLength);
     Task<long> GetUploadOffset(long organizationId, long projectId, long realDataSourceId, string uploadId,
         ObjectStorageConfigDto objectStorageConfig);
     Task<long> GetUploadLength(long organizationId, long projectId, long realDataSourceId, string uploadId,
         ObjectStorageConfigDto objectStorageConfig);
-    Task<long> UploadPart(long organizationId, long projectId, long realDataSourceId, string uploadId, long uploadOffset,
+    Task<long> UploadPartTus(long organizationId, long projectId, long realDataSourceId, string uploadId, long uploadOffset,
         ObjectStorageConfigDto objectStorageConfig, System.IO.Stream uploadBody);
 }

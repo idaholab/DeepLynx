@@ -438,7 +438,17 @@ public class FileFilesystemBusiness : IFileBusiness
         }
     }
 
-    public async Task<Guid> CreateUpload(long organizationId, long projectId, long datasourceId,
+    /// <summary>
+    /// Creates an upload in the storage space with a filelength var for the tus protocol.
+    /// </summary>
+    /// <param name="organizationId"></param>
+    /// <param name="projectId"></param>
+    /// <param name="datasourceId"></param>
+    /// <param name="objectStorageConfig"></param>
+    /// <param name="uploadLength"></param>
+    /// <returns></returns>
+    /// <exception cref="InvalidOperationException"></exception>
+    public async Task<Guid> CreateUploadTus(long organizationId, long projectId, long datasourceId,
         ObjectStorageConfigDto objectStorageConfig, long uploadLength)
     {
         var uploadId = Guid.NewGuid();
@@ -462,6 +472,17 @@ public class FileFilesystemBusiness : IFileBusiness
         return uploadId;
     }
 
+
+    /// <summary>
+    /// Gets the current upload offset/upload-progress for the tus protocol. 
+    /// </summary>
+    /// <param name="organizationId"></param>
+    /// <param name="projectId"></param>
+    /// <param name="datasourceId"></param>
+    /// <param name="uploadId"></param>
+    /// <param name="objectStorageConfig"></param>
+    /// <returns></returns>
+    /// <exception cref="InvalidOperationException"></exception>
     public async Task<long> GetUploadOffset(long organizationId, long projectId, long datasourceId, string uploadId,
         ObjectStorageConfigDto objectStorageConfig)
     {
@@ -489,6 +510,16 @@ public class FileFilesystemBusiness : IFileBusiness
         return fileInfo.Length;
     }
 
+    /// <summary>
+    /// Gets the total declared length for the upload for the tus protocol.
+    /// </summary>
+    /// <param name="organizationId"></param>
+    /// <param name="projectId"></param>
+    /// <param name="datasourceId"></param>
+    /// <param name="uploadId"></param>
+    /// <param name="objectStorageConfig"></param>
+    /// <returns></returns>
+    /// <exception cref="InvalidOperationException"></exception>
     public async Task<long> GetUploadLength(long organizationId, long projectId, long datasourceId, string uploadId,
         ObjectStorageConfigDto objectStorageConfig)
     {
@@ -516,7 +547,19 @@ public class FileFilesystemBusiness : IFileBusiness
         return (long)meta.UploadLength;
     }
 
-    public async Task<long> UploadPart(long organizationId, long projectId, long datasourceId, string uploadId,
+    /// <summary>
+    /// Uploads a part for the tus protocol using a byte filestream, for the tus protocol.
+    /// </summary>
+    /// <param name="organizationId"></param>
+    /// <param name="projectId"></param>
+    /// <param name="datasourceId"></param>
+    /// <param name="uploadId"></param>
+    /// <param name="uploadOffset"></param>
+    /// <param name="objectStorageConfig"></param>
+    /// <param name="uploadBody"></param>
+    /// <returns></returns>
+    /// <exception cref="InvalidOperationException"></exception>
+    public async Task<long> UploadPartTus(long organizationId, long projectId, long datasourceId, string uploadId,
         long uploadOffset, ObjectStorageConfigDto objectStorageConfig, System.IO.Stream uploadBody)
     {
         if (objectStorageConfig.MountPath == null)

@@ -919,7 +919,7 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
         try
         {
             // Act
-            var uploadId = await _fileBusiness.CreateUpload(
+            var uploadId = await _fileBusiness.CreateUploadTus(
                 organizationId,
                 pid,
                 dataSourceId,
@@ -954,7 +954,7 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
 
         // Act
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            _fileBusiness.CreateUpload(
+            _fileBusiness.CreateUploadTus(
                 organizationId,
                 pid,
                 dataSourceId,
@@ -975,7 +975,7 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
 
         try
         {
-            var uploadId = await _fileBusiness.CreateUpload(
+            var uploadId = await _fileBusiness.CreateUploadTus(
                 organizationId,
                 pid,
                 dataSourceId,
@@ -1010,7 +1010,7 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
 
         try
         {
-            var uploadId = await _fileBusiness.CreateUpload(
+            var uploadId = await _fileBusiness.CreateUploadTus(
                 organizationId,
                 pid,
                 dataSourceId,
@@ -1092,7 +1092,7 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
 
         try
         {
-            var uploadId = await _fileBusiness.CreateUpload(
+            var uploadId = await _fileBusiness.CreateUploadTus(
                 organizationId,
                 pid,
                 dataSourceId,
@@ -1204,7 +1204,7 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
 
         try
         {
-            var uploadId = await _fileBusiness.CreateUpload(
+            var uploadId = await _fileBusiness.CreateUploadTus(
                 organizationId,
                 pid,
                 dataSourceId,
@@ -1215,7 +1215,7 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
             var dataPath = Path.Combine(uploadPath, "data");
 
             // Act
-            var result = await _fileBusiness.UploadPart(
+            var result = await _fileBusiness.UploadPartTus(
                 organizationId,
                 pid,
                 dataSourceId,
@@ -1249,7 +1249,7 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
 
         try
         {
-            var uploadId = await _fileBusiness.CreateUpload(
+            var uploadId = await _fileBusiness.CreateUploadTus(
                 organizationId,
                 pid,
                 dataSourceId,
@@ -1259,7 +1259,7 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
             var uploadPath = GetResumableUploadPath(organizationId, pid, dataSourceId, uploadId.ToString());
             var dataPath = Path.Combine(uploadPath, "data");
 
-            var firstOffset = await _fileBusiness.UploadPart(
+            var firstOffset = await _fileBusiness.UploadPartTus(
                 organizationId,
                 pid,
                 dataSourceId,
@@ -1269,7 +1269,7 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
                 firstBody);
 
             // Act
-            var secondOffset = await _fileBusiness.UploadPart(
+            var secondOffset = await _fileBusiness.UploadPartTus(
                 organizationId,
                 pid,
                 dataSourceId,
@@ -1303,7 +1303,7 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
 
         try
         {
-            var uploadId = await _fileBusiness.CreateUpload(
+            var uploadId = await _fileBusiness.CreateUploadTus(
                 organizationId,
                 pid,
                 dataSourceId,
@@ -1313,7 +1313,7 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
             var uploadPath = GetResumableUploadPath(organizationId, pid, dataSourceId, uploadId.ToString());
             var dataPath = Path.Combine(uploadPath, "data");
 
-            await _fileBusiness.UploadPart(
+            await _fileBusiness.UploadPartTus(
                 organizationId,
                 pid,
                 dataSourceId,
@@ -1323,7 +1323,7 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
                 firstBody);
 
             // Act
-            var result = await _fileBusiness.UploadPart(
+            var result = await _fileBusiness.UploadPartTus(
                 organizationId,
                 pid,
                 dataSourceId,
@@ -1356,7 +1356,7 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
 
         // Act
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            _fileBusiness.UploadPart(
+            _fileBusiness.UploadPartTus(
                 organizationId,
                 pid,
                 dataSourceId,
@@ -1382,7 +1382,7 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
 
         // Act
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            _fileBusiness.UploadPart(
+            _fileBusiness.UploadPartTus(
                 organizationId,
                 pid,
                 dataSourceId,

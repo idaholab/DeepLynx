@@ -349,9 +349,17 @@ public class FileController : ControllerBase
         }
     }
 
-    [HttpPost("upload", Name = "api_create_file_upload")]
+    /// <summary>
+    /// Creates an upload according to the tus protocol.
+    /// </summary>
+    /// <param name="organizationId"></param>
+    /// <param name="projectId"></param>
+    /// <param name="dataSourceId"></param>
+    /// <param name="objectStorageId"></param>
+    /// <returns></returns>
+    [HttpPost("upload", Name = "api_create_file_upload_tus")]
     [Auth("write", "file")]
-    public async Task<IActionResult> CreateUpload(
+    public async Task<IActionResult> CreateUploadTus(
         long organizationId,
         long projectId,
         [FromQuery] long? dataSourceId,
@@ -382,7 +390,7 @@ public class FileController : ControllerBase
                 FileSize = uploadLength
             };
 
-            var uploadSession = await _fileBusiness.CreateUpload(
+            var uploadSession = await _fileBusiness.CreateUploadTus(
                 organizationId, projectId, dataSourceId, objectStorageId, request);
 
             Response.Headers["Tus-Resumable"] = "1.0.0";
@@ -398,9 +406,18 @@ public class FileController : ControllerBase
         }
     }
 
-    [HttpHead("upload/{uploadId}", Name = "api_get_offset_file_upload")]
+    /// <summary>
+    /// Gets the offset/upload-progress of the desired upload declared in the http header.
+    /// </summary>
+    /// <param name="organizationId"></param>
+    /// <param name="projectId"></param>
+    /// <param name="uploadId"></param>
+    /// <param name="dataSourceId"></param>
+    /// <param name="objectStorageId"></param>
+    /// <returns></returns>
+    [HttpHead("upload/{uploadId}", Name = "api_get_upload_offset_tus")]
     [Auth("write", "file")]
-    public async Task<IActionResult> GetUploadOffset(
+    public async Task<IActionResult> GetUploadOffsetTus(
         long organizationId,
         long projectId,
         string uploadId,
@@ -415,7 +432,7 @@ public class FileController : ControllerBase
                 return StatusCode(412);
             }
 
-            var (offset, uploadLength) = await _fileBusiness.GetUploadOffset(organizationId, projectId, dataSourceId, objectStorageId, uploadId);
+            var (offset, uploadLength) = await _fileBusiness.GetUploadOffsetTus(organizationId, projectId, dataSourceId, objectStorageId, uploadId);
 
             Response.Headers["Tus-Resumable"] = "1.0.0";
             Response.Headers["Upload-Offset"] = offset.ToString();
@@ -431,9 +448,18 @@ public class FileController : ControllerBase
         }
     }
 
+    /// <summary>
+    /// Uploads parts according to the tus protocol. Currently has no upload part size limit.
+    /// </summary>
+    /// <param name="organizationId"></param>
+    /// <param name="projectId"></param>
+    /// <param name="uploadId"></param>
+    /// <param name="dataSourceId"></param>
+    /// <param name="objectStorageId"></param>
+    /// <returns></returns>
     [HttpPatch("upload/{uploadId}", Name = "api_patch_file_upload")]
     [Auth("write", "file")]
-    public async Task<IActionResult> UploadPart(
+    public async Task<IActionResult> UploadPartTus(
         long organizationId,
         long projectId,
         string uploadId,
@@ -456,7 +482,7 @@ public class FileController : ControllerBase
                 contentType != "application/offset+octet-stream")
                 return StatusCode(415);
 
-            var newOffset = await _fileBusiness.UploadPart(
+            var newOffset = await _fileBusiness.UploadPartTus(
                 organizationId, projectId, dataSourceId, objectStorageId, uploadId, uploadOffset, Request.Body);
 
             Response.Headers["Tus-Resumable"] = "1.0.0";
@@ -471,6 +497,15 @@ public class FileController : ControllerBase
         }
     }
 
+    /// <summary>
+    /// Cancles a tus protocol upload.
+    /// </summary>
+    /// <param name="organizationId"></param>
+    /// <param name="projectId"></param>
+    /// <param name="uploadId"></param>
+    /// <param name="dataSourceId"></param>
+    /// <param name="objectStorageId"></param>
+    /// <returns></returns>
     [HttpDelete("upload/{uploadId}", Name = "api_cancel_tus_file_upload")]
     [Auth("write", "file")]
     public async Task<IActionResult> CancelTusUpload(
@@ -501,7 +536,7 @@ public class FileController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
-
+    //Private helper
     private string ParseMetadataValue(string uploadMetadata, string key)
     {
         foreach (var pair in uploadMetadata.Split(','))

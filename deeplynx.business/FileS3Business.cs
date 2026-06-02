@@ -80,7 +80,7 @@ public class FileS3Business : IFileBusiness
         return 0;
     }
 
-    public async Task<Guid> CreateUpload(long organizationId, long projectId, long realDataSourceId,
+    public async Task<Guid> CreateUploadTus(long organizationId, long projectId, long realDataSourceId,
         ObjectStorageConfigDto objectStorageConfig, long uploadLength)
     {
         return Guid.Empty;
@@ -98,7 +98,7 @@ public class FileS3Business : IFileBusiness
         return 0;
     }
 
-    public async Task<long> UploadPart(long organizationId, long projectId, long realDataSourceId, string uploadId,
+    public async Task<long> UploadPartTus(long organizationId, long projectId, long realDataSourceId, string uploadId,
         long uploadOffset, ObjectStorageConfigDto objectStorageConfig, System.IO.Stream uploadBody)
     {
         return 0;

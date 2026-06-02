@@ -553,7 +553,7 @@ public class FileBusiness
         await _context.SaveChangesAsync();
     }
 
-    public async Task<TusFileUploadSessionResponseDto> CreateUpload(
+    public async Task<TusFileUploadSessionResponseDto> CreateUploadTus(
         long organizationId,
         long projectId,
         long? dataSourceId,
@@ -568,7 +568,7 @@ public class FileBusiness
 
         var fileBusiness = _factory.CreateFileBusiness(objectStorage.Type);
 
-        var uploadId = await fileBusiness.CreateUpload(organizationId, projectId, realDataSourceId, objectStorage.Config, request.FileSize);
+        var uploadId = await fileBusiness.CreateUploadTus(organizationId, projectId, realDataSourceId, objectStorage.Config, request.FileSize);
 
         return new TusFileUploadSessionResponseDto
         {
@@ -576,7 +576,7 @@ public class FileBusiness
         };
     }
 
-    public async Task<(long, long)> GetUploadOffset(
+    public async Task<(long, long)> GetUploadOffsetTus(
         long organizationId,
         long projectId,
         long? dataSourceId,
@@ -596,7 +596,7 @@ public class FileBusiness
         return (uploadOffset, uploadLength);
     }
 
-    public async Task<long> UploadPart(
+    public async Task<long> UploadPartTus(
     long organizationId,
     long projectId,
     long? dataSourceId,
@@ -613,7 +613,7 @@ public class FileBusiness
         var objectStorage = await _objectStorageBusiness.GetDecryptedObjectStorage(realObjectStorageId);
         var fileBusiness = _factory.CreateFileBusiness(objectStorage.Type);
 
-        var newOffset = await fileBusiness.UploadPart(organizationId, projectId, realDataSourceId, uploadId, uploadOffset,
+        var newOffset = await fileBusiness.UploadPartTus(organizationId, projectId, realDataSourceId, uploadId, uploadOffset,
             objectStorage.Config, uploadBody);
         var uploadLength = await fileBusiness.GetUploadLength(organizationId, projectId, realDataSourceId, uploadId, objectStorage.Config);
 
