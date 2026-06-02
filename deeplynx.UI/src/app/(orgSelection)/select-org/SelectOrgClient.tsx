@@ -122,7 +122,7 @@ const SelectOrgClient = ({ session }: Props) => {
     setOrganization({
       organizationId: org.id,
       organizationName: org.name,
-      themeName: org.themeName,
+      themeName: org.theme,
     });
 
     router.push("/");

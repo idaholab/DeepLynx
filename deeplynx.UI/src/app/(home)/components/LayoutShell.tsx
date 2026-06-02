@@ -133,7 +133,7 @@ const LayoutShell = ({ children }: { children: ReactNode }) => {
       organizationId: org.id,
       organizationName: org.name,
       banner: org.banner ?? null,
-      themeName: org.themeName ?? "default",
+      themeName: org.theme ?? "default",
     });
 
     router.push("/");

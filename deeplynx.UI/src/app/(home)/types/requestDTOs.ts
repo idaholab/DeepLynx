@@ -39,7 +39,7 @@ export type UpdateOrganizationRequestDto = {
   description?: string | null;
   defaultOrg?: boolean | null;
   banner?: string | null;
-  themeName?: string | null;
+  theme?: string | null;
 };
 
 export type CreateOauthApplicationRequestDto = {

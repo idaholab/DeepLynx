@@ -189,10 +189,10 @@ const OrganizationSettings = () => {
 
       const updateOrg = await updateOrganization(
         organization?.organizationId as number,
-        { themeName: selectedThemeName },
+        { theme: selectedThemeName },
       );
 
-      const newThemeName = resolveOrganizationTheme(updateOrg.themeName);
+      const newThemeName = resolveOrganizationTheme(updateOrg.theme);
 
       setOriginalThemeName(newThemeName);
       applyOrganizationTheme(newThemeName);

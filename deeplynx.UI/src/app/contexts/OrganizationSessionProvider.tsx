@@ -95,7 +95,7 @@ export const OrganizationSessionProvider = ({
           const updated = {
             ...prev,
             banner: fullOrg.banner ?? null,
-            themeName: fullOrg.themeName ?? "default",
+            themeName: fullOrg.theme ?? "default",
           };
           const serialized = JSON.stringify(updated);
           localStorage.setItem("organizationSession", serialized);
