@@ -99,6 +99,30 @@ export type RecordResponseDto = {
   labels?: { id: number | null; name: string }[];
 };
 
+export type QueryRecordViewResponseDto = {
+  id: number | null;
+  uri?: string | null;
+  properties?: unknown;
+  originalId?: string | null;
+  name: string;
+  description?: string | null;
+  classId?: number | null;
+  className?: string | null;
+  dataSourceId?: number | null;
+  dataSourceName?: string | null;
+  objectStorageId?: number | null;
+  objectStorageName?: string | null;
+  projectId?: number | null;
+  projectName?: string | null;
+  fileType?: string | null;
+  fileSize?: number | null;
+  tags?: string | null;
+  labels?: string | null;
+  lastUpdatedAt?: string;
+  lastUpdatedBy?: number | null;
+  isArchived?: boolean;
+}
+
 export type ObjectStorageResponseDto = {
   id: number | string;
   name: string;
