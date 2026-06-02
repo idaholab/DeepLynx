@@ -3405,6 +3405,5 @@ public class FileBusinessTests : IntegrationTestBase
                 It.IsAny<ObjectStorageConfigDto>()),
             Times.Never);
     }
-
     #endregion
 }
