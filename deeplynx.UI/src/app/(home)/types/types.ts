@@ -226,3 +226,7 @@ export type ExpandableTableColumn<T> = {
   isExpandTrigger?: (row: T) => boolean;
 };
 
+export type RecordTagLinkDto = {
+  record_id: number;
+  tag_id: number;
+};

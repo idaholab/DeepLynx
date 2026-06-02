@@ -127,34 +127,17 @@ public class FileBusiness
         // Initialize properties
         var properties = metadata?.Properties ?? new JsonObject();
 
-        // Extract column names for tabular files (CSV/Parquet)
-        if (fileExtension == "csv" || fileExtension == "parquet")
-        {
-            bool hasContent;
-            using (var reader = new StreamReader(file.OpenReadStream()))
-            {
-                hasContent = false;
-                var buffer = new char[256];
-                int bytesRead;
-                while ((bytesRead = await reader.ReadAsync(buffer, 0, buffer.Length)) > 0 && !hasContent)
-                {
-                    if (buffer.Take(bytesRead).Any(c => !char.IsWhiteSpace(c)))
-                    {
-                        hasContent = true;
-                    }
-                }
-            }
-
-            if (hasContent)
-            {
-                var columns = await _olapBusiness.ExtractTabularColumns(objectStorage.Type, objectStorage.Config, uri);
-                if (columns != null && columns.Count > 0)
-                {
-                    properties["columns"] = columns;
-                    recordClass = await _classBusiness.GetOrCreateClass(currentUserId, organizationId, projectId, "Timeseries");
-                }
-            }
-        }
+        recordClass = await ExtractTabularRecordMetadata(
+            currentUserId,
+            organizationId,
+            projectId,
+            fileExtension,
+            objectStorage.Type,
+            objectStorage.Config,
+            uri,
+            properties,
+            recordClass,
+            () => file.OpenReadStream());
 
         var recordRequest = new CreateRecordRequestDto
         {
@@ -428,16 +411,31 @@ public class FileBusiness
         var uri = await fileBusiness.CompleteUpload(organizationId, projectId, realDataSourceId,
             objectStorage.Config, request, guid);
 
+        var fileExtension = Path.GetExtension(request.FileName).TrimStart('.').ToLower();
         var fileClass = await _classBusiness.GetOrCreateClass(currentUserId, organizationId, projectId, "File");
         var fileSize = new FileInfo(uri).Length;
+        var properties = metadata?.Properties ?? new JsonObject
+        {
+            ["fileType"] = fileExtension,
+            ["uploadedViaChunking"] = true,
+            ["originalUploadId"] = request.UploadId
+        };
+
+        fileClass = await ExtractTabularRecordMetadata(
+            currentUserId,
+            organizationId,
+            projectId,
+            fileExtension,
+            objectStorage.Type,
+            objectStorage.Config,
+            uri,
+            properties,
+            fileClass,
+            objectStorage.Type == "filesystem" ? () => File.OpenRead(uri) : null);
+
         var recordRequest = new CreateRecordRequestDto
         {
-            Properties = metadata?.Properties ?? new JsonObject
-            {
-                ["fileType"] = Path.GetExtension(request.FileName).TrimStart('.').ToLower(),
-                ["uploadedViaChunking"] = true,
-                ["originalUploadId"] = request.UploadId
-            },
+            Properties = properties,
             Name = metadata?.Name ?? request.FileName,
             ObjectStorageId = objectStorage.Id,
             Description = metadata?.Description ?? $"File uploaded via chunked upload (session: {request.UploadId})",
@@ -445,7 +443,7 @@ public class FileBusiness
             Uri = uri,
             ClassId = metadata?.ClassId ?? fileClass.Id,
             ClassName = metadata?.ClassName ?? fileClass.Name,
-            FileType = Path.GetExtension(request.FileName).TrimStart('.').ToLower(),
+            FileType = fileExtension,
             FileSize = fileSize
         };
 
@@ -651,5 +649,56 @@ public class FileBusiness
         var defaultObjectStorage = await _objectStorageBusiness.GetDefaultObjectStorage(organizationId, projectId)
             ?? throw new KeyNotFoundException("Default object storage not found");
         return defaultObjectStorage.Id;
+    }
+
+    private async Task<ClassResponseDto> ExtractTabularRecordMetadata(
+        long currentUserId,
+        long organizationId,
+        long projectId,
+        string fileExtension,
+        string objectStorageType,
+        ObjectStorageConfigDto objectStorageConfig,
+        string uri,
+        JsonObject properties,
+        ClassResponseDto defaultClass,
+        Func<Stream>? openReadStream)
+    {
+        if (!IsTabularFileExtension(fileExtension))
+            return defaultClass;
+
+        if (openReadStream != null && !await HasNonWhitespaceContent(openReadStream))
+            return defaultClass;
+
+        var columns = await _olapBusiness.ExtractTabularColumns(objectStorageType, objectStorageConfig, uri);
+        if (columns == null || columns.Count == 0)
+            return defaultClass;
+
+        properties["columns"] = columns;
+        return await _classBusiness.GetOrCreateClass(currentUserId, organizationId, projectId, "Timeseries");
+    }
+
+    private static bool IsTabularFileExtension(string fileExtension)
+    {
+        return fileExtension == "csv" || fileExtension == "parquet";
+    }
+
+    private static async Task<bool> HasNonWhitespaceContent(Func<Stream> openReadStream)
+    {
+        await using var stream = openReadStream();
+        using var reader = new StreamReader(stream);
+
+        var buffer = new char[256];
+        int charsRead;
+
+        while ((charsRead = await reader.ReadAsync(buffer, 0, buffer.Length)) > 0)
+        {
+            for (var i = 0; i < charsRead; i++)
+            {
+                if (!char.IsWhiteSpace(buffer[i]))
+                    return true;
+            }
+        }
+
+        return false;
     }
 }

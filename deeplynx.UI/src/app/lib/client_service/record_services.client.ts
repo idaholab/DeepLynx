@@ -1,9 +1,9 @@
 // src/app/lib/record_services.client.ts
 "use client";
 
-import { CreateRecordRequestDto, UpdateRecordRequestDto } from "@/app/(home)/types/requestDTOs";
+import { CreateRecordRequestDto, UpdateRecordRequestDto} from "@/app/(home)/types/requestDTOs";
 import { HistoricalRecordResponseDto, RecordResponseDto, RelatedRecordsResponseDto } from "@/app/(home)/types/responseDTOs";
-import { GraphResponse } from "@/app/(home)/types/types";
+import { GraphResponse, RecordTagLinkDto } from "@/app/(home)/types/types";
 import api from "./api";
 
 
@@ -276,6 +276,56 @@ export async function unattachTagFromRecord(
     return res.data;
   } catch (error) {
     console.error(`Error unattaching tag ${tagId} from record ${recordId}:`, error);
+    throw error;
+  }
+}
+
+/**
+ * Bulk attach tags to records
+ * @param organizationId - The ID of the organization
+ * @param projectId - The ID of the project
+ * @param dtos - Array of record/tag pairs to attach
+ * @returns Promise with success message
+ */
+export async function bulkAttachTagsToRecords(
+    organizationId: number,
+    projectId: number,
+    dtos: RecordTagLinkDto[]
+): Promise<{ message: string }> {
+  try {
+    const res = await api.post(
+        `/organizations/${organizationId}/projects/${projectId}/records/bulk-attach-tags-to-records`,
+        dtos,
+        { headers: { "Content-Type": "application/json" } }
+    );
+    return res.data;
+  } catch (error) {
+    console.error(`Error bulk attaching tags to records:`, error);
+    throw error;
+  }
+}
+
+/**
+ * Bulk unattach tags from records
+ * @param organizationId - The ID of the organization
+ * @param projectId - The ID of the project
+ * @param dtos - Array of record/tag pairs to unattach
+ * @returns Promise with success message
+ */
+export async function bulkUnattachTagsFromRecords(
+    organizationId: number,
+    projectId: number,
+    dtos: RecordTagLinkDto[]
+): Promise<{ message: string }> {
+  try {
+    const res = await api.post(
+        `/organizations/${organizationId}/projects/${projectId}/records/bulk-unattach-tags-from-records`,
+        dtos,
+        { headers: { "Content-Type": "application/json" } }
+    );
+    return res.data;
+  } catch (error) {
+    console.error(`Error bulk unattaching tags from records:`, error);
     throw error;
   }
 }

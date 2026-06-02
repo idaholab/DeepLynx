@@ -126,7 +126,18 @@ public class SensitivityLabelService : ISensitivityLabelService
 
         return labelIds;
     }
+    
+    public async Task<List<long>> GetRecordCollectionSensitivityLabels(long recordCollectionId)
+    {
+        var labelIds = await _context.RecordCollections
+            .Where(r => r.Id == recordCollectionId)
+            .SelectMany(r => r.Labels)
+            .Select(l => l.Id)
+            .ToListAsync();
 
+        return labelIds;
+    }
+    
     public async Task<HashSet<long>> FilterAuthorizedRecordIds(
     long currentUserId,
     long organizationId,
