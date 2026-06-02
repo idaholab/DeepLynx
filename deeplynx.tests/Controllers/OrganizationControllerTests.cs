@@ -27,6 +27,8 @@ public class OrganizationControllerTests : IDisposable
     private const long TagId = 40L;
     private const long LabelId = 50L;
     private const long NotFoundId = 99L;
+    private const long TargetUserId = 20L;
+    private const string UserEmail = "test@example.com";
 
     public OrganizationControllerTests()
     {
@@ -525,6 +527,629 @@ public class OrganizationControllerTests : IDisposable
     #endregion
 
     // =========================================================================
+    // DeleteOrganization Tests
+    // =========================================================================
+
+    #region DeleteOrganization Tests
+
+    [Fact]
+    public async Task DeleteOrganization_Returns200_WithMessage()
+    {
+        // Arrange
+        var expectedMessage = $"Deleted organization {OrgId}";
+
+        _mockOrganizationBusiness
+            .Setup(b => b.DeleteOrganization(OrgId))
+            .ReturnsAsync(true);
+
+        // Act
+        var actionResult = await _organizationController.DeleteOrganization(OrgId);
+
+        // Assert
+        var result = Assert.IsType<OkObjectResult>(actionResult);
+
+        Assert.Equal(StatusCodes.Status200OK, result.StatusCode);
+        Assert.NotNull(result.Value);
+
+        var messageProperty = result.Value.GetType().GetProperty("message");
+        Assert.NotNull(messageProperty);
+
+        var actualMessage = messageProperty.GetValue(result.Value) as string;
+        Assert.Equal(expectedMessage, actualMessage);
+
+        _mockOrganizationBusiness.Verify(
+            b => b.DeleteOrganization(OrgId),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task DeleteOrganization_Returns500_OnUnexpectedException()
+    {
+        // Arrange
+        _mockOrganizationBusiness
+            .Setup(b => b.DeleteOrganization(It.IsAny<long>()))
+            .ThrowsAsync(new Exception("db error"));
+
+        // Act
+        var actionResult = await _organizationController.DeleteOrganization(OrgId);
+
+        // Assert
+        var result = Assert.IsType<ObjectResult>(actionResult);
+
+        Assert.Equal(StatusCodes.Status500InternalServerError, result.StatusCode);
+
+        var message = Assert.IsType<string>(result.Value);
+        Assert.Contains($"An error occurred while deleting organization {OrgId}", message);
+        Assert.Contains("db error", message);
+    }
+
+    [Fact]
+    public async Task DeleteOrganization_PassesOrganizationIdToBusinessLayer()
+    {
+        // Arrange
+        _mockOrganizationBusiness
+            .Setup(b => b.DeleteOrganization(OrgId))
+            .ReturnsAsync(true);
+
+        // Act
+        await _organizationController.DeleteOrganization(OrgId);
+
+        // Assert
+        _mockOrganizationBusiness.Verify(
+            b => b.DeleteOrganization(OrgId),
+            Times.Once);
+    }
+
+    [Fact]
+    public void DeleteOrganization_HasHttpDelete()
+    {
+        var method = GetControllerMethod(
+            nameof(OrganizationController.DeleteOrganization),
+            "organizationId");
+
+        AssertHasHttpAttribute(method, nameof(HttpDeleteAttribute));
+    }
+
+    #endregion
+
+    // =========================================================================
+    // ArchiveOrganization Tests
+    // =========================================================================
+
+    #region ArchiveOrganization Tests
+
+    [Fact]
+    public async Task ArchiveOrganization_Returns200_WithArchivedMessage()
+    {
+        // Arrange
+        UserContextStorage.UserId = UserId;
+
+        _mockOrganizationBusiness
+            .Setup(b => b.ArchiveOrganization(UserId, OrgId))
+            .ReturnsAsync(true);
+
+        // Act
+        var actionResult = await _organizationController.ArchiveOrganization(OrgId, true);
+
+        // Assert
+        var result = Assert.IsType<OkObjectResult>(actionResult);
+
+        Assert.Equal(StatusCodes.Status200OK, result.StatusCode);
+        Assert.Equal(
+            $"Archived organization {OrgId}",
+            GetMessageFromResultValue(result.Value));
+    }
+
+    [Fact]
+    public async Task ArchiveOrganization_Returns200_WithUnarchivedMessage()
+    {
+        // Arrange
+        UserContextStorage.UserId = UserId;
+
+        _mockOrganizationBusiness
+            .Setup(b => b.UnarchiveOrganization(UserId, OrgId))
+            .ReturnsAsync(true);
+
+        // Act
+        var actionResult = await _organizationController.ArchiveOrganization(OrgId, false);
+
+        // Assert
+        var result = Assert.IsType<OkObjectResult>(actionResult);
+
+        Assert.Equal(StatusCodes.Status200OK, result.StatusCode);
+        Assert.Equal(
+            $"Unarchived organization {OrgId}",
+            GetMessageFromResultValue(result.Value));
+    }
+
+    [Fact]
+    public async Task ArchiveOrganization_Returns500_OnArchiveException()
+    {
+        // Arrange
+        UserContextStorage.UserId = UserId;
+
+        _mockOrganizationBusiness
+            .Setup(b => b.ArchiveOrganization(UserId, OrgId))
+            .ThrowsAsync(new Exception("db error"));
+
+        // Act
+        var actionResult = await _organizationController.ArchiveOrganization(OrgId, true);
+
+        // Assert
+        var result = Assert.IsType<ObjectResult>(actionResult);
+
+        Assert.Equal(StatusCodes.Status500InternalServerError, result.StatusCode);
+
+        var message = Assert.IsType<string>(result.Value);
+        Assert.Contains($"An error occurred while archiving organization {OrgId}", message);
+        Assert.Contains("db error", message);
+    }
+
+    [Fact]
+    public async Task ArchiveOrganization_Returns500_OnUnarchiveException()
+    {
+        // Arrange
+        UserContextStorage.UserId = UserId;
+
+        _mockOrganizationBusiness
+            .Setup(b => b.UnarchiveOrganization(UserId, OrgId))
+            .ThrowsAsync(new Exception("db error"));
+
+        // Act
+        var actionResult = await _organizationController.ArchiveOrganization(OrgId, false);
+
+        // Assert
+        var result = Assert.IsType<ObjectResult>(actionResult);
+
+        Assert.Equal(StatusCodes.Status500InternalServerError, result.StatusCode);
+
+        var message = Assert.IsType<string>(result.Value);
+        Assert.Contains($"An error occurred while unarchiving organization {OrgId}", message);
+        Assert.Contains("db error", message);
+    }
+
+    [Fact]
+    public async Task ArchiveOrganization_PassesUserIdAndOrganizationIdToBusinessLayer_WhenArchiving()
+    {
+        // Arrange
+        UserContextStorage.UserId = UserId;
+
+        _mockOrganizationBusiness
+            .Setup(b => b.ArchiveOrganization(UserId, OrgId))
+            .ReturnsAsync(true);
+
+        // Act
+        await _organizationController.ArchiveOrganization(OrgId, true);
+
+        // Assert
+        _mockOrganizationBusiness.Verify(
+            b => b.ArchiveOrganization(UserId, OrgId),
+            Times.Once);
+
+        _mockOrganizationBusiness.Verify(
+            b => b.UnarchiveOrganization(It.IsAny<long>(), It.IsAny<long>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task ArchiveOrganization_PassesUserIdAndOrganizationIdToBusinessLayer_WhenUnarchiving()
+    {
+        // Arrange
+        UserContextStorage.UserId = UserId;
+
+        _mockOrganizationBusiness
+            .Setup(b => b.UnarchiveOrganization(UserId, OrgId))
+            .ReturnsAsync(true);
+
+        // Act
+        await _organizationController.ArchiveOrganization(OrgId, false);
+
+        // Assert
+        _mockOrganizationBusiness.Verify(
+            b => b.UnarchiveOrganization(UserId, OrgId),
+            Times.Once);
+
+        _mockOrganizationBusiness.Verify(
+            b => b.ArchiveOrganization(It.IsAny<long>(), It.IsAny<long>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public void ArchiveOrganization_HasHttpPatch()
+    {
+        var method = GetControllerMethod(
+            nameof(OrganizationController.ArchiveOrganization),
+            "organizationId",
+            "archive");
+
+        AssertHasHttpAttribute(method, nameof(HttpPatchAttribute));
+    }
+
+    #endregion
+
+    // =========================================================================
+    // AddUserToOrganization Tests
+    // =========================================================================
+
+    #region AddUserToOrganization Tests
+
+    [Fact]
+    public async Task AddUserToOrganization_Returns200_WithMessage()
+    {
+        // Arrange
+        const bool isAdmin = true;
+
+        _mockOrganizationBusiness
+            .Setup(b => b.AddUserToOrganization(OrgId, TargetUserId, isAdmin))
+            .ReturnsAsync(true);
+
+        // Act
+        var actionResult = await _organizationController.AddUserToOrganization(
+            OrgId,
+            TargetUserId,
+            isAdmin);
+
+        // Assert
+        var result = Assert.IsType<OkObjectResult>(actionResult);
+
+        Assert.Equal(StatusCodes.Status200OK, result.StatusCode);
+        Assert.Equal(
+            $"Added user {TargetUserId} to organization {OrgId}",
+            GetMessageFromResultValue(result.Value));
+    }
+
+    [Fact]
+    public async Task AddUserToOrganization_Returns500_OnUnexpectedException()
+    {
+        // Arrange
+        const bool isAdmin = true;
+
+        _mockOrganizationBusiness
+            .Setup(b => b.AddUserToOrganization(OrgId, TargetUserId, isAdmin))
+            .ThrowsAsync(new Exception("db error"));
+
+        // Act
+        var actionResult = await _organizationController.AddUserToOrganization(
+            OrgId,
+            TargetUserId,
+            isAdmin);
+
+        // Assert
+        var result = Assert.IsType<ObjectResult>(actionResult);
+
+        Assert.Equal(StatusCodes.Status500InternalServerError, result.StatusCode);
+
+        var message = Assert.IsType<string>(result.Value);
+        Assert.Contains($"An error occurred while adding user {TargetUserId} to organization {OrgId}", message);
+        Assert.Contains("db error", message);
+    }
+
+    [Fact]
+    public async Task AddUserToOrganization_PassesArgumentsToBusinessLayer()
+    {
+        // Arrange
+        const bool isAdmin = true;
+
+        _mockOrganizationBusiness
+            .Setup(b => b.AddUserToOrganization(OrgId, TargetUserId, isAdmin))
+            .ReturnsAsync(true);
+
+        // Act
+        await _organizationController.AddUserToOrganization(
+            OrgId,
+            TargetUserId,
+            isAdmin);
+
+        // Assert
+        _mockOrganizationBusiness.Verify(
+            b => b.AddUserToOrganization(OrgId, TargetUserId, isAdmin),
+            Times.Once);
+    }
+
+    [Fact]
+    public void AddUserToOrganization_HasHttpPost()
+    {
+        var method = GetControllerMethod(
+            nameof(OrganizationController.AddUserToOrganization),
+            "organizationId",
+            "userId",
+            "isAdmin");
+
+        AssertHasHttpAttribute(method, nameof(HttpPostAttribute));
+    }
+
+    #endregion
+
+    // =========================================================================
+    // SetOrganizationAdminStatus Tests
+    // =========================================================================
+
+    #region SetOrganizationAdminStatus Tests
+
+    [Fact]
+    public async Task SetOrganizationAdminStatus_Returns200_WithMessage()
+    {
+        // Arrange
+        const bool isAdmin = true;
+
+        _mockOrganizationBusiness
+            .Setup(b => b.SetOrganizationAdminStatus(OrgId, TargetUserId, isAdmin))
+            .ReturnsAsync(true);
+
+        // Act
+        var actionResult = await _organizationController.SetOrganizationAdminStatus(
+            OrgId,
+            TargetUserId,
+            isAdmin);
+
+        // Assert
+        var result = Assert.IsType<OkObjectResult>(actionResult);
+
+        Assert.Equal(StatusCodes.Status200OK, result.StatusCode);
+        Assert.Equal(
+            $"Adjusted admin status for user {TargetUserId} in organization {OrgId}",
+            GetMessageFromResultValue(result.Value));
+    }
+
+    [Fact]
+    public async Task SetOrganizationAdminStatus_Returns500_OnUnexpectedException()
+    {
+        // Arrange
+        const bool isAdmin = true;
+
+        _mockOrganizationBusiness
+            .Setup(b => b.SetOrganizationAdminStatus(OrgId, TargetUserId, isAdmin))
+            .ThrowsAsync(new Exception("db error"));
+
+        // Act
+        var actionResult = await _organizationController.SetOrganizationAdminStatus(
+            OrgId,
+            TargetUserId,
+            isAdmin);
+
+        // Assert
+        var result = Assert.IsType<ObjectResult>(actionResult);
+
+        Assert.Equal(StatusCodes.Status500InternalServerError, result.StatusCode);
+
+        var message = Assert.IsType<string>(result.Value);
+        Assert.Contains(
+            $"An error occurred while setting admin status for user {TargetUserId} in organization {OrgId}",
+            message);
+        Assert.Contains("db error", message);
+    }
+
+    [Fact]
+    public async Task SetOrganizationAdminStatus_PassesArgumentsToBusinessLayer()
+    {
+        // Arrange
+        const bool isAdmin = true;
+
+        _mockOrganizationBusiness
+            .Setup(b => b.SetOrganizationAdminStatus(OrgId, TargetUserId, isAdmin))
+            .ReturnsAsync(true);
+
+        // Act
+        await _organizationController.SetOrganizationAdminStatus(
+            OrgId,
+            TargetUserId,
+            isAdmin);
+
+        // Assert
+        _mockOrganizationBusiness.Verify(
+            b => b.SetOrganizationAdminStatus(OrgId, TargetUserId, isAdmin),
+            Times.Once);
+    }
+
+    [Fact]
+    public void SetOrganizationAdminStatus_HasHttpPut()
+    {
+        var method = GetControllerMethod(
+            nameof(OrganizationController.SetOrganizationAdminStatus),
+            "organizationId",
+            "userId",
+            "isAdmin");
+
+        AssertHasHttpAttribute(method, nameof(HttpPutAttribute));
+    }
+
+    #endregion
+
+    // =========================================================================
+    // RemoveUserFromOrganization Tests
+    // =========================================================================
+
+    #region RemoveUserFromOrganization Tests
+
+    [Fact]
+    public async Task RemoveUserFromOrganization_Returns200_WithMessage()
+    {
+        // Arrange
+        _mockOrganizationBusiness
+            .Setup(b => b.RemoveUserFromOrganization(OrgId, TargetUserId))
+            .ReturnsAsync(true);
+
+        // Act
+        var actionResult = await _organizationController.RemoveUserFromOrganization(
+            OrgId,
+            TargetUserId);
+
+        // Assert
+        var result = Assert.IsType<OkObjectResult>(actionResult);
+
+        Assert.Equal(StatusCodes.Status200OK, result.StatusCode);
+        Assert.Equal(
+            $"Removed user {TargetUserId} from organization {OrgId}",
+            GetMessageFromResultValue(result.Value));
+    }
+
+    [Fact]
+    public async Task RemoveUserFromOrganization_Returns500_OnUnexpectedException()
+    {
+        // Arrange
+        _mockOrganizationBusiness
+            .Setup(b => b.RemoveUserFromOrganization(OrgId, TargetUserId))
+            .ThrowsAsync(new Exception("db error"));
+
+        // Act
+        var actionResult = await _organizationController.RemoveUserFromOrganization(
+            OrgId,
+            TargetUserId);
+
+        // Assert
+        var result = Assert.IsType<ObjectResult>(actionResult);
+
+        Assert.Equal(StatusCodes.Status500InternalServerError, result.StatusCode);
+
+        var message = Assert.IsType<string>(result.Value);
+        Assert.Contains($"An error occurred while removing user {TargetUserId} from organization {OrgId}", message);
+        Assert.Contains("db error", message);
+    }
+
+    [Fact]
+    public async Task RemoveUserFromOrganization_PassesArgumentsToBusinessLayer()
+    {
+        // Arrange
+        _mockOrganizationBusiness
+            .Setup(b => b.RemoveUserFromOrganization(OrgId, TargetUserId))
+            .ReturnsAsync(true);
+
+        // Act
+        await _organizationController.RemoveUserFromOrganization(
+            OrgId,
+            TargetUserId);
+
+        // Assert
+        _mockOrganizationBusiness.Verify(
+            b => b.RemoveUserFromOrganization(OrgId, TargetUserId),
+            Times.Once);
+    }
+
+    [Fact]
+    public void RemoveUserFromOrganization_HasHttpDelete()
+    {
+        var method = GetControllerMethod(
+            nameof(OrganizationController.RemoveUserFromOrganization),
+            "organizationId",
+            "userId");
+
+        AssertHasHttpAttribute(method, nameof(HttpDeleteAttribute));
+    }
+
+    #endregion
+
+    // =========================================================================
+    // InviteUserToOrganization Tests
+    // =========================================================================
+
+    #region InviteUserToOrganization Tests
+
+    [Fact]
+    public async Task InviteUserToOrganization_Returns200_WithMessage()
+    {
+        // Arrange
+        _mockInvitationBusiness
+            .Setup(b => b.InviteAndAddUserToHierarchy(
+                OrgId,
+                (long?)null,
+                (long?)null,
+                (long?)null,
+                TargetUserId,
+                UserEmail))
+            .ReturnsAsync(true);
+
+        // Act
+        var actionResult = await _organizationController.InviteUserToOrganization(
+            OrgId,
+            UserEmail,
+            TargetUserId);
+
+        // Assert
+        var result = Assert.IsType<OkObjectResult>(actionResult);
+
+        Assert.Equal(StatusCodes.Status200OK, result.StatusCode);
+        Assert.Equal(
+            $"Invited and added inactive user with email {UserEmail} to organization {OrgId}",
+            GetMessageFromResultValue(result.Value));
+    }
+
+    [Fact]
+    public async Task InviteUserToOrganization_Returns500_OnUnexpectedException()
+    {
+        // Arrange
+        _mockInvitationBusiness
+            .Setup(b => b.InviteAndAddUserToHierarchy(
+                OrgId,
+                (long?)null,
+                (long?)null,
+                (long?)null,
+                TargetUserId,
+                UserEmail))
+            .ThrowsAsync(new Exception("db error"));
+
+        // Act
+        var actionResult = await _organizationController.InviteUserToOrganization(
+            OrgId,
+            UserEmail,
+            TargetUserId);
+
+        // Assert
+        var result = Assert.IsType<ObjectResult>(actionResult);
+
+        Assert.Equal(StatusCodes.Status500InternalServerError, result.StatusCode);
+
+        var message = Assert.IsType<string>(result.Value);
+        Assert.Contains($"An error occurred while adding user with email {UserEmail} to organization {OrgId}", message);
+        Assert.Contains("db error", message);
+    }
+
+    [Fact]
+    public async Task InviteUserToOrganization_PassesArgumentsToInvitationBusinessLayer()
+    {
+        // Arrange
+        _mockInvitationBusiness
+            .Setup(b => b.InviteAndAddUserToHierarchy(
+                OrgId,
+                (long?)null,
+                (long?)null,
+                (long?)null,
+                TargetUserId,
+                UserEmail))
+            .ReturnsAsync(true);
+
+        // Act
+        await _organizationController.InviteUserToOrganization(
+            OrgId,
+            UserEmail,
+            TargetUserId);
+
+        // Assert
+        _mockInvitationBusiness.Verify(
+            b => b.InviteAndAddUserToHierarchy(
+                OrgId,
+                (long?)null,
+                (long?)null,
+                (long?)null,
+                TargetUserId,
+                UserEmail),
+            Times.Once);
+    }
+
+    [Fact]
+    public void InviteUserToOrganization_HasHttpPost()
+    {
+        var method = GetControllerMethod(
+            nameof(OrganizationController.InviteUserToOrganization),
+            "organizationId",
+            "userEmail",
+            "userId");
+
+        AssertHasHttpAttribute(method, nameof(HttpPostAttribute));
+    }
+
+    #endregion
+
+    // =========================================================================
     // Test Helpers
     // =========================================================================
 
@@ -545,5 +1170,18 @@ public class OrganizationControllerTests : IDisposable
             .Where(method => method.Name == methodName)
             .Where(method => parameterNames.All(parameterName =>
                 method.GetParameters().Any(parameter => parameter.Name == parameterName))));
+    }
+
+    private static string GetMessageFromResultValue(object? value)
+    {
+        Assert.NotNull(value);
+
+        var messageProperty = value.GetType().GetProperty("message");
+        Assert.NotNull(messageProperty);
+
+        var message = messageProperty.GetValue(value) as string;
+        Assert.NotNull(message);
+
+        return message;
     }
 }
