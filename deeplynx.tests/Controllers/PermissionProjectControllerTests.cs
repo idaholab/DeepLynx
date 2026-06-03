@@ -321,7 +321,7 @@ public class PermissionProjectControllerTests : IDisposable
     public void GetPermission_HasHttpGet()
     {
         var method = GetControllerMethod(
-            nameof(PermissionOrganizationController.GetPermission),
+            nameof(PermissionProjectController.GetPermission),
             "organizationId",
             "permissionId",
             "hideArchived");
@@ -425,7 +425,7 @@ public class PermissionProjectControllerTests : IDisposable
     public void CreatePermission_HasHttpPost()
     {
         var method = GetControllerMethod(
-            nameof(PermissionOrganizationController.CreatePermission),
+            nameof(PermissionProjectController.CreatePermission),
             "dto");
 
         AssertHasHttpAttribute(method, nameof(HttpPostAttribute));
@@ -529,7 +529,7 @@ public class PermissionProjectControllerTests : IDisposable
     public void UpdatePermission_HasHttpPut()
     {
         var method = GetControllerMethod(
-            nameof(PermissionOrganizationController.UpdatePermission),
+            nameof(PermissionProjectController.UpdatePermission),
             "dto");
 
         AssertHasHttpAttribute(method, nameof(HttpPutAttribute));
@@ -632,10 +632,246 @@ public class PermissionProjectControllerTests : IDisposable
     public void DeletePermission_HasHttpDelete()
     {
         var method = GetControllerMethod(
-            nameof(PermissionOrganizationController.DeletePermission),
+            nameof(PermissionProjectController.DeletePermission),
             "permissionId");
 
         AssertHasHttpAttribute(method, nameof(HttpDeleteAttribute));
+    }
+
+    #endregion
+
+    // =========================================================================
+    // ArchivePermission Tests
+    // =========================================================================
+
+    #region ArchivePermission Tests
+
+    [Fact]
+    public async Task ArchivePermission_Returns200_WithArchivedMessage()
+    {
+        // Arrange
+        UserContextStorage.UserId = UserId;
+
+        _mockPermissionBusiness
+            .Setup(b => b.ArchivePermission(
+                OrgId,
+                ProjectId,
+                UserId,
+                PermissionId))
+            .ReturnsAsync(true);
+
+        // Act
+        var actionResult = await _permissionProjectController.ArchivePermission(
+            OrgId,
+            ProjectId,
+            PermissionId,
+            true);
+
+        // Assert
+        var result = Assert.IsType<OkObjectResult>(actionResult);
+
+        Assert.Equal(StatusCodes.Status200OK, result.StatusCode);
+        Assert.Equal(
+            $"Archived permission {PermissionId}",
+            GetMessageFromResultValue(result.Value));
+    }
+
+    [Fact]
+    public async Task ArchivePermission_Returns200_WithUnarchivedMessage()
+    {
+        // Arrange
+        UserContextStorage.UserId = UserId;
+
+        _mockPermissionBusiness
+            .Setup(b => b.ArchivePermission(
+                OrgId,
+                ProjectId,
+                UserId,
+                PermissionId))
+            .ReturnsAsync(true);
+
+        // Act
+        var actionResult = await _permissionProjectController.ArchivePermission(
+            OrgId,
+            ProjectId,
+            PermissionId,
+            false);
+
+        // Assert
+        var result = Assert.IsType<OkObjectResult>(actionResult);
+
+        Assert.Equal(StatusCodes.Status200OK, result.StatusCode);
+        Assert.Equal(
+            $"Unarchived permission {PermissionId}",
+            GetMessageFromResultValue(result.Value));
+    }
+
+    [Fact]
+    public async Task ArchivePermission_Returns500_OnArchiveException()
+    {
+        // Arrange
+        UserContextStorage.UserId = UserId;
+
+        _mockPermissionBusiness
+            .Setup(b => b.ArchivePermission(
+                OrgId,
+                ProjectId,
+                UserId,
+                PermissionId))
+            .ThrowsAsync(new Exception("db error"));
+
+        // Act
+        var actionResult = await _permissionProjectController.ArchivePermission(
+            OrgId,
+            ProjectId,
+            PermissionId,
+            true);
+
+        // Assert
+        var result = Assert.IsType<ObjectResult>(actionResult);
+
+        Assert.Equal(StatusCodes.Status500InternalServerError, result.StatusCode);
+
+        var message = Assert.IsType<string>(result.Value);
+        Assert.Contains($"An error occurred while archiving permission {PermissionId}", message);
+        Assert.Contains("db error", message);
+    }
+
+    [Fact]
+    public async Task ArchivePermission_Returns500_OnUnarchiveException()
+    {
+        // Arrange
+        UserContextStorage.UserId = UserId;
+
+        _mockPermissionBusiness
+            .Setup(b => b.UnarchivePermission(
+                OrgId,
+                ProjectId,
+                UserId,
+                PermissionId))
+            .ThrowsAsync(new Exception("db error"));
+
+        // Act
+        var actionResult = await _permissionProjectController.ArchivePermission(
+            OrgId,
+            ProjectId,
+            PermissionId,
+            false);
+
+        // Assert
+        var result = Assert.IsType<ObjectResult>(actionResult);
+
+        Assert.Equal(StatusCodes.Status500InternalServerError, result.StatusCode);
+
+        var message = Assert.IsType<string>(result.Value);
+        Assert.Contains($"An error occurred while unarchiving permission {PermissionId}", message);
+        Assert.Contains("db error", message);
+
+        _mockPermissionBusiness.Verify(
+            b => b.UnarchivePermission(
+                OrgId,
+                ProjectId,
+                UserId,
+                PermissionId),
+            Times.Once);
+
+        _mockPermissionBusiness.Verify(
+            b => b.ArchivePermission(
+                It.IsAny<long>(),
+                It.IsAny<long?>(),
+                It.IsAny<long>(),
+                It.IsAny<long>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task ArchivePermission_PassesUserIdAndPermissionIdToBusinessLayer_WhenArchiving()
+    {
+        // Arrange
+        UserContextStorage.UserId = UserId;
+
+        _mockPermissionBusiness
+            .Setup(b => b.ArchivePermission(
+                OrgId,
+                ProjectId,
+                UserId,
+                PermissionId))
+            .ReturnsAsync(true);
+
+        // Act
+        await _permissionProjectController.ArchivePermission(
+            OrgId,
+            ProjectId,
+            PermissionId,
+            true);
+
+        // Assert
+        _mockPermissionBusiness.Verify(
+            b => b.ArchivePermission(
+                OrgId,
+                ProjectId,
+                UserId,
+                PermissionId),
+            Times.Once);
+
+        _mockPermissionBusiness.Verify(
+            b => b.UnarchivePermission(
+                It.IsAny<long>(),
+                It.IsAny<long?>(),
+                It.IsAny<long>(),
+                It.IsAny<long>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task ArchivePermission_PassesUserIdPermissionIdToBusinessLayer_WhenUnarchiving()
+    {
+        // Arrange
+        UserContextStorage.UserId = UserId;
+
+        _mockPermissionBusiness
+            .Setup(b => b.UnarchivePermission(
+                OrgId,
+                ProjectId,
+                UserId,
+                PermissionId))
+            .ReturnsAsync(true);
+
+        // Act
+        await _permissionProjectController.ArchivePermission(
+            OrgId,
+            ProjectId,
+            PermissionId,
+            false);
+
+        // Assert
+        _mockPermissionBusiness.Verify(
+            b => b.UnarchivePermission(
+                OrgId,
+                ProjectId,
+                UserId,
+                PermissionId),
+            Times.Once);
+
+        _mockPermissionBusiness.Verify(
+            b => b.ArchivePermission(
+                It.IsAny<long>(),
+                It.IsAny<long?>(),
+                It.IsAny<long>(),
+                It.IsAny<long>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public void ArchivePermission_HasHttpPatch()
+    {
+        var method = GetControllerMethod(
+            nameof(PermissionProjectController.ArchivePermission),
+            "organizationId",
+            "permissionId",
+            "archive");
+
+        AssertHasHttpAttribute(method, nameof(HttpPatchAttribute));
     }
 
     #endregion
