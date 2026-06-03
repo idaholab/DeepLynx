@@ -247,16 +247,17 @@ public class ClassBusinessTests : IntegrationTestBase
         {
             Name = "Relationship 1",
             OriginId = cid1,
-            DestinationId = cid4,
+            DestinationId = cid5,
             ProjectId = pid,
             OrganizationId = oid,
             LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
             LastUpdatedBy = uid
         };
+
         var rel2 = new Relationship
         {
             Name = "Relationship 2",
-            OriginId = cid4,
+            OriginId = cid5,
             DestinationId = cid1,
             ProjectId = pid,
             OrganizationId = oid,
