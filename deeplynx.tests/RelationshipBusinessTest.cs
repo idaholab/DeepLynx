@@ -1359,39 +1359,34 @@ public class RelationshipBusinessTests : IntegrationTestBase
     } 
 
     [Fact]
-    public async Task CreateRelationship_Fails_WhenOrgLevelClassesBelongToDifferentProjects()
+    public async Task CreateRelationship_Fails_WhenOrgLevelRelationshipUsesProjectLevelClasses()
     {
-        var projectA = new Project { Name = $"Project A {DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}", OrganizationId = oid };
-        var projectB = new Project { Name = $"Project B {DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}", OrganizationId = oid };
+        var projectA = new Project
+        {
+            Name = $"Project A {DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}",
+            OrganizationId = oid
+        };
 
-        Context.Projects.AddRange(projectA, projectB);
+        Context.Projects.Add(projectA);
         await Context.SaveChangesAsync();
 
-        var projectAClass = new Class
+        var projectClass = new Class
         {
-            Name = $"Project A Class {DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}",
+            Name = $"Project Class {DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}",
             OrganizationId = oid,
             ProjectId = projectA.Id,
             IsArchived = false
         };
 
-        var projectBClass = new Class
-        {
-            Name = $"Project B Class {DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}",
-            OrganizationId = oid,
-            ProjectId = projectB.Id,
-            IsArchived = false
-        };
-
-        Context.Classes.AddRange(projectAClass, projectBClass);
+        Context.Classes.Add(projectClass);
         await Context.SaveChangesAsync();
 
         var dto = new CreateRelationshipRequestDto
         {
             Name = $"Invalid Org Relationship {DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}",
-            Description = "Should fail",
-            OriginId = projectAClass.Id,
-            DestinationId = projectBClass.Id
+            Description = "Should fail because org-level relationships require org-level classes",
+            OriginId = projectClass.Id,
+            DestinationId = projectClass.Id
         };
 
         await Assert.ThrowsAsync<KeyNotFoundException>(() =>
@@ -1399,39 +1394,42 @@ public class RelationshipBusinessTests : IntegrationTestBase
     }
     
     [Fact]
-    public async Task UpdateRelationship_Fails_WhenOrgLevelDestinationClassBelongsToDifferentProject()
+    public async Task UpdateRelationship_Fails_WhenOrgLevelRelationshipUsesProjectLevelClass()
     {
-        var projectA = new Project { Name = $"Project A {DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}", OrganizationId = oid };
-        var projectB = new Project { Name = $"Project B {DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}", OrganizationId = oid };
+        var orgClass1 = new Class
+        {
+            Name = $"Org Class 1 {DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}",
+            OrganizationId = oid,
+            ProjectId = null,
+            IsArchived = false
+        };
 
-        Context.Projects.AddRange(projectA, projectB);
+        var orgClass2 = new Class
+        {
+            Name = $"Org Class 2 {DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}",
+            OrganizationId = oid,
+            ProjectId = null,
+            IsArchived = false
+        };
+
+        var project = new Project
+        {
+            Name = $"Project {DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}",
+            OrganizationId = oid
+        };
+
+        Context.Projects.Add(project);
         await Context.SaveChangesAsync();
 
-        var projectAClass1 = new Class
+        var projectClass = new Class
         {
-            Name = $"Project A Class 1 {DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}",
+            Name = $"Project Class {DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}",
             OrganizationId = oid,
-            ProjectId = projectA.Id,
+            ProjectId = project.Id,
             IsArchived = false
         };
 
-        var projectAClass2 = new Class
-        {
-            Name = $"Project A Class 2 {DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}",
-            OrganizationId = oid,
-            ProjectId = projectA.Id,
-            IsArchived = false
-        };
-
-        var projectBClass = new Class
-        {
-            Name = $"Project B Class {DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}",
-            OrganizationId = oid,
-            ProjectId = projectB.Id,
-            IsArchived = false
-        };
-
-        Context.Classes.AddRange(projectAClass1, projectAClass2, projectBClass);
+        Context.Classes.AddRange(orgClass1, orgClass2, projectClass);
         await Context.SaveChangesAsync();
 
         var relationship = new Relationship
@@ -1439,8 +1437,8 @@ public class RelationshipBusinessTests : IntegrationTestBase
             Name = $"Valid Org Relationship {DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}",
             OrganizationId = oid,
             ProjectId = null,
-            OriginId = projectAClass1.Id,
-            DestinationId = projectAClass2.Id,
+            OriginId = orgClass1.Id,
+            DestinationId = orgClass2.Id,
             LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
             LastUpdatedBy = uid,
             IsArchived = false
@@ -1451,7 +1449,7 @@ public class RelationshipBusinessTests : IntegrationTestBase
 
         var dto = new UpdateRelationshipRequestDto
         {
-            DestinationId = projectBClass.Id
+            DestinationId = projectClass.Id
         };
 
         await Assert.ThrowsAsync<KeyNotFoundException>(() =>
@@ -1459,31 +1457,26 @@ public class RelationshipBusinessTests : IntegrationTestBase
     }
 
     [Fact]
-    public async Task BulkCreateRelationships_Fails_WhenOrgLevelDestinationClassBelongsToDifferentProject()
+    public async Task BulkCreateRelationships_Fails_WhenOrgLevelRelationshipUsesProjectLevelClasses()
     {
-        var projectA = new Project { Name = $"Project A {DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}", OrganizationId = oid };
-        var projectB = new Project { Name = $"Project B {DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}", OrganizationId = oid };
+        var project = new Project
+        {
+            Name = $"Project {DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}",
+            OrganizationId = oid
+        };
 
-        Context.Projects.AddRange(projectA, projectB);
+        Context.Projects.Add(project);
         await Context.SaveChangesAsync();
 
-        var projectAClass = new Class
+        var projectClass = new Class
         {
-            Name = $"Project A Class {DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}",
+            Name = $"Project Class {DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}",
             OrganizationId = oid,
-            ProjectId = projectA.Id,
+            ProjectId = project.Id,
             IsArchived = false
         };
 
-        var projectBClass = new Class
-        {
-            Name = $"Project B Class {DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}",
-            OrganizationId = oid,
-            ProjectId = projectB.Id,
-            IsArchived = false
-        };
-
-        Context.Classes.AddRange(projectAClass, projectBClass);
+        Context.Classes.Add(projectClass);
         await Context.SaveChangesAsync();
 
         var relationships = new List<CreateRelationshipRequestDto>
@@ -1491,9 +1484,9 @@ public class RelationshipBusinessTests : IntegrationTestBase
             new()
             {
                 Name = $"Invalid Org Bulk Relationship {DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}",
-                Description = "Should fail",
-                OriginId = projectAClass.Id,
-                DestinationId = projectBClass.Id
+                Description = "Should fail because org-level relationships require org-level classes",
+                OriginId = projectClass.Id,
+                DestinationId = projectClass.Id
             }
         };
 
