@@ -188,7 +188,7 @@ public class PermissionProjectControllerTests : IDisposable
     #region GetPermission Tests
 
     [Fact]
-    public async Task GetPermission_Returns200_WithOrganization()
+    public async Task GetPermission_Returns200_WithPermission()
     {
         // Arrange
         PermissionResponseDto expected = new PermissionResponseDto();
@@ -224,7 +224,7 @@ public class PermissionProjectControllerTests : IDisposable
     }
 
     [Fact]
-    public async Task GetPermission_Returns200_WithNullOrganization()
+    public async Task GetPermission_Returns200_WithNullPermission()
     {
         // Arrange
 
@@ -327,6 +327,315 @@ public class PermissionProjectControllerTests : IDisposable
             "hideArchived");
 
         AssertHasHttpAttribute(method, nameof(HttpGetAttribute));
+    }
+
+    #endregion
+
+    // =========================================================================
+    // CreatePermission Tests
+    // =========================================================================
+
+    #region CreatePermission Tests
+
+    [Fact]
+    public async Task CreatePermission_Returns200_WithPermission()
+    {
+        // Arrange
+        PermissionResponseDto expected =
+            new PermissionResponseDto();
+        CreatePermissionRequestDto input = new CreatePermissionRequestDto();
+
+        _mockPermissionBusiness
+            .Setup(b => b.CreatePermission(
+                UserId,
+                input,
+                ProjectId,
+                OrgId))
+            .ReturnsAsync(expected);
+
+        // Act
+        var actionResult = await _permissionProjectController.CreatePermission(OrgId, ProjectId, input);
+
+        // Assert
+        var result = Assert.IsType<OkObjectResult>(actionResult.Result);
+
+        Assert.Equal(StatusCodes.Status200OK, result.StatusCode);
+        Assert.Equal(expected, result.Value);
+
+        _mockPermissionBusiness.Verify(
+            b => b.CreatePermission(
+                UserId,
+                input,
+                ProjectId,
+                OrgId),
+            Times.Once);
+    }
+
+
+    [Fact]
+    public async Task CreatePermission_Returns500_OnUnexpectedException()
+    {
+        _mockPermissionBusiness
+            .Setup(b => b.CreatePermission(
+                It.IsAny<long>(),
+                It.IsAny<CreatePermissionRequestDto>(),
+                It.IsAny<long>(),
+                It.IsAny<long>()))
+                .ThrowsAsync(new Exception("db error"));
+
+        var result = (await _permissionProjectController.CreatePermission(It.IsAny<long>(), It.IsAny<long>(), It.IsAny<CreatePermissionRequestDto>())).Result as ObjectResult;
+
+        Assert.NotNull(result);
+        Assert.Equal(500, result.StatusCode);
+    }
+
+    [Fact]
+    public async Task CreatePermission_PassesToBusinessLayer()
+    {
+        // Arrange
+        CreatePermissionRequestDto input = new CreatePermissionRequestDto();
+
+        UserContextStorage.UserId = UserId;
+        UserContextStorage.IsSysAdmin = true;
+
+        var expected = new PermissionResponseDto();
+
+        _mockPermissionBusiness
+            .Setup(b => b.CreatePermission(
+                UserId,
+                input,
+                ProjectId,
+                OrgId))
+            .ReturnsAsync(expected);
+
+        // Act
+        await _permissionProjectController.CreatePermission(OrgId, ProjectId, input);
+
+        // Assert
+        _mockPermissionBusiness.Verify(
+            b => b.CreatePermission(
+                UserId,
+                input,
+                ProjectId,
+                OrgId),
+            Times.Once);
+    }
+
+    [Fact]
+    public void CreatePermission_HasHttpPost()
+    {
+        var method = GetControllerMethod(
+            nameof(PermissionOrganizationController.CreatePermission),
+            "dto");
+
+        AssertHasHttpAttribute(method, nameof(HttpPostAttribute));
+    }
+
+    #endregion
+
+    // =========================================================================
+    // UpdatePermission Tests
+    // =========================================================================
+
+    #region UpdatePermission Tests
+
+    [Fact]
+    public async Task UpdatePermission_Returns200_WithPermission()
+    {
+        // Arrange
+        PermissionResponseDto expected =
+            new PermissionResponseDto();
+        UpdatePermissionRequestDto input = new UpdatePermissionRequestDto();
+
+        _mockPermissionBusiness
+            .Setup(b => b.UpdatePermission(
+                OrgId,
+                ProjectId,
+                UserId,
+                PermissionId,
+                input)).ReturnsAsync(expected);
+
+        // Act
+        var actionResult = await _permissionProjectController.UpdatePermission(OrgId, ProjectId, PermissionId, input);
+
+        // Assert
+        var result = Assert.IsType<OkObjectResult>(actionResult.Result);
+
+        Assert.Equal(StatusCodes.Status200OK, result.StatusCode);
+        Assert.Equal(expected, result.Value);
+
+        _mockPermissionBusiness.Verify(
+            b => b.UpdatePermission(
+                OrgId,
+                ProjectId,
+                UserId,
+                PermissionId,
+                input),
+            Times.Once);
+    }
+
+
+    [Fact]
+    public async Task UpdatePermission_Returns500_OnUnexpectedException()
+    {
+        _mockPermissionBusiness
+           .Setup(b => b.UpdatePermission(
+               It.IsAny<long>(),
+               It.IsAny<long>(),
+               It.IsAny<long>(),
+               It.IsAny<long>(),
+               It.IsAny<UpdatePermissionRequestDto>())).ThrowsAsync(new Exception("db error"));
+
+        var result = (await _permissionProjectController.UpdatePermission(It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(), It.IsAny<UpdatePermissionRequestDto>())).Result as ObjectResult;
+
+        Assert.NotNull(result);
+        Assert.Equal(500, result.StatusCode);
+    }
+
+    [Fact]
+    public async Task UpdatePermission_PassesToBusinessLayer()
+    {
+        // Arrange
+        UpdatePermissionRequestDto input = new UpdatePermissionRequestDto();
+
+        UserContextStorage.UserId = UserId;
+        UserContextStorage.IsSysAdmin = true;
+
+        var expected = new PermissionResponseDto();
+
+        _mockPermissionBusiness
+            .Setup(b => b.UpdatePermission(
+                OrgId,
+                ProjectId,
+                UserId,
+                PermissionId,
+                input)).ReturnsAsync(expected);
+
+        // Act
+        await _permissionProjectController.UpdatePermission(OrgId, ProjectId, PermissionId, input);
+
+        // Assert
+        _mockPermissionBusiness.Verify(
+            b => b.UpdatePermission(
+                OrgId,
+                ProjectId,
+                UserId,
+                PermissionId,
+                input),
+            Times.Once);
+    }
+
+    [Fact]
+    public void UpdatePermission_HasHttpPut()
+    {
+        var method = GetControllerMethod(
+            nameof(PermissionOrganizationController.UpdatePermission),
+            "dto");
+
+        AssertHasHttpAttribute(method, nameof(HttpPutAttribute));
+    }
+
+    #endregion
+
+    // =========================================================================
+    // DeletePermission Tests
+    // =========================================================================
+
+    #region DeletePermission Tests
+
+    [Fact]
+    public async Task DeletePermission_Returns200_WithMessage()
+    {
+        // Arrange
+        var expectedMessage = $"Deleted permission {PermissionId}";
+
+        _mockPermissionBusiness
+            .Setup(b => b.DeletePermission(
+                OrgId,
+                ProjectId,
+                UserId,
+                PermissionId)).ReturnsAsync(true);
+
+        // Act
+        var actionResult = await _permissionProjectController.DeletePermission(OrgId, ProjectId, PermissionId);
+
+        // Assert
+        var result = Assert.IsType<OkObjectResult>(actionResult);
+
+        Assert.Equal(StatusCodes.Status200OK, result.StatusCode);
+        Assert.NotNull(result.Value);
+
+        var messageProperty = result.Value.GetType().GetProperty("message");
+        Assert.NotNull(messageProperty);
+
+        var actualMessage = messageProperty.GetValue(result.Value) as string;
+        Assert.Equal(expectedMessage, actualMessage);
+
+        _mockPermissionBusiness.Verify(
+            b => b.DeletePermission(
+                OrgId,
+                ProjectId,
+                UserId,
+                PermissionId),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task DeletePermission_Returns500_OnUnexpectedException()
+    {
+        // Arrange
+        _mockPermissionBusiness
+            .Setup(b => b.DeletePermission(
+                It.IsAny<long>(),
+                It.IsAny<long>(),
+                It.IsAny<long>(),
+                It.IsAny<long>())).ThrowsAsync(new Exception("db error"));
+
+        // Act
+        var actionResult = await _permissionProjectController.DeletePermission(OrgId, ProjectId, PermissionId);
+
+        // Assert
+        var result = Assert.IsType<ObjectResult>(actionResult);
+
+        Assert.Equal(StatusCodes.Status500InternalServerError, result.StatusCode);
+
+        var message = Assert.IsType<string>(result.Value);
+        Assert.Contains($"An error occurred while deleting permission {PermissionId}", message);
+        Assert.Contains("db error", message);
+    }
+
+    [Fact]
+    public async Task DeletePermission_PassesToBusinessLayer()
+    {
+        // Arrange
+        _mockPermissionBusiness
+            .Setup(b => b.DeletePermission(
+                OrgId,
+                ProjectId,
+                UserId,
+                PermissionId)).ReturnsAsync(true);
+
+        // Act
+        await _permissionProjectController.DeletePermission(OrgId, ProjectId, PermissionId);
+
+        // Assert
+        _mockPermissionBusiness.Verify(
+            b => b.DeletePermission(
+                OrgId,
+                ProjectId,
+                UserId,
+                PermissionId),
+            Times.Once);
+    }
+
+    [Fact]
+    public void DeletePermission_HasHttpDelete()
+    {
+        var method = GetControllerMethod(
+            nameof(PermissionOrganizationController.DeletePermission),
+            "permissionId");
+
+        AssertHasHttpAttribute(method, nameof(HttpDeleteAttribute));
     }
 
     #endregion
