@@ -39,4 +39,10 @@
         <Folder Include="uploads\" />
     </ItemGroup>
 
+    <ItemGroup>
+        <EmbeddedResource Include="Prompts\*.md" />
+        <EmbeddedResource Include="Templates\*.html" />
+        <EmbeddedResource Include="Templates\*.png" />
+    </ItemGroup>
+
 </Project>
