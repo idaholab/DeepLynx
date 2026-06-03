@@ -3,14 +3,6 @@ using System.Text.Json.Serialization;
 
 namespace deeplynx.models;
 
-public enum OrganizationTheme
-{
-    Default,
-    Nric,
-    Nord,
-    Emerald
-}
-
 public class UpdateOrganizationRequestDto
 {
     [MaxLength(50)] public string? Name { get; set; }

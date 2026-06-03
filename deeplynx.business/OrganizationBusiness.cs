@@ -230,14 +230,7 @@ public class OrganizationBusiness : IOrganizationBusiness
 
         if (dto.Theme != null)
         {
-            organization.Theme = dto.Theme.Value switch
-            {
-                OrganizationTheme.Default => "default",
-                OrganizationTheme.Nric => "nric",
-                OrganizationTheme.Nord => "nord",
-                OrganizationTheme.Emerald => "emerald",
-                _ => "default"
-            };
+            organization.Theme = dto.Theme.Value.ToCamelCaseValue();
         }
 
         organization.Name = dto.Name ?? organization.Name;
