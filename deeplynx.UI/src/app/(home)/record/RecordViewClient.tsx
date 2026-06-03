@@ -811,8 +811,20 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
           projectId,
           fileId: recordId,
         });
-
+        
         if (cancelled) return;
+        
+        if (status.available === false) {
+
+          setIsRecordInsightEmbedded(false);
+          
+          if (recordEmbedPollRef.current) {
+            clearInterval(recordEmbedPollRef.current);
+            recordEmbedPollRef.current = null;
+          }
+          
+          return;
+        }
 
         setIsRecordInsightEmbedded(status.indexed);
 

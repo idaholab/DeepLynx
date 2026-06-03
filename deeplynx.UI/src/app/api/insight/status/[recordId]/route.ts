@@ -7,6 +7,13 @@ import {
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+function isInsightUnavailableMessage(message: string): boolean {
+  return (
+      message.includes("Connection refused") ||
+      message.includes("ECONNREFUSED")
+  );
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ recordId: string }> },
@@ -44,6 +51,23 @@ export async function GET(
       await fetchInsightIngestionStatus(organizationId, projectId, recordId);
 
     if (!upstreamResponse.ok) {
+      const errorMessage = getInsightErrorMessage(
+          "Insight status check failed",
+          upstreamResponseBody,
+      );
+      
+      if (isInsightUnavailableMessage(String(upstreamResponseBody))) {
+        console.warn("Insight service unavailable:", errorMessage);
+        
+        return NextResponse.json({
+          available: false,
+          status: "unavailable",
+          indexed: false,
+          chunk_count: 0,
+          page_count: 0,
+        });
+      }
+      
       return NextResponse.json(
         {
           message: "Insight status check failed",
