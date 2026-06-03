@@ -179,7 +179,7 @@ public class PermissionOrganizationControllerTests : IDisposable
     #region GetPermission Tests
 
     [Fact]
-    public async Task GetPermission_Returns200_WithOrganization()
+    public async Task GetPermission_Returns200_WithPermission()
     {
         // Arrange
         PermissionResponseDto expected = new PermissionResponseDto();
@@ -214,7 +214,7 @@ public class PermissionOrganizationControllerTests : IDisposable
     }
 
     [Fact]
-    public async Task GetPermission_Returns200_WithNullOrganization()
+    public async Task GetPermission_Returns200_WithNullPermission()
     {
         // Arrange
 
@@ -377,7 +377,7 @@ public class PermissionOrganizationControllerTests : IDisposable
     }
 
     [Fact]
-    public async Task CreatePermission_PassesFiltersAndAdminFlagsToBusinessLayer()
+    public async Task CreatePermission_PassesToBusinessLayer()
     {
         // Arrange
         CreatePermissionRequestDto input = new CreatePermissionRequestDto();
@@ -592,7 +592,7 @@ public class PermissionOrganizationControllerTests : IDisposable
     }
 
     [Fact]
-    public async Task DeletePermission_PassesOrganizationIdToBusinessLayer()
+    public async Task DeletePermission_PassesToBusinessLayer()
     {
         // Arrange
         _mockPermissionBusiness
