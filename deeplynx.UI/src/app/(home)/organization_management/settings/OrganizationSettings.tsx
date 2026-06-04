@@ -28,6 +28,13 @@ const OrganizationSettings = () => {
   const { organization, setOrganization } = useOrganizationSession();
   const { t } = useLanguage();
 
+  const themeLabels: Record<string, string> = {
+    default: t.translations.ORGANIZATION_THEME_DEFAULT,
+    nric: t.translations.ORGANIZATION_THEME_NRIC,
+    nord: t.translations.ORGANIZATION_THEME_NORD,
+    emerald: t.translations.ORGANIZATION_THEME_EMERALD,
+  };
+
   // Logo states
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [logoFile, setLogoFile] = useState<File | null>(null);
@@ -326,7 +333,7 @@ const OrganizationSettings = () => {
                       {logoPreview ? (
                         <Image
                           src={logoPreview}
-                          alt="Organization Logo"
+                          alt={t.translations.ORGANIZATION_LOGO}
                           fill
                           sizes="96px"
                           className="object-contain p-2"
@@ -346,12 +353,15 @@ const OrganizationSettings = () => {
 
                   <div className="flex flex-col gap-2 flex-1">
                     <span className="font-semibold text-base">
-                      {organization?.organizationName || "Organization"}
+                      {organization?.organizationName ||
+                        t.translations.ORGANIZATION}
                     </span>
 
                     <div className="flex flex-wrap gap-2">
                       <label className="btn btn-sm btn-primary">
-                        {logoFile ? "Change Logo" : "Select Logo"}
+                        {logoFile
+                          ? t.translations.CHANGE_LOGO
+                          : t.translations.SELECT_LOGO}
                         <input
                           type="file"
                           accept=".png,.jpg,.jpeg,.svg,.webp"
@@ -448,7 +458,7 @@ const OrganizationSettings = () => {
                       {isSavingBanner && (
                         <span className="loading loading-spinner loading-xs" />
                       )}
-                      {t.translations.SAVE || "Save"}
+                      {t.translations.SAVE}
                     </button>
 
                     {bannerText !== originalBannerText && (
@@ -458,7 +468,7 @@ const OrganizationSettings = () => {
                         onClick={handleCancelBanner}
                         disabled={isSavingBanner}
                       >
-                        {t.translations.CANCEL || "Cancel"}
+                        {t.translations.CANCEL}
                       </button>
                     )}
                   </div>
@@ -468,10 +478,10 @@ const OrganizationSettings = () => {
                 <div className="space-y-4">
                   <div>
                     <h3 className="card-title text-lg mb-4">
-                      Organization Theme
+                      {t.translations.ORGANIZATION_THEME}
                     </h3>
                     <p className="text-sm text-base-content/60 mt-1">
-                      Applies to all users in this Organization.
+                      {t.translations.ORGANIZATION_THEME_DESCRIPTION}
                     </p>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -492,7 +502,7 @@ const OrganizationSettings = () => {
                         >
                           <div className="flex items-center justify-between gap-3">
                             <span className="font-medium text-base-content">
-                              {theme.label}
+                              {themeLabels[theme.id] ?? theme.label}
                             </span>
 
                             <div className="flex gap-1">
@@ -576,9 +586,15 @@ const OrganizationSettings = () => {
                     <option value="org-default">
                       {t.translations.ORGANIZATION_DEFAULT}
                     </option>
-                    <option value="s3-west">S3 — us-west-2</option>
-                    <option value="s3-east">S3 — us-east-1</option>
-                    <option value="local-cluster">Local Cluster Storage</option>
+                    <option value="s3-west">
+                      {t.translations.S3_US_WEST_2}
+                    </option>
+                    <option value="s3-east">
+                      {t.translations.S3_US_EAST_1}
+                    </option>
+                    <option value="local-cluster">
+                      {t.translations.LOCAL_CLUSTER_STORAGE}
+                    </option>
                   </select>
                   <label className="label">
                     <span className="label-text-alt text-base-content/60">
@@ -601,10 +617,14 @@ const OrganizationSettings = () => {
         <div className="alert alert-info mt-6">
           <InformationCircleIcon className="h-6 w-6" />
           <div>
-            <div className="font-bold">Additional Settings Coming Soon</div>
+            <div className="font-bold">
+              {t.translations.ADDITIONAL_SETTINGS_COMING_SOON}
+            </div>
             <div className="text-sm">
-              Storage configuration and additional organization management
-              features are currently in development.
+              {
+                t.translations
+                  .STORAGE_CONFIGURATION_AND_ADDITIONAL_ORG_MANAGEMENT_IN_DEVELOPMENT
+              }
             </div>
           </div>
         </div>
