@@ -109,6 +109,17 @@ const GenericTable = <T extends object>({
     }
   }, [filterValues, filters.length]);
 
+  useEffect(() => {
+    if (showFilters) {
+      document.body.style.overflowX = "visible";
+    } else {
+      document.body.style.overflowX = "";
+    }
+    return () => {
+      document.body.style.overflowX = "";
+    };
+  }, [showFilters]);
+
   // Filter data based on the search input
   const filteredData = React.useMemo(() => {
     return (
@@ -331,11 +342,7 @@ const GenericTable = <T extends object>({
     : filteredData.length > currentDisplayedRows;
 
   return (
-    <div
-      className={`overflow-x-auto ${
-        bordered ? "rounded-box border border-base-300" : ""
-      } p-4`}
-    >
+    <div className={`${bordered ? "rounded-box border border-base-300" : ""} p-4`}>
       {title && (
         <h2 className="text-xl font-bold text-base-content">{title}</h2>
       )}
@@ -373,8 +380,9 @@ const GenericTable = <T extends object>({
                 </button>
 
                 {/* Dropdown Panel */}
+                
                 {showFilters && (
-                  <div className="absolute left-0 mt-2 w-96 bg-base-100 border border-base-300 rounded-lg shadow-lg z-50 p-4">
+                  <div className="absolute left-0 mt-2 w-96 bg-base-100 border border-base-300 rounded-lg shadow-lg z-50 p-4 max-h-[80vh] overflow-y-auto">
                     <div className="flex justify-between mb-4">
                       <h3 className="font-semibold text-base-content">
                         Filter Options
@@ -474,6 +482,7 @@ const GenericTable = <T extends object>({
           </div>
         )}
       </div>
+      <div className="overflow-x-auto">
       <table
         className={`table table-pin-cols ${bordered ? "table-bordered" : ""} ${
           tableClassName ?? ""
@@ -567,6 +576,7 @@ const GenericTable = <T extends object>({
           })}
         </tbody>
       </table>
+      </div>
 
       <div className="flex justify-between">
         {showPageNavigation && (

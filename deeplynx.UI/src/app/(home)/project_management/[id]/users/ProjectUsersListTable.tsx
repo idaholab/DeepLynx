@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { PencilIcon, TrashIcon } from "@heroicons/react/24/outline";
+import { UserGroupIcon, PencilIcon, TrashIcon } from "@heroicons/react/24/outline";
 import {
   ProjectMemberTableRow,
   MemberType,
@@ -15,6 +15,7 @@ interface ProjectUsersListTableProps {
   tableData: ProjectMemberTableRow[];
   loading: boolean;
   onEditRole: (row: ProjectMemberTableRow) => void;
+  onViewGroupMembers: (row: ProjectMemberTableRow) => void;
   onOpenRemoveModal: (payload: {
     memberId: number;
     memberName: string;
@@ -26,6 +27,7 @@ const ProjectUsersListTable: React.FC<ProjectUsersListTableProps> = ({
   tableData,
   loading,
   onEditRole,
+  onViewGroupMembers,
   onOpenRemoveModal,
 }) => {
   return (
@@ -69,7 +71,21 @@ const ProjectUsersListTable: React.FC<ProjectUsersListTableProps> = ({
                 <td className="capitalize">{row.memberType}</td>
                 <td className="text-base-content/70">{row.email || "—"}</td>
                 <td>
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 items-center">
+                    {row.memberType === "group" ? (
+                        <button
+                          className="btn btn-ghost btn-xs"
+                          disabled={loading}    
+                          onClick={() => onViewGroupMembers(row)}
+                          title={"View group members"}
+                        >
+                          <UserGroupIcon className="size-6" />
+                        </button>
+                    ) : (
+                        <div className="btn btn-ghost btn-xs invisible">
+                          <UserGroupIcon className="size-6" />
+                        </div>
+                    )}
                     <button
                       className="btn btn-ghost btn-xs"
                       disabled={loading}

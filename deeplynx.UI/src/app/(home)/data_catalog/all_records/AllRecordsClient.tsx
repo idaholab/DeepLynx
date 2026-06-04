@@ -35,6 +35,7 @@ import {
   fullTextSearch,
   getMultiProjectRecords,
 } from "@/app/lib/client_service/query_services.client";
+import { getAllTagsOrg } from "@/app/lib/client_service/tag_services.client";
 import { HistoricalRecordResponseDto } from "@/app/(home)/types/responseDTOs";
 import ProjectDropdown from "@/app/(home)/components/ProjectDropdown";
 import { useLanguage } from "@/app/contexts/Language";
@@ -50,8 +51,13 @@ import FilterSidebar, {
   RecordStatusFilter,
 } from "./components/FilterSidebar";
 import RecordCard from "./components/RecordCard";
+import ManageTagsCard from "./components/ManageTagsCard";
 import { countFacet, parseRecordTags } from "./components/utils";
 
+import {
+  bulkAttachTagsToRecords,
+  bulkUnattachTagsFromRecords,
+} from "@/app/lib/client_service/record_services.client";
 /* ─── Types ──────────────────────────────────────────────────────────────── */
 
 type Props = {
@@ -64,6 +70,27 @@ type Props = {
   /** Records fetched server-side for the initial render to avoid a loading flash. */
   initialRecords: RecordTableRow[];
 };
+
+/**
+ * Represents how a tag applies across the currently selected records.
+ * 
+ * checked - Every selected record already has the tag, or the tag is pending attach
+ * unchecked - No selected records have the tag, or the tag is pending unattach
+ * indeterminate - Only some selected records currently have the tag
+ */
+type BulkTagState = "checked" | "unchecked" | "indeterminate";
+
+/**
+ * Tag returned for the current project scope.
+ * 
+ * projectId is null for organization-level tags.
+ * projectId is set when the tag belongs to a specific project.
+ */
+type AvailableTag = {
+  id: number;
+  name: string;
+  projectId: number | null;
+}
 
 /** Number of records shown per page in the paginated list. */
 const RECORDS_PER_PAGE = 12;
@@ -125,6 +152,21 @@ export default function DataCatalogClient({
   const [tagFacetQuery, setTagFacetQuery] = useState("");
 
   /**
+   * Bulk tag management state.
+   * 
+   * selectedRecordKeys stores selected records as `${projectId}-${recordId}`, so selections remain unique.
+   * 
+   * tagsToAttach and tagsToUnattach store pending tag IDs only. Actual API call happens when the user clicks apply.
+   */
+  const [selectedRecordKeys, setSelectedRecordKeys] = useState<string[]>([]);
+  const [tagsToAttach, setTagsToAttach] = useState<number[]>([]);
+  const [tagsToUnattach, setTagsToUnattach] = useState<number[]>([]);
+  const [bulkTagQuery, setBulkTagQuery] = useState("");
+  const [isApplyingBulkTags, setIsApplyingBulkTags] = useState(false);
+  const [isBulkMode, setIsBulkMode] = useState(false);
+  const [availableTags, setAvailableTags] = useState<AvailableTag[]>([]);
+  
+  /**
    * Guard ref that prevents the initial URL search term from being re-submitted
    * every time the component re-renders. We use a ref (not state) so that
    * storing the applied term does not itself trigger a re-render.
@@ -149,6 +191,13 @@ export default function DataCatalogClient({
     () => selectedProjects.join("|"),
     [selectedProjects],
   );
+
+  /**
+   * Builds a unique selection key for records across multiple projects.
+   */
+  const getRecordKey = useCallback((record: RecordTableRow) => {
+    return `${record.projectId}-${record.id}`;
+  }, []);
 
   /**
    * Resolve the effective project IDs to fetch records for.
@@ -399,6 +448,42 @@ export default function DataCatalogClient({
     fetchRecordsForSelection,
   ]);
 
+  /**
+   * Fetches tags available to the current project scope.
+   * 
+   * The organization tag endpoint returns organization-level tags by default.
+   * When projectIds are provided, it also includes tags scoped to those projects.
+   */
+  useEffect(() => {
+    if (!hasLoaded) return;
+    if (!organization?.organizationId) return;
+    
+    const fetchTagsForProjectScope = async () => {
+      const organizationId = Number(organization.organizationId);
+      const projectIds = effectiveProjectIds
+          .map(Number)
+          .filter(Number.isFinite);
+      
+      const tags = await getAllTagsOrg(
+          organizationId,
+          projectIds,
+          true,
+      );
+      
+      setAvailableTags(
+          tags.map((tag) => ({
+            id: tag.id,
+            name: tag.name,
+            projectId: tag.projectId ?? null,
+          })),
+      );
+    };
+    
+    fetchTagsForProjectScope().catch((error) => {
+      console.error("Failed to fetch available tags:", error);
+    });
+  }, [hasLoaded, organization?.organizationId, selectedProjectsToken]);
+  
   /** Bridge between the SearchBar's onSubmit callback shape and handleSearch. */
   const handleSubmit = useCallback(
     async ({ query }: { query: string }) => {
@@ -530,6 +615,25 @@ export default function DataCatalogClient({
     firstRecordIndex,
     firstRecordIndex + RECORDS_PER_PAGE,
   );
+  const selectedRecords = useMemo(() => {
+    const selected = new Set(selectedRecordKeys);
+    
+    return tableData.filter((record) =>
+      selected.has(getRecordKey(record)),
+    );
+  }, [getRecordKey, tableData, selectedRecordKeys]);
+  const visibleAvailableTags = useMemo(() => {
+    if (effectiveProjectIds.length === 1) {
+      const projectId = Number(effectiveProjectIds[0]);
+      
+      return availableTags.filter(
+          (tag) => tag.projectId === null || tag.projectId === projectId,
+      );
+    }
+    return availableTags.filter((tag) => tag.projectId === null);
+  }, [availableTags, effectiveProjectIds]);
+  const selectedRecordCount = selectedRecords.length;
+  const hasPendingBulkTagChanges = tagsToAttach.length > 0 || tagsToUnattach.length > 0;
   const pageStart = scopedRecords.length === 0 ? 0 : firstRecordIndex + 1;
   const pageEnd = Math.min(
     firstRecordIndex + RECORDS_PER_PAGE,
@@ -568,6 +672,185 @@ export default function DataCatalogClient({
         : [...prev, value],
     );
   }, []);
+  
+  const toggleRecordSelection = useCallback(
+      (record: RecordTableRow) => {
+        const recordKey = getRecordKey(record);
+        
+        setSelectedRecordKeys((prev) =>
+          prev.includes(recordKey)
+            ? prev.filter((item) => item !== recordKey)
+            : [...prev, recordKey],  
+        );
+      },
+      [getRecordKey],
+  );
+
+  /**
+   * Calculates the visual checkbox state for a tag across selected records.
+   * 
+   * Checked tags are marked for unattach. Unchecked or indeterminate tags are
+   * marked for attach so all selected records will receive the tag on Apply.
+   */
+  const getBulkTagState = useCallback(
+      (tag: AvailableTag): BulkTagState => {
+        if (!tag || selectedRecords.length === 0) {
+          return "unchecked";
+        }
+        
+        if (tagsToAttach.includes(tag.id)) {
+          return "checked";
+        }
+        
+        if (tagsToUnattach.includes(tag.id)) {
+          return "unchecked";
+        }
+        
+        const matchingCount = selectedRecords.filter((record) => {
+          const tags = parseRecordTags(record.tags);
+          
+          return tags.includes(tag.name);
+        }).length;
+        
+        if (matchingCount === 0) {
+          return "unchecked";
+        }
+        
+        if (matchingCount === selectedRecords.length) {
+          return "checked";
+        }
+        
+        return "indeterminate";
+      },
+      [selectedRecords, tagsToAttach, tagsToUnattach],
+  );
+
+  /**
+   * Tracks pending bulk tag changes.
+   * 
+   * Pending attach/unattach changes are checked first so the UI immediately
+   * reflects what will happen on apply, even before the records are refreshed.
+   */
+  const toggleBulkTag = useCallback(
+      (tag: AvailableTag) => {
+        const state = getBulkTagState(tag);
+        
+        if (state === "checked") {
+          setTagsToAttach((prev) => prev.filter((id) => id !== tag.id));
+          
+          setTagsToUnattach((prev) =>
+            prev.includes(tag.id) ? prev : [...prev, tag.id],
+          );
+        } else {
+          setTagsToUnattach((prev) => prev.filter((id) => id !== tag.id));
+          
+          setTagsToAttach((prev) =>
+              prev.includes(tag.id) ? prev : [...prev, tag.id],
+          );
+        }
+      },
+      [getBulkTagState],
+  );
+  
+  const handleCancelBulkTags = useCallback(() => {
+    setIsBulkMode(false);
+    setSelectedRecordKeys([]);
+    setTagsToAttach([]);
+    setTagsToUnattach([]);
+    setBulkTagQuery("");
+  }, []);
+
+  const handleApplyBulkTags = useCallback(async () => {
+    if (selectedRecords.length === 0) return;
+    if (!hasPendingBulkTagChanges) return;
+    if (!organization?.organizationId) return;
+
+    setIsApplyingBulkTags(true);
+
+    const organizationId = Number(organization.organizationId);
+
+    try {
+      const recordsByProject = new Map<number, RecordTableRow[]>();
+
+      // Bulk record-tag APIs are project-scoped, so selected records must be grouped by projectId.
+      selectedRecords.forEach((record) => {
+        if (record.projectId === undefined) return;
+
+        const projectId = Number(record.projectId);
+        const records = recordsByProject.get(projectId) ?? [];
+
+        records.push(record);
+        recordsByProject.set(projectId, records);
+      });
+
+      await Promise.all(
+          Array.from(recordsByProject.entries()).flatMap(([projectId, records]) => {
+            const requests: Promise<unknown>[] = [];
+
+            // API expects one record/tag pair per operation, using keys.
+            const attachDtos = records.flatMap((record) =>
+                tagsToAttach.map((tagId) => ({
+                  record_id: Number(record.id),
+                  tag_id: tagId,
+                })),
+            );
+
+            const unattachDtos = records.flatMap((record) =>
+                tagsToUnattach.map((tagId) => ({
+                  record_id: Number(record.id),
+                  tag_id: tagId,
+                })),
+            );
+
+            if (attachDtos.length > 0) {
+              requests.push(
+                  bulkAttachTagsToRecords(
+                      organizationId,
+                      projectId,
+                      attachDtos,
+                  ),
+              );
+            }
+
+            if (unattachDtos.length > 0) {
+              requests.push(
+                  bulkUnattachTagsFromRecords(
+                      organizationId,
+                      projectId,
+                      unattachDtos,
+                  ),
+              );
+            }
+
+            return requests;
+          }),
+      );
+
+      // Refresh whichever data mode the page is currently in.
+      if (activeFilters.length > 0) {
+        await runSearchTerms(activeFilters.map((filter) => filter.term));
+      } else {
+        await fetchRecordsForSelection();
+      }
+
+      // Only clear selection and staged changes after every API request succeeds.
+      handleCancelBulkTags();
+    } catch (error) {
+      console.error("Failed to apply bulk tag changes:", error);
+    } finally {
+      setIsApplyingBulkTags(false);
+    }
+  }, [
+    activeFilters,
+    fetchRecordsForSelection,
+    handleCancelBulkTags,
+    hasPendingBulkTagChanges,
+    organization?.organizationId,
+    runSearchTerms,
+    selectedRecords,
+    tagsToAttach,
+    tagsToUnattach,
+  ]);
 
   /** Resets all facet filters and clears both sidebar search inputs. */
   const clearFacetFilters = useCallback(() => {
@@ -628,6 +911,7 @@ export default function DataCatalogClient({
                     ? initialSelectedProjects
                     : undefined
                 }
+                disabled={isBulkMode}
               />
             </div>
 
@@ -655,6 +939,34 @@ export default function DataCatalogClient({
             {pageStart}-{pageEnd} {t.translations.OF} {scopedRecords.length}
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              disabled={isApplyingBulkTags}
+              className="cursor-pointer text-sm font-semibold underline underline-offset-2 hover:text-primary disabled:cursor-not-allowed disabled:opacity-50"
+              onClick={() => {
+                if (isBulkMode) {
+                  handleCancelBulkTags();
+                } else {
+                  setIsBulkMode(true);
+                }
+              }}
+            >
+              {isBulkMode ? "Cancel Selection" : "Select Records"}
+            </button>
+            {isBulkMode && (
+              <button
+                type="button"  
+                className="btn btn-sm btn-primary"
+                onClick={handleApplyBulkTags}
+                disabled={
+                  selectedRecordCount === 0 ||
+                  !hasPendingBulkTagChanges ||
+                  isApplyingBulkTags
+                }
+              >
+                {isApplyingBulkTags ? "Applying..." : "Apply Changes"}
+              </button>
+            )}
             {activeFilters.length > 0 && (
               <button
                 type="button"
@@ -681,23 +993,37 @@ export default function DataCatalogClient({
 
         {/* Two-column layout: sidebar on left, record list on right */}
         <div className="grid grid-cols-1 gap-5 lg:grid-cols-[18rem_minmax(0,1fr)]">
-          <FilterSidebar
-            projectScopedRecords={projectScopedRecords}
-            statusFilter={statusFilter}
-            onStatusFilterChange={setStatusFilter}
-            selectedClassFilters={selectedClassFilters}
-            onToggleClassFilter={toggleClassFilter}
-            filteredClassFacetOptions={filteredClassFacetOptions}
-            classFacetQuery={classFacetQuery}
-            onClassFacetQueryChange={setClassFacetQuery}
-            selectedTagFilters={selectedTagFilters}
-            onToggleTagFilter={toggleTagFilter}
-            filteredTagFacetOptions={filteredTagFacetOptions}
-            tagFacetQuery={tagFacetQuery}
-            onTagFacetQueryChange={setTagFacetQuery}
-            activeFacetCount={activeFacetCount}
-            onClearFacetFilters={clearFacetFilters}
-          />
+          <div className="space-y-4 lg:sticky lg:top-4 lg:self-start">
+            <FilterSidebar
+                projectScopedRecords={projectScopedRecords}
+                statusFilter={statusFilter}
+                onStatusFilterChange={setStatusFilter}
+                selectedClassFilters={selectedClassFilters}
+                onToggleClassFilter={toggleClassFilter}
+                filteredClassFacetOptions={filteredClassFacetOptions}
+                classFacetQuery={classFacetQuery}
+                onClassFacetQueryChange={setClassFacetQuery}
+                selectedTagFilters={selectedTagFilters}
+                onToggleTagFilter={toggleTagFilter}
+                filteredTagFacetOptions={filteredTagFacetOptions}
+                tagFacetQuery={tagFacetQuery}
+                onTagFacetQueryChange={setTagFacetQuery}
+                activeFacetCount={activeFacetCount}
+                onClearFacetFilters={clearFacetFilters}
+            />
+
+            {isBulkMode && (
+                <ManageTagsCard
+                  selectedRecordCount={selectedRecordCount}
+                  bulkTagQuery={bulkTagQuery}
+                  onBulkTagQueryChange={setBulkTagQuery}
+                  availableTags={visibleAvailableTags}
+                  getBulkTagState={getBulkTagState}
+                  onToggleBulkTag={toggleBulkTag}
+                  showProjectScopeNotice={effectiveProjectIds.length > 1}
+                />
+            )}
+          </div>
 
           {/* Record list */}
           <div className="min-w-0">
@@ -720,6 +1046,9 @@ export default function DataCatalogClient({
                     key={`${record.projectId}-${record.id}`}
                     record={record}
                     activeSearchTerms={activeSearchTerms}
+                    isBulkMode={isBulkMode}
+                    isSelected={selectedRecordKeys.includes(getRecordKey(record))}
+                    onToggleSelected={toggleRecordSelection}
                   />
                 ))}
               </div>

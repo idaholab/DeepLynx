@@ -1699,6 +1699,194 @@ public class RecordBusinessTests : IntegrationTestBase
     }
 
     #endregion
+    
+    #region ArchiveRecord Collection Removal Tests
+
+    [Fact]
+    public async Task ArchiveRecord_RemovesRecordFromAllCollections()
+    {
+        // Arrange - create a collection containing the record
+        var record = await Context.Records.FirstAsync(r => r.Id == rid);
+
+        var collection = new RecordCollection
+        {
+            Name = "Collection To Remove From",
+            Description = "Record should be removed on archive",
+            Properties = "{}",
+            ProjectId = pid,
+            OrganizationId = organizationId,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            IsArchived = false,
+            Records = new List<Record> { record }
+        };
+        Context.RecordCollections.Add(collection);
+        await Context.SaveChangesAsync();
+        Context.ChangeTracker.Clear();
+
+        // Act
+        await _recordBusiness.ArchiveRecord(uid, organizationId, pid, rid);
+        Context.ChangeTracker.Clear();
+
+        // Assert - record should be archived
+        var archivedRecord = await Context.Records.FindAsync(rid);
+        Assert.NotNull(archivedRecord);
+        Assert.True(archivedRecord.IsArchived);
+
+        // Assert - record should no longer be in the collection
+        var updatedCollection = await Context.RecordCollections
+            .Include(c => c.Records)
+            .FirstAsync(c => c.Id == collection.Id);
+
+        Assert.DoesNotContain(updatedCollection.Records, r => r.Id == rid);
+        Assert.Equal(uid, updatedCollection.LastUpdatedBy);
+        Assert.NotNull(updatedCollection.LastUpdatedAt);
+    }
+
+    [Fact]
+    public async Task ArchiveRecord_RemovesRecordFromMultipleCollections()
+    {
+        // Arrange - create two collections both containing the record
+        var record = await Context.Records.FirstAsync(r => r.Id == rid);
+
+        var collection1 = new RecordCollection
+        {
+            Name = "First Collection",
+            Description = "First collection containing the record",
+            Properties = "{}",
+            ProjectId = pid,
+            OrganizationId = organizationId,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            IsArchived = false,
+            Records = new List<Record> { record }
+        };
+        var collection2 = new RecordCollection
+        {
+            Name = "Second Collection",
+            Description = "Second collection containing the record",
+            Properties = "{}",
+            ProjectId = pid,
+            OrganizationId = organizationId,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            IsArchived = false,
+            Records = new List<Record> { record }
+        };
+        Context.RecordCollections.AddRange(collection1, collection2);
+        await Context.SaveChangesAsync();
+        Context.ChangeTracker.Clear();
+
+        // Act
+        await _recordBusiness.ArchiveRecord(uid, organizationId, pid, rid);
+        Context.ChangeTracker.Clear();
+
+        // Assert - record removed from both collections
+        var updatedCollection1 = await Context.RecordCollections
+            .Include(c => c.Records)
+            .FirstAsync(c => c.Id == collection1.Id);
+
+        var updatedCollection2 = await Context.RecordCollections
+            .Include(c => c.Records)
+            .FirstAsync(c => c.Id == collection2.Id);
+
+        Assert.DoesNotContain(updatedCollection1.Records, r => r.Id == rid);
+        Assert.Equal(uid, updatedCollection1.LastUpdatedBy);
+
+        Assert.DoesNotContain(updatedCollection2.Records, r => r.Id == rid);
+        Assert.Equal(uid, updatedCollection2.LastUpdatedBy);
+    }
+
+    [Fact]
+    public async Task ArchiveRecord_DoesNotAffectOtherRecordsInCollection()
+    {
+        // Arrange - create a collection with two records, only archive one
+        var record1 = await Context.Records.FirstAsync(r => r.Id == rid);
+        var record2 = await Context.Records.FirstAsync(r => r.Id == rid2);
+
+        var collection = new RecordCollection
+        {
+            Name = "Collection With Multiple Records",
+            Description = "Only one record will be archived",
+            Properties = "{}",
+            ProjectId = pid,
+            OrganizationId = organizationId,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            IsArchived = false,
+            Records = new List<Record> { record1, record2 }
+        };
+        Context.RecordCollections.Add(collection);
+        await Context.SaveChangesAsync();
+        Context.ChangeTracker.Clear();
+
+        // Act - only archive rid
+        await _recordBusiness.ArchiveRecord(uid, organizationId, pid, rid);
+        Context.ChangeTracker.Clear();
+
+        // Assert - rid is removed but rid2 remains
+        var updatedCollection = await Context.RecordCollections
+            .Include(c => c.Records)
+            .FirstAsync(c => c.Id == collection.Id);
+
+        Assert.DoesNotContain(updatedCollection.Records, r => r.Id == rid);
+        Assert.Contains(updatedCollection.Records, r => r.Id == rid2);
+        Assert.Equal(1, updatedCollection.Records.Count);
+    }
+
+    [Fact]
+    public async Task ArchiveRecord_UpdatesCollectionLastUpdatedFields()
+    {
+        // Arrange
+        var record = await Context.Records.FirstAsync(r => r.Id == rid);
+        var beforeArchive = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
+
+        var collection = new RecordCollection
+        {
+            Name = "Timestamp Check Collection",
+            Description = "Check that timestamps are updated",
+            Properties = "{}",
+            ProjectId = pid,
+            OrganizationId = organizationId,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow.AddMinutes(-5), DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            IsArchived = false,
+            Records = new List<Record> { record }
+        };
+        Context.RecordCollections.Add(collection);
+        await Context.SaveChangesAsync();
+        Context.ChangeTracker.Clear();
+
+        // Act
+        await _recordBusiness.ArchiveRecord(uid, organizationId, pid, rid);
+        Context.ChangeTracker.Clear();
+
+        // Assert
+        var updatedCollection = await Context.RecordCollections
+            .FirstAsync(c => c.Id == collection.Id);
+
+        Assert.True(updatedCollection.LastUpdatedAt >= beforeArchive);
+        Assert.Equal(uid, updatedCollection.LastUpdatedBy);
+    }
+
+    [Fact]
+    public async Task ArchiveRecord_NoCollections_ArchivesSuccessfully()
+    {
+        // Arrange - rid2 is not in any collection in seed data
+        Context.ChangeTracker.Clear();
+
+        // Act & Assert - should not throw even when record is in no collections
+        var result = await _recordBusiness.ArchiveRecord(uid, organizationId, pid, rid2);
+        Assert.True(result);
+
+        Context.ChangeTracker.Clear();
+
+        var archivedRecord = await Context.Records.FindAsync(rid2);
+        Assert.NotNull(archivedRecord);
+        Assert.True(archivedRecord.IsArchived);
+    }
+
+    #endregion
 
     #region Edge Cases and Integration Tests
 
@@ -2161,6 +2349,436 @@ public class RecordBusinessTests : IntegrationTestBase
         Assert.Equal(2, record2Updated.Labels.Count);
         Assert.Contains(record2Updated.Labels, l => l.Name == newLabel1.Name);
         Assert.Contains(record2Updated.Labels, l => l.Name == newLabel2.Name);
+    }
+
+    #endregion
+    
+    #region AttachLabel Collection Propagation Tests
+
+    [Fact]
+    public async Task AttachLabel_PropagatesLabelToCollectionsContainingRecord()
+    {
+        // Arrange - create a collection containing rid
+        var newLabel = new CreateSensitivityLabelRequestDto
+        {
+            Name = "Propagation Label",
+            Description = "Label that should propagate to collections"
+        };
+        var newLabelResponse = await _sensitivityLabelBusiness.CreateSensitivityLabel(
+            uid, newLabel, pid, organizationId);
+
+        var collection = new RecordCollection
+        {
+            Name = "Collection With Record",
+            Description = "Contains the record we will attach a label to",
+            Properties = "{}",
+            ProjectId = pid,
+            OrganizationId = organizationId,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            IsArchived = false,
+            Records = new List<Record> { await Context.Records.FirstAsync(r => r.Id == rid) },
+            Labels = new List<SensitivityLabel>()
+        };
+        Context.RecordCollections.Add(collection);
+        await Context.SaveChangesAsync();
+        Context.ChangeTracker.Clear();
+
+        // Act
+        var result = await _recordBusiness.AttachLabel(uid, organizationId, pid, rid, newLabelResponse.Id);
+
+        // Assert
+        Assert.True(result);
+
+        var updatedCollection = await Context.RecordCollections
+            .Include(c => c.Labels)
+            .FirstAsync(c => c.Id == collection.Id);
+
+        Assert.NotEmpty(updatedCollection.Labels);
+        Assert.Contains(updatedCollection.Labels, l => l.Id == newLabelResponse.Id);
+        Assert.Equal(1, updatedCollection.Labels.Count);
+    }
+
+    [Fact]
+    public async Task AttachLabel_DoesNotDuplicateLabelOnCollection_IfAlreadyPresent()
+    {
+        // Arrange - create a label and a collection that already has it
+        var newLabel = new CreateSensitivityLabelRequestDto
+        {
+            Name = "Existing Collection Label",
+            Description = "Already on the collection"
+        };
+        var newLabelResponse = await _sensitivityLabelBusiness.CreateSensitivityLabel(
+            uid, newLabel, pid, organizationId);
+
+        var label = await Context.SensitivityLabels.FirstAsync(l => l.Id == newLabelResponse.Id);
+        var record = await Context.Records.FirstAsync(r => r.Id == rid);
+
+        var collection = new RecordCollection
+        {
+            Name = "Collection With Existing Label",
+            Description = "Already has the label",
+            Properties = "{}",
+            ProjectId = pid,
+            OrganizationId = organizationId,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            IsArchived = false,
+            Records = new List<Record> { record },
+            Labels = new List<SensitivityLabel> { label }
+        };
+        Context.RecordCollections.Add(collection);
+        await Context.SaveChangesAsync();
+        Context.ChangeTracker.Clear();
+
+        // Act
+        var result = await _recordBusiness.AttachLabel(uid, organizationId, pid, rid, newLabelResponse.Id);
+
+        // Assert
+        Assert.True(result);
+
+        var updatedCollection = await Context.RecordCollections
+            .Include(c => c.Labels)
+            .FirstAsync(c => c.Id == collection.Id);
+
+        Assert.Equal(1, updatedCollection.Labels.Count(l => l.Id == newLabelResponse.Id));
+    }
+
+    [Fact]
+    public async Task AttachLabel_OnlyPropagatesToCollectionsContainingRecord()
+    {
+        // Arrange - create two collections, only one contains the record
+        var newLabel = new CreateSensitivityLabelRequestDto
+        {
+            Name = "Selective Propagation Label",
+            Description = "Should only go to collections with the record"
+        };
+        var newLabelResponse = await _sensitivityLabelBusiness.CreateSensitivityLabel(
+            uid, newLabel, pid, organizationId);
+
+        var record = await Context.Records.FirstAsync(r => r.Id == rid);
+
+        var collectionWithRecord = new RecordCollection
+        {
+            Name = "Collection With Record",
+            Description = "Has the record",
+            Properties = "{}",
+            ProjectId = pid,
+            OrganizationId = organizationId,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            IsArchived = false,
+            Records = new List<Record> { record },
+            Labels = new List<SensitivityLabel>()
+        };
+        var collectionWithoutRecord = new RecordCollection
+        {
+            Name = "Collection Without Record",
+            Description = "Does not have the record",
+            Properties = "{}",
+            ProjectId = pid,
+            OrganizationId = organizationId,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            IsArchived = false,
+            Records = new List<Record>(),
+            Labels = new List<SensitivityLabel>()
+        };
+        Context.RecordCollections.AddRange(collectionWithRecord, collectionWithoutRecord);
+        await Context.SaveChangesAsync();
+        Context.ChangeTracker.Clear();
+
+        // Act
+        await _recordBusiness.AttachLabel(uid, organizationId, pid, rid, newLabelResponse.Id);
+
+        // Assert
+        var updatedWithRecord = await Context.RecordCollections
+            .Include(c => c.Labels)
+            .FirstAsync(c => c.Id == collectionWithRecord.Id);
+
+        var updatedWithoutRecord = await Context.RecordCollections
+            .Include(c => c.Labels)
+            .FirstAsync(c => c.Id == collectionWithoutRecord.Id);
+
+        Assert.Contains(updatedWithRecord.Labels, l => l.Id == newLabelResponse.Id);
+        Assert.DoesNotContain(updatedWithoutRecord.Labels, l => l.Id == newLabelResponse.Id);
+    }
+
+    [Fact]
+    public async Task AttachLabel_PropagatesLabelToMultipleCollectionsContainingRecord()
+    {
+        // Arrange - create two collections that both contain the record
+        var newLabel = new CreateSensitivityLabelRequestDto
+        {
+            Name = "Multi Collection Label",
+            Description = "Should propagate to all collections with the record"
+        };
+        var newLabelResponse = await _sensitivityLabelBusiness.CreateSensitivityLabel(
+            uid, newLabel, pid, organizationId);
+
+        var record = await Context.Records.FirstAsync(r => r.Id == rid);
+
+        var collection1 = new RecordCollection
+        {
+            Name = "First Collection",
+            Description = "First collection with the record",
+            Properties = "{}",
+            ProjectId = pid,
+            OrganizationId = organizationId,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            IsArchived = false,
+            Records = new List<Record> { record },
+            Labels = new List<SensitivityLabel>()
+        };
+        var collection2 = new RecordCollection
+        {
+            Name = "Second Collection",
+            Description = "Second collection with the record",
+            Properties = "{}",
+            ProjectId = pid,
+            OrganizationId = organizationId,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            IsArchived = false,
+            Records = new List<Record> { record },
+            Labels = new List<SensitivityLabel>()
+        };
+        Context.RecordCollections.AddRange(collection1, collection2);
+        await Context.SaveChangesAsync();
+        Context.ChangeTracker.Clear();
+
+        // Act
+        await _recordBusiness.AttachLabel(uid, organizationId, pid, rid, newLabelResponse.Id);
+
+        // Assert
+        var updatedCollection1 = await Context.RecordCollections
+            .Include(c => c.Labels)
+            .FirstAsync(c => c.Id == collection1.Id);
+
+        var updatedCollection2 = await Context.RecordCollections
+            .Include(c => c.Labels)
+            .FirstAsync(c => c.Id == collection2.Id);
+
+        Assert.Contains(updatedCollection1.Labels, l => l.Id == newLabelResponse.Id);
+        Assert.Equal(1, updatedCollection1.Labels.Count);
+
+        Assert.Contains(updatedCollection2.Labels, l => l.Id == newLabelResponse.Id);
+        Assert.Equal(1, updatedCollection2.Labels.Count);
+    }
+
+    #endregion
+    
+    #region BulkAttachLabels Collection Propagation Tests
+
+    [Fact]
+    public async Task BulkAttachLabels_PropagatesLabelsToCollectionsContainingRecords()
+    {
+        // Arrange - create two labels and a collection containing rid and rid2
+        var newLabel1 = new CreateSensitivityLabelRequestDto
+        {
+            Name = "Bulk Label 1",
+            Description = "First bulk label"
+        };
+        var newLabel2 = new CreateSensitivityLabelRequestDto
+        {
+            Name = "Bulk Label 2",
+            Description = "Second bulk label"
+        };
+
+        var label1Response = await _sensitivityLabelBusiness.CreateSensitivityLabel(uid, newLabel1, pid, organizationId);
+        var label2Response = await _sensitivityLabelBusiness.CreateSensitivityLabel(uid, newLabel2, pid, organizationId);
+
+        var record1 = await Context.Records.FirstAsync(r => r.Id == rid);
+        var record2 = await Context.Records.FirstAsync(r => r.Id == rid2);
+
+        var collection = new RecordCollection
+        {
+            Name = "Bulk Label Collection",
+            Description = "Collection containing both records",
+            Properties = "{}",
+            ProjectId = pid,
+            OrganizationId = organizationId,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            IsArchived = false,
+            Records = new List<Record> { record1, record2 },
+            Labels = new List<SensitivityLabel>()
+        };
+        Context.RecordCollections.Add(collection);
+        await Context.SaveChangesAsync();
+        Context.ChangeTracker.Clear();
+
+        // Act
+        var result = await _recordBusiness.BulkAttachLabels(
+            uid, organizationId, pid,
+            new List<long> { rid, rid2 },
+            new List<long> { label1Response.Id, label2Response.Id });
+
+        // Assert
+        Assert.True(result);
+
+        var updatedCollection = await Context.RecordCollections
+            .Include(c => c.Labels)
+            .FirstAsync(c => c.Id == collection.Id);
+
+        Assert.Equal(2, updatedCollection.Labels.Count);
+        Assert.Contains(updatedCollection.Labels, l => l.Id == label1Response.Id);
+        Assert.Contains(updatedCollection.Labels, l => l.Id == label2Response.Id);
+        Assert.Equal(uid, updatedCollection.LastUpdatedBy);
+    }
+
+    [Fact]
+    public async Task BulkAttachLabels_DoesNotPropagateLabelToCollectionNotContainingRecord()
+    {
+        // Arrange - create a collection that does NOT contain any of the records
+        var newLabel = new CreateSensitivityLabelRequestDto
+        {
+            Name = "Non Propagation Label",
+            Description = "Should not appear on unrelated collection"
+        };
+        var labelResponse = await _sensitivityLabelBusiness.CreateSensitivityLabel(uid, newLabel, pid, organizationId);
+
+        var unrelatedCollection = new RecordCollection
+        {
+            Name = "Unrelated Collection",
+            Description = "Contains none of the records being labeled",
+            Properties = "{}",
+            ProjectId = pid,
+            OrganizationId = organizationId,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            IsArchived = false,
+            Records = new List<Record>(),
+            Labels = new List<SensitivityLabel>()
+        };
+        Context.RecordCollections.Add(unrelatedCollection);
+        await Context.SaveChangesAsync();
+        Context.ChangeTracker.Clear();
+
+        // Act
+        await _recordBusiness.BulkAttachLabels(
+            uid, organizationId, pid,
+            new List<long> { rid },
+            new List<long> { labelResponse.Id });
+
+        // Assert
+        var updatedCollection = await Context.RecordCollections
+            .Include(c => c.Labels)
+            .FirstAsync(c => c.Id == unrelatedCollection.Id);
+
+        Assert.Empty(updatedCollection.Labels);
+        Assert.DoesNotContain(updatedCollection.Labels, l => l.Id == labelResponse.Id);
+    }
+
+    [Fact]
+    public async Task BulkAttachLabels_DoesNotDuplicateLabelsAlreadyOnCollection()
+    {
+        // Arrange - create a collection that already has the label
+        var newLabel = new CreateSensitivityLabelRequestDto
+        {
+            Name = "Pre-existing Label",
+            Description = "Already on the collection"
+        };
+        var labelResponse = await _sensitivityLabelBusiness.CreateSensitivityLabel(uid, newLabel, pid, organizationId);
+        var label = await Context.SensitivityLabels.FirstAsync(l => l.Id == labelResponse.Id);
+        var record = await Context.Records.FirstAsync(r => r.Id == rid);
+
+        var collection = new RecordCollection
+        {
+            Name = "Collection With Existing Label",
+            Description = "Already has the label before bulk attach",
+            Properties = "{}",
+            ProjectId = pid,
+            OrganizationId = organizationId,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            IsArchived = false,
+            Records = new List<Record> { record },
+            Labels = new List<SensitivityLabel> { label }
+        };
+        Context.RecordCollections.Add(collection);
+        await Context.SaveChangesAsync();
+        Context.ChangeTracker.Clear();
+
+        // Act
+        await _recordBusiness.BulkAttachLabels(
+            uid, organizationId, pid,
+            new List<long> { rid },
+            new List<long> { labelResponse.Id });
+
+        // Assert
+        var updatedCollection = await Context.RecordCollections
+            .Include(c => c.Labels)
+            .FirstAsync(c => c.Id == collection.Id);
+
+        Assert.Equal(1, updatedCollection.Labels.Count(l => l.Id == labelResponse.Id));
+    }
+
+    [Fact]
+    public async Task BulkAttachLabels_PropagatesLabelsAcrossMultipleCollections()
+    {
+        // Arrange - two collections both containing rid
+        var newLabel = new CreateSensitivityLabelRequestDto
+        {
+            Name = "Multi Collection Bulk Label",
+            Description = "Should appear on all collections with the record"
+        };
+        var labelResponse = await _sensitivityLabelBusiness.CreateSensitivityLabel(uid, newLabel, pid, organizationId);
+        var record = await Context.Records.FirstAsync(r => r.Id == rid);
+
+        var collection1 = new RecordCollection
+        {
+            Name = "First Bulk Collection",
+            Description = "First collection with the record",
+            Properties = "{}",
+            ProjectId = pid,
+            OrganizationId = organizationId,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            IsArchived = false,
+            Records = new List<Record> { record },
+            Labels = new List<SensitivityLabel>()
+        };
+        var collection2 = new RecordCollection
+        {
+            Name = "Second Bulk Collection",
+            Description = "Second collection with the record",
+            Properties = "{}",
+            ProjectId = pid,
+            OrganizationId = organizationId,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            IsArchived = false,
+            Records = new List<Record> { record },
+            Labels = new List<SensitivityLabel>()
+        };
+        Context.RecordCollections.AddRange(collection1, collection2);
+        await Context.SaveChangesAsync();
+        Context.ChangeTracker.Clear();
+
+        // Act
+        await _recordBusiness.BulkAttachLabels(
+            uid, organizationId, pid,
+            new List<long> { rid },
+            new List<long> { labelResponse.Id });
+
+        // Assert
+        var updatedCollection1 = await Context.RecordCollections
+            .Include(c => c.Labels)
+            .FirstAsync(c => c.Id == collection1.Id);
+
+        var updatedCollection2 = await Context.RecordCollections
+            .Include(c => c.Labels)
+            .FirstAsync(c => c.Id == collection2.Id);
+
+        Assert.Contains(updatedCollection1.Labels, l => l.Id == labelResponse.Id);
+        Assert.Equal(1, updatedCollection1.Labels.Count);
+        Assert.Equal(uid, updatedCollection1.LastUpdatedBy);
+
+        Assert.Contains(updatedCollection2.Labels, l => l.Id == labelResponse.Id);
+        Assert.Equal(1, updatedCollection2.Labels.Count);
+        Assert.Equal(uid, updatedCollection2.LastUpdatedBy);
     }
 
     #endregion

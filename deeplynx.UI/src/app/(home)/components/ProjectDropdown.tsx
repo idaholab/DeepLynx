@@ -8,12 +8,14 @@ interface ProjectDropdownProps {
   projects: { id: string; name: string }[];
   onSelectionChange?: (selected: string[]) => void;
   defaultSelected?: string[];
+  disabled?: boolean;
 }
 
 const ProjectDropdown: React.FC<ProjectDropdownProps> = ({
   projects,
   onSelectionChange,
   defaultSelected,
+  disabled = false,  
 }) => {
   const { t } = useLanguage();
   const [isOpen, setIsOpen] = useState(false);
@@ -57,6 +59,13 @@ const ProjectDropdown: React.FC<ProjectDropdownProps> = ({
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+  
+  // Automatically close the dropdown if the bulk mode disables project scope changes.
+  useEffect(() => {
+    if (disabled) {
+      setIsOpen(false);
+    }
+  }, [disabled]);
 
   const toggleProject = (id: string) => {
     let newSelection: string[];
@@ -84,7 +93,7 @@ const ProjectDropdown: React.FC<ProjectDropdownProps> = ({
     if (selectedIds.includes("ALL")) return "All Your Projects";
     if (selectedIds.length === 1) {
       const project = projects.find((p) => p.id === selectedIds[0]);
-      const name = project?.name || "1 project selected"
+      const name = project?.name || "1 project selected";
       return  name.length >50 ? name.slice(0 ,50) + "..." : name;
     }
     return `${selectedIds.length} projects selected`;
@@ -96,9 +105,13 @@ const ProjectDropdown: React.FC<ProjectDropdownProps> = ({
       ref={dropdownRef}
     >
       <button
-        className="flex items-center gap-1 text-md max-w-full"
-        onClick={() => setIsOpen((o) => !o)}
-        title={selectedIds.length === 1 ? projects.find((p) => p.id === selectedIds[0])?.name : undefined}
+        className={`flex items-center gap-1 text-md max-w-full ${
+          disabled ? "cursor-not-allowed opacity-60" : ""
+        }`}
+        onClick={() => {
+          if (disabled) return;
+          setIsOpen((o) => !o);
+        }}
         type="button"
       >
         <span className="truncate">{selectedLabel}</span>

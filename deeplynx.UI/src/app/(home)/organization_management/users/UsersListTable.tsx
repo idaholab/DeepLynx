@@ -32,6 +32,8 @@ interface UsersListTableProps {
     itemName: string;
     isPending: boolean;
   }) => void;
+  isArchivedTab?: boolean;   
+  onUnarchive?: (userId: number) => void;
 }
 
 const UsersListTable: React.FC<UsersListTableProps> = ({
@@ -41,6 +43,8 @@ const UsersListTable: React.FC<UsersListTableProps> = ({
   onResendInvite,
   onEditUser,
   onOpenConfirm,
+  isArchivedTab = false, 
+  onUnarchive, 
 }) => {
   const { t } = useLanguage();
 
@@ -70,14 +74,14 @@ const UsersListTable: React.FC<UsersListTableProps> = ({
             <th>{t.translations.USERNAME}</th>
             <th>{t.translations.STATUS}</th>
             <th>{t.translations.LAST_LOGIN}</th>
-            <th>{t.translations.ACTIONS}</th>
+            <th>{isArchivedTab ? t.translations.UNARCHIVE_USER : t.translations.ACTIONS}</th>
           </tr>
         </thead>
         <tbody>
           {tableData.length === 0 ? (
             <tr>
               <td colSpan={6} className="text-center py-8 text-base-content/70">
-                {t.translations.NO_USERS_OR_PENDING_INVITES_GET_STARTED}
+                {isArchivedTab ? t.translations.NO_ARCHIVED_USERS : t.translations.NO_USERS_OR_PENDING_INVITES_GET_STARTED}
               </td>
             </tr>
           ) : (
@@ -185,21 +189,18 @@ const UsersListTable: React.FC<UsersListTableProps> = ({
                         </>
                       ) : (
                         <>
-                          <button
-                            className="btn btn-ghost btn-sm"
-                            title={t.translations.EDIT_USER}
-                            onClick={() =>
-                              onEditUser(
-                                row.id,
-                                row.name,
-                                !!row.isOrgAdmin,
-                                !!row.isSysAdmin,
-                              )
-                            }
-                            disabled={loading}
-                          >
-                            <PencilIcon className="size-6" />
-                          </button>
+                          {!isArchivedTab && (
+                            <button
+                              className="btn btn-ghost btn-sm"
+                              title={t.translations.EDIT_USER}
+                              onClick={() =>
+                                onEditUser(row.id, row.name, !!row.isOrgAdmin, !!row.isSysAdmin)
+                              }
+                              disabled={loading}
+                            >
+                              <PencilIcon className="size-6" />
+                            </button>
+                          )}
 
                           {scope === "org" && (
                             <button
@@ -220,21 +221,32 @@ const UsersListTable: React.FC<UsersListTableProps> = ({
                           )}
 
                           {scope === "site" && (
-                            <button
-                              className="btn btn-ghost btn-sm text-error"
-                              title={t.translations.ARCHIVE_USER_ACTION}
-                              onClick={() =>
-                                onOpenConfirm({
-                                  isOpen: true,
-                                  itemId: row.id,
-                                  itemName: row.name,
-                                  isPending: false,
-                                })
-                              }
-                              disabled={loading || row.isSysAdmin}
-                            >
-                              <TrashIcon className="size-6" />
-                            </button>
+                            isArchivedTab ? (
+                              <button
+                                className="btn btn-ghost btn-sm text-success"
+                                title="Unarchive User"
+                                onClick={() => onUnarchive?.(row.id)}
+                                disabled={loading}
+                              >
+                                <ArrowPathIcon className="w-4 h-4" />
+                              </button>
+                            ) : (
+                              <button
+                                className="btn btn-ghost btn-sm text-error"
+                                title={t.translations.ARCHIVE_USER_ACTION}
+                                onClick={() =>
+                                  onOpenConfirm({
+                                    isOpen: true,
+                                    itemId: row.id,
+                                    itemName: row.name,
+                                    isPending: false,
+                                  })
+                                }
+                                disabled={loading || row.isSysAdmin}
+                              >
+                                <TrashIcon className="size-6" />
+                              </button>
+                            )
                           )}
                         </>
                       )}

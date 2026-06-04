@@ -354,6 +354,15 @@ html {
   );
 }
 
+.login {
+  background: #152230;
+  background: linear-gradient(
+    180deg,
+    rgba(34, 41, 51, 1) 0%,
+    rgba(57, 82, 108, 1) 100%
+  );
+}
+
 .grayed-out {
   opacity: 0.5;
   pointer-events: none;
@@ -406,4 +415,8 @@ html {
 
 .copy-tooltip::before {
   font-size: 0.65rem;
+}
+
+.id-tooltip:hover [role="tooltip"] {
+  pointer-events: auto;
 }

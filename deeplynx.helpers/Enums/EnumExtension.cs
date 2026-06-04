@@ -1,4 +1,4 @@
-namespace deeplynx.models;
+namespace deeplynx.helpers;
 
 public static class EnumExtensions
 {
