@@ -23,7 +23,7 @@ import {
   AdjustmentsHorizontalIcon,
   XMarkIcon,
 } from "@heroicons/react/24/outline";
-import { useDeferredValue, useEffect, useState } from "react";
+import { useDeferredValue, useEffect, useState, useMemo } from "react";
 import toast from "react-hot-toast";
 import ProjectInsightChat from "./components/ProjectInsightChat";
 import ProjectInsightFilters from "./components/ProjectInsightFilters";
@@ -77,6 +77,18 @@ export default function ProjectInsightClientView() {
     Record<number, ProjectInsightStatus>
   >({});
   const [isInsightUnavailable, setIsInsightUnavailable] = useState(false);
+  const pollingKey = useMemo(
+      () =>
+          Object.entries(statusMap)
+              .filter(
+                  ([, status]) =>
+                      status.state === "queued" || status.state === "processing",
+              )
+              .map(([recordId]) => Number(recordId))
+              .sort((a, b) => a - b)
+              .join(","),
+      [statusMap],
+  );
   const [isLoadingRecords, setIsLoadingRecords] = useState(true);
   const [isFiltersOpen, setIsFiltersOpen] = useState(false);
   const [activeTabKey, setActiveTabKey] = useState<"library" | "pending">(
@@ -290,21 +302,14 @@ export default function ProjectInsightClientView() {
   ]);
 
   useEffect(() => {
-    if (!organizationId || !projectId) return;
+    if (!organizationId || !projectId || !pollingKey) return;
 
-    const pollingIds = Object.entries(statusMap)
-      .filter(
-        ([, status]) =>
-          status.state === "queued" || status.state === "processing",
-      )
-      .map(([recordId]) => Number(recordId));
-
-    if (pollingIds.length === 0) return;
+    const pollingIds = pollingKey.split(",").map(Number);
 
     let cancelled = false;
 
     const pollStatuses = async () => {
-      const updatedStatuses = await Promise.all(
+      const updatedStatuses: Array<[number, ProjectInsightStatus]> = await Promise.all(
         pollingIds.map(async (recordId) => {
           try {
             const ingestionStatus = await fetchInsightIngestionStatus({
@@ -330,10 +335,26 @@ export default function ProjectInsightClientView() {
 
       if (cancelled) return;
 
-      setStatusMap((current) => ({
-        ...current,
-        ...Object.fromEntries(updatedStatuses),
-      }));
+      setStatusMap((current) => {
+        let next: typeof current | undefined;
+
+        for (const [recordId, newStatus] of updatedStatuses) {
+          const oldStatus = current[recordId];
+
+          const changed =
+              oldStatus?.state !== newStatus.state ||
+              oldStatus?.chunkCount !== newStatus.chunkCount ||
+              oldStatus?.pageCount !== newStatus.pageCount;
+
+          if (!changed) continue;
+
+          next ??= { ...current };
+          next[recordId] = newStatus;
+        }
+
+        return next ?? current;
+      });
+        
     };
 
     void pollStatuses();
@@ -345,7 +366,7 @@ export default function ProjectInsightClientView() {
       cancelled = true;
       window.clearInterval(interval);
     };
-  }, [statusMap]);
+  }, [organizationId, projectId, pollingKey]);
 
   useEffect(() => {
     setSelectedPendingIds((current) =>
