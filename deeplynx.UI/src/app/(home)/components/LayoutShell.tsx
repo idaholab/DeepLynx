@@ -46,7 +46,7 @@ const LayoutShell = ({ children }: { children: ReactNode }) => {
   const { data: session } = useSafeSession();
   const { user } = useRBAC();
   const { organization, setOrganization } = useOrganizationSession();
-  const { project } = useProjectSession();
+  const { project, clearProject } = useProjectSession();
 
   const [organizations, setOrganizations] = useState<OrganizationResponseDto[]>(
     [],
@@ -131,6 +131,8 @@ const LayoutShell = ({ children }: { children: ReactNode }) => {
   };
 
   const handleOrganizationSwitch = (org: OrganizationResponseDto) => {
+    clearProject();
+
     setOrganization({
       organizationId: org.id,
       organizationName: org.name,
@@ -294,7 +296,7 @@ const LayoutShell = ({ children }: { children: ReactNode }) => {
           >
             <ul className="mt-20 flex-grow">
               <li>
-                <Link href={"/"}>
+                <Link href={"/"} onClick={clearProject}>
                   <GlobeAmericasIcon className="size-10" />
                 </Link>
               </li>
