@@ -629,24 +629,157 @@ public class FileAzureBusiness : IFileBusiness
     public async Task<Guid> CreateUploadTus(long organizationId, long projectId, long realDataSourceId,
         ObjectStorageConfigDto objectStorageConfig, long uploadLength)
     {
-        return Guid.Empty;
+        if (objectStorageConfig?.AzureObjectConfig == null)
+        {
+            throw new ArgumentException("Azure configuration is null");
+        }
+
+        // Generate a unique upload ID for this session
+        var uploadId = Guid.NewGuid();
+
+        // Verify container exists
+        var container = new BlobContainerClient(
+            objectStorageConfig.AzureObjectConfig.AzureConnectionString,
+            objectStorageConfig.AzureObjectConfig.AzureContainerName);
+
+        await container.CreateIfNotExistsAsync();
+
+        return uploadId;
     }
 
-    public async Task<long> GetUploadOffset(long organizationId, long projectId, long realDataSourceId, string uploadId,
-        ObjectStorageConfigDto objectStorageConfig)
+    public async Task<long> GetUploadOffset(long organizationId, long projectId, long realDataSourceId, string uploadId, ObjectStorageConfigDto objectStorageConfig)
     {
-        return 0;
+        if (objectStorageConfig.AzureObjectConfig == null)
+            throw new Exception("Azure configuration not set in object storage");
+
+        if (string.IsNullOrWhiteSpace(uploadId))
+            throw new ArgumentException("Upload ID is not specified.");
+
+        try
+        {
+            var containerClient = new BlobContainerClient(
+                objectStorageConfig.AzureObjectConfig.AzureConnectionString,
+                objectStorageConfig.AzureObjectConfig.AzureContainerName);
+
+            if (!await containerClient.ExistsAsync())
+                return 0;
+
+
+            var blobName = $"organization_{organizationId}/project_{projectId}/datasource_{realDataSourceId}/uploads/{uploadId}";
+
+            var blobClient = containerClient.GetBlockBlobClient(blobName);
+
+            if (!await blobClient.ExistsAsync())
+                return 0;
+
+            var properties = await blobClient.GetPropertiesAsync();
+
+            try
+            {
+                var blockList = await blobClient.GetBlockListAsync(BlockListTypes.Uncommitted);
+
+                return blockList.Value.UncommittedBlocks.Sum(block => block.SizeLong);
+            }
+            catch (Azure.RequestFailedException ex) when (ex.Status == 404)
+            {
+                return 0;
+            }
+        }
+        catch (Exception ex)
+        {
+            throw new Exception($"Failed to get upload offset for upload {uploadId}: {ex.Message}", ex);
+        }
     }
 
     public async Task<long> GetUploadLength(long organizationId, long projectId, long realDataSourceId, string uploadId,
         ObjectStorageConfigDto objectStorageConfig)
     {
-        return 0;
+        if (objectStorageConfig.AzureObjectConfig == null)
+            throw new Exception("Azure configuration not set in object storage");
+
+        if (string.IsNullOrWhiteSpace(uploadId))
+            throw new ArgumentException("Upload ID is not specified.");
+
+        try
+        {
+            var containerClient = new BlobContainerClient(
+                objectStorageConfig.AzureObjectConfig.AzureConnectionString,
+                objectStorageConfig.AzureObjectConfig.AzureContainerName);
+
+            if (!await containerClient.ExistsAsync())
+                return 0;
+
+
+            var blobName = $"organization_{organizationId}/project_{projectId}/datasource_{realDataSourceId}/uploads/{uploadId}";
+
+            var blobClient = containerClient.GetBlobClient(blobName);
+
+            if (!await blobClient.ExistsAsync())
+                return 0;
+
+            var properties = await blobClient.GetPropertiesAsync();
+            var uploadLength = long.Parse(properties.Value.Metadata["uploadLength"]);
+
+            return uploadLength;
+        }
+        catch (Exception ex)
+        {
+            throw new Exception($"Failed to get upload offset for upload {uploadId}: {ex.Message}", ex);
+        }
     }
 
     public async Task<long> UploadPartTus(long organizationId, long projectId, long realDataSourceId, string uploadId,
         long uploadOffset, ObjectStorageConfigDto objectStorageConfig, System.IO.Stream uploadBody)
     {
-        return 0;
+        if (objectStorageConfig?.AzureObjectConfig == null)
+        {
+            throw new ArgumentException("Azure configuration is null");
+        }
+
+        if (uploadBody == null || uploadBody.Length == 0)
+        {
+            throw new ArgumentException("No upload Body data provided");
+        }
+
+        // The blob name that will eventually hold the complete file
+        // We stage blocks to this blob without committing yet
+        var blobName = $"organization_{organizationId}/project_{projectId}/datasource_{realDataSourceId}/uploads/{uploadId}";
+
+        var container = new BlobContainerClient(
+            objectStorageConfig.AzureObjectConfig.AzureConnectionString,
+            objectStorageConfig.AzureObjectConfig.AzureContainerName);
+
+        if (!await container.ExistsAsync())
+        {
+            throw new InvalidOperationException("Azure Object Storage container does not exist");
+        }
+
+        // Get BlockBlobClient for direct block operations
+        var blockBlobClient = container.GetBlockBlobClient(blobName);
+
+        try
+        {
+            // Generate a base64-encoded block ID (must be consistent and under 64 bytes)
+            // Using zero-padded upload offset number to ensure proper ordering
+            var blockId = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes($"block-{uploadOffset:D10}"));
+
+
+            // This uploads the stream as an uncommitted block
+            await blockBlobClient.StageBlockAsync(blockId, uploadBody);
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException($"Failed to upload offset at {uploadOffset}: {ex.Message}", ex);
+        }
+
+
+        var blobClient = container.GetBlobClient(blobName);
+
+        if (!await blobClient.ExistsAsync())
+            return 0;
+
+        var properties = await blobClient.GetPropertiesAsync();
+
+        return properties.Value.ContentLength;
     }
 }
