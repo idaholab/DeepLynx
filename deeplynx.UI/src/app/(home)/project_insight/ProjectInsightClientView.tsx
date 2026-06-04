@@ -76,6 +76,7 @@ export default function ProjectInsightClientView() {
   const [statusMap, setStatusMap] = useState<
     Record<number, ProjectInsightStatus>
   >({});
+  const [isInsightUnavailable, setIsInsightUnavailable] = useState(false);
   const [isLoadingRecords, setIsLoadingRecords] = useState(true);
   const [isFiltersOpen, setIsFiltersOpen] = useState(false);
   const [activeTabKey, setActiveTabKey] = useState<"library" | "pending">(
@@ -118,6 +119,7 @@ export default function ProjectInsightClientView() {
     setLibrarySearchError("");
     setSelectedPendingIds([]);
     setActiveTabKey("library");
+    setIsInsightUnavailable(false);
   }, [projectId]);
 
   useEffect(() => {
@@ -137,6 +139,7 @@ export default function ProjectInsightClientView() {
     const loadProjectInsight = async () => {
       setIsLoadingRecords(true);
       setLibrarySearchError("");
+      setIsInsightUnavailable(false);
 
       try {
         const [recordDtos, classDtos, dataSourceDtos, tagDtos] =
@@ -180,6 +183,11 @@ export default function ProjectInsightClientView() {
                 projectId,
                 fileId: record.id,
               });
+
+              if (ingestionStatus.available === false) {
+                setIsInsightUnavailable(true);
+              }
+              
               return [
                 record.id,
                 ingestionStatus.indexed
@@ -685,6 +693,11 @@ export default function ProjectInsightClientView() {
                   {t.translations.PROJECT_INSIGHT_SCOPE}
                 </h1>
                 <BetaBadge size="sm" />
+                {isInsightUnavailable && (
+                    <span className="badge badge-warning badge-sm">
+                      Insight service unavailable
+                    </span>
+                )}
               </div>
               <p className="mt-3 text-base-content/70">
                 {withTokens(t.translations.PROJECT_INSIGHT_DESCRIPTION, {

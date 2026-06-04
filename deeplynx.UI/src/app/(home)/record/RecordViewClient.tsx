@@ -176,6 +176,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
   const [isCheckingLatticeReadiness, setIsCheckingLatticeReadiness] =
     useState(false);
   const [isRecordInsightEmbedded, setIsRecordInsightEmbedded] = useState(false);
+  const [isInsightUnavailable, setIsInsightUnavailable] = useState(false);
   const [isQueuingInsightUpload, setIsQueuingInsightUpload] = useState(false);
   const [latticeMode, setLatticeMode] = useState<"strict" | "discovery">(
     "discovery",
@@ -265,6 +266,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
   const resetAllState = useCallback(() => {
     setRecord(null);
     setRecordFileType(null);
+    setIsInsightUnavailable(false);
     setSelectedTags([]);
     setSelectedIds([]);
     setSelectedLabels([]);
@@ -816,6 +818,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
         
         if (status.available === false) {
 
+          setIsInsightUnavailable(true);
           setIsRecordInsightEmbedded(false);
           
           if (recordEmbedPollRef.current) {
@@ -826,6 +829,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
           return;
         }
 
+        setIsInsightUnavailable(false);
         setIsRecordInsightEmbedded(status.indexed);
 
         if (status.indexed && recordEmbedPollRef.current) {
@@ -1307,9 +1311,16 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
               <p className="text-xs font-semibold uppercase tracking-wide text-base-content/60">
                 {t.translations.RECORD}
               </p>
-              <h1 className="break-words text-2xl font-bold text-base-content sm:text-3xl">
-                {record.name}
-              </h1>
+              <div className="flex flex-wrap items-center gap-3">
+                <h1 className="break-words text-2xl font-bold text-base-content sm:text-3xl">
+                  {record.name}
+                </h1>
+                {isInsightUnavailable && (
+                    <span className="badge badge-warning badge-sm">
+                      Insight service unavailable
+                    </span>
+                )}
+              </div>
               {record.classId ? (
                 <div className="mt-3 flex flex-wrap items-center gap-2">
                   <span className="badge badge-primary h-auto min-h-6 whitespace-normal break-words px-3 py-1 text-center leading-tight">
