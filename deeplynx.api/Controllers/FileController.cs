@@ -350,14 +350,15 @@ public class FileController : ControllerBase
     }
 
     /// <summary>
-    /// Creates an upload according to the tus protocol.
+    /// Create Resumable Upload
     /// </summary>
+    /// <remarks>Creates a reumable upload according to the tus protocol.</remarks>
     /// <param name="organizationId"></param>
     /// <param name="projectId"></param>
     /// <param name="dataSourceId"></param>
     /// <param name="objectStorageId"></param>
     /// <returns></returns>
-    [HttpPost("upload", Name = "api_create_file_upload_tus")]
+    [HttpPost("res-upload", Name = "api_create_resumable_file_upload")]
     [Auth("write", "file")]
     public async Task<IActionResult> CreateUploadTus(
         long organizationId,
@@ -407,15 +408,16 @@ public class FileController : ControllerBase
     }
 
     /// <summary>
-    /// Gets the offset/upload-progress of the desired upload declared in the http header.
+    /// Get Resumable Offset
     /// </summary>
+    /// <remarks>Gets the offset/upload-progress according to the tus protocol.</remarks>
     /// <param name="organizationId"></param>
     /// <param name="projectId"></param>
     /// <param name="uploadId"></param>
     /// <param name="dataSourceId"></param>
     /// <param name="objectStorageId"></param>
     /// <returns></returns>
-    [HttpHead("upload/{uploadId}", Name = "api_get_upload_offset_tus")]
+    [HttpHead("res-upload/{uploadId}", Name = "api_get_resumable_upload_offset")]
     [Auth("write", "file")]
     public async Task<IActionResult> GetUploadOffsetTus(
         long organizationId,
@@ -449,15 +451,16 @@ public class FileController : ControllerBase
     }
 
     /// <summary>
-    /// Uploads parts according to the tus protocol. Currently has no upload part size limit.
+    /// Upload Resumable Part
     /// </summary>
+    /// <remarks>Uploads a reumable part of a file at the desired offset according to the tus protocol.</remarks>
     /// <param name="organizationId"></param>
     /// <param name="projectId"></param>
     /// <param name="uploadId"></param>
     /// <param name="dataSourceId"></param>
     /// <param name="objectStorageId"></param>
     /// <returns></returns>
-    [HttpPatch("upload/{uploadId}", Name = "api_patch_file_upload")]
+    [HttpPatch("res-upload/{uploadId}", Name = "api_patch_resumable_file_upload")]
     [Auth("write", "file")]
     public async Task<IActionResult> UploadPartTus(
         long organizationId,
@@ -498,15 +501,16 @@ public class FileController : ControllerBase
     }
 
     /// <summary>
-    /// Cancles a tus protocol upload.
+    /// Cancel Resumable Upload
     /// </summary>
+    /// <remarks>Cancels a resumable upload with tus protocol reponse.</remarks>
     /// <param name="organizationId"></param>
     /// <param name="projectId"></param>
     /// <param name="uploadId"></param>
     /// <param name="dataSourceId"></param>
     /// <param name="objectStorageId"></param>
     /// <returns></returns>
-    [HttpDelete("upload/tus/{uploadId}", Name = "api_cancel_tus_file_upload")]
+    [HttpDelete("res-upload{uploadId}", Name = "api_cancel_resumable_file_upload")]
     [Auth("write", "file")]
     public async Task<IActionResult> CancelTusUpload(
         long organizationId,
