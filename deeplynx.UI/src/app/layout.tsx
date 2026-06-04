@@ -21,11 +21,12 @@ export default function RootLayout({
 	    var KEY = 'dlx-theme-mode';
 	    var saved = localStorage.getItem(KEY);
 	    var orgTheme = 'default';
+	    var validOrgThemes = ['default', 'nric', 'nord', 'emerald'];
 	    var storedOrg = localStorage.getItem('organizationSession');
 
 	    if (storedOrg) {
 	      var parsedOrg = JSON.parse(storedOrg);
-	      if (['default', 'nric', 'nord'].indexOf(parsedOrg.themeName) >= 0) {
+	      if (validOrgThemes.indexOf(parsedOrg.themeName) >= 0) {
 	        orgTheme = parsedOrg.themeName;
 	      }
 	    }
