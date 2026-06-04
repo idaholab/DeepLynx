@@ -21,7 +21,7 @@ export default function RootLayout({
 	    var KEY = 'dlx-theme-mode';
 	    var saved = localStorage.getItem(KEY);
 	    var orgTheme = 'default';
-	    var validOrgThemes = ['default', 'nric', 'nord', 'emerald'];
+	    var validOrgThemes = ['default', 'nric', 'nord', 'emerald', 'ron'];
 	    var storedOrg = localStorage.getItem('organizationSession');
 
 	    if (storedOrg) {
