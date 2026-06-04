@@ -10,6 +10,11 @@ export const ORGANIZATION_THEMES = [
     swatches: ["#00bfb2", "#006e97", "#e3d935"],
   },
   {
+    id: "ron",
+    label: "Ron",
+    swatches: ["#5fb7c9", "#255a88", "#d5973f"],
+  },
+  {
     id: "nord",
     label: "Nord",
     swatches: ["#81a1c1", "#88c0d0", "#a3be8c"],

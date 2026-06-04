@@ -82,6 +82,90 @@
   --noise: 0;
 }
 
+/* Ron light theme */
+@plugin "daisyui/theme" {
+  name: "ron";
+  default: false;
+  prefersdark: false;
+  color-scheme: "light";
+  --color-base-100: oklch(90% 0.026 196);
+  --color-base-200: oklch(80% 0.04 198);
+  --color-base-300: oklch(66% 0.058 202);
+  --color-base-content: oklch(10% 0.06 218);
+  --color-primary: oklch(68% 0.15 194);
+  --color-primary-content: oklch(90% 0.026 196);
+  --color-secondary: oklch(43% 0.13 209);
+  --color-secondary-content: oklch(92% 0.035 196);
+  --color-accent: oklch(70% 0.17 66);
+  --color-accent-content: oklch(16% 0.045 42);
+  --color-neutral: oklch(18% 0.075 214);
+  --color-neutral-content: oklch(92% 0.035 196);
+  --color-info: oklch(64% 0.14 202);
+  --color-info-content: oklch(12% 0.055 218);
+  --color-success: oklch(66% 0.13 165);
+  --color-success-content: oklch(12% 0.04 165);
+  --color-warning: oklch(72% 0.16 76);
+  --color-warning-content: oklch(16% 0.045 42);
+  --color-error: oklch(64% 0.17 24);
+  --color-error-content: oklch(96% 0.02 24);
+  --header-gradient-start: oklch(12% 0.055 218);
+  --header-gradient-end: oklch(0.703 0.124 215.12);
+  --ron-card-border: oklch(68% 0.15 194 / 0.74);
+  --ron-card-halo: oklch(68% 0.15 194 / 0.5);
+  --ron-card-glow: oklch(68% 0.15 194 / 0.32);
+  --ron-card-glow-soft: oklch(68% 0.15 194 / 0.16);
+  --radius-selector: 0.5rem;
+  --radius-field: 0.5rem;
+  --radius-box: 1rem;
+  --size-selector: 0.25rem;
+  --size-field: 0.25rem;
+  --border: 1.5px;
+  --depth: 1;
+  --noise: 0;
+}
+
+/* Ron dark theme */
+@plugin "daisyui/theme" {
+  name: "ron-dark";
+  default: false;
+  prefersdark: true;
+  color-scheme: "dark";
+  --color-base-100: oklch(9% 0.045 24);
+  --color-base-200: oklch(13% 0.06 25);
+  --color-base-300: oklch(20% 0.085 26);
+  --color-base-content: oklch(92% 0.03 28);
+  --color-primary: oklch(65% 0.24 27);
+  --color-primary-content: oklch(98% 0.018 24);
+  --color-secondary: oklch(45% 0.16 24);
+  --color-secondary-content: oklch(96% 0.02 24);
+  --color-accent: oklch(78% 0.18 46);
+  --color-accent-content: oklch(10% 0.04 24);
+  --color-neutral: oklch(7% 0.032 24);
+  --color-neutral-content: oklch(88% 0.025 28);
+  --color-info: oklch(62% 0.14 20);
+  --color-info-content: oklch(96% 0.02 24);
+  --color-success: oklch(64% 0.13 150);
+  --color-success-content: oklch(8% 0.03 150);
+  --color-warning: oklch(76% 0.18 54);
+  --color-warning-content: oklch(10% 0.04 32);
+  --color-error: oklch(67% 0.25 25);
+  --color-error-content: oklch(98% 0.018 24);
+  --header-gradient-start: oklch(6% 0.04 24);
+  --header-gradient-end: oklch(28% 0.13 25);
+  --ron-card-border: oklch(65% 0.24 27 / 0.68);
+  --ron-card-halo: oklch(65% 0.24 27 / 0.48);
+  --ron-card-glow: oklch(65% 0.24 27 / 0.34);
+  --ron-card-glow-soft: oklch(65% 0.24 27 / 0.2);
+  --radius-selector: 0rem;
+  --radius-field: 0rem;
+  --radius-box: 0rem;
+  --size-selector: 0.25rem;
+  --size-field: 0.25rem;
+  --border: 1.5px;
+  --depth: 1;
+  --noise: 0;
+}
+
 /* NRIC light theme */
 @plugin "daisyui/theme" {
   name: "nric";
@@ -336,6 +420,35 @@ body {
 
 html {
   overflow-x: hidden;
+}
+
+[data-theme="ron"] .card,
+[data-theme="ron-dark"] .card,
+[data-theme="ron"] .rounded-box[class*="bg-base-100"]:not([role="tooltip"]):not(.dropdown-content):not(.fixed):not(.absolute),
+[data-theme="ron-dark"] .rounded-box[class*="bg-base-100"]:not([role="tooltip"]):not(.dropdown-content):not(.fixed):not(.absolute),
+[data-theme="ron"] [class*="bg-base-100"][class*="shadow"]:not([role="tooltip"]):not(.dropdown-content):not(.fixed):not(.absolute),
+[data-theme="ron-dark"] [class*="bg-base-100"][class*="shadow"]:not([role="tooltip"]):not(.dropdown-content):not(.fixed):not(.absolute) {
+  position: relative;
+  border-color: var(--ron-card-border);
+  box-shadow:
+    0 0 0 1px var(--ron-card-halo),
+    0 0 16px var(--ron-card-glow),
+    0 0 42px var(--ron-card-glow-soft) !important;
+}
+
+[data-theme="ron"] .card::before,
+[data-theme="ron-dark"] .card::before,
+[data-theme="ron"] .rounded-box[class*="bg-base-100"]:not([role="tooltip"]):not(.dropdown-content):not(.fixed):not(.absolute)::before,
+[data-theme="ron-dark"] .rounded-box[class*="bg-base-100"]:not([role="tooltip"]):not(.dropdown-content):not(.fixed):not(.absolute)::before,
+[data-theme="ron"] [class*="bg-base-100"][class*="shadow"]:not([role="tooltip"]):not(.dropdown-content):not(.fixed):not(.absolute)::before,
+[data-theme="ron-dark"] [class*="bg-base-100"][class*="shadow"]:not([role="tooltip"]):not(.dropdown-content):not(.fixed):not(.absolute)::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border: 1px solid var(--ron-card-halo);
+  border-radius: inherit;
+  box-shadow: inset 0 0 12px var(--ron-card-glow-soft);
 }
 
 .app-header {

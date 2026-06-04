@@ -287,7 +287,7 @@ const LayoutShell = ({ children }: { children: ReactNode }) => {
         {/* Side Menu */}
         <div
           className={`fixed top-20 bottom-0 hidden lg:flex ${
-            isUserDropdownOpen ? "z-[60]" : "z-40"
+            isUserDropdownOpen ? "z-[70]" : "z-[55]"
           }`}
         >
           <aside
