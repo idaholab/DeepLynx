@@ -25,10 +25,10 @@ function MemberManagementUserSkeleton() {
               <input className="checkbox" type="checkbox"></input>
             </div>
             <div className="w-1/4 pl-4 h-4">
-              <Skeleton width="35%" baseColor="var(--skeleton-base)" highlightColor="var(--skeleton-highlight)" />
+              <Skeleton width="35%" baseColor="var(--color-base-200)" highlightColor="var(--color-base-100)" />
             </div>
             <div className="w-1/2 pl-4 h-4">
-              <Skeleton width="35%" baseColor="var(--skeleton-base)" highlightColor="var(--skeleton-highlight)" />
+              <Skeleton width="35%" baseColor="var(--color-base-200)" highlightColor="var(--color-base-100)" />
             </div>
             <div className="w-1/8 pl-4">
               <span>
@@ -48,7 +48,7 @@ function MemberManagementUserSkeleton() {
               <ChevronLeftIcon className="size-6" />
             </button>
             <span className="px-2 text-sm">
-              <Skeleton width={60} baseColor="var(--skeleton-base)" highlightColor="var(--skeleton-highlight)" />
+              <Skeleton width={60} baseColor="var(--color-base-200)" highlightColor="var(--color-base-100)" />
             </span>
             <button className="btn btn-sm btn-ghost">
               <ChevronRightIcon className="size-6" />
