@@ -512,7 +512,7 @@ public class FileController : ControllerBase
     /// <param name="dataSourceId"></param>
     /// <param name="objectStorageId"></param>
     /// <returns></returns>
-    [HttpDelete("res-upload{uploadId}", Name = "api_cancel_resumable_file_upload")]
+    [HttpDelete("res-upload/{uploadId}", Name = "api_cancel_resumable_file_upload")]
     [Auth("write", "file")]
     public async Task<IActionResult> CancelTusUpload(
         long organizationId,
