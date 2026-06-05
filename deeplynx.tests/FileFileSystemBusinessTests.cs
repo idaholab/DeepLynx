@@ -23,6 +23,9 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
     public long os1;
     public long os2;
     public long pid;
+    private const long oid = 2L;
+    private const long did = 2L;
+    private static readonly string fileName = "testfile.txt";
 
     public FileFileSystemBusinessTests(TestSuiteFixture fixture) : base(fixture)
     {
@@ -924,7 +927,8 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
                 pid,
                 dataSourceId,
                 config,
-                uploadLength);
+                uploadLength,
+                fileName);
 
             var uploadPath = GetResumableUploadPath(organizationId, pid, dataSourceId, uploadId.ToString());
             var metaPath = Path.Combine(uploadPath, "meta.json");
@@ -959,7 +963,8 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
                 pid,
                 dataSourceId,
                 config,
-                uploadLength));
+                uploadLength,
+                fileName));
 
         // Assert
         Assert.Equal("File system mount path not set in object storage", exception.Message);
@@ -980,7 +985,8 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
                 pid,
                 dataSourceId,
                 config,
-                uploadLength);
+                uploadLength,
+                fileName);
 
             // Act
             var result = await _fileBusiness.GetUploadOffset(
@@ -1015,7 +1021,8 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
                 pid,
                 dataSourceId,
                 config,
-                uploadLength);
+                uploadLength,
+                fileName);
 
             var uploadPath = GetResumableUploadPath(organizationId, pid, dataSourceId, uploadId.ToString());
             var dataPath = Path.Combine(uploadPath, "data");
@@ -1097,7 +1104,8 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
                 pid,
                 dataSourceId,
                 config,
-                uploadLength);
+                uploadLength,
+                fileName);
 
             // Act
             var result = await _fileBusiness.GetUploadLength(
@@ -1209,7 +1217,8 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
                 pid,
                 dataSourceId,
                 config,
-                uploadLength);
+                uploadLength,
+                fileName);
 
             var uploadPath = GetResumableUploadPath(organizationId, pid, dataSourceId, uploadId.ToString());
             var dataPath = Path.Combine(uploadPath, "data");
@@ -1254,7 +1263,8 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
                 pid,
                 dataSourceId,
                 config,
-                uploadLength);
+                uploadLength,
+                fileName);
 
             var uploadPath = GetResumableUploadPath(organizationId, pid, dataSourceId, uploadId.ToString());
             var dataPath = Path.Combine(uploadPath, "data");
@@ -1308,7 +1318,8 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
                 pid,
                 dataSourceId,
                 config,
-                uploadLength);
+                uploadLength,
+                fileName);
 
             var uploadPath = GetResumableUploadPath(organizationId, pid, dataSourceId, uploadId.ToString());
             var dataPath = Path.Combine(uploadPath, "data");
@@ -1404,6 +1415,248 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
             $"datasource_{dataSourceId}",
             "uploads",
             uploadId);
+    }
+
+    #endregion
+
+    #region TUS Filesystem Tests
+
+    private static string BuildTusUploadPath(
+        string mountPath,
+        long organizationId,
+        long projectId,
+        long datasourceId,
+        string uploadId)
+    {
+        return Path.Combine(
+            mountPath,
+            $"org_{organizationId}",
+            $"project_{projectId}",
+            $"datasource_{datasourceId}",
+            "uploads",
+            uploadId
+        );
+    }
+
+    [Fact]
+    public async Task GetFileNameTus_WithValidMetadata_ReturnsFileName()
+    {
+        // Arrange
+        const string uploadId = "test-upload-id";
+        const string expectedFileName = "test-file.csv";
+
+        var objectStorageConfig = new ObjectStorageConfigDto
+        {
+            MountPath = _testDirectory
+        };
+
+        var uploadPath = BuildTusUploadPath(_testDirectory, oid, pid, did, uploadId);
+        Directory.CreateDirectory(uploadPath);
+
+        await File.WriteAllTextAsync(
+            Path.Combine(uploadPath, "meta.json"),
+            $"{{\"FileName\":\"{expectedFileName}\"}}");
+
+        // Act
+        var result = await _fileBusiness.GetFileNameTus(
+            oid,
+            pid,
+            did,
+            uploadId,
+            objectStorageConfig);
+
+        // Assert
+        Assert.Equal(expectedFileName, result);
+    }
+
+    [Fact]
+    public async Task GetFileNameTus_WhenMountPathIsNull_ThrowsInvalidOperationException()
+    {
+        // Arrange
+        var objectStorageConfig = new ObjectStorageConfigDto
+        {
+            MountPath = null
+        };
+
+        // Act
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            _fileBusiness.GetFileNameTus(
+                oid,
+                pid,
+                did,
+                "upload-id",
+                objectStorageConfig));
+
+        // Assert
+        Assert.Equal("File system mount path not set in object storage", exception.Message);
+    }
+
+    [Fact]
+    public async Task GetFileNameTus_WhenUploadDirectoryDoesNotExist_ThrowsInvalidOperationException()
+    {
+        // Arrange
+        const string uploadId = "missing-upload";
+
+        var objectStorageConfig = new ObjectStorageConfigDto
+        {
+            MountPath = _testDirectory
+        };
+
+        // Act
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            _fileBusiness.GetFileNameTus(
+                oid,
+                pid,
+                did,
+                uploadId,
+                objectStorageConfig));
+
+        // Assert
+        Assert.Equal($"Upload session {uploadId} not found or expired", exception.Message);
+    }
+
+    [Fact]
+    public async Task GetFileNameTus_WhenMetadataFileDoesNotExist_ThrowsInvalidOperationException()
+    {
+        // Arrange
+        const string uploadId = "upload-without-meta";
+
+        var objectStorageConfig = new ObjectStorageConfigDto
+        {
+            MountPath = _testDirectory
+        };
+
+        var uploadPath = BuildTusUploadPath(_testDirectory, oid, pid, did, uploadId);
+        Directory.CreateDirectory(uploadPath);
+
+        // Act
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            _fileBusiness.GetFileNameTus(
+                oid,
+                pid,
+                did,
+                uploadId,
+                objectStorageConfig));
+
+        // Assert
+        Assert.Equal($"Metadata for upload session {uploadId} not found", exception.Message);
+    }
+
+    [Fact]
+    public async Task CompleteUploadTus_WithValidUpload_CompletesUploadAndDeletesUploadDirectory()
+    {
+        // Arrange
+        const string uploadId = "complete-tus-upload";
+        const string fileName = "completed-file.txt";
+        const string fileContent = "hello from tus upload";
+
+        var guid = Guid.NewGuid();
+
+        var objectStorageConfig = new ObjectStorageConfigDto
+        {
+            MountPath = _testDirectory
+        };
+
+        var uploadPath = BuildTusUploadPath(_testDirectory, oid, pid, did, uploadId);
+        Directory.CreateDirectory(uploadPath);
+
+        var tusDataPath = Path.Combine(uploadPath, "data");
+        await File.WriteAllTextAsync(tusDataPath, fileContent);
+
+        // Act
+        var uri = await _fileBusiness.CompleteUploadTus(
+            oid,
+            pid,
+            did,
+            objectStorageConfig,
+            uploadId,
+            guid,
+            fileName);
+
+        // Assert
+        Assert.False(Directory.Exists(uploadPath));
+        Assert.True(File.Exists(uri));
+        Assert.Equal(fileContent, await File.ReadAllTextAsync(uri));
+        Assert.Contains($"{guid}_{fileName}", uri);
+    }
+
+    [Fact]
+    public async Task CompleteUploadTus_WhenMountPathIsNull_ThrowsInvalidOperationException()
+    {
+        // Arrange
+        var objectStorageConfig = new ObjectStorageConfigDto
+        {
+            MountPath = null
+        };
+
+        // Act
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            _fileBusiness.CompleteUploadTus(
+                oid,
+                pid,
+                did,
+                objectStorageConfig,
+                "upload-id",
+                Guid.NewGuid(),
+                "file.txt"));
+
+        // Assert
+        Assert.Equal("File system mount path not set in object storage", exception.Message);
+    }
+
+    [Fact]
+    public async Task CompleteUploadTus_WhenUploadDirectoryDoesNotExist_ThrowsInvalidOperationException()
+    {
+        // Arrange
+        const string uploadId = "missing-upload";
+
+        var objectStorageConfig = new ObjectStorageConfigDto
+        {
+            MountPath = _testDirectory
+        };
+
+        // Act
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            _fileBusiness.CompleteUploadTus(
+                oid,
+                pid,
+                did,
+                objectStorageConfig,
+                uploadId,
+                Guid.NewGuid(),
+                "file.txt"));
+
+        // Assert
+        Assert.Equal($"Upload session {uploadId} not found", exception.Message);
+    }
+
+    [Fact]
+    public async Task CompleteUploadTus_WhenDataFileDoesNotExist_ThrowsInvalidOperationException()
+    {
+        // Arrange
+        const string uploadId = "upload-without-data";
+
+        var objectStorageConfig = new ObjectStorageConfigDto
+        {
+            MountPath = _testDirectory
+        };
+
+        var uploadPath = BuildTusUploadPath(_testDirectory, oid, pid, did, uploadId);
+        Directory.CreateDirectory(uploadPath);
+
+        // Act
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            _fileBusiness.CompleteUploadTus(
+                oid,
+                pid,
+                did,
+                objectStorageConfig,
+                uploadId,
+                Guid.NewGuid(),
+                "file.txt"));
+
+        // Assert
+        Assert.Equal($"TUS upload file not found for upload {uploadId}", exception.Message);
     }
 
     #endregion

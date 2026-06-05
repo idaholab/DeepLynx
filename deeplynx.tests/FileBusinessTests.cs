@@ -49,6 +49,7 @@ public class FileBusinessTests : IntegrationTestBase
     public long osid; // object storage ID
     public long pid; // project ID
     public long uid; // user ID
+    const long currentUserId = 1;
 
     public FileBusinessTests(TestSuiteFixture fixture) : base(fixture)
     {
@@ -3195,6 +3196,7 @@ public class FileBusinessTests : IntegrationTestBase
             osid,
             uploadId,
             uploadOffset,
+            currentUserId,
             uploadBody);
 
         // Assert
@@ -3265,6 +3267,7 @@ public class FileBusinessTests : IntegrationTestBase
             null,
             uploadId,
             uploadOffset,
+            currentUserId,
             uploadBody);
 
         // Assert
@@ -3307,6 +3310,7 @@ public class FileBusinessTests : IntegrationTestBase
                 osid,
                 uploadId,
                 uploadOffset,
+                currentUserId,
                 null!));
 
         // Assert
@@ -3325,9 +3329,13 @@ public class FileBusinessTests : IntegrationTestBase
         const long uploadOffset = 25;
         const long uploadLength = 50;
         const long expectedNewOffset = 50;
+        const string fileName = "test.txt";
 
         using var uploadBody = new MemoryStream(Encoding.UTF8.GetBytes("final chunk"));
         var innerFileBusiness = new Mock<IFileBusiness>();
+
+        var completedFilePath = Path.Combine(_testDirectory, "completed-test.txt");
+        await File.WriteAllTextAsync(completedFilePath, "final file contents");
 
         _fileBusinessFactory
             .Setup(x => x.CreateFileBusiness("filesystem"))
@@ -3353,6 +3361,26 @@ public class FileBusinessTests : IntegrationTestBase
                 It.IsAny<ObjectStorageConfigDto>()))
             .ReturnsAsync(uploadLength);
 
+        innerFileBusiness
+            .Setup(x => x.GetFileNameTus(
+                oid,
+                pid,
+                did,
+                uploadId,
+                It.IsAny<ObjectStorageConfigDto>()))
+            .ReturnsAsync(fileName);
+
+        innerFileBusiness
+            .Setup(x => x.CompleteUploadTus(
+                oid,
+                pid,
+                did,
+                It.IsAny<ObjectStorageConfigDto>(),
+                uploadId,
+                It.IsAny<Guid>(),
+                fileName))
+            .ReturnsAsync(completedFilePath);
+
         // Act
         var result = await _fileBusiness.UploadPartTus(
             oid,
@@ -3361,10 +3389,27 @@ public class FileBusinessTests : IntegrationTestBase
             osid,
             uploadId,
             uploadOffset,
+            uid,
             uploadBody);
 
         // Assert
         Assert.Equal(expectedNewOffset, result);
+
+        innerFileBusiness.Verify(x => x.GetFileNameTus(
+            oid,
+            pid,
+            did,
+            uploadId,
+            It.IsAny<ObjectStorageConfigDto>()), Times.Once);
+
+        innerFileBusiness.Verify(x => x.CompleteUploadTus(
+            oid,
+            pid,
+            did,
+            It.IsAny<ObjectStorageConfigDto>(),
+            uploadId,
+            It.IsAny<Guid>(),
+            fileName), Times.Once);
     }
 
     [Fact]
@@ -3412,6 +3457,7 @@ public class FileBusinessTests : IntegrationTestBase
                 osid,
                 uploadId,
                 uploadOffset,
+                currentUserId,
                 uploadBody));
 
         // Assert
@@ -3474,6 +3520,7 @@ public class FileBusinessTests : IntegrationTestBase
                 osid,
                 uploadId,
                 uploadOffset,
+                currentUserId,
                 uploadBody));
 
         // Assert

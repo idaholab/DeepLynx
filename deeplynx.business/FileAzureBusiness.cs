@@ -627,7 +627,7 @@ public class FileAzureBusiness : IFileBusiness
     }
 
     public async Task<Guid> CreateUploadTus(long organizationId, long projectId, long realDataSourceId,
-        ObjectStorageConfigDto objectStorageConfig, long uploadLength)
+        ObjectStorageConfigDto objectStorageConfig, long uploadLength, string fileName)
     {
         if (objectStorageConfig?.AzureObjectConfig == null)
         {
@@ -643,6 +643,19 @@ public class FileAzureBusiness : IFileBusiness
             objectStorageConfig.AzureObjectConfig.AzureContainerName);
 
         await container.CreateIfNotExistsAsync();
+
+        var blobName = $"organization_{organizationId}/project_{projectId}/datasource_{realDataSourceId}/uploads/{uploadId}";
+
+        await container.GetBlockBlobClient(blobName).UploadAsync(
+            new MemoryStream(Array.Empty<byte>()),
+            new BlobUploadOptions
+            {
+                Metadata = new Dictionary<string, string>
+                {
+                    ["filename"] = fileName,
+                    ["uploadLength"] = uploadLength.ToString()
+                }
+            });
 
         return uploadId;
     }
@@ -781,5 +794,100 @@ public class FileAzureBusiness : IFileBusiness
         var properties = await blobClient.GetPropertiesAsync();
 
         return properties.Value.ContentLength;
+    }
+
+    public async Task<string> CompleteUploadTus(long organizationId, long projectId, long datasourceId,
+        ObjectStorageConfigDto objectStorageConfig, string uploadId, Guid guid, string fileName)
+    {
+        if (objectStorageConfig?.AzureObjectConfig == null)
+        {
+            throw new ArgumentException("Azure configuration is null");
+        }
+
+        var container = new BlobContainerClient(
+            objectStorageConfig.AzureObjectConfig.AzureConnectionString,
+            objectStorageConfig.AzureObjectConfig.AzureContainerName);
+
+        if (!await container.ExistsAsync())
+        {
+            throw new InvalidOperationException("Azure Object Storage container does not exist");
+        }
+
+        // The temporary blob where blocks were staged
+        var tempBlobName = $"organization_{organizationId}/project_{projectId}/datasource_{datasourceId}/uploads/{uploadId}";
+        var tempBlockBlobClient = container.GetBlockBlobClient(tempBlobName);
+
+        // Final blob name following your naming convention
+        var finalBlobName = $"organization_{organizationId}/project_{projectId}/datasource_{datasourceId}/{guid}_{fileName}";
+        var finalBlockBlobClient = container.GetBlockBlobClient(finalBlobName);
+
+        try
+        {
+            // Create a list of block IDs in the correct order
+            var blockList = await tempBlockBlobClient.GetBlockListAsync(BlockListTypes.Uncommitted);
+            var blockIds = blockList.Value.UncommittedBlocks
+                .OrderBy(block => long.Parse(System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(block.Name)).Replace("block-", "")))
+                .Select(block => block.Name)
+                .ToList();
+
+            var uncommittedBlocks = blockList.Value.UncommittedBlocks.ToList();
+
+            // Commit all blocks to create the final blob at the temp location
+            await tempBlockBlobClient.CommitBlockListAsync(blockIds);
+
+            // Copy the committed blob to the final location with proper naming
+            var copyOperation = await finalBlockBlobClient.StartCopyFromUriAsync(tempBlockBlobClient.Uri);
+
+            // Wait for copy to complete (usually instant for same storage account)
+            await copyOperation.WaitForCompletionAsync();
+
+            // Delete the temporary blob after successful copy
+            await tempBlockBlobClient.DeleteIfExistsAsync();
+
+            return finalBlobName;
+        }
+        catch (Exception ex)
+        {
+            // Clean up on failure
+            await finalBlockBlobClient.DeleteIfExistsAsync();
+            await tempBlockBlobClient.DeleteIfExistsAsync();
+
+            throw new InvalidOperationException($"Failed to complete upload: {ex.Message}", ex);
+        }
+    }
+
+    public async Task<string> GetFileNameTus(
+        long organizationId,
+        long projectId,
+        long realDataSourceId,
+        string uploadId,
+        ObjectStorageConfigDto objectStorageConfig)
+    {
+        if (objectStorageConfig?.AzureObjectConfig == null)
+        {
+            throw new ArgumentException("Azure configuration is null");
+        }
+
+        if (string.IsNullOrWhiteSpace(uploadId))
+        {
+            throw new ArgumentException("Upload ID is not specified.");
+        }
+
+        var container = new BlobContainerClient(
+            objectStorageConfig.AzureObjectConfig.AzureConnectionString,
+            objectStorageConfig.AzureObjectConfig.AzureContainerName);
+
+        var blobName = $"organization_{organizationId}/project_{projectId}/datasource_{realDataSourceId}/uploads/{uploadId}";
+
+        var blockBlobClient = container.GetBlockBlobClient(blobName);
+
+        var properties = await blockBlobClient.GetPropertiesAsync();
+
+        if (!properties.Value.Metadata.TryGetValue("filename", out var fileName))
+        {
+            throw new InvalidOperationException($"Filename metadata not found for upload {uploadId}");
+        }
+
+        return fileName;
     }
 }

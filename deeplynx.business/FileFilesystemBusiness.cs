@@ -449,7 +449,7 @@ public class FileFilesystemBusiness : IFileBusiness
     /// <returns></returns>
     /// <exception cref="InvalidOperationException"></exception>
     public async Task<Guid> CreateUploadTus(long organizationId, long projectId, long datasourceId,
-        ObjectStorageConfigDto objectStorageConfig, long uploadLength)
+        ObjectStorageConfigDto objectStorageConfig, long uploadLength, string fileName)
     {
         var uploadId = Guid.NewGuid();
 
@@ -467,7 +467,7 @@ public class FileFilesystemBusiness : IFileBusiness
         Directory.CreateDirectory(uploadPath);
 
         var metaPath = Path.Combine(uploadPath, "meta.json");
-        await File.WriteAllTextAsync(metaPath, JsonConvert.SerializeObject(new { UploadLength = uploadLength }));
+        await File.WriteAllTextAsync(metaPath, JsonConvert.SerializeObject(new { UploadLength = uploadLength, FileName = fileName }));
 
         return uploadId;
     }
@@ -584,6 +584,90 @@ public class FileFilesystemBusiness : IFileBusiness
         await uploadBody.CopyToAsync(stream);
 
         return stream.Position;
+    }
+
+    public async Task<string> CompleteUploadTus(long organizationId, long projectId, long datasourceId,
+        ObjectStorageConfigDto objectStorageConfig, string uploadId, Guid guid, string fileName)
+    {
+        if (objectStorageConfig.MountPath == null)
+            throw new InvalidOperationException("File system mount path not set in object storage");
+
+        var uploadPath = Path.Combine(
+            objectStorageConfig.MountPath,
+            $"org_{organizationId}",
+            $"project_{projectId}",
+            $"datasource_{datasourceId}",
+            "uploads",
+            uploadId
+        );
+
+        if (!Directory.Exists(uploadPath))
+            throw new InvalidOperationException($"Upload session {uploadId} not found");
+
+        var tusFilePath = Path.Combine(uploadPath, "data");
+
+        if (!File.Exists(tusFilePath))
+            throw new InvalidOperationException($"TUS upload file not found for upload {uploadId}");
+
+        try
+        {
+            await using var fileStream = new FileStream(tusFilePath, FileMode.Open, FileAccess.Read);
+
+            var formFile = new FormFile(fileStream, 0, fileStream.Length, "file", fileName)
+            {
+                Headers = new HeaderDictionary(),
+                ContentType = "application/octet-stream"
+            };
+
+            var uri = await UploadFile(
+                organizationId,
+                projectId,
+                datasourceId,
+                objectStorageConfig,
+                formFile,
+                guid
+            );
+
+            fileStream.Close();
+
+            Directory.Delete(uploadPath, true);
+
+            return uri;
+        }
+        catch
+        {
+            if (Directory.Exists(uploadPath))
+                Directory.Delete(uploadPath, true);
+
+            throw;
+        }
+    }
+
+    public async Task<string> GetFileNameTus(long organizationId, long projectId, long datasourceId, string uploadId,
+        ObjectStorageConfigDto objectStorageConfig)
+    {
+        if (objectStorageConfig.MountPath == null)
+            throw new InvalidOperationException("File system mount path not set in object storage");
+
+        var uploadPath = Path.Combine(
+            objectStorageConfig.MountPath,
+            $"org_{organizationId}",
+            $"project_{projectId}",
+            $"datasource_{datasourceId}",
+            "uploads",
+            uploadId
+        );
+
+        if (!Directory.Exists(uploadPath))
+            throw new InvalidOperationException($"Upload session {uploadId} not found or expired");
+
+        var metaPath = Path.Combine(uploadPath, "meta.json");
+
+        if (!File.Exists(metaPath))
+            throw new InvalidOperationException($"Metadata for upload session {uploadId} not found");
+
+        var meta = JsonConvert.DeserializeObject<dynamic>(await File.ReadAllTextAsync(metaPath));
+        return (string)meta.FileName;
     }
 
 }

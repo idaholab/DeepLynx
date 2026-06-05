@@ -566,7 +566,7 @@ public class FileBusiness
 
         var fileBusiness = _factory.CreateFileBusiness(objectStorage.Type);
 
-        var uploadId = await fileBusiness.CreateUploadTus(organizationId, projectId, realDataSourceId, objectStorage.Config, request.FileSize);
+        var uploadId = await fileBusiness.CreateUploadTus(organizationId, projectId, realDataSourceId, objectStorage.Config, request.FileSize, request.FileName);
 
         return new TusFileUploadSessionResponseDto
         {
@@ -601,7 +601,13 @@ public class FileBusiness
     long? objectStorageId,
     string uploadId,
     long uploadOffset,
-    System.IO.Stream uploadBody)
+    long currentUserId,
+    System.IO.Stream uploadBody,
+    List<long>? sensitivityLabelIds = null,
+    CreateRecordFileUploadRequestDto? metadata = null,
+    bool embed = false,
+    long? vlmConfigId = null,
+    long? embeddingModelConfigId = null)
     {
         var realDataSourceId = await ResolveDataSourceId(organizationId, projectId, dataSourceId);
 
@@ -617,6 +623,62 @@ public class FileBusiness
 
         if (newOffset > uploadLength)
             throw new InvalidOperationException($"Upload offset {newOffset} exceeds declared Upload-Length {uploadLength}");
+        if (newOffset == uploadLength)
+        {
+            var guid = Guid.NewGuid();
+            var fileName = await fileBusiness.GetFileNameTus(organizationId, projectId, realDataSourceId, uploadId, objectStorage.Config);
+            var uri = await fileBusiness.CompleteUploadTus(organizationId, projectId, realDataSourceId,
+                objectStorage.Config, uploadId, guid, fileName);
+
+            var fileExtension = Path.GetExtension(fileName).TrimStart('.').ToLower();
+            var fileClass = await _classBusiness.GetOrCreateClass(currentUserId, organizationId, projectId, "File");
+            var fileSize = await fileBusiness.GetFileSize(uri, objectStorage.Config);
+            var properties = new JsonObject
+            {
+                ["fileType"] = fileExtension,
+                ["uploadedViaChunking"] = true,
+                ["originalUploadId"] = uploadId
+            };
+
+            fileClass = await ExtractTabularRecordMetadata(
+                currentUserId,
+                organizationId,
+                projectId,
+                fileExtension,
+                objectStorage.Type,
+                objectStorage.Config,
+                uri,
+                properties,
+                fileClass,
+                objectStorage.Type == "filesystem" ? () => File.OpenRead(uri) : null);
+            var recordName = metadata?.Name ?? Path.GetFileName(fileName);
+            if (recordName.Length > 100) recordName = recordName[..100];
+            var recordRequest = new CreateRecordRequestDto
+            {
+                Properties = properties,
+                Name = recordName,
+                ObjectStorageId = objectStorage.Id,
+                Description = metadata?.Description ?? $"File uploaded via chunked upload (session: {uploadId})",
+                OriginalId = metadata?.OriginalId ?? guid.ToString(),
+                Uri = uri,
+                ClassId = metadata?.ClassId ?? fileClass.Id,
+                ClassName = metadata?.ClassName ?? fileClass.Name,
+                FileType = fileExtension,
+                FileSize = fileSize
+            };
+
+            var createdRecord = await _recordBusiness.CreateRecord(currentUserId, organizationId, projectId,
+                realDataSourceId, recordRequest, sensitivityLabelIds, embedded: embed);
+
+            if (embed)
+            {
+                var vlmConfig = await _insightBusiness.ResolveModelConfig(currentUserId, organizationId, projectId, vlmConfigId, "vlm");
+                var embeddingModelConfig = await _insightBusiness.ResolveModelConfig(currentUserId, organizationId, projectId, embeddingModelConfigId, "embedding");
+
+                _insightBusiness.TriggerEmbedding(projectId, createdRecord.Id,
+                    createdRecord.Uri!, vlmConfig, embeddingModelConfig);
+            }
+        }
 
         return newOffset;
     }

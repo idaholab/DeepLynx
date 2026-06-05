@@ -81,7 +81,7 @@ public class FileS3Business : IFileBusiness
     }
 
     public async Task<Guid> CreateUploadTus(long organizationId, long projectId, long realDataSourceId,
-        ObjectStorageConfigDto objectStorageConfig, long uploadLength)
+        ObjectStorageConfigDto objectStorageConfig, long uploadLength, string fIlename)
     {
         return Guid.Empty;
     }
@@ -102,5 +102,21 @@ public class FileS3Business : IFileBusiness
         long uploadOffset, ObjectStorageConfigDto objectStorageConfig, System.IO.Stream uploadBody)
     {
         return 0;
+    }
+
+    public async Task<string> CompleteUploadTus(long organizationId, long projectId, long datasourceId,
+        ObjectStorageConfigDto objectStorageConfig, string uploadId, Guid guid, string fileName)
+    {
+        return "";
+    }
+
+    public async Task<string> GetFileNameTus(
+        long organizationId,
+        long projectId,
+        long realDataSourceId,
+        string uploadId,
+        ObjectStorageConfigDto objectStorageConfig)
+    {
+        return "";
     }
 }

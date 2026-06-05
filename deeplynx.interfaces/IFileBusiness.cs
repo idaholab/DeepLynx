@@ -35,11 +35,15 @@ public interface IFileBusiness
 
     Task<long> GetFileSize(string fileUri, ObjectStorageConfigDto objectStorageConfig);
     Task<Guid> CreateUploadTus(long organizationId, long projectId, long realDataSourceId,
-        ObjectStorageConfigDto objectStorageConfig, long uploadLength);
+        ObjectStorageConfigDto objectStorageConfig, long uploadLength, string fileName);
     Task<long> GetUploadOffset(long organizationId, long projectId, long realDataSourceId, string uploadId,
         ObjectStorageConfigDto objectStorageConfig);
     Task<long> GetUploadLength(long organizationId, long projectId, long realDataSourceId, string uploadId,
         ObjectStorageConfigDto objectStorageConfig);
     Task<long> UploadPartTus(long organizationId, long projectId, long realDataSourceId, string uploadId, long uploadOffset,
         ObjectStorageConfigDto objectStorageConfig, System.IO.Stream uploadBody);
+    Task<string> CompleteUploadTus(long organizationId, long projectId, long datasourceId,
+        ObjectStorageConfigDto objectStorageConfig, string uploadId, Guid guid, string fileName);
+    Task<string> GetFileNameTus(long organizationId, long projectId, long realDataSourceId,
+        string uploadId, ObjectStorageConfigDto objectStorageConfig);
 }

@@ -363,6 +363,7 @@ public class FileController : ControllerBase
     public async Task<IActionResult> CreateUploadTus(
         long organizationId,
         long projectId,
+        long userId,
         [FromQuery] long? dataSourceId,
         [FromQuery] long? objectStorageId)
     {
@@ -395,7 +396,7 @@ public class FileController : ControllerBase
                 organizationId, projectId, dataSourceId, objectStorageId, request);
 
             Response.Headers["Tus-Resumable"] = "1.0.0";
-            Response.Headers["Location"] = $"/organizations/{organizationId}/projects/{projectId}/files/upload/{uploadSession.UploadId}";
+            Response.Headers["Location"] = $"/api/v1/organizations/{organizationId}/projects/{projectId}/files/res-upload/{uploadSession.UploadId}";
 
             return StatusCode(201);
         }
@@ -466,6 +467,7 @@ public class FileController : ControllerBase
         long organizationId,
         long projectId,
         string uploadId,
+        long userId,
         [FromQuery] long? dataSourceId,
         [FromQuery] long? objectStorageId)
     {
@@ -486,7 +488,7 @@ public class FileController : ControllerBase
                 return StatusCode(415);
 
             var newOffset = await _fileBusiness.UploadPartTus(
-                organizationId, projectId, dataSourceId, objectStorageId, uploadId, uploadOffset, Request.Body);
+                organizationId, projectId, dataSourceId, objectStorageId, uploadId, uploadOffset, userId, Request.Body, null, null, false, null, null);
 
             Response.Headers["Tus-Resumable"] = "1.0.0";
             Response.Headers["Upload-Offset"] = newOffset.ToString();
