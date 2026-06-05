@@ -360,7 +360,7 @@ public class QueryBusiness : IQueryBusiness
             " : "";
 
         var sql = $@"
-            SELECT DISTINCT ON (qr.id)
+            SELECT
             qr.*,
             qr.class_id as ClassId,
             qr.class_name as ClassName,
@@ -478,10 +478,7 @@ public class QueryBusiness : IQueryBusiness
             query = query.Where(r => authorizedRecordIds.Contains(r.Id));
         }
 
-        var records = await query
-            .GroupBy(r => r.Id)
-            .Select(g => g.OrderByDescending(r => r.LastUpdatedAt).First())
-            .ToListAsync();
+        var records = await query.ToListAsync();
 
         return records.Select(r => new QueryRecordViewResponseDto
         {
@@ -542,13 +539,9 @@ public class QueryBusiness : IQueryBusiness
             recordQuery = recordQuery.Where(r => authorizedRecordIds.Contains(r.Id));
         }
 
-        var records = await recordQuery
-            .GroupBy(e => e.Id)
-            .Select(g => g.OrderByDescending(r => r.LastUpdatedAt).FirstOrDefault())
-            .ToListAsync();
+        var records = await recordQuery.ToListAsync();
 
         return records
-            .Where(r => r != null)
             .Select(r => new QueryRecordViewResponseDto
             {
                 Id = r.Id,
