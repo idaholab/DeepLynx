@@ -439,8 +439,8 @@ const LayoutShell = ({ children }: { children: ReactNode }) => {
         />
         <main
           className={`transition-all duration-300 min-w-[750px] flex-1 w-full mt-20 ml-0 ${
-              isMenuCollapsed ? "lg:ml-40" : "lg:ml-82"
-            }`}
+            isMenuCollapsed ? "lg:ml-40" : "lg:ml-82"
+          }`}
         >
           {/* Organization Banner */}
           <div className="sticky top-25 z-20">
