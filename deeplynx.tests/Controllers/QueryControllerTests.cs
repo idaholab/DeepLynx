@@ -65,8 +65,8 @@ public class QueryControllerTests : IDisposable
     [Fact]
     public async Task SearchRecords_Returns200_WithRecordResponse()
     {
-        IEnumerable<HistoricalRecordResponseDto> expected =
-            new List<HistoricalRecordResponseDto>();
+        IEnumerable<QueryRecordViewResponseDto> expected =
+            new List<QueryRecordViewResponseDto>();
 
         _mockQueryBusiness.Setup(b => b.Search(
             UserId, Query, OrgId, ProjectList, false, false, false))
@@ -75,7 +75,8 @@ public class QueryControllerTests : IDisposable
         var result = (await _QueryController.SearchRecords(
             OrgId,
             Query,
-            ProjectList)).Result as OkObjectResult;
+            ProjectList,
+            true)).Result as OkObjectResult;
 
         Assert.NotNull(result);
         Assert.Equal(200, result.StatusCode);
@@ -93,7 +94,8 @@ public class QueryControllerTests : IDisposable
         var result = (await _QueryController.SearchRecords(
             OrgId,
             Query,
-            ProjectList)).Result as OkObjectResult;
+            ProjectList,
+            true)).Result as OkObjectResult;
 
         Assert.NotNull(result);
         Assert.Equal(200, result.StatusCode);
@@ -105,13 +107,14 @@ public class QueryControllerTests : IDisposable
 
 
         _mockQueryBusiness.Setup(b => b.Search(
-            UserId, Query, OrgId, ProjectList, false, false, false))
+            UserId, Query, OrgId, ProjectList, true, false, false))
             .ThrowsAsync(new Exception("db error"));
 
         var actionResult = await _QueryController.SearchRecords(
             OrgId,
             Query,
-            ProjectList);
+            ProjectList,
+            true);
 
         var result = Assert.IsType<ObjectResult>(actionResult.Result);
 
@@ -121,17 +124,18 @@ public class QueryControllerTests : IDisposable
     [Fact]
     public async Task SearchRecords_PassesToBusinessLayer()
     {
-        IEnumerable<HistoricalRecordResponseDto> expected =
-            new List<HistoricalRecordResponseDto>();
+        IEnumerable<QueryRecordViewResponseDto> expected =
+            new List<QueryRecordViewResponseDto>();
 
         _mockQueryBusiness.Setup(b => b.Search(
-            UserId, Query, OrgId, ProjectList, false, false, false))
+            UserId, Query, OrgId, ProjectList, true, false, false))
             .ReturnsAsync(expected);
 
         var result = (await _QueryController.SearchRecords(
             OrgId,
             Query,
-            ProjectList)).Result as OkObjectResult;
+            ProjectList,
+            true)).Result as OkObjectResult;
 
 
         _mockQueryBusiness.Verify(
@@ -140,7 +144,7 @@ public class QueryControllerTests : IDisposable
                 Query,
                 OrgId,
                 ProjectList,
-                false,
+                true,
                 false,
                 false),
             Times.Once);
@@ -168,8 +172,8 @@ public class QueryControllerTests : IDisposable
     public async Task QueryBuilder_Returns200_WithRecordResponse()
     {
         // Arrange
-        IEnumerable<HistoricalRecordResponseDto> expected =
-            new List<HistoricalRecordResponseDto>();
+        IEnumerable<QueryRecordViewResponseDto> expected =
+            new List<QueryRecordViewResponseDto>();
 
         var request = Array.Empty<CustomQueryDtos.CustomQueryRequestDto>();
 
@@ -216,7 +220,7 @@ public class QueryControllerTests : IDisposable
                 false,
                 false,
                 false))
-            .ReturnsAsync(new List<HistoricalRecordResponseDto>());
+            .ReturnsAsync(new List<QueryRecordViewResponseDto>());
 
         // Act
         var actionResult = await _QueryController.QueryBuilder(
@@ -230,7 +234,7 @@ public class QueryControllerTests : IDisposable
         // Assert
         Assert.Equal(200, result.StatusCode);
 
-        var records = Assert.IsAssignableFrom<IEnumerable<HistoricalRecordResponseDto>>(result.Value);
+        var records = Assert.IsAssignableFrom<IEnumerable<QueryRecordViewResponseDto>>(result.Value);
         Assert.Empty(records);
     }
 
@@ -269,8 +273,8 @@ public class QueryControllerTests : IDisposable
     public async Task QueryBuilder_PassesToBusinessLayer()
     {
         // Arrange
-        IEnumerable<HistoricalRecordResponseDto> expected =
-            new List<HistoricalRecordResponseDto>();
+        IEnumerable<QueryRecordViewResponseDto> expected =
+            new List<QueryRecordViewResponseDto>();
 
         var request = Array.Empty<CustomQueryDtos.CustomQueryRequestDto>();
 
@@ -327,8 +331,8 @@ public class QueryControllerTests : IDisposable
     [Fact]
     public async Task GetMultiProjectRecords_Returns200_WithRecordResponse()
     {
-        IEnumerable<HistoricalRecordResponseDto> expected =
-            new List<HistoricalRecordResponseDto>();
+        IEnumerable<QueryRecordViewResponseDto> expected =
+            new List<QueryRecordViewResponseDto>();
 
         _mockQueryBusiness
             .Setup(b => b.GetMultiProjectRecords(
@@ -388,8 +392,8 @@ public class QueryControllerTests : IDisposable
     [Fact]
     public async Task GetMultiProjectRecords_PassesToBusinessLayer()
     {
-        IEnumerable<HistoricalRecordResponseDto> expected =
-            new List<HistoricalRecordResponseDto>();
+        IEnumerable<QueryRecordViewResponseDto> expected =
+            new List<QueryRecordViewResponseDto>();
 
         _mockQueryBusiness
             .Setup(b => b.GetMultiProjectRecords(
@@ -432,8 +436,8 @@ public class QueryControllerTests : IDisposable
     [Fact]
     public async Task GetRecentlyAddedRecords_Returns200_WithRecordResponse()
     {
-        IEnumerable<HistoricalRecordResponseDto> expected =
-            new List<HistoricalRecordResponseDto>();
+        IEnumerable<QueryRecordViewResponseDto> expected =
+            new List<QueryRecordViewResponseDto>();
 
         _mockQueryBusiness
             .Setup(b => b.GetRecentlyAddedRecords(
@@ -491,8 +495,8 @@ public class QueryControllerTests : IDisposable
     [Fact]
     public async Task GetRecentlyAddedRecords_PassesToBusinessLayer()
     {
-        IEnumerable<HistoricalRecordResponseDto> expected =
-            new List<HistoricalRecordResponseDto>();
+        IEnumerable<QueryRecordViewResponseDto> expected =
+            new List<QueryRecordViewResponseDto>();
 
         _mockQueryBusiness
             .Setup(b => b.GetRecentlyAddedRecords(
