@@ -3,6 +3,7 @@ using deeplynx.interfaces;
 using deeplynx.models;
 using Microsoft.AspNetCore.Mvc;
 using deeplynx.helpers;
+using deeplynx.api.Filters;
 
 namespace deeplynx.api.Controllers;
 
@@ -95,6 +96,7 @@ public class PermissionOrganizationController : ControllerBase
     /// <returns>The created permission</returns>
     [HttpPost(Name = "api_create_organization_permission")]
     [Auth("write", "permission")]
+    [CleanPermissionValidationErrors]
     public async Task<ActionResult<PermissionResponseDto>> CreatePermission(
         long organizationId,
         [FromBody] CreatePermissionRequestDto dto)

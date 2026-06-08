@@ -4,6 +4,7 @@ using deeplynx.models;
 using Microsoft.AspNetCore.Mvc;
 using deeplynx.helpers;
 using Microsoft.AspNetCore.Authorization;
+using deeplynx.api.Filters;
 
 namespace deeplynx.api.Controllers;
 
@@ -102,6 +103,7 @@ public class PermissionProjectController : ControllerBase
     /// <returns>The created permission</returns>
     [HttpPost(Name = "api_create_project_permission")]
     [Auth("write", "permission")]
+    [CleanPermissionValidationErrors]
     public async Task<ActionResult<PermissionResponseDto>> CreatePermission(
         long organizationId,
         long projectId,
