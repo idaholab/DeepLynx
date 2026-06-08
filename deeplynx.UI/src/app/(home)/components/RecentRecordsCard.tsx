@@ -4,14 +4,14 @@ import { useOrganizationSession } from "@/app/contexts/OrganizationSessionProvid
 import { useRouter } from "next/navigation";
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import CatalogViewSkeleton from "./skeletons/catalogviewskeleton";
-import { HistoricalRecordResponseDto } from "../types/responseDTOs";
-import { getRecentlyAddedRecords } from "@/app/lib/client_service/query_services.client";
+import { QueryRecordViewResponseDto } from "../types/responseDTOs";
 import { formatLocalDateTime } from "@/app/lib/date_time";
 import PaginationControls from "./PaginationControls";
 import { useLocalPagination } from "@/app/hooks/useLocalPagination";
 import SortSelect from "./SortSelect";
 import { useSortedItems } from "../hooks/useSortedItems";
 import type { SortOption } from "../hooks/useSortedItems";
+import { getRecentlyAddedRecords } from "@/app/lib/client_service/query_services.client";
 
 interface Props {
   selectedProjects: string[];
@@ -29,14 +29,14 @@ const RecentRecordsCard: React.FC<Props> = ({
   const { organization } = useOrganizationSession();
 
   // View state
-  const [records, setRecords] = useState<HistoricalRecordResponseDto[]>([]);
+  const [records, setRecords] = useState<QueryRecordViewResponseDto[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const failedToLoadRecentRecords =
     t.translations.FAILED_TO_LOAD_RECENT_RECORDS;
 
   const sortOptions = useMemo<
-    SortOption<HistoricalRecordResponseDto, RecentRecordSortValue>[]
+    SortOption<QueryRecordViewResponseDto, RecentRecordSortValue>[]
   >(
     () => [
       {
@@ -59,15 +59,15 @@ const RecentRecordsCard: React.FC<Props> = ({
         value: "dateNew",
         label: t.translations.SORT_DATE_NEWEST,
         compare: (a, b) =>
-          new Date(b.lastUpdatedAt).getTime() -
-          new Date(a.lastUpdatedAt).getTime(),
+          new Date(String(b.lastUpdatedAt)).getTime() -
+          new Date(String(a.lastUpdatedAt)).getTime(),
       },
       {
         value: "dateOld",
         label: t.translations.SORT_DATE_OLDEST,
         compare: (a, b) =>
-          new Date(a.lastUpdatedAt).getTime() -
-          new Date(b.lastUpdatedAt).getTime(),
+          new Date(String(a.lastUpdatedAt)).getTime() -
+          new Date(String(b.lastUpdatedAt)).getTime(),
       },
     ],
     [t],
@@ -143,7 +143,7 @@ const RecentRecordsCard: React.FC<Props> = ({
     resetPagination();
   }, [resetPagination, sortValue]);
 
-  const handleRecordClick = (record: HistoricalRecordResponseDto) => {
+  const handleRecordClick = (record: QueryRecordViewResponseDto) => {
     router.push(`/record?recordId=${record.id}&projectId=${record.projectId}`);
   };
 
@@ -203,7 +203,7 @@ const RecentRecordsCard: React.FC<Props> = ({
                 <span className="text-base-content/50">
                   {t.translations.LAST_EDIT}:
                 </span>{" "}
-                {formatLocalDateTime(record.lastUpdatedAt)}
+                {formatLocalDateTime(String(record.lastUpdatedAt))}
               </span>
 
               <span>
