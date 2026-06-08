@@ -10,12 +10,14 @@ import React, {
 } from "react";
 import type { ReactNode, Context } from "react";
 import { getOrganization } from "@/app/lib/client_service/organization_services.client";
+import { applyOrganizationTheme } from "@/app/lib/themes/themeMode";
 
 export interface OrganizationSession {
   organizationId: string | number;
   organizationName: string;
   logoUrl?: string;
   banner?: string | null;
+  themeName?: string | null;
 }
 
 interface OrganizationSessionContextType {
@@ -70,6 +72,12 @@ export const OrganizationSessionProvider = ({
     setHasLoaded(true);
   }, []);
 
+  useEffect(() => {
+    if (!hasLoaded) return;
+
+    applyOrganizationTheme(organization?.themeName ?? "default");
+  }, [hasLoaded, organization?.themeName]);
+
   // Fetch full organization data when organizationId changes
   useEffect(() => {
     const fetchFullOrganization = async () => {
@@ -87,6 +95,7 @@ export const OrganizationSessionProvider = ({
           const updated = {
             ...prev,
             banner: fullOrg.banner ?? null,
+            themeName: fullOrg.theme ?? "default",
           };
           const serialized = JSON.stringify(updated);
           localStorage.setItem("organizationSession", serialized);

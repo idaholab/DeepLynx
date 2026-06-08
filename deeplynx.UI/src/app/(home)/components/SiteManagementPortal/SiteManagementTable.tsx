@@ -61,7 +61,7 @@ export const SiteManagementTable = <T extends { id: string | number }>({
 
 
     return (
-        <div className={`overflow-x-auto ${border ? "shadow-md shadow-dynamic-shadow rounded-xl" : ""}`}>
+        <div className={`overflow-x-auto ${border ? "shadow-md shadow-base-content/10 rounded-xl" : ""}`}>
             <table className="table">
                 {/* head */}
                 <thead>

@@ -17,6 +17,12 @@ public class FileUploadSessionResponseDto
     public int TotalChunks { get; set; }
 }
 
+public class TusFileUploadSessionResponseDto
+{
+    public string UploadId { get; set; }
+
+}
+
 public class FileUploadCompleteRequestDto
 {
     [Required] public string UploadId { get; set; }

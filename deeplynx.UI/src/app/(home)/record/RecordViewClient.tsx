@@ -610,6 +610,14 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
         label: t.translations.DATA_SOURCE,
         value: record.dataSourceName,
       },
+      {
+        label: t.translations.DATA_SOURCE_ID,
+        value: record.dataSourceId,
+      },
+      {
+        label: t.translations.OBJECT_STORAGE_ID,
+        value: record.objectStorageId,
+      },
     ];
   }, [record, handleUpdateRecord, t.translations]);
 
