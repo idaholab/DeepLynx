@@ -34,6 +34,81 @@ public class LatticeExtractionController : ControllerBase
         _insightBusiness = insightBusiness;
         _logger = logger;
     }
+
+    private static IActionResult StructuredTriggerFailure(ControllerBase controller, InvalidOperationException exc)
+    {
+        if (exc.Message.Contains("Embeddings are being generated", StringComparison.OrdinalIgnoreCase))
+        {
+            return controller.Conflict(new
+            {
+                error = "embeddings_not_ready",
+                message = exc.Message
+            });
+        }
+
+        if (exc.Message.Contains("sufficient ontology", StringComparison.OrdinalIgnoreCase))
+        {
+            return controller.BadRequest(new
+            {
+                error = "ontology_not_ready",
+                message = exc.Message
+            });
+        }
+
+        if (exc.Message.Contains("not found", StringComparison.OrdinalIgnoreCase))
+        {
+            return controller.NotFound(new
+            {
+                error = "record_not_found",
+                message = exc.Message
+            });
+        }
+
+        return controller.BadRequest(new
+        {
+            error = "lattice_trigger_invalid",
+            message = exc.Message
+        });
+    }
+
+    private static string? ExtractFailureMessage(string? rawBody)
+    {
+        if (string.IsNullOrWhiteSpace(rawBody)) return null;
+
+        var trimmedBody = rawBody.Trim();
+        if (trimmedBody.StartsWith('{'))
+        {
+            try
+            {
+                var dto = JsonSerializer.Deserialize<LatticeExtractionErrorDto>(trimmedBody);
+                if (!string.IsNullOrWhiteSpace(dto?.Detail)) return dto.Detail.Trim();
+                if (!string.IsNullOrWhiteSpace(dto?.Error)) return dto.Error.Trim();
+            }
+            catch (JsonException)
+            {
+                return trimmedBody;
+            }
+        }
+
+        return trimmedBody;
+    }
+
+    private async Task<string?> ReadFailureMessage(string? queryMessage)
+    {
+        if (!string.IsNullOrWhiteSpace(queryMessage)) return queryMessage.Trim();
+
+        var request = ControllerContext.HttpContext?.Request;
+        if (request?.Body == null) return null;
+
+        if (request.Body.CanSeek) request.Body.Position = 0;
+
+        using var reader = new StreamReader(request.Body, leaveOpen: true);
+        var rawBody = await reader.ReadToEndAsync();
+
+        if (request.Body.CanSeek) request.Body.Position = 0;
+
+        return ExtractFailureMessage(rawBody);
+    }
     
     /// <summary>
     ///     Returns all extractions created by the current user, ordered newest first.
@@ -100,6 +175,18 @@ public class LatticeExtractionController : ControllerBase
                 currentUserId, organizationId, projectId, embeddingModelConfigId);
             return Accepted();
         }
+        catch (InvalidOperationException exc)
+        {
+            _logger.LogWarning(
+                "Unable to queue ontology embedding for project {ProjectId}: {Error}",
+                projectId,
+                exc.Message);
+            return BadRequest(new
+            {
+                error = "ontology_schema_not_ready",
+                message = exc.Message
+            });
+        }
         catch (Exception exc)
         {
             var message = $"An error occurred while queuing ontology embedding: {exc}";
@@ -125,8 +212,14 @@ public class LatticeExtractionController : ControllerBase
     {
         try
         {
-            await _latticeExtractionBusiness.MarkExtractionFailed(extractionId, errorMessage);
-            return Ok();
+            var failureMessage = await ReadFailureMessage(errorMessage);
+            await _latticeExtractionBusiness.MarkExtractionFailed(extractionId, failureMessage);
+            return Accepted(new
+            {
+                status = "failed",
+                extraction_id = extractionId,
+                message = failureMessage
+            });
         }
         catch (InvalidOperationException exc)
         {
@@ -293,13 +386,36 @@ public class LatticeExtractionController : ControllerBase
         catch (InvalidOperationException exc)
         {
             _logger.LogWarning(exc.Message);
-            return BadRequest(exc.Message);
+            return StructuredTriggerFailure(this, exc);
+        }
+        catch (InsightServiceException exc)
+        {
+            _logger.LogError(
+                exc,
+                "Insight rejected Lattice extraction trigger for project {ProjectId}, record {RecordId}. HTTP status: {StatusCode}. Response body: {ResponseBody}",
+                projectId,
+                recordId,
+                exc.StatusCode,
+                exc.ResponseBody);
+            return StatusCode(
+                exc.StatusCode.HasValue
+                    ? (int)exc.StatusCode.Value
+                    : StatusCodes.Status502BadGateway,
+                new
+                {
+                    error = "lattice_trigger_failed",
+                    message = exc.Message
+                });
         }
         catch (Exception exc)
         {
             var message = $"An error occurred while triggering Lattice extraction: {exc}";
             _logger.LogError(message);
-            return StatusCode(StatusCodes.Status500InternalServerError, message);
+            return StatusCode(StatusCodes.Status500InternalServerError, new
+            {
+                error = "lattice_trigger_failed",
+                message
+            });
         }
     }
 }

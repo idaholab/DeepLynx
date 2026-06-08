@@ -64,6 +64,23 @@ public class InsightController : ControllerBase
             _logger.LogError("Insight upload failed for project {ProjectId}: {Error}", projectId, exc.Message);
             return BadRequest(exc.Message);
         }
+        catch (InsightServiceException exc)
+        {
+            _logger.LogError(
+                exc,
+                "Insight upload request failed for project {ProjectId}: {Error}",
+                projectId,
+                exc.Message);
+            return StatusCode(
+                exc.StatusCode.HasValue
+                    ? (int)exc.StatusCode.Value
+                    : StatusCodes.Status502BadGateway,
+                new
+                {
+                    error = "insight_upload_failed",
+                    message = exc.Message
+                });
+        }
         catch (Exception exc)
         {
             var message = $"An unexpected error occurred while queuing Insight upload for project {projectId}: {exc}";
@@ -212,6 +229,23 @@ public class InsightController : ControllerBase
         {
             _logger.LogError("Ontology embeddings failed for project {ProjectId}: {Error}", projectId, exc.Message);
             return BadRequest(exc.Message);
+        }
+        catch (InsightServiceException exc)
+        {
+            _logger.LogError(
+                exc,
+                "Insight ontology embedding request failed for project {ProjectId}: {Error}",
+                projectId,
+                exc.Message);
+            return StatusCode(
+                exc.StatusCode.HasValue
+                    ? (int)exc.StatusCode.Value
+                    : StatusCodes.Status502BadGateway,
+                new
+                {
+                    error = "insight_ontology_embedding_failed",
+                    message = exc.Message
+                });
         }
         catch (Exception exc)
         {

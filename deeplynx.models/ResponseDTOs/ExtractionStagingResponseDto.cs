@@ -8,6 +8,7 @@ public class ExtractionStagingResponseDto
     [JsonPropertyName("status")] public string Status { get; set; } = null!;
     [JsonPropertyName("mode")] public string? Mode { get; set; }
     [JsonPropertyName("created_by")] public long? CreatedBy { get; set; }
+    [JsonPropertyName("failure_message")] public string? FailureMessage { get; set; }
     [JsonPropertyName("classes")] public List<StagedClassDto> Classes { get; set; } = [];
     [JsonPropertyName("records")] public List<StagedRecordDto> Records { get; set; } = [];
     [JsonPropertyName("relationships")] public List<StagedRelationshipDto> Relationships { get; set; } = [];
