@@ -37,11 +37,15 @@ public class QueryController : ControllerBase
     /// <param name="organizationId">The organization to which the records/projects belong</param>
     /// <param name="userQuery">String phrase entered by user</param>
     /// <param name="projectIds">Project IDs in the organization to search across</param>
-    /// <returns>List of historical record response DTOs</returns>
+    /// <param name="hideArchived">Flag indicating whether to hide archived records from the result</param>
+    /// <returns>List of record response DTOs from the query_record view</returns>
     [HttpGet("records", Name = "api_filter_records")]
     [Auth("read", "record")]
-    public async Task<ActionResult<IEnumerable<HistoricalRecordResponseDto>>> SearchRecords(
-        long organizationId, [FromQuery] string userQuery, [FromQuery] long[] projectIds)
+    public async Task<ActionResult<IEnumerable<QueryRecordViewResponseDto>>> SearchRecords(
+        long organizationId, 
+        [FromQuery] string userQuery, 
+        [FromQuery] long[] projectIds, 
+        [FromQuery] bool hideArchived)
     {
         try
         {
@@ -51,7 +55,7 @@ public class QueryController : ControllerBase
             var isProjectAdmin = UserContextStorage.IsProjectAdmin;
             var records = await _queryBusiness.Search(
                 currentUserId, userQuery, organizationId, projectIds,
-                isSysAdmin, isOrgAdmin, isProjectAdmin);
+                hideArchived, isSysAdmin, isOrgAdmin, isProjectAdmin);
             return Ok(records);
         }
         catch (Exception exc)
@@ -69,10 +73,10 @@ public class QueryController : ControllerBase
     /// <param name="filterArray">Array of QueryComponent dtos</param>
     /// <param name="textSearch">Full text search phrase</param>
     /// <param name="projectIds">Project IDs in the organization to search across</param>
-    /// <returns>List of historical record response DTOs</returns>
+    /// <returns>List of record response DTOs from the query_record view</returns>
     [HttpPost("records/advanced", Name = "api_query_builder_records")]
     [Auth("read", "record")]
-    public async Task<ActionResult<IEnumerable<HistoricalRecordResponseDto>>> QueryBuilder(
+    public async Task<ActionResult<IEnumerable<QueryRecordViewResponseDto>>> QueryBuilder(
         long organizationId, [FromQuery] string? textSearch, [FromQuery] long[] projectIds,
         [FromBody] CustomQueryDtos.CustomQueryRequestDto[] filterArray)
     {
@@ -99,10 +103,10 @@ public class QueryController : ControllerBase
     /// </summary>
     /// <param name="organizationId"> Organization Id of projects</param>
     /// <param name="projectIds">Array of project ids</param>
-    /// <returns>List of record response DTOs sorted by most recent</returns>
+    /// <returns>List of record response DTOs from the query_record view sorted by most recent</returns>
     [HttpGet("recent", Name = "api_get_recent_records")]
     [Auth("read", "record")]
-    public async Task<ActionResult<IEnumerable<HistoricalRecordResponseDto>>> GetRecentlyAddedRecords(
+    public async Task<ActionResult<IEnumerable<QueryRecordViewResponseDto>>> GetRecentlyAddedRecords(
         long organizationId, [FromQuery] long[] projectIds)
     {
         try
@@ -117,7 +121,7 @@ public class QueryController : ControllerBase
         }
         catch (Exception exc)
         {
-            var message = $"An error occurred while listing historical records: {exc}";
+            var message = $"An error occurred while listing records: {exc}";
             _logger.LogError(message);
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
@@ -130,10 +134,10 @@ public class QueryController : ControllerBase
     /// <param name="organizationId">ID of the organization to which the projects belong</param>
     /// <param name="projects">Array of project ids whose records are to be retrieved</param>
     /// <param name="hideArchived">Flag indicating whether to hide archived records from the result</param>
-    /// <returns>List of record response DTOs</returns>
+    /// <returns>List of record response DTOs from the query_record view</returns>
     [HttpGet("multiproject", Name = "api_multiproject_records")]
     [Auth("read", "record")]
-    public async Task<ActionResult<IEnumerable<HistoricalRecordResponseDto>>> GetMultiProjectRecords(
+    public async Task<ActionResult<IEnumerable<QueryRecordViewResponseDto>>> GetMultiProjectRecords(
         long organizationId,
         [FromQuery] long[] projects,
         [FromQuery] bool hideArchived = true)

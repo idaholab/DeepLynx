@@ -15,7 +15,7 @@ function UserSettingsSkeleton() {
         {times(rows).map((i) => (
           <div key={i} className="flex items-center font-mono text-sm pb-3">
             <div className="w-7/8 h-2">
-              <Skeleton width="90%" baseColor="var(--skeleton-base)" highlightColor="var(--skeleton-highlight)" />
+              <Skeleton width="90%" baseColor="var(--color-base-200)" highlightColor="var(--color-base-100)" />
             </div>
             <div className="ml-auto">
               <span>

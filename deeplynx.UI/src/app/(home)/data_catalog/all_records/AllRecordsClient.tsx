@@ -36,7 +36,7 @@ import {
   getMultiProjectRecords,
 } from "@/app/lib/client_service/query_services.client";
 import { getAllTagsOrg } from "@/app/lib/client_service/tag_services.client";
-import { HistoricalRecordResponseDto } from "@/app/(home)/types/responseDTOs";
+import { QueryRecordViewResponseDto } from "@/app/(home)/types/responseDTOs";
 import ProjectDropdown from "@/app/(home)/components/ProjectDropdown";
 import { useLanguage } from "@/app/contexts/Language";
 import {
@@ -231,7 +231,7 @@ export default function DataCatalogClient({
     const data = await getMultiProjectRecords(
       organization?.organizationId as number,
       idsNum,
-      true,
+      false, // archived records will be marked as archived
     );
     const transformedData: RecordTableRow[] = data.map((record) => ({
       id: record.id || 0,
@@ -316,13 +316,14 @@ export default function DataCatalogClient({
             organization?.organizationId as number,
             term,
             projects.map((p) => Number(p.id)),
+            false // keep archived ones showing, but will be flagged as archived
           ),
         ),
       );
 
       const recordsByKey = new Map<string, RecordTableRow>();
 
-      searchResults.flat().forEach((dto: HistoricalRecordResponseDto) => {
+      searchResults.flat().forEach((dto: QueryRecordViewResponseDto) => {
         const record: RecordTableRow = {
           ...dto,
           fileType: "",
@@ -585,7 +586,7 @@ export default function DataCatalogClient({
 
       if (
         selectedUpdatedByFilters.length > 0 &&
-        !selectedUpdatedByFilters.includes(updatedBy)
+        !selectedUpdatedByFilters.includes(String(updatedBy))
       ) {
         return false;
       }

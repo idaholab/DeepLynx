@@ -49,6 +49,7 @@ public class FileBusinessTests : IntegrationTestBase
     public long osid; // object storage ID
     public long pid; // project ID
     public long uid; // user ID
+    const long currentUserId = 1;
 
     public FileBusinessTests(TestSuiteFixture fixture) : base(fixture)
     {
@@ -60,7 +61,7 @@ public class FileBusinessTests : IntegrationTestBase
         // These are pre-generated valid AES-256 keys for testing
         Environment.SetEnvironmentVariable("ENCRYPTION_KEY", "SU5TRUNVUkVfREVWX0tFWV8zMl9CWVRFU19MT05HISE="); // 32 bytes
         Environment.SetEnvironmentVariable("ENCRYPTION_IV", "SU5TRUNVUkVfREVWX0lWIQ=="); // 16 bytes
-        
+
         _encryptionHelper = new EncryptionHelper();
         await base.InitializeAsync();
         Directory.CreateDirectory(_testDirectory);
@@ -2497,7 +2498,7 @@ public class FileBusinessTests : IntegrationTestBase
     }
 
     #endregion
-    
+
     #region BackfillFileSizes Tests
 
     [Fact]
@@ -2524,7 +2525,7 @@ public class FileBusinessTests : IntegrationTestBase
 
         // Upload a valid file (has URI and ObjectStorageId)
         var validRecord = await _fileBusiness.UploadFile(uid, oid, pid, did, osid, file);
-        
+
         // Manually clear FileSize to simulate old record
         var dbRecord = await Context.Records.FindAsync(validRecord.Id);
         dbRecord.FileSize = null;
@@ -2596,7 +2597,7 @@ public class FileBusinessTests : IntegrationTestBase
         };
 
         var record = await _fileBusiness.UploadFile(uid, oid, pid, did, osid, file);
-        
+
         // Verify FileSize is already set
         var dbRecord = await Context.Records.FindAsync(record.Id);
         Assert.NotNull(dbRecord.FileSize);
@@ -2819,7 +2820,7 @@ public class FileBusinessTests : IntegrationTestBase
 
         // Upload files
         var content = "Test content";
-        
+
         var ms1 = new MemoryStream(Encoding.UTF8.GetBytes(content));
         var file1 = new FormFile(ms1, 0, ms1.Length, "file", "org1-proj1.txt")
         {
@@ -2865,7 +2866,7 @@ public class FileBusinessTests : IntegrationTestBase
         Assert.Null(after2.FileSize);
         Assert.Null(after3.FileSize);
     }
-    
+
     [Fact]
     public async Task BackfillFileSizes_HandlesMultipleObjectStorages()
     {
@@ -2923,4 +2924,628 @@ public class FileBusinessTests : IntegrationTestBase
     }
 
     #endregion
+
+
+    #region BackfillFileSizes Tests
+
+    [Fact]
+    public async Task CreateUpload_CreatesUploadDirectory_AndReturnsSessionInfo()
+    {
+        // Arrange
+        var request = new FileUploadInitRequestDto
+        {
+            FileName = "bigfile.bin",
+            FileSize = 2L * 1024 * 1024 * 1024 // 2GB
+        };
+
+        // Act
+        var session = await _fileBusiness.CreateUploadTus(
+            oid,
+            pid,
+            did,
+            osid,
+            request
+        );
+
+        // Assert
+        Assert.NotNull(session);
+        Assert.False(string.IsNullOrWhiteSpace(session.UploadId));
+
+        var uploadPath = Path.Combine(
+            _testDirectory,
+            $"org_{oid}",
+            $"project_{pid}",
+            $"datasource_{did}",
+            "uploads",
+            session.UploadId
+        );
+
+        Assert.True(Directory.Exists(uploadPath));
+    }
+    #endregion
+
+    #region GetUploadOffset Tests
+
+    [Fact]
+    public async Task GetUploadOffset_WithExplicitDataSourceAndObjectStorage_ReturnsOffsetAndLength()
+    {
+        // Arrange
+        const string uploadId = "test-upload-id";
+        const long expectedOffset = 25;
+        const long expectedLength = 100;
+
+        var innerFileBusiness = new Mock<IFileBusiness>();
+
+        _fileBusinessFactory
+            .Setup(x => x.CreateFileBusiness("filesystem"))
+            .Returns(innerFileBusiness.Object);
+
+        innerFileBusiness
+            .Setup(x => x.GetUploadOffset(
+                oid,
+                pid,
+                did,
+                uploadId,
+                It.Is<ObjectStorageConfigDto>(c => c != null && c.MountPath == _testDirectory)))
+            .ReturnsAsync(expectedOffset);
+
+        innerFileBusiness
+            .Setup(x => x.GetUploadLength(
+                oid,
+                pid,
+                did,
+                uploadId,
+                It.Is<ObjectStorageConfigDto>(c => c != null && c.MountPath == _testDirectory)))
+            .ReturnsAsync(expectedLength);
+
+        // Act
+        var result = await _fileBusiness.GetUploadOffsetTus(
+            oid,
+            pid,
+            did,
+            osid,
+            uploadId);
+
+        // Assert
+        Assert.Equal(expectedOffset, result.Item1);
+        Assert.Equal(expectedLength, result.Item2);
+
+        _fileBusinessFactory.Verify(
+            x => x.CreateFileBusiness("filesystem"),
+            Times.Once);
+
+        innerFileBusiness.Verify(
+            x => x.GetUploadOffset(
+                oid,
+                pid,
+                did,
+                uploadId,
+                It.Is<ObjectStorageConfigDto>(c => c != null && c.MountPath == _testDirectory)),
+            Times.Once);
+
+        innerFileBusiness.Verify(
+            x => x.GetUploadLength(
+                oid,
+                pid,
+                did,
+                uploadId,
+                It.Is<ObjectStorageConfigDto>(c => c != null && c.MountPath == _testDirectory)),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task GetUploadOffset_WithNullDataSourceAndObjectStorage_UsesDefaults()
+    {
+        // Arrange
+        const string uploadId = "test-upload-defaults";
+        const long expectedOffset = 10;
+        const long expectedLength = 50;
+
+        var innerFileBusiness = new Mock<IFileBusiness>();
+
+        _fileBusinessFactory
+            .Setup(x => x.CreateFileBusiness("filesystem"))
+            .Returns(innerFileBusiness.Object);
+
+        innerFileBusiness
+            .Setup(x => x.GetUploadOffset(
+                oid,
+                pid,
+                did,
+                uploadId,
+                It.Is<ObjectStorageConfigDto>(c => c != null && c.MountPath == _testDirectory)))
+            .ReturnsAsync(expectedOffset);
+
+        innerFileBusiness
+            .Setup(x => x.GetUploadLength(
+                oid,
+                pid,
+                did,
+                uploadId,
+                It.Is<ObjectStorageConfigDto>(c => c != null && c.MountPath == _testDirectory)))
+            .ReturnsAsync(expectedLength);
+
+        // Act
+        var result = await _fileBusiness.GetUploadOffsetTus(
+            oid,
+            pid,
+            null,
+            null,
+            uploadId);
+
+        // Assert
+        Assert.Equal(expectedOffset, result.Item1);
+        Assert.Equal(expectedLength, result.Item2);
+
+        innerFileBusiness.Verify(
+            x => x.GetUploadOffset(
+                oid,
+                pid,
+                did,
+                uploadId,
+                It.Is<ObjectStorageConfigDto>(c => c != null && c.MountPath == _testDirectory)),
+            Times.Once);
+
+        innerFileBusiness.Verify(
+            x => x.GetUploadLength(
+                oid,
+                pid,
+                did,
+                uploadId,
+                It.Is<ObjectStorageConfigDto>(c => c != null && c.MountPath == _testDirectory)),
+            Times.Once);
+    }
+
+
+    [Fact]
+    public async Task GetUploadOffset_WhenGetUploadOffsetFails_DoesNotGetUploadLength()
+    {
+        // Arrange
+        const string uploadId = "test-upload-offset-fails";
+
+        var innerFileBusiness = new Mock<IFileBusiness>();
+
+        _fileBusinessFactory
+            .Setup(x => x.CreateFileBusiness("filesystem"))
+            .Returns(innerFileBusiness.Object);
+
+        innerFileBusiness
+            .Setup(x => x.GetUploadOffset(
+                oid,
+                pid,
+                did,
+                uploadId,
+                It.IsAny<ObjectStorageConfigDto>()))
+            .ThrowsAsync(new InvalidOperationException("Could not get upload offset"));
+
+        // Act
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            _fileBusiness.GetUploadOffsetTus(
+                oid,
+                pid,
+                did,
+                osid,
+                uploadId));
+
+        // Assert
+        Assert.Equal("Could not get upload offset", exception.Message);
+
+        innerFileBusiness.Verify(
+            x => x.GetUploadOffset(
+                oid,
+                pid,
+                did,
+                uploadId,
+                It.IsAny<ObjectStorageConfigDto>()),
+            Times.Once);
+
+        innerFileBusiness.Verify(
+            x => x.GetUploadLength(
+                It.IsAny<long>(),
+                It.IsAny<long>(),
+                It.IsAny<long>(),
+                It.IsAny<string>(),
+                It.IsAny<ObjectStorageConfigDto>()),
+            Times.Never);
+    }
+    #endregion
+
+    #region UploadPart Tests
+
+    [Fact]
+    public async Task UploadPart_WithValidBody_ReturnsNewOffset()
+    {
+        // Arrange
+        const string uploadId = "test-upload-part";
+        const long uploadOffset = 0;
+        const long expectedNewOffset = 12;
+        const long uploadLength = 100;
+
+        using var uploadBody = new MemoryStream(Encoding.UTF8.GetBytes("hello world!"));
+        var innerFileBusiness = new Mock<IFileBusiness>();
+
+        _fileBusinessFactory
+            .Setup(x => x.CreateFileBusiness("filesystem"))
+            .Returns(innerFileBusiness.Object);
+
+        innerFileBusiness
+            .Setup(x => x.UploadPartTus(
+                oid,
+                pid,
+                did,
+                uploadId,
+                uploadOffset,
+                It.Is<ObjectStorageConfigDto>(c => c != null && c.MountPath == _testDirectory),
+                uploadBody))
+            .ReturnsAsync(expectedNewOffset);
+
+        innerFileBusiness
+            .Setup(x => x.GetUploadLength(
+                oid,
+                pid,
+                did,
+                uploadId,
+                It.Is<ObjectStorageConfigDto>(c => c != null && c.MountPath == _testDirectory)))
+            .ReturnsAsync(uploadLength);
+
+        // Act
+        var result = await _fileBusiness.UploadPartTus(
+            oid,
+            pid,
+            did,
+            osid,
+            uploadId,
+            uploadOffset,
+            currentUserId,
+            uploadBody);
+
+        // Assert
+        Assert.Equal(expectedNewOffset, result);
+
+        innerFileBusiness.Verify(
+            x => x.UploadPartTus(
+                oid,
+                pid,
+                did,
+                uploadId,
+                uploadOffset,
+                It.Is<ObjectStorageConfigDto>(c => c != null && c.MountPath == _testDirectory),
+                uploadBody),
+            Times.Once);
+
+        innerFileBusiness.Verify(
+            x => x.GetUploadLength(
+                oid,
+                pid,
+                did,
+                uploadId,
+                It.Is<ObjectStorageConfigDto>(c => c != null && c.MountPath == _testDirectory)),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task UploadPart_WithNullDataSourceAndObjectStorage_UsesDefaults()
+    {
+        // Arrange
+        const string uploadId = "test-upload-part-defaults";
+        const long uploadOffset = 5;
+        const long expectedNewOffset = 20;
+        const long uploadLength = 100;
+
+        using var uploadBody = new MemoryStream(Encoding.UTF8.GetBytes("chunk content"));
+        var innerFileBusiness = new Mock<IFileBusiness>();
+
+        _fileBusinessFactory
+            .Setup(x => x.CreateFileBusiness("filesystem"))
+            .Returns(innerFileBusiness.Object);
+
+        innerFileBusiness
+            .Setup(x => x.UploadPartTus(
+                oid,
+                pid,
+                did,
+                uploadId,
+                uploadOffset,
+                It.Is<ObjectStorageConfigDto>(c => c != null && c.MountPath == _testDirectory),
+                uploadBody))
+            .ReturnsAsync(expectedNewOffset);
+
+        innerFileBusiness
+            .Setup(x => x.GetUploadLength(
+                oid,
+                pid,
+                did,
+                uploadId,
+                It.Is<ObjectStorageConfigDto>(c => c != null && c.MountPath == _testDirectory)))
+            .ReturnsAsync(uploadLength);
+
+        // Act
+        var result = await _fileBusiness.UploadPartTus(
+            oid,
+            pid,
+            null,
+            null,
+            uploadId,
+            uploadOffset,
+            currentUserId,
+            uploadBody);
+
+        // Assert
+        Assert.Equal(expectedNewOffset, result);
+
+        innerFileBusiness.Verify(
+            x => x.UploadPartTus(
+                oid,
+                pid,
+                did,
+                uploadId,
+                uploadOffset,
+                It.Is<ObjectStorageConfigDto>(c => c != null && c.MountPath == _testDirectory),
+                uploadBody),
+            Times.Once);
+
+        innerFileBusiness.Verify(
+            x => x.GetUploadLength(
+                oid,
+                pid,
+                did,
+                uploadId,
+                It.Is<ObjectStorageConfigDto>(c => c != null && c.MountPath == _testDirectory)),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task UploadPart_WhenUploadBodyIsNull_ThrowsArgumentException()
+    {
+        // Arrange
+        const string uploadId = "test-null-body";
+        const long uploadOffset = 0;
+
+        // Act
+        var exception = await Assert.ThrowsAsync<ArgumentException>(() =>
+            _fileBusiness.UploadPartTus(
+                oid,
+                pid,
+                did,
+                osid,
+                uploadId,
+                uploadOffset,
+                currentUserId,
+                null!));
+
+        // Assert
+        Assert.Equal("uploadBody cannot be null", exception.Message);
+
+        _fileBusinessFactory.Verify(
+            x => x.CreateFileBusiness(It.IsAny<string>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task UploadPart_WhenNewOffsetEqualsUploadLength_ReturnsNewOffset()
+    {
+        // Arrange
+        const string uploadId = "test-upload-complete";
+        const long uploadOffset = 25;
+        const long uploadLength = 50;
+        const long expectedNewOffset = 50;
+        const string fileName = "test.txt";
+
+        using var uploadBody = new MemoryStream(Encoding.UTF8.GetBytes("final chunk"));
+        var innerFileBusiness = new Mock<IFileBusiness>();
+
+        var completedFilePath = Path.Combine(_testDirectory, "completed-test.txt");
+        await File.WriteAllTextAsync(completedFilePath, "final file contents");
+
+        _fileBusinessFactory
+            .Setup(x => x.CreateFileBusiness("filesystem"))
+            .Returns(innerFileBusiness.Object);
+
+        innerFileBusiness
+            .Setup(x => x.UploadPartTus(
+                oid,
+                pid,
+                did,
+                uploadId,
+                uploadOffset,
+                It.IsAny<ObjectStorageConfigDto>(),
+                uploadBody))
+            .ReturnsAsync(expectedNewOffset);
+
+        innerFileBusiness
+            .Setup(x => x.GetUploadLength(
+                oid,
+                pid,
+                did,
+                uploadId,
+                It.IsAny<ObjectStorageConfigDto>()))
+            .ReturnsAsync(uploadLength);
+
+        innerFileBusiness
+            .Setup(x => x.GetFileNameTus(
+                oid,
+                pid,
+                did,
+                uploadId,
+                It.IsAny<ObjectStorageConfigDto>()))
+            .ReturnsAsync(fileName);
+
+        innerFileBusiness
+            .Setup(x => x.CompleteUploadTus(
+                oid,
+                pid,
+                did,
+                It.IsAny<ObjectStorageConfigDto>(),
+                uploadId,
+                It.IsAny<Guid>(),
+                fileName))
+            .ReturnsAsync(completedFilePath);
+
+        // Act
+        var result = await _fileBusiness.UploadPartTus(
+            oid,
+            pid,
+            did,
+            osid,
+            uploadId,
+            uploadOffset,
+            uid,
+            uploadBody);
+
+        // Assert
+        Assert.Equal(expectedNewOffset, result);
+
+        innerFileBusiness.Verify(x => x.GetFileNameTus(
+            oid,
+            pid,
+            did,
+            uploadId,
+            It.IsAny<ObjectStorageConfigDto>()), Times.Once);
+
+        innerFileBusiness.Verify(x => x.CompleteUploadTus(
+            oid,
+            pid,
+            did,
+            It.IsAny<ObjectStorageConfigDto>(),
+            uploadId,
+            It.IsAny<Guid>(),
+            fileName), Times.Once);
+    }
+
+    [Fact]
+    public async Task UploadPart_WhenNewOffsetExceedsUploadLength_ThrowsInvalidOperationException()
+    {
+        // Arrange
+        const string uploadId = "test-offset-too-large";
+        const long uploadOffset = 40;
+        const long newOffset = 75;
+        const long uploadLength = 50;
+
+        using var uploadBody = new MemoryStream(Encoding.UTF8.GetBytes("too much data"));
+        var innerFileBusiness = new Mock<IFileBusiness>();
+
+        _fileBusinessFactory
+            .Setup(x => x.CreateFileBusiness("filesystem"))
+            .Returns(innerFileBusiness.Object);
+
+        innerFileBusiness
+            .Setup(x => x.UploadPartTus(
+                oid,
+                pid,
+                did,
+                uploadId,
+                uploadOffset,
+                It.IsAny<ObjectStorageConfigDto>(),
+                uploadBody))
+            .ReturnsAsync(newOffset);
+
+        innerFileBusiness
+            .Setup(x => x.GetUploadLength(
+                oid,
+                pid,
+                did,
+                uploadId,
+                It.IsAny<ObjectStorageConfigDto>()))
+            .ReturnsAsync(uploadLength);
+
+        // Act
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            _fileBusiness.UploadPartTus(
+                oid,
+                pid,
+                did,
+                osid,
+                uploadId,
+                uploadOffset,
+                currentUserId,
+                uploadBody));
+
+        // Assert
+        Assert.Equal(
+            $"Upload offset {newOffset} exceeds declared Upload-Length {uploadLength}",
+            exception.Message);
+
+        innerFileBusiness.Verify(
+            x => x.UploadPartTus(
+                oid,
+                pid,
+                did,
+                uploadId,
+                uploadOffset,
+                It.IsAny<ObjectStorageConfigDto>(),
+                uploadBody),
+            Times.Once);
+
+        innerFileBusiness.Verify(
+            x => x.GetUploadLength(
+                oid,
+                pid,
+                did,
+                uploadId,
+                It.IsAny<ObjectStorageConfigDto>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task UploadPart_WhenInnerUploadPartFails_DoesNotGetUploadLength()
+    {
+        // Arrange
+        const string uploadId = "test-upload-part-fails";
+        const long uploadOffset = 0;
+
+        using var uploadBody = new MemoryStream(Encoding.UTF8.GetBytes("chunk"));
+        var innerFileBusiness = new Mock<IFileBusiness>();
+
+        _fileBusinessFactory
+            .Setup(x => x.CreateFileBusiness("filesystem"))
+            .Returns(innerFileBusiness.Object);
+
+        innerFileBusiness
+            .Setup(x => x.UploadPartTus(
+                oid,
+                pid,
+                did,
+                uploadId,
+                uploadOffset,
+                It.IsAny<ObjectStorageConfigDto>(),
+                uploadBody))
+            .ThrowsAsync(new InvalidOperationException("Upload failed"));
+
+        // Act
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            _fileBusiness.UploadPartTus(
+                oid,
+                pid,
+                did,
+                osid,
+                uploadId,
+                uploadOffset,
+                currentUserId,
+                uploadBody));
+
+        // Assert
+        Assert.Equal("Upload failed", exception.Message);
+
+        innerFileBusiness.Verify(
+            x => x.UploadPartTus(
+                oid,
+                pid,
+                did,
+                uploadId,
+                uploadOffset,
+                It.IsAny<ObjectStorageConfigDto>(),
+                uploadBody),
+            Times.Once);
+
+        innerFileBusiness.Verify(
+            x => x.GetUploadLength(
+                It.IsAny<long>(),
+                It.IsAny<long>(),
+                It.IsAny<long>(),
+                It.IsAny<string>(),
+                It.IsAny<ObjectStorageConfigDto>()),
+            Times.Never);
+    }
+    #endregion
+
 }
