@@ -972,7 +972,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
           </div>
 
           {/* Right Column - Tags & Relations */}
-          <div className="w-full xl:flex-1 space-y-4">
+          <div className="w-full xl:w-1/2 space-y-4">
             {isInsightSupported ? (
               <RecordInsightChat
                 organizationId={
