@@ -35,6 +35,10 @@ public partial class DeeplynxContext : DbContext
 
     public virtual DbSet<OauthApplication> OauthApplications { get; set; }
 
+    public virtual DbSet<OauthDeviceAuthorizationRequest> OauthDeviceAuthorizationRequests { get; set; }
+
+    public virtual DbSet<OauthRefreshToken> OauthRefreshTokens { get; set; }
+
     public virtual DbSet<OauthToken> OauthTokens { get; set; }
 
     public virtual DbSet<ObjectStorage> ObjectStorages { get; set; }
@@ -546,6 +550,83 @@ public partial class DeeplynxContext : DbContext
 
             entity.HasOne(d => d.User).WithMany(p => p.OauthTokens)
                 .HasConstraintName("oauth_tokens_user_id_fkey");
+        });
+
+        modelBuilder.Entity<OauthDeviceAuthorizationRequest>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("oauth_device_auth_requests_pkey");
+
+            entity.HasIndex(e => e.Id)
+                .HasDatabaseName("idx_oauth_device_auth_requests_id");
+
+            entity.HasIndex(e => e.DeviceCodeHash)
+                .HasDatabaseName("idx_oauth_device_auth_device_code_hash")
+                .IsUnique();
+
+            entity.HasIndex(e => e.UserCodeHash)
+                .HasDatabaseName("idx_oauth_device_auth_user_code_hash")
+                .IsUnique();
+
+            entity.HasIndex(e => e.ApplicationId)
+                .HasDatabaseName("idx_oauth_device_auth_application_id");
+
+            entity.HasIndex(e => e.UserId)
+                .HasDatabaseName("idx_oauth_device_auth_user_id");
+
+            entity.HasIndex(e => e.Status)
+                .HasDatabaseName("idx_oauth_device_auth_status");
+
+            entity.HasIndex(e => e.ExpiresAt)
+                .HasDatabaseName("idx_oauth_device_auth_expires_at");
+
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+            entity.Property(e => e.PollingIntervalSeconds).HasDefaultValue(5);
+            entity.Property(e => e.PollCount).HasDefaultValue(0);
+            entity.Property(e => e.Status).HasDefaultValue(OauthDeviceAuthorizationStatus.Pending);
+
+            entity.HasOne(d => d.OauthApplication).WithMany(p => p.OauthDeviceAuthorizationRequests)
+                .HasForeignKey(d => d.ApplicationId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("oauth_device_auth_requests_application_id_fkey");
+
+            entity.HasOne(d => d.User).WithMany(p => p.OauthDeviceAuthorizationRequests)
+                .HasForeignKey(d => d.UserId)
+                .OnDelete(DeleteBehavior.SetNull)
+                .HasConstraintName("oauth_device_auth_requests_user_id_fkey");
+        });
+
+        modelBuilder.Entity<OauthRefreshToken>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("oauth_refresh_tokens_pkey");
+
+            entity.HasIndex(e => e.Id)
+                .HasDatabaseName("idx_oauth_refresh_tokens_id");
+
+            entity.HasIndex(e => e.TokenHash)
+                .HasDatabaseName("idx_oauth_refresh_tokens_token_hash")
+                .IsUnique();
+
+            entity.HasIndex(e => e.ApplicationId)
+                .HasDatabaseName("idx_oauth_refresh_tokens_application_id");
+
+            entity.HasIndex(e => e.UserId)
+                .HasDatabaseName("idx_oauth_refresh_tokens_user_id");
+
+            entity.HasIndex(e => e.ExpiresAt)
+                .HasDatabaseName("idx_oauth_refresh_tokens_expires_at");
+
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+            entity.Property(e => e.Revoked).HasDefaultValue(false);
+
+            entity.HasOne(d => d.OauthApplication).WithMany(p => p.OauthRefreshTokens)
+                .HasForeignKey(d => d.ApplicationId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("oauth_refresh_tokens_application_id_fkey");
+
+            entity.HasOne(d => d.User).WithMany(p => p.OauthRefreshTokens)
+                .HasForeignKey(d => d.UserId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("oauth_refresh_tokens_user_id_fkey");
         });
 
         // Org-level entity \\

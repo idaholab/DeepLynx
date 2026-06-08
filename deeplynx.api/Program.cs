@@ -170,6 +170,7 @@ try
     builder.Services.AddTransient<IInvitationBusiness, InvitationBusiness>();
     builder.Services.AddTransient<ITokenBusiness, TokenBusiness>();
     builder.Services.AddTransient<IOauthApplicationBusiness, OauthApplicationBusiness>();
+    builder.Services.AddTransient<IOauthDeviceAuthorizationBusiness, OauthDeviceAuthorizationBusiness>();
 
     builder.Services.AddTransient<IQueryBusiness, QueryBusiness>();
     builder.Services.AddTransient<IMetadataBusiness, MetadataBusiness>();
