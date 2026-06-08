@@ -98,7 +98,7 @@ const SideMenu: React.FC<SideMenuProps> = ({
     } finally {
       setLoadingProjects(false);
     }
-  }, [organization]);
+  }, [organization, project]);
 
   /* -------------------------------- Effects ------------------------------- */
 
@@ -312,7 +312,7 @@ const SideMenu: React.FC<SideMenuProps> = ({
                       {t.translations.PROJECTS}
                     </span>
                     <h1 className="text-lg font-bold truncate">
-                      {activeProject?.name || t.translations.NO_PROJECT}
+                      {project?.projectName || activeProject?.name || t.translations.NO_PROJECT}
                     </h1>
                   </div>
                 )}
