@@ -20,6 +20,9 @@ type Props = {
    * can do a case-insensitive match without re-lowercasing on every render.
    */
   activeSearchTerms: string[];
+  isBulkMode: boolean;
+  isSelected: boolean;
+  onToggleSelected?: (record: RecordTableRow) => void;
 };
 
 /**
@@ -41,7 +44,7 @@ type Props = {
  * "use client" is required because this component calls useLanguage, which
  * reads from a React context that is only available in the browser.
  */
-export default function RecordCard({ record, activeSearchTerms }: Props) {
+export default function RecordCard({ record, activeSearchTerms, isBulkMode=false, isSelected=false, onToggleSelected }: Props) {
   const { t } = useLanguage();
 
   // Highlight matching search terms in every visible text field.
@@ -66,7 +69,24 @@ export default function RecordCard({ record, activeSearchTerms }: Props) {
   const recordHref = `/record?recordId=${record.id}&projectId=${record.projectId}`;
 
   return (
-    <article className="group grid grid-cols-1 gap-3 p-4 transition hover:bg-base-200/60 md:grid-cols-[minmax(0,1fr)_auto]">
+    <article className={`group grid grid-cols-1 gap-3 p-4 transition hover:bg-base-200/60 ${
+        isBulkMode
+            ? "md:grid-cols-[auto_minmax(0,1fr)_auto]"
+            : "md:grid-cols-[minmax(0,1fr)_auto]"}
+            `}
+    >
+      {isBulkMode && (
+          <div className="flex items-start pt-1">
+            <input
+              type="checkbox"
+              className="checkbox checkbox-primary checkbox-sm"
+              checked={isSelected}
+              onChange={() => onToggleSelected?.(record)}
+              onClick={(event) => event.stopPropagation()}
+              aria-label={`Select ${record.name || `record ${record.id}`}`}
+            />
+          </div>
+      )}
       <div className="min-w-0">
         {/* Badge row: record ID, class name, and optional archived warning */}
         <div className="mb-2 flex flex-wrap items-center gap-2">

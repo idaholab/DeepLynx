@@ -5,6 +5,7 @@ namespace deeplynx.models;
 
 public class CreateRecordFileUploadRequestDto
 {
+    [MaxLength(100)]
     [Required] public string Name { get; set; }
 
     [Required] public string Description { get; set; }

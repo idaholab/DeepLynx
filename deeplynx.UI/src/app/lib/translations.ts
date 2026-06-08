@@ -45,6 +45,7 @@ export const translations = {
       ADDING: "Adding...",
       ADDITIONAL_FILTERS: "Additional Filters",
       ADDITIONAL_PROPERTIES: "Additional Properties",
+      ADDITIONAL_SETTINGS_COMING_SOON: "Additional Settings Coming Soon",
       ADMIN: "Admin",
       ADMIN_OVERVIEW: "Admin Overview",
       ALIAS: "Alias:",
@@ -57,6 +58,8 @@ export const translations = {
         "All {count} records are valid and ready to upload.",
       ALL_YOUR_PROJECTS: "All your Projects",
       AND: "and",
+      API_ID_TOOLTIP_DESCRIPTION:
+        "Use these IDs when using the API scoped to your current organization and project.",
       API_KEYPAIRS: "API Keys",
       APP_OWNER_EMAIL: "App Owner Email",
       APPEAR_ON_TOP_RIGHT_NEXT_TO_ORG_NAME:
@@ -132,6 +135,7 @@ export const translations = {
       CANNOT_DEFINE_NEW_TAGS: "cannot define new tags",
       CANT_SWITCH_TO_SINGLE_FILE: "Can't switch to single-file",
       CHANGES_DISCARDED: "Changes discarded",
+      CHANGE_LOGO: "Change Logo",
       CHART_SETTINGS: "Chart Settings",
       CHART_TYPE: "Chart Type",
       CHOOSE_A_CLASS: "Choose a class",
@@ -198,6 +202,7 @@ export const translations = {
       CREATE_NEW_GROUP: "Create New Group",
       CREATE_NEW_LABEL: "Create new label",
       CREATE_NEW_LINK: "Create New Link",
+      CREATE_NEW_ORGANIZATION: "Create New Organization",
       CREATE_NEW_PROJECT_LABEL: "Create new project label",
       CREATE_NEW_PROJECT_TAG: "Create new project tag",
       CREATE_NEW_ROLE: "Create New Role",
@@ -207,6 +212,8 @@ export const translations = {
       CREATE_OAUTH_APPLICATION: "Create OAuth Application",
       CREATE_OBJECT_STORAGE: "Create Object Storage",
       CREATE_ORGANIZATION: "Create Organization",
+      CREATE_FIRST_ORGANIZATION_TO_GET_STARTED:
+        "Create your first organization to get started.",
       CREATE_PROJECT: "Create New Project",
       CREATE_RELATIONSHIP: "Create Relationship",
       CREATE_ROLE: "Create Role",
@@ -233,10 +240,12 @@ export const translations = {
       DATA_RECORD: "Data Records",
       DATA_SCHEMA: "Data Schema",
       DATA_SOURCE: "Data source",
+      DATA_SOURCE_ID: "Data Source ID",
       DATA_SOURCE_NAME: "Data Source Name",
       DATA_SOURCES: "Data Sources",
       DATA_TYPE: "Data Type",
       DEEPLYNX_ECOSYSTEM_SERVICES: "DeepLynx Ecosystem Services",
+      DEEPLYNX_LOGO: "DeepLynx logo",
       DEFAULT_BADGE: "Default",
       DEFAULT_STORAGE: "Delete Storage",
       DEFAULT_STORAGE_FOR_DATA_SOURCES_HELPER:
@@ -332,6 +341,8 @@ export const translations = {
       FAILED_TO_CREATE_LABEL: "Failed to create label",
       FAILED_TO_CREATE_RECORD: "Failed to create record.",
       FAILED_TO_CREATE_RELATIONSHIPS: "Failed to create relationships",
+      FAILED_TO_CREATE_ORGANIZATION_TRY_AGAIN:
+        "Failed to create organization. Please try again.",
       FAILED_TO_CREATE_STORAGE: "Failed to create storage",
       FAILED_TO_DELETE_STORAGE: "Failed to delete storage",
       FAILED_TO_FETCH_CLASSES: "Failed to fetch classes",
@@ -340,6 +351,8 @@ export const translations = {
       FAILED_TO_LOAD_DATA_SOURCE: "Failed to load data sources",
       FAILED_TO_LOAD_ORGANIZATION_LABELS: "Failed to load organization labels.",
       FAILED_TO_LOAD_ORGANIZATION_TAGS: "Failed to load organization tags.",
+      FAILED_TO_LOAD_ORGANIZATIONS_TRY_AGAIN:
+        "Failed to load organizations. Please try again.",
       FAILED_TO_LOAD_PROJECT_LABELS: "Failed to load project labels.",
       FAILED_TO_LOAD_PROJECT_TAGS: "Failed to load project tags.",
       FAILED_TO_LOAD_RECENT_RECORDS: "Failed to load recent records.",
@@ -644,6 +657,7 @@ export const translations = {
         "Labels are locked at the organization level. Cannot create or edit project labels.",
       LABELS_LOWER: "labels",
       LANGUAGE: "Language",
+      LAUNCH: "Launch",
       LAST_EDIT: "Last Edited",
       LAST_LOGIN: "Last Login",
       LAST_UPDATE: "Last update:",
@@ -785,6 +799,7 @@ export const translations = {
       LOADING_CLASSES: "Loading classes...",
       LOADING_DATA_SOURCES: "Loading data sources...",
       LOADING_OBJECT_STORAGES: "Loading object storages...",
+      LOCAL_CLUSTER_STORAGE: "Local Cluster Storage",
       LOADING_ORGANIZATION_LABELS: "Loading organization labels...",
       LOADING_ORGANIZATION_TAGS: "Loading organization tags...",
       LOADING_PERMISSIONS: "Loading Permissions...",
@@ -915,6 +930,7 @@ export const translations = {
         "No organization selected. Unable to save label.",
       NO_ORGANIZATION_SELECTED_UNABLE_TO_SAVE_TAG:
         "No organization selected. Unable to save tag.",
+      NO_ORGANIZATIONS_FOUND: "No organizations found.",
       NO_PERMISSION: "No permission",
       NO_PERMISSIONS: "No permissions available.",
       NO_PERMISSIONS_AVAILABLE: "No Permissions Available",
@@ -953,6 +969,7 @@ export const translations = {
       NOT_FOUND: "Not Found",
       OAUTH_APPLICATION: "OAuth Application",
       OBJECT_STORAGE: "Object Storage",
+      OBJECT_STORAGE_ID: "Object Storage ID",
       OBJECT_STORAGE_ID_MUST_BE_AN_INTEGER:
         "object_storage_id must be an integer if provided.",
       OBJECT_STORAGE_ID_NOT_FOUND_IN_PROJECT:
@@ -982,10 +999,13 @@ export const translations = {
       ORGANIZATION: "Organization",
       ORGANIZATION_ADMIN_ACCESS_UPDATED: "Organization admin access updated.",
       ORGANIZATION_DEFAULT: "Organization Default",
+      ORGANIZATION_ID: "Organization ID",
       ORGANIZATION_LABEL: "Organization Label",
       ORGANIZATION_LABEL_CREATED: "Organization label created.",
       ORGANIZATION_LABEL_UPDATED: "Organization label updated.",
+      ORGANIZATION_LOGO: "Organization Logo",
       ORGANIZATION_MANAGEMENT: "Organization Management",
+      ORGANIZATION_NAME: "Organization Name",
       ORGANIZATION_NOT_FOUND: "Organization not found",
       ORGANIZATION_OVERVIEW: "Organization Overview",
       ORGANIZATION_ROLE: "Organization Role",
@@ -1007,6 +1027,13 @@ export const translations = {
       ORGANIZATION_TAGS_DESCRIPTION:
         "Tags for classification, workflows, and search. All projects inherit these and can optionally add their own.",
       ORGANIZATION_USERS: "Organization Users",
+      ORGANIZATION_THEME: "Organization Theme",
+      ORGANIZATION_THEME_DEFAULT: "Default",
+      ORGANIZATION_THEME_DESCRIPTION:
+        "Applies to all users in this organization.",
+      ORGANIZATION_THEME_EMERALD: "Emerald",
+      ORGANIZATION_THEME_NORD: "Nord",
+      ORGANIZATION_THEME_NRIC: "NRIC",
       ORGANIZATION_WARNING_BANNER: "Organization Warning Banner",
       ORGANIZATIONS: "Organizations",
       ORIGINAL_ID: "Original ID",
@@ -1286,6 +1313,8 @@ export const translations = {
       ROOT: "Root",
       ROW_WITH_NUMBER: "Row {row}",
       ROWS_FROM_CSV: "rows from CSV",
+      S3_US_EAST_1: "S3 - us-east-1",
+      S3_US_WEST_2: "S3 - us-west-2",
       SAVE: "Save",
       SAVE_ALL_CHANGES: "Save All Changes",
       SAVE_CHANGES: "Save Changes",
@@ -1348,6 +1377,7 @@ export const translations = {
       SELECTED_ORGANIZATION_USERS: "Selected Organization Users",
       SELECTED_RECORD: "Selected record:",
       SELECTED_RECORDS: "Selected Records",
+      SELECT_LOGO: "Select Logo",
       SEND_INVITATION: "Send Invitation",
       SEND_INVITATIONS: "Send invitation(s)",
       SENSITIVITY_LABEL_REMOVED: "Sensitivity label removed",
@@ -1398,6 +1428,8 @@ export const translations = {
       STEP_1_DOWNLOAD_TEMPLATE: "Step 1: Download Template",
       STEP_2_UPLOAD_YOUR_CSV: "Step 2: Upload Your CSV",
       STORAGE: "Storage",
+      STORAGE_CONFIGURATION_AND_ADDITIONAL_ORG_MANAGEMENT_IN_DEVELOPMENT:
+        "Storage configuration and additional organization management features are currently in development.",
       STORAGE_CREATED_SUCCESSFULLY: "Storage created successfully",
       STORAGE_DELETE_SUCCESSFULLY: "Storage deleted successfully",
       STORAGE_DESTINATION: "Storage Destination",
@@ -1551,6 +1583,7 @@ export const translations = {
         "All data contained within DOE computer systems is owned by DOE and may be audited, intercepted, recorded, read, copied, or captured in any manner and disclosed in any manner by authorized personnel. " +
         "THERE IS NO RIGHT OF PRIVACY IN THIS SYSTEM. System personnel may disclose any potential evidence of crime found on DOE computer systems to appropriate authorities. USE OF THIS SYSTEM BY ANY USER, AUTHORIZED OR " +
         "UNAUTHORIZED, CONSTITUTES CONSENT TO THIS AUDITING, INTERCEPTION, RECORDING, READING, COPYING, CAPTURING, and DISCLOSURE OF COMPUTER ACTIVITY. **WARNING**WARNING**WARNING**WARNING**WARNING**",
+      WELCOME_BACK_COMMA: "Welcome back,",
       WELECOME: "Welcome Back",
       WHAT_HAPPENS_NEXT: "What happens next?",
       WHEN_LABELS_ARE: "When labels are",
@@ -1570,6 +1603,11 @@ export const translations = {
       YOUVE_BEEN_ADDED_TO_A_PROJECT_IN_DEEPLYNX_NEXUS:
         "You've been added to a project in DeepLynx Nexus",
       ZOOM_CONTROLS: "Zoom controls",
+      THEME_UPDATE_SUCCESS: "Theme updated successfully",
+      FAILED_TO_UPDATE_THEME: "Failed to update theme",
+      ARCHIVED_USERS: "Archived Users",
+      UNARCHIVE_USER: "Unarchive",
+      NO_ARCHIVED_USERS: "No archived users."
     },
   },
   es: {
@@ -1618,6 +1656,8 @@ export const translations = {
       ADDING: "Agregando...",
       ADDITIONAL_FILTERS: "Filtros adicionales",
       ADDITIONAL_PROPERTIES: "Propiedades adicionales",
+      ADDITIONAL_SETTINGS_COMING_SOON:
+        "Configuraciones adicionales próximamente",
       ADMIN: "Admin",
       ADMIN_OVERVIEW: "Resumen de administración",
       ALIAS: "Alias:",
@@ -1631,6 +1671,8 @@ export const translations = {
         "Los {count} registros son válidos y están listos para cargarse.",
       ALL_YOUR_PROJECTS: "Todos tus proyectos",
       AND: "y",
+      API_ID_TOOLTIP_DESCRIPTION:
+        "Usa estos identificadores al usar la API en el ámbito de tu organización y proyecto actuales.",
       API_KEYPAIRS: "Claves API",
       APP_OWNER_EMAIL: "Correo del propietario de la aplicación",
       APPEAR_ON_TOP_RIGHT_NEXT_TO_ORG_NAME:
@@ -1710,6 +1752,7 @@ export const translations = {
       CANNOT_DEFINE_NEW_TAGS: "no pueden definir nuevas etiquetas",
       CANT_SWITCH_TO_SINGLE_FILE: "No se puede cambiar a archivo único",
       CHANGES_DISCARDED: "Cambios descartados",
+      CHANGE_LOGO: "Cambiar logotipo",
       CHART_SETTINGS: "Configuración del Gráfico",
       CHART_TYPE: "Tipo de Gráfico",
       CHOOSE_A_CLASS: "Elige una clase",
@@ -1778,6 +1821,7 @@ export const translations = {
       CREATE_NEW_GROUP: "Crear nuevo grupo",
       CREATE_NEW_LABEL: "Crear nueva etiqueta",
       CREATE_NEW_LINK: "Crear nuevo enlace",
+      CREATE_NEW_ORGANIZATION: "Crear nueva organización",
       CREATE_NEW_PROJECT_LABEL: "Crear nueva etiqueta del proyecto",
       CREATE_NEW_PROJECT_TAG: "Crear nueva etiqueta del proyecto",
       CREATE_NEW_ROLE: "Crear un rol nuevo",
@@ -1787,6 +1831,8 @@ export const translations = {
       CREATE_OAUTH_APPLICATION: "Crear aplicación OAuth",
       CREATE_OBJECT_STORAGE: "Create Object Storage",
       CREATE_ORGANIZATION: "Crear organización",
+      CREATE_FIRST_ORGANIZATION_TO_GET_STARTED:
+        "Crea tu primera organización para comenzar.",
       CREATE_PROJECT: "Crear nuevo proyecto",
       CREATE_RELATIONSHIP: "Crear relacion",
       CREATE_ROLE: "Crear un rol",
@@ -1813,10 +1859,12 @@ export const translations = {
       DATA_RECORD: "Registros de datos",
       DATA_SCHEMA: "Esquema de Datos",
       DATA_SOURCE: "Fuente de datos: ",
+      DATA_SOURCE_ID: "ID de la fuente de datos",
       DATA_SOURCE_NAME: "Nombre de la fuente de datos",
       DATA_SOURCES: "Fuentes de datos",
       DATA_TYPE: "Tipo de dato",
       DEEPLYNX_ECOSYSTEM_SERVICES: "Servicios del ecosistema DeepLynx",
+      DEEPLYNX_LOGO: "Logotipo de DeepLynx",
       DEFAULT_BADGE: "Predeterminado",
       DEFAULT_STORAGE: "Eliminar almacenamiento",
       DEFAULT_STORAGE_FOR_DATA_SOURCES_HELPER:
@@ -1914,6 +1962,8 @@ export const translations = {
       FAILED_TO_CREATE_LABEL: "Error al crear la etiqueta",
       FAILED_TO_CREATE_RECORD: "No se pudo crear el registro.",
       FAILED_TO_CREATE_RELATIONSHIPS: "No se pudieron crear las relaciones",
+      FAILED_TO_CREATE_ORGANIZATION_TRY_AGAIN:
+        "No se pudo crear la organización. Inténtalo de nuevo.",
       FAILED_TO_CREATE_STORAGE: "No se pudo crear el almacenamiento",
       FAILED_TO_DELETE_STORAGE: "No se pudo eliminar el almacenamiento",
       FAILED_TO_FETCH_CLASSES: "No se pudieron obtener las clases",
@@ -1925,6 +1975,8 @@ export const translations = {
         "No se pudieron cargar las etiquetas de la organización.",
       FAILED_TO_LOAD_ORGANIZATION_TAGS:
         "No se pudieron cargar las etiquetas de la organización.",
+      FAILED_TO_LOAD_ORGANIZATIONS_TRY_AGAIN:
+        "No se pudieron cargar las organizaciones. Inténtalo de nuevo.",
       FAILED_TO_LOAD_PROJECT_LABELS:
         "No se pudieron cargar las etiquetas del proyecto.",
       FAILED_TO_LOAD_PROJECT_TAGS:
@@ -2258,6 +2310,7 @@ export const translations = {
         "Las etiquetas están bloqueadas a nivel de organización. No se pueden crear ni editar etiquetas del proyecto.",
       LABELS_LOWER: "etiquetas",
       LANGUAGE: "Idioma",
+      LAUNCH: "Iniciar",
       LAST_EDIT: "Última edición",
       LAST_LOGIN: "Último inicio de sesión",
       LAST_UPDATE: "Última actualización:",
@@ -2407,6 +2460,7 @@ export const translations = {
       LOADING_CLASSES: "Cargando clases...",
       LOADING_DATA_SOURCES: "Cargando fuentes de datos...",
       LOADING_OBJECT_STORAGES: "Cargando almacenamientos de objetos...",
+      LOCAL_CLUSTER_STORAGE: "Almacenamiento local del clúster",
       LOADING_ORGANIZATION_LABELS: "Cargando etiquetas de la organización...",
       LOADING_ORGANIZATION_TAGS: "Cargando etiquetas de la organización...",
       LOADING_PERMISSIONS: "Cargando permisos...",
@@ -2557,6 +2611,7 @@ export const translations = {
       NO_PROJECT_TAGS_MATCH_SEARCH:
         "Ninguna etiqueta del proyecto coincide con tu búsqueda.",
       NO_PROJECTS: "Sin proyectos",
+      NO_ORGANIZATIONS_FOUND: "No se encontraron organizaciones.",
       NO_PROPERTIES_YET_ADD_ONE: "Aun no hay propiedades. Agrega una abajo.",
       NO_RECENT_RECORDS: "No se encontraron registros recientes",
       NO_RECORDS:
@@ -2582,6 +2637,7 @@ export const translations = {
       NOT_FOUND: "No encontrado",
       OAUTH_APPLICATION: "Aplicación OAuth",
       OBJECT_STORAGE: "Almacenamiento de objetos",
+      OBJECT_STORAGE_ID: "ID del almacenamiento de objetos",
       OBJECT_STORAGE_ID_MUST_BE_AN_INTEGER:
         "object_storage_id debe ser un número entero si se proporciona.",
       OBJECT_STORAGE_ID_NOT_FOUND_IN_PROJECT:
@@ -2612,10 +2668,13 @@ export const translations = {
       ORGANIZATION_ADMIN_ACCESS_UPDATED:
         "Se actualizo el acceso de administrador de la organizacion.",
       ORGANIZATION_DEFAULT: "Predeterminado de la organización",
+      ORGANIZATION_ID: "ID de la organización",
       ORGANIZATION_LABEL: "Etiqueta de la organización",
       ORGANIZATION_LABEL_CREATED: "Etiqueta de la organización creada.",
       ORGANIZATION_LABEL_UPDATED: "Etiqueta de la organización actualizada.",
+      ORGANIZATION_LOGO: "Logotipo de la organización",
       ORGANIZATION_MANAGEMENT: "Gestión de organizaciones",
+      ORGANIZATION_NAME: "Nombre de la organización",
       ORGANIZATION_NOT_FOUND: "Organización no encontrada",
       ORGANIZATION_OVERVIEW: "Resumen de la organización",
       ORGANIZATION_ROLE: "Rol de la organización",
@@ -2638,6 +2697,13 @@ export const translations = {
       ORGANIZATION_TAGS: "Etiquetas de la organización",
       ORGANIZATION_TAGS_DESCRIPTION:
         "Etiquetas para clasificación, flujos de trabajo y búsqueda. Todos los proyectos las heredan y opcionalmente pueden agregar las suyas.",
+      ORGANIZATION_THEME: "Tema de la organización",
+      ORGANIZATION_THEME_DEFAULT: "Predeterminado",
+      ORGANIZATION_THEME_DESCRIPTION:
+        "Se aplica a todos los usuarios de esta organización.",
+      ORGANIZATION_THEME_EMERALD: "Esmeralda",
+      ORGANIZATION_THEME_NORD: "Nord",
+      ORGANIZATION_THEME_NRIC: "NRIC",
       ORGANIZATION_USERS: "Usuarios de la organización",
       ORGANIZATION_WARNING_BANNER: "Banner de advertencia de la organización",
       ORGANIZATIONS: "Organizaciones",
@@ -2929,6 +2995,8 @@ export const translations = {
       ROOT: "Raíz",
       ROW_WITH_NUMBER: "Fila {row}",
       ROWS_FROM_CSV: "filas del CSV",
+      S3_US_EAST_1: "S3 - us-east-1",
+      S3_US_WEST_2: "S3 - us-west-2",
       SAVE: "Guardar",
       SAVE_ALL_CHANGES: "Guardar todos los cambios",
       SAVE_CHANGES: "Guardar cambios",
@@ -2991,6 +3059,7 @@ export const translations = {
       SELECTED_ORGANIZATION_USERS: "Usuarios seleccionados de la organización",
       SELECTED_RECORD: "Registro seleccionado:",
       SELECTED_RECORDS: "Registros seleccionados",
+      SELECT_LOGO: "Seleccionar logotipo",
       SEND_INVITATION: "Enviar invitación",
       SEND_INVITATIONS: "Enviar invitación(es)",
       SENSITIVITY_LABEL_REMOVED: "Etiqueta de sensibilidad eliminada",
@@ -3043,6 +3112,8 @@ export const translations = {
       STEP_1_DOWNLOAD_TEMPLATE: "Paso 1: Descargar plantilla",
       STEP_2_UPLOAD_YOUR_CSV: "Paso 2: Cargue su CSV",
       STORAGE: "Almacenamiento",
+      STORAGE_CONFIGURATION_AND_ADDITIONAL_ORG_MANAGEMENT_IN_DEVELOPMENT:
+        "La configuración de almacenamiento y las funciones adicionales de administración de la organización están actualmente en desarrollo.",
       STORAGE_CREATED_SUCCESSFULLY: "El almacenamiento se creó correctamente",
       STORAGE_DELETE_SUCCESSFULLY: "El almacenamiento se eliminó correctamente",
       STORAGE_DESTINATION: "Destino de almacenamiento",
@@ -3206,6 +3277,7 @@ export const translations = {
       WARNING:
         "Todos los datos contenidos en los sistemas informáticos del DOE son propiedad del DOE y pueden ser auditados, interceptados, registrados, leídos, copiados o capturados de cualquier manera y divulgados de cualquier forma por personal autorizado. " +
         "NO EXISTE DERECHO A LA PRIVACIDAD EN ESTE SISTEMA. El personal del sistema puede divulgar a las autoridades competentes cualquier evidencia potencial de delito encontrada en los sistemas informáticos del DOE. EL USO DE ESTE SISTEMA POR CUALQUIER USUARIO, AUTORIZADO O NO AUTORIZADO, CONSTITUYE CONSENTIMIENTO PARA ESTA AUDITORÍA, INTERCEPCIÓN, REGISTRO, LECTURA, COPIA, CAPTURA Y DIVULGACIÓN DE LA ACTIVIDAD INFORMÁTICA. **ADVERTENCIA**ADVERTENCIA**ADVERTENCIA**ADVERTENCIA**ADVERTENCIA**",
+      WELCOME_BACK_COMMA: "Bienvenido de nuevo,",
       WELECOME: "Bienvenido de nuevo ",
       WHAT_HAPPENS_NEXT: "¿Qué sigue?",
       WHEN_LABELS_ARE: "Cuando las etiquetas están",
@@ -3225,6 +3297,11 @@ export const translations = {
       YOUVE_BEEN_ADDED_TO_A_PROJECT_IN_DEEPLYNX_NEXUS:
         "Has sido agregado a un proyecto en DeepLynx Nexus",
       ZOOM_CONTROLS: "Controles de zoom",
+      THEME_UPDATE_SUCCESS: "Tema actualizado",
+      FAILED_TO_UPDATE_THEME: "Error al actualizar el tema",
+      ARCHIVED_USERS: "Usuarios Archivados",
+      UNARCHIVE_USER: "Desarchivar",
+      NO_ARCHIVED_USERS: "No hay usuarios archivados."
     },
   },
 };

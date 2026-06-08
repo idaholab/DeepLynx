@@ -556,7 +556,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
         editable: true,
         onEdit: (value: string) =>
           handleUpdateRecord("name", value, t.translations.RECORD_NAME_UPDATED),
-        maxCharacterLimit: 50,
+        maxCharacterLimit: 100,
       },
       {
         label: t.translations.RECORD_DESCRIPTION,
@@ -596,11 +596,11 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
       // },
       ...(isDownloadable
         ? [
-            {
-              label: t.translations.FILE_SIZE || "File Size",
-              value: formatFileSize(record.fileSize),
-            },
-          ]
+          {
+            label: t.translations.FILE_SIZE || "File Size",
+            value: formatFileSize(record.fileSize),
+          },
+        ]
         : []),
       {
         label: t.translations.LAST_UPDATED_AT,
@@ -609,6 +609,14 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
       {
         label: t.translations.DATA_SOURCE,
         value: record.dataSourceName,
+      },
+      {
+        label: t.translations.DATA_SOURCE_ID,
+        value: record.dataSourceId,
+      },
+      {
+        label: t.translations.OBJECT_STORAGE_ID,
+        value: record.objectStorageId,
       },
     ];
   }, [record, handleUpdateRecord, t.translations]);
@@ -917,7 +925,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
       ontologyStatus.embedded_class_count >= ontologyStatus.class_count) &&
     (ontologyStatus.relationship_count === 0 ||
       ontologyStatus.embedded_relationship_count >=
-        ontologyStatus.relationship_count);
+      ontologyStatus.relationship_count);
 
   const canTriggerLatticeExtract =
     hasLatticeRecordRequirements &&
@@ -945,7 +953,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
           </div>
 
           {/* Right Column - Tags & Relations */}
-          <div className="w-full xl:flex-1 space-y-4">
+          <div className="w-full xl:w-1/2 space-y-4">
             {isInsightSupported ? (
               <RecordInsightChat
                 organizationId={
@@ -1122,7 +1130,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
                   {ontologyStatus && (
                     <div className="rounded-lg border border-base-300 divide-y divide-base-300 text-sm">
                       {ontologyStatus.class_count === 0 &&
-                      ontologyStatus.relationship_count === 0 ? (
+                        ontologyStatus.relationship_count === 0 ? (
                         <p className="px-4 py-3 text-base-content/50 text-xs">
                           {t.translations.LATTICE_ONTOLOGY_NO_SCHEMA}
                         </p>
@@ -1135,7 +1143,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
                             <span
                               className={
                                 ontologyStatus.embedded_class_count ===
-                                ontologyStatus.class_count
+                                  ontologyStatus.class_count
                                   ? "text-success font-medium"
                                   : "text-warning font-medium"
                               }
@@ -1153,7 +1161,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
                             <span
                               className={
                                 ontologyStatus.embedded_relationship_count ===
-                                ontologyStatus.relationship_count
+                                  ontologyStatus.relationship_count
                                   ? "text-success font-medium"
                                   : "text-warning font-medium"
                               }
@@ -1202,11 +1210,10 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
                       type="button"
                       onClick={() => setLatticeMode("discovery")}
                       disabled={isTriggeringLatticeExtraction}
-                      className={`rounded-xl border-2 p-4 text-left transition-colors ${
-                        latticeMode === "discovery"
-                          ? "border-primary bg-primary/5"
-                          : "border-base-300 hover:border-base-content/30"
-                      }`}
+                      className={`rounded-xl border-2 p-4 text-left transition-colors ${latticeMode === "discovery"
+                        ? "border-primary bg-primary/5"
+                        : "border-base-300 hover:border-base-content/30"
+                        }`}
                     >
                       <p className="font-semibold text-sm">
                         {t.translations.LATTICE_DISCOVERY}
@@ -1219,11 +1226,10 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
                       type="button"
                       onClick={() => setLatticeMode("strict")}
                       disabled={isTriggeringLatticeExtraction}
-                      className={`rounded-xl border-2 p-4 text-left transition-colors ${
-                        latticeMode === "strict"
-                          ? "border-primary bg-primary/5"
-                          : "border-base-300 hover:border-base-content/30"
-                      }`}
+                      className={`rounded-xl border-2 p-4 text-left transition-colors ${latticeMode === "strict"
+                        ? "border-primary bg-primary/5"
+                        : "border-base-300 hover:border-base-content/30"
+                        }`}
                     >
                       <p className="font-semibold text-sm">
                         {t.translations.LATTICE_STRICT}
