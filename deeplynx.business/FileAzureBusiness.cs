@@ -749,10 +749,21 @@ public class FileAzureBusiness : IFileBusiness
             throw new ArgumentException("Azure configuration is null");
         }
 
-        if (uploadBody == null || uploadBody.Length == 0)
+        if (uploadBody == null)
         {
             throw new ArgumentException("No upload Body data provided");
         }
+
+        await using var bufferedUploadBody = new MemoryStream();
+        await uploadBody.CopyToAsync(bufferedUploadBody);
+
+        if (bufferedUploadBody.Length == 0)
+        {
+            throw new ArgumentException("No upload Body data provided");
+        }
+
+        var bytesUploaded = bufferedUploadBody.Length;
+        bufferedUploadBody.Position = 0;
 
         // The blob name that will eventually hold the complete file
         // We stage blocks to this blob without committing yet
@@ -778,7 +789,7 @@ public class FileAzureBusiness : IFileBusiness
 
 
             // This uploads the stream as an uncommitted block
-            await blockBlobClient.StageBlockAsync(blockId, uploadBody);
+            await blockBlobClient.StageBlockAsync(blockId, bufferedUploadBody);
         }
         catch (Exception ex)
         {
@@ -786,14 +797,7 @@ public class FileAzureBusiness : IFileBusiness
         }
 
 
-        var blobClient = container.GetBlobClient(blobName);
-
-        if (!await blobClient.ExistsAsync())
-            return 0;
-
-        var properties = await blobClient.GetPropertiesAsync();
-
-        return properties.Value.ContentLength;
+        return uploadOffset + bytesUploaded;
     }
 
     public async Task<string> CompleteUploadTus(long organizationId, long projectId, long datasourceId,
