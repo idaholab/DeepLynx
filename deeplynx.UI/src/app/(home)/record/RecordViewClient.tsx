@@ -32,6 +32,7 @@ import ConfirmationModal from "@/app/(home)/components/ConfirmationModal";
 import RelatedRecordsCard, {
   CardColumn,
 } from "./components/RelatedRecordsCard";
+import ArchiveDelete from "../components/ArchiveDelete";
 
 // Types & Context
 import { useLanguage } from "@/app/contexts/Language";
@@ -42,6 +43,7 @@ import {
   getClass,
 } from "@/app/lib/client_service/class_services.client";
 import {
+  archiveRecord,
   getHistoricalRecord,
   getRecord,
   unattachSensitivityLabelFromRecord,
@@ -950,6 +952,23 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
               rows={additionalPropertiesRows}
               onEditProperties={() => setIsPropertiesEditorOpen(true)}
             />
+            {/* Delete a Record */}
+            <ArchiveDelete
+                actionType="archive"
+                itemType="Record"
+                itemName={record?.name || ""}
+                onConfirm={async () => {
+                  if (organization && projectId && record) {
+                    await archiveRecord(
+                      organization.organizationId as number,
+                      projectId as number,
+                      recordId as number,
+                      true
+                    );
+                    window.location.href = `/project/${projectId}`;
+                  }
+                }}
+              />
           </div>
 
           {/* Right Column - Tags & Relations */}
