@@ -16,6 +16,7 @@ public class HistoricalRecordBusiness : IHistoricalRecordBusiness
     ///     Initializes a new instance of the <see cref="HistoricalRecordBusiness" /> class.
     /// </summary>
     /// <param name="context">The database context used for the record operations.</param>
+    /// <param name="sensitivityLabelService">The sensitivity Label Service. </param>
     public HistoricalRecordBusiness(DeeplynxContext context, ISensitivityLabelService sensitivityLabelService)
     {
         _context = context;
@@ -60,21 +61,37 @@ public class HistoricalRecordBusiness : IHistoricalRecordBusiness
         if (hideArchived && records.Count > 0)
             records = records.Where(r => !r.IsArchived).ToList();
 
-        var recordIds = records.Select(r => r.RecordId).ToList();
         
         // if user is not admin, filter out unauthorized labels
+
+        var recordIds = records.Select(r => r.RecordId).ToList();
+
         if (!isSysAdmin && !isOrgAdmin && !isProjectAdmin)
         {
             var authorizedIds = await _sensitivityLabelService
                         .FilterAuthorizedRecordIds(currentUserId, organizationId, projectId, recordIds, _context);
             records = records.Where(r => authorizedIds.Contains(r.RecordId)).ToList();
         }
+        
+        var authorizedDownloadLabels = await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
+            currentUserId,
+            organizationId,
+            projectId,
+            "download file");
+
+        var currentRecords = await _context.Records
+            .Where(r => recordIds.Contains(r.Id))
+            .Include(r => r.Labels)
+            .ToDictionaryAsync(r => r.Id);
 
         return records
             .Select(r => new HistoricalRecordResponseDto
             {
                 Id = r.RecordId,
-                Uri = r.Uri,
+                Uri = currentRecords.TryGetValue(r.RecordId, out var currentRecord) &&
+                    CanExposeUri(currentRecord, authorizedDownloadLabels, isSysAdmin, isOrgAdmin, isProjectAdmin)
+                    ? r.Uri
+                    : null,
                 Properties = r.Properties,
                 OriginalId = r.OriginalId,
                 Name = r.Name,
@@ -103,13 +120,30 @@ public class HistoricalRecordBusiness : IHistoricalRecordBusiness
     /// <param name="currentUserId">The ID of current user</param>
     /// <param name="recordId">The ID of the record to list history for</param>
     /// <param name="organizationId">The ID of the organization under which project exists</param>
+    /// <param name="isSysAdmin">Whether the current user is a system administrator</param>
+    /// <param name="isOrgAdmin">Whether the current user is an organization administrator</param>
+    /// <param name="isProjectAdmin">Whether the current user is a project administrator</param>
     /// <returns>An array of record instances for the given record</returns>
-    public async Task<IEnumerable<HistoricalRecordResponseDto>> GetHistoryForRecord(long currentUserId, long recordId, long organizationId)
+    public async Task<IEnumerable<HistoricalRecordResponseDto>> GetHistoryForRecord(long currentUserId, long recordId, 
+    long organizationId, bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false)
     {
         var record = await _context.Records
             .Include(r => r.Labels)
             .FirstOrDefaultAsync(r => r.Id == recordId && r.OrganizationId == organizationId);
         if (record == null) throw new KeyNotFoundException($"Record with id {recordId} not found");
+
+        var authorizedDownloadLabels = await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
+            currentUserId,
+            organizationId,
+            record.ProjectId,
+            "download file");
+
+        var canExposeUri = CanExposeUri(
+            record,
+            authorizedDownloadLabels,
+            isSysAdmin,
+            isOrgAdmin,
+            isProjectAdmin);
 
         var historicalRecord = await _context.HistoricalRecords
             .Where(r => r.RecordId == recordId && r.OrganizationId == organizationId)
@@ -117,7 +151,9 @@ public class HistoricalRecordBusiness : IHistoricalRecordBusiness
             .Select(r => new HistoricalRecordResponseDto
             {
                 Id = r.RecordId,
-                Uri = r.Uri,
+                Uri = canExposeUri
+                    ? r.Uri
+                    : null,
                 Properties = r.Properties,
                 OriginalId = r.OriginalId,
                 Name = r.Name,
@@ -151,6 +187,9 @@ public class HistoricalRecordBusiness : IHistoricalRecordBusiness
     /// <param name="organizationId">The ID of the organization under which project exists</param>
     /// <param name="pointInTime">(Optional) Find the most current record that existed before this point in time</param>
     /// <param name="hideArchived">(Optional) Flag indicating whether to hide archived records from the result.</param>
+    /// <param name="isSysAdmin">Whether the current user is a system administrator</param>
+    /// <param name="isOrgAdmin">Whether the current user is an organization administrator</param>
+    /// <param name="isProjectAdmin">Whether the current user is a project administrator</param>
     /// <returns>A record that matches the applied filters.</returns>
     /// <exception cref="KeyNotFoundException">Returned if record not found</exception>
     public async Task<HistoricalRecordResponseDto> GetHistoricalRecord(
@@ -158,7 +197,10 @@ public class HistoricalRecordBusiness : IHistoricalRecordBusiness
         long recordId,
         long organizationId,
         DateTime? pointInTime,
-        bool hideArchived = true)
+        bool hideArchived = true,
+        bool isSysAdmin = false,
+        bool isOrgAdmin = false,
+        bool isProjectAdmin = false)
     {
         var recordQuery = _context.HistoricalRecords
             .Where(r => r.RecordId == recordId && r.OrganizationId == organizationId)
@@ -185,10 +227,31 @@ public class HistoricalRecordBusiness : IHistoricalRecordBusiness
         if (hideArchived && record.IsArchived)
             throw new KeyNotFoundException($"Historical record with id {recordId} not found or is archived.");
 
+        var currentRecord = await _context.Records
+            .Where(r => r.Id == recordId && r.OrganizationId == organizationId)
+            .Include(r => r.Labels)
+            .FirstOrDefaultAsync();
+
+        if (currentRecord == null)
+            throw new KeyNotFoundException($"Record with id {recordId} not found");
+
+        var authorizedDownloadLabels = await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
+            currentUserId,
+            organizationId,
+            record.ProjectId,
+            "download file");
+
         return new HistoricalRecordResponseDto
         {
             Id = record.RecordId,
-            Uri = record.Uri,
+            Uri = CanExposeUri(
+                currentRecord,
+                authorizedDownloadLabels,
+                isSysAdmin,
+                isOrgAdmin,
+                isProjectAdmin)
+                    ? record.Uri
+                    : null,
             Properties = record.Properties,
             OriginalId = record.OriginalId,
             Name = record.Name,
@@ -209,5 +272,19 @@ public class HistoricalRecordBusiness : IHistoricalRecordBusiness
             IsArchived = record.IsArchived,
             LastUpdatedAt = record.LastUpdatedAt
         };
+    }
+
+    private static bool CanExposeUri(
+        Record record,
+        List<long> authorizedDownloadLabels,
+        bool isSysAdmin = false,
+        bool isOrgAdmin = false,
+        bool isProjectAdmin = false)
+    {
+        return isSysAdmin ||
+            isOrgAdmin ||
+            isProjectAdmin ||
+            record.Labels.Count == 0 ||
+            record.Labels.All(l => authorizedDownloadLabels.Contains(l.Id));
     }
 }

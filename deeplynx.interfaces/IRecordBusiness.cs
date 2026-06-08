@@ -18,7 +18,8 @@ public interface IRecordBusiness
         bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false);
 
     Task<RecordResponseDto> GetRecord(
-        long currentUserId, long organizationId, long projectId, long recordId, bool hideArchived);
+        long currentUserId, long organizationId, long projectId, long recordId, bool hideArchived, bool isSysAdmin = false, bool isOrgAdmin = false,
+        bool isProjectAdmin = false);
 
     Task<int> GetRecordsCountByDataSource(
         long organizationId, long projectId, long dataSourceId, bool hideArchived);
