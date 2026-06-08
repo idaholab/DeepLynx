@@ -277,7 +277,7 @@ const LayoutShell = ({ children }: { children: ReactNode }) => {
         </div>
       </header>
       {/* Page Content */}
-      <div className="flex h-full z-0 mt-6">
+      <div className="flex h-full z-0 mt-6 w-full overflow-x-auto">
         {isMobileNavOpen && (
           <button
             type="button"
@@ -440,7 +440,7 @@ const LayoutShell = ({ children }: { children: ReactNode }) => {
           onMobileClose={() => setIsMobileNavOpen(false)}
         />
         <main
-          className={`transition-all duration-300 w-full mt-20 ml-0 ${
+          className={`transition-all duration-300 min-w-[750px] flex-1 w-full mt-20 ml-0 ${
             isMenuCollapsed ? "lg:ml-40" : "lg:ml-82"
           }`}
         >
