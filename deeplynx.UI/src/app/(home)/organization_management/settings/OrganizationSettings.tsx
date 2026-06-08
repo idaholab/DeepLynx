@@ -18,6 +18,7 @@ import {
 import { useLanguage } from "@/app/contexts/Language";
 import Image from "next/image";
 import OrganizationInsightModelTemplateSection from "./components/OrganizationInsightModelTemplateSection";
+import { isInsightHidden } from "@/app/lib/feature_flags";
 
 const OrganizationSettings = () => {
   const { organization } = useOrganizationSession();
@@ -437,9 +438,13 @@ const OrganizationSettings = () => {
               </div>
             </div>
 
-            <OrganizationInsightModelTemplateSection
-              organizationId={organization?.organizationId as number | undefined}
-            />
+            {!isInsightHidden() && (
+              <OrganizationInsightModelTemplateSection
+                organizationId={
+                  organization?.organizationId as number | undefined
+                }
+              />
+            )}
           </div>
         </div>
 
