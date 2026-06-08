@@ -319,6 +319,212 @@ public class QueryControllerTests : IDisposable
     #endregion
 
     // =========================================================================
+    // GetMultiProjectRecords Tests
+    // =========================================================================
+
+    #region GetMultiProjectRecords Tests
+
+    [Fact]
+    public async Task GetMultiProjectRecords_Returns200_WithRecordResponse()
+    {
+        IEnumerable<HistoricalRecordResponseDto> expected =
+            new List<HistoricalRecordResponseDto>();
+
+        _mockQueryBusiness
+            .Setup(b => b.GetMultiProjectRecords(
+                UserId, OrgId, ProjectList, false, false, false, false))
+            .ReturnsAsync(expected);
+
+        var actionResult = await _QueryController.GetMultiProjectRecords(
+            OrgId,
+            ProjectList,
+            true);
+
+        var result = actionResult.Result as OkObjectResult;
+
+        Assert.NotNull(result);
+        Assert.Equal(200, result.StatusCode);
+        Assert.Equal(expected, result.Value);
+    }
+
+    [Fact]
+    public async Task GetMultiProjectRecords_Returns200_WithEmptyList()
+    {
+
+        _mockQueryBusiness
+            .Setup(b => b.GetMultiProjectRecords(
+                UserId, OrgId, ProjectList, false, false, false, false))
+            .ReturnsAsync([]);
+
+        var actionResult = await _QueryController.GetMultiProjectRecords(
+            OrgId,
+            ProjectList,
+            true);
+
+        var result = actionResult.Result as OkObjectResult;
+
+        Assert.NotNull(result);
+        Assert.Equal(200, result.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetMultiProjectRecords_Returns500_UnexpectedException()
+    {
+        _mockQueryBusiness
+            .Setup(b => b.GetMultiProjectRecords(
+                UserId, OrgId, ProjectList, true, false, false, false))
+            .ThrowsAsync(new Exception("db error"));
+
+        var actionResult = await _QueryController.GetMultiProjectRecords(
+            OrgId,
+            ProjectList,
+            true);
+
+        var result = Assert.IsType<ObjectResult>(actionResult.Result);
+
+        Assert.Equal(StatusCodes.Status500InternalServerError, result.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetMultiProjectRecords_PassesToBusinessLayer()
+    {
+        IEnumerable<HistoricalRecordResponseDto> expected =
+            new List<HistoricalRecordResponseDto>();
+
+        _mockQueryBusiness
+            .Setup(b => b.GetMultiProjectRecords(
+                UserId, OrgId, ProjectList, true, false, false, false))
+            .ReturnsAsync(expected);
+
+        var actionResult = await _QueryController.GetMultiProjectRecords(
+            OrgId,
+            ProjectList,
+            true);
+
+        var result = actionResult.Result as OkObjectResult;
+
+        Assert.NotNull(result);
+
+        _mockQueryBusiness.Verify(
+            b => b.GetMultiProjectRecords(
+                UserId, OrgId, ProjectList, true, false, false, false),
+            Times.Once);
+    }
+
+    [Fact]
+    public void GetMultiProjectRecords_HasHttpGet()
+    {
+        var method = GetControllerMethod(
+            nameof(QueryController.GetMultiProjectRecords),
+            "organizationId");
+
+        AssertHasHttpAttribute(method, nameof(HttpGetAttribute));
+    }
+
+    #endregion
+
+    // =========================================================================
+    // GetRecentlyAddedRecords Tests
+    // =========================================================================
+
+    #region GetRecentlyAddedRecords Tests
+
+    [Fact]
+    public async Task GetRecentlyAddedRecords_Returns200_WithRecordResponse()
+    {
+        IEnumerable<HistoricalRecordResponseDto> expected =
+            new List<HistoricalRecordResponseDto>();
+
+        _mockQueryBusiness
+            .Setup(b => b.GetRecentlyAddedRecords(
+                UserId, OrgId, ProjectList, false, false, false))
+            .ReturnsAsync(expected);
+
+        var actionResult = await _QueryController.GetRecentlyAddedRecords(
+            OrgId,
+            ProjectList);
+
+        var result = actionResult.Result as OkObjectResult;
+
+        Assert.NotNull(result);
+        Assert.Equal(200, result.StatusCode);
+        Assert.Equal(expected, result.Value);
+    }
+
+    [Fact]
+    public async Task GetRecentlyAddedRecords_Returns200_WithEmptyList()
+    {
+
+        _mockQueryBusiness
+            .Setup(b => b.GetRecentlyAddedRecords(
+                UserId, OrgId, ProjectList, false, false, false))
+            .ReturnsAsync([]);
+
+        var actionResult = await _QueryController.GetRecentlyAddedRecords(
+            OrgId,
+            ProjectList);
+
+        var result = actionResult.Result as OkObjectResult;
+
+        Assert.NotNull(result);
+        Assert.Equal(200, result.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetRecentlyAddedRecords_Returns500_UnexpectedException()
+    {
+
+        _mockQueryBusiness
+            .Setup(b => b.GetRecentlyAddedRecords(
+                UserId, OrgId, ProjectList, false, false, false))
+            .ThrowsAsync(new Exception("db error"));
+
+        var actionResult = await _QueryController.GetRecentlyAddedRecords(
+            OrgId,
+            ProjectList);
+
+        var result = Assert.IsType<ObjectResult>(actionResult.Result);
+
+        Assert.Equal(StatusCodes.Status500InternalServerError, result.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetRecentlyAddedRecords_PassesToBusinessLayer()
+    {
+        IEnumerable<HistoricalRecordResponseDto> expected =
+            new List<HistoricalRecordResponseDto>();
+
+        _mockQueryBusiness
+            .Setup(b => b.GetRecentlyAddedRecords(
+                UserId, OrgId, ProjectList, false, false, false))
+            .ReturnsAsync(expected);
+
+        var actionResult = await _QueryController.GetRecentlyAddedRecords(
+            OrgId,
+            ProjectList);
+
+        var result = actionResult.Result as OkObjectResult;
+
+
+        _mockQueryBusiness.Verify(
+            b => b.GetRecentlyAddedRecords(
+                UserId, OrgId, ProjectList, false, false, false),
+            Times.Once);
+    }
+
+    [Fact]
+    public void GetRecentlyAddedRecords_HasHttpGet()
+    {
+        var method = GetControllerMethod(
+            nameof(QueryController.GetRecentlyAddedRecords),
+            "organizationId");
+
+        AssertHasHttpAttribute(method, nameof(HttpGetAttribute));
+    }
+
+    #endregion
+
+    // =========================================================================
     // Test Helpers
     // =========================================================================
 
