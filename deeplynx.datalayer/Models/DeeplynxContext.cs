@@ -775,6 +775,8 @@ public partial class DeeplynxContext : DbContext
             entity.HasIndex(e => e.Id)
                 .HasDatabaseName("idx_project_members_id");
 
+            entity.Property(e => e.IsProjectAdmin).HasDefaultValue(false);
+
             entity.HasIndex(e => e.ProjectId)
                 .HasDatabaseName("idx_project_members_project_id");
 
