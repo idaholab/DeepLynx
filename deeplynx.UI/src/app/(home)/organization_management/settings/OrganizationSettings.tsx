@@ -18,11 +18,23 @@ import {
 import { useLanguage } from "@/app/contexts/Language";
 import Image from "next/image";
 import OrganizationInsightModelTemplateSection from "./components/OrganizationInsightModelTemplateSection";
+import {
+  ORGANIZATION_THEMES,
+  resolveOrganizationTheme,
+} from "@/app/lib/themes/organizationTheme";
+import { applyOrganizationTheme } from "@/app/lib/themes/themeMode";
 import { isInsightHidden } from "@/app/lib/feature_flags";
 
 const OrganizationSettings = () => {
-  const { organization } = useOrganizationSession();
+  const { organization, setOrganization } = useOrganizationSession();
   const { t } = useLanguage();
+
+  const themeLabels: Record<string, string> = {
+    default: t.translations.ORGANIZATION_THEME_DEFAULT,
+    nric: t.translations.ORGANIZATION_THEME_NRIC,
+    nord: t.translations.ORGANIZATION_THEME_NORD,
+    emerald: t.translations.ORGANIZATION_THEME_EMERALD,
+  };
 
   // Logo states
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
@@ -34,6 +46,15 @@ const OrganizationSettings = () => {
   const [bannerText, setBannerText] = useState<string>("");
   const [originalBannerText, setOriginalBannerText] = useState<string>("");
   const [isSavingBanner, setIsSavingBanner] = useState(false);
+
+  // Theme states
+  const [selectedThemeName, setSelectedThemeName] = useState("default");
+  const [originalThemeName, setOriginalThemeName] = useState("default");
+  const [isSavingTheme, setIsSavingTheme] = useState(false);
+  const [themeToast, setThemeToast] = useState<{
+    message: string;
+    type: "success" | "error" | "info";
+  } | null>(null);
 
   // Storage states
   const [storageLocation, setStorageLocation] = useState<string>("org-default");
@@ -149,6 +170,70 @@ const OrganizationSettings = () => {
     }
   };
 
+  // Syncs Theme from session
+  useEffect(() => {
+    const themeName = resolveOrganizationTheme(organization?.themeName);
+    setSelectedThemeName(themeName);
+    setOriginalThemeName(themeName);
+  }, [organization?.themeName]);
+
+  // Theme Handler
+  const handleSaveTheme = async () => {
+    if (!organization?.organizationId) {
+      setThemeToast({ message: t.translations.NO_ORG_SELECTED, type: "error" });
+      return;
+    }
+
+    if (selectedThemeName === originalThemeName) {
+      setThemeToast({
+        message: t.translations.NO_CHANGES_TO_SAVE,
+        type: "info",
+      });
+      return;
+    }
+
+    try {
+      setIsSavingTheme(true);
+
+      const updateOrg = await updateOrganization(
+        organization?.organizationId as number,
+        { theme: selectedThemeName },
+      );
+
+      const newThemeName = resolveOrganizationTheme(updateOrg.theme);
+
+      setOriginalThemeName(newThemeName);
+      applyOrganizationTheme(newThemeName);
+
+      setOrganization({
+        ...organization,
+        themeName: newThemeName,
+      });
+      setThemeToast({
+        message: t.translations.THEME_UPDATE_SUCCESS,
+        type: "success",
+      });
+    } catch (error) {
+      console.error("Failed to update Organization theme: ", error);
+      setThemeToast({
+        message: t.translations.FAILED_TO_UPDATE_THEME,
+        type: "error",
+      });
+    } finally {
+      setIsSavingTheme(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!themeToast) return;
+
+    const timeout = window.setTimeout(() => {
+      setThemeToast(null);
+    }, 3000);
+
+    return () => window.clearTimeout(timeout);
+  }, [themeToast]);
+
   useEffect(() => {
     if (organization?.banner !== undefined) {
       const banner = organization.banner || "";
@@ -249,7 +334,7 @@ const OrganizationSettings = () => {
                       {logoPreview ? (
                         <Image
                           src={logoPreview}
-                          alt="Organization Logo"
+                          alt={t.translations.ORGANIZATION_LOGO}
                           fill
                           sizes="96px"
                           className="object-contain p-2"
@@ -269,12 +354,15 @@ const OrganizationSettings = () => {
 
                   <div className="flex flex-col gap-2 flex-1">
                     <span className="font-semibold text-base">
-                      {organization?.organizationName || "Organization"}
+                      {organization?.organizationName ||
+                        t.translations.ORGANIZATION}
                     </span>
 
                     <div className="flex flex-wrap gap-2">
                       <label className="btn btn-sm btn-primary">
-                        {logoFile ? "Change Logo" : "Select Logo"}
+                        {logoFile
+                          ? t.translations.CHANGE_LOGO
+                          : t.translations.SELECT_LOGO}
                         <input
                           type="file"
                           accept=".png,.jpg,.jpeg,.svg,.webp"
@@ -371,7 +459,7 @@ const OrganizationSettings = () => {
                       {isSavingBanner && (
                         <span className="loading loading-spinner loading-xs" />
                       )}
-                      {t.translations.SAVE || "Save"}
+                      {t.translations.SAVE}
                     </button>
 
                     {bannerText !== originalBannerText && (
@@ -381,7 +469,81 @@ const OrganizationSettings = () => {
                         onClick={handleCancelBanner}
                         disabled={isSavingBanner}
                       >
-                        {t.translations.CANCEL || "Cancel"}
+                        {t.translations.CANCEL}
+                      </button>
+                    )}
+                  </div>
+                </div>
+                <div className="divider" />
+
+                <div className="space-y-4">
+                  <div>
+                    <h3 className="card-title text-lg mb-4">
+                      {t.translations.ORGANIZATION_THEME}
+                    </h3>
+                    <p className="text-sm text-base-content/60 mt-1">
+                      {t.translations.ORGANIZATION_THEME_DESCRIPTION}
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {ORGANIZATION_THEMES.map((theme) => {
+                      const selected = selectedThemeName === theme.id;
+
+                      return (
+                        <button
+                          key={theme.id}
+                          type="button"
+                          className={`rounded-lg border p-4 text-left transition ${
+                            selected
+                              ? "border-primary bg-primary/10"
+                              : "border-base-300 bg-base-100 hover:border-primary/40 hover:bg-base-200/40"
+                          }`}
+                          onClick={() => setSelectedThemeName(theme.id)}
+                          disabled={isSavingTheme}
+                        >
+                          <div className="flex items-center justify-between gap-3">
+                            <span className="font-medium text-base-content">
+                              {themeLabels[theme.id] ?? theme.label}
+                            </span>
+
+                            <div className="flex gap-1">
+                              {theme.swatches.map((color) => (
+                                <span
+                                  className="h-5 w-5 rounded-full border border-base-300"
+                                  key={color}
+                                  style={{ backgroundColor: color }}
+                                />
+                              ))}
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <div className="flex gap-2">
+                    <button
+                      className="btn btn-primary btn-sm"
+                      type="button"
+                      onClick={handleSaveTheme}
+                      disabled={
+                        isSavingTheme || selectedThemeName === originalThemeName
+                      }
+                    >
+                      {isSavingTheme && (
+                        <span className="loading loading-spinner loading-xs" />
+                      )}
+                      {t.translations.SAVE}
+                    </button>
+
+                    {selectedThemeName !== originalThemeName && (
+                      <button
+                        className="btn btn-ghost btn-sm"
+                        type="button"
+                        onClick={() => setSelectedThemeName(originalThemeName)}
+                        disabled={isSavingTheme}
+                      >
+                        {t.translations.CANCEL}
                       </button>
                     )}
                   </div>
@@ -425,9 +587,15 @@ const OrganizationSettings = () => {
                     <option value="org-default">
                       {t.translations.ORGANIZATION_DEFAULT}
                     </option>
-                    <option value="s3-west">S3 — us-west-2</option>
-                    <option value="s3-east">S3 — us-east-1</option>
-                    <option value="local-cluster">Local Cluster Storage</option>
+                    <option value="s3-west">
+                      {t.translations.S3_US_WEST_2}
+                    </option>
+                    <option value="s3-east">
+                      {t.translations.S3_US_EAST_1}
+                    </option>
+                    <option value="local-cluster">
+                      {t.translations.LOCAL_CLUSTER_STORAGE}
+                    </option>
                   </select>
                   <label className="label">
                     <span className="label-text-alt text-base-content/60">
@@ -452,10 +620,14 @@ const OrganizationSettings = () => {
         <div className="alert alert-info mt-6">
           <InformationCircleIcon className="h-6 w-6" />
           <div>
-            <div className="font-bold">Additional Settings Coming Soon</div>
+            <div className="font-bold">
+              {t.translations.ADDITIONAL_SETTINGS_COMING_SOON}
+            </div>
             <div className="text-sm">
-              Storage configuration and additional organization management
-              features are currently in development.
+              {
+                t.translations
+                  .STORAGE_CONFIGURATION_AND_ADDITIONAL_ORG_MANAGEMENT_IN_DEVELOPMENT
+              }
             </div>
           </div>
         </div>
@@ -483,6 +655,13 @@ const OrganizationSettings = () => {
           </div>
         </div>
       </div>
+      {themeToast && (
+        <div className="toast toast-bottom toast-end">
+          <div className={`alert alert-${themeToast.type}`}>
+            {themeToast.message}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

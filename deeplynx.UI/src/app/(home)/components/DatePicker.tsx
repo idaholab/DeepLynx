@@ -5,12 +5,13 @@ import { DatePickerQuery } from "../types/types";
 interface DatePickerProps {
     row: DatePickerQuery;
     onChange: (value: string) => void;
+    onKeyDown?: React.KeyboardEventHandler<HTMLInputElement>;
 }
 
 type DateState = { dateValue?: string };
 
 
-export const DatePicker: React.FC<DatePickerProps> = ({ row, onChange }) => {
+export const DatePicker: React.FC<DatePickerProps> = ({ row, onChange, onKeyDown }) => {
     const [date, setDate] = useState<DateState>({});
 
 
@@ -30,6 +31,7 @@ export const DatePicker: React.FC<DatePickerProps> = ({ row, onChange }) => {
                         type="date"
                         className="input input-bordered input-sm max-h-8 w-full sm:w-auto"
                         onChange={handleDateTimeChange}
+                        onKeyDown={onKeyDown}
                     />
                 </div>
             </div>

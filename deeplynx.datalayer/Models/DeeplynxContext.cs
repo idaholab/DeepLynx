@@ -48,6 +48,8 @@ public partial class DeeplynxContext : DbContext
     public virtual DbSet<Project> Projects { get; set; }
 
     public virtual DbSet<ProjectMember> ProjectMembers { get; set; }
+    
+    public virtual DbSet<QueryRecord> QueryRecords { get; set; }
 
     public virtual DbSet<Record> Records { get; set; }
 
@@ -805,6 +807,35 @@ public partial class DeeplynxContext : DbContext
             entity.HasOne(d => d.User).WithMany(p => p.ProjectMembers)
                 .OnDelete(DeleteBehavior.Cascade)
                 .HasConstraintName("project_members_user_id_fkey");
+        });
+
+        modelBuilder.Entity<QueryRecord>(entity =>
+        {
+            entity.HasNoKey();
+            entity.ToView("query_records", "deeplynx");
+
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.Uri).HasColumnName("uri");
+            entity.Property(e => e.Properties).HasColumnName("properties");
+            entity.Property(e => e.OriginalId).HasColumnName("original_id");
+            entity.Property(e => e.Name).HasColumnName("name");
+            entity.Property(e => e.Description).HasColumnName("description");
+            entity.Property(e => e.ClassId).HasColumnName("class_id");
+            entity.Property(e => e.ClassName).HasColumnName("class_name");
+            entity.Property(e => e.DataSourceId).HasColumnName("data_source_id");
+            entity.Property(e => e.DataSourceName).HasColumnName("data_source_name");
+            entity.Property(e => e.ObjectStorageId).HasColumnName("object_storage_id");
+            entity.Property(e => e.ObjectStorageName).HasColumnName("object_storage_name");
+            entity.Property(e => e.ProjectId).HasColumnName("project_id");
+            entity.Property(e => e.ProjectName).HasColumnName("project_name");
+            entity.Property(e => e.OrganizationId).HasColumnName("organization_id");
+            entity.Property(e => e.FileType).HasColumnName("file_type");
+            entity.Property(e => e.FileSize).HasColumnName("file_size");
+            entity.Property(e => e.Tags).HasColumnName("tags");
+            entity.Property(e => e.Labels).HasColumnName("labels");
+            entity.Property(e => e.LastUpdatedAt).HasColumnName("last_updated_at");
+            entity.Property(e => e.LastUpdatedBy).HasColumnName("last_updated_by");
+            entity.Property(e => e.IsArchived).HasColumnName("is_archived");
         });
 
         modelBuilder.Entity<Record>(entity =>

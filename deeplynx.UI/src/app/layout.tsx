@@ -11,36 +11,33 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" data-theme="light" suppressHydrationWarning>
+    <html lang="en" data-theme="default" suppressHydrationWarning>
       <head>
         <script
           dangerouslySetInnerHTML={{
             __html: `
-(function () {
-  try {
-    var KEY = 'dlx-theme';
-    var saved = localStorage.getItem(KEY);
-    if (saved) {
-      document.documentElement.setAttribute('data-theme', saved);
-    }
-    document.documentElement.setAttribute('data-theme', saved || 'light');
-    
-    document.addEventListener('change', function (e) {
-      var t = e.target;
-      if (t && t.classList && t.classList.contains('theme-controller')) {
-        var theme = t.value;
-        var checked = t.checked;
-        var next = checked ? theme : 'light';
-        document.documentElement.setAttribute('data-theme', next);
-        localStorage.setItem(KEY, next);
-      }
-    }, { capture: true });
-  } catch (e) {}
-})();
-          `,
+	(function () {
+	  try {
+	    var KEY = 'dlx-theme-mode';
+	    var saved = localStorage.getItem(KEY);
+	    var orgTheme = 'default';
+	    var validOrgThemes = ['default', 'nric', 'nord', 'emerald', 'ron'];
+	    var storedOrg = localStorage.getItem('organizationSession');
+
+	    if (storedOrg) {
+	      var parsedOrg = JSON.parse(storedOrg);
+	      if (validOrgThemes.indexOf(parsedOrg.themeName) >= 0) {
+	        orgTheme = parsedOrg.themeName;
+	      }
+	    }
+
+	    document.documentElement.setAttribute('data-theme', saved === 'dark' ? orgTheme + '-dark' : orgTheme);
+	  } catch (e) {}
+	})();
+	          `,
           }}
         />
-     </head>
+      </head>
       <body className="min-h-screen bg-base-100 text-base-content">
         <ClientProviders>{children}</ClientProviders>
       </body>

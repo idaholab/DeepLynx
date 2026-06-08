@@ -25,7 +25,7 @@ import ProjectDropdown from "@/app/(home)/components/ProjectDropdown";
 import {
   ClassResponseDto,
   DataSourceResponseDto,
-  HistoricalRecordResponseDto,
+  QueryRecordViewResponseDto,
   TagResponseDto,
 } from "@/app/(home)/types/responseDTOs";
 import { getAllClassesOrg } from "@/app/lib/client_service/class_services.client";
@@ -197,6 +197,7 @@ interface FilterRowProps {
   onUpdate: (id: string, patch: Partial<QueryBuilderQuery>) => void;
   onRemove: (id: string) => void;
   onFieldChange: (field: string) => void;
+  onSearch: () => void;
 }
 
 function FilterRow({
@@ -215,6 +216,7 @@ function FilterRow({
   onUpdate,
   onRemove,
   onFieldChange,
+  onSearch,
 }: FilterRowProps) {
   const getFilterIcon = (field: string) => {
     const type = FILTER_TYPES.find((t) => t.value === field);
@@ -244,6 +246,15 @@ function FilterRow({
   const Icon = getFilterIcon(row.query.filter);
   const color = getFilterColor(row.query.filter);
   const { t } = useLanguage();
+
+  const handleEnterSearch = (
+      e: React.KeyboardEvent<HTMLInputElement | HTMLSelectElement>
+  ) => {
+    if (e.key === "Enter" && !e.nativeEvent.isComposing) {
+      e.preventDefault();
+      onSearch();
+    }
+  };
 
   return (
     <div className="card bg-base-100 border border-base-content/10 hover:border-primary/40 transition-colors shadow-sm">
@@ -289,6 +300,7 @@ function FilterRow({
                     });
                     onFieldChange(e.target.value);
                   }}
+                  onKeyDown={handleEnterSearch}
                 >
                   <option value="" disabled>
                     {t.translations.FILTER}
@@ -311,6 +323,7 @@ function FilterRow({
                     query: { ...row.query, operator: e.target.value },
                   })
                 }
+                onKeyDown={handleEnterSearch}
               >
                 <option value="" disabled>
                   {t.translations.OPERATOR}
@@ -332,6 +345,7 @@ function FilterRow({
               isLoadingDataSources={isLoadingDataSources}
               isLoadingTags={isLoadingTags}
               onUpdate={onUpdate}
+              onSearch={onSearch}
             />
           </div>
 
@@ -360,6 +374,7 @@ interface ValueInputProps {
   isLoadingDataSources: boolean;
   isLoadingTags: boolean;
   onUpdate: (id: string, patch: Partial<QueryBuilderQuery>) => void;
+  onSearch: () => void;
 }
 
 function ValueInput({
@@ -371,11 +386,21 @@ function ValueInput({
   isLoadingDataSources,
   isLoadingTags,
   onUpdate,
+  onSearch,
 }: ValueInputProps) {
   const baseInputClass =
     "input input-sm input-bordered bg-base-100 text-base-content placeholder:text-base-content/40";
   const { t } = useLanguage();
 
+  const handleEnterSearch = (
+      e: React.KeyboardEvent<HTMLInputElement | HTMLSelectElement>
+  ) => {
+    if (e.key === "Enter" && !e.nativeEvent.isComposing) {
+      e.preventDefault();
+      onSearch();
+    }
+  };
+  
   if (row.query.filter === "last_updated_at") {
     return (
       <div className="col-span-5">
@@ -384,6 +409,7 @@ function ValueInput({
           onChange={(dateTime: string) =>
             onUpdate(row.id, { query: { ...row.query, value: dateTime } })
           }
+          onKeyDown={handleEnterSearch}
         />
       </div>
     );
@@ -399,6 +425,7 @@ function ValueInput({
           onChange={(e) =>
             onUpdate(row.id, { query: { ...row.query, jsonKey: e.target.value } })
           }
+          onKeyDown={handleEnterSearch}
           className={`${baseInputClass} w-full`}
         />
         <input
@@ -410,6 +437,7 @@ function ValueInput({
               query: { ...row.query, jsonValue: e.target.value },
             })
           }
+          onKeyDown={handleEnterSearch}
           className={`${baseInputClass} w-full`}
         />
       </div>
@@ -426,6 +454,7 @@ function ValueInput({
           onChange={(e) =>
             onUpdate(row.id, { query: { ...row.query, value: e.target.value } })
           }
+          onKeyDown={handleEnterSearch}
           className={`${baseInputClass} w-full`}
         />
       </div>
@@ -445,6 +474,7 @@ function ValueInput({
                 query: { ...row.query, value: e.target.value },
               })
             }
+            onKeyDown={handleEnterSearch}
             className={`${baseInputClass} w-full`}
           />
         </div>
@@ -460,6 +490,7 @@ function ValueInput({
                 query: { ...row.query, value: e.target.value },
               })
             }
+            onKeyDown={handleEnterSearch}
             disabled={
               (row.query.filter === "class_name" && isLoadingClasses) ||
               (row.query.filter === "data_source_name" && isLoadingDataSources) ||
@@ -523,6 +554,7 @@ function ValueInput({
         onChange={(e) =>
           onUpdate(row.id, { query: { ...row.query, value: e.target.value } })
         }
+        onKeyDown={handleEnterSearch}
         className={`${baseInputClass} w-full`}
       />
     </div>
@@ -660,7 +692,7 @@ export default function QueryBuilderClient({
   // ---- State ----------------------------------------------------------------
   const [projects] = useState(initialProjects);
   const [selectedProjects, setSelectedProjects] = useState<string[]>(initialSelectedProjects);
-  const [records, setQueriedRecords] = useState<HistoricalRecordResponseDto[] | null>();
+  const [records, setQueriedRecords] = useState<QueryRecordViewResponseDto[] | null>();
   const [searchTerm, setSearchTerm] = useState(initialSearchTerm ?? "");
   const [showFilters, setShowFilters] = useState(true);
   const [rows, setRows] = useState<QueryBuilderQuery[]>([emptyRow()]);
@@ -993,6 +1025,7 @@ export default function QueryBuilderClient({
                       onUpdate={updateRow}
                       onRemove={removeRow}
                       onFieldChange={handleFieldChange}
+                      onSearch={handleSubmit}
                     />
                   ))}
                 </div>

@@ -3,6 +3,7 @@
 
 import React, { useState } from "react";
 import { CheckCircleIcon, XCircleIcon, PencilIcon } from "@heroicons/react/24/outline";
+import { useProjectSession } from "@/app/contexts/ProjectSessionProvider";
 
 // Table Shape
 interface ProjectPropertyRow {
@@ -19,6 +20,7 @@ interface Props {
 }
 
 const ProjectSettingsTable: React.FC<Props> = (projectInfo) => {
+  const { project, setProject } = useProjectSession();
   // State
   const [editingKey, setEditingKey] = useState<string>("");
   const [editValue, setEditingValue] = useState<string>("");
@@ -31,6 +33,13 @@ const ProjectSettingsTable: React.FC<Props> = (projectInfo) => {
 
   const handleSave = async (row: ProjectPropertyRow) => {
     row.onEdit?.(editValue);
+    if (editingKey == "Project Name ") {
+      if (!project) return;
+      setProject({
+        ...project,
+        projectName: editValue,
+      });
+    }
     setEditingKey("");
   }
 
