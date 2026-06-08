@@ -38,7 +38,7 @@ public class CleanPermissionValidationErrorsAttribute : ActionFilterAttribute
             // Replace labelId binding errors with a user-friendly message.
             if (fieldName.Equals("labelId", StringComparison.OrdinalIgnoreCase))
             {
-                errors["labelId"] = new[] { "Label ID must be a valid numbrer." };
+                errors["labelId"] = new[] { "Label ID must be a valid number." };
                 continue;
             }
             
