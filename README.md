@@ -40,7 +40,7 @@ docker compose up
 **With Insight:** (Will run everything including Insight)
 
 ```bash
-NEXT_PUBLIC_HIDE_INSIGHT=false HIDE_INSIGHT=false docker compose --profile insight up --build
+HIDE_INSIGHT=false docker compose --profile insight up --build
 ```
 
 ### PostgreSQL Configuration

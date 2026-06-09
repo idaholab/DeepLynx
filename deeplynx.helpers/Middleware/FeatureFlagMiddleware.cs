@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 
 namespace deeplynx.helpers;
 
@@ -13,10 +14,12 @@ public class InsightEnabledAttribute : Attribute
 public class FeatureFlagMiddleware
 {
     private readonly RequestDelegate _next;
+    private readonly IProblemDetailsService _problemDetailsService;
 
-    public FeatureFlagMiddleware(RequestDelegate next)
+    public FeatureFlagMiddleware(RequestDelegate next, IProblemDetailsService problemDetailsService)
     {
         _next = next;
+        _problemDetailsService = problemDetailsService;
     }
 
     public async Task InvokeAsync(HttpContext context)
@@ -45,7 +48,17 @@ public class FeatureFlagMiddleware
             if (hideInsight)
             {
                 context.Response.StatusCode = StatusCodes.Status403Forbidden;
-                await context.Response.WriteAsJsonAsync(new {error = "Forbidden: Insight Features Disabled on this instance"});
+                await _problemDetailsService.TryWriteAsync(new ProblemDetailsContext
+                {
+                    HttpContext = context,
+                    ProblemDetails = new ProblemDetails
+                    {
+                        Type = "https://tools.ietf.org/html/rfc7231#section-6.5.3",
+                        Title = "Forbidden",
+                        Status = StatusCodes.Status403Forbidden,
+                        Detail = "Insight features are disabled on this instance."
+                    }
+                });
                 return;
             }
 

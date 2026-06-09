@@ -587,14 +587,14 @@ export default function LatticeDecisionsPage() {
     if (saved) router.replace(`/lattice/decisions?extractionId=${saved}`);
   }, [insightHidden, projId, selectedId, router]);
 
-  if (insightHidden) {
-    return null;
-  }
-
   const handleSelect = (id: number) => {
     if (projId) localStorage.setItem(storageKey(projId), String(id));
     router.replace(`/lattice/decisions?extractionId=${id}`);
   };
+
+  if (insightHidden) {
+    return null;
+  }
 
   return (
     <main className="min-h-screen bg-base-200/30">

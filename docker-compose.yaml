@@ -15,7 +15,7 @@ services:
         BACKEND_BASE_URL: "http://server:5000/api/v1"
         AUTH_TRUST_HOST: true
         NEXT_PUBLIC_DISABLE_FRONTEND_AUTHENTICATION: true # change to false if supplying okta info on lines 12-13, 25-26
-        NEXT_PUBLIC_HIDE_INSIGHT: ${NEXT_PUBLIC_HIDE_INSIGHT:-true}
+        NEXT_PUBLIC_HIDE_INSIGHT: ${HIDE_INSIGHT:-true}
     environment:
       NODE_ENV: production
       OKTA_ISSUER: "https://identity-preview.inl.gov"
@@ -30,7 +30,7 @@ services:
       INSIGHT_API_URL: "http://insight-fastapi:5009"
       AUTH_TRUST_HOST: true
       NEXT_PUBLIC_DISABLE_FRONTEND_AUTHENTICATION: true # change to false if supplying okta info on lines 12-13, 25-26
-      NEXT_PUBLIC_HIDE_INSIGHT: ${NEXT_PUBLIC_HIDE_INSIGHT:-true}
+      NEXT_PUBLIC_HIDE_INSIGHT: ${HIDE_INSIGHT:-true}
     ports:
       - "3000:3000"
     networks:
