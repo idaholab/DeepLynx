@@ -78,7 +78,7 @@ public class RecordControllerTests : IDisposable
                          UserId, OrgId, ProjectId, null, true, null, false, false, false))
                      .ReturnsAsync(expected);
 
-        var result = (await _controller.GetAllRecords(OrgId, ProjectId)).Result as OkObjectResult;
+        var result = (await _controller.GetAllRecords(OrgId, ProjectId, null, null, true)).Result as OkObjectResult;
 
         Assert.NotNull(result);
         Assert.Equal(200, result.StatusCode);
@@ -94,7 +94,7 @@ public class RecordControllerTests : IDisposable
                          It.IsAny<bool>(), It.IsAny<bool>(), It.IsAny<bool>()))
                      .ReturnsAsync([]);
 
-        var result = (await _controller.GetAllRecords(OrgId, ProjectId)).Result as OkObjectResult;
+        var result = (await _controller.GetAllRecords(OrgId, ProjectId, null, null, true)).Result as OkObjectResult;
 
         Assert.NotNull(result);
         Assert.Equal(200, result.StatusCode);
@@ -110,7 +110,7 @@ public class RecordControllerTests : IDisposable
                          It.IsAny<bool>(), It.IsAny<bool>(), It.IsAny<bool>()))
                      .ThrowsAsync(new Exception("db error"));
 
-        var result = (await _controller.GetAllRecords(OrgId, ProjectId)).Result as ObjectResult;
+        var result = (await _controller.GetAllRecords(OrgId, ProjectId, null, null, true)).Result as ObjectResult;
 
         Assert.NotNull(result);
         Assert.Equal(500, result.StatusCode);
@@ -201,7 +201,7 @@ public class RecordControllerTests : IDisposable
                          true, false, false, false))
                      .ReturnsAsync(expected);
 
-        var result = (await _controller.GetRecordsByTags(OrgId, ProjectId, new[] { TagId })).Result as OkObjectResult;
+        var result = (await _controller.GetRecordsByTags(OrgId, ProjectId, new[] { TagId }, true)).Result as OkObjectResult;
 
         Assert.NotNull(result);
         Assert.Equal(200, result.StatusCode);
@@ -216,7 +216,7 @@ public class RecordControllerTests : IDisposable
                          It.IsAny<bool>(), It.IsAny<bool>(), It.IsAny<bool>(), It.IsAny<bool>()))
                      .ThrowsAsync(new Exception("db error"));
 
-        var result = (await _controller.GetRecordsByTags(OrgId, ProjectId, new[] { TagId })).Result as ObjectResult;
+        var result = (await _controller.GetRecordsByTags(OrgId, ProjectId, new[] { TagId }, true)).Result as ObjectResult;
 
         Assert.NotNull(result);
         Assert.Equal(500, result.StatusCode);
@@ -254,7 +254,7 @@ public class RecordControllerTests : IDisposable
                      .ReturnsAsync(expected);
 
         var result = (await _controller.GetRecordsByOriginalId(
-            OrgId, ProjectId, DataSourceId, originalIds)).Result as OkObjectResult;
+            OrgId, ProjectId, DataSourceId, originalIds, true)).Result as OkObjectResult;
 
         Assert.NotNull(result);
         Assert.Equal(200, result.StatusCode);
@@ -271,7 +271,7 @@ public class RecordControllerTests : IDisposable
                      .ThrowsAsync(new ArgumentException("invalid input"));
 
         var result = (await _controller.GetRecordsByOriginalId(
-            OrgId, ProjectId, DataSourceId, new List<string> { "og-1" })).Result as BadRequestObjectResult;
+            OrgId, ProjectId, DataSourceId, new List<string> { "og-1" }, true)).Result as BadRequestObjectResult;
 
         Assert.NotNull(result);
         Assert.Equal(400, result.StatusCode);
@@ -287,7 +287,7 @@ public class RecordControllerTests : IDisposable
                      .ThrowsAsync(new KeyNotFoundException($"DataSource {NotFoundId} not found"));
 
         var result = (await _controller.GetRecordsByOriginalId(
-            OrgId, ProjectId, NotFoundId, new List<string> { "og-1" })).Result as NotFoundObjectResult;
+            OrgId, ProjectId, NotFoundId, new List<string> { "og-1" }, true)).Result as NotFoundObjectResult;
 
         Assert.NotNull(result);
         Assert.Equal(404, result.StatusCode);
@@ -303,7 +303,7 @@ public class RecordControllerTests : IDisposable
                      .ThrowsAsync(new Exception("db error"));
 
         var result = (await _controller.GetRecordsByOriginalId(
-            OrgId, ProjectId, DataSourceId, new List<string> { "og-1" })).Result as ObjectResult;
+            OrgId, ProjectId, DataSourceId, new List<string> { "og-1" }, true)).Result as ObjectResult;
 
         Assert.NotNull(result);
         Assert.Equal(500, result.StatusCode);
@@ -338,7 +338,7 @@ public class RecordControllerTests : IDisposable
         _mockBusiness.Setup(b => b.GetRecord(UserId, OrgId, ProjectId, RecordIdConst, true))
                      .ReturnsAsync(expected);
 
-        var result = (await _controller.GetRecord(OrgId, ProjectId, RecordIdConst)).Result as OkObjectResult;
+        var result = (await _controller.GetRecord(OrgId, ProjectId, RecordIdConst, true)).Result as OkObjectResult;
 
         Assert.NotNull(result);
         Assert.Equal(200, result.StatusCode);
@@ -352,7 +352,7 @@ public class RecordControllerTests : IDisposable
                          It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(), It.IsAny<bool>()))
                      .ThrowsAsync(new Exception("db error"));
 
-        var result = (await _controller.GetRecord(OrgId, ProjectId, RecordIdConst)).Result as ObjectResult;
+        var result = (await _controller.GetRecord(OrgId, ProjectId, RecordIdConst, true)).Result as ObjectResult;
 
         Assert.NotNull(result);
         Assert.Equal(500, result.StatusCode);
@@ -385,7 +385,7 @@ public class RecordControllerTests : IDisposable
         _mockBusiness.Setup(b => b.GetRecordsCountByDataSource(OrgId, ProjectId, DataSourceId, true))
                      .ReturnsAsync(42);
 
-        var result = (await _controller.GetRecordsCountByDataSource(OrgId, ProjectId, DataSourceId)).Result as OkObjectResult;
+        var result = (await _controller.GetRecordsCountByDataSource(OrgId, ProjectId, DataSourceId, true)).Result as OkObjectResult;
 
         Assert.NotNull(result);
         Assert.Equal(200, result.StatusCode);
@@ -400,7 +400,7 @@ public class RecordControllerTests : IDisposable
                      .ThrowsAsync(new Exception("db error"));
 
         var result = (await _controller.GetRecordsCountByDataSource(
-            OrgId, ProjectId, DataSourceId)).Result as ObjectResult;
+            OrgId, ProjectId, DataSourceId, true)).Result as ObjectResult;
 
         Assert.NotNull(result);
         Assert.Equal(500, result.StatusCode);
@@ -536,7 +536,7 @@ public class RecordControllerTests : IDisposable
                      .ReturnsAsync(expected);
 
         var result = (await _controller.BulkCreateRecords(
-            OrgId, ProjectId, DataSourceId, records: dtos)).Result as OkObjectResult;
+            OrgId, ProjectId, DataSourceId, records: dtos, null)).Result as OkObjectResult;
 
         Assert.NotNull(result);
         Assert.Equal(200, result.StatusCode);
@@ -552,7 +552,7 @@ public class RecordControllerTests : IDisposable
                      .ThrowsAsync(new Exception("db error"));
 
         var result = (await _controller.BulkCreateRecords(
-            OrgId, ProjectId, DataSourceId, records: new List<CreateRecordRequestDto>())).Result as ObjectResult;
+            OrgId, ProjectId, DataSourceId, records: new List<CreateRecordRequestDto>(), null)).Result as ObjectResult;
 
         Assert.NotNull(result);
         Assert.Equal(500, result.StatusCode);
