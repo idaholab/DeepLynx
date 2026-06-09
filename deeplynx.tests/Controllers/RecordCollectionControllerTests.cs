@@ -27,6 +27,7 @@ public class RecordCollectionControllerTests : IDisposable
 
     private const long OrgId = 1L;
     private const long ProjectId = 2L;
+    private static readonly long[] ProjectList = { 13L, 14L };
     private const long UserId = 10L;
     private const long CollectionId = 7L;
     private const long RecordCollectionId = 8L;
@@ -257,18 +258,12 @@ public class RecordCollectionControllerTests : IDisposable
     [Fact]
     public async Task AddRecordsToRecordCollection_Returns200_OnSuccess()
     {
-        var recordIds = new List<long> { RecordIdConst };
-        var request = new UpdateRecordCollectionRequestDto
-        {
-            RecordIds = recordIds
-        };
-
         _mockRecordCollectionBusiness.Setup(b => b.AddRecordsToRecordCollection(
                          UserId,
                          OrgId,
                          ProjectId,
                          CollectionId,
-                         It.Is<List<long>>(ids => ids.SequenceEqual(recordIds)),
+                         ProjectList,
                          false,
                          false,
                          false))
@@ -278,31 +273,26 @@ public class RecordCollectionControllerTests : IDisposable
             OrgId,
             ProjectId,
             CollectionId,
-            request) as OkObjectResult;
+            ProjectList) as OkObjectResult;
 
         Assert.NotNull(result);
         Assert.Equal(200, result.StatusCode);
-        Assert.Equal(true, result.Value);
+        Assert.Contains("Successfully added records", result.Value.ToString());
     }
 
     [Fact]
     public async Task AddRecordsToRecordCollection_Returns400_OnArgumentException()
     {
-        var request = new UpdateRecordCollectionRequestDto
-        {
-            RecordIds = new List<long> { RecordIdConst }
-        };
-
         _mockRecordCollectionBusiness.Setup(b => b.AddRecordsToRecordCollection(
                          It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(),
-                         It.IsAny<List<long>>(), It.IsAny<bool>(), It.IsAny<bool>(), It.IsAny<bool>()))
+                         It.IsAny<long[]>(), It.IsAny<bool>(), It.IsAny<bool>(), It.IsAny<bool>()))
                      .ThrowsAsync(new ArgumentException("invalid request"));
 
         var result = await _recordCollectionController.AddRecordsToRecordCollection(
             OrgId,
             ProjectId,
             CollectionId,
-            request) as BadRequestObjectResult;
+            ProjectList) as BadRequestObjectResult;
 
         Assert.NotNull(result);
         Assert.Equal(400, result.StatusCode);
@@ -312,21 +302,16 @@ public class RecordCollectionControllerTests : IDisposable
     [Fact]
     public async Task AddRecordsToRecordCollection_Returns404_OnKeyNotFoundException()
     {
-        var request = new UpdateRecordCollectionRequestDto
-        {
-            RecordIds = new List<long> { RecordIdConst }
-        };
-
         _mockRecordCollectionBusiness.Setup(b => b.AddRecordsToRecordCollection(
                          It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(),
-                         It.IsAny<List<long>>(), It.IsAny<bool>(), It.IsAny<bool>(), It.IsAny<bool>()))
+                         It.IsAny<long[]>(), It.IsAny<bool>(), It.IsAny<bool>(), It.IsAny<bool>()))
                      .ThrowsAsync(new KeyNotFoundException("record not found"));
 
         var result = await _recordCollectionController.AddRecordsToRecordCollection(
             OrgId,
             ProjectId,
             CollectionId,
-            request) as NotFoundObjectResult;
+            ProjectList) as NotFoundObjectResult;
 
         Assert.NotNull(result);
         Assert.Equal(404, result.StatusCode);
@@ -336,21 +321,16 @@ public class RecordCollectionControllerTests : IDisposable
     [Fact]
     public async Task AddRecordsToRecordCollection_Returns403_OnUnauthorizedAccessException()
     {
-        var request = new UpdateRecordCollectionRequestDto
-        {
-            RecordIds = new List<long> { RecordIdConst }
-        };
-
         _mockRecordCollectionBusiness.Setup(b => b.AddRecordsToRecordCollection(
                          It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(),
-                         It.IsAny<List<long>>(), It.IsAny<bool>(), It.IsAny<bool>(), It.IsAny<bool>()))
+                         It.IsAny<long[]>(), It.IsAny<bool>(), It.IsAny<bool>(), It.IsAny<bool>()))
                      .ThrowsAsync(new UnauthorizedAccessException("not allowed"));
 
         var result = await _recordCollectionController.AddRecordsToRecordCollection(
             OrgId,
             ProjectId,
             CollectionId,
-            request) as ObjectResult;
+            ProjectList) as ObjectResult;
 
         Assert.NotNull(result);
         Assert.Equal(StatusCodes.Status403Forbidden, result.StatusCode);
@@ -360,21 +340,16 @@ public class RecordCollectionControllerTests : IDisposable
     [Fact]
     public async Task AddRecordsToRecordCollection_Returns500_OnUnexpectedException()
     {
-        var request = new UpdateRecordCollectionRequestDto
-        {
-            RecordIds = new List<long> { RecordIdConst }
-        };
-
         _mockRecordCollectionBusiness.Setup(b => b.AddRecordsToRecordCollection(
                          It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(),
-                         It.IsAny<List<long>>(), It.IsAny<bool>(), It.IsAny<bool>(), It.IsAny<bool>()))
+                         It.IsAny<long[]>(), It.IsAny<bool>(), It.IsAny<bool>(), It.IsAny<bool>()))
                      .ThrowsAsync(new Exception("db error"));
 
         var result = await _recordCollectionController.AddRecordsToRecordCollection(
             OrgId,
             ProjectId,
             CollectionId,
-            request) as ObjectResult;
+            ProjectList) as ObjectResult;
 
         Assert.NotNull(result);
         Assert.Equal(500, result.StatusCode);
@@ -389,18 +364,12 @@ public class RecordCollectionControllerTests : IDisposable
         UserContextStorage.IsOrgAdmin = true;
         UserContextStorage.IsProjectAdmin = true;
 
-        var recordIds = new List<long> { RecordIdConst };
-        var request = new UpdateRecordCollectionRequestDto
-        {
-            RecordIds = recordIds
-        };
-
         _mockRecordCollectionBusiness.Setup(b => b.AddRecordsToRecordCollection(
                          UserId,
                          OrgId,
                          ProjectId,
                          CollectionId,
-                         It.Is<List<long>>(ids => ids.SequenceEqual(recordIds)),
+                         ProjectList,
                          true,
                          true,
                          true))
@@ -410,14 +379,14 @@ public class RecordCollectionControllerTests : IDisposable
             OrgId,
             ProjectId,
             CollectionId,
-            request);
+            ProjectList);
 
         _mockRecordCollectionBusiness.Verify(b => b.AddRecordsToRecordCollection(
             UserId,
             OrgId,
             ProjectId,
             CollectionId,
-            It.Is<List<long>>(ids => ids.SequenceEqual(recordIds)),
+            ProjectList,
             true,
             true,
             true), Times.Once);
@@ -434,18 +403,12 @@ public class RecordCollectionControllerTests : IDisposable
     [Fact]
     public async Task RemoveRecordsFromRecordCollection_Returns200_OnSuccess()
     {
-        var recordIds = new List<long> { RecordIdConst };
-        var request = new UpdateRecordCollectionRequestDto
-        {
-            RecordIds = recordIds
-        };
-
         _mockRecordCollectionBusiness.Setup(b => b.RemoveRecordsFromRecordCollection(
                          UserId,
                          OrgId,
                          ProjectId,
                          CollectionId,
-                         It.Is<List<long>>(ids => ids.SequenceEqual(recordIds)),
+                         ProjectList,
                          false,
                          false,
                          false))
@@ -455,31 +418,26 @@ public class RecordCollectionControllerTests : IDisposable
             OrgId,
             ProjectId,
             CollectionId,
-            request) as OkObjectResult;
+            ProjectList) as OkObjectResult;
 
         Assert.NotNull(result);
         Assert.Equal(200, result.StatusCode);
-        Assert.Equal(true, result.Value);
+        Assert.Contains("Successfully removed records", result.Value.ToString());
     }
 
     [Fact]
     public async Task RemoveRecordsFromRecordCollection_Returns400_OnArgumentException()
     {
-        var request = new UpdateRecordCollectionRequestDto
-        {
-            RecordIds = new List<long> { RecordIdConst }
-        };
-
         _mockRecordCollectionBusiness.Setup(b => b.RemoveRecordsFromRecordCollection(
                          It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(),
-                         It.IsAny<List<long>>(), It.IsAny<bool>(), It.IsAny<bool>(), It.IsAny<bool>()))
+                         It.IsAny<long[]>(), It.IsAny<bool>(), It.IsAny<bool>(), It.IsAny<bool>()))
                      .ThrowsAsync(new ArgumentException("invalid request"));
 
         var result = await _recordCollectionController.RemoveRecordsFromRecordCollection(
             OrgId,
             ProjectId,
             CollectionId,
-            request) as BadRequestObjectResult;
+            ProjectList) as BadRequestObjectResult;
 
         Assert.NotNull(result);
         Assert.Equal(400, result.StatusCode);
@@ -489,21 +447,16 @@ public class RecordCollectionControllerTests : IDisposable
     [Fact]
     public async Task RemoveRecordsFromRecordCollection_Returns404_OnKeyNotFoundException()
     {
-        var request = new UpdateRecordCollectionRequestDto
-        {
-            RecordIds = new List<long> { RecordIdConst }
-        };
-
         _mockRecordCollectionBusiness.Setup(b => b.RemoveRecordsFromRecordCollection(
                          It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(),
-                         It.IsAny<List<long>>(), It.IsAny<bool>(), It.IsAny<bool>(), It.IsAny<bool>()))
+                         It.IsAny<long[]>(), It.IsAny<bool>(), It.IsAny<bool>(), It.IsAny<bool>()))
                      .ThrowsAsync(new KeyNotFoundException("record not found"));
 
         var result = await _recordCollectionController.RemoveRecordsFromRecordCollection(
             OrgId,
             ProjectId,
             CollectionId,
-            request) as NotFoundObjectResult;
+            ProjectList) as NotFoundObjectResult;
 
         Assert.NotNull(result);
         Assert.Equal(404, result.StatusCode);
@@ -513,21 +466,16 @@ public class RecordCollectionControllerTests : IDisposable
     [Fact]
     public async Task RemoveRecordsFromRecordCollection_Returns403_OnUnauthorizedAccessException()
     {
-        var request = new UpdateRecordCollectionRequestDto
-        {
-            RecordIds = new List<long> { RecordIdConst }
-        };
-
         _mockRecordCollectionBusiness.Setup(b => b.RemoveRecordsFromRecordCollection(
                          It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(),
-                         It.IsAny<List<long>>(), It.IsAny<bool>(), It.IsAny<bool>(), It.IsAny<bool>()))
+                         It.IsAny<long[]>(), It.IsAny<bool>(), It.IsAny<bool>(), It.IsAny<bool>()))
                      .ThrowsAsync(new UnauthorizedAccessException("not allowed"));
 
         var result = await _recordCollectionController.RemoveRecordsFromRecordCollection(
             OrgId,
             ProjectId,
             CollectionId,
-            request) as ObjectResult;
+            ProjectList) as ObjectResult;
 
         Assert.NotNull(result);
         Assert.Equal(StatusCodes.Status403Forbidden, result.StatusCode);
@@ -544,14 +492,14 @@ public class RecordCollectionControllerTests : IDisposable
 
         _mockRecordCollectionBusiness.Setup(b => b.RemoveRecordsFromRecordCollection(
                          It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(),
-                         It.IsAny<List<long>>(), It.IsAny<bool>(), It.IsAny<bool>(), It.IsAny<bool>()))
+                         It.IsAny<long[]>(), It.IsAny<bool>(), It.IsAny<bool>(), It.IsAny<bool>()))
                      .ThrowsAsync(new Exception("db error"));
 
         var result = await _recordCollectionController.RemoveRecordsFromRecordCollection(
             OrgId,
             ProjectId,
             CollectionId,
-            request) as ObjectResult;
+            ProjectList) as ObjectResult;
 
         Assert.NotNull(result);
         Assert.Equal(500, result.StatusCode);
@@ -577,7 +525,7 @@ public class RecordCollectionControllerTests : IDisposable
                          OrgId,
                          ProjectId,
                          CollectionId,
-                         It.Is<List<long>>(ids => ids.SequenceEqual(recordIds)),
+                         ProjectList,
                          true,
                          true,
                          true))
@@ -587,14 +535,14 @@ public class RecordCollectionControllerTests : IDisposable
             OrgId,
             ProjectId,
             CollectionId,
-            request);
+            ProjectList);
 
         _mockRecordCollectionBusiness.Verify(b => b.RemoveRecordsFromRecordCollection(
             UserId,
             OrgId,
             ProjectId,
             CollectionId,
-            It.Is<List<long>>(ids => ids.SequenceEqual(recordIds)),
+            ProjectList,
             true,
             true,
             true), Times.Once);
@@ -615,12 +563,13 @@ public class RecordCollectionControllerTests : IDisposable
         var expected = new RecordCollectionResponseDto();
 
         _mockRecordCollectionBusiness.Setup(b => b.CreateRecordCollection(
-                         UserId, OrgId, ProjectId, request))
+                         UserId, OrgId, ProjectId, null, request))
                      .ReturnsAsync(expected);
 
         var result = (await _recordCollectionController.CreateRecordCollection(
             OrgId,
             ProjectId,
+            null,
             request)).Result as OkObjectResult;
 
         Assert.NotNull(result);
@@ -634,13 +583,14 @@ public class RecordCollectionControllerTests : IDisposable
         var request = new CreateRecordCollectionRequestDto();
 
         _mockRecordCollectionBusiness.Setup(b => b.CreateRecordCollection(
-                         It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(),
+                         It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(), It.IsAny<List<long>>(),
                          It.IsAny<CreateRecordCollectionRequestDto>()))
                      .ThrowsAsync(new Exception("db error"));
 
         var result = (await _recordCollectionController.CreateRecordCollection(
             OrgId,
             ProjectId,
+            It.IsAny<List<long>>(),
             request)).Result as ObjectResult;
 
         Assert.NotNull(result);
@@ -656,16 +606,17 @@ public class RecordCollectionControllerTests : IDisposable
         var expected = new RecordCollectionResponseDto();
 
         _mockRecordCollectionBusiness.Setup(b => b.CreateRecordCollection(
-                         UserId, OrgId, ProjectId, request))
+                         UserId, OrgId, ProjectId, null, request))
                      .ReturnsAsync(expected);
 
         await _recordCollectionController.CreateRecordCollection(
             OrgId,
             ProjectId,
+            null,
             request);
 
         _mockRecordCollectionBusiness.Verify(b => b.CreateRecordCollection(
-            UserId, OrgId, ProjectId, request), Times.Once);
+            UserId, OrgId, ProjectId, null, request), Times.Once);
     }
 
     #endregion
@@ -708,7 +659,7 @@ public class RecordCollectionControllerTests : IDisposable
         Assert.NotNull(result);
         Assert.Equal(500, result.StatusCode);
         Assert.IsType<string>(result.Value);
-        Assert.Contains($"An error occurred while deleting record {RecordCollectionId}", result.Value.ToString());
+        Assert.Contains("An error occurred while deleting record collection", result.Value.ToString());
     }
 
     [Fact]
@@ -752,7 +703,7 @@ public class RecordCollectionControllerTests : IDisposable
             "hideArchived");
 
         AssertHasHttpAttribute(method, "HttpGetAttribute");
-        AssertHasAuthAttribute(method, "read", "record");
+        AssertHasAuthAttribute(method, "read", "record_collection");
         AssertHasSensitivityAttribute(method, "read record");
     }
 
@@ -763,11 +714,11 @@ public class RecordCollectionControllerTests : IDisposable
             nameof(RecordCollectionController.GetRecordsInRecordCollection),
             "organizationId",
             "projectId",
-            "collectionId",
+            "recordCollectionId",
             "hideArchived");
 
         AssertHasHttpAttribute(method, "HttpGetAttribute");
-        AssertHasAuthAttribute(method, "read", "record");
+        AssertHasAuthAttribute(method, "read", "record_collection");
         AssertHasSensitivityAttribute(method, "read record");
     }
 
@@ -778,12 +729,12 @@ public class RecordCollectionControllerTests : IDisposable
             nameof(RecordCollectionController.AddRecordsToRecordCollection),
             "organizationId",
             "projectId",
-            "collectionId",
-            "recordCollectionDto");
+            "recordCollectionId",
+            "recordIds");
 
         AssertHasHttpAttribute(method, "HttpPostAttribute");
-        AssertHasAuthAttribute(method, "update", "record");
-        AssertHasSensitivityAttribute(method, "update record");
+        AssertHasAuthAttribute(method, "update", "record_collection");
+        AssertHasSensitivityAttribute(method, "read record");
     }
 
     [Fact]
@@ -793,12 +744,12 @@ public class RecordCollectionControllerTests : IDisposable
             nameof(RecordCollectionController.RemoveRecordsFromRecordCollection),
             "organizationId",
             "projectId",
-            "collectionId",
-            "recordCollectionDto");
+            "recordCollectionId",
+            "recordIds");
 
-        AssertHasHttpAttribute(method, "HttpDeleteAttribute");
-        AssertHasAuthAttribute(method, "update", "record");
-        AssertHasSensitivityAttribute(method, "update record");
+        AssertHasHttpAttribute(method, "HttpPutAttribute");
+        AssertHasAuthAttribute(method, "update", "record_collection");
+        AssertHasSensitivityAttribute(method, "read record");
     }
 
     [Fact]
@@ -808,11 +759,12 @@ public class RecordCollectionControllerTests : IDisposable
             nameof(RecordCollectionController.CreateRecordCollection),
             "organizationId",
             "projectId",
+            "sensitivityLabelIds",
             "dto");
 
         AssertHasHttpAttribute(method, "HttpPostAttribute");
-        AssertHasAuthAttribute(method, "write", "record");
-        AssertHasSensitivityAttribute(method, "write record");
+        AssertHasAuthAttribute(method, "write", "record_collection");
+        AssertHasSensitivityAttribute(method, "read record");
     }
 
     [Fact]
@@ -825,8 +777,8 @@ public class RecordCollectionControllerTests : IDisposable
             "recordCollectionId");
 
         AssertHasHttpAttribute(method, "HttpDeleteAttribute");
-        AssertHasAuthAttribute(method, "write", "record");
-        AssertHasSensitivityAttribute(method, "delete record");
+        AssertHasAuthAttribute(method, "write", "record_collection");
+        AssertHasSensitivityAttribute(method, "read record");
     }
 
     #endregion
