@@ -103,7 +103,7 @@ public class PermissionProjectController : ControllerBase
     /// <returns>The created permission</returns>
     [HttpPost(Name = "api_create_project_permission")]
     [Auth("write", "permission")]
-    [CleanPermissionValidationErrors]
+    // [CleanPermissionValidationErrors]
     public async Task<ActionResult<PermissionResponseDto>> CreatePermission(
         long organizationId,
         long projectId,
