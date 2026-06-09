@@ -525,7 +525,7 @@ public class FileBusiness
             var fileBusiness = _factory.CreateFileBusiness(objectStorage.Type);
 
             // for azure, try batch operation first
-            if (objectStorage.Type == "azure" && fileBusiness is FileAzureBusiness azureBusiness)
+            if (objectStorage.Type == "azure_object" && fileBusiness is FileAzureBusiness azureBusiness)
             {
                 var uris = storageGroup.Select(r => r.Uri).ToList();
                 var sizes = await azureBusiness.GetFileSizesBatch(uris, objectStorage.Config);
