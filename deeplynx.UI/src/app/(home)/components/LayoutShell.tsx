@@ -46,7 +46,7 @@ const LayoutShell = ({ children }: { children: ReactNode }) => {
   const { data: session } = useSafeSession();
   const { user } = useRBAC();
   const { organization, setOrganization } = useOrganizationSession();
-  const { project } = useProjectSession();
+  const { project, clearProject } = useProjectSession();
 
   const [organizations, setOrganizations] = useState<OrganizationResponseDto[]>(
     [],
@@ -131,10 +131,13 @@ const LayoutShell = ({ children }: { children: ReactNode }) => {
   };
 
   const handleOrganizationSwitch = (org: OrganizationResponseDto) => {
+    clearProject();
+
     setOrganization({
       organizationId: org.id,
       organizationName: org.name,
       banner: org.banner ?? null,
+      themeName: org.theme ?? "default",
     });
 
     router.push("/");
@@ -155,8 +158,8 @@ const LayoutShell = ({ children }: { children: ReactNode }) => {
     <div className="flex flex-col min-h-screen bg-base-100 text-base-content">
       {/* Top Banner */}
       <TopBanner />
-      {/* Banner/Header */}
-      <header className="bg-[var(--base-400)] text-primary-content flex justify-between items-center gap-2 px-3 sm:px-5 py-2 sm:py-3 z-50 fixed w-full top-6">
+      {/* Header */}
+      <header className="app-header text-neutral-content flex justify-between items-center gap-2 px-3 sm:px-5 py-2 sm:py-3 z-50 fixed w-full top-6">
         {/* Organization Switcher */}
         <div className="flex items-center gap-2 min-w-0">
           <button
@@ -226,10 +229,11 @@ const LayoutShell = ({ children }: { children: ReactNode }) => {
                     <li key={org.id} className="w-full">
                       <a
                         onClick={() => handleOrganizationSwitch(org)}
-                        className={`flex items-center gap-2 w-full max-w-full ${organization?.organizationId === org.id
-                          ? "active bg-info/60"
-                          : ""
-                          }`}
+                        className={`flex items-center gap-2 w-full max-w-full ${
+                          organization?.organizationId === org.id
+                            ? "active bg-info/60"
+                            : ""
+                        }`}
                       >
                         <div className="min-w-0 flex-1 overflow-hidden">
                           <div className=" font-medium truncate">
@@ -273,7 +277,7 @@ const LayoutShell = ({ children }: { children: ReactNode }) => {
         </div>
       </header>
       {/* Page Content */}
-      <div className="flex h-full z-0 mt-6">
+      <div className="flex h-full z-0 mt-6 w-full overflow-x-auto">
         {isMobileNavOpen && (
           <button
             type="button"
@@ -284,17 +288,18 @@ const LayoutShell = ({ children }: { children: ReactNode }) => {
         )}
         {/* Side Menu */}
         <div
-          className={`fixed top-20 bottom-0 hidden lg:flex ${isUserDropdownOpen ? "z-[60]" : "z-50"
-            }`}
+          className={`fixed top-20 bottom-0 hidden lg:flex ${
+            isUserDropdownOpen ? "z-[70]" : "z-[55]"
+          }`}
         >
           <aside
             className={
-              "h-full shadow-xl w-18 login text-primary-content p-4 transition-all duration-300 flex flex-col"
+              "h-full shadow-xl w-18 app-header-inverted text-primary-content p-4 transition-all duration-300 flex flex-col"
             }
           >
             <ul className="mt-20 flex-grow">
               <li>
-                <Link href={"/"}>
+                <Link href={"/"} onClick={clearProject}>
                   <GlobeAmericasIcon className="size-10" />
                 </Link>
               </li>
@@ -435,8 +440,9 @@ const LayoutShell = ({ children }: { children: ReactNode }) => {
           onMobileClose={() => setIsMobileNavOpen(false)}
         />
         <main
-          className={`transition-all duration-300 w-full mt-20 ml-0 ${isMenuCollapsed ? "lg:ml-40" : "lg:ml-82"
-            }`}
+          className={`transition-all duration-300 min-w-[750px] flex-1 w-full mt-20 ml-0 ${
+            isMenuCollapsed ? "lg:ml-40" : "lg:ml-82"
+          }`}
         >
           {/* Organization Banner */}
           <div className="sticky top-25 z-20">

@@ -78,7 +78,8 @@ public class OrganizationBusinessTests : IntegrationTestBase
             Description = "Test Description",
             LastUpdatedAt = now,
             LastUpdatedBy = uid,
-            IsArchived = false
+            IsArchived = false,
+            Theme = "nord"
         };
 
         // Assert
@@ -88,6 +89,7 @@ public class OrganizationBusinessTests : IntegrationTestBase
         Assert.Equal(now, dto.LastUpdatedAt);
         Assert.Equal(uid, dto.LastUpdatedBy);
         Assert.False(dto.IsArchived);
+        Assert.Equal("nord", dto.Theme);
     }
 
     #endregion
@@ -280,6 +282,7 @@ public class OrganizationBusinessTests : IntegrationTestBase
         Assert.Equal(uid, result.LastUpdatedBy);
         Assert.Equal(dto.Banner, result.Banner);
         Assert.True(result.RequireSensitivityLabel);
+        Assert.Equal("default", result.Theme);
 
         // verify org was actually created in database
         var createdOrg = await Context.Organizations.FindAsync(result.Id);
@@ -854,6 +857,24 @@ public class OrganizationBusinessTests : IntegrationTestBase
         Assert.NotNull(updateResult);
         Assert.NotNull(updateResult.RequireSensitivityLabel);
         Assert.True(updateResult.RequireSensitivityLabel);
+    }
+
+    [Fact]
+    public async Task UpdateOrganization_Success_UpdateTheme()
+    {
+        var dto = new UpdateOrganizationRequestDto
+        {
+            Theme = OrganizationTheme.Nord
+        };
+
+        var result = await _organizationBusiness.UpdateOrganization(uid, oid, dto);
+
+        Assert.NotNull(result);
+        Assert.Equal("nord", result.Theme);
+
+        var savedOrg = await Context.Organizations.FindAsync(oid);
+        Assert.NotNull(savedOrg);
+        Assert.Equal("nord", savedOrg!.Theme);
     }
 
     #endregion

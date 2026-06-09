@@ -1359,6 +1359,12 @@ namespace deeplynx.datalayer.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("require_sensitivity_label");
 
+                    b.Property<string>("ThemeName")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("theme");
+
                     b.HasKey("Id")
                         .HasName("organization_pkey");
 

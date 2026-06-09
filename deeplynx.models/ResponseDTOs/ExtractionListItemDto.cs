@@ -9,4 +9,6 @@ public class ExtractionListItemDto
     [JsonPropertyName("mode")] public string? Mode { get; set; }
     [JsonPropertyName("created_by")] public long? CreatedBy { get; set; }
     [JsonPropertyName("failure_message")] public string? FailureMessage { get; set; }
+
+    [JsonPropertyName("project_id")] public long? ProjectId { get; set; }
 }

@@ -7,6 +7,7 @@ import React, {
   useEffect,
   useState,
   useCallback,
+  useRef,
 } from "react";
 import type { ReactNode, Context } from "react";
 
@@ -43,6 +44,7 @@ export const ProjectSessionProvider = ({
 }): React.JSX.Element => {
   const [project, setProjectState] = useState<ProjectSession | null>(null);
   const [hasLoaded, setHasLoaded] = useState(false);
+  const isClearingProjectRef = useRef(false);
 
   useEffect(() => {
     const storedLocal = localStorage.getItem("projectSession");
@@ -69,6 +71,7 @@ export const ProjectSessionProvider = ({
   }, []);
 
   const setProject = useCallback((proj: ProjectSession) => {
+    if (isClearingProjectRef.current) return;
     setProjectState(proj);
     const serialized = JSON.stringify(proj);
 
@@ -81,9 +84,13 @@ export const ProjectSessionProvider = ({
   }, []);
 
   const clearProject = useCallback(() => {
+    isClearingProjectRef.current = true;
     setProjectState(null);
     localStorage.removeItem("projectSession");
     document.cookie = "projectSession=; path=/; max-age=0";
+    setTimeout(() => {
+      isClearingProjectRef.current = false;
+    }, 250);
   }, []);
 
   return (

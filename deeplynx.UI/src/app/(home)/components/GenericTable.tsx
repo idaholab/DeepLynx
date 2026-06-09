@@ -204,7 +204,7 @@ const GenericTable = <T extends object>({
           <button
             key={i}
             className={`join-item btn ${
-              currentPage === i ? "bg-dynamic-blue text-white" : ""
+              currentPage === i ? "bg-primary text-primary-content" : ""
             }`}
             onClick={() => handlePageClick(i)}
           >
@@ -230,7 +230,7 @@ const GenericTable = <T extends object>({
           <button
             key={i}
             className={`join-item btn ${
-              currentPage === i ? "bg-dynamic-blue text-white" : ""
+              currentPage === i ? "bg-primary text-primary-content" : ""
             }`}
             onClick={() => handlePageClick(i)}
           >
@@ -248,7 +248,7 @@ const GenericTable = <T extends object>({
         pagination.push(
           <button
             key={currentPage}
-            className="join-item btn bg-dynamic-blue text-white"
+            className="join-item btn bg-primary text-primary-content"
             onClick={() => handlePageClick(currentPage)}
           >
             {currentPage}
@@ -272,7 +272,7 @@ const GenericTable = <T extends object>({
           <button
             key={i}
             className={`join-item btn ${
-              currentPage === i ? "bg-dynamic-blue text-white" : ""
+              currentPage === i ? "bg-primary text-primary-content" : ""
             }`}
             onClick={() => handlePageClick(i)}
           >
@@ -315,7 +315,7 @@ const GenericTable = <T extends object>({
           key={i}
           className={`join-item btn ${
             currentDisplayedRows === pageLengthOptions[i]
-              ? "bg-dynamic-blue text-white"
+              ? "bg-primary text-primary-content"
               : ""
           }`}
           onClick={() => handleRowLengthClick(pageLengthOptions[i])}
@@ -366,7 +366,7 @@ const GenericTable = <T extends object>({
                   {Object.keys(filterValues || {}).filter(
                     (k) => filterValues?.[k],
                   ).length > 0 && (
-                    <span className="badge bg-dynamic-blue text-white badge-sm border-none">
+                    <span className="badge bg-primary text-primary-content badge-sm border-none">
                       {
                         Object.keys(filterValues || {}).filter(
                           (k) => filterValues?.[k],
@@ -418,7 +418,7 @@ const GenericTable = <T extends object>({
                                   [filter.key]: e.target.value,
                                 })
                               }
-                              className="input input-md mx-1 bg-base-100 border-base-300 focus:border-dynamic-blue focus:outline-none"
+                              className="input input-md mx-1 bg-base-100 border-base-300 focus:border-primary focus:outline-none"
                               id={filter.key}
                             />
                           </div>
@@ -441,7 +441,7 @@ const GenericTable = <T extends object>({
                           onFilterChange?.(tempFilters);
                           setShowFilters(false);
                         }}
-                        className="btn bg-dynamic-blue text-white border-none hover:bg-dynamic-blue/60 btn-sm flex-1"
+                        className="btn bg-primary text-primary-content border-none hover:bg-primary/80 btn-sm flex-1"
                       >
                         Apply Filters
                       </button>
