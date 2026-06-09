@@ -646,6 +646,16 @@ namespace deeplynx.datalayer.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("record_id");
 
+                    b.Property<string>("ChunkHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("chunk_hash");
+
+                    b.Property<string>("EmbeddingHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("embedding_hash");
+
                     b.Property<string>("TextChunk")
                         .IsRequired()
                         .HasColumnType("text")
@@ -1770,6 +1780,11 @@ namespace deeplynx.datalayer.Migrations
                     b.Property<bool>("Embedded")
                         .HasColumnType("boolean")
                         .HasColumnName("embedded");
+
+                    b.Property<string>("NormalizedContentHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("normalized_content_hash");
 
                     b.Property<long?>("ExtractionId")
                         .HasColumnType("bigint")
