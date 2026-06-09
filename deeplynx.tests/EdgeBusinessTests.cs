@@ -1315,8 +1315,8 @@ public class EdgeBusinessTests : IntegrationTestBase
         Assert.NotNull(origin);
         Assert.NotNull(destination);
 
-        origin.Properties = "{\"original_id\":\"parsed-record-001\"}";
-        destination.Properties = "{\"original_id\":\"parsed-record-002\"}";
+        origin.OriginalId = "parsed-record-001";
+        destination.OriginalId = "parsed-record-002";
 
         Context.Records.Update(origin);
         Context.Records.Update(destination);
