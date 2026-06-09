@@ -12,8 +12,8 @@ using deeplynx.datalayer.Models;
 namespace deeplynx.datalayer.Migrations
 {
     [DbContext(typeof(DeeplynxContext))]
-    [Migration("20260608203128_NowSupportingUserTypes")]
-    partial class NowSupportingUserTypes
+    [Migration("20260609200938_UserTypes")]
+    partial class UserTypes
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -2412,10 +2412,6 @@ namespace deeplynx.datalayer.Migrations
                         .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("account_type");
-
-                    b.Property<long?>("CreatedByUserId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("created_by_user_id");
 
                     b.Property<string>("Email")
                         .HasColumnType("text")

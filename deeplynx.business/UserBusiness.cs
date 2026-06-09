@@ -157,12 +157,11 @@ public class UserBusiness : IUserBusiness
     ///     Creates a new user based on the data transfer object supplied.
     /// </summary>
     /// <param name="dto">A data transfer object with details on the new user to be created.</param>
-    /// <param name="currentUserId">The ID of the user making the create request.</param>
     /// <param name="isSysAdmin">Optional Boolean Value indicating that the user is a system admin.</param>
     /// <param name="isOrgAdmin">Optional Boolean Value indicating that the user is an organization admin.</param>
     /// <param name="isProjectAdmin">Optional Boolean Value indicating that the user is a project admin.</param>
     /// <returns>The new user which was just created.</returns>
-    public async Task<UserResponseDto> CreateUser(CreateUserRequestDto dto, long? currentUserId, bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false)
+    public async Task<UserResponseDto> CreateUser(CreateUserRequestDto dto, bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false)
     {
         // TODO: adjusting is_sys_admin is currently disabled. Enable once route permission protections are in place
         
@@ -173,8 +172,6 @@ public class UserBusiness : IUserBusiness
         if (dto.AccountType is null or "human")
             humanAccountType = true;
         
-        // created by user is only populated for non-human accounts
-        long? createdByUser = null;
         if (!humanAccountType)
         {
             // service accounts are an admin feature only and are limited to project 
@@ -188,8 +185,6 @@ public class UserBusiness : IUserBusiness
             var nameExists = await _context.Users.AnyAsync(p => p.Name == dto.Name);
             if (nameExists)
                 throw new InvalidOperationException($"Name must be unique for {dto.AccountType} accounts");
-
-            createdByUser = currentUserId;
         }
         
         // require email for human account types
@@ -211,7 +206,6 @@ public class UserBusiness : IUserBusiness
             IsActive = dto.IsActive ?? false,
             IsArchived = dto.IsArchived ?? false,
             AccountType = dto.AccountType ?? "human",
-            CreatedByUserId = createdByUser
         };
 
         _context.Users.Add(user);
@@ -417,10 +411,11 @@ public class UserBusiness : IUserBusiness
             Name = user.Name,
             Email = user.Email,
             Username = user.Username,
+            AccountType = user.AccountType,
             IsSysAdmin = user.IsSysAdmin,
             IsArchived = user.IsArchived,
             IsActive = user.IsActive,
-            LastLogin = user.LastLogin
+            LastLogin = user.LastLogin,
         };
     }
 

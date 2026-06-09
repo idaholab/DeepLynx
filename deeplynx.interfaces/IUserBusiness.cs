@@ -10,9 +10,8 @@ public interface IUserBusiness
     Task<UserResponseDto> GetUser(long userId);
     Task<UserAdminInfoDto> GetUserAdminInfo(long userId, long? organizationId = null, long? projectId = null);
     Task<UserResponseDto> GetLocalDevUser();
-
-    Task<UserResponseDto> CreateUser(CreateUserRequestDto dto,
-        long? currentUserId, bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false);
+    Task<UserResponseDto> CreateUser(CreateUserRequestDto dto, 
+        bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false);
     Task<UserResponseDto> UpdateUser(long userId, UpdateUserRequestDto dto);
     Task<bool> DeleteUser(long userId);
     Task<bool> ArchiveUser(long userId);

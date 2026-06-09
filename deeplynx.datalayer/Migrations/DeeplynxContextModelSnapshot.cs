@@ -2410,10 +2410,6 @@ namespace deeplynx.datalayer.Migrations
                         .HasColumnType("text")
                         .HasColumnName("account_type");
 
-                    b.Property<long?>("CreatedByUserId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("created_by_user_id");
-
                     b.Property<string>("Email")
                         .HasColumnType("text")
                         .HasColumnName("email");

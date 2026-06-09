@@ -5,7 +5,7 @@
 namespace deeplynx.datalayer.Migrations
 {
     /// <inheritdoc />
-    public partial class NowSupportingUserTypes : Migration
+    public partial class UserTypes : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -26,13 +26,6 @@ namespace deeplynx.datalayer.Migrations
                 type: "text",
                 nullable: false,
                 defaultValue: "");
-
-            migrationBuilder.AddColumn<long>(
-                name: "created_by_user_id",
-                schema: "deeplynx",
-                table: "users",
-                type: "bigint",
-                nullable: true);
             
             migrationBuilder.Sql("UPDATE deeplynx.users SET account_type = 'human'");
         }
@@ -42,11 +35,6 @@ namespace deeplynx.datalayer.Migrations
         {
             migrationBuilder.DropColumn(
                 name: "account_type",
-                schema: "deeplynx",
-                table: "users");
-
-            migrationBuilder.DropColumn(
-                name: "created_by_user_id",
                 schema: "deeplynx",
                 table: "users");
 

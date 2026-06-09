@@ -39,10 +39,7 @@ public partial class User
 
     [Column("account_type")]
     public string AccountType { get; set; }
-
-    [Column("created_by_user_id")]
-    public long? CreatedByUserId { get; set; }
-
+    
     [InverseProperty("User")]
     public virtual ICollection<OrganizationUser> OrganizationUsers { get; set; } = new List<OrganizationUser>();
 
