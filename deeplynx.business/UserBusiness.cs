@@ -157,20 +157,61 @@ public class UserBusiness : IUserBusiness
     ///     Creates a new user based on the data transfer object supplied.
     /// </summary>
     /// <param name="dto">A data transfer object with details on the new user to be created.</param>
+    /// <param name="currentUserId">The ID of the user making the create request.</param>
+    /// <param name="isSysAdmin">Optional Boolean Value indicating that the user is a system admin.</param>
+    /// <param name="isOrgAdmin">Optional Boolean Value indicating that the user is an organization admin.</param>
+    /// <param name="isProjectAdmin">Optional Boolean Value indicating that the user is a project admin.</param>
     /// <returns>The new user which was just created.</returns>
-    public async Task<UserResponseDto> CreateUser(CreateUserRequestDto dto)
+    public async Task<UserResponseDto> CreateUser(CreateUserRequestDto dto, long? currentUserId, bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false)
     {
         // TODO: adjusting is_sys_admin is currently disabled. Enable once route permission protections are in place
-        var otherUserHasEmail = await _context.Users.AnyAsync(u => u.Email.ToLower() == dto.Email.ToLower());
-        if (otherUserHasEmail) throw new ArgumentException("User with email already exists");
+        
+        // if not specified account types will always be human
+        bool humanAccountType = false;
+        var isAdmin = isSysAdmin || isOrgAdmin || isProjectAdmin;
+        
+        if (dto.AccountType is null or "human")
+            humanAccountType = true;
+        
+        // created by user is only populated for non-human accounts
+        long? createdByUser = null;
+        if (!humanAccountType)
+        {
+            // service accounts are an admin feature only and are limited to project 
+            if (dto.AccountType == "service" && !isAdmin)
+                throw new UnauthorizedAccessException("Unauthorized: Only Admins can create service accounts");
+            // test accounts are a sysAdmin feature only
+            if (dto.AccountType == "test" && !isSysAdmin)
+                throw new UnauthorizedAccessException("Unauthorized: Only SysAdmins can create test accounts");
+            
+            // for non-human accounts Name must be unique
+            var nameExists = await _context.Users.AnyAsync(p => p.Name == dto.Name);
+            if (nameExists)
+                throw new InvalidOperationException($"Name must be unique for {dto.AccountType} accounts");
 
+            createdByUser = currentUserId;
+        }
+        
+        // require email for human account types
+        if (humanAccountType && dto.Email is null)
+            throw new ArgumentException("Email is required for human accounts");
+        
+        // verify email is unique only with human accounts
+        if (humanAccountType)
+        {
+           var otherUserHasEmail = await _context.Users.AnyAsync(u => u.Email.ToLower() == dto.Email.ToLower());
+           if (otherUserHasEmail) throw new ArgumentException("User with email already exists"); 
+        }
+        
         var user = new User
         {
             Name = dto.Name,
             Email = dto.Email,
             Username = dto.Username,
             IsActive = dto.IsActive ?? false,
-            IsArchived = dto.IsArchived ?? false
+            IsArchived = dto.IsArchived ?? false,
+            AccountType = dto.AccountType ?? "human",
+            CreatedByUserId = createdByUser
         };
 
         _context.Users.Add(user);
@@ -182,10 +223,11 @@ public class UserBusiness : IUserBusiness
             Name = user.Name,
             Username = user.Username,
             Email = user.Email,
+            AccountType = user.AccountType,
             IsSysAdmin = user.IsSysAdmin,
             IsArchived = user.IsArchived,
             IsActive = user.IsActive,
-            LastLogin = user.LastLogin
+            LastLogin = user.LastLogin,
         };
     }
 
