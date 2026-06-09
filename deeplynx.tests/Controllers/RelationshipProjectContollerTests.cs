@@ -1,0 +1,895 @@
+using deeplynx.api.Controllers;
+using deeplynx.datalayer.Models;
+using deeplynx.helpers.Context;
+using deeplynx.interfaces;
+using deeplynx.models;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
+using Moq;
+using Org.BouncyCastle.Crypto.Engines;
+
+namespace deeplynx.tests.Controllers;
+
+[Collection("Test Suite Collection")]
+public class RelationshipProjectControllerTests : IDisposable
+{
+    private readonly Mock<IRelationshipBusiness> _mockRelationshipBusiness;
+    private readonly Mock<ILogger<RelationshipProjectController>> _mockLogger;
+    private readonly RelationshipProjectController _relationshipProjectController;
+
+    private const long UserId = 10L;
+    private const long OrgId = 1L;
+    private const long ProjectId = 2L;
+    private static readonly long[] ProjectList = { 13L, 14L };
+    private const long RelationshipId = 22L;
+
+
+    public RelationshipProjectControllerTests()
+    {
+        _mockRelationshipBusiness = new Mock<IRelationshipBusiness>();
+        _mockLogger = new Mock<ILogger<RelationshipProjectController>>();
+
+        _relationshipProjectController = new RelationshipProjectController(
+            _mockRelationshipBusiness.Object,
+            _mockLogger.Object
+        );
+
+        UserContextStorage.UserId = UserId;
+        UserContextStorage.IsSysAdmin = false;
+    }
+
+    public void Dispose()
+    {
+        UserContextStorage.UserId = default;
+        UserContextStorage.OrganizationId = default;
+        UserContextStorage.IsSysAdmin = default;
+        UserContextStorage.IsOrgAdmin = default;
+        UserContextStorage.IsProjectAdmin = default;
+    }
+
+    // =========================================================================
+    // GetAllRelationships Tests
+    // =========================================================================
+
+    #region GetAllRelationships Tests
+
+    [Fact]
+    public async Task GetAllRelationships_Returns200_WithRelationships()
+    {
+        // Arrange
+        List<RelationshipResponseDto> expected =
+            new List<RelationshipResponseDto>();
+
+        UserContextStorage.OrganizationId = OrgId;
+
+        _mockRelationshipBusiness
+            .Setup(b => b.GetAllRelationships(
+                OrgId,
+                It.Is<long[]?>(projectIds =>
+                    projectIds != null &&
+                    projectIds.Length == 1 &&
+                    projectIds[0] == ProjectId),
+                true))
+            .ReturnsAsync(expected);
+
+        // Act
+        var actionResult = await _relationshipProjectController.GetAllRelationships(
+            ProjectId,
+            true);
+
+        // Assert
+        var result = Assert.IsType<OkObjectResult>(actionResult.Result);
+
+        Assert.Equal(StatusCodes.Status200OK, result.StatusCode);
+        Assert.Equal(expected, result.Value);
+    }
+
+    [Fact]
+    public async Task GetAllRelationships_Returns200_WithEmptyList()
+    {
+        // Arrange
+
+        _mockRelationshipBusiness
+            .Setup(b => b.GetAllRelationships(It.IsAny<long>(), It.IsAny<long[]>(), It.IsAny<bool>()))
+            .ReturnsAsync([]);
+
+        // Act
+        var actionResult = await _relationshipProjectController.GetAllRelationships(It.IsAny<long>(), It.IsAny<bool>());
+
+        // Assert
+        var result = Assert.IsType<OkObjectResult>(actionResult.Result);
+
+        Assert.NotNull(result);
+
+        Assert.Equal(StatusCodes.Status200OK, result.StatusCode);
+
+    }
+
+    [Fact]
+    public async Task GetAllRelationships_Returns500_OnUnexpectedException()
+    {
+        _mockRelationshipBusiness
+            .Setup(b => b.GetAllRelationships(It.IsAny<long>(), It.IsAny<long[]>(), It.IsAny<bool>()))
+            .ThrowsAsync(new Exception("db error"));
+
+        var result = (await _relationshipProjectController.GetAllRelationships(It.IsAny<long>(), It.IsAny<bool>())).Result as ObjectResult;
+        Assert.NotNull(result);
+        Assert.Equal(500, result.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetAllRelationships_PassesToBusinessLayer()
+    {
+        // Arrange
+
+        var expected = new List<RelationshipResponseDto>();
+
+        UserContextStorage.OrganizationId = OrgId;
+
+        _mockRelationshipBusiness
+            .Setup(b => b.GetAllRelationships(
+                OrgId,
+                It.Is<long[]?>(projectIds =>
+                    projectIds != null &&
+                    projectIds.Length == 1 &&
+                    projectIds[0] == ProjectId),
+                true))
+            .ReturnsAsync(expected);
+
+        // Act
+        await _relationshipProjectController.GetAllRelationships(ProjectId, true);
+
+        // Assert
+        _mockRelationshipBusiness.Verify(
+            b => b.GetAllRelationships(
+                OrgId,
+                It.Is<long[]?>(projectIds =>
+                    projectIds != null &&
+                    projectIds.Length == 1 &&
+                    projectIds[0] == ProjectId),
+                true),
+            Times.Once);
+    }
+
+    [Fact]
+    public void GetAllRelationships_HasHttpGet()
+    {
+        var method = GetControllerMethod(
+            nameof(RelationshipProjectController.GetAllRelationships),
+            "projectId",
+            "hideArchived");
+
+        AssertHasHttpAttribute(method, nameof(HttpGetAttribute));
+    }
+
+    #endregion
+
+    // =========================================================================
+    // GetRelationship Tests
+    // =========================================================================
+
+    #region GetRelationship Tests
+
+    [Fact]
+    public async Task GetRelationship_Returns200_WithRelationship()
+    {
+        // Arrange
+        RelationshipResponseDto expected = new RelationshipResponseDto();
+        UserContextStorage.OrganizationId = OrgId;
+
+        _mockRelationshipBusiness
+            .Setup(b => b.GetRelationship(OrgId, ProjectId, RelationshipId, true))
+            .ReturnsAsync(expected);
+
+        // Act
+        var actionResult = await _relationshipProjectController.GetRelationship(
+            ProjectId,
+            RelationshipId,
+            true);
+
+        // Assert
+        var result = Assert.IsType<OkObjectResult>(actionResult.Result);
+
+        Assert.Equal(StatusCodes.Status200OK, result.StatusCode);
+        Assert.Equal(expected, result.Value);
+    }
+
+    [Fact]
+    public async Task GetRelationship_Returns200_WithEmptyPermission()
+    {
+        // Arrange
+
+        _mockRelationshipBusiness
+            .Setup(b => b.GetRelationship(OrgId, ProjectId, RelationshipId, true))
+            .ReturnsAsync((RelationshipResponseDto)null!);
+
+        // Act
+        var actionResult = await _relationshipProjectController.GetRelationship(
+            ProjectId,
+            RelationshipId,
+            true);
+
+        // Assert
+        var result = Assert.IsType<OkObjectResult>(actionResult.Result);
+
+        Assert.Equal(StatusCodes.Status200OK, result.StatusCode);
+        Assert.Null(result.Value);
+    }
+
+    [Fact]
+    public async Task GetRelationship_Returns500_OnUnexpectedException()
+    {
+        // Arrange
+        UserContextStorage.OrganizationId = OrgId;
+        _mockRelationshipBusiness
+            .Setup(b => b.GetRelationship(OrgId, ProjectId, RelationshipId, true))
+            .ThrowsAsync(new Exception("db error"));
+
+        // Act
+        var actionResult = await _relationshipProjectController.GetRelationship(
+            ProjectId,
+            RelationshipId,
+            true);
+
+        // Assert
+        var result = Assert.IsType<ObjectResult>(actionResult.Result);
+
+        Assert.Equal(StatusCodes.Status500InternalServerError, result.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetRelationship_PassesToBusinessLayer()
+    {
+        // Arrange
+        UserContextStorage.OrganizationId = OrgId;
+
+        var expected = new RelationshipResponseDto();
+
+        _mockRelationshipBusiness
+            .Setup(b => b.GetRelationship(OrgId, ProjectId, RelationshipId, true))
+            .ReturnsAsync(expected);
+
+        // Act
+        var actionResult = await _relationshipProjectController.GetRelationship(
+            ProjectId,
+            RelationshipId,
+            true);
+
+        // Assert
+        var result = Assert.IsType<OkObjectResult>(actionResult.Result);
+
+        // Assert
+        _mockRelationshipBusiness.Verify(
+            b => b.GetRelationship(
+                OrgId,
+                ProjectId,
+                RelationshipId,
+                true),
+            Times.Once);
+    }
+
+    [Fact]
+    public void GetRelationship_HasHttpGet()
+    {
+        var method = GetControllerMethod(
+            nameof(RelationshipProjectController.GetRelationship),
+            "projectId",
+            "relationshipId",
+            "hideArchived");
+
+        AssertHasHttpAttribute(method, nameof(HttpGetAttribute));
+    }
+
+    #endregion
+
+    // =========================================================================
+    // CreateRelationship Tests
+    // =========================================================================
+
+    #region CreateRelationship Tests
+
+    [Fact]
+    public async Task CreateRelationship_Returns200_WithRelationship()
+    {
+        // Arrange
+        RelationshipResponseDto expected =
+            new RelationshipResponseDto();
+        CreateRelationshipRequestDto input = new CreateRelationshipRequestDto();
+        UserContextStorage.OrganizationId = OrgId;
+
+        _mockRelationshipBusiness
+            .Setup(b => b.CreateRelationship(UserId, OrgId, ProjectId, input))
+            .ReturnsAsync(expected);
+
+        // Act
+        var actionResult = await _relationshipProjectController.CreateRelationship(
+            ProjectId,
+            input);
+
+        // Assert
+        var result = Assert.IsType<OkObjectResult>(actionResult.Result);
+
+        Assert.Equal(StatusCodes.Status200OK, result.StatusCode);
+        Assert.Equal(expected, result.Value);
+    }
+
+
+    [Fact]
+    public async Task CreateRelationship_Returns500_OnUnexpectedException()
+    {
+        CreateRelationshipRequestDto input = new CreateRelationshipRequestDto();
+        UserContextStorage.OrganizationId = OrgId;
+
+        _mockRelationshipBusiness
+            .Setup(b => b.CreateRelationship(UserId, OrgId, ProjectId, input))
+            .ThrowsAsync(new Exception("db error"));
+
+        var actionResult = await _relationshipProjectController.CreateRelationship(
+            ProjectId,
+            input);
+
+        // Assert
+        var result = Assert.IsType<ObjectResult>(actionResult.Result);
+
+        Assert.NotNull(result);
+        Assert.Equal(500, result.StatusCode);
+    }
+
+    [Fact]
+    public async Task CreateRelationship_PassesToBusinessLayer()
+    {
+        // Arrange
+        CreateRelationshipRequestDto input = new CreateRelationshipRequestDto();
+        var expected = new RelationshipResponseDto();
+
+        UserContextStorage.OrganizationId = OrgId;
+
+        _mockRelationshipBusiness
+            .Setup(b => b.CreateRelationship(UserId, OrgId, ProjectId, input))
+            .ReturnsAsync(expected);
+
+        // Act
+        var actionResult = await _relationshipProjectController.CreateRelationship(
+            ProjectId,
+            input);
+
+        var result = Assert.IsType<OkObjectResult>(actionResult.Result);
+
+        // Assert
+        _mockRelationshipBusiness.Verify(
+            b => b.CreateRelationship(UserId, OrgId, ProjectId, input),
+            Times.Once);
+    }
+
+    [Fact]
+    public void CreateRelationship_HasHttpPost()
+    {
+        var method = GetControllerMethod(
+            nameof(RelationshipProjectController.CreateRelationship),
+            "projectId",
+            "dto");
+
+        AssertHasHttpAttribute(method, nameof(HttpPostAttribute));
+    }
+
+    #endregion
+
+    // =========================================================================
+    // BulkCreateRelationships Tests
+    // =========================================================================
+
+    #region BulkCreateRelationships Tests
+
+    [Fact]
+    public async Task BulkCreateRelationships_Returns200_WithRelationshipList()
+    {
+        // Arrange
+        List<RelationshipResponseDto> expected =
+            new List<RelationshipResponseDto>();
+        List<CreateRelationshipRequestDto> input = new List<CreateRelationshipRequestDto>();
+        UserContextStorage.OrganizationId = OrgId;
+
+        _mockRelationshipBusiness
+            .Setup(b => b.BulkCreateRelationships(UserId, OrgId, ProjectId, input))
+            .ReturnsAsync(expected);
+
+        // Act
+        var actionResult = await _relationshipProjectController.BulkCreateRelationships(
+            ProjectId,
+            input);
+
+        // Assert
+        var result = Assert.IsType<OkObjectResult>(actionResult.Result);
+
+        Assert.Equal(StatusCodes.Status200OK, result.StatusCode);
+        Assert.Equal(expected, result.Value);
+    }
+
+
+    [Fact]
+    public async Task BulkCreateRelationships_Returns500_OnUnexpectedException()
+    {
+        List<CreateRelationshipRequestDto> input = new List<CreateRelationshipRequestDto>();
+        UserContextStorage.OrganizationId = OrgId;
+        _mockRelationshipBusiness
+            .Setup(b => b.BulkCreateRelationships(UserId, OrgId, ProjectId, input))
+            .ThrowsAsync(new Exception("db error"));
+
+        var actionResult = await _relationshipProjectController.BulkCreateRelationships(
+            ProjectId,
+            input);
+
+        // Assert
+        var result = Assert.IsType<ObjectResult>(actionResult.Result);
+
+        Assert.NotNull(result);
+        Assert.Equal(500, result.StatusCode);
+    }
+
+    [Fact]
+    public async Task BulkCreateRelationships_PassesToBusinessLayer()
+    {
+        // Arrange
+        List<RelationshipResponseDto> expected =
+            new List<RelationshipResponseDto>();
+        List<CreateRelationshipRequestDto> input = new List<CreateRelationshipRequestDto>();
+        UserContextStorage.OrganizationId = OrgId;
+
+        _mockRelationshipBusiness
+            .Setup(b => b.BulkCreateRelationships(UserId, OrgId, ProjectId, input))
+            .ReturnsAsync(expected);
+
+        // Act
+        var actionResult = await _relationshipProjectController.BulkCreateRelationships(
+            ProjectId,
+            input);
+
+        var result = Assert.IsType<OkObjectResult>(actionResult.Result);
+
+        // Assert
+        _mockRelationshipBusiness.Verify(
+            b => b.BulkCreateRelationships(UserId, OrgId, ProjectId, input),
+            Times.Once);
+    }
+
+    [Fact]
+    public void BulkCreateRelationships_HasHttpPost()
+    {
+        var method = GetControllerMethod(
+            nameof(RelationshipProjectController.BulkCreateRelationships),
+            "projectId",
+            "relationships");
+
+        AssertHasHttpAttribute(method, nameof(HttpPostAttribute));
+    }
+
+    #endregion
+
+
+    // =========================================================================
+    // UpdateRelationship Tests
+    // =========================================================================
+
+    #region UpdateRelationship Tests
+
+    [Fact]
+    public async Task UpdateRelationship_Returns200_WithRelationship()
+    {
+        // Arrange
+        RelationshipResponseDto expected =
+            new RelationshipResponseDto();
+        UpdateRelationshipRequestDto input = new UpdateRelationshipRequestDto();
+        UserContextStorage.OrganizationId = OrgId;
+
+        _mockRelationshipBusiness
+            .Setup(b => b.UpdateRelationship(UserId, OrgId, ProjectId, RelationshipId, input))
+            .ReturnsAsync(expected);
+
+        // Act
+        var actionResult = await _relationshipProjectController.UpdateRelationship(
+            ProjectId,
+            RelationshipId,
+            input);
+
+        // Assert
+        var result = Assert.IsType<OkObjectResult>(actionResult.Result);
+
+        Assert.Equal(StatusCodes.Status200OK, result.StatusCode);
+        Assert.Equal(expected, result.Value);
+    }
+
+
+    [Fact]
+    public async Task UpdateRelationship_Returns500_OnUnexpectedException()
+    {
+        UpdateRelationshipRequestDto input = new UpdateRelationshipRequestDto();
+        UserContextStorage.OrganizationId = OrgId;
+        _mockRelationshipBusiness
+            .Setup(b => b.UpdateRelationship(UserId, OrgId, ProjectId, RelationshipId, input))
+            .ThrowsAsync(new Exception("db error"));
+
+        var actionResult = await _relationshipProjectController.UpdateRelationship(
+            ProjectId,
+            RelationshipId,
+            input);
+
+        // Assert
+        var result = Assert.IsType<ObjectResult>(actionResult.Result);
+
+        Assert.NotNull(result);
+        Assert.Equal(500, result.StatusCode);
+    }
+
+    [Fact]
+    public async Task UpdateRelationship_PassesToBusinessLayer()
+    {
+        // Arrange
+        UpdateRelationshipRequestDto input = new UpdateRelationshipRequestDto();
+        var expected = new RelationshipResponseDto();
+
+        UserContextStorage.OrganizationId = OrgId;
+
+        _mockRelationshipBusiness
+            .Setup(b => b.UpdateRelationship(UserId, OrgId, ProjectId, RelationshipId, input))
+            .ReturnsAsync(expected);
+
+        // Act
+        var actionResult = await _relationshipProjectController.UpdateRelationship(
+            ProjectId,
+            RelationshipId,
+            input);
+
+        var result = Assert.IsType<OkObjectResult>(actionResult.Result);
+
+        // Assert
+        _mockRelationshipBusiness.Verify(
+            b => b.UpdateRelationship(UserId, OrgId, ProjectId, RelationshipId, input),
+            Times.Once);
+    }
+
+    [Fact]
+    public void UpdateRelationship_HasHttpPut()
+    {
+        var method = GetControllerMethod(
+            nameof(RelationshipProjectController.UpdateRelationship),
+            "projectId",
+            "relationshipId",
+            "dto");
+
+        AssertHasHttpAttribute(method, nameof(HttpPutAttribute));
+    }
+
+    #endregion
+
+    // =========================================================================
+    // DeleteRelationship Tests
+    // =========================================================================
+
+    #region DeleteRelationship Tests
+
+    [Fact]
+    public async Task DeleteRelationship_Returns200()
+    {
+        // Arrange
+        var expectedMessage = $"Deleted relationship {RelationshipId}";
+        UserContextStorage.OrganizationId = OrgId;
+
+        _mockRelationshipBusiness
+            .Setup(b => b.DeleteRelationship(UserId, OrgId, ProjectId, RelationshipId))
+            .ReturnsAsync(true);
+
+        // Act
+        var actionResult = await _relationshipProjectController.DeleteRelationship(
+            ProjectId,
+            RelationshipId);
+
+        // Assert
+        var result = Assert.IsType<OkObjectResult>(actionResult);
+
+        Assert.Equal(StatusCodes.Status200OK, result.StatusCode);
+        Assert.NotNull(result.Value);
+
+        var messageProperty = result.Value.GetType().GetProperty("message");
+        Assert.NotNull(messageProperty);
+
+        var actualMessage = messageProperty.GetValue(result.Value) as string;
+        Assert.Equal(expectedMessage, actualMessage);
+    }
+
+
+    [Fact]
+    public async Task DeleteRelationship_Returns500_OnUnexpectedException()
+    {
+        UserContextStorage.OrganizationId = OrgId;
+        _mockRelationshipBusiness
+            .Setup(b => b.DeleteRelationship(UserId, OrgId, ProjectId, RelationshipId))
+            .ThrowsAsync(new Exception("db error"));
+
+        var actionResult = await _relationshipProjectController.DeleteRelationship(
+            ProjectId,
+            RelationshipId);
+
+        // Assert
+        var result = Assert.IsType<ObjectResult>(actionResult);
+
+        Assert.NotNull(result);
+        Assert.Equal(500, result.StatusCode);
+    }
+
+    [Fact]
+    public async Task DeleteRelationship_PassesToBusinessLayer()
+    {
+        // Arrange
+        UserContextStorage.OrganizationId = OrgId;
+
+        _mockRelationshipBusiness
+            .Setup(b => b.DeleteRelationship(UserId, OrgId, ProjectId, RelationshipId))
+            .ReturnsAsync(true);
+
+        // Act
+        var actionResult = await _relationshipProjectController.DeleteRelationship(
+            ProjectId,
+            RelationshipId);
+
+        var result = Assert.IsType<OkObjectResult>(actionResult);
+
+        // Assert
+        _mockRelationshipBusiness.Verify(
+            b => b.DeleteRelationship(UserId, OrgId, ProjectId, RelationshipId),
+            Times.Once);
+    }
+
+    [Fact]
+    public void DeleteRelationship_HasHttpDelete()
+    {
+        var method = GetControllerMethod(
+            nameof(RelationshipProjectController.DeleteRelationship),
+            "projectId",
+            "relationshipId");
+
+        AssertHasHttpAttribute(method, nameof(HttpDeleteAttribute));
+    }
+
+    #endregion
+
+    // =========================================================================
+    // ArchiveRelationship Tests
+    // =========================================================================
+
+    #region ArchiveRelationship Tests
+
+    [Fact]
+    public async Task ArchiveRelationship_Returns200_WhenArchiving()
+    {
+        // Arrange
+        var expectedMessage = $"Archived relationship {RelationshipId}";
+
+        UserContextStorage.OrganizationId = OrgId;
+
+        _mockRelationshipBusiness
+            .Setup(b => b.ArchiveRelationship(UserId, OrgId, ProjectId, RelationshipId))
+            .ReturnsAsync(true);
+
+        // Act
+        var actionResult = await _relationshipProjectController.ArchiveRelationship(
+            ProjectId,
+            RelationshipId,
+            true);
+
+        // Assert
+        var result = Assert.IsType<OkObjectResult>(actionResult);
+
+        Assert.Equal(StatusCodes.Status200OK, result.StatusCode);
+        Assert.NotNull(result.Value);
+
+        var messageProperty = result.Value.GetType().GetProperty("message");
+        Assert.NotNull(messageProperty);
+
+        var actualMessage = messageProperty.GetValue(result.Value) as string;
+        Assert.Equal(expectedMessage, actualMessage);
+    }
+
+    [Fact]
+    public async Task ArchiveRelationship_Returns200_WhenUnarchiving()
+    {
+        // Arrange
+        var expectedMessage = $"Unarchived relationship {RelationshipId}";
+
+        UserContextStorage.OrganizationId = OrgId;
+
+        _mockRelationshipBusiness
+            .Setup(b => b.UnarchiveRelationship(UserId, OrgId, ProjectId, RelationshipId))
+            .ReturnsAsync(true);
+
+        // Act
+        var actionResult = await _relationshipProjectController.ArchiveRelationship(
+            ProjectId,
+            RelationshipId,
+            false);
+
+        // Assert
+        var result = Assert.IsType<OkObjectResult>(actionResult);
+
+        Assert.Equal(StatusCodes.Status200OK, result.StatusCode);
+        Assert.NotNull(result.Value);
+
+        var messageProperty = result.Value.GetType().GetProperty("message");
+        Assert.NotNull(messageProperty);
+
+        var actualMessage = messageProperty.GetValue(result.Value) as string;
+        Assert.Equal(expectedMessage, actualMessage);
+    }
+
+    [Fact]
+    public async Task ArchiveRelationship_Returns500_OnUnexpectedException_WhenArchiving()
+    {
+        // Arrange
+        UserContextStorage.OrganizationId = OrgId;
+
+        _mockRelationshipBusiness
+            .Setup(b => b.ArchiveRelationship(UserId, OrgId, ProjectId, RelationshipId))
+            .ThrowsAsync(new Exception("db error"));
+
+        // Act
+        var actionResult = await _relationshipProjectController.ArchiveRelationship(
+            ProjectId,
+            RelationshipId,
+            true);
+
+        // Assert
+        var result = Assert.IsType<ObjectResult>(actionResult);
+
+        Assert.NotNull(result);
+        Assert.Equal(StatusCodes.Status500InternalServerError, result.StatusCode);
+
+        var message = Assert.IsType<string>(result.Value);
+
+        Assert.Contains(
+            $"An error occurred while archiving relationship {RelationshipId}",
+            message);
+    }
+
+    [Fact]
+    public async Task ArchiveRelationship_Returns500_OnUnexpectedException_WhenUnarchiving()
+    {
+        // Arrange
+        UserContextStorage.OrganizationId = OrgId;
+
+        _mockRelationshipBusiness
+            .Setup(b => b.UnarchiveRelationship(UserId, OrgId, ProjectId, RelationshipId))
+            .ThrowsAsync(new Exception("db error"));
+
+        // Act
+        var actionResult = await _relationshipProjectController.ArchiveRelationship(
+            ProjectId,
+            RelationshipId,
+            false);
+
+        // Assert
+        var result = Assert.IsType<ObjectResult>(actionResult);
+
+        Assert.NotNull(result);
+        Assert.Equal(StatusCodes.Status500InternalServerError, result.StatusCode);
+
+        var message = Assert.IsType<string>(result.Value);
+
+        Assert.Contains(
+            $"An error occurred while unarchiving relationship {RelationshipId}",
+            message);
+    }
+
+    [Fact]
+    public async Task ArchiveRelationship_PassesToBusinessLayer_WhenArchiving()
+    {
+        // Arrange
+        UserContextStorage.OrganizationId = OrgId;
+
+        _mockRelationshipBusiness
+            .Setup(b => b.ArchiveRelationship(UserId, OrgId, ProjectId, RelationshipId))
+            .ReturnsAsync(true);
+
+        // Act
+        var actionResult = await _relationshipProjectController.ArchiveRelationship(
+            ProjectId,
+            RelationshipId,
+            true);
+
+        var result = Assert.IsType<OkObjectResult>(actionResult);
+
+        // Assert
+        _mockRelationshipBusiness.Verify(
+            b => b.ArchiveRelationship(UserId, OrgId, ProjectId, RelationshipId),
+            Times.Once);
+
+        _mockRelationshipBusiness.Verify(
+            b => b.UnarchiveRelationship(
+                It.IsAny<long>(),
+                It.IsAny<long>(),
+                It.IsAny<long?>(),
+                It.IsAny<long>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task ArchiveRelationship_PassesToBusinessLayer_WhenUnarchiving()
+    {
+        // Arrange
+        UserContextStorage.OrganizationId = OrgId;
+
+        _mockRelationshipBusiness
+            .Setup(b => b.UnarchiveRelationship(UserId, OrgId, ProjectId, RelationshipId))
+            .ReturnsAsync(true);
+
+        // Act
+        var actionResult = await _relationshipProjectController.ArchiveRelationship(
+            ProjectId,
+            RelationshipId,
+            false);
+
+        var result = Assert.IsType<OkObjectResult>(actionResult);
+
+        // Assert
+        _mockRelationshipBusiness.Verify(
+            b => b.UnarchiveRelationship(UserId, OrgId, ProjectId, RelationshipId),
+            Times.Once);
+
+        _mockRelationshipBusiness.Verify(
+            b => b.ArchiveRelationship(
+                It.IsAny<long>(),
+                It.IsAny<long>(),
+                It.IsAny<long?>(),
+                It.IsAny<long>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public void ArchiveRelationship_HasHttpPatch()
+    {
+        var method = GetControllerMethod(
+            nameof(RelationshipProjectController.ArchiveRelationship),
+            "projectId",
+            "relationshipId",
+            "archive");
+
+        AssertHasHttpAttribute(method, nameof(HttpPatchAttribute));
+    }
+
+    #endregion
+
+    // =========================================================================
+    // Test Helpers
+    // =========================================================================
+
+
+    private static void AssertHasHttpAttribute(
+        System.Reflection.MethodInfo method,
+        string expectedAttributeName)
+    {
+        Assert.Contains(method.GetCustomAttributesData(), attribute =>
+            attribute.AttributeType.Name == expectedAttributeName);
+    }
+
+    private static System.Reflection.MethodInfo GetControllerMethod(
+        string methodName,
+        params string[] parameterNames)
+    {
+        return Assert.Single(typeof(RelationshipProjectController).GetMethods()
+            .Where(method => method.Name == methodName)
+            .Where(method => parameterNames.All(parameterName =>
+                method.GetParameters().Any(parameter => parameter.Name == parameterName))));
+    }
+
+    private static string GetMessageFromResultValue(object? value)
+    {
+        Assert.NotNull(value);
+
+        var messageProperty = value.GetType().GetProperty("message");
+        Assert.NotNull(messageProperty);
+
+        var message = messageProperty.GetValue(value) as string;
+        Assert.NotNull(message);
+
+        return message;
+    }
+}
