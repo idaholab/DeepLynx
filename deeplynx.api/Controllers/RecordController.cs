@@ -223,7 +223,20 @@ public class RecordController : ControllerBase
         try
         {
             var currentUserId = UserContextStorage.UserId;
-            var record = await _recordBusiness.GetRecord(currentUserId, organizationId, projectId, recordId, hideArchived);
+            var isSysAdmin = UserContextStorage.IsSysAdmin;
+            var isOrgAdmin = UserContextStorage.IsOrgAdmin;
+            var isProjectAdmin = UserContextStorage.IsProjectAdmin;
+
+            var record = await _recordBusiness.GetRecord(
+                currentUserId,
+                organizationId,
+                projectId,
+                recordId,
+                hideArchived,
+                isSysAdmin,
+                isOrgAdmin,
+                isProjectAdmin);
+
             return Ok(record);
         }
         catch (Exception exc)
@@ -322,9 +335,20 @@ public class RecordController : ControllerBase
         try
         {
             var currentUserId = UserContextStorage.UserId;
-            var newRecords =
-                await _recordBusiness.BulkCreateRecords(currentUserId, organizationId, projectId, dataSourceId,
-                    records, sensitivityLabelIds);
+            var isSysAdmin = UserContextStorage.IsSysAdmin;
+            var isOrgAdmin = UserContextStorage.IsOrgAdmin;
+            var isProjectAdmin = UserContextStorage.IsProjectAdmin;
+
+            var newRecords = await _recordBusiness.BulkCreateRecords(
+                currentUserId,
+                organizationId,
+                projectId,
+                dataSourceId,
+                records,
+                sensitivityLabelIds,
+                isSysAdmin,
+                isOrgAdmin,
+                isProjectAdmin);
             return Ok(newRecords);
         }
         catch (Exception exc)

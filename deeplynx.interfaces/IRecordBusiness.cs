@@ -18,7 +18,8 @@ public interface IRecordBusiness
         bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false);
 
     Task<RecordResponseDto> GetRecord(
-        long currentUserId, long organizationId, long projectId, long recordId, bool hideArchived);
+        long currentUserId, long organizationId, long projectId, long recordId, bool hideArchived, bool isSysAdmin = false, bool isOrgAdmin = false,
+        bool isProjectAdmin = false);
 
     Task<int> GetRecordsCountByDataSource(
         long organizationId, long projectId, long dataSourceId, bool hideArchived);
@@ -28,7 +29,8 @@ public interface IRecordBusiness
         List<long>? sensitivityLabelIds = null, bool embedded = false);
 
     Task<List<RecordResponseDto>> BulkCreateRecords(
-        long currentUserId, long organizationId, long projectId, long dataSourceId, List<CreateRecordRequestDto> dtos, List<long>? sensitivityLabelIds = null);
+        long currentUserId, long organizationId, long projectId, long dataSourceId, List<CreateRecordRequestDto> dtos, List<long>? sensitivityLabelIds = null,
+        bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false);
 
     Task<RecordResponseDto> UpdateRecord(
         long currentUserId, long organizationId, long projectId, long recordId, UpdateRecordRequestDto dto);
