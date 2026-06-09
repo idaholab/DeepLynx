@@ -262,44 +262,53 @@ public class LatticeExtractionBusinessTests : IntegrationTestBase
     #endregion
 
     // =========================================================================
-    // ListExtractionsByUser Tests
+    // ListExtractionsByProject Tests
     // =========================================================================
 
     #region ListExtractionsByUser Tests
 
     [Fact]
-    public async Task ListExtractionsByUser_ReturnsExtractionsForCorrectUser()
+    public async Task ListExtractionsByProject_ReturnsExtractionsForCorrectProject()
     {
-        var result = await _business.ListExtractionsByUser(uid, pid);
+        var result = await _business.ListExtractionsByProject(pid);
 
         Assert.NotEmpty(result);
-        Assert.All(result, e => Assert.Equal(uid, e.CreatedBy));
+        Assert.All(result, e => Assert.Equal(pid, e.ProjectId));
     }
 
     [Fact]
-    public async Task ListExtractionsByUser_ReturnsEmpty_WhenNoExtractionsExistForProject()
+    public async Task ListExtractionsByProject_ReturnsEmpty_WhenNoExtractionsExistForProject()
     {
-        var result = await _business.ListExtractionsByUser(uid, NotFoundId);
+        var result = await _business.ListExtractionsByProject(NotFoundId);
 
         Assert.Empty(result);
     }
 
     [Fact]
-    public async Task ListExtractionsByUser_DoesNotReturnOtherUsersExtractions()
+    public async Task ListExtractionsByProject_DoesNotReturnOtherProjectExtractions()
     {
+        //add a project with no extractions
+        var otherProj = new Project { Name = "Other Project", IsArchived = false, OrganizationId = oid};
+        Context.Projects.Add(otherProj);
+        
+        //add an extraction to pid
         var other = new User { Name = "Other User", Email = "other@test.com", Password = "pw", IsArchived = false };
         Context.Users.Add(other);
         await Context.SaveChangesAsync();
+        
+        var extraction = new Extraction { CreatedBy = other.Id, ProjectId = pid }; 
+        Context.Extractions.Add(extraction);
+        await Context.SaveChangesAsync();
 
-        var result = await _business.ListExtractionsByUser(other.Id, pid);
+        var result = await _business.ListExtractionsByProject(otherProj.Id);
 
         Assert.Empty(result);
     }
 
     [Fact]
-    public async Task ListExtractionsByUser_ReturnsCorrectFields()
+    public async Task ListExtractionsByProject_ReturnsCorrectFields()
     {
-        var result = await _business.ListExtractionsByUser(uid, pid);
+        var result = await _business.ListExtractionsByProject(pid);
 
         Assert.Contains(result, e => e.Id == extractionId && e.Status == ExtractionStatus.Running && e.Mode == ExtractionMode.Strict);
         Assert.Contains(result, e => e.Id == completeExtractionId && e.Status == ExtractionStatus.Complete && e.Mode == ExtractionMode.Discovery);
@@ -370,7 +379,7 @@ public class LatticeExtractionBusinessTests : IntegrationTestBase
     [Fact]
     public async Task ProcessInsightExtractionCallback_StagesAllItems_AndSetsExtractionComplete()
     {
-        var result = await _business.ProcessInsightExtractionCallback(
+        var result = await _business.ProcessInsightCallback(
             oid, pid, dsid, extractionId, BuildValidDto());
 
         Assert.Equal(2, result.ClassCount);
@@ -386,7 +395,7 @@ public class LatticeExtractionBusinessTests : IntegrationTestBase
     [Fact]
     public async Task ProcessInsightExtractionCallback_SetsValidStatus_WhenOntologyMatches()
     {
-        await _business.ProcessInsightExtractionCallback(oid, pid, dsid, extractionId, BuildValidDto());
+        await _business.ProcessInsightCallback(oid, pid, dsid, extractionId, BuildValidDto());
 
         var classes = _latticeCtx.ExtractionClasses.Where(c => c.ExtractionId == extractionId).ToList();
         Assert.All(classes, c => Assert.Equal(ExtractionValidationStatus.Valid, c.ValidationStatus));
@@ -399,7 +408,7 @@ public class LatticeExtractionBusinessTests : IntegrationTestBase
     [Fact]
     public async Task ProcessInsightExtractionCallback_SetsInvalidSchema_WhenNoOntologyMatch()
     {
-        var result = await _business.ProcessInsightExtractionCallback(
+        var result = await _business.ProcessInsightCallback(
             oid, pid, dsid, extractionId, BuildInvalidSchemaDto());
 
         Assert.Equal(1, result.ClassCount);
@@ -421,7 +430,7 @@ public class LatticeExtractionBusinessTests : IntegrationTestBase
             Relationships = []
         };
 
-        var result = await _business.ProcessInsightExtractionCallback(oid, pid, dsid, extractionId, dto);
+        var result = await _business.ProcessInsightCallback(oid, pid, dsid, extractionId, dto);
 
         Assert.Equal(1, result.ClassCount);
         Assert.Equal(1, result.RecordCount);
@@ -453,7 +462,7 @@ public class LatticeExtractionBusinessTests : IntegrationTestBase
             ]
         };
 
-        await _business.ProcessInsightExtractionCallback(oid, pid, dsid, extractionId, dto);
+        await _business.ProcessInsightCallback(oid, pid, dsid, extractionId, dto);
 
         var rel = _latticeCtx.ExtractionRelationships.Single(r => r.ExtractionId == extractionId);
         Assert.Equal(ExtractionValidationStatus.NovelDiscovery, rel.ValidationStatus);
@@ -463,7 +472,7 @@ public class LatticeExtractionBusinessTests : IntegrationTestBase
     public async Task ProcessInsightExtractionCallback_Throws_WhenExtractionNotFound()
     {
         var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            _business.ProcessInsightExtractionCallback(oid, pid, dsid, NotFoundId, BuildValidDto()));
+            _business.ProcessInsightCallback(oid, pid, dsid, NotFoundId, BuildValidDto()));
 
         Assert.Contains(NotFoundId.ToString(), ex.Message);
     }
@@ -489,7 +498,7 @@ public class LatticeExtractionBusinessTests : IntegrationTestBase
             ]
         };
 
-        var result = await _business.ProcessInsightExtractionCallback(oid, pid, dsid, extractionId, dto);
+        var result = await _business.ProcessInsightCallback(oid, pid, dsid, extractionId, dto);
 
         Assert.Equal(0, result.EdgeCount);
     }

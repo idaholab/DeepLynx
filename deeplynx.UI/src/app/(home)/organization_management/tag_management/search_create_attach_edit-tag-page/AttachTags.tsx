@@ -1,6 +1,6 @@
 import SimpleFilterInput from "@/app/(home)/components/SimpleFilterComponent";
 import {
-  HistoricalRecordResponseDto,
+  QueryRecordViewResponseDto,
   TagResponseDto,
 } from "@/app/(home)/types/responseDTOs";
 import { useOrganizationSession } from "@/app/contexts/OrganizationSessionProvider";
@@ -29,7 +29,7 @@ const parseTags = (
   return [];
 };
 
-type RecordWithParsedTags = Omit<HistoricalRecordResponseDto, "tags"> & {
+type RecordWithParsedTags = Omit<QueryRecordViewResponseDto, "tags"> & {
   tags: TagResponseDto[];
 };
 
