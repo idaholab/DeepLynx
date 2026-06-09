@@ -14,7 +14,7 @@ public partial class User
     public string Name { get; set; } = null!;
 
     [Column("email")]
-    public string Email { get; set; } = null!;
+    public string? Email { get; set; } = null!;
 
     [Column("username")]
     public string? Username { get; set; } = null!;
@@ -36,6 +36,12 @@ public partial class User
 
     [Column("is_sys_admin")]
     public bool IsSysAdmin { get; set; }
+
+    [Column("account_type")]
+    public string AccountType { get; set; }
+
+    [Column("created_by_user_id")]
+    public long? CreatedByUserId { get; set; }
 
     [InverseProperty("User")]
     public virtual ICollection<OrganizationUser> OrganizationUsers { get; set; } = new List<OrganizationUser>();
