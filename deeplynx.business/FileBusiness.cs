@@ -3,6 +3,7 @@ using deeplynx.datalayer.Models;
 using deeplynx.helpers;
 using deeplynx.interfaces;
 using deeplynx.models;
+using deeplynx.models.ResponseDTOs;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -495,13 +496,24 @@ public class FileBusiness
     /// <param name="organizationId">ID of the organization in which to backfill file sizes</param>
     /// <param name="projectId">ID of the project in which to backfill file sizes</param>
     /// <exception cref="InvalidOperationException">Returned if org ID or project ID not supplied</exception>
-    public async Task BackfillFileSizes(
+    public async Task<BackfillFileSizesResponseDto> BackfillFileSizes(
         long? organizationId,
-        long? projectId)
+        long? projectId,
+        long? afterRecordId = null,
+        int batchSize = 500,
+        int maxBatches = 5)
     {
         if (organizationId == null && projectId == null)
             throw new InvalidOperationException("At least one of organization or project must be specified.");
-
+        
+        if (batchSize <= 0)
+            throw new ArgumentException("batchSize must be greater than zero.");
+        
+        if (maxBatches <= 0)
+            throw new ArgumentException("maxBatches must be greater than zero.");
+        
+        var response = new BackfillFileSizesResponseDto();
+        
         // only backfill for records that have a uri and an object storage id
         var toBackfill = _context.Records
             .Where(r => r.Uri != null && r.FileSize == null && r.ObjectStorageId != null);
