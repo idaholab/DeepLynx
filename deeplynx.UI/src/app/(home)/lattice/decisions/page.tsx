@@ -547,6 +547,7 @@ export default function LatticeDecisionsPage() {
 
   const orgId = organization?.organizationId as number | undefined;
   const projId = project?.projectId as number | undefined;
+  const insightHidden = isInsightHidden();
 
   const refreshList = useCallback(() => {
     if (!orgId || !projId) return;
@@ -558,30 +559,37 @@ export default function LatticeDecisionsPage() {
   }, [orgId, projId, t.translations.LATTICE_FAILED_LOAD_EXTRACTIONS]);
 
   useEffect(() => {
-    if (isInsightHidden()) {
+    if (insightHidden) {
       router.replace("/");
     }
-  }, [router]);
-
-  if (isInsightHidden()) {
-    return null;
-  }
+  }, [insightHidden, router]);
 
   useEffect(() => {
+    if (insightHidden) return;
     if (!orgId || !projId) return;
     setIsListLoading(true);
     listExtractions(orgId, projId)
       .then(setItems)
       .catch(() => setListError(t.translations.LATTICE_FAILED_LOAD_EXTRACTIONS))
       .finally(() => setIsListLoading(false));
-  }, [orgId, projId, t.translations.LATTICE_FAILED_LOAD_EXTRACTIONS]);
+  }, [
+    insightHidden,
+    orgId,
+    projId,
+    t.translations.LATTICE_FAILED_LOAD_EXTRACTIONS,
+  ]);
 
   // Restore last selected extraction when arriving without a query param
   useEffect(() => {
+    if (insightHidden) return;
     if (!projId || selectedId) return;
     const saved = localStorage.getItem(storageKey(projId));
     if (saved) router.replace(`/lattice/decisions?extractionId=${saved}`);
-  }, [projId, selectedId, router]);
+  }, [insightHidden, projId, selectedId, router]);
+
+  if (insightHidden) {
+    return null;
+  }
 
   const handleSelect = (id: number) => {
     if (projId) localStorage.setItem(storageKey(projId), String(id));
