@@ -38,7 +38,7 @@ public partial class User
     public bool IsSysAdmin { get; set; }
 
     [Column("account_type")]
-    public string AccountType { get; set; }
+    public string AccountType { get; set; } = "human";
     
     [InverseProperty("User")]
     public virtual ICollection<OrganizationUser> OrganizationUsers { get; set; } = new List<OrganizationUser>();
