@@ -771,10 +771,10 @@ public class UserBusinessTests : IntegrationTestBase
         Assert.Equal("New User", result.Name);
         Assert.Equal("newuser@test.com", result.Email);
         Assert.Equal("newuser", result.Username);
+        Assert.Equal("human", result.AccountType);
         Assert.True(result.IsActive);
         Assert.False(result.IsArchived);
 
-        // Verify it was actually saved to DB
         var savedUser = await Context.Users.FindAsync(result.Id);
         Assert.NotNull(savedUser);
         Assert.Equal("New User", savedUser.Name);
@@ -799,6 +799,7 @@ public class UserBusinessTests : IntegrationTestBase
         Assert.True(result.Id > 0);
         Assert.Equal("Minimal User", result.Name);
         Assert.Equal("minimal@test.com", result.Email);
+        Assert.Equal("human", result.AccountType);
         Assert.False(result.IsActive);
         Assert.False(result.IsArchived);
     }
@@ -818,6 +819,185 @@ public class UserBusinessTests : IntegrationTestBase
             () => _userBusiness.CreateUser(dto));
 
         Assert.Contains("User with email already exists", exception.Message);
+    }
+
+    [Fact]
+    public async Task CreateUser_Fails_IfEmailMissing_ForHumanAccount()
+    {
+        // Arrange
+        var dto = new CreateUserRequestDto
+        {
+            Name = "No Email User",
+            AccountType = "human"
+        };
+
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<ArgumentException>(
+            () => _userBusiness.CreateUser(dto));
+
+        Assert.Contains("Email is required for human accounts", exception.Message);
+    }
+
+    [Fact]
+    public async Task CreateUser_Fails_IfEmailMissing_WhenAccountTypeIsNull()
+    {
+        // Arrange — null AccountType should be treated as human, so email is still required
+        var dto = new CreateUserRequestDto
+        {
+            Name = "No Email User"
+        };
+
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<ArgumentException>(
+            () => _userBusiness.CreateUser(dto));
+
+        Assert.Contains("Email is required for human accounts", exception.Message);
+    }
+
+    // -- Service account tests --
+
+    [Fact]
+    public async Task CreateUser_Succeeds_ServiceAccount_AsOrgAdmin()
+    {
+        // Arrange
+        var dto = new CreateUserRequestDto
+        {
+            Name = "CI Bot",
+            AccountType = "service"
+        };
+
+        // Act
+        var result = await _userBusiness.CreateUser(dto, isOrgAdmin: true);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal("CI Bot", result.Name);
+        Assert.Equal("service", result.AccountType);
+        Assert.Null(result.Email);
+    }
+
+    [Fact]
+    public async Task CreateUser_Succeeds_ServiceAccount_AsProjectAdmin()
+    {
+        // Arrange
+        var dto = new CreateUserRequestDto
+        {
+            Name = "Deploy Bot",
+            AccountType = "service"
+        };
+
+        // Act
+        var result = await _userBusiness.CreateUser(dto, isProjectAdmin: true);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal("service", result.AccountType);
+    }
+
+    [Fact]
+    public async Task CreateUser_Fails_ServiceAccount_IfNotAdmin()
+    {
+        // Arrange
+        var dto = new CreateUserRequestDto
+        {
+            Name = "Unauthorized Bot",
+            AccountType = "service"
+        };
+
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<UnauthorizedAccessException>(
+            () => _userBusiness.CreateUser(dto));
+
+        Assert.Contains("Only Admins can create service accounts", exception.Message);
+    }
+
+    [Fact]
+    public async Task CreateUser_Fails_ServiceAccount_IfNameAlreadyExists()
+    {
+        // Arrange — "User 1" exists in seed data
+        var dto = new CreateUserRequestDto
+        {
+            Name = "User 1",
+            AccountType = "service"
+        };
+
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => _userBusiness.CreateUser(dto, isOrgAdmin: true));
+
+        Assert.Contains("Name must be unique", exception.Message);
+    }
+
+    // -- Test account tests --
+
+    [Fact]
+    public async Task CreateUser_Succeeds_TestAccount_AsSysAdmin()
+    {
+        // Arrange
+        var dto = new CreateUserRequestDto
+        {
+            Name = "Test Account Bot",
+            AccountType = "test"
+        };
+
+        // Act
+        var result = await _userBusiness.CreateUser(dto, isSysAdmin: true);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal("Test Account Bot", result.Name);
+        Assert.Equal("test", result.AccountType);
+    }
+
+    [Fact]
+    public async Task CreateUser_Fails_TestAccount_IfNotSysAdmin()
+    {
+        // Arrange
+        var dto = new CreateUserRequestDto
+        {
+            Name = "Unauthorized Test Bot",
+            AccountType = "test"
+        };
+
+        // Act & Assert — org/project admin is not enough
+        var exception = await Assert.ThrowsAsync<UnauthorizedAccessException>(
+            () => _userBusiness.CreateUser(dto, isOrgAdmin: true));
+
+        Assert.Contains("Only SysAdmins can create test accounts", exception.Message);
+    }
+
+    [Fact]
+    public async Task CreateUser_Fails_TestAccount_IfNotAdmin()
+    {
+        // Arrange
+        var dto = new CreateUserRequestDto
+        {
+            Name = "Unauthorized Test Bot",
+            AccountType = "test"
+        };
+
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<UnauthorizedAccessException>(
+            () => _userBusiness.CreateUser(dto));
+
+        Assert.Contains("Only SysAdmins can create test accounts", exception.Message);
+    }
+
+    [Fact]
+    public async Task CreateUser_Fails_TestAccount_IfNameAlreadyExists()
+    {
+        // Arrange — "User 1" exists in seed data
+        var dto = new CreateUserRequestDto
+        {
+            Name = "User 1",
+            AccountType = "test"
+        };
+
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => _userBusiness.CreateUser(dto, isSysAdmin: true));
+
+        Assert.Contains("Name must be unique", exception.Message);
     }
 
     #endregion
