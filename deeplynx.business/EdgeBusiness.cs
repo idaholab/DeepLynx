@@ -85,8 +85,8 @@ public class EdgeBusiness : IEdgeBusiness
             .Select(e => new EdgeResponseDto
             {
                 Id = e.Id,
-                OriginOriginalId = GetOriginalId(e.Origin?.Properties),
-                DestinationOriginalId = GetOriginalId(e.Destination?.Properties),
+                OriginOriginalId = e.Origin?.OriginalId,
+                DestinationOriginalId = e.Destination?.OriginalId,
                 Properties = e.Properties,
                 OriginId = e.OriginId,
                 DestinationId = e.DestinationId,
@@ -144,8 +144,8 @@ public class EdgeBusiness : IEdgeBusiness
         return new EdgeResponseDto
         {
             Id = edge.Id,
-            OriginOriginalId = GetOriginalId(edge.Origin?.Properties),
-            DestinationOriginalId = GetOriginalId(edge.Destination?.Properties),
+            OriginOriginalId = edge.Origin?.OriginalId,
+            DestinationOriginalId = edge.Destination?.OriginalId,
             Properties = edge.Properties,
             OriginId = edge.OriginId,
             DestinationId = edge.DestinationId,
@@ -230,8 +230,8 @@ public class EdgeBusiness : IEdgeBusiness
         return new EdgeResponseDto
         {
             Id = edge.Id,
-            OriginOriginalId = GetOriginalId(edge.Origin?.Properties),
-            DestinationOriginalId = GetOriginalId(edge.Destination?.Properties),
+            OriginOriginalId = edge.Origin?.OriginalId,
+            DestinationOriginalId = edge.Destination?.OriginalId,
             Properties = edge.Properties,
             OriginId = edge.OriginId,
             DestinationId = edge.DestinationId,
@@ -390,6 +390,9 @@ public class EdgeBusiness : IEdgeBusiness
         _context.Edges.Update(edge);
         await _context.SaveChangesAsync();
 
+        await _context.Entry(edge).Reference(e => e.Origin).LoadAsync();
+        await _context.Entry(edge).Reference(e => e.Destination).LoadAsync();
+
         // log edge update event
         await _eventBusiness.CreateEvent(
             currentUserId,
@@ -407,8 +410,8 @@ public class EdgeBusiness : IEdgeBusiness
         return new EdgeResponseDto
         {
             Id = edge.Id,
-            OriginOriginalId = GetOriginalId(edge.Origin?.Properties),
-            DestinationOriginalId = GetOriginalId(edge.Destination?.Properties),
+            OriginOriginalId = edge.Origin?.OriginalId,
+            DestinationOriginalId = edge.Destination?.OriginalId,
             Properties = edge.Properties,
             OriginId = edge.OriginId,
             DestinationId = edge.DestinationId,
@@ -689,26 +692,4 @@ public class EdgeBusiness : IEdgeBusiness
         };
     }
 
-    private static string? GetOriginalId(string? properties)
-    {
-        if (string.IsNullOrWhiteSpace(properties))
-            return null;
-
-        try
-        {
-            using var doc = JsonDocument.Parse(properties);
-
-            if (doc.RootElement.TryGetProperty("original_id", out var originalId))
-                return originalId.GetString();
-
-            if (doc.RootElement.TryGetProperty("originalId", out var camelOriginalId))
-                return camelOriginalId.GetString();
-
-            return null;
-        }
-        catch (JsonException)
-        {
-            return null;
-        }
-    }
 }
