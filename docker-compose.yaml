@@ -30,7 +30,9 @@ services:
       INSIGHT_API_URL: "http://insight-fastapi:5009"
       AUTH_TRUST_HOST: true
       NEXT_PUBLIC_DISABLE_FRONTEND_AUTHENTICATION: true # change to false if supplying okta info on lines 12-13, 25-26
-      NEXT_PUBLIC_HIDE_INSIGHT: ${HIDE_INSIGHT:-true}
+      # NEXT_PUBLIC_HIDE_INSIGHT is baked into the standalone build at build time
+      # (see build.args above). Setting it here at runtime has no effect — toggling
+      # it requires rebuilding the image (`docker compose up --build`).
     ports:
       - "3000:3000"
     networks:

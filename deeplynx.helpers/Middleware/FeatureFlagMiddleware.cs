@@ -41,29 +41,25 @@ public class FeatureFlagMiddleware
             return;
         }
 
-        // HIDE_INSIGHT env var. Defaults to true if not supplied.
+        // HIDE_INSIGHT env var. Defaults to true (hidden) if unset or invalid.
         var hideInsight = !bool.TryParse(Environment.GetEnvironmentVariable("HIDE_INSIGHT"), out var result) || result;
-        if (insightAttr != null) // this is redundant now but won't be once more feature flags are added
+        if (hideInsight)
         {
-            if (hideInsight)
+            context.Response.StatusCode = StatusCodes.Status403Forbidden;
+            await _problemDetailsService.TryWriteAsync(new ProblemDetailsContext
             {
-                context.Response.StatusCode = StatusCodes.Status403Forbidden;
-                await _problemDetailsService.TryWriteAsync(new ProblemDetailsContext
+                HttpContext = context,
+                ProblemDetails = new ProblemDetails
                 {
-                    HttpContext = context,
-                    ProblemDetails = new ProblemDetails
-                    {
-                        Type = "https://tools.ietf.org/html/rfc7231#section-6.5.3",
-                        Title = "Forbidden",
-                        Status = StatusCodes.Status403Forbidden,
-                        Detail = "Insight features are disabled on this instance."
-                    }
-                });
-                return;
-            }
-
-            await _next(context);
+                    Type = "https://tools.ietf.org/html/rfc7231#section-6.5.3",
+                    Title = "Forbidden",
+                    Status = StatusCodes.Status403Forbidden,
+                    Detail = "Insight features are disabled on this instance."
+                }
+            });
             return;
         }
+
+        await _next(context);
     }
 }
