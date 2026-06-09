@@ -46,7 +46,7 @@ function SigninContent() {
   // If auth is disabled, show loading while redirecting
   if (isAuthDisabled) {
     return (
-      <div className="flex flex-col items-center justify-center login min-h-screen gap-4 sm:p-22 font-[family-name:var(--font-roboto-sans)]">
+      <div className="flex flex-col items-center justify-center app-header min-h-screen gap-4 sm:p-22 font-[family-name:var(--font-roboto-sans)]">
         <div className="flex flex-col items-center sm:items-start mb-0">
           <Image
             src="/assets/nexusWhite.png"
@@ -67,7 +67,7 @@ function SigninContent() {
   // Show loading while checking authentication status
   if (status === "loading") {
     return (
-      <div className="flex flex-col items-center justify-center login min-h-screen gap-4 sm:p-22 font-[family-name:var(--font-roboto-sans)]">
+      <div className="flex flex-col items-center justify-center app-header min-h-screen gap-4 sm:p-22 font-[family-name:var(--font-roboto-sans)]">
         <div className="flex flex-col items-center sm:items-start mb-0">
           <Image
             src="/assets/nexusWhite.png"
@@ -88,7 +88,7 @@ function SigninContent() {
   // If authenticated, show loading while redirecting
   if (status === "authenticated") {
     return (
-      <div className="flex flex-col items-center justify-center login min-h-screen gap-4 sm:p-22 font-[family-name:var(--font-roboto-sans)]">
+      <div className="flex flex-col items-center justify-center app-header min-h-screen gap-4 sm:p-22 font-[family-name:var(--font-roboto-sans)]">
         <div className="flex flex-col items-center sm:items-start mb-0">
           <Image
             src="/assets/nexusWhite.png"
@@ -131,7 +131,7 @@ function SigninContent() {
       {/* Top Banner */}
       <TopBanner />
 
-      <div className="flex flex-col items-center justify-center login min-h-screen gap-4 sm:p-22 font-[family-name:var(--font-roboto-sans)] pt-10">
+      <div className="flex flex-col items-center justify-center app-header min-h-screen gap-4 sm:p-22 font-[family-name:var(--font-roboto-sans)] pt-10">
         <Image
           src="/assets/nexusWhite.png"
           alt="DeepLynx logo"
@@ -148,7 +148,9 @@ function SigninContent() {
                 className="p-6 transition-all duration-500"
                 style={{
                   opacity: hasAcknowledged ? 0 : 1,
-                  transform: hasAcknowledged ? "translateX(-100%)" : "translateX(0)",
+                  transform: hasAcknowledged
+                    ? "translateX(-100%)"
+                    : "translateX(0)",
                   position: hasAcknowledged ? "absolute" : "relative",
                   width: "100%",
                 }}
@@ -163,21 +165,21 @@ function SigninContent() {
                     information only.
                   </p>
                   <p>
-                    All data contained within DOE computer systems is owned by DOE
-                    and may be audited, intercepted, recorded, read, copied, or
-                    captured in any manner and disclosed in any manner by
+                    All data contained within DOE computer systems is owned by
+                    DOE and may be audited, intercepted, recorded, read, copied,
+                    or captured in any manner and disclosed in any manner by
                     authorized personnel.
                   </p>
                   <p>
-                    THERE IS NO RIGHT OF PRIVACY IN THIS SYSTEM. System personnel
-                    may disclose any potential evidence of crime found on DOE
-                    computer systems to appropriate authorities.
+                    THERE IS NO RIGHT OF PRIVACY IN THIS SYSTEM. System
+                    personnel may disclose any potential evidence of crime found
+                    on DOE computer systems to appropriate authorities.
                   </p>
                   <p>
                     USE OF THIS SYSTEM BY ANY USER, AUTHORIZED OR UNAUTHORIZED,
-                    CONSTITUTES CONSENT TO THIS AUDITING, INTERCEPTION, RECORDING,
-                    READING, COPYING, CAPTURING, and DISCLOSURE OF COMPUTER
-                    ACTIVITY.
+                    CONSTITUTES CONSENT TO THIS AUDITING, INTERCEPTION,
+                    RECORDING, READING, COPYING, CAPTURING, and DISCLOSURE OF
+                    COMPUTER ACTIVITY.
                   </p>
                   <p className="font-bold text-red-600 text-center text-base mt-4">
                     **WARNING**WARNING**WARNING**WARNING**WARNING**
@@ -196,7 +198,9 @@ function SigninContent() {
                 className="p-6 transition-all duration-500"
                 style={{
                   opacity: hasAcknowledged ? 1 : 0,
-                  transform: hasAcknowledged ? "translateX(0)" : "translateX(100%)",
+                  transform: hasAcknowledged
+                    ? "translateX(0)"
+                    : "translateX(100%)",
                   position: hasAcknowledged ? "relative" : "absolute",
                   width: "100%",
                 }}
@@ -246,7 +250,7 @@ export default function Signin() {
   return (
     <Suspense
       fallback={
-        <div className="flex flex-col items-center justify-center login min-h-screen gap-4 sm:p-22 font-[family-name:var(--font-roboto-sans)]">
+        <div className="flex flex-col items-center justify-center app-header min-h-screen gap-4 sm:p-22 font-[family-name:var(--font-roboto-sans)]">
           <div className="flex flex-col items-center sm:items-start mb-0">
             <Image
               src="/assets/nexusWhite.png"

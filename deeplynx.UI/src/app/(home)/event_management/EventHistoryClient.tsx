@@ -317,7 +317,7 @@ const EventsHistoryClient = ({initialProjects, initialSelectedProjects}: Props) 
           />
         </section>
       )}
-      <section className="mx-auto flex w-full max-w-7xl px-3 py-5 sm:px-6 lg:px-8">
+      <section className="bg-base-100/40 mx-auto flex w-full max-w-7xl px-3 py-5 sm:px-6 lg:px-8 min-h-screen">
         <div className="flex-1">
           <GenericTable
             columns={columns}

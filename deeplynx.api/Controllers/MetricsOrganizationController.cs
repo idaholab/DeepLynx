@@ -39,7 +39,6 @@ public class MetricsOrganizationController : ControllerBase
     /// <param name="organizationId">The organization from which to retrieve the summary statistic</param>
     /// <returns>The total number of bytes of file data stored in this org's registered object storages.</returns>
     [HttpGet("storage/size", Name = "api_storage_size_organization")]
-    [SysAdmin]
     public async Task<IActionResult> GetOrganizationStorageSize(long organizationId)
     {
         try

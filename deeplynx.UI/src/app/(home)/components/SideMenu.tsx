@@ -98,7 +98,7 @@ const SideMenu: React.FC<SideMenuProps> = ({
     } finally {
       setLoadingProjects(false);
     }
-  }, [organization]);
+  }, [organization, project]);
 
   /* -------------------------------- Effects ------------------------------- */
 
@@ -247,8 +247,9 @@ const SideMenu: React.FC<SideMenuProps> = ({
   };
 
   const isProjectActive = (projectId: string | number) => {
-    const isOnProjectPage = pathname.includes(`/project/${projectId}`);
-    const isSessionProject = project?.projectId === projectId.toString();
+    const projectIdString = projectId.toString();
+    const isOnProjectPage = pathname.match(/^\/project\/([^/]+)(?:\/|$)/)?.[1] === projectIdString;
+    const isSessionProject = project?.projectId === projectIdString;
     return isOnProjectPage || isSessionProject;
   };
 
@@ -256,12 +257,14 @@ const SideMenu: React.FC<SideMenuProps> = ({
 
   return (
     <div
-      className={`fixed top-20 bottom-0 left-0 lg:left-18 flex z-40 transition-transform duration-300 ${mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
-        }`}
+      className={`fixed top-20 bottom-0 left-0 lg:left-18 flex z-40 transition-transform duration-300 ${
+        mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
+      }`}
     >
       <aside
-        className={`h-full shadow-xl ${isCollapsed ? "w-22" : "w-[18rem] sm:w-[20rem] lg:w-64"
-          } bg-[var(--base-400)] brightness-120 text-primary-content p-4 transition-all duration-300 flex flex-col overflow-y-auto`}
+        className={`h-full shadow-xl ${
+          isCollapsed ? "w-22" : "w-[18rem] sm:w-[20rem] lg:w-64"
+        } app-header-inverted brightness-120 text-neutral-content p-4 transition-all duration-300 flex flex-col overflow-y-auto`}
       >
         <div className="flex justify-end lg:hidden">
           <button
@@ -309,7 +312,7 @@ const SideMenu: React.FC<SideMenuProps> = ({
                       {t.translations.PROJECTS}
                     </span>
                     <h1 className="text-lg font-bold truncate">
-                      {activeProject?.name || t.translations.NO_PROJECT}
+                      {project?.projectName || activeProject?.name || t.translations.NO_PROJECT}
                     </h1>
                   </div>
                 )}
@@ -327,9 +330,9 @@ const SideMenu: React.FC<SideMenuProps> = ({
 
             {/* Projects List */}
             {!isCollapsed && isProjectsExpanded && (
-              <ul className="mt-2 space-y-1 max-h-64 overflow-y-auto bg-[var(--base-400)] border border-white/10 rounded-lg ">
+              <ul className="mt-2 space-y-1 max-h-64 overflow-y-auto border border-white/10 rounded-lg ">
                 {loadingProjects ? (
-                  <li className="py-2 px-4 text-sm text-primary-content/70">
+                  <li className="py-2 px-4 text-sm text-neutral-content/70">
                     <span className="loading loading-spinner loading-sm"></span>
                     <span className="ml-2">{t.translations.LOADING}</span>
                   </li>
@@ -342,10 +345,11 @@ const SideMenu: React.FC<SideMenuProps> = ({
                     <li key={proj.id}>
                       <button
                         onClick={() => handleProjectClick(proj)}
-                        className={`w-full text-left py-2 px-4 rounded transition text-sm flex items-center ${isProjectActive(proj.id)
-                          ? "bg-info/30 text-primary-content font-semibold"
-                          : "hover:bg-info/20 text-primary-content"
-                          }`}
+                        className={`w-full text-left py-2 px-4 rounded transition text-sm flex items-center ${
+                          isProjectActive(proj.id)
+                            ? "bg-info/30 text-neutral-content font-semibold"
+                            : "hover:bg-info/20 text-neutral-content"
+                        }`}
                       >
                         <span className="truncate">{proj.name}</span>
                         {isProjectActive(proj.id) && (
@@ -363,7 +367,7 @@ const SideMenu: React.FC<SideMenuProps> = ({
         )}
 
         {/* ------------------------------ Menu ------------------------------- */}
-        <ul className="mt-8">
+        <ul className="mt-8 text-secondary-content">
           {/* Project Dashboard */}
           <li>
             <Link
@@ -480,7 +484,7 @@ const SideMenu: React.FC<SideMenuProps> = ({
 
       {/* ---------------------------- Toggle Tab ----------------------------- */}
       <div
-        className="hidden lg:flex h-8 w-4 bg-base-300 brightness-120 text-primary-content items-center justify-center cursor-pointer rounded-r-md mt-16"
+        className="hidden lg:flex h-8 w-4 app-header brightness-120 text-neutral-content items-center justify-center cursor-pointer rounded-r-md mt-16"
         onClick={toggleMenu}
       >
         {isCollapsed ? (

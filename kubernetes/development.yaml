@@ -6,7 +6,6 @@ metadata:
   labels:
     name: deeplynxv3-dev
 
-
 # Secret for Azure Storage Account with SAS Token
 ---
 apiVersion: v1
@@ -20,7 +19,6 @@ stringData:
   azurestorageaccountsastoken: ${AZURE_STORAGE_ACCOUNT_SAS_TOKEN}
   azurestorageaccountkey: ${AZURE_STORAGE_ACCOUNT_KEY}
   azurestorageconnectionstring: ${AZURE_OBJECT_CONNECTION_STRING}
-
 
 # Persistent Volume pointing to existing Azure File Share
 ---
@@ -59,7 +57,6 @@ spec:
       name: azure-storage-secret
       namespace: deeplynxv3-dev
 
-
 # Storage Class (simplified for static provisioning)
 ---
 apiVersion: storage.k8s.io/v1
@@ -73,7 +70,6 @@ parameters:
 reclaimPolicy: Retain
 allowVolumeExpansion: true
 volumeBindingMode: Immediate
-
 
 # Persistent Volume Claim
 ---
@@ -402,6 +398,7 @@ spec:
               memory: "2Gi"
           ports:
             - containerPort: 5000
+            - containerPort: 50051
           volumeMounts:
             - name: duckdb-storage
               mountPath: /data/duckdb
@@ -409,7 +406,6 @@ spec:
         - name: duckdb-storage
           persistentVolumeClaim:
             claimName: ${AZURE_FILE_SHARE_PVC}
-
 
 #docs
 ---
@@ -449,7 +445,6 @@ spec:
           ports:
             - containerPort: 3001
 
-
 #mcp
 ---
 apiVersion: apps/v1
@@ -485,7 +480,6 @@ spec:
               cpu: "500m"
           ports:
             - containerPort: 43656
-
 
 # insight-rabbitmq
 ---
@@ -544,7 +538,6 @@ spec:
             timeoutSeconds: 5
             failureThreshold: 3
 
-
 # insight-storage: scratch volume for the Insight processing pipeline
 ---
 apiVersion: v1
@@ -559,7 +552,6 @@ spec:
     requests:
       storage: 25Gi
   storageClassName: ${AZURE_FILE_SHARE_STORAGE_CLASS}
-
 
 # insight-fastapi
 ---
@@ -669,7 +661,6 @@ spec:
         - name: insight-storage
           persistentVolumeClaim:
             claimName: insight-storage
-
 
 # insight-rabbitmq-runner
 ---
@@ -824,6 +815,9 @@ spec:
     - name: http
       port: 80
       targetPort: 5000
+    - name: grpc
+      port: 50051
+      targetPort: 50051
   selector:
     app: deeplynxbackend
 ---

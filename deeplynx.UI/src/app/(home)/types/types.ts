@@ -2,9 +2,9 @@
 
 import React, { ReactNode } from 'react';
 import { CustomQueryRequestDto } from './requestDTOs';
-import { HistoricalRecordResponseDto, RecordResponseDto } from './responseDTOs';
+import { QueryRecordViewResponseDto } from './responseDTOs';
 
-export type RecordTableRow = HistoricalRecordResponseDto & {
+export type RecordTableRow = QueryRecordViewResponseDto & {
   fileType: string;
   timeseries?: boolean;
   fileSize?: number;
@@ -226,3 +226,7 @@ export type ExpandableTableColumn<T> = {
   isExpandTrigger?: (row: T) => boolean;
 };
 
+export type RecordTagLinkDto = {
+  record_id: number;
+  tag_id: number;
+};
