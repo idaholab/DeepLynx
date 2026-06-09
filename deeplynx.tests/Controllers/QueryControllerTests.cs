@@ -69,7 +69,7 @@ public class QueryControllerTests : IDisposable
             new List<QueryRecordViewResponseDto>();
 
         _mockQueryBusiness.Setup(b => b.Search(
-            UserId, Query, OrgId, ProjectList, false, false, false))
+            UserId, Query, OrgId, ProjectList, false, false, false, false))
             .ReturnsAsync(expected);
 
         var result = (await _QueryController.SearchRecords(
@@ -88,7 +88,7 @@ public class QueryControllerTests : IDisposable
     {
 
         _mockQueryBusiness.Setup(b => b.Search(
-            UserId, Query, OrgId, ProjectList, false, false, false))
+            UserId, Query, OrgId, ProjectList, false, false, false, false))
             .ReturnsAsync([]);
 
         var result = (await _QueryController.SearchRecords(
@@ -107,7 +107,7 @@ public class QueryControllerTests : IDisposable
 
 
         _mockQueryBusiness.Setup(b => b.Search(
-            UserId, Query, OrgId, ProjectList, true, false, false))
+            UserId, Query, OrgId, ProjectList, true, false, false, false))
             .ThrowsAsync(new Exception("db error"));
 
         var actionResult = await _QueryController.SearchRecords(
@@ -128,7 +128,7 @@ public class QueryControllerTests : IDisposable
             new List<QueryRecordViewResponseDto>();
 
         _mockQueryBusiness.Setup(b => b.Search(
-            UserId, Query, OrgId, ProjectList, true, false, false))
+            UserId, Query, OrgId, ProjectList, true, false, false, false))
             .ReturnsAsync(expected);
 
         var result = (await _QueryController.SearchRecords(
@@ -145,6 +145,7 @@ public class QueryControllerTests : IDisposable
                 OrgId,
                 ProjectList,
                 true,
+                false,
                 false,
                 false),
             Times.Once);
