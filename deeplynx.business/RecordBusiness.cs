@@ -1051,7 +1051,7 @@ public async Task<PaginatedResponse<RecordResponseDto>> GetAllRecordsPaginated(
                 w.Write(projectId, NpgsqlDbType.Bigint);
                 w.Write(dataSourceId, NpgsqlDbType.Bigint);
                 if (dto.Name is null) w.WriteNull();
-                else w.Write(dto.Name, NpgsqlDbType.Text);
+                else w.Write(dto.Name.Length > 500 ? dto.Name [..500] : dto.Name,  NpgsqlDbType.Text);
                 if (dto.Description is null) w.WriteNull();
                 else w.Write(dto.Description, NpgsqlDbType.Text);
                 if (dto.Uri is null) w.WriteNull();
