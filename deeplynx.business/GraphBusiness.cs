@@ -59,13 +59,25 @@ public class GraphBusiness : IGraphBusiness
 
         if (sourceRecord == null) throw new KeyNotFoundException($"Record with id {recordId} not found");
 
-        var isAdmin = await AdminHelper.IsAnyAdmin(_context, currentUserId, organizationId, projectId);
+        var isSysAdmin = await AdminHelper.IsSysAdmin(_context, currentUserId);
+        var isAdmin = isSysAdmin || await AdminHelper.IsAnyAdmin(_context, currentUserId, organizationId, projectId);
 
         IQueryable<Edge> edgeQuery = _context.Edges
             .Include(e => e.Relationship)
             .Where(e => !e.IsArchived
                 && e.OrganizationId == organizationId
                 && e.ProjectId == projectId);
+
+        if (!isSysAdmin)
+        {
+            var hasProjectAccess = await _context.ProjectMembers.AnyAsync(pm =>
+                pm.ProjectId == projectId &&
+                (pm.UserId == currentUserId ||
+                (pm.GroupId.HasValue && pm.Group != null && pm.Group.Users.Any(u => u.Id == currentUserId))));
+
+            if (!hasProjectAccess && !isAdmin)
+                throw new AccessViolationException($"You do not have access to project with id {projectId}");
+        }
 
         if (!isAdmin)
         {
@@ -198,8 +210,8 @@ public class GraphBusiness : IGraphBusiness
 
                 visitedRecords.Add(currentLevelRecordId);
 
-                var outgoingEdges = await GetGraphEdges(currentLevelRecordId, userProjectIds, userAuthorizedLabels, isSysAdmin, true);
-                var incomingEdges = await GetGraphEdges(currentLevelRecordId, userProjectIds, userAuthorizedLabels, isSysAdmin, false);
+                var outgoingEdges = await GetGraphEdges(currentLevelRecordId, userProjectIds, userAuthorizedLabels, isSysAdmin, isAdmin, true);
+                var incomingEdges = await GetGraphEdges(currentLevelRecordId, userProjectIds, userAuthorizedLabels, isSysAdmin, isAdmin, false);
 
                 ProcessEdges(outgoingEdges, nodes, links, visitedEdges, nextLevelRecordIds, true);
                 ProcessEdges(incomingEdges, nodes, links, visitedEdges, nextLevelRecordIds, false);
@@ -221,6 +233,7 @@ public class GraphBusiness : IGraphBusiness
     /// <param name="recordId">The ID of the record to get edges for</param>
     /// <param name="userProjectIds">The ID of the projects the user has access to</param>
     /// <param name="userAuthorizedLabels">list of Sensitivity Label IDs that the requesting user has access to</param>
+    /// <param name="isSysAdmin">If true, skips project membership filtering.</param>
     /// <param name="isAdmin">if admin then skip sensitivity label checks</param>
     /// <param name="isOutgoing">True for edges going OUT from this record, False for edges coming IN to this record</param>
     /// <returns>A list of edges with their related data (origin, destination, relationship) loaded</returns>
@@ -228,6 +241,7 @@ public class GraphBusiness : IGraphBusiness
         long recordId,
         List<long> userProjectIds,
         List<long>? userAuthorizedLabels,
+        bool isSysAdmin,
         bool isAdmin,
         bool isOutgoing)
     {
@@ -239,13 +253,16 @@ public class GraphBusiness : IGraphBusiness
             .Include(e => e.Relationship)
             .Where(e => !e.IsArchived);
 
-        if (!isAdmin)
+        if (!isSysAdmin)
         {
             query = query.Where(e =>
                 userProjectIds.Contains(e.ProjectId) &&
                 userProjectIds.Contains(e.Origin.ProjectId) &&
                 userProjectIds.Contains(e.Destination.ProjectId));
+        }
 
+        if (!isAdmin)
+        {
             query = query.Where(e =>
                 (!e.Origin.Labels.Any() || e.Origin.Labels.All(l => userAuthorizedLabels!.Contains(l.Id))) &&
                 (!e.Destination.Labels.Any() || e.Destination.Labels.All(l => userAuthorizedLabels!.Contains(l.Id))));
