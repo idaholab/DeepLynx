@@ -259,6 +259,23 @@ public class LatticeExtractionBusinessTests : IntegrationTestBase
             _business.MarkExtractionFailed(NotFoundId));
     }
 
+    [Fact]
+    public async Task MarkExtractionFailed_Throws_WhenScopedToWrongProject()
+    {
+        var otherProj = new Project
+        {
+            Name = "Wrong Scope Project",
+            OrganizationId = oid,
+            LastUpdatedAt = UnspecifiedNow(),
+            LastUpdatedBy = uid
+        };
+        Context.Projects.Add(otherProj);
+        await Context.SaveChangesAsync();
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            _business.MarkExtractionFailed(extractionId, oid, otherProj.Id, "wrong scope"));
+    }
+
     #endregion
 
     // =========================================================================
@@ -312,6 +329,17 @@ public class LatticeExtractionBusinessTests : IntegrationTestBase
 
         Assert.Contains(result, e => e.Id == extractionId && e.Status == ExtractionStatus.Running && e.Mode == ExtractionMode.Strict);
         Assert.Contains(result, e => e.Id == completeExtractionId && e.Status == ExtractionStatus.Complete && e.Mode == ExtractionMode.Discovery);
+    }
+
+    [Fact]
+    public async Task ListExtractionsByProject_ReturnsFailureMessage()
+    {
+        const string failureMessage = "LLM model endpoint rejected the request.";
+        await _business.MarkExtractionFailed(extractionId, failureMessage);
+
+        var result = await _business.ListExtractionsByProject(pid);
+
+        Assert.Contains(result, e => e.Id == extractionId && e.FailureMessage == failureMessage);
     }
 
     #endregion

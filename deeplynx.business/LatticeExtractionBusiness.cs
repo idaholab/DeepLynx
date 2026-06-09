@@ -83,6 +83,42 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
             : null;
     }
 
+    private static void EnsureExtractionInProject(Extraction extraction, long projectId)
+    {
+        if (extraction.ProjectId != projectId)
+            throw new InvalidOperationException($"Extraction {extraction.Id} not found in project {projectId}.");
+    }
+
+    private async Task EnsureProjectInOrganization(long organizationId, long projectId)
+    {
+        var projectExists = await _context.Projects.AnyAsync(p =>
+            p.Id == projectId &&
+            p.OrganizationId == organizationId &&
+            !p.IsArchived);
+
+        if (!projectExists)
+            throw new InvalidOperationException($"Project {projectId} not found in organization {organizationId}.");
+    }
+
+    private async Task EnsureExtractionScope(Extraction extraction, long organizationId, long projectId)
+    {
+        EnsureExtractionInProject(extraction, projectId);
+        await EnsureProjectInOrganization(organizationId, projectId);
+    }
+
+    private async Task EnsureDataSourceScope(long dataSourceId, long organizationId, long projectId)
+    {
+        var dataSourceExists = await _context.DataSources.AnyAsync(ds =>
+            ds.Id == dataSourceId &&
+            ds.ProjectId == projectId &&
+            ds.OrganizationId == organizationId &&
+            !ds.IsArchived);
+
+        if (!dataSourceExists)
+            throw new InvalidOperationException(
+                $"Data source {dataSourceId} not found in organization {organizationId}, project {projectId}.");
+    }
+
     private async Task MarkExtractionFailedInternal(
         Extraction extraction,
         string stage,
@@ -137,10 +173,19 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
         long recordId,
         string mode)
     {
+        if (mode != ExtractionMode.Strict && mode != ExtractionMode.Discovery)
+            throw new InvalidOperationException(
+                $"Extraction mode must be '{ExtractionMode.Strict}' or '{ExtractionMode.Discovery}'.");
+
         var record = await _context.Records
-                         .Where(r => r.Id == recordId && r.ProjectId == projectId)
+                         .Where(r =>
+                             r.Id == recordId &&
+                             r.ProjectId == projectId &&
+                             r.OrganizationId == organizationId &&
+                             !r.IsArchived)
                          .FirstOrDefaultAsync()
-                     ?? throw new InvalidOperationException($"Record {recordId} not found in project {projectId}");
+                     ?? throw new InvalidOperationException(
+                         $"Record {recordId} not found in organization {organizationId}, project {projectId}");
 
         // Minimum ontology items necessary for extraction
         await EnsureOntologyReady(projectId);
@@ -255,6 +300,8 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
     {
         var extraction = await _context.Extractions.FindAsync(extractionId)
                          ?? throw new InvalidOperationException($"Extraction {extractionId} not found.");
+        await EnsureExtractionScope(extraction, organizationId, projectId);
+        await EnsureDataSourceScope(dataSourceId, organizationId, projectId);
 
         var failureStage = FailureStageCallback;
         try
@@ -340,6 +387,24 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
         var extraction = await _context.Extractions.FindAsync(extractionId)
                          ?? throw new InvalidOperationException($"Extraction {extractionId} not found.");
 
+        await MarkExtractionFailed(extraction, errorMessage);
+    }
+
+    public async Task MarkExtractionFailed(
+        long extractionId,
+        long organizationId,
+        long projectId,
+        string? errorMessage = null)
+    {
+        var extraction = await _context.Extractions.FindAsync(extractionId)
+                         ?? throw new InvalidOperationException($"Extraction {extractionId} not found.");
+        await EnsureExtractionScope(extraction, organizationId, projectId);
+
+        await MarkExtractionFailed(extraction, errorMessage);
+    }
+
+    private async Task MarkExtractionFailed(Extraction extraction, string? errorMessage = null)
+    {
         var failureMessage = string.IsNullOrWhiteSpace(errorMessage)
             ? "Insight reported that extraction failed, but did not include a failure message."
             : errorMessage.Trim();
@@ -353,7 +418,7 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
 
         _logger.LogError(
             "Lattice extraction {ExtractionId} failed asynchronously at stage {FailureStage}. Message: {ErrorMessage}",
-            extractionId,
+            extraction.Id,
             failureStage,
             failureMessage);
     }
@@ -410,18 +475,31 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
     /// <param name="projectId">The ID of the project</param>
     public async Task<List<ExtractionListItemDto>> ListExtractionsByProject(long projectId)
     {
-        return await _context.Extractions
+        var extractions = await _context.Extractions
             .Where(e => e.ProjectId == projectId)
             .OrderByDescending(e => e.Id)
+            .Select(e => new
+            {
+                e.Id,
+                e.Status,
+                e.Mode,
+                e.CreatedBy,
+                e.ProjectId,
+                e.Properties
+            })
+            .ToListAsync();
+
+        return extractions
             .Select(e => new ExtractionListItemDto
             {
                 Id = e.Id,
                 Status = e.Status,
                 Mode = e.Mode,
                 CreatedBy = e.CreatedBy,
-                ProjectId = e.ProjectId
+                ProjectId = e.ProjectId,
+                FailureMessage = GetExtractionFailureMessage(e.Properties)
             })
-            .ToListAsync();
+            .ToList();
     }
 
 
@@ -429,6 +507,25 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
     {
         var extraction = await _context.Extractions.FindAsync(extractionId)
                          ?? throw new InvalidOperationException($"Extraction {extractionId} not found.");
+
+        return await GetExtractionStaging(extraction);
+    }
+
+    public async Task<ExtractionStagingResponseDto> GetExtractionStaging(
+        long extractionId,
+        long organizationId,
+        long projectId)
+    {
+        var extraction = await _context.Extractions.FindAsync(extractionId)
+                         ?? throw new InvalidOperationException($"Extraction {extractionId} not found.");
+        await EnsureExtractionScope(extraction, organizationId, projectId);
+
+        return await GetExtractionStaging(extraction);
+    }
+
+    private async Task<ExtractionStagingResponseDto> GetExtractionStaging(Extraction extraction)
+    {
+        var extractionId = extraction.Id;
 
         var classes = await _latticeContext.ExtractionClasses
             .Where(c => c.ExtractionId == extractionId)
@@ -520,6 +617,7 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
     {
         var extraction = await _context.Extractions.FindAsync(extractionId)
                          ?? throw new InvalidOperationException($"Extraction {extractionId} not found.");
+        await EnsureExtractionScope(extraction, organizationId, projectId);
 
         if (extraction.Status != ExtractionStatus.Complete)
             throw new InvalidOperationException(
@@ -1021,6 +1119,10 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
 
         if (!recordEmbedded)
         {
+            if (string.IsNullOrWhiteSpace(record.Uri))
+                throw new InvalidOperationException(
+                    $"Record {recordId} does not have a file URI available for Insight embedding.");
+
             AiModelConfigResponseDto.WithToken vlmConfig;
             try
             {

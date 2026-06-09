@@ -185,6 +185,23 @@ public class LatticeExtractionController : ControllerBase
                 message = exc.Message
             });
         }
+        catch (InsightServiceException exc)
+        {
+            _logger.LogError(
+                exc,
+                "Insight ontology embedding request failed for project {ProjectId}: {Error}",
+                projectId,
+                exc.Message);
+            return StatusCode(
+                exc.StatusCode.HasValue
+                    ? (int)exc.StatusCode.Value
+                    : StatusCodes.Status502BadGateway,
+                new
+                {
+                    error = "ontology_embedding_failed",
+                    message = exc.Message
+                });
+        }
         catch (Exception exc)
         {
             var message = $"An error occurred while queuing ontology embedding: {exc}";
@@ -211,7 +228,11 @@ public class LatticeExtractionController : ControllerBase
         try
         {
             var failureMessage = await ReadFailureMessage(errorMessage);
-            await _latticeExtractionBusiness.MarkExtractionFailed(extractionId, failureMessage);
+            await _latticeExtractionBusiness.MarkExtractionFailed(
+                extractionId,
+                organizationId,
+                projectId,
+                failureMessage);
             return Accepted(new
             {
                 status = "failed",
@@ -267,7 +288,10 @@ public class LatticeExtractionController : ControllerBase
             try
             {
                 await _latticeExtractionBusiness.MarkExtractionFailed(
-                    extractionId, $"LLM response could not be parsed: {exc.Message}");
+                    extractionId,
+                    organizationId,
+                    projectId,
+                    $"LLM response could not be parsed: {exc.Message}");
             }
             catch (Exception markFailedExc)
             {
@@ -311,7 +335,7 @@ public class LatticeExtractionController : ControllerBase
     {
         try
         {
-            var result = await _latticeExtractionBusiness.GetExtractionStaging(extractionId);
+            var result = await _latticeExtractionBusiness.GetExtractionStaging(extractionId, organizationId, projectId);
             return Ok(result);
         }
         catch (InvalidOperationException exc)
