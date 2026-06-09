@@ -513,54 +513,75 @@ public class FileBusiness
             throw new ArgumentException("maxBatches must be greater than zero.");
         
         var response = new BackfillFileSizesResponseDto();
-        
-        // only backfill for records that have a uri and an object storage id
-        var toBackfill = _context.Records
-            .Where(r => r.Uri != null && r.FileSize == null && r.ObjectStorageId != null);
 
-        if (organizationId.HasValue)
-            toBackfill = toBackfill.Where(r => r.OrganizationId == organizationId.Value);
-        if (projectId.HasValue)
-            toBackfill = toBackfill.Where(r => r.ProjectId == projectId.Value);
-
-        var backfillRecords = await toBackfill.ToListAsync();
-
-        // group by storage to avoid per-record storage lookup
-        var recordsByStorage = backfillRecords
-            .GroupBy(r => r.ObjectStorageId!.Value)
-            .ToList();
-
-        foreach (var storageGroup in recordsByStorage)
+        for (var batchNumber = 0; batchNumber < maxBatches; batchNumber++)
         {
-            var objectStorageId = storageGroup.Key;
-            var objectStorage = await _objectStorageBusiness.GetDecryptedObjectStorage(objectStorageId);
-            var fileBusiness = _factory.CreateFileBusiness(objectStorage.Type);
+            var toBackfill = _context.Records
+                .Where(r => r.Uri != null && r.FileSize == null && r.ObjectStorageId != null && !r.IsArchived);
+            
+            if (organizationId.HasValue)
+                toBackfill = toBackfill.Where(r => r.OrganizationId == organizationId.Value);
+            
+            if (projectId.HasValue)
+                toBackfill = toBackfill.Where(r => r.ProjectId == projectId.Value);
+            
+            if (afterRecordId.HasValue)
+                toBackfill = toBackfill.Where(r => r.Id > afterRecordId.Value);
+            
+            var records = await toBackfill
+                .OrderBy(r => r.Id)
+                .Take(batchSize)
+                .ToListAsync();
 
-            // for azure, try batch operation first
-            if (objectStorage.Type == "azure_object" && fileBusiness is FileAzureBusiness azureBusiness)
+            if (records.Count == 0)
+                break;
+            
+            response.Processed += records.Count;
+            response.LastRecordId = records.Max(r => r.Id);
+
+            var recordsByStorage = records
+                .GroupBy(r => r.ObjectStorageId!.Value)
+                .ToList();
+            
+            foreach (var storageGroup in recordsByStorage)
             {
-                var uris = storageGroup.Select(r => r.Uri).ToList();
-                var sizes = await azureBusiness.GetFileSizesBatch(uris, objectStorage.Config);
+                var objectStorageId = storageGroup.Key;
+                var objectStorage = await _objectStorageBusiness.GetDecryptedObjectStorage(objectStorageId);
+                var fileBusiness = _factory.CreateFileBusiness(objectStorage.Type);
 
-                foreach (var record in storageGroup)
+                // for azure, try batch operation first
+                if (objectStorage.Type == "azure_object" && fileBusiness is FileAzureBusiness azureBusiness)
                 {
-                    if (sizes.TryGetValue(record.Uri, out var size))
-                        record.FileSize = size;
+                    var uris = storageGroup.Select(r => r.Uri).ToList();
+                    var sizes = await azureBusiness.GetFileSizesBatch(uris, objectStorage.Config);
+
+                    foreach (var record in storageGroup)
+                    {
+                        if (sizes.TryGetValue(record.Uri, out var size))
+                            record.FileSize = size;
+                    }
+                }
+                else
+                {
+                    // fall back to individual calls for filesystem
+                    foreach (var record in storageGroup)
+                    {
+                        var fileSize = await fileBusiness.GetFileSize(record.Uri, objectStorage.Config);
+                        record.FileSize = fileSize;
+                    }
                 }
             }
-            else
-            {
-                // fall back to individual calls for filesystem
-                foreach (var record in storageGroup)
-                {
-                    var fileSize = await fileBusiness.GetFileSize(record.Uri, objectStorage.Config);
-                    record.FileSize = fileSize;
-                }
-            }
+
+            // save all changes at once to avoid multiple DB trips
+            await _context.SaveChangesAsync();
+
+            afterRecordId = response.LastRecordId;
+
+            if (records.Count < batchSize)
+                break;
         }
-
-        // save all changes at once to avoid multiple DB trips
-        await _context.SaveChangesAsync();
+        
+        return response;
     }
 
     public async Task<TusFileUploadSessionResponseDto> CreateUploadTus(
