@@ -89,7 +89,7 @@ public class HistoricalRecordBusiness : IHistoricalRecordBusiness
             {
                 Id = r.RecordId,
                 Uri = currentRecords.TryGetValue(r.RecordId, out var currentRecord) &&
-                    CanExposeUri(currentRecord, authorizedDownloadLabels, isSysAdmin, isOrgAdmin, isProjectAdmin)
+                    ExposeUriHelper.CanExposeUri(currentRecord, authorizedDownloadLabels, isSysAdmin, isOrgAdmin, isProjectAdmin)
                     ? r.Uri
                     : null,
                 Properties = r.Properties,
@@ -138,7 +138,7 @@ public class HistoricalRecordBusiness : IHistoricalRecordBusiness
             record.ProjectId,
             "download file");
 
-        var canExposeUri = CanExposeUri(
+        var canExposeUri = ExposeUriHelper.CanExposeUri(
             record,
             authorizedDownloadLabels,
             isSysAdmin,
@@ -244,7 +244,7 @@ public class HistoricalRecordBusiness : IHistoricalRecordBusiness
         return new HistoricalRecordResponseDto
         {
             Id = record.RecordId,
-            Uri = CanExposeUri(
+            Uri = ExposeUriHelper.CanExposeUri(
                 currentRecord,
                 authorizedDownloadLabels,
                 isSysAdmin,
@@ -274,17 +274,4 @@ public class HistoricalRecordBusiness : IHistoricalRecordBusiness
         };
     }
 
-    private static bool CanExposeUri(
-        Record record,
-        List<long> authorizedDownloadLabels,
-        bool isSysAdmin = false,
-        bool isOrgAdmin = false,
-        bool isProjectAdmin = false)
-    {
-        return isSysAdmin ||
-            isOrgAdmin ||
-            isProjectAdmin ||
-            record.Labels.Count == 0 ||
-            record.Labels.All(l => authorizedDownloadLabels.Contains(l.Id));
-    }
 }

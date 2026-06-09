@@ -99,7 +99,7 @@ public class RecordBusiness : IRecordBusiness
         {
             Id = r.Id,
             Description = r.Description,
-            Uri = CanExposeUri(
+            Uri = ExposeUriHelper.CanExposeUri(
                 r,
                 authorizedDownloadLabels,
                 isSysAdmin,
@@ -213,7 +213,7 @@ public async Task<PaginatedResponse<RecordResponseDto>> GetAllRecordsPaginated(
     {
         Id = r.Id,
         Description = r.Description,
-        Uri = CanExposeUri(
+        Uri = ExposeUriHelper.CanExposeUri(
             r,
             authorizedDownloadLabels,
             isSysAdmin,
@@ -305,7 +305,7 @@ public async Task<PaginatedResponse<RecordResponseDto>> GetAllRecordsPaginated(
             {
                 Id = r.Id,
                 Description = r.Description,
-                Uri = CanExposeUri(
+                Uri = ExposeUriHelper.CanExposeUri(
                     r,
                     authorizedDownloadLabels,
                     isSysAdmin,
@@ -380,7 +380,7 @@ public async Task<PaginatedResponse<RecordResponseDto>> GetAllRecordsPaginated(
         {
             Id = record.Id,
             Description = record.Description,
-            Uri = CanExposeUri(record, authorizedDownloadLabels, isSysAdmin, isOrgAdmin, isProjectAdmin)
+            Uri = ExposeUriHelper.CanExposeUri(record, authorizedDownloadLabels, isSysAdmin, isOrgAdmin, isProjectAdmin)
                 ? record.Uri
                 : null,
             Properties = record.Properties,
@@ -888,7 +888,7 @@ public async Task<PaginatedResponse<RecordResponseDto>> GetAllRecordsPaginated(
             {
                 Id = record.Id,
                 Description = record.Description,
-                Uri = CanExposeUri(record, authorizedDownloadLabels) ? record.Uri : null,
+                Uri = ExposeUriHelper.CanExposeUri(record, authorizedDownloadLabels) ? record.Uri : null,
                 Properties = record.Properties,
                 ObjectStorageId = record.ObjectStorageId,
                 OriginalId = record.OriginalId,
@@ -928,6 +928,9 @@ public async Task<PaginatedResponse<RecordResponseDto>> GetAllRecordsPaginated(
     /// <param name="dataSourceId">The ID of the data source under which to create the record</param>
     /// <param name="records">Enumerable list for of record transfer objects containing details on the records to be created</param>
     /// <param name="sensitivityLabelIds">The IDs of the labels to attach</param>
+    /// <param name="isSysAdmin">Optional param determining if the requesting user is a system admin</param>
+    /// <param name="isOrgAdmin">Optional param determining if the requesting user is an organization admin</param>
+    /// <param name="isProjectAdmin">Optional param determining if the requesting user is a project admin</param>
     /// <returns>The newly created metadata record</returns>
     /// <exception cref="KeyNotFoundException">Returned if the project or datasource are not found</exception>
     /// <exception cref="Exception">Returned on other general errors</exception>
@@ -937,7 +940,10 @@ public async Task<PaginatedResponse<RecordResponseDto>> GetAllRecordsPaginated(
         long projectId,
         long dataSourceId,
         List<CreateRecordRequestDto> records,
-        List<long>? sensitivityLabelIds = null)
+        List<long>? sensitivityLabelIds = null,
+        bool isSysAdmin = false,
+        bool isOrgAdmin = false,
+        bool isProjectAdmin = false)
     {
         await ExistenceHelper.EnsureDataSourceExistsForProjectAsync(_context, dataSourceId, projectId);
 
@@ -1219,9 +1225,11 @@ public async Task<PaginatedResponse<RecordResponseDto>> GetAllRecordsPaginated(
 
         foreach (var record in inserted)
         {
-            var canExposeUri =
-                record.Labels.Count == 0 ||
-                record.Labels.All(l => authorizedDownloadLabels.Contains(l.Id));
+            var canExposeUri = isSysAdmin ||
+                            isOrgAdmin ||
+                            isProjectAdmin ||
+                            record.Labels.Count == 0 ||
+                            record.Labels.All(l => authorizedDownloadLabels.Contains(l.Id));
 
             if (!canExposeUri)
                 record.Uri = null;
@@ -1520,7 +1528,7 @@ public async Task<PaginatedResponse<RecordResponseDto>> GetAllRecordsPaginated(
         {
             Id = returnedRecord.Id,
             Description = returnedRecord.Description,
-            Uri = CanExposeUri(returnedRecord, authorizedDownloadLabels) ? returnedRecord.Uri : null,
+            Uri = ExposeUriHelper.CanExposeUri(returnedRecord, authorizedDownloadLabels) ? returnedRecord.Uri : null,
             Properties = returnedRecord.Properties,
             ObjectStorageId = returnedRecord.ObjectStorageId,
             OriginalId = returnedRecord.OriginalId,
@@ -1652,7 +1660,7 @@ public async Task<PaginatedResponse<RecordResponseDto>> GetAllRecordsPaginated(
         {
             Id = r.Id,
             Description = r.Description,
-            Uri = CanExposeUri(
+            Uri = ExposeUriHelper.CanExposeUri(
                 r,
                 authorizedDownloadLabels,
                 isSysAdmin,
@@ -1961,17 +1969,4 @@ public async Task<PaginatedResponse<RecordResponseDto>> GetAllRecordsPaginated(
         };
     }
 
-    private static bool CanExposeUri(
-        Record record,
-        List<long> authorizedDownloadLabels,
-        bool isSysAdmin = false,
-        bool isOrgAdmin = false,
-        bool isProjectAdmin = false)
-    {
-        return isSysAdmin ||
-            isOrgAdmin ||
-            isProjectAdmin ||
-            record.Labels.Count == 0 ||
-            record.Labels.All(l => authorizedDownloadLabels.Contains(l.Id));
-    }
 }
