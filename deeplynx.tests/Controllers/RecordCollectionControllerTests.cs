@@ -75,7 +75,7 @@ public class RecordCollectionControllerTests : IDisposable
 
         var result = (await _recordCollectionController.GetAllRecordCollections(
             OrgId,
-            ProjectId)).Result as OkObjectResult;
+            ProjectId, true)).Result as OkObjectResult;
 
         Assert.NotNull(result);
         Assert.Equal(200, result.StatusCode);
@@ -92,7 +92,7 @@ public class RecordCollectionControllerTests : IDisposable
 
         var result = (await _recordCollectionController.GetAllRecordCollections(
             OrgId,
-            ProjectId)).Result as OkObjectResult;
+            ProjectId, true)).Result as OkObjectResult;
 
         Assert.NotNull(result);
         Assert.Equal(200, result.StatusCode);
@@ -109,7 +109,7 @@ public class RecordCollectionControllerTests : IDisposable
 
         var result = (await _recordCollectionController.GetAllRecordCollections(
             OrgId,
-            ProjectId)).Result as ObjectResult;
+            ProjectId, true)).Result as ObjectResult;
 
         Assert.NotNull(result);
         Assert.Equal(500, result.StatusCode);
@@ -161,7 +161,7 @@ public class RecordCollectionControllerTests : IDisposable
         var result = (await _recordCollectionController.GetRecordsInRecordCollection(
             OrgId,
             ProjectId,
-            CollectionId)).Result as OkObjectResult;
+            CollectionId, true)).Result as OkObjectResult;
 
         Assert.NotNull(result);
         Assert.Equal(200, result.StatusCode);
@@ -179,7 +179,7 @@ public class RecordCollectionControllerTests : IDisposable
         var result = (await _recordCollectionController.GetRecordsInRecordCollection(
             OrgId,
             ProjectId,
-            CollectionId)).Result as OkObjectResult;
+            CollectionId, true)).Result as OkObjectResult;
 
         Assert.NotNull(result);
         Assert.Equal(200, result.StatusCode);
@@ -199,7 +199,7 @@ public class RecordCollectionControllerTests : IDisposable
         var result = (await _recordCollectionController.GetRecordsInRecordCollection(
             OrgId,
             ProjectId,
-            CollectionId)).Result as NotFoundObjectResult;
+            CollectionId, true)).Result as NotFoundObjectResult;
 
         Assert.NotNull(result);
         Assert.Equal(404, result.StatusCode);
@@ -217,7 +217,7 @@ public class RecordCollectionControllerTests : IDisposable
         var result = (await _recordCollectionController.GetRecordsInRecordCollection(
             OrgId,
             ProjectId,
-            CollectionId)).Result as ObjectResult;
+            CollectionId, true)).Result as ObjectResult;
 
         Assert.NotNull(result);
         Assert.Equal(500, result.StatusCode);
