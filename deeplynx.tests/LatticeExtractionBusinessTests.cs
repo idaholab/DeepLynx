@@ -148,7 +148,8 @@ public class LatticeExtractionBusinessTests : IntegrationTestBase
             Properties = "{}",
             IsArchived = false,
             LastUpdatedAt = UnspecifiedNow(),
-            LastUpdatedBy = uid
+            LastUpdatedBy = uid,
+            Uri = "/usr/src/app"
         };
         Context.Records.Add(rec);
         await Context.SaveChangesAsync();
@@ -305,15 +306,15 @@ public class LatticeExtractionBusinessTests : IntegrationTestBase
     public async Task ListExtractionsByProject_DoesNotReturnOtherProjectExtractions()
     {
         //add a project with no extractions
-        var otherProj = new Project { Name = "Other Project", IsArchived = false, OrganizationId = oid};
+        var otherProj = new Project { Name = "Other Project", IsArchived = false, OrganizationId = oid };
         Context.Projects.Add(otherProj);
-        
+
         //add an extraction to pid
         var other = new User { Name = "Other User", Email = "other@test.com", Password = "pw", IsArchived = false };
         Context.Users.Add(other);
         await Context.SaveChangesAsync();
-        
-        var extraction = new Extraction { CreatedBy = other.Id, ProjectId = pid }; 
+
+        var extraction = new Extraction { CreatedBy = other.Id, ProjectId = pid };
         Context.Extractions.Add(extraction);
         await Context.SaveChangesAsync();
 
