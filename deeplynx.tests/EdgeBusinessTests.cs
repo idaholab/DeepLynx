@@ -1318,8 +1318,6 @@ public class EdgeBusinessTests : IntegrationTestBase
         origin.OriginalId = "parsed-record-001";
         destination.OriginalId = "parsed-record-002";
 
-        Context.Records.Update(origin);
-        Context.Records.Update(destination);
         await Context.SaveChangesAsync();
     }
     #endregion
