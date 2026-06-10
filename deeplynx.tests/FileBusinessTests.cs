@@ -12,6 +12,7 @@ using deeplynx.models;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Record = deeplynx.datalayer.Models.Record;
 
@@ -111,7 +112,8 @@ public class FileBusinessTests : IntegrationTestBase
             _recordBusiness,
             _insightBusiness.Object,
             _olapBusiness,
-            _objectStorageBusiness
+            _objectStorageBusiness,
+            NullLogger<FileBusiness>.Instance
         );
     }
 

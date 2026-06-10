@@ -13,6 +13,7 @@ using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Newtonsoft.Json;
 using Parquet;
@@ -167,7 +168,8 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
             _recordBusiness,
             _insightBusiness.Object,
             _olapBusiness,
-            _objectStorageBusiness
+            _objectStorageBusiness,
+            NullLogger<FileBusiness>.Instance
         );
     }
 
