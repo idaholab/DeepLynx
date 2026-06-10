@@ -881,5 +881,152 @@ public class GraphBusinessTests : IntegrationTestBase
         Assert.Null(unclassifiedNode.ClassName);
     }
 
+    [Fact]
+    public async Task GetGraphDataForRecord_ReturnsGraph_WhenUserIsSysAdminAndNotProjectMember()
+    {
+        // Arrange
+        var sysAdminUser = new User
+        {
+            Name = "Sys Admin",
+            Email = $"sys-admin-{Guid.NewGuid()}@test.com",
+            IsSysAdmin = true,
+            IsActive = true
+        };
+
+        Context.Users.Add(sysAdminUser);
+        await Context.SaveChangesAsync();
+
+        var originRecord = new Record
+        {
+            OrganizationId = oid,
+            ProjectId = pid,
+            DataSourceId = dsid,
+            ClassId = classId,
+            Name = $"Origin Record {Guid.NewGuid()}",
+            Description = "Origin record for graph sys admin test",
+            Properties = "{}",
+            OriginalId = Guid.NewGuid().ToString(),
+            LastUpdatedBy = sysAdminUser.Id,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),
+            IsArchived = false
+        };
+
+        var destinationRecord = new Record
+        {
+            OrganizationId = oid,
+            ProjectId = pid,
+            DataSourceId = dsid,
+            ClassId = classId,
+            Name = $"Destination Record {Guid.NewGuid()}",
+            Description = "Destination record for graph sys admin test",
+            Properties = "{}",
+            OriginalId = Guid.NewGuid().ToString(),
+            LastUpdatedBy = sysAdminUser.Id,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),
+            IsArchived = false
+        };
+
+        Context.Records.Add(originRecord);
+        Context.Records.Add(destinationRecord);
+        await Context.SaveChangesAsync();
+
+        var relationship = new Relationship
+        {
+            OrganizationId = oid,
+            ProjectId = pid,
+            Name = $"Graph Test Relationship {Guid.NewGuid()}",
+            Description = "Relationship for sys admin graph test",
+            LastUpdatedBy = sysAdminUser.Id,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),
+            IsArchived = false
+        };
+
+        Context.Relationships.Add(relationship);
+        await Context.SaveChangesAsync();
+
+        var edge = new Edge
+        {
+            OrganizationId = oid,
+            ProjectId = pid,
+            DataSourceId = dsid,
+            OriginId = originRecord.Id,
+            DestinationId = destinationRecord.Id,
+            RelationshipId = relationship.Id,
+            LastUpdatedBy = sysAdminUser.Id,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),
+            IsArchived = false
+        };
+
+        Context.Edges.Add(edge);
+        await Context.SaveChangesAsync();
+
+        // Confirm the point of the test: sys admin is not a project member
+        Assert.False(Context.ProjectMembers.Any(pm =>
+            pm.UserId == sysAdminUser.Id && pm.ProjectId == pid));
+
+        // Act
+        var result = await _graphBusiness.GetGraphDataForRecord(
+            oid,
+            pid,
+            originRecord.Id,
+            sysAdminUser.Id,
+            depth: 1);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Contains(result.Nodes, n => n.Id == originRecord.Id);
+        Assert.Contains(result.Nodes, n => n.Id == destinationRecord.Id);
+        Assert.Contains(result.Links, l =>
+            l.Source == originRecord.Id &&
+            l.Target == destinationRecord.Id &&
+            l.EdgeId == edge.Id);
+    }
+
+    [Fact]
+    public async Task GetGraphDataForRecord_Throws_WhenUserIsNotSysAdminAndNotProjectMember()
+    {
+        // Arrange
+        var regularUser = new User
+        {
+            Name = "Regular User",
+            Email = $"regular-{Guid.NewGuid()}@test.com",
+            IsSysAdmin = false,
+            IsActive = true
+        };
+
+        Context.Users.Add(regularUser);
+        await Context.SaveChangesAsync();
+
+        var record = new Record
+        {
+            OrganizationId = oid,
+            ProjectId = pid,
+            DataSourceId = dsid,
+            ClassId = classId,
+            Name = $"Restricted Graph Record {Guid.NewGuid()}",
+            Description = "Record regular non-member should not access",
+            Properties = "{}",
+            OriginalId = Guid.NewGuid().ToString(),
+            LastUpdatedBy = regularUser.Id,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),
+            IsArchived = false
+        };
+
+        Context.Records.Add(record);
+        await Context.SaveChangesAsync();
+
+        Assert.False(Context.ProjectMembers.Any(pm =>
+            pm.UserId == regularUser.Id && pm.ProjectId == pid));
+
+        // Act / Assert
+        await Assert.ThrowsAsync<AccessViolationException>(() =>
+            _graphBusiness.GetGraphDataForRecord(
+                oid,
+                pid,
+                record.Id,
+                regularUser.Id,
+                depth: 1));
+    }
+    
     #endregion
 }
