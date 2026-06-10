@@ -20,12 +20,7 @@ public class SavedSearchControllerTests : IDisposable
 
     private const long UserId = 10L;
     private const long OrgId = 1L;
-    private const long RoleId = 11L;
-    private const long ProjectId = 2L;
-    private const long PermissionId = 15L;
     private static readonly long[] ProjectList = { 13L, 14L };
-    private static readonly long[] PermissionList = { 13L, 14L };
-    private const long RelationshipId = 22L;
     private static readonly string Alias = "aliasString";
     private static readonly string TextSearch = "searchString";
     private const long SavedSearchId = 22L;
