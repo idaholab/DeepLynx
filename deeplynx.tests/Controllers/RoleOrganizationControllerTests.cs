@@ -22,7 +22,9 @@ public class RoleOrganizationControllerTests : IDisposable
     private const long OrgId = 1L;
     private const long RoleId = 11L;
     private const long ProjectId = 2L;
+    private const long PermissionId = 15L;
     private static readonly long[] ProjectList = { 13L, 14L };
+    private static readonly long[] PermissionList = { 13L, 14L };
     private const long RelationshipId = 22L;
 
 
@@ -453,6 +455,771 @@ public class RoleOrganizationControllerTests : IDisposable
 
     #endregion
 
+    // =========================================================================
+    // DeleteRole Tests
+    // =========================================================================
+
+    #region DeleteRole Tests
+
+    [Fact]
+    public async Task DeleteRole_Returns200()
+    {
+        // Arrange
+        var expectedMessage = $"Deleted role {RoleId}";
+
+        _mockRoleBusiness
+            .Setup(b => b.DeleteRole(UserId, RoleId, OrgId, null))
+            .ReturnsAsync(true);
+
+        // Act
+        var actionResult = await _roleOrganizationController.DeleteRole(
+            OrgId,
+            RoleId);
+
+        // Assert
+        var result = Assert.IsType<OkObjectResult>(actionResult);
+
+        Assert.Equal(StatusCodes.Status200OK, result.StatusCode);
+        Assert.NotNull(result.Value);
+
+        var messageProperty = result.Value.GetType().GetProperty("message");
+        Assert.NotNull(messageProperty);
+
+        var actualMessage = messageProperty.GetValue(result.Value) as string;
+        Assert.Equal(expectedMessage, actualMessage);
+    }
+
+
+    [Fact]
+    public async Task DeleteRole_Returns500_OnUnexpectedException()
+    {
+        _mockRoleBusiness
+            .Setup(b => b.DeleteRole(UserId, RoleId, OrgId, null))
+            .ThrowsAsync(new Exception("db error"));
+
+        var actionResult = await _roleOrganizationController.DeleteRole(
+            OrgId,
+            RoleId);
+
+        // Assert
+        var result = Assert.IsType<ObjectResult>(actionResult);
+
+        Assert.NotNull(result);
+        Assert.Equal(500, result.StatusCode);
+    }
+
+    [Fact]
+    public async Task DeleteRole_PassesToBusinessLayer()
+    {
+        // Arrange
+        UserContextStorage.UserId = UserId;
+        UserContextStorage.IsSysAdmin = true;
+
+        _mockRoleBusiness
+            .Setup(b => b.DeleteRole(UserId, RoleId, OrgId, null))
+            .ReturnsAsync(true);
+
+        // Act
+        var actionResult = await _roleOrganizationController.DeleteRole(
+            OrgId,
+            RoleId);
+
+        var result = Assert.IsType<OkObjectResult>(actionResult);
+
+        // Assert
+        _mockRoleBusiness.Verify(
+            b => b.DeleteRole(UserId, RoleId, OrgId, null),
+            Times.Once);
+    }
+
+    [Fact]
+    public void DeleteRole_HasHttpDelete()
+    {
+        var method = GetControllerMethod(
+            nameof(RoleOrganizationController.DeleteRole),
+            "organizationId",
+            "roleId");
+
+        AssertHasHttpAttribute(method, nameof(HttpDeleteAttribute));
+    }
+
+    #endregion
+
+    // =========================================================================
+    // ArchiveRole Tests
+    // =========================================================================
+
+    #region ArchiveRole Tests
+
+    [Fact]
+    public async Task ArchiveRole_Returns200_WhenArchiving()
+    {
+        // Arrange
+        var expectedMessage = $"Archived role {RoleId}";
+
+        UserContextStorage.UserId = UserId;
+        UserContextStorage.IsSysAdmin = true;
+
+        _mockRoleBusiness
+            .Setup(b => b.ArchiveRole(UserId, RoleId, OrgId, null))
+            .ReturnsAsync(true);
+
+        // Act
+        var actionResult = await _roleOrganizationController.ArchiveRole(
+            OrgId,
+            RoleId,
+            true);
+
+        // Assert
+        var result = Assert.IsType<OkObjectResult>(actionResult);
+
+        Assert.Equal(StatusCodes.Status200OK, result.StatusCode);
+        Assert.NotNull(result.Value);
+
+        var messageProperty = result.Value.GetType().GetProperty("message");
+        Assert.NotNull(messageProperty);
+
+        var actualMessage = messageProperty.GetValue(result.Value) as string;
+        Assert.Equal(expectedMessage, actualMessage);
+    }
+
+    [Fact]
+    public async Task ArchiveRole_Returns200_WhenUnarchiving()
+    {
+        // Arrange
+        var expectedMessage = $"Unarchived role {RoleId}";
+
+        UserContextStorage.UserId = UserId;
+        UserContextStorage.IsSysAdmin = true;
+
+        _mockRoleBusiness
+            .Setup(b => b.UnarchiveRole(UserId, RoleId, OrgId, null))
+            .ReturnsAsync(true);
+
+        // Act
+        var actionResult = await _roleOrganizationController.ArchiveRole(
+            OrgId,
+            RoleId,
+            false);
+
+        // Assert
+        var result = Assert.IsType<OkObjectResult>(actionResult);
+
+        Assert.Equal(StatusCodes.Status200OK, result.StatusCode);
+        Assert.NotNull(result.Value);
+
+        var messageProperty = result.Value.GetType().GetProperty("message");
+        Assert.NotNull(messageProperty);
+
+        var actualMessage = messageProperty.GetValue(result.Value) as string;
+        Assert.Equal(expectedMessage, actualMessage);
+    }
+
+    [Fact]
+    public async Task ArchiveRole_Returns500_OnUnexpectedException_WhenArchiving()
+    {
+        // Arrange
+        UserContextStorage.UserId = UserId;
+        UserContextStorage.IsSysAdmin = true;
+
+        _mockRoleBusiness
+            .Setup(b => b.ArchiveRole(UserId, RoleId, OrgId, null))
+            .ThrowsAsync(new Exception("db error"));
+
+        // Act
+        var actionResult = await _roleOrganizationController.ArchiveRole(
+            OrgId,
+            RoleId,
+            true);
+
+        // Assert
+        var result = Assert.IsType<ObjectResult>(actionResult);
+
+        Assert.NotNull(result);
+        Assert.Equal(StatusCodes.Status500InternalServerError, result.StatusCode);
+
+        var message = Assert.IsType<string>(result.Value);
+
+        Assert.Contains(
+            $"An error occurred while archiving role {RoleId}",
+            message);
+    }
+
+    [Fact]
+    public async Task ArchiveRole_Returns500_OnUnexpectedException_WhenUnarchiving()
+    {
+        // Arrange
+        UserContextStorage.UserId = UserId;
+        UserContextStorage.IsSysAdmin = true;
+
+        _mockRoleBusiness
+            .Setup(b => b.UnarchiveRole(UserId, RoleId, OrgId, null))
+            .ThrowsAsync(new Exception("db error"));
+
+        // Act
+        var actionResult = await _roleOrganizationController.ArchiveRole(
+            OrgId,
+            RoleId,
+            false);
+
+        // Assert
+        var result = Assert.IsType<ObjectResult>(actionResult);
+
+        Assert.NotNull(result);
+        Assert.Equal(StatusCodes.Status500InternalServerError, result.StatusCode);
+
+        var message = Assert.IsType<string>(result.Value);
+
+        Assert.Contains(
+            $"An error occurred while unarchiving role {RoleId}",
+            message);
+    }
+
+    [Fact]
+    public async Task ArchiveRole_PassesToBusinessLayer_WhenArchiving()
+    {
+        // Arrange
+        UserContextStorage.UserId = UserId;
+        UserContextStorage.IsSysAdmin = true;
+
+        _mockRoleBusiness
+            .Setup(b => b.ArchiveRole(UserId, RoleId, OrgId, null))
+            .ReturnsAsync(true);
+
+        // Act
+        var actionResult = await _roleOrganizationController.ArchiveRole(
+            OrgId,
+            RoleId,
+            true);
+
+        var result = Assert.IsType<OkObjectResult>(actionResult);
+
+        // Assert
+        _mockRoleBusiness.Verify(
+            b => b.ArchiveRole(UserId, RoleId, OrgId, null),
+            Times.Once);
+
+        _mockRoleBusiness.Verify(
+            b => b.UnarchiveRole(UserId, RoleId, OrgId, null),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task ArchiveRole_PassesToBusinessLayer_WhenUnarchiving()
+    {
+        // Arrange
+        UserContextStorage.UserId = UserId;
+        UserContextStorage.IsSysAdmin = true;
+
+        _mockRoleBusiness
+            .Setup(b => b.UnarchiveRole(UserId, RoleId, OrgId, null))
+            .ReturnsAsync(true);
+
+        // Act
+        var actionResult = await _roleOrganizationController.ArchiveRole(
+            OrgId,
+            RoleId,
+            false);
+
+        var result = Assert.IsType<OkObjectResult>(actionResult);
+
+        // Assert
+        _mockRoleBusiness.Verify(
+            b => b.UnarchiveRole(UserId, RoleId, OrgId, null),
+            Times.Once);
+
+        _mockRoleBusiness.Verify(
+            b => b.ArchiveRole(UserId, RoleId, OrgId, null),
+            Times.Never);
+    }
+
+    [Fact]
+    public void ArchiveRole_HasHttpPatch()
+    {
+        var method = GetControllerMethod(
+            nameof(RoleOrganizationController.ArchiveRole),
+            "organizationId",
+            "roleId",
+            "archive");
+
+        AssertHasHttpAttribute(method, nameof(HttpPatchAttribute));
+    }
+
+    #endregion
+
+    // =========================================================================
+    // GetPermissionsByRole Tests
+    // =========================================================================
+
+    #region GetPermissionsByRole Tests
+
+    [Fact]
+    public async Task GetPermissionsByRole_Returns200_WithPermission()
+    {
+        // Arrange
+        List<PermissionResponseDto> expected = new List<PermissionResponseDto>();
+
+        _mockRoleBusiness
+            .Setup(b => b.GetPermissionsByRole(RoleId, OrgId, null))
+            .ReturnsAsync(expected);
+
+        // Act
+        var actionResult = await _roleOrganizationController.GetPermissionsByRole(
+            OrgId,
+            RoleId);
+
+        // Assert
+        var result = Assert.IsType<OkObjectResult>(actionResult.Result);
+
+        Assert.Equal(StatusCodes.Status200OK, result.StatusCode);
+        Assert.Equal(expected, result.Value);
+    }
+
+    [Fact]
+    public async Task GetPermissionsByRole_Returns200_WithEmptyList()
+    {
+        // Arrange
+
+        _mockRoleBusiness
+            .Setup(b => b.GetPermissionsByRole(RoleId, OrgId, null))
+            .ReturnsAsync((List<PermissionResponseDto>)null!);
+
+        // Act
+        var actionResult = await _roleOrganizationController.GetPermissionsByRole(
+            OrgId,
+            RoleId);
+
+        // Assert
+        var result = Assert.IsType<OkObjectResult>(actionResult.Result);
+
+        Assert.Equal(StatusCodes.Status200OK, result.StatusCode);
+        Assert.Null(result.Value);
+    }
+
+    [Fact]
+    public async Task GetPermissionsByRole_Returns500_OnUnexpectedException()
+    {
+        // Arrange
+        _mockRoleBusiness
+            .Setup(b => b.GetPermissionsByRole(RoleId, OrgId, null))
+            .ThrowsAsync(new Exception("db error"));
+
+        // Act
+        var actionResult = await _roleOrganizationController.GetPermissionsByRole(
+            OrgId,
+            RoleId);
+
+        // Assert
+        var result = Assert.IsType<ObjectResult>(actionResult.Result);
+
+        Assert.Equal(StatusCodes.Status500InternalServerError, result.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetPermissionsByRole_PassesToBusinessLayer()
+    {
+        // Arrange
+        UserContextStorage.UserId = UserId;
+        UserContextStorage.IsSysAdmin = true;
+
+        var expected = new List<PermissionResponseDto>();
+
+        _mockRoleBusiness
+            .Setup(b => b.GetPermissionsByRole(RoleId, OrgId, null))
+            .ReturnsAsync(expected);
+
+        // Act
+        var actionResult = await _roleOrganizationController.GetPermissionsByRole(
+            OrgId,
+            RoleId);
+
+        // Assert
+        var result = Assert.IsType<OkObjectResult>(actionResult.Result);
+
+        // Assert
+        _mockRoleBusiness.Verify(
+            b => b.GetPermissionsByRole(RoleId, OrgId, null),
+            Times.Once);
+    }
+
+    [Fact]
+    public void GetPermissionsByRole_HasHttpGet()
+    {
+        var method = GetControllerMethod(
+            nameof(RoleOrganizationController.GetPermissionsByRole),
+            "organizationId",
+            "roleId");
+
+        AssertHasHttpAttribute(method, nameof(HttpGetAttribute));
+    }
+
+    #endregion
+
+    // =========================================================================
+    // AddPermissionToRole Tests
+    // =========================================================================
+
+    #region AddPermissionToRole Tests
+
+    [Fact]
+    public async Task AddPermissionToRole_Returns200_WithPermission()
+    {
+        // Arrange
+        var expectedMessage = $"Added permission {PermissionId} to role {RoleId}";
+
+        _mockRoleBusiness
+            .Setup(b => b.AddPermissionToRole(RoleId, PermissionId, OrgId, null))
+            .ReturnsAsync(true);
+
+        // Act
+        var actionResult = await _roleOrganizationController.AddPermissionToRole(
+            OrgId,
+            RoleId,
+            PermissionId);
+
+        // Assert
+        var result = Assert.IsType<OkObjectResult>(actionResult);
+
+        Assert.Equal(StatusCodes.Status200OK, result.StatusCode);
+        Assert.NotNull(result.Value);
+
+        var messageProperty = result.Value.GetType().GetProperty("message");
+        Assert.NotNull(messageProperty);
+
+        var actualMessage = messageProperty.GetValue(result.Value) as string;
+        Assert.Equal(expectedMessage, actualMessage);
+    }
+
+    [Fact]
+    public async Task AddPermissionToRole_Returns200_WithEmptyList()
+    {
+        // Arrange
+
+        _mockRoleBusiness
+            .Setup(b => b.AddPermissionToRole(RoleId, PermissionId, OrgId, null))
+            .ReturnsAsync(true);
+
+        // Act
+        var actionResult = await _roleOrganizationController.AddPermissionToRole(
+            OrgId,
+            RoleId,
+            PermissionId);
+
+        // Assert
+        var result = Assert.IsType<OkObjectResult>(actionResult);
+
+        Assert.Equal(StatusCodes.Status200OK, result.StatusCode);
+        Assert.NotNull(result.Value);
+
+        var messageProperty = result.Value.GetType().GetProperty("message");
+        Assert.NotNull(messageProperty);
+
+        var actualMessage = messageProperty.GetValue(result.Value) as string;
+    }
+
+    [Fact]
+    public async Task AddPermissionToRole_Returns500_OnUnexpectedException()
+    {
+        // Arrange
+        _mockRoleBusiness
+            .Setup(b => b.AddPermissionToRole(RoleId, PermissionId, OrgId, null))
+            .ThrowsAsync(new Exception("db error"));
+
+        // Act
+        var actionResult = await _roleOrganizationController.AddPermissionToRole(
+            OrgId,
+            RoleId,
+            PermissionId);
+
+        // Assert
+        var result = Assert.IsType<ObjectResult>(actionResult);
+
+        Assert.NotNull(result);
+        Assert.Equal(500, result.StatusCode);
+    }
+
+    [Fact]
+    public async Task AddPermissionToRole_PassesToBusinessLayer()
+    {
+        // Arrange
+        UserContextStorage.UserId = UserId;
+        UserContextStorage.IsSysAdmin = true;
+
+        var expected = new List<PermissionResponseDto>();
+
+        _mockRoleBusiness
+            .Setup(b => b.AddPermissionToRole(RoleId, PermissionId, OrgId, null))
+            .ReturnsAsync(true);
+
+        // Act
+        var actionResult = await _roleOrganizationController.AddPermissionToRole(
+            OrgId,
+            RoleId,
+            PermissionId);
+
+        // Assert
+        _mockRoleBusiness.Verify(
+            b => b.AddPermissionToRole(RoleId, PermissionId, OrgId, null),
+            Times.Once);
+    }
+
+    [Fact]
+    public void AddPermissionToRole_HasHttpPost()
+    {
+        var method = GetControllerMethod(
+            nameof(RoleOrganizationController.AddPermissionToRole),
+            "organizationId",
+            "roleId",
+            "permissionId");
+
+        AssertHasHttpAttribute(method, nameof(HttpPostAttribute));
+    }
+
+    #endregion
+
+    // =========================================================================
+    // RemovePermissionFromRole Tests
+    // =========================================================================
+
+    #region RemovePermissionFromRole Tests
+
+    [Fact]
+    public async Task RemovePermissionFromRole_Returns200_WithPermission()
+    {
+        // Arrange
+        var expectedMessage = $"Removed permission {PermissionId} from role {RoleId}";
+
+        _mockRoleBusiness
+            .Setup(b => b.RemovePermissionFromRole(RoleId, PermissionId, OrgId, null))
+            .ReturnsAsync(true);
+
+        // Act
+        var actionResult = await _roleOrganizationController.RemovePermissionFromRole(
+            OrgId,
+            RoleId,
+            PermissionId);
+
+        // Assert
+        var result = Assert.IsType<OkObjectResult>(actionResult);
+
+        Assert.Equal(StatusCodes.Status200OK, result.StatusCode);
+        Assert.NotNull(result.Value);
+
+        var messageProperty = result.Value.GetType().GetProperty("message");
+        Assert.NotNull(messageProperty);
+
+        var actualMessage = messageProperty.GetValue(result.Value) as string;
+        Assert.Equal(expectedMessage, actualMessage);
+    }
+
+    [Fact]
+    public async Task RemovePermissionFromRole_Returns200_WithEmptyList()
+    {
+        // Arrange
+
+        _mockRoleBusiness
+            .Setup(b => b.RemovePermissionFromRole(RoleId, PermissionId, OrgId, null))
+            .ReturnsAsync(true);
+
+        // Act
+        var actionResult = await _roleOrganizationController.RemovePermissionFromRole(
+            OrgId,
+            RoleId,
+            PermissionId);
+
+        // Assert
+        var result = Assert.IsType<OkObjectResult>(actionResult);
+
+        Assert.Equal(StatusCodes.Status200OK, result.StatusCode);
+        Assert.NotNull(result.Value);
+
+        var messageProperty = result.Value.GetType().GetProperty("message");
+        Assert.NotNull(messageProperty);
+
+        var actualMessage = messageProperty.GetValue(result.Value) as string;
+    }
+
+    [Fact]
+    public async Task RemovePermissionFromRole_Returns500_OnUnexpectedException()
+    {
+        // Arrange
+        _mockRoleBusiness
+            .Setup(b => b.RemovePermissionFromRole(RoleId, PermissionId, OrgId, null))
+            .ThrowsAsync(new Exception("db error"));
+
+        // Act
+        var actionResult = await _roleOrganizationController.RemovePermissionFromRole(
+            OrgId,
+            RoleId,
+            PermissionId);
+
+        // Assert
+        var result = Assert.IsType<ObjectResult>(actionResult);
+
+        Assert.NotNull(result);
+        Assert.Equal(500, result.StatusCode);
+    }
+
+    [Fact]
+    public async Task RemovePermissionFromRole_PassesToBusinessLayer()
+    {
+        // Arrange
+        UserContextStorage.UserId = UserId;
+        UserContextStorage.IsSysAdmin = true;
+
+        var expected = new List<PermissionResponseDto>();
+
+        _mockRoleBusiness
+            .Setup(b => b.RemovePermissionFromRole(RoleId, PermissionId, OrgId, null))
+            .ReturnsAsync(true);
+
+        // Act
+        var actionResult = await _roleOrganizationController.RemovePermissionFromRole(
+            OrgId,
+            RoleId,
+            PermissionId);
+
+        // Assert
+        _mockRoleBusiness.Verify(
+            b => b.RemovePermissionFromRole(RoleId, PermissionId, OrgId, null),
+            Times.Once);
+    }
+
+    [Fact]
+    public void RemovePermissionFromRole_HasHttpDelete()
+    {
+        var method = GetControllerMethod(
+            nameof(RoleOrganizationController.RemovePermissionFromRole),
+            "organizationId",
+            "roleId",
+            "permissionId");
+
+        AssertHasHttpAttribute(method, nameof(HttpDeleteAttribute));
+    }
+
+    #endregion
+
+    // =========================================================================
+    // SetPermissionsForRole Tests
+    // =========================================================================
+
+    #region SetPermissionsForRole Tests
+
+    [Fact]
+    public async Task SetPermissionsForRole_Returns200_WithPermission()
+    {
+        // Arrange
+        var expectedMessage = $"Set permissions for role {RoleId}";
+
+        _mockRoleBusiness
+            .Setup(b => b.SetPermissionsForRole(RoleId, PermissionList, OrgId, null))
+            .ReturnsAsync(true);
+
+        // Act
+        var actionResult = await _roleOrganizationController.SetPermissionsForRole(
+            OrgId,
+            RoleId,
+            PermissionList);
+
+        // Assert
+        var result = Assert.IsType<OkObjectResult>(actionResult);
+
+        Assert.Equal(StatusCodes.Status200OK, result.StatusCode);
+        Assert.NotNull(result.Value);
+
+        var messageProperty = result.Value.GetType().GetProperty("message");
+        Assert.NotNull(messageProperty);
+
+        var actualMessage = messageProperty.GetValue(result.Value) as string;
+        Assert.Equal(expectedMessage, actualMessage);
+    }
+
+    [Fact]
+    public async Task SetPermissionsForRole_Returns200_WithEmptyList()
+    {
+        // Arrange
+
+        _mockRoleBusiness
+            .Setup(b => b.SetPermissionsForRole(RoleId, PermissionList, OrgId, null))
+            .ReturnsAsync(true);
+
+        // Act
+        var actionResult = await _roleOrganizationController.SetPermissionsForRole(
+            OrgId,
+            RoleId,
+            PermissionList);
+
+        // Assert
+        var result = Assert.IsType<OkObjectResult>(actionResult);
+
+        Assert.Equal(StatusCodes.Status200OK, result.StatusCode);
+        Assert.NotNull(result.Value);
+
+        var messageProperty = result.Value.GetType().GetProperty("message");
+        Assert.NotNull(messageProperty);
+
+        var actualMessage = messageProperty.GetValue(result.Value) as string;
+    }
+
+    [Fact]
+    public async Task SetPermissionsForRole_Returns500_OnUnexpectedException()
+    {
+        // Arrange
+        _mockRoleBusiness
+            .Setup(b => b.SetPermissionsForRole(RoleId, PermissionList, OrgId, null))
+            .ThrowsAsync(new Exception("db error"));
+
+        // Act
+        var actionResult = await _roleOrganizationController.SetPermissionsForRole(
+            OrgId,
+            RoleId,
+            PermissionList);
+
+        // Assert
+        var result = Assert.IsType<ObjectResult>(actionResult);
+
+        Assert.NotNull(result);
+        Assert.Equal(500, result.StatusCode);
+    }
+
+    [Fact]
+    public async Task SetPermissionsForRole_PassesToBusinessLayer()
+    {
+        // Arrange
+        UserContextStorage.UserId = UserId;
+        UserContextStorage.IsSysAdmin = true;
+
+        var expected = new List<PermissionResponseDto>();
+
+        _mockRoleBusiness
+            .Setup(b => b.SetPermissionsForRole(RoleId, PermissionList, OrgId, null))
+            .ReturnsAsync(true);
+
+        // Act
+        var actionResult = await _roleOrganizationController.SetPermissionsForRole(
+            OrgId,
+            RoleId,
+            PermissionList);
+
+        // Assert
+        _mockRoleBusiness.Verify(
+            b => b.SetPermissionsForRole(RoleId, PermissionList, OrgId, null),
+            Times.Once);
+    }
+
+    [Fact]
+    public void SetPermissionsForRole_HasHttpPut()
+    {
+        var method = GetControllerMethod(
+            nameof(RoleOrganizationController.SetPermissionsForRole),
+            "organizationId",
+            "roleId",
+            "permissionIds");
+
+        AssertHasHttpAttribute(method, nameof(HttpPutAttribute));
+    }
+
+    #endregion
 
     // =========================================================================
     // Test Helpers
