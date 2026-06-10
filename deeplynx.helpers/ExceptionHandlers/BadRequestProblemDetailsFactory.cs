@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
+using Microsoft.AspNetCore.Mvc.Abstractions;
 
 namespace deeplynx.helpers.ExceptionHandlers;
 
@@ -12,8 +13,10 @@ public static class BadRequestProblemDetailsFactory
     public static ValidationProblemDetails Create(string detail) =>
         Apply(new ValidationProblemDetails { Detail = detail });
 
-    public static ValidationProblemDetails CreateForModelState(ModelStateDictionary modelState) =>
-        Apply(new ValidationProblemDetails(BuildCleanedErrors(modelState))
+    public static ValidationProblemDetails CreateForModelState(
+        ModelStateDictionary modelState,
+        IList<ParameterDescriptor> parameters) =>
+        Apply(new ValidationProblemDetails(BuildCleanedErrors(modelState, parameters))
         {
             Detail = "One or more validation errors occurred."
         });
@@ -21,17 +24,26 @@ public static class BadRequestProblemDetailsFactory
     // System.Text.Json keys body-binding errors by JSON path ("$.labelId"); strip the JSON-path
     // syntax so clients see the plain field name. A path that cleans to empty (e.g. malformed JSON
     // reported against the document root "$") falls back to "request".
-    private static Dictionary<string, string[]> BuildCleanedErrors(ModelStateDictionary modelState)
+    private static Dictionary<string, string[]> BuildCleanedErrors(
+        ModelStateDictionary modelState,
+        IList<ParameterDescriptor> parameters)
     {
         var errors = new Dictionary<string, string[]>(StringComparer.Ordinal);
+        
+        var bodyParameterNames = parameters
+            .Where(parameter => parameter.BindingInfo?.BindingSource == BindingSource.Body)
+            .Select(parameter => parameter.Name)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
         foreach (var (key, entry) in modelState)
         {
-            Console.WriteLine(key);
             if (entry.Errors.Count == 0)
                 continue;
 
             var field = CleanFieldName(key);
+            
+            if (bodyParameterNames.Contains(key))
+                continue;
 
             var messages = entry.Errors
                 .Select(e => NormalizeMessage(e.ErrorMessage))

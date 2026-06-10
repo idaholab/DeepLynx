@@ -135,7 +135,9 @@ try
             options.InvalidModelStateResponseFactory = context =>
             {
                 return new BadRequestObjectResult(
-                    BadRequestProblemDetailsFactory.CreateForModelState(context.ModelState))
+                    BadRequestProblemDetailsFactory.CreateForModelState(
+                        context.ModelState,
+                        context.ActionDescriptor.Parameters))
                 {
                     ContentTypes = { "application/problem+json" }
                 };
