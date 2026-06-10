@@ -549,7 +549,6 @@ public class FileBusiness
             foreach (var storageGroup in recordsByStorage)
             {
                 var objectStorageId = storageGroup.Key;
-
                 ObjectStorageDecryptedDto objectStorage;
                 
                 try
@@ -573,27 +572,66 @@ public class FileBusiness
                 // for azure, try batch operation first
                 if (objectStorage.Type == "azure_object" && fileBusiness is FileAzureBusiness azureBusiness)
                 {
-                    var uris = storageGroup.Select(r => r.Uri).ToList();
-                    var sizes = await azureBusiness.GetFileSizesBatch(uris, objectStorage.Config);
-
-                    foreach (var record in storageGroup)
+                    try
                     {
-                        if (sizes.TryGetValue(record.Uri, out var size))
-                            record.FileSize = size;
+                        var uris = storageGroup.Select(r => r.Uri!).ToList();
+                        var sizes = await azureBusiness.GetFileSizesBatch(uris, objectStorage.Config);
+
+                        foreach (var record in storageGroup)
+                        {
+                            if (record.Uri != null && sizes.TryGetValue(record.Uri, out var size))
+                            {
+                                record.FileSize = size;
+                                response.Updated++;
+                            }
+                            else
+                            {
+                                response.Failed++;
+
+                                _logger.LogWarning(
+                                    "Failed to backfill size for record {RecordId}, project {ProjectId}, object storage {ObjectStorageId}, uri {Uri}",
+                                    record.Id,
+                                    record.ProjectId,
+                                    record.ObjectStorageId,
+                                    record.Uri);
+                            }
+                        }
+
+                        continue;
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(
+                            ex,
+                            "Azure batch file size lookup failed for object storage {ObjectStorageId}; falling back to individual file size lookups",
+                            storageGroup.Key);
                     }
                 }
-                else
+                // fall back to individual calls for non-Azure path or Azure batch fallback path
+                foreach (var record in storageGroup)
                 {
-                    // fall back to individual calls for filesystem
-                    foreach (var record in storageGroup)
+                    try
                     {
-                        var fileSize = await fileBusiness.GetFileSize(record.Uri, objectStorage.Config);
+                        var fileSize = await fileBusiness.GetFileSize(record.Uri!, objectStorage.Config);
                         record.FileSize = fileSize;
+                        response.Updated++;
+                    }
+                    catch (Exception ex)
+                    {
+                        response.Failed++;
+                        
+                        _logger.LogWarning(
+                            ex,
+                            "Failed to backfill size for record {RecordId}, project {ProjectId}, object storage {ObjectStorageId}, uri {Uri} while individual calls",
+                            record.Id,
+                            record.ProjectId,
+                            record.ObjectStorageId,
+                            record.Uri);
                     }
                 }
             }
 
-            // save all changes at once to avoid multiple DB trips
+            // save progress after each batch so the backfill can resume if a later batch fails.
             await _context.SaveChangesAsync();
 
             afterRecordId = response.LastRecordId;
