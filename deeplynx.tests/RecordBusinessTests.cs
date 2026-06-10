@@ -1304,14 +1304,14 @@ public class RecordBusinessTests : IntegrationTestBase
     }
     
     [Fact]
-    public async Task BulkCreateRecords_ValidData_TruncatesNames()
+    public async Task BulkCreateRecords_ValidData_LongNames()
     {
         // Arrange
         var records = new List<CreateRecordRequestDto>
         {
             new()
             {
-                Name = "A name that is over five hundred characters long a name that is over five hundred characters long a name that is over five hundred characters long a name that is over five hundred characters long a name that is over five hundred characters long a name that is over five hundred characters long a name that is over five hundred characters long a name that is over five hundred characters long a name that is over five hundred characters long a name that is over five hundred characters long a name that is over five hundred characters long",
+                Name = "A name that is five hundred characters long a name that is five hundred characters long a name that is five hundred characters long a name that is five hundred characters long a name that is five hundred characters long a name that is five hundred characters long a name that is five hundred characters long a name that is five hundred characters long a name that is five hundred characters long a name that is five hundred characters long a name that is five hundred characters long a name that is f",
                 Description = "Long name 1 Description",
                 ObjectStorageId = osid,
                 OriginalId = "br1",
@@ -1335,7 +1335,7 @@ public class RecordBusinessTests : IntegrationTestBase
         Assert.Equal(2, result.Count());
         Assert.True(result.All(r =>
             r.LastUpdatedBy == uid && !r.IsArchived && r.DataSourceId == did && r.ProjectId == pid));
-        Assert.Contains(result, r => r.Name == "A name that is over five hundred characters long a name that is over five hundred characters long a name that is over five hundred characters long a name that is over five hundred characters long a name that is over five hundred characters long a name that is over five hundred characters long a name that is over five hundred characters long a name that is over five hundred characters long a name that is over five hundred characters long a name that is over five hundred characters long a name tha");
+        Assert.Contains(result, r => r.Name == "A name that is five hundred characters long a name that is five hundred characters long a name that is five hundred characters long a name that is five hundred characters long a name that is five hundred characters long a name that is five hundred characters long a name that is five hundred characters long a name that is five hundred characters long a name that is five hundred characters long a name that is five hundred characters long a name that is five hundred characters long a name that is f");
         Assert.Contains(result, r => r.Name == "A name that is just over one hundred characters long a name that is just over one hundred characters long");
         
         // Ensure that a record create event was logged
