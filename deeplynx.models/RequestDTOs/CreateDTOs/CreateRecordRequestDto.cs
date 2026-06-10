@@ -8,6 +8,7 @@ public class CreateRecordRequestDto
 {
     [Required]
     [JsonPropertyName("name")]
+    [MaxLength(500)]
     public string Name { get; set; }
 
     [JsonPropertyName("description")]
