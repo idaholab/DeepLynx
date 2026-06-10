@@ -145,48 +145,6 @@ public class RecordControllerTests : IDisposable
     #endregion
 
     // =========================================================================
-    // GetAllRecordsPaginated Tests
-    // =========================================================================
-
-    #region GetAllRecordsPaginated Tests
-
-    [Fact]
-    public async Task GetAllRecordsPaginated_Returns200_WithPage()
-    {
-        var expected = new PaginatedResponse<RecordResponseDto>
-        {
-            TotalCount = 1,
-            Items = new List<RecordResponseDto> { new() { Id = 1, Name = "Page1" } }
-        };
-        _mockBusiness.Setup(b => b.GetAllRecordsPaginated(
-                         UserId, OrgId, ProjectId, true, null, false, false, false))
-                     .ReturnsAsync(expected);
-
-        var result = (await _controller.GetAllRecordsPaginated(OrgId, ProjectId, true, null)).Result as OkObjectResult;
-
-        Assert.NotNull(result);
-        Assert.Equal(200, result.StatusCode);
-        Assert.Equal(expected, result.Value);
-    }
-
-    [Fact]
-    public async Task GetAllRecordsPaginated_Returns500_OnUnexpectedException()
-    {
-        _mockBusiness.Setup(b => b.GetAllRecordsPaginated(
-                         It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(), It.IsAny<bool>(),
-                         It.IsAny<RecordQueryRequestDto?>(),
-                         It.IsAny<bool>(), It.IsAny<bool>(), It.IsAny<bool>()))
-                     .ThrowsAsync(new Exception("db error"));
-
-        var result = (await _controller.GetAllRecordsPaginated(OrgId, ProjectId, true, null)).Result as ObjectResult;
-
-        Assert.NotNull(result);
-        Assert.Equal(500, result.StatusCode);
-    }
-
-    #endregion
-
-    // =========================================================================
     // GetRecordsByTags Tests
     // =========================================================================
 

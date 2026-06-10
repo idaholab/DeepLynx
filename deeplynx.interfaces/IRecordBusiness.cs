@@ -8,11 +8,6 @@ public interface IRecordBusiness
         long currentUserId, long organizationId, long projectId, long? dataSourceId, bool hideArchived, string? fileType,
         bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false);
 
-    Task<PaginatedResponse<RecordResponseDto>> GetAllRecordsPaginated(
-    long currentUserId, long organizationId, long projectId, bool hideArchived,
-    RecordQueryRequestDto? queryDto,
-    bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false);
-
     Task<List<RecordResponseDto>> GetRecordsByTags(
         long currentUserId, long organizationId, long projectId, long[] tagIds, bool hideArchived,
         bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false);
@@ -25,7 +20,7 @@ public interface IRecordBusiness
         long organizationId, long projectId, long dataSourceId, bool hideArchived);
 
     Task<RecordResponseDto> CreateRecord(
-        long currentUserId, long organizationId, long projectId, long dataSourceId, CreateRecordRequestDto dto, 
+        long currentUserId, long organizationId, long projectId, long dataSourceId, CreateRecordRequestDto dto,
         List<long>? sensitivityLabelIds = null, bool embedded = false);
 
     Task<List<RecordResponseDto>> BulkCreateRecords(
@@ -46,7 +41,7 @@ public interface IRecordBusiness
     Task<bool> BulkDeleteRecordTagLinks(List<RecordTagLinkDto> dtos);
     Task<bool> BulkAttachLabels(
         long currentUserId, long organizationId, long projectId, List<long> recordIds, List<long> sensitiityLabelIds);
-    Task<List<RecordResponseDto>> GetRecordsByOriginalId(long currentUserId, long organizationId, long projectId, long dataSourceId, List<string> originalIds, 
+    Task<List<RecordResponseDto>> GetRecordsByOriginalId(long currentUserId, long organizationId, long projectId, long dataSourceId, List<string> originalIds,
         bool hideArchived, bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false);
     Task<List<LatticeRecordDto>> GetLatticeRecords(long organizationId, long projectId);
     Task<bool> BulkAttachTags(long currentUserId, long organizationId, long projectId,
