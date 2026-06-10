@@ -12,8 +12,8 @@ using deeplynx.datalayer.Models;
 namespace deeplynx.datalayer.Migrations
 {
     [DbContext(typeof(DeeplynxContext))]
-    [Migration("20260609200938_UserTypes")]
-    partial class UserTypes
+    [Migration("20260610210711_UserAccountTypesAndUniqueUsernames")]
+    partial class UserAccountTypesAndUniqueUsernames
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -2410,10 +2410,13 @@ namespace deeplynx.datalayer.Migrations
 
                     b.Property<string>("AccountType")
                         .IsRequired()
+                        .ValueGeneratedOnAdd()
                         .HasColumnType("text")
+                        .HasDefaultValue("human")
                         .HasColumnName("account_type");
 
                     b.Property<string>("Email")
+                        .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("email");
 
@@ -2468,6 +2471,10 @@ namespace deeplynx.datalayer.Migrations
 
                     b.HasIndex("SsoId")
                         .HasDatabaseName("idx_users_sso_id");
+
+                    b.HasIndex("Username")
+                        .IsUnique()
+                        .HasDatabaseName("idx_users_username");
 
                     b.ToTable("users", "deeplynx");
                 });

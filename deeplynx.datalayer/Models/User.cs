@@ -14,7 +14,7 @@ public partial class User
     public string Name { get; set; } = null!;
 
     [Column("email")]
-    public string? Email { get; set; } = null!;
+    public string Email { get; set; } = null!;
 
     [Column("username")]
     public string? Username { get; set; } = null!;
@@ -38,8 +38,9 @@ public partial class User
     public bool IsSysAdmin { get; set; }
 
     [Column("account_type")]
+    // Mirrors deeplynx.models.AccountTypes.Default; kept as a literal because datalayer does not reference models.
     public string AccountType { get; set; } = "human";
-    
+
     [InverseProperty("User")]
     public virtual ICollection<OrganizationUser> OrganizationUsers { get; set; } = new List<OrganizationUser>();
 

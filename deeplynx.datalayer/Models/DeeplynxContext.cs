@@ -1372,6 +1372,10 @@ public partial class DeeplynxContext : DbContext
             entity.HasIndex(e => e.SsoId)
                 .HasDatabaseName("idx_users_sso_id");
 
+            entity.HasIndex(e => e.Username)
+                .HasDatabaseName("idx_users_username")
+                .IsUnique();
+
             entity.Property(e => e.Id).UseIdentityAlwaysColumn();
 
             entity.Property(e => e.IsArchived).HasDefaultValue(false);
@@ -1379,6 +1383,10 @@ public partial class DeeplynxContext : DbContext
             entity.Property(e => e.IsSysAdmin).HasDefaultValue(false);
 
             entity.Property(e => e.IsActive).HasDefaultValue(false);
+
+            entity.Property(e => e.AccountType)
+                .IsRequired()
+                .HasDefaultValue("human");
         });
 
         modelBuilder.Entity<SavedSearch>(entity =>
