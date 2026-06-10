@@ -24,6 +24,7 @@ public class FileBusiness
     private readonly IOlapBusiness _olapBusiness;
     private readonly IInsightBusiness _insightBusiness;
     private readonly IObjectStorageBusiness _objectStorageBusiness;
+    private readonly ILogger<FileBusiness> _logger;
 
 
     // NOTE: Chunked upload methods currently only support filesystem storage.
@@ -37,7 +38,8 @@ public class FileBusiness
         IRecordBusiness recordBusiness,
         IInsightBusiness insightBusiness,
         IOlapBusiness olapBusiness,
-        IObjectStorageBusiness objectStorageBusiness)
+        IObjectStorageBusiness objectStorageBusiness,
+        ILogger<FileBusiness> logger)
     {
         _context = context;
         _factory = factory;
@@ -47,6 +49,7 @@ public class FileBusiness
         _insightBusiness = insightBusiness;
         _olapBusiness = olapBusiness;
         _objectStorageBusiness = objectStorageBusiness;
+        _logger = logger;
 
         var chunkSizeStr = Environment.GetEnvironmentVariable("RECOMMENDED_CHUNK_SIZE")
                            ?? throw new InvalidOperationException(
@@ -546,7 +549,25 @@ public class FileBusiness
             foreach (var storageGroup in recordsByStorage)
             {
                 var objectStorageId = storageGroup.Key;
-                var objectStorage = await _objectStorageBusiness.GetDecryptedObjectStorage(objectStorageId);
+
+                ObjectStorageDecryptedDto objectStorage;
+                
+                try
+                {
+                    objectStorage = await _objectStorageBusiness.GetDecryptedObjectStorage(objectStorageId);
+                }
+                catch (Exception ex)
+                {
+                    response.Failed += storageGroup.Count();
+                    
+                    _logger.LogWarning(
+                        ex,
+                        "Object storage {ObjectStorageId} not found or archived while backfilling file sizes",
+                        storageGroup.Key);
+
+                    continue;
+                }
+
                 var fileBusiness = _factory.CreateFileBusiness(objectStorage.Type);
 
                 // for azure, try batch operation first
