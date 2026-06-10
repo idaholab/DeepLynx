@@ -1791,7 +1791,7 @@ public class UserBusinessTests : IntegrationTestBase
         {
             Name = "Admin Alan",
             Email = "adminalan@test.com",
-            Username = "admin",
+            Username = $"admin_{Guid.NewGuid()}",
             IsActive = true,
             IsSysAdmin = true
         };
@@ -1799,7 +1799,7 @@ public class UserBusinessTests : IntegrationTestBase
         {
             Name = "Regular Joe",
             Email = "regularjoe@test.com",
-            Username = "regular",
+            Username = $"regular_{Guid.NewGuid()}",
             IsActive = true,
             IsSysAdmin = false
         };
@@ -1826,7 +1826,7 @@ public class UserBusinessTests : IntegrationTestBase
         {
             Name = "Regular Joe",
             Email = "regularjoe@test.com",
-            Username = "regular",
+            Username = $"regular_{Guid.NewGuid()}",
             IsActive = true,
             IsSysAdmin = false
         };
@@ -1834,7 +1834,7 @@ public class UserBusinessTests : IntegrationTestBase
         {
             Name = "Candidate User",
             Email = "candidate@test.com",
-            Username = "candidate",
+            Username = $"candidate_{Guid.NewGuid()}",
             IsActive = true,
             IsSysAdmin = false
         };
