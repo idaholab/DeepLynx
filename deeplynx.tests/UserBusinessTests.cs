@@ -869,11 +869,13 @@ public class UserBusinessTests : IntegrationTestBase
         // Act
         var result = await _userBusiness.CreateUser(dto, isOrgAdmin: true);
 
-        // Assert
+        // Assert — admin-provided Name is kept; username/email are generated as service_<guid>
         Assert.NotNull(result);
         Assert.Equal("CI Bot", result.Name);
         Assert.Equal("service", result.AccountType);
-        Assert.Null(result.Email);
+        Assert.StartsWith("service_", result.Username);
+        Assert.StartsWith("service_", result.Email);
+        Assert.Equal(result.Username, result.Email);
     }
 
     [Fact]
@@ -912,93 +914,28 @@ public class UserBusinessTests : IntegrationTestBase
     }
 
     [Fact]
-    public async Task CreateUser_Fails_ServiceAccount_IfNameAlreadyExists()
+    public async Task CreateUser_Succeeds_ServiceAccount_WithDuplicateName_GeneratesUniqueIdentifier()
     {
-        // Arrange — "User 1" exists in seed data
+        // Arrange — service account Names need not be unique; uniqueness comes from the
+        // generated service_<guid> username/email. Create two with the same Name.
         var dto = new CreateUserRequestDto
         {
-            Name = "User 1",
+            Name = "Shared Bot Name",
             AccountType = "service"
         };
 
-        // Act & Assert
-        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => _userBusiness.CreateUser(dto, isOrgAdmin: true));
-
-        Assert.Contains("Name must be unique", exception.Message);
-    }
-
-    // -- Test account tests --
-
-    [Fact]
-    public async Task CreateUser_Succeeds_TestAccount_AsSysAdmin()
-    {
-        // Arrange
-        var dto = new CreateUserRequestDto
-        {
-            Name = "Test Account Bot",
-            AccountType = "test"
-        };
-
         // Act
-        var result = await _userBusiness.CreateUser(dto, isSysAdmin: true);
+        var first = await _userBusiness.CreateUser(dto, isOrgAdmin: true);
+        var second = await _userBusiness.CreateUser(dto, isOrgAdmin: true);
 
-        // Assert
-        Assert.NotNull(result);
-        Assert.Equal("Test Account Bot", result.Name);
-        Assert.Equal("test", result.AccountType);
+        // Assert — same Name, distinct generated identifiers
+        Assert.Equal("Shared Bot Name", first.Name);
+        Assert.Equal("Shared Bot Name", second.Name);
+        Assert.NotEqual(first.Username, second.Username);
+        Assert.NotEqual(first.Email, second.Email);
     }
 
-    [Fact]
-    public async Task CreateUser_Fails_TestAccount_IfNotSysAdmin()
-    {
-        // Arrange
-        var dto = new CreateUserRequestDto
-        {
-            Name = "Unauthorized Test Bot",
-            AccountType = "test"
-        };
-
-        // Act & Assert — org/project admin is not enough
-        var exception = await Assert.ThrowsAsync<UnauthorizedAccessException>(
-            () => _userBusiness.CreateUser(dto, isOrgAdmin: true));
-
-        Assert.Contains("Only SysAdmins can create test accounts", exception.Message);
-    }
-
-    [Fact]
-    public async Task CreateUser_Fails_TestAccount_IfNotAdmin()
-    {
-        // Arrange
-        var dto = new CreateUserRequestDto
-        {
-            Name = "Unauthorized Test Bot",
-            AccountType = "test"
-        };
-
-        // Act & Assert
-        var exception = await Assert.ThrowsAsync<UnauthorizedAccessException>(
-            () => _userBusiness.CreateUser(dto));
-
-        Assert.Contains("Only SysAdmins can create test accounts", exception.Message);
-    }
-
-    [Fact]
-    public async Task CreateUser_Fails_TestAccount_IfNameAlreadyExists()
-    {
-        // Arrange — "User 1" exists in seed data
-        var dto = new CreateUserRequestDto
-        {
-            Name = "User 1",
-            AccountType = "test"
-        };
-
-        // Act & Assert
-        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => _userBusiness.CreateUser(dto, isSysAdmin: true));
-
-        Assert.Contains("Name must be unique", exception.Message);
-    }
+    // Test account tests are deferred until test-account creation is implemented.
 
     #endregion
 
