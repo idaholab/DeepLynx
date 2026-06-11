@@ -33,40 +33,37 @@ public class OrgRolePermissionService : IOrgRolePermissionService
             "Checking permission - User: {UserId}, Organization: {OrgId}, Action: {Action}, Resource: {Resource}",
             userId, orgId, action, resource);
         
-        bool hasPermission = false;
-        //check for whether a user has permission to an action/resource within a organization through group membership
-        hasPermission = _dbContext.Database
+        // Organization admins have full permission to every action/resource in the org.
+        var isOrgAdmin = _dbContext.Database
             .SqlQuery<bool>($@"
              SELECT EXISTS(
                 SELECT 1
-                FROM deeplynx.users u
-                LEFT JOIN deeplynx.organization_users ou ON (ou.user_id = u.id)
-                WHERE u.id = {userId}
+                FROM deeplynx.organization_users ou
+                WHERE ou.user_id = {userId}
                   AND ou.organization_id = {orgId}
                   AND ou.is_org_admin = true) as has_permission")
             .AsEnumerable()
             .FirstOrDefault();
-        if (!hasPermission)
+
+        var hasPermission = isOrgAdmin;
+
+        // There is no org-level user->role assignment in the schema (organization_users only
+        // carries is_org_admin), so granular per-user permissions cannot be evaluated at the org
+        // level. Non-admin members are therefore granted read-only access to org-scoped resources;
+        // any create/update/delete (write/update) action requires org admin.
+        if (!hasPermission && string.Equals(action, "read", StringComparison.OrdinalIgnoreCase))
         {
-            //check for whether a user has permission to an action/resource within a organization through group membership
             hasPermission = _dbContext.Database
                 .SqlQuery<bool>($@"
-              SELECT EXISTS(
+             SELECT EXISTS(
                 SELECT 1
-                FROM deeplynx.users u
-                LEFT JOIN deeplynx.organization_users ou ON (ou.user_id = u.id)
-                LEFT JOIN deeplynx.roles r ON r.organization_id = ou.organization_id
-                LEFT JOIN deeplynx.role_permissions rp ON rp.role_id = r.id
-                LEFT JOIN deeplynx.permissions perm ON rp.permission_id = perm.id
-                WHERE u.id = {userId}
-                  AND ou.organization_id = {orgId}
-                  AND perm.resource = {resource}
-                  AND perm.action = {action}
-                  AND r.is_archived = false
-                  AND perm.is_archived = false) as has_permission")
+                FROM deeplynx.organization_users ou
+                WHERE ou.user_id = {userId}
+                  AND ou.organization_id = {orgId}) as has_permission")
                 .AsEnumerable()
                 .FirstOrDefault();
         }
+
         if (hasPermission)
         {
             _logger.LogInformation(
