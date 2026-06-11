@@ -1,7 +1,8 @@
 using System.Linq.Expressions;
+using deeplynx.models;
 using Microsoft.EntityFrameworkCore;
 
-namespace deeplynx.models;
+namespace deeplynx.helpers;
 
 /// <summary>
 /// Paginating utilities. Paginating may be used to improve load times by reducing network traffic.
