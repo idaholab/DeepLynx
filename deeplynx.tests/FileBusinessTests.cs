@@ -216,6 +216,40 @@ public class FileBusinessTests : IntegrationTestBase
             ContentType = "application/octet-stream"
         };
     }
+    
+    private async Task<Record> CreateBackfillFileRecord(
+        string fileName,
+        string content,
+        long objectStorageId,
+        bool isArchived = false)
+    {
+        var filePath = Path.Combine(_testDirectory, fileName);
+        Directory.CreateDirectory(Path.GetDirectoryName(filePath)!);
+        await File.WriteAllTextAsync(filePath, content);
+
+        var record = new Record
+        {
+            Name = fileName,
+            Description = fileName,
+            ClassId = Context.Classes.First(c => c.Name == "File" && c.ProjectId == pid).Id,
+            DataSourceId = did,
+            ProjectId = pid,
+            OrganizationId = oid,
+            OriginalId = Guid.NewGuid().ToString(),
+            Properties = "{}",
+            Uri = filePath,
+            ObjectStorageId = objectStorageId,
+            FileSize = null,
+            IsArchived = isArchived,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid
+        };
+
+        Context.Records.Add(record);
+        await Context.SaveChangesAsync();
+
+        return record;
+    }
 
     #endregion
 
@@ -2924,11 +2958,200 @@ public class FileBusinessTests : IntegrationTestBase
         Assert.Equal(Encoding.UTF8.GetBytes(content1).Length, after1.FileSize);
         Assert.Equal(Encoding.UTF8.GetBytes(content2).Length, after2.FileSize);
     }
+    
+    // Verifies that invalid batch sizes are rejected before any backfill work starts.
+    [Fact]
+    public async Task BackfillFileSizes_ThrowsException_WhenBatchSizeIsZeroOrNegative()
+    {
+        await Assert.ThrowsAsync<ArgumentException>(() =>
+            _fileBusiness.BackfillFileSizes(oid, pid, batchSize: 0));
+    }
+
+    // Verifies that invalid maxBatches values are rejected before any backfill work starts.
+    [Fact]
+    public async Task BackfillFileSizes_ThrowsException_WhenMaxBatchesIsZeroOrNegative()
+    {
+        await Assert.ThrowsAsync<ArgumentException>(() =>
+            _fileBusiness.BackfillFileSizes(oid, pid, maxBatches: 0));
+    }
+
+    // Verifies that archived records are excluded from file size backfill.
+    [Fact]
+    public async Task BackfillFileSizes_SkipsArchivedRecords()
+    {
+        var record = await CreateBackfillFileRecord(
+            "archived-backfill.txt",
+            "archived content",
+            osid,
+            isArchived: true);
+
+        var result = await _fileBusiness.BackfillFileSizes(oid, pid);
+
+        var afterBackfill = await Context.Records.FindAsync(record.Id);
+
+        Assert.Equal(0, result.Processed);
+        Assert.Equal(0, result.Updated);
+        Assert.Equal(0, result.Failed);
+        Assert.Null(result.LastRecordId);
+        Assert.Null(afterBackfill!.FileSize);
+    }
+
+    // Verifies that only records with IDs greater than afterRecordId are processed.
+    [Fact]
+    public async Task BackfillFileSizes_RespectsAfterRecordId()
+    {
+        var skippedRecord = await CreateBackfillFileRecord(
+            "before-cursor.txt",
+            "before cursor",
+            osid);
+
+        var processedRecord = await CreateBackfillFileRecord(
+            "after-cursor.txt",
+            "after cursor",
+            osid);
+
+        var result = await _fileBusiness.BackfillFileSizes(
+            oid,
+            pid,
+            afterRecordId: skippedRecord.Id);
+
+        var skippedAfter = await Context.Records.FindAsync(skippedRecord.Id);
+        var processedAfter = await Context.Records.FindAsync(processedRecord.Id);
+
+        Assert.Equal(1, result.Processed);
+        Assert.Equal(1, result.Updated);
+        Assert.Equal(0, result.Failed);
+        Assert.Equal(processedRecord.Id, result.LastRecordId);
+        Assert.Null(skippedAfter!.FileSize);
+        Assert.NotNull(processedAfter!.FileSize);
+    }
+
+    // Verifies that one backfill call is bounded by batchSize multiplied by maxBatches.
+    [Fact]
+    public async Task BackfillFileSizes_ProcessesAtMostBatchSizeTimesMaxBatches()
+    {
+        var records = new List<Record>();
+
+        for (var i = 0; i < 5; i++)
+        {
+            records.Add(await CreateBackfillFileRecord(
+                $"bounded-backfill-{i}.txt",
+                $"bounded content {i}",
+                osid));
+        }
+
+        var result = await _fileBusiness.BackfillFileSizes(
+            oid,
+            pid,
+            batchSize: 2,
+            maxBatches: 2);
+
+        var recordIds = records.Select(r => r.Id).ToList();
+
+        var updatedCount = Context.Records
+            .Count(r => recordIds.Contains(r.Id) && r.FileSize != null);
+        
+        var remainingCount = Context.Records
+            .Count(r => recordIds.Contains(r.Id) && r.FileSize == null);
+
+        Assert.Equal(4, result.Processed);
+        Assert.Equal(4, result.Updated);
+        Assert.Equal(0, result.Failed);
+        Assert.Equal(4, updatedCount);
+        Assert.Equal(1, remainingCount);
+        Assert.NotNull(result.LastRecordId);
+    }
+
+    // Verifies that one failed file lookup does not prevent other records from being saved.
+    [Fact]
+    public async Task BackfillFileSizes_ContinuesWhenOneFileFails()
+    {
+        var firstGoodRecord = await CreateBackfillFileRecord(
+            "good-backfill-file.txt",
+            "good content",
+            osid);
+
+        var badRecord = await CreateBackfillFileRecord(
+            "missing-backfill-file.txt",
+            "missing content",
+            osid);
+        
+        var secondGoodRecord = await CreateBackfillFileRecord(
+            "second-good-backfill-file.txt",
+            "second good content",
+            osid);
+
+        File.Delete(badRecord.Uri!);
+
+        var result = await _fileBusiness.BackfillFileSizes(oid, pid);
+
+        var firstGoodAfter = await Context.Records.FindAsync(firstGoodRecord.Id);
+        var badAfter = await Context.Records.FindAsync(badRecord.Id);
+        var secondGoodAfter = await Context.Records.FindAsync(secondGoodRecord.Id);
+
+        Assert.Equal(3, result.Processed);
+        Assert.Equal(2, result.Updated);
+        Assert.Equal(1, result.Failed);
+        Assert.Equal(secondGoodRecord.Id, result.LastRecordId);
+        
+        Assert.NotNull(firstGoodAfter!.FileSize);
+        Assert.Null(badAfter!.FileSize);
+        Assert.NotNull(secondGoodAfter!.FileSize);
+    }
+
+    // Scenario test - Verifies that a later call can resume from the LastRecordId returned by a previous bounded call.
+    [Fact]
+    public async Task BackfillFileSizes_CanResumeFromLastRecordId()
+    {
+        var records = new List<Record>();
+
+        for (var i = 0; i < 5; i++)
+        {
+            records.Add(await CreateBackfillFileRecord(
+                $"resume-backfill-{i}.txt",
+                $"resume content {i}",
+                osid));
+        }
+
+        var firstResult = await _fileBusiness.BackfillFileSizes(
+            oid,
+            pid,
+            batchSize: 2,
+            maxBatches: 1);
+
+        var secondResult = await _fileBusiness.BackfillFileSizes(
+            oid,
+            pid,
+            afterRecordId: firstResult.LastRecordId,
+            batchSize: 10,
+            maxBatches: 1);
+
+        var updatedCount = 0;
+
+        foreach (var record in records)
+        {
+            var dbRecord = await Context.Records.FindAsync(record.Id);
+
+            if (dbRecord?.FileSize != null)
+                updatedCount++;
+        }
+
+        Assert.Equal(2, firstResult.Processed);
+        Assert.Equal(2, firstResult.Updated);
+        Assert.Equal(0, firstResult.Failed);
+        Assert.NotNull(firstResult.LastRecordId);
+
+        Assert.Equal(3, secondResult.Processed);
+        Assert.Equal(3, secondResult.Updated);
+        Assert.Equal(0, secondResult.Failed);
+        Assert.Equal(records.Max(r => r.Id), secondResult.LastRecordId);
+
+        Assert.Equal(5, updatedCount);
+    }
 
     #endregion
-
-
-    #region BackfillFileSizes Tests
+    
+    #region CreateUploadTus Tests
 
     [Fact]
     public async Task CreateUpload_CreatesUploadDirectory_AndReturnsSessionInfo()
@@ -2965,7 +3188,7 @@ public class FileBusinessTests : IntegrationTestBase
         Assert.True(Directory.Exists(uploadPath));
     }
     #endregion
-
+    
     #region GetUploadOffset Tests
 
     [Fact]
