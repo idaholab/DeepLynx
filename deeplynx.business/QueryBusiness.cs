@@ -532,7 +532,7 @@ public class QueryBusiness : IQueryBusiness
         return Paginator.Paginate(paginated, query, r => QueryRecordToResponse(r));
     }
 
-    private QueryRecordViewResponseDto QueryRecordToResponse(QueryRecord r)
+    static private QueryRecordViewResponseDto QueryRecordToResponse(QueryRecord r)
     {
         return new QueryRecordViewResponseDto
         {
