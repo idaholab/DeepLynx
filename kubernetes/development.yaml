@@ -203,6 +203,11 @@ spec:
                 configMapKeyRef:
                   name: app-config
                   key: disabled-front-auth
+            - name: NEXT_PUBLIC_HIDE_INSIGHT
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: hide-insight
             - name: OKTA_CLIENT_ID
               valueFrom:
                 configMapKeyRef:

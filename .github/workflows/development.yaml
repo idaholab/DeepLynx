@@ -317,6 +317,7 @@ jobs:
             --from-literal=redirect-link="${{ vars.REDIRECT_LINK }}" \
             --from-literal=backend-base-url="${{ vars.BACKEND_BASE_URL }}" \
             --from-literal=disabled-front-auth="${{ vars.NEXT_PUBLIC_DISABLE_FRONTEND_AUTHENTICATION }}" \
+            --from-literal=hide-insight="${{ vars.NEXT_PUBLIC_HIDE_INSIGHT }}" \
             --from-literal=hosted-link="${{ vars.HOSTED_LINK }}" \
             --from-literal=rabbitmq-default-user="${{ vars.RABBITMQ_DEFAULT_USER }}" \
             --namespace=deeplynxv3-dev \
