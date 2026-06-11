@@ -370,6 +370,8 @@ jobs:
           AIRFLOW_PASSWORD: ${{ secrets.AIRFLOW_PASSWORD }}
           LATTICE_MODEL: ${{ vars.LATTICE_MODEL }}
           NEXUS_API_URL: ${{ vars.NEXUS_API_URL }}
+          HIDE_INSIGHT: ${{ vars.HIDE_INSIGHT }}
+          NEXT_PUBLIC_HIDE_INSIGHT: ${{ vars.NEXT_PUBLIC_HIDE_INSIGHT }}
         run: |
           cd $GITHUB_WORKSPACE/kubernetes
           envsubst < development.yaml > manifest.yaml
