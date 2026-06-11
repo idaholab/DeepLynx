@@ -2,7 +2,7 @@
 
 import { FunnelIcon, XMarkIcon } from "@heroicons/react/24/outline";
 
-type FacetOption = { label: string; count: number };
+import { FacetOption } from "./recordCollections.types";
 
 type Props = {
   selectedSensitivityFilters: string[];

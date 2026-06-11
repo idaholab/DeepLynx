@@ -5,14 +5,7 @@ import {
   ChevronDownIcon,
 } from "@heroicons/react/24/outline";
 import React from "react";
-
-type CollectionSortOption =
-  | "updatedDesc"
-  | "updatedAsc"
-  | "alphabeticalAsc"
-  | "alphabeticalDesc"
-  | "recordCountDesc"
-  | "recordCountAsc";
+import { CollectionSortOption } from "./recordCollections.types";
 
 type Props = {
   collectionSort: CollectionSortOption;

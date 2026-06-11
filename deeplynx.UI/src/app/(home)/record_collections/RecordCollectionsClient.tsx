@@ -3,14 +3,10 @@
 import PaginationControls, {
   DEFAULT_PAGE_SIZE_OPTIONS,
 } from "@/app/(home)/components/PaginationControls";
+import SearchInput from "@/app/(home)/components/SearchInput";
 import Tabs from "@/app/(home)/components/Tabs";
-import {
-  ArrowRightIcon,
-  ArrowLeftIcon,
-  MagnifyingGlassIcon,
-} from "@heroicons/react/24/outline";
-import { useLocalPagination } from "@/app/hooks/useLocalPagination";
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ArrowLeftIcon } from "@heroicons/react/24/outline";
+import React, { useCallback, useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import AdditionalPropertiesEditor from "../record/components/AdditionalPropertiesEditor";
 import {
@@ -51,8 +47,29 @@ import NewCollectionTabContent from "./components/NewCollectionTabContent";
 import SectionCard from "./components/SectionCard";
 import SelectedCollectionDetailsTab from "./components/SelectedCollectionDetailsTab";
 import SelectedCollectionRecordsTab from "./components/SelectedCollectionRecordsTab";
-import { formatLocalDateTime } from "@/app/lib/date_time";
-import { countFacet, parseRecordTags } from "./components/utils";
+import {
+  COLLECTION_BADGE_DISPLAY_LIMIT,
+  COLLECTION_SORT_OPTIONS,
+  NEW_COLLECTION_RECORDS_PER_PAGE,
+} from "./components/recordCollections.constants";
+import {
+  getSelectedRecordLabelNames,
+  getSelectedRecordTagNames,
+  mergeDraftEntities,
+  getMetadataRows,
+  getSensitivityClass,
+  parseProperties,
+} from "./components/recordCollections.utils";
+import { renderCollectionSortLabel } from "./components/recordCollections.view-utils";
+import {
+  NewCollectionSelectedRecord,
+  PendingRecordChanges,
+} from "./components/recordCollections.types";
+import { useCollectionsDashboard } from "./hooks/useCollectionsDashboard";
+import { useSelectedCollectionDetailsController } from "./hooks/useSelectedCollectionDetailsController";
+import { useNewCollectionDerived } from "./hooks/useNewCollectionDerived";
+import { useSelectedCollectionDetailsView } from "./hooks/useSelectedCollectionDetailsView";
+import { useSelectedCollectionEditDerived } from "./hooks/useSelectedCollectionEditDerived";
 
 type Props = {
   recordCollections: RecordCollectionResponseDto[];
@@ -63,162 +80,6 @@ type Props = {
 type TopLevelTabId = "All Collections" | "New Collection";
 type CollectionWorkspaceTabId = "Details" | "Records";
 type NewCollectionStep = "Records" | "Metadata" | "Modify" | "Review";
-type CollectionSortOption =
-  | "updatedDesc"
-  | "updatedAsc"
-  | "alphabeticalAsc"
-  | "alphabeticalDesc"
-  | "recordCountDesc"
-  | "recordCountAsc";
-
-type MetadataRow = {
-  label: string;
-  value: string;
-};
-
-type FacetOption = {
-  label: string;
-  count: number;
-};
-
-type NewCollectionSelectedRecord = HistoricalRecordResponseDto & {
-  fullRecord?: RecordResponseDto;
-};
-
-type PendingRecordChanges = {
-  added: number[];
-  removed: number[];
-};
-
-const COLLECTION_SORT_OPTIONS: CollectionSortOption[] = [
-  "updatedDesc",
-  "updatedAsc",
-  "alphabeticalAsc",
-  "alphabeticalDesc",
-  "recordCountDesc",
-  "recordCountAsc",
-];
-
-function getSelectedRecordLabelNames(record: NewCollectionSelectedRecord) {
-  if (record.fullRecord?.labels?.length) {
-    return record.fullRecord.labels.map((label) => label.name);
-  }
-  return parseRecordTags(record.labels);
-}
-
-function getSelectedRecordTagNames(record: NewCollectionSelectedRecord) {
-  if (record.fullRecord?.tags?.length) {
-    return record.fullRecord.tags.map((tag) => tag.name);
-  }
-  return parseRecordTags(record.tags);
-}
-
-const NEW_COLLECTION_RECORDS_PER_PAGE = 6;
-const COLLECTIONS_DASHBOARD_PER_PAGE = 6;
-const COLLECTION_BADGE_DISPLAY_LIMIT = 10;
-
-function buildAlphabeticalFacetOptions(values: string[]): FacetOption[] {
-  return countFacet(values).sort((a, b) =>
-    a.label.localeCompare(b.label, undefined, { sensitivity: "base" }),
-  );
-}
-
-function parseProperties(properties?: string | null): Record<string, unknown> {
-  if (!properties) return {};
-
-  try {
-    const parsed = JSON.parse(properties);
-    return typeof parsed === "object" && parsed !== null ? parsed : {};
-  } catch {
-    return {};
-  }
-}
-
-function getMetadataRows(properties?: string | null): MetadataRow[] {
-  return Object.entries(parseProperties(properties)).map(([label, value]) => ({
-    label,
-    value:
-      typeof value === "string" || typeof value === "number" || typeof value === "boolean"
-        ? String(value)
-        : JSON.stringify(value),
-  }));
-}
-
-function getSensitivity(collection: RecordCollectionResponseDto) {
-  return collection.labels?.[0]?.name ?? "Unlabeled";
-}
-
-function getSensitivityClass(label: string) {
-  const lower = label.toLowerCase();
-  if (lower.includes("high")) return "badge-error";
-  if (lower.includes("moderate") || lower.includes("medium")) return "badge-warning";
-  if (lower.includes("low")) return "badge-success";
-  return "badge-outline";
-}
-
-function renderCollectionSortLabel(option: CollectionSortOption) {
-  switch (option) {
-    case "updatedDesc":
-      return "Last Updated (Newest)";
-    case "updatedAsc":
-      return "Last Updated (Oldest)";
-    case "alphabeticalAsc":
-      return (
-        <>
-          Alphabetical (A
-          <ArrowRightIcon className="size-3" />
-          Z)
-        </>
-      );
-    case "alphabeticalDesc":
-      return (
-        <>
-          Alphabetical (Z
-          <ArrowRightIcon className="size-3" />
-          A)
-        </>
-      );
-    case "recordCountDesc":
-      return "# of Records (Highest)";
-    case "recordCountAsc":
-      return "# of Records (Lowest)";
-    default:
-      return option;
-  }
-}
-
-function mergeDraftEntities<T extends { id: number; name: string }>(
-  baseline: T[] | undefined,
-  draft: T[] | undefined,
-  refreshed: T[] | undefined,
-): T[] {
-  const baselineItems = baseline ?? [];
-  const draftItems = draft ?? [];
-  const refreshedItems = refreshed ?? [];
-
-  const itemMap = new Map<number, T>();
-  [...baselineItems, ...draftItems, ...refreshedItems].forEach((item) => {
-    itemMap.set(item.id, item);
-  });
-
-  const baselineIds = new Set(baselineItems.map((item) => item.id));
-  const draftIds = new Set(draftItems.map((item) => item.id));
-  const resultIds = new Set(refreshedItems.map((item) => item.id));
-
-  draftIds.forEach((id) => {
-    if (!baselineIds.has(id)) resultIds.add(id);
-  });
-
-  baselineIds.forEach((id) => {
-    if (!draftIds.has(id)) resultIds.delete(id);
-  });
-
-  return Array.from(resultIds)
-    .map((id) => itemMap.get(id))
-    .filter((item): item is T => Boolean(item))
-    .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
-}
-
 /* ─── Component ──────────────────────────────────────────────────────────── */
 
 export default function RecordCollectionsClient({
@@ -229,16 +90,6 @@ export default function RecordCollectionsClient({
   const [collections, setCollections] =
     useState<RecordCollectionResponseDto[]>(recordCollections);
   const [activeTab, setActiveTab] = useState<TopLevelTabId>("All Collections");
-  const [searchTerm, setSearchTerm] = useState("");
-  const [collectionSort, setCollectionSort] =
-    useState<CollectionSortOption>("updatedDesc");
-  const [collectionSortMenuOpen, setCollectionSortMenuOpen] = useState(false);
-  const [expandedDashboardLabelIds, setExpandedDashboardLabelIds] = useState<
-    number[]
-  >([]);
-  const [expandedDashboardTagIds, setExpandedDashboardTagIds] = useState<
-    number[]
-  >([]);
   const [selectedCollection, setSelectedCollection] =
     useState<RecordCollectionResponseDto | null>(null);
   const [isEditingSelectedCollection, setIsEditingSelectedCollection] =
@@ -249,12 +100,6 @@ export default function RecordCollectionsClient({
     selectedCollectionPropertiesEditorOpen,
     setSelectedCollectionPropertiesEditorOpen,
   ] = useState(false);
-  const [selectedDescriptionExpandable, setSelectedDescriptionExpandable] =
-    useState(false);
-  const [selectedDescriptionExpanded, setSelectedDescriptionExpanded] =
-    useState(false);
-  const [selectedLabelsExpanded, setSelectedLabelsExpanded] = useState(false);
-  const [selectedTagsExpanded, setSelectedTagsExpanded] = useState(false);
   const [collectionWorkspaceTab, setCollectionWorkspaceTab] =
     useState<CollectionWorkspaceTabId>("Details");
   const [collectionRecords, setCollectionRecords] = useState<RecordResponseDto[]>([]);
@@ -286,9 +131,6 @@ export default function RecordCollectionsClient({
     useState(false);
   const [selectedCollectionTagCreating, setSelectedCollectionTagCreating] =
     useState(false);
-  const [collectionDetailRecordSearchTerm, setCollectionDetailRecordSearchTerm] =
-    useState("");
-  const [collectionDetailRecordPage, setCollectionDetailRecordPage] = useState(1);
   const [newCollectionStep, setNewCollectionStep] =
     useState<NewCollectionStep>("Records");
   const [newCollectionName, setNewCollectionName] = useState("");
@@ -306,6 +148,9 @@ export default function RecordCollectionsClient({
   const [newCollectionRecordSearchResults, setNewCollectionRecordSearchResults] =
     useState<HistoricalRecordResponseDto[]>([]);
   const [newCollectionRecordPage, setNewCollectionRecordPage] = useState(1);
+  const [newCollectionRecordsPerPage, setNewCollectionRecordsPerPage] = useState(
+    DEFAULT_PAGE_SIZE_OPTIONS[0],
+  );
   const [newCollectionSelectedRecordIds, setNewCollectionSelectedRecordIds] =
     useState<number[]>([]);
   const [newCollectionSelectedRecords, setNewCollectionSelectedRecords] =
@@ -317,12 +162,106 @@ export default function RecordCollectionsClient({
   const [newCollectionReviewPage, setNewCollectionReviewPage] = useState(1);
   const [newCollectionRecordSearchLoading, setNewCollectionRecordSearchLoading] =
     useState(false);
-  const [selectedSensitivityFilters, setSelectedSensitivityFilters] = useState<string[]>([]);
-  const [selectedTagFilters, setSelectedTagFilters] = useState<string[]>([]);
-  const [sensitivityFacetQuery, setSensitivityFacetQuery] = useState("");
-  const [tagFacetQuery, setTagFacetQuery] = useState("");
-  const collectionSortMenuRef = useRef<HTMLDivElement | null>(null);
-  const selectedDescriptionRef = useRef<HTMLParagraphElement | null>(null);
+
+  const dashboard = useCollectionsDashboard({ collections });
+  const collectionDetailsView = useSelectedCollectionDetailsView({
+    selectedCollection,
+    selectedCollectionDraft,
+    collectionRecords,
+    badgeDisplayLimit: COLLECTION_BADGE_DISPLAY_LIMIT,
+    recordsPerPage: NEW_COLLECTION_RECORDS_PER_PAGE,
+  });
+  const selectedCollectionEditDerived = useSelectedCollectionEditDerived({
+    selectedCollectionDraft,
+    availableLabels,
+    availableTags,
+    selectedCollectionLabelSearchTerm,
+    selectedCollectionTagSearchTerm,
+    recordSearchTerm,
+    recordSearchResults,
+    collectionRecords,
+  });
+  const newCollectionDerived = useNewCollectionDerived({
+    availableLabels,
+    availableTags,
+    newCollectionSelectedLabelIds,
+    newCollectionSelectedTagNames,
+    newCollectionLabelSearchTerm,
+    newCollectionTagSearchTerm,
+    newCollectionRecordSearchResults,
+    newCollectionRecordPage,
+    newCollectionSelectedRecordIds,
+    newCollectionSelectedRecords,
+    newCollectionReviewSearchTerm,
+    newCollectionReviewPage,
+    recordsPerPage: newCollectionRecordsPerPage,
+    setNewCollectionReviewPage,
+  });
+
+  const {
+    searchTerm,
+    setSearchTerm,
+    collectionSort,
+    setCollectionSort,
+    collectionSortMenuOpen,
+    setCollectionSortMenuOpen,
+    collectionSortMenuRef,
+    filteredCollections,
+    sortedCollections,
+    activeFacetCount,
+    selectedSensitivityFilters,
+    toggleSensitivityFilter,
+    filteredSensitivityFacetOptions,
+    sensitivityFacetQuery,
+    setSensitivityFacetQuery,
+    selectedTagFilters,
+    toggleTagFilter,
+    filteredTagFacetOptions,
+    tagFacetQuery,
+    setTagFacetQuery,
+    clearFacetFilters,
+    isDashboardLabelsExpanded,
+    isDashboardTagsExpanded,
+    toggleDashboardLabelsExpanded,
+    toggleDashboardTagsExpanded,
+    collectionDashboardPage,
+    collectionDashboardPageSize,
+    visibleSortedCollections,
+    setCollectionDashboardPage,
+    setCollectionDashboardPageSize,
+    collectionDashboardStartIndex,
+    collectionDashboardPageCount,
+  } = dashboard;
+
+  const { editableSelectedCollection, resetCollectionDetailsView } =
+    collectionDetailsView;
+
+  const { addableRecordResults } = selectedCollectionEditDerived;
+
+  const {
+    newCollectionSelectedLabelTally,
+    newCollectionSelectedTagTally,
+    selectedNewCollectionLabels,
+    filteredNewCollectionLabelOptions,
+    filteredNewCollectionTagOptions,
+    canAddTypedNewCollectionTag,
+    canAddTypedNewCollectionLabel,
+    newCollectionRecordPageCount,
+    visibleNewCollectionRecords,
+    allVisibleNewCollectionRecordsSelected,
+    allRetrievedNewCollectionRecordsSelected,
+    someVisibleNewCollectionRecordsSelected,
+    filteredNewCollectionSelectedRecords,
+    newCollectionReviewPageCount,
+    visibleNewCollectionReviewRecords,
+    selectedRecordMetadata,
+  } = newCollectionDerived;
+
+  const handleSetNewCollectionRecordsPerPage = useCallback((pageSize: number) => {
+    setNewCollectionRecordsPerPage(pageSize);
+    setNewCollectionRecordPage(1);
+    setNewCollectionReviewPage(1);
+  }, []);
 
   useEffect(() => {
     const loadLabels = async () => {
@@ -357,20 +296,6 @@ export default function RecordCollectionsClient({
 
     loadTags();
   }, [projectId]);
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        collectionSortMenuRef.current &&
-        !collectionSortMenuRef.current.contains(event.target as Node)
-      ) {
-        setCollectionSortMenuOpen(false);
-      }
-    };
-
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
 
   const refreshCollections = useCallback(async (preserveSelection = true) => {
     const refreshed = await getAllRecordCollections(organizationId, projectId);
@@ -841,13 +766,9 @@ export default function RecordCollectionsClient({
     setSelectedCollectionPropertiesEditorOpen(false);
     setSelectedCollectionLabelSearchTerm("");
     setSelectedCollectionTagSearchTerm("");
-    setSelectedDescriptionExpanded(false);
-    setSelectedLabelsExpanded(false);
-    setSelectedTagsExpanded(false);
+    resetCollectionDetailsView();
     setCollectionWorkspaceTab("Details");
     setCollectionRecords([]);
-    setCollectionDetailRecordSearchTerm("");
-    setCollectionDetailRecordPage(1);
     const records = await loadCollectionRecords(collection);
     syncSelectedCollectionRecordCount(records.length, collection.id);
   };
@@ -902,6 +823,7 @@ export default function RecordCollectionsClient({
       setSelectedCollectionPropertiesEditorOpen(false);
       setSelectedCollectionLabelSearchTerm("");
       setSelectedCollectionTagSearchTerm("");
+      resetCollectionDetailsView();
       setIsEditingSelectedCollection(false);
     } catch (error) {
       console.error("Failed to cancel record collection edit:", error);
@@ -954,9 +876,7 @@ export default function RecordCollectionsClient({
       setCollections((prev) => [createdWithRecordCount, ...prev]);
       setSelectedCollection(createdWithRecordCount);
       setIsEditingSelectedCollection(false);
-      setSelectedDescriptionExpanded(false);
-      setSelectedLabelsExpanded(false);
-      setSelectedTagsExpanded(false);
+      resetCollectionDetailsView();
       setCollectionWorkspaceTab("Details");
       setActiveTab("All Collections");
       setNewCollectionStep("Records");
@@ -1070,6 +990,7 @@ export default function RecordCollectionsClient({
         ),
       );
       setPendingRecordChanges({ added: [], removed: [] });
+      resetCollectionDetailsView();
       setIsEditingSelectedCollection(false);
       toast.success("Record collection updated");
     } catch (error) {
@@ -1204,121 +1125,9 @@ export default function RecordCollectionsClient({
     }
   };
 
-  const toggleSensitivityFilter = (value: string) => {
-    setSelectedSensitivityFilters((prev) =>
-      prev.includes(value)
-        ? prev.filter((filter) => filter !== value)
-        : [...prev, value],
-    );
-  };
-
-  const toggleTagFilter = (value: string) => {
-    setSelectedTagFilters((prev) =>
-      prev.includes(value)
-        ? prev.filter((filter) => filter !== value)
-        : [...prev, value],
-    );
-  };
-
-  const clearFacetFilters = () => {
-    setSelectedSensitivityFilters([]);
-    setSelectedTagFilters([]);
-    setSensitivityFacetQuery("");
-    setTagFacetQuery("");
-  };
-
-  const activeFacetCount =
-    selectedSensitivityFilters.length + selectedTagFilters.length;
-
-  const newCollectionSelectedLabelTally = useMemo(
-    () =>
-      countFacet(
-        newCollectionSelectedRecords.flatMap((record) =>
-          getSelectedRecordLabelNames(record),
-        ),
-      ),
-    [newCollectionSelectedRecords],
-  );
-
-  const newCollectionSelectedTagTally = useMemo(
-    () =>
-      countFacet(
-        newCollectionSelectedRecords.flatMap((record) =>
-          getSelectedRecordTagNames(record),
-        ),
-      ),
-    [newCollectionSelectedRecords],
-  );
-
-  const selectedNewCollectionLabels = useMemo(
-    () =>
-      availableLabels.filter((label) =>
-        newCollectionSelectedLabelIds.includes(label.id),
-      ),
-    [availableLabels, newCollectionSelectedLabelIds],
-  );
-
-  const filteredNewCollectionLabelOptions = useMemo(() => {
-    const query = newCollectionLabelSearchTerm.trim().toLowerCase();
-    return availableLabels
-      .filter((label) => !newCollectionSelectedLabelIds.includes(label.id))
-      .filter((label) => label.name.toLowerCase().includes(query));
-  }, [
-    availableLabels,
-    newCollectionLabelSearchTerm,
-    newCollectionSelectedLabelIds,
-  ]);
-
-  const filteredNewCollectionTagOptions = useMemo(() => {
-    const query = newCollectionTagSearchTerm.trim().toLowerCase();
-    return availableTags
-      .filter(
-        (tag) =>
-          !newCollectionSelectedTagNames.some(
-            (name) => name.toLowerCase() === tag.name.toLowerCase(),
-          ),
-      )
-      .filter((tag) => tag.name.toLowerCase().includes(query));
-  }, [availableTags, newCollectionSelectedTagNames, newCollectionTagSearchTerm]);
-
-  const canAddTypedNewCollectionTag =
-    newCollectionTagSearchTerm.trim().length > 0 &&
-    !newCollectionSelectedTagNames.some(
-      (name) =>
-        name.toLowerCase() === newCollectionTagSearchTerm.trim().toLowerCase(),
-    );
-
-  const canAddTypedNewCollectionLabel =
-    newCollectionLabelSearchTerm.trim().length > 0 &&
-    !selectedNewCollectionLabels.some(
-      (label) =>
-        label.name.toLowerCase() ===
-        newCollectionLabelSearchTerm.trim().toLowerCase(),
-    );
-
   const goToNewCollectionModifyStep = () => {
-    const selectedRecordLabelIds = new Set<number>();
-    const selectedRecordLabelNames = new Set<string>();
-
-    newCollectionSelectedRecords.forEach((record) => {
-      record.fullRecord?.labels?.forEach((label) => {
-        if (label.id !== null) selectedRecordLabelIds.add(label.id);
-        selectedRecordLabelNames.add(label.name.toLowerCase());
-      });
-    });
-
-    newCollectionSelectedLabelTally.forEach((label) =>
-      selectedRecordLabelNames.add(label.label.toLowerCase()),
-    );
-
-    availableLabels
-      .filter((label) => selectedRecordLabelNames.has(label.name.toLowerCase()))
-      .forEach((label) => selectedRecordLabelIds.add(label.id));
-
-    setNewCollectionSelectedLabelIds(Array.from(selectedRecordLabelIds));
-    setNewCollectionSelectedTagNames(
-      newCollectionSelectedTagTally.map((tag) => tag.label),
-    );
+    setNewCollectionSelectedLabelIds(selectedRecordMetadata.labelIds);
+    setNewCollectionSelectedTagNames(selectedRecordMetadata.tagNames);
     setNewCollectionStep("Modify");
   };
 
@@ -1327,380 +1136,14 @@ export default function RecordCollectionsClient({
     setNewCollectionReviewPage(1);
     setNewCollectionStep("Review");
   };
-
-  const filteredCollections = useMemo(() => {
-    const query = searchTerm.trim().toLowerCase();
-
-    return collections.filter((collection) => {
-      const collectionLabelNames =
-        collection.labels?.map((label) => label.name) ?? [];
-      const collectionTagNames = collection.tags?.map((tag) => tag.name) ?? [];
-      const matchesSensitivity =
-        selectedSensitivityFilters.length === 0 ||
-        selectedSensitivityFilters.every((filter) =>
-          collectionLabelNames.includes(filter),
-        );
-      const matchesTags =
-        selectedTagFilters.length === 0 ||
-        selectedTagFilters.every((filter) => collectionTagNames.includes(filter));
-
-      if (!matchesSensitivity || !matchesTags) return false;
-      if (!query) return true;
-
-      const haystack = [
-        collection.name,
-        collection.description,
-        getSensitivity(collection),
-        collectionTagNames.join(" "),
-        collectionLabelNames.join(" "),
-      ]
-        .join(" ")
-        .toLowerCase();
-
-      return haystack.includes(query);
-    });
-  }, [
-    collections,
-    searchTerm,
-    selectedSensitivityFilters,
-    selectedTagFilters,
-  ]);
-
-  const sortedCollections = useMemo(() => {
-    return [...filteredCollections].sort((a, b) => {
-      const alphabeticalComparison = a.name.localeCompare(b.name, undefined, {
-        sensitivity: "base",
-      });
-      const updatedComparison =
-        new Date(a.lastUpdatedAt).getTime() -
-        new Date(b.lastUpdatedAt).getTime();
-      const recordCountComparison = a.recordCount - b.recordCount;
-
-      switch (collectionSort) {
-        case "alphabeticalAsc":
-          return alphabeticalComparison;
-        case "alphabeticalDesc":
-          return alphabeticalComparison * -1;
-        case "recordCountAsc":
-          return recordCountComparison || alphabeticalComparison;
-        case "recordCountDesc":
-          return recordCountComparison * -1 || alphabeticalComparison;
-        case "updatedAsc":
-          return updatedComparison || alphabeticalComparison;
-        case "updatedDesc":
-        default:
-          return updatedComparison * -1 || alphabeticalComparison;
-      }
-    });
-  }, [collectionSort, filteredCollections]);
-
-  const {
-    currentPage: collectionDashboardPage,
-    pageSize: collectionDashboardPageSize,
-    paginatedItems: visibleSortedCollections,
-    resetPagination: resetCollectionDashboardPagination,
-    setCurrentPage: setCollectionDashboardPage,
-    setPageSize: setCollectionDashboardPageSize,
-    startIndex: collectionDashboardStartIndex,
-    totalPages: collectionDashboardPageCount,
-  } = useLocalPagination({
-    items: sortedCollections,
-    initialPageSize: COLLECTIONS_DASHBOARD_PER_PAGE,
-  });
-
-  useEffect(() => {
-    resetCollectionDashboardPagination();
-  }, [searchTerm, selectedSensitivityFilters, selectedTagFilters, collectionSort]);
-
-  useEffect(() => {
-    const measureDescriptionOverflow = () => {
-      const selectedDescriptionElement = selectedDescriptionRef.current;
-      const nextSelectedExpandable = Boolean(
-        selectedDescriptionElement &&
-        selectedDescriptionElement.scrollHeight - selectedDescriptionElement.clientHeight > 1,
-      );
-      setSelectedDescriptionExpandable((current) =>
-        current === nextSelectedExpandable ? current : nextSelectedExpandable,
-      );
-    };
-
-    const frameId = window.requestAnimationFrame(measureDescriptionOverflow);
-    window.addEventListener("resize", measureDescriptionOverflow);
-
-    return () => {
-      window.cancelAnimationFrame(frameId);
-      window.removeEventListener("resize", measureDescriptionOverflow);
-    };
-  }, [selectedCollection?.id, selectedCollection?.description]);
-
-  const sensitivityFacetOptions = useMemo(
-    () =>
-      buildAlphabeticalFacetOptions(
-        filteredCollections.flatMap((collection) =>
-          collection.labels?.map((label) => label.name) ?? [],
-        ),
-      ),
-    [filteredCollections],
-  );
-
-  const tagFacetOptions = useMemo(
-    () =>
-      buildAlphabeticalFacetOptions(
-        filteredCollections.flatMap((collection) =>
-          collection.tags?.map((tag) => tag.name) ?? [],
-        ),
-      ),
-    [filteredCollections],
-  );
-
-  const filteredSensitivityFacetOptions = useMemo(() => {
-    const query = sensitivityFacetQuery.trim().toLowerCase();
-    return sensitivityFacetOptions.filter((option) =>
-      option.label.toLowerCase().includes(query),
-    );
-  }, [sensitivityFacetOptions, sensitivityFacetQuery]);
-
-  const filteredTagFacetOptions = useMemo(() => {
-    const query = tagFacetQuery.trim().toLowerCase();
-    return tagFacetOptions.filter((option) =>
-      option.label.toLowerCase().includes(query),
-    );
-  }, [tagFacetOptions, tagFacetQuery]);
-
-  const unattachedLabels = useMemo(() => {
-    const attachedIds = new Set(
-      selectedCollectionDraft?.labels?.map((label) => label.id) ?? [],
-    );
-    return availableLabels.filter((label) => !attachedIds.has(label.id));
-  }, [availableLabels, selectedCollectionDraft?.labels]);
-
-  const unattachedTags = useMemo(() => {
-    const attachedIds = new Set(
-      selectedCollectionDraft?.tags?.map((tag) => tag.id) ?? [],
-    );
-    return availableTags.filter((tag) => !attachedIds.has(tag.id));
-  }, [availableTags, selectedCollectionDraft?.tags]);
-
-  const filteredSelectedCollectionLabelOptions = useMemo(() => {
-    const query = selectedCollectionLabelSearchTerm.trim().toLowerCase();
-    return unattachedLabels.filter((label) =>
-      label.name.toLowerCase().includes(query),
-    );
-  }, [selectedCollectionLabelSearchTerm, unattachedLabels]);
-
-  const filteredSelectedCollectionTagOptions = useMemo(() => {
-    const query = selectedCollectionTagSearchTerm.trim().toLowerCase();
-    return unattachedTags.filter((tag) =>
-      tag.name.toLowerCase().includes(query),
-    );
-  }, [selectedCollectionTagSearchTerm, unattachedTags]);
-
-  const canAddTypedSelectedCollectionLabel =
-    selectedCollectionLabelSearchTerm.trim().length > 0 &&
-    !(selectedCollectionDraft?.labels ?? []).some(
-      (label) =>
-        label.name.toLowerCase() ===
-        selectedCollectionLabelSearchTerm.trim().toLowerCase(),
-    );
-
-  const canAddTypedSelectedCollectionTag =
-    selectedCollectionTagSearchTerm.trim().length > 0 &&
-    !(selectedCollectionDraft?.tags ?? []).some(
-      (tag) =>
-        tag.name.toLowerCase() ===
-        selectedCollectionTagSearchTerm.trim().toLowerCase(),
-    );
-
-  const addableRecordResults = useMemo(() => {
-    const existingIds = new Set(
-      collectionRecords
-        .map((record) => record.id)
-        .filter((id): id is number => typeof id === "number"),
-    );
-    return recordSearchResults.filter((record) => !existingIds.has(record.id));
-  }, [collectionRecords, recordSearchResults]);
-
-  const collectionRecordIds = useMemo(
-    () =>
-      new Set(
-        collectionRecords
-          .map((record) => record.id)
-          .filter((id): id is number => typeof id === "number"),
-      ),
-    [collectionRecords],
-  );
-
-  const editRecordResults = useMemo(
-    () =>
-      recordSearchTerm.trim().length
-        ? recordSearchResults
-        : collectionRecords,
-    [collectionRecords, recordSearchResults, recordSearchTerm],
-  );
-
-  const newCollectionRecordPageCount = Math.max(
-    1,
-    Math.ceil(
-      newCollectionRecordSearchResults.length / NEW_COLLECTION_RECORDS_PER_PAGE,
-    ),
-  );
-
-  const visibleNewCollectionRecords = useMemo(() => {
-    const startIndex =
-      (newCollectionRecordPage - 1) * NEW_COLLECTION_RECORDS_PER_PAGE;
-    return newCollectionRecordSearchResults.slice(
-      startIndex,
-      startIndex + NEW_COLLECTION_RECORDS_PER_PAGE,
-    );
-  }, [newCollectionRecordPage, newCollectionRecordSearchResults]);
-
-  const visibleNewCollectionRecordIds = useMemo(
-    () => visibleNewCollectionRecords.map((record) => record.id),
-    [visibleNewCollectionRecords],
-  );
-
-  const allVisibleNewCollectionRecordsSelected =
-    visibleNewCollectionRecordIds.length > 0 &&
-    visibleNewCollectionRecordIds.every((id) =>
-      newCollectionSelectedRecordIds.includes(id),
-    );
-
-  const allRetrievedNewCollectionRecordsSelected =
-    newCollectionRecordSearchResults.length > 0 &&
-    newCollectionRecordSearchResults.every((record) =>
-      newCollectionSelectedRecordIds.includes(record.id),
-    );
-
-  const someVisibleNewCollectionRecordsSelected =
-    visibleNewCollectionRecordIds.some((id) =>
-      newCollectionSelectedRecordIds.includes(id),
-    );
-
-  const filteredNewCollectionSelectedRecords = useMemo(() => {
-    const query = newCollectionReviewSearchTerm.trim().toLowerCase();
-    if (!query) return newCollectionSelectedRecords;
-
-    return newCollectionSelectedRecords.filter((record) => {
-      const haystack = [
-        record.name,
-        record.description,
-        record.className,
-        record.dataSourceName,
-        record.projectName,
-        getSelectedRecordLabelNames(record).join(" "),
-        getSelectedRecordTagNames(record).join(" "),
-      ]
-        .join(" ")
-        .toLowerCase();
-
-      return haystack.includes(query);
-    });
-  }, [newCollectionReviewSearchTerm, newCollectionSelectedRecords]);
-
-  const newCollectionReviewPageCount = Math.max(
-    1,
-    Math.ceil(
-      filteredNewCollectionSelectedRecords.length /
-      NEW_COLLECTION_RECORDS_PER_PAGE,
-    ),
-  );
-
-  const visibleNewCollectionReviewRecords = useMemo(() => {
-    const startIndex =
-      (newCollectionReviewPage - 1) * NEW_COLLECTION_RECORDS_PER_PAGE;
-    return filteredNewCollectionSelectedRecords.slice(
-      startIndex,
-      startIndex + NEW_COLLECTION_RECORDS_PER_PAGE,
-    );
-  }, [filteredNewCollectionSelectedRecords, newCollectionReviewPage]);
-
-  useEffect(() => {
-    setNewCollectionReviewPage(1);
-  }, [newCollectionReviewSearchTerm, newCollectionSelectedRecords.length]);
-
-  const filteredCollectionDetailRecords = useMemo(() => {
-    const query = collectionDetailRecordSearchTerm.trim().toLowerCase();
-    if (!query) return collectionRecords;
-
-    return collectionRecords.filter((record) => {
-      const haystack = [
-        record.name,
-        record.description,
-        record.uri,
-        record.classId,
-        record.dataSourceId,
-        record.projectId,
-        record.lastUpdatedBy,
-      ]
-        .join(" ")
-        .toLowerCase();
-
-      return haystack.includes(query);
-    });
-  }, [collectionDetailRecordSearchTerm, collectionRecords]);
-
-  const collectionDetailRecordPageCount = Math.max(
-    1,
-    Math.ceil(
-      filteredCollectionDetailRecords.length / NEW_COLLECTION_RECORDS_PER_PAGE,
-    ),
-  );
-
-  const visibleCollectionDetailRecords = useMemo(() => {
-    const startIndex =
-      (collectionDetailRecordPage - 1) * NEW_COLLECTION_RECORDS_PER_PAGE;
-    return filteredCollectionDetailRecords.slice(
-      startIndex,
-      startIndex + NEW_COLLECTION_RECORDS_PER_PAGE,
-    );
-  }, [collectionDetailRecordPage, filteredCollectionDetailRecords]);
-
-  useEffect(() => {
-    setCollectionDetailRecordPage(1);
-  }, [collectionDetailRecordSearchTerm, collectionRecords.length]);
-
-  const editableSelectedCollection = selectedCollectionDraft ?? selectedCollection;
-  const selectedCollectionLabels = selectedCollection?.labels ?? [];
-  const selectedCollectionTags = selectedCollection?.tags ?? [];
-  const visibleSelectedCollectionLabels = selectedLabelsExpanded
-    ? selectedCollectionLabels
-    : selectedCollectionLabels.slice(0, COLLECTION_BADGE_DISPLAY_LIMIT);
-  const visibleSelectedCollectionTags = selectedTagsExpanded
-    ? selectedCollectionTags
-    : selectedCollectionTags.slice(0, COLLECTION_BADGE_DISPLAY_LIMIT);
-  const collectionSummaryPanel = selectedCollection ? (
-    <div className="grid gap-4 rounded-2xl border border-base-300 bg-base-200/30 p-4 text-sm sm:grid-cols-2 lg:grid-cols-4">
-      <div>
-        <p className="text-base-content/60">Collection ID</p>
-        <p className="font-semibold text-base-content">{selectedCollection.id}</p>
-      </div>
-      <div>
-        <p className="text-base-content/60">Total Records</p>
-        <p className="font-semibold text-base-content">
-          {selectedCollection.recordCount}
-        </p>
-      </div>
-      <div>
-        <p className="text-base-content/60">Updated</p>
-        <p className="font-semibold text-base-content">
-          {formatLocalDateTime(selectedCollection.lastUpdatedAt)}
-        </p>
-      </div>
-      <div>
-        <p className="text-base-content/60">Last Updated By</p>
-        <p className="font-semibold text-base-content">
-          {selectedCollection.lastUpdatedBy ?? "Unknown"}
-        </p>
-      </div>
-    </div>
-  ) : null;
-
   const newCollectionController = {
     workflow: {
       projectId,
       newCollectionStep,
       setNewCollectionStep,
-      recordsPerPage: NEW_COLLECTION_RECORDS_PER_PAGE,
+      recordsPerPage: newCollectionRecordsPerPage,
+      setRecordsPerPage: handleSetNewCollectionRecordsPerPage,
+      recordPageSizeOptions: DEFAULT_PAGE_SIZE_OPTIONS,
       saving,
       getSensitivityClass,
     },
@@ -1808,81 +1251,46 @@ export default function RecordCollectionsClient({
     : null;
 
   const selectedCollectionDetailsController =
-    selectedCollection && editableSelectedCollection
-      ? {
-          readonlyView: {
-            selectedCollection,
-            collectionSummaryPanel,
-            selectedDescriptionRef,
-            selectedDescriptionExpanded,
-            selectedDescriptionExpandable,
-            setSelectedDescriptionExpanded,
-            selectedCollectionLabels,
-            visibleSelectedCollectionLabels,
-            selectedLabelsExpanded,
-            setSelectedLabelsExpanded,
-            selectedCollectionTags,
-            visibleSelectedCollectionTags,
-            selectedTagsExpanded,
-            setSelectedTagsExpanded,
-            badgeDisplayLimit: COLLECTION_BADGE_DISPLAY_LIMIT,
-            getMetadataRows,
-            getSensitivityClass,
-            collectionRecords,
-            filteredCollectionDetailRecords,
-            collectionDetailRecordSearchTerm,
-            setCollectionDetailRecordSearchTerm,
-            visibleCollectionDetailRecords,
-            recordsLoading,
-            onViewAllCollectionRecords: viewAllCollectionRecords,
-            recordsPerPage: NEW_COLLECTION_RECORDS_PER_PAGE,
-            collectionDetailRecordPage,
-            setCollectionDetailRecordPage,
-            collectionDetailRecordPageCount,
-            projectId,
-            onOpenSelectedCollectionEdit: openSelectedCollectionEdit,
-          },
-          editView: {
-            editableSelectedCollection,
-            isEditingSelectedCollection,
-            saving,
-            setSelectedCollectionDraft,
-            setSelectedCollectionPropertiesEditorOpen,
-            selectedCollectionLabelSearchTerm,
-            setSelectedCollectionLabelSearchTerm,
-            selectedCollectionTagSearchTerm,
-            setSelectedCollectionTagSearchTerm,
-            selectedCollectionLabelCreating,
-            selectedCollectionTagCreating,
-            canAddTypedSelectedCollectionLabel,
-            canAddTypedSelectedCollectionTag,
-            filteredSelectedCollectionLabelOptions,
-            filteredSelectedCollectionTagOptions,
-            labelsLoading,
-            tagsLoading,
-            onAddSelectedCollectionLabelFromSearch:
-              addSelectedCollectionLabelFromSearch,
-            onAddSelectedCollectionTagFromSearch:
-              addSelectedCollectionTagFromSearch,
-            onAddSelectedCollectionLabel: addSelectedCollectionLabel,
-            onAddSelectedCollectionTag: addSelectedCollectionTag,
-            onRemoveLabel: handleRemoveLabel,
-            onRemoveTag: handleRemoveTag,
-            recordSearchTerm,
-            setRecordSearchTerm,
-            recordSearchLoading,
-            onSearchRecords: handleSearchRecords,
-            editRecordResults,
-            collectionRecordIds,
-            addingRecordIds,
-            removingRecordIds,
-            onRemoveCollectionRecord: handleRemoveCollectionRecord,
-            onAddCollectionRecord: handleAddCollectionRecord,
-            onCancelSelectedCollectionEdit: cancelSelectedCollectionEdit,
-            onSaveSelectedDetails: handleSaveSelectedDetails,
-          },
-        }
-      : null;
+    useSelectedCollectionDetailsController({
+      projectId,
+      selectedCollection,
+      collectionRecords,
+      collectionDetailsView,
+      selectedCollectionEditDerived,
+      recordsLoading,
+      saving,
+      isEditingSelectedCollection,
+      setSelectedCollectionDraft,
+      setSelectedCollectionPropertiesEditorOpen,
+      selectedCollectionLabelSearchTerm,
+      setSelectedCollectionLabelSearchTerm,
+      selectedCollectionTagSearchTerm,
+      setSelectedCollectionTagSearchTerm,
+      selectedCollectionLabelCreating,
+      selectedCollectionTagCreating,
+      labelsLoading,
+      tagsLoading,
+      onAddSelectedCollectionLabelFromSearch: addSelectedCollectionLabelFromSearch,
+      onAddSelectedCollectionTagFromSearch: addSelectedCollectionTagFromSearch,
+      onAddSelectedCollectionLabel: addSelectedCollectionLabel,
+      onAddSelectedCollectionTag: addSelectedCollectionTag,
+      onRemoveLabel: handleRemoveLabel,
+      onRemoveTag: handleRemoveTag,
+      recordSearchTerm,
+      setRecordSearchTerm,
+      recordSearchLoading,
+      onSearchRecords: handleSearchRecords,
+      addingRecordIds,
+      removingRecordIds,
+      onRemoveCollectionRecord: handleRemoveCollectionRecord,
+      onAddCollectionRecord: handleAddCollectionRecord,
+      onCancelSelectedCollectionEdit: cancelSelectedCollectionEdit,
+      onSaveSelectedDetails: handleSaveSelectedDetails,
+      onViewAllCollectionRecords: viewAllCollectionRecords,
+      onOpenSelectedCollectionEdit: openSelectedCollectionEdit,
+      getMetadataRows,
+      getSensitivityClass,
+    });
 
   const selectedCollectionDetailsTab = selectedCollectionDetailsController ? (
     <SelectedCollectionDetailsTab controller={selectedCollectionDetailsController} />
@@ -1928,16 +1336,12 @@ export default function RecordCollectionsClient({
               }
             >
               <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_18rem]">
-                <label className="input input-bordered flex w-full items-center gap-2 self-end">
-                  <MagnifyingGlassIcon className="size-5 text-base-content/60" />
-                  <input
-                    type="text"
-                    className="grow"
-                    placeholder="Search by collection title or description..."
-                    value={searchTerm}
-                    onChange={(event) => setSearchTerm(event.target.value)}
-                  />
-                </label>
+                <SearchInput
+                  className="self-end"
+                  placeholder="Search by collection title or description..."
+                  value={searchTerm}
+                  onChange={(event) => setSearchTerm(event.target.value)}
+                />
                 <CollectionSortControl
                   collectionSort={collectionSort}
                   collectionSortMenuOpen={collectionSortMenuOpen}
@@ -1956,12 +1360,8 @@ export default function RecordCollectionsClient({
 
               <div className="grid gap-4">
                 {visibleSortedCollections.map((collection) => {
-                  const labelsExpanded = expandedDashboardLabelIds.includes(
-                    collection.id,
-                  );
-                  const tagsExpanded = expandedDashboardTagIds.includes(
-                    collection.id,
-                  );
+                  const labelsExpanded = isDashboardLabelsExpanded(collection.id);
+                  const tagsExpanded = isDashboardTagsExpanded(collection.id);
                   return (
                     <CollectionDashboardCard
                       key={collection.id}
@@ -1970,26 +1370,14 @@ export default function RecordCollectionsClient({
                       tagsExpanded={tagsExpanded}
                       badgeDisplayLimit={COLLECTION_BADGE_DISPLAY_LIMIT}
                       getSensitivityClass={getSensitivityClass}
-                      onToggleLabels={(collectionId) =>
-                        setExpandedDashboardLabelIds((current) =>
-                          labelsExpanded
-                            ? current.filter((id) => id !== collectionId)
-                            : [...current, collectionId],
-                        )
-                      }
-                      onToggleTags={(collectionId) =>
-                        setExpandedDashboardTagIds((current) =>
-                          tagsExpanded
-                            ? current.filter((id) => id !== collectionId)
-                            : [...current, collectionId],
-                        )
-                      }
+                      onToggleLabels={toggleDashboardLabelsExpanded}
+                      onToggleTags={toggleDashboardTagsExpanded}
                       onOpenCollection={openCollection}
                     />
                   );
                 })}
               </div>
-              {sortedCollections.length > COLLECTIONS_DASHBOARD_PER_PAGE ? (
+              {sortedCollections.length > collectionDashboardPageSize ? (
                 <div className="flex flex-col gap-3 border-t border-base-300 pt-4">
                   <span className="text-sm text-base-content/70">
                     Showing {collectionDashboardStartIndex + 1}-
@@ -2041,8 +1429,10 @@ export default function RecordCollectionsClient({
               className="btn btn-outline btn-sm"
               onClick={() => {
                 setSelectedCollection(null);
+                setSelectedCollectionDraft(null);
                 setIsEditingSelectedCollection(false);
                 setSelectedCollectionPropertiesEditorOpen(false);
+                resetCollectionDetailsView();
                 refreshCollections(false).catch((error) => {
                   console.error("Failed to refresh record collections:", error);
                 });

@@ -1,28 +1,55 @@
 import { test, expect } from "@playwright/test";
-<<<<<<< Updated upstream
+import * as fs from "fs";
+import * as path from "path";
 import { seedSession } from "../helpers/seed";
 
-test.describe("Login", () => {
-  /**
-   * In the test environment NEXT_PUBLIC_DISABLE_FRONTEND_AUTHENTICATION=true,
-   * so the login page immediately redirects to "/". These tests verify that
-   * the auth-disabled flow works correctly and the local dev user is loaded.
-   */
+function isAuthEnabled(): boolean {
+  const root = path.resolve(__dirname, "../..");
+  const envFiles = [
+    ".env",
+    ".env.local",
+    ".env.development",
+    ".env.development.local",
+  ];
+  let disabled = false;
 
+  for (const file of envFiles) {
+    try {
+      const content = fs.readFileSync(path.join(root, file), "utf-8");
+      const match = content.match(
+        /NEXT_PUBLIC_DISABLE_FRONTEND_AUTHENTICATION\s*=\s*(.+)/,
+      );
+      if (match) {
+        disabled = match[1].trim().replace(/["']/g, "") === "true";
+      }
+    } catch {
+      // File doesn't exist, skip.
+    }
+  }
+
+  return !disabled;
+}
+
+const AUTH_ENABLED = isAuthEnabled();
+
+test.describe("Login", () => {
   test.describe("Login page redirect (auth disabled)", () => {
+    test.skip(
+      AUTH_ENABLED,
+      "Auth is enabled; redirect tests apply only to local auth-disabled mode",
+    );
+
     test("visiting /login/signin redirects to the home page", async ({
       page,
     }) => {
       await seedSession(page);
       await page.goto("/login/signin", { waitUntil: "domcontentloaded" });
-      // The login page detects auth is disabled and redirects to "/"
       await page.waitForURL("/", { timeout: 15000 });
     });
 
     test("login page shows Nexus logo while redirecting", async ({ page }) => {
       await seedSession(page);
       await page.goto("/login/signin", { waitUntil: "domcontentloaded" });
-      // The logo should be visible during the redirect
       await expect(page.getByAltText("DeepLynx logo")).toBeVisible();
     });
 
@@ -31,7 +58,6 @@ test.describe("Login", () => {
     }) => {
       await seedSession(page);
       await page.goto("/login/signin", { waitUntil: "domcontentloaded" });
-      // The System Use Notification and Sign In button should not render
       await expect(
         page.getByText("System Use Notification"),
       ).not.toBeVisible();
@@ -39,6 +65,11 @@ test.describe("Login", () => {
   });
 
   test.describe("Authenticated session (local dev user)", () => {
+    test.skip(
+      AUTH_ENABLED,
+      "Auth is enabled; local seeded-session tests apply only to auth-disabled mode",
+    );
+
     test.beforeEach(async ({ page }) => {
       await seedSession(page);
       await page.goto("/", { waitUntil: "domcontentloaded" });
@@ -67,40 +98,8 @@ test.describe("Login", () => {
         page.locator("aside", { hasText: "Project Dashboard" }),
       ).toBeVisible({ timeout: 15000 });
     });
-=======
-import * as fs from "fs";
-import * as path from "path";
-
-// Read .env files in Next.js precedence order to determine whether
-// frontend authentication is enabled. Later files override earlier ones.
-function isAuthEnabled(): boolean {
-  const root = path.resolve(__dirname, "../..");
-  const envFiles = [
-    ".env",
-    ".env.local",
-    ".env.development",
-    ".env.development.local",
-  ];
-  let disabled = false;
-
-  for (const file of envFiles) {
-    try {
-      const content = fs.readFileSync(path.join(root, file), "utf-8");
-      const match = content.match(
-        /NEXT_PUBLIC_DISABLE_FRONTEND_AUTHENTICATION\s*=\s*(.+)/,
-      );
-      if (match) {
-        disabled = match[1].trim().replace(/["']/g, "") === "true";
-      }
-    } catch {
-      // File doesn't exist, skip
-    }
-  }
-
-  return !disabled;
-}
-
-const AUTH_ENABLED = isAuthEnabled();
+  });
+});
 
 test.describe("Login Page", () => {
   test.skip(
@@ -146,18 +145,13 @@ test.describe("Login Page", () => {
       page.getByRole("heading", { name: "System Use Notification" }),
     ).toBeVisible({ timeout: 15000 });
 
-    // Track whether any auth request is made
     let authRequestMade = false;
     await page.route("**/api/auth/signin/**", async (route) => {
       authRequestMade = true;
       await route.fulfill({ status: 200, body: "" });
     });
 
-    // The Sign In button exists in the DOM but handleOktaSignIn
-    // returns early when hasAcknowledged is false
     await page.getByRole("button", { name: "Sign In" }).click({ force: true });
-
-    // Give time for any async request to fire, then verify none did
     await page.waitForTimeout(2000);
     expect(authRequestMade).toBe(false);
   });
@@ -176,7 +170,6 @@ test.describe("Login Page", () => {
   });
 
   test("clicking Sign In initiates the OAuth flow", async ({ page }) => {
-    // Intercept the CSRF endpoint so signIn() can get a token
     await page.route("**/api/auth/csrf", async (route) => {
       await route.fulfill({
         status: 200,
@@ -185,7 +178,6 @@ test.describe("Login Page", () => {
       });
     });
 
-    // Intercept the signin endpoint to prevent external redirect
     await page.route("**/api/auth/signin/**", async (route) => {
       await route.fulfill({
         status: 200,
@@ -245,7 +237,6 @@ test.describe("Auth Guard", () => {
   test("unauthenticated visit to home page redirects to login", async ({
     page,
   }) => {
-    // No session seeded — AuthGuard should redirect to /login/signin
     await page.goto("/", { waitUntil: "domcontentloaded" });
     await page.waitForURL(/\/login\/signin/, { timeout: 15000 });
     await expect(
@@ -256,12 +247,10 @@ test.describe("Auth Guard", () => {
   test("unauthenticated visit to a protected route redirects to login", async ({
     page,
   }) => {
-    // Try accessing a protected project route without any session
     await page.goto("/settings", { waitUntil: "domcontentloaded" });
     await page.waitForURL(/\/login\/signin/, { timeout: 15000 });
     await expect(
       page.getByRole("heading", { name: "System Use Notification" }),
     ).toBeVisible({ timeout: 15000 });
->>>>>>> Stashed changes
   });
 });

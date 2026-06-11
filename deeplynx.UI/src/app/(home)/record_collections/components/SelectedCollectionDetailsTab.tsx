@@ -1,107 +1,15 @@
 "use client";
 
 import React from "react";
-import {
-  MagnifyingGlassIcon,
-  XCircleIcon,
-} from "@heroicons/react/24/outline";
+import CollectionEntitySelector from "./CollectionEntitySelector";
 import CollectionDetailsReadonlyView from "./CollectionDetailsReadonlyView";
+import CollectionRecordSearchControls from "./CollectionRecordSearchControls";
+import CollectionRecordSearchResultsTable from "./CollectionRecordSearchResultsTable";
 import SectionCard from "./SectionCard";
-import {
-  HistoricalRecordResponseDto,
-  RecordCollectionLabelDto,
-  RecordCollectionResponseDto,
-  RecordCollectionTagDto,
-  RecordResponseDto,
-  TagResponseDto,
-  SensitivityLabelsDto,
-} from "../../types/responseDTOs";
-import { formatLocalDateTime } from "@/app/lib/date_time";
-type MetadataRow = {
-  label: string;
-  value: string;
-};
-
-type EditableRecordResult = HistoricalRecordResponseDto | RecordResponseDto;
+import { SelectedCollectionDetailsController } from "./componentTypes";
 
 type Props = {
-  controller: {
-    readonlyView: {
-      selectedCollection: RecordCollectionResponseDto;
-      collectionSummaryPanel: React.ReactNode;
-      selectedDescriptionRef: React.RefObject<HTMLParagraphElement | null>;
-      selectedDescriptionExpanded: boolean;
-      selectedDescriptionExpandable: boolean;
-      setSelectedDescriptionExpanded: React.Dispatch<React.SetStateAction<boolean>>;
-      selectedCollectionLabels: RecordCollectionLabelDto[];
-      visibleSelectedCollectionLabels: RecordCollectionLabelDto[];
-      selectedLabelsExpanded: boolean;
-      setSelectedLabelsExpanded: React.Dispatch<React.SetStateAction<boolean>>;
-      selectedCollectionTags: RecordCollectionTagDto[];
-      visibleSelectedCollectionTags: RecordCollectionTagDto[];
-      selectedTagsExpanded: boolean;
-      setSelectedTagsExpanded: React.Dispatch<React.SetStateAction<boolean>>;
-      badgeDisplayLimit: number;
-      getMetadataRows: (properties?: string | null) => MetadataRow[];
-      getSensitivityClass: (label: string) => string;
-      collectionRecords: RecordResponseDto[];
-      filteredCollectionDetailRecords: RecordResponseDto[];
-      collectionDetailRecordSearchTerm: string;
-      setCollectionDetailRecordSearchTerm: React.Dispatch<
-        React.SetStateAction<string>
-      >;
-      visibleCollectionDetailRecords: RecordResponseDto[];
-      recordsLoading: boolean;
-      onViewAllCollectionRecords: () => void;
-      recordsPerPage: number;
-      collectionDetailRecordPage: number;
-      setCollectionDetailRecordPage: React.Dispatch<React.SetStateAction<number>>;
-      collectionDetailRecordPageCount: number;
-      projectId: number;
-      onOpenSelectedCollectionEdit: () => void;
-    };
-    editView: {
-      editableSelectedCollection: RecordCollectionResponseDto;
-      isEditingSelectedCollection: boolean;
-      saving: boolean;
-      setSelectedCollectionDraft: React.Dispatch<
-        React.SetStateAction<RecordCollectionResponseDto | null>
-      >;
-      setSelectedCollectionPropertiesEditorOpen: React.Dispatch<
-        React.SetStateAction<boolean>
-      >;
-      selectedCollectionLabelSearchTerm: string;
-      setSelectedCollectionLabelSearchTerm: React.Dispatch<React.SetStateAction<string>>;
-      selectedCollectionTagSearchTerm: string;
-      setSelectedCollectionTagSearchTerm: React.Dispatch<React.SetStateAction<string>>;
-      selectedCollectionLabelCreating: boolean;
-      selectedCollectionTagCreating: boolean;
-      canAddTypedSelectedCollectionLabel: boolean;
-      canAddTypedSelectedCollectionTag: boolean;
-      filteredSelectedCollectionLabelOptions: SensitivityLabelsDto[];
-      filteredSelectedCollectionTagOptions: TagResponseDto[];
-      labelsLoading: boolean;
-      tagsLoading: boolean;
-      onAddSelectedCollectionLabelFromSearch: () => Promise<void>;
-      onAddSelectedCollectionTagFromSearch: () => Promise<void>;
-      onAddSelectedCollectionLabel: (label: { id: number; name: string }) => void;
-      onAddSelectedCollectionTag: (tag: { id: number; name: string }) => void;
-      onRemoveLabel: (labelId: number) => void;
-      onRemoveTag: (tagId: number) => void;
-      recordSearchTerm: string;
-      setRecordSearchTerm: React.Dispatch<React.SetStateAction<string>>;
-      recordSearchLoading: boolean;
-      onSearchRecords: () => void;
-      editRecordResults: EditableRecordResult[];
-      collectionRecordIds: Set<number>;
-      addingRecordIds: number[];
-      removingRecordIds: number[];
-      onRemoveCollectionRecord: (recordId: number) => Promise<void>;
-      onAddCollectionRecord: (recordId: number) => Promise<void>;
-      onCancelSelectedCollectionEdit: () => Promise<void>;
-      onSaveSelectedDetails: () => void;
-    };
-  };
+  controller: SelectedCollectionDetailsController;
 };
 
 export default function SelectedCollectionDetailsTab({
@@ -342,184 +250,62 @@ export default function SelectedCollectionDetailsTab({
             <div className="space-y-4">
               <div className="rounded-2xl border border-base-300 bg-base-200/30 p-5">
                 <div className="mt-1 space-y-3 text-sm text-base-content/80">
-                  <div>
-                    <p className="text-base-content/60">Labels</p>
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      {editableSelectedCollection.labels?.length ? (
-                        editableSelectedCollection.labels.map((label) => (
-                          <button
-                            type="button"
-                            key={label.id}
-                            className={`group badge badge-sm gap-1 transition-colors hover:brightness-95 ${getSensitivityClass(label.name)}`}
-                            disabled={saving}
-                            onClick={() => onRemoveLabel(label.id)}
-                            title="Remove label"
-                          >
-                            {label.name}
-                            <XCircleIcon
-                              className="size-4 transition-colors group-hover:text-error group-focus-visible:text-error"
-                              aria-hidden="true"
-                            />
-                          </button>
-                        ))
-                      ) : null}
-                    </div>
-                    <div className="mt-3 flex flex-col gap-2 sm:flex-row">
-                      <label className="input input-bordered input-sm flex min-w-0 flex-1 items-center gap-2">
-                        <MagnifyingGlassIcon className="size-4 text-base-content/60" />
-                        <input
-                          type="text"
-                          className="grow"
-                          placeholder="Search or add label"
-                          value={selectedCollectionLabelSearchTerm}
-                          onChange={(event) =>
-                            setSelectedCollectionLabelSearchTerm(
-                              event.target.value,
-                            )
-                          }
-                          onKeyDown={(event) => {
-                            if (event.key === "Enter") {
-                              event.preventDefault();
-                              void onAddSelectedCollectionLabelFromSearch();
-                            }
-                          }}
-                        />
-                      </label>
-                      <button
-                        type="button"
-                        className="btn btn-primary btn-sm"
-                        disabled={
-                          saving ||
-                          selectedCollectionLabelCreating ||
-                          !canAddTypedSelectedCollectionLabel
-                        }
-                        onClick={() => void onAddSelectedCollectionLabelFromSearch()}
-                      >
-                        {selectedCollectionLabelCreating ? (
-                          <span className="loading loading-spinner loading-xs" />
-                        ) : (
-                          "Add"
-                        )}
-                      </button>
-                    </div>
-                    <div className="mt-3 max-h-40 space-y-2 overflow-auto rounded-xl border border-base-300 bg-base-100 p-3">
-                      {labelsLoading ? (
-                        <div className="flex items-center gap-2 text-sm text-base-content/70">
-                          <span className="loading loading-spinner loading-sm" />
-                          Loading labels
-                        </div>
-                      ) : filteredSelectedCollectionLabelOptions.length ? (
-                        filteredSelectedCollectionLabelOptions.map((label) => (
-                          <button
-                            type="button"
-                            key={label.id}
-                            className="flex w-full items-center justify-between rounded-lg px-2 py-1 text-left text-sm hover:bg-base-200"
-                            onClick={() =>
-                              onAddSelectedCollectionLabel({
-                                id: label.id,
-                                name: label.name,
-                              })
-                            }
-                          >
-                            <span className="truncate">{label.name}</span>
-                            <span className="btn btn-primary btn-xs">Add</span>
-                          </button>
-                        ))
-                      ) : (
-                        <p className="text-sm text-base-content/60">
-                          No labels found.
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                  <div>
-                    <p className="text-base-content/60">Tags</p>
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      {editableSelectedCollection.tags?.length ? (
-                        editableSelectedCollection.tags.map((tag) => (
-                          <button
-                            type="button"
-                            key={tag.id}
-                            className="group badge badge-secondary badge-outline badge-sm gap-1 transition-colors hover:brightness-95"
-                            disabled={saving}
-                            onClick={() => onRemoveTag(tag.id)}
-                            title="Remove tag"
-                          >
-                            {tag.name}
-                            <XCircleIcon
-                              className="size-4 transition-colors group-hover:text-error group-focus-visible:text-error"
-                              aria-hidden="true"
-                            />
-                          </button>
-                        ))
-                      ) : null}
-                    </div>
-                    <div className="mt-3 flex flex-col gap-2 sm:flex-row">
-                      <label className="input input-bordered input-sm flex min-w-0 flex-1 items-center gap-2">
-                        <MagnifyingGlassIcon className="size-4 text-base-content/60" />
-                        <input
-                          type="text"
-                          className="grow"
-                          placeholder="Search or add tag"
-                          value={selectedCollectionTagSearchTerm}
-                          onChange={(event) =>
-                            setSelectedCollectionTagSearchTerm(event.target.value)
-                          }
-                          onKeyDown={(event) => {
-                            if (event.key === "Enter") {
-                              event.preventDefault();
-                              void onAddSelectedCollectionTagFromSearch();
-                            }
-                          }}
-                        />
-                      </label>
-                      <button
-                        type="button"
-                        className="btn btn-primary btn-sm"
-                        disabled={
-                          saving ||
-                          selectedCollectionTagCreating ||
-                          !canAddTypedSelectedCollectionTag
-                        }
-                        onClick={() => void onAddSelectedCollectionTagFromSearch()}
-                      >
-                        {selectedCollectionTagCreating ? (
-                          <span className="loading loading-spinner loading-xs" />
-                        ) : (
-                          "Add"
-                        )}
-                      </button>
-                    </div>
-                    <div className="mt-3 max-h-40 space-y-2 overflow-auto rounded-xl border border-base-300 bg-base-100 p-3">
-                      {tagsLoading ? (
-                        <div className="flex items-center gap-2 text-sm text-base-content/70">
-                          <span className="loading loading-spinner loading-sm" />
-                          Loading tags
-                        </div>
-                      ) : filteredSelectedCollectionTagOptions.length ? (
-                        filteredSelectedCollectionTagOptions.map((tag) => (
-                          <button
-                            type="button"
-                            key={tag.id}
-                            className="flex w-full items-center justify-between rounded-lg px-2 py-1 text-left text-sm hover:bg-base-200"
-                            onClick={() =>
-                              onAddSelectedCollectionTag({
-                                id: tag.id,
-                                name: tag.name,
-                              })
-                            }
-                          >
-                            <span className="truncate">{tag.name}</span>
-                            <span className="btn btn-primary btn-xs">Add</span>
-                          </button>
-                        ))
-                      ) : (
-                        <p className="text-sm text-base-content/60">
-                          No tags found.
-                        </p>
-                      )}
-                    </div>
-                  </div>
+                  <CollectionEntitySelector
+                    title="Labels"
+                    selectedItems={editableSelectedCollection.labels ?? []}
+                    searchTerm={selectedCollectionLabelSearchTerm}
+                    setSearchTerm={setSelectedCollectionLabelSearchTerm}
+                    searchPlaceholder="Search or add label"
+                    options={filteredSelectedCollectionLabelOptions}
+                    loading={labelsLoading}
+                    loadingText="Loading labels"
+                    emptyOptionsText="No labels found."
+                    addDisabled={
+                      saving ||
+                      selectedCollectionLabelCreating ||
+                      !canAddTypedSelectedCollectionLabel
+                    }
+                    addButtonLoading={selectedCollectionLabelCreating}
+                    selectedItemClassName={(item) =>
+                      `badge badge-sm gap-1 ${getSensitivityClass(item.name)}`
+                    }
+                    addTypedItem={onAddSelectedCollectionLabelFromSearch}
+                    selectOption={(item) =>
+                      onAddSelectedCollectionLabel({
+                        id: Number(item.id),
+                        name: item.name,
+                      })
+                    }
+                    removeItem={(item) => onRemoveLabel(Number(item.id))}
+                  />
+                  <CollectionEntitySelector
+                    title="Tags"
+                    selectedItems={editableSelectedCollection.tags ?? []}
+                    searchTerm={selectedCollectionTagSearchTerm}
+                    setSearchTerm={setSelectedCollectionTagSearchTerm}
+                    searchPlaceholder="Search or add tag"
+                    options={filteredSelectedCollectionTagOptions}
+                    loading={tagsLoading}
+                    loadingText="Loading tags"
+                    emptyOptionsText="No tags found."
+                    addDisabled={
+                      saving ||
+                      selectedCollectionTagCreating ||
+                      !canAddTypedSelectedCollectionTag
+                    }
+                    addButtonLoading={selectedCollectionTagCreating}
+                    selectedItemClassName={() =>
+                      "badge badge-secondary badge-outline badge-sm gap-1"
+                    }
+                    addTypedItem={onAddSelectedCollectionTagFromSearch}
+                    selectOption={(item) =>
+                      onAddSelectedCollectionTag({
+                        id: Number(item.id),
+                        name: item.name,
+                      })
+                    }
+                    removeItem={(item) => onRemoveTag(Number(item.id))}
+                  />
                 </div>
               </div>
             </div>
@@ -541,125 +327,76 @@ export default function SelectedCollectionDetailsTab({
             </div>
 
             <div className="mt-4 rounded-2xl border border-base-300 bg-base-200/30 p-4">
-              <div className="flex flex-col gap-3 lg:flex-row">
-                <label className="input input-bordered flex min-w-0 flex-1 items-center gap-2">
-                  <MagnifyingGlassIcon className="size-5 text-base-content/60" />
-                  <input
-                    type="text"
-                    className="grow"
-                    placeholder="Search all records"
-                    value={recordSearchTerm}
-                    onChange={(event) => setRecordSearchTerm(event.target.value)}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter") {
-                        event.preventDefault();
-                        onSearchRecords();
-                      }
-                    }}
-                  />
-                </label>
-                <button
-                  type="button"
-                  className="btn btn-outline"
-                  disabled={recordSearchLoading}
-                  onClick={onSearchRecords}
-                >
-                  Search
-                </button>
-              </div>
+              <CollectionRecordSearchControls
+                searchTerm={recordSearchTerm}
+                setSearchTerm={setRecordSearchTerm}
+                placeholder="Search all records"
+                searchLoading={recordSearchLoading}
+                onSearch={onSearchRecords}
+              />
 
-              <div className="mt-4 max-h-72 overflow-auto rounded-xl border border-base-300 bg-base-100">
-                <table className="table table-sm table-pin-rows">
-                  <thead className="bg-base-100">
-                    <tr>
-                      <th>Record</th>
-                      <th>Class</th>
-                      <th>Source</th>
-                      <th>Updated</th>
-                      <th></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {editRecordResults.length ? (
-                      editRecordResults.map((record) => {
-                        const recordId =
-                          typeof record.id === "number" ? record.id : null;
-                        const isAssigned =
-                          typeof recordId === "number" &&
-                          collectionRecordIds.has(recordId);
-                        const isAdding =
-                          typeof recordId === "number" &&
-                          addingRecordIds.includes(recordId);
-                        const isRemoving =
-                          typeof recordId === "number" &&
-                          removingRecordIds.includes(recordId);
-                        const className =
-                          "className" in record ? record.className : record.classId;
-                        const sourceName =
-                          "dataSourceName" in record
-                            ? record.dataSourceName
-                            : record.projectId ?? projectId;
+              <CollectionRecordSearchResultsTable
+                rows={editRecordResults.map((record) => {
+                  const recordId = typeof record.id === "number" ? record.id : null;
+                  const isAssigned =
+                    typeof recordId === "number" && collectionRecordIds.has(recordId);
+                  const isAdding =
+                    typeof recordId === "number" && addingRecordIds.includes(recordId);
+                  const isRemoving =
+                    typeof recordId === "number" && removingRecordIds.includes(recordId);
 
-                        return (
-                          <tr key={record.id ?? record.name}>
-                            <td className="font-medium">{record.name}</td>
-                            <td>{className ?? "Unclassified"}</td>
-                            <td>{sourceName ?? "Unknown"}</td>
-                            <td>
-                              {record.lastUpdatedAt
-                                ? formatLocalDateTime(record.lastUpdatedAt)
-                                : "Not Updated"}
-                            </td>
-                            <td className="text-right">
-                              {isAssigned ? (
-                                <button
-                                  type="button"
-                                  className="btn btn-error btn-outline btn-xs"
-                                  disabled={isRemoving || recordId === null}
-                                  onClick={() =>
-                                    recordId !== null &&
-                                    void onRemoveCollectionRecord(recordId)
-                                  }
-                                >
-                                  {isRemoving ? (
-                                    <span className="loading loading-spinner loading-xs" />
-                                  ) : (
-                                    "Remove"
-                                  )}
-                                </button>
-                              ) : (
-                                <button
-                                  type="button"
-                                  className="btn btn-primary btn-xs"
-                                  disabled={isAdding || recordId === null}
-                                  onClick={() =>
-                                    recordId !== null &&
-                                    void onAddCollectionRecord(recordId)
-                                  }
-                                >
-                                  {isAdding ? (
-                                    <span className="loading loading-spinner loading-xs" />
-                                  ) : (
-                                    "Add"
-                                  )}
-                                </button>
-                              )}
-                            </td>
-                          </tr>
-                        );
-                      })
+                  return {
+                    key: record.id ?? record.name ?? "record",
+                    name: record.name,
+                    className:
+                      ("className" in record ? record.className : record.classId) ??
+                      "Unclassified",
+                    sourceName:
+                      ("dataSourceName" in record
+                        ? record.dataSourceName
+                        : record.projectId) ??
+                      projectId ??
+                      "Unknown",
+                    updatedAt: record.lastUpdatedAt,
+                    actionCell: isAssigned ? (
+                      <button
+                        type="button"
+                        className="btn btn-error btn-outline btn-xs"
+                        disabled={isRemoving || recordId === null}
+                        onClick={() =>
+                          recordId !== null && void onRemoveCollectionRecord(recordId)
+                        }
+                      >
+                        {isRemoving ? (
+                          <span className="loading loading-spinner loading-xs" />
+                        ) : (
+                          "Remove"
+                        )}
+                      </button>
                     ) : (
-                      <tr>
-                        <td colSpan={5}>
-                          {recordSearchTerm.trim()
-                            ? "No records match this search."
-                            : "No records are currently assigned."}
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
+                      <button
+                        type="button"
+                        className="btn btn-primary btn-xs"
+                        disabled={isAdding || recordId === null}
+                        onClick={() =>
+                          recordId !== null && void onAddCollectionRecord(recordId)
+                        }
+                      >
+                        {isAdding ? (
+                          <span className="loading loading-spinner loading-xs" />
+                        ) : (
+                          "Add"
+                        )}
+                      </button>
+                    ),
+                  };
+                })}
+                emptyMessage={
+                  recordSearchTerm.trim()
+                    ? "No records match this search."
+                    : "No records are currently assigned."
+                }
+              />
 
               {recordSearchLoading ? (
                 <div className="mt-3 flex items-center gap-2 text-sm text-base-content/70">

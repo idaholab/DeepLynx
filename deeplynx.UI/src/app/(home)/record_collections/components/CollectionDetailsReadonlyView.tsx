@@ -1,15 +1,12 @@
 "use client";
 
+import PaginationControls from "@/app/(home)/components/PaginationControls";
+import SearchInput from "@/app/(home)/components/SearchInput";
 import Link from "next/link";
 import React from "react";
 import { formatLocalDateTime } from "@/app/lib/date_time";
-import { MagnifyingGlassIcon } from "@heroicons/react/24/outline";
+import { MetadataRow } from "./recordCollections.types";
 import SectionCard from "./SectionCard";
-
-type MetadataRow = {
-  label: string;
-  value: string;
-};
 
 type NamedItem = {
   id: number | string;
@@ -61,6 +58,8 @@ type Props = {
   recordPage: number;
   setRecordPage: React.Dispatch<React.SetStateAction<number>>;
   recordPageCount: number;
+  recordPageSizeOptions?: number[];
+  onRecordPageSizeChange?: (pageSize: number) => void;
 };
 
 export default function CollectionDetailsReadonlyView({
@@ -92,6 +91,8 @@ export default function CollectionDetailsReadonlyView({
   recordPage,
   setRecordPage,
   recordPageCount,
+  recordPageSizeOptions,
+  onRecordPageSizeChange,
 }: Props) {
   const collectionLabels = collection.labels ?? [];
   const collectionTags = collection.tags ?? [];
@@ -216,16 +217,11 @@ export default function CollectionDetailsReadonlyView({
         subtitle={`${filteredRecords.length} of ${records.length} assigned records shown.`}
         action={recordsSectionAction}
       >
-        <label className="input input-bordered flex w-full items-center gap-2">
-          <MagnifyingGlassIcon className="size-5 text-base-content/60" />
-          <input
-            type="text"
-            className="grow"
-            placeholder="Search records in this collection"
-            value={recordSearchTerm}
-            onChange={(event) => setRecordSearchTerm(event.target.value)}
-          />
-        </label>
+        <SearchInput
+          placeholder="Search records in this collection"
+          value={recordSearchTerm}
+          onChange={(event) => setRecordSearchTerm(event.target.value)}
+        />
 
         <div className="overflow-x-auto rounded-2xl border border-base-300">
           <table className="table">
@@ -288,26 +284,14 @@ export default function CollectionDetailsReadonlyView({
               {Math.min(recordPage * recordsPerPage, filteredRecords.length)} of{" "}
               {filteredRecords.length}
             </span>
-            <div className="join">
-              <button
-                type="button"
-                className="btn btn-sm join-item"
-                disabled={recordPage === 1}
-                onClick={() => setRecordPage((page) => Math.max(1, page - 1))}
-              >
-                Previous
-              </button>
-              <button
-                type="button"
-                className="btn btn-sm join-item"
-                disabled={recordPage >= recordPageCount}
-                onClick={() =>
-                  setRecordPage((page) => Math.min(recordPageCount, page + 1))
-                }
-              >
-                Next
-              </button>
-            </div>
+            <PaginationControls
+              currentPage={recordPage}
+              pageSize={recordsPerPage}
+              totalPages={recordPageCount}
+              pageSizeOptions={recordPageSizeOptions ?? [recordsPerPage]}
+              onPageChange={setRecordPage}
+              onPageSizeChange={onRecordPageSizeChange ?? (() => undefined)}
+            />
           </div>
         ) : null}
       </SectionCard>

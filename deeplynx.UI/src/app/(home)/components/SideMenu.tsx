@@ -264,7 +264,7 @@ const SideMenu: React.FC<SideMenuProps> = ({
       <aside
         className={`h-full shadow-xl ${
           isCollapsed ? "w-22" : "w-[18rem] sm:w-[20rem] lg:w-64"
-        } app-header-inverted brightness-120 text-neutral-content p-4 transition-all duration-300 flex flex-col overflow-y-auto`}
+        } bg-neutral text-neutral-content p-4 transition-all duration-300 flex flex-col overflow-y-auto`}
       >
         <div className="flex justify-end lg:hidden">
           <button
@@ -337,7 +337,7 @@ const SideMenu: React.FC<SideMenuProps> = ({
                     <span className="ml-2">{t.translations.LOADING}</span>
                   </li>
                 ) : projects.length === 0 ? (
-                  <li className="py-2 px-4 text-sm text-base-content/70">
+                  <li className="py-2 px-4 text-sm text-neutral-content/70">
                     {t.translations.NO_PROJECT_FOUND}
                   </li>
                 ) : (
@@ -367,7 +367,7 @@ const SideMenu: React.FC<SideMenuProps> = ({
         )}
 
         {/* ------------------------------ Menu ------------------------------- */}
-        <ul className="mt-8 text-secondary-content">
+        <ul className="mt-8 text-neutral-content">
           {/* Project Dashboard */}
           <li>
             <Link
@@ -396,6 +396,18 @@ const SideMenu: React.FC<SideMenuProps> = ({
               {!isCollapsed && (
                 <p className="ml-2">{t.translations.UPLOAD_CENTER}</p>
               )}
+            </Link>
+          </li>
+
+          {/* Record Collections */}
+          <li className="mt-2">
+            <Link
+              href="/record_collections"
+              onClick={() => onMobileClose?.()}
+              className={getItemClass("/record_collections")}
+            >
+              <FolderIcon className="size-6" />
+              {!isCollapsed && <p className="ml-2">Record Collections</p>}
             </Link>
           </li>
 
@@ -490,7 +502,7 @@ const SideMenu: React.FC<SideMenuProps> = ({
 
       {/* ---------------------------- Toggle Tab ----------------------------- */}
       <div
-        className="hidden lg:flex h-8 w-4 app-header brightness-120 text-neutral-content items-center justify-center cursor-pointer rounded-r-md mt-16"
+        className="hidden lg:flex h-8 w-4 bg-neutral text-neutral-content items-center justify-center cursor-pointer rounded-r-md mt-16"
         onClick={toggleMenu}
       >
         {isCollapsed ? (

@@ -1,42 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { MagnifyingGlassIcon } from "@heroicons/react/24/outline";
 import React from "react";
 import { formatLocalDateTime } from "@/app/lib/date_time";
+import CollectionRecordSearchControls from "./CollectionRecordSearchControls";
+import CollectionRecordSearchResultsTable from "./CollectionRecordSearchResultsTable";
 import SectionCard from "./SectionCard";
-import {
-  HistoricalRecordResponseDto,
-  RecordCollectionResponseDto,
-  RecordResponseDto,
-} from "../../types/responseDTOs";
+import { SelectedCollectionRecordsController } from "./componentTypes";
 
 type Props = {
-  controller: {
-    overview: {
-      selectedCollection: RecordCollectionResponseDto;
-      projectId: number;
-      collectionRecords: RecordResponseDto[];
-      recordsLoading: boolean;
-    };
-    search: {
-      recordSearchTerm: string;
-      setRecordSearchTerm: React.Dispatch<React.SetStateAction<string>>;
-      recordSearchLoading: boolean;
-      recordSearchResults: HistoricalRecordResponseDto[];
-      addableRecordResults: HistoricalRecordResponseDto[];
-      onSearchRecords: () => void;
-    };
-    selection: {
-      saving: boolean;
-      selectedRecordIds: number[];
-      onToggleSelectedRecord: (recordId: number) => void;
-      onAddSelectedRecords: () => void;
-    };
-    actions: {
-      onBackToDetails: () => void;
-    };
-  };
+  controller: SelectedCollectionRecordsController;
 };
 
 export default function SelectedCollectionRecordsTab({
@@ -75,81 +48,45 @@ export default function SelectedCollectionRecordsTab({
         }
       >
         <div className="rounded-2xl border border-base-300 bg-base-200/30 p-4">
-          <div className="flex flex-col gap-3 lg:flex-row">
-            <label className="input input-bordered flex min-w-0 flex-1 items-center gap-2">
-              <MagnifyingGlassIcon className="size-5 text-base-content/60" />
-              <input
-                type="text"
-                className="grow"
-                placeholder="Search records to add"
-                value={recordSearchTerm}
-                onChange={(event) => setRecordSearchTerm(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") {
-                    event.preventDefault();
-                    onSearchRecords();
-                  }
-                }}
-              />
-            </label>
-            <button
-              type="button"
-              className="btn btn-outline"
-              disabled={recordSearchLoading}
-              onClick={onSearchRecords}
-            >
-              Search
-            </button>
-            <button
-              type="button"
-              className="btn btn-primary"
-              disabled={saving || selectedRecordIds.length === 0}
-              onClick={onAddSelectedRecords}
-            >
-              Add selected
-            </button>
-          </div>
+          <CollectionRecordSearchControls
+            searchTerm={recordSearchTerm}
+            setSearchTerm={setRecordSearchTerm}
+            placeholder="Search records to add"
+            searchLoading={recordSearchLoading}
+            onSearch={onSearchRecords}
+            action={
+              <button
+                type="button"
+                className="btn btn-primary"
+                disabled={saving || selectedRecordIds.length === 0}
+                onClick={onAddSelectedRecords}
+              >
+                Add selected
+              </button>
+            }
+          />
 
           {recordSearchResults.length ? (
-            <div className="mt-4 overflow-x-auto rounded-xl border border-base-300 bg-base-100">
-              <table className="table table-sm">
-                <thead>
-                  <tr>
-                    <th></th>
-                    <th>Record</th>
-                    <th>Class</th>
-                    <th>Source</th>
-                    <th>Updated</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {addableRecordResults.length ? (
-                    addableRecordResults.map((record) => (
-                      <tr key={record.id}>
-                        <td>
-                          <input
-                            type="checkbox"
-                            className="checkbox checkbox-sm"
-                            checked={selectedRecordIds.includes(record.id)}
-                            onChange={() => onToggleSelectedRecord(record.id)}
-                          />
-                        </td>
-                        <td className="font-medium">{record.name}</td>
-                        <td>{record.className ?? "Unclassified"}</td>
-                        <td>{record.dataSourceName ?? "Unknown"}</td>
-                        <td>{formatLocalDateTime(record.lastUpdatedAt)}</td>
-                      </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan={5}>
-                        All matching records are already in this collection.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
+            <CollectionRecordSearchResultsTable
+              rows={addableRecordResults.map((record) => ({
+                key: record.id,
+                leadingCell: (
+                  <input
+                    type="checkbox"
+                    className="checkbox checkbox-sm"
+                    checked={selectedRecordIds.includes(record.id)}
+                    onChange={() => onToggleSelectedRecord(record.id)}
+                  />
+                ),
+                name: record.name,
+                className: record.className ?? "Unclassified",
+                sourceName: record.dataSourceName ?? "Unknown",
+                updatedAt: record.lastUpdatedAt,
+              }))}
+              emptyMessage="All matching records are already in this collection."
+              maxHeightClassName="max-h-fit"
+              pinnedHeader={false}
+            />
           ) : null}
 
           {recordSearchLoading ? (

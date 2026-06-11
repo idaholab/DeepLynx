@@ -79,6 +79,8 @@ export interface HistoricalRecordResponseDto {
   objectStorageName?: string | null;
 }
 
+export type QueryRecordViewResponseDto = HistoricalRecordResponseDto;
+
 export type RecordResponseDto = {
   id: number | null;
   name: string;

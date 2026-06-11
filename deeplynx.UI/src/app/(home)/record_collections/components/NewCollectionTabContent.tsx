@@ -1,202 +1,20 @@
 "use client";
 
-import { formatLocalDateTime } from "@/app/lib/date_time";
-import {
-  MagnifyingGlassIcon,
-  XCircleIcon,
-} from "@heroicons/react/24/outline";
+import PaginationControls from "@/app/(home)/components/PaginationControls";
 import React from "react";
-import {
-  HistoricalRecordResponseDto,
-  RecordResponseDto,
-  SensitivityLabelsDto,
-  TagResponseDto,
-} from "../../types/responseDTOs";
 import CollectionDetailsReadonlyView from "./CollectionDetailsReadonlyView";
+import CollectionEntitySelector from "./CollectionEntitySelector";
+import CollectionFacetSummary from "./CollectionFacetSummary";
+import CollectionRecordSearchControls from "./CollectionRecordSearchControls";
+import CollectionRecordSearchResultsTable from "./CollectionRecordSearchResultsTable";
 import NewCollectionStepIndicator from "./NewCollectionStepIndicator";
+import SelectedRecordsPreviewPanel from "./SelectedRecordsPreviewPanel";
 import SectionCard from "./SectionCard";
-
-type NewCollectionStep = "Records" | "Metadata" | "Modify" | "Review";
-
-type FacetOption = {
-  label: string;
-  count: number;
-};
-
-type NewCollectionSelectedRecord = HistoricalRecordResponseDto & {
-  fullRecord?: RecordResponseDto;
-};
+import { NewCollectionTabController } from "./componentTypes";
 
 type Props = {
-  controller: {
-    workflow: {
-      projectId: number;
-      newCollectionStep: NewCollectionStep;
-      setNewCollectionStep: React.Dispatch<React.SetStateAction<NewCollectionStep>>;
-      recordsPerPage: number;
-      saving: boolean;
-      getSensitivityClass: (label: string) => string;
-    };
-    metadata: {
-      newCollectionName: string;
-      setNewCollectionName: React.Dispatch<React.SetStateAction<string>>;
-      newCollectionDescription: string;
-      setNewCollectionDescription: React.Dispatch<React.SetStateAction<string>>;
-    };
-    recordSearch: {
-      newCollectionRecordSearchTerm: string;
-      setNewCollectionRecordSearchTerm: React.Dispatch<React.SetStateAction<string>>;
-      newCollectionRecordSearchResults: HistoricalRecordResponseDto[];
-      newCollectionRecordSearchLoading: boolean;
-      visibleNewCollectionRecords: HistoricalRecordResponseDto[];
-      allVisibleNewCollectionRecordsSelected: boolean;
-      allRetrievedNewCollectionRecordsSelected: boolean;
-      someVisibleNewCollectionRecordsSelected: boolean;
-      newCollectionRecordPage: number;
-      setNewCollectionRecordPage: React.Dispatch<React.SetStateAction<number>>;
-      newCollectionRecordPageCount: number;
-      onSearchRecords: (overrideTerm?: string) => Promise<void>;
-      onClearRecordSearch: () => void;
-      onToggleSelectAllVisibleRecords: () => Promise<void>;
-      onToggleNewCollectionRecord: (record: HistoricalRecordResponseDto) => Promise<void>;
-      onSelectAllSearchedRecords: () => Promise<void>;
-    };
-    selection: {
-      newCollectionSelectedRecordIds: number[];
-      newCollectionSelectedRecords: NewCollectionSelectedRecord[];
-      confirmClearNewCollectionRecords: boolean;
-      setConfirmClearNewCollectionRecords: React.Dispatch<React.SetStateAction<boolean>>;
-      newCollectionSelectedLabelTally: FacetOption[];
-      newCollectionSelectedTagTally: FacetOption[];
-      onDeselectRecordsByLabel: (labelName: string) => void;
-      onDeselectRecordsByTag: (tagName: string) => void;
-      onClearSelectedRecords: () => void;
-    };
-    review: {
-      newCollectionReviewSearchTerm: string;
-      setNewCollectionReviewSearchTerm: React.Dispatch<React.SetStateAction<string>>;
-      filteredNewCollectionSelectedRecords: NewCollectionSelectedRecord[];
-      visibleNewCollectionReviewRecords: NewCollectionSelectedRecord[];
-      newCollectionReviewPage: number;
-      setNewCollectionReviewPage: React.Dispatch<React.SetStateAction<number>>;
-      newCollectionReviewPageCount: number;
-    };
-    labelsAndTags: {
-      selectedNewCollectionLabels: SensitivityLabelsDto[];
-      newCollectionSelectedTagNames: string[];
-      newCollectionLabelSearchTerm: string;
-      setNewCollectionLabelSearchTerm: React.Dispatch<React.SetStateAction<string>>;
-      newCollectionTagSearchTerm: string;
-      setNewCollectionTagSearchTerm: React.Dispatch<React.SetStateAction<string>>;
-      filteredNewCollectionLabelOptions: SensitivityLabelsDto[];
-      filteredNewCollectionTagOptions: TagResponseDto[];
-      labelsLoading: boolean;
-      tagsLoading: boolean;
-      newCollectionLabelCreating: boolean;
-      canAddTypedNewCollectionLabel: boolean;
-      canAddTypedNewCollectionTag: boolean;
-      onAddNewCollectionLabelFromSearch: () => Promise<void>;
-      onAddNewCollectionLabel: (labelId: number) => void;
-      onRemoveNewCollectionLabel: (labelId: number) => void;
-      onAddNewCollectionTag: (tagName: string) => void;
-      onRemoveNewCollectionTag: (tagName: string) => void;
-    };
-    actions: {
-      onCancelToAllCollections: () => void;
-      onGoToModifyStep: () => void;
-      onGoToReviewStep: () => void;
-      onCreateCollection: () => Promise<void>;
-    };
-  };
+  controller: NewCollectionTabController;
 };
-
-function SelectedRecordsTable({
-  records,
-  emptyMessage,
-  showSource = true,
-}: {
-  records: NewCollectionSelectedRecord[];
-  emptyMessage: string;
-  showSource?: boolean;
-}) {
-  return (
-    <div className="mt-4 max-h-48 overflow-auto rounded-xl border border-base-300">
-      <table className="table table-sm">
-        <thead>
-          <tr>
-            <th>Record</th>
-            <th>Class</th>
-            {showSource ? <th>Source</th> : null}
-            <th>Updated</th>
-          </tr>
-        </thead>
-        <tbody>
-          {records.length ? (
-            records.map((record) => (
-              <tr key={record.id}>
-                <td className="font-medium">{record.name ?? "Unnamed record"}</td>
-                <td>{record.className ?? "Unclassified"}</td>
-                {showSource ? <td>{record.dataSourceName ?? "Unknown"}</td> : null}
-                <td>
-                  {record.lastUpdatedAt
-                    ? formatLocalDateTime(record.lastUpdatedAt)
-                    : "Not updated"}
-                </td>
-              </tr>
-            ))
-          ) : (
-            <tr>
-              <td colSpan={showSource ? 4 : 3}>{emptyMessage}</td>
-            </tr>
-          )}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-function SelectedRecordsPagination({
-  count,
-  currentPage,
-  setCurrentPage,
-  pageCount,
-  pageSize,
-}: {
-  count: number;
-  currentPage: number;
-  setCurrentPage: React.Dispatch<React.SetStateAction<number>>;
-  pageCount: number;
-  pageSize: number;
-}) {
-  return count > pageSize ? (
-    <div className="mt-3 flex flex-col gap-3 text-sm sm:flex-row sm:items-center sm:justify-between">
-      <span className="text-base-content/70">
-        Showing {(currentPage - 1) * pageSize + 1}-
-        {Math.min(currentPage * pageSize, count)} of {count}
-      </span>
-      <div className="join">
-        <button
-          type="button"
-          className="btn btn-sm join-item"
-          disabled={currentPage === 1}
-          onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
-        >
-          Previous
-        </button>
-        <button
-          type="button"
-          className="btn btn-sm join-item"
-          disabled={currentPage >= pageCount}
-          onClick={() =>
-            setCurrentPage((page) => Math.min(pageCount, page + 1))
-          }
-        >
-          Next
-        </button>
-      </div>
-    </div>
-  ) : null;
-}
 
 export default function NewCollectionTabContent({
   controller: {
@@ -205,6 +23,8 @@ export default function NewCollectionTabContent({
       newCollectionStep,
       setNewCollectionStep,
       recordsPerPage,
+      setRecordsPerPage,
+      recordPageSizeOptions,
       saving,
       getSensitivityClass,
     },
@@ -383,45 +203,26 @@ export default function NewCollectionTabContent({
             <>
               <div className="space-y-4">
                 <div className="rounded-2xl border border-base-300 bg-base-200/30 p-4">
-                  <div className="flex flex-col gap-3 lg:flex-row">
-                    <label className="input input-bordered flex min-w-0 flex-1 items-center gap-2">
-                      <MagnifyingGlassIcon className="size-5 text-base-content/60" />
-                      <input
-                        type="text"
-                        className="grow"
-                        placeholder="Search records to add"
-                        value={newCollectionRecordSearchTerm}
-                        onChange={(event) =>
-                          setNewCollectionRecordSearchTerm(event.target.value)
+                  <CollectionRecordSearchControls
+                    searchTerm={newCollectionRecordSearchTerm}
+                    setSearchTerm={setNewCollectionRecordSearchTerm}
+                    placeholder="Search records to add"
+                    searchLoading={newCollectionRecordSearchLoading}
+                    onSearch={() => void onSearchRecords()}
+                    action={
+                      <button
+                        type="button"
+                        className="btn btn-outline"
+                        disabled={
+                          newCollectionRecordSearchLoading ||
+                          !newCollectionRecordSearchTerm.trim()
                         }
-                        onKeyDown={(event) => {
-                          if (event.key === "Enter") {
-                            event.preventDefault();
-                            void onSearchRecords();
-                          }
-                        }}
-                      />
-                    </label>
-                    <button
-                      type="button"
-                      className="btn btn-outline"
-                      disabled={newCollectionRecordSearchLoading}
-                      onClick={() => void onSearchRecords()}
-                    >
-                      Search
-                    </button>
-                    <button
-                      type="button"
-                      className="btn btn-outline"
-                      disabled={
-                        newCollectionRecordSearchLoading ||
-                        !newCollectionRecordSearchTerm.trim()
-                      }
-                      onClick={onClearRecordSearch}
-                    >
-                      Clear
-                    </button>
-                  </div>
+                        onClick={onClearRecordSearch}
+                      >
+                        Clear
+                      </button>
+                    }
+                  />
 
                   <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-base-content/70">
                     <span>{newCollectionSelectedRecordIds.length} records selected</span>
@@ -452,63 +253,44 @@ export default function NewCollectionTabContent({
                   </div>
 
                   {newCollectionRecordSearchResults.length ? (
-                    <div className="mt-4 overflow-x-auto rounded-xl border border-base-300 bg-base-100">
-                      <table className="table table-sm">
-                        <thead>
-                          <tr>
-                            <th>
-                              <input
-                                type="checkbox"
-                                className="checkbox checkbox-sm"
-                                checked={allVisibleNewCollectionRecordsSelected}
-                                ref={(input) => {
-                                  if (input) {
-                                    input.indeterminate =
-                                      !allVisibleNewCollectionRecordsSelected &&
-                                      someVisibleNewCollectionRecordsSelected;
-                                  }
-                                }}
-                                onChange={() =>
-                                  void onToggleSelectAllVisibleRecords()
-                                }
-                              />
-                            </th>
-                            <th>Record</th>
-                            <th>Class</th>
-                            <th>Source</th>
-                            <th>Updated</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {visibleNewCollectionRecords.map((record) => (
-                            <tr key={record.id}>
-                              <td>
-                                <input
-                                  type="checkbox"
-                                  className="checkbox checkbox-sm"
-                                  checked={newCollectionSelectedRecordIds.includes(
-                                    record.id,
-                                  )}
-                                  onChange={() =>
-                                    void onToggleNewCollectionRecord(record)
-                                  }
-                                />
-                              </td>
-                              <td className="font-medium">{record.name}</td>
-                              <td>{record.className ?? "Unclassified"}</td>
-                              <td>{record.dataSourceName ?? "Unknown"}</td>
-                              <td>
-                                {record.lastUpdatedAt
-                                  ? formatLocalDateTime(record.lastUpdatedAt)
-                                  : "Not updated"}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-
+                    <>
+                      <CollectionRecordSearchResultsTable
+                        rows={visibleNewCollectionRecords.map((record) => ({
+                          key: record.id,
+                          leadingCell: (
+                            <input
+                              type="checkbox"
+                              className="checkbox checkbox-sm"
+                              checked={newCollectionSelectedRecordIds.includes(record.id)}
+                              onChange={() => void onToggleNewCollectionRecord(record)}
+                            />
+                          ),
+                          name: record.name,
+                          className: record.className ?? "Unclassified",
+                          sourceName: record.dataSourceName ?? "Unknown",
+                          updatedAt: record.lastUpdatedAt,
+                        }))}
+                        emptyMessage="No records found."
+                        maxHeightClassName="max-h-fit"
+                        pinnedHeader={false}
+                        leadingHeaderCell={
+                          <input
+                            type="checkbox"
+                            className="checkbox checkbox-sm"
+                            checked={allVisibleNewCollectionRecordsSelected}
+                            ref={(input) => {
+                              if (input) {
+                                input.indeterminate =
+                                  !allVisibleNewCollectionRecordsSelected &&
+                                  someVisibleNewCollectionRecordsSelected;
+                              }
+                            }}
+                            onChange={() => void onToggleSelectAllVisibleRecords()}
+                          />
+                        }
+                      />
                       {newCollectionRecordSearchResults.length > recordsPerPage ? (
-                        <div className="flex flex-col gap-3 border-t border-base-300 px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between">
+                        <div className="flex flex-col gap-3 px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between">
                           <span className="text-base-content/70">
                             Showing {(newCollectionRecordPage - 1) * recordsPerPage + 1}-
                             {Math.min(
@@ -517,38 +299,17 @@ export default function NewCollectionTabContent({
                             )}{" "}
                             of {newCollectionRecordSearchResults.length}
                           </span>
-                          <div className="join">
-                            <button
-                              type="button"
-                              className="btn btn-sm join-item"
-                              disabled={newCollectionRecordPage === 1}
-                              onClick={() =>
-                                setNewCollectionRecordPage((page) =>
-                                  Math.max(1, page - 1),
-                                )
-                              }
-                            >
-                              Previous
-                            </button>
-                            <button
-                              type="button"
-                              className="btn btn-sm join-item"
-                              disabled={
-                                newCollectionRecordPage >=
-                                newCollectionRecordPageCount
-                              }
-                              onClick={() =>
-                                setNewCollectionRecordPage((page) =>
-                                  Math.min(newCollectionRecordPageCount, page + 1),
-                                )
-                              }
-                            >
-                              Next
-                            </button>
-                          </div>
+                          <PaginationControls
+                            currentPage={newCollectionRecordPage}
+                            pageSize={recordsPerPage}
+                            totalPages={newCollectionRecordPageCount}
+                            pageSizeOptions={recordPageSizeOptions}
+                            onPageChange={setNewCollectionRecordPage}
+                            onPageSizeChange={setRecordsPerPage}
+                          />
                         </div>
                       ) : null}
-                    </div>
+                    </>
                   ) : null}
 
                   {newCollectionRecordSearchLoading ? (
@@ -599,69 +360,13 @@ export default function NewCollectionTabContent({
                   </div>
 
                   <div className="mt-5 space-y-5">
-                    <div>
-                      <p className="text-sm font-medium text-base-content">
-                        Sensitivity Labels
-                      </p>
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        {newCollectionSelectedLabelTally.length ? (
-                          newCollectionSelectedLabelTally.map((label) => (
-                            <span
-                              key={label.label}
-                              className={`badge badge-sm gap-1 ${getSensitivityClass(
-                                label.label,
-                              )}`}
-                            >
-                              {label.label} ({label.count})
-                              <button
-                                type="button"
-                                className="group ml-1 rounded-full px-1 leading-none text-base-content/70 transition-colors hover:bg-base-100/70 hover:text-error focus-visible:bg-base-100/70 focus-visible:text-error"
-                                onClick={() =>
-                                  onDeselectRecordsByLabel(label.label)
-                                }
-                                title={`Deselect records with ${label.label}`}
-                              >
-                                <XCircleIcon
-                                  className="size-4 transition-colors group-hover:text-error group-focus-visible:text-error"
-                                  aria-hidden="true"
-                                />
-                              </button>
-                            </span>
-                          ))
-                        ) : null}
-                      </div>
-                    </div>
-
-                    <div>
-                      <p className="text-sm font-medium text-base-content">
-                        Tags
-                      </p>
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        {newCollectionSelectedTagTally.length ? (
-                          newCollectionSelectedTagTally.map((tag) => (
-                            <span
-                              key={tag.label}
-                              className="badge badge-sm badge-outline badge-secondary gap-1"
-                            >
-                              {tag.label} ({tag.count})
-                              <button
-                                type="button"
-                                className="group ml-1 rounded-full px-1 leading-none text-base-content/70 transition-colors hover:bg-base-100/70 hover:text-error focus-visible:bg-base-100/70 focus-visible:text-error"
-                                onClick={() =>
-                                  onDeselectRecordsByTag(tag.label)
-                                }
-                                title={`Deselect records with ${tag.label}`}
-                              >
-                                <XCircleIcon
-                                  className="size-4 transition-colors group-hover:text-error group-focus-visible:text-error"
-                                  aria-hidden="true"
-                                />
-                              </button>
-                            </span>
-                          ))
-                        ) : null}
-                      </div>
-                    </div>
+                    <CollectionFacetSummary
+                      labelFacets={newCollectionSelectedLabelTally}
+                      tagFacets={newCollectionSelectedTagTally}
+                      getSensitivityClass={getSensitivityClass}
+                      onRemoveLabel={onDeselectRecordsByLabel}
+                      onRemoveTag={onDeselectRecordsByTag}
+                    />
                   </div>
                 </div>
 
@@ -719,43 +424,21 @@ export default function NewCollectionTabContent({
                       />
                     </label>
 
-                    <div className="mt-2 rounded-2xl border border-base-300 bg-base-100 p-4">
-                      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                        <div>
-                          <h3 className="font-semibold text-base-content">
-                            Selected Records
-                          </h3>
-                          <p className="text-sm text-base-content/70">
-                            {filteredNewCollectionSelectedRecords.length} of{" "}
-                            {newCollectionSelectedRecords.length} records shown
-                          </p>
-                        </div>
-                        <label className="input input-bordered input-sm flex min-w-0 items-center gap-2 lg:w-72">
-                          <MagnifyingGlassIcon className="size-4 text-base-content/60" />
-                          <input
-                            type="text"
-                            className="grow"
-                            placeholder="Search selected records"
-                            value={newCollectionReviewSearchTerm}
-                            onChange={(event) =>
-                              setNewCollectionReviewSearchTerm(event.target.value)
-                            }
-                          />
-                        </label>
-                      </div>
-
-                      <SelectedRecordsTable
-                        records={visibleNewCollectionReviewRecords}
-                        emptyMessage="No selected records match this search."
-                      />
-                      <SelectedRecordsPagination
-                        count={filteredNewCollectionSelectedRecords.length}
-                        currentPage={newCollectionReviewPage}
-                        setCurrentPage={setNewCollectionReviewPage}
-                        pageCount={newCollectionReviewPageCount}
-                        pageSize={recordsPerPage}
-                      />
-                    </div>
+                    <SelectedRecordsPreviewPanel
+                      title="Selected Records"
+                      shownCount={filteredNewCollectionSelectedRecords.length}
+                      totalCount={newCollectionSelectedRecords.length}
+                      searchTerm={newCollectionReviewSearchTerm}
+                      setSearchTerm={setNewCollectionReviewSearchTerm}
+                      records={visibleNewCollectionReviewRecords}
+                      emptyMessage="No selected records match this search."
+                      currentPage={newCollectionReviewPage}
+                      setCurrentPage={setNewCollectionReviewPage}
+                      pageCount={newCollectionReviewPageCount}
+                      pageSize={recordsPerPage}
+                      pageSizeOptions={recordPageSizeOptions}
+                      onPageSizeChange={setRecordsPerPage}
+                    />
                   </div>
                 </div>
               </div>
@@ -765,44 +448,12 @@ export default function NewCollectionTabContent({
                   <h3 className="font-semibold text-base-content">
                     Selected Labels and Tags
                   </h3>
-                  <div className="mt-5 space-y-5">
-                    <div>
-                      <p className="text-sm font-medium text-base-content">
-                        Sensitivity Labels
-                      </p>
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        {newCollectionSelectedLabelTally.length ? (
-                          newCollectionSelectedLabelTally.map((label) => (
-                            <span
-                              key={label.label}
-                              className={`badge badge-sm ${getSensitivityClass(
-                                label.label,
-                              )}`}
-                            >
-                              {label.label} ({label.count})
-                            </span>
-                          ))
-                        ) : null}
-                      </div>
-                    </div>
-
-                    <div>
-                      <p className="text-sm font-medium text-base-content">
-                        Tags
-                      </p>
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        {newCollectionSelectedTagTally.length ? (
-                          newCollectionSelectedTagTally.map((tag) => (
-                            <span
-                              key={tag.label}
-                              className="badge badge-sm badge-outline badge-secondary"
-                            >
-                              {tag.label} ({tag.count})
-                            </span>
-                          ))
-                        ) : null}
-                      </div>
-                    </div>
+                  <div className="mt-5">
+                    <CollectionFacetSummary
+                      labelFacets={newCollectionSelectedLabelTally}
+                      tagFacets={newCollectionSelectedTagTally}
+                      getSensitivityClass={getSensitivityClass}
+                    />
                   </div>
                 </div>
 
@@ -864,43 +515,21 @@ export default function NewCollectionTabContent({
                       />
                     </label>
 
-                    <div className="mt-2 rounded-2xl border border-base-300 bg-base-100 p-4">
-                      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                        <div>
-                          <h3 className="font-semibold text-base-content">
-                            Selected Records
-                          </h3>
-                          <p className="text-sm text-base-content/70">
-                            {filteredNewCollectionSelectedRecords.length} of{" "}
-                            {newCollectionSelectedRecords.length} records shown
-                          </p>
-                        </div>
-                        <label className="input input-bordered input-sm flex min-w-0 items-center gap-2 lg:w-72">
-                          <MagnifyingGlassIcon className="size-4 text-base-content/60" />
-                          <input
-                            type="text"
-                            className="grow"
-                            placeholder="Search selected records"
-                            value={newCollectionReviewSearchTerm}
-                            onChange={(event) =>
-                              setNewCollectionReviewSearchTerm(event.target.value)
-                            }
-                          />
-                        </label>
-                      </div>
-
-                      <SelectedRecordsTable
-                        records={visibleNewCollectionReviewRecords}
-                        emptyMessage="No selected records match this search."
-                      />
-                      <SelectedRecordsPagination
-                        count={filteredNewCollectionSelectedRecords.length}
-                        currentPage={newCollectionReviewPage}
-                        setCurrentPage={setNewCollectionReviewPage}
-                        pageCount={newCollectionReviewPageCount}
-                        pageSize={recordsPerPage}
-                      />
-                    </div>
+                    <SelectedRecordsPreviewPanel
+                      title="Selected Records"
+                      shownCount={filteredNewCollectionSelectedRecords.length}
+                      totalCount={newCollectionSelectedRecords.length}
+                      searchTerm={newCollectionReviewSearchTerm}
+                      setSearchTerm={setNewCollectionReviewSearchTerm}
+                      records={visibleNewCollectionReviewRecords}
+                      emptyMessage="No selected records match this search."
+                      currentPage={newCollectionReviewPage}
+                      setCurrentPage={setNewCollectionReviewPage}
+                      pageCount={newCollectionReviewPageCount}
+                      pageSize={recordsPerPage}
+                      pageSizeOptions={recordPageSizeOptions}
+                      onPageSizeChange={setRecordsPerPage}
+                    />
                   </div>
                 </div>
               </div>
@@ -911,180 +540,55 @@ export default function NewCollectionTabContent({
                     Modify Labels and Tags
                   </h3>
                   <div className="mt-5 space-y-6">
-                    <div>
-                      <p className="text-sm font-medium text-base-content">
-                        Sensitivity Labels
-                      </p>
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        {selectedNewCollectionLabels.length ? (
-                          selectedNewCollectionLabels.map((label) => (
-                            <span
-                              key={label.id}
-                              className={`badge badge-sm gap-1 ${getSensitivityClass(
-                                label.name,
-                              )}`}
-                            >
-                              {label.name}
-                              <button
-                                type="button"
-                                className="group ml-1 rounded-full px-1 leading-none text-base-content/70 transition-colors hover:bg-base-100/70 hover:text-error focus-visible:bg-base-100/70 focus-visible:text-error"
-                                onClick={() =>
-                                  onRemoveNewCollectionLabel(label.id)
-                                }
-                                title={`Remove ${label.name}`}
-                              >
-                                <XCircleIcon
-                                  className="size-4 transition-colors group-hover:text-error group-focus-visible:text-error"
-                                  aria-hidden="true"
-                                />
-                              </button>
-                            </span>
-                          ))
-                        ) : null}
-                      </div>
-                      <div className="mt-3 flex flex-col gap-2 sm:flex-row">
-                        <label className="input input-bordered input-sm flex min-w-0 flex-1 items-center gap-2">
-                          <MagnifyingGlassIcon className="size-4 text-base-content/60" />
-                          <input
-                            type="text"
-                            className="grow"
-                            placeholder="Search or add label"
-                            value={newCollectionLabelSearchTerm}
-                            onChange={(event) =>
-                              setNewCollectionLabelSearchTerm(event.target.value)
-                            }
-                            onKeyDown={(event) => {
-                              if (event.key === "Enter") {
-                                event.preventDefault();
-                                void onAddNewCollectionLabelFromSearch();
-                              }
-                            }}
-                          />
-                        </label>
-                        <button
-                          type="button"
-                          className="btn btn-primary btn-sm"
-                          disabled={
-                            !canAddTypedNewCollectionLabel ||
-                            newCollectionLabelCreating
-                          }
-                          onClick={() => void onAddNewCollectionLabelFromSearch()}
-                        >
-                          {newCollectionLabelCreating ? (
-                            <span className="loading loading-spinner loading-xs" />
-                          ) : (
-                            "Add"
-                          )}
-                        </button>
-                      </div>
-                      <div className="mt-3 max-h-48 space-y-2 overflow-auto rounded-xl border border-base-300 bg-base-200/30 p-3">
-                        {labelsLoading ? (
-                          <div className="flex items-center gap-2 text-sm text-base-content/70">
-                            <span className="loading loading-spinner loading-sm" />
-                            Loading labels
-                          </div>
-                        ) : filteredNewCollectionLabelOptions.length ? (
-                          filteredNewCollectionLabelOptions.map((label) => (
-                            <button
-                              type="button"
-                              key={label.id}
-                              className="flex w-full items-center justify-between rounded-lg px-2 py-1 text-left text-sm hover:bg-base-200"
-                              onClick={() => onAddNewCollectionLabel(label.id)}
-                            >
-                              <span className="truncate">{label.name}</span>
-                              <span className="btn btn-primary btn-xs">Add</span>
-                            </button>
-                          ))
-                        ) : (
-                          <p className="text-sm text-base-content/60">
-                            No labels found.
-                          </p>
-                        )}
-                      </div>
-                    </div>
+                    <CollectionEntitySelector
+                      title="Sensitivity Labels"
+                      selectedItems={selectedNewCollectionLabels}
+                      searchTerm={newCollectionLabelSearchTerm}
+                      setSearchTerm={setNewCollectionLabelSearchTerm}
+                      searchPlaceholder="Search or add label"
+                      options={filteredNewCollectionLabelOptions}
+                      loading={labelsLoading}
+                      loadingText="Loading labels"
+                      emptyOptionsText="No labels found."
+                      addDisabled={
+                        !canAddTypedNewCollectionLabel || newCollectionLabelCreating
+                      }
+                      addButtonLoading={newCollectionLabelCreating}
+                      selectedItemClassName={(item) =>
+                        `badge badge-sm gap-1 ${getSensitivityClass(item.name)}`
+                      }
+                      addTypedItem={onAddNewCollectionLabelFromSearch}
+                      selectOption={(item) =>
+                        onAddNewCollectionLabel(Number(item.id))
+                      }
+                      removeItem={(item) =>
+                        onRemoveNewCollectionLabel(Number(item.id))
+                      }
+                    />
 
-                    <div>
-                      <p className="text-sm font-medium text-base-content">
-                        Tags
-                      </p>
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        {newCollectionSelectedTagNames.length ? (
-                          newCollectionSelectedTagNames.map((tag) => (
-                            <span
-                              key={tag}
-                              className="badge badge-sm badge-outline badge-secondary gap-1"
-                            >
-                              {tag}
-                              <button
-                                type="button"
-                                className="group ml-1 rounded-full px-1 leading-none text-base-content/70 transition-colors hover:bg-base-100/70 hover:text-error focus-visible:bg-base-100/70 focus-visible:text-error"
-                                onClick={() => onRemoveNewCollectionTag(tag)}
-                                title={`Remove ${tag}`}
-                              >
-                                <XCircleIcon
-                                  className="size-4 transition-colors group-hover:text-error group-focus-visible:text-error"
-                                  aria-hidden="true"
-                                />
-                              </button>
-                            </span>
-                          ))
-                        ) : null}
-                      </div>
-                      <div className="mt-3 flex flex-col gap-2 sm:flex-row">
-                        <label className="input input-bordered input-sm flex min-w-0 flex-1 items-center gap-2">
-                          <MagnifyingGlassIcon className="size-4 text-base-content/60" />
-                          <input
-                            type="text"
-                            className="grow"
-                            placeholder="Search or add tag"
-                            value={newCollectionTagSearchTerm}
-                            onChange={(event) =>
-                              setNewCollectionTagSearchTerm(event.target.value)
-                            }
-                            onKeyDown={(event) => {
-                              if (event.key === "Enter") {
-                                event.preventDefault();
-                                onAddNewCollectionTag(newCollectionTagSearchTerm);
-                              }
-                            }}
-                          />
-                        </label>
-                        <button
-                          type="button"
-                          className="btn btn-primary btn-sm"
-                          disabled={!canAddTypedNewCollectionTag}
-                          onClick={() =>
-                            onAddNewCollectionTag(newCollectionTagSearchTerm)
-                          }
-                        >
-                          Add
-                        </button>
-                      </div>
-                      <div className="mt-3 max-h-48 space-y-2 overflow-auto rounded-xl border border-base-300 bg-base-200/30 p-3">
-                        {tagsLoading ? (
-                          <div className="flex items-center gap-2 text-sm text-base-content/70">
-                            <span className="loading loading-spinner loading-sm" />
-                            Loading tags
-                          </div>
-                        ) : filteredNewCollectionTagOptions.length ? (
-                          filteredNewCollectionTagOptions.map((tag) => (
-                            <button
-                              type="button"
-                              key={tag.id}
-                              className="flex w-full items-center justify-between rounded-lg px-2 py-1 text-left text-sm hover:bg-base-200"
-                              onClick={() => onAddNewCollectionTag(tag.name)}
-                            >
-                              <span className="truncate">{tag.name}</span>
-                              <span className="btn btn-primary btn-xs">Add</span>
-                            </button>
-                          ))
-                        ) : (
-                          <p className="text-sm text-base-content/60">
-                            No tags found.
-                          </p>
-                        )}
-                      </div>
-                    </div>
+                    <CollectionEntitySelector
+                      title="Tags"
+                      selectedItems={newCollectionSelectedTagNames.map((tag) => ({
+                        id: tag,
+                        name: tag,
+                      }))}
+                      searchTerm={newCollectionTagSearchTerm}
+                      setSearchTerm={setNewCollectionTagSearchTerm}
+                      searchPlaceholder="Search or add tag"
+                      options={filteredNewCollectionTagOptions}
+                      loading={tagsLoading}
+                      loadingText="Loading tags"
+                      emptyOptionsText="No tags found."
+                      addDisabled={!canAddTypedNewCollectionTag}
+                      selectedItemClassName={() =>
+                        "badge badge-sm badge-outline badge-secondary gap-1"
+                      }
+                      addTypedItem={() =>
+                        onAddNewCollectionTag(newCollectionTagSearchTerm)
+                      }
+                      selectOption={(item) => onAddNewCollectionTag(item.name)}
+                      removeItem={(item) => onRemoveNewCollectionTag(item.name)}
+                    />
                   </div>
                 </div>
 
@@ -1151,6 +655,8 @@ export default function NewCollectionTabContent({
                 recordPage={newCollectionReviewPage}
                 setRecordPage={setNewCollectionReviewPage}
                 recordPageCount={newCollectionReviewPageCount}
+                recordPageSizeOptions={recordPageSizeOptions}
+                onRecordPageSizeChange={setRecordsPerPage}
               />
 
               <div className="flex justify-end rounded-2xl border border-base-300 bg-base-100 p-4">
