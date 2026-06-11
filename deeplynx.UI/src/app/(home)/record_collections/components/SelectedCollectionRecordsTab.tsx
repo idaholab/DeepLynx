@@ -1,5 +1,6 @@
 "use client";
 
+import { useLanguage } from "@/app/contexts/Language";
 import Link from "next/link";
 import React from "react";
 import { formatLocalDateTime } from "@/app/lib/date_time";
@@ -7,6 +8,7 @@ import CollectionRecordSearchControls from "./CollectionRecordSearchControls";
 import CollectionRecordSearchResultsTable from "./CollectionRecordSearchResultsTable";
 import SectionCard from "./SectionCard";
 import { SelectedCollectionRecordsController } from "./componentTypes";
+import { interpolateTemplate } from "./utils";
 
 type Props = {
   controller: SelectedCollectionRecordsController;
@@ -32,18 +34,23 @@ export default function SelectedCollectionRecordsTab({
     actions: { onBackToDetails },
   },
 }: Props) {
+  const { t } = useLanguage();
+
   return (
     <div className="mt-4">
       <SectionCard
-        title="Records"
-        subtitle={`Records currently assigned to ${selectedCollection.name}.`}
+        title={t.translations.RECORDS}
+        subtitle={interpolateTemplate(
+          t.translations.RECORD_COLLECTIONS_RECORDS_ASSIGNED_TO,
+          { name: selectedCollection.name },
+        )}
         action={
           <button
             type="button"
             className="btn btn-outline btn-sm"
             onClick={onBackToDetails}
           >
-            Back to details
+            {t.translations.RECORD_COLLECTIONS_BACK_TO_DETAILS}
           </button>
         }
       >
@@ -51,7 +58,7 @@ export default function SelectedCollectionRecordsTab({
           <CollectionRecordSearchControls
             searchTerm={recordSearchTerm}
             setSearchTerm={setRecordSearchTerm}
-            placeholder="Search records to add"
+            placeholder={t.translations.RECORD_COLLECTIONS_SEARCH_RECORDS_TO_ADD}
             searchLoading={recordSearchLoading}
             onSearch={onSearchRecords}
             action={
@@ -61,7 +68,7 @@ export default function SelectedCollectionRecordsTab({
                 disabled={saving || selectedRecordIds.length === 0}
                 onClick={onAddSelectedRecords}
               >
-                Add selected
+                {t.translations.RECORD_COLLECTIONS_ADD_SELECTED}
               </button>
             }
           />
@@ -87,11 +94,14 @@ export default function SelectedCollectionRecordsTab({
                   />
                 ),
                 name: record.name,
-                className: record.className ?? "Unclassified",
-                sourceName: record.dataSourceName ?? "Unknown",
+                className:
+                  record.className ?? t.translations.RECORD_COLLECTIONS_UNCLASSIFIED,
+                sourceName: record.dataSourceName ?? t.translations.UNKNOWN,
                 updatedAt: record.lastUpdatedAt,
               }))}
-              emptyMessage="All matching records are already in this collection."
+              emptyMessage={
+                t.translations.RECORD_COLLECTIONS_ALL_MATCHING_ALREADY_IN_THIS_COLLECTION
+              }
               maxHeightClassName="max-h-fit"
               pinnedHeader={false}
             />
@@ -100,7 +110,7 @@ export default function SelectedCollectionRecordsTab({
           {recordSearchLoading ? (
             <div className="mt-3 flex items-center gap-2 text-sm text-base-content/70">
               <span className="loading loading-spinner loading-sm" />
-              Searching records
+              {t.translations.RECORD_COLLECTIONS_SEARCHING_RECORDS}
             </div>
           ) : null}
         </div>
@@ -109,10 +119,10 @@ export default function SelectedCollectionRecordsTab({
           <table className="table">
             <thead>
               <tr>
-                <th>Record</th>
-                <th>Class</th>
-                <th>Project</th>
-                <th>Updated</th>
+                <th>{t.translations.RECORD}</th>
+                <th>{t.translations.RECORD_COLLECTIONS_CLASS}</th>
+                <th>{t.translations.PROJECT}</th>
+                <th>{t.translations.RECORD_COLLECTIONS_UPDATED}</th>
               </tr>
             </thead>
             <tbody>
@@ -131,24 +141,27 @@ export default function SelectedCollectionRecordsTab({
                           href={`/record?recordId=${record.id}&projectId=${record.projectId ?? projectId}`}
                           className="link link-primary"
                         >
-                          {record.name}
+                          {record.name ??
+                            t.translations.RECORD_COLLECTIONS_UNNAMED_RECORD}
                         </Link>
                       ) : (
-                        record.name
+                        record.name ?? t.translations.RECORD_COLLECTIONS_UNNAMED_RECORD
                       )}
                     </td>
-                    <td>{record.classId ?? "Unclassified"}</td>
+                    <td>{record.classId ?? t.translations.RECORD_COLLECTIONS_UNCLASSIFIED}</td>
                     <td>{record.projectId ?? projectId}</td>
                     <td>
                       {record.lastUpdatedAt
                         ? formatLocalDateTime(record.lastUpdatedAt)
-                        : "Not updated"}
+                        : t.translations.RECORD_COLLECTIONS_NOT_UPDATED}
                     </td>
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td colSpan={4}>No records are currently assigned.</td>
+                  <td colSpan={4}>
+                    {t.translations.RECORD_COLLECTIONS_NO_RECORDS_ARE_CURRENTLY_ASSIGNED}
+                  </td>
                 </tr>
               )}
             </tbody>

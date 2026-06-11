@@ -1,5 +1,6 @@
 "use client";
 
+import { useLanguage } from "@/app/contexts/Language";
 import React from "react";
 import { formatLocalDateTime } from "@/app/lib/date_time";
 import {
@@ -133,6 +134,7 @@ export function useSelectedCollectionDetailsController({
     collectionRecordIds,
     editRecordResults,
   } = selectedCollectionEditDerived;
+  const { t } = useLanguage();
 
   if (!selectedCollection || !editableSelectedCollection) {
     return null;
@@ -144,25 +146,33 @@ export function useSelectedCollectionDetailsController({
       collectionSummaryPanel: (
         <div className="grid gap-4 rounded-2xl border border-base-300 bg-base-200/30 p-4 text-sm sm:grid-cols-2 lg:grid-cols-4">
           <div>
-            <p className="text-base-content/60">Collection ID</p>
+            <p className="text-base-content/60">
+              {t.translations.RECORD_COLLECTIONS_COLLECTION_ID}
+            </p>
             <p className="font-semibold text-base-content">{selectedCollection.id}</p>
           </div>
           <div>
-            <p className="text-base-content/60">Total Records</p>
+            <p className="text-base-content/60">
+              {t.translations.RECORD_COLLECTIONS_TOTAL_RECORDS}
+            </p>
             <p className="font-semibold text-base-content">
               {selectedCollection.recordCount}
             </p>
           </div>
           <div>
-            <p className="text-base-content/60">Updated</p>
+            <p className="text-base-content/60">
+              {t.translations.RECORD_COLLECTIONS_UPDATED}
+            </p>
             <p className="font-semibold text-base-content">
               {formatLocalDateTime(selectedCollection.lastUpdatedAt)}
             </p>
           </div>
           <div>
-            <p className="text-base-content/60">Last Updated By</p>
+            <p className="text-base-content/60">
+              {t.translations.RECORD_COLLECTIONS_LAST_UPDATED_BY}
+            </p>
             <p className="font-semibold text-base-content">
-              {selectedCollection.lastUpdatedBy ?? "Unknown"}
+              {selectedCollection.lastUpdatedBy ?? t.translations.UNKNOWN}
             </p>
           </div>
         </div>

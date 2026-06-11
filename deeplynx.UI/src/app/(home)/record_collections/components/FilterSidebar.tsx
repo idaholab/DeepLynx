@@ -1,5 +1,6 @@
 "use client";
 
+import { useLanguage } from "@/app/contexts/Language";
 import { FunnelIcon, XMarkIcon } from "@heroicons/react/24/outline";
 
 import { FacetOption } from "./recordCollections.types";
@@ -33,13 +34,15 @@ export default function FilterSidebar({
   activeFacetCount,
   onClearFacetFilters,
 }: Props) {
+  const { t } = useLanguage();
+
   return (
     <aside>
       <div className="rounded-box border border-base-300 bg-base-100 shadow-sm">
         <div className="flex items-center justify-between border-b border-base-300 px-4 py-3">
           <div className="flex items-center gap-2 font-semibold">
             <FunnelIcon className="size-4 text-primary" />
-            Filter by
+            {t.translations.FILTER_BY}
           </div>
           {activeFacetCount > 0 ? (
             <button
@@ -48,7 +51,7 @@ export default function FilterSidebar({
               onClick={onClearFacetFilters}
             >
               <XMarkIcon className="size-3" />
-              Clear
+              {t.translations.CLEAR}
             </button>
           ) : null}
         </div>
@@ -57,13 +60,13 @@ export default function FilterSidebar({
           <div className="collapse collapse-arrow rounded-none">
             <input type="checkbox" defaultChecked />
             <div className="collapse-title min-h-0 px-4 py-3 text-sm font-semibold">
-              Sensitivity Labels
+              {t.translations.SENSITIVITY_LABELS}
             </div>
             <div className="collapse-content px-4 pb-4">
               <input
                 type="search"
                 className="input input-sm mb-3 w-full"
-                placeholder="Search labels"
+                placeholder={t.translations.SEARCH_LABELS}
                 value={sensitivityFacetQuery}
                 onChange={(event) =>
                   onSensitivityFacetQueryChange(event.target.value)
@@ -92,7 +95,7 @@ export default function FilterSidebar({
                   ))
                 ) : (
                   <p className="text-xs text-base-content/50">
-                    No sensitivity labels match.
+                    {t.translations.RECORD_COLLECTIONS_NO_SENSITIVITY_LABELS_MATCH}
                   </p>
                 )}
               </div>
@@ -102,13 +105,13 @@ export default function FilterSidebar({
           <div className="collapse collapse-arrow rounded-none">
             <input type="checkbox" defaultChecked />
             <div className="collapse-title min-h-0 px-4 py-3 text-sm font-semibold">
-              Tags
+              {t.translations.TAGS}
             </div>
             <div className="collapse-content px-4 pb-4">
               <input
                 type="search"
                 className="input input-sm mb-3 w-full"
-                placeholder="Search tags"
+                placeholder={t.translations.SEARCH_TAGS}
                 value={tagFacetQuery}
                 onChange={(event) => onTagFacetQueryChange(event.target.value)}
               />
@@ -135,7 +138,7 @@ export default function FilterSidebar({
                   ))
                 ) : (
                   <p className="text-xs text-base-content/50">
-                    No tags match.
+                    {t.translations.NO_TAGS_MATCH_SEARCH}
                   </p>
                 )}
               </div>

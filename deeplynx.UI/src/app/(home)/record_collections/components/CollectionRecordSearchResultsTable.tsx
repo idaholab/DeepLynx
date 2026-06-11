@@ -1,5 +1,6 @@
 "use client";
 
+import { useLanguage } from "@/app/contexts/Language";
 import { formatLocalDateTime } from "@/app/lib/date_time";
 import React from "react";
 
@@ -30,6 +31,7 @@ export default function CollectionRecordSearchResultsTable({
   leadingHeaderCell,
   actionHeaderCell,
 }: Props) {
+  const { t } = useLanguage();
   const showLeadingColumn = rows.some((row) => row.leadingCell !== undefined);
   const showActionColumn = rows.some((row) => row.actionCell !== undefined);
   const columnCount =
@@ -43,10 +45,10 @@ export default function CollectionRecordSearchResultsTable({
         <thead className={pinnedHeader ? "bg-base-100" : undefined}>
           <tr>
             {showLeadingColumn ? <th>{leadingHeaderCell ?? null}</th> : null}
-            <th>Record</th>
-            <th>Class</th>
-            <th>Source</th>
-            <th>Updated</th>
+            <th>{t.translations.RECORD}</th>
+            <th>{t.translations.RECORD_COLLECTIONS_CLASS}</th>
+            <th>{t.translations.RECORD_COLLECTIONS_SOURCE}</th>
+            <th>{t.translations.RECORD_COLLECTIONS_UPDATED}</th>
             {showActionColumn ? <th>{actionHeaderCell ?? null}</th> : null}
           </tr>
         </thead>
@@ -59,7 +61,9 @@ export default function CollectionRecordSearchResultsTable({
                 <td>{row.className}</td>
                 <td>{row.sourceName}</td>
                 <td>
-                  {row.updatedAt ? formatLocalDateTime(row.updatedAt) : "Not updated"}
+                  {row.updatedAt
+                    ? formatLocalDateTime(row.updatedAt)
+                    : t.translations.RECORD_COLLECTIONS_NOT_UPDATED}
                 </td>
                 {showActionColumn ? (
                   <td className="text-right">{row.actionCell ?? null}</td>

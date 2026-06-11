@@ -2,9 +2,11 @@
 
 import PaginationControls from "@/app/(home)/components/PaginationControls";
 import SearchInput from "@/app/(home)/components/SearchInput";
+import { useLanguage } from "@/app/contexts/Language";
 import { formatLocalDateTime } from "@/app/lib/date_time";
 import React from "react";
 import { NewCollectionSelectedRecord } from "./recordCollections.types";
+import { interpolateTemplate } from "./utils";
 
 type Props = {
   title: string;
@@ -37,18 +39,23 @@ export default function SelectedRecordsPreviewPanel({
   pageSizeOptions,
   onPageSizeChange,
 }: Props) {
+  const { t } = useLanguage();
+
   return (
     <div className="mt-2 rounded-2xl border border-base-300 bg-base-100 p-4">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <h3 className="font-semibold text-base-content">{title}</h3>
           <p className="text-sm text-base-content/70">
-            {shownCount} of {totalCount} records shown
+            {interpolateTemplate(
+              t.translations.RECORD_COLLECTIONS_SELECTED_RECORDS_SHOWN,
+              { shown: shownCount, total: totalCount },
+            )}
           </p>
         </div>
         <SearchInput
           className="min-w-0 lg:w-72"
-          placeholder="Search selected records"
+          placeholder={t.translations.RECORD_COLLECTIONS_SEARCH_SELECTED_RECORDS}
           value={searchTerm}
           size="sm"
           onChange={(event) => setSearchTerm(event.target.value)}
@@ -59,23 +66,25 @@ export default function SelectedRecordsPreviewPanel({
         <table className="table table-sm">
           <thead>
             <tr>
-              <th>Record</th>
-              <th>Class</th>
-              <th>Source</th>
-              <th>Updated</th>
+              <th>{t.translations.RECORD}</th>
+              <th>{t.translations.RECORD_COLLECTIONS_CLASS}</th>
+              <th>{t.translations.RECORD_COLLECTIONS_SOURCE}</th>
+              <th>{t.translations.RECORD_COLLECTIONS_UPDATED}</th>
             </tr>
           </thead>
           <tbody>
             {records.length ? (
               records.map((record) => (
                 <tr key={record.id}>
-                  <td className="font-medium">{record.name ?? "Unnamed record"}</td>
-                  <td>{record.className ?? "Unclassified"}</td>
-                  <td>{record.dataSourceName ?? "Unknown"}</td>
+                  <td className="font-medium">
+                    {record.name ?? t.translations.RECORD_COLLECTIONS_UNNAMED_RECORD}
+                  </td>
+                  <td>{record.className ?? t.translations.RECORD_COLLECTIONS_UNCLASSIFIED}</td>
+                  <td>{record.dataSourceName ?? t.translations.UNKNOWN}</td>
                   <td>
                     {record.lastUpdatedAt
                       ? formatLocalDateTime(record.lastUpdatedAt)
-                      : "Not updated"}
+                      : t.translations.RECORD_COLLECTIONS_NOT_UPDATED}
                   </td>
                 </tr>
               ))
@@ -91,8 +100,10 @@ export default function SelectedRecordsPreviewPanel({
       {shownCount > pageSize ? (
         <div className="mt-3 flex flex-col gap-3 text-sm sm:flex-row sm:items-center sm:justify-between">
           <span className="text-base-content/70">
-            Showing {(currentPage - 1) * pageSize + 1}-
-            {Math.min(currentPage * pageSize, shownCount)} of {shownCount}
+            {`${t.translations.SHOWING} ${(currentPage - 1) * pageSize + 1}-${Math.min(
+              currentPage * pageSize,
+              shownCount,
+            )} ${t.translations.OF} ${shownCount}`}
           </span>
           <PaginationControls
             currentPage={currentPage}

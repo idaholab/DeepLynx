@@ -5,6 +5,7 @@ import PaginationControls, {
 } from "@/app/(home)/components/PaginationControls";
 import SearchInput from "@/app/(home)/components/SearchInput";
 import Tabs from "@/app/(home)/components/Tabs";
+import { useLanguage } from "@/app/contexts/Language";
 import { ArrowLeftIcon } from "@heroicons/react/24/outline";
 import React, { useCallback, useEffect, useState } from "react";
 import toast from "react-hot-toast";
@@ -70,6 +71,7 @@ import { useSelectedCollectionDetailsController } from "./hooks/useSelectedColle
 import { useNewCollectionDerived } from "./hooks/useNewCollectionDerived";
 import { useSelectedCollectionDetailsView } from "./hooks/useSelectedCollectionDetailsView";
 import { useSelectedCollectionEditDerived } from "./hooks/useSelectedCollectionEditDerived";
+import { interpolateTemplate } from "./components/utils";
 
 type Props = {
   recordCollections: RecordCollectionResponseDto[];
@@ -87,6 +89,7 @@ export default function RecordCollectionsClient({
   organizationId,
   projectId,
 }: Props) {
+  const { t } = useLanguage();
   const [collections, setCollections] =
     useState<RecordCollectionResponseDto[]>(recordCollections);
   const [activeTab, setActiveTab] = useState<TopLevelTabId>("All Collections");
@@ -271,7 +274,7 @@ export default function RecordCollectionsClient({
         setAvailableLabels(labels);
       } catch (error) {
         console.error("Failed to load project labels:", error);
-        toast.error("Failed to load project labels");
+        toast.error(t.translations.RECORD_COLLECTIONS_FAILED_LOAD_PROJECT_LABELS);
       } finally {
         setLabelsLoading(false);
       }
@@ -288,7 +291,7 @@ export default function RecordCollectionsClient({
         setAvailableTags(tags);
       } catch (error) {
         console.error("Failed to load project tags:", error);
-        toast.error("Failed to load project tags");
+        toast.error(t.translations.RECORD_COLLECTIONS_FAILED_LOAD_PROJECT_TAGS);
       } finally {
         setTagsLoading(false);
       }
@@ -440,7 +443,7 @@ export default function RecordCollectionsClient({
       return records;
     } catch (error) {
       console.error("Failed to load records in record collection:", error);
-      toast.error("Failed to load collection records");
+      toast.error(t.translations.RECORD_COLLECTIONS_FAILED_LOAD_COLLECTION_RECORDS);
       return [];
     } finally {
       setRecordsLoading(false);
@@ -459,7 +462,7 @@ export default function RecordCollectionsClient({
       setSelectedRecordIds([]);
     } catch (error) {
       console.error("Failed to search records:", error);
-      toast.error("Failed to search records");
+      toast.error(t.translations.RECORD_COLLECTIONS_FAILED_SEARCH_RECORDS);
     } finally {
       setRecordSearchLoading(false);
     }
@@ -622,10 +625,10 @@ export default function RecordCollectionsClient({
       setAvailableLabels((prev) => [...prev, createdLabel]);
       addNewCollectionLabel(createdLabel.id);
       setNewCollectionLabelSearchTerm("");
-      toast.success("Label created");
+      toast.success(t.translations.RECORD_COLLECTIONS_LABEL_CREATED);
     } catch (error) {
       console.error("Failed to create sensitivity label:", error);
-      toast.error("Failed to create sensitivity label");
+      toast.error(t.translations.RECORD_COLLECTIONS_FAILED_CREATE_LABEL);
     } finally {
       setNewCollectionLabelCreating(false);
     }
@@ -667,7 +670,7 @@ export default function RecordCollectionsClient({
       setNewCollectionRecordPage(1);
     } catch (error) {
       console.error("Failed to search records:", error);
-      toast.error("Failed to search records");
+      toast.error(t.translations.RECORD_COLLECTIONS_FAILED_SEARCH_RECORDS);
     } finally {
       setNewCollectionRecordSearchLoading(false);
     }
@@ -716,10 +719,10 @@ export default function RecordCollectionsClient({
       setSelectedRecordIds([]);
       setRecordSearchResults([]);
       setRecordSearchTerm("");
-      toast.success("Records added to collection");
+      toast.success(t.translations.RECORD_COLLECTIONS_RECORDS_ADDED);
     } catch (error) {
       console.error("Failed to add records to collection:", error);
-      toast.error("Failed to add records");
+      toast.error(t.translations.RECORD_COLLECTIONS_FAILED_UPDATE);
     } finally {
       setSaving(false);
     }
@@ -740,10 +743,10 @@ export default function RecordCollectionsClient({
       syncSelectedCollectionRecordCount(records.length);
       trackAddedRecords([recordId]);
       await refreshCollections();
-      toast.success("Record added to collection");
+      toast.success(t.translations.RECORD_COLLECTIONS_RECORD_ADDED);
     } catch (error) {
       console.error("Failed to add record to collection:", error);
-      toast.error("Failed to add record to collection");
+      toast.error(t.translations.RECORD_COLLECTIONS_FAILED_UPDATE);
     } finally {
       setAddingRecordIds((prev) => prev.filter((id) => id !== recordId));
     }
@@ -765,10 +768,10 @@ export default function RecordCollectionsClient({
       trackRemovedRecords([recordId]);
       await refreshCollections();
       setSelectedRecordIds((prev) => prev.filter((id) => id !== recordId));
-      toast.success("Record removed from collection");
+      toast.success(t.translations.RECORD_COLLECTIONS_RECORD_REMOVED);
     } catch (error) {
       console.error("Failed to remove record from collection:", error);
-      toast.error("Failed to remove record from collection");
+      toast.error(t.translations.RECORD_COLLECTIONS_FAILED_UPDATE);
     } finally {
       setRemovingRecordIds((prev) => prev.filter((id) => id !== recordId));
     }
@@ -842,7 +845,7 @@ export default function RecordCollectionsClient({
       setIsEditingSelectedCollection(false);
     } catch (error) {
       console.error("Failed to cancel record collection edit:", error);
-      toast.error("Failed to cancel collection changes");
+      toast.error(t.translations.RECORD_COLLECTIONS_FAILED_CANCEL_CHANGES);
     } finally {
       setSaving(false);
     }
@@ -859,7 +862,7 @@ export default function RecordCollectionsClient({
     const name = newCollectionName.trim();
     const description = newCollectionDescription.trim();
     if (!name || !description) {
-      toast.error("Name and description are required");
+      toast.error(t.translations.RECORD_COLLECTIONS_NAME_AND_DESCRIPTION_REQUIRED);
       return;
     }
 
@@ -909,10 +912,10 @@ export default function RecordCollectionsClient({
       if (newCollectionSelectedRecordIds.length > 0) {
         await loadCollectionRecords(createdWithRecordCount);
       }
-      toast.success("Record collection created");
+      toast.success(t.translations.RECORD_COLLECTIONS_CREATED);
     } catch (error) {
       console.error("Failed to create record collection:", error);
-      toast.error("Failed to create record collection");
+      toast.error(t.translations.RECORD_COLLECTIONS_FAILED_CREATE);
     } finally {
       setSaving(false);
     }
@@ -1007,10 +1010,10 @@ export default function RecordCollectionsClient({
       setPendingRecordChanges({ added: [], removed: [] });
       resetCollectionDetailsView();
       setIsEditingSelectedCollection(false);
-      toast.success("Record collection updated");
+      toast.success(t.translations.RECORD_COLLECTIONS_UPDATE_SUCCESS);
     } catch (error) {
       console.error("Failed to update record collection:", error);
-      toast.error("Failed to update record collection");
+      toast.error(t.translations.RECORD_COLLECTIONS_FAILED_UPDATE);
     } finally {
       setSaving(false);
     }
@@ -1099,10 +1102,10 @@ export default function RecordCollectionsClient({
         id: createdLabel.id,
         name: createdLabel.name,
       });
-      toast.success("Label created");
+      toast.success(t.translations.RECORD_COLLECTIONS_LABEL_CREATED);
     } catch (error) {
       console.error("Failed to create sensitivity label:", error);
-      toast.error("Failed to create sensitivity label");
+      toast.error(t.translations.RECORD_COLLECTIONS_FAILED_CREATE_LABEL);
     } finally {
       setSelectedCollectionLabelCreating(false);
     }
@@ -1131,10 +1134,10 @@ export default function RecordCollectionsClient({
         id: createdTag.id,
         name: createdTag.name,
       });
-      toast.success("Tag created");
+      toast.success(t.translations.RECORD_COLLECTIONS_TAG_CREATED);
     } catch (error) {
       console.error("Failed to create tag:", error);
-      toast.error("Failed to create tag");
+      toast.error(t.translations.RECORD_COLLECTIONS_FAILED_CREATE_TAG);
     } finally {
       setSelectedCollectionTagCreating(false);
     }
@@ -1318,6 +1321,7 @@ export default function RecordCollectionsClient({
   const topLevelTabs = [
     {
       label: "All Collections",
+      displayLabel: t.translations.RECORD_COLLECTIONS_ALL,
       content: (
         <div className="mt-4 space-y-6">
           <div className="grid gap-4 lg:grid-cols-[280px_minmax(0,1fr)] lg:items-start">
@@ -1339,11 +1343,13 @@ export default function RecordCollectionsClient({
             </div>
 
             <SectionCard
-              title="All Collections"
-              subtitle="Browse, search, and open record collections for this project."
+              title={t.translations.RECORD_COLLECTIONS_ALL}
+              subtitle={t.translations.RECORD_COLLECTIONS_BROWSE_SEARCH_OPEN_PROJECT}
               action={
                 <div className="rounded-lg border border-base-300 bg-base-200/50 px-3 py-2 text-sm">
-                  <span className="text-base-content/70">Total Collections: </span>
+                  <span className="text-base-content/70">
+                    {t.translations.RECORD_COLLECTIONS_TOTAL_COLLECTIONS}{" "}
+                  </span>
                   <span className="font-semibold text-base-content">
                     {filteredCollections.length}
                   </span>{" "}
@@ -1353,7 +1359,7 @@ export default function RecordCollectionsClient({
               <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_18rem]">
                 <SearchInput
                   className="self-end"
-                  placeholder="Search by collection title or description..."
+                  placeholder={t.translations.RECORD_COLLECTIONS_FILTER_BY_TITLE_OR_DESCRIPTION}
                   value={searchTerm}
                   onChange={(event) => setSearchTerm(event.target.value)}
                 />
@@ -1369,7 +1375,7 @@ export default function RecordCollectionsClient({
                     setCollectionSort(option);
                     setCollectionSortMenuOpen(false);
                   }}
-                  renderLabel={renderCollectionSortLabel}
+                  renderLabel={(option) => renderCollectionSortLabel(option, t)}
                 />
               </div>
 
@@ -1395,12 +1401,10 @@ export default function RecordCollectionsClient({
               {sortedCollections.length > collectionDashboardPageSize ? (
                 <div className="flex flex-col gap-3 border-t border-base-300 pt-4">
                   <span className="text-sm text-base-content/70">
-                    Showing {collectionDashboardStartIndex + 1}-
-                    {Math.min(
+                    {`${t.translations.SHOWING} ${collectionDashboardStartIndex + 1}-${Math.min(
                       collectionDashboardStartIndex + collectionDashboardPageSize,
                       sortedCollections.length,
-                    )}{" "}
-                    of {sortedCollections.length}
+                    )} ${t.translations.OF} ${sortedCollections.length}`}
                   </span>
                   <PaginationControls
                     currentPage={collectionDashboardPage}
@@ -1419,6 +1423,7 @@ export default function RecordCollectionsClient({
     },
     {
       label: "New Collection",
+      displayLabel: t.translations.RECORD_COLLECTIONS_NEW,
       content: <NewCollectionTabContent controller={newCollectionController} />,
     },
   ];
@@ -1429,13 +1434,17 @@ export default function RecordCollectionsClient({
         <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-base-content/60">
-              Record Collections
+              {t.translations.RECORD_COLLECTIONS}
             </p>
             <h1 className="mt-2 text-3xl font-bold text-base-content">
-              {selectedCollection ? "Collection Details" : "Collection Dashboard"}
+              {selectedCollection
+                ? t.translations.RECORD_COLLECTIONS_COLLECTION_DETAILS
+                : t.translations.RECORD_COLLECTIONS_COLLECTION_DASHBOARD}
             </h1>
             <p className="mt-2 max-w-3xl text-sm text-base-content/70">
-              {selectedCollection ? "Review and modify collection details." : "Browse collections, create new collections, and modify existing collections."}
+              {selectedCollection
+                ? t.translations.RECORD_COLLECTIONS_REVIEW_AND_MODIFY_DETAILS
+                : t.translations.RECORD_COLLECTIONS_BROWSE_CREATE_MODIFY_EXISTING}
             </p>
           </div>
           {selectedCollection ? (
@@ -1454,7 +1463,7 @@ export default function RecordCollectionsClient({
               }}
             >
               <ArrowLeftIcon className="size-4" />
-              Back to collections
+              {t.translations.RECORD_COLLECTIONS_BACK_TO_COLLECTIONS}
             </button>
           ) : null}
         </div>

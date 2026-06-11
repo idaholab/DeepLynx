@@ -1,5 +1,6 @@
 "use client";
 
+import { useLanguage } from "@/app/contexts/Language";
 import React from "react";
 import CollectionEntitySelector from "./CollectionEntitySelector";
 import CollectionDetailsReadonlyView from "./CollectionDetailsReadonlyView";
@@ -7,6 +8,7 @@ import CollectionRecordSearchControls from "./CollectionRecordSearchControls";
 import CollectionRecordSearchResultsTable from "./CollectionRecordSearchResultsTable";
 import SectionCard from "./SectionCard";
 import { SelectedCollectionDetailsController } from "./componentTypes";
+import { interpolateTemplate } from "./utils";
 
 type Props = {
   controller: SelectedCollectionDetailsController;
@@ -85,6 +87,8 @@ export default function SelectedCollectionDetailsTab({
     },
   },
 }: Props) {
+  const { t } = useLanguage();
+
   return (
     <div className="mt-4 space-y-4">
       {collectionSummaryPanel}
@@ -105,7 +109,7 @@ export default function SelectedCollectionDetailsTab({
               className="btn btn-primary btn-sm"
               onClick={onOpenSelectedCollectionEdit}
             >
-              Edit Collection
+              {t.translations.RECORD_COLLECTIONS_EDIT_COLLECTION}
             </button>
           }
           descriptionRef={selectedDescriptionRef}
@@ -134,7 +138,7 @@ export default function SelectedCollectionDetailsTab({
               className="btn btn-primary btn-sm"
               onClick={onViewAllCollectionRecords}
             >
-              View all
+              {t.translations.RECORD_COLLECTIONS_VIEW_ALL}
             </button>
           }
           recordsPerPage={recordsPerPage}
@@ -144,8 +148,8 @@ export default function SelectedCollectionDetailsTab({
         />
       ) : (
         <SectionCard
-          title="Manage Collection"
-          subtitle="Edit collection identity, labels, and metadata."
+          title={t.translations.RECORD_COLLECTIONS_MANAGE}
+          subtitle={t.translations.RECORD_COLLECTIONS_MANAGE_IDENTITY_LABELS_METADATA}
           action={
             <div className="flex flex-wrap justify-end gap-2">
               <button
@@ -154,7 +158,7 @@ export default function SelectedCollectionDetailsTab({
                 disabled={saving}
                 onClick={() => void onCancelSelectedCollectionEdit()}
               >
-                Cancel
+                {t.translations.CANCEL}
               </button>
               <button
                 type="button"
@@ -165,7 +169,7 @@ export default function SelectedCollectionDetailsTab({
                 {saving ? (
                   <span className="loading loading-spinner loading-xs" />
                 ) : (
-                  "Save Modifications"
+                  t.translations.RECORD_COLLECTIONS_SAVE_MODIFICATIONS
                 )}
               </button>
             </div>
@@ -175,7 +179,9 @@ export default function SelectedCollectionDetailsTab({
             <div className="space-y-4">
               <label className="form-control w-full">
                 <div className="label">
-                  <span className="label-text font-medium">Name</span>
+                  <span className="label-text font-medium">
+                    {t.translations.NAME}
+                  </span>
                 </div>
                 <input
                   type="text"
@@ -192,7 +198,7 @@ export default function SelectedCollectionDetailsTab({
 
               <div className="form-control w-full">
                 <span className="mb-2 text-sm font-medium text-base-content">
-                  Description
+                  {t.translations.DESCRIPTION}
                 </span>
                 <textarea
                   className="textarea textarea-bordered min-h-40 w-full resize-y"
@@ -209,7 +215,7 @@ export default function SelectedCollectionDetailsTab({
               <div className="rounded-2xl border border-base-300 bg-base-100 p-5">
                 <div className="flex items-start justify-between gap-3">
                   <h3 className="font-semibold text-base-content">
-                    Additional Properties
+                    {t.translations.RECORD_COLLECTIONS_ADDITIONAL_PROPERTIES}
                   </h3>
                   <button
                     type="button"
@@ -217,15 +223,15 @@ export default function SelectedCollectionDetailsTab({
                     disabled={saving}
                     onClick={() => setSelectedCollectionPropertiesEditorOpen(true)}
                   >
-                    Edit
+                    {t.translations.EDIT}
                   </button>
                 </div>
                 <div className="mt-4 max-h-[17.5rem] overflow-auto pr-1">
                   <table className="table table-pin-rows">
                     <thead className="bg-base-100">
                       <tr>
-                        <th>Field</th>
-                        <th>Value</th>
+                        <th>{t.translations.RECORD_COLLECTIONS_FIELD}</th>
+                        <th>{t.translations.RECORD_COLLECTIONS_VALUE}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -238,7 +244,9 @@ export default function SelectedCollectionDetailsTab({
                         ))
                       ) : (
                         <tr>
-                          <td colSpan={2}>No additional properties set.</td>
+                          <td colSpan={2}>
+                            {t.translations.RECORD_COLLECTIONS_NO_ADDITIONAL_PROPERTIES_SET}
+                          </td>
                         </tr>
                       )}
                     </tbody>
@@ -251,15 +259,15 @@ export default function SelectedCollectionDetailsTab({
               <div className="rounded-2xl border border-base-300 bg-base-200/30 p-5">
                 <div className="mt-1 space-y-3 text-sm text-base-content/80">
                   <CollectionEntitySelector
-                    title="Labels"
+                    title={t.translations.RECORD_COLLECTIONS_LABELS}
                     selectedItems={editableSelectedCollection.labels ?? []}
                     searchTerm={selectedCollectionLabelSearchTerm}
                     setSearchTerm={setSelectedCollectionLabelSearchTerm}
-                    searchPlaceholder="Search or add label"
+                    searchPlaceholder={t.translations.RECORD_COLLECTIONS_SEARCH_OR_ADD_LABEL}
                     options={filteredSelectedCollectionLabelOptions}
                     loading={labelsLoading}
-                    loadingText="Loading labels"
-                    emptyOptionsText="No labels found."
+                    loadingText={t.translations.RECORD_COLLECTIONS_LOADING_LABELS}
+                    emptyOptionsText={t.translations.RECORD_COLLECTIONS_NO_LABELS_FOUND}
                     addDisabled={
                       saving ||
                       selectedCollectionLabelCreating ||
@@ -279,15 +287,15 @@ export default function SelectedCollectionDetailsTab({
                     removeItem={(item) => onRemoveLabel(Number(item.id))}
                   />
                   <CollectionEntitySelector
-                    title="Tags"
+                    title={t.translations.RECORD_COLLECTIONS_TAGS}
                     selectedItems={editableSelectedCollection.tags ?? []}
                     searchTerm={selectedCollectionTagSearchTerm}
                     setSearchTerm={setSelectedCollectionTagSearchTerm}
-                    searchPlaceholder="Search or add tag"
+                    searchPlaceholder={t.translations.RECORD_COLLECTIONS_SEARCH_OR_ADD_TAG}
                     options={filteredSelectedCollectionTagOptions}
                     loading={tagsLoading}
-                    loadingText="Loading tags"
-                    emptyOptionsText="No tags found."
+                    loadingText={t.translations.RECORD_COLLECTIONS_LOADING_TAGS}
+                    emptyOptionsText={t.translations.RECORD_COLLECTIONS_NO_TAGS_FOUND}
                     addDisabled={
                       saving ||
                       selectedCollectionTagCreating ||
@@ -315,14 +323,17 @@ export default function SelectedCollectionDetailsTab({
             <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
               <div>
                 <h3 className="font-semibold text-base-content">
-                  Manage Records
+                  {t.translations.RECORD_COLLECTIONS_MANAGE_RECORDS}
                 </h3>
                 <p className="text-sm text-base-content/60">
-                  Add records to this collection or remove records already assigned.
+                  {t.translations.RECORD_COLLECTIONS_MANAGE_RECORDS_DESCRIPTION}
                 </p>
               </div>
               <span className="text-sm font-semibold text-base-content/70">
-                {collectionRecords.length} assigned
+                {interpolateTemplate(
+                  t.translations.RECORD_COLLECTIONS_ASSIGNED_COUNT,
+                  { count: collectionRecords.length },
+                )}
               </span>
             </div>
 
@@ -330,7 +341,7 @@ export default function SelectedCollectionDetailsTab({
               <CollectionRecordSearchControls
                 searchTerm={recordSearchTerm}
                 setSearchTerm={setRecordSearchTerm}
-                placeholder="Search all records"
+                placeholder={t.translations.RECORD_COLLECTIONS_SEARCH_ALL_RECORDS}
                 searchLoading={recordSearchLoading}
                 onSearch={onSearchRecords}
               />
@@ -350,13 +361,13 @@ export default function SelectedCollectionDetailsTab({
                     name: record.name,
                     className:
                       ("className" in record ? record.className : record.classId) ??
-                      "Unclassified",
+                      t.translations.RECORD_COLLECTIONS_UNCLASSIFIED,
                     sourceName:
                       ("dataSourceName" in record
                         ? record.dataSourceName
                         : record.projectId) ??
                       projectId ??
-                      "Unknown",
+                      t.translations.UNKNOWN,
                     updatedAt: record.lastUpdatedAt,
                     actionCell: isAssigned ? (
                       <button
@@ -370,7 +381,7 @@ export default function SelectedCollectionDetailsTab({
                         {isRemoving ? (
                           <span className="loading loading-spinner loading-xs" />
                         ) : (
-                          "Remove"
+                          t.translations.REMOVE
                         )}
                       </button>
                     ) : (
@@ -385,7 +396,7 @@ export default function SelectedCollectionDetailsTab({
                         {isAdding ? (
                           <span className="loading loading-spinner loading-xs" />
                         ) : (
-                          "Add"
+                          t.translations.ADD
                         )}
                       </button>
                     ),
@@ -393,15 +404,15 @@ export default function SelectedCollectionDetailsTab({
                 })}
                 emptyMessage={
                   recordSearchTerm.trim()
-                    ? "No records match this search."
-                    : "No records are currently assigned."
+                    ? t.translations.RECORD_COLLECTIONS_NO_RECORDS_MATCH_SEARCH
+                    : t.translations.RECORD_COLLECTIONS_NO_RECORDS_ARE_CURRENTLY_ASSIGNED
                 }
               />
 
               {recordSearchLoading ? (
                 <div className="mt-3 flex items-center gap-2 text-sm text-base-content/70">
                   <span className="loading loading-spinner loading-sm" />
-                  Searching records
+                  {t.translations.RECORD_COLLECTIONS_SEARCHING_RECORDS}
                 </div>
               ) : null}
             </div>

@@ -1,35 +1,24 @@
 "use client";
 
-import { ArrowRightIcon } from "@heroicons/react/24/outline";
-import React from "react";
 import { CollectionSortOption } from "./recordCollections.types";
 
-export function renderCollectionSortLabel(option: CollectionSortOption) {
+export function renderCollectionSortLabel(
+  option: CollectionSortOption,
+  t: { translations: Record<string, string> },
+) {
   switch (option) {
     case "updatedDesc":
-      return "Last Updated (Newest)";
+      return t.translations.RECORD_COLLECTIONS_SORT_UPDATED_DESC;
     case "updatedAsc":
-      return "Last Updated (Oldest)";
+      return t.translations.RECORD_COLLECTIONS_SORT_UPDATED_ASC;
     case "alphabeticalAsc":
-      return (
-        <>
-          Alphabetical (A
-          <ArrowRightIcon className="size-3" />
-          Z)
-        </>
-      );
+      return t.translations.RECORD_COLLECTIONS_SORT_ALPHABETICAL_ASC;
     case "alphabeticalDesc":
-      return (
-        <>
-          Alphabetical (Z
-          <ArrowRightIcon className="size-3" />
-          A)
-        </>
-      );
+      return t.translations.RECORD_COLLECTIONS_SORT_ALPHABETICAL_DESC;
     case "recordCountDesc":
-      return "# of Records (Highest)";
+      return t.translations.RECORD_COLLECTIONS_SORT_RECORD_COUNT_DESC;
     case "recordCountAsc":
-      return "# of Records (Lowest)";
+      return t.translations.RECORD_COLLECTIONS_SORT_RECORD_COUNT_ASC;
     default:
       return option;
   }

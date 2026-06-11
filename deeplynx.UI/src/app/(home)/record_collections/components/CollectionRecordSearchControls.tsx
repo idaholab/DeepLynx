@@ -1,6 +1,7 @@
 "use client";
 
 import SearchInput from "@/app/(home)/components/SearchInput";
+import { useLanguage } from "@/app/contexts/Language";
 import React from "react";
 
 type Props = {
@@ -20,6 +21,8 @@ export default function CollectionRecordSearchControls({
   onSearch,
   action,
 }: Props) {
+  const { t } = useLanguage();
+
   return (
     <div className="flex flex-col gap-3 lg:flex-row">
       <div
@@ -44,7 +47,7 @@ export default function CollectionRecordSearchControls({
         disabled={searchLoading}
         onClick={onSearch}
       >
-        Search
+        {t.translations.SEARCH}
       </button>
       {action}
     </div>

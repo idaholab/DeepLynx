@@ -1,5 +1,6 @@
 "use client";
 
+import { useLanguage } from "@/app/contexts/Language";
 import { formatLocalDateTime } from "@/app/lib/date_time";
 import { RecordCollectionResponseDto } from "../../types/responseDTOs";
 import React from "react";
@@ -25,6 +26,7 @@ export default function CollectionDashboardCard({
   onToggleTags,
   onOpenCollection,
 }: Props) {
+  const { t } = useLanguage();
   const collectionLabels = collection.labels ?? [];
   const collectionTags = collection.tags ?? [];
   const visibleLabels = labelsExpanded
@@ -54,7 +56,7 @@ export default function CollectionDashboardCard({
       <div className="mt-4 space-y-2">
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-xs font-semibold uppercase text-base-content/60">
-            Sensitivity Labels:
+            {t.translations.SENSITIVITY_LABELS}
           </span>
           {collectionLabels.length ? (
             <>
@@ -72,7 +74,9 @@ export default function CollectionDashboardCard({
                   className="btn btn-ghost btn-xs px-1"
                   onClick={() => onToggleLabels(collection.id)}
                 >
-                  {labelsExpanded ? "Show less" : "Show more"}
+                  {labelsExpanded
+                    ? t.translations.SHOW_LESS
+                    : t.translations.RECORD_COLLECTIONS_SHOW_MORE}
                 </button>
               ) : null}
             </>
@@ -80,7 +84,7 @@ export default function CollectionDashboardCard({
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-xs font-semibold uppercase text-base-content/60">
-            Tags:
+            {t.translations.TAGS}
           </span>
           {collectionTags.length ? (
             <>
@@ -98,7 +102,9 @@ export default function CollectionDashboardCard({
                   className="btn btn-ghost btn-xs px-1"
                   onClick={() => onToggleTags(collection.id)}
                 >
-                  {tagsExpanded ? "Show less" : "Show more"}
+                  {tagsExpanded
+                    ? t.translations.SHOW_LESS
+                    : t.translations.RECORD_COLLECTIONS_SHOW_MORE}
                 </button>
               ) : null}
             </>
@@ -108,17 +114,23 @@ export default function CollectionDashboardCard({
 
       <div className="mt-4 grid gap-3 text-sm sm:grid-cols-4 sm:items-end">
         <div>
-          <p className="text-base-content/60">Collection ID</p>
+          <p className="text-base-content/60">
+            {t.translations.RECORD_COLLECTIONS_COLLECTION_ID}
+          </p>
           <p className="font-semibold text-base-content">{collection.id}</p>
         </div>
         <div>
-          <p className="text-base-content/60">Total Records</p>
+          <p className="text-base-content/60">
+            {t.translations.RECORD_COLLECTIONS_TOTAL_RECORDS}
+          </p>
           <p className="font-semibold text-base-content">
             {collection.recordCount}
           </p>
         </div>
         <div>
-          <p className="text-base-content/60">Updated</p>
+          <p className="text-base-content/60">
+            {t.translations.RECORD_COLLECTIONS_UPDATED}
+          </p>
           <p className="font-semibold text-base-content">
             {formatLocalDateTime(collection.lastUpdatedAt)}
           </p>
@@ -129,7 +141,7 @@ export default function CollectionDashboardCard({
             className="btn btn-primary btn-sm"
             onClick={() => onOpenCollection(collection)}
           >
-            Open details
+            {t.translations.RECORD_COLLECTIONS_OPEN_DETAILS}
           </button>
         </div>
       </div>

@@ -10,6 +10,16 @@ function escapeRegExp(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+export function interpolateTemplate(
+  template: string,
+  values: Record<string, string | number>,
+) {
+  return Object.entries(values).reduce(
+    (result, [key, value]) => result.replaceAll(`{${key}}`, String(value)),
+    template,
+  );
+}
+
 /**
  * Wraps any portion of `text` that matches one of the active search `queries`
  * in a styled <mark> element so users can see why a record appeared in results.

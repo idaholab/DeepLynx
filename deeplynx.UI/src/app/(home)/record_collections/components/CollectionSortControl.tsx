@@ -1,5 +1,6 @@
 "use client";
 
+import { useLanguage } from "@/app/contexts/Language";
 import {
   CheckIcon,
   ChevronDownIcon,
@@ -26,11 +27,13 @@ export default function CollectionSortControl({
   onSelectOption,
   renderLabel,
 }: Props) {
+  const { t } = useLanguage();
+
   return (
     <label className="form-control w-full lg:w-64">
       <span className="label py-0 pb-1">
         <span className="label-text text-xs font-semibold uppercase text-base-content/60">
-          Sort by
+          {t.translations.SORT_BY}
         </span>
       </span>
       <div className="relative" ref={collectionSortMenuRef}>

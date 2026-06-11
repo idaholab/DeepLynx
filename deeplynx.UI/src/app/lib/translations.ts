@@ -1226,6 +1226,143 @@ export const translations = {
       RECORD: "Record",
       RECORD_: "Record ",
       RECORD_CREATED_SUCCESSFULLY: "Record created successfully!",
+      RECORD_COLLECTIONS: "Record Collections",
+      RECORD_COLLECTIONS_ADD_SELECTED: "Add selected",
+      RECORD_COLLECTIONS_ADDITIONAL_PROPERTIES: "Additional Properties",
+      RECORD_COLLECTIONS_ALL: "All Collections",
+      RECORD_COLLECTIONS_ALL_MATCHING_ALREADY_IN_THIS_COLLECTION:
+        "All matching records are already in this collection.",
+      RECORD_COLLECTIONS_ARE_YOU_SURE: "Are you sure?",
+      RECORD_COLLECTIONS_ASSIGNED_COUNT: "{count} assigned",
+      RECORD_COLLECTIONS_ASSIGNED_RECORDS_SHOWN:
+        "{shown} of {total} assigned records shown.",
+      RECORD_COLLECTIONS_BACK_TO_COLLECTIONS: "Back to collections",
+      RECORD_COLLECTIONS_BACK_TO_DETAILS: "Back to details",
+      RECORD_COLLECTIONS_BROWSE_CREATE_MODIFY_EXISTING:
+        "Browse collections, create new collections, and modify existing collections.",
+      RECORD_COLLECTIONS_BROWSE_SEARCH_OPEN_PROJECT:
+        "Browse, search, and open record collections for this project.",
+      RECORD_COLLECTIONS_CLASS: "Class",
+      RECORD_COLLECTIONS_COLLECTION_DASHBOARD: "Collection Dashboard",
+      RECORD_COLLECTIONS_COLLECTION_DETAILS: "Collection Details",
+      RECORD_COLLECTIONS_COLLECTION_ID: "Collection ID",
+      RECORD_COLLECTIONS_CREATED: "Record collection created",
+      RECORD_COLLECTIONS_CREATE_IN_ACTIVE_PROJECT:
+        "Create a record collection in the active project.",
+      RECORD_COLLECTIONS_DESELECT_RECORDS_WITH:
+        "Deselect records with {name}",
+      RECORD_COLLECTIONS_EDIT_COLLECTION: "Edit Collection",
+      RECORD_COLLECTIONS_FAILED_CANCEL_CHANGES:
+        "Failed to cancel collection changes",
+      RECORD_COLLECTIONS_FAILED_CREATE:
+        "Failed to create record collection",
+      RECORD_COLLECTIONS_FAILED_CREATE_LABEL:
+        "Failed to create sensitivity label",
+      RECORD_COLLECTIONS_FAILED_CREATE_TAG: "Failed to create tag",
+      RECORD_COLLECTIONS_FAILED_LOAD_COLLECTION_RECORDS:
+        "Failed to load collection records",
+      RECORD_COLLECTIONS_FAILED_LOAD_PROJECT_LABELS:
+        "Failed to load project labels",
+      RECORD_COLLECTIONS_FAILED_LOAD_PROJECT_TAGS:
+        "Failed to load project tags",
+      RECORD_COLLECTIONS_FAILED_SEARCH_RECORDS:
+        "Failed to search records",
+      RECORD_COLLECTIONS_FAILED_UPDATE:
+        "Failed to update record collection",
+      RECORD_COLLECTIONS_FIELD: "Field",
+      RECORD_COLLECTIONS_FILTER_BY_TITLE_OR_DESCRIPTION:
+        "Search by collection title or description...",
+      RECORD_COLLECTIONS_LABELS: "Labels",
+      RECORD_COLLECTIONS_LABEL_CREATED: "Label created",
+      RECORD_COLLECTIONS_LAST_UPDATED_BY: "Last Updated By",
+      RECORD_COLLECTIONS_LOADING_LABELS: "Loading labels",
+      RECORD_COLLECTIONS_LOADING_TAGS: "Loading tags",
+      RECORD_COLLECTIONS_MANAGE: "Manage Collection",
+      RECORD_COLLECTIONS_MANAGE_IDENTITY_LABELS_METADATA:
+        "Edit collection identity, labels, and metadata.",
+      RECORD_COLLECTIONS_MANAGE_RECORDS: "Manage Records",
+      RECORD_COLLECTIONS_MANAGE_RECORDS_DESCRIPTION:
+        "Add records to this collection or remove records already assigned.",
+      RECORD_COLLECTIONS_MODIFY_LABELS_AND_TAGS:
+        "Modify Labels and Tags",
+      RECORD_COLLECTIONS_NAME_AND_DESCRIPTION_REQUIRED:
+        "Name and description are required",
+      RECORD_COLLECTIONS_NEW: "New Collection",
+      RECORD_COLLECTIONS_NOT_UPDATED: "Not updated",
+      RECORD_COLLECTIONS_NO_ADDITIONAL_PROPERTIES_SET:
+        "No additional properties set.",
+      RECORD_COLLECTIONS_NO_DESCRIPTION_PROVIDED:
+        "No description provided.",
+      RECORD_COLLECTIONS_NO_LABELS_FOUND: "No labels found.",
+      RECORD_COLLECTIONS_NO_RECORDS_ARE_CURRENTLY_ASSIGNED:
+        "No records are currently assigned.",
+      RECORD_COLLECTIONS_NO_RECORDS_FOUND: "No records found.",
+      RECORD_COLLECTIONS_NO_RECORDS_MATCH_SEARCH:
+        "No records match this search.",
+      RECORD_COLLECTIONS_NO_SELECTED_RECORDS_MATCH_SEARCH:
+        "No selected records match this search.",
+      RECORD_COLLECTIONS_NO_SENSITIVITY_LABELS_MATCH:
+        "No sensitivity labels match.",
+      RECORD_COLLECTIONS_NO_TAGS_FOUND: "No tags found.",
+      RECORD_COLLECTIONS_OPEN_DETAILS: "Open details",
+      RECORD_COLLECTIONS_RECORDS_ADDED: "Records added to collection",
+      RECORD_COLLECTIONS_RECORDS_ASSIGNED_TO:
+        "Records currently assigned to {name}.",
+      RECORD_COLLECTIONS_RECORD_ADDED: "Record added to collection",
+      RECORD_COLLECTIONS_RECORD_REMOVED: "Record removed from collection",
+      RECORD_COLLECTIONS_RECORD_SUMMARY: "Selected Record Summary",
+      RECORD_COLLECTIONS_REMOVE_ITEM: "Remove {name}",
+      RECORD_COLLECTIONS_REVIEW_AND_MODIFY_DETAILS:
+        "Review and modify collection details.",
+      RECORD_COLLECTIONS_SAVE_COLLECTION: "Save Collection",
+      RECORD_COLLECTIONS_SAVE_MODIFICATIONS: "Save Modifications",
+      RECORD_COLLECTIONS_SEARCH_ALL_RECORDS: "Search all records",
+      RECORD_COLLECTIONS_SEARCH_IN_THIS_COLLECTION:
+        "Search records in this collection",
+      RECORD_COLLECTIONS_SEARCH_OR_ADD_LABEL: "Search or add label",
+      RECORD_COLLECTIONS_SEARCH_OR_ADD_TAG: "Search or add tag",
+      RECORD_COLLECTIONS_SEARCH_RECORDS_TO_ADD:
+        "Search records to add",
+      RECORD_COLLECTIONS_SEARCH_SELECTED_RECORDS:
+        "Search selected records",
+      RECORD_COLLECTIONS_SEARCHING_RECORDS: "Searching records",
+      RECORD_COLLECTIONS_SELECTED_LABELS_AND_TAGS:
+        "Selected Labels and Tags",
+      RECORD_COLLECTIONS_SELECTED_RECORDS_COUNT:
+        "{count} records selected",
+      RECORD_COLLECTIONS_SELECTED_RECORDS_SHOWN:
+        "{shown} of {total} records shown",
+      RECORD_COLLECTIONS_SHOW_MORE: "Show more",
+      RECORD_COLLECTIONS_SOURCE: "Source",
+      RECORD_COLLECTIONS_SORT_ALPHABETICAL_ASC: "Alphabetical (A to Z)",
+      RECORD_COLLECTIONS_SORT_ALPHABETICAL_DESC: "Alphabetical (Z to A)",
+      RECORD_COLLECTIONS_SORT_RECORD_COUNT_ASC: "# of Records (Lowest)",
+      RECORD_COLLECTIONS_SORT_RECORD_COUNT_DESC: "# of Records (Highest)",
+      RECORD_COLLECTIONS_SORT_UPDATED_ASC: "Last Updated (Oldest)",
+      RECORD_COLLECTIONS_SORT_UPDATED_DESC: "Last Updated (Newest)",
+      RECORD_COLLECTIONS_STEP_1: "Step 1",
+      RECORD_COLLECTIONS_STEP_2: "Step 2",
+      RECORD_COLLECTIONS_STEP_3: "Step 3",
+      RECORD_COLLECTIONS_STEP_4: "Step 4",
+      RECORD_COLLECTIONS_STEP_ADD_METADATA: "Add Metadata",
+      RECORD_COLLECTIONS_STEP_MODIFY_LABELS_AND_TAGS:
+        "Modify Labels and Tags",
+      RECORD_COLLECTIONS_STEP_REVIEW: "Review",
+      RECORD_COLLECTIONS_STEP_SELECT_RECORDS: "Select Records",
+      RECORD_COLLECTIONS_TAGS: "Tags",
+      RECORD_COLLECTIONS_TAG_CREATED: "Tag created",
+      RECORD_COLLECTIONS_TITLE: "Collection Title",
+      RECORD_COLLECTIONS_TOTAL_COLLECTIONS: "Total Collections:",
+      RECORD_COLLECTIONS_TOTAL_RECORDS: "Total Records",
+      RECORD_COLLECTIONS_UNCLASSIFIED: "Unclassified",
+      RECORD_COLLECTIONS_UNNAMED_RECORD: "Unnamed record",
+      RECORD_COLLECTIONS_UNSELECT_ALL: "Unselect All",
+      RECORD_COLLECTIONS_UNTITLED_COLLECTION: "Untitled Collection",
+      RECORD_COLLECTIONS_UPDATED: "Updated",
+      RECORD_COLLECTIONS_UPDATE_SUCCESS: "Record collection updated",
+      RECORD_COLLECTIONS_UPDATED_ON_CREATE: "On create",
+      RECORD_COLLECTIONS_VALUE: "Value",
+      RECORD_COLLECTIONS_VIEW_ALL: "View all",
       RECORD_COUNT: "Record Count",
       RECORD_DESCRIPTION: "Record Description",
       RECORD_FILE_UPDATED_SUCCESSFULLY: "Record file updated successfully.",
@@ -2906,6 +3043,166 @@ export const translations = {
       RECORD: "Registro",
       RECORD_: "Registro ",
       RECORD_CREATED_SUCCESSFULLY: "¡Registro creado correctamente!",
+      RECORD_COLLECTIONS: "Colecciones de registros",
+      RECORD_COLLECTIONS_ADD_SELECTED: "Agregar seleccionados",
+      RECORD_COLLECTIONS_ADDITIONAL_PROPERTIES:
+        "Propiedades adicionales",
+      RECORD_COLLECTIONS_ALL: "Todas las colecciones",
+      RECORD_COLLECTIONS_ALL_MATCHING_ALREADY_IN_THIS_COLLECTION:
+        "Todos los registros coincidentes ya están en esta colección.",
+      RECORD_COLLECTIONS_ARE_YOU_SURE: "¿Estás seguro?",
+      RECORD_COLLECTIONS_ASSIGNED_COUNT: "{count} asignados",
+      RECORD_COLLECTIONS_ASSIGNED_RECORDS_SHOWN:
+        "Se muestran {shown} de {total} registros asignados.",
+      RECORD_COLLECTIONS_BACK_TO_COLLECTIONS:
+        "Volver a las colecciones",
+      RECORD_COLLECTIONS_BACK_TO_DETAILS: "Volver a los detalles",
+      RECORD_COLLECTIONS_BROWSE_CREATE_MODIFY_EXISTING:
+        "Explora colecciones, crea nuevas colecciones y modifica las existentes.",
+      RECORD_COLLECTIONS_BROWSE_SEARCH_OPEN_PROJECT:
+        "Explora, busca y abre colecciones de registros para este proyecto.",
+      RECORD_COLLECTIONS_CLASS: "Clase",
+      RECORD_COLLECTIONS_COLLECTION_DASHBOARD:
+        "Panel de colecciones",
+      RECORD_COLLECTIONS_COLLECTION_DETAILS:
+        "Detalles de la colección",
+      RECORD_COLLECTIONS_COLLECTION_ID: "ID de la colección",
+      RECORD_COLLECTIONS_CREATED: "Colección de registros creada",
+      RECORD_COLLECTIONS_CREATE_IN_ACTIVE_PROJECT:
+        "Crea una colección de registros en el proyecto activo.",
+      RECORD_COLLECTIONS_DESELECT_RECORDS_WITH:
+        "Deseleccionar registros con {name}",
+      RECORD_COLLECTIONS_EDIT_COLLECTION: "Editar colección",
+      RECORD_COLLECTIONS_FAILED_CANCEL_CHANGES:
+        "No se pudieron cancelar los cambios de la colección",
+      RECORD_COLLECTIONS_FAILED_CREATE:
+        "No se pudo crear la colección de registros",
+      RECORD_COLLECTIONS_FAILED_CREATE_LABEL:
+        "No se pudo crear la etiqueta de sensibilidad",
+      RECORD_COLLECTIONS_FAILED_CREATE_TAG:
+        "No se pudo crear la etiqueta",
+      RECORD_COLLECTIONS_FAILED_LOAD_COLLECTION_RECORDS:
+        "No se pudieron cargar los registros de la colección",
+      RECORD_COLLECTIONS_FAILED_LOAD_PROJECT_LABELS:
+        "No se pudieron cargar las etiquetas del proyecto",
+      RECORD_COLLECTIONS_FAILED_LOAD_PROJECT_TAGS:
+        "No se pudieron cargar las etiquetas del proyecto",
+      RECORD_COLLECTIONS_FAILED_SEARCH_RECORDS:
+        "No se pudieron buscar los registros",
+      RECORD_COLLECTIONS_FAILED_UPDATE:
+        "No se pudo actualizar la colección de registros",
+      RECORD_COLLECTIONS_FIELD: "Campo",
+      RECORD_COLLECTIONS_FILTER_BY_TITLE_OR_DESCRIPTION:
+        "Buscar por título o descripción de la colección...",
+      RECORD_COLLECTIONS_LABELS: "Etiquetas",
+      RECORD_COLLECTIONS_LABEL_CREATED: "Etiqueta creada",
+      RECORD_COLLECTIONS_LAST_UPDATED_BY: "Última actualización por",
+      RECORD_COLLECTIONS_LOADING_LABELS: "Cargando etiquetas",
+      RECORD_COLLECTIONS_LOADING_TAGS: "Cargando etiquetas",
+      RECORD_COLLECTIONS_MANAGE: "Administrar colección",
+      RECORD_COLLECTIONS_MANAGE_IDENTITY_LABELS_METADATA:
+        "Edita la identidad, las etiquetas y los metadatos de la colección.",
+      RECORD_COLLECTIONS_MANAGE_RECORDS: "Administrar registros",
+      RECORD_COLLECTIONS_MANAGE_RECORDS_DESCRIPTION:
+        "Agrega registros a esta colección o elimina registros ya asignados.",
+      RECORD_COLLECTIONS_MODIFY_LABELS_AND_TAGS:
+        "Modificar etiquetas y etiquetas de sensibilidad",
+      RECORD_COLLECTIONS_NAME_AND_DESCRIPTION_REQUIRED:
+        "El nombre y la descripción son obligatorios",
+      RECORD_COLLECTIONS_NEW: "Nueva colección",
+      RECORD_COLLECTIONS_NOT_UPDATED: "No actualizado",
+      RECORD_COLLECTIONS_NO_ADDITIONAL_PROPERTIES_SET:
+        "No hay propiedades adicionales definidas.",
+      RECORD_COLLECTIONS_NO_DESCRIPTION_PROVIDED:
+        "No se proporcionó descripción.",
+      RECORD_COLLECTIONS_NO_LABELS_FOUND: "No se encontraron etiquetas.",
+      RECORD_COLLECTIONS_NO_RECORDS_ARE_CURRENTLY_ASSIGNED:
+        "No hay registros asignados actualmente.",
+      RECORD_COLLECTIONS_NO_RECORDS_FOUND:
+        "No se encontraron registros.",
+      RECORD_COLLECTIONS_NO_RECORDS_MATCH_SEARCH:
+        "Ningún registro coincide con esta búsqueda.",
+      RECORD_COLLECTIONS_NO_SELECTED_RECORDS_MATCH_SEARCH:
+        "Ningún registro seleccionado coincide con esta búsqueda.",
+      RECORD_COLLECTIONS_NO_SENSITIVITY_LABELS_MATCH:
+        "Ninguna etiqueta de sensibilidad coincide.",
+      RECORD_COLLECTIONS_NO_TAGS_FOUND: "No se encontraron etiquetas.",
+      RECORD_COLLECTIONS_OPEN_DETAILS: "Abrir detalles",
+      RECORD_COLLECTIONS_RECORDS_ADDED:
+        "Registros agregados a la colección",
+      RECORD_COLLECTIONS_RECORDS_ASSIGNED_TO:
+        "Registros asignados actualmente a {name}.",
+      RECORD_COLLECTIONS_RECORD_ADDED:
+        "Registro agregado a la colección",
+      RECORD_COLLECTIONS_RECORD_REMOVED:
+        "Registro eliminado de la colección",
+      RECORD_COLLECTIONS_RECORD_SUMMARY:
+        "Resumen de registros seleccionados",
+      RECORD_COLLECTIONS_REMOVE_ITEM: "Eliminar {name}",
+      RECORD_COLLECTIONS_REVIEW_AND_MODIFY_DETAILS:
+        "Revisa y modifica los detalles de la colección.",
+      RECORD_COLLECTIONS_SAVE_COLLECTION: "Guardar colección",
+      RECORD_COLLECTIONS_SAVE_MODIFICATIONS:
+        "Guardar modificaciones",
+      RECORD_COLLECTIONS_SEARCH_ALL_RECORDS:
+        "Buscar en todos los registros",
+      RECORD_COLLECTIONS_SEARCH_IN_THIS_COLLECTION:
+        "Buscar registros en esta colección",
+      RECORD_COLLECTIONS_SEARCH_OR_ADD_LABEL:
+        "Buscar o agregar etiqueta",
+      RECORD_COLLECTIONS_SEARCH_OR_ADD_TAG: "Buscar o agregar etiqueta",
+      RECORD_COLLECTIONS_SEARCH_RECORDS_TO_ADD:
+        "Buscar registros para agregar",
+      RECORD_COLLECTIONS_SEARCH_SELECTED_RECORDS:
+        "Buscar registros seleccionados",
+      RECORD_COLLECTIONS_SEARCHING_RECORDS:
+        "Buscando registros",
+      RECORD_COLLECTIONS_SELECTED_LABELS_AND_TAGS:
+        "Etiquetas y etiquetas de sensibilidad seleccionadas",
+      RECORD_COLLECTIONS_SELECTED_RECORDS_COUNT:
+        "{count} registros seleccionados",
+      RECORD_COLLECTIONS_SELECTED_RECORDS_SHOWN:
+        "Se muestran {shown} de {total} registros",
+      RECORD_COLLECTIONS_SHOW_MORE: "Mostrar más",
+      RECORD_COLLECTIONS_SOURCE: "Fuente",
+      RECORD_COLLECTIONS_SORT_ALPHABETICAL_ASC: "Alfabético (A a Z)",
+      RECORD_COLLECTIONS_SORT_ALPHABETICAL_DESC: "Alfabético (Z a A)",
+      RECORD_COLLECTIONS_SORT_RECORD_COUNT_ASC:
+        "# de registros (menor)",
+      RECORD_COLLECTIONS_SORT_RECORD_COUNT_DESC:
+        "# de registros (mayor)",
+      RECORD_COLLECTIONS_SORT_UPDATED_ASC:
+        "Última actualización (más antigua)",
+      RECORD_COLLECTIONS_SORT_UPDATED_DESC:
+        "Última actualización (más reciente)",
+      RECORD_COLLECTIONS_STEP_1: "Paso 1",
+      RECORD_COLLECTIONS_STEP_2: "Paso 2",
+      RECORD_COLLECTIONS_STEP_3: "Paso 3",
+      RECORD_COLLECTIONS_STEP_4: "Paso 4",
+      RECORD_COLLECTIONS_STEP_ADD_METADATA:
+        "Agregar metadatos",
+      RECORD_COLLECTIONS_STEP_MODIFY_LABELS_AND_TAGS:
+        "Modificar etiquetas y etiquetas de sensibilidad",
+      RECORD_COLLECTIONS_STEP_REVIEW: "Revisar",
+      RECORD_COLLECTIONS_STEP_SELECT_RECORDS:
+        "Seleccionar registros",
+      RECORD_COLLECTIONS_TAGS: "Etiquetas",
+      RECORD_COLLECTIONS_TAG_CREATED: "Etiqueta creada",
+      RECORD_COLLECTIONS_TITLE: "Título de la colección",
+      RECORD_COLLECTIONS_TOTAL_COLLECTIONS:
+        "Total de colecciones:",
+      RECORD_COLLECTIONS_TOTAL_RECORDS: "Total de registros",
+      RECORD_COLLECTIONS_UNCLASSIFIED: "Sin clasificar",
+      RECORD_COLLECTIONS_UNNAMED_RECORD: "Registro sin nombre",
+      RECORD_COLLECTIONS_UNSELECT_ALL: "Deseleccionar todo",
+      RECORD_COLLECTIONS_UNTITLED_COLLECTION:
+        "Colección sin título",
+      RECORD_COLLECTIONS_UPDATED: "Actualizado",
+      RECORD_COLLECTIONS_UPDATE_SUCCESS:
+        "Colección de registros actualizada",
+      RECORD_COLLECTIONS_UPDATED_ON_CREATE: "Al crear",
+      RECORD_COLLECTIONS_VALUE: "Valor",
+      RECORD_COLLECTIONS_VIEW_ALL: "Ver todos",
       RECORD_COUNT: "Conteo de registros",
       RECORD_DESCRIPTION: "Descripción del registro",
       RECORD_FILE_UPDATED_SUCCESSFULLY:

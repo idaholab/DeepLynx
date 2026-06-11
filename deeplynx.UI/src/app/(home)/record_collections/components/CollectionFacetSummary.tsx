@@ -1,8 +1,10 @@
 "use client";
 
+import { useLanguage } from "@/app/contexts/Language";
 import { XCircleIcon } from "@heroicons/react/24/outline";
 import React from "react";
 import { FacetOption } from "./recordCollections.types";
+import { interpolateTemplate } from "./utils";
 
 type Props = {
   labelFacets: FacetOption[];
@@ -41,10 +43,14 @@ export default function CollectionFacetSummary({
   onRemoveLabel,
   onRemoveTag,
 }: Props) {
+  const { t } = useLanguage();
+
   return (
     <div className="space-y-5">
       <div>
-        <p className="text-sm font-medium text-base-content">Sensitivity Labels</p>
+        <p className="text-sm font-medium text-base-content">
+          {t.translations.SENSITIVITY_LABELS}
+        </p>
         <div className="mt-2 flex flex-wrap gap-2">
           {labelFacets.map((label) => (
             <span
@@ -54,7 +60,10 @@ export default function CollectionFacetSummary({
               {label.label} ({label.count})
               {onRemoveLabel ? (
                 <RemoveFacetButton
-                  title={`Deselect records with ${label.label}`}
+                  title={interpolateTemplate(
+                    t.translations.RECORD_COLLECTIONS_DESELECT_RECORDS_WITH,
+                    { name: label.label },
+                  )}
                   onClick={() => onRemoveLabel(label.label)}
                 />
               ) : null}
@@ -64,7 +73,9 @@ export default function CollectionFacetSummary({
       </div>
 
       <div>
-        <p className="text-sm font-medium text-base-content">Tags</p>
+        <p className="text-sm font-medium text-base-content">
+          {t.translations.TAGS}
+        </p>
         <div className="mt-2 flex flex-wrap gap-2">
           {tagFacets.map((tag) => (
             <span
@@ -74,7 +85,10 @@ export default function CollectionFacetSummary({
               {tag.label} ({tag.count})
               {onRemoveTag ? (
                 <RemoveFacetButton
-                  title={`Deselect records with ${tag.label}`}
+                  title={interpolateTemplate(
+                    t.translations.RECORD_COLLECTIONS_DESELECT_RECORDS_WITH,
+                    { name: tag.label },
+                  )}
                   onClick={() => onRemoveTag(tag.label)}
                 />
               ) : null}

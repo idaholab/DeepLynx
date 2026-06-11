@@ -2,11 +2,13 @@
 
 import PaginationControls from "@/app/(home)/components/PaginationControls";
 import SearchInput from "@/app/(home)/components/SearchInput";
+import { useLanguage } from "@/app/contexts/Language";
 import Link from "next/link";
 import React from "react";
 import { formatLocalDateTime } from "@/app/lib/date_time";
 import { MetadataRow } from "./recordCollections.types";
 import SectionCard from "./SectionCard";
+import { interpolateTemplate } from "./utils";
 
 type NamedItem = {
   id: number | string;
@@ -94,6 +96,7 @@ export default function CollectionDetailsReadonlyView({
   recordPageSizeOptions,
   onRecordPageSizeChange,
 }: Props) {
+  const { t } = useLanguage();
   const collectionLabels = collection.labels ?? [];
   const collectionTags = collection.tags ?? [];
 
@@ -107,7 +110,8 @@ export default function CollectionDetailsReadonlyView({
               ref={descriptionRef}
               className={`whitespace-pre-wrap text-sm leading-6 text-base-content/75 ${descriptionExpanded ? "" : "line-clamp-10"}`}
             >
-              {collection.description || "No description provided."}
+              {collection.description ||
+                t.translations.RECORD_COLLECTIONS_NO_DESCRIPTION_PROVIDED}
             </p>
             {collection.description &&
             (descriptionExpanded || descriptionExpandable) ? (
@@ -116,7 +120,9 @@ export default function CollectionDetailsReadonlyView({
                 className="btn btn-ghost btn-xs mt-2 px-0"
                 onClick={() => setDescriptionExpanded((expanded) => !expanded)}
               >
-                {descriptionExpanded ? "Show less" : "Show more"}
+                {descriptionExpanded
+                  ? t.translations.SHOW_LESS
+                  : t.translations.RECORD_COLLECTIONS_SHOW_MORE}
               </button>
             ) : null}
           </div>
@@ -124,7 +130,7 @@ export default function CollectionDetailsReadonlyView({
           <div className="space-y-3 text-sm">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
               <span className="min-w-36 font-semibold text-base-content">
-                Sensitivity Labels:
+                {t.translations.SENSITIVITY_LABELS}
               </span>
               <div className="flex flex-wrap gap-2">
                 {collectionLabels.length ? (
@@ -143,7 +149,9 @@ export default function CollectionDetailsReadonlyView({
                         className="btn btn-ghost btn-xs px-1"
                         onClick={() => setLabelsExpanded((expanded) => !expanded)}
                       >
-                        {labelsExpanded ? "Show less" : "Show more"}
+                        {labelsExpanded
+                          ? t.translations.SHOW_LESS
+                          : t.translations.RECORD_COLLECTIONS_SHOW_MORE}
                       </button>
                     ) : null}
                   </>
@@ -152,7 +160,7 @@ export default function CollectionDetailsReadonlyView({
             </div>
             <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
               <span className="min-w-36 font-semibold text-base-content">
-                Tags:
+                {t.translations.TAGS}
               </span>
               <div className="flex flex-wrap gap-2">
                 {collectionTags.length ? (
@@ -171,7 +179,9 @@ export default function CollectionDetailsReadonlyView({
                         className="btn btn-ghost btn-xs px-1"
                         onClick={() => setTagsExpanded((expanded) => !expanded)}
                       >
-                        {tagsExpanded ? "Show less" : "Show more"}
+                        {tagsExpanded
+                          ? t.translations.SHOW_LESS
+                          : t.translations.RECORD_COLLECTIONS_SHOW_MORE}
                       </button>
                     ) : null}
                   </>
@@ -182,14 +192,14 @@ export default function CollectionDetailsReadonlyView({
 
           <div className="rounded-2xl border border-base-300 bg-base-100 p-5">
             <h3 className="font-semibold text-base-content">
-              Additional Properties
+              {t.translations.RECORD_COLLECTIONS_ADDITIONAL_PROPERTIES}
             </h3>
             <div className="mt-4 max-h-[17.5rem] overflow-auto pr-1">
               <table className="table table-pin-rows">
                 <thead className="bg-base-100">
                   <tr>
-                    <th>Field</th>
-                    <th>Value</th>
+                    <th>{t.translations.RECORD_COLLECTIONS_FIELD}</th>
+                    <th>{t.translations.RECORD_COLLECTIONS_VALUE}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -202,7 +212,9 @@ export default function CollectionDetailsReadonlyView({
                     ))
                   ) : (
                     <tr>
-                      <td colSpan={2}>No additional properties set.</td>
+                      <td colSpan={2}>
+                        {t.translations.RECORD_COLLECTIONS_NO_ADDITIONAL_PROPERTIES_SET}
+                      </td>
                     </tr>
                   )}
                 </tbody>
@@ -213,12 +225,15 @@ export default function CollectionDetailsReadonlyView({
       </SectionCard>
 
       <SectionCard
-        title="Records"
-        subtitle={`${filteredRecords.length} of ${records.length} assigned records shown.`}
+        title={t.translations.RECORDS}
+        subtitle={interpolateTemplate(
+          t.translations.RECORD_COLLECTIONS_ASSIGNED_RECORDS_SHOWN,
+          { shown: filteredRecords.length, total: records.length },
+        )}
         action={recordsSectionAction}
       >
         <SearchInput
-          placeholder="Search records in this collection"
+          placeholder={t.translations.RECORD_COLLECTIONS_SEARCH_IN_THIS_COLLECTION}
           value={recordSearchTerm}
           onChange={(event) => setRecordSearchTerm(event.target.value)}
         />
@@ -227,10 +242,10 @@ export default function CollectionDetailsReadonlyView({
           <table className="table">
             <thead>
               <tr>
-                <th>Record</th>
-                <th>Class</th>
-                <th>Project</th>
-                <th>Updated</th>
+                <th>{t.translations.RECORD}</th>
+                <th>{t.translations.RECORD_COLLECTIONS_CLASS}</th>
+                <th>{t.translations.PROJECT}</th>
+                <th>{t.translations.RECORD_COLLECTIONS_UPDATED}</th>
               </tr>
             </thead>
             <tbody>
@@ -249,18 +264,23 @@ export default function CollectionDetailsReadonlyView({
                           href={`/record?recordId=${record.id}&projectId=${record.projectId ?? projectId}`}
                           className="link link-primary"
                         >
-                          {record.name ?? "Unnamed record"}
+                          {record.name ??
+                            t.translations.RECORD_COLLECTIONS_UNNAMED_RECORD}
                         </Link>
                       ) : (
-                        record.name ?? "Unnamed record"
+                        record.name ?? t.translations.RECORD_COLLECTIONS_UNNAMED_RECORD
                       )}
                     </td>
-                    <td>{record.classId ?? record.className ?? "Unclassified"}</td>
+                    <td>
+                      {record.classId ??
+                        record.className ??
+                        t.translations.RECORD_COLLECTIONS_UNCLASSIFIED}
+                    </td>
                     <td>{record.projectId ?? projectId}</td>
                     <td>
                       {record.lastUpdatedAt
                         ? formatLocalDateTime(record.lastUpdatedAt)
-                        : "Not Updated"}
+                        : t.translations.RECORD_COLLECTIONS_NOT_UPDATED}
                     </td>
                   </tr>
                 ))
@@ -268,8 +288,8 @@ export default function CollectionDetailsReadonlyView({
                 <tr>
                   <td colSpan={4}>
                     {records.length
-                      ? "No records match this search."
-                      : "No records are currently assigned."}
+                      ? t.translations.RECORD_COLLECTIONS_NO_RECORDS_MATCH_SEARCH
+                      : t.translations.RECORD_COLLECTIONS_NO_RECORDS_ARE_CURRENTLY_ASSIGNED}
                   </td>
                 </tr>
               )}
@@ -280,9 +300,10 @@ export default function CollectionDetailsReadonlyView({
         {filteredRecords.length > recordsPerPage ? (
           <div className="flex flex-col gap-3 text-sm sm:flex-row sm:items-center sm:justify-between">
             <span className="text-base-content/70">
-              Showing {(recordPage - 1) * recordsPerPage + 1}-
-              {Math.min(recordPage * recordsPerPage, filteredRecords.length)} of{" "}
-              {filteredRecords.length}
+              {`${t.translations.SHOWING} ${(recordPage - 1) * recordsPerPage + 1}-${Math.min(
+                recordPage * recordsPerPage,
+                filteredRecords.length,
+              )} ${t.translations.OF} ${filteredRecords.length}`}
             </span>
             <PaginationControls
               currentPage={recordPage}
