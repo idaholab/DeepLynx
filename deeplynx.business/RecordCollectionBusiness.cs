@@ -81,6 +81,7 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
         var recordCollecions = await recordCollectionQuery
             .Include(c => c.Tags)
             .Include(c => c.Labels)
+            .Include(c => c.Records)
             .ToListAsync();
 
         return recordCollecions.Select(c => new RecordCollectionResponseDto
@@ -94,6 +95,7 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
             LastUpdatedBy = c.LastUpdatedBy,
             LastUpdatedAt = c.LastUpdatedAt,
             IsArchived = c.IsArchived,
+            RecordCount = c.Records.Count,
             Tags = c.Tags.Select(t => new RecordCollectionTagDto
             {
                 Id = t.Id,
@@ -226,6 +228,7 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
         var records = await recordCollectionQuery
             .Include(r => r.Tags)
             .Include(r => r.Labels)
+            .Include(r => r.Records)
             .ToListAsync();
 
         return records
@@ -240,6 +243,7 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
                 LastUpdatedBy = r.LastUpdatedBy,
                 LastUpdatedAt = r.LastUpdatedAt,
                 IsArchived = r.IsArchived,
+                RecordCount = r.Records.Count,
                 Tags = r.Tags.Select(t => new RecordCollectionTagDto
                 {
                     Id = t.Id,
@@ -556,6 +560,7 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
                 LastUpdatedBy = collection.LastUpdatedBy,
                 LastUpdatedAt = collection.LastUpdatedAt,
                 IsArchived = collection.IsArchived,
+                RecordCount = collection.Records.Count,
                 Tags = tags,
                 Labels = collection.Labels.Select(l => new RecordCollectionLabelDto
                 {
@@ -589,6 +594,7 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
         ValidationHelper.ValidateModel(dto);
 
         var query = _context.RecordCollections
+            .Include(c => c.Records)
             .Where(c => c.Id == recordCollectionId && c.OrganizationId == organizationId && c.ProjectId == projectId && !c.IsArchived);
 
         var returnedRecordCollection = await query.FirstOrDefaultAsync();
@@ -631,6 +637,7 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
             LastUpdatedBy = returnedRecordCollection.LastUpdatedBy,
             LastUpdatedAt = returnedRecordCollection.LastUpdatedAt,
             IsArchived = returnedRecordCollection.IsArchived,
+            RecordCount = returnedRecordCollection.Records.Count,
         };
     }
 

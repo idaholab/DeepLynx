@@ -99,6 +99,31 @@ export type RecordResponseDto = {
   labels?: { id: number | null; name: string }[];
 };
 
+export type RecordCollectionTagDto = {
+  id: number;
+  name: string;
+};
+
+export type RecordCollectionLabelDto = {
+  id: number;
+  name: string;
+};
+
+export type RecordCollectionResponseDto = {
+  id: number;
+  name: string;
+  description: string;
+  properties?: string | null;
+  projectId: number;
+  organizationId: number;
+  lastUpdatedAt: string;
+  lastUpdatedBy?: number | null;
+  isArchived: boolean;
+  recordCount: number;
+  tags?: RecordCollectionTagDto[];
+  labels?: RecordCollectionLabelDto[];
+};
+
 export type ObjectStorageResponseDto = {
   id: number | string;
   name: string;
