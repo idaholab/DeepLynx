@@ -543,11 +543,11 @@ public class QueryControllerTests : IDisposable
 
         _mockQueryBusiness
             .Setup(b => b.GetRecordsPaginated(
-                UserId, OrgId, "nameAZ", paginatedDto, ProjectList, false, false, false))
+                UserId, OrgId, SortRecordsRequestDto.NameAZ, paginatedDto, ProjectList, false, false, false))
             .ReturnsAsync(expected);
 
         var actionResult = await _QueryController.GetRecordsPaginated(
-            OrgId, ProjectList, "nameAZ", paginatedDto);
+            OrgId, ProjectList, SortRecordsRequestDto.NameAZ, paginatedDto);
 
         var result = actionResult.Result as OkObjectResult;
 
@@ -563,11 +563,11 @@ public class QueryControllerTests : IDisposable
 
         _mockQueryBusiness
             .Setup(b => b.GetRecordsPaginated(
-                UserId, OrgId, "nameAZ", paginatedDto, ProjectList, false, false, false))
+                UserId, OrgId, SortRecordsRequestDto.NameAZ, paginatedDto, ProjectList, false, false, false))
             .ReturnsAsync(new PaginatedResponse<QueryRecordViewResponseDto>());
 
         var actionResult = await _QueryController.GetRecordsPaginated(
-            OrgId, ProjectList, "nameAZ", paginatedDto);
+            OrgId, ProjectList, SortRecordsRequestDto.NameAZ, paginatedDto);
 
         var result = actionResult.Result as OkObjectResult;
 
@@ -582,11 +582,11 @@ public class QueryControllerTests : IDisposable
 
         _mockQueryBusiness
             .Setup(b => b.GetRecordsPaginated(
-                UserId, OrgId, "nameAZ", paginatedDto, ProjectList, false, false, false))
+                UserId, OrgId, SortRecordsRequestDto.NameAZ, paginatedDto, ProjectList, false, false, false))
             .ThrowsAsync(new Exception("db error"));
 
         var actionResult = await _QueryController.GetRecordsPaginated(
-            OrgId, ProjectList, "nameAZ", paginatedDto);
+            OrgId, ProjectList, SortRecordsRequestDto.NameAZ, paginatedDto);
 
         var result = Assert.IsType<ObjectResult>(actionResult.Result);
 
@@ -601,15 +601,15 @@ public class QueryControllerTests : IDisposable
 
         _mockQueryBusiness
             .Setup(b => b.GetRecordsPaginated(
-                UserId, OrgId, "nameAZ", paginatedDto, ProjectList, false, false, false))
+                UserId, OrgId, SortRecordsRequestDto.NameAZ, paginatedDto, ProjectList, false, false, false))
             .ReturnsAsync(expected);
 
         await _QueryController.GetRecordsPaginated(
-            OrgId, ProjectList, "nameAZ", paginatedDto);
+            OrgId, ProjectList, SortRecordsRequestDto.NameAZ, paginatedDto);
 
         _mockQueryBusiness.Verify(
             b => b.GetRecordsPaginated(
-                UserId, OrgId, "nameAZ", paginatedDto, ProjectList, false, false, false),
+                UserId, OrgId, SortRecordsRequestDto.NameAZ, paginatedDto, ProjectList, false, false, false),
             Times.Once);
     }
 

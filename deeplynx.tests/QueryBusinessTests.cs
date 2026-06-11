@@ -3322,7 +3322,7 @@ public class QueryBusinessTests : IntegrationTestBase
     public async Task GetRecordsPaginated_ReturnsEmpty_WhenNoProjectIdsProvided()
     {
         // Act
-        var result = await _queryBusiness.GetRecordsPaginated(uid, organizationId, "nameAZ",
+        var result = await _queryBusiness.GetRecordsPaginated(uid, organizationId, SortRecordsRequestDto.NameAZ,
             new PaginatedRequestDto { PageNumber = 1, PageSize = 10 }, []);
 
         // Assert
@@ -3333,7 +3333,7 @@ public class QueryBusinessTests : IntegrationTestBase
     public async Task GetRecordsPaginated_ReturnsRecords_ForSingleProject()
     {
         // Act
-        var result = await _queryBusiness.GetRecordsPaginated(uid, organizationId, "nameAZ",
+        var result = await _queryBusiness.GetRecordsPaginated(uid, organizationId, SortRecordsRequestDto.NameAZ,
             new PaginatedRequestDto { PageNumber = 1, PageSize = 10 }, [pid]);
 
         // Assert
@@ -3345,7 +3345,7 @@ public class QueryBusinessTests : IntegrationTestBase
     public async Task GetRecordsPaginated_ReturnsRecords_ForMultipleProjects()
     {
         // Act
-        var result = await _queryBusiness.GetRecordsPaginated(uid, organizationId, "nameAZ",
+        var result = await _queryBusiness.GetRecordsPaginated(uid, organizationId, SortRecordsRequestDto.NameAZ,
             new PaginatedRequestDto { PageNumber = 1, PageSize = 25 }, [pid, pid2]);
 
         // Assert
@@ -3358,7 +3358,7 @@ public class QueryBusinessTests : IntegrationTestBase
     public async Task GetRecordsPaginated_ExcludesArchivedRecords()
     {
         // Act
-        var result = await _queryBusiness.GetRecordsPaginated(uid, organizationId, "nameAZ",
+        var result = await _queryBusiness.GetRecordsPaginated(uid, organizationId, SortRecordsRequestDto.NameAZ,
             new PaginatedRequestDto { PageNumber = 1, PageSize = 25 }, [pid, pid2]);
 
         // Assert
@@ -3371,7 +3371,7 @@ public class QueryBusinessTests : IntegrationTestBase
     public async Task GetRecordsPaginated_SortByNameAZ_ReturnsSortedAscending()
     {
         // Act
-        var result = await _queryBusiness.GetRecordsPaginated(uid, organizationId, "nameAZ",
+        var result = await _queryBusiness.GetRecordsPaginated(uid, organizationId, SortRecordsRequestDto.NameAZ,
             new PaginatedRequestDto { PageNumber = 1, PageSize = 25 }, [pid]);
         var names = result.Items.Select(r => r.Name).ToList();
 
@@ -3383,7 +3383,7 @@ public class QueryBusinessTests : IntegrationTestBase
     public async Task GetRecordsPaginated_SortByNameZA_ReturnsSortedDescending()
     {
         // Act
-        var result = await _queryBusiness.GetRecordsPaginated(uid, organizationId, "nameZA",
+        var result = await _queryBusiness.GetRecordsPaginated(uid, organizationId, SortRecordsRequestDto.NameZA,
             new PaginatedRequestDto { PageNumber = 1, PageSize = 25 }, [pid]);
         var names = result.Items.Select(r => r.Name).ToList();
 
@@ -3395,7 +3395,7 @@ public class QueryBusinessTests : IntegrationTestBase
     public async Task GetRecordsPaginated_SortByDateNew_ReturnsMostRecentFirst()
     {
         // Act
-        var result = await _queryBusiness.GetRecordsPaginated(uid, organizationId, "dateNew",
+        var result = await _queryBusiness.GetRecordsPaginated(uid, organizationId, SortRecordsRequestDto.DateNew,
             new PaginatedRequestDto { PageNumber = 1, PageSize = 25 }, [pid]);
         var dates = result.Items.Select(r => r.LastUpdatedAt).ToList();
 
@@ -3407,7 +3407,7 @@ public class QueryBusinessTests : IntegrationTestBase
     public async Task GetRecordsPaginated_SortByDateOld_ReturnsOldestFirst()
     {
         // Act
-        var result = await _queryBusiness.GetRecordsPaginated(uid, organizationId, "dateOld",
+        var result = await _queryBusiness.GetRecordsPaginated(uid, organizationId, SortRecordsRequestDto.DateOld,
             new PaginatedRequestDto { PageNumber = 1, PageSize = 25 }, [pid]);
         var dates = result.Items.Select(r => r.LastUpdatedAt).ToList();
 
@@ -3419,9 +3419,9 @@ public class QueryBusinessTests : IntegrationTestBase
     public async Task GetRecordsPaginated_Pagination_ReturnsCorrectPage()
     {
         // Arrange - pid has 5 non-archived records; fetch page 2 with 2 per page
-        var page1 = await _queryBusiness.GetRecordsPaginated(uid, organizationId, "nameAZ",
+        var page1 = await _queryBusiness.GetRecordsPaginated(uid, organizationId, SortRecordsRequestDto.NameAZ,
             new PaginatedRequestDto { PageNumber = 1, PageSize = 2 }, [pid]);
-        var page2 = await _queryBusiness.GetRecordsPaginated(uid, organizationId, "nameAZ",
+        var page2 = await _queryBusiness.GetRecordsPaginated(uid, organizationId, SortRecordsRequestDto.NameAZ,
             new PaginatedRequestDto { PageNumber = 2, PageSize = 2 }, [pid]);
 
         // Assert
@@ -3434,7 +3434,7 @@ public class QueryBusinessTests : IntegrationTestBase
     public async Task GetRecordsPaginated_Pagination_TotalCountIsCorrect()
     {
         // Act
-        var result = await _queryBusiness.GetRecordsPaginated(uid, organizationId, "nameAZ",
+        var result = await _queryBusiness.GetRecordsPaginated(uid, organizationId, SortRecordsRequestDto.NameAZ,
             new PaginatedRequestDto { PageNumber = 1, PageSize = 2 }, [pid]);
 
         // Assert - 5 non-archived records in pid
@@ -3445,7 +3445,7 @@ public class QueryBusinessTests : IntegrationTestBase
     public async Task GetRecordsPaginated_Pagination_LastPageHasRemainder()
     {
         // pid has 5 non-archived records; page 3 with 2 per page should have 1 record
-        var result = await _queryBusiness.GetRecordsPaginated(uid, organizationId, "nameAZ",
+        var result = await _queryBusiness.GetRecordsPaginated(uid, organizationId, SortRecordsRequestDto.NameAZ,
             new PaginatedRequestDto { PageNumber = 3, PageSize = 2 }, [pid]);
 
         // Assert
@@ -3456,7 +3456,7 @@ public class QueryBusinessTests : IntegrationTestBase
     public async Task GetRecordsPaginated_Pagination_BeyondLastPageReturnsEmpty()
     {
         // Act
-        var result = await _queryBusiness.GetRecordsPaginated(uid, organizationId, "nameAZ",
+        var result = await _queryBusiness.GetRecordsPaginated(uid, organizationId, SortRecordsRequestDto.NameAZ,
             new PaginatedRequestDto { PageNumber = 99, PageSize = 10 }, [pid]);
 
         // Assert
@@ -3499,7 +3499,7 @@ public class QueryBusinessTests : IntegrationTestBase
         Context.ChangeTracker.Clear();
 
         // Act
-        var result = await _queryBusiness.GetRecordsPaginated(uid, organizationId, "nameAZ",
+        var result = await _queryBusiness.GetRecordsPaginated(uid, organizationId, SortRecordsRequestDto.NameAZ,
             new PaginatedRequestDto { PageNumber = 1, PageSize = 10 }, [pid]);
 
         // Assert
@@ -3544,7 +3544,7 @@ public class QueryBusinessTests : IntegrationTestBase
         Context.ChangeTracker.Clear();
 
         // Act
-        var result = await _queryBusiness.GetRecordsPaginated(uid, organizationId, "nameAZ",
+        var result = await _queryBusiness.GetRecordsPaginated(uid, organizationId, SortRecordsRequestDto.NameAZ,
             new PaginatedRequestDto { PageNumber = 1, PageSize = 10 }, [pid]);
 
         // Assert
@@ -3588,7 +3588,7 @@ public class QueryBusinessTests : IntegrationTestBase
         Context.ChangeTracker.Clear();
 
         // Act
-        var result = await _queryBusiness.GetRecordsPaginated(uid, organizationId, "nameAZ",
+        var result = await _queryBusiness.GetRecordsPaginated(uid, organizationId, SortRecordsRequestDto.NameAZ,
             new PaginatedRequestDto { PageNumber = 1, PageSize = 10 }, [pid]);
 
         // Assert - user lacks read on label2, so Captain Rex is filtered
@@ -3635,7 +3635,7 @@ public class QueryBusinessTests : IntegrationTestBase
         Context.ChangeTracker.Clear();
 
         // Act
-        var result = await _queryBusiness.GetRecordsPaginated(uid, organizationId, "nameAZ",
+        var result = await _queryBusiness.GetRecordsPaginated(uid, organizationId, SortRecordsRequestDto.NameAZ,
             new PaginatedRequestDto { PageNumber = 1, PageSize = 10 }, [pid]);
 
         // Assert
@@ -3672,7 +3672,7 @@ public class QueryBusinessTests : IntegrationTestBase
         Context.ChangeTracker.Clear();
 
         // Act - isSysAdmin bypasses label check
-        var result = await _queryBusiness.GetRecordsPaginated(uid, organizationId, "nameAZ",
+        var result = await _queryBusiness.GetRecordsPaginated(uid, organizationId, SortRecordsRequestDto.NameAZ,
             new PaginatedRequestDto { PageNumber = 1, PageSize = 10 }, [pid], isSysAdmin: true);
 
         // Assert - Captain Rex is included despite no read permission
@@ -3705,7 +3705,7 @@ public class QueryBusinessTests : IntegrationTestBase
         Context.ChangeTracker.Clear();
 
         // Act
-        var result = await _queryBusiness.GetRecordsPaginated(uid, organizationId, "nameAZ",
+        var result = await _queryBusiness.GetRecordsPaginated(uid, organizationId, SortRecordsRequestDto.NameAZ,
             new PaginatedRequestDto { PageNumber = 1, PageSize = 10 }, [pid], isOrgAdmin: true);
 
         // Assert
@@ -3738,7 +3738,7 @@ public class QueryBusinessTests : IntegrationTestBase
         Context.ChangeTracker.Clear();
 
         // Act
-        var result = await _queryBusiness.GetRecordsPaginated(uid, organizationId, "nameAZ",
+        var result = await _queryBusiness.GetRecordsPaginated(uid, organizationId, SortRecordsRequestDto.NameAZ,
             new PaginatedRequestDto { PageNumber = 1, PageSize = 10 }, [pid], isProjectAdmin: true);
 
         // Assert
