@@ -3,6 +3,7 @@ using deeplynx.datalayer.Models;
 using deeplynx.helpers;
 using deeplynx.interfaces;
 using deeplynx.models;
+using Microsoft.AspNetCore.Http.Features;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using NpgsqlTypes;
@@ -176,7 +177,7 @@ public class QueryBusiness : IQueryBusiness
                     }
                     else if (query.Operator == ">")
                     {
-                        
+
                         condition = $"qr.{query.Filter} > @{paramName}";
 
                         if (DateTime.TryParse(query.Value, out var dateVal))
@@ -259,7 +260,7 @@ public class QueryBusiness : IQueryBusiness
 
             // Execute the query with parameters
             var queryRecordResults = _context.QueryRecords.FromSqlRaw(sql, parameters.ToArray());
-            
+
             return await queryRecordResults
                 .Select(r => new QueryRecordViewResponseDto
                 {
@@ -280,7 +281,7 @@ public class QueryBusiness : IQueryBusiness
                     Tags = r.Tags,
                     LastUpdatedBy = r.LastUpdatedBy,
                     LastUpdatedAt = r.LastUpdatedAt,
-                    IsArchived =  r.IsArchived
+                    IsArchived = r.IsArchived
                 }).ToListAsync();
         }
         catch (PostgresException ex) when (ex.SqlState == "42703") // undefined_column
@@ -321,7 +322,7 @@ public class QueryBusiness : IQueryBusiness
     /// <param name="isProjectAdmin">Optional param determining if the requesting user is a project admin</param>
     /// <returns>A list of record response dtos from the query view that match provided query parameters</returns>
     public async Task<IEnumerable<QueryRecordViewResponseDto>> Search(
-        long currentUserId, string userQuery, long organizationId, long[] projectIds, 
+        long currentUserId, string userQuery, long organizationId, long[] projectIds,
         bool hideArchived = true, bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false)
     {
         if (string.IsNullOrWhiteSpace(userQuery))
@@ -480,7 +481,60 @@ public class QueryBusiness : IQueryBusiness
 
         var records = await query.ToListAsync();
 
-        return records.Select(r => new QueryRecordViewResponseDto
+        return records.Select(r => QueryRecordToResponse(r));
+    }
+
+    /// <summary>
+    ///     Retrieves current paginated records for projects, ordered as specified
+    /// </summary>
+    /// <param name="currentUserId">The ID of current user</param>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <param name="projectId">An array of project ids</param>
+    /// <param name="sortBy">The sorting method</param>
+    /// <param name="paginated">Pagination details</param>
+    /// <param name="isSysAdmin">Optional param determining if the requesting user is a system admin</param>
+    /// <param name="isOrgAdmin">Optional param determining if the requesting user is an organization admin</param>
+    /// <param name="isProjectAdmin">Optional param determining if the requesting user is a project admin</param>
+    /// <returns>Paginated records</returns>
+    public async Task<PaginatedResponse<QueryRecordViewResponseDto>> GetRecordsPaginated(
+        long currentUserId, long organizationId, string sortBy, PaginatedRequestDto paginated,
+        long[] projectId, bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false)
+    {
+        if (projectId.Length == 0)
+            return new PaginatedResponse<QueryRecordViewResponseDto> { Items = [] };
+
+        var query = _context.QueryRecords
+            .Where(r => r.OrganizationId == organizationId && !r.IsArchived)
+            .Where(r => projectId.Contains(r.ProjectId));
+
+        if (!isSysAdmin && !isOrgAdmin && !isProjectAdmin)
+        {
+            var authorizedLabelIds = await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
+                currentUserId, organizationId, projectId, "read record");
+
+            var authorizedRecordIds = await _context.Records
+                .WithAuthorizedLabels(authorizedLabelIds)
+                .Select(rec => rec.Id)
+                .ToListAsync();
+
+            query = query.Where(r => authorizedRecordIds.Contains(r.Id));
+        }
+
+        if (sortBy == "nameAZ")
+            query = query.OrderBy(r => r.Name);
+        else if (sortBy == "nameZA")
+            query = query.OrderByDescending(r => r.Name);
+        else if (sortBy == "dateNew")
+            query = query.OrderByDescending(r => r.LastUpdatedAt);
+        else if (sortBy == "dateOld")
+            query = query.OrderBy(r => r.LastUpdatedAt);
+
+        return Paginator.Paginate(paginated, query, r => QueryRecordToResponse(r));
+    }
+
+    private QueryRecordViewResponseDto QueryRecordToResponse(QueryRecord r)
+    {
+        return new QueryRecordViewResponseDto
         {
             Id = r.Id,
             Uri = r.Uri,
@@ -498,7 +552,7 @@ public class QueryBusiness : IQueryBusiness
             LastUpdatedBy = r.LastUpdatedBy,
             IsArchived = r.IsArchived,
             LastUpdatedAt = r.LastUpdatedAt
-        });
+        };
     }
 
     /// <summary>
