@@ -165,6 +165,8 @@ spec:
               value: ${INSIGHT_FASTAPI_URL}
             - name: TENANT_MODE
               value: ${TENANT_MODE}
+            - name: NEXT_PUBLIC_HIDE_INSIGHT
+              value: ${NEXT_PUBLIC_HIDE_INSIGHT}
             # Runtime environment variables from secrets (sensitive)
             - name: OKTA_CLIENT_SECRET
               valueFrom:
@@ -203,11 +205,6 @@ spec:
                 configMapKeyRef:
                   name: app-config
                   key: disabled-front-auth
-            - name: NEXT_PUBLIC_HIDE_INSIGHT
-              valueFrom:
-                configMapKeyRef:
-                  name: app-config
-                  key: hide-insight
             - name: OKTA_CLIENT_ID
               valueFrom:
                 configMapKeyRef:
@@ -270,8 +267,6 @@ spec:
           image: ${CI_REGISTRY}/${CI_REGISTRY_PATH}:deeplynx-server-${GITHUB_RUN_NUMBER}
           imagePullPolicy: Always
           env:
-            - name: HIDE_INSIGHT
-              value: "false"
             - name: AWS_S3_CONNECTION_STRING
               value: ${AWS_S3_CONNECTION_STRING}
             - name: AZURE_OBJECT_CONNECTION_STRING
@@ -346,6 +341,8 @@ spec:
               value: ${AIRFLOW_USERNAME}
             - name: AIRFLOW_PASSWORD
               value: ${AIRFLOW_PASSWORD}
+            - name: HIDE_INSIGHT
+              value: ${HIDE_INSIGHT}
             # Backend may also need these environment variables
             - name: OKTA_CLIENT_SECRET
               valueFrom:
@@ -546,6 +543,7 @@ spec:
             timeoutSeconds: 5
             failureThreshold: 3
 
+
 # insight-storage: scratch volume for the Insight processing pipeline
 ---
 apiVersion: v1
@@ -560,6 +558,7 @@ spec:
     requests:
       storage: 25Gi
   storageClassName: ${AZURE_FILE_SHARE_STORAGE_CLASS}
+
 
 # insight-fastapi
 ---
