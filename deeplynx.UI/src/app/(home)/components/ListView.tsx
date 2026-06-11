@@ -88,7 +88,7 @@ const ListView: React.FC<ListViewProps> = ({
     : data.filter(
         (record) =>
           record.projectId !== undefined &&
-          selectedProjects.includes(record.projectId),
+          selectedProjects.includes(Number(record.projectId)),
       );
 
   const totalPages = Math.ceil(filteredRecords.length / RECORDS_PER_PAGE);
@@ -123,7 +123,7 @@ const ListView: React.FC<ListViewProps> = ({
             activeSearchTerms,
           );
           // const time = getHighlightedCell(record.timeseries, activeSearchTerms);
-          const formattedDate = formatLocalDateTime(record.lastUpdatedAt);
+          const formattedDate = formatLocalDateTime(String(record.lastUpdatedAt));
           const date = getHighlightedCell(formattedDate, activeSearchTerms);
           return (
             <li

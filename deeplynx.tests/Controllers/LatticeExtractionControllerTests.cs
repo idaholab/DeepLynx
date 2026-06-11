@@ -75,7 +75,7 @@ public class LatticeExtractionControllerTests : IDisposable
         {
             new() { Id = 1, Status = ExtractionStatus.Complete, Mode = ExtractionMode.Strict, CreatedBy = UserId }
         };
-        _mockBusiness.Setup(b => b.ListExtractionsByUser(UserId, ProjectId))
+        _mockBusiness.Setup(b => b.ListExtractionsByProject(ProjectId))
                      .ReturnsAsync(expected);
 
         var result = await _controller.ListExtractions(OrgId, ProjectId) as OkObjectResult;
@@ -88,7 +88,7 @@ public class LatticeExtractionControllerTests : IDisposable
     [Fact]
     public async Task ListExtractions_Returns200_WithEmptyList()
     {
-        _mockBusiness.Setup(b => b.ListExtractionsByUser(UserId, ProjectId))
+        _mockBusiness.Setup(b => b.ListExtractionsByProject(ProjectId))
                      .ReturnsAsync([]);
 
         var result = await _controller.ListExtractions(OrgId, ProjectId) as OkObjectResult;
@@ -101,7 +101,7 @@ public class LatticeExtractionControllerTests : IDisposable
     [Fact]
     public async Task ListExtractions_Returns500_OnUnexpectedException()
     {
-        _mockBusiness.Setup(b => b.ListExtractionsByUser(It.IsAny<long>(), It.IsAny<long>()))
+        _mockBusiness.Setup(b => b.ListExtractionsByProject(It.IsAny<long>()))
                      .ThrowsAsync(new Exception("db error"));
 
         var result = await _controller.ListExtractions(OrgId, ProjectId) as ObjectResult;
@@ -276,7 +276,7 @@ public class LatticeExtractionControllerTests : IDisposable
         SetRequestBody(json);
 
         var expected = new ExtractionResponseDto { Id = 7, ClassCount = 1 };
-        _mockBusiness.Setup(b => b.ProcessInsightExtractionCallback(
+        _mockBusiness.Setup(b => b.ProcessInsightCallback(
                          OrgId, ProjectId, 3L, 7L, It.IsAny<InsightExtractionCallbackDto>()))
                      .ReturnsAsync(expected);
 
@@ -307,7 +307,7 @@ public class LatticeExtractionControllerTests : IDisposable
         SetRequestBody(json);
 
         InsightExtractionCallbackDto? captured = null;
-        _mockBusiness.Setup(b => b.ProcessInsightExtractionCallback(
+        _mockBusiness.Setup(b => b.ProcessInsightCallback(
                          OrgId, ProjectId, 3L, 7L, It.IsAny<InsightExtractionCallbackDto>()))
                      .Callback<long, long, long, long, InsightExtractionCallbackDto>(
                          (_, _, _, _, dto) => captured = dto)
@@ -371,7 +371,7 @@ public class LatticeExtractionControllerTests : IDisposable
     public async Task InsightExtractionCallback_Returns404_OnInvalidOperationException()
     {
         SetRequestBody("""{"classes":[],"relationships":[]}""");
-        _mockBusiness.Setup(b => b.ProcessInsightExtractionCallback(
+        _mockBusiness.Setup(b => b.ProcessInsightCallback(
                          It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(),
                          It.IsAny<InsightExtractionCallbackDto>()))
                      .ThrowsAsync(new InvalidOperationException("Extraction not found."));
@@ -387,7 +387,7 @@ public class LatticeExtractionControllerTests : IDisposable
     public async Task InsightExtractionCallback_Returns500_OnUnexpectedException()
     {
         SetRequestBody("""{"classes":[],"relationships":[]}""");
-        _mockBusiness.Setup(b => b.ProcessInsightExtractionCallback(
+        _mockBusiness.Setup(b => b.ProcessInsightCallback(
                          It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(),
                          It.IsAny<InsightExtractionCallbackDto>()))
                      .ThrowsAsync(new Exception("unexpected"));

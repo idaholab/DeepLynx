@@ -372,6 +372,23 @@ public class QueryBusinessTests : IntegrationTestBase
         };
         await Context.Records.AddAsync(crosshair);
         await Context.SaveChangesAsync();
+        
+        var echo = new Record
+        {
+            Name = "Echo",
+            Description = "Repeater",
+            OriginalId = "CT-1409",
+            Properties = JsonSerializer.Serialize(new { CloneForce = "99" }),
+            ProjectId = project.Id,
+            DataSourceId = dataSource.Id,
+            ClassId = empireClass.Id, // Using Empire class!
+            Tags = new List<Tag> { tag },
+            Uri = "localhost:8090",
+            OrganizationId = organizationId,
+            IsArchived = true
+        };
+        await Context.Records.AddAsync(echo);
+        await Context.SaveChangesAsync();
 
         // MIXED RECORDS - Project 2 (Rebellion) with cross-project references
         var leia = new Record
@@ -436,6 +453,23 @@ public class QueryBusinessTests : IntegrationTestBase
             OrganizationId = organizationId
         };
         await Context.Records.AddAsync(wedge);
+        await Context.SaveChangesAsync();
+        
+        var chewie = new Record
+        {
+            Name = "Chewbacca",
+            Description = "Kiss a Wookiee",
+            OriginalId = "REB-005",
+            Properties = JsonSerializer.Serialize(new { Homeworld = "Kashyyk", Rank = "Co-pilot" }),
+            ProjectId = pid2,
+            DataSourceId = rebelDataSource.Id,
+            ClassId = rebelClass.Id,
+            Tags = new List<Tag> { rebelTag },
+            Uri = "localhost:8090",
+            OrganizationId = organizationId,
+            IsArchived = true
+        };
+        await Context.Records.AddAsync(chewie);
         await Context.SaveChangesAsync();
 
         // MIXED RECORDS - Project 3 (Empire) with cross-project references
@@ -578,6 +612,38 @@ public class QueryBusinessTests : IntegrationTestBase
         Assert.NotEmpty(records);
         Assert.Contains(records, r => r.ProjectId == pid);
         Assert.Contains(records, r => r.ProjectId == pid2);
+        Assert.All(records, r => Assert.False(r.IsArchived));
+    }
+    
+    [Fact]
+    public async Task GetMultiProjectRecords_Success_ReturnsOnlyUnarchivedRecords()
+    {
+        // Arrange
+        var projectIds = new[] { pid, pid2 };
+
+        // Act
+        var result = await _queryBusiness.GetMultiProjectRecords(uid, organizationId, projectIds, true);
+        var records = result.ToList();
+
+        // Assert
+        Assert.NotEmpty(records);
+        Assert.All(records, r => Assert.False(r.IsArchived));
+    }
+    
+    [Fact]
+    public async Task GetMultiProjectRecords_Success_ReturnsWithArchivedRecords()
+    {
+        // Arrange
+        var projectIds = new[] { pid, pid2 };
+
+        // Act
+        var result = await _queryBusiness.GetMultiProjectRecords(uid, organizationId, projectIds, false);
+        var records = result.ToList();
+
+        // Assert
+        Assert.NotEmpty(records);
+        Assert.Contains(records, r => r.Name == "Echo");
+        Assert.Contains(records, r => r.Name == "Chewbacca");
     }
 
     #endregion
@@ -1099,6 +1165,18 @@ public class QueryBusinessTests : IntegrationTestBase
         Assert.Equal("Tech", records.First().Name);
         Assert.Equal(pid, records.First().ProjectId);
     }
+    
+    [Fact]
+    public async Task Search_Success_FindsArchivedRecordByName()
+    {
+        // Act
+        var result = await _queryBusiness.Search(uid, "Echo", organizationId, [pid], false);
+        var records = result.ToList();
+
+        // Assert
+        Assert.Single(records);
+        Assert.Equal("Echo", records.First().Name);
+    }
 
     [Fact]
     public async Task Search_Failure_IfEmptyString()
@@ -1128,6 +1206,17 @@ public class QueryBusinessTests : IntegrationTestBase
             _queryBusiness.Search(uid, "     ", organizationId, [pid]));
 
         Assert.Contains("Search query is required", exception.Message);
+    }
+    
+    [Fact]
+    public async Task Search_ReturnsEmpty_IfRecordArchived()
+    {
+        // Act
+        var result = await _queryBusiness.Search(uid, "Chewbacca", organizationId, [pid2], true);
+        var records = result.ToList();
+
+        // Assert
+        Assert.Empty(records);
     }
 
     #endregion
@@ -1435,7 +1524,41 @@ public class QueryBusinessTests : IntegrationTestBase
         // Assert
         Assert.Empty(result);
     }
+    
+    [Fact]
+    public async Task QueryBuilder_Success_ExcludesArchivedRecords()
+    {
+        // Arrange
+        var dto = new CustomQueryDtos.CustomQueryRequestDto
+        {
+            Connector = "AND", Filter = "name", Operator = "=", Value = "Echo"
+        };
 
+        // Act
+        var result = await _queryBusiness.QueryBuilder(uid, [dto], organizationId, [pid]);
+        var records = result.ToList();
+
+        // Assert
+        Assert.Empty(records);
+    }
+    
+    [Fact]
+    public async Task QueryBuilder_Success_AllRecordsExcludesArchivedRecords()
+    {
+        // Arrange
+        var dto = new CustomQueryDtos.CustomQueryRequestDto
+        {
+            Connector = "AND", Filter = "project_name", Operator = "LIKE", Value = "rebellion"
+        };
+
+        // Act
+        var result = await _queryBusiness.QueryBuilder(uid, [dto], organizationId, [pid, pid2]);
+        var records = result.ToList();
+
+        // Assert
+        Assert.Equal(4, records.Count);
+        Assert.DoesNotContain(records, r => r.Name == "Chewbacca");
+    }
 
     [Fact]
     public async Task QueryBuilder_Success_FiltersRecordsByLikeOperatorCaseInsensitive()
@@ -2526,7 +2649,7 @@ public class QueryBusinessTests : IntegrationTestBase
     public async Task GetRecentlyAddedRecords_ExcludesArchivedRecords()
     {
         // Arrange
-        var projectIds = new[] { pid };
+        var projectIds = new[] { pid, pid2 };
 
         // Act
         var result = await _queryBusiness.GetRecentlyAddedRecords(uid, organizationId, projectIds);
@@ -2534,6 +2657,8 @@ public class QueryBusinessTests : IntegrationTestBase
 
         // Assert - Archived records should not appear
         Assert.All(records, r => Assert.False(r.IsArchived));
+        Assert.DoesNotContain(records, r => r.Name == "Echo");
+        Assert.DoesNotContain(records, r=> r.Name == "Chewbacca");
     }
 
     [Fact]
@@ -2548,22 +2673,6 @@ public class QueryBusinessTests : IntegrationTestBase
 
         // Assert
         Assert.Empty(records);
-    }
-
-    [Fact]
-    public async Task GetRecentlyAddedRecords_ReturnsLatestVersion_WhenMultipleVersionsExist()
-    {
-        // Arrange
-        var projectIds = new[] { pid };
-
-        // Act
-        var result = await _queryBusiness.GetRecentlyAddedRecords(uid, organizationId, projectIds);
-        var records = result.ToList();
-
-        // Assert - Historical records should return the most recent version
-        // Since the seed data creates multiple historical versions, verify we only get one per record
-        var recordsByOriginalId = records.GroupBy(r => r.OriginalId);
-        Assert.All(recordsByOriginalId, g => Assert.Single(g));
     }
 
     #endregion

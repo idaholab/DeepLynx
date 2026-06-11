@@ -732,7 +732,7 @@ export default function ProjectInsightClientView() {
             />
           </section>
 
-          <aside className="card card-border bg-base-100 shadow-md shadow-dynamic-shadow xl:h-full xl:min-h-0">
+          <aside className="card card-border bg-base-100 shadow-md shadow-base-content/10 xl:h-full xl:min-h-0">
             <div className="card-body h-full min-h-0 gap-4 p-4 sm:p-5">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0">

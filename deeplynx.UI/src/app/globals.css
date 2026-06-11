@@ -6,56 +6,22 @@
   themes: false;
 }
 
-/* Custom Light Theme */
-[data-theme="light"] {
-  color-scheme: light;
-
-  /* DaisyUI base colors (abbreviated format for v5) */
-  --b1: 98% 0.003 247.858;
-  --b2: 86% 0.022 252.894;
-  --b3: 55% 0.046 257.417;
-  --bc: 13.454% 0.033 35.791;
-  --p: 33.78% 0.1 254.3;
-  --pc: 88.34% 0.019 251.473;
-  --s: 44.08% 0.141 255.19;
-  --sc: 98% 0.003 247.858;
-  --a: 75% 0.2 70.934;
-  --ac: 13.454% 0.033 35.791;
-  --n: 47.441% 0.013 253.041;
-  --nc: 85.488% 0.002 253.041;
-  --in: 86.19% 0.047 224.14;
-  --inc: 12.523% 0.028 240.033;
-  --su: 80.226% 0.15 156.596;
-  --suc: 14.045% 0.018 156.596;
-  --wa: 85.482% 0.115 81.519;
-  --wac: 15.496% 0.023 81.519;
-  --er: 70.61% 0.146 29.674;
-  --erc: 90.322% 0.029 29.674;
-
-  /* DaisyUI component settings */
-  --rounded-box: 1rem;
-  --rounded-btn: 0.5rem;
-  --rounded-badge: 1.9rem;
-  --animation-btn: 0.25s;
-  --animation-input: 0.2s;
-  --btn-focus-scale: 0.95;
-  --border-btn: 1px;
-  --tab-border: 1px;
-  --tab-radius: 0.5rem;
-
-  /* Custom color variables (full oklch format) */
+/* Default light theme */
+@plugin "daisyui/theme" {
+  name: "default";
+  default: true;
+  prefersdark: false;
+  color-scheme: "light";
   --color-base-100: oklch(98% 0.003 247.858);
   --color-base-200: oklch(86% 0.022 252.894);
   --color-base-300: oklch(55% 0.046 257.417);
   --color-base-content: oklch(13.454% 0.033 35.791);
   --color-primary: oklch(33.78% 0.1 254.3);
-  --color-dynamic-blue: oklch(33.78% 0.1 254.3);
   --color-primary-content: oklch(88.34% 0.019 251.473);
   --color-secondary: oklch(44.08% 0.141 255.19);
   --color-secondary-content: oklch(98% 0.003 247.858);
   --color-accent: oklch(75% 0.2 70.934);
   --color-accent-content: oklch(13.454% 0.033 35.791);
-  --color-dynamic-shadow: oklch(80% 0 0);
   --color-neutral: oklch(47.441% 0.013 253.041);
   --color-neutral-content: oklch(85.488% 0.002 253.041);
   --color-info: oklch(86.19% 0.047 224.14);
@@ -66,8 +32,8 @@
   --color-warning-content: oklch(15.496% 0.023 81.519);
   --color-error: oklch(70.61% 0.146 29.674);
   --color-error-content: oklch(90.322% 0.029 29.674);
-
-  /* Additional custom variables */
+  --header-gradient-start: oklch(28% 0.02 256);
+  --header-gradient-end: oklch(45% 0.05 252);
   --radius-selector: 0.5rem;
   --radius-field: 0.5rem;
   --radius-box: 1rem;
@@ -76,63 +42,24 @@
   --border: 1.5px;
   --depth: 1;
   --noise: 0;
-  --skeleton-base: oklch(86% 0.022 252.894);
-  --skeleton-highlight: oklch(0.9213 0.022 252.894);
-  --base-400: oklch(28% 0.02 256);
-  --base-500: oklch(23% 0.018 258);
-  --base-600: oklch(18% 0.015 260);
 }
 
-/* Custom Dark Theme */
-[data-theme="dark"] {
-  color-scheme: dark;
-
-  /* DaisyUI base colors (abbreviated format for v5) */
-  --b1: 18% 0.015 260;
-  --b2: 23% 0.018 258;
-  --b3: 28% 0.02 256;
-  --bc: 92% 0.004 260;
-  --p: 30% 0.17 254.3;
-  --pc: 95% 0.004 251;
-  --s: 45% 0.14 255.19;
-  --sc: 94% 0.004 255;
-  --a: 100% 0.02 70;
-  --ac: 18% 0.02 70;
-  --n: 35% 0.015 253;
-  --nc: 90% 0.004 253;
-  --in: 60% 0.12 224;
-  --inc: 95% 0.015 224;
-  --su: 55% 0.14 156;
-  --suc: 95% 0.02 156;
-  --wa: 65% 0.12 81;
-  --wac: 18% 0.02 81;
-  --er: 58% 0.18 29;
-  --erc: 95% 0.02 29;
-
-  /* DaisyUI component settings */
-  --rounded-box: 1rem;
-  --rounded-btn: 0.5rem;
-  --rounded-badge: 1.9rem;
-  --animation-btn: 0.25s;
-  --animation-input: 0.2s;
-  --btn-focus-scale: 0.95;
-  --border-btn: 1px;
-  --tab-border: 1px;
-  --tab-radius: 0.5rem;
-
-  /* Custom color variables (full oklch format) */
-  --color-base-100: oklch(18% 0.015 260);
-  --color-base-200: oklch(23% 0.018 258);
-  --color-base-300: oklch(28% 0.02 256);
+/* Default dark theme */
+@plugin "daisyui/theme" {
+  name: "default-dark";
+  default: false;
+  prefersdark: true;
+  color-scheme: "dark";
+  --color-base-100: oklch(24% 0.008 260);
+  --color-base-200: oklch(29% 0.01 258);
+  --color-base-300: oklch(35% 0.012 256);
   --color-base-content: oklch(92% 0.004 260);
   --color-primary: oklch(30% 0.17 254.3);
-  --color-dynamic-blue: oklch(45% 0.14 255.19);
   --color-primary-content: oklch(95% 0.004 251);
   --color-secondary: oklch(45% 0.14 255.19);
   --color-secondary-content: oklch(94% 0.004 255);
   --color-accent: oklch(100% 0.02 70);
   --color-accent-content: oklch(18% 0.02 70);
-  --color-dynamic-shadow: oklch(50% 0 0);
   --color-neutral: oklch(35% 0.015 253);
   --color-neutral-content: oklch(90% 0.004 253);
   --color-info: oklch(60% 0.12 224);
@@ -143,8 +70,8 @@
   --color-warning-content: oklch(18% 0.02 81);
   --color-error: oklch(58% 0.18 29);
   --color-error-content: oklch(95% 0.02 29);
-
-  /* Additional custom variables */
+  --header-gradient-start: oklch(22% 0.012 260);
+  --header-gradient-end: oklch(34% 0.016 256);
   --radius-selector: 0.5rem;
   --radius-field: 0.5rem;
   --radius-box: 1rem;
@@ -153,11 +80,314 @@
   --border: 1.5px;
   --depth: 1;
   --noise: 0;
-  --skeleton-base: oklch(28% 0.02 256);
-  --skeleton-highlight: oklch(23% 0.018 258);
-  --base-400: oklch(28% 0.02 256);
-  --base-500: oklch(23% 0.018 258);
-  --base-600: oklch(18% 0.015 260);
+}
+
+/* Ron light theme */
+@plugin "daisyui/theme" {
+  name: "ron";
+  default: false;
+  prefersdark: false;
+  color-scheme: "light";
+  --color-base-100: oklch(90% 0.026 196);
+  --color-base-200: oklch(80% 0.04 198);
+  --color-base-300: oklch(66% 0.058 202);
+  --color-base-content: oklch(10% 0.06 218);
+  --color-primary: oklch(68% 0.15 194);
+  --color-primary-content: oklch(90% 0.026 196);
+  --color-secondary: oklch(43% 0.13 209);
+  --color-secondary-content: oklch(92% 0.035 196);
+  --color-accent: oklch(70% 0.17 66);
+  --color-accent-content: oklch(16% 0.045 42);
+  --color-neutral: oklch(18% 0.075 214);
+  --color-neutral-content: oklch(92% 0.035 196);
+  --color-info: oklch(64% 0.14 202);
+  --color-info-content: oklch(12% 0.055 218);
+  --color-success: oklch(66% 0.13 165);
+  --color-success-content: oklch(12% 0.04 165);
+  --color-warning: oklch(72% 0.16 76);
+  --color-warning-content: oklch(16% 0.045 42);
+  --color-error: oklch(64% 0.17 24);
+  --color-error-content: oklch(96% 0.02 24);
+  --header-gradient-start: oklch(12% 0.055 218);
+  --header-gradient-end: oklch(0.703 0.124 215.12);
+  --ron-card-border: oklch(68% 0.15 194 / 0.74);
+  --ron-card-halo: oklch(68% 0.15 194 / 0.5);
+  --ron-card-glow: oklch(68% 0.15 194 / 0.32);
+  --ron-card-glow-soft: oklch(68% 0.15 194 / 0.16);
+  --radius-selector: 0.5rem;
+  --radius-field: 0.5rem;
+  --radius-box: 1rem;
+  --size-selector: 0.25rem;
+  --size-field: 0.25rem;
+  --border: 1.5px;
+  --depth: 1;
+  --noise: 0;
+}
+
+/* Ron dark theme */
+@plugin "daisyui/theme" {
+  name: "ron-dark";
+  default: false;
+  prefersdark: true;
+  color-scheme: "dark";
+  --color-base-100: oklch(9% 0.045 24);
+  --color-base-200: oklch(13% 0.06 25);
+  --color-base-300: oklch(20% 0.085 26);
+  --color-base-content: oklch(92% 0.03 28);
+  --color-primary: oklch(65% 0.24 27);
+  --color-primary-content: oklch(98% 0.018 24);
+  --color-secondary: oklch(45% 0.16 24);
+  --color-secondary-content: oklch(96% 0.02 24);
+  --color-accent: oklch(78% 0.18 46);
+  --color-accent-content: oklch(10% 0.04 24);
+  --color-neutral: oklch(7% 0.032 24);
+  --color-neutral-content: oklch(88% 0.025 28);
+  --color-info: oklch(62% 0.14 20);
+  --color-info-content: oklch(96% 0.02 24);
+  --color-success: oklch(64% 0.13 150);
+  --color-success-content: oklch(8% 0.03 150);
+  --color-warning: oklch(76% 0.18 54);
+  --color-warning-content: oklch(10% 0.04 32);
+  --color-error: oklch(67% 0.25 25);
+  --color-error-content: oklch(98% 0.018 24);
+  --header-gradient-start: oklch(6% 0.04 24);
+  --header-gradient-end: oklch(28% 0.13 25);
+  --ron-card-border: oklch(65% 0.24 27 / 0.68);
+  --ron-card-halo: oklch(65% 0.24 27 / 0.48);
+  --ron-card-glow: oklch(65% 0.24 27 / 0.34);
+  --ron-card-glow-soft: oklch(65% 0.24 27 / 0.2);
+  --radius-selector: 0rem;
+  --radius-field: 0rem;
+  --radius-box: 0rem;
+  --size-selector: 0.25rem;
+  --size-field: 0.25rem;
+  --border: 1.5px;
+  --depth: 1;
+  --noise: 0;
+}
+
+/* NRIC light theme */
+@plugin "daisyui/theme" {
+  name: "nric";
+  default: false;
+  prefersdark: false;
+  color-scheme: "light";
+  --color-base-100: oklch(99% 0.004 185);
+  --color-base-200: oklch(96% 0.018 185);
+  --color-base-300: oklch(91% 0.032 185);
+  --color-base-content: oklch(25% 0.025 240);
+  --color-primary: oklch(66% 0.135 185);
+  --color-primary-content: oklch(91% 0.032 185);
+  --color-secondary: oklch(42% 0.085 220);
+  --color-secondary-content: oklch(98% 0.004 185);
+  --color-accent: oklch(88% 0.18 98);
+  --color-accent-content: oklch(22% 0.04 220);
+  --color-neutral: oklch(24% 0.055 220);
+  --color-neutral-content: oklch(98% 0.004 185);
+  --color-info: oklch(86.19% 0.047 224.14);
+  --color-info-content: oklch(12.523% 0.028 240.033);
+  --color-success: oklch(80.226% 0.15 156.596);
+  --color-success-content: oklch(14.045% 0.018 156.596);
+  --color-warning: oklch(85.482% 0.115 81.519);
+  --color-warning-content: oklch(15.496% 0.023 81.519);
+  --color-error: oklch(70.61% 0.146 29.674);
+  --color-error-content: oklch(90.322% 0.029 29.674);
+  --header-gradient-start: oklch(24% 0.055 220);
+  --header-gradient-end: oklch(42% 0.085 220);
+  --radius-selector: 0.5rem;
+  --radius-field: 0.5rem;
+  --radius-box: 1rem;
+  --size-selector: 0.25rem;
+  --size-field: 0.25rem;
+  --border: 1.5px;
+  --depth: 1;
+  --noise: 0;
+}
+
+/* NRIC dark theme */
+@plugin "daisyui/theme" {
+  name: "nric-dark";
+  default: false;
+  prefersdark: true;
+  color-scheme: "dark";
+  --color-base-100: oklch(21% 0.035 220);
+  --color-base-200: oklch(26% 0.045 220);
+  --color-base-300: oklch(32% 0.055 220);
+  --color-base-content: oklch(94% 0.012 185);
+  --color-primary: oklch(70% 0.13 185);
+  --color-primary-content: oklch(96% 0.012 185);
+  --color-secondary: oklch(58% 0.1 220);
+  --color-secondary-content: oklch(96% 0.012 185);
+  --color-accent: oklch(86% 0.17 98);
+  --color-accent-content: oklch(18% 0.035 220);
+  --color-neutral: oklch(16% 0.04 220);
+  --color-neutral-content: oklch(98% 0.004 185);
+  --color-info: oklch(68% 0.11 220);
+  --color-info-content: oklch(96% 0.012 185);
+  --color-success: oklch(66% 0.13 160);
+  --color-success-content: oklch(16% 0.04 160);
+  --color-warning: oklch(78% 0.15 88);
+  --color-warning-content: oklch(18% 0.035 80);
+  --color-error: oklch(63% 0.18 28);
+  --color-error-content: oklch(96% 0.012 28);
+  --header-gradient-start: oklch(16% 0.04 220);
+  --header-gradient-end: oklch(32% 0.055 220);
+  --radius-selector: 0.5rem;
+  --radius-field: 0.5rem;
+  --radius-box: 1rem;
+  --size-selector: 0.25rem;
+  --size-field: 0.25rem;
+  --border: 1.5px;
+  --depth: 1;
+  --noise: 0;
+}
+
+@plugin "daisyui/theme" {
+  name: "nord";
+  default: false;
+  prefersdark: false;
+  color-scheme: "light";
+  --color-base-100: oklch(95.127% 0.007 260.731);
+  --color-base-200: oklch(93.299% 0.01 261.788);
+  --color-base-300: oklch(89.925% 0.016 262.749);
+  --color-base-content: oklch(32.437% 0.022 264.182);
+  --color-primary: oklch(59.435% 0.077 254.027);
+  --color-primary-content: oklch(89.925% 0.016 262.749);
+  --color-secondary: oklch(69.651% 0.059 248.687);
+  --color-secondary-content: oklch(89.925% 0.016 262.749);
+  --color-accent: oklch(77.464% 0.062 217.469);
+  --color-accent-content: oklch(15.492% 0.012 217.469);
+  --color-neutral: oklch(45.229% 0.035 264.131);
+  --color-neutral-content: oklch(89.925% 0.016 262.749);
+  --color-info: oklch(69.207% 0.062 332.664);
+  --color-info-content: oklch(13.841% 0.012 332.664);
+  --color-success: oklch(76.827% 0.074 131.063);
+  --color-success-content: oklch(15.365% 0.014 131.063);
+  --color-warning: oklch(85.486% 0.089 84.093);
+  --color-warning-content: oklch(17.097% 0.017 84.093);
+  --color-error: oklch(60.61% 0.12 15.341);
+  --color-error-content: oklch(12.122% 0.024 15.341);
+  --header-gradient-start: oklch(32.437% 0.022 264.182);
+  --header-gradient-end: oklch(59.435% 0.077 254.027);
+  --radius-selector: 1rem;
+  --radius-field: 0.25rem;
+  --radius-box: 0.5rem;
+  --size-selector: 0.25rem;
+  --size-field: 0.25rem;
+  --border: 1px;
+  --depth: 0;
+  --noise: 0;
+}
+
+@plugin "daisyui/theme" {
+  name: "nord-dark";
+  default: false;
+  prefersdark: true;
+  color-scheme: "dark";
+  --color-base-100: oklch(27.69% 0.033 260.03);
+  --color-base-200: oklch(23.76% 0.026 260.28);
+  --color-base-300: oklch(20.32% 0.021 260.39);
+  --color-base-content: oklch(86.78% 0.014 263.48);
+  --color-primary: oklch(69.65% 0.059 248.69);
+  --color-primary-content: oklch(86.78% 0.014 263.48);
+  --color-secondary: oklch(77.46% 0.062 217.47);
+  --color-secondary-content: oklch(86.78% 0.014 263.48);
+  --color-accent: oklch(76.83% 0.074 131.06);
+  --color-accent-content: oklch(20.32% 0.021 260.39);
+  --color-neutral: oklch(45.23% 0.035 264.13);
+  --color-neutral-content: oklch(89.93% 0.016 262.75);
+  --color-info: oklch(69.21% 0.062 332.66);
+  --color-info-content: oklch(20.32% 0.021 260.39);
+  --color-success: oklch(76.83% 0.074 131.06);
+  --color-success-content: oklch(20.32% 0.021 260.39);
+  --color-warning: oklch(85.49% 0.089 84.09);
+  --color-warning-content: oklch(20.32% 0.021 260.39);
+  --color-error: oklch(60.61% 0.12 15.34);
+  --color-error-content: oklch(95.13% 0.007 260.73);
+  --header-gradient-start: oklch(20.32% 0.021 260.39);
+  --header-gradient-end: oklch(32.44% 0.022 264.18);
+  --radius-selector: 1rem;
+  --radius-field: 0.25rem;
+  --radius-box: 0.5rem;
+  --size-selector: 0.25rem;
+  --size-field: 0.25rem;
+  --border: 1px;
+  --depth: 0;
+  --noise: 0;
+}
+
+@plugin "daisyui/theme" {
+  name: "emerald";
+  default: false;
+  prefersdark: false;
+  color-scheme: "light";
+  --color-base-100: oklch(100% 0 0);
+  --color-base-200: oklch(93% 0 0);
+  --color-base-300: oklch(86% 0 0);
+  --color-base-content: oklch(35.519% 0.032 262.988);
+  --color-primary: oklch(76.662% 0.135 153.45);
+  --color-primary-content: oklch(86% 0 0);
+  --color-secondary: oklch(61.302% 0.202 261.294);
+  --color-secondary-content: oklch(100% 0 0);
+  --color-accent: oklch(72.772% 0.149 33.2);
+  --color-accent-content: oklch(0% 0 0);
+  --color-neutral: oklch(35.519% 0.032 262.988);
+  --color-neutral-content: oklch(98.462% 0.001 247.838);
+  --color-info: oklch(72.06% 0.191 231.6);
+  --color-info-content: oklch(0% 0 0);
+  --color-success: oklch(64.8% 0.15 160);
+  --color-success-content: oklch(0% 0 0);
+  --color-warning: oklch(84.71% 0.199 83.87);
+  --color-warning-content: oklch(0% 0 0);
+  --color-error: oklch(71.76% 0.221 22.18);
+  --color-error-content: oklch(0% 0 0);
+  --header-gradient-start: oklch(30% 0.075 162);
+  --header-gradient-end: oklch(42% 0.105 153);
+  --radius-selector: 1rem;
+  --radius-field: 0.5rem;
+  --radius-box: 1rem;
+  --size-selector: 0.25rem;
+  --size-field: 0.25rem;
+  --border: 1px;
+  --depth: 0;
+  --noise: 0;
+}
+
+@plugin "daisyui/theme" {
+  name: "emerald-dark";
+  default: false;
+  prefersdark: true;
+  color-scheme: "dark";
+  --color-base-100: oklch(22% 0.028 170);
+  --color-base-200: oklch(18% 0.024 170);
+  --color-base-300: oklch(14% 0.02 170);
+  --color-base-content: oklch(92% 0.012 160);
+  --color-primary: oklch(74% 0.13 153.45);
+  --color-primary-content: oklch(92% 0.012 160);
+  --color-secondary: oklch(68% 0.16 261.294);
+  --color-secondary-content: oklch(96% 0.01 260);
+  --color-accent: oklch(76% 0.15 33.2);
+  --color-accent-content: oklch(14% 0.018 35);
+  --color-neutral: oklch(30% 0.035 170);
+  --color-neutral-content: oklch(92% 0.012 160);
+  --color-info: oklch(72% 0.15 231.6);
+  --color-info-content: oklch(14% 0.02 230);
+  --color-success: oklch(70% 0.13 160);
+  --color-success-content: oklch(14% 0.02 160);
+  --color-warning: oklch(82% 0.17 83.87);
+  --color-warning-content: oklch(16% 0.025 84);
+  --color-error: oklch(68% 0.19 22.18);
+  --color-error-content: oklch(96% 0.01 22);
+  --header-gradient-start: oklch(16% 0.035 170);
+  --header-gradient-end: oklch(30% 0.075 162);
+  --radius-selector: 1rem;
+  --radius-field: 0.5rem;
+  --radius-box: 1rem;
+  --size-selector: 0.25rem;
+  --size-field: 0.25rem;
+  --border: 1px;
+  --depth: 0;
+  --noise: 0;
 }
 
 /* Root theme variables */
@@ -192,11 +422,58 @@ html {
   overflow-x: hidden;
 }
 
+[data-theme="ron"] .card,
+[data-theme="ron-dark"] .card,
+[data-theme="ron"] .rounded-box[class*="bg-base-100"]:not([role="tooltip"]):not(.dropdown-content):not(.fixed):not(.absolute),
+[data-theme="ron-dark"] .rounded-box[class*="bg-base-100"]:not([role="tooltip"]):not(.dropdown-content):not(.fixed):not(.absolute),
+[data-theme="ron"] [class*="bg-base-100"][class*="shadow"]:not([role="tooltip"]):not(.dropdown-content):not(.fixed):not(.absolute),
+[data-theme="ron-dark"] [class*="bg-base-100"][class*="shadow"]:not([role="tooltip"]):not(.dropdown-content):not(.fixed):not(.absolute) {
+  position: relative;
+  border-color: var(--ron-card-border);
+  box-shadow:
+    0 0 0 1px var(--ron-card-halo),
+    0 0 16px var(--ron-card-glow),
+    0 0 42px var(--ron-card-glow-soft) !important;
+}
+
+[data-theme="ron"] .card::before,
+[data-theme="ron-dark"] .card::before,
+[data-theme="ron"] .rounded-box[class*="bg-base-100"]:not([role="tooltip"]):not(.dropdown-content):not(.fixed):not(.absolute)::before,
+[data-theme="ron-dark"] .rounded-box[class*="bg-base-100"]:not([role="tooltip"]):not(.dropdown-content):not(.fixed):not(.absolute)::before,
+[data-theme="ron"] [class*="bg-base-100"][class*="shadow"]:not([role="tooltip"]):not(.dropdown-content):not(.fixed):not(.absolute)::before,
+[data-theme="ron-dark"] [class*="bg-base-100"][class*="shadow"]:not([role="tooltip"]):not(.dropdown-content):not(.fixed):not(.absolute)::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border: 1px solid var(--ron-card-halo);
+  border-radius: inherit;
+  box-shadow: inset 0 0 12px var(--ron-card-glow-soft);
+}
+
+.app-header {
+  background: linear-gradient(
+    180deg,
+    var(--header-gradient-start),
+    var(--header-gradient-end)
+  );
+}
+
+.app-header-inverted {
+  background: linear-gradient(
+    180deg,
+    var(--header-gradient-end),
+    var(--header-gradient-start)
+  );
+}
+
 .login {
   background: #152230;
-  background: linear-gradient(180deg,
-      rgba(34, 41, 51, 1) 0%,
-      rgba(57, 82, 108, 1) 100%);
+  background: linear-gradient(
+    180deg,
+    rgba(34, 41, 51, 1) 0%,
+    rgba(57, 82, 108, 1) 100%
+  );
 }
 
 .grayed-out {
@@ -206,16 +483,6 @@ html {
 
 .red-icon {
   color: red;
-}
-
-.top-shadow {
-  box-shadow: 0 0px 10px rgba(var(--color-dynamic-shadow) / 0.3);
-}
-
-.shadow-dynamic {
-  box-shadow:
-    0 4px 6px -1px var(--color-dynamic-shadow),
-    0 2px 4px -2px var(--color-dynamic-shadow);
 }
 
 /* Custom styles for the table */

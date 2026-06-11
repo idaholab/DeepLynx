@@ -157,7 +157,7 @@ public class SavedSearchBusiness : ISavedSearchBusiness
     /// <param name="isOrgAdmin">Boolean value determining if the user is a organization admin</param>
     /// <param name="isProjectAdmin">Boolean value determining if the user is a admin for all the project ID's referenced</param>
     /// <returns>List of records retrieved by the query</returns>
-    public async Task<IEnumerable<HistoricalRecordResponseDto>> ExecuteSavedSearch(
+    public async Task<IEnumerable<QueryRecordViewResponseDto>> ExecuteSavedSearch(
         long savedSearchId, long currentUserId, long organizationId, long[] projectIds,
         bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false)
     {
