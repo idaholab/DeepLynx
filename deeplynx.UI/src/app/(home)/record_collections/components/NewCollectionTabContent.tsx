@@ -256,12 +256,16 @@ export default function NewCollectionTabContent({
                     <>
                       <CollectionRecordSearchResultsTable
                         rows={visibleNewCollectionRecords.map((record) => ({
-                          key: record.id,
+                          key: record.id ?? record.name,
                           leadingCell: (
                             <input
                               type="checkbox"
                               className="checkbox checkbox-sm"
-                              checked={newCollectionSelectedRecordIds.includes(record.id)}
+                              checked={
+                                typeof record.id === "number" &&
+                                newCollectionSelectedRecordIds.includes(record.id)
+                              }
+                              disabled={typeof record.id !== "number"}
                               onChange={() => void onToggleNewCollectionRecord(record)}
                             />
                           ),

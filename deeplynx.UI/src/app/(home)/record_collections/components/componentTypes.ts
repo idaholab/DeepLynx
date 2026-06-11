@@ -1,6 +1,6 @@
 import React from "react";
 import {
-  HistoricalRecordResponseDto,
+  QueryRecordViewResponseDto,
   RecordCollectionLabelDto,
   RecordCollectionResponseDto,
   RecordCollectionTagDto,
@@ -17,7 +17,7 @@ import {
 type StateSetter<T> = React.Dispatch<React.SetStateAction<T>>;
 
 export type NewCollectionStep = "Records" | "Metadata" | "Modify" | "Review";
-export type EditableRecordResult = HistoricalRecordResponseDto | RecordResponseDto;
+export type EditableRecordResult = QueryRecordViewResponseDto | RecordResponseDto;
 
 export type NewCollectionTabController = {
   workflow: {
@@ -39,9 +39,9 @@ export type NewCollectionTabController = {
   recordSearch: {
     newCollectionRecordSearchTerm: string;
     setNewCollectionRecordSearchTerm: StateSetter<string>;
-    newCollectionRecordSearchResults: HistoricalRecordResponseDto[];
+    newCollectionRecordSearchResults: QueryRecordViewResponseDto[];
     newCollectionRecordSearchLoading: boolean;
-    visibleNewCollectionRecords: HistoricalRecordResponseDto[];
+    visibleNewCollectionRecords: QueryRecordViewResponseDto[];
     allVisibleNewCollectionRecordsSelected: boolean;
     allRetrievedNewCollectionRecordsSelected: boolean;
     someVisibleNewCollectionRecordsSelected: boolean;
@@ -51,7 +51,7 @@ export type NewCollectionTabController = {
     onSearchRecords: (overrideTerm?: string) => Promise<void>;
     onClearRecordSearch: () => void;
     onToggleSelectAllVisibleRecords: () => Promise<void>;
-    onToggleNewCollectionRecord: (record: HistoricalRecordResponseDto) => Promise<void>;
+    onToggleNewCollectionRecord: (record: QueryRecordViewResponseDto) => Promise<void>;
     onSelectAllSearchedRecords: () => Promise<void>;
   };
   selection: {
@@ -185,8 +185,8 @@ export type SelectedCollectionRecordsController = {
     recordSearchTerm: string;
     setRecordSearchTerm: StateSetter<string>;
     recordSearchLoading: boolean;
-    recordSearchResults: HistoricalRecordResponseDto[];
-    addableRecordResults: HistoricalRecordResponseDto[];
+    recordSearchResults: QueryRecordViewResponseDto[];
+    addableRecordResults: QueryRecordViewResponseDto[];
     onSearchRecords: () => void;
   };
   selection: {

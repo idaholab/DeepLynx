@@ -10,7 +10,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import AdditionalPropertiesEditor from "../record/components/AdditionalPropertiesEditor";
 import {
-  HistoricalRecordResponseDto,
+  QueryRecordViewResponseDto,
   RecordCollectionLabelDto,
   RecordCollectionResponseDto,
   RecordCollectionTagDto,
@@ -105,7 +105,7 @@ export default function RecordCollectionsClient({
   const [collectionRecords, setCollectionRecords] = useState<RecordResponseDto[]>([]);
   const [recordSearchTerm, setRecordSearchTerm] = useState("");
   const [recordSearchResults, setRecordSearchResults] = useState<
-    HistoricalRecordResponseDto[]
+    QueryRecordViewResponseDto[]
   >([]);
   const [selectedRecordIds, setSelectedRecordIds] = useState<number[]>([]);
   const [addingRecordIds, setAddingRecordIds] = useState<number[]>([]);
@@ -146,7 +146,7 @@ export default function RecordCollectionsClient({
   const [newCollectionRecordSearchTerm, setNewCollectionRecordSearchTerm] =
     useState("");
   const [newCollectionRecordSearchResults, setNewCollectionRecordSearchResults] =
-    useState<HistoricalRecordResponseDto[]>([]);
+    useState<QueryRecordViewResponseDto[]>([]);
   const [newCollectionRecordPage, setNewCollectionRecordPage] = useState(1);
   const [newCollectionRecordsPerPage, setNewCollectionRecordsPerPage] = useState(
     DEFAULT_PAGE_SIZE_OPTIONS[0],
@@ -474,9 +474,13 @@ export default function RecordCollectionsClient({
   };
 
   const addNewCollectionRecords = useCallback(
-    async (records: HistoricalRecordResponseDto[]) => {
+    async (records: QueryRecordViewResponseDto[]) => {
       const unselectedRecords = records.filter(
-        (record) => !newCollectionSelectedRecordIds.includes(record.id),
+        (
+          record,
+        ): record is QueryRecordViewResponseDto & { id: number; projectId?: number | null } =>
+          typeof record.id === "number" &&
+          !newCollectionSelectedRecordIds.includes(record.id),
       );
       if (unselectedRecords.length === 0) return;
 
@@ -514,7 +518,9 @@ export default function RecordCollectionsClient({
     [newCollectionSelectedRecordIds, organizationId, projectId],
   );
 
-  const toggleNewCollectionRecord = async (record: HistoricalRecordResponseDto) => {
+  const toggleNewCollectionRecord = async (record: QueryRecordViewResponseDto) => {
+    if (typeof record.id !== "number") return;
+
     if (newCollectionSelectedRecordIds.includes(record.id)) {
       setNewCollectionSelectedRecordIds((prev) =>
         prev.filter((id) => id !== record.id),
@@ -530,21 +536,26 @@ export default function RecordCollectionsClient({
 
   const toggleSelectAllVisibleRecords = async () => {
     const visibleRecords = visibleNewCollectionRecords;
-    const visibleRecordIds = visibleRecords.map((record) => record.id);
+    const visibleRecordIds = visibleRecords
+      .map((record) => record.id)
+      .filter((id): id is number => typeof id === "number");
     const allVisibleRecordsSelected =
       visibleRecordIds.length > 0 &&
       visibleRecordIds.every((id) => newCollectionSelectedRecordIds.includes(id));
 
-    if (allVisibleRecordsSelected) {
-      const visibleIdSet = new Set(visibleRecordIds);
-      setNewCollectionSelectedRecordIds((prev) =>
-        prev.filter((id) => !visibleIdSet.has(id)),
-      );
-      setNewCollectionSelectedRecords((prev) =>
-        prev.filter((record) => !visibleIdSet.has(record.id)),
-      );
-      return;
-    }
+      if (allVisibleRecordsSelected) {
+        const visibleIdSet = new Set(visibleRecordIds);
+        setNewCollectionSelectedRecordIds((prev) =>
+          prev.filter((id) => !visibleIdSet.has(id)),
+        );
+        setNewCollectionSelectedRecords((prev) =>
+          prev.filter(
+            (record) =>
+              typeof record.id !== "number" || !visibleIdSet.has(record.id),
+          ),
+        );
+        return;
+      }
 
     await addNewCollectionRecords(visibleRecords);
   };
@@ -559,7 +570,9 @@ export default function RecordCollectionsClient({
     );
     setNewCollectionSelectedRecords(remainingRecords);
     setNewCollectionSelectedRecordIds(
-      remainingRecords.map((record) => record.id),
+      remainingRecords
+        .map((record) => record.id)
+        .filter((id): id is number => typeof id === "number"),
     );
   };
 
@@ -569,7 +582,9 @@ export default function RecordCollectionsClient({
     );
     setNewCollectionSelectedRecords(remainingRecords);
     setNewCollectionSelectedRecordIds(
-      remainingRecords.map((record) => record.id),
+      remainingRecords
+        .map((record) => record.id)
+        .filter((id): id is number => typeof id === "number"),
     );
   };
 

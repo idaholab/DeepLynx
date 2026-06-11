@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import {
-  HistoricalRecordResponseDto,
+  QueryRecordViewResponseDto,
   RecordCollectionResponseDto,
   RecordResponseDto,
   SensitivityLabelsDto,
@@ -16,7 +16,7 @@ type Params = {
   selectedCollectionLabelSearchTerm: string;
   selectedCollectionTagSearchTerm: string;
   recordSearchTerm: string;
-  recordSearchResults: HistoricalRecordResponseDto[];
+  recordSearchResults: QueryRecordViewResponseDto[];
   collectionRecords: RecordResponseDto[];
 };
 
@@ -75,7 +75,9 @@ export function useSelectedCollectionEditDerived({
         .map((record) => record.id)
         .filter((id): id is number => typeof id === "number"),
     );
-    return recordSearchResults.filter((record) => !existingIds.has(record.id));
+    return recordSearchResults.filter(
+      (record) => typeof record.id === "number" && !existingIds.has(record.id),
+    );
   }, [collectionRecords, recordSearchResults]);
 
   const collectionRecordIds = useMemo(

@@ -123,7 +123,10 @@ export function useNewCollectionDerived({
   }, [newCollectionRecordPage, newCollectionRecordSearchResults, recordsPerPage]);
 
   const visibleNewCollectionRecordIds = useMemo(
-    () => visibleNewCollectionRecords.map((record) => record.id),
+    () =>
+      visibleNewCollectionRecords
+        .map((record) => record.id)
+        .filter((id): id is number => typeof id === "number"),
     [visibleNewCollectionRecords],
   );
 
@@ -136,6 +139,7 @@ export function useNewCollectionDerived({
   const allRetrievedNewCollectionRecordsSelected =
     newCollectionRecordSearchResults.length > 0 &&
     newCollectionRecordSearchResults.every((record) =>
+      typeof record.id === "number" &&
       newCollectionSelectedRecordIds.includes(record.id),
     );
 

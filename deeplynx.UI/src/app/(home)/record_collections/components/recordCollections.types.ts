@@ -1,5 +1,5 @@
 import {
-  HistoricalRecordResponseDto,
+  QueryRecordViewResponseDto,
   RecordResponseDto,
 } from "../../types/responseDTOs";
 
@@ -21,7 +21,7 @@ export type FacetOption = {
   count: number;
 };
 
-export type NewCollectionSelectedRecord = HistoricalRecordResponseDto & {
+export type NewCollectionSelectedRecord = QueryRecordViewResponseDto & {
   fullRecord?: RecordResponseDto;
 };
 

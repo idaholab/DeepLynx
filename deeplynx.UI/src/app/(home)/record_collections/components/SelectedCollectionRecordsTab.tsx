@@ -69,13 +69,21 @@ export default function SelectedCollectionRecordsTab({
           {recordSearchResults.length ? (
             <CollectionRecordSearchResultsTable
               rows={addableRecordResults.map((record) => ({
-                key: record.id,
+                key: record.id ?? record.name,
                 leadingCell: (
                   <input
                     type="checkbox"
                     className="checkbox checkbox-sm"
-                    checked={selectedRecordIds.includes(record.id)}
-                    onChange={() => onToggleSelectedRecord(record.id)}
+                    checked={
+                      typeof record.id === "number" &&
+                      selectedRecordIds.includes(record.id)
+                    }
+                    disabled={typeof record.id !== "number"}
+                    onChange={() => {
+                      if (typeof record.id === "number") {
+                        onToggleSelectedRecord(record.id);
+                      }
+                    }}
                   />
                 ),
                 name: record.name,
