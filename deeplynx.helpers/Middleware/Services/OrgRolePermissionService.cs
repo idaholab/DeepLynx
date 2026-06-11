@@ -33,7 +33,6 @@ public class OrgRolePermissionService : IOrgRolePermissionService
             "Checking permission - User: {UserId}, Organization: {OrgId}, Action: {Action}, Resource: {Resource}",
             userId, orgId, action, resource);
         
-        // Organization admins have full permission to every action/resource in the org.
         var isOrgAdmin = _dbContext.Database
             .SqlQuery<bool>($@"
              SELECT EXISTS(
@@ -47,10 +46,6 @@ public class OrgRolePermissionService : IOrgRolePermissionService
 
         var hasPermission = isOrgAdmin;
 
-        // There is no org-level user->role assignment in the schema (organization_users only
-        // carries is_org_admin), so granular per-user permissions cannot be evaluated at the org
-        // level. Non-admin members are therefore granted read-only access to org-scoped resources;
-        // any create/update/delete (write/update) action requires org admin.
         if (!hasPermission && string.Equals(action, "read", StringComparison.OrdinalIgnoreCase))
         {
             hasPermission = _dbContext.Database
