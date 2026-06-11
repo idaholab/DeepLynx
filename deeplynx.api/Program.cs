@@ -577,6 +577,7 @@ try
     app.UseAuthentication(); // Must be first
     app.UseMiddleware<UserContextMiddleware>(); // Second - sets UserId/Email
     app.UseMiddleware<AuthMiddleware>(); // Third - sets OrganizationId
+    app.UseMiddleware<FeatureFlagMiddleware>();
     app.UseMiddleware<SensitivityMiddleware>();
     app.UseAuthorization(); // Fourth
     app.MapControllers(); // Last
