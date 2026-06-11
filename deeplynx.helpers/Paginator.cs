@@ -1,3 +1,6 @@
+using System.Linq.Expressions;
+using Microsoft.EntityFrameworkCore;
+
 namespace deeplynx.models;
 
 /// <summary>
@@ -13,18 +16,18 @@ public class Paginator
     /// <param name="values">The query</param>
     /// <param name="map">The mapping to the final paginated value</param>
     /// <returns>The query paginated</returns>
-    static public PaginatedResponse<U> Paginate<T, U>(PaginatedRequestDto paginated, IQueryable<T> values, Func<T, U> map)
+    static public async Task<PaginatedResponse<U>> Paginate<T, U>(PaginatedRequestDto paginated, IQueryable<T> values, Expression<Func<T, U>> map)
     {
         return new PaginatedResponse<U>
         {
-            Items = values
+            Items = await values
                     .Skip((paginated.PageNumber - 1) * paginated.PageSize)
                     .Take(paginated.PageSize)
                     .Select(map)
-                    .ToList(),
+                    .ToListAsync(),
             PageNumber = paginated.PageNumber,
             PageSize = paginated.PageSize,
-            TotalCount = values.Count(),
+            TotalCount = await values.CountAsync(),
         };
     }
 }

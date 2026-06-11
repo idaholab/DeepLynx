@@ -529,7 +529,7 @@ public class QueryBusiness : IQueryBusiness
             _ => query
         };
 
-        return Paginator.Paginate(paginated, query, r => QueryRecordToResponse(r));
+        return await Paginator.Paginate(paginated, query, r => QueryRecordToResponse(r));
     }
 
     static private QueryRecordViewResponseDto QueryRecordToResponse(QueryRecord r)
