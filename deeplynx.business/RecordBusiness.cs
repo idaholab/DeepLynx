@@ -787,11 +787,15 @@ public async Task<PaginatedResponse<RecordResponseDto>> GetAllRecordsPaginated(
     /// <param name="dto">The data transfer object containing details on the record to be created</param>
     /// <param name="sensitivityLabelIds">The IDs of the labels to attach</param>
     /// <param name="embedded">Boolean value that determines if the file will be embedded by Insight</param>
+    /// <param name="isSysAdmin">Optional param determining if the requesting user is a system admin</param>
+    /// <param name="isOrgAdmin">Optional param determining if the requesting user is an organization admin</param>
+    /// <param name="isProjectAdmin">Optional param determining if the requesting user is a project admin</param>
     /// <returns>The newly created metadata record</returns>
     /// <exception cref="KeyNotFoundException">Returned if the project or datasource are not found</exception>
     /// <exception cref="Exception">Returned if the metadata is too deeply nested</exception>
     public async Task<RecordResponseDto> CreateRecord(long currentUserId, long organizationId, long projectId,
-        long dataSourceId, CreateRecordRequestDto dto, List<long>? sensitivityLabelIds = null, bool embedded = false)
+        long dataSourceId, CreateRecordRequestDto dto, List<long>? sensitivityLabelIds = null, bool embedded = false,
+        bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false)
     {
         ValidationHelper.ValidateModel(dto);
         await ExistenceHelper.EnsureDataSourceExistsForProjectAsync(_context, dataSourceId, projectId);
@@ -811,7 +815,11 @@ public async Task<PaginatedResponse<RecordResponseDto>> GetAllRecordsPaginated(
 
         try
         {
-            if (!string.IsNullOrWhiteSpace(dto.Uri) && sensitivityLabelIds?.Count > 0)
+            if (!isSysAdmin &&
+                !isOrgAdmin &&
+                !isProjectAdmin &&
+                !string.IsNullOrWhiteSpace(dto.Uri) &&
+                sensitivityLabelIds?.Count > 0)
             {
                 var authorizedUploadLabels = await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
                     currentUserId,
@@ -888,7 +896,14 @@ public async Task<PaginatedResponse<RecordResponseDto>> GetAllRecordsPaginated(
             {
                 Id = record.Id,
                 Description = record.Description,
-                Uri = ExposeUriHelper.CanExposeUri(record, authorizedDownloadLabels) ? record.Uri : null,
+                Uri = ExposeUriHelper.CanExposeUri(
+                    record,
+                    authorizedDownloadLabels,
+                    isSysAdmin,
+                    isOrgAdmin,
+                    isProjectAdmin)
+                        ? record.Uri
+                        : null,
                 Properties = record.Properties,
                 ObjectStorageId = record.ObjectStorageId,
                 OriginalId = record.OriginalId,
@@ -953,7 +968,11 @@ public async Task<PaginatedResponse<RecordResponseDto>> GetAllRecordsPaginated(
 
         var containsUri = records.Any(r => !string.IsNullOrWhiteSpace(r.Uri));
 
-        if (containsUri && sensitivityLabelIds?.Count > 0)
+        if (!isSysAdmin &&
+            !isOrgAdmin &&
+            !isProjectAdmin &&
+            containsUri &&
+            sensitivityLabelIds?.Count > 0)
         {
             var authorizedUploadLabels = await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
                 currentUserId,
@@ -1450,11 +1469,14 @@ public async Task<PaginatedResponse<RecordResponseDto>> GetAllRecordsPaginated(
     /// <param name="projectId">The ID of the project to which the record belongs</param>
     /// <param name="recordId">The ID of the record to be updated</param>
     /// <param name="dto">The data transfer object containing details on the record to be updated</param>
+    /// <param name="isSysAdmin">Optional param determining if the requesting user is a system admin</param>
+    /// <param name="isOrgAdmin">Optional param determining if the requesting user is an organization admin</param>
+    /// <param name="isProjectAdmin">Optional param determining if the requesting user is a project admin</param>
     /// <returns>The newly updated metadata record</returns>
     /// <exception cref="KeyNotFoundException">Returned if record to be updated is not found</exception>
     public async Task<RecordResponseDto> UpdateRecord(long currentUserId, long organizationId, long projectId,
         long recordId,
-        UpdateRecordRequestDto dto)
+        UpdateRecordRequestDto dto, bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false)
     {
         ValidationHelper.ValidateModel(dto);
 
@@ -1476,7 +1498,11 @@ public async Task<PaginatedResponse<RecordResponseDto>> GetAllRecordsPaginated(
         if (dto.ObjectStorageId != null)
             await CheckObjectStorageExists(organizationId, projectId, dto.ObjectStorageId.Value);
 
-        if (!string.IsNullOrWhiteSpace(dto.Uri) && dto.Uri != returnedRecord.Uri)
+        if (!isSysAdmin &&
+            !isOrgAdmin &&
+            !isProjectAdmin &&
+            !string.IsNullOrWhiteSpace(dto.Uri) &&
+            dto.Uri != returnedRecord.Uri)
         {
             var authorizedUpdateLabels = await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
                 currentUserId,
@@ -1528,7 +1554,14 @@ public async Task<PaginatedResponse<RecordResponseDto>> GetAllRecordsPaginated(
         {
             Id = returnedRecord.Id,
             Description = returnedRecord.Description,
-            Uri = ExposeUriHelper.CanExposeUri(returnedRecord, authorizedDownloadLabels) ? returnedRecord.Uri : null,
+            Uri = ExposeUriHelper.CanExposeUri(
+                returnedRecord,
+                authorizedDownloadLabels,
+                isSysAdmin,
+                isOrgAdmin,
+                isProjectAdmin)
+                    ? returnedRecord.Uri
+                    : null,
             Properties = returnedRecord.Properties,
             ObjectStorageId = returnedRecord.ObjectStorageId,
             OriginalId = returnedRecord.OriginalId,
