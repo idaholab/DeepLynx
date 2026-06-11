@@ -264,6 +264,8 @@ spec:
           image: ${CI_REGISTRY}/${CI_REGISTRY_PATH}:deeplynxv3-server-${GITHUB_RUN_NUMBER}
           imagePullPolicy: Always
           env:
+            - name: HIDE_INSIGHT
+              value: "false"
             - name: AWS_S3_CONNECTION_STRING
               value: ${AWS_S3_CONNECTION_STRING}
             - name: AZURE_OBJECT_CONNECTION_STRING

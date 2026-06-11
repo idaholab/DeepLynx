@@ -43,6 +43,7 @@ jobs:
             --build-arg SERVICE_TOKEN=${{ secrets.SERVICE_TOKEN }} \
             --build-arg BACKEND_BASE_URL=${{ vars.BACKEND_BASE_URL }} \
             --build-arg NEXT_PUBLIC_DISABLE_FRONTEND_AUTHENTICATION=${{ vars.NEXT_PUBLIC_DISABLE_FRONTEND_AUTHENTICATION }} \
+            --build-arg NEXT_PUBLIC_HIDE_INSIGHT=${{ vars.NEXT_PUBLIC_HIDE_INSIGHT }} \
             .
 
   build-server:

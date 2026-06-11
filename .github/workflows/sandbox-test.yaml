@@ -42,6 +42,7 @@ jobs:
           SERVICE_TOKEN: ${{ secrets.SERVICE_TOKEN }}
           BACKEND_BASE_URL: ${{ vars.BACKEND_BASE_URL }}
           NEXT_PUBLIC_DISABLE_FRONTEND_AUTHENTICATION: ${{ vars.NEXT_PUBLIC_DISABLE_FRONTEND_AUTHENTICATION }}
+          NEXT_PUBLIC_HIDE_INSIGHT: ${{ vars.NEXT_PUBLIC_HIDE_INSIGHT }}
         run: |
           az cloud set --name AzureUSGovernment
           az login --service-principal -u "$ACR_SP_USER" -p "$ACR_SP_PASSWORD" --tenant "$ACR_SP_TENANT"
@@ -60,6 +61,7 @@ jobs:
             --build-arg SERVICE_TOKEN="$SERVICE_TOKEN" \
             --build-arg BACKEND_BASE_URL="$BACKEND_BASE_URL" \
             --build-arg NEXT_PUBLIC_DISABLE_FRONTEND_AUTHENTICATION=$NEXT_PUBLIC_DISABLE_FRONTEND_AUTHENTICATION \
+            --build-arg NEXT_PUBLIC_HIDE_INSIGHT=$NEXT_PUBLIC_HIDE_INSIGHT \
             .
 
   build-server:
