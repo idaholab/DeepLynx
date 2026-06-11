@@ -500,7 +500,7 @@ public class QueryBusiness : IQueryBusiness
         long[] projectId, bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false)
     {
         if (projectId.Length == 0)
-            return new PaginatedResponse<QueryRecordViewResponseDto> { Items = [] };
+            return new PaginatedResponse<QueryRecordViewResponseDto> { Items = [], PageSize = paginated.PageSize, PageNumber = paginated.PageNumber };
 
         var query = _context.QueryRecords
             .Where(r => r.OrganizationId == organizationId && !r.IsArchived)
