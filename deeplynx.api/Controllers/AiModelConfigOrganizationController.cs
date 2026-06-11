@@ -123,6 +123,7 @@ public class AiModelConfigController : ControllerBase
     /// <param name="dto">The data transfer object containing the details of the AI Model Configuration to create.</param>
     /// <returns>The newly created AI Model Configuration DTO.</returns>
     [HttpPost(Name = "api_create_ai_model_config_organization")]
+    [OrgAdmin]
     public async Task<ActionResult<AiModelConfigResponseDto>> CreateAiModelConfig(
         long organizationId,
         [FromBody] CreateAiModelConfigDto dto
@@ -154,6 +155,7 @@ public class AiModelConfigController : ControllerBase
     /// <param name="dto">The data transfer object containing the updated details of the AI Model Configuration.</param>
     /// <returns>The updated AI Model Configuration DTO.</returns>
     [HttpPut(("{aiModelConfigId:long}"), Name = "api_update_ai_model_config_organization")]
+    [OrgAdmin]
     public async Task<ActionResult<AiModelConfigResponseDto>> UpdateAiModelConfig(
         long organizationId,
         long aiModelConfigId,
@@ -189,6 +191,7 @@ public class AiModelConfigController : ControllerBase
     /// <param name="archive">True to archive the AI Model Configuration, false to unarchive it.</param>
     /// <returns>A message confirming the AI Model Configuration was successfully archived or unarchived.</returns>
     [HttpPatch(("{aiModelConfigId:long}/archive"), Name = "api_archive_ai_model_config_organization")] // BUG FIX: was "{}", route placeholder was empty so aiModelConfigId was never bound
+    [OrgAdmin]
     public async Task<IActionResult> ArchiveAiModelConfig(
         long organizationId,
         long aiModelConfigId,
@@ -229,6 +232,7 @@ public class AiModelConfigController : ControllerBase
     /// <param name="aiModelConfigId">The ID of the AI Model Configuration to delete.</param>
     /// <returns>A message confirming the AI Model Configuration was successfully deleted.</returns>
     [HttpDelete("{aiModelConfigId:long}", Name = "api_delete_ai_model_configuration_organization")]
+    [OrgAdmin]
     public async Task<IActionResult> DeleteAiModelConfig(long organizationId, long aiModelConfigId)
     {
         try
