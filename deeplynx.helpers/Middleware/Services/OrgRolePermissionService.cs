@@ -33,31 +33,16 @@ public class OrgRolePermissionService : IOrgRolePermissionService
             "Checking permission - User: {UserId}, Organization: {OrgId}, Action: {Action}, Resource: {Resource}",
             userId, orgId, action, resource);
         
-        var isOrgAdmin = _dbContext.Database
+        var hasPermission = _dbContext.Database
             .SqlQuery<bool>($@"
              SELECT EXISTS(
                 SELECT 1
                 FROM deeplynx.organization_users ou
                 WHERE ou.user_id = {userId}
                   AND ou.organization_id = {orgId}
-                  AND ou.is_org_admin = true) as has_permission")
+                  AND (ou.is_org_admin = true OR {action} = 'read')) as has_permission")
             .AsEnumerable()
             .FirstOrDefault();
-
-        var hasPermission = isOrgAdmin;
-
-        if (!hasPermission && string.Equals(action, "read", StringComparison.OrdinalIgnoreCase))
-        {
-            hasPermission = _dbContext.Database
-                .SqlQuery<bool>($@"
-             SELECT EXISTS(
-                SELECT 1
-                FROM deeplynx.organization_users ou
-                WHERE ou.user_id = {userId}
-                  AND ou.organization_id = {orgId}) as has_permission")
-                .AsEnumerable()
-                .FirstOrDefault();
-        }
 
         if (hasPermission)
         {
