@@ -347,7 +347,7 @@ spec:
             - name: HIDE_INSIGHT
               value: ${HIDE_INSIGHT}
               # Backend may also need these environment variables
-
+            - name: OKTA_CLIENT_SECRET
               valueFrom:
                 secretKeyRef:
                   name: app-secrets
