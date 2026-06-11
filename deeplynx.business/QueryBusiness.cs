@@ -522,8 +522,8 @@ public class QueryBusiness : IQueryBusiness
 
         query = sortBy switch
         {
-            SortRecordsRequestDto.NameAZ => query.OrderBy(r => r.Name),
-            SortRecordsRequestDto.NameZA => query.OrderByDescending(r => r.Name),
+            SortRecordsRequestDto.NameAZ => query.OrderBy(r => (r.Name ?? "").ToLower()),
+            SortRecordsRequestDto.NameZA => query.OrderByDescending(r => (r.Name ?? "").ToLower()),
             SortRecordsRequestDto.DateNew => query.OrderByDescending(r => r.LastUpdatedAt),
             SortRecordsRequestDto.DateOld => query.OrderBy(r => r.LastUpdatedAt),
             _ => query
