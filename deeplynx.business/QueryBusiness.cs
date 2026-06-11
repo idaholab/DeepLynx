@@ -497,7 +497,7 @@ public class QueryBusiness : IQueryBusiness
     /// <param name="isProjectAdmin">Optional param determining if the requesting user is a project admin</param>
     /// <returns>Paginated records</returns>
     public async Task<PaginatedResponse<QueryRecordViewResponseDto>> GetRecordsPaginated(
-        long currentUserId, long organizationId, string sortBy, PaginatedRequestDto paginated,
+        long currentUserId, long organizationId, SortRecordsRequestDto sortBy, PaginatedRequestDto paginated,
         long[] projectId, bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false)
     {
         if (projectId.Length == 0)
@@ -520,14 +520,14 @@ public class QueryBusiness : IQueryBusiness
             query = query.Where(r => authorizedRecordIds.Contains(r.Id));
         }
 
-        if (sortBy == "nameAZ")
-            query = query.OrderBy(r => r.Name);
-        else if (sortBy == "nameZA")
-            query = query.OrderByDescending(r => r.Name);
-        else if (sortBy == "dateNew")
-            query = query.OrderByDescending(r => r.LastUpdatedAt);
-        else if (sortBy == "dateOld")
-            query = query.OrderBy(r => r.LastUpdatedAt);
+        query = sortBy switch
+        {
+            SortRecordsRequestDto.NameAZ => query.OrderBy(r => r.Name),
+            SortRecordsRequestDto.NameZA => query.OrderByDescending(r => r.Name),
+            SortRecordsRequestDto.DateNew => query.OrderByDescending(r => r.LastUpdatedAt),
+            SortRecordsRequestDto.DateOld => query.OrderBy(r => r.LastUpdatedAt),
+            _ => query
+        };
 
         return Paginator.Paginate(paginated, query, r => QueryRecordToResponse(r));
     }

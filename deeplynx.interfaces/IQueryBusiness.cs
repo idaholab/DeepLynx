@@ -13,7 +13,7 @@ public interface IQueryBusiness
     Task<IEnumerable<QueryRecordViewResponseDto>> GetRecentlyAddedRecords(long currentUserId, long organizationId,
         long[] projectId, bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false);
 
-    Task<PaginatedResponse<QueryRecordViewResponseDto>> GetRecordsPaginated(long currentUserId, long organizationId, string sortBy,
+    Task<PaginatedResponse<QueryRecordViewResponseDto>> GetRecordsPaginated(long currentUserId, long organizationId, SortRecordsRequestDto sortBy,
         PaginatedRequestDto paginated, long[] projectId, bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false);
 
     Task<IEnumerable<QueryRecordViewResponseDto>> GetMultiProjectRecords(long currentUserId, long organizationId, long[] projects,

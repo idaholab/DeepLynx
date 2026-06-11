@@ -138,7 +138,7 @@ public class QueryController : ControllerBase
     [HttpGet("records/paginated", Name = "api_get_records_paginated")]
     [Auth("read", "record")]
     public async Task<ActionResult<PaginatedResponse<QueryRecordViewResponseDto>>> GetRecordsPaginated(
-        long organizationId, [FromQuery] long[] projectIds, [FromQuery] string sortBy, [FromQuery] PaginatedRequestDto paginatedDto)
+        long organizationId, [FromQuery] long[] projectIds, [FromQuery] SortRecordsRequestDto sortBy, [FromQuery] PaginatedRequestDto paginatedDto)
     {
         try
         {
