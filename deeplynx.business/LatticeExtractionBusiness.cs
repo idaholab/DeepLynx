@@ -126,7 +126,7 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
             }
             else
             {
-                await MarkExtractionFailedInternal(
+                await MarkExtractionFailedWithStage(
                     extraction,
                     FailureStageInsightRequest,
                     $"Lattice extraction request failed with HTTP status {(int)response.StatusCode} ({response.StatusCode}).");
@@ -146,7 +146,7 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
                 Environment.GetEnvironmentVariable("LATTICE_MODEL") ?? "Mistral-Small-3.2-24B-Instruct-2506",
                 ex.StatusCode,
                 ex.ResponseBody);
-            await MarkExtractionFailedInternal(
+            await MarkExtractionFailedWithStage(
                 extraction,
                 FailureStageInsightRequest,
                 ex.Message,
@@ -157,7 +157,7 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
         {
             if (extraction.Status != ExtractionStatus.Failed)
             {
-                await MarkExtractionFailedInternal(
+                await MarkExtractionFailedWithStage(
                     extraction,
                     FailureStageTrigger,
                     ex.Message,
@@ -190,8 +190,7 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
     {
         var extraction = await _context.Extractions.FindAsync(extractionId)
                          ?? throw new InvalidOperationException($"Extraction {extractionId} not found.");
-        await EnsureExtractionScope(extraction, organizationId, projectId);
-        await EnsureDataSourceScope(dataSourceId, organizationId, projectId);
+        EnsureExtractionInProject(extraction, projectId);
 
         var failureStage = FailureStageCallback;
         try
@@ -248,7 +247,7 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
             catch (Exception ex)
             {
                 await transaction.RollbackAsync();
-                await MarkExtractionFailedInternal(
+                await MarkExtractionFailedWithStage(
                     extraction,
                     FailureStageStaging,
                     ex.Message,
@@ -258,7 +257,7 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
         }
         catch (Exception ex) when (extraction.Status != ExtractionStatus.Failed)
         {
-            await MarkExtractionFailedInternal(
+            await MarkExtractionFailedWithStage(
                 extraction,
                 failureStage,
                 ex.Message,
@@ -271,15 +270,9 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
     ///     Marks an extraction as failed. Called when Lattice reports an error via its error callback.
     /// </summary>
     /// <param name="extractionId">The ID of the extraction to mark as failed.</param>
+    /// <param name="organizationId">The ID of the organization from the callback route.</param>
+    /// <param name="projectId">The ID of the project from the callback route.</param>
     /// <param name="errorMessage">Optional error message from Lattice, logged by the caller.</param>
-    public async Task MarkExtractionFailed(long extractionId, string? errorMessage = null)
-    {
-        var extraction = await _context.Extractions.FindAsync(extractionId)
-                         ?? throw new InvalidOperationException($"Extraction {extractionId} not found.");
-
-        await MarkExtractionFailed(extraction, errorMessage);
-    }
-
     public async Task MarkExtractionFailed(
         long extractionId,
         long organizationId,
@@ -288,7 +281,7 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
     {
         var extraction = await _context.Extractions.FindAsync(extractionId)
                          ?? throw new InvalidOperationException($"Extraction {extractionId} not found.");
-        await EnsureExtractionScope(extraction, organizationId, projectId);
+        EnsureExtractionInProject(extraction, projectId);
 
         await MarkExtractionFailed(extraction, errorMessage);
     }
@@ -408,7 +401,7 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
     {
         var extraction = await _context.Extractions.FindAsync(extractionId)
                          ?? throw new InvalidOperationException($"Extraction {extractionId} not found.");
-        await EnsureExtractionScope(extraction, organizationId, projectId);
+        EnsureExtractionInProject(extraction, projectId);
 
         return await GetExtractionStaging(extraction);
     }
@@ -507,7 +500,7 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
     {
         var extraction = await _context.Extractions.FindAsync(extractionId)
                          ?? throw new InvalidOperationException($"Extraction {extractionId} not found.");
-        await EnsureExtractionScope(extraction, organizationId, projectId);
+        EnsureExtractionInProject(extraction, projectId);
 
         if (extraction.Status != ExtractionStatus.Complete)
             throw new InvalidOperationException(
@@ -1038,33 +1031,6 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
             "Please retry the extraction in a few minutes.");
     }
 
-    public async Task<List<ExtractionListItemDto>> ListExtractionsByUser(long userId, long projectId)
-    {
-        var extractions = await _context.Extractions
-            .Where(e => e.CreatedBy == userId && e.ProjectId == projectId)
-            .OrderByDescending(e => e.Id)
-            .Select(e => new
-            {
-                e.Id,
-                e.Status,
-                e.Mode,
-                e.CreatedBy,
-                e.Properties,
-            })
-            .ToListAsync();
-
-        return extractions
-            .Select(e => new ExtractionListItemDto
-            {
-                Id = e.Id,
-                Status = e.Status,
-                Mode = e.Mode,
-                CreatedBy = e.CreatedBy,
-                FailureMessage = GetExtractionFailureMessage(e.Properties),
-            })
-            .ToList();
-    }
-
     public async Task<EmbeddingStatusResponseDto> GetEmbeddingStatus(long projectId)
     {
         var projectExists = await _context.Projects.AnyAsync(p => p.Id == projectId);
@@ -1579,82 +1545,17 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
     }
 
     /// <summary>
-    ///     Verifies that a project exists within the specified organization and is not archived.
-    ///     Throws when the project is missing, archived, or belongs to a different organization.
-    /// </summary>
-    /// <param name="organizationId">The expected organization ID.</param>
-    /// <param name="projectId">The project ID to validate.</param>
-    /// <exception cref="InvalidOperationException">
-    ///     Thrown when the project is not found in the specified organization or is archived.
-    /// </exception>
-    private async Task EnsureProjectInOrganization(long organizationId, long projectId)
-    {
-        var projectExists = await _context.Projects.AnyAsync(p =>
-            p.Id == projectId &&
-            p.OrganizationId == organizationId &&
-            !p.IsArchived);
-
-        if (!projectExists)
-            throw new InvalidOperationException($"Project {projectId} not found in organization {organizationId}.");
-    }
-
-    /// <summary>
-    ///     Verifies that an extraction is within both the requested project scope and
-    ///     organization scope.
-    ///     First validates the extraction's project ID, then confirms that the project belongs
-    ///     to the organization and is not archived.
-    /// </summary>
-    /// <param name="extraction">The extraction record to validate.</param>
-    /// <param name="organizationId">The expected organization ID.</param>
-    /// <param name="projectId">The expected project ID.</param>
-    /// <exception cref="InvalidOperationException">
-    ///     Thrown when the extraction is outside the project scope, or when the project is not
-    ///     found in the specified organization.
-    /// </exception>
-    private async Task EnsureExtractionScope(Extraction extraction, long organizationId, long projectId)
-    {
-        EnsureExtractionInProject(extraction, projectId);
-        await EnsureProjectInOrganization(organizationId, projectId);
-    }
-
-    /// <summary>
-    ///     Verifies that a data source exists within the specified organization and project,
-    ///     and that it has not been archived.
-    ///     Throws when the data source is missing, archived, or outside the requested scope.
-    /// </summary>
-    /// <param name="dataSourceId">The data source ID to validate.</param>
-    /// <param name="organizationId">The expected organization ID.</param>
-    /// <param name="projectId">The expected project ID.</param>
-    /// <exception cref="InvalidOperationException">
-    ///     Thrown when the data source is not found in the specified organization and project,
-    ///     or when it is archived.
-    /// </exception>
-    private async Task EnsureDataSourceScope(long dataSourceId, long organizationId, long projectId)
-    {
-        var dataSourceExists = await _context.DataSources.AnyAsync(ds =>
-            ds.Id == dataSourceId &&
-            ds.ProjectId == projectId &&
-            ds.OrganizationId == organizationId &&
-            !ds.IsArchived);
-
-        if (!dataSourceExists)
-            throw new InvalidOperationException(
-                $"Data source {dataSourceId} not found in organization {organizationId}, project {projectId}.");
-    }
-
-    /// <summary>
-    ///     Marks an extraction as failed, stores normalized failure details in the extraction
-    ///     properties, persists the update, and writes an error log entry.
-    ///     If Insight does not provide a failure message, a default diagnostic message is used.
+    ///     Persists a failed extraction state for errors raised inside the trigger or callback
+    ///     workflow, storing the processing stage and diagnostic message for display and logging.
     /// </summary>
     /// <param name="extraction">The extraction record to mark as failed.</param>
     /// <param name="stage">The processing stage where the failure occurred.</param>
-    /// <param name="message">The failure message returned by Insight or generated by the caller.</param>
+    /// <param name="message">The failure message generated by the current workflow.</param>
     /// <param name="exception">
     ///     Optional exception associated with the failure. When provided, it is included in the
     ///     structured error log.
     /// </param>
-    private async Task MarkExtractionFailedInternal(
+    private async Task MarkExtractionFailedWithStage(
         Extraction extraction,
         string stage,
         string message,

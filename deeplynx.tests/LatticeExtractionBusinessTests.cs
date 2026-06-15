@@ -245,7 +245,7 @@ public class LatticeExtractionBusinessTests : IntegrationTestBase
     [Fact]
     public async Task MarkExtractionFailed_SetsStatusToFailed()
     {
-        await _business.MarkExtractionFailed(extractionId, "test error");
+        await _business.MarkExtractionFailed(extractionId, oid, pid, "test error");
 
         Context.ChangeTracker.Clear();
         var ex = await Context.Extractions.FindAsync(extractionId);
@@ -257,7 +257,7 @@ public class LatticeExtractionBusinessTests : IntegrationTestBase
     public async Task MarkExtractionFailed_Throws_WhenExtractionNotFound()
     {
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            _business.MarkExtractionFailed(NotFoundId));
+            _business.MarkExtractionFailed(NotFoundId, oid, pid));
     }
 
     [Fact]
@@ -283,7 +283,7 @@ public class LatticeExtractionBusinessTests : IntegrationTestBase
     // ListExtractionsByProject Tests
     // =========================================================================
 
-    #region ListExtractionsByUser Tests
+    #region ListExtractionsByProject Tests
 
     [Fact]
     public async Task ListExtractionsByProject_ReturnsExtractionsForCorrectProject()
@@ -336,7 +336,7 @@ public class LatticeExtractionBusinessTests : IntegrationTestBase
     public async Task ListExtractionsByProject_ReturnsFailureMessage()
     {
         const string failureMessage = "LLM model endpoint rejected the request.";
-        await _business.MarkExtractionFailed(extractionId, failureMessage);
+        await _business.MarkExtractionFailed(extractionId, oid, pid, failureMessage);
 
         var result = await _business.ListExtractionsByProject(pid);
 
