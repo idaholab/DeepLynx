@@ -10,6 +10,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using JsonSerializer = System.Text.Json.JsonSerializer;
+using deeplynx.helpers.Cache;
 
 namespace deeplynx.business;
 
@@ -60,7 +61,7 @@ public class FileBusiness
 
         _recommendedChunkSize = chunkSize;
     }
-
+    
     /// <summary>
     ///     Upload a File
     /// </summary>
@@ -169,6 +170,8 @@ public class FileBusiness
                             createdRecord.Uri!, vlmConfig, embeddingModelConfig, userJwt);
         }
 
+        await InvalidateProjectStorageSizeCache(projectId);
+
         return createdRecord;
     }
 
@@ -233,6 +236,8 @@ public class FileBusiness
             _insightBusiness.TriggerEmbedding(projectId, updatedRecord.Id, updatedRecord.Uri!, vlmConfig, embeddingModelConfig, userJwt, overwrite: true);
         }
 
+        await InvalidateProjectStorageSizeCache(projectId);
+        
         return updatedRecord;
     }
 
@@ -298,8 +303,12 @@ public class FileBusiness
         var fileBusiness = _factory.CreateFileBusiness(objectStorage.Type);
 
         await fileBusiness.DeleteFile(record, objectStorage.Config);
+        
+        var deleted = await _recordBusiness.DeleteRecord(currentUserId, organizationId, projectId, recordId);
+        
+        await InvalidateProjectStorageSizeCache(projectId);
 
-        return await _recordBusiness.DeleteRecord(currentUserId, organizationId, projectId, recordId);
+        return deleted;
 
         // Embeddings made by Insight that reference this record will be auto deleted
     }
@@ -462,6 +471,8 @@ public class FileBusiness
             _insightBusiness.TriggerEmbedding(projectId, createdRecord.Id,
                 createdRecord.Uri!, vlmConfig, embeddingModelConfig);
         }
+
+        await InvalidateProjectStorageSizeCache(projectId);
 
         return createdRecord;
     }
@@ -631,8 +642,18 @@ public class FileBusiness
                 }
             }
 
+            var affectedProjectIds = records
+                .Select(r => r.ProjectId)
+                .Distinct()
+                .ToList();
+
             // save progress after each batch so the backfill can resume if a later batch fails.
             await _context.SaveChangesAsync();
+
+            foreach (var affectedProjectId in affectedProjectIds)
+            {
+                await InvalidateProjectStorageSizeCache(affectedProjectId);
+            }
 
             afterRecordId = response.LastRecordId;
 
@@ -762,6 +783,8 @@ public class FileBusiness
             var createdRecord = await _recordBusiness.CreateRecord(currentUserId, organizationId, projectId,
                 realDataSourceId, recordRequest, sensitivityLabelIds, embedded: embed);
 
+            await InvalidateProjectStorageSizeCache(projectId);
+
             if (embed)
             {
                 var vlmConfig = await _insightBusiness.ResolveModelConfig(currentUserId, organizationId, projectId, vlmConfigId, "vlm");
@@ -779,6 +802,12 @@ public class FileBusiness
     // Private helpers
     // -------------------------------------------------------------------------
 
+    private static async Task InvalidateProjectStorageSizeCache(long projectId)
+    {
+        await CacheService.Instance.DeleteAsync(
+            CacheKeys.ProjectStorageSize(projectId));
+    }
+    
     private async Task<long> ResolveDataSourceId(long organizationId, long projectId, long? dataSourceId)
     {
         if (dataSourceId.HasValue)
