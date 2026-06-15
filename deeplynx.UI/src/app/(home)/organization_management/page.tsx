@@ -3,10 +3,7 @@
 import { getAllGroupsServer } from "@/app/lib/server_service/group_services.server";
 import { getAllProjectsServer } from "@/app/lib/server_service/projects_services.server";
 import { getAllOrgRolesServer } from "@/app/lib/server_service/role_services.server";
-import {
-  getAllUsersServer,
-  getCurrentUserServer,
-} from "@/app/lib/server_service/user_services.server";
+import { getAllUsersServer } from "@/app/lib/server_service/user_services.server";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { mapToProjectResponseDtos } from "../page";

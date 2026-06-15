@@ -26,10 +26,10 @@ export async function requireOrgAdminServer(organizationId?: number) {
 }
 
 export async function requireProjectAdminServer(
-  orfanizationId: number,
+  organizationId: number,
   projectId: number,
 ) {
-  const currentUser = await getCurrentUserServer(orfanizationId, projectId);
+  const currentUser = await getCurrentUserServer(organizationId, projectId);
 
   if (
     !currentUser.isSysAdmin &&

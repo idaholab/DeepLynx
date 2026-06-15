@@ -8,10 +8,7 @@ import {
 } from "../types/responseDTOs";
 import { getAllOrganizationsServer } from "@/app/lib/server_service/organization_services.server";
 import { getAllOauthApplicationsServer } from "@/app/lib/server_service/oauth_services.server";
-import {
-  getAllUsersServer,
-  getCurrentUserServer,
-} from "@/app/lib/server_service/user_services.server";
+import { getAllUsersServer } from "@/app/lib/server_service/user_services.server";
 import { getAllProjectsServer } from "@/app/lib/server_service/projects_services.server";
 import { cookies } from "next/headers";
 import { auth } from "../../../../auth";

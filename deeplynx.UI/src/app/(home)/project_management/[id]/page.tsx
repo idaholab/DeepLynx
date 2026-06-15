@@ -18,7 +18,6 @@ import {
 } from "@/app/lib/server_service/projects_services.server";
 import { getAllRolesServer } from "@/app/lib/server_service/role_services.server";
 import { getAllPermissionsServer } from "@/app/lib/server_service/permissions_services.server";
-import { getCurrentUserServer } from "@/app/lib/server_service/user_services.server";
 import { requireProjectAdminServer } from "@/app/lib/server_service/rbac_guards.server";
 
 export const dynamic = "force-dynamic";
