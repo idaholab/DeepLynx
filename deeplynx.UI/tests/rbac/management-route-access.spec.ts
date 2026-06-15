@@ -58,7 +58,7 @@ test.describe("management route RBAC", () => {
   }) => {
     const user = await getCurrentUser();
     test.skip(!user, "Backend current-user endpoint is unavailable.");
-    test.skip(user.isSysAdmin, "Current test user is a sys admin.");
+    test.skip(user?.isSysAdmin === true, "Current test user is a sys admin.");
 
     await page.goto("/site_management", { waitUntil: "domcontentloaded" });
     await expect(page).toHaveURL(/\/unauthorized$/);
