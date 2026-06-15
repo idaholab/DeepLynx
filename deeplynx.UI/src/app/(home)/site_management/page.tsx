@@ -16,6 +16,7 @@ import { getAllProjectsServer } from "@/app/lib/server_service/projects_services
 import { cookies } from "next/headers";
 import { auth } from "../../../../auth";
 import { redirect } from "next/navigation";
+import { requireSystemAdminServer } from "@/app/lib/server_service/rbac_guards.server";
 
 export const dynamic = "force-dynamic";
 
@@ -42,10 +43,7 @@ const SysAdminPage = async () => {
     organizationId = session?.user?.organizationId;
   }
 
-  const currentUser = await getCurrentUserServer(organizationId);
-  if (!currentUser.isSysAdmin) {
-    redirect("/");
-  }
+  await requireSystemAdminServer(organizationId);
 
   // Fetch all data
   const OrganizationResponseDtos =
@@ -53,10 +51,10 @@ const SysAdminPage = async () => {
   const oAuthApplications =
     (await getAllOauthApplicationsServer()) as OauthApplicationResponseDto[];
   const members = (await getAllUsersServer()) as UserResponseDto[];
-  
+
   // Fetch projects filtered by organization
   const projects = (await getAllProjectsServer(
-    organizationId as number
+    organizationId as number,
   )) as ProjectResponseDto[];
   const initialProjects = projects.map((p) => ({
     id: String(p.id),

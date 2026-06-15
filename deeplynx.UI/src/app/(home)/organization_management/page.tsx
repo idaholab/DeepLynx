@@ -2,9 +2,7 @@
 
 import { getAllGroupsServer } from "@/app/lib/server_service/group_services.server";
 import { getAllProjectsServer } from "@/app/lib/server_service/projects_services.server";
-import {
-  getAllOrgRolesServer,
-} from "@/app/lib/server_service/role_services.server";
+import { getAllOrgRolesServer } from "@/app/lib/server_service/role_services.server";
 import {
   getAllUsersServer,
   getCurrentUserServer,
@@ -21,6 +19,7 @@ import {
 } from "../types/responseDTOs";
 import OrganizationManagmentClient from "./OrganizationManagementClient";
 import { getAllOrgPermissionsServer } from "@/app/lib/server_service/permissions_services.server";
+import { requireOrgAdminServer } from "@/app/lib/server_service/rbac_guards.server";
 
 export const dynamic = "force-dynamic";
 
@@ -51,10 +50,7 @@ const OrganizationManagementPage = async ({
     redirect("/select-org");
   }
 
-  const currentUser = await getCurrentUserServer(Number(organizationId));
-  if (!currentUser.isSysAdmin && !currentUser.isOrgAdmin) {
-    redirect("/");
-  }
+  await requireOrgAdminServer(organizationId as number);
 
   // Fetch projects filtered by organization
   let projects: ProjectResponseDto[] = [];
@@ -84,7 +80,10 @@ const OrganizationManagementPage = async ({
   try {
     // First, fetch roles for the organization
     roles = await getAllOrgRolesServer(Number(organizationId));
-    permissions = await getAllOrgPermissionsServer(Number(organizationId), true);
+    permissions = await getAllOrgPermissionsServer(
+      Number(organizationId),
+      true,
+    );
   } catch (error) {
     console.error("Failed to fetch roles or permissions:", error);
   }
