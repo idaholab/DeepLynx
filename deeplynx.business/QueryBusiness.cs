@@ -523,11 +523,11 @@ public class QueryBusiness : IQueryBusiness
 
         query = sortBy switch
         {
-            SortRecordsRequestDto.NameAZ => query.OrderBy(r => (r.Name ?? "").ToLower()),
-            SortRecordsRequestDto.NameZA => query.OrderByDescending(r => (r.Name ?? "").ToLower()),
-            SortRecordsRequestDto.DateNew => query.OrderByDescending(r => r.LastUpdatedAt),
-            SortRecordsRequestDto.DateOld => query.OrderBy(r => r.LastUpdatedAt),
-            _ => query
+            SortRecordsRequestDto.NameAZ => query.OrderBy(r => (r.Name ?? "").ToLower()).ThenBy(r => r.Id),
+            SortRecordsRequestDto.NameZA => query.OrderByDescending(r => (r.Name ?? "").ToLower()).ThenBy(r => r.Id),
+            SortRecordsRequestDto.DateNew => query.OrderByDescending(r => r.LastUpdatedAt).ThenBy(r => r.Id),
+            SortRecordsRequestDto.DateOld => query.OrderBy(r => r.LastUpdatedAt).ThenBy(r => r.Id),
+            _ => query.OrderByDescending(r => r.LastUpdatedAt).ThenBy(r => r.Id), // Sorts date by default
         };
 
         return await Paginator.Paginate(paginated, query, r => QueryRecordToResponse(r));
