@@ -5,7 +5,10 @@ import { getAllProjectsServer } from "@/app/lib/server_service/projects_services
 import {
   getAllOrgRolesServer,
 } from "@/app/lib/server_service/role_services.server";
-import { getAllUsersServer } from "@/app/lib/server_service/user_services.server";
+import {
+  getAllUsersServer,
+  getCurrentUserServer,
+} from "@/app/lib/server_service/user_services.server";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { mapToProjectResponseDtos } from "../page";
@@ -46,6 +49,11 @@ const OrganizationManagementPage = async ({
   } catch (e) {
     console.error("Failed to parse organization session:", e);
     redirect("/select-org");
+  }
+
+  const currentUser = await getCurrentUserServer(Number(organizationId));
+  if (!currentUser.isSysAdmin && !currentUser.isOrgAdmin) {
+    redirect("/");
   }
 
   // Fetch projects filtered by organization
