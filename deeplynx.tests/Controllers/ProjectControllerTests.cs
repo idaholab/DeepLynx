@@ -75,7 +75,7 @@ public class ProjectControllerTests : IDisposable
         _mockBusiness.Setup(b => b.GetAllProjects(UserId, OrgId, true))
                      .ReturnsAsync(expected);
 
-        var result = (await _controller.GetAllProjects(OrgId)).Result as OkObjectResult;
+        var result = (await _controller.GetAllProjects(OrgId, true)).Result as OkObjectResult;
 
         Assert.NotNull(result);
         Assert.Equal(200, result.StatusCode);
@@ -89,7 +89,7 @@ public class ProjectControllerTests : IDisposable
                          It.IsAny<long>(), It.IsAny<long>(), It.IsAny<bool>()))
                      .ReturnsAsync([]);
 
-        var result = (await _controller.GetAllProjects(OrgId)).Result as OkObjectResult;
+        var result = (await _controller.GetAllProjects(OrgId, true)).Result as OkObjectResult;
 
         Assert.NotNull(result);
         Assert.Equal(200, result.StatusCode);
@@ -103,7 +103,7 @@ public class ProjectControllerTests : IDisposable
                          It.IsAny<long>(), It.IsAny<long>(), It.IsAny<bool>()))
                      .ThrowsAsync(new Exception("db error"));
 
-        var result = (await _controller.GetAllProjects(OrgId)).Result as ObjectResult;
+        var result = (await _controller.GetAllProjects(OrgId, true)).Result as ObjectResult;
 
         Assert.NotNull(result);
         Assert.Equal(500, result.StatusCode);
@@ -143,7 +143,7 @@ public class ProjectControllerTests : IDisposable
                      .ReturnsAsync(expected);
 
         var result = (await _controller.GetAllProjectsByUser(
-            OrgId, OtherUserId)).Result as OkObjectResult;
+            OrgId, OtherUserId, true)).Result as OkObjectResult;
 
         Assert.NotNull(result);
         Assert.Equal(200, result.StatusCode);
@@ -158,7 +158,7 @@ public class ProjectControllerTests : IDisposable
                      .ReturnsAsync([]);
 
         var result = (await _controller.GetAllProjectsByUser(
-            OrgId, OtherUserId)).Result as OkObjectResult;
+            OrgId, OtherUserId, true)).Result as OkObjectResult;
 
         Assert.NotNull(result);
         Assert.Equal(200, result.StatusCode);
@@ -173,7 +173,7 @@ public class ProjectControllerTests : IDisposable
                      .ThrowsAsync(new Exception("db error"));
 
         var result = (await _controller.GetAllProjectsByUser(
-            OrgId, OtherUserId)).Result as ObjectResult;
+            OrgId, OtherUserId, true)).Result as ObjectResult;
 
         Assert.NotNull(result);
         Assert.Equal(500, result.StatusCode);
@@ -208,7 +208,7 @@ public class ProjectControllerTests : IDisposable
                      .ReturnsAsync(expected);
 
         var result = (await _controller.GetProject(
-            OrgId, ProjectId)).Result as OkObjectResult;
+            OrgId, ProjectId, true)).Result as OkObjectResult;
 
         Assert.NotNull(result);
         Assert.Equal(200, result.StatusCode);
@@ -223,7 +223,7 @@ public class ProjectControllerTests : IDisposable
                      .ThrowsAsync(new Exception("db error"));
 
         var result = (await _controller.GetProject(
-            OrgId, ProjectId)).Result as ObjectResult;
+            OrgId, ProjectId, true)).Result as ObjectResult;
 
         Assert.NotNull(result);
         Assert.Equal(500, result.StatusCode);
