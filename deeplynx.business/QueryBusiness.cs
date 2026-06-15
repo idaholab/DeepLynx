@@ -471,6 +471,7 @@ public class QueryBusiness : IQueryBusiness
                 currentUserId, organizationId, projectIds, "read record");
 
             var authorizedRecordIds = await _context.Records
+                .Where(rec => rec.OrganizationId == organizationId && projectIds.Contains(rec.ProjectId))
                 .WithAuthorizedLabels(authorizedLabelIds)
                 .Select(rec => rec.Id)
                 .ToListAsync();
@@ -512,6 +513,7 @@ public class QueryBusiness : IQueryBusiness
                 currentUserId, organizationId, projectId, "read record");
 
             var authorizedRecordIds = await _context.Records
+                .Where(rec => rec.OrganizationId == organizationId && projectId.Contains(rec.ProjectId))
                 .WithAuthorizedLabels(authorizedLabelIds)
                 .Select(rec => rec.Id)
                 .ToListAsync();
@@ -585,6 +587,7 @@ public class QueryBusiness : IQueryBusiness
                 currentUserId, organizationId, projects, "read record");
 
             var authorizedRecordIds = await _context.Records
+                .Where(rec => rec.OrganizationId == organizationId && projects.Contains(rec.ProjectId))
                 .WithAuthorizedLabels(authorizedLabelIds)
                 .Select(rec => rec.Id)
                 .ToListAsync();
