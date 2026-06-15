@@ -33,8 +33,8 @@ export async function getCurrentUserServer(
   if (projectId !== undefined) {
     params.projectId = String(projectId);
   }
-  const qs = new URLSearchParams(params);
-  const suffix = qs.toString() ? `?${qs.toString()}` : "";
+  const query = new URLSearchParams(params).toString();
+  const suffix = query ? `?${query}` : "";
   const res = await apiFetch(`users/current${suffix}`);
   return asJson<UserAdminInfoDto>(res);
 }

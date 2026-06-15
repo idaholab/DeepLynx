@@ -12,7 +12,6 @@ import { getAllUsersServer } from "@/app/lib/server_service/user_services.server
 import { getAllProjectsServer } from "@/app/lib/server_service/projects_services.server";
 import { cookies } from "next/headers";
 import { auth } from "../../../../auth";
-import { redirect } from "next/navigation";
 import { requireSystemAdminServer } from "@/app/lib/server_service/rbac_guards.server";
 
 export const dynamic = "force-dynamic";

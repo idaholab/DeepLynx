@@ -11,8 +11,6 @@ export async function requireSystemAdminServer(organizationId?: number) {
   if (!currentUser.isSysAdmin) {
     redirect(UNAUTHORIZED_ROUTE);
   }
-
-  return currentUser;
 }
 
 export async function requireOrgAdminServer(organizationId?: number) {
@@ -21,8 +19,6 @@ export async function requireOrgAdminServer(organizationId?: number) {
   if (!currentUser.isSysAdmin && !currentUser.isOrgAdmin) {
     redirect(UNAUTHORIZED_ROUTE);
   }
-
-  return currentUser;
 }
 
 export async function requireProjectAdminServer(
@@ -38,6 +34,4 @@ export async function requireProjectAdminServer(
   ) {
     redirect(UNAUTHORIZED_ROUTE);
   }
-
-  return currentUser;
 }
