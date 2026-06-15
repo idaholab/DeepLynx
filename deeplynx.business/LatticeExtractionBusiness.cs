@@ -42,116 +42,6 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
     private const int RequiredOntologyRelationshipCount = 1;
     private static readonly string[] DefaultOntologyClassNames = { "File", "Report", "Timeseries" };
 
-    private static string RelationshipPatternKey(
-        string subjectType,
-        string relationshipType,
-        string objectType) =>
-        $"{subjectType.Trim()}|{relationshipType.Trim()}|{objectType.Trim()}";
-
-    private static JsonObject GetExtractionProperties(string? properties)
-    {
-        if (string.IsNullOrWhiteSpace(properties))
-            return new JsonObject();
-
-        try
-        {
-            return JsonNode.Parse(properties)?.AsObject() ?? new JsonObject();
-        }
-        catch
-        {
-            return new JsonObject();
-        }
-    }
-
-    private static void SetExtractionFailureProperties(
-        Extraction extraction,
-        string stage,
-        string message)
-    {
-        var properties = GetExtractionProperties(extraction.Properties);
-        properties["failure_stage"] = stage;
-        properties["failure_message"] = message;
-        properties["failed_at"] = DateTimeOffset.UtcNow.ToString("O");
-        extraction.Properties = properties.ToJsonString();
-    }
-
-    private static string? GetExtractionFailureMessage(string? properties)
-    {
-        var extractionProperties = GetExtractionProperties(properties);
-        return extractionProperties.TryGetPropertyValue("failure_message", out var messageNode)
-            ? messageNode?.GetValue<string>()
-            : null;
-    }
-
-    private static void EnsureExtractionInProject(Extraction extraction, long projectId)
-    {
-        if (extraction.ProjectId != projectId)
-            throw new InvalidOperationException($"Extraction {extraction.Id} not found in project {projectId}.");
-    }
-
-    private async Task EnsureProjectInOrganization(long organizationId, long projectId)
-    {
-        var projectExists = await _context.Projects.AnyAsync(p =>
-            p.Id == projectId &&
-            p.OrganizationId == organizationId &&
-            !p.IsArchived);
-
-        if (!projectExists)
-            throw new InvalidOperationException($"Project {projectId} not found in organization {organizationId}.");
-    }
-
-    private async Task EnsureExtractionScope(Extraction extraction, long organizationId, long projectId)
-    {
-        EnsureExtractionInProject(extraction, projectId);
-        await EnsureProjectInOrganization(organizationId, projectId);
-    }
-
-    private async Task EnsureDataSourceScope(long dataSourceId, long organizationId, long projectId)
-    {
-        var dataSourceExists = await _context.DataSources.AnyAsync(ds =>
-            ds.Id == dataSourceId &&
-            ds.ProjectId == projectId &&
-            ds.OrganizationId == organizationId &&
-            !ds.IsArchived);
-
-        if (!dataSourceExists)
-            throw new InvalidOperationException(
-                $"Data source {dataSourceId} not found in organization {organizationId}, project {projectId}.");
-    }
-
-    private async Task MarkExtractionFailedInternal(
-        Extraction extraction,
-        string stage,
-        string message,
-        Exception? exception = null)
-    {
-        if (string.IsNullOrWhiteSpace(message))
-            message = "Insight reported that extraction failed, but did not include a failure message.";
-
-        extraction.Status = ExtractionStatus.Failed;
-        SetExtractionFailureProperties(extraction, stage, message);
-
-        await _context.SaveChangesAsync();
-
-        if (exception != null)
-        {
-            _logger.LogError(
-                exception,
-                "Lattice extraction {ExtractionId} failed at stage {FailureStage}: {FailureMessage}",
-                extraction.Id,
-                stage,
-                message);
-        }
-        else
-        {
-            _logger.LogError(
-                "Lattice extraction {ExtractionId} failed at stage {FailureStage}: {FailureMessage}",
-                extraction.Id,
-                stage,
-                message);
-        }
-    }
-
     /// <summary>
     ///     Creates a Pending Extraction record, builds ontology context via similarity search,
     ///     and fires the trigger request to Insight.
@@ -1590,5 +1480,210 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
         await _latticeContext.SaveChangesAsync();
 
         return edgePairs.Count;
+    }
+
+    /// <summary>
+    ///     Builds a stable key that uniquely identifies a relationship pattern by combining
+    ///     the subject type, relationship type, and object type.
+    ///     Leading and trailing whitespace is removed from each component before the key is
+    ///     created.
+    /// </summary>
+    /// <param name="subjectType">The ontology/entity type for the relationship subject.</param>
+    /// <param name="relationshipType">The type or name of the relationship between the subject and object.</param>
+    /// <param name="objectType">The ontology/entity type for the relationship object.</param>
+    /// <returns>
+    ///     A pipe-delimited relationship pattern key in the format
+    ///     <c>subjectType|relationshipType|objectType</c>.
+    /// </returns>
+    private static string RelationshipPatternKey(
+        string subjectType,
+        string relationshipType,
+        string objectType) =>
+        $"{subjectType.Trim()}|{relationshipType.Trim()}|{objectType.Trim()}";
+
+    /// <summary>
+    ///     Parses the serialized extraction properties JSON into a mutable JSON object.
+    ///     Returns an empty object when the input is null, empty, whitespace, invalid JSON,
+    ///     or does not parse to a JSON object.
+    /// </summary>
+    /// <param name="properties">Serialized extraction properties JSON.</param>
+    /// <returns>
+    ///     A mutable <see cref="JsonObject"/> containing the parsed extraction properties,
+    ///     or an empty object when no valid properties are available.
+    /// </returns>
+    private static JsonObject GetExtractionProperties(string? properties)
+    {
+        if (string.IsNullOrWhiteSpace(properties))
+            return new JsonObject();
+
+        try
+        {
+            return JsonNode.Parse(properties)?.AsObject() ?? new JsonObject();
+        }
+        catch
+        {
+            return new JsonObject();
+        }
+    }
+
+    /// <summary>
+    ///     Records failure details on an extraction by updating its serialized properties.
+    ///     Existing properties are preserved, and the failure stage, failure message, and
+    ///     UTC failure timestamp are added or overwritten.
+    /// </summary>
+    /// <param name="extraction">The extraction record to update with failure metadata.</param>
+    /// <param name="stage">The processing stage where the failure occurred.</param>
+    /// <param name="message">The failure message to store for diagnostics and display.</param>
+    private static void SetExtractionFailureProperties(
+        Extraction extraction,
+        string stage,
+        string message)
+    {
+        var properties = GetExtractionProperties(extraction.Properties);
+        properties["failure_stage"] = stage;
+        properties["failure_message"] = message;
+        properties["failed_at"] = DateTimeOffset.UtcNow.ToString("O");
+        extraction.Properties = properties.ToJsonString();
+    }
+
+    /// <summary>
+    ///     Reads the stored failure message from serialized extraction properties.
+    ///     Returns null when the properties are missing, invalid, or do not contain a
+    ///     failure message.
+    /// </summary>
+    /// <param name="properties">Serialized extraction properties JSON.</param>
+    /// <returns>
+    ///     The stored failure message, or null when no failure message is available.
+    /// </returns>
+    private static string? GetExtractionFailureMessage(string? properties)
+    {
+        var extractionProperties = GetExtractionProperties(properties);
+        return extractionProperties.TryGetPropertyValue("failure_message", out var messageNode)
+            ? messageNode?.GetValue<string>()
+            : null;
+    }
+
+    /// <summary>
+    ///     Verifies that an extraction belongs to the expected project.
+    ///     Throws when the extraction is outside the requested project scope.
+    /// </summary>
+    /// <param name="extraction">The extraction record to validate.</param>
+    /// <param name="projectId">The expected project ID.</param>
+    /// <exception cref="InvalidOperationException">
+    ///     Thrown when the extraction does not belong to the specified project.
+    /// </exception>
+    private static void EnsureExtractionInProject(Extraction extraction, long projectId)
+    {
+        if (extraction.ProjectId != projectId)
+            throw new InvalidOperationException($"Extraction {extraction.Id} not found in project {projectId}.");
+    }
+
+    /// <summary>
+    ///     Verifies that a project exists within the specified organization and is not archived.
+    ///     Throws when the project is missing, archived, or belongs to a different organization.
+    /// </summary>
+    /// <param name="organizationId">The expected organization ID.</param>
+    /// <param name="projectId">The project ID to validate.</param>
+    /// <exception cref="InvalidOperationException">
+    ///     Thrown when the project is not found in the specified organization or is archived.
+    /// </exception>
+    private async Task EnsureProjectInOrganization(long organizationId, long projectId)
+    {
+        var projectExists = await _context.Projects.AnyAsync(p =>
+            p.Id == projectId &&
+            p.OrganizationId == organizationId &&
+            !p.IsArchived);
+
+        if (!projectExists)
+            throw new InvalidOperationException($"Project {projectId} not found in organization {organizationId}.");
+    }
+
+    /// <summary>
+    ///     Verifies that an extraction is within both the requested project scope and
+    ///     organization scope.
+    ///     First validates the extraction's project ID, then confirms that the project belongs
+    ///     to the organization and is not archived.
+    /// </summary>
+    /// <param name="extraction">The extraction record to validate.</param>
+    /// <param name="organizationId">The expected organization ID.</param>
+    /// <param name="projectId">The expected project ID.</param>
+    /// <exception cref="InvalidOperationException">
+    ///     Thrown when the extraction is outside the project scope, or when the project is not
+    ///     found in the specified organization.
+    /// </exception>
+    private async Task EnsureExtractionScope(Extraction extraction, long organizationId, long projectId)
+    {
+        EnsureExtractionInProject(extraction, projectId);
+        await EnsureProjectInOrganization(organizationId, projectId);
+    }
+
+    /// <summary>
+    ///     Verifies that a data source exists within the specified organization and project,
+    ///     and that it has not been archived.
+    ///     Throws when the data source is missing, archived, or outside the requested scope.
+    /// </summary>
+    /// <param name="dataSourceId">The data source ID to validate.</param>
+    /// <param name="organizationId">The expected organization ID.</param>
+    /// <param name="projectId">The expected project ID.</param>
+    /// <exception cref="InvalidOperationException">
+    ///     Thrown when the data source is not found in the specified organization and project,
+    ///     or when it is archived.
+    /// </exception>
+    private async Task EnsureDataSourceScope(long dataSourceId, long organizationId, long projectId)
+    {
+        var dataSourceExists = await _context.DataSources.AnyAsync(ds =>
+            ds.Id == dataSourceId &&
+            ds.ProjectId == projectId &&
+            ds.OrganizationId == organizationId &&
+            !ds.IsArchived);
+
+        if (!dataSourceExists)
+            throw new InvalidOperationException(
+                $"Data source {dataSourceId} not found in organization {organizationId}, project {projectId}.");
+    }
+
+    /// <summary>
+    ///     Marks an extraction as failed, stores normalized failure details in the extraction
+    ///     properties, persists the update, and writes an error log entry.
+    ///     If Insight does not provide a failure message, a default diagnostic message is used.
+    /// </summary>
+    /// <param name="extraction">The extraction record to mark as failed.</param>
+    /// <param name="stage">The processing stage where the failure occurred.</param>
+    /// <param name="message">The failure message returned by Insight or generated by the caller.</param>
+    /// <param name="exception">
+    ///     Optional exception associated with the failure. When provided, it is included in the
+    ///     structured error log.
+    /// </param>
+    private async Task MarkExtractionFailedInternal(
+        Extraction extraction,
+        string stage,
+        string message,
+        Exception? exception = null)
+    {
+        if (string.IsNullOrWhiteSpace(message))
+            message = "Insight reported that extraction failed, but did not include a failure message.";
+
+        extraction.Status = ExtractionStatus.Failed;
+        SetExtractionFailureProperties(extraction, stage, message);
+
+        await _context.SaveChangesAsync();
+
+        if (exception != null)
+        {
+            _logger.LogError(
+                exception,
+                "Lattice extraction {ExtractionId} failed at stage {FailureStage}: {FailureMessage}",
+                extraction.Id,
+                stage,
+                message);
+        }
+        else
+        {
+            _logger.LogError(
+                "Lattice extraction {ExtractionId} failed at stage {FailureStage}: {FailureMessage}",
+                extraction.Id,
+                stage,
+                message);
+        }
     }
 }
