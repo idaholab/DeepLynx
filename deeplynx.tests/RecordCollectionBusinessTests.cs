@@ -253,8 +253,85 @@ public class RecordCollectionBusinessTests : IntegrationTestBase
         _collectionId = collection.Id;
         _archivedCollectionId = archivedCollection.Id;
     }
+
+    private async Task<RecordCollection> CreateRecordCollectionAsync(
+        string name,
+        string description,
+        DateTime? lastUpdatedAt = null,
+        IEnumerable<long>? tagIds = null,
+        IEnumerable<long>? labelIds = null,
+        IEnumerable<long>? recordIds = null,
+        bool isArchived = false)
+    {
+        var tags = tagIds?.Any() == true
+            ? await Context.Tags.Where(t => tagIds.Contains(t.Id)).ToListAsync()
+            : new List<Tag>();
+        var labels = labelIds?.Any() == true
+            ? await Context.SensitivityLabels.Where(l => labelIds.Contains(l.Id)).ToListAsync()
+            : new List<SensitivityLabel>();
+        var records = recordIds?.Any() == true
+            ? await Context.Records.Where(r => recordIds.Contains(r.Id)).ToListAsync()
+            : new List<Record>();
+
+        var collection = new RecordCollection
+        {
+            Name = name,
+            Description = description,
+            Properties = JsonSerializer.Serialize(new { source = "test" }),
+            ProjectId = _projectId,
+            OrganizationId = _organizationId,
+            LastUpdatedAt = lastUpdatedAt ?? DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = _userId,
+            IsArchived = isArchived,
+            Tags = tags,
+            Labels = labels,
+            Records = records
+        };
+
+        Context.RecordCollections.Add(collection);
+        await Context.SaveChangesAsync();
+        return collection;
+    }
     
     #region Get all Tests
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    [InlineData(-500)]
+    public void GetValidatedPageSize_ReturnsDefault_WhenPageSizeIsNonPositive(int pageSize)
+    {
+        var dto = new RecordCollectionQueryRequestDto { PageSize = pageSize };
+
+        var result = dto.GetValidatedPageSize();
+
+        Assert.Equal(25, result);
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(10)]
+    [InlineData(500)]
+    public void GetValidatedPageSize_ReturnsConfiguredValue_WhenWithinBounds(int pageSize)
+    {
+        var dto = new RecordCollectionQueryRequestDto { PageSize = pageSize };
+
+        var result = dto.GetValidatedPageSize();
+
+        Assert.Equal(pageSize, result);
+    }
+
+    [Theory]
+    [InlineData(501)]
+    [InlineData(1000)]
+    public void GetValidatedPageSize_ClampsToMaximum_WhenPageSizeExceedsLimit(int pageSize)
+    {
+        var dto = new RecordCollectionQueryRequestDto { PageSize = pageSize };
+
+        var result = dto.GetValidatedPageSize();
+
+        Assert.Equal(500, result);
+    }
+
     [Fact]
     public async Task GetAllRecordCollections_HideArchived_ReturnsOnlyActiveCollections()
     {
@@ -264,7 +341,7 @@ public class RecordCollectionBusinessTests : IntegrationTestBase
 
         Assert.Equal(1, result.TotalCount);
         Assert.Equal(1, result.PageNumber);
-        Assert.Equal(25, result.PageSize);
+        Assert.Equal(queryDto.GetValidatedPageSize(), result.PageSize);
         var collection = Assert.Single(result.Items);
         Assert.Equal(_collectionId, collection.Id);
         Assert.False(collection.IsArchived);
@@ -316,6 +393,113 @@ public class RecordCollectionBusinessTests : IntegrationTestBase
         Assert.NotEmpty(result.Items);
         Assert.Contains(result.Items, c => c.Id == accessibleCollection.Id);
         Assert.DoesNotContain(result.Items, c => c.Id == restrictedCollection.Id);
+    }
+
+    [Fact]
+    public async Task GetAllRecordCollections_Search_MatchesRelatedTagAndLabelNames()
+    {
+        var matchedCollection = await CreateRecordCollectionAsync(
+            "Tagged Collection",
+            "search target",
+            tagIds: new[] { _tagId2 },
+            labelIds: new[] { _labelId2 });
+        await CreateRecordCollectionAsync(
+            "Non Matching Collection",
+            "control group",
+            tagIds: new[] { _tagId1 },
+            labelIds: new[] { _labelId });
+
+        var tagQuery = new RecordCollectionQueryRequestDto { Search = "tag-two" };
+        var tagResult = await _recordCollectionBusiness.GetAllRecordCollections(
+            _userId, _organizationId, _projectId, tagQuery, true, isSysAdmin: true);
+
+        Assert.Contains(tagResult.Items, c => c.Id == matchedCollection.Id);
+        Assert.DoesNotContain(tagResult.Items, c => c.Id == _collectionId);
+
+        var labelQuery = new RecordCollectionQueryRequestDto { Search = "label-two" };
+        var labelResult = await _recordCollectionBusiness.GetAllRecordCollections(
+            _userId, _organizationId, _projectId, labelQuery, true, isSysAdmin: true);
+
+        Assert.Contains(labelResult.Items, c => c.Id == matchedCollection.Id);
+        Assert.DoesNotContain(labelResult.Items, c => c.Id == _collectionId);
+    }
+
+    [Fact]
+    public async Task GetAllRecordCollections_FilterBySensitivityLabelIds_ReturnsCollectionsWithAllSelectedLabels()
+    {
+        var bothLabelsCollection = await CreateRecordCollectionAsync(
+            "Both Labels",
+            "matches all labels",
+            labelIds: new[] { _labelId, _labelId2 });
+        await CreateRecordCollectionAsync(
+            "Only Second Label",
+            "missing first label",
+            labelIds: new[] { _labelId2 });
+
+        var queryDto = new RecordCollectionQueryRequestDto
+        {
+            SensitivityLabelIds = new[] { _labelId, _labelId2 }
+        };
+
+        var result = await _recordCollectionBusiness.GetAllRecordCollections(
+            _userId, _organizationId, _projectId, queryDto, true, isSysAdmin: true);
+
+        var collection = Assert.Single(result.Items);
+        Assert.Equal(bothLabelsCollection.Id, collection.Id);
+    }
+
+    [Fact]
+    public async Task GetAllRecordCollections_FilterByTagIds_ReturnsCollectionsWithAllSelectedTags()
+    {
+        var bothTagsCollection = await CreateRecordCollectionAsync(
+            "Both Tags",
+            "matches all tags",
+            tagIds: new[] { _tagId1, _tagId2 });
+        await CreateRecordCollectionAsync(
+            "Only Second Tag",
+            "missing first tag",
+            tagIds: new[] { _tagId2 });
+
+        var queryDto = new RecordCollectionQueryRequestDto
+        {
+            TagIds = new[] { _tagId1, _tagId2 }
+        };
+
+        var result = await _recordCollectionBusiness.GetAllRecordCollections(
+            _userId, _organizationId, _projectId, queryDto, true, isSysAdmin: true);
+
+        var collection = Assert.Single(result.Items);
+        Assert.Equal(bothTagsCollection.Id, collection.Id);
+    }
+
+    [Fact]
+    public async Task GetAllRecordCollections_SortAndPaginate_ReturnsRequestedSlice()
+    {
+        var timestamp = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
+        await CreateRecordCollectionAsync("alpha-page", "page-set", timestamp.AddMinutes(-3));
+        await CreateRecordCollectionAsync("bravo-page", "page-set", timestamp.AddMinutes(-2));
+        var charlieCollection = await CreateRecordCollectionAsync(
+            "charlie-page",
+            "page-set",
+            timestamp.AddMinutes(-1));
+
+        var queryDto = new RecordCollectionQueryRequestDto
+        {
+            Search = "page-set",
+            Sort = "alphabeticalAsc",
+            PageNumber = 2,
+            PageSize = 2
+        };
+
+        var result = await _recordCollectionBusiness.GetAllRecordCollections(
+            _userId, _organizationId, _projectId, queryDto, true, isSysAdmin: true);
+
+        Assert.Equal(3, result.TotalCount);
+        Assert.Equal(2, result.PageNumber);
+        Assert.Equal(2, result.PageSize);
+        var collection = Assert.Single(result.Items);
+        Assert.Equal(charlieCollection.Id, collection.Id);
+        Assert.Equal("charlie-page", collection.Name);
     }
     
     #endregion

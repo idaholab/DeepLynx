@@ -48,14 +48,10 @@ export default async function Page() {
     totalCount: 0,
   };
 
-  try {
-    recordCollectionsPage = await getAllRecordCollectionsServer(
-      Number(organizationId),
-      Number(projectId),
-    );
-  } catch (err) {
-    console.error("Failed to grab record collections:", err);
-  }
+  recordCollectionsPage = await getAllRecordCollectionsServer(
+    Number(organizationId),
+    Number(projectId),
+  );
 
   return (
     <RecordCollectionsClient

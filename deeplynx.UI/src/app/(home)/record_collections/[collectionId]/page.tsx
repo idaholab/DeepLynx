@@ -65,15 +65,11 @@ export default async function Page({ params }: Props) {
   }
 
   let initialCollectionRecords: RecordResponseDto[] = [];
-  try {
-    initialCollectionRecords = await getRecordsInRecordCollectionServer(
-      Number(organizationId),
-      Number(projectId),
-      parsedCollectionId,
-    );
-  } catch (error) {
-    console.error("Failed to load initial collection records:", error);
-  }
+  initialCollectionRecords = await getRecordsInRecordCollectionServer(
+    Number(organizationId),
+    Number(projectId),
+    parsedCollectionId,
+  )
 
   return (
     <CollectionDetailsClient

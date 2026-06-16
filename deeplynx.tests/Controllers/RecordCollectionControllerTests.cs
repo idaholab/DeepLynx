@@ -134,7 +134,7 @@ public class RecordCollectionControllerTests : IDisposable
         Assert.NotNull(result);
         Assert.Equal(500, result.StatusCode);
         Assert.IsType<string>(result.Value);
-        Assert.Contains("An error occurred while listing all record collections", result.Value.ToString());
+        Assert.Equal("An unexpected error occurred while listing record collections.", result.Value);
     }
 
     [Fact]
@@ -256,7 +256,7 @@ public class RecordCollectionControllerTests : IDisposable
         Assert.NotNull(result);
         Assert.Equal(500, result.StatusCode);
         Assert.IsType<string>(result.Value);
-        Assert.Contains($"An error occurred while listing records in collection {CollectionId}", result.Value.ToString());
+        Assert.Equal("An unexpected error occurred while listing records in the record collection.", result.Value);
     }
 
     [Fact]
@@ -387,7 +387,7 @@ public class RecordCollectionControllerTests : IDisposable
         Assert.NotNull(result);
         Assert.Equal(500, result.StatusCode);
         Assert.IsType<string>(result.Value);
-        Assert.Contains("An error occurred while updating record collection records", result.Value.ToString());
+        Assert.Equal("An unexpected error occurred while adding records to the record collection.", result.Value);
     }
 
     [Fact]
@@ -537,7 +537,7 @@ public class RecordCollectionControllerTests : IDisposable
         Assert.NotNull(result);
         Assert.Equal(500, result.StatusCode);
         Assert.IsType<string>(result.Value);
-        Assert.Contains("An error occurred while updating record collection records", result.Value.ToString());
+        Assert.Equal("An unexpected error occurred while removing records from the record collection.", result.Value);
     }
 
     [Fact]
@@ -629,7 +629,7 @@ public class RecordCollectionControllerTests : IDisposable
         Assert.NotNull(result);
         Assert.Equal(500, result.StatusCode);
         Assert.IsType<string>(result.Value);
-        Assert.Contains("An error occurred while creating record collection", result.Value.ToString());
+        Assert.Equal("An unexpected error occurred while creating the record collection.", result.Value);
     }
 
     [Fact]
@@ -692,7 +692,7 @@ public class RecordCollectionControllerTests : IDisposable
         Assert.NotNull(result);
         Assert.Equal(500, result.StatusCode);
         Assert.IsType<string>(result.Value);
-        Assert.Contains("An error occurred while deleting record collection", result.Value.ToString());
+        Assert.Equal("An unexpected error occurred while deleting the record collection.", result.Value);
     }
 
     [Fact]

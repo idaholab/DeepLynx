@@ -1309,6 +1309,16 @@ export const translations = {
         "No sensitivity labels match.",
       RECORD_COLLECTIONS_NO_TAGS_FOUND: "No tags found.",
       RECORD_COLLECTIONS_OPEN_DETAILS: "Open details",
+      RECORD_COLLECTIONS_PARTIAL_UPDATE:
+        "Collection details saved, but some changes failed: {operations}",
+      RECORD_COLLECTIONS_PARTIAL_UPDATE_ADD_LABEL:
+        'add label "{name}"',
+      RECORD_COLLECTIONS_PARTIAL_UPDATE_ADD_TAG:
+        'add tag "{name}"',
+      RECORD_COLLECTIONS_PARTIAL_UPDATE_REMOVE_LABEL:
+        'remove label "{name}"',
+      RECORD_COLLECTIONS_PARTIAL_UPDATE_REMOVE_TAG:
+        'remove tag "{name}"',
       RECORD_COLLECTIONS_RECORDS_ADDED: "Records added to collection",
       RECORD_COLLECTIONS_RECORDS_ASSIGNED_TO:
         "Records currently assigned to {name}.",
@@ -3140,6 +3150,16 @@ export const translations = {
         "Ninguna etiqueta de sensibilidad coincide.",
       RECORD_COLLECTIONS_NO_TAGS_FOUND: "No se encontraron etiquetas.",
       RECORD_COLLECTIONS_OPEN_DETAILS: "Abrir detalles",
+      RECORD_COLLECTIONS_PARTIAL_UPDATE:
+        "Se guardaron los detalles de la colección, pero algunos cambios fallaron: {operations}",
+      RECORD_COLLECTIONS_PARTIAL_UPDATE_ADD_LABEL:
+        'agregar la etiqueta de sensibilidad "{name}"',
+      RECORD_COLLECTIONS_PARTIAL_UPDATE_ADD_TAG:
+        'agregar la etiqueta "{name}"',
+      RECORD_COLLECTIONS_PARTIAL_UPDATE_REMOVE_LABEL:
+        'quitar la etiqueta de sensibilidad "{name}"',
+      RECORD_COLLECTIONS_PARTIAL_UPDATE_REMOVE_TAG:
+        'quitar la etiqueta "{name}"',
       RECORD_COLLECTIONS_RECORDS_ADDED:
         "Registros agregados a la colección",
       RECORD_COLLECTIONS_RECORDS_ASSIGNED_TO:

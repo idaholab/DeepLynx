@@ -5,6 +5,7 @@ import {
   addRecordsToRecordCollection,
   attachSensitivityLabelToRecordCollection,
   attachTagToRecordCollection,
+  getAllRecordCollections,
   getRecordsInRecordCollection,
   removeRecordsFromRecordCollection,
   unattachSensitivityLabelFromRecordCollection,
@@ -235,6 +236,35 @@ export function useCollectionDetails({
     }
   }, [organizationId, projectId, selectedCollection.id, t]);
 
+  const refreshSelectedCollection = useCallback(async () => {
+    let pageNumber = 1;
+
+    while (true) {
+      const page = await getAllRecordCollections(
+        organizationId,
+        projectId,
+        { pageNumber, pageSize: 500 },
+      );
+
+      const refreshedCollection = page.items.find(
+        (collection) => collection.id === selectedCollection.id,
+      );
+
+      if (refreshedCollection) {
+        setSelectedCollection(refreshedCollection);
+        return refreshedCollection;
+      }
+
+      if (pageNumber * page.pageSize >= page.totalCount) {
+        throw new Error(
+          `Unable to refresh record collection ${selectedCollection.id}`,
+        );
+      }
+
+      pageNumber += 1;
+    }
+  }, [organizationId, projectId, selectedCollection.id]);
+
   useEffect(() => {
     if (skipInitialCollectionRecordsLoad.current) {
       skipInitialCollectionRecordsLoad.current = false;
@@ -414,7 +444,7 @@ export function useCollectionDetails({
         selectedCollectionDraft.tags?.map((tag) => tag.id) ?? [],
       );
 
-      const updated = await updateRecordCollection(
+      await updateRecordCollection(
         organizationId,
         projectId,
         selectedCollection.id,
@@ -425,63 +455,99 @@ export function useCollectionDetails({
         },
       );
 
-      await Promise.all([
+      const mutationOperations = [
         ...(selectedCollectionDraft.labels ?? [])
           .filter((label) => !originalLabelIds.has(label.id))
-          .map((label) =>
-            attachSensitivityLabelToRecordCollection(
-              organizationId,
-              projectId,
-              selectedCollection.id,
-              label.id,
-            ),
-          ),
+          .map((label) => ({
+            description:
+              t.translations.RECORD_COLLECTIONS_PARTIAL_UPDATE_ADD_LABEL.replace(
+                "{name}",
+                label.name,
+              ),
+            execute: () =>
+              attachSensitivityLabelToRecordCollection(
+                organizationId,
+                projectId,
+                selectedCollection.id,
+                label.id,
+              ),
+          })),
         ...(selectedCollection.labels ?? [])
           .filter((label) => !draftLabelIds.has(label.id))
-          .map((label) =>
-            unattachSensitivityLabelFromRecordCollection(
-              organizationId,
-              projectId,
-              selectedCollection.id,
-              label.id,
-            ),
-          ),
+          .map((label) => ({
+            description:
+              t.translations.RECORD_COLLECTIONS_PARTIAL_UPDATE_REMOVE_LABEL.replace(
+                "{name}",
+                label.name,
+              ),
+            execute: () =>
+              unattachSensitivityLabelFromRecordCollection(
+                organizationId,
+                projectId,
+                selectedCollection.id,
+                label.id,
+              ),
+          })),
         ...(selectedCollectionDraft.tags ?? [])
           .filter((tag) => !originalTagIds.has(tag.id))
-          .map((tag) =>
-            attachTagToRecordCollection(
-              organizationId,
-              projectId,
-              selectedCollection.id,
-              tag.id,
-            ),
-          ),
+          .map((tag) => ({
+            description:
+              t.translations.RECORD_COLLECTIONS_PARTIAL_UPDATE_ADD_TAG.replace(
+                "{name}",
+                tag.name,
+              ),
+            execute: () =>
+              attachTagToRecordCollection(
+                organizationId,
+                projectId,
+                selectedCollection.id,
+                tag.id,
+              ),
+          })),
         ...(selectedCollection.tags ?? [])
           .filter((tag) => !draftTagIds.has(tag.id))
-          .map((tag) =>
-            unattachTagFromRecordCollection(
-              organizationId,
-              projectId,
-              selectedCollection.id,
-              tag.id,
-            ),
-          ),
-      ]);
+          .map((tag) => ({
+            description:
+              t.translations.RECORD_COLLECTIONS_PARTIAL_UPDATE_REMOVE_TAG.replace(
+                "{name}",
+                tag.name,
+              ),
+            execute: () =>
+              unattachTagFromRecordCollection(
+                organizationId,
+                projectId,
+                selectedCollection.id,
+                tag.id,
+              ),
+          })),
+      ];
 
-      const updatedCollection = {
-        ...updated,
-        labels: selectedCollectionDraft.labels,
-        tags: selectedCollectionDraft.tags,
-        recordCount: selectedCollectionDraft.recordCount,
-      };
+      const mutationResults = await Promise.allSettled(
+        mutationOperations.map((operation) => operation.execute()),
+      );
+      const failedOperations = mutationResults.flatMap((result, index) =>
+        result.status === "rejected"
+          ? [mutationOperations[index].description]
+          : [],
+      );
 
-      setSelectedCollection(updatedCollection);
+      await refreshSelectedCollection();
       setSelectedCollectionDraft(null);
       setSelectedCollectionPropertiesEditorOpen(false);
       setPendingRecordChanges({ added: [], removed: [] });
       resetCollectionDetailsView();
       setIsEditingSelectedCollection(false);
-      toast.success(t.translations.RECORD_COLLECTIONS_UPDATE_SUCCESS);
+
+      if (failedOperations.length > 0) {
+        toast.error(
+          t.translations.RECORD_COLLECTIONS_PARTIAL_UPDATE.replace(
+            "{operations}",
+            failedOperations.join(", "),
+          ),
+        );
+      } else {
+        toast.success(t.translations.RECORD_COLLECTIONS_UPDATE_SUCCESS);
+      }
     } catch (error) {
       console.error("Failed to update record collection:", error);
       toast.error(t.translations.RECORD_COLLECTIONS_FAILED_UPDATE);

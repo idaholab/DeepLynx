@@ -126,37 +126,32 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
         var pageSize = dto.GetValidatedPageSize();
 
         // Apply pagination and execute query
-        var recordCollecions = await recordCollectionQuery
-            .Include(c => c.Tags)
-            .Include(c => c.Labels)
-            .Include(c => c.Records)
+        var items = await recordCollectionQuery
             .Skip((pageNumber - 1) * pageSize)
             .Take(pageSize)
-            .ToListAsync();
-
-        var items = recordCollecions.Select(c => new RecordCollectionResponseDto
-        {
-            Id = c.Id,
-            Description = c.Description,
-            Properties = c.Properties,
-            Name = c.Name,
-            ProjectId = c.ProjectId,
-            OrganizationId = c.OrganizationId,
-            LastUpdatedBy = c.LastUpdatedBy,
-            LastUpdatedAt = c.LastUpdatedAt,
-            IsArchived = c.IsArchived,
-            RecordCount = c.Records.Count,
-            Tags = c.Tags.Select(t => new RecordCollectionTagDto
+            .Select(c => new RecordCollectionResponseDto
             {
-                Id = t.Id,
-                Name = t.Name
-            }).ToList(),
-            Labels = c.Labels.Select(l => new RecordCollectionLabelDto
-            {
-                Id = l.Id,
-                Name = l.Name
-            }).ToList()
-        }).ToList();
+                Id = c.Id,
+                Description = c.Description,
+                Properties = c.Properties,
+                Name = c.Name,
+                ProjectId = c.ProjectId,
+                OrganizationId = c.OrganizationId,
+                LastUpdatedBy = c.LastUpdatedBy,
+                LastUpdatedAt = c.LastUpdatedAt,
+                IsArchived = c.IsArchived,
+                RecordCount = c.Records.Count(),
+                Tags = c.Tags.Select(t => new RecordCollectionTagDto
+                {
+                    Id = t.Id,
+                    Name = t.Name
+                }).ToList(),
+                Labels = c.Labels.Select(l => new RecordCollectionLabelDto
+                {
+                    Id = l.Id,
+                    Name = l.Name
+                }).ToList()
+            }).ToListAsync();
 
         return new PaginatedResponse<RecordCollectionResponseDto>
         {
@@ -285,13 +280,7 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
                 r.Labels.All(l => userAuthorizedLabels.Contains(l.Id)));
         }
 
-        var records = await recordCollectionQuery
-            .Include(r => r.Tags)
-            .Include(r => r.Labels)
-            .Include(r => r.Records)
-            .ToListAsync();
-
-        return records
+        return await recordCollectionQuery
             .Select(r => new RecordCollectionResponseDto
             {
                 Id = r.Id,
@@ -303,7 +292,7 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
                 LastUpdatedBy = r.LastUpdatedBy,
                 LastUpdatedAt = r.LastUpdatedAt,
                 IsArchived = r.IsArchived,
-                RecordCount = r.Records.Count,
+                RecordCount = r.Records.Count(),
                 Tags = r.Tags.Select(t => new RecordCollectionTagDto
                 {
                     Id = t.Id,
@@ -314,7 +303,7 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
                     Id = l.Id,
                     Name = l.Name
                 }).ToList()
-            }).ToList();
+            }).ToListAsync();
     }
 
 
@@ -620,7 +609,7 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
                 LastUpdatedBy = collection.LastUpdatedBy,
                 LastUpdatedAt = collection.LastUpdatedAt,
                 IsArchived = collection.IsArchived,
-                RecordCount = collection.Records.Count,
+                RecordCount = 0,
                 Tags = tags,
                 Labels = collection.Labels.Select(l => new RecordCollectionLabelDto
                 {
@@ -629,11 +618,10 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
                 }).ToList()
             };
         }
-        catch (Exception exc)
+        catch
         {
             await transaction.RollbackAsync();
-            throw new DependencyDeletionException(
-                $"unable to create record collection or its downstream dependents: {exc}");
+            throw;
         }
     }
 
@@ -654,7 +642,6 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
         ValidationHelper.ValidateModel(dto);
 
         var query = _context.RecordCollections
-            .Include(c => c.Records)
             .Where(c => c.Id == recordCollectionId && c.OrganizationId == organizationId && c.ProjectId == projectId && !c.IsArchived);
 
         var returnedRecordCollection = await query.FirstOrDefaultAsync();
@@ -675,6 +662,11 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
 
         _context.RecordCollections.Update(returnedRecordCollection);
         await _context.SaveChangesAsync();
+
+        var recordCount = await _context.RecordCollections
+            .Where(c => c.Id == returnedRecordCollection.Id)
+            .Select(c => c.Records.Count())
+            .FirstAsync();
 
         // Log Record Update Event
         await _eventBusiness.CreateEvent(currentUserId, organizationId, projectId, new CreateEventRequestDto
@@ -697,7 +689,7 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
             LastUpdatedBy = returnedRecordCollection.LastUpdatedBy,
             LastUpdatedAt = returnedRecordCollection.LastUpdatedAt,
             IsArchived = returnedRecordCollection.IsArchived,
-            RecordCount = returnedRecordCollection.Records.Count,
+            RecordCount = recordCount,
         };
     }
 

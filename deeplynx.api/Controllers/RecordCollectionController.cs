@@ -34,6 +34,13 @@ public class RecordCollectionController : ControllerBase
         _logger = logger;
     }
 
+    private ObjectResult InternalServerError(Exception exc, string logMessage, string clientMessage,
+        params object[] args)
+    {
+        _logger.LogError(exc, logMessage, args);
+        return StatusCode(StatusCodes.Status500InternalServerError, clientMessage);
+    }
+
     /// <summary>
     ///     Get All Record Collections
     /// </summary>
@@ -63,9 +70,12 @@ public class RecordCollectionController : ControllerBase
         }
         catch (Exception exc)
         {
-            var message = $"An error occurred while listing all record collections: {exc}";
-            _logger.LogError(message);
-            return StatusCode(StatusCodes.Status500InternalServerError, message);
+            return InternalServerError(
+                exc,
+                "An error occurred while listing all record collections for organization {OrganizationId} and project {ProjectId}",
+                "An unexpected error occurred while listing record collections.",
+                organizationId,
+                projectId);
         }
     }
 
@@ -110,9 +120,13 @@ public class RecordCollectionController : ControllerBase
         }
         catch (Exception exc)
         {
-            var message = $"An error occurred while listing records in collection {recordCollectionId}: {exc}";
-            _logger.LogError(message);
-            return StatusCode(StatusCodes.Status500InternalServerError, message);
+            return InternalServerError(
+                exc,
+                "An error occurred while listing records in record collection {RecordCollectionId} for organization {OrganizationId} and project {ProjectId}",
+                "An unexpected error occurred while listing records in the record collection.",
+                recordCollectionId,
+                organizationId,
+                projectId);
         }
     }
 
@@ -145,9 +159,12 @@ public class RecordCollectionController : ControllerBase
         }
         catch (Exception exc)
         {
-            var message = $"An error occurred while listing records by tags: {exc}";
-            _logger.LogError(message);
-            return StatusCode(StatusCodes.Status500InternalServerError, message);
+            return InternalServerError(
+                exc,
+                "An error occurred while listing record collections by tags for organization {OrganizationId} and project {ProjectId}",
+                "An unexpected error occurred while listing record collections by tags.",
+                organizationId,
+                projectId);
         }
     }
 
@@ -180,9 +197,13 @@ public class RecordCollectionController : ControllerBase
         }
         catch (Exception exc)
         {
-            var message = $"An error occurred while updating record collection {recordCollectionId}: {exc}";
-            _logger.LogError(message);
-            return StatusCode(StatusCodes.Status500InternalServerError, message);
+            return InternalServerError(
+                exc,
+                "An error occurred while updating record collection {RecordCollectionId} for organization {OrganizationId} and project {ProjectId}",
+                "An unexpected error occurred while updating the record collection.",
+                recordCollectionId,
+                organizationId,
+                projectId);
         }
     }
 
@@ -225,9 +246,13 @@ public class RecordCollectionController : ControllerBase
         }
         catch (Exception exc)
         {
-            var message = $"An error occurred while updating record collection records: {exc}";
-            _logger.LogError(message);
-            return StatusCode(StatusCodes.Status500InternalServerError, message);
+            return InternalServerError(
+                exc,
+                "An error occurred while adding records to record collection {RecordCollectionId} for organization {OrganizationId} and project {ProjectId}",
+                "An unexpected error occurred while adding records to the record collection.",
+                recordCollectionId,
+                organizationId,
+                projectId);
         }
     }
 
@@ -279,9 +304,13 @@ public class RecordCollectionController : ControllerBase
         }
         catch (Exception exc)
         {
-            var message = $"An error occurred while updating record collection records: {exc}";
-            _logger.LogError(message);
-            return StatusCode(StatusCodes.Status500InternalServerError, message);
+            return InternalServerError(
+                exc,
+                "An error occurred while removing records from record collection {RecordCollectionId} for organization {OrganizationId} and project {ProjectId}",
+                "An unexpected error occurred while removing records from the record collection.",
+                recordCollectionId,
+                organizationId,
+                projectId);
         }
     }
 
@@ -316,9 +345,12 @@ public class RecordCollectionController : ControllerBase
         }
         catch (Exception exc)
         {
-            var message = $"An error occurred while creating record collection: {exc}";
-            _logger.LogError(message);
-            return StatusCode(StatusCodes.Status500InternalServerError, message);
+            return InternalServerError(
+                exc,
+                "An error occurred while creating a record collection for organization {OrganizationId} and project {ProjectId}",
+                "An unexpected error occurred while creating the record collection.",
+                organizationId,
+                projectId);
         }
     }
 
@@ -349,9 +381,13 @@ public class RecordCollectionController : ControllerBase
         }
         catch (Exception exc)
         {
-            var message = $"An error occurred while deleting record collection {recordCollectionId}: {exc}";
-            _logger.LogError(message);
-            return StatusCode(StatusCodes.Status500InternalServerError, message);
+            return InternalServerError(
+                exc,
+                "An error occurred while deleting record collection {RecordCollectionId} for organization {OrganizationId} and project {ProjectId}",
+                "An unexpected error occurred while deleting the record collection.",
+                recordCollectionId,
+                organizationId,
+                projectId);
         }
     }
 
@@ -390,10 +426,16 @@ public class RecordCollectionController : ControllerBase
         }
         catch (Exception exc)
         {
-            var action = archive ? "archiving" : "unarchiving";
-            var message = $"An error occurred while {action} record collection{recordCollectionId}: {exc}";
-            _logger.LogError(message);
-            return StatusCode(StatusCodes.Status500InternalServerError, message);
+            return InternalServerError(
+                exc,
+                "An error occurred while {Action} record collection {RecordCollectionId} for organization {OrganizationId} and project {ProjectId}",
+                archive
+                    ? "An unexpected error occurred while archiving the record collection."
+                    : "An unexpected error occurred while unarchiving the record collection.",
+                archive ? "archiving" : "unarchiving",
+                recordCollectionId,
+                organizationId,
+                projectId);
         }
     }
 
@@ -430,9 +472,14 @@ public class RecordCollectionController : ControllerBase
         }
         catch (Exception exc)
         {
-            var message = $"An error occurred while attaching tag {tagId} to record collection{recordCollectionId}: {exc}";
-            _logger.LogError(message);
-            return StatusCode(StatusCodes.Status500InternalServerError, message);
+            return InternalServerError(
+                exc,
+                "An error occurred while attaching tag {TagId} to record collection {RecordCollectionId} for organization {OrganizationId} and project {ProjectId}",
+                "An unexpected error occurred while attaching the tag to the record collection.",
+                tagId,
+                recordCollectionId,
+                organizationId,
+                projectId);
         }
     }
 
@@ -465,9 +512,14 @@ public class RecordCollectionController : ControllerBase
         }
         catch (Exception exc)
         {
-            var message = $"An error occurred while unattaching tag {tagId} from record collection {recordCollectionId}: {exc}";
-            _logger.LogError(message);
-            return StatusCode(StatusCodes.Status500InternalServerError, message);
+            return InternalServerError(
+                exc,
+                "An error occurred while detaching tag {TagId} from record collection {RecordCollectionId} for organization {OrganizationId} and project {ProjectId}",
+                "An unexpected error occurred while detaching the tag from the record collection.",
+                tagId,
+                recordCollectionId,
+                organizationId,
+                projectId);
         }
     }
 
@@ -504,9 +556,14 @@ public class RecordCollectionController : ControllerBase
         }
         catch (Exception exc)
         {
-            var message = $"An error occurred while attaching label {sensitivityLabelId} to record {recordCollectionId}: {exc}";
-            _logger.LogError(message);
-            return StatusCode(StatusCodes.Status500InternalServerError, message);
+            return InternalServerError(
+                exc,
+                "An error occurred while attaching sensitivity label {SensitivityLabelId} to record collection {RecordCollectionId} for organization {OrganizationId} and project {ProjectId}",
+                "An unexpected error occurred while attaching the sensitivity label to the record collection.",
+                sensitivityLabelId,
+                recordCollectionId,
+                organizationId,
+                projectId);
         }
     }
 
@@ -543,9 +600,14 @@ public class RecordCollectionController : ControllerBase
         }
         catch (Exception exc)
         {
-            var message = $"An error occurred while unattaching sensitivity label {sensitivityLabelId} from record collection {recordCollectionId}: {exc}";
-            _logger.LogError(message);
-            return StatusCode(StatusCodes.Status500InternalServerError, message);
+            return InternalServerError(
+                exc,
+                "An error occurred while detaching sensitivity label {SensitivityLabelId} from record collection {RecordCollectionId} for organization {OrganizationId} and project {ProjectId}",
+                "An unexpected error occurred while detaching the sensitivity label from the record collection.",
+                sensitivityLabelId,
+                recordCollectionId,
+                organizationId,
+                projectId);
         }
     }
 
@@ -577,9 +639,13 @@ public class RecordCollectionController : ControllerBase
         }
         catch (Exception exc)
         {
-            var message = $"An error occurred while retrieving sensitivity labels for record collection {recordCollectionId}: {exc}";
-            _logger.LogError(message);
-            return StatusCode(StatusCodes.Status500InternalServerError, message);
+            return InternalServerError(
+                exc,
+                "An error occurred while retrieving sensitivity labels for record collection {RecordCollectionId} in organization {OrganizationId} and project {ProjectId}",
+                "An unexpected error occurred while retrieving sensitivity labels for the record collection.",
+                recordCollectionId,
+                organizationId,
+                projectId);
         }
     }
 

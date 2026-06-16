@@ -57,16 +57,13 @@ const buildRecordCollectionQueryParams = (
 const normalizeRecordCollectionsPage = (
   data: unknown,
 ): PaginatedRecordCollectionsResponseDto => {
-  if (Array.isArray(data)) {
-    return {
-      items: data as RecordCollectionResponseDto[],
-      pageNumber: 1,
-      pageSize: data.length,
-      totalCount: data.length,
-    };
+  if (!data || typeof data !== "object" || Array.isArray(data)) {
+    throw new Error(
+      "Invalid record collections response: expected paginated object payload",
+    );
   }
 
-  const page = (data ?? {}) as {
+  const page = data as {
     items?: RecordCollectionResponseDto[];
     pageNumber?: number;
     pageSize?: number;
@@ -79,12 +76,32 @@ const normalizeRecordCollectionsPage = (
     MaxPageSize?: number;
   };
 
-  const items = page.items ?? page.Items ?? [];
+  const items = page.items ?? page.Items;
+  const pageNumber = page.pageNumber ?? page.PageNumber;
+  const pageSize = page.pageSize ?? page.PageSize;
+  const totalCount = page.totalCount ?? page.TotalCount;
+
+  if (!Array.isArray(items)) {
+    throw new Error(
+      "Invalid record collections response: items must be an array",
+    );
+  }
+
+  if (
+    typeof pageNumber !== "number" ||
+    typeof pageSize !== "number" ||
+    typeof totalCount !== "number"
+  ) {
+    throw new Error(
+      "Invalid record collections response: pageNumber, pageSize, and totalCount must be numbers",
+    );
+  }
+
   return {
     items,
-    pageNumber: page.pageNumber ?? page.PageNumber ?? 1,
-    pageSize: page.pageSize ?? page.PageSize ?? items.length,
-    totalCount: page.totalCount ?? page.TotalCount ?? items.length,
+    pageNumber,
+    pageSize,
+    totalCount,
     maxPageSize: page.maxPageSize ?? page.MaxPageSize,
   };
 };
