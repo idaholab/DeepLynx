@@ -413,7 +413,7 @@ public class FileBusiness
 
         var fileExtension = Path.GetExtension(request.FileName).TrimStart('.').ToLower();
         var fileClass = await _classBusiness.GetOrCreateClass(currentUserId, organizationId, projectId, "File");
-        var fileSize = new FileInfo(uri).Length;
+        var fileSize = await fileBusiness.GetFileSize(uri, objectStorage.Config);
         var properties = metadata?.Properties ?? new JsonObject
         {
             ["fileType"] = fileExtension,
