@@ -470,11 +470,10 @@ public class QueryBusiness : IQueryBusiness
             var authorizedLabelIds = await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
                 currentUserId, organizationId, projectIds, "read record");
 
-            var authorizedRecordIds = await _context.Records
+            var authorizedRecordIds = _context.Records
                 .Where(rec => rec.OrganizationId == organizationId && projectIds.Contains(rec.ProjectId))
                 .WithAuthorizedLabels(authorizedLabelIds)
-                .Select(rec => rec.Id)
-                .ToListAsync();
+                .Select(rec => rec.Id);
 
             query = query.Where(r => authorizedRecordIds.Contains(r.Id));
         }
@@ -512,11 +511,10 @@ public class QueryBusiness : IQueryBusiness
             var authorizedLabelIds = await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
                 currentUserId, organizationId, projectId, "read record");
 
-            var authorizedRecordIds = await _context.Records
+            var authorizedRecordIds = _context.Records
                 .Where(rec => rec.OrganizationId == organizationId && projectId.Contains(rec.ProjectId))
                 .WithAuthorizedLabels(authorizedLabelIds)
-                .Select(rec => rec.Id)
-                .ToListAsync();
+                .Select(rec => rec.Id);
 
             query = query.Where(r => authorizedRecordIds.Contains(r.Id));
         }
@@ -586,11 +584,10 @@ public class QueryBusiness : IQueryBusiness
             var authorizedLabelIds = await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
                 currentUserId, organizationId, projects, "read record");
 
-            var authorizedRecordIds = await _context.Records
+            var authorizedRecordIds = _context.Records
                 .Where(rec => rec.OrganizationId == organizationId && projects.Contains(rec.ProjectId))
                 .WithAuthorizedLabels(authorizedLabelIds)
-                .Select(rec => rec.Id)
-                .ToListAsync();
+                .Select(rec => rec.Id);
 
             recordQuery = recordQuery.Where(r => authorizedRecordIds.Contains(r.Id));
         }
