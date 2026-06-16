@@ -6,6 +6,7 @@ using deeplynx.business;
 using deeplynx.datalayer.Models;
 using deeplynx.helpers;
 using deeplynx.helpers.BigData;
+using deeplynx.helpers.Cache;
 using deeplynx.helpers.Hubs;
 using deeplynx.interfaces;
 using deeplynx.models;
@@ -3147,6 +3148,28 @@ public class FileBusinessTests : IntegrationTestBase
         Assert.Equal(records.Max(r => r.Id), secondResult.LastRecordId);
 
         Assert.Equal(5, updatedCount);
+    }
+
+    [Fact]
+    public async Task BackfillFileSizes_InvalidateProjectStorageSizeCache()
+    {
+        var cacheKey = CacheKeys.ProjectStorageSize(pid);
+
+        await CacheService.Instance.SetAsync(
+            cacheKey,
+            999L,
+            TimeSpan.FromHours(1));
+
+        await CreateBackfillFileRecord(
+            "cache-invalidation-backfill.txt",
+            "cache invalidation content",
+            osid);
+
+        await _fileBusiness.BackfillFileSizes(oid, pid);
+
+        var cachedValue = await CacheService.Instance.GetAsync<long?>(cacheKey);
+        
+        Assert.Null(cachedValue);
     }
 
     #endregion
