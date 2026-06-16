@@ -235,7 +235,10 @@ const SideMenu: React.FC<SideMenuProps> = ({
     const isExactMatch = selectedItem === targetPath;
     const isDynamicProject =
       targetPath === "/project/[id]" && /^\/project\/[^/]+$/.test(pathname);
-    const isSelected = isExactMatch || isDynamicProject;
+    const isRecordCollectionsRoute =
+      targetPath === "/record_collections" &&
+      pathname?.startsWith("/record_collections");
+    const isSelected = isExactMatch || isDynamicProject || isRecordCollectionsRoute;
 
     return [
       "flex items-center block py-2 px-4 rounded transition",
@@ -344,8 +347,8 @@ const SideMenu: React.FC<SideMenuProps> = ({
                       <button
                         onClick={() => handleProjectClick(proj)}
                         className={`w-full text-left py-2 px-4 rounded transition text-sm flex items-center ${isProjectActive(proj.id)
-                            ? "bg-info/30 text-neutral-content font-semibold"
-                            : "hover:bg-info/20 text-neutral-content"
+                          ? "bg-info/30 text-neutral-content font-semibold"
+                          : "hover:bg-info/20 text-neutral-content"
                           }`}
                       >
                         <span className="truncate">{proj.name}</span>
@@ -404,7 +407,8 @@ const SideMenu: React.FC<SideMenuProps> = ({
               className={getItemClass("/record_collections")}
             >
               <FolderIcon className="size-6" />
-              {!isCollapsed && <p className="ml-2">Record Collections</p>}
+              {!isCollapsed && <p className="ml-2">Collections</p>}
+              <BetaBadge size="xs" className="ml-auto" />
             </Link>
           </li>
 

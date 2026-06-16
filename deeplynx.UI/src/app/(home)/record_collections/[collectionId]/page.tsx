@@ -1,12 +1,21 @@
-import RecordCollectionsClient from "./RecordCollectionsClient";
+import CollectionDetailsClient from "./CollectionDetailsClient";
 import { cookies } from "next/headers";
-import { redirect } from "next/navigation";
-import { RecordCollectionResponseDto } from "../types/responseDTOs";
+import { notFound, redirect } from "next/navigation";
 import { getAllRecordCollectionsServer } from "@/app/lib/server_service/record_collection_services.server";
 
 export const metadata = { title: "Record Collections" };
 
-export default async function Page() {
+type Props = {
+  params: Promise<{ collectionId: string }>;
+};
+
+export default async function Page({ params }: Props) {
+  const { collectionId } = await params;
+  const parsedCollectionId = Number(collectionId);
+  if (!Number.isFinite(parsedCollectionId)) {
+    return notFound();
+  }
+
   // Get organization from cookies
   const cookieStore = await cookies();
   const orgSessionCookie = cookieStore.get("organizationSession");
@@ -41,20 +50,23 @@ export default async function Page() {
     redirect("/");
   }
 
-  let recordCollections: RecordCollectionResponseDto[] = [];
+  const collections = await getAllRecordCollectionsServer(
+    Number(organizationId),
+    Number(projectId),
+  );
+  const initialCollection = collections.find(
+    (collection) => collection.id === parsedCollectionId,
+  );
 
-  try {
-    recordCollections = await getAllRecordCollectionsServer(
-      Number(organizationId),
-      Number(projectId),
-    );
-  } catch (err) {
-    console.error("Failed to grab record collections:", err);
+  if (!initialCollection) {
+    return notFound();
   }
 
   return (
-    <RecordCollectionsClient
-      recordCollections={recordCollections}
+    <CollectionDetailsClient
+      organizationId={Number(organizationId)}
+      projectId={Number(projectId)}
+      initialCollection={initialCollection}
     />
   );
 }

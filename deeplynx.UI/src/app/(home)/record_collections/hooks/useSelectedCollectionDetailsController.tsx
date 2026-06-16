@@ -17,91 +17,121 @@ import { SelectedCollectionDetailsViewState } from "./useSelectedCollectionDetai
 import { SelectedCollectionEditDerivedState } from "./useSelectedCollectionEditDerived";
 
 type Params = {
-  projectId: number;
-  selectedCollection: RecordCollectionResponseDto | null;
-  collectionRecords: RecordResponseDto[];
-  collectionDetailsView: SelectedCollectionDetailsViewState;
-  selectedCollectionEditDerived: SelectedCollectionEditDerivedState;
-  recordsLoading: boolean;
-  saving: boolean;
-  isEditingSelectedCollection: boolean;
-  setSelectedCollectionDraft: React.Dispatch<
-    React.SetStateAction<RecordCollectionResponseDto | null>
-  >;
-  setSelectedCollectionPropertiesEditorOpen: React.Dispatch<
-    React.SetStateAction<boolean>
-  >;
-  selectedCollectionLabelSearchTerm: string;
-  setSelectedCollectionLabelSearchTerm: React.Dispatch<
-    React.SetStateAction<string>
-  >;
-  selectedCollectionTagSearchTerm: string;
-  setSelectedCollectionTagSearchTerm: React.Dispatch<React.SetStateAction<string>>;
-  selectedCollectionLabelCreating: boolean;
-  selectedCollectionTagCreating: boolean;
-  labelsLoading: boolean;
-  tagsLoading: boolean;
-  onAddSelectedCollectionLabelFromSearch: () => Promise<void>;
-  onAddSelectedCollectionTagFromSearch: () => Promise<void>;
-  onAddSelectedCollectionLabel: (label: { id: number; name: string }) => void;
-  onAddSelectedCollectionTag: (tag: { id: number; name: string }) => void;
-  onRemoveLabel: (labelId: number) => void;
-  onRemoveTag: (tagId: number) => void;
-  recordSearchTerm: string;
-  setRecordSearchTerm: React.Dispatch<React.SetStateAction<string>>;
-  recordSearchLoading: boolean;
-  onSearchRecords: () => void;
-  addingRecordIds: number[];
-  removingRecordIds: number[];
-  onRemoveCollectionRecord: (recordId: number) => Promise<void>;
-  onAddCollectionRecord: (recordId: number) => Promise<void>;
-  onCancelSelectedCollectionEdit: () => Promise<void>;
-  onSaveSelectedDetails: () => void;
-  onViewAllCollectionRecords: () => void;
-  onOpenSelectedCollectionEdit: () => void;
-  getMetadataRows: (properties?: string | null) => MetadataRow[];
-  getSensitivityClass: (label: string) => string;
+  context: {
+    projectId: number;
+    selectedCollection: RecordCollectionResponseDto | null;
+    collectionRecords: RecordResponseDto[];
+    recordsLoading: boolean;
+    saving: boolean;
+    isEditingSelectedCollection: boolean;
+  };
+  view: SelectedCollectionDetailsViewState;
+  editDerived: SelectedCollectionEditDerivedState;
+  editState: {
+    setSelectedCollectionDraft: React.Dispatch<
+      React.SetStateAction<RecordCollectionResponseDto | null>
+    >;
+    setSelectedCollectionPropertiesEditorOpen: React.Dispatch<
+      React.SetStateAction<boolean>
+    >;
+    selectedCollectionLabelSearchTerm: string;
+    setSelectedCollectionLabelSearchTerm: React.Dispatch<
+      React.SetStateAction<string>
+    >;
+    selectedCollectionTagSearchTerm: string;
+    setSelectedCollectionTagSearchTerm: React.Dispatch<
+      React.SetStateAction<string>
+    >;
+    selectedCollectionLabelCreating: boolean;
+    selectedCollectionTagCreating: boolean;
+    labelsLoading: boolean;
+    tagsLoading: boolean;
+  };
+  labelAndTagActions: {
+    onAddSelectedCollectionLabelFromSearch: () => Promise<void>;
+    onAddSelectedCollectionTagFromSearch: () => Promise<void>;
+    onAddSelectedCollectionLabel: (label: { id: number; name: string }) => void;
+    onAddSelectedCollectionTag: (tag: { id: number; name: string }) => void;
+    onRemoveLabel: (labelId: number) => void;
+    onRemoveTag: (tagId: number) => void;
+  };
+  recordSearch: {
+    recordSearchTerm: string;
+    setRecordSearchTerm: React.Dispatch<React.SetStateAction<string>>;
+    recordSearchLoading: boolean;
+    onSearchRecords: () => void;
+  };
+  recordMutations: {
+    addingRecordIds: number[];
+    removingRecordIds: number[];
+    onRemoveCollectionRecord: (recordId: number) => Promise<void>;
+    onAddCollectionRecord: (recordId: number) => Promise<void>;
+  };
+  navigation: {
+    onCancelSelectedCollectionEdit: () => Promise<void>;
+    onSaveSelectedDetails: () => void;
+    onViewAllCollectionRecords: () => void;
+    onOpenSelectedCollectionEdit: () => void;
+  };
+  formatting: {
+    getMetadataRows: (properties?: string | null) => MetadataRow[];
+    getSensitivityClass: (label: string) => string;
+  };
 };
 
 export function useSelectedCollectionDetailsController({
-  projectId,
-  selectedCollection,
-  collectionRecords,
-  collectionDetailsView,
-  selectedCollectionEditDerived,
-  recordsLoading,
-  saving,
-  isEditingSelectedCollection,
-  setSelectedCollectionDraft,
-  setSelectedCollectionPropertiesEditorOpen,
-  selectedCollectionLabelSearchTerm,
-  setSelectedCollectionLabelSearchTerm,
-  selectedCollectionTagSearchTerm,
-  setSelectedCollectionTagSearchTerm,
-  selectedCollectionLabelCreating,
-  selectedCollectionTagCreating,
-  labelsLoading,
-  tagsLoading,
-  onAddSelectedCollectionLabelFromSearch,
-  onAddSelectedCollectionTagFromSearch,
-  onAddSelectedCollectionLabel,
-  onAddSelectedCollectionTag,
-  onRemoveLabel,
-  onRemoveTag,
-  recordSearchTerm,
-  setRecordSearchTerm,
-  recordSearchLoading,
-  onSearchRecords,
-  addingRecordIds,
-  removingRecordIds,
-  onRemoveCollectionRecord,
-  onAddCollectionRecord,
-  onCancelSelectedCollectionEdit,
-  onSaveSelectedDetails,
-  onViewAllCollectionRecords,
-  onOpenSelectedCollectionEdit,
-  getMetadataRows,
-  getSensitivityClass,
+  context: {
+    projectId,
+    selectedCollection,
+    collectionRecords,
+    recordsLoading,
+    saving,
+    isEditingSelectedCollection,
+  },
+  view: collectionDetailsView,
+  editDerived: selectedCollectionEditDerived,
+  editState: {
+    setSelectedCollectionDraft,
+    setSelectedCollectionPropertiesEditorOpen,
+    selectedCollectionLabelSearchTerm,
+    setSelectedCollectionLabelSearchTerm,
+    selectedCollectionTagSearchTerm,
+    setSelectedCollectionTagSearchTerm,
+    selectedCollectionLabelCreating,
+    selectedCollectionTagCreating,
+    labelsLoading,
+    tagsLoading,
+  },
+  labelAndTagActions: {
+    onAddSelectedCollectionLabelFromSearch,
+    onAddSelectedCollectionTagFromSearch,
+    onAddSelectedCollectionLabel,
+    onAddSelectedCollectionTag,
+    onRemoveLabel,
+    onRemoveTag,
+  },
+  recordSearch: {
+    recordSearchTerm,
+    setRecordSearchTerm,
+    recordSearchLoading,
+    onSearchRecords,
+  },
+  recordMutations: {
+    addingRecordIds,
+    removingRecordIds,
+    onRemoveCollectionRecord,
+    onAddCollectionRecord,
+  },
+  navigation: {
+    onCancelSelectedCollectionEdit,
+    onSaveSelectedDetails,
+    onViewAllCollectionRecords,
+    onOpenSelectedCollectionEdit,
+  },
+  formatting: {
+    getMetadataRows,
+    getSensitivityClass,
+  },
 }: Params): SelectedCollectionDetailsController | null {
   const {
     selectedDescriptionRef,

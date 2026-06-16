@@ -1,13 +1,23 @@
 "use client";
 
 import { useLocalPagination } from "@/app/hooks/useLocalPagination";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  type ChangeEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { RecordCollectionResponseDto } from "../../types/responseDTOs";
 import {
   buildAlphabeticalFacetOptions,
   getSensitivity,
 } from "../components/recordCollections.utils";
-import { COLLECTIONS_DASHBOARD_PER_PAGE } from "../components/recordCollections.constants";
+import {
+  COLLECTIONS_DASHBOARD_PER_PAGE,
+  COLLECTION_SORT_OPTIONS,
+} from "../components/recordCollections.constants";
 import { CollectionSortOption } from "../components/recordCollections.types";
 
 type Params = {
@@ -217,37 +227,54 @@ export function useCollectionsDashboard({ collections }: Params) {
   }, []);
 
   return {
-    searchTerm,
-    setSearchTerm,
-    collectionSort,
-    setCollectionSort,
-    collectionSortMenuOpen,
-    setCollectionSortMenuOpen,
-    collectionSortMenuRef,
-    filteredCollections,
-    sortedCollections,
-    activeFacetCount,
-    selectedSensitivityFilters,
-    toggleSensitivityFilter,
-    filteredSensitivityFacetOptions,
-    sensitivityFacetQuery,
-    setSensitivityFacetQuery,
-    selectedTagFilters,
-    toggleTagFilter,
-    filteredTagFacetOptions,
-    tagFacetQuery,
-    setTagFacetQuery,
-    clearFacetFilters,
-    isDashboardLabelsExpanded,
-    isDashboardTagsExpanded,
-    toggleDashboardLabelsExpanded,
-    toggleDashboardTagsExpanded,
-    collectionDashboardPage: currentPage,
-    collectionDashboardPageSize: pageSize,
-    visibleSortedCollections: paginatedItems,
-    setCollectionDashboardPage: setCurrentPage,
-    setCollectionDashboardPageSize: setPageSize,
-    collectionDashboardStartIndex: startIndex,
-    collectionDashboardPageCount: totalPages,
+    summary: {
+      filteredCount: filteredCollections.length,
+    },
+    searchInput: {
+      value: searchTerm,
+      onChange: (event: ChangeEvent<HTMLInputElement>) =>
+        setSearchTerm(event.target.value),
+    },
+    sortControl: {
+      collectionSort,
+      collectionSortMenuOpen,
+      collectionSortMenuRef,
+      options: COLLECTION_SORT_OPTIONS,
+      onToggleMenu: () => setCollectionSortMenuOpen((current) => !current),
+      onSelectOption: (option: CollectionSortOption) => {
+        setCollectionSort(option);
+        setCollectionSortMenuOpen(false);
+      },
+    },
+    filterSidebar: {
+      selectedSensitivityFilters,
+      onToggleSensitivityFilter: toggleSensitivityFilter,
+      filteredSensitivityFacetOptions,
+      sensitivityFacetQuery,
+      onSensitivityFacetQueryChange: setSensitivityFacetQuery,
+      selectedTagFilters,
+      onToggleTagFilter: toggleTagFilter,
+      filteredTagFacetOptions,
+      tagFacetQuery,
+      onTagFacetQueryChange: setTagFacetQuery,
+      activeFacetCount,
+      onClearFacetFilters: clearFacetFilters,
+    },
+    collectionCards: {
+      items: paginatedItems,
+      isLabelsExpanded: isDashboardLabelsExpanded,
+      isTagsExpanded: isDashboardTagsExpanded,
+      onToggleLabels: toggleDashboardLabelsExpanded,
+      onToggleTags: toggleDashboardTagsExpanded,
+    },
+    pagination: {
+      currentPage,
+      pageSize,
+      totalPages,
+      totalItems: sortedCollections.length,
+      startIndex,
+      onPageChange: setCurrentPage,
+      onPageSizeChange: setPageSize,
+    },
   };
 }

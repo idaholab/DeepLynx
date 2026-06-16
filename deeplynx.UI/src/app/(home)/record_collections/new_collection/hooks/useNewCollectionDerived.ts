@@ -4,16 +4,16 @@ import { Dispatch, SetStateAction, useEffect, useMemo } from "react";
 import {
   SensitivityLabelsDto,
   TagResponseDto,
-} from "../../types/responseDTOs";
+} from "../../../types/responseDTOs";
 import {
   countFacet,
-} from "../components/utils";
+} from "../../components/utils";
 import {
   deriveSelectedRecordMetadata,
   getSelectedRecordLabelNames,
   getSelectedRecordTagNames,
-} from "../components/recordCollections.utils";
-import { NewCollectionSelectedRecord } from "../components/recordCollections.types";
+} from "../../components/recordCollections.utils";
+import { NewCollectionSelectedRecord } from "../../components/recordCollections.types";
 
 type Params = {
   availableLabels: SensitivityLabelsDto[];

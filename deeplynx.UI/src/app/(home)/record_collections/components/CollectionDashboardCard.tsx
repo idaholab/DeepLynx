@@ -3,6 +3,7 @@
 import { useLanguage } from "@/app/contexts/Language";
 import { formatLocalDateTime } from "@/app/lib/date_time";
 import { RecordCollectionResponseDto } from "../../types/responseDTOs";
+import Link from "next/link";
 import React from "react";
 
 type Props = {
@@ -13,7 +14,7 @@ type Props = {
   getSensitivityClass: (label: string) => string;
   onToggleLabels: (collectionId: number) => void;
   onToggleTags: (collectionId: number) => void;
-  onOpenCollection: (collection: RecordCollectionResponseDto) => void;
+  detailsHref: string;
 };
 
 export default function CollectionDashboardCard({
@@ -24,7 +25,7 @@ export default function CollectionDashboardCard({
   getSensitivityClass,
   onToggleLabels,
   onToggleTags,
-  onOpenCollection,
+  detailsHref,
 }: Props) {
   const { t } = useLanguage();
   const collectionLabels = collection.labels ?? [];
@@ -136,13 +137,12 @@ export default function CollectionDashboardCard({
           </p>
         </div>
         <div className="flex justify-start sm:justify-end">
-          <button
-            type="button"
+          <Link
+            href={detailsHref}
             className="btn btn-primary btn-sm"
-            onClick={() => onOpenCollection(collection)}
           >
             {t.translations.RECORD_COLLECTIONS_OPEN_DETAILS}
-          </button>
+          </Link>
         </div>
       </div>
     </div>

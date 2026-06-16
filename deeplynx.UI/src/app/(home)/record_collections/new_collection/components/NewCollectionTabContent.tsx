@@ -3,16 +3,16 @@
 import PaginationControls from "@/app/(home)/components/PaginationControls";
 import { useLanguage } from "@/app/contexts/Language";
 import React from "react";
-import CollectionDetailsReadonlyView from "./CollectionDetailsReadonlyView";
-import CollectionEntitySelector from "./CollectionEntitySelector";
-import CollectionFacetSummary from "./CollectionFacetSummary";
-import CollectionRecordSearchControls from "./CollectionRecordSearchControls";
-import CollectionRecordSearchResultsTable from "./CollectionRecordSearchResultsTable";
+import CollectionDetailsReadonlyView from "../../components/CollectionDetailsReadonlyView";
+import CollectionEntitySelector from "../../components/CollectionEntitySelector";
+import CollectionFacetSummary from "../../components/CollectionFacetSummary";
+import CollectionRecordSearchControls from "../../components/CollectionRecordSearchControls";
+import CollectionRecordSearchResultsTable from "../../components/CollectionRecordSearchResultsTable";
 import NewCollectionStepIndicator from "./NewCollectionStepIndicator";
-import SelectedRecordsPreviewPanel from "./SelectedRecordsPreviewPanel";
-import SectionCard from "./SectionCard";
-import { NewCollectionTabController } from "./componentTypes";
-import { interpolateTemplate } from "./utils";
+import SelectedRecordsPreviewPanel from "../../components/SelectedRecordsPreviewPanel";
+import SectionCard from "../../components/SectionCard";
+import { NewCollectionTabController } from "../../components/componentTypes";
+import { interpolateTemplate } from "../../components/utils";
 
 type Props = {
   controller: NewCollectionTabController;
