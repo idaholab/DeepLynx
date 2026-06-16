@@ -7,12 +7,11 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using Moq;
-using Org.BouncyCastle.Crypto.Engines;
 
 namespace deeplynx.tests.Controllers;
 
 [Collection("Test Suite Collection")]
-public class SavedSearchControllerTests : IDisposable
+public class SavedSearchesControllerTests : IDisposable
 {
     private readonly Mock<ISavedSearchBusiness> _mockSavedSearchBusiness;
     private readonly Mock<ILogger<SavedSearchController>> _mockLogger;
@@ -54,7 +53,7 @@ public class SavedSearchControllerTests : IDisposable
     };
 
 
-    public SavedSearchControllerTests()
+    public SavedSearchesControllerTests()
     {
         _mockSavedSearchBusiness = new Mock<ISavedSearchBusiness>();
         _mockLogger = new Mock<ILogger<SavedSearchController>>();
@@ -386,7 +385,6 @@ public class SavedSearchControllerTests : IDisposable
     [Fact]
     public async Task ExecuteSavedSearchReturns500_OnUnexpectedException()
     {
-        CreateRoleRequestDto input = new CreateRoleRequestDto();
         _mockSavedSearchBusiness
             .Setup(b => b.ExecuteSavedSearch(SavedSearchId, UserId, OrgId, ProjectList, false, false, false))
             .ThrowsAsync(new Exception("db error"));
@@ -425,6 +423,33 @@ public class SavedSearchControllerTests : IDisposable
         // Assert
         _mockSavedSearchBusiness.Verify(
             b => b.ExecuteSavedSearch(SavedSearchId, UserId, OrgId, ProjectList, false, false, false),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task ExecuteSavedSearch_PassesAdminFlagTrueToBusinessLayer()
+    {
+        // Arrange
+        IEnumerable<QueryRecordViewResponseDto> expected =
+        new List<QueryRecordViewResponseDto>();
+
+        UserContextStorage.IsSysAdmin = true;
+
+        _mockSavedSearchBusiness
+            .Setup(b => b.ExecuteSavedSearch(SavedSearchId, UserId, OrgId, ProjectList, true, false, false))
+            .ReturnsAsync(expected);
+
+        // Act
+        var actionResult = await _savedSearchController.ExecuteSavedSearch(
+            OrgId,
+            ProjectList,
+            SavedSearchId);
+
+        var result = Assert.IsType<OkObjectResult>(actionResult.Result);
+
+        // Assert
+        _mockSavedSearchBusiness.Verify(
+            b => b.ExecuteSavedSearch(SavedSearchId, UserId, OrgId, ProjectList, true, false, false),
             Times.Once);
     }
 
@@ -492,7 +517,6 @@ public class SavedSearchControllerTests : IDisposable
     {
         // Arrange
         UserContextStorage.UserId = UserId;
-        UserContextStorage.IsSysAdmin = true;
 
         _mockSavedSearchBusiness
             .Setup(b => b.DeleteSavedSearch(UserId, SavedSearchId))
@@ -543,18 +567,5 @@ public class SavedSearchControllerTests : IDisposable
             .Where(method => method.Name == methodName)
             .Where(method => parameterNames.All(parameterName =>
                 method.GetParameters().Any(parameter => parameter.Name == parameterName))));
-    }
-
-    private static string GetMessageFromResultValue(object? value)
-    {
-        Assert.NotNull(value);
-
-        var messageProperty = value.GetType().GetProperty("message");
-        Assert.NotNull(messageProperty);
-
-        var message = messageProperty.GetValue(value) as string;
-        Assert.NotNull(message);
-
-        return message;
     }
 }
