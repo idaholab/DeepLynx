@@ -5,6 +5,7 @@ using deeplynx.interfaces;
 using deeplynx.models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using deeplynx.helpers;
 
 namespace deeplynx.api.Controllers;
 
@@ -35,12 +36,88 @@ public class LatticeExtractionController : ControllerBase
         _logger = logger;
     }
 
+    private static IActionResult StructuredTriggerFailure(ControllerBase controller, InvalidOperationException exc)
+    {
+        if (exc.Message.Contains("Embeddings are being generated", StringComparison.OrdinalIgnoreCase))
+        {
+            return controller.Conflict(new
+            {
+                error = "embeddings_not_ready",
+                message = exc.Message
+            });
+        }
+
+        if (exc.Message.Contains("sufficient ontology", StringComparison.OrdinalIgnoreCase))
+        {
+            return controller.BadRequest(new
+            {
+                error = "ontology_not_ready",
+                message = exc.Message
+            });
+        }
+
+        if (exc.Message.Contains("not found", StringComparison.OrdinalIgnoreCase))
+        {
+            return controller.NotFound(new
+            {
+                error = "record_not_found",
+                message = exc.Message
+            });
+        }
+
+        return controller.BadRequest(new
+        {
+            error = "lattice_trigger_invalid",
+            message = exc.Message
+        });
+    }
+
+    private static string? ExtractFailureMessage(string? rawBody)
+    {
+        if (string.IsNullOrWhiteSpace(rawBody)) return null;
+
+        var trimmedBody = rawBody.Trim();
+        if (trimmedBody.StartsWith('{'))
+        {
+            try
+            {
+                var dto = JsonSerializer.Deserialize<LatticeExtractionErrorDto>(trimmedBody);
+                if (!string.IsNullOrWhiteSpace(dto?.Detail)) return dto.Detail.Trim();
+                if (!string.IsNullOrWhiteSpace(dto?.Error)) return dto.Error.Trim();
+            }
+            catch (JsonException)
+            {
+                return trimmedBody;
+            }
+        }
+
+        return trimmedBody;
+    }
+
+    private async Task<string?> ReadFailureMessage(string? queryMessage)
+    {
+        if (!string.IsNullOrWhiteSpace(queryMessage)) return queryMessage.Trim();
+
+        var request = ControllerContext.HttpContext?.Request;
+        if (request?.Body == null) return null;
+
+        if (request.Body.CanSeek) request.Body.Position = 0;
+
+        using var reader = new StreamReader(request.Body, leaveOpen: true);
+        var rawBody = await reader.ReadToEndAsync();
+
+        if (request.Body.CanSeek) request.Body.Position = 0;
+
+        return ExtractFailureMessage(rawBody);
+    }
+
     /// <summary>
     ///     Returns all extractions created by the current user
     /// </summary>
     /// <param name="organizationId">The ID of the organization.</param>
     /// <param name="projectId">The ID of the project.</param>
     [HttpGet(Name = "api_list_extractions")]
+    [InsightEnabled]
     public async Task<IActionResult> ListExtractions(long organizationId, long projectId)
     {
         try
@@ -62,6 +139,7 @@ public class LatticeExtractionController : ControllerBase
     /// <param name="organizationId">The ID of the organization.</param>
     /// <param name="projectId">The ID of the project.</param>
     [HttpGet("embedding-status", Name = "api_get_embedding_status")]
+    [InsightEnabled]
     public async Task<IActionResult> GetEmbeddingStatus(long organizationId, long projectId)
     {
         try
@@ -86,6 +164,7 @@ public class LatticeExtractionController : ControllerBase
     ///     Optional embedding model config ID. If omitted, the project/org default is used.
     /// </param>
     [HttpPost("embed-ontology", Name = "api_embed_ontology")]
+    [InsightEnabled]
     public async Task<IActionResult> EmbedOntology(
         long organizationId,
         long projectId,
@@ -97,6 +176,35 @@ public class LatticeExtractionController : ControllerBase
             await _insightBusiness.QueueInsightEmbedStrings(
                 currentUserId, organizationId, projectId, embeddingModelConfigId);
             return Accepted();
+        }
+        catch (InvalidOperationException exc)
+        {
+            _logger.LogWarning(
+                "Unable to queue ontology embedding for project {ProjectId}: {Error}",
+                projectId,
+                exc.Message);
+            return BadRequest(new
+            {
+                error = "ontology_schema_not_ready",
+                message = exc.Message
+            });
+        }
+        catch (InsightServiceException exc)
+        {
+            _logger.LogError(
+                exc,
+                "Insight ontology embedding request failed for project {ProjectId}: {Error}",
+                projectId,
+                exc.Message);
+            return StatusCode(
+                exc.StatusCode.HasValue
+                    ? (int)exc.StatusCode.Value
+                    : StatusCodes.Status502BadGateway,
+                new
+                {
+                    error = "ontology_embedding_failed",
+                    message = exc.Message
+                });
         }
         catch (Exception exc)
         {
@@ -115,6 +223,7 @@ public class LatticeExtractionController : ControllerBase
     /// <param name="errorMessage">Optional error message from Insight describing the failure.</param>
     [AllowAnonymous]
     [HttpPost("{extractionId:long}/failure", Name = "api_insight_extraction_failure")]
+    [InsightEnabled]
     public async Task<IActionResult> InsightExtractionFailure(
         long organizationId,
         long projectId,
@@ -123,8 +232,18 @@ public class LatticeExtractionController : ControllerBase
     {
         try
         {
-            await _latticeExtractionBusiness.MarkExtractionFailed(extractionId, errorMessage);
-            return Ok();
+            var failureMessage = await ReadFailureMessage(errorMessage);
+            await _latticeExtractionBusiness.MarkExtractionFailed(
+                extractionId,
+                organizationId,
+                projectId,
+                failureMessage);
+            return Accepted(new
+            {
+                status = "failed",
+                extraction_id = extractionId,
+                message = failureMessage
+            });
         }
         catch (InvalidOperationException exc)
         {
@@ -149,6 +268,7 @@ public class LatticeExtractionController : ControllerBase
     /// <param name="dto">LLM response payload from Insight.</param>
     [AllowAnonymous]
     [HttpPost("{extractionId:long}/callback", Name = "api_insight_extraction_callback")]
+    [InsightEnabled]
     public async Task<IActionResult> InsightExtractionCallback(
         long organizationId,
         long projectId,
@@ -174,7 +294,10 @@ public class LatticeExtractionController : ControllerBase
             try
             {
                 await _latticeExtractionBusiness.MarkExtractionFailed(
-                    extractionId, $"LLM response could not be parsed: {exc.Message}");
+                    extractionId,
+                    organizationId,
+                    projectId,
+                    $"LLM response could not be parsed: {exc.Message}");
             }
             catch (Exception markFailedExc)
             {
@@ -211,6 +334,7 @@ public class LatticeExtractionController : ControllerBase
     /// <param name="projectId">The ID of the project.</param>
     /// <param name="extractionId">The extraction to retrieve staging data for.</param>
     [HttpGet("{extractionId:long}/staging", Name = "api_get_extraction_staging")]
+    [InsightEnabled]
     public async Task<IActionResult> GetExtractionStaging(
         long organizationId,
         long projectId,
@@ -218,7 +342,7 @@ public class LatticeExtractionController : ControllerBase
     {
         try
         {
-            var result = await _latticeExtractionBusiness.GetExtractionStaging(extractionId);
+            var result = await _latticeExtractionBusiness.GetExtractionStaging(extractionId, organizationId, projectId);
             return Ok(result);
         }
         catch (InvalidOperationException exc)
@@ -248,6 +372,7 @@ public class LatticeExtractionController : ControllerBase
     /// <param name="extractionId">The extraction to promote.</param>
     /// <param name="request">The selection of staged items to promote.</param>
     [HttpPost("{extractionId:long}/promote", Name = "api_promote_extraction")]
+    [InsightEnabled]
     public async Task<IActionResult> PromoteExtraction(
         long organizationId,
         long projectId,
@@ -323,6 +448,7 @@ public class LatticeExtractionController : ControllerBase
     /// <returns>202 Accepted with the extraction_id.</returns>
     [HttpPost("/organizations/{organizationId:long}/projects/{projectId:long}/records/{recordId:long}/trigger",
         Name = "api_trigger_extraction")]
+    [InsightEnabled]
     public async Task<IActionResult> TriggerExtraction(
         long organizationId,
         long projectId,
@@ -339,13 +465,36 @@ public class LatticeExtractionController : ControllerBase
         catch (InvalidOperationException exc)
         {
             _logger.LogWarning(exc.Message);
-            return BadRequest(exc.Message);
+            return StructuredTriggerFailure(this, exc);
+        }
+        catch (InsightServiceException exc)
+        {
+            _logger.LogError(
+                exc,
+                "Insight rejected Lattice extraction trigger for project {ProjectId}, record {RecordId}. HTTP status: {StatusCode}. Response body: {ResponseBody}",
+                projectId,
+                recordId,
+                exc.StatusCode,
+                exc.ResponseBody);
+            return StatusCode(
+                exc.StatusCode.HasValue
+                    ? (int)exc.StatusCode.Value
+                    : StatusCodes.Status502BadGateway,
+                new
+                {
+                    error = "lattice_trigger_failed",
+                    message = exc.Message
+                });
         }
         catch (Exception exc)
         {
             var message = $"An error occurred while triggering Lattice extraction: {exc}";
             _logger.LogError(message);
-            return StatusCode(StatusCodes.Status500InternalServerError, message);
+            return StatusCode(StatusCodes.Status500InternalServerError, new
+            {
+                error = "lattice_trigger_failed",
+                message
+            });
         }
     }
 }

@@ -11,9 +11,11 @@ public interface ILatticeExtractionBusiness
         long extractionId,
         InsightExtractionCallbackDto dto);
 
-    Task MarkExtractionFailed(long extractionId, string? errorMessage = null);
+    Task MarkExtractionFailed(long extractionId, long organizationId, long projectId, string? errorMessage = null);
 
     Task<ExtractionStagingResponseDto> GetExtractionStaging(long extractionId);
+
+    Task<ExtractionStagingResponseDto> GetExtractionStaging(long extractionId, long organizationId, long projectId);
 
     Task<ExtractionResponseDto> PromoteExtraction(
         long currentUserId,

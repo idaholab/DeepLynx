@@ -14,6 +14,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
 using Apache.Arrow.Flight.Server;
+using Microsoft.AspNetCore.Mvc;
 using Npgsql;
 using Scalar.AspNetCore;
 using Serilog;
@@ -128,6 +129,19 @@ try
         {
             options.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles;
             options.JsonSerializerOptions.MaxDepth = 64;
+        })
+        .ConfigureApiBehaviorOptions(options =>
+        {
+            options.InvalidModelStateResponseFactory = context =>
+            {
+                return new BadRequestObjectResult(
+                    BadRequestProblemDetailsFactory.CreateForModelState(
+                        context.ModelState,
+                        context.ActionDescriptor.Parameters))
+                {
+                    ContentTypes = { "application/problem+json" }
+                };
+            };
         });
 
     /*
@@ -576,6 +590,7 @@ try
     app.UseAuthentication(); // Must be first
     app.UseMiddleware<UserContextMiddleware>(); // Second - sets UserId/Email
     app.UseMiddleware<AuthMiddleware>(); // Third - sets OrganizationId
+    app.UseMiddleware<FeatureFlagMiddleware>();
     app.UseMiddleware<SensitivityMiddleware>();
     app.UseAuthorization(); // Fourth
     app.MapControllers(); // Last
