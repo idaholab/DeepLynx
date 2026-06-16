@@ -22,6 +22,18 @@ public class Embedding
     [Column("vector")]
     public string Vector { get; set; } = null!;
 
+    [Column("organization_id")]
+    public long? OrganizationId { get; set; }
+
+    [Column("project_id")]
+    public long? ProjectId { get; set; }
+
+    [Column("embedding_model")]
+    public string? EmbeddingModel { get; set; }
+
+    [Column("dimensions")]
+    public int? Dimensions { get; set; }
+
     [Column("last_updated_at", TypeName = "timestamp without time zone")]
     public DateTime LastUpdatedAt { get; set; }
 
