@@ -274,10 +274,15 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
 
         if (extractions.Count == 0) return extractions;
 
-        // Staging items live in the lattice schema (separate context), so totals/resolved counts are
-        // gathered per staging table and aggregated. "Resolved" mirrors the completeness rule: an item
-        // counts once it is promoted, rejected, or (for classes/relationships) matched an existing
-        // ontology entity that needs no promotion.
+        return await ProjectTotals(extractions);
+    }
+
+    // Staging items live in the lattice schema (separate context), so totals/resolved counts are
+    // gathered per staging table and aggregated. "Resolved" mirrors the completeness rule: an item
+    // counts once it is promoted, rejected, or (for classes/relationships) matched an existing
+    // ontology entity that needs no promotion.
+    private async Task<List<ExtractionListItemDto>> ProjectTotals(List<ExtractionListItemDto> extractions)
+    {
         var ids = extractions.Select(e => e.Id).ToList();
         var totals = ids.ToDictionary(id => id, _ => 0);
         var resolved = ids.ToDictionary(id => id, _ => 0);
