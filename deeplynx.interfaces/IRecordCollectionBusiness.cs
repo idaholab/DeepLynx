@@ -5,9 +5,9 @@ namespace deeplynx.interfaces;
 
 public interface IRecordCollectionBusiness
 {
-    Task<List<RecordCollectionResponseDto>> GetAllRecordCollections(
-        long currentUserId, long organizationId, long projectId, bool hideArchived,
-        bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false);
+    Task<PaginatedResponse<RecordCollectionResponseDto>> GetAllRecordCollections(
+        long currentUserId, long organizationId, long projectId, RecordCollectionQueryRequestDto dto,
+        bool hideArchived, bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false);
 
     Task<List<RecordResponseDto>> GetRecordsInRecordCollection(
         long currentUserId, long organizationId, long projectId, long recordCollectionId, bool hideArchived,

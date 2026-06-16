@@ -258,10 +258,14 @@ public class RecordCollectionBusinessTests : IntegrationTestBase
     [Fact]
     public async Task GetAllRecordCollections_HideArchived_ReturnsOnlyActiveCollections()
     {
+        var queryDto = new RecordCollectionQueryRequestDto();
         var result = await _recordCollectionBusiness.GetAllRecordCollections(
-            _userId, _organizationId, _projectId, true, isSysAdmin: true);
+            _userId, _organizationId, _projectId, queryDto, true, isSysAdmin: true);
 
-        var collection = Assert.Single(result);
+        Assert.Equal(1, result.TotalCount);
+        Assert.Equal(1, result.PageNumber);
+        Assert.Equal(25, result.PageSize);
+        var collection = Assert.Single(result.Items);
         Assert.Equal(_collectionId, collection.Id);
         Assert.False(collection.IsArchived);
         Assert.Single(collection.Tags);
@@ -305,12 +309,13 @@ public class RecordCollectionBusinessTests : IntegrationTestBase
         Context.RecordCollections.AddRange(accessibleCollection, restrictedCollection);
         await Context.SaveChangesAsync();
 
+        var queryDto = new RecordCollectionQueryRequestDto();
         var result = await _recordCollectionBusiness.GetAllRecordCollections(
-            _userId, _organizationId, _projectId, hideArchived: true);
+            _userId, _organizationId, _projectId, queryDto, hideArchived: true);
 
-        Assert.NotEmpty(result);
-        Assert.Contains(result, c => c.Id == accessibleCollection.Id);
-        Assert.DoesNotContain(result, c => c.Id == restrictedCollection.Id);
+        Assert.NotEmpty(result.Items);
+        Assert.Contains(result.Items, c => c.Id == accessibleCollection.Id);
+        Assert.DoesNotContain(result.Items, c => c.Id == restrictedCollection.Id);
     }
     
     #endregion

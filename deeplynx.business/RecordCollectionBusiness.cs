@@ -53,19 +53,48 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
     /// <param name="currentUserId">The ID of current user</param>
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
     /// <param name="projectId">The ID of the project whose records are to be retrieved</param>
+    /// <param name="dto">The data transfer object of the search parameters and pagination</param>
     /// <param name="hideArchived">Flag indicating whether to hide archived records from the result</param>
     /// <param name="isSysAdmin">Optional param determining if the requesting user is a system admin</param>
     /// <param name="isOrgAdmin">Optional param determining if the requesting user is an organization admin</param>
     /// <param name="isProjectAdmin">Optional param determining if the requesting user is a project admin</param>
     /// <returns>A list of record collections based on the applied filters.</returns>
-    public async Task<List<RecordCollectionResponseDto>> GetAllRecordCollections(
-        long currentUserId, long organizationId, long projectId, bool hideArchived,
-         bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false)
+    public async Task<PaginatedResponse<RecordCollectionResponseDto>> GetAllRecordCollections(
+        long currentUserId, long organizationId, long projectId, RecordCollectionQueryRequestDto dto,
+        bool hideArchived, bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false)
     {
+        var search = dto.Search?.Trim().ToLower();
+
+
         var recordCollectionQuery = _context.RecordCollections
             .Where(c => c.ProjectId == projectId && c.OrganizationId == organizationId);
 
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            recordCollectionQuery = recordCollectionQuery.Where(c =>
+                            c.Name.ToLower().Contains(search) ||
+                            (c.Description != null && c.Description.ToLower().Contains(search)) ||
+                            c.Labels.Any(l => l.Name.ToLower().Contains(search)) ||
+                            c.Tags.Any(t => t.Name.ToLower().Contains(search)));
+        }
+
         if (hideArchived) recordCollectionQuery = recordCollectionQuery.Where(c => !c.IsArchived);
+
+        if (dto.SensitivityLabelIds?.Any() == true)
+        {
+            foreach (var labelId in dto.SensitivityLabelIds.Distinct())
+            {
+                recordCollectionQuery = recordCollectionQuery.Where(c => c.Labels.Any(l => l.Id == labelId));
+            }
+        }
+
+        if (dto.TagIds?.Any() == true)
+        {
+            foreach (var tagId in dto.TagIds.Distinct())
+            {
+                recordCollectionQuery = recordCollectionQuery.Where(c => c.Tags.Any(t => t.Id == tagId));
+            }
+        }
 
         // if user is not admin, filter out unauthorized labels
         if (!isSysAdmin && !isOrgAdmin && !isProjectAdmin)
@@ -78,13 +107,34 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
                 r.Labels.All(l => userAuthorizedLabels.Contains(l.Id)));
         }
 
+        recordCollectionQuery = dto.Sort switch
+        {
+            "alphabeticalAsc" => recordCollectionQuery.OrderBy(c => c.Name),
+            "alphabeticalDesc" => recordCollectionQuery.OrderByDescending(c => c.Name),
+            "recordCountAsc" => recordCollectionQuery.OrderBy(c => c.Records.Count).ThenBy(c => c.Name),
+            "recordCountDesc" => recordCollectionQuery.OrderByDescending(c => c.Records.Count).ThenBy(c => c.Name),
+            "updatedAsc" => recordCollectionQuery.OrderBy(c => c.LastUpdatedAt).ThenBy(c => c.Name),
+            "updatedDesc" => recordCollectionQuery.OrderByDescending(c => c.LastUpdatedAt).ThenBy(c => c.Name),
+            _ => recordCollectionQuery.OrderByDescending(c => c.LastUpdatedAt).ThenBy(c => c.Name),
+        };
+
+        // Get total count before pagination
+        var totalCount = await recordCollectionQuery.CountAsync();
+
+        // Get pagination values
+        var pageNumber = Math.Max(1, dto.PageNumber);
+        var pageSize = dto.GetValidatedPageSize();
+
+        // Apply pagination and execute query
         var recordCollecions = await recordCollectionQuery
             .Include(c => c.Tags)
             .Include(c => c.Labels)
             .Include(c => c.Records)
+            .Skip((pageNumber - 1) * pageSize)
+            .Take(pageSize)
             .ToListAsync();
 
-        return recordCollecions.Select(c => new RecordCollectionResponseDto
+        var items = recordCollecions.Select(c => new RecordCollectionResponseDto
         {
             Id = c.Id,
             Description = c.Description,
@@ -107,6 +157,16 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
                 Name = l.Name
             }).ToList()
         }).ToList();
+
+        return new PaginatedResponse<RecordCollectionResponseDto>
+        {
+            Items = items,
+            PageNumber = pageNumber,
+            PageSize = pageSize,
+            TotalCount = totalCount
+        };
+
+
     }
 
     /// <summary>
@@ -161,32 +221,32 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
 
         return records
         .Select(r => new RecordResponseDto
+        {
+            Id = r.Id,
+            Description = r.Description,
+            Uri = r.Uri,
+            Properties = r.Properties,
+            OriginalId = r.OriginalId,
+            Name = r.Name,
+            ClassId = r.ClassId,
+            DataSourceId = r.DataSourceId,
+            ProjectId = r.ProjectId,
+            OrganizationId = r.OrganizationId,
+            LastUpdatedBy = r.LastUpdatedBy,
+            LastUpdatedAt = r.LastUpdatedAt,
+            IsArchived = r.IsArchived,
+            FileType = r.FileType,
+            Tags = r.Tags.Select(t => new RecordTagDto
             {
-                Id = r.Id,
-                Description = r.Description,
-                Uri = r.Uri,
-                Properties = r.Properties,
-                OriginalId = r.OriginalId,
-                Name = r.Name,
-                ClassId = r.ClassId,
-                DataSourceId = r.DataSourceId,
-                ProjectId = r.ProjectId,
-                OrganizationId = r.OrganizationId,
-                LastUpdatedBy = r.LastUpdatedBy,
-                LastUpdatedAt = r.LastUpdatedAt,
-                IsArchived = r.IsArchived,
-                FileType = r.FileType,
-                Tags = r.Tags.Select(t => new RecordTagDto
-                {
-                    Id = t.Id,
-                    Name = t.Name
-                }).ToList(),
-                Labels = r.Labels.Select(l => new RecordLabelDto
-                {
-                    Id = l.Id,
-                    Name = l.Name
-                }).ToList()
-            }).ToList();
+                Id = t.Id,
+                Name = t.Name
+            }).ToList(),
+            Labels = r.Labels.Select(l => new RecordLabelDto
+            {
+                Id = l.Id,
+                Name = l.Name
+            }).ToList()
+        }).ToList();
     }
 
     /// <summary>
@@ -219,7 +279,7 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
         {
             var userAuthorizedLabels = await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
                 currentUserId, organizationId, projectId, "read record");
-                
+
             recordCollectionQuery = recordCollectionQuery.Where(r =>
                 r.Labels.Count == 0 ||
                 r.Labels.All(l => userAuthorizedLabels.Contains(l.Id)));
@@ -278,7 +338,7 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
             throw new ArgumentException("Record IDs list cannot be null or empty", nameof(recordIds));
 
         var distinctRecordIds = recordIds.Distinct().ToList();
-        
+
         // no need to search record collections by authorized labels since middleware checks it using id
         var collection = await _context.RecordCollections
             .Where(c =>
@@ -292,7 +352,7 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
 
         if (collection == null)
             throw new KeyNotFoundException($"Record collection with id {recordCollectionId} not found or is archived.");
-        
+
         var authorizedRecordIds = distinctRecordIds.ToHashSet();
         if (!isSysAdmin && !isOrgAdmin && !isProjectAdmin)
         {
@@ -307,7 +367,7 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
                             (!r.Labels.Any() || r.Labels.All(l => userAuthorizedLabels.Contains(l.Id))))
                 .Select(r => r.Id)
                 .ToHashSetAsync();
-            
+
             var unauthorizedRecordIds = distinctRecordIds
                 .Where(id => !authorizedRecordIds.Contains(id))
                 .ToList();
@@ -344,9 +404,9 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
                     collection.Labels.Add(label);
                 }
             }
-                
+
         }
-        
+
         collection.LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
         collection.LastUpdatedBy = currentUserId;
 
@@ -493,7 +553,7 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
 
         await using var transaction = await _context.Database.BeginTransactionAsync();
 
-        List<SensitivityLabel> sensitivityLabelsToAdd= new List<SensitivityLabel>();
+        List<SensitivityLabel> sensitivityLabelsToAdd = new List<SensitivityLabel>();
 
         if (sensitivityLabelIds != null && sensitivityLabelIds.Any())
         {
@@ -511,7 +571,7 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
                 throw new KeyNotFoundException(
                     $"Sensitivity labels not found inside this organization/project: {string.Join(", ", missingLabelIds)}");
         }
-        
+
         try
         {
             var collection = new RecordCollection
@@ -644,7 +704,6 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
     /// <summary>
     ///     Attaches a tag to a record collection
     /// </summary>
-    /// <param name="currentUserId">The ID of current user</param>
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
     /// <param name="projectId">Project ID for the record and tag</param>
     /// <param name="recordCollectionId">The ID of the record collection</param>
@@ -926,7 +985,7 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
 
         return true;
     }
-    
+
     /// <summary>
     /// Get Sensitivity Labels for Record Collection
     /// </summary>
@@ -989,7 +1048,7 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
         // Handle tags if provided
         if (tags == null || !tags.Any())
             return new List<RecordCollectionTagDto>();
-        
+
         // Filter out empty or whitespace strings
         tags = tags.Where(t => !string.IsNullOrWhiteSpace(t)).ToList();
 

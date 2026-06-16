@@ -39,14 +39,16 @@ public class RecordCollectionController : ControllerBase
     /// </summary>
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
     /// <param name="projectId">The ID of the project whose collections are to be retrieved</param>
+    /// <param name="dto">The collection data transfer object used to search and return collections</param>
     /// <param name="hideArchived">Flag indicating whether to hide archived collections from the result (Default true)</param>
-    /// <returns>A list of record collections based on the applied filters.</returns>
+    /// <returns>A paginated response of record collections based on the applied filters.</returns>
     [HttpGet(Name = "api_get_all_record_collections")]
     [Auth("read", "record_collection")]
     [Sensitivity("read record")]
-    public async Task<ActionResult<IEnumerable<RecordCollectionResponseDto>>> GetAllRecordCollections(
+    public async Task<ActionResult<PaginatedResponse<RecordCollectionResponseDto>>> GetAllRecordCollections(
         long organizationId,
         long projectId,
+        [FromQuery] RecordCollectionQueryRequestDto dto,
         [FromQuery] bool hideArchived = true)
     {
         try
@@ -56,7 +58,7 @@ public class RecordCollectionController : ControllerBase
             var isOrgAdmin = UserContextStorage.IsOrgAdmin;
             var isProjectAdmin = UserContextStorage.IsProjectAdmin;
             var recordCollections =
-                await _recordCollectionBusiness.GetAllRecordCollections(currentUserId, organizationId, projectId, hideArchived, isSysAdmin, isOrgAdmin, isProjectAdmin);
+                await _recordCollectionBusiness.GetAllRecordCollections(currentUserId, organizationId, projectId, dto, hideArchived, isSysAdmin, isOrgAdmin, isProjectAdmin);
             return Ok(recordCollections);
         }
         catch (Exception exc)
@@ -148,7 +150,7 @@ public class RecordCollectionController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
-    
+
     /// <summary>
     ///     Update Record Collection Metadata
     /// </summary>
@@ -288,7 +290,7 @@ public class RecordCollectionController : ControllerBase
     /// </summary>
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
     /// <param name="projectId">The ID of the project to which the record belongs</param>
-    /// <param name="dto">The record request data transfer object containing record details</param>
+    /// <param name="dto">The collection request data transfer object containing collection details</param>
     /// <param name="sensitivityLabelIds">sensitivity labels to apply to the collection on creation</param>
     /// <returns>The created Record Collection</returns>
     [HttpPost(Name = "api_create_a_record_collection")]
@@ -352,7 +354,7 @@ public class RecordCollectionController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
-    
+
     /// <summary>
     ///     Archive or Unarchive a Record Collection
     /// </summary>
@@ -394,7 +396,7 @@ public class RecordCollectionController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
-    
+
     /// <summary>
     ///     Attach a Tag to a Record Collection
     /// </summary>
@@ -433,7 +435,7 @@ public class RecordCollectionController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
-    
+
     /// <summary>
     ///     Unattach a Tag from a Record Collection
     /// </summary>
@@ -468,7 +470,7 @@ public class RecordCollectionController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
-    
+
     /// <summary>
     ///     Attach a Sensitivity Label to a Record Collection
     /// </summary>
@@ -507,7 +509,7 @@ public class RecordCollectionController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
-    
+
     /// <summary>
     ///     Unattach a sensitivity label from a Record Collection
     /// </summary>
@@ -546,8 +548,8 @@ public class RecordCollectionController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
-    
-    
+
+
     /// <summary>
     ///     Get Sensitivity Labels for a Record Collection
     /// </summary>
@@ -580,5 +582,5 @@ public class RecordCollectionController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
-    
+
 }
