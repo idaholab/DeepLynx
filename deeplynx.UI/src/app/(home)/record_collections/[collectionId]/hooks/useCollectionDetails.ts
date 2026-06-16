@@ -20,7 +20,7 @@ import {
   getMultiProjectRecords,
 } from "@/app/lib/client_service/query_services.client";
 import { createTag, getAllTags } from "@/app/lib/client_service/tag_services.client";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import {
   QueryRecordViewResponseDto,
@@ -49,6 +49,7 @@ type Params = {
   organizationId: number;
   projectId: number;
   initialCollection: RecordCollectionResponseDto;
+  initialCollectionRecords: RecordResponseDto[];
 };
 
 type CollectionWorkspaceTabId = "Details" | "Records";
@@ -57,6 +58,7 @@ export function useCollectionDetails({
   organizationId,
   projectId,
   initialCollection,
+  initialCollectionRecords,
 }: Params) {
   const { t } = useLanguage();
   const [selectedCollection, setSelectedCollection] =
@@ -69,9 +71,12 @@ export function useCollectionDetails({
     selectedCollectionPropertiesEditorOpen,
     setSelectedCollectionPropertiesEditorOpen,
   ] = useState(false);
+  const skipInitialCollectionRecordsLoad = useRef(true);
   const [collectionWorkspaceTab, setCollectionWorkspaceTab] =
     useState<CollectionWorkspaceTabId>("Details");
-  const [collectionRecords, setCollectionRecords] = useState<RecordResponseDto[]>([]);
+  const [collectionRecords, setCollectionRecords] = useState<RecordResponseDto[]>(
+    initialCollectionRecords,
+  );
   const [recordSearchTerm, setRecordSearchTerm] = useState("");
   const [recordSearchResults, setRecordSearchResults] = useState<
     QueryRecordViewResponseDto[]
@@ -231,6 +236,11 @@ export function useCollectionDetails({
   }, [organizationId, projectId, selectedCollection.id, t]);
 
   useEffect(() => {
+    if (skipInitialCollectionRecordsLoad.current) {
+      skipInitialCollectionRecordsLoad.current = false;
+      return;
+    }
+
     void loadCollectionRecords();
   }, [loadCollectionRecords]);
 

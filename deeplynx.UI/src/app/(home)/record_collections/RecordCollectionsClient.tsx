@@ -61,24 +61,24 @@ export default function RecordCollectionsClient({ recordCollections }: Props) {
               title={t.translations.RECORD_COLLECTIONS_ALL}
               subtitle={t.translations.RECORD_COLLECTIONS_BROWSE_SEARCH_OPEN_PROJECT}
               action={
-                <div className="rounded-lg border border-base-300 bg-base-200/50 px-3 py-2 text-sm">
-                  <span className="text-base-content/70">
-                    {t.translations.RECORD_COLLECTIONS_TOTAL_COLLECTIONS}{" "}
-                  </span>
-                  <span className="font-semibold text-base-content">
-                    {summary.filteredCount}
-                  </span>{" "}
+                <div className="flex flex-wrap items-center justify-end gap-3">
+                  <div className="rounded-lg border border-base-300 bg-base-200/50 px-3 py-2 text-sm">
+                    <span className="text-base-content/70">
+                      {t.translations.RECORD_COLLECTIONS_TOTAL_COLLECTIONS}{" "}
+                    </span>
+                    <span className="font-semibold text-base-content">
+                      {summary.filteredCount}
+                    </span>
+                  </div>
+                  <Link
+                    href="/record_collections/new_collection"
+                    className="btn btn-primary px-2 text-base-content"
+                  >
+                    {t.translations.RECORD_COLLECTIONS_NEW}
+                  </Link>
                 </div>
               }
             >
-              <div>
-                <Link
-                  href="/record_collections/new_collection"
-                  className="btn btn-primary btn-sm"
-                >
-                  {t.translations.RECORD_COLLECTIONS_NEW}
-                </Link>
-              </div>
               <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_18rem]">
                 <SearchInput
                   className="self-end"

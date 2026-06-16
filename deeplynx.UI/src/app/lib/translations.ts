@@ -1284,7 +1284,9 @@ export const translations = {
       RECORD_COLLECTIONS_MANAGE_RECORDS_DESCRIPTION:
         "Add records to this collection or remove records already assigned.",
       RECORD_COLLECTIONS_MODIFY_LABELS_AND_TAGS:
-        "Modify Labels and Tags",
+        "Collection Labels and Tags",
+      RECORD_COLLECTIONS_MODIFY_LABELS_AND_TAGS_HELP:
+        "These labels and tags will be applied to the collection itself. They do not change the included records.",
       RECORD_COLLECTIONS_NAME_AND_DESCRIPTION_REQUIRED:
         "Name and description are required",
       RECORD_COLLECTIONS_NEW: "New Collection",
@@ -1310,7 +1312,9 @@ export const translations = {
         "Records currently assigned to {name}.",
       RECORD_COLLECTIONS_RECORD_ADDED: "Record added to collection",
       RECORD_COLLECTIONS_RECORD_REMOVED: "Record removed from collection",
-      RECORD_COLLECTIONS_RECORD_SUMMARY: "Selected Record Summary",
+      RECORD_COLLECTIONS_RECORD_SUMMARY: "Included Record Summary",
+      RECORD_COLLECTIONS_RECORD_SUMMARY_HELP:
+        "These labels and tags come from the records currently selected for this collection. Use them to refine which records are included.",
       RECORD_COLLECTIONS_REMOVE_ITEM: "Remove {name}",
       RECORD_COLLECTIONS_REVIEW_AND_MODIFY_DETAILS:
         "Review and modify collection details.",
@@ -1327,7 +1331,9 @@ export const translations = {
         "Search selected records",
       RECORD_COLLECTIONS_SEARCHING_RECORDS: "Searching records",
       RECORD_COLLECTIONS_SELECTED_LABELS_AND_TAGS:
-        "Selected Labels and Tags",
+        "Labels and Tags on Selected Records",
+      RECORD_COLLECTIONS_SELECTED_LABELS_AND_TAGS_HELP:
+        "This is a read-only summary of the labels and tags already present on the selected records.",
       RECORD_COLLECTIONS_SELECTED_RECORDS_COUNT:
         "{count} records selected",
       RECORD_COLLECTIONS_SELECTED_RECORDS_SHOWN:
@@ -1344,11 +1350,11 @@ export const translations = {
       RECORD_COLLECTIONS_STEP_2: "Step 2",
       RECORD_COLLECTIONS_STEP_3: "Step 3",
       RECORD_COLLECTIONS_STEP_4: "Step 4",
-      RECORD_COLLECTIONS_STEP_ADD_METADATA: "Add Metadata",
+      RECORD_COLLECTIONS_STEP_ADD_METADATA: "Describe Collection",
       RECORD_COLLECTIONS_STEP_MODIFY_LABELS_AND_TAGS:
-        "Modify Labels and Tags",
+        "Set Collection Labels and Tags",
       RECORD_COLLECTIONS_STEP_REVIEW: "Review",
-      RECORD_COLLECTIONS_STEP_SELECT_RECORDS: "Select Records",
+      RECORD_COLLECTIONS_STEP_SELECT_RECORDS: "Select Included Records",
       RECORD_COLLECTIONS_TAGS: "Tags",
       RECORD_COLLECTIONS_TAG_CREATED: "Tag created",
       RECORD_COLLECTIONS_TITLE: "Collection Title",
@@ -3106,7 +3112,9 @@ export const translations = {
       RECORD_COLLECTIONS_MANAGE_RECORDS_DESCRIPTION:
         "Agrega registros a esta colección o elimina registros ya asignados.",
       RECORD_COLLECTIONS_MODIFY_LABELS_AND_TAGS:
-        "Modificar etiquetas y etiquetas de sensibilidad",
+        "Etiquetas de la colección",
+      RECORD_COLLECTIONS_MODIFY_LABELS_AND_TAGS_HELP:
+        "Estas etiquetas se aplicarán a la colección misma. No cambian los registros incluidos.",
       RECORD_COLLECTIONS_NAME_AND_DESCRIPTION_REQUIRED:
         "El nombre y la descripción son obligatorios",
       RECORD_COLLECTIONS_NEW: "Nueva colección",
@@ -3137,7 +3145,9 @@ export const translations = {
       RECORD_COLLECTIONS_RECORD_REMOVED:
         "Registro eliminado de la colección",
       RECORD_COLLECTIONS_RECORD_SUMMARY:
-        "Resumen de registros seleccionados",
+        "Resumen de registros incluidos",
+      RECORD_COLLECTIONS_RECORD_SUMMARY_HELP:
+        "Estas etiquetas provienen de los registros seleccionados actualmente para esta colección. Úsalas para refinar qué registros se incluyen.",
       RECORD_COLLECTIONS_REMOVE_ITEM: "Eliminar {name}",
       RECORD_COLLECTIONS_REVIEW_AND_MODIFY_DETAILS:
         "Revisa y modifica los detalles de la colección.",
@@ -3158,7 +3168,9 @@ export const translations = {
       RECORD_COLLECTIONS_SEARCHING_RECORDS:
         "Buscando registros",
       RECORD_COLLECTIONS_SELECTED_LABELS_AND_TAGS:
-        "Etiquetas y etiquetas de sensibilidad seleccionadas",
+        "Etiquetas de los registros seleccionados",
+      RECORD_COLLECTIONS_SELECTED_LABELS_AND_TAGS_HELP:
+        "Este es un resumen de solo lectura de las etiquetas que ya existen en los registros seleccionados.",
       RECORD_COLLECTIONS_SELECTED_RECORDS_COUNT:
         "{count} registros seleccionados",
       RECORD_COLLECTIONS_SELECTED_RECORDS_SHOWN:
@@ -3180,12 +3192,12 @@ export const translations = {
       RECORD_COLLECTIONS_STEP_3: "Paso 3",
       RECORD_COLLECTIONS_STEP_4: "Paso 4",
       RECORD_COLLECTIONS_STEP_ADD_METADATA:
-        "Agregar metadatos",
+        "Describir colección",
       RECORD_COLLECTIONS_STEP_MODIFY_LABELS_AND_TAGS:
-        "Modificar etiquetas y etiquetas de sensibilidad",
+        "Definir etiquetas de la colección",
       RECORD_COLLECTIONS_STEP_REVIEW: "Revisar",
       RECORD_COLLECTIONS_STEP_SELECT_RECORDS:
-        "Seleccionar registros",
+        "Seleccionar registros incluidos",
       RECORD_COLLECTIONS_TAGS: "Etiquetas",
       RECORD_COLLECTIONS_TAG_CREATED: "Etiqueta creada",
       RECORD_COLLECTIONS_TITLE: "Título de la colección",

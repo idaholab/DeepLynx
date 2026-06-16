@@ -262,7 +262,7 @@ export default function CollectionDetailsReadonlyView({
                       {record.id ? (
                         <Link
                           href={`/record?recordId=${record.id}&projectId=${record.projectId ?? projectId}`}
-                          className="link link-primary"
+                          className="link text-base-content hover:text-base-content/80"
                         >
                           {record.name ??
                             t.translations.RECORD_COLLECTIONS_UNNAMED_RECORD}

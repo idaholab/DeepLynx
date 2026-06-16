@@ -5,7 +5,10 @@ import { useLanguage } from "@/app/contexts/Language";
 import { ArrowLeftIcon } from "@heroicons/react/24/outline";
 import { useRouter } from "next/navigation";
 import React from "react";
-import { RecordCollectionResponseDto } from "../../types/responseDTOs";
+import {
+  RecordCollectionResponseDto,
+  RecordResponseDto,
+} from "../../types/responseDTOs";
 import SelectedCollectionDetailsTab from "../components/SelectedCollectionDetailsTab";
 import SelectedCollectionRecordsTab from "../components/SelectedCollectionRecordsTab";
 import { useCollectionDetails } from "./hooks/useCollectionDetails";
@@ -14,12 +17,14 @@ type Props = {
   organizationId: number;
   projectId: number;
   initialCollection: RecordCollectionResponseDto;
+  initialCollectionRecords: RecordResponseDto[];
 };
 
 export default function CollectionDetailsClient({
   organizationId,
   projectId,
   initialCollection,
+  initialCollectionRecords,
 }: Props) {
   const router = useRouter();
   const { t } = useLanguage();
@@ -28,6 +33,7 @@ export default function CollectionDetailsClient({
       organizationId,
       projectId,
       initialCollection,
+      initialCollectionRecords,
     });
 
   return (

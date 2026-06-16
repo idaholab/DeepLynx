@@ -1,7 +1,11 @@
 import CollectionDetailsClient from "./CollectionDetailsClient";
 import { cookies } from "next/headers";
 import { notFound, redirect } from "next/navigation";
-import { getAllRecordCollectionsServer } from "@/app/lib/server_service/record_collection_services.server";
+import {
+  getAllRecordCollectionsServer,
+  getRecordsInRecordCollectionServer,
+} from "@/app/lib/server_service/record_collection_services.server";
+import { RecordResponseDto } from "@/app/(home)/types/responseDTOs";
 
 export const metadata = { title: "Record Collections" };
 
@@ -62,11 +66,23 @@ export default async function Page({ params }: Props) {
     return notFound();
   }
 
+  let initialCollectionRecords: RecordResponseDto[] = [];
+  try {
+    initialCollectionRecords = await getRecordsInRecordCollectionServer(
+      Number(organizationId),
+      Number(projectId),
+      parsedCollectionId,
+    );
+  } catch (error) {
+    console.error("Failed to load initial collection records:", error);
+  }
+
   return (
     <CollectionDetailsClient
       organizationId={Number(organizationId)}
       projectId={Number(projectId)}
       initialCollection={initialCollection}
+      initialCollectionRecords={initialCollectionRecords}
     />
   );
 }

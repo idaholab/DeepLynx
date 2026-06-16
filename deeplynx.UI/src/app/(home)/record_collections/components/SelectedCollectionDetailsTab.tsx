@@ -88,6 +88,17 @@ export default function SelectedCollectionDetailsTab({
   },
 }: Props) {
   const { t } = useLanguage();
+  const [confirmRemoveRecordId, setConfirmRemoveRecordId] = React.useState<
+    number | null
+  >(null);
+
+  const handleConfirmRemoveRecord = React.useCallback(
+    async (recordId: number) => {
+      await onRemoveCollectionRecord(recordId);
+      setConfirmRemoveRecordId((current) => (current === recordId ? null : current));
+    },
+    [onRemoveCollectionRecord],
+  );
 
   return (
     <div className="mt-4 space-y-4">
@@ -355,6 +366,8 @@ export default function SelectedCollectionDetailsTab({
                     typeof recordId === "number" && addingRecordIds.includes(recordId);
                   const isRemoving =
                     typeof recordId === "number" && removingRecordIds.includes(recordId);
+                  const showRemoveConfirmation =
+                    typeof recordId === "number" && confirmRemoveRecordId === recordId;
 
                   return {
                     key: record.id ?? record.name ?? "record",
@@ -369,36 +382,71 @@ export default function SelectedCollectionDetailsTab({
                       projectId ??
                       t.translations.UNKNOWN,
                     updatedAt: record.lastUpdatedAt,
-                    actionCell: isAssigned ? (
-                      <button
-                        type="button"
-                        className="btn btn-error btn-outline btn-xs"
-                        disabled={isRemoving || recordId === null}
-                        onClick={() =>
-                          recordId !== null && void onRemoveCollectionRecord(recordId)
-                        }
-                      >
-                        {isRemoving ? (
-                          <span className="loading loading-spinner loading-xs" />
+                    actionCell: (
+                      <div className="flex min-w-[16rem] justify-end">
+                        {isAssigned ? (
+                          showRemoveConfirmation ? (
+                            <div className="flex flex-nowrap items-center justify-end gap-2 text-xs">
+                              <span className="whitespace-nowrap text-base-content/70">
+                                {t.translations.RECORD_COLLECTIONS_ARE_YOU_SURE}
+                              </span>
+                              <button
+                                type="button"
+                                className="btn btn-error btn-xs"
+                                disabled={isRemoving || recordId === null}
+                                onClick={() =>
+                                  recordId !== null &&
+                                  void handleConfirmRemoveRecord(recordId)
+                                }
+                              >
+                                {isRemoving ? (
+                                  <span className="loading loading-spinner loading-xs" />
+                                ) : (
+                                  t.translations.YES
+                                )}
+                              </button>
+                              <button
+                                type="button"
+                                className="btn btn-ghost btn-xs"
+                                disabled={isRemoving}
+                                onClick={() => setConfirmRemoveRecordId(null)}
+                              >
+                                {t.translations.NO}
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              type="button"
+                              className="btn btn-error btn-outline btn-xs"
+                              disabled={isRemoving || recordId === null}
+                              onClick={() =>
+                                recordId !== null && setConfirmRemoveRecordId(recordId)
+                              }
+                            >
+                              {isRemoving ? (
+                                <span className="loading loading-spinner loading-xs" />
+                              ) : (
+                                t.translations.REMOVE
+                              )}
+                            </button>
+                          )
                         ) : (
-                          t.translations.REMOVE
+                          <button
+                            type="button"
+                            className="btn btn-primary btn-xs"
+                            disabled={isAdding || recordId === null}
+                            onClick={() =>
+                              recordId !== null && void onAddCollectionRecord(recordId)
+                            }
+                          >
+                            {isAdding ? (
+                              <span className="loading loading-spinner loading-xs" />
+                            ) : (
+                              t.translations.ADD
+                            )}
+                          </button>
                         )}
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        className="btn btn-primary btn-xs"
-                        disabled={isAdding || recordId === null}
-                        onClick={() =>
-                          recordId !== null && void onAddCollectionRecord(recordId)
-                        }
-                      >
-                        {isAdding ? (
-                          <span className="loading loading-spinner loading-xs" />
-                        ) : (
-                          t.translations.ADD
-                        )}
-                      </button>
+                      </div>
                     ),
                   };
                 })}

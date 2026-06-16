@@ -9,6 +9,6 @@ export const COLLECTION_SORT_OPTIONS: CollectionSortOption[] = [
   "recordCountAsc",
 ];
 
-export const NEW_COLLECTION_RECORDS_PER_PAGE = 6;
-export const COLLECTIONS_DASHBOARD_PER_PAGE = 6;
+export const NEW_COLLECTION_RECORDS_PER_PAGE = 5;
+export const COLLECTIONS_DASHBOARD_PER_PAGE = 5;
 export const COLLECTION_BADGE_DISPLAY_LIMIT = 10;

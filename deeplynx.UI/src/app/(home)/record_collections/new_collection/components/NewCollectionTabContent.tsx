@@ -348,6 +348,9 @@ export default function NewCollectionTabContent({
                   <h3 className="font-semibold text-base-content">
                     {t.translations.RECORD_COLLECTIONS_RECORD_SUMMARY}
                   </h3>
+                  <p className="mt-2 text-sm text-base-content/70">
+                    {t.translations.RECORD_COLLECTIONS_RECORD_SUMMARY_HELP}
+                  </p>
                   <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-base-content/70">
                     <span>
                       {interpolateTemplate(
@@ -479,6 +482,9 @@ export default function NewCollectionTabContent({
                   <h3 className="font-semibold text-base-content">
                     {t.translations.RECORD_COLLECTIONS_SELECTED_LABELS_AND_TAGS}
                   </h3>
+                  <p className="mt-2 text-sm text-base-content/70">
+                    {t.translations.RECORD_COLLECTIONS_SELECTED_LABELS_AND_TAGS_HELP}
+                  </p>
                   <div className="mt-5">
                     <CollectionFacetSummary
                       labelFacets={newCollectionSelectedLabelTally}
@@ -574,6 +580,9 @@ export default function NewCollectionTabContent({
                   <h3 className="font-semibold text-base-content">
                     {t.translations.RECORD_COLLECTIONS_MODIFY_LABELS_AND_TAGS}
                   </h3>
+                  <p className="mt-2 text-sm text-base-content/70">
+                    {t.translations.RECORD_COLLECTIONS_MODIFY_LABELS_AND_TAGS_HELP}
+                  </p>
                   <div className="mt-5 space-y-6">
                     <CollectionEntitySelector
                       title={t.translations.SENSITIVITY_LABELS}
