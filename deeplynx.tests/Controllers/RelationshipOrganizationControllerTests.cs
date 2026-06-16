@@ -7,7 +7,6 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using Moq;
-using Org.BouncyCastle.Crypto.Engines;
 
 namespace deeplynx.tests.Controllers;
 
@@ -174,12 +173,12 @@ public class RelationshipOrganizationControllerTests : IDisposable
     }
 
     [Fact]
-    public async Task GetRelationship_Returns200_WithEmptyPermission()
+    public async Task GetRelationship_Returns200_WithEmptyRelationship()
     {
         // Arrange
 
         _mockRelationshipBusiness
-            .Setup(b => b.GetRelationship(OrgId, ProjectId, RelationshipId, true))
+            .Setup(b => b.GetRelationship(OrgId, null, RelationshipId, true))
             .ReturnsAsync((RelationshipResponseDto)null!);
 
         // Act
@@ -858,18 +857,5 @@ public class RelationshipOrganizationControllerTests : IDisposable
             .Where(method => method.Name == methodName)
             .Where(method => parameterNames.All(parameterName =>
                 method.GetParameters().Any(parameter => parameter.Name == parameterName))));
-    }
-
-    private static string GetMessageFromResultValue(object? value)
-    {
-        Assert.NotNull(value);
-
-        var messageProperty = value.GetType().GetProperty("message");
-        Assert.NotNull(messageProperty);
-
-        var message = messageProperty.GetValue(value) as string;
-        Assert.NotNull(message);
-
-        return message;
     }
 }
