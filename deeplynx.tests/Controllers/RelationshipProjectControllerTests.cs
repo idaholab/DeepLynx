@@ -7,7 +7,6 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using Moq;
-using Org.BouncyCastle.Crypto.Engines;
 
 namespace deeplynx.tests.Controllers;
 
@@ -196,7 +195,7 @@ public class RelationshipProjectControllerTests : IDisposable
     }
 
     [Fact]
-    public async Task GetRelationship_Returns200_WithEmptyPermission()
+    public async Task GetRelationship_Returns200_WithEmptyRelationship()
     {
         // Arrange
 
@@ -236,6 +235,28 @@ public class RelationshipProjectControllerTests : IDisposable
         var result = Assert.IsType<ObjectResult>(actionResult.Result);
 
         Assert.Equal(StatusCodes.Status500InternalServerError, result.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetRelationship_Returns404_OnKeyNotFoundException()
+    {
+        // Arrange
+        UserContextStorage.OrganizationId = OrgId;
+
+        _mockRelationshipBusiness
+            .Setup(b => b.GetRelationship(OrgId, ProjectId, RelationshipId, true))
+            .ThrowsAsync(new KeyNotFoundException("relationship not found"));
+
+        // Act
+        var actionResult = await _relationshipProjectController.GetRelationship(
+            ProjectId,
+            RelationshipId,
+            true);
+
+        // Assert
+        var result = Assert.IsType<NotFoundObjectResult>(actionResult.Result);
+
+        Assert.Equal(StatusCodes.Status404NotFound, result.StatusCode);
     }
 
     [Fact]
@@ -878,18 +899,5 @@ public class RelationshipProjectControllerTests : IDisposable
             .Where(method => method.Name == methodName)
             .Where(method => parameterNames.All(parameterName =>
                 method.GetParameters().Any(parameter => parameter.Name == parameterName))));
-    }
-
-    private static string GetMessageFromResultValue(object? value)
-    {
-        Assert.NotNull(value);
-
-        var messageProperty = value.GetType().GetProperty("message");
-        Assert.NotNull(messageProperty);
-
-        var message = messageProperty.GetValue(value) as string;
-        Assert.NotNull(message);
-
-        return message;
     }
 }
