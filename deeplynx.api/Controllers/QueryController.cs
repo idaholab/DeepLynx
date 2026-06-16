@@ -42,9 +42,9 @@ public class QueryController : ControllerBase
     [HttpGet("records", Name = "api_filter_records")]
     [Auth("read", "record")]
     public async Task<ActionResult<IEnumerable<QueryRecordViewResponseDto>>> SearchRecords(
-        long organizationId, 
-        [FromQuery] string userQuery, 
-        [FromQuery] long[] projectIds, 
+        long organizationId,
+        [FromQuery] string userQuery,
+        [FromQuery] long[] projectIds,
         [FromQuery] bool hideArchived)
     {
         try
@@ -122,6 +122,37 @@ public class QueryController : ControllerBase
         catch (Exception exc)
         {
             var message = $"An error occurred while listing records: {exc}";
+            _logger.LogError(message);
+            return StatusCode(StatusCodes.Status500InternalServerError, message);
+        }
+    }
+
+    /// <summary>
+    ///     Get Recent Records Paginated
+    /// </summary>
+    /// <param name="organizationId"> Organization Id of projects</param>
+    /// <param name="projectIds">Array of project ids</param>
+    /// <param name="sortBy">Sorting method before paginating</param>
+    /// <param name="paginatedDto">Pagination details</param>
+    /// <returns>Paginated records response DTO from the query_record view sorted by specified method</returns>
+    [HttpGet("records/paginated", Name = "api_get_records_paginated")]
+    [Auth("read", "record")]
+    public async Task<ActionResult<PaginatedResponse<QueryRecordViewResponseDto>>> GetRecordsPaginated(
+        long organizationId, [FromQuery] long[] projectIds, [FromQuery] SortRecordsRequestDto sortBy, [FromQuery] PaginatedRequestDto paginatedDto)
+    {
+        try
+        {
+            var currentUserId = UserContextStorage.UserId;
+            var isSysAdmin = UserContextStorage.IsSysAdmin;
+            var isOrgAdmin = UserContextStorage.IsOrgAdmin;
+            var isProjectAdmin = UserContextStorage.IsProjectAdmin;
+            var records = await _queryBusiness.GetRecordsPaginated(currentUserId, organizationId, sortBy, paginatedDto,
+                projectIds, isSysAdmin, isOrgAdmin, isProjectAdmin);
+            return Ok(records);
+        }
+        catch (Exception exc)
+        {
+            var message = $"An error occurred while listing paginated records: {exc}";
             _logger.LogError(message);
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }

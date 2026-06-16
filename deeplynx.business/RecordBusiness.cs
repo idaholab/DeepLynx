@@ -74,13 +74,13 @@ public class RecordBusiness : IRecordBusiness
             var formattedFileType = fileType.TrimStart('.').ToLower();
             recordQuery = recordQuery.Where(r => r.FileType == formattedFileType);
         }
-        
+
         // if user is not admin, filter out unauthorized labels
         if (!isSysAdmin && !isOrgAdmin && !isProjectAdmin)
         {
             var userAuthorizedLabels = await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
                 currentUserId, organizationId, projectId, "read record");
-            
+
             recordQuery = recordQuery.WithAuthorizedLabels(userAuthorizedLabels);
         }
 
@@ -132,130 +132,6 @@ public class RecordBusiness : IRecordBusiness
         }).ToList();
     }
 
-/// <summary>
-///     Retrieves all records for a specific project with pagination.
-/// </summary>
-/// <param name="currentUserId">The ID of current user</param>
-/// <param name="organizationId">The ID of the organization to which the project belongs</param>
-/// <param name="projectId">The ID of the project whose records are to be retrieved</param>
-/// <param name="hideArchived">Flag indicating whether to hide archived records from the result</param>
-/// <param name="queryDto">Filter criteria and pagination parameters</param>
-/// <param name="isSysAdmin">Optional param determining if the requesting user is a system admin</param>
-/// <param name="isOrgAdmin">Optional param determining if the requesting user is an organization admin</param>
-/// <param name="isProjectAdmin">Optional param determining if the requesting user is a project admin</param>
-/// <returns>Paginated response containing records and pagination metadata</returns>
-public async Task<PaginatedResponse<RecordResponseDto>> GetAllRecordsPaginated(
-    long currentUserId, long organizationId, long projectId, bool hideArchived,
-    RecordQueryRequestDto? queryDto,
-    bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false)
-{
-    var recordQuery = _context.Records
-        .Where(r => r.ProjectId == projectId && r.OrganizationId == organizationId)
-        .AsQueryable();
-
-    if (hideArchived) recordQuery = recordQuery.Where(r => !r.IsArchived);
-
-    if (queryDto != null)
-    {
-        if (queryDto.DataSourceId.HasValue)
-            recordQuery = recordQuery.Where(r => r.DataSourceId == queryDto.DataSourceId);
-
-        if (!string.IsNullOrWhiteSpace(queryDto.FileType))
-        {
-            var formattedFileType = queryDto.FileType.TrimStart('.').ToLower();
-            recordQuery = recordQuery.Where(r => r.FileType == formattedFileType);
-        }
-
-        if (!string.IsNullOrWhiteSpace(queryDto.Name))
-            recordQuery = recordQuery.Where(r => EF.Functions.ILike(r.Name, $"%{queryDto.Name.Trim()}%"));
-
-        if (queryDto.ClassId.HasValue)
-            recordQuery = recordQuery.Where(r => r.ClassId == queryDto.ClassId);
-
-        if (queryDto.StartDate.HasValue)
-            recordQuery = recordQuery.Where(r => r.LastUpdatedAt >= queryDto.StartDate.Value);
-
-        if (queryDto.EndDate.HasValue)
-            recordQuery = recordQuery.Where(r => r.LastUpdatedAt <= queryDto.EndDate.Value);
-    }
-
-    // if user is not admin, filter out unauthorized labels
-    if (!isSysAdmin && !isOrgAdmin && !isProjectAdmin)
-    {
-        var userAuthorizedLabels = await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
-            currentUserId, organizationId, projectId, "read record");
-        recordQuery = recordQuery.WithAuthorizedLabels(userAuthorizedLabels);
-    }
-
-    // Get total count before pagination
-    var totalCount = await recordQuery.CountAsync();
-
-    // Get pagination values
-    var pageNumber = queryDto?.PageNumber ?? 1;
-    var pageSize = queryDto?.GetValidatedPageSize() ?? 25;
-
-    var authorizedDownloadLabels = await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
-        currentUserId,
-        organizationId,
-        projectId,
-        "download file");
-
-    // Apply pagination and execute query
-    var records = await recordQuery
-        .Include(r => r.Tags)
-        .Include(r => r.Labels)
-        .OrderByDescending(r => r.LastUpdatedAt)
-        .Skip((pageNumber - 1) * pageSize)
-        .Take(pageSize)
-        .ToListAsync();
-
-    var items = records.Select(r => new RecordResponseDto
-    {
-        Id = r.Id,
-        Description = r.Description,
-        Uri = ExposeUriHelper.CanExposeUri(
-            r,
-            authorizedDownloadLabels,
-            isSysAdmin,
-            isOrgAdmin,
-            isProjectAdmin)
-                ? r.Uri
-                : null,
-        Properties = r.Properties,
-        OriginalId = r.OriginalId,
-        Name = r.Name,
-        ClassId = r.ClassId,
-        DataSourceId = r.DataSourceId,
-        ProjectId = r.ProjectId,
-        OrganizationId = r.OrganizationId,
-        LastUpdatedBy = r.LastUpdatedBy,
-        LastUpdatedAt = r.LastUpdatedAt,
-        IsArchived = r.IsArchived,
-        FileType = r.FileType,
-        FileSize = r.FileSize,
-        Tags = r.Tags.Select(t => new RecordTagDto
-        {
-            Id = t.Id,
-            Name = t.Name
-        }).ToList(),
-        Labels = r.Labels.Select(l => new RecordLabelDto
-        {
-            Id = l.Id,
-            Name = l.Name
-        }).ToList()
-    }).ToList();
-
-    return new PaginatedResponse<RecordResponseDto>
-    {
-        Items = items,
-        PageNumber = pageNumber,
-        PageSize = pageSize,
-        TotalCount = totalCount
-    };
-}
-
-    
-
     /// <summary>
     ///     Get all records that contain all given tags
     /// </summary>
@@ -280,7 +156,7 @@ public async Task<PaginatedResponse<RecordResponseDto>> GetAllRecordsPaginated(
         // Only return records that contain ALL given IDs
         recordQuery = recordQuery.Where(r =>
             tagIds.All(tagId => r.Tags.Any(t => t.Id == tagId)));
-        
+
         // if user is not admin, filter out unauthorized labels
         if (!isSysAdmin && !isOrgAdmin && !isProjectAdmin)
         {
@@ -353,7 +229,7 @@ public async Task<PaginatedResponse<RecordResponseDto>> GetAllRecordsPaginated(
     /// <returns>The record in question</returns>
     /// <exception cref="KeyNotFoundException">Returned if record not found</exception>
     public async Task<RecordResponseDto> GetRecord(
-        long currentUserId, long organizationId, long projectId, long recordId, bool hideArchived, bool isSysAdmin = false, 
+        long currentUserId, long organizationId, long projectId, long recordId, bool hideArchived, bool isSysAdmin = false,
         bool isOrgAdmin = false, bool isProjectAdmin = false)
     {
         var record = await _context.Records
@@ -662,10 +538,10 @@ public async Task<PaginatedResponse<RecordResponseDto>> GetAllRecordsPaginated(
     {
         if (!dtos.Any())
             return true;
-        
+
         // Bulk delete from record_tags
         var sql = @"DELETE FROM deeplynx.record_tags WHERE (record_id, tag_id) IN ({0});";
-        
+
         // establish parameters
         var parameters = new List<NpgsqlParameter>();
         parameters.AddRange(dtos.SelectMany((dto, i) => new[]
@@ -673,7 +549,7 @@ public async Task<PaginatedResponse<RecordResponseDto>> GetAllRecordsPaginated(
             new NpgsqlParameter($"@record{i}_id", dto.RecordId),
             new NpgsqlParameter($"@tag{i}_id", dto.TagId)
         }));
-        
+
         // stringify params and comma separate them
         var valueTuples = string.Join(", ", dtos.Select((_, i) => $"(@record{i}_id, @tag{i}_id)"));
 
@@ -684,7 +560,7 @@ public async Task<PaginatedResponse<RecordResponseDto>> GetAllRecordsPaginated(
 
         return true;
     }
-    
+
     /// <summary>
     ///     Bulk attach sensitivity labels and records
     /// </summary>
@@ -733,10 +609,10 @@ public async Task<PaginatedResponse<RecordResponseDto>> GetAllRecordsPaginated(
         try
         {
             await _context.Database.ExecuteSqlRawAsync(sql, parameters.ToArray());
-            
+
             // Clear tracker so EF fetches fresh state after the raw SQL
             _context.ChangeTracker.Clear();
-            
+
             // Fetch labels to attach to collections
             var labels = await _context.SensitivityLabels
                 .Where(l => distinctLabelIds.Contains(l.Id))
@@ -787,11 +663,15 @@ public async Task<PaginatedResponse<RecordResponseDto>> GetAllRecordsPaginated(
     /// <param name="dto">The data transfer object containing details on the record to be created</param>
     /// <param name="sensitivityLabelIds">The IDs of the labels to attach</param>
     /// <param name="embedded">Boolean value that determines if the file will be embedded by Insight</param>
+    /// <param name="isSysAdmin">Optional param determining if the requesting user is a system admin</param>
+    /// <param name="isOrgAdmin">Optional param determining if the requesting user is an organization admin</param>
+    /// <param name="isProjectAdmin">Optional param determining if the requesting user is a project admin</param>
     /// <returns>The newly created metadata record</returns>
     /// <exception cref="KeyNotFoundException">Returned if the project or datasource are not found</exception>
     /// <exception cref="Exception">Returned if the metadata is too deeply nested</exception>
     public async Task<RecordResponseDto> CreateRecord(long currentUserId, long organizationId, long projectId,
-        long dataSourceId, CreateRecordRequestDto dto, List<long>? sensitivityLabelIds = null, bool embedded = false)
+        long dataSourceId, CreateRecordRequestDto dto, List<long>? sensitivityLabelIds = null, bool embedded = false,
+        bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false)
     {
         ValidationHelper.ValidateModel(dto);
         await ExistenceHelper.EnsureDataSourceExistsForProjectAsync(_context, dataSourceId, projectId);
@@ -811,7 +691,11 @@ public async Task<PaginatedResponse<RecordResponseDto>> GetAllRecordsPaginated(
 
         try
         {
-            if (!string.IsNullOrWhiteSpace(dto.Uri) && sensitivityLabelIds?.Count > 0)
+            if (!isSysAdmin &&
+                !isOrgAdmin &&
+                !isProjectAdmin &&
+                !string.IsNullOrWhiteSpace(dto.Uri) &&
+                sensitivityLabelIds?.Count > 0)
             {
                 var authorizedUploadLabels = await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
                     currentUserId,
@@ -888,7 +772,14 @@ public async Task<PaginatedResponse<RecordResponseDto>> GetAllRecordsPaginated(
             {
                 Id = record.Id,
                 Description = record.Description,
-                Uri = ExposeUriHelper.CanExposeUri(record, authorizedDownloadLabels) ? record.Uri : null,
+                Uri = ExposeUriHelper.CanExposeUri(
+                    record,
+                    authorizedDownloadLabels,
+                    isSysAdmin,
+                    isOrgAdmin,
+                    isProjectAdmin)
+                        ? record.Uri
+                        : null,
                 Properties = record.Properties,
                 ObjectStorageId = record.ObjectStorageId,
                 OriginalId = record.OriginalId,
@@ -953,7 +844,11 @@ public async Task<PaginatedResponse<RecordResponseDto>> GetAllRecordsPaginated(
 
         var containsUri = records.Any(r => !string.IsNullOrWhiteSpace(r.Uri));
 
-        if (containsUri && sensitivityLabelIds?.Count > 0)
+        if (!isSysAdmin &&
+            !isOrgAdmin &&
+            !isProjectAdmin &&
+            containsUri &&
+            sensitivityLabelIds?.Count > 0)
         {
             var authorizedUploadLabels = await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
                 currentUserId,
@@ -1100,12 +995,12 @@ public async Task<PaginatedResponse<RecordResponseDto>> GetAllRecordsPaginated(
 
                 // Apply the same label(s) to all inserted records
                 foreach (var record in inserted)
-                foreach (var labelId in sensitivityLabelIds)
-                {
-                    await writer.StartRowAsync();
-                    await writer.WriteAsync(record.Id, NpgsqlDbType.Bigint);
-                    await writer.WriteAsync(labelId, NpgsqlDbType.Bigint);
-                }
+                    foreach (var labelId in sensitivityLabelIds)
+                    {
+                        await writer.StartRowAsync();
+                        await writer.WriteAsync(record.Id, NpgsqlDbType.Bigint);
+                        await writer.WriteAsync(labelId, NpgsqlDbType.Bigint);
+                    }
 
                 await writer.CompleteAsync();
             } // Writer is disposed here
@@ -1283,7 +1178,7 @@ public async Task<PaginatedResponse<RecordResponseDto>> GetAllRecordsPaginated(
                 if (archived == 0)
                     throw new DependencyDeletionException(
                         $"unable to archive record {recordId} or its downstream dependents.");
-                
+
                 // Clear the change tracker so EF fetches fresh state after the procedure
                 _context.ChangeTracker.Clear();
 
@@ -1450,11 +1345,14 @@ public async Task<PaginatedResponse<RecordResponseDto>> GetAllRecordsPaginated(
     /// <param name="projectId">The ID of the project to which the record belongs</param>
     /// <param name="recordId">The ID of the record to be updated</param>
     /// <param name="dto">The data transfer object containing details on the record to be updated</param>
+    /// <param name="isSysAdmin">Optional param determining if the requesting user is a system admin</param>
+    /// <param name="isOrgAdmin">Optional param determining if the requesting user is an organization admin</param>
+    /// <param name="isProjectAdmin">Optional param determining if the requesting user is a project admin</param>
     /// <returns>The newly updated metadata record</returns>
     /// <exception cref="KeyNotFoundException">Returned if record to be updated is not found</exception>
     public async Task<RecordResponseDto> UpdateRecord(long currentUserId, long organizationId, long projectId,
         long recordId,
-        UpdateRecordRequestDto dto)
+        UpdateRecordRequestDto dto, bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false)
     {
         ValidationHelper.ValidateModel(dto);
 
@@ -1476,7 +1374,11 @@ public async Task<PaginatedResponse<RecordResponseDto>> GetAllRecordsPaginated(
         if (dto.ObjectStorageId != null)
             await CheckObjectStorageExists(organizationId, projectId, dto.ObjectStorageId.Value);
 
-        if (!string.IsNullOrWhiteSpace(dto.Uri) && dto.Uri != returnedRecord.Uri)
+        if (!isSysAdmin &&
+            !isOrgAdmin &&
+            !isProjectAdmin &&
+            !string.IsNullOrWhiteSpace(dto.Uri) &&
+            dto.Uri != returnedRecord.Uri)
         {
             var authorizedUpdateLabels = await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
                 currentUserId,
@@ -1528,7 +1430,14 @@ public async Task<PaginatedResponse<RecordResponseDto>> GetAllRecordsPaginated(
         {
             Id = returnedRecord.Id,
             Description = returnedRecord.Description,
-            Uri = ExposeUriHelper.CanExposeUri(returnedRecord, authorizedDownloadLabels) ? returnedRecord.Uri : null,
+            Uri = ExposeUriHelper.CanExposeUri(
+                returnedRecord,
+                authorizedDownloadLabels,
+                isSysAdmin,
+                isOrgAdmin,
+                isProjectAdmin)
+                    ? returnedRecord.Uri
+                    : null,
             Properties = returnedRecord.Properties,
             ObjectStorageId = returnedRecord.ObjectStorageId,
             OriginalId = returnedRecord.OriginalId,
@@ -1630,7 +1539,7 @@ public async Task<PaginatedResponse<RecordResponseDto>> GetAllRecordsPaginated(
                         && r.OrganizationId == organizationId
                         && (!hideArchived || !r.IsArchived)
                         && cleanOriginalIds.Contains(r.OriginalId));
-        
+
         // if user is not admin, filter out unauthorized labels
         if (!isSysAdmin && !isOrgAdmin && !isProjectAdmin)
         {
@@ -1638,7 +1547,7 @@ public async Task<PaginatedResponse<RecordResponseDto>> GetAllRecordsPaginated(
                 currentUserId, organizationId, projectId, "read record");
             recordQuery = recordQuery.WithAuthorizedLabels(userAuthorizedLabels);
         }
-        
+
         var existingRecords = await recordQuery.ToListAsync();
 
         // Check for missing records
@@ -1822,22 +1731,22 @@ public async Task<PaginatedResponse<RecordResponseDto>> GetAllRecordsPaginated(
     /// <exception cref="ArgumentException"> Thrown if no record/tag pairs are provided or if no authorized record/tag pairs remain after filtering</exception>
     /// <exception cref="KeyNotFoundException">Returned if one or more records or tags are not found or archived</exception>
     /// <returns>True if successful</returns>
-    public async Task<bool> BulkAttachTags(long currentUserId, long organizationId, 
+    public async Task<bool> BulkAttachTags(long currentUserId, long organizationId,
         long projectId, List<RecordTagLinkDto> dtos)
     {
         if (dtos.Count == 0)
             throw new ArgumentException("Record,tag pairs cannot be null or empty", nameof(dtos));
-        
+
         var recordIds = dtos
             .Select(r => r.RecordId)
             .Distinct()
             .ToList();
-        
+
         var tagIds = dtos
             .Select(r => r.TagId)
             .Distinct()
             .ToList();
-        
+
         // Validate records belong to this organization/project and are not archived 
         var records = await _context.Records
             .Where(r => recordIds.Contains(r.Id) && r.OrganizationId == organizationId && r.ProjectId == projectId && !r.IsArchived)
@@ -1852,20 +1761,20 @@ public async Task<PaginatedResponse<RecordResponseDto>> GetAllRecordsPaginated(
             .Where(t => tagIds.Contains(t.Id) && t.OrganizationId == organizationId && (t.ProjectId == projectId || t.ProjectId == null) && !t.IsArchived)
             .Select(t => t.Id)
             .ToListAsync();
-        
+
         if (tags.Count != tagIds.Count)
             throw new KeyNotFoundException("One or more tags were not found or archived.");
-        
+
         var authorizedRecordIds = await _sensitivityLabelService
             .FilterAuthorizedRecordIds(currentUserId, organizationId, projectId, recordIds, _context);
-        
+
         dtos = dtos
             .Where(dto => authorizedRecordIds.Contains(dto.RecordId))
             .ToList();
-        
+
         if (dtos.Count == 0)
             throw new ArgumentException("User does not have access to any provided records", nameof(dtos));
-        
+
         await BulkInsertRecordTagLinks(dtos);
 
         return true;
@@ -1886,7 +1795,7 @@ public async Task<PaginatedResponse<RecordResponseDto>> GetAllRecordsPaginated(
     {
         if (dtos.Count == 0)
             throw new ArgumentException("Record,tag pairs cannot be null or empty", nameof(dtos));
-        
+
         var recordIds = dtos
             .Select(r => r.RecordId)
             .Distinct()
@@ -1896,40 +1805,40 @@ public async Task<PaginatedResponse<RecordResponseDto>> GetAllRecordsPaginated(
             .Select(r => r.TagId)
             .Distinct()
             .ToList();
-        
+
         // Validate records belong to this organization/project and are not archived 
         var records = await _context.Records
             .Where(r => recordIds.Contains(r.Id) && r.OrganizationId == organizationId && r.ProjectId == projectId && !r.IsArchived)
             .Select(r => r.Id)
             .ToListAsync();
-        
+
         if (records.Count != recordIds.Count)
             throw new KeyNotFoundException("One or more records were not found or archived.");
-        
+
         // Validate tags belong to this organization/project and are not archived 
         var tags = await _context.Tags
             .Where(t => tagIds.Contains(t.Id) && t.OrganizationId == organizationId && (t.ProjectId == projectId || t.ProjectId == null) && !t.IsArchived)
             .Select(t => t.Id)
             .ToListAsync();
-        
+
         if (tags.Count != tagIds.Count)
             throw new KeyNotFoundException("One or more tags were not found or archived.");
 
         var authorizedRecordIds = await _sensitivityLabelService
             .FilterAuthorizedRecordIds(currentUserId, organizationId, projectId, recordIds, _context);
-        
+
         dtos = dtos
             .Where(dto => authorizedRecordIds.Contains(dto.RecordId))
             .ToList();
-        
+
         if (dtos.Count == 0)
             throw new ArgumentException("User does not have access to any provided records", nameof(dtos));
-        
+
         await BulkDeleteRecordTagLinks(dtos);
-        
+
         return true;
     }
-    
+
     /// <summary>
     ///     Map an NPGSQL data reader to a return DTO usually during high scale read operations
     /// </summary>

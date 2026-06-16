@@ -1,17 +1,12 @@
 "use client";
 import { useLanguage } from "@/app/contexts/Language";
-import { useOrganizationSession } from "@/app/contexts/OrganizationSessionProvider";
 import { useRouter } from "next/navigation";
-import React, { useEffect, useState, useCallback, useMemo } from "react";
+import React, { useMemo } from "react";
 import CatalogViewSkeleton from "./skeletons/catalogviewskeleton";
-import { QueryRecordViewResponseDto } from "../types/responseDTOs";
+import { QueryRecordViewResponseDto } from "@/app/(home)/types/responseDTOs";
 import { formatLocalDateTime } from "@/app/lib/date_time";
 import PaginationControls from "./PaginationControls";
-import { useLocalPagination } from "@/app/hooks/useLocalPagination";
-import SortSelect from "./SortSelect";
-import { useSortedItems } from "../hooks/useSortedItems";
-import type { SortOption } from "../hooks/useSortedItems";
-import { getRecentlyAddedRecords } from "@/app/lib/client_service/query_services.client";
+import { useRecordsPaginated } from "@/app/hooks/useRecordsPaginated";
 
 interface Props {
   selectedProjects: string[];
@@ -25,155 +20,75 @@ const RecentRecordsCard: React.FC<Props> = ({
   border = true,
 }) => {
   const { t } = useLanguage();
-  const router = useRouter();
-  const { organization } = useOrganizationSession();
-
-  // View state
-  const [records, setRecords] = useState<QueryRecordViewResponseDto[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const failedToLoadRecentRecords =
-    t.translations.FAILED_TO_LOAD_RECENT_RECORDS;
 
   const sortOptions = useMemo<
-    SortOption<QueryRecordViewResponseDto, RecentRecordSortValue>[]
+    {
+      value: RecentRecordSortValue;
+      label: string;
+    }[]
   >(
     () => [
       {
         value: "nameAZ",
         label: t.translations.SORT_NAME_A_TO_Z,
-        compare: (a, b) =>
-          (a.name ?? "").localeCompare(b.name ?? "", undefined, {
-            sensitivity: "base",
-          }),
       },
       {
         value: "nameZA",
         label: t.translations.SORT_NAME_Z_TO_A,
-        compare: (a, b) =>
-          (b.name ?? "").localeCompare(a.name ?? "", undefined, {
-            sensitivity: "base",
-          }),
       },
       {
         value: "dateNew",
         label: t.translations.SORT_DATE_NEWEST,
-        compare: (a, b) =>
-          new Date(String(b.lastUpdatedAt)).getTime() -
-          new Date(String(a.lastUpdatedAt)).getTime(),
       },
       {
         value: "dateOld",
         label: t.translations.SORT_DATE_OLDEST,
-        compare: (a, b) =>
-          new Date(String(a.lastUpdatedAt)).getTime() -
-          new Date(String(b.lastUpdatedAt)).getTime(),
       },
     ],
     [t],
   );
 
   const {
-    sortValue,
-    setSortValue,
-    sortedItems: sortedRecords,
-  } = useSortedItems({
-    items: records,
-    sortOptions,
-    defaultSortValue: "dateNew",
-  });
-
-  // Local pagination state for the sorted dataset.
-  const {
-    currentPage,
-    pageSize,
-    paginatedItems: paginatedRecords,
-    resetPagination,
-    setCurrentPage,
-    setPageSize,
+    records,
+    totalRecords,
     totalPages,
-  } = useLocalPagination({
-    items: sortedRecords,
-    initialPageSize: 5,
-  });
+    sortBy,
+    setSortBy,
+    currentPage,
+    setCurrentPage,
+    pageSize,
+    setPageSize,
+    isLoading,
+    requestFailed,
+    fetchRecords,
+  } = useRecordsPaginated(selectedProjects);
 
-  // Fetch recent records for the selected projects and organization.
-  const fetchRecentRecords = useCallback(async () => {
-    if (
-      !organization?.organizationId ||
-      !selectedProjects ||
-      selectedProjects.length === 0
-    ) {
-      setRecords([]);
-      resetPagination();
-      return;
-    }
-
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      const projectIds = selectedProjects.map((id) => Number(id));
-      const data = await getRecentlyAddedRecords(
-        organization.organizationId as number,
-        projectIds,
-      );
-      setRecords(Array.isArray(data) ? data : []);
-      resetPagination();
-    } catch (e) {
-      console.error("Failed to fetch recent records:", e);
-      setError(failedToLoadRecentRecords);
-      setRecords([]);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [
-    failedToLoadRecentRecords,
-    organization?.organizationId,
-    resetPagination,
-    selectedProjects,
-  ]);
-
-  useEffect(() => {
-    fetchRecentRecords();
-  }, [fetchRecentRecords]);
-
-  // Reset back to the first page whenever the sort order changes.
-  useEffect(() => {
-    resetPagination();
-  }, [resetPagination, sortValue]);
-
-  const handleRecordClick = (record: QueryRecordViewResponseDto) => {
-    router.push(`/record?recordId=${record.id}&projectId=${record.projectId}`);
-  };
-
-  if (isLoading) return <CatalogViewSkeleton />;
+  if (isLoading && records.length === 0) return <CatalogViewSkeleton />;
 
   return (
-    <div className={border ? "shadow-md shadow-base-content/10 rounded-xl" : ""}>
+    <div
+      className={border ? "shadow-md shadow-base-content/10 rounded-xl" : ""}
+    >
       {/* Header and sort controls */}
       <div className="flex items-center justify-between p-4">
         <h2 className="text-lg font-semibold text-base-content">
           {t.translations.RECENTLY_ADDED_RECORDS}
         </h2>
 
-        <SortSelect
-          value={sortValue}
-          onChange={setSortValue}
+        <BasicSortSelect
+          value={sortBy}
           options={sortOptions}
+          onChange={setSortBy}
         />
       </div>
 
       <div className="divider m-0"></div>
 
       {/* Error state */}
-      {error && (
+      {requestFailed && (
         <div className="p-4 text-error flex items-center justify-between">
-          <span>{error}</span>
-          <button
-            className="btn btn-sm btn-outline"
-            onClick={fetchRecentRecords}
-          >
+          <span>{t.translations.FAILED_TO_LOAD_RECENT_RECORDS}</span>
+          <button className="btn btn-sm btn-outline" onClick={fetchRecords}>
             {t.translations.RETRY}
           </button>
         </div>
@@ -181,44 +96,13 @@ const RecentRecordsCard: React.FC<Props> = ({
 
       {/* Paginated records list */}
       <ul className="space-y-1 p-2">
-        {paginatedRecords.map((record) => (
-          <li
-            key={record.id}
-            className="border-b border-base-content/40 cursor-pointer hover:bg-base-100/40 p-3 -mx-1 transition-colors"
-            onClick={() => handleRecordClick(record)}
-          >
-            <div className="font-medium text-base-content mb-2 line-clamp-1 overflow-hidden break-all">
-              {record.name}
-            </div>
-
-            <div className="text-sm text-base-content/60 flex flex-wrap gap-x-4 gap-y-1">
-              <span className="flex items-center gap-1">
-                <span>{t.translations.CLASS}: </span>
-                <span className="badge badge-sm badge-secondary">
-                  {record.className ?? t.translations.UNKNOWN}
-                </span>
-              </span>
-
-              <span>
-                <span className="text-base-content/50">
-                  {t.translations.LAST_EDIT}:
-                </span>{" "}
-                {formatLocalDateTime(String(record.lastUpdatedAt))}
-              </span>
-
-              <span>
-                <span className="text-base-content/50">
-                  {t.translations.DATA_SOURCE}:
-                </span>{" "}
-                {record.dataSourceName}
-              </span>
-            </div>
-          </li>
+        {records.map((record) => (
+          <RecordView record={record} key={record.id} />
         ))}
       </ul>
 
       {/* Empty state */}
-      {!error && paginatedRecords.length === 0 && (
+      {!requestFailed && records.length === 0 && (
         <div className="text-center py-8 text-base-content/60">
           {t.translations.NO_RECENT_RECORDS}
         </div>
@@ -235,5 +119,91 @@ const RecentRecordsCard: React.FC<Props> = ({
     </div>
   );
 };
+
+interface BasicSortSelectProps {
+  value: string;
+  options: {
+    value: string;
+    label: string;
+  }[];
+  onChange: (value: string) => void;
+}
+
+/**
+ * A select input for sorting values.
+ */
+function BasicSortSelect({ value, options, onChange }: BasicSortSelectProps) {
+  const { t } = useLanguage();
+
+  if (!options.length) return null;
+
+  return (
+    <div className="flex items-center gap-1">
+      <div className="px-3 py-2 text-md font-semibold text-base-content/50">
+        {t.translations.SORT_BY}
+      </div>
+      <div className="relative inline-block">
+        <select
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          className="select"
+        >
+          {options.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * A view of a single record that redirects users to the record's page.
+ */
+function RecordView({ record }: { record: QueryRecordViewResponseDto }) {
+  const { t } = useLanguage();
+  const router = useRouter();
+
+  const handleRecordClick = () => {
+    router.push(`/record?recordId=${record.id}&projectId=${record.projectId}`);
+  };
+
+  return (
+    <li
+      key={record.id}
+      className="border-b border-base-content/40 cursor-pointer hover:bg-base-100/40 p-3 -mx-1 transition-colors"
+      onClick={() => handleRecordClick()}
+    >
+      <div className="font-medium text-base-content mb-2 line-clamp-1 overflow-hidden break-all">
+        {record.name}
+      </div>
+
+      <div className="text-sm text-base-content/60 flex flex-wrap gap-x-4 gap-y-1">
+        <span className="flex items-center gap-1">
+          <span>{t.translations.CLASS}: </span>
+          <span className="badge badge-sm badge-secondary">
+            {record.className ?? t.translations.UNKNOWN}
+          </span>
+        </span>
+
+        <span>
+          <span className="text-base-content/50">
+            {t.translations.LAST_EDIT}:
+          </span>{" "}
+          {formatLocalDateTime(String(record.lastUpdatedAt))}
+        </span>
+
+        <span>
+          <span className="text-base-content/50">
+            {t.translations.DATA_SOURCE}:
+          </span>{" "}
+          {record.dataSourceName}
+        </span>
+      </div>
+    </li>
+  );
+}
 
 export default RecentRecordsCard;

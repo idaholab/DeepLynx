@@ -99,6 +99,14 @@ export type RecordResponseDto = {
   labels?: { id: number | null; name: string }[];
 };
 
+export type PaginatedResponse<T> = {
+  items: T[] | [];
+  pageNumber: number;
+  pageSize: number;
+  maxPageSize: number;
+  totalCount: number;
+};
+
 export type RecordCollectionTagDto = {
   id: number;
   name: string;
@@ -124,16 +132,8 @@ export type RecordCollectionResponseDto = {
   labels?: RecordCollectionLabelDto[];
 };
 
-export type PaginatedResponseDto<T> = {
-  items: T[] | [];
-  pageNumber: number;
-  pageSize: number;
-  totalCount: number;
-  maxPageSize?: number;
-};
-
 export type PaginatedRecordCollectionsResponseDto =
-  PaginatedResponseDto<RecordCollectionResponseDto>;
+  PaginatedResponse<RecordCollectionResponseDto>;
 
 export type QueryRecordViewResponseDto = {
   id: number | null;
@@ -157,7 +157,7 @@ export type QueryRecordViewResponseDto = {
   lastUpdatedAt?: string;
   lastUpdatedBy?: number | null;
   isArchived?: boolean;
-}
+};
 
 export type ObjectStorageResponseDto = {
   id: number | string;
