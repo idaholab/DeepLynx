@@ -13,28 +13,33 @@ public class SensitivityLabelBusiness : ISensitivityLabelBusiness
 {
     private readonly DeeplynxContext _context;
     private readonly IEventBusiness _eventBusiness;
+    private readonly IUserBusiness _userBusiness;
 
     /// <summary>
     ///     Initializes a new instance of the <see cref="SensitivityLabelBusiness" /> class.
     /// </summary>
     /// <param name="context">The database context to be used for sensitivity label operations</param>
     /// <param name="eventBusiness">Used for logging events during CRUD operations</param>
-    public SensitivityLabelBusiness(DeeplynxContext context, IEventBusiness eventBusiness)
+    /// <param name="userBusiness">Used to get the user's current Admin info</param>
+    public SensitivityLabelBusiness(DeeplynxContext context, IEventBusiness eventBusiness,IUserBusiness userBusiness)
     {
         _context = context;
         _eventBusiness = eventBusiness;
+        _userBusiness = userBusiness;
     }
     
      /// <summary>
     ///     Get all sensitivity labels for a given project and/or organization
     /// </summary>
+    /// <param name="currentUserId">Id of the user executing this method.</param>
     /// <param name="projectIds">ID of the project across which to search</param>
     /// <param name="organizationId">ID of the organization across which to search</param>
     /// <param name="hideArchived">Flag indicating whether to search on archived labels</param>
     /// <returns>A list of labels</returns>
     public async Task<IEnumerable<SensitivityLabelResponseDto>> GetAllSensitivityLabels(
-        long[]? projectIds, long organizationId, bool hideArchived = true)
+        long currentUserId, long[]? projectIds, long organizationId, bool hideArchived = true)
     {
+        var labelService = new SensitivityLabelService(_context);
         var query = _context.SensitivityLabels
             .Where(t => t.OrganizationId == organizationId
                         && (!hideArchived || !t.IsArchived));
@@ -48,6 +53,36 @@ public class SensitivityLabelBusiness : ISensitivityLabelBusiness
         else
         {  
             query = query.Where(c => c.ProjectId == null);
+        }
+
+        // User Information
+        var user = await _userBusiness.GetUserAdminInfo(currentUserId, organizationId);
+
+        // Org and System admins can see everything
+        if (user.IsSysAdmin == false && user.IsOrgAdmin == false) {
+            // List of projects user is an admin for
+            var adminProjects = new List<long?>(); 
+            foreach (var projectId in projectIds ?? Enumerable.Empty<long>())
+            {
+                var projUser = await _userBusiness.GetUserAdminInfo(currentUserId, organizationId, projectId);
+                if (projUser.IsProjectAdmin == true) adminProjects.Add(projectId);
+            }
+
+            // Find if there's only one project and if the user is the admin (the user is only looking at their personal project, will show everything including org labels)
+            bool? isOneProjAdmin = false;
+            if (projectIds?.Length == 1)
+            {
+                var projUser = await _userBusiness.GetUserAdminInfo(currentUserId, organizationId, projectIds[0]);
+                isOneProjAdmin = projUser.IsProjectAdmin;
+            }
+
+            if (isOneProjAdmin == false) {
+                var authorizedLabels = await labelService.GetAuthorizedSensitivityLabels(currentUserId, organizationId, projectIds, "read record");
+                query = query.Where(c => 
+                    (c.ProjectId.HasValue && adminProjects.Contains(c.ProjectId)) ||
+                    authorizedLabels.Contains(c.Id)
+                );
+            }
         }
 
         return await query.Select(l => new SensitivityLabelResponseDto
