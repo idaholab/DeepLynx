@@ -63,7 +63,7 @@ export default async function Page() {
   }
 
   // If still no org (shouldn't happen), redirect
-  if (!organizationId && !isAuthDisabled) {
+  if (!organizationId) {
     redirect("/select-org");
   }
 
