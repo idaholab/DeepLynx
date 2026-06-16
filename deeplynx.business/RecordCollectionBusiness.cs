@@ -80,7 +80,7 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
 
         if (hideArchived) recordCollectionQuery = recordCollectionQuery.Where(c => !c.IsArchived);
 
-        if (dto.SensitivityLabelIds?.Any() == true)
+        if (dto.SensitivityLabelIds?.Length > 0)
         {
             foreach (var labelId in dto.SensitivityLabelIds.Distinct())
             {
@@ -88,7 +88,7 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
             }
         }
 
-        if (dto.TagIds?.Any() == true)
+        if (dto.TagIds?.Length > 0)
         {
             foreach (var tagId in dto.TagIds.Distinct())
             {

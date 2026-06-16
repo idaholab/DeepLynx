@@ -1241,7 +1241,7 @@ export const translations = {
       RECORD_COLLECTIONS_BROWSE_CREATE_MODIFY_EXISTING:
         "Browse collections, create new collections, and modify existing collections.",
       RECORD_COLLECTIONS_BROWSE_SEARCH_OPEN_PROJECT:
-        "Browse, search, and open record collections for this project.",
+        "Browse, search, and modify record collections for this project.",
       RECORD_COLLECTIONS_CLASS: "Class",
       RECORD_COLLECTIONS_COLLECTION_DASHBOARD: "Collection Dashboard",
       RECORD_COLLECTIONS_COLLECTION_DETAILS: "Collection Details",
@@ -1259,6 +1259,8 @@ export const translations = {
       RECORD_COLLECTIONS_FAILED_CREATE_LABEL:
         "Failed to create sensitivity label",
       RECORD_COLLECTIONS_FAILED_CREATE_TAG: "Failed to create tag",
+      RECORD_COLLECTIONS_FAILED_LOAD_COLLECTIONS:
+        "Failed to load record collections",
       RECORD_COLLECTIONS_FAILED_LOAD_COLLECTION_RECORDS:
         "Failed to load collection records",
       RECORD_COLLECTIONS_FAILED_LOAD_PROJECT_LABELS:
@@ -3066,7 +3068,7 @@ export const translations = {
       RECORD_COLLECTIONS_BROWSE_CREATE_MODIFY_EXISTING:
         "Explora colecciones, crea nuevas colecciones y modifica las existentes.",
       RECORD_COLLECTIONS_BROWSE_SEARCH_OPEN_PROJECT:
-        "Explora, busca y abre colecciones de registros para este proyecto.",
+        "Explora, busca y modifica colecciones de registros para este proyecto.",
       RECORD_COLLECTIONS_CLASS: "Clase",
       RECORD_COLLECTIONS_COLLECTION_DASHBOARD:
         "Panel de colecciones",
@@ -3087,6 +3089,8 @@ export const translations = {
         "No se pudo crear la etiqueta de sensibilidad",
       RECORD_COLLECTIONS_FAILED_CREATE_TAG:
         "No se pudo crear la etiqueta",
+      RECORD_COLLECTIONS_FAILED_LOAD_COLLECTIONS:
+        "No se pudieron cargar las colecciones de registros",
       RECORD_COLLECTIONS_FAILED_LOAD_COLLECTION_RECORDS:
         "No se pudieron cargar los registros de la colección",
       RECORD_COLLECTIONS_FAILED_LOAD_PROJECT_LABELS:

@@ -1,7 +1,7 @@
 import RecordCollectionsClient from "./RecordCollectionsClient";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { RecordCollectionResponseDto } from "../types/responseDTOs";
+import { PaginatedRecordCollectionsResponseDto } from "../types/responseDTOs";
 import { getAllRecordCollectionsServer } from "@/app/lib/server_service/record_collection_services.server";
 
 export const metadata = { title: "Record Collections" };
@@ -41,10 +41,15 @@ export default async function Page() {
     redirect("/");
   }
 
-  let recordCollections: RecordCollectionResponseDto[] = [];
+  let recordCollectionsPage: PaginatedRecordCollectionsResponseDto = {
+    items: [],
+    pageNumber: 1,
+    pageSize: 25,
+    totalCount: 0,
+  };
 
   try {
-    recordCollections = await getAllRecordCollectionsServer(
+    recordCollectionsPage = await getAllRecordCollectionsServer(
       Number(organizationId),
       Number(projectId),
     );
@@ -54,7 +59,9 @@ export default async function Page() {
 
   return (
     <RecordCollectionsClient
-      recordCollections={recordCollections}
+      organizationId={Number(organizationId)}
+      projectId={Number(projectId)}
+      initialRecordCollectionsPage={recordCollectionsPage}
     />
   );
 }

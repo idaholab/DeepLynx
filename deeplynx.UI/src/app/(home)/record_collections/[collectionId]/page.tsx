@@ -2,7 +2,7 @@ import CollectionDetailsClient from "./CollectionDetailsClient";
 import { cookies } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import {
-  getAllRecordCollectionsServer,
+  getRecordCollectionByIdServer,
   getRecordsInRecordCollectionServer,
 } from "@/app/lib/server_service/record_collection_services.server";
 import { RecordResponseDto } from "@/app/(home)/types/responseDTOs";
@@ -54,12 +54,10 @@ export default async function Page({ params }: Props) {
     redirect("/");
   }
 
-  const collections = await getAllRecordCollectionsServer(
+  const initialCollection = await getRecordCollectionByIdServer(
     Number(organizationId),
     Number(projectId),
-  );
-  const initialCollection = collections.find(
-    (collection) => collection.id === parsedCollectionId,
+    parsedCollectionId,
   );
 
   if (!initialCollection) {

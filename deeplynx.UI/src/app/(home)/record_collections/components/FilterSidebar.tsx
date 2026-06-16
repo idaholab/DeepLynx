@@ -6,13 +6,13 @@ import { FunnelIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import { FacetOption } from "./recordCollections.types";
 
 type Props = {
-  selectedSensitivityFilters: string[];
-  onToggleSensitivityFilter: (value: string) => void;
+  selectedSensitivityFilters: number[];
+  onToggleSensitivityFilter: (value: number) => void;
   filteredSensitivityFacetOptions: FacetOption[];
   sensitivityFacetQuery: string;
   onSensitivityFacetQueryChange: (value: string) => void;
-  selectedTagFilters: string[];
-  onToggleTagFilter: (value: string) => void;
+  selectedTagFilters: number[];
+  onToggleTagFilter: (value: number) => void;
   filteredTagFacetOptions: FacetOption[];
   tagFacetQuery: string;
   onTagFacetQueryChange: (value: string) => void;
@@ -76,15 +76,22 @@ export default function FilterSidebar({
                 {filteredSensitivityFacetOptions.length ? (
                   filteredSensitivityFacetOptions.map((option) => (
                     <label
-                      key={option.label}
+                      key={option.id ?? option.label}
                       className="flex cursor-pointer items-center justify-between gap-3 text-sm"
                     >
                       <span className="flex min-w-0 items-center gap-2">
                         <input
                           type="checkbox"
                           className="checkbox checkbox-primary checkbox-xs"
-                          checked={selectedSensitivityFilters.includes(option.label)}
-                          onChange={() => onToggleSensitivityFilter(option.label)}
+                          checked={
+                            option.id !== undefined &&
+                            selectedSensitivityFilters.includes(option.id)
+                          }
+                          onChange={() => {
+                            if (option.id !== undefined) {
+                              onToggleSensitivityFilter(option.id);
+                            }
+                          }}
                         />
                         <span className="truncate">{option.label}</span>
                       </span>
@@ -119,15 +126,22 @@ export default function FilterSidebar({
                 {filteredTagFacetOptions.length ? (
                   filteredTagFacetOptions.map((option) => (
                     <label
-                      key={option.label}
+                      key={option.id ?? option.label}
                       className="flex cursor-pointer items-center justify-between gap-3 text-sm"
                     >
                       <span className="flex min-w-0 items-center gap-2">
                         <input
                           type="checkbox"
                           className="checkbox checkbox-primary checkbox-xs"
-                          checked={selectedTagFilters.includes(option.label)}
-                          onChange={() => onToggleTagFilter(option.label)}
+                          checked={
+                            option.id !== undefined &&
+                            selectedTagFilters.includes(option.id)
+                          }
+                          onChange={() => {
+                            if (option.id !== undefined) {
+                              onToggleTagFilter(option.id);
+                            }
+                          }}
                         />
                         <span className="truncate">{option.label}</span>
                       </span>

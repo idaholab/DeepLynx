@@ -1,45 +1,82 @@
 "use client";
 
-import { useLocalPagination } from "@/app/hooks/useLocalPagination";
+import { useLanguage } from "@/app/contexts/Language";
+import { getAllRecordCollections } from "@/app/lib/client_service/record_collection_services.client";
+import { getAllSensitivityLabelsProject } from "@/app/lib/client_service/sensitivity_labels_services.client";
+import { getAllTags } from "@/app/lib/client_service/tag_services.client";
+import {
+  SensitivityLabelsDto,
+  TagResponseDto,
+  PaginatedRecordCollectionsResponseDto,
+} from "@/app/(home)/types/responseDTOs";
 import {
   type ChangeEvent,
   useCallback,
+  useDeferredValue,
   useEffect,
   useMemo,
   useRef,
   useState,
 } from "react";
-import { RecordCollectionResponseDto } from "../../types/responseDTOs";
-import {
-  buildAlphabeticalFacetOptions,
-  getSensitivity,
-} from "../components/recordCollections.utils";
+import toast from "react-hot-toast";
 import {
   COLLECTIONS_DASHBOARD_PER_PAGE,
   COLLECTION_SORT_OPTIONS,
 } from "../components/recordCollections.constants";
-import { CollectionSortOption } from "../components/recordCollections.types";
+import { FacetOption, CollectionSortOption } from "../components/recordCollections.types";
 
 type Params = {
-  collections: RecordCollectionResponseDto[];
+  organizationId: number;
+  projectId: number;
+  initialPage: PaginatedRecordCollectionsResponseDto;
 };
 
-export function useCollectionsDashboard({ collections }: Params) {
+function buildFacetOptions<T extends { id: number; name: string }>(
+  availableItems: T[],
+  getCount: (itemId: number) => number,
+) {
+  return availableItems
+    .map<FacetOption>((item) => ({
+      id: item.id,
+      label: item.name,
+      count: getCount(item.id),
+    }))
+    .sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: "base" }));
+}
+
+export function useCollectionsDashboard({
+  organizationId,
+  projectId,
+  initialPage,
+}: Params) {
+  const { t } = useLanguage();
   const [searchTerm, setSearchTerm] = useState("");
+  const deferredSearchTerm = useDeferredValue(searchTerm);
   const [collectionSort, setCollectionSort] =
     useState<CollectionSortOption>("updatedDesc");
   const [collectionSortMenuOpen, setCollectionSortMenuOpen] = useState(false);
-  const [expandedDashboardLabelIds, setExpandedDashboardLabelIds] = useState<
-    number[]
-  >([]);
-  const [expandedDashboardTagIds, setExpandedDashboardTagIds] = useState<number[]>([]);
-  const [selectedSensitivityFilters, setSelectedSensitivityFilters] = useState<string[]>(
+  const [expandedDashboardLabelIds, setExpandedDashboardLabelIds] = useState<number[]>(
     [],
   );
-  const [selectedTagFilters, setSelectedTagFilters] = useState<string[]>([]);
+  const [expandedDashboardTagIds, setExpandedDashboardTagIds] = useState<number[]>([]);
+  const [selectedSensitivityFilters, setSelectedSensitivityFilters] = useState<number[]>(
+    [],
+  );
+  const [selectedTagFilters, setSelectedTagFilters] = useState<number[]>([]);
   const [sensitivityFacetQuery, setSensitivityFacetQuery] = useState("");
   const [tagFacetQuery, setTagFacetQuery] = useState("");
+  const [pageNumber, setPageNumber] = useState(initialPage.pageNumber || 1);
+  const [pageSize, setPageSize] = useState(
+    initialPage.pageSize || COLLECTIONS_DASHBOARD_PER_PAGE,
+  );
+  const [pageData, setPageData] = useState<PaginatedRecordCollectionsResponseDto>(
+    initialPage,
+  );
+  const [availableLabels, setAvailableLabels] = useState<SensitivityLabelsDto[]>([]);
+  const [availableTags, setAvailableTags] = useState<TagResponseDto[]>([]);
+  const [loading, setLoading] = useState(false);
   const collectionSortMenuRef = useRef<HTMLDivElement | null>(null);
+  const skipInitialFetch = useRef(true);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -55,20 +92,105 @@ export function useCollectionsDashboard({ collections }: Params) {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const toggleSensitivityFilter = useCallback((value: string) => {
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadFacetSources = async () => {
+      try {
+        const [labels, tags] = await Promise.all([
+          getAllSensitivityLabelsProject(projectId),
+          getAllTags(projectId),
+        ]);
+
+        if (cancelled) return;
+        setAvailableLabels(labels);
+        setAvailableTags(tags);
+      } catch (error) {
+        console.error("Failed to load record collection dashboard filters:", error);
+        toast.error(t.translations.RECORD_COLLECTIONS_FAILED_LOAD_PROJECT_TAGS);
+      }
+    };
+
+    void loadFacetSources();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [projectId, t]);
+
+  useEffect(() => {
+    if (skipInitialFetch.current) {
+      skipInitialFetch.current = false;
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadCollections = async () => {
+      setLoading(true);
+      try {
+        const nextPage = await getAllRecordCollections(
+          organizationId,
+          projectId,
+          {
+            search: deferredSearchTerm.trim() || undefined,
+            sensitivityLabelIds:
+              selectedSensitivityFilters.length > 0
+                ? selectedSensitivityFilters
+                : undefined,
+            tagIds: selectedTagFilters.length > 0 ? selectedTagFilters : undefined,
+            sort: collectionSort,
+            pageNumber,
+            pageSize,
+          },
+          true,
+        );
+
+        if (cancelled) return;
+        setPageData(nextPage);
+      } catch (error) {
+        console.error("Failed to load record collections:", error);
+        toast.error(t.translations.RECORD_COLLECTIONS_FAILED_LOAD_COLLECTIONS);
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    };
+
+    void loadCollections();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    collectionSort,
+    deferredSearchTerm,
+    organizationId,
+    pageNumber,
+    pageSize,
+    projectId,
+    selectedSensitivityFilters,
+    selectedTagFilters,
+    t,
+  ]);
+
+  const toggleSensitivityFilter = useCallback((value: number) => {
     setSelectedSensitivityFilters((current) =>
       current.includes(value)
         ? current.filter((filter) => filter !== value)
         : [...current, value],
     );
+    setPageNumber(1);
   }, []);
 
-  const toggleTagFilter = useCallback((value: string) => {
+  const toggleTagFilter = useCallback((value: number) => {
     setSelectedTagFilters((current) =>
       current.includes(value)
         ? current.filter((filter) => filter !== value)
         : [...current, value],
     );
+    setPageNumber(1);
   }, []);
 
   const clearFacetFilters = useCallback(() => {
@@ -76,111 +198,51 @@ export function useCollectionsDashboard({ collections }: Params) {
     setSelectedTagFilters([]);
     setSensitivityFacetQuery("");
     setTagFacetQuery("");
+    setPageNumber(1);
   }, []);
 
-  const filteredCollections = useMemo(() => {
-    const query = searchTerm.trim().toLowerCase();
+  const labelCountMap = useMemo(() => {
+    const counts = new Map<number, number>();
+    const collections = pageData.items ?? [];
 
-    return collections.filter((collection) => {
-      const collectionLabelNames =
-        collection.labels?.map((label) => label.name) ?? [];
-      const collectionTagNames = collection.tags?.map((tag) => tag.name) ?? [];
-      const matchesSensitivity =
-        selectedSensitivityFilters.length === 0 ||
-        selectedSensitivityFilters.every((filter) =>
-          collectionLabelNames.includes(filter),
-        );
-      const matchesTags =
-        selectedTagFilters.length === 0 ||
-        selectedTagFilters.every((filter) => collectionTagNames.includes(filter));
-
-      if (!matchesSensitivity || !matchesTags) return false;
-      if (!query) return true;
-
-      const haystack = [
-        collection.name,
-        collection.description,
-        getSensitivity(collection),
-        collectionTagNames.join(" "),
-        collectionLabelNames.join(" "),
-      ]
-        .join(" ")
-        .toLowerCase();
-
-      return haystack.includes(query);
-    });
-  }, [collections, searchTerm, selectedSensitivityFilters, selectedTagFilters]);
-
-  const sortedCollections = useMemo(() => {
-    return [...filteredCollections].sort((a, b) => {
-      const alphabeticalComparison = a.name.localeCompare(b.name, undefined, {
-        sensitivity: "base",
+    collections.forEach((collection) => {
+      collection.labels?.forEach((label) => {
+        counts.set(label.id, (counts.get(label.id) ?? 0) + 1);
       });
-      const updatedComparison =
-        new Date(a.lastUpdatedAt).getTime() -
-        new Date(b.lastUpdatedAt).getTime();
-      const recordCountComparison = a.recordCount - b.recordCount;
-
-      switch (collectionSort) {
-        case "alphabeticalAsc":
-          return alphabeticalComparison;
-        case "alphabeticalDesc":
-          return alphabeticalComparison * -1;
-        case "recordCountAsc":
-          return recordCountComparison || alphabeticalComparison;
-        case "recordCountDesc":
-          return recordCountComparison * -1 || alphabeticalComparison;
-        case "updatedAsc":
-          return updatedComparison || alphabeticalComparison;
-        case "updatedDesc":
-        default:
-          return updatedComparison * -1 || alphabeticalComparison;
-      }
     });
-  }, [collectionSort, filteredCollections]);
 
-  const {
-    currentPage,
-    pageSize,
-    paginatedItems,
-    resetPagination,
-    setCurrentPage,
-    setPageSize,
-    startIndex,
-    totalPages,
-  } = useLocalPagination({
-    items: sortedCollections,
-    initialPageSize: COLLECTIONS_DASHBOARD_PER_PAGE,
-  });
+    return counts;
+  }, [pageData.items]);
 
-  useEffect(() => {
-    resetPagination();
-  }, [
-    collectionSort,
-    resetPagination,
-    searchTerm,
-    selectedSensitivityFilters,
-    selectedTagFilters,
-  ]);
+  const tagCountMap = useMemo(() => {
+    const counts = new Map<number, number>();
+    const collections = pageData.items ?? [];
+
+    collections.forEach((collection) => {
+      collection.tags?.forEach((tag) => {
+        counts.set(tag.id, (counts.get(tag.id) ?? 0) + 1);
+      });
+    });
+
+    return counts;
+  }, [pageData.items]);
 
   const sensitivityFacetOptions = useMemo(
     () =>
-      buildAlphabeticalFacetOptions(
-        filteredCollections.flatMap((collection) =>
-          collection.labels?.map((label) => label.name) ?? [],
-        ),
+      buildFacetOptions(
+        availableLabels,
+        (labelId) => labelCountMap.get(labelId) ?? 0,
       ),
-    [filteredCollections],
+    [availableLabels, labelCountMap],
   );
 
   const tagFacetOptions = useMemo(
     () =>
-      buildAlphabeticalFacetOptions(
-        filteredCollections.flatMap((collection) =>
-          collection.tags?.map((tag) => tag.name) ?? [],
-        ),
+      buildFacetOptions(
+        availableTags,
+        (tagId) => tagCountMap.get(tagId) ?? 0,
       ),
-    [filteredCollections],
+    [availableTags, tagCountMap],
   );
 
   const filteredSensitivityFacetOptions = useMemo(() => {
@@ -226,14 +288,20 @@ export function useCollectionsDashboard({ collections }: Params) {
     );
   }, []);
 
+  const totalPages = Math.max(1, Math.ceil(pageData.totalCount / pageSize));
+  const startIndex = Math.max(0, (pageNumber - 1) * pageSize);
+
   return {
     summary: {
-      filteredCount: filteredCollections.length,
+      filteredCount: pageData.totalCount,
+      isLoading: loading,
     },
     searchInput: {
       value: searchTerm,
-      onChange: (event: ChangeEvent<HTMLInputElement>) =>
-        setSearchTerm(event.target.value),
+      onChange: (event: ChangeEvent<HTMLInputElement>) => {
+        setSearchTerm(event.target.value);
+        setPageNumber(1);
+      },
     },
     sortControl: {
       collectionSort,
@@ -244,6 +312,7 @@ export function useCollectionsDashboard({ collections }: Params) {
       onSelectOption: (option: CollectionSortOption) => {
         setCollectionSort(option);
         setCollectionSortMenuOpen(false);
+        setPageNumber(1);
       },
     },
     filterSidebar: {
@@ -261,20 +330,23 @@ export function useCollectionsDashboard({ collections }: Params) {
       onClearFacetFilters: clearFacetFilters,
     },
     collectionCards: {
-      items: paginatedItems,
+      items: pageData.items,
       isLabelsExpanded: isDashboardLabelsExpanded,
       isTagsExpanded: isDashboardTagsExpanded,
       onToggleLabels: toggleDashboardLabelsExpanded,
       onToggleTags: toggleDashboardTagsExpanded,
     },
     pagination: {
-      currentPage,
+      currentPage: pageNumber,
       pageSize,
       totalPages,
-      totalItems: sortedCollections.length,
+      totalItems: pageData.totalCount,
       startIndex,
-      onPageChange: setCurrentPage,
-      onPageSizeChange: setPageSize,
+      onPageChange: setPageNumber,
+      onPageSizeChange: (nextPageSize: number) => {
+        setPageSize(nextPageSize);
+        setPageNumber(1);
+      },
     },
   };
 }

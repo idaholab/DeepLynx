@@ -2,9 +2,11 @@
 
 import {
   CreateRecordCollectionRequestDto,
+  RecordCollectionQueryRequestDto,
   UpdateRecordCollectionRequestDto,
 } from "@/app/(home)/types/requestDTOs";
 import {
+  PaginatedRecordCollectionsResponseDto,
   RecordCollectionResponseDto,
   RecordResponseDto,
 } from "@/app/(home)/types/responseDTOs";
@@ -21,15 +23,82 @@ const buildSensitivityLabelParams = (sensitivityLabelIds?: number[]) => {
   return params;
 };
 
+const buildRecordCollectionQueryParams = (
+  dto?: RecordCollectionQueryRequestDto,
+  hideArchived: boolean = true,
+) => {
+  const params = new URLSearchParams();
+  params.set("hideArchived", String(hideArchived));
+
+  if (dto?.search?.trim()) {
+    params.set("search", dto.search.trim());
+  }
+
+  dto?.sensitivityLabelIds?.forEach((id) =>
+    params.append("sensitivityLabelIds", String(id)),
+  );
+  dto?.tagIds?.forEach((id) => params.append("tagIds", String(id)));
+
+  if (dto?.sort) {
+    params.set("sort", dto.sort);
+  }
+
+  if (dto?.pageNumber) {
+    params.set("pageNumber", String(dto.pageNumber));
+  }
+
+  if (dto?.pageSize) {
+    params.set("pageSize", String(dto.pageSize));
+  }
+
+  return params;
+};
+
+const normalizeRecordCollectionsPage = (
+  data: unknown,
+): PaginatedRecordCollectionsResponseDto => {
+  if (Array.isArray(data)) {
+    return {
+      items: data as RecordCollectionResponseDto[],
+      pageNumber: 1,
+      pageSize: data.length,
+      totalCount: data.length,
+    };
+  }
+
+  const page = (data ?? {}) as {
+    items?: RecordCollectionResponseDto[];
+    pageNumber?: number;
+    pageSize?: number;
+    totalCount?: number;
+    maxPageSize?: number;
+    Items?: RecordCollectionResponseDto[];
+    PageNumber?: number;
+    PageSize?: number;
+    TotalCount?: number;
+    MaxPageSize?: number;
+  };
+
+  const items = page.items ?? page.Items ?? [];
+  return {
+    items,
+    pageNumber: page.pageNumber ?? page.PageNumber ?? 1,
+    pageSize: page.pageSize ?? page.PageSize ?? items.length,
+    totalCount: page.totalCount ?? page.TotalCount ?? items.length,
+    maxPageSize: page.maxPageSize ?? page.MaxPageSize,
+  };
+};
+
 export const getAllRecordCollections = async (
   organizationId: number,
   projectId: number,
+  dto?: RecordCollectionQueryRequestDto,
   hideArchived: boolean = true,
-): Promise<RecordCollectionResponseDto[]> => {
+) : Promise<PaginatedRecordCollectionsResponseDto> => {
   const res = await api.get(recordCollectionsPath(organizationId, projectId), {
-    params: { hideArchived },
+    params: buildRecordCollectionQueryParams(dto, hideArchived),
   });
-  return res.data;
+  return normalizeRecordCollectionsPage(res.data);
 };
 
 export const createRecordCollection = async (

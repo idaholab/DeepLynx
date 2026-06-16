@@ -123,6 +123,18 @@ export type RecordCollectionResponseDto = {
   tags?: RecordCollectionTagDto[];
   labels?: RecordCollectionLabelDto[];
 };
+
+export type PaginatedResponseDto<T> = {
+  items: T[] | [];
+  pageNumber: number;
+  pageSize: number;
+  totalCount: number;
+  maxPageSize?: number;
+};
+
+export type PaginatedRecordCollectionsResponseDto =
+  PaginatedResponseDto<RecordCollectionResponseDto>;
+
 export type QueryRecordViewResponseDto = {
   id: number | null;
   uri?: string | null;

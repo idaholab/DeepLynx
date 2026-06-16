@@ -15,6 +15,15 @@ export type CreateRecordCollectionRequestDto = {
   tags?: string[];
 };
 
+export type RecordCollectionQueryRequestDto = {
+  search?: string;
+  sensitivityLabelIds?: number[];
+  tagIds?: number[];
+  sort?: string;
+  pageNumber?: number;
+  pageSize?: number;
+};
+
 export type UpdateRecordCollectionRequestDto = {
   name?: string;
   description?: string;

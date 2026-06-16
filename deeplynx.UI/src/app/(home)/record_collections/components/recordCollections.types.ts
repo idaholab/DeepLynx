@@ -17,6 +17,7 @@ export type MetadataRow = {
 };
 
 export type FacetOption = {
+  id?: number;
   label: string;
   count: number;
 };

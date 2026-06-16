@@ -6,8 +6,8 @@ import PaginationControls, {
 import SearchInput from "@/app/(home)/components/SearchInput";
 import { useLanguage } from "@/app/contexts/Language";
 import Link from "next/link";
-import React, { useState } from "react";
-import { RecordCollectionResponseDto } from "../types/responseDTOs";
+import React from "react";
+import { PaginatedRecordCollectionsResponseDto } from "../types/responseDTOs";
 import CollectionDashboardCard from "./components/CollectionDashboardCard";
 import CollectionSortControl from "./components/CollectionSortControl";
 import FilterSidebar from "./components/FilterSidebar";
@@ -18,12 +18,17 @@ import { renderCollectionSortLabel } from "./components/recordCollections.view-u
 import { useCollectionsDashboard } from "./hooks/useCollectionsDashboard";
 
 type Props = {
-  recordCollections: RecordCollectionResponseDto[];
+  organizationId: number;
+  projectId: number;
+  initialRecordCollectionsPage: PaginatedRecordCollectionsResponseDto;
 };
 
-export default function RecordCollectionsClient({ recordCollections }: Props) {
+export default function RecordCollectionsClient({
+  organizationId,
+  projectId,
+  initialRecordCollectionsPage,
+}: Props) {
   const { t } = useLanguage();
-  const [collections] = useState<RecordCollectionResponseDto[]>(recordCollections);
 
   const {
     summary,
@@ -32,7 +37,11 @@ export default function RecordCollectionsClient({ recordCollections }: Props) {
     filterSidebar,
     collectionCards,
     pagination,
-  } = useCollectionsDashboard({ collections });
+  } = useCollectionsDashboard({
+    organizationId,
+    projectId,
+    initialPage: initialRecordCollectionsPage,
+  });
 
   return (
     <div className="min-h-screen bg-base-200/30 px-4 py-6 lg:px-8">
@@ -91,7 +100,11 @@ export default function RecordCollectionsClient({ recordCollections }: Props) {
                 />
               </div>
 
-              <div className="grid gap-4">
+              <div
+                className={`grid gap-4 transition-opacity ${
+                  summary.isLoading ? "opacity-70" : "opacity-100"
+                }`}
+              >
                 {collectionCards.items.map((collection) => {
                   const labelsExpanded = collectionCards.isLabelsExpanded(collection.id);
                   const tagsExpanded = collectionCards.isTagsExpanded(collection.id);
@@ -109,6 +122,14 @@ export default function RecordCollectionsClient({ recordCollections }: Props) {
                     />
                   );
                 })}
+
+                {!collectionCards.items.length ? (
+                  <div className="rounded-xl border border-dashed border-base-300 bg-base-100/60 px-4 py-8 text-center text-sm text-base-content/70">
+                    {summary.isLoading
+                      ? t.translations.LOADING
+                      : t.translations.RECORD_COLLECTIONS_NO_RECORDS_MATCH_SEARCH}
+                  </div>
+                ) : null}
               </div>
 
               {pagination.totalItems > pagination.pageSize ? (
