@@ -3955,6 +3955,190 @@ public class RecordBusinessTests : IntegrationTestBase
         Assert.Equal(adminUri, results.Single().Uri);
     }
 
+    [Fact]
+    public async Task CreateRecord_AllowsSysAdminToCreateUriWithoutUploadFilePermission()
+    {
+        var adminUser = new User
+        {
+            Name = "Admin",
+            Email = $"admin-{Guid.NewGuid()}@test.com",
+            IsSysAdmin = true,
+            IsActive = true
+        };
+
+        Context.Users.Add(adminUser);
+        await Context.SaveChangesAsync();
+
+        var label = new SensitivityLabel
+        {
+            Name = $"Test Label {Guid.NewGuid()}",
+            Description = "Test label",
+            OrganizationId = organizationId,
+            ProjectId = pid,
+            LastUpdatedBy = adminUser.Id,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),
+            IsArchived = false
+        };
+
+        Context.SensitivityLabels.Add(label);
+        await Context.SaveChangesAsync();
+
+        var uri = $"../data/test/{Guid.NewGuid()}_admin-create.txt";
+
+        var dto = new CreateRecordRequestDto
+        {
+            Name = "Admin create URI test",
+            Description = "Admin create URI test",
+            Uri = uri,
+            Properties = new JsonObject(),
+            OriginalId = Guid.NewGuid().ToString(),
+            ClassId = cid,
+            FileType = "txt",
+            FileSize = 1
+        };
+
+        var result = await _recordBusiness.CreateRecord(
+            adminUser.Id,
+            organizationId,
+            pid,
+            did,
+            dto,
+            new List<long> { label.Id },
+            embedded: false,
+            isSysAdmin: true);
+
+        Assert.Equal(uri, result.Uri);
+    }
+
+    [Fact]
+    public async Task BulkCreateRecords_AllowsSysAdminToCreateUriWithoutUploadFilePermission()
+    {
+        var adminUser = new User
+        {
+            Name = "Admin",
+            Email = $"admin-{Guid.NewGuid()}@test.com",
+            IsSysAdmin = true,
+            IsActive = true
+        };
+
+        Context.Users.Add(adminUser);
+        await Context.SaveChangesAsync();
+
+        var label = new SensitivityLabel
+        {
+            Name = $"Test Label {Guid.NewGuid()}",
+            Description = "Test label",
+            OrganizationId = organizationId,
+            ProjectId = pid,
+            LastUpdatedBy = adminUser.Id,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),
+            IsArchived = false
+        };
+
+        Context.SensitivityLabels.Add(label);
+        await Context.SaveChangesAsync();
+
+        var uri = $"../data/test/{Guid.NewGuid()}_admin-bulk-create.txt";
+
+        var records = new List<CreateRecordRequestDto>
+        {
+            new()
+            {
+                Name = "Admin bulk create URI test",
+                Description = "Admin bulk create URI test",
+                Uri = uri,
+                Properties = new JsonObject(),
+                OriginalId = Guid.NewGuid().ToString(),
+                ClassId = cid,
+                FileType = "txt",
+                FileSize = 1
+            }
+        };
+
+        var results = await _recordBusiness.BulkCreateRecords(
+            adminUser.Id,
+            organizationId,
+            pid,
+            did,
+            records,
+            new List<long> { label.Id },
+            isSysAdmin: true);
+
+        Assert.Single(results);
+        Assert.Equal(uri, results.Single().Uri);
+    }
+
+    [Fact]
+    public async Task UpdateRecord_AllowsSysAdminToUpdateUriWithoutUpdateFilePermission()
+    {
+        var adminUser = new User
+        {
+            Name = "Admin",
+            Email = $"admin-{Guid.NewGuid()}@test.com",
+            IsSysAdmin = true,
+            IsActive = true
+        };
+
+        Context.Users.Add(adminUser);
+        await Context.SaveChangesAsync();
+
+        var label = new SensitivityLabel
+        {
+            Name = $"Test Label {Guid.NewGuid()}",
+            Description = "Test label",
+            OrganizationId = organizationId,
+            ProjectId = pid,
+            LastUpdatedBy = adminUser.Id,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),
+            IsArchived = false
+        };
+
+        Context.SensitivityLabels.Add(label);
+        await Context.SaveChangesAsync();
+
+        var originalUri = $"../data/test/{Guid.NewGuid()}_original.txt";
+
+        var record = new Record
+        {
+            OrganizationId = organizationId,
+            ProjectId = pid,
+            DataSourceId = did,
+            ClassId = cid,
+            Name = "Admin update URI test",
+            Description = "Admin update URI test",
+            Uri = originalUri,
+            Properties = "{}",
+            OriginalId = Guid.NewGuid().ToString(),
+            LastUpdatedBy = adminUser.Id,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),
+            IsArchived = false,
+            FileType = "txt",
+            FileSize = 1,
+            Labels = new List<SensitivityLabel> { label }
+        };
+
+        Context.Records.Add(record);
+        await Context.SaveChangesAsync();
+
+        var updatedUri = $"../data/test/{Guid.NewGuid()}_updated.txt";
+
+        var dto = new UpdateRecordRequestDto
+        {
+            Uri = updatedUri,
+            Properties = new JsonObject()
+        };
+
+        var result = await _recordBusiness.UpdateRecord(
+            adminUser.Id,
+            organizationId,
+            pid,
+            record.Id,
+            dto,
+            isSysAdmin: true);
+
+        Assert.Equal(updatedUri, result.Uri);
+    }
+
     private async Task<(User adminUser, User restrictedUser, SensitivityLabel label)>
         SeedUriSecurityUsersAndLabel(params string[] permissionActions)
 {
