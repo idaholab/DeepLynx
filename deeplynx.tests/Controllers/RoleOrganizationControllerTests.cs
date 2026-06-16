@@ -7,7 +7,6 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using Moq;
-using Org.BouncyCastle.Crypto.Engines;
 
 namespace deeplynx.tests.Controllers;
 
@@ -79,7 +78,7 @@ public class RoleOrganizationControllerTests : IDisposable
     }
 
     [Fact]
-    public async Task GetAllRelationships_Returns200_WithEmptyList()
+    public async Task GetAllRoles_Returns200_WithEmptyList()
     {
         // Arrange
 
@@ -122,7 +121,7 @@ public class RoleOrganizationControllerTests : IDisposable
     }
 
     [Fact]
-    public async Task GetAllRelationships_PassesToBusinessLayer()
+    public async Task GetAllRoles_PassesToBusinessLayer()
     {
         // Arrange
 
@@ -189,7 +188,7 @@ public class RoleOrganizationControllerTests : IDisposable
         // Arrange
 
         _mockRoleBusiness
-            .Setup(b => b.GetRole(RoleId, OrgId, ProjectId, true))
+            .Setup(b => b.GetRole(RoleId, OrgId, null, true))
             .ReturnsAsync((RoleResponseDto)null!);
 
         // Act
@@ -368,7 +367,7 @@ public class RoleOrganizationControllerTests : IDisposable
     #region UpdateRole Tests
 
     [Fact]
-    public async Task UpdateRole_Returns200_WithRelationship()
+    public async Task UpdateRole_Returns200_WithRole()
     {
         // Arrange
         RoleResponseDto expected =
@@ -891,33 +890,6 @@ public class RoleOrganizationControllerTests : IDisposable
     }
 
     [Fact]
-    public async Task AddPermissionToRole_Returns200_WithEmptyList()
-    {
-        // Arrange
-
-        _mockRoleBusiness
-            .Setup(b => b.AddPermissionToRole(RoleId, PermissionId, OrgId, null))
-            .ReturnsAsync(true);
-
-        // Act
-        var actionResult = await _roleOrganizationController.AddPermissionToRole(
-            OrgId,
-            RoleId,
-            PermissionId);
-
-        // Assert
-        var result = Assert.IsType<OkObjectResult>(actionResult);
-
-        Assert.Equal(StatusCodes.Status200OK, result.StatusCode);
-        Assert.NotNull(result.Value);
-
-        var messageProperty = result.Value.GetType().GetProperty("message");
-        Assert.NotNull(messageProperty);
-
-        var actualMessage = messageProperty.GetValue(result.Value) as string;
-    }
-
-    [Fact]
     public async Task AddPermissionToRole_Returns500_OnUnexpectedException()
     {
         // Arrange
@@ -1242,18 +1214,5 @@ public class RoleOrganizationControllerTests : IDisposable
             .Where(method => method.Name == methodName)
             .Where(method => parameterNames.All(parameterName =>
                 method.GetParameters().Any(parameter => parameter.Name == parameterName))));
-    }
-
-    private static string GetMessageFromResultValue(object? value)
-    {
-        Assert.NotNull(value);
-
-        var messageProperty = value.GetType().GetProperty("message");
-        Assert.NotNull(messageProperty);
-
-        var message = messageProperty.GetValue(value) as string;
-        Assert.NotNull(message);
-
-        return message;
     }
 }
