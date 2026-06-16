@@ -1883,6 +1883,97 @@ public class FileBusinessTests : IntegrationTestBase
         Assert.False(Directory.Exists(uploadPath));
     }
 
+    [Fact]
+    public async Task CompleteUpload_WithAzureBlobObjectStorage_GetsFileSizeFromStorageBusiness()
+    {
+        // Arrange
+        var expectedFileSize = 512L;
+
+        // This intentionally looks like a blob key, not a local filesystem path.
+        // If FileBusiness uses new FileInfo(uri).Length, this test should fail.
+        var blobUri =
+            $"organization_{oid}/project_{pid}/datasource_{did}/{Guid.NewGuid():N}_binary-test.bin";
+
+        var azureObjectStorage = new ObjectStorage
+        {
+            Name = "Azure Blob Regression Test Storage",
+            ProjectId = pid,
+            OrganizationId = oid,
+            Type = "azure_object",
+            ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(new ObjectStorageConfigDto()),
+            Default = false
+        };
+
+        Context.ObjectStorages.Add(azureObjectStorage);
+        await Context.SaveChangesAsync();
+
+        var azureOsId = azureObjectStorage.Id;
+
+        var azureFileBusiness = new Mock<IFileBusiness>(MockBehavior.Strict);
+
+        azureFileBusiness
+            .Setup(x => x.CompleteUpload(
+                oid,
+                pid,
+                did,
+                It.IsAny<ObjectStorageConfigDto>(),
+                It.Is<FileUploadCompleteRequestDto>(r => r.FileName == "binary-test.bin"),
+                It.IsAny<Guid>()))
+            .ReturnsAsync(blobUri);
+
+        azureFileBusiness
+            .Setup(x => x.GetFileSize(
+                blobUri,
+                It.IsAny<ObjectStorageConfigDto>()))
+            .ReturnsAsync(expectedFileSize);
+
+        _fileBusinessFactory
+            .Setup(x => x.CreateFileBusiness("azure_object"))
+            .Returns(azureFileBusiness.Object);
+
+        var completeRequest = new FileUploadCompleteRequestDto
+        {
+            UploadId = Guid.NewGuid().ToString(),
+            FileName = "binary-test.bin",
+            TotalChunks = 2
+        };
+
+        // Act
+        var result = await _fileBusiness.CompleteUpload(
+            uid,
+            oid,
+            pid,
+            did,
+            azureOsId,
+            completeRequest
+        );
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal("binary-test.bin", result.Name);
+        Assert.Equal(azureOsId, result.ObjectStorageId);
+        Assert.Equal(blobUri, result.Uri);
+
+        Assert.True(result.FileSize.HasValue);
+        Assert.Equal(expectedFileSize, result.FileSize.Value);
+
+        azureFileBusiness.Verify(x => x.CompleteUpload(
+                oid,
+                pid,
+                did,
+                It.IsAny<ObjectStorageConfigDto>(),
+                It.IsAny<FileUploadCompleteRequestDto>(),
+                It.IsAny<Guid>()),
+            Times.Once);
+
+        azureFileBusiness.Verify(x => x.GetFileSize(
+                blobUri,
+                It.IsAny<ObjectStorageConfigDto>()),
+            Times.Once);
+
+        _fileBusinessFactory.Verify(x => x.CreateFileBusiness("azure_object"), Times.Once);
+    }
+
     #endregion
 
     #region Default Object Storage Tests
