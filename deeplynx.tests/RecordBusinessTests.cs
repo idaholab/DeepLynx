@@ -1222,6 +1222,46 @@ public class RecordBusinessTests : IntegrationTestBase
     }
 
     [Fact]
+    public async Task BulkCreateRecords_ValidData_LongNames()
+    {
+        // Arrange
+        var records = new List<CreateRecordRequestDto>
+        {
+            new()
+            {
+                Name = "A name that is five hundred characters long a name that is five hundred characters long a name that is five hundred characters long a name that is five hundred characters long a name that is five hundred characters long a name that is five hundred characters long a name that is five hundred characters long a name that is five hundred characters long a name that is five hundred characters long a name that is five hundred characters long a name that is five hundred characters long a name that is f",
+                Description = "Long name 1 Description",
+                ObjectStorageId = osid,
+                OriginalId = "br1",
+                Properties = (JsonObject)JsonNode.Parse(JsonSerializer.Serialize(new { TestProp = "Value1" }))!
+            },
+            new()
+            {
+                Name = "A name that is just over one hundred characters long a name that is just over one hundred characters long",
+                Description = "Long name 2 Description",
+                ObjectStorageId = osid,
+                OriginalId = "br2",
+                Properties = (JsonObject)JsonNode.Parse(JsonSerializer.Serialize(new { TestProp = "Value2" }))!
+            }
+        };
+    
+        // Act
+        var result = await _recordBusiness.BulkCreateRecords(uid, organizationId, pid, did, records);
+    
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(2, result.Count());
+        Assert.True(result.All(r =>
+            r.LastUpdatedBy == uid && !r.IsArchived && r.DataSourceId == did && r.ProjectId == pid));
+        Assert.Contains(result, r => r.Name == "A name that is five hundred characters long a name that is five hundred characters long a name that is five hundred characters long a name that is five hundred characters long a name that is five hundred characters long a name that is five hundred characters long a name that is five hundred characters long a name that is five hundred characters long a name that is five hundred characters long a name that is five hundred characters long a name that is five hundred characters long a name that is f");
+        Assert.Contains(result, r => r.Name == "A name that is just over one hundred characters long a name that is just over one hundred characters long");
+        
+        // Ensure that a record create event was logged
+        var eventList = await Context.Events.ToListAsync();
+        Assert.Single(eventList); // One event is logged with the total bulk count in the properties
+    }
+    
+    [Fact]
     public async Task BulkCreateRecords_WithLabelsAndTags_CreatesMultipleRecordsWithLabelsAndTags()
     {
         // Arrange
@@ -3809,6 +3849,190 @@ public class RecordBusinessTests : IntegrationTestBase
             new List<long> { label.Id });
 
         Assert.Equal(adminUri, results.Single().Uri);
+    }
+
+    [Fact]
+    public async Task CreateRecord_AllowsSysAdminToCreateUriWithoutUploadFilePermission()
+    {
+        var adminUser = new User
+        {
+            Name = "Admin",
+            Email = $"admin-{Guid.NewGuid()}@test.com",
+            IsSysAdmin = true,
+            IsActive = true
+        };
+
+        Context.Users.Add(adminUser);
+        await Context.SaveChangesAsync();
+
+        var label = new SensitivityLabel
+        {
+            Name = $"Test Label {Guid.NewGuid()}",
+            Description = "Test label",
+            OrganizationId = organizationId,
+            ProjectId = pid,
+            LastUpdatedBy = adminUser.Id,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),
+            IsArchived = false
+        };
+
+        Context.SensitivityLabels.Add(label);
+        await Context.SaveChangesAsync();
+
+        var uri = $"../data/test/{Guid.NewGuid()}_admin-create.txt";
+
+        var dto = new CreateRecordRequestDto
+        {
+            Name = "Admin create URI test",
+            Description = "Admin create URI test",
+            Uri = uri,
+            Properties = new JsonObject(),
+            OriginalId = Guid.NewGuid().ToString(),
+            ClassId = cid,
+            FileType = "txt",
+            FileSize = 1
+        };
+
+        var result = await _recordBusiness.CreateRecord(
+            adminUser.Id,
+            organizationId,
+            pid,
+            did,
+            dto,
+            new List<long> { label.Id },
+            embedded: false,
+            isSysAdmin: true);
+
+        Assert.Equal(uri, result.Uri);
+    }
+
+    [Fact]
+    public async Task BulkCreateRecords_AllowsSysAdminToCreateUriWithoutUploadFilePermission()
+    {
+        var adminUser = new User
+        {
+            Name = "Admin",
+            Email = $"admin-{Guid.NewGuid()}@test.com",
+            IsSysAdmin = true,
+            IsActive = true
+        };
+
+        Context.Users.Add(adminUser);
+        await Context.SaveChangesAsync();
+
+        var label = new SensitivityLabel
+        {
+            Name = $"Test Label {Guid.NewGuid()}",
+            Description = "Test label",
+            OrganizationId = organizationId,
+            ProjectId = pid,
+            LastUpdatedBy = adminUser.Id,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),
+            IsArchived = false
+        };
+
+        Context.SensitivityLabels.Add(label);
+        await Context.SaveChangesAsync();
+
+        var uri = $"../data/test/{Guid.NewGuid()}_admin-bulk-create.txt";
+
+        var records = new List<CreateRecordRequestDto>
+        {
+            new()
+            {
+                Name = "Admin bulk create URI test",
+                Description = "Admin bulk create URI test",
+                Uri = uri,
+                Properties = new JsonObject(),
+                OriginalId = Guid.NewGuid().ToString(),
+                ClassId = cid,
+                FileType = "txt",
+                FileSize = 1
+            }
+        };
+
+        var results = await _recordBusiness.BulkCreateRecords(
+            adminUser.Id,
+            organizationId,
+            pid,
+            did,
+            records,
+            new List<long> { label.Id },
+            isSysAdmin: true);
+
+        Assert.Single(results);
+        Assert.Equal(uri, results.Single().Uri);
+    }
+
+    [Fact]
+    public async Task UpdateRecord_AllowsSysAdminToUpdateUriWithoutUpdateFilePermission()
+    {
+        var adminUser = new User
+        {
+            Name = "Admin",
+            Email = $"admin-{Guid.NewGuid()}@test.com",
+            IsSysAdmin = true,
+            IsActive = true
+        };
+
+        Context.Users.Add(adminUser);
+        await Context.SaveChangesAsync();
+
+        var label = new SensitivityLabel
+        {
+            Name = $"Test Label {Guid.NewGuid()}",
+            Description = "Test label",
+            OrganizationId = organizationId,
+            ProjectId = pid,
+            LastUpdatedBy = adminUser.Id,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),
+            IsArchived = false
+        };
+
+        Context.SensitivityLabels.Add(label);
+        await Context.SaveChangesAsync();
+
+        var originalUri = $"../data/test/{Guid.NewGuid()}_original.txt";
+
+        var record = new Record
+        {
+            OrganizationId = organizationId,
+            ProjectId = pid,
+            DataSourceId = did,
+            ClassId = cid,
+            Name = "Admin update URI test",
+            Description = "Admin update URI test",
+            Uri = originalUri,
+            Properties = "{}",
+            OriginalId = Guid.NewGuid().ToString(),
+            LastUpdatedBy = adminUser.Id,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),
+            IsArchived = false,
+            FileType = "txt",
+            FileSize = 1,
+            Labels = new List<SensitivityLabel> { label }
+        };
+
+        Context.Records.Add(record);
+        await Context.SaveChangesAsync();
+
+        var updatedUri = $"../data/test/{Guid.NewGuid()}_updated.txt";
+
+        var dto = new UpdateRecordRequestDto
+        {
+            Uri = updatedUri,
+            Properties = new JsonObject()
+        };
+
+        var result = await _recordBusiness.UpdateRecord(
+            adminUser.Id,
+            organizationId,
+            pid,
+            record.Id,
+            dto,
+            isSysAdmin: true);
+
+        Assert.Equal(updatedUri, result.Uri);
     }
 
     private async Task<(User adminUser, User restrictedUser, SensitivityLabel label)>

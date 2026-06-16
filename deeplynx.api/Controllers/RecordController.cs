@@ -254,8 +254,20 @@ public class RecordController : ControllerBase
         try
         {
             var currentUserId = UserContextStorage.UserId;
-            var record =
-                await _recordBusiness.CreateRecord(currentUserId, organizationId, projectId, dataSourceId, dto, sensitivityLabelIds);
+            var isSysAdmin = UserContextStorage.IsSysAdmin;
+            var isOrgAdmin = UserContextStorage.IsOrgAdmin;
+            var isProjectAdmin = UserContextStorage.IsProjectAdmin;
+            var record = await _recordBusiness.CreateRecord(
+                currentUserId,
+                organizationId,
+                projectId,
+                dataSourceId,
+                dto,
+                sensitivityLabelIds,
+                embedded: false,
+                isSysAdmin,
+                isOrgAdmin,
+                isProjectAdmin);
             return Ok(record);
         }
         catch (Exception exc)
@@ -332,7 +344,12 @@ public class RecordController : ControllerBase
         try
         {
             var currentUserId = UserContextStorage.UserId;
-            var updated = await _recordBusiness.UpdateRecord(currentUserId, organizationId, projectId, recordId, dto);
+            var isSysAdmin = UserContextStorage.IsSysAdmin;
+            var isOrgAdmin = UserContextStorage.IsOrgAdmin;
+            var isProjectAdmin = UserContextStorage.IsProjectAdmin;
+            var updated = await _recordBusiness.UpdateRecord(currentUserId, organizationId, projectId, recordId, dto, isSysAdmin,
+                isOrgAdmin,
+                isProjectAdmin);
             return Ok(updated);
         }
         catch (Exception exc)
