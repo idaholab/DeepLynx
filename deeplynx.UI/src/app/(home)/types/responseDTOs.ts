@@ -103,8 +103,11 @@ export type PaginatedResponse<T> = {
   items: T[] | [];
   pageNumber: number;
   pageSize: number;
-  maxPageSize: number;
   totalCount: number;
+  totalPages?: number;
+  hasPrevious?: boolean;
+  hasNext?: boolean;
+  maxPageSize?: number;
 };
 
 export type RecordCollectionTagDto = {
@@ -335,13 +338,7 @@ export type OauthApplicationSecureResponseDto = {
   clientSecretRaw: string;
 };
 
-export type PaginatedEventsResponseDto = {
-  items: EventResponseDto[] | [];
-  pageNumber: number;
-  pageSize: number;
-  maxPageSize: number;
-  totalCount: number;
-};
+export type PaginatedEventsResponseDto = PaginatedResponse<EventResponseDto>;
 
 export type EventResponseDto = {
   id: number;
@@ -432,10 +429,5 @@ export interface SavedSearchesResponseDto {
   };
 }
 
-export type PaginatedSavedSearchesResponseDto = {
-  items: SavedSearchesResponseDto[] | [];
-  pageNumber: number;
-  pageSize: number;
-  maxPageSize: number;
-  totalCount: number;
-};
+export type PaginatedSavedSearchesResponseDto =
+  PaginatedResponse<SavedSearchesResponseDto>;

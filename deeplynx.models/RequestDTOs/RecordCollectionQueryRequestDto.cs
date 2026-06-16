@@ -7,7 +7,7 @@ public class RecordCollectionQueryRequestDto
     public long[]? TagIds { get; set; }
     public string? Sort { get; set; }
     public int PageNumber { get; set; } = 1;
-    public int PageSize { get; set; } = 25;
+    public int PageSize { get; set; } = 10;
     private const int MaxPageSize = 500;
 
     public int GetValidatedPageSize()

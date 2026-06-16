@@ -44,7 +44,7 @@ export default async function Page() {
   let recordCollectionsPage: PaginatedRecordCollectionsResponseDto = {
     items: [],
     pageNumber: 1,
-    pageSize: 25,
+    pageSize: 10,
     totalCount: 0,
   };
 
