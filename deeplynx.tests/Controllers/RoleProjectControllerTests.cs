@@ -7,7 +7,6 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using Moq;
-using Org.BouncyCastle.Crypto.Engines;
 
 namespace deeplynx.tests.Controllers;
 
@@ -16,7 +15,7 @@ public class RoleProjectControllerTests : IDisposable
 {
     private readonly Mock<IRoleBusiness> _mockRoleBusiness;
     private readonly Mock<ILogger<RoleProjectController>> _mockLogger;
-    private readonly RoleProjectController _roleOrganizationController;
+    private readonly RoleProjectController _roleProjectController;
 
     private const long UserId = 10L;
     private const long OrgId = 1L;
@@ -33,7 +32,7 @@ public class RoleProjectControllerTests : IDisposable
         _mockRoleBusiness = new Mock<IRoleBusiness>();
         _mockLogger = new Mock<ILogger<RoleProjectController>>();
 
-        _roleOrganizationController = new RoleProjectController(
+        _roleProjectController = new RoleProjectController(
             _mockRoleBusiness.Object,
             _mockLogger.Object
         );
@@ -69,7 +68,7 @@ public class RoleProjectControllerTests : IDisposable
             .ReturnsAsync(expected);
 
         // Act
-        var actionResult = await _roleOrganizationController.GetAllRoles(OrgId, ProjectId, true);
+        var actionResult = await _roleProjectController.GetAllRoles(OrgId, ProjectId, true);
 
         // Assert
         var result = Assert.IsType<OkObjectResult>(actionResult.Result);
@@ -79,7 +78,7 @@ public class RoleProjectControllerTests : IDisposable
     }
 
     [Fact]
-    public async Task GetAllRelationships_Returns200_WithEmptyList()
+    public async Task GetAllRoles_Returns200_WithEmptyList()
     {
         // Arrange
 
@@ -88,7 +87,7 @@ public class RoleProjectControllerTests : IDisposable
             .ReturnsAsync([]);
 
         // Act
-        var actionResult = await _roleOrganizationController.GetAllRoles(It.IsAny<long>(), It.IsAny<long>(), It.IsAny<bool>());
+        var actionResult = await _roleProjectController.GetAllRoles(It.IsAny<long>(), It.IsAny<long>(), It.IsAny<bool>());
 
         // Assert
         var result = Assert.IsType<OkObjectResult>(actionResult.Result);
@@ -110,7 +109,7 @@ public class RoleProjectControllerTests : IDisposable
             .ThrowsAsync(new Exception("db error"));
 
         // Act
-        var actionResult = await _roleOrganizationController.GetAllRoles(
+        var actionResult = await _roleProjectController.GetAllRoles(
             OrgId,
             ProjectId,
             true);
@@ -123,7 +122,7 @@ public class RoleProjectControllerTests : IDisposable
     }
 
     [Fact]
-    public async Task GetAllRelationships_PassesToBusinessLayer()
+    public async Task GetAllRoles_PassesToBusinessLayer()
     {
         // Arrange
 
@@ -134,7 +133,7 @@ public class RoleProjectControllerTests : IDisposable
             .ReturnsAsync(expected);
 
         // Act
-        await _roleOrganizationController.GetAllRoles(OrgId, ProjectId, true);
+        await _roleProjectController.GetAllRoles(OrgId, ProjectId, true);
 
         // Assert
         _mockRoleBusiness.Verify(
@@ -146,7 +145,7 @@ public class RoleProjectControllerTests : IDisposable
     public void GetAllRoles_HasHttpGet()
     {
         var method = GetControllerMethod(
-            nameof(RoleOrganizationController.GetAllRoles),
+            nameof(RoleProjectController.GetAllRoles),
             "organizationId",
             "hideArchived");
 
@@ -172,7 +171,7 @@ public class RoleProjectControllerTests : IDisposable
             .ReturnsAsync(expected);
 
         // Act
-        var actionResult = await _roleOrganizationController.GetRole(
+        var actionResult = await _roleProjectController.GetRole(
             OrgId,
             ProjectId,
             RoleId,
@@ -195,7 +194,7 @@ public class RoleProjectControllerTests : IDisposable
             .ReturnsAsync((RoleResponseDto)null!);
 
         // Act
-        var actionResult = await _roleOrganizationController.GetRole(
+        var actionResult = await _roleProjectController.GetRole(
             OrgId,
             ProjectId,
             RoleId,
@@ -217,7 +216,7 @@ public class RoleProjectControllerTests : IDisposable
             .ThrowsAsync(new Exception("db error"));
 
         // Act
-        var actionResult = await _roleOrganizationController.GetRole(
+        var actionResult = await _roleProjectController.GetRole(
             OrgId,
             ProjectId,
             RoleId,
@@ -243,7 +242,7 @@ public class RoleProjectControllerTests : IDisposable
             .ReturnsAsync(expected);
 
         // Act
-        var actionResult = await _roleOrganizationController.GetRole(
+        var actionResult = await _roleProjectController.GetRole(
             OrgId,
             ProjectId,
             RoleId,
@@ -266,7 +265,7 @@ public class RoleProjectControllerTests : IDisposable
     public void GetRole_HasHttpGet()
     {
         var method = GetControllerMethod(
-            nameof(RoleOrganizationController.GetRole),
+            nameof(RoleProjectController.GetRole),
             "organizationId",
             "roleId",
             "hideArchived");
@@ -295,7 +294,7 @@ public class RoleProjectControllerTests : IDisposable
             .ReturnsAsync(expected);
 
         // Act
-        var actionResult = await _roleOrganizationController.CreateRole(
+        var actionResult = await _roleProjectController.CreateRole(
             OrgId,
             ProjectId,
             input);
@@ -316,7 +315,7 @@ public class RoleProjectControllerTests : IDisposable
             .Setup(b => b.CreateRole(UserId, input, OrgId, ProjectId))
             .ThrowsAsync(new Exception("db error"));
 
-        var actionResult = await _roleOrganizationController.CreateRole(
+        var actionResult = await _roleProjectController.CreateRole(
             OrgId,
             ProjectId,
             input);
@@ -343,7 +342,7 @@ public class RoleProjectControllerTests : IDisposable
             .ReturnsAsync(expected);
 
         // Act
-        var actionResult = await _roleOrganizationController.CreateRole(
+        var actionResult = await _roleProjectController.CreateRole(
             OrgId,
             ProjectId,
             input);
@@ -360,7 +359,7 @@ public class RoleProjectControllerTests : IDisposable
     public void CreateRole_HasHttpPost()
     {
         var method = GetControllerMethod(
-            nameof(RoleOrganizationController.CreateRole),
+            nameof(RoleProjectController.CreateRole),
             "organizationId",
             "dto");
 
@@ -376,7 +375,7 @@ public class RoleProjectControllerTests : IDisposable
     #region UpdateRole Tests
 
     [Fact]
-    public async Task UpdateRole_Returns200_WithRelationship()
+    public async Task UpdateRole_Returns200_WithRole()
     {
         // Arrange
         RoleResponseDto expected =
@@ -388,7 +387,7 @@ public class RoleProjectControllerTests : IDisposable
             .ReturnsAsync(expected);
 
         // Act
-        var actionResult = await _roleOrganizationController.UpdateRole(
+        var actionResult = await _roleProjectController.UpdateRole(
             OrgId,
             ProjectId,
             RoleId,
@@ -410,7 +409,7 @@ public class RoleProjectControllerTests : IDisposable
             .Setup(b => b.UpdateRole(UserId, RoleId, OrgId, ProjectId, input))
             .ThrowsAsync(new Exception("db error"));
 
-        var actionResult = await _roleOrganizationController.UpdateRole(
+        var actionResult = await _roleProjectController.UpdateRole(
             OrgId,
             ProjectId,
             RoleId,
@@ -438,7 +437,7 @@ public class RoleProjectControllerTests : IDisposable
             .ReturnsAsync(expected);
 
         // Act
-        var actionResult = await _roleOrganizationController.UpdateRole(
+        var actionResult = await _roleProjectController.UpdateRole(
             OrgId,
             ProjectId,
             RoleId,
@@ -456,7 +455,7 @@ public class RoleProjectControllerTests : IDisposable
     public void UpdateRole_HasHttpPut()
     {
         var method = GetControllerMethod(
-            nameof(RoleOrganizationController.UpdateRole),
+            nameof(RoleProjectController.UpdateRole),
             "organizationId",
             "roleId",
             "dto");
@@ -483,7 +482,7 @@ public class RoleProjectControllerTests : IDisposable
             .ReturnsAsync(true);
 
         // Act
-        var actionResult = await _roleOrganizationController.DeleteRole(
+        var actionResult = await _roleProjectController.DeleteRole(
             OrgId,
             ProjectId,
             RoleId);
@@ -509,7 +508,7 @@ public class RoleProjectControllerTests : IDisposable
             .Setup(b => b.DeleteRole(UserId, RoleId, OrgId, ProjectId))
             .ThrowsAsync(new Exception("db error"));
 
-        var actionResult = await _roleOrganizationController.DeleteRole(
+        var actionResult = await _roleProjectController.DeleteRole(
             OrgId,
             ProjectId,
             RoleId);
@@ -533,7 +532,7 @@ public class RoleProjectControllerTests : IDisposable
             .ReturnsAsync(true);
 
         // Act
-        var actionResult = await _roleOrganizationController.DeleteRole(
+        var actionResult = await _roleProjectController.DeleteRole(
             OrgId,
             ProjectId,
             RoleId);
@@ -550,7 +549,7 @@ public class RoleProjectControllerTests : IDisposable
     public void DeleteRole_HasHttpDelete()
     {
         var method = GetControllerMethod(
-            nameof(RoleOrganizationController.DeleteRole),
+            nameof(RoleProjectController.DeleteRole),
             "organizationId",
             "roleId");
 
@@ -579,7 +578,7 @@ public class RoleProjectControllerTests : IDisposable
             .ReturnsAsync(true);
 
         // Act
-        var actionResult = await _roleOrganizationController.ArchiveRole(
+        var actionResult = await _roleProjectController.ArchiveRole(
             OrgId,
             ProjectId,
             RoleId,
@@ -612,7 +611,7 @@ public class RoleProjectControllerTests : IDisposable
             .ReturnsAsync(true);
 
         // Act
-        var actionResult = await _roleOrganizationController.ArchiveRole(
+        var actionResult = await _roleProjectController.ArchiveRole(
             OrgId,
             ProjectId,
             RoleId,
@@ -643,7 +642,7 @@ public class RoleProjectControllerTests : IDisposable
             .ThrowsAsync(new Exception("db error"));
 
         // Act
-        var actionResult = await _roleOrganizationController.ArchiveRole(
+        var actionResult = await _roleProjectController.ArchiveRole(
             OrgId,
             ProjectId,
             RoleId,
@@ -674,7 +673,7 @@ public class RoleProjectControllerTests : IDisposable
             .ThrowsAsync(new Exception("db error"));
 
         // Act
-        var actionResult = await _roleOrganizationController.ArchiveRole(
+        var actionResult = await _roleProjectController.ArchiveRole(
             OrgId,
             ProjectId,
             RoleId,
@@ -705,7 +704,7 @@ public class RoleProjectControllerTests : IDisposable
             .ReturnsAsync(true);
 
         // Act
-        var actionResult = await _roleOrganizationController.ArchiveRole(
+        var actionResult = await _roleProjectController.ArchiveRole(
             OrgId,
             ProjectId,
             RoleId,
@@ -735,7 +734,7 @@ public class RoleProjectControllerTests : IDisposable
             .ReturnsAsync(true);
 
         // Act
-        var actionResult = await _roleOrganizationController.ArchiveRole(
+        var actionResult = await _roleProjectController.ArchiveRole(
             OrgId,
             ProjectId,
             RoleId,
@@ -757,7 +756,7 @@ public class RoleProjectControllerTests : IDisposable
     public void ArchiveRole_HasHttpPatch()
     {
         var method = GetControllerMethod(
-            nameof(RoleOrganizationController.ArchiveRole),
+            nameof(RoleProjectController.ArchiveRole),
             "organizationId",
             "roleId",
             "archive");
@@ -784,7 +783,7 @@ public class RoleProjectControllerTests : IDisposable
             .ReturnsAsync(expected);
 
         // Act
-        var actionResult = await _roleOrganizationController.GetPermissionsByRole(
+        var actionResult = await _roleProjectController.GetPermissionsByRole(
             OrgId,
             ProjectId,
             RoleId);
@@ -806,7 +805,7 @@ public class RoleProjectControllerTests : IDisposable
             .ReturnsAsync((List<PermissionResponseDto>)null!);
 
         // Act
-        var actionResult = await _roleOrganizationController.GetPermissionsByRole(
+        var actionResult = await _roleProjectController.GetPermissionsByRole(
             OrgId,
             ProjectId,
             RoleId);
@@ -827,7 +826,7 @@ public class RoleProjectControllerTests : IDisposable
             .ThrowsAsync(new Exception("db error"));
 
         // Act
-        var actionResult = await _roleOrganizationController.GetPermissionsByRole(
+        var actionResult = await _roleProjectController.GetPermissionsByRole(
             OrgId,
             ProjectId,
             RoleId);
@@ -852,7 +851,7 @@ public class RoleProjectControllerTests : IDisposable
             .ReturnsAsync(expected);
 
         // Act
-        var actionResult = await _roleOrganizationController.GetPermissionsByRole(
+        var actionResult = await _roleProjectController.GetPermissionsByRole(
             OrgId,
             ProjectId,
             RoleId);
@@ -870,7 +869,7 @@ public class RoleProjectControllerTests : IDisposable
     public void GetPermissionsByRole_HasHttpGet()
     {
         var method = GetControllerMethod(
-            nameof(RoleOrganizationController.GetPermissionsByRole),
+            nameof(RoleProjectController.GetPermissionsByRole),
             "organizationId",
             "roleId");
 
@@ -896,7 +895,7 @@ public class RoleProjectControllerTests : IDisposable
             .ReturnsAsync(true);
 
         // Act
-        var actionResult = await _roleOrganizationController.AddPermissionToRole(
+        var actionResult = await _roleProjectController.AddPermissionToRole(
             OrgId,
             ProjectId,
             RoleId,
@@ -916,34 +915,6 @@ public class RoleProjectControllerTests : IDisposable
     }
 
     [Fact]
-    public async Task AddPermissionToRole_Returns200_WithEmptyList()
-    {
-        // Arrange
-
-        _mockRoleBusiness
-            .Setup(b => b.AddPermissionToRole(RoleId, PermissionId, OrgId, ProjectId))
-            .ReturnsAsync(true);
-
-        // Act
-        var actionResult = await _roleOrganizationController.AddPermissionToRole(
-            OrgId,
-            ProjectId,
-            RoleId,
-            PermissionId);
-
-        // Assert
-        var result = Assert.IsType<OkObjectResult>(actionResult);
-
-        Assert.Equal(StatusCodes.Status200OK, result.StatusCode);
-        Assert.NotNull(result.Value);
-
-        var messageProperty = result.Value.GetType().GetProperty("message");
-        Assert.NotNull(messageProperty);
-
-        var actualMessage = messageProperty.GetValue(result.Value) as string;
-    }
-
-    [Fact]
     public async Task AddPermissionToRole_Returns500_OnUnexpectedException()
     {
         // Arrange
@@ -952,7 +923,7 @@ public class RoleProjectControllerTests : IDisposable
             .ThrowsAsync(new Exception("db error"));
 
         // Act
-        var actionResult = await _roleOrganizationController.AddPermissionToRole(
+        var actionResult = await _roleProjectController.AddPermissionToRole(
             OrgId,
             ProjectId,
             RoleId,
@@ -979,7 +950,7 @@ public class RoleProjectControllerTests : IDisposable
             .ReturnsAsync(true);
 
         // Act
-        var actionResult = await _roleOrganizationController.AddPermissionToRole(
+        var actionResult = await _roleProjectController.AddPermissionToRole(
             OrgId,
             ProjectId,
             RoleId,
@@ -995,7 +966,7 @@ public class RoleProjectControllerTests : IDisposable
     public void AddPermissionToRole_HasHttpPost()
     {
         var method = GetControllerMethod(
-            nameof(RoleOrganizationController.AddPermissionToRole),
+            nameof(RoleProjectController.AddPermissionToRole),
             "organizationId",
             "roleId",
             "permissionId");
@@ -1022,7 +993,7 @@ public class RoleProjectControllerTests : IDisposable
             .ReturnsAsync(true);
 
         // Act
-        var actionResult = await _roleOrganizationController.RemovePermissionFromRole(
+        var actionResult = await _roleProjectController.RemovePermissionFromRole(
             OrgId,
             ProjectId,
             RoleId,
@@ -1042,34 +1013,6 @@ public class RoleProjectControllerTests : IDisposable
     }
 
     [Fact]
-    public async Task RemovePermissionFromRole_Returns200_WithEmptyList()
-    {
-        // Arrange
-
-        _mockRoleBusiness
-            .Setup(b => b.RemovePermissionFromRole(RoleId, PermissionId, OrgId, ProjectId))
-            .ReturnsAsync(true);
-
-        // Act
-        var actionResult = await _roleOrganizationController.RemovePermissionFromRole(
-            OrgId,
-            ProjectId,
-            RoleId,
-            PermissionId);
-
-        // Assert
-        var result = Assert.IsType<OkObjectResult>(actionResult);
-
-        Assert.Equal(StatusCodes.Status200OK, result.StatusCode);
-        Assert.NotNull(result.Value);
-
-        var messageProperty = result.Value.GetType().GetProperty("message");
-        Assert.NotNull(messageProperty);
-
-        var actualMessage = messageProperty.GetValue(result.Value) as string;
-    }
-
-    [Fact]
     public async Task RemovePermissionFromRole_Returns500_OnUnexpectedException()
     {
         // Arrange
@@ -1078,7 +1021,7 @@ public class RoleProjectControllerTests : IDisposable
             .ThrowsAsync(new Exception("db error"));
 
         // Act
-        var actionResult = await _roleOrganizationController.RemovePermissionFromRole(
+        var actionResult = await _roleProjectController.RemovePermissionFromRole(
             OrgId,
             ProjectId,
             RoleId,
@@ -1105,7 +1048,7 @@ public class RoleProjectControllerTests : IDisposable
             .ReturnsAsync(true);
 
         // Act
-        var actionResult = await _roleOrganizationController.RemovePermissionFromRole(
+        var actionResult = await _roleProjectController.RemovePermissionFromRole(
             OrgId,
             ProjectId,
             RoleId,
@@ -1121,7 +1064,7 @@ public class RoleProjectControllerTests : IDisposable
     public void RemovePermissionFromRole_HasHttpDelete()
     {
         var method = GetControllerMethod(
-            nameof(RoleOrganizationController.RemovePermissionFromRole),
+            nameof(RoleProjectController.RemovePermissionFromRole),
             "organizationId",
             "roleId",
             "permissionId");
@@ -1148,7 +1091,7 @@ public class RoleProjectControllerTests : IDisposable
             .ReturnsAsync(true);
 
         // Act
-        var actionResult = await _roleOrganizationController.SetPermissionsForRole(
+        var actionResult = await _roleProjectController.SetPermissionsForRole(
             OrgId,
             ProjectId,
             RoleId,
@@ -1168,34 +1111,6 @@ public class RoleProjectControllerTests : IDisposable
     }
 
     [Fact]
-    public async Task SetPermissionsForRole_Returns200_WithEmptyList()
-    {
-        // Arrange
-
-        _mockRoleBusiness
-            .Setup(b => b.SetPermissionsForRole(RoleId, PermissionList, OrgId, ProjectId))
-            .ReturnsAsync(true);
-
-        // Act
-        var actionResult = await _roleOrganizationController.SetPermissionsForRole(
-            OrgId,
-            ProjectId,
-            RoleId,
-            PermissionList);
-
-        // Assert
-        var result = Assert.IsType<OkObjectResult>(actionResult);
-
-        Assert.Equal(StatusCodes.Status200OK, result.StatusCode);
-        Assert.NotNull(result.Value);
-
-        var messageProperty = result.Value.GetType().GetProperty("message");
-        Assert.NotNull(messageProperty);
-
-        var actualMessage = messageProperty.GetValue(result.Value) as string;
-    }
-
-    [Fact]
     public async Task SetPermissionsForRole_Returns500_OnUnexpectedException()
     {
         // Arrange
@@ -1204,7 +1119,7 @@ public class RoleProjectControllerTests : IDisposable
             .ThrowsAsync(new Exception("db error"));
 
         // Act
-        var actionResult = await _roleOrganizationController.SetPermissionsForRole(
+        var actionResult = await _roleProjectController.SetPermissionsForRole(
             OrgId,
             ProjectId,
             RoleId,
@@ -1231,7 +1146,7 @@ public class RoleProjectControllerTests : IDisposable
             .ReturnsAsync(true);
 
         // Act
-        var actionResult = await _roleOrganizationController.SetPermissionsForRole(
+        var actionResult = await _roleProjectController.SetPermissionsForRole(
             OrgId,
             ProjectId,
             RoleId,
@@ -1247,7 +1162,7 @@ public class RoleProjectControllerTests : IDisposable
     public void SetPermissionsForRole_HasHttpPut()
     {
         var method = GetControllerMethod(
-            nameof(RoleOrganizationController.SetPermissionsForRole),
+            nameof(RoleProjectController.SetPermissionsForRole),
             "organizationId",
             "roleId",
             "permissionIds");
@@ -1274,22 +1189,9 @@ public class RoleProjectControllerTests : IDisposable
         string methodName,
         params string[] parameterNames)
     {
-        return Assert.Single(typeof(RoleOrganizationController).GetMethods()
+        return Assert.Single(typeof(RoleProjectController).GetMethods()
             .Where(method => method.Name == methodName)
             .Where(method => parameterNames.All(parameterName =>
                 method.GetParameters().Any(parameter => parameter.Name == parameterName))));
-    }
-
-    private static string GetMessageFromResultValue(object? value)
-    {
-        Assert.NotNull(value);
-
-        var messageProperty = value.GetType().GetProperty("message");
-        Assert.NotNull(messageProperty);
-
-        var message = messageProperty.GetValue(value) as string;
-        Assert.NotNull(message);
-
-        return message;
     }
 }
