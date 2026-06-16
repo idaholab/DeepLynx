@@ -235,24 +235,30 @@ public class LatticeExtractionController : ControllerBase
     }
 
     /// <summary>
-    ///     Approve or reject a completed extraction
+    ///     Promote a selected subset of a completed (or partially promoted) extraction's staged items.
     /// </summary>
+    /// <remarks>
+    ///     The request body selects items by explicit id and/or by validation status
+    ///     (<c>valid</c> / <c>novel_discovery</c>). Promotion is strict: if a selected item depends on a
+    ///     class/record/relationship that is neither selected nor already promoted, the call fails with
+    ///     400 and lists the missing dependencies. Unselected items remain staged for a later round.
+    /// </remarks>
     /// <param name="organizationId">The ID of the organization.</param>
     /// <param name="projectId">The ID of the project.</param>
     /// <param name="extractionId">The extraction to promote.</param>
-    /// <param name="approve">True to promote all staged items; false to reject.</param>
+    /// <param name="request">The selection of staged items to promote.</param>
     [HttpPost("{extractionId:long}/promote", Name = "api_promote_extraction")]
     public async Task<IActionResult> PromoteExtraction(
         long organizationId,
         long projectId,
         long extractionId,
-        [FromQuery] bool approve)
+        [FromBody] PromoteExtractionRequestDto request)
     {
         try
         {
             var currentUserId = UserContextStorage.UserId;
             var result = await _latticeExtractionBusiness.PromoteExtraction(
-                currentUserId, organizationId, projectId, extractionId, approve);
+                currentUserId, organizationId, projectId, extractionId, request);
             return Ok(result);
         }
         catch (InvalidOperationException exc)
@@ -263,6 +269,45 @@ public class LatticeExtractionController : ControllerBase
         catch (Exception exc)
         {
             var message = $"An error occurred while promoting extraction {extractionId}: {exc}";
+            _logger.LogError(message);
+            return StatusCode(StatusCodes.Status500InternalServerError, message);
+        }
+    }
+
+    /// <summary>
+    ///     Reject a selected subset of an extraction's staged items, or every remaining item when
+    ///     <c>reject_all_remaining</c> is set.
+    /// </summary>
+    /// <remarks>
+    ///     The request body selects items by explicit id and/or validation status. Rejection is strict:
+    ///     if a rejected item has pending dependents (records/edges that rely on it) not included in the
+    ///     selection, the call fails with 400 and lists them. Rejected items are flagged and never
+    ///     promoted; items promoted in a prior round are untouched.
+    /// </remarks>
+    /// <param name="organizationId">The ID of the organization.</param>
+    /// <param name="projectId">The ID of the project.</param>
+    /// <param name="extractionId">The extraction to reject items from.</param>
+    /// <param name="request">The selection of staged items to reject.</param>
+    [HttpPost("{extractionId:long}/reject", Name = "api_reject_extraction")]
+    public async Task<IActionResult> RejectExtraction(
+        long organizationId,
+        long projectId,
+        long extractionId,
+        [FromBody] RejectExtractionRequestDto request)
+    {
+        try
+        {
+            var result = await _latticeExtractionBusiness.RejectExtraction(extractionId, request);
+            return Ok(result);
+        }
+        catch (InvalidOperationException exc)
+        {
+            _logger.LogWarning(exc.Message);
+            return BadRequest(exc.Message);
+        }
+        catch (Exception exc)
+        {
+            var message = $"An error occurred while rejecting extraction {extractionId}: {exc}";
             _logger.LogError(message);
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
