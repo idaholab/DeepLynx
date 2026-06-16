@@ -153,8 +153,16 @@ public class QueryBusiness : IQueryBusiness
 
                         if (jsonbColumns.Contains(query.Filter.ToLower()))
                         {
-                            condition = $"jsonb_pretty(qr.{query.Filter}) ILIKE @{paramName}";
-                            parameters.Add(new NpgsqlParameter(paramName, $"%{query.Value}%"));
+                            if (query.Filter.ToLower() == "tags")
+                            {
+                                condition = $"EXISTS (SELECT 1 FROM jsonb_array_elements(qr.{query.Filter}) elem WHERE elem->>'name' = @{paramName})";
+                                parameters.Add(new NpgsqlParameter(paramName, query.Value));
+                            }
+                            else
+                            {
+                                condition = $"jsonb_pretty(qr.{query.Filter}) ILIKE @{paramName}";
+                                parameters.Add(new NpgsqlParameter(paramName, $"%{query.Value}%"));
+                            }
                         }
                         else
                         {
