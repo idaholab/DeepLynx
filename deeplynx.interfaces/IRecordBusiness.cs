@@ -26,14 +26,16 @@ public interface IRecordBusiness
 
     Task<RecordResponseDto> CreateRecord(
         long currentUserId, long organizationId, long projectId, long dataSourceId, CreateRecordRequestDto dto, 
-        List<long>? sensitivityLabelIds = null, bool embedded = false);
+        List<long>? sensitivityLabelIds = null, bool embedded = false,  bool isSysAdmin = false, bool isOrgAdmin = false,
+        bool isProjectAdmin = false);
 
     Task<List<RecordResponseDto>> BulkCreateRecords(
         long currentUserId, long organizationId, long projectId, long dataSourceId, List<CreateRecordRequestDto> dtos, List<long>? sensitivityLabelIds = null,
         bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false);
 
     Task<RecordResponseDto> UpdateRecord(
-        long currentUserId, long organizationId, long projectId, long recordId, UpdateRecordRequestDto dto);
+        long currentUserId, long organizationId, long projectId, long recordId, UpdateRecordRequestDto dto, bool isSysAdmin = false, bool isOrgAdmin = false,
+        bool isProjectAdmin = false);
 
     Task<bool> DeleteRecord(long currentUserId, long organizationId, long projectId, long recordId);
     Task<bool> ArchiveRecord(long currentUserId, long organizationId, long projectId, long recordId);
