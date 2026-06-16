@@ -260,28 +260,14 @@ public class QueryBusiness : IQueryBusiness
             // Execute the query with parameters
             var queryRecordResults = _context.QueryRecords.FromSqlRaw(sql, parameters.ToArray());
 
+            var authorizedDownloadLabels = await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
+                currentUserId,
+                organizationId,
+                projectIds,
+                "download file");
+
             return await queryRecordResults
-                .Select(r => new QueryRecordViewResponseDto
-                {
-                    Id = r.Id,
-                    Uri = r.Uri,
-                    Properties = r.Properties,
-                    OriginalId = r.OriginalId,
-                    Name = r.Name,
-                    Description = r.Description,
-                    ClassId = r.ClassId,
-                    ClassName = r.ClassName,
-                    DataSourceId = r.DataSourceId,
-                    DataSourceName = r.DataSourceName,
-                    ObjectStorageId = r.ObjectStorageId,
-                    ObjectStorageName = r.ObjectStorageName,
-                    ProjectId = r.ProjectId,
-                    ProjectName = r.ProjectName,
-                    Tags = r.Tags,
-                    LastUpdatedBy = r.LastUpdatedBy,
-                    LastUpdatedAt = r.LastUpdatedAt,
-                    IsArchived = r.IsArchived
-                }).ToListAsync();
+                .Select(r => QueryRecordToResponse(r, authorizedDownloadLabels, isSysAdmin, isOrgAdmin, isProjectAdmin)).ToListAsync();
         }
         catch (PostgresException ex) when (ex.SqlState == "42703") // undefined_column
         {
@@ -420,28 +406,14 @@ public class QueryBusiness : IQueryBusiness
         var queryRecordsResults =
             _context.QueryRecords.FromSqlRaw(sql, parameters.ToArray());
 
+        var authorizedDownloadLabels = await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
+            currentUserId,
+            organizationId,
+            projectIds,
+            "download file");
+
         return await queryRecordsResults
-            .Select(r => new QueryRecordViewResponseDto
-            {
-                Id = r.Id,
-                Uri = r.Uri,
-                Properties = r.Properties,
-                OriginalId = r.OriginalId,
-                Name = r.Name,
-                Description = r.Description,
-                ClassId = r.ClassId,
-                ClassName = r.ClassName,
-                DataSourceId = r.DataSourceId,
-                DataSourceName = r.DataSourceName,
-                ObjectStorageId = r.ObjectStorageId,
-                ObjectStorageName = r.ObjectStorageName,
-                ProjectId = r.ProjectId,
-                ProjectName = r.ProjectName,
-                Tags = r.Tags,
-                LastUpdatedBy = r.LastUpdatedBy,
-                LastUpdatedAt = r.LastUpdatedAt,
-                IsArchived = r.IsArchived
-            }).ToListAsync();
+            .Select(r => QueryRecordToResponse(r, authorizedDownloadLabels, isSysAdmin, isOrgAdmin, isProjectAdmin)).ToListAsync();
     }
 
     /// <summary>
@@ -480,7 +452,13 @@ public class QueryBusiness : IQueryBusiness
 
         var records = await query.ToListAsync();
 
-        return records.Select(r => QueryRecordToResponse(r));
+        var authorizedDownloadLabels = await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
+            currentUserId,
+            organizationId,
+            projectIds,
+            "download file");
+
+        return records.Select(r => QueryRecordToResponse(r, authorizedDownloadLabels, isSysAdmin, isOrgAdmin, isProjectAdmin));
     }
 
     /// <summary>
@@ -528,15 +506,32 @@ public class QueryBusiness : IQueryBusiness
             _ => query.OrderByDescending(r => r.LastUpdatedAt).ThenBy(r => r.Id), // Sorts date by default
         };
 
-        return await Paginator.Paginate(paginated, query, r => QueryRecordToResponse(r));
+        var authorizedDownloadLabels = await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
+            currentUserId,
+            organizationId,
+            projectId,
+            "download file");
+
+        return await Paginator.Paginate(
+            paginated,
+            query,
+            r => QueryRecordToResponse(r, authorizedDownloadLabels, isSysAdmin, isOrgAdmin, isProjectAdmin));
     }
 
-    static private QueryRecordViewResponseDto QueryRecordToResponse(QueryRecord r)
+    static private QueryRecordViewResponseDto QueryRecordToResponse(
+        QueryRecord r, List<long> authorizedDownloadLabels, bool isSysAdmin, bool isOrgAdmin, bool isProjectAdmin)
     {
         return new QueryRecordViewResponseDto
         {
             Id = r.Id,
-            Uri = r.Uri,
+            Uri = ExposeUriHelper.CanExposeUri(
+                r,
+                authorizedDownloadLabels,
+                isSysAdmin,
+                isOrgAdmin,
+                isProjectAdmin)
+                    ? r.Uri
+                    : null,
             Properties = r.Properties,
             OriginalId = r.OriginalId,
             Name = r.Name,
@@ -547,6 +542,7 @@ public class QueryBusiness : IQueryBusiness
             ProjectId = r.ProjectId,
             ProjectName = r.ProjectName,
             Tags = r.Tags,
+            Labels = r.Labels,
             Description = r.Description,
             LastUpdatedBy = r.LastUpdatedBy,
             IsArchived = r.IsArchived,
@@ -594,27 +590,13 @@ public class QueryBusiness : IQueryBusiness
 
         var records = await recordQuery.ToListAsync();
 
+        var authorizedDownloadLabels = await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
+            currentUserId,
+            organizationId,
+            projects,
+            "download file");
+
         return records
-            .Select(r => new QueryRecordViewResponseDto
-            {
-                Id = r.Id,
-                Uri = r.Uri,
-                Properties = r.Properties,
-                OriginalId = r.OriginalId,
-                Name = r.Name,
-                Description = r.Description,
-                ClassId = r.ClassId,
-                ClassName = r.ClassName,
-                DataSourceId = r.DataSourceId,
-                DataSourceName = r.DataSourceName,
-                ObjectStorageId = r.ObjectStorageId,
-                ObjectStorageName = r.ObjectStorageName,
-                ProjectId = r.ProjectId,
-                ProjectName = r.ProjectName,
-                Tags = r.Tags,
-                LastUpdatedBy = r.LastUpdatedBy,
-                LastUpdatedAt = r.LastUpdatedAt,
-                IsArchived = r.IsArchived
-            });
+            .Select(r => QueryRecordToResponse(r, authorizedDownloadLabels, isSysAdmin, isOrgAdmin, isProjectAdmin));
     }
 }
