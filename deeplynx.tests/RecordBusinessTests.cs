@@ -1304,6 +1304,46 @@ public class RecordBusinessTests : IntegrationTestBase
     }
     
     [Fact]
+    public async Task BulkCreateRecords_ValidData_LongNames()
+    {
+        // Arrange
+        var records = new List<CreateRecordRequestDto>
+        {
+            new()
+            {
+                Name = "A name that is five hundred characters long a name that is five hundred characters long a name that is five hundred characters long a name that is five hundred characters long a name that is five hundred characters long a name that is five hundred characters long a name that is five hundred characters long a name that is five hundred characters long a name that is five hundred characters long a name that is five hundred characters long a name that is five hundred characters long a name that is f",
+                Description = "Long name 1 Description",
+                ObjectStorageId = osid,
+                OriginalId = "br1",
+                Properties = (JsonObject)JsonNode.Parse(JsonSerializer.Serialize(new { TestProp = "Value1" }))!
+            },
+            new()
+            {
+                Name = "A name that is just over one hundred characters long a name that is just over one hundred characters long",
+                Description = "Long name 2 Description",
+                ObjectStorageId = osid,
+                OriginalId = "br2",
+                Properties = (JsonObject)JsonNode.Parse(JsonSerializer.Serialize(new { TestProp = "Value2" }))!
+            }
+        };
+    
+        // Act
+        var result = await _recordBusiness.BulkCreateRecords(uid, organizationId, pid, did, records);
+    
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(2, result.Count());
+        Assert.True(result.All(r =>
+            r.LastUpdatedBy == uid && !r.IsArchived && r.DataSourceId == did && r.ProjectId == pid));
+        Assert.Contains(result, r => r.Name == "A name that is five hundred characters long a name that is five hundred characters long a name that is five hundred characters long a name that is five hundred characters long a name that is five hundred characters long a name that is five hundred characters long a name that is five hundred characters long a name that is five hundred characters long a name that is five hundred characters long a name that is five hundred characters long a name that is five hundred characters long a name that is f");
+        Assert.Contains(result, r => r.Name == "A name that is just over one hundred characters long a name that is just over one hundred characters long");
+        
+        // Ensure that a record create event was logged
+        var eventList = await Context.Events.ToListAsync();
+        Assert.Single(eventList); // One event is logged with the total bulk count in the properties
+    }
+    
+    [Fact]
     public async Task BulkCreateRecords_WithLabelsAndTags_CreatesMultipleRecordsWithLabelsAndTags()
     {
         // Arrange
@@ -3456,6 +3496,790 @@ public class RecordBusinessTests : IntegrationTestBase
 
         // Assert - Both records should be counted regardless of file size
         Assert.True(count >= 2);
+    }
+
+    [Fact]
+    public async Task GetRecord_ReturnsUriOnlyWhenUserCanDownload()
+    {
+        // Arrange
+        var adminUser = new User
+        {
+            Name = "Admin",
+            Email = $"admin-{Guid.NewGuid()}@test.com",
+            IsSysAdmin = true,
+            IsActive = true
+        };
+
+        var restrictedUser = new User
+        {
+            Name = "Restricted",
+            Email = $"restricted-{Guid.NewGuid()}@test.com",
+            IsSysAdmin = false,
+            IsActive = true
+        };
+
+        Context.Users.Add(adminUser);
+        Context.Users.Add(restrictedUser);
+        await Context.SaveChangesAsync();
+
+        var label = new SensitivityLabel
+        {
+            Name = $"Test Label {Guid.NewGuid()}",
+            Description = "Test label for download permission",
+            OrganizationId = organizationId,
+            ProjectId = pid,
+            LastUpdatedBy = adminUser.Id,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),
+            IsArchived = false
+        };
+
+        Context.SensitivityLabels.Add(label);
+        await Context.SaveChangesAsync();
+
+        var permission = new Permission
+        {
+            Name = $"Download File Permission {Guid.NewGuid()}",
+            Description = "Allows file download for this label",
+            Action = "download file",
+            LabelId = label.Id,
+            OrganizationId = organizationId,
+            ProjectId = pid,
+            LastUpdatedBy = adminUser.Id,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),
+            IsArchived = false,
+            IsDefault = false
+        };
+
+        var role = new Role
+        {
+            Name = $"Download Role {Guid.NewGuid()}",
+            Description = "Role with download file permission",
+            OrganizationId = organizationId,
+            ProjectId = pid,
+            LastUpdatedBy = adminUser.Id,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),
+            IsArchived = false,
+            Permissions = new List<Permission> { permission }
+        };
+
+        Context.Roles.Add(role);
+        await Context.SaveChangesAsync();
+
+        var projectMember = new ProjectMember
+        {
+            UserId = adminUser.Id,
+            ProjectId = pid,
+            RoleId = role.Id
+        };
+
+        Context.ProjectMembers.Add(projectMember);
+        await Context.SaveChangesAsync();
+
+        var expectedUri = $"../data/test/{Guid.NewGuid()}_protected-file.txt";
+
+        var record = new Record
+        {
+            OrganizationId = organizationId,
+            ProjectId = pid,
+            DataSourceId = did,
+            ClassId = cid,
+            Name = "Protected file record",
+            Description = "Protected file record",
+            Uri = expectedUri,
+            Properties = "{}",
+            OriginalId = Guid.NewGuid().ToString(),
+            LastUpdatedBy = adminUser.Id,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),
+            IsArchived = false,
+            FileType = "txt",
+            FileSize = 1,
+            Labels = new List<SensitivityLabel> { label }
+        };
+
+        Context.Records.Add(record);
+        await Context.SaveChangesAsync();
+
+        // Act
+        var adminResult = await _recordBusiness.GetRecord(
+            adminUser.Id,
+            organizationId,
+            pid,
+            record.Id,
+            hideArchived: true);
+
+        var restrictedUserResult = await _recordBusiness.GetRecord(
+            restrictedUser.Id,
+            organizationId,
+            pid,
+            record.Id,
+            hideArchived: true);
+
+        // Assert
+        Assert.Equal(expectedUri, adminResult.Uri);
+        Assert.Null(restrictedUserResult.Uri);
+    }
+    
+    [Fact]
+    public async Task UpdateRecord_OnlyAllowsUriUpdateWhenUserCanUploadForLabel()
+    {
+        // Arrange
+        var adminUser = new User
+        {
+            Name = "Admin",
+            Email = $"admin-{Guid.NewGuid()}@test.com",
+            IsSysAdmin = true,
+            IsActive = true
+        };
+
+        var restrictedUser = new User
+        {
+            Name = "Restricted",
+            Email = $"restricted-{Guid.NewGuid()}@test.com",
+            IsSysAdmin = false,
+            IsActive = true
+        };
+
+        Context.Users.Add(adminUser);
+        Context.Users.Add(restrictedUser);
+        await Context.SaveChangesAsync();
+
+        var label = new SensitivityLabel
+        {
+            Name = $"Test Label {Guid.NewGuid()}",
+            Description = "Test label for upload permission",
+            OrganizationId = organizationId,
+            ProjectId = pid,
+            LastUpdatedBy = adminUser.Id,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),
+            IsArchived = false
+        };
+
+        Context.SensitivityLabels.Add(label);
+        await Context.SaveChangesAsync();
+
+        var uploadPermission = new Permission
+        {
+            Name = $"Upload File Permission {Guid.NewGuid()}",
+            Description = "Allows file upload for this label",
+            Action = "update file",
+            LabelId = label.Id,
+            OrganizationId = organizationId,
+            ProjectId = pid,
+            LastUpdatedBy = adminUser.Id,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),
+            IsArchived = false,
+            IsDefault = false
+        };
+
+        var downloadPermission = new Permission
+        {
+            Name = $"Download File Permission {Guid.NewGuid()}",
+            Description = "Allows file download for this label",
+            Action = "download file",
+            LabelId = label.Id,
+            OrganizationId = organizationId,
+            ProjectId = pid,
+            LastUpdatedBy = adminUser.Id,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),
+            IsArchived = false,
+            IsDefault = false
+        };
+
+        var role = new Role
+        {
+            Name = $"Upload Download Role {Guid.NewGuid()}",
+            Description = "Role with upload and download file permission",
+            OrganizationId = organizationId,
+            ProjectId = pid,
+            LastUpdatedBy = adminUser.Id,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),
+            IsArchived = false,
+            Permissions = new List<Permission> { uploadPermission, downloadPermission }
+        };
+
+        Context.Roles.Add(role);
+        await Context.SaveChangesAsync();
+
+        Context.ProjectMembers.Add(new ProjectMember
+        {
+            UserId = adminUser.Id,
+            ProjectId = pid,
+            RoleId = role.Id
+        });
+
+        await Context.SaveChangesAsync();
+
+        var originalUri = $"../data/test/{Guid.NewGuid()}_original-file.txt";
+
+        var record = new Record
+        {
+            OrganizationId = organizationId,
+            ProjectId = pid,
+            DataSourceId = did,
+            ClassId = cid,
+            Name = "Protected file record",
+            Description = "Protected file record",
+            Uri = originalUri,
+            Properties = "{}",
+            OriginalId = Guid.NewGuid().ToString(),
+            LastUpdatedBy = adminUser.Id,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),
+            IsArchived = false,
+            FileType = "txt",
+            FileSize = 1,
+            Labels = new List<SensitivityLabel> { label }
+        };
+
+        Context.Records.Add(record);
+        await Context.SaveChangesAsync();
+
+        var restrictedUpdateDto = new UpdateRecordRequestDto
+        {
+            Uri = $"../data/test/{Guid.NewGuid()}_restricted-update.txt",
+            Properties = new JsonObject()
+        };
+
+        // Act / Assert
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            _recordBusiness.UpdateRecord(
+                restrictedUser.Id,
+                organizationId,
+                pid,
+                record.Id,
+                restrictedUpdateDto));
+
+        var adminUpdateUri = $"../data/test/{Guid.NewGuid()}_admin-update.txt";
+
+        var adminUpdateDto = new UpdateRecordRequestDto
+        {
+            Uri = adminUpdateUri,
+            Properties = new JsonObject()
+        };
+
+        var adminResult = await _recordBusiness.UpdateRecord(
+            adminUser.Id,
+            organizationId,
+            pid,
+            record.Id,
+            adminUpdateDto);
+
+        Assert.Equal(adminUpdateUri, adminResult.Uri);
+    }
+
+    [Fact]
+    public async Task GetAllRecords_ReturnsUriOnlyWhenUserCanDownload()
+    {
+        var (adminUser, restrictedUser, label) =
+            await SeedUriSecurityUsersAndLabel("download file");
+
+        var record = await SeedLabeledRecord(adminUser, label);
+
+        var adminResults = await _recordBusiness.GetAllRecords(
+            adminUser.Id, organizationId, pid, did, hideArchived: true);
+
+        var restrictedResults = await _recordBusiness.GetAllRecords(
+            restrictedUser.Id, organizationId, pid, did, hideArchived: true);
+
+        Assert.Equal(record.Uri, adminResults.Single(r => r.Id == record.Id).Uri);
+        Assert.Null(restrictedResults.Single(r => r.Id == record.Id).Uri);
+    }
+
+    [Fact]
+    public async Task GetAllRecordsPaginated_ReturnsUriOnlyWhenUserCanDownload()
+    {
+        var (adminUser, restrictedUser, label) =
+            await SeedUriSecurityUsersAndLabel("download file");
+
+        var record = await SeedLabeledRecord(adminUser, label);
+
+        var queryDto = new RecordQueryRequestDto
+        {
+            DataSourceId = did,
+            PageNumber = 1,
+            PageSize = 25
+        };
+
+        var adminResults = await _recordBusiness.GetAllRecordsPaginated(
+            adminUser.Id, organizationId, pid, hideArchived: true, queryDto);
+
+        var restrictedResults = await _recordBusiness.GetAllRecordsPaginated(
+            restrictedUser.Id, organizationId, pid, hideArchived: true, queryDto);
+
+        Assert.Equal(record.Uri, adminResults.Items.Single(r => r.Id == record.Id).Uri);
+        Assert.Null(restrictedResults.Items.Single(r => r.Id == record.Id).Uri);
+    }
+
+    [Fact]
+    public async Task GetRecordsByTags_ReturnsUriOnlyWhenUserCanDownload()
+    {
+        var (adminUser, restrictedUser, label) =
+            await SeedUriSecurityUsersAndLabel("download file");
+
+        var tagName = $"uri-test-tag-{Guid.NewGuid()}";
+        var record = await SeedLabeledRecord(adminUser, label, tagName);
+        var tagId = record.Tags.Single().Id;
+
+        var adminResults = await _recordBusiness.GetRecordsByTags(
+            adminUser.Id, organizationId, pid, new[] { tagId }, hideArchived: true);
+
+        var restrictedResults = await _recordBusiness.GetRecordsByTags(
+            restrictedUser.Id, organizationId, pid, new[] { tagId }, hideArchived: true);
+
+        Assert.Equal(record.Uri, adminResults.Single(r => r.Id == record.Id).Uri);
+        Assert.Null(restrictedResults.Single(r => r.Id == record.Id).Uri);
+    }
+
+    [Fact]
+    public async Task GetRecordsByOriginalId_ReturnsUriOnlyWhenUserCanDownload()
+    {
+        var (adminUser, restrictedUser, label) =
+            await SeedUriSecurityUsersAndLabel("download file");
+
+        var record = await SeedLabeledRecord(adminUser, label);
+
+        var adminResults = await _recordBusiness.GetRecordsByOriginalId(
+            adminUser.Id, organizationId, pid, did, new List<string> { record.OriginalId }, hideArchived: true);
+
+        var restrictedResults = await _recordBusiness.GetRecordsByOriginalId(
+            restrictedUser.Id, organizationId, pid, did, new List<string> { record.OriginalId }, hideArchived: true);
+
+        Assert.Equal(record.Uri, adminResults.Single().Uri);
+        Assert.Null(restrictedResults.Single().Uri);
+    }
+
+    [Fact]
+    public async Task CreateRecord_OnlyAllowsUriCreateWhenUserCanUploadForLabel()
+    {
+        var (adminUser, restrictedUser, label) =
+            await SeedUriSecurityUsersAndLabel("upload file", "download file");
+
+        var restrictedDto = new CreateRecordRequestDto
+        {
+            Name = "Restricted create URI test",
+            Description = "Restricted create URI test",
+            Uri = $"../data/test/{Guid.NewGuid()}_restricted-create.txt",
+            Properties = new JsonObject(),
+            OriginalId = Guid.NewGuid().ToString(),
+            ClassId = cid,
+            FileType = "txt",
+            FileSize = 1
+        };
+
+        await Assert.ThrowsAsync<DependencyDeletionException>(() =>
+            _recordBusiness.CreateRecord(
+                restrictedUser.Id,
+                organizationId,
+                pid,
+                did,
+                restrictedDto,
+                new List<long> { label.Id }));
+
+        var adminDto = new CreateRecordRequestDto
+        {
+            Name = "Admin create URI test",
+            Description = "Admin create URI test",
+            Uri = $"../data/test/{Guid.NewGuid()}_admin-create.txt",
+            Properties = new JsonObject(),
+            OriginalId = Guid.NewGuid().ToString(),
+            ClassId = cid,
+            FileType = "txt",
+            FileSize = 1
+        };
+
+        var result = await _recordBusiness.CreateRecord(
+            adminUser.Id,
+            organizationId,
+            pid,
+            did,
+            adminDto,
+            new List<long> { label.Id });
+
+        Assert.Equal(adminDto.Uri, result.Uri);
+    }
+
+    [Fact]
+    public async Task BulkCreateRecords_OnlyAllowsUriCreateWhenUserCanUploadForLabel()
+    {
+        var (adminUser, restrictedUser, label) =
+            await SeedUriSecurityUsersAndLabel("upload file", "download file");
+
+        var restrictedRecords = new List<CreateRecordRequestDto>
+        {
+            new()
+            {
+                Name = "Restricted bulk create URI test",
+                Description = "Restricted bulk create URI test",
+                Uri = $"../data/test/{Guid.NewGuid()}_restricted-bulk-create.txt",
+                Properties = new JsonObject(),
+                OriginalId = Guid.NewGuid().ToString(),
+                ClassId = cid,
+                FileType = "txt",
+                FileSize = 1
+            }
+        };
+
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            _recordBusiness.BulkCreateRecords(
+                restrictedUser.Id,
+                organizationId,
+                pid,
+                did,
+                restrictedRecords,
+                new List<long> { label.Id }));
+
+        var adminUri = $"../data/test/{Guid.NewGuid()}_admin-bulk-create.txt";
+
+        var adminRecords = new List<CreateRecordRequestDto>
+        {
+            new()
+            {
+                Name = "Admin bulk create URI test",
+                Description = "Admin bulk create URI test",
+                Uri = adminUri,
+                Properties = new JsonObject(),
+                OriginalId = Guid.NewGuid().ToString(),
+                ClassId = cid,
+                FileType = "txt",
+                FileSize = 1
+            }
+        };
+
+        var results = await _recordBusiness.BulkCreateRecords(
+            adminUser.Id,
+            organizationId,
+            pid,
+            did,
+            adminRecords,
+            new List<long> { label.Id });
+
+        Assert.Equal(adminUri, results.Single().Uri);
+    }
+
+    [Fact]
+    public async Task CreateRecord_AllowsSysAdminToCreateUriWithoutUploadFilePermission()
+    {
+        var adminUser = new User
+        {
+            Name = "Admin",
+            Email = $"admin-{Guid.NewGuid()}@test.com",
+            IsSysAdmin = true,
+            IsActive = true
+        };
+
+        Context.Users.Add(adminUser);
+        await Context.SaveChangesAsync();
+
+        var label = new SensitivityLabel
+        {
+            Name = $"Test Label {Guid.NewGuid()}",
+            Description = "Test label",
+            OrganizationId = organizationId,
+            ProjectId = pid,
+            LastUpdatedBy = adminUser.Id,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),
+            IsArchived = false
+        };
+
+        Context.SensitivityLabels.Add(label);
+        await Context.SaveChangesAsync();
+
+        var uri = $"../data/test/{Guid.NewGuid()}_admin-create.txt";
+
+        var dto = new CreateRecordRequestDto
+        {
+            Name = "Admin create URI test",
+            Description = "Admin create URI test",
+            Uri = uri,
+            Properties = new JsonObject(),
+            OriginalId = Guid.NewGuid().ToString(),
+            ClassId = cid,
+            FileType = "txt",
+            FileSize = 1
+        };
+
+        var result = await _recordBusiness.CreateRecord(
+            adminUser.Id,
+            organizationId,
+            pid,
+            did,
+            dto,
+            new List<long> { label.Id },
+            embedded: false,
+            isSysAdmin: true);
+
+        Assert.Equal(uri, result.Uri);
+    }
+
+    [Fact]
+    public async Task BulkCreateRecords_AllowsSysAdminToCreateUriWithoutUploadFilePermission()
+    {
+        var adminUser = new User
+        {
+            Name = "Admin",
+            Email = $"admin-{Guid.NewGuid()}@test.com",
+            IsSysAdmin = true,
+            IsActive = true
+        };
+
+        Context.Users.Add(adminUser);
+        await Context.SaveChangesAsync();
+
+        var label = new SensitivityLabel
+        {
+            Name = $"Test Label {Guid.NewGuid()}",
+            Description = "Test label",
+            OrganizationId = organizationId,
+            ProjectId = pid,
+            LastUpdatedBy = adminUser.Id,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),
+            IsArchived = false
+        };
+
+        Context.SensitivityLabels.Add(label);
+        await Context.SaveChangesAsync();
+
+        var uri = $"../data/test/{Guid.NewGuid()}_admin-bulk-create.txt";
+
+        var records = new List<CreateRecordRequestDto>
+        {
+            new()
+            {
+                Name = "Admin bulk create URI test",
+                Description = "Admin bulk create URI test",
+                Uri = uri,
+                Properties = new JsonObject(),
+                OriginalId = Guid.NewGuid().ToString(),
+                ClassId = cid,
+                FileType = "txt",
+                FileSize = 1
+            }
+        };
+
+        var results = await _recordBusiness.BulkCreateRecords(
+            adminUser.Id,
+            organizationId,
+            pid,
+            did,
+            records,
+            new List<long> { label.Id },
+            isSysAdmin: true);
+
+        Assert.Single(results);
+        Assert.Equal(uri, results.Single().Uri);
+    }
+
+    [Fact]
+    public async Task UpdateRecord_AllowsSysAdminToUpdateUriWithoutUpdateFilePermission()
+    {
+        var adminUser = new User
+        {
+            Name = "Admin",
+            Email = $"admin-{Guid.NewGuid()}@test.com",
+            IsSysAdmin = true,
+            IsActive = true
+        };
+
+        Context.Users.Add(adminUser);
+        await Context.SaveChangesAsync();
+
+        var label = new SensitivityLabel
+        {
+            Name = $"Test Label {Guid.NewGuid()}",
+            Description = "Test label",
+            OrganizationId = organizationId,
+            ProjectId = pid,
+            LastUpdatedBy = adminUser.Id,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),
+            IsArchived = false
+        };
+
+        Context.SensitivityLabels.Add(label);
+        await Context.SaveChangesAsync();
+
+        var originalUri = $"../data/test/{Guid.NewGuid()}_original.txt";
+
+        var record = new Record
+        {
+            OrganizationId = organizationId,
+            ProjectId = pid,
+            DataSourceId = did,
+            ClassId = cid,
+            Name = "Admin update URI test",
+            Description = "Admin update URI test",
+            Uri = originalUri,
+            Properties = "{}",
+            OriginalId = Guid.NewGuid().ToString(),
+            LastUpdatedBy = adminUser.Id,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),
+            IsArchived = false,
+            FileType = "txt",
+            FileSize = 1,
+            Labels = new List<SensitivityLabel> { label }
+        };
+
+        Context.Records.Add(record);
+        await Context.SaveChangesAsync();
+
+        var updatedUri = $"../data/test/{Guid.NewGuid()}_updated.txt";
+
+        var dto = new UpdateRecordRequestDto
+        {
+            Uri = updatedUri,
+            Properties = new JsonObject()
+        };
+
+        var result = await _recordBusiness.UpdateRecord(
+            adminUser.Id,
+            organizationId,
+            pid,
+            record.Id,
+            dto,
+            isSysAdmin: true);
+
+        Assert.Equal(updatedUri, result.Uri);
+    }
+
+    private async Task<(User adminUser, User restrictedUser, SensitivityLabel label)>
+        SeedUriSecurityUsersAndLabel(params string[] permissionActions)
+{
+    var adminUser = new User
+    {
+        Name = "Admin",
+        Email = $"admin-{Guid.NewGuid()}@test.com",
+        IsSysAdmin = true,
+        IsActive = true
+    };
+
+    var restrictedUser = new User
+    {
+        Name = "Restricted",
+        Email = $"restricted-{Guid.NewGuid()}@test.com",
+        IsSysAdmin = false,
+        IsActive = true
+    };
+
+    Context.Users.AddRange(adminUser, restrictedUser);
+    await Context.SaveChangesAsync();
+
+    var label = new SensitivityLabel
+    {
+        Name = $"Test Label {Guid.NewGuid()}",
+        Description = "Test label for URI permission",
+        OrganizationId = organizationId,
+        ProjectId = pid,
+        LastUpdatedBy = adminUser.Id,
+        LastUpdatedAt = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),
+        IsArchived = false
+    };
+
+    Context.SensitivityLabels.Add(label);
+    await Context.SaveChangesAsync();
+
+    var readPermission = new Permission
+    {
+        Name = $"Read Record Permission {Guid.NewGuid()}",
+        Description = "Allows record read for this label",
+        Action = "read record",
+        LabelId = label.Id,
+        OrganizationId = organizationId,
+        ProjectId = pid,
+        LastUpdatedBy = adminUser.Id,
+        LastUpdatedAt = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),
+        IsArchived = false,
+        IsDefault = false
+    };
+
+    var adminPermissions = permissionActions.Select(action => new Permission
+    {
+        Name = $"{action} Permission {Guid.NewGuid()}",
+        Description = $"Allows {action} for this label",
+        Action = action,
+        LabelId = label.Id,
+        OrganizationId = organizationId,
+        ProjectId = pid,
+        LastUpdatedBy = adminUser.Id,
+        LastUpdatedAt = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),
+        IsArchived = false,
+        IsDefault = false
+    }).ToList();
+
+    var adminRole = new Role
+    {
+        Name = $"Admin URI Role {Guid.NewGuid()}",
+        Description = "Role with URI permission",
+        OrganizationId = organizationId,
+        ProjectId = pid,
+        LastUpdatedBy = adminUser.Id,
+        LastUpdatedAt = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),
+        IsArchived = false,
+        Permissions = new List<Permission> { readPermission }.Concat(adminPermissions).ToList()
+    };
+
+    var restrictedRole = new Role
+    {
+        Name = $"Restricted URI Role {Guid.NewGuid()}",
+        Description = "Role with read permission only",
+        OrganizationId = organizationId,
+        ProjectId = pid,
+        LastUpdatedBy = adminUser.Id,
+        LastUpdatedAt = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),
+        IsArchived = false,
+        Permissions = new List<Permission> { readPermission }
+    };
+
+    Context.Roles.AddRange(adminRole, restrictedRole);
+    await Context.SaveChangesAsync();
+
+    Context.ProjectMembers.AddRange(
+        new ProjectMember { UserId = adminUser.Id, ProjectId = pid, RoleId = adminRole.Id },
+        new ProjectMember { UserId = restrictedUser.Id, ProjectId = pid, RoleId = restrictedRole.Id });
+
+    await Context.SaveChangesAsync();
+
+    return (adminUser, restrictedUser, label);
+}
+
+    private async Task<Record> SeedLabeledRecord(User user, SensitivityLabel label, string? tagName = null)
+    {
+        var record = new Record
+        {
+            OrganizationId = organizationId,
+            ProjectId = pid,
+            DataSourceId = did,
+            ClassId = cid,
+            Name = $"Protected file record {Guid.NewGuid()}",
+            Description = "Protected file record",
+            Uri = $"../data/test/{Guid.NewGuid()}_protected-file.txt",
+            Properties = "{}",
+            OriginalId = Guid.NewGuid().ToString(),
+            LastUpdatedBy = user.Id,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),
+            IsArchived = false,
+            FileType = "txt",
+            FileSize = 1,
+            Labels = new List<SensitivityLabel> { label }
+        };
+
+        if (tagName != null)
+        {
+            record.Tags = new List<Tag>
+            {
+                new()
+                {
+                    Name = tagName,
+                    OrganizationId = organizationId,
+                    ProjectId = pid,
+                    LastUpdatedBy = user.Id,
+                    LastUpdatedAt = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),
+                    IsArchived = false
+                }
+            };
+        }
+
+        Context.Records.Add(record);
+        await Context.SaveChangesAsync();
+
+        return record;
     }
 
     #endregion
