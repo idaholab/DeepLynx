@@ -10,6 +10,7 @@ import {
   RoleResponseDto,
   PermissionResponseDto,
   ProjectMemberResponseDto,
+  SensitivityLabelsDto,
 } from "@/app/(home)/types/responseDTOs";
 import { useLanguage } from "@/app/contexts/Language";
 import { useProjectSession } from "@/app/contexts/ProjectSessionProvider";
@@ -18,6 +19,8 @@ import ProjectRolesAndPermissions from "./roles_and_permissions/ProjectRolesAndP
 import DataSources from "./data_source/DataSourcesClient";
 import ProjectTagAndLabelManagementClient from "./tag_management/ProjectTagAndLabelManagementClient";
 import ProjectSettings from "./settings/ProjectSettings";
+import { getAllPermissions } from "@/app/lib/client_service/permission_services.client";
+import { getAllSensitivityLabelsProject } from "@/app/lib/client_service/sensitivity_labels_services.client";
 
 interface ProjectManagementProps {
   project: ProjectResponseDto | null;
@@ -38,6 +41,8 @@ const ProjectManagementClient = ({
   const { t } = useLanguage();
   const { project: sessionProject, setProject } = useProjectSession();
   const [editingProject, setEditingProject] = useState(project); 
+  const [labels, setLabels] = useState<SensitivityLabelsDto[]>();
+  const [permissions, setPermissions] = useState(projectPermissions);
 
   useEffect(() => {
     if (!editingProject?.id || !editingProject?.name) {
@@ -61,6 +66,21 @@ const ProjectManagementClient = ({
     setActiveTab(label);
   };
 
+  const refreshLabels = async () => {
+    try {
+      const updatedPermissions = await getAllPermissions(Number(project?.organizationId), Number(project?.id), undefined, true);
+      setPermissions(updatedPermissions);
+    } catch (e) {
+      console.error("getAllpermissionsServer failed: ", e);
+    }
+    try {
+      const dtoList: SensitivityLabelsDto[] = await getAllSensitivityLabelsProject(Number(project?.id));
+      setLabels(dtoList);
+    } catch (e) {
+      console.error("getAllSensitivityLabels failed: ", e);
+    }
+  }
+
   const tabData = [
     {
       label: t.translations.USERS,
@@ -77,7 +97,7 @@ const ProjectManagementClient = ({
       content: (
         <ProjectRolesAndPermissions
           initialRoles={projectRoles}
-          initialPermissions={projectPermissions}
+          initialPermissions={permissions}
           projectId={editingProject?.id as number}
         />
       ),
@@ -92,6 +112,8 @@ const ProjectManagementClient = ({
         <ProjectTagAndLabelManagementClient
           project={editingProject as ProjectResponseDto}
           orgTagsLocked={false}
+          initialLabels={labels}
+          refreshLabels={refreshLabels}
         />
       ),
     },
