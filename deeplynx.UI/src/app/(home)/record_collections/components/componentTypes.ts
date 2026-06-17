@@ -12,6 +12,8 @@ import {
   FacetOption,
   MetadataRow,
   NewCollectionSelectedRecord,
+  RecordMutationStatusById,
+  SelectionState,
 } from "./recordCollections.types";
 
 type StateSetter<T> = React.Dispatch<React.SetStateAction<T>>;
@@ -28,6 +30,9 @@ export type NewCollectionTabController = {
     setRecordsPerPage: (pageSize: number) => void;
     recordPageSizeOptions: number[];
     saving: boolean;
+    selectedRecordEnrichmentPending: boolean;
+    hasSelectedRecordEnrichmentFailures: boolean;
+    selectedRecordEnrichmentFailureCount: number;
     getSensitivityClass: (label: string) => string;
   };
   metadata: {
@@ -42,9 +47,8 @@ export type NewCollectionTabController = {
     newCollectionRecordSearchResults: QueryRecordViewResponseDto[];
     newCollectionRecordSearchLoading: boolean;
     visibleNewCollectionRecords: QueryRecordViewResponseDto[];
-    allVisibleNewCollectionRecordsSelected: boolean;
-    allRetrievedNewCollectionRecordsSelected: boolean;
-    someVisibleNewCollectionRecordsSelected: boolean;
+    visibleSelectionState: SelectionState;
+    retrievedSelectionState: SelectionState;
     newCollectionRecordPage: number;
     setNewCollectionRecordPage: StateSetter<number>;
     newCollectionRecordPageCount: number;
@@ -165,8 +169,7 @@ export type SelectedCollectionDetailsController = {
     onSearchRecords: () => void;
     editRecordResults: EditableRecordResult[];
     collectionRecordIds: Set<number>;
-    addingRecordIds: number[];
-    removingRecordIds: number[];
+    recordMutationStatusById: RecordMutationStatusById;
     onRemoveCollectionRecord: (recordId: number) => Promise<void>;
     onAddCollectionRecord: (recordId: number) => Promise<void>;
     onCancelSelectedCollectionEdit: () => Promise<void>;

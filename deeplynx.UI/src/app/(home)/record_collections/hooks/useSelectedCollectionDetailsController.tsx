@@ -12,7 +12,10 @@ import {
   COLLECTION_BADGE_DISPLAY_LIMIT,
   NEW_COLLECTION_RECORDS_PER_PAGE,
 } from "../components/recordCollections.constants";
-import { MetadataRow } from "../components/recordCollections.types";
+import {
+  MetadataRow,
+  RecordMutationStatusById,
+} from "../components/recordCollections.types";
 import { SelectedCollectionDetailsViewState } from "./useSelectedCollectionDetailsView";
 import { SelectedCollectionEditDerivedState } from "./useSelectedCollectionEditDerived";
 
@@ -62,8 +65,7 @@ type Params = {
     onSearchRecords: () => void;
   };
   recordMutations: {
-    addingRecordIds: number[];
-    removingRecordIds: number[];
+    recordMutationStatusById: RecordMutationStatusById;
     onRemoveCollectionRecord: (recordId: number) => Promise<void>;
     onAddCollectionRecord: (recordId: number) => Promise<void>;
   };
@@ -117,8 +119,7 @@ export function useSelectedCollectionDetailsController({
     onSearchRecords,
   },
   recordMutations: {
-    addingRecordIds,
-    removingRecordIds,
+    recordMutationStatusById,
     onRemoveCollectionRecord,
     onAddCollectionRecord,
   },
@@ -266,8 +267,7 @@ export function useSelectedCollectionDetailsController({
       onSearchRecords,
       editRecordResults,
       collectionRecordIds,
-      addingRecordIds,
-      removingRecordIds,
+      recordMutationStatusById,
       onRemoveCollectionRecord,
       onAddCollectionRecord,
       onCancelSelectedCollectionEdit,

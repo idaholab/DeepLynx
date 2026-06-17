@@ -68,18 +68,25 @@ const normalizeRecordCollectionsPage = (
     pageNumber?: number;
     pageSize?: number;
     totalCount?: number;
-    maxPageSize?: number;
+    totalPages?: number;
+    hasPrevious?: boolean;
+    hasNext?: boolean;
     Items?: RecordCollectionResponseDto[];
     PageNumber?: number;
     PageSize?: number;
     TotalCount?: number;
-    MaxPageSize?: number;
+    TotalPages?: number;
+    HasPrevious?: boolean;
+    HasNext?: boolean;
   };
 
   const items = page.items ?? page.Items;
   const pageNumber = page.pageNumber ?? page.PageNumber;
   const pageSize = page.pageSize ?? page.PageSize;
   const totalCount = page.totalCount ?? page.TotalCount;
+  const totalPages = page.totalPages ?? page.TotalPages;
+  const hasPrevious = page.hasPrevious ?? page.HasPrevious;
+  const hasNext = page.hasNext ?? page.HasNext;
 
   if (!Array.isArray(items)) {
     throw new Error(
@@ -90,10 +97,13 @@ const normalizeRecordCollectionsPage = (
   if (
     typeof pageNumber !== "number" ||
     typeof pageSize !== "number" ||
-    typeof totalCount !== "number"
+    typeof totalCount !== "number" ||
+    typeof totalPages !== "number" ||
+    typeof hasPrevious !== "boolean" ||
+    typeof hasNext !== "boolean"
   ) {
     throw new Error(
-      "Invalid record collections response: pageNumber, pageSize, and totalCount must be numbers",
+      "Invalid record collections response: pagination metadata is malformed",
     );
   }
 
@@ -102,7 +112,9 @@ const normalizeRecordCollectionsPage = (
     pageNumber,
     pageSize,
     totalCount,
-    maxPageSize: page.maxPageSize ?? page.MaxPageSize,
+    totalPages,
+    hasPrevious,
+    hasNext,
   };
 };
 

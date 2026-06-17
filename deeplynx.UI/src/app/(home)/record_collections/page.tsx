@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { PaginatedRecordCollectionsResponseDto } from "../types/responseDTOs";
 import { getAllRecordCollectionsServer } from "@/app/lib/server_service/record_collection_services.server";
+import { COLLECTIONS_DASHBOARD_PER_PAGE } from "./components/recordCollections.constants";
 
 export const metadata = { title: "Record Collections" };
 
@@ -46,11 +47,19 @@ export default async function Page() {
     pageNumber: 1,
     pageSize: 10,
     totalCount: 0,
+    totalPages: 0,
+    hasPrevious: false,
+    hasNext: false,
   };
 
   recordCollectionsPage = await getAllRecordCollectionsServer(
     Number(organizationId),
     Number(projectId),
+    {
+      pageNumber: 1,
+      pageSize: COLLECTIONS_DASHBOARD_PER_PAGE,
+      sort: "updatedDesc",
+    },
   );
 
   return (

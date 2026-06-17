@@ -28,6 +28,9 @@ export default function NewCollectionTabContent({
       setRecordsPerPage,
       recordPageSizeOptions,
       saving,
+      selectedRecordEnrichmentPending,
+      hasSelectedRecordEnrichmentFailures,
+      selectedRecordEnrichmentFailureCount,
       getSensitivityClass,
     },
     metadata: {
@@ -42,9 +45,8 @@ export default function NewCollectionTabContent({
       newCollectionRecordSearchResults,
       newCollectionRecordSearchLoading,
       visibleNewCollectionRecords,
-      allVisibleNewCollectionRecordsSelected,
-      allRetrievedNewCollectionRecordsSelected,
-      someVisibleNewCollectionRecordsSelected,
+      visibleSelectionState,
+      retrievedSelectionState,
       newCollectionRecordPage,
       setNewCollectionRecordPage,
       newCollectionRecordPageCount,
@@ -247,11 +249,11 @@ export default function NewCollectionTabContent({
                     <button
                       type="button"
                       className="btn btn-xs btn-outline"
-                      disabled={
-                        newCollectionRecordSearchLoading ||
-                        newCollectionRecordSearchResults.length === 0 ||
-                        allRetrievedNewCollectionRecordsSelected
-                      }
+                        disabled={
+                          newCollectionRecordSearchLoading ||
+                          newCollectionRecordSearchResults.length === 0 ||
+                          retrievedSelectionState === "all"
+                        }
                       onClick={() => void onSelectAllSearchedRecords()}
                     >
                       {t.translations.SELECT_ALL}
@@ -259,11 +261,11 @@ export default function NewCollectionTabContent({
                     <button
                       type="button"
                       className="btn btn-xs btn-outline"
-                      disabled={
-                        newCollectionRecordSearchLoading ||
-                        newCollectionRecordSearchResults.length === 0 ||
-                        !allRetrievedNewCollectionRecordsSelected
-                      }
+                        disabled={
+                          newCollectionRecordSearchLoading ||
+                          newCollectionRecordSearchResults.length === 0 ||
+                          retrievedSelectionState !== "all"
+                        }
                       onClick={onClearSelectedRecords}
                     >
                       {t.translations.RECORD_COLLECTIONS_UNSELECT_ALL}
@@ -301,12 +303,11 @@ export default function NewCollectionTabContent({
                           <input
                             type="checkbox"
                             className="checkbox checkbox-sm"
-                            checked={allVisibleNewCollectionRecordsSelected}
+                            checked={visibleSelectionState === "all"}
                             ref={(input) => {
                               if (input) {
                                 input.indeterminate =
-                                  !allVisibleNewCollectionRecordsSelected &&
-                                  someVisibleNewCollectionRecordsSelected;
+                                  visibleSelectionState === "some";
                               }
                             }}
                             onChange={() => void onToggleSelectAllVisibleRecords()}
@@ -401,6 +402,20 @@ export default function NewCollectionTabContent({
                 </div>
 
                 <div className="flex flex-wrap justify-end gap-2 self-end">
+                  {selectedRecordEnrichmentPending ? (
+                    <p className="w-full text-right text-sm text-base-content/70">
+                      {t.translations.RECORD_COLLECTIONS_WAIT_FOR_SELECTED_RECORD_METADATA}
+                    </p>
+                  ) : null}
+                  {!selectedRecordEnrichmentPending &&
+                  hasSelectedRecordEnrichmentFailures ? (
+                    <p className="w-full text-right text-sm text-error">
+                      {t.translations.RECORD_COLLECTIONS_SELECTED_RECORD_METADATA_INCOMPLETE.replace(
+                        "{count}",
+                        String(selectedRecordEnrichmentFailureCount),
+                      )}
+                    </p>
+                  ) : null}
                   <button
                     type="button"
                     className="btn btn-ghost btn-sm"
@@ -512,8 +527,8 @@ export default function NewCollectionTabContent({
                   <button
                     type="button"
                     className="btn btn-primary btn-sm"
-                    disabled={saving}
-                    onClick={onGoToModifyStep}
+                    disabled={saving || selectedRecordEnrichmentPending}
+                    onClick={() => void onGoToModifyStep()}
                   >
                     {t.translations.NEXT}
                   </button>

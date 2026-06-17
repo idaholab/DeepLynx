@@ -38,6 +38,9 @@ type Params = {
   projectId: number;
 };
 
+const getRecordDisplayName = (record: { id?: number | null; name: string }) =>
+  record.name?.trim() || String(record.id ?? "record");
+
 export function useNewCollectionWorkflow({
   organizationId,
   projectId,
@@ -82,6 +85,13 @@ export function useNewCollectionWorkflow({
   const [newCollectionReviewPage, setNewCollectionReviewPage] = useState(1);
   const [newCollectionRecordSearchLoading, setNewCollectionRecordSearchLoading] =
     useState(false);
+  const [enrichingSelectedRecordIds, setEnrichingSelectedRecordIds] = useState<
+    number[]
+  >([]);
+  const [
+    failedSelectedRecordEnrichmentIds,
+    setFailedSelectedRecordEnrichmentIds,
+  ] = useState<number[]>([]);
 
   const {
     newCollectionSelectedLabelTally,
@@ -93,9 +103,8 @@ export function useNewCollectionWorkflow({
     canAddTypedNewCollectionLabel,
     newCollectionRecordPageCount,
     visibleNewCollectionRecords,
-    allVisibleNewCollectionRecordsSelected,
-    allRetrievedNewCollectionRecordsSelected,
-    someVisibleNewCollectionRecordsSelected,
+    visibleSelectionState,
+    retrievedSelectionState,
     filteredNewCollectionSelectedRecords,
     newCollectionReviewPageCount,
     visibleNewCollectionReviewRecords,
@@ -157,6 +166,90 @@ export function useNewCollectionWorkflow({
     void loadTags();
   }, [projectId, t]);
 
+  useEffect(() => {
+    const selectedIdSet = new Set(newCollectionSelectedRecordIds);
+    setEnrichingSelectedRecordIds((prev) =>
+      prev.filter((id) => selectedIdSet.has(id)),
+    );
+    setFailedSelectedRecordEnrichmentIds((prev) =>
+      prev.filter((id) => selectedIdSet.has(id)),
+    );
+  }, [newCollectionSelectedRecordIds]);
+
+  const enrichSelectedRecords = useCallback(
+    async (
+      records: Array<
+        QueryRecordViewResponseDto & { id: number; projectId?: number | null }
+      >,
+      options?: { notifyOnFailure?: boolean },
+    ) => {
+      if (records.length === 0) {
+        return { failedIds: [] as number[] };
+      }
+
+      const recordIds = records.map((record) => record.id);
+      const failedNames: string[] = [];
+
+      setEnrichingSelectedRecordIds((prev) => [
+        ...new Set([...prev, ...recordIds]),
+      ]);
+
+      try {
+        const enrichedRecords = await Promise.all(
+          records.map(async (record) => {
+            try {
+              const fullRecord = await getRecord(
+                organizationId,
+                record.projectId ?? projectId,
+                record.id,
+              );
+              return { ...record, fullRecord };
+            } catch (error) {
+              console.error("Failed to load selected record labels:", error);
+              failedNames.push(getRecordDisplayName(record));
+              return record;
+            }
+          }),
+        );
+
+        const failedIds = enrichedRecords
+          .filter((record) => !("fullRecord" in record))
+          .map((record) => record.id)
+          .filter((id): id is number => typeof id === "number");
+
+        setNewCollectionSelectedRecords((prev) =>
+          prev.map((selectedRecord) => {
+            const enrichedRecord = enrichedRecords.find(
+              (record) => record.id === selectedRecord.id,
+            );
+            return enrichedRecord ?? selectedRecord;
+          }),
+        );
+
+        setFailedSelectedRecordEnrichmentIds((prev) => [
+          ...prev.filter((id) => !recordIds.includes(id)),
+          ...failedIds,
+        ]);
+
+        if ((options?.notifyOnFailure ?? true) && failedNames.length > 0) {
+          toast.error(
+            t.translations.RECORD_COLLECTIONS_FAILED_LOAD_SELECTED_RECORD_METADATA.replace(
+              "{records}",
+              failedNames.join(", "),
+            ),
+          );
+        }
+
+        return { failedIds };
+      } finally {
+        setEnrichingSelectedRecordIds((prev) =>
+          prev.filter((id) => !recordIds.includes(id)),
+        );
+      }
+    },
+    [organizationId, projectId, t],
+  );
+
   const addNewCollectionRecords = useCallback(
     async (records: QueryRecordViewResponseDto[]) => {
       const unselectedRecords = records.filter(
@@ -174,32 +267,9 @@ export function useNewCollectionWorkflow({
       ]);
       setNewCollectionSelectedRecords((prev) => [...prev, ...unselectedRecords]);
 
-      const enrichedRecords = await Promise.all(
-        unselectedRecords.map(async (record) => {
-          try {
-            const fullRecord = await getRecord(
-              organizationId,
-              record.projectId ?? projectId,
-              record.id,
-            );
-            return { ...record, fullRecord };
-          } catch (error) {
-            console.error("Failed to load selected record labels:", error);
-            return record;
-          }
-        }),
-      );
-
-      setNewCollectionSelectedRecords((prev) =>
-        prev.map((selectedRecord) => {
-          const enrichedRecord = enrichedRecords.find(
-            (record) => record.id === selectedRecord.id,
-          );
-          return enrichedRecord ?? selectedRecord;
-        }),
-      );
+      await enrichSelectedRecords(unselectedRecords);
     },
-    [newCollectionSelectedRecordIds, organizationId, projectId],
+    [enrichSelectedRecords, newCollectionSelectedRecordIds],
   );
 
   const toggleNewCollectionRecord = async (record: QueryRecordViewResponseDto) => {
@@ -223,7 +293,7 @@ export function useNewCollectionWorkflow({
       .map((record) => record.id)
       .filter((id): id is number => typeof id === "number");
 
-    if (allVisibleNewCollectionRecordsSelected) {
+    if (visibleSelectionState === "all") {
       const visibleIdSet = new Set(visibleRecordIds);
       setNewCollectionSelectedRecordIds((prev) =>
         prev.filter((id) => !visibleIdSet.has(id)),
@@ -271,6 +341,8 @@ export function useNewCollectionWorkflow({
   const clearNewCollectionSelectedRecords = () => {
     setNewCollectionSelectedRecordIds([]);
     setNewCollectionSelectedRecords([]);
+    setEnrichingSelectedRecordIds([]);
+    setFailedSelectedRecordEnrichmentIds([]);
     setConfirmClearNewCollectionRecords(false);
   };
 
@@ -335,23 +407,26 @@ export function useNewCollectionWorkflow({
     );
   };
 
-  const handleSearchNewCollectionRecords = async (overrideTerm?: string) => {
-    const query = (overrideTerm ?? newCollectionRecordSearchTerm).trim();
+  const handleSearchNewCollectionRecords = useCallback(
+    async (overrideTerm?: string) => {
+      const query = (overrideTerm ?? newCollectionRecordSearchTerm).trim();
 
-    setNewCollectionRecordSearchLoading(true);
-    try {
-      const results = query
-        ? await fullTextSearch(organizationId, query, [projectId])
-        : await getMultiProjectRecords(organizationId, [projectId]);
-      setNewCollectionRecordSearchResults(results);
-      setNewCollectionRecordPage(1);
-    } catch (error) {
-      console.error("Failed to search records:", error);
-      toast.error(t.translations.RECORD_COLLECTIONS_FAILED_SEARCH_RECORDS);
-    } finally {
-      setNewCollectionRecordSearchLoading(false);
-    }
-  };
+      setNewCollectionRecordSearchLoading(true);
+      try {
+        const results = query
+          ? await fullTextSearch(organizationId, query, [projectId])
+          : await getMultiProjectRecords(organizationId, [projectId]);
+        setNewCollectionRecordSearchResults(results);
+        setNewCollectionRecordPage(1);
+      } catch (error) {
+        console.error("Failed to search records:", error);
+        toast.error(t.translations.RECORD_COLLECTIONS_FAILED_SEARCH_RECORDS);
+      } finally {
+        setNewCollectionRecordSearchLoading(false);
+      }
+    },
+    [newCollectionRecordSearchTerm, organizationId, projectId, t],
+  );
 
   const clearNewCollectionRecordSearch = () => {
     setNewCollectionRecordSearchTerm("");
@@ -370,6 +445,7 @@ export function useNewCollectionWorkflow({
 
     void handleSearchNewCollectionRecords();
   }, [
+    handleSearchNewCollectionRecords,
     newCollectionStep,
     newCollectionRecordSearchResults.length,
     newCollectionRecordSearchTerm,
@@ -416,7 +492,35 @@ export function useNewCollectionWorkflow({
     }
   };
 
-  const goToNewCollectionModifyStep = () => {
+  const goToNewCollectionModifyStep = async () => {
+    if (enrichingSelectedRecordIds.length > 0) {
+      toast.error(
+        t.translations.RECORD_COLLECTIONS_WAIT_FOR_SELECTED_RECORD_METADATA,
+      );
+      return;
+    }
+
+    const failedSelectedRecords = newCollectionSelectedRecords.filter(
+      (
+        record,
+      ): record is QueryRecordViewResponseDto & { id: number; projectId?: number | null } =>
+        typeof record.id === "number" &&
+        failedSelectedRecordEnrichmentIds.includes(record.id),
+    );
+
+    if (failedSelectedRecords.length > 0) {
+      const retryResult = await enrichSelectedRecords(failedSelectedRecords, {
+        notifyOnFailure: false,
+      });
+
+      if (retryResult.failedIds.length > 0) {
+        toast.error(
+          t.translations.RECORD_COLLECTIONS_CANNOT_CONTINUE_WITH_INCOMPLETE_RECORD_METADATA,
+        );
+        return;
+      }
+    }
+
     setNewCollectionSelectedLabelIds(selectedRecordMetadata.labelIds);
     setNewCollectionSelectedTagNames(selectedRecordMetadata.tagNames);
     setNewCollectionStep("Modify");
@@ -437,6 +541,11 @@ export function useNewCollectionWorkflow({
       setRecordsPerPage: handleSetNewCollectionRecordsPerPage,
       recordPageSizeOptions: DEFAULT_PAGE_SIZE_OPTIONS,
       saving,
+      selectedRecordEnrichmentPending: enrichingSelectedRecordIds.length > 0,
+      hasSelectedRecordEnrichmentFailures:
+        failedSelectedRecordEnrichmentIds.length > 0,
+      selectedRecordEnrichmentFailureCount:
+        failedSelectedRecordEnrichmentIds.length,
       getSensitivityClass,
     },
     metadata: {
@@ -451,9 +560,8 @@ export function useNewCollectionWorkflow({
       newCollectionRecordSearchResults,
       newCollectionRecordSearchLoading,
       visibleNewCollectionRecords,
-      allVisibleNewCollectionRecordsSelected,
-      allRetrievedNewCollectionRecordsSelected,
-      someVisibleNewCollectionRecordsSelected,
+      visibleSelectionState,
+      retrievedSelectionState,
       newCollectionRecordPage,
       setNewCollectionRecordPage,
       newCollectionRecordPageCount,

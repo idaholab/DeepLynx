@@ -30,3 +30,9 @@ export type PendingRecordChanges = {
   added: number[];
   removed: number[];
 };
+
+export type SelectionState = "none" | "some" | "all";
+
+export type RecordMutationStatus = "adding" | "removing";
+
+export type RecordMutationStatusById = Record<number, RecordMutationStatus>;

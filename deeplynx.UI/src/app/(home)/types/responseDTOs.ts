@@ -100,14 +100,13 @@ export type RecordResponseDto = {
 };
 
 export type PaginatedResponse<T> = {
-  items: T[] | [];
+  items: T[];
   pageNumber: number;
   pageSize: number;
   totalCount: number;
-  totalPages?: number;
-  hasPrevious?: boolean;
-  hasNext?: boolean;
-  maxPageSize?: number;
+  totalPages: number;
+  hasPrevious: boolean;
+  hasNext: boolean;
 };
 
 export type RecordCollectionTagDto = {

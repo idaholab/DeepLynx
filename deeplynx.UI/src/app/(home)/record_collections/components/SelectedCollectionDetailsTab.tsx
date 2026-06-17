@@ -78,8 +78,7 @@ export default function SelectedCollectionDetailsTab({
       onSearchRecords,
       editRecordResults,
       collectionRecordIds,
-      addingRecordIds,
-      removingRecordIds,
+      recordMutationStatusById,
       onRemoveCollectionRecord,
       onAddCollectionRecord,
       onCancelSelectedCollectionEdit,
@@ -362,10 +361,12 @@ export default function SelectedCollectionDetailsTab({
                   const recordId = typeof record.id === "number" ? record.id : null;
                   const isAssigned =
                     typeof recordId === "number" && collectionRecordIds.has(recordId);
-                  const isAdding =
-                    typeof recordId === "number" && addingRecordIds.includes(recordId);
-                  const isRemoving =
-                    typeof recordId === "number" && removingRecordIds.includes(recordId);
+                  const mutationStatus =
+                    typeof recordId === "number"
+                      ? recordMutationStatusById[recordId]
+                      : undefined;
+                  const isAdding = mutationStatus === "adding";
+                  const isRemoving = mutationStatus === "removing";
                   const showRemoveConfirmation =
                     typeof recordId === "number" && confirmRemoveRecordId === recordId;
 

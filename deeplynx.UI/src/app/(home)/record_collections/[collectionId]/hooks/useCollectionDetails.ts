@@ -36,7 +36,10 @@ import {
   COLLECTION_BADGE_DISPLAY_LIMIT,
   NEW_COLLECTION_RECORDS_PER_PAGE,
 } from "../../components/recordCollections.constants";
-import { PendingRecordChanges } from "../../components/recordCollections.types";
+import {
+  PendingRecordChanges,
+  RecordMutationStatusById,
+} from "../../components/recordCollections.types";
 import {
   getMetadataRows,
   getSensitivityClass,
@@ -54,6 +57,29 @@ type Params = {
 };
 
 type CollectionWorkspaceTabId = "Details" | "Records";
+
+const mapSearchResultToCollectionRecord = (
+  record: QueryRecordViewResponseDto,
+): RecordResponseDto => ({
+  id: record.id,
+  name: record.name,
+  description: record.description,
+  uri: record.uri,
+  properties: record.properties,
+  objectStorageId: record.objectStorageId,
+  originalId: record.originalId,
+  classId: record.classId,
+  dataSourceId: record.dataSourceId,
+  projectId: record.projectId,
+  lastUpdatedAt: record.lastUpdatedAt,
+  lastUpdatedBy:
+    record.lastUpdatedBy === null || record.lastUpdatedBy === undefined
+      ? null
+      : String(record.lastUpdatedBy),
+  isArchived: record.isArchived,
+  fileType: record.fileType,
+  fileSize: record.fileSize,
+});
 
 export function useCollectionDetails({
   organizationId,
@@ -73,6 +99,8 @@ export function useCollectionDetails({
     setSelectedCollectionPropertiesEditorOpen,
   ] = useState(false);
   const skipInitialCollectionRecordsLoad = useRef(true);
+  const collectionRecordsRef = useRef<RecordResponseDto[]>(initialCollectionRecords);
+  const editStartCollectionRecordsRef = useRef<RecordResponseDto[] | null>(null);
   const [collectionWorkspaceTab, setCollectionWorkspaceTab] =
     useState<CollectionWorkspaceTabId>("Details");
   const [collectionRecords, setCollectionRecords] = useState<RecordResponseDto[]>(
@@ -83,8 +111,8 @@ export function useCollectionDetails({
     QueryRecordViewResponseDto[]
   >([]);
   const [selectedRecordIds, setSelectedRecordIds] = useState<number[]>([]);
-  const [addingRecordIds, setAddingRecordIds] = useState<number[]>([]);
-  const [removingRecordIds, setRemovingRecordIds] = useState<number[]>([]);
+  const [recordMutationStatusById, setRecordMutationStatusById] =
+    useState<RecordMutationStatusById>({});
   const [pendingRecordChanges, setPendingRecordChanges] = useState<PendingRecordChanges>({
     added: [],
     removed: [],
@@ -127,6 +155,10 @@ export function useCollectionDetails({
   const { addableRecordResults } = selectedCollectionEditDerived;
 
   useEffect(() => {
+    collectionRecordsRef.current = collectionRecords;
+  }, [collectionRecords]);
+
+  useEffect(() => {
     const loadLabels = async () => {
       setLabelsLoading(true);
       try {
@@ -162,6 +194,12 @@ export function useCollectionDetails({
 
   const syncSelectedCollectionRecordCount = useCallback((count: number) => {
     setSelectedCollection((current) => ({ ...current, recordCount: count }));
+    setSelectedCollectionDraft((current) =>
+      current ? { ...current, recordCount: count } : current,
+    );
+  }, []);
+
+  const syncDraftCollectionRecordCount = useCallback((count: number) => {
     setSelectedCollectionDraft((current) =>
       current ? { ...current, recordCount: count } : current,
     );
@@ -217,6 +255,24 @@ export function useCollectionDetails({
     [isEditingSelectedCollection],
   );
 
+  const setRecordMutationStatus = useCallback(
+    (recordId: number, status: "adding" | "removing") => {
+      setRecordMutationStatusById((current) => ({
+        ...current,
+        [recordId]: status,
+      }));
+    },
+    [],
+  );
+
+  const clearRecordMutationStatus = useCallback((recordId: number) => {
+    setRecordMutationStatusById((current) => {
+      const next = { ...current };
+      delete next[recordId];
+      return next;
+    });
+  }, []);
+
   const loadCollectionRecords = useCallback(async () => {
     setRecordsLoading(true);
     try {
@@ -235,6 +291,66 @@ export function useCollectionDetails({
       setRecordsLoading(false);
     }
   }, [organizationId, projectId, selectedCollection.id, t]);
+
+  const stageCollectionRecords = useCallback(
+    (nextRecords: RecordResponseDto[]) => {
+      collectionRecordsRef.current = nextRecords;
+      setCollectionRecords(nextRecords);
+      syncDraftCollectionRecordCount(nextRecords.length);
+    },
+    [syncDraftCollectionRecordCount],
+  );
+
+  const stageAddedRecords = useCallback(
+    (recordIds: number[]) => {
+      const existingIds = new Set(
+        collectionRecordsRef.current
+          .map((record) => record.id)
+          .filter((id): id is number => typeof id === "number"),
+      );
+      const recordsToAdd = recordIds
+        .filter((recordId) => !existingIds.has(recordId))
+        .map((recordId) =>
+          recordSearchResults.find((record) => record.id === recordId),
+        )
+        .filter(
+          (record): record is QueryRecordViewResponseDto =>
+            Boolean(record && typeof record.id === "number"),
+        )
+        .map(mapSearchResultToCollectionRecord);
+
+      if (recordsToAdd.length === 0) {
+        return false;
+      }
+
+      stageCollectionRecords([...collectionRecordsRef.current, ...recordsToAdd]);
+      trackAddedRecords(
+        recordsToAdd
+          .map((record) => record.id)
+          .filter((id): id is number => typeof id === "number"),
+      );
+      return true;
+    },
+    [recordSearchResults, stageCollectionRecords, trackAddedRecords],
+  );
+
+  const stageRemovedRecords = useCallback(
+    (recordIds: number[]) => {
+      const nextRecords = collectionRecordsRef.current.filter(
+        (record) =>
+          !(typeof record.id === "number" && recordIds.includes(record.id)),
+      );
+
+      if (nextRecords.length === collectionRecordsRef.current.length) {
+        return false;
+      }
+
+      stageCollectionRecords(nextRecords);
+      trackRemovedRecords(recordIds);
+      return true;
+    },
+    [stageCollectionRecords, trackRemovedRecords],
+  );
 
   const refreshSelectedCollection = useCallback(async () => {
     let pageNumber = 1;
@@ -303,6 +419,17 @@ export function useCollectionDetails({
   const handleAddSelectedRecords = async () => {
     if (selectedRecordIds.length === 0) return;
 
+    if (isEditingSelectedCollection) {
+      const didStageRecords = stageAddedRecords(selectedRecordIds);
+      if (!didStageRecords) return;
+
+      setSelectedRecordIds([]);
+      setRecordSearchResults([]);
+      setRecordSearchTerm("");
+      toast.success(t.translations.RECORD_COLLECTIONS_RECORDS_ADDED);
+      return;
+    }
+
     setSaving(true);
     try {
       await addRecordsToRecordCollection(
@@ -329,7 +456,15 @@ export function useCollectionDetails({
   const handleAddCollectionRecord = async (recordId?: number | null) => {
     if (typeof recordId !== "number") return;
 
-    setAddingRecordIds((prev) => [...prev, recordId]);
+    if (isEditingSelectedCollection) {
+      const didStageRecord = stageAddedRecords([recordId]);
+      if (!didStageRecord) return;
+
+      toast.success(t.translations.RECORD_COLLECTIONS_RECORD_ADDED);
+      return;
+    }
+
+    setRecordMutationStatus(recordId, "adding");
     try {
       await addRecordsToRecordCollection(
         organizationId,
@@ -345,14 +480,23 @@ export function useCollectionDetails({
       console.error("Failed to add record to collection:", error);
       toast.error(t.translations.RECORD_COLLECTIONS_FAILED_UPDATE);
     } finally {
-      setAddingRecordIds((prev) => prev.filter((id) => id !== recordId));
+      clearRecordMutationStatus(recordId);
     }
   };
 
   const handleRemoveCollectionRecord = async (recordId?: number | null) => {
     if (typeof recordId !== "number") return;
 
-    setRemovingRecordIds((prev) => [...prev, recordId]);
+    if (isEditingSelectedCollection) {
+      const didStageRecord = stageRemovedRecords([recordId]);
+      if (!didStageRecord) return;
+
+      setSelectedRecordIds((prev) => prev.filter((id) => id !== recordId));
+      toast.success(t.translations.RECORD_COLLECTIONS_RECORD_REMOVED);
+      return;
+    }
+
+    setRecordMutationStatus(recordId, "removing");
     try {
       await removeRecordsFromRecordCollection(
         organizationId,
@@ -369,11 +513,12 @@ export function useCollectionDetails({
       console.error("Failed to remove record from collection:", error);
       toast.error(t.translations.RECORD_COLLECTIONS_FAILED_UPDATE);
     } finally {
-      setRemovingRecordIds((prev) => prev.filter((id) => id !== recordId));
+      clearRecordMutationStatus(recordId);
     }
   };
 
   const openSelectedCollectionEdit = () => {
+    editStartCollectionRecordsRef.current = [...collectionRecordsRef.current];
     setPendingRecordChanges({ added: [], removed: [] });
     setSelectedCollectionDraft({
       ...selectedCollection,
@@ -389,41 +534,23 @@ export function useCollectionDetails({
   };
 
   const cancelSelectedCollectionEdit = async () => {
-    setSaving(true);
-    try {
-      if (pendingRecordChanges.added.length > 0) {
-        await removeRecordsFromRecordCollection(
-          organizationId,
-          projectId,
-          selectedCollection.id,
-          pendingRecordChanges.added,
-        );
-      }
+    const originalRecords =
+      editStartCollectionRecordsRef.current ?? collectionRecordsRef.current;
 
-      if (pendingRecordChanges.removed.length > 0) {
-        await addRecordsToRecordCollection(
-          organizationId,
-          projectId,
-          selectedCollection.id,
-          pendingRecordChanges.removed,
-        );
-      }
-
-      const records = await loadCollectionRecords();
-      syncSelectedCollectionRecordCount(records.length);
-      setPendingRecordChanges({ added: [], removed: [] });
-      setSelectedCollectionDraft(null);
-      setSelectedCollectionPropertiesEditorOpen(false);
-      setSelectedCollectionLabelSearchTerm("");
-      setSelectedCollectionTagSearchTerm("");
-      resetCollectionDetailsView();
-      setIsEditingSelectedCollection(false);
-    } catch (error) {
-      console.error("Failed to cancel record collection edit:", error);
-      toast.error(t.translations.RECORD_COLLECTIONS_FAILED_CANCEL_CHANGES);
-    } finally {
-      setSaving(false);
-    }
+    collectionRecordsRef.current = originalRecords;
+    setCollectionRecords(originalRecords);
+    editStartCollectionRecordsRef.current = null;
+    setPendingRecordChanges({ added: [], removed: [] });
+    setSelectedCollectionDraft(null);
+    setSelectedCollectionPropertiesEditorOpen(false);
+    setSelectedCollectionLabelSearchTerm("");
+    setSelectedCollectionTagSearchTerm("");
+    setRecordSearchTerm("");
+    setRecordSearchResults([]);
+    setSelectedRecordIds([]);
+    setRecordMutationStatusById({});
+    resetCollectionDetailsView();
+    setIsEditingSelectedCollection(false);
   };
 
   const handleSaveSelectedDetails = async () => {
@@ -455,7 +582,50 @@ export function useCollectionDetails({
         },
       );
 
-      const mutationOperations = [
+      const recordMutationOperations = [
+        ...pendingRecordChanges.added.map((recordId) => {
+          const addedRecord =
+            collectionRecordsRef.current.find((record) => record.id === recordId) ??
+            recordSearchResults.find((record) => record.id === recordId);
+
+          return {
+            description:
+              t.translations.RECORD_COLLECTIONS_PARTIAL_UPDATE_ADD_RECORD.replace(
+                "{name}",
+                addedRecord?.name ?? String(recordId),
+              ),
+            execute: () =>
+              addRecordsToRecordCollection(
+                organizationId,
+                projectId,
+                selectedCollection.id,
+                [recordId],
+              ),
+          };
+        }),
+        ...pendingRecordChanges.removed.map((recordId) => {
+          const removedRecord = editStartCollectionRecordsRef.current?.find(
+            (record) => record.id === recordId,
+          );
+
+          return {
+            description:
+              t.translations.RECORD_COLLECTIONS_PARTIAL_UPDATE_REMOVE_RECORD.replace(
+                "{name}",
+                removedRecord?.name ?? String(recordId),
+              ),
+            execute: () =>
+              removeRecordsFromRecordCollection(
+                organizationId,
+                projectId,
+                selectedCollection.id,
+                [recordId],
+              ),
+          };
+        }),
+      ];
+
+      const labelAndTagMutationOperations = [
         ...(selectedCollectionDraft.labels ?? [])
           .filter((label) => !originalLabelIds.has(label.id))
           .map((label) => ({
@@ -522,19 +692,35 @@ export function useCollectionDetails({
           })),
       ];
 
-      const mutationResults = await Promise.allSettled(
-        mutationOperations.map((operation) => operation.execute()),
+      const recordMutationResults = await Promise.allSettled(
+        recordMutationOperations.map((operation) => operation.execute()),
       );
-      const failedOperations = mutationResults.flatMap((result, index) =>
+      const labelAndTagMutationResults = await Promise.allSettled(
+        labelAndTagMutationOperations.map((operation) => operation.execute()),
+      );
+      const failedOperations = [
+        ...recordMutationResults.flatMap((result, index) =>
+          result.status === "rejected"
+            ? [recordMutationOperations[index].description]
+            : [],
+        ),
+        ...labelAndTagMutationResults.flatMap((result, index) =>
         result.status === "rejected"
-          ? [mutationOperations[index].description]
+          ? [labelAndTagMutationOperations[index].description]
           : [],
-      );
+        ),
+      ];
 
       await refreshSelectedCollection();
+      await loadCollectionRecords();
+      editStartCollectionRecordsRef.current = null;
       setSelectedCollectionDraft(null);
       setSelectedCollectionPropertiesEditorOpen(false);
       setPendingRecordChanges({ added: [], removed: [] });
+      setRecordSearchTerm("");
+      setRecordSearchResults([]);
+      setSelectedRecordIds([]);
+      setRecordMutationStatusById({});
       resetCollectionDetailsView();
       setIsEditingSelectedCollection(false);
 
@@ -744,8 +930,7 @@ export function useCollectionDetails({
       onSearchRecords: handleSearchRecords,
     },
     recordMutations: {
-      addingRecordIds,
-      removingRecordIds,
+      recordMutationStatusById,
       onRemoveCollectionRecord: handleRemoveCollectionRecord,
       onAddCollectionRecord: handleAddCollectionRecord,
     },

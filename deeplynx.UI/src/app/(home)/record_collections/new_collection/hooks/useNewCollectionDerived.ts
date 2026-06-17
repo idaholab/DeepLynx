@@ -13,7 +13,10 @@ import {
   getSelectedRecordLabelNames,
   getSelectedRecordTagNames,
 } from "../../components/recordCollections.utils";
-import { NewCollectionSelectedRecord } from "../../components/recordCollections.types";
+import {
+  NewCollectionSelectedRecord,
+  SelectionState,
+} from "../../components/recordCollections.types";
 
 type Params = {
   availableLabels: SensitivityLabelsDto[];
@@ -48,6 +51,15 @@ export function useNewCollectionDerived({
   recordsPerPage,
   setNewCollectionReviewPage,
 }: Params) {
+  const deriveSelectionState = (
+    totalCount: number,
+    selectedCount: number,
+  ): SelectionState => {
+    if (selectedCount === 0) return "none";
+    if (selectedCount === totalCount && totalCount > 0) return "all";
+    return "some";
+  };
+
   const newCollectionSelectedLabelTally = useMemo(
     () =>
       countFacet(
@@ -130,21 +142,26 @@ export function useNewCollectionDerived({
     [visibleNewCollectionRecords],
   );
 
-  const allVisibleNewCollectionRecordsSelected =
-    visibleNewCollectionRecordIds.length > 0 &&
-    visibleNewCollectionRecordIds.every((id) =>
-      newCollectionSelectedRecordIds.includes(id),
-    );
+  const visibleSelectedCount = visibleNewCollectionRecordIds.filter((id) =>
+    newCollectionSelectedRecordIds.includes(id),
+  ).length;
 
-  const allRetrievedNewCollectionRecordsSelected =
-    newCollectionRecordSearchResults.length > 0 &&
-    newCollectionRecordSearchResults.every((record) =>
-      typeof record.id === "number" &&
-      newCollectionSelectedRecordIds.includes(record.id),
-    );
+  const retrievedRecordIds = newCollectionRecordSearchResults
+    .map((record) => record.id)
+    .filter((id): id is number => typeof id === "number");
 
-  const someVisibleNewCollectionRecordsSelected = visibleNewCollectionRecordIds.some(
-    (id) => newCollectionSelectedRecordIds.includes(id),
+  const retrievedSelectedCount = retrievedRecordIds.filter((id) =>
+    newCollectionSelectedRecordIds.includes(id),
+  ).length;
+
+  const visibleSelectionState = deriveSelectionState(
+    visibleNewCollectionRecordIds.length,
+    visibleSelectedCount,
+  );
+
+  const retrievedSelectionState = deriveSelectionState(
+    retrievedRecordIds.length,
+    retrievedSelectedCount,
   );
 
   const filteredNewCollectionSelectedRecords = useMemo(() => {
@@ -213,9 +230,8 @@ export function useNewCollectionDerived({
     newCollectionRecordPageCount,
     visibleNewCollectionRecords,
     visibleNewCollectionRecordIds,
-    allVisibleNewCollectionRecordsSelected,
-    allRetrievedNewCollectionRecordsSelected,
-    someVisibleNewCollectionRecordsSelected,
+    visibleSelectionState,
+    retrievedSelectionState,
     filteredNewCollectionSelectedRecords,
     newCollectionReviewPageCount,
     visibleNewCollectionReviewRecords,

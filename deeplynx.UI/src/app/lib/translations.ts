@@ -1267,6 +1267,8 @@ export const translations = {
         "Failed to load project labels",
       RECORD_COLLECTIONS_FAILED_LOAD_PROJECT_TAGS:
         "Failed to load project tags",
+      RECORD_COLLECTIONS_FAILED_LOAD_SELECTED_RECORD_METADATA:
+        "Failed to load full record metadata for: {records}",
       RECORD_COLLECTIONS_FAILED_SEARCH_RECORDS:
         "Failed to search records",
       RECORD_COLLECTIONS_FAILED_UPDATE:
@@ -1308,15 +1310,21 @@ export const translations = {
       RECORD_COLLECTIONS_NO_SENSITIVITY_LABELS_MATCH:
         "No sensitivity labels match.",
       RECORD_COLLECTIONS_NO_TAGS_FOUND: "No tags found.",
+      RECORD_COLLECTIONS_CANNOT_CONTINUE_WITH_INCOMPLETE_RECORD_METADATA:
+        "Some selected records are still missing full metadata. Remove them or retry before continuing.",
       RECORD_COLLECTIONS_OPEN_DETAILS: "Open details",
       RECORD_COLLECTIONS_PARTIAL_UPDATE:
         "Collection details saved, but some changes failed: {operations}",
       RECORD_COLLECTIONS_PARTIAL_UPDATE_ADD_LABEL:
         'add label "{name}"',
+      RECORD_COLLECTIONS_PARTIAL_UPDATE_ADD_RECORD:
+        'add record "{name}"',
       RECORD_COLLECTIONS_PARTIAL_UPDATE_ADD_TAG:
         'add tag "{name}"',
       RECORD_COLLECTIONS_PARTIAL_UPDATE_REMOVE_LABEL:
         'remove label "{name}"',
+      RECORD_COLLECTIONS_PARTIAL_UPDATE_REMOVE_RECORD:
+        'remove record "{name}"',
       RECORD_COLLECTIONS_PARTIAL_UPDATE_REMOVE_TAG:
         'remove tag "{name}"',
       RECORD_COLLECTIONS_RECORDS_ADDED: "Records added to collection",
@@ -1346,6 +1354,8 @@ export const translations = {
         "Labels and Tags on Selected Records",
       RECORD_COLLECTIONS_SELECTED_LABELS_AND_TAGS_HELP:
         "This is a read-only summary of the labels and tags already present on the selected records.",
+      RECORD_COLLECTIONS_SELECTED_RECORD_METADATA_INCOMPLETE:
+        "{count} selected record(s) still need full metadata before you can continue.",
       RECORD_COLLECTIONS_SELECTED_RECORDS_COUNT:
         "{count} records selected",
       RECORD_COLLECTIONS_SELECTED_RECORDS_SHOWN:
@@ -1381,6 +1391,8 @@ export const translations = {
       RECORD_COLLECTIONS_UPDATED_ON_CREATE: "On create",
       RECORD_COLLECTIONS_VALUE: "Value",
       RECORD_COLLECTIONS_VIEW_ALL: "View all",
+      RECORD_COLLECTIONS_WAIT_FOR_SELECTED_RECORD_METADATA:
+        "Wait for selected record metadata to finish loading before continuing.",
       RECORD_COUNT: "Record Count",
       RECORD_DESCRIPTION: "Record Description",
       RECORD_FILE_UPDATED_SUCCESSFULLY: "Record file updated successfully.",
@@ -3107,6 +3119,8 @@ export const translations = {
         "No se pudieron cargar las etiquetas del proyecto",
       RECORD_COLLECTIONS_FAILED_LOAD_PROJECT_TAGS:
         "No se pudieron cargar las etiquetas del proyecto",
+      RECORD_COLLECTIONS_FAILED_LOAD_SELECTED_RECORD_METADATA:
+        "No se pudieron cargar los metadatos completos de los registros: {records}",
       RECORD_COLLECTIONS_FAILED_SEARCH_RECORDS:
         "No se pudieron buscar los registros",
       RECORD_COLLECTIONS_FAILED_UPDATE:
@@ -3149,15 +3163,21 @@ export const translations = {
       RECORD_COLLECTIONS_NO_SENSITIVITY_LABELS_MATCH:
         "Ninguna etiqueta de sensibilidad coincide.",
       RECORD_COLLECTIONS_NO_TAGS_FOUND: "No se encontraron etiquetas.",
+      RECORD_COLLECTIONS_CANNOT_CONTINUE_WITH_INCOMPLETE_RECORD_METADATA:
+        "Algunos registros seleccionados todavía no tienen metadatos completos. Quítelos o vuelva a intentarlo antes de continuar.",
       RECORD_COLLECTIONS_OPEN_DETAILS: "Abrir detalles",
       RECORD_COLLECTIONS_PARTIAL_UPDATE:
         "Se guardaron los detalles de la colección, pero algunos cambios fallaron: {operations}",
       RECORD_COLLECTIONS_PARTIAL_UPDATE_ADD_LABEL:
         'agregar la etiqueta de sensibilidad "{name}"',
+      RECORD_COLLECTIONS_PARTIAL_UPDATE_ADD_RECORD:
+        'agregar el registro "{name}"',
       RECORD_COLLECTIONS_PARTIAL_UPDATE_ADD_TAG:
         'agregar la etiqueta "{name}"',
       RECORD_COLLECTIONS_PARTIAL_UPDATE_REMOVE_LABEL:
         'quitar la etiqueta de sensibilidad "{name}"',
+      RECORD_COLLECTIONS_PARTIAL_UPDATE_REMOVE_RECORD:
+        'quitar el registro "{name}"',
       RECORD_COLLECTIONS_PARTIAL_UPDATE_REMOVE_TAG:
         'quitar la etiqueta "{name}"',
       RECORD_COLLECTIONS_RECORDS_ADDED:
@@ -3195,6 +3215,8 @@ export const translations = {
         "Etiquetas de los registros seleccionados",
       RECORD_COLLECTIONS_SELECTED_LABELS_AND_TAGS_HELP:
         "Este es un resumen de solo lectura de las etiquetas que ya existen en los registros seleccionados.",
+      RECORD_COLLECTIONS_SELECTED_RECORD_METADATA_INCOMPLETE:
+        "{count} registro(s) seleccionado(s) todavía necesitan metadatos completos antes de continuar.",
       RECORD_COLLECTIONS_SELECTED_RECORDS_COUNT:
         "{count} registros seleccionados",
       RECORD_COLLECTIONS_SELECTED_RECORDS_SHOWN:
@@ -3239,6 +3261,8 @@ export const translations = {
       RECORD_COLLECTIONS_UPDATED_ON_CREATE: "Al crear",
       RECORD_COLLECTIONS_VALUE: "Valor",
       RECORD_COLLECTIONS_VIEW_ALL: "Ver todos",
+      RECORD_COLLECTIONS_WAIT_FOR_SELECTED_RECORD_METADATA:
+        "Espere a que terminen de cargarse los metadatos de los registros seleccionados antes de continuar.",
       RECORD_COUNT: "Conteo de registros",
       RECORD_DESCRIPTION: "Descripción del registro",
       RECORD_FILE_UPDATED_SUCCESSFULLY:

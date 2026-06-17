@@ -28,7 +28,6 @@ export type UpdateRecordCollectionRequestDto = {
   name?: string;
   description?: string;
   properties?: Record<string, unknown>;
-  records?: number[];
 };
 
 export type RelatedRecordsRequestDto = {
