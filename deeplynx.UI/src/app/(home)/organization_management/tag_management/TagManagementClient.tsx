@@ -35,6 +35,7 @@ import TagEditModal from "./TagEditModal";
 import LabelEditModal from "./LabelEditModal";
 import ConfirmArchiveLabelModal from "./ConfirmArchiveLabelModal";
 import { AxiosError } from "axios";
+import { useRouter } from "next/navigation";
 
 /* -------------------------------------------------------------------------- */
 /*                                   Types                                    */
@@ -42,6 +43,7 @@ import { AxiosError } from "axios";
 
 interface Props {
   projects: ProjectResponseDto[];
+  initialLabels: SensitivityLabelsDto[] | undefined;
 }
 
 type ModalMode = "tag";
@@ -50,7 +52,7 @@ type ModalMode = "tag";
 /*                       TagManagementClientOption3                           */
 /* -------------------------------------------------------------------------- */
 
-const TagManagementClient: React.FC<Props> = ({ projects }) => {
+const TagManagementClient: React.FC<Props> = ({ projects, initialLabels }) => {
   /* ------------------------------------------------------------------------ */
   /*                        Organization / Core Tag State                     */
   /* ------------------------------------------------------------------------ */
@@ -77,6 +79,8 @@ const TagManagementClient: React.FC<Props> = ({ projects }) => {
   const [labelsError, setLabelsError] = useState<string | null>(null);
 
   const [archivingLabelId, setArchivingLabelId] = useState<number | null>(null);
+
+  const router = useRouter();
 
   /* ------------------------------------------------------------------------ */
   /*                               Search State                               */
@@ -233,13 +237,14 @@ const TagManagementClient: React.FC<Props> = ({ projects }) => {
       setLabelsLoading(true);
       setLabelsError(null);
 
-      const dtoList: SensitivityLabelsDto[] = await getAllSensitivityLabelsOrg(
-        orgId,
-        undefined,
-        true, // hide archived by default
-      );
-
-      setLabels(dtoList.filter((l) => !l.isArchived));
+      if (!initialLabels) {
+        const dtoList: SensitivityLabelsDto[] = 
+          await getAllSensitivityLabelsOrg(orgId);
+        setLabels(dtoList.filter((l) => !l.isArchived));
+      } else {
+        setLabels(initialLabels.filter((l) => !l.isArchived));
+      }
+      router.refresh();
     } catch (error) {
       console.error("Failed to load organization labels:", error);
       setLabelsError(t.translations.FAILED_TO_LOAD_ORGANIZATION_LABELS);
@@ -333,6 +338,7 @@ const TagManagementClient: React.FC<Props> = ({ projects }) => {
         setLabels((prev) =>
           prev.map((l) => (l.id === updated.id ? updated : l)),
         );
+        router.refresh();
         toast.success(t.translations.ORGANIZATION_LABEL_UPDATED);
       } else {
         const created = await createSensitivityLabelsOrg(orgId, {
@@ -341,6 +347,7 @@ const TagManagementClient: React.FC<Props> = ({ projects }) => {
         });
 
         setLabels((prev) => [...prev, created]);
+        router.refresh();
         toast.success(t.translations.ORGANIZATION_LABEL_CREATED);
       }
 
@@ -385,6 +392,7 @@ const TagManagementClient: React.FC<Props> = ({ projects }) => {
       toast.success(
         t.translations.LABEL_ARCHIVED_WITH_NAME.replace("{name}", labelToArchive.name),
       );
+      router.refresh();
     } catch (error) {
       console.error("Failed to archive label:", error);
       if (String((error as AxiosError).response?.data).includes("Cannot archive")) {
