@@ -260,14 +260,14 @@ public class QueryBusiness : IQueryBusiness
             // Execute the query with parameters
             var queryRecordResults = _context.QueryRecords.FromSqlRaw(sql, parameters.ToArray());
 
-            var authorizedDownloadLabels = await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
+            var isUriAuthorized = await ExposeUriHelper.GetQueryRecordUriExposer(
+                _sensitivityLabelService,
                 currentUserId,
                 organizationId,
                 projectIds,
-                "download file");
+                isSysAdmin || isOrgAdmin || isProjectAdmin);
 
-            return await queryRecordResults
-                .Select(r => QueryRecordToResponse(r, authorizedDownloadLabels, isSysAdmin, isOrgAdmin, isProjectAdmin)).ToListAsync();
+            return await queryRecordResults.Select(r => QueryRecordToResponse(r, isUriAuthorized(r))).ToListAsync();
         }
         catch (PostgresException ex) when (ex.SqlState == "42703") // undefined_column
         {
@@ -406,14 +406,14 @@ public class QueryBusiness : IQueryBusiness
         var queryRecordsResults =
             _context.QueryRecords.FromSqlRaw(sql, parameters.ToArray());
 
-        var authorizedDownloadLabels = await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
+        var isUriAuthorized = await ExposeUriHelper.GetQueryRecordUriExposer(
+            _sensitivityLabelService,
             currentUserId,
             organizationId,
             projectIds,
-            "download file");
+            isSysAdmin || isOrgAdmin || isProjectAdmin);
 
-        return await queryRecordsResults
-            .Select(r => QueryRecordToResponse(r, authorizedDownloadLabels, isSysAdmin, isOrgAdmin, isProjectAdmin)).ToListAsync();
+        return await queryRecordsResults.Select(r => QueryRecordToResponse(r, isUriAuthorized(r))).ToListAsync();
     }
 
     /// <summary>
@@ -452,13 +452,14 @@ public class QueryBusiness : IQueryBusiness
 
         var records = await query.ToListAsync();
 
-        var authorizedDownloadLabels = await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
+        var isUriAuthorized = await ExposeUriHelper.GetQueryRecordUriExposer(
+            _sensitivityLabelService,
             currentUserId,
             organizationId,
             projectIds,
-            "download file");
+            isSysAdmin || isOrgAdmin || isProjectAdmin);
 
-        return records.Select(r => QueryRecordToResponse(r, authorizedDownloadLabels, isSysAdmin, isOrgAdmin, isProjectAdmin));
+        return records.Select(r => QueryRecordToResponse(r, isUriAuthorized(r)));
     }
 
     /// <summary>
@@ -506,32 +507,24 @@ public class QueryBusiness : IQueryBusiness
             _ => query.OrderByDescending(r => r.LastUpdatedAt).ThenBy(r => r.Id), // Sorts date by default
         };
 
-        var authorizedDownloadLabels = await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
+
+        var isUriAuthorized = await ExposeUriHelper.GetQueryRecordUriExposer(
+            _sensitivityLabelService,
             currentUserId,
             organizationId,
             projectId,
-            "download file");
+            isSysAdmin || isOrgAdmin || isProjectAdmin);
 
-        return await Paginator.Paginate(
-            paginated,
-            query,
-            r => QueryRecordToResponse(r, authorizedDownloadLabels, isSysAdmin, isOrgAdmin, isProjectAdmin));
+        return await Paginator.Paginate(paginated, query, r => QueryRecordToResponse(r, isUriAuthorized(r)));
     }
 
     static private QueryRecordViewResponseDto QueryRecordToResponse(
-        QueryRecord r, List<long> authorizedDownloadLabels, bool isSysAdmin, bool isOrgAdmin, bool isProjectAdmin)
+        QueryRecord r, bool exposeUri)
     {
         return new QueryRecordViewResponseDto
         {
             Id = r.Id,
-            Uri = ExposeUriHelper.CanExposeUri(
-                r,
-                authorizedDownloadLabels,
-                isSysAdmin,
-                isOrgAdmin,
-                isProjectAdmin)
-                    ? r.Uri
-                    : null,
+            Uri = exposeUri ? r.Uri : null,
             Properties = r.Properties,
             OriginalId = r.OriginalId,
             Name = r.Name,
@@ -590,13 +583,13 @@ public class QueryBusiness : IQueryBusiness
 
         var records = await recordQuery.ToListAsync();
 
-        var authorizedDownloadLabels = await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
+        var isUriAuthorized = await ExposeUriHelper.GetQueryRecordUriExposer(
+            _sensitivityLabelService,
             currentUserId,
             organizationId,
             projects,
-            "download file");
+            isSysAdmin || isOrgAdmin || isProjectAdmin);
 
-        return records
-            .Select(r => QueryRecordToResponse(r, authorizedDownloadLabels, isSysAdmin, isOrgAdmin, isProjectAdmin));
+        return records.Select(r => QueryRecordToResponse(r, isUriAuthorized(r)));
     }
 }
