@@ -148,7 +148,8 @@ public class LatticeExtractionBusinessTests : IntegrationTestBase
             Properties = "{}",
             IsArchived = false,
             LastUpdatedAt = UnspecifiedNow(),
-            LastUpdatedBy = uid
+            LastUpdatedBy = uid,
+            Uri = "/usr/src/app"
         };
         Context.Records.Add(rec);
         await Context.SaveChangesAsync();
@@ -244,7 +245,7 @@ public class LatticeExtractionBusinessTests : IntegrationTestBase
     [Fact]
     public async Task MarkExtractionFailed_SetsStatusToFailed()
     {
-        await _business.MarkExtractionFailed(extractionId, "test error");
+        await _business.MarkExtractionFailed(extractionId, oid, pid, "test error");
 
         Context.ChangeTracker.Clear();
         var ex = await Context.Extractions.FindAsync(extractionId);
@@ -256,53 +257,90 @@ public class LatticeExtractionBusinessTests : IntegrationTestBase
     public async Task MarkExtractionFailed_Throws_WhenExtractionNotFound()
     {
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            _business.MarkExtractionFailed(NotFoundId));
+            _business.MarkExtractionFailed(NotFoundId, oid, pid));
+    }
+
+    [Fact]
+    public async Task MarkExtractionFailed_Throws_WhenScopedToWrongProject()
+    {
+        var otherProj = new Project
+        {
+            Name = "Wrong Scope Project",
+            OrganizationId = oid,
+            LastUpdatedAt = UnspecifiedNow(),
+            LastUpdatedBy = uid
+        };
+        Context.Projects.Add(otherProj);
+        await Context.SaveChangesAsync();
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            _business.MarkExtractionFailed(extractionId, oid, otherProj.Id, "wrong scope"));
     }
 
     #endregion
 
     // =========================================================================
-    // ListExtractionsByUser Tests
+    // ListExtractionsByProject Tests
     // =========================================================================
 
-    #region ListExtractionsByUser Tests
+    #region ListExtractionsByProject Tests
 
     [Fact]
-    public async Task ListExtractionsByUser_ReturnsExtractionsForCorrectUser()
+    public async Task ListExtractionsByProject_ReturnsExtractionsForCorrectProject()
     {
-        var result = await _business.ListExtractionsByUser(uid, pid);
+        var result = await _business.ListExtractionsByProject(pid);
 
         Assert.NotEmpty(result);
-        Assert.All(result, e => Assert.Equal(uid, e.CreatedBy));
+        Assert.All(result, e => Assert.Equal(pid, e.ProjectId));
     }
 
     [Fact]
-    public async Task ListExtractionsByUser_ReturnsEmpty_WhenNoExtractionsExistForProject()
+    public async Task ListExtractionsByProject_ReturnsEmpty_WhenNoExtractionsExistForProject()
     {
-        var result = await _business.ListExtractionsByUser(uid, NotFoundId);
+        var result = await _business.ListExtractionsByProject(NotFoundId);
 
         Assert.Empty(result);
     }
 
     [Fact]
-    public async Task ListExtractionsByUser_DoesNotReturnOtherUsersExtractions()
+    public async Task ListExtractionsByProject_DoesNotReturnOtherProjectExtractions()
     {
+        //add a project with no extractions
+        var otherProj = new Project { Name = "Other Project", IsArchived = false, OrganizationId = oid };
+        Context.Projects.Add(otherProj);
+
+        //add an extraction to pid
         var other = new User { Name = "Other User", Email = "other@test.com", Password = "pw", IsArchived = false };
         Context.Users.Add(other);
         await Context.SaveChangesAsync();
 
-        var result = await _business.ListExtractionsByUser(other.Id, pid);
+        var extraction = new Extraction { CreatedBy = other.Id, ProjectId = pid };
+        Context.Extractions.Add(extraction);
+        await Context.SaveChangesAsync();
+
+        var result = await _business.ListExtractionsByProject(otherProj.Id);
 
         Assert.Empty(result);
     }
 
     [Fact]
-    public async Task ListExtractionsByUser_ReturnsCorrectFields()
+    public async Task ListExtractionsByProject_ReturnsCorrectFields()
     {
-        var result = await _business.ListExtractionsByUser(uid, pid);
+        var result = await _business.ListExtractionsByProject(pid);
 
         Assert.Contains(result, e => e.Id == extractionId && e.Status == ExtractionStatus.Running && e.Mode == ExtractionMode.Strict);
         Assert.Contains(result, e => e.Id == completeExtractionId && e.Status == ExtractionStatus.Complete && e.Mode == ExtractionMode.Discovery);
+    }
+
+    [Fact]
+    public async Task ListExtractionsByProject_ReturnsFailureMessage()
+    {
+        const string failureMessage = "LLM model endpoint rejected the request.";
+        await _business.MarkExtractionFailed(extractionId, oid, pid, failureMessage);
+
+        var result = await _business.ListExtractionsByProject(pid);
+
+        Assert.Contains(result, e => e.Id == extractionId && e.FailureMessage == failureMessage);
     }
 
     #endregion
@@ -343,7 +381,29 @@ public class LatticeExtractionBusinessTests : IntegrationTestBase
     }
 
     [Fact]
-    public async Task GetEmbeddingStatus_ReturnsOntologyReady_WhenClassesAreEmbedded()
+    public async Task GetEmbeddingStatus_ReturnsMinimumTargets_WhenOnlyDefaultClassesExist()
+    {
+        var proj = new Project { Name = "Default Schema Status Proj", OrganizationId = oid, LastUpdatedAt = UnspecifiedNow(), LastUpdatedBy = uid };
+        Context.Projects.Add(proj);
+        await Context.SaveChangesAsync();
+
+        Context.Classes.AddRange(
+            new Class { Name = "File", ProjectId = proj.Id, OrganizationId = oid, IsArchived = false, LastUpdatedAt = UnspecifiedNow(), LastUpdatedBy = uid },
+            new Class { Name = "Report", ProjectId = proj.Id, OrganizationId = oid, IsArchived = false, LastUpdatedAt = UnspecifiedNow(), LastUpdatedBy = uid },
+            new Class { Name = "Timeseries", ProjectId = proj.Id, OrganizationId = oid, IsArchived = false, LastUpdatedAt = UnspecifiedNow(), LastUpdatedBy = uid });
+        await Context.SaveChangesAsync();
+
+        var result = await _business.GetEmbeddingStatus(proj.Id);
+
+        Assert.Equal(2, result.ClassCount);
+        Assert.Equal(0, result.EmbeddedClassCount);
+        Assert.Equal(1, result.RelationshipCount);
+        Assert.Equal(0, result.EmbeddedRelationshipCount);
+        Assert.False(result.OntologyReady);
+    }
+
+    [Fact]
+    public async Task GetEmbeddingStatus_ReturnsOntologyReady_WhenRequiredSchemaIsEmbedded()
     {
         // OntologyVector.Vector is typed as string in the model but the DB column is
         // type vector with a NOT NULL constraint — EF Core cannot bridge that gap.
@@ -352,10 +412,45 @@ public class LatticeExtractionBusinessTests : IntegrationTestBase
             "INSERT INTO dl_vector.ontology_vector (class_id, vector) VALUES ({0}, '[0]')", cid1);
         await Context.Database.ExecuteSqlRawAsync(
             "INSERT INTO dl_vector.ontology_vector (class_id, vector) VALUES ({0}, '[0]')", cid2);
+        await Context.Database.ExecuteSqlRawAsync(
+            "INSERT INTO dl_vector.ontology_vector (relationship_id, vector) VALUES ({0}, '[0]')", relid1);
 
         var result = await _business.GetEmbeddingStatus(pid);
 
         Assert.Equal(2, result.EmbeddedClassCount);
+        Assert.Equal(1, result.EmbeddedRelationshipCount);
+        Assert.True(result.OntologyReady);
+    }
+
+    [Fact]
+    public async Task GetEmbeddingStatus_CapsReadinessCountsAtRequiredSchemaMinimum()
+    {
+        var c3 = new Class { Name = "Aircraft", ProjectId = pid, OrganizationId = oid, IsArchived = false, LastUpdatedAt = UnspecifiedNow(), LastUpdatedBy = uid };
+        var c4 = new Class { Name = "Mission", ProjectId = pid, OrganizationId = oid, IsArchived = false, LastUpdatedAt = UnspecifiedNow(), LastUpdatedBy = uid };
+        Context.Classes.AddRange(c3, c4);
+        await Context.SaveChangesAsync();
+
+        var rel2 = new Relationship { Name = "supports", OriginId = c3.Id, DestinationId = c4.Id, ProjectId = pid, OrganizationId = oid, IsArchived = false, LastUpdatedAt = UnspecifiedNow(), LastUpdatedBy = uid };
+        Context.Relationships.Add(rel2);
+        await Context.SaveChangesAsync();
+
+        await Context.Database.ExecuteSqlRawAsync(
+            "INSERT INTO dl_vector.ontology_vector (class_id, vector) VALUES ({0}, '[0]')", cid1);
+        await Context.Database.ExecuteSqlRawAsync(
+            "INSERT INTO dl_vector.ontology_vector (class_id, vector) VALUES ({0}, '[0]')", cid2);
+        await Context.Database.ExecuteSqlRawAsync(
+            "INSERT INTO dl_vector.ontology_vector (class_id, vector) VALUES ({0}, '[0]')", c3.Id);
+        await Context.Database.ExecuteSqlRawAsync(
+            "INSERT INTO dl_vector.ontology_vector (relationship_id, vector) VALUES ({0}, '[0]')", relid1);
+        await Context.Database.ExecuteSqlRawAsync(
+            "INSERT INTO dl_vector.ontology_vector (relationship_id, vector) VALUES ({0}, '[0]')", rel2.Id);
+
+        var result = await _business.GetEmbeddingStatus(pid);
+
+        Assert.Equal(2, result.ClassCount);
+        Assert.Equal(2, result.EmbeddedClassCount);
+        Assert.Equal(1, result.RelationshipCount);
+        Assert.Equal(1, result.EmbeddedRelationshipCount);
         Assert.True(result.OntologyReady);
     }
 
@@ -370,7 +465,7 @@ public class LatticeExtractionBusinessTests : IntegrationTestBase
     [Fact]
     public async Task ProcessInsightExtractionCallback_StagesAllItems_AndSetsExtractionComplete()
     {
-        var result = await _business.ProcessInsightExtractionCallback(
+        var result = await _business.ProcessInsightCallback(
             oid, pid, dsid, extractionId, BuildValidDto());
 
         Assert.Equal(2, result.ClassCount);
@@ -386,7 +481,7 @@ public class LatticeExtractionBusinessTests : IntegrationTestBase
     [Fact]
     public async Task ProcessInsightExtractionCallback_SetsValidStatus_WhenOntologyMatches()
     {
-        await _business.ProcessInsightExtractionCallback(oid, pid, dsid, extractionId, BuildValidDto());
+        await _business.ProcessInsightCallback(oid, pid, dsid, extractionId, BuildValidDto());
 
         var classes = _latticeCtx.ExtractionClasses.Where(c => c.ExtractionId == extractionId).ToList();
         Assert.All(classes, c => Assert.Equal(ExtractionValidationStatus.Valid, c.ValidationStatus));
@@ -399,7 +494,7 @@ public class LatticeExtractionBusinessTests : IntegrationTestBase
     [Fact]
     public async Task ProcessInsightExtractionCallback_SetsInvalidSchema_WhenNoOntologyMatch()
     {
-        var result = await _business.ProcessInsightExtractionCallback(
+        var result = await _business.ProcessInsightCallback(
             oid, pid, dsid, extractionId, BuildInvalidSchemaDto());
 
         Assert.Equal(1, result.ClassCount);
@@ -421,7 +516,7 @@ public class LatticeExtractionBusinessTests : IntegrationTestBase
             Relationships = []
         };
 
-        var result = await _business.ProcessInsightExtractionCallback(oid, pid, dsid, extractionId, dto);
+        var result = await _business.ProcessInsightCallback(oid, pid, dsid, extractionId, dto);
 
         Assert.Equal(1, result.ClassCount);
         Assert.Equal(1, result.RecordCount);
@@ -453,7 +548,7 @@ public class LatticeExtractionBusinessTests : IntegrationTestBase
             ]
         };
 
-        await _business.ProcessInsightExtractionCallback(oid, pid, dsid, extractionId, dto);
+        await _business.ProcessInsightCallback(oid, pid, dsid, extractionId, dto);
 
         var rel = _latticeCtx.ExtractionRelationships.Single(r => r.ExtractionId == extractionId);
         Assert.Equal(ExtractionValidationStatus.NovelDiscovery, rel.ValidationStatus);
@@ -463,7 +558,7 @@ public class LatticeExtractionBusinessTests : IntegrationTestBase
     public async Task ProcessInsightExtractionCallback_Throws_WhenExtractionNotFound()
     {
         var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            _business.ProcessInsightExtractionCallback(oid, pid, dsid, NotFoundId, BuildValidDto()));
+            _business.ProcessInsightCallback(oid, pid, dsid, NotFoundId, BuildValidDto()));
 
         Assert.Contains(NotFoundId.ToString(), ex.Message);
     }
@@ -489,7 +584,7 @@ public class LatticeExtractionBusinessTests : IntegrationTestBase
             ]
         };
 
-        var result = await _business.ProcessInsightExtractionCallback(oid, pid, dsid, extractionId, dto);
+        var result = await _business.ProcessInsightCallback(oid, pid, dsid, extractionId, dto);
 
         Assert.Equal(0, result.EdgeCount);
     }
@@ -883,12 +978,13 @@ public class LatticeExtractionBusinessTests : IntegrationTestBase
         Context.Projects.Add(proj);
         await Context.SaveChangesAsync();
 
-        var ts = new Class { Name = "Timeseries", ProjectId = proj.Id, OrganizationId = oid, IsArchived = false, LastUpdatedAt = UnspecifiedNow(), LastUpdatedBy = uid };
         var file = new Class { Name = "File", ProjectId = proj.Id, OrganizationId = oid, IsArchived = false, LastUpdatedAt = UnspecifiedNow(), LastUpdatedBy = uid };
+        var report = new Class { Name = "Report", ProjectId = proj.Id, OrganizationId = oid, IsArchived = false, LastUpdatedAt = UnspecifiedNow(), LastUpdatedBy = uid };
+        var ts = new Class { Name = "Timeseries", ProjectId = proj.Id, OrganizationId = oid, IsArchived = false, LastUpdatedAt = UnspecifiedNow(), LastUpdatedBy = uid };
         var ds = new DataSource { Name = "Default DS", ProjectId = proj.Id, OrganizationId = oid, LastUpdatedAt = UnspecifiedNow(), LastUpdatedBy = uid };
-        Context.Classes.AddRange(ts, file);
+        Context.Classes.AddRange(file, report, ts);
         Context.DataSources.Add(ds);
-        await Context.SaveChangesAsync(); // ts.Id and file.Id are now populated
+        await Context.SaveChangesAsync();
 
         // Build the Relationship AFTER saving so both FK columns carry real PKs
         var rel = new Relationship { Name = "some rel", OriginId = ts.Id, DestinationId = file.Id, ProjectId = proj.Id, OrganizationId = oid, IsArchived = false, LastUpdatedAt = UnspecifiedNow(), LastUpdatedBy = uid };

@@ -22,6 +22,9 @@ public partial class ProjectMember
     [Column("user_id")]
     public long? UserId { get; set; }
 
+    [Column("is_project_admin")]
+    public bool IsProjectAdmin { get; set; } = false;
+
     [ForeignKey("GroupId")]
     [InverseProperty("ProjectMembers")]
     public virtual Group? Group { get; set; }

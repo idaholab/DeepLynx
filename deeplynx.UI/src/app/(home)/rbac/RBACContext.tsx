@@ -115,7 +115,7 @@ export function RBACProvider({
         ...response,
         roles: deriveRoles(response),
       };
-      console.log("Current user:", userData);
+
       setUser(userData);
     } catch (error) {
       console.error("Failed to fetch user data:", error);

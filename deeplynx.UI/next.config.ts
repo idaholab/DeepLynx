@@ -2,15 +2,11 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Add any actual configuration you need here
-  // For example:
-  // images: {
-  //   domains: ['example.com'],
-  // },
-  // env: {
-  //   CUSTOM_KEY: process.env.CUSTOM_KEY,
-  // },
-  output: 'standalone',
+  output: "standalone",
+  env: {
+    NEXT_PUBLIC_HIDE_INSIGHT:
+      process.env.NEXT_PUBLIC_HIDE_INSIGHT ?? process.env.HIDE_INSIGHT ?? "true",
+  },
 };
 
 export default nextConfig;

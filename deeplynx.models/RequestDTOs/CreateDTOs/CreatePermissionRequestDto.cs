@@ -1,4 +1,6 @@
 using System.ComponentModel.DataAnnotations;
+using System.Text.Json.Serialization;
+using deeplynx.models.Converters;
 
 namespace deeplynx.models;
 
@@ -10,5 +12,6 @@ public class CreatePermissionRequestDto
     public string? Description { get; set; }
     [Required]
     public string Action { get; set; }
+    [JsonConverter(typeof(NullableLongJsonConverter))]
     public long? LabelId { get; set; }
 }

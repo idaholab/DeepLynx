@@ -25,7 +25,7 @@ import ProjectDropdown from "@/app/(home)/components/ProjectDropdown";
 import {
   ClassResponseDto,
   DataSourceResponseDto,
-  HistoricalRecordResponseDto,
+  QueryRecordViewResponseDto,
   TagResponseDto,
 } from "@/app/(home)/types/responseDTOs";
 import { getAllClassesOrg } from "@/app/lib/client_service/class_services.client";
@@ -692,7 +692,7 @@ export default function QueryBuilderClient({
   // ---- State ----------------------------------------------------------------
   const [projects] = useState(initialProjects);
   const [selectedProjects, setSelectedProjects] = useState<string[]>(initialSelectedProjects);
-  const [records, setQueriedRecords] = useState<HistoricalRecordResponseDto[] | null>();
+  const [records, setQueriedRecords] = useState<QueryRecordViewResponseDto[] | null>();
   const [searchTerm, setSearchTerm] = useState(initialSearchTerm ?? "");
   const [showFilters, setShowFilters] = useState(true);
   const [rows, setRows] = useState<QueryBuilderQuery[]>([emptyRow()]);

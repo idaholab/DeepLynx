@@ -4,10 +4,10 @@ import { useLanguage } from "@/app/contexts/Language";
 import { ChevronLeftIcon, ChevronRightIcon, ClockIcon, TagIcon } from "@heroicons/react/24/outline";
 import { useRouter } from "next/navigation";
 import React, { useState } from "react";
-import { HistoricalRecordResponseDto, TagResponseDto } from "../types/responseDTOs";
+import { QueryRecordViewResponseDto, TagResponseDto } from "../types/responseDTOs";
 
 interface ListViewProps {
-    data: HistoricalRecordResponseDto[];
+    data: QueryRecordViewResponseDto[];
     activeSearchTerms?: string[];
     selectedProjects?: number[];
 }
@@ -88,7 +88,7 @@ const RecordSearchList: React.FC<ListViewProps> = ({
         : data.filter(
             (record) =>
                 record.projectId !== undefined &&
-                selectedProjects.includes(record.projectId)
+                selectedProjects.includes(Number(record.projectId))
         );
 
     const totalPages = Math.ceil(filteredRecords.length / RECORDS_PER_PAGE);

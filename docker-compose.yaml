@@ -15,6 +15,7 @@ services:
         BACKEND_BASE_URL: "http://server:5000/api/v1"
         AUTH_TRUST_HOST: true
         NEXT_PUBLIC_DISABLE_FRONTEND_AUTHENTICATION: true # change to false if supplying okta info on lines 12-13, 25-26
+        NEXT_PUBLIC_HIDE_INSIGHT: ${HIDE_INSIGHT:-true}
     environment:
       NODE_ENV: production
       OKTA_ISSUER: "https://identity-preview.inl.gov"
@@ -29,6 +30,9 @@ services:
       INSIGHT_API_URL: "http://insight-fastapi:5009"
       AUTH_TRUST_HOST: true
       NEXT_PUBLIC_DISABLE_FRONTEND_AUTHENTICATION: true # change to false if supplying okta info on lines 12-13, 25-26
+      # NEXT_PUBLIC_HIDE_INSIGHT is baked into the standalone build at build time
+      # (see build.args above). Setting it here at runtime has no effect — toggling
+      # it requires rebuilding the image (`docker compose up --build`).
     ports:
       - "3000:3000"
     networks:
@@ -84,6 +88,7 @@ services:
       AIRFLOW_BASE_URL: http://localhost:8080
       AIRFLOW_USERNAME: admin
       AIRFLOW_PASSWORD: admin
+      HIDE_INSIGHT: ${HIDE_INSIGHT:-true}
     entrypoint: /usr/local/bin/entrypoint.sh
     ports:
       - "5000:5000"

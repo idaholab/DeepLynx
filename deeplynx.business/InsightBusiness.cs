@@ -67,6 +67,9 @@ public class InsightBusiness : IInsightBusiness
         InsightUploadApiRequestDto payload,
         string? userJwt = null)
     {
+        if (payload.FileInfo.Count == 0)
+            throw new InvalidOperationException("Select at least one document to queue for Insight indexing.");
+
         var vlmConfig = await ResolveModelConfig(currentUserId, organizationId, projectId, vlmModelConfigId, "vlm");
         var embeddingConfig = await ResolveModelConfig(currentUserId, organizationId, projectId, embeddingModelConfigId, "embedding");
 
@@ -78,6 +81,9 @@ public class InsightBusiness : IInsightBusiness
         var authorizedFileInfo = payload.FileInfo
             .Where(f => authorizedIds.Contains(f.FileId))
             .ToList();
+
+        if (authorizedFileInfo.Count == 0)
+            throw new InvalidOperationException("No authorized documents were available to queue for Insight indexing.");
 
         var request = new InsightUploadRequestDto
         {
@@ -303,7 +309,7 @@ public class InsightBusiness : IInsightBusiness
         }
 
         var classEmbeds = await _context.Classes
-            .Where(c => c.ProjectId == projectId)
+            .Where(c => c.ProjectId == projectId && !c.IsArchived)
             .Select(c => new InsightEmbedStringRequestDto.EmbedStringDto
             {
                 ClassId = c.Id,
@@ -312,13 +318,30 @@ public class InsightBusiness : IInsightBusiness
             .ToListAsync();
 
         var relationshipEmbeds = await _context.Relationships
-            .Where(r => r.ProjectId == projectId)
+            .Where(r => r.ProjectId == projectId && !r.IsArchived)
             .Select(r => new InsightEmbedStringRequestDto.EmbedStringDto
             {
                 RelationshipId = r.Id,
                 Text = string.IsNullOrEmpty(r.Description) ? r.Name : r.Description
             })
             .ToListAsync();
+
+        var validationErrors = new List<string>();
+
+        if (classEmbeds.Count == 0)
+        {
+            validationErrors.Add("Define at least one class before queueing data schema embeddings.");
+        }
+
+        if (relationshipEmbeds.Count == 0)
+        {
+            validationErrors.Add("Define at least one relationship before queueing data schema embeddings.");
+        }
+
+        if (validationErrors.Count > 0)
+        {
+            throw new InvalidOperationException(string.Join(" ", validationErrors));
+        }
 
         var request = new InsightEmbedStringRequestDto
         {

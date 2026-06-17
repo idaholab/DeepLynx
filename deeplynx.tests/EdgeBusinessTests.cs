@@ -1037,6 +1037,8 @@ public class EdgeBusinessTests : IntegrationTestBase
         var dto = new EdgeResponseDto
         {
             Id = 1,
+            OriginOriginalId = "parsed-record-001",
+            DestinationOriginalId = "parsed-record-002",
             OriginId = 2,
             DestinationId = 3,
             RelationshipId = 4,
@@ -1049,6 +1051,8 @@ public class EdgeBusinessTests : IntegrationTestBase
 
         // Assert
         Assert.Equal(1, dto.Id);
+        Assert.Equal("parsed-record-001", dto.OriginOriginalId);
+        Assert.Equal("parsed-record-002", dto.DestinationOriginalId);
         Assert.Equal(2, dto.OriginId);
         Assert.Equal(3, dto.DestinationId);
         Assert.Equal(4, dto.RelationshipId);
@@ -1185,5 +1189,136 @@ public class EdgeBusinessTests : IntegrationTestBase
         Assert.Equal(destinationRecordId2, updatedEdge.DestinationId);
     }
 
+    [Fact]
+    public async Task GetAllEdges_ReturnsOriginAndDestinationOriginalIds()
+    {
+        // Arrange
+        await SetRecordOriginalIds();
+
+        var testEdge = new Edge
+        {
+            OriginId = originRecordId,
+            DestinationId = destinationRecordId,
+            DataSourceId = dsid,
+            ProjectId = pid,
+            OrganizationId = oid,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid1
+        };
+
+        Context.Edges.Add(testEdge);
+        await Context.SaveChangesAsync();
+
+        // Act
+        var result = await _edgeBusiness.GetAllEdges(uid1, oid, pid, dsid, false);
+
+        // Assert
+        var edge = Assert.Single(result, e => e.Id == testEdge.Id);
+        Assert.Equal("parsed-record-001", edge.OriginOriginalId);
+        Assert.Equal("parsed-record-002", edge.DestinationOriginalId);
+    }
+
+    [Fact]
+    public async Task GetEdge_ReturnsOriginAndDestinationOriginalIds()
+    {
+        // Arrange
+        await SetRecordOriginalIds();
+
+        var testEdge = new Edge
+        {
+            OriginId = originRecordId,
+            DestinationId = destinationRecordId,
+            DataSourceId = dsid,
+            ProjectId = pid,
+            OrganizationId = oid,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid1
+        };
+
+        Context.Edges.Add(testEdge);
+        await Context.SaveChangesAsync();
+
+        // Act
+        var result = await _edgeBusiness.GetEdge(uid1, oid, pid, testEdge.Id, null, null, false);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal("parsed-record-001", result.OriginOriginalId);
+        Assert.Equal("parsed-record-002", result.DestinationOriginalId);
+    }
+
+    [Fact]
+    public async Task CreateEdge_ReturnsOriginAndDestinationOriginalIds()
+    {
+        // Arrange
+        await SetRecordOriginalIds();
+
+        var request = new CreateEdgeRequestDto
+        {
+            OriginId = originRecordId,
+            DestinationId = destinationRecordId,
+            RelationshipId = null,
+            Properties = null
+        };
+
+        // Act
+        var result = await _edgeBusiness.CreateEdge(uid1, oid, pid, dsid, request);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal("parsed-record-001", result.OriginOriginalId);
+        Assert.Equal("parsed-record-002", result.DestinationOriginalId);
+    }
+
+    [Fact]
+    public async Task UpdateEdge_ReturnsOriginAndDestinationOriginalIds()
+    {
+        // Arrange
+        await SetRecordOriginalIds();
+
+        var testEdge = new Edge
+        {
+            OriginId = originRecordId,
+            DestinationId = destinationRecordId,
+            DataSourceId = dsid,
+            ProjectId = pid,
+            OrganizationId = oid,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid1
+        };
+
+        Context.Edges.Add(testEdge);
+        await Context.SaveChangesAsync();
+
+        var request = new UpdateEdgeRequestDto
+        {
+            OriginId = originRecordId,
+            DestinationId = destinationRecordId,
+            RelationshipId = testEdge.RelationshipId,
+            Properties = null
+        };
+
+        // Act
+        var result = await _edgeBusiness.UpdateEdge(uid1, oid, pid, request, testEdge.Id, null, null);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal("parsed-record-001", result.OriginOriginalId);
+        Assert.Equal("parsed-record-002", result.DestinationOriginalId);
+    }
+    
+    private async Task SetRecordOriginalIds()
+    {
+        var origin = await Context.Records.FindAsync(originRecordId);
+        var destination = await Context.Records.FindAsync(destinationRecordId);
+
+        Assert.NotNull(origin);
+        Assert.NotNull(destination);
+
+        origin.OriginalId = "parsed-record-001";
+        destination.OriginalId = "parsed-record-002";
+
+        await Context.SaveChangesAsync();
+    }
     #endregion
 }

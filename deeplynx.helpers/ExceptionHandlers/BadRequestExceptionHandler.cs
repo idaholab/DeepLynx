@@ -49,13 +49,7 @@ public class BadRequestExceptionHandler : IExceptionHandler
         {
             HttpContext = httpContext,
             Exception = exception,
-            ProblemDetails = new ProblemDetails
-            {
-                Type = "https://tools.ietf.org/html/rfc7231#section-6.5.1",
-                Title = "Bad Request",
-                Status = StatusCodes.Status400BadRequest,
-                Detail = exception.Message
-            }
+            ProblemDetails = BadRequestProblemDetailsFactory.Create(exception.Message)
         });
     }
 }

@@ -28,6 +28,7 @@ import {
 import toast from "react-hot-toast";
 import { useLanguage } from "@/app/contexts/Language";
 import { BetaBadge } from "@/app/(home)/components/BetaBadge";
+import { isInsightHidden } from "@/app/lib/feature_flags";
 
 type DetailTab = "records" | "classes" | "edges" | "relationships";
 
@@ -49,7 +50,10 @@ function extractionStatusBadgeClass(status: string) {
   return "badge-warning";
 }
 
-function statusLabel(status: string, translations: { LATTICE_APPROVED_STATUS: string }) {
+function statusLabel(
+  status: string,
+  translations: { LATTICE_APPROVED_STATUS: string },
+) {
   if (status === "promoted") return translations.LATTICE_APPROVED_STATUS;
   return status;
 }
@@ -81,7 +85,8 @@ function parseNestedRows(
       .join(" ");
     return {
       label,
-      value: typeof value === "object" ? JSON.stringify(value) : String(value ?? ""),
+      value:
+        typeof value === "object" ? JSON.stringify(value) : String(value ?? ""),
     };
   });
 }
@@ -105,14 +110,17 @@ function RecordCard({ record }: { record: StagedRecordDTO }) {
               <span className="badge badge-outline">{record.class_name}</span>
             )}
             {record.validation_status && (
-              <span className={`badge ${validationBadgeClass(record.validation_status)}`}>
+              <span
+                className={`badge ${validationBadgeClass(record.validation_status)}`}
+              >
                 {record.validation_status}
               </span>
             )}
           </div>
           <div className="mt-2 flex flex-wrap gap-2 text-xs text-base-content/60">
             <span className="rounded-full bg-base-200 px-3 py-1">
-              {t.translations.LATTICE_SCORE}: {(record.ensemble_score * 100).toFixed(0)}%
+              {t.translations.LATTICE_SCORE}:{" "}
+              {(record.ensemble_score * 100).toFixed(0)}%
             </span>
             <span className="rounded-full bg-base-200 px-3 py-1">
               {t.translations.LATTICE_FREQUENCY}: {record.frequency}
@@ -128,7 +136,10 @@ function RecordCard({ record }: { record: StagedRecordDTO }) {
 
       {expanded && attrs ? (
         <div className="border-t border-base-300 px-4 py-5">
-          <PropertyTable title={t.translations.LATTICE_PROPERTIES_TITLE} rows={parseNestedRows(attrs)} />
+          <PropertyTable
+            title={t.translations.LATTICE_PROPERTIES_TITLE}
+            rows={parseNestedRows(attrs)}
+          />
         </div>
       ) : null}
     </section>
@@ -142,7 +153,9 @@ function ClassCard({ cls }: { cls: StagedClassDTO }) {
       <div className="flex items-center justify-between gap-2">
         <p className="font-semibold">{cls.name}</p>
         {cls.validation_status && (
-          <span className={`badge ${validationBadgeClass(cls.validation_status)}`}>
+          <span
+            className={`badge ${validationBadgeClass(cls.validation_status)}`}
+          >
             {cls.validation_status}
           </span>
         )}
@@ -162,19 +175,21 @@ function EdgeCard({ edge }: { edge: StagedEdgeDTO }) {
     <div className="rounded-2xl border border-base-300 bg-base-200/50 p-4">
       <div className="flex items-center justify-between gap-2">
         <p className="font-semibold">
-          {edge.origin_record_name ?? "?"} →{" "}
-          {edge.relationship_name ?? "?"} →{" "}
+          {edge.origin_record_name ?? "?"} → {edge.relationship_name ?? "?"} →{" "}
           {edge.destination_record_name ?? "?"}
         </p>
         {edge.validation_status && (
-          <span className={`badge ${validationBadgeClass(edge.validation_status)}`}>
+          <span
+            className={`badge ${validationBadgeClass(edge.validation_status)}`}
+          >
             {edge.validation_status}
           </span>
         )}
       </div>
       <div className="mt-2 flex flex-wrap gap-2 text-xs text-base-content/60">
         <span className="rounded-full bg-base-200 px-3 py-1">
-          {t.translations.LATTICE_SCORE}: {(edge.ensemble_score * 100).toFixed(0)}%
+          {t.translations.LATTICE_SCORE}:{" "}
+          {(edge.ensemble_score * 100).toFixed(0)}%
         </span>
         <span className="rounded-full bg-base-200 px-3 py-1">
           {t.translations.LATTICE_FREQUENCY}: {edge.frequency}
@@ -191,7 +206,9 @@ function RelationshipCard({ rel }: { rel: StagedRelationshipDTO }) {
       <div className="flex items-center justify-between gap-2">
         <p className="font-semibold">{rel.name}</p>
         {rel.validation_status && (
-          <span className={`badge ${validationBadgeClass(rel.validation_status)}`}>
+          <span
+            className={`badge ${validationBadgeClass(rel.validation_status)}`}
+          >
             {rel.validation_status}
           </span>
         )}
@@ -199,13 +216,27 @@ function RelationshipCard({ rel }: { rel: StagedRelationshipDTO }) {
       {(rel.origin_class_name || rel.destination_class_name) && (
         <div className="mt-3 flex items-center gap-2 text-xs">
           <div>
-            <p className="text-base-content/40 uppercase tracking-wide" style={{ fontSize: "0.625rem" }}>{t.translations.LATTICE_ORIGIN}</p>
-            <p className="mt-0.5 font-medium text-base-content/70">{rel.origin_class_name ?? "?"}</p>
+            <p
+              className="text-base-content/40 uppercase tracking-wide"
+              style={{ fontSize: "0.625rem" }}
+            >
+              {t.translations.LATTICE_ORIGIN}
+            </p>
+            <p className="mt-0.5 font-medium text-base-content/70">
+              {rel.origin_class_name ?? "?"}
+            </p>
           </div>
           <span className="mt-3 text-base-content/30">→</span>
           <div>
-            <p className="text-base-content/40 uppercase tracking-wide" style={{ fontSize: "0.625rem" }}>{t.translations.LATTICE_DESTINATION}</p>
-            <p className="mt-0.5 font-medium text-base-content/70">{rel.destination_class_name ?? "?"}</p>
+            <p
+              className="text-base-content/40 uppercase tracking-wide"
+              style={{ fontSize: "0.625rem" }}
+            >
+              {t.translations.LATTICE_DESTINATION}
+            </p>
+            <p className="mt-0.5 font-medium text-base-content/70">
+              {rel.destination_class_name ?? "?"}
+            </p>
           </div>
         </div>
       )}
@@ -224,7 +255,9 @@ function ExtractionDetailPanel({
   projectId: number;
   onStatusChange?: () => void;
 }) {
-  const [staging, setStaging] = useState<ExtractionStagingResponseDTO | null>(null);
+  const [staging, setStaging] = useState<ExtractionStagingResponseDTO | null>(
+    null,
+  );
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isPromoting, setIsPromoting] = useState(false);
@@ -234,7 +267,11 @@ function ExtractionDetailPanel({
 
   const fetchStaging = useCallback(async () => {
     try {
-      const data = await getExtractionStaging(organizationId, projectId, extractionId);
+      const data = await getExtractionStaging(
+        organizationId,
+        projectId,
+        extractionId,
+      );
       setStaging(data);
       setError(null);
 
@@ -246,7 +283,12 @@ function ExtractionDetailPanel({
     } finally {
       setIsLoading(false);
     }
-  }, [organizationId, projectId, extractionId, t.translations.LATTICE_FAILED_LOAD_EXTRACTION]);
+  }, [
+    organizationId,
+    projectId,
+    extractionId,
+    t.translations.LATTICE_FAILED_LOAD_EXTRACTION,
+  ]);
 
   useEffect(() => {
     setIsLoading(true);
@@ -264,7 +306,11 @@ function ExtractionDetailPanel({
     try {
       setIsPromoting(true);
       await promoteExtraction(organizationId, projectId, extractionId, approve);
-      toast.success(approve ? t.translations.LATTICE_EXTRACTION_APPROVED_TOAST : t.translations.LATTICE_EXTRACTION_REJECTED_TOAST);
+      toast.success(
+        approve
+          ? t.translations.LATTICE_EXTRACTION_APPROVED_TOAST
+          : t.translations.LATTICE_EXTRACTION_REJECTED_TOAST,
+      );
       await fetchStaging();
       onStatusChange?.();
     } catch {
@@ -285,7 +331,9 @@ function ExtractionDetailPanel({
   if (error || !staging) {
     return (
       <div className="p-4">
-        <p className="text-error">{error ?? t.translations.LATTICE_NO_EXTRACTION_DATA}</p>
+        <p className="text-error">
+          {error ?? t.translations.LATTICE_NO_EXTRACTION_DATA}
+        </p>
       </div>
     );
   }
@@ -305,12 +353,17 @@ function ExtractionDetailPanel({
     <div className="flex flex-col gap-4">
       {/* Header: title + status + approve/reject */}
       <div className="flex flex-col gap-2">
-        <h2 className="text-lg font-bold">{t.translations.LATTICE_EXTRACTION_NUMBER}{staging.id}</h2>
+        <h2 className="text-lg font-bold">
+          {t.translations.LATTICE_EXTRACTION_NUMBER}
+          {staging.id}
+        </h2>
 
         {/* Row 1: status + mode on left, buttons on right */}
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex flex-wrap items-center gap-2">
-            <span className={`badge ${extractionStatusBadgeClass(staging.status)}`}>
+            <span
+              className={`badge ${extractionStatusBadgeClass(staging.status)}`}
+            >
               {isRunning ? (
                 <>
                   <span className="loading loading-spinner loading-xs mr-1" />
@@ -374,7 +427,9 @@ function ExtractionDetailPanel({
           {canDecide && (
             <p className="text-xs text-base-content/50 text-right max-w-[220px]">
               {t.translations.LATTICE_APPROVE_NOTE_PREFIX}{" "}
-              <span className="font-medium text-error/70">{t.translations.LATTICE_INVALID_SCHEMA_ITEMS}</span>{" "}
+              <span className="font-medium text-error/70">
+                {t.translations.LATTICE_INVALID_SCHEMA_ITEMS}
+              </span>{" "}
               {t.translations.LATTICE_ITEMS_SUFFIX}
             </p>
           )}
@@ -383,21 +438,31 @@ function ExtractionDetailPanel({
 
       {/* Summary card */}
       <div className="rounded-2xl border border-base-300 bg-base-100 p-4 shadow-sm">
-        <h3 className="mb-3 text-sm font-semibold text-base-content/70">{t.translations.LATTICE_SUMMARY}</h3>
+        <h3 className="mb-3 text-sm font-semibold text-base-content/70">
+          {t.translations.LATTICE_SUMMARY}
+        </h3>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           {(
             [
               { label: t.translations.RECORDS, count: staging.records.length },
               { label: t.translations.CLASSES, count: staging.classes.length },
-              { label: t.translations.RELATIONSHIPS, count: staging.relationships.length },
-              { label: t.translations.LATTICE_EDGES, count: staging.edges.length },
+              {
+                label: t.translations.RELATIONSHIPS,
+                count: staging.relationships.length,
+              },
+              {
+                label: t.translations.LATTICE_EDGES,
+                count: staging.edges.length,
+              },
             ] as const
           ).map(({ label, count }) => (
             <div
               key={label}
               className="rounded-xl border border-base-300 bg-base-200/50 px-4 py-3 text-center"
             >
-              <p className="text-xs font-medium text-base-content/60">{label}</p>
+              <p className="text-xs font-medium text-base-content/60">
+                {label}
+              </p>
               <p className="text-2xl font-bold">{count}</p>
             </div>
           ))}
@@ -424,7 +489,9 @@ function ExtractionDetailPanel({
             (staging.records.length === 0 ? (
               <EmptyState message={t.translations.LATTICE_NO_RECORDS_STAGED} />
             ) : (
-              staging.records.map((record) => <RecordCard key={record.id} record={record} />)
+              staging.records.map((record) => (
+                <RecordCard key={record.id} record={record} />
+              ))
             ))}
 
           {activeTab === "classes" &&
@@ -438,14 +505,20 @@ function ExtractionDetailPanel({
             (staging.edges.length === 0 ? (
               <EmptyState message={t.translations.LATTICE_NO_EDGES_STAGED} />
             ) : (
-              staging.edges.map((edge) => <EdgeCard key={edge.id} edge={edge} />)
+              staging.edges.map((edge) => (
+                <EdgeCard key={edge.id} edge={edge} />
+              ))
             ))}
 
           {activeTab === "relationships" &&
             (staging.relationships.length === 0 ? (
-              <EmptyState message={t.translations.LATTICE_NO_RELATIONSHIPS_STAGED} />
+              <EmptyState
+                message={t.translations.LATTICE_NO_RELATIONSHIPS_STAGED}
+              />
             ) : (
-              staging.relationships.map((rel) => <RelationshipCard key={rel.id} rel={rel} />)
+              staging.relationships.map((rel) => (
+                <RelationshipCard key={rel.id} rel={rel} />
+              ))
             ))}
         </div>
       </div>
@@ -474,34 +547,54 @@ export default function LatticeDecisionsPage() {
 
   const orgId = organization?.organizationId as number | undefined;
   const projId = project?.projectId as number | undefined;
+  const insightHidden = isInsightHidden();
 
   const refreshList = useCallback(() => {
     if (!orgId || !projId) return;
     listExtractions(orgId, projId)
       .then(setItems)
-      .catch(() => setListError(t.translations.LATTICE_FAILED_LOAD_EXTRACTIONS));
+      .catch(() =>
+        setListError(t.translations.LATTICE_FAILED_LOAD_EXTRACTIONS),
+      );
   }, [orgId, projId, t.translations.LATTICE_FAILED_LOAD_EXTRACTIONS]);
 
   useEffect(() => {
+    if (insightHidden) {
+      router.replace("/");
+    }
+  }, [insightHidden, router]);
+
+  useEffect(() => {
+    if (insightHidden) return;
     if (!orgId || !projId) return;
     setIsListLoading(true);
     listExtractions(orgId, projId)
       .then(setItems)
       .catch(() => setListError(t.translations.LATTICE_FAILED_LOAD_EXTRACTIONS))
       .finally(() => setIsListLoading(false));
-  }, [orgId, projId, t.translations.LATTICE_FAILED_LOAD_EXTRACTIONS]);
+  }, [
+    insightHidden,
+    orgId,
+    projId,
+    t.translations.LATTICE_FAILED_LOAD_EXTRACTIONS,
+  ]);
 
   // Restore last selected extraction when arriving without a query param
   useEffect(() => {
+    if (insightHidden) return;
     if (!projId || selectedId) return;
     const saved = localStorage.getItem(storageKey(projId));
     if (saved) router.replace(`/lattice/decisions?extractionId=${saved}`);
-  }, [projId, selectedId, router]);
+  }, [insightHidden, projId, selectedId, router]);
 
   const handleSelect = (id: number) => {
     if (projId) localStorage.setItem(storageKey(projId), String(id));
     router.replace(`/lattice/decisions?extractionId=${id}`);
   };
+
+  if (insightHidden) {
+    return null;
+  }
 
   return (
     <main className="min-h-screen bg-base-200/30">
@@ -520,17 +613,27 @@ export default function LatticeDecisionsPage() {
             </div>
             <p className="mt-3 max-w-4xl text-base-content/70">
               {t.translations.LATTICE_PAGE_DESCRIPTION_INTRO}{" "}
-              <span className="font-medium">{t.translations.LATTICE_VALID_LABEL}</span>{" "}
+              <span className="font-medium">
+                {t.translations.LATTICE_VALID_LABEL}
+              </span>{" "}
               {t.translations.LATTICE_VALID_DESCRIPTION}{" "}
-              <span className="font-medium">{t.translations.LATTICE_NOVEL_DISCOVERY_LABEL}</span>{" "}
+              <span className="font-medium">
+                {t.translations.LATTICE_NOVEL_DISCOVERY_LABEL}
+              </span>{" "}
               {t.translations.LATTICE_NOVEL_DISCOVERY_DESCRIPTION}{" "}
-              <span className="font-medium">{t.translations.LATTICE_INVALID_SCHEMA_LABEL}</span>{" "}
+              <span className="font-medium">
+                {t.translations.LATTICE_INVALID_SCHEMA_LABEL}
+              </span>{" "}
               {t.translations.LATTICE_INVALID_SCHEMA_DESCRIPTION}{" "}
               {t.translations.LATTICE_APPROVE_PROMOTES_ALL}
             </p>
             <div className="mt-3 flex flex-wrap items-center gap-2">
-              <span className="badge badge-warning badge-sm">{t.translations.LATTICE_COMING_SOON}</span>
-              <span className="text-sm text-base-content/70">{t.translations.LATTICE_COMING_SOON_TEXT}</span>
+              <span className="badge badge-warning badge-sm">
+                {t.translations.LATTICE_COMING_SOON}
+              </span>
+              <span className="text-sm text-base-content/70">
+                {t.translations.LATTICE_COMING_SOON_TEXT}
+              </span>
             </div>
           </div>
         </div>
@@ -541,7 +644,9 @@ export default function LatticeDecisionsPage() {
           {/* Left: extraction list */}
           <aside className="rounded-2xl border border-base-300 bg-base-100 shadow-sm overflow-hidden self-start">
             <div className="border-b border-base-300 px-4 py-3">
-              <h2 className="text-sm font-semibold text-base-content/70">{t.translations.LATTICE_EXTRACTIONS_PANEL_TITLE}</h2>
+              <h2 className="text-sm font-semibold text-base-content/70">
+                {t.translations.LATTICE_EXTRACTIONS_PANEL_TITLE}
+              </h2>
             </div>
 
             {isListLoading ? (
@@ -560,36 +665,57 @@ export default function LatticeDecisionsPage() {
                   <li key={item.id}>
                     <button
                       type="button"
-                      className={`flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition hover:bg-base-200/60 ${selectedId === item.id ? "bg-base-200/80 font-semibold" : ""
-                        }`}
+                      className={`flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition hover:bg-base-200/60 ${
+                        selectedId === item.id
+                          ? "bg-base-200/80 font-semibold"
+                          : ""
+                      }`}
                       onClick={() => handleSelect(item.id)}
                     >
                       <div className="min-w-0">
-                        <p className="truncate text-sm">{t.translations.LATTICE_EXTRACTION_NUMBER}{item.id}</p>
+                        <p className="truncate text-sm">
+                          {t.translations.LATTICE_EXTRACTION_NUMBER}
+                          {item.id}
+                        </p>
                         <div className="mt-2 grid grid-cols-2 gap-x-2">
                           <div>
-                            <p className="text-base-content/40 uppercase tracking-wide" style={{ fontSize: "0.625rem" }}>{t.translations.LATTICE_STATUS_HEADER}</p>
+                            <p
+                              className="text-base-content/40 uppercase tracking-wide"
+                              style={{ fontSize: "0.625rem" }}
+                            >
+                              {t.translations.LATTICE_STATUS_HEADER}
+                            </p>
                             <div className="mt-0.5 flex h-4 items-center">
-                              <span className={`badge badge-xs ${extractionStatusBadgeClass(item.status)}`}>
+                              <span
+                                className={`badge badge-xs ${extractionStatusBadgeClass(item.status)}`}
+                              >
                                 {statusLabel(item.status, t.translations)}
                               </span>
                             </div>
                           </div>
                           {item.mode && (
                             <div>
-                              <p className="text-base-content/40 uppercase tracking-wide" style={{ fontSize: "0.625rem" }}>{t.translations.LATTICE_MODE_HEADER}</p>
+                              <p
+                                className="text-base-content/40 uppercase tracking-wide"
+                                style={{ fontSize: "0.625rem" }}
+                              >
+                                {t.translations.LATTICE_MODE_HEADER}
+                              </p>
                               <div className="mt-0.5 flex h-4 items-center">
-                                <p className="text-xs font-medium text-base-content/70 capitalize">{item.mode}</p>
+                                <p className="text-xs font-medium text-base-content/70 capitalize">
+                                  {item.mode}
+                                </p>
                               </div>
                             </div>
                           )}
                         </div>
                       </div>
                       <ArrowRightIcon
-                        className={`size-4 flex-shrink-0 transition ${selectedId === item.id
-                          ? "text-primary"
-                          : "text-base-content/30"
-                          }`}
+                        className={`size-4 flex-shrink-0 transition ${
+                          selectedId === item.id
+                            ? "text-primary"
+                            : "text-base-content/30"
+                        }`}
                       />
                     </button>
                   </li>

@@ -36,6 +36,7 @@ import { useLanguage } from "@/app/contexts/Language";
 import ProjectsSecurityLabels from "./ProjectsSecurityLabels";
 import ProjectTagOverviewStrip from "./ProjectTagOverviewStrip";
 import ProjectTagsPanel from "./ProjectTagsPanel";
+import { AxiosError } from "axios";
 
 /* -------------------------------------------------------------------------- */
 /*                                   Types                                    */
@@ -418,7 +419,11 @@ const ProjectTagAndLabelManagementClient: React.FC<Props> = ({
       );
     } catch (error) {
       console.error("Failed to archive label:", error);
-      toast.error(t.translations.FAILED_TO_ARCHIVE_LABEL);
+      if (String((error as AxiosError).response?.data).includes("Cannot archive")) {
+        toast.error(t.translations.LABEL_IN_USE)
+      } else {
+        toast.error(t.translations.FAILED_TO_ARCHIVE_LABEL);
+      }
     } finally {
       setArchivingLabelId(null);
       setShowArchiveLabelModal(false);

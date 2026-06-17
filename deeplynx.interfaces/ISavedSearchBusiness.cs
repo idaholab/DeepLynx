@@ -11,7 +11,7 @@ public interface ISavedSearchBusiness
 
     Task<SavedSearchResponseDto> GetSavedSearchById(long currentUserId, long savedSearchId);
 
-    Task<IEnumerable<HistoricalRecordResponseDto>> ExecuteSavedSearch(
+    Task<IEnumerable<QueryRecordViewResponseDto>> ExecuteSavedSearch(
         long savedSearchId, long currentUserId, long organizationId, long[] projectIds,
         bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false);
 

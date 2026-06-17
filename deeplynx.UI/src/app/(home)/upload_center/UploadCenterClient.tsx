@@ -44,7 +44,7 @@ function mapRecordToExistingFile(record: {
   name?: string | null;
   description?: string | null;
   lastUpdatedAt?: string | null;
-  lastUpdatedBy?: string | null;
+  lastUpdatedBy?: string | number | null;
   dataSourceName?: string | null;
 }): ExistingFile | null {
   if (record.id == null) return null;
@@ -53,7 +53,7 @@ function mapRecordToExistingFile(record: {
     name: record.name?.trim() || String(record.id),
     description: record.description ?? undefined,
     lastUpdate: record.lastUpdatedAt ?? undefined,
-    updatedBy: record.lastUpdatedBy ?? undefined,
+    updatedBy: String(record.lastUpdatedBy) ?? undefined,
     dataSource: record.dataSourceName ?? undefined,
   };
 }

@@ -56,6 +56,8 @@ public class EdgeBusiness : IEdgeBusiness
         var isAdmin = await AdminHelper.IsAnyAdmin(_context, currentUserId, organizationId, projectId);
 
         var edgeQuery = _context.Edges
+            .Include(e => e.Origin)
+            .Include(e => e.Destination)
             .Where(e => e.ProjectId == projectId && e.OrganizationId == organizationId);
 
         if (!isAdmin)
@@ -83,6 +85,8 @@ public class EdgeBusiness : IEdgeBusiness
             .Select(e => new EdgeResponseDto
             {
                 Id = e.Id,
+                OriginOriginalId = e.Origin?.OriginalId,
+                DestinationOriginalId = e.Destination?.OriginalId,
                 Properties = e.Properties,
                 OriginId = e.OriginId,
                 DestinationId = e.DestinationId,
@@ -140,6 +144,8 @@ public class EdgeBusiness : IEdgeBusiness
         return new EdgeResponseDto
         {
             Id = edge.Id,
+            OriginOriginalId = edge.Origin?.OriginalId,
+            DestinationOriginalId = edge.Destination?.OriginalId,
             Properties = edge.Properties,
             OriginId = edge.OriginId,
             DestinationId = edge.DestinationId,
@@ -200,6 +206,9 @@ public class EdgeBusiness : IEdgeBusiness
         _context.Edges.Add(edge);
         await _context.SaveChangesAsync();
 
+        await _context.Entry(edge).Reference(e => e.Origin).LoadAsync();
+        await _context.Entry(edge).Reference(e => e.Destination).LoadAsync();
+
         // log edge create event
         await _eventBusiness.CreateEvent(
             currentUserId,
@@ -221,6 +230,8 @@ public class EdgeBusiness : IEdgeBusiness
         return new EdgeResponseDto
         {
             Id = edge.Id,
+            OriginOriginalId = edge.Origin?.OriginalId,
+            DestinationOriginalId = edge.Destination?.OriginalId,
             Properties = edge.Properties,
             OriginId = edge.OriginId,
             DestinationId = edge.DestinationId,
@@ -229,7 +240,8 @@ public class EdgeBusiness : IEdgeBusiness
             ProjectId = edge.ProjectId,
             OrganizationId = edge.OrganizationId,
             LastUpdatedAt = edge.LastUpdatedAt,
-            LastUpdatedBy = edge.LastUpdatedBy
+            LastUpdatedBy = edge.LastUpdatedBy,
+            IsArchived = edge.IsArchived
         };
     }
 
@@ -378,6 +390,9 @@ public class EdgeBusiness : IEdgeBusiness
         _context.Edges.Update(edge);
         await _context.SaveChangesAsync();
 
+        await _context.Entry(edge).Reference(e => e.Origin).LoadAsync();
+        await _context.Entry(edge).Reference(e => e.Destination).LoadAsync();
+
         // log edge update event
         await _eventBusiness.CreateEvent(
             currentUserId,
@@ -395,6 +410,8 @@ public class EdgeBusiness : IEdgeBusiness
         return new EdgeResponseDto
         {
             Id = edge.Id,
+            OriginOriginalId = edge.Origin?.OriginalId,
+            DestinationOriginalId = edge.Destination?.OriginalId,
             Properties = edge.Properties,
             OriginId = edge.OriginId,
             DestinationId = edge.DestinationId,
@@ -674,4 +691,5 @@ public class EdgeBusiness : IEdgeBusiness
             RelationshipId = r.IsDBNull(iRel) ? null : r.GetInt64(iRel)
         };
     }
+
 }

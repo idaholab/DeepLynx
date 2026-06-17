@@ -46,7 +46,7 @@ const LayoutShell = ({ children }: { children: ReactNode }) => {
   const { data: session } = useSafeSession();
   const { user } = useRBAC();
   const { organization, setOrganization } = useOrganizationSession();
-  const { project } = useProjectSession();
+  const { project, clearProject } = useProjectSession();
 
   const [organizations, setOrganizations] = useState<OrganizationResponseDto[]>(
     [],
@@ -131,6 +131,8 @@ const LayoutShell = ({ children }: { children: ReactNode }) => {
   };
 
   const handleOrganizationSwitch = (org: OrganizationResponseDto) => {
+    clearProject();
+
     setOrganization({
       organizationId: org.id,
       organizationName: org.name,
@@ -275,7 +277,7 @@ const LayoutShell = ({ children }: { children: ReactNode }) => {
         </div>
       </header>
       {/* Page Content */}
-      <div className="flex h-full z-0 mt-6">
+      <div className="flex h-full z-0 mt-6 w-full overflow-x-auto">
         {isMobileNavOpen && (
           <button
             type="button"
@@ -297,7 +299,7 @@ const LayoutShell = ({ children }: { children: ReactNode }) => {
           >
             <ul className="mt-20 flex-grow">
               <li>
-                <Link href={"/"}>
+                <Link href={"/"} onClick={clearProject}>
                   <GlobeAmericasIcon className="size-10" />
                 </Link>
               </li>
@@ -438,7 +440,7 @@ const LayoutShell = ({ children }: { children: ReactNode }) => {
           onMobileClose={() => setIsMobileNavOpen(false)}
         />
         <main
-          className={`transition-all duration-300 w-full mt-20 ml-0 ${
+          className={`transition-all duration-300 min-w-[750px] flex-1 w-full mt-20 ml-0 ${
             isMenuCollapsed ? "lg:ml-40" : "lg:ml-82"
           }`}
         >

@@ -16,7 +16,7 @@ public class UpdateRecordRequestDto
     public string? OriginalId { get; set; }
 
     [JsonPropertyName("name")]
-    [MaxLength(100)]
+    [MaxLength(500)]
     public string? Name { get; set; }
 
     [JsonPropertyName("class_id")]

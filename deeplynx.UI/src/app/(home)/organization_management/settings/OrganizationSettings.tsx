@@ -23,6 +23,7 @@ import {
   resolveOrganizationTheme,
 } from "@/app/lib/themes/organizationTheme";
 import { applyOrganizationTheme } from "@/app/lib/themes/themeMode";
+import { isInsightHidden } from "@/app/lib/feature_flags";
 
 const OrganizationSettings = () => {
   const { organization, setOrganization } = useOrganizationSession();
@@ -605,11 +606,13 @@ const OrganizationSettings = () => {
               </div>
             </div>
 
-            <OrganizationInsightModelTemplateSection
-              organizationId={
-                organization?.organizationId as number | undefined
-              }
-            />
+            {!isInsightHidden() && (
+              <OrganizationInsightModelTemplateSection
+                organizationId={
+                  organization?.organizationId as number | undefined
+                }
+              />
+            )}
           </div>
         </div>
 

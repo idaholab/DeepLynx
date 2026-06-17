@@ -6,6 +6,10 @@ public class EdgeResponseDto
 {
     [Column("id")] public long Id { get; set; }
 
+    [Column("origin_original_id")] public string? OriginOriginalId { get; set; }
+
+    [Column("destination_original_id")] public string? DestinationOriginalId { get; set; }
+    
     [Column("origin_id")] public long OriginId { get; set; }
 
     [Column("destination_id")] public long DestinationId { get; set; }

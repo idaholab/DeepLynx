@@ -1,6 +1,6 @@
 import {
   TagResponseDto,
-  HistoricalRecordResponseDto,
+  QueryRecordViewResponseDto,
 } from "@/app/(home)/types/responseDTOs";
 import { useOrganizationSession } from "@/app/contexts/OrganizationSessionProvider";
 import { getRecentlyAddedRecords } from "@/app/lib/client_service/query_services.client";
@@ -29,7 +29,7 @@ const parseTags = (
   return [];
 };
 
-type RecordWithParsedTags = Omit<HistoricalRecordResponseDto, "tags"> & {
+type RecordWithParsedTags = Omit<QueryRecordViewResponseDto, "tags"> & {
   tags: TagResponseDto[];
 };
 

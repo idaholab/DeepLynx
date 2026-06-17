@@ -2,26 +2,32 @@
 "use client";
 
 import { CustomQueryRequestDto } from "@/app/(home)/types/requestDTOs";
-import { HistoricalRecordResponseDto } from "@/app/(home)/types/responseDTOs";
+import {
+    QueryRecordViewResponseDto,
+    PaginatedResponse,
+} from "@/app/(home)/types/responseDTOs";
 import api from "./api";
-
 
 /**
  * Full text search for records
  * @param organizationId - The ID of the organization
  * @param userQuery - String phrase entered by user
  * @param projectIds - Array of project IDs to search across
- * @returns Promise with array of HistoricalRecordResponseDto
+ * @param hideArchived - Flag to hide archived records (default: true)
+ * @returns Promise with array of QueryRecordViewResponseDto
  */
 export async function fullTextSearch(
     organizationId: number,
     userQuery: string,
-    projectIds: number[]
-): Promise<HistoricalRecordResponseDto[]> {
+    projectIds: number[],
+    hideArchived: boolean = true,
+): Promise<QueryRecordViewResponseDto[]> {
     try {
-        const projectIdsQuery = projectIds.map(id => `projectIds=${id}`).join('&');
+        const projectIdsQuery = projectIds
+            .map((id) => `projectIds=${id}`)
+            .join("&");
         const res = await api.get(
-            `/organizations/${organizationId}/query/records?userQuery=${encodeURIComponent(userQuery)}&${projectIdsQuery}`
+            `/organizations/${organizationId}/query/records?userQuery=${encodeURIComponent(userQuery)}&${projectIdsQuery}&hideArchived=${hideArchived}`,
         );
         return res.data;
     } catch (error) {
@@ -36,14 +42,14 @@ export async function fullTextSearch(
  * @param queryObj - Array of custom query request DTOs
  * @param projectIds - Array of project IDs to search across
  * @param textSearch - Optional full text search phrase
- * @returns Promise with array of HistoricalRecordResponseDto
+ * @returns Promise with array of QueryRecordViewResponseDto
  */
 export async function queryBuilder(
     organizationId: number,
     queryObj: CustomQueryRequestDto[],
     projectIds: number[],
-    textSearch?: string | null
-): Promise<HistoricalRecordResponseDto[]> {
+    textSearch?: string | null,
+): Promise<QueryRecordViewResponseDto[]> {
     try {
         // Building json string format from key/value input
         for (const obj of queryObj) {
@@ -53,13 +59,17 @@ export async function queryBuilder(
             }
         }
 
-        const projectIdsQuery = projectIds.map(id => `projectIds=${id}`).join('&');
-        const textSearchParam = textSearch ? `&textSearch=${encodeURIComponent(textSearch)}` : '';
+        const projectIdsQuery = projectIds
+            .map((id) => `projectIds=${id}`)
+            .join("&");
+        const textSearchParam = textSearch
+            ? `&textSearch=${encodeURIComponent(textSearch)}`
+            : "";
 
         const res = await api.post(
             `/organizations/${organizationId}/query/records/advanced?${projectIdsQuery}${textSearchParam}`,
             queryObj,
-            { headers: { "Content-Type": "application/json" } }
+            { headers: { "Content-Type": "application/json" } },
         );
         return res.data;
     } catch (error) {
@@ -72,16 +82,18 @@ export async function queryBuilder(
  * Get recently added records
  * @param organizationId - The ID of the organization
  * @param projectIds - Array of project IDs
- * @returns Promise with array of HistoricalRecordResponseDto sorted by most recent
+ * @returns Promise with array of QueryRecordViewResponseDto sorted by most recent
  */
 export async function getRecentlyAddedRecords(
     organizationId: number,
-    projectIds: number[]
-): Promise<HistoricalRecordResponseDto[]> {
+    projectIds: number[],
+): Promise<QueryRecordViewResponseDto[]> {
     try {
-        const projectIdsQuery = projectIds.map(id => `projectIds=${id}`).join('&');
-        const res = await api.get<HistoricalRecordResponseDto[]>(
-            `/organizations/${organizationId}/query/recent?${projectIdsQuery}`
+        const projectIdsQuery = projectIds
+            .map((id) => `projectIds=${id}`)
+            .join("&");
+        const res = await api.get<QueryRecordViewResponseDto[]>(
+            `/organizations/${organizationId}/query/recent?${projectIdsQuery}`,
         );
         return res.data;
     } catch (error) {
@@ -91,21 +103,57 @@ export async function getRecentlyAddedRecords(
 }
 
 /**
+ * Get paginated records
+ * @param organizationId - The ID of the organization
+ * @param projectIds - Array of project IDs
+ * @param sortBy - Field to sort by
+ * @param paginatedDto - Pagination information (pageNumber, pageSize)
+ * @returns Promise with paginated QueryRecordViewResponseDto
+ */
+export async function getRecordsPaginated(
+    organizationId: number,
+    projectIds: number[],
+    sortBy: string,
+    pageNumber: number,
+    pageSize: number,
+): Promise<PaginatedResponse<QueryRecordViewResponseDto>> {
+    try {
+        const params = new URLSearchParams();
+        projectIds.forEach((id) => params.append("projectIds", String(id)));
+        params.append("sortBy", sortBy);
+        params.append("pageNumber", String(pageNumber ?? 1));
+        params.append("pageSize", String(pageSize ?? 25));
+
+        const res = await api.get<
+            PaginatedResponse<QueryRecordViewResponseDto>
+        >(
+            `/organizations/${organizationId}/query/records/paginated?${params.toString()}`,
+        );
+        return res.data;
+    } catch (error) {
+        console.error("Error getting paginated records:", error);
+        throw error;
+    }
+}
+
+/**
  * Get records from multiple projects
  * @param organizationId - The ID of the organization
  * @param projectIds - Array of project IDs whose records are to be retrieved
  * @param hideArchived - Flag to hide archived records (default: true)
- * @returns Promise with array of RecordResponseDto
+ * @returns Promise with array of QueryRecordViewResponseDto
  */
 export async function getMultiProjectRecords(
     organizationId: number,
     projectIds: number[],
-    hideArchived: boolean = true
-): Promise<HistoricalRecordResponseDto[]> {
+    hideArchived: boolean = true,
+): Promise<QueryRecordViewResponseDto[]> {
     try {
-        const projectIdsQuery = projectIds.map(id => `projects=${id}`).join('&');
+        const projectIdsQuery = projectIds
+            .map((id) => `projects=${id}`)
+            .join("&");
         const res = await api.get(
-            `/organizations/${organizationId}/query/multiproject?${projectIdsQuery}&hideArchived=${hideArchived}`
+            `/organizations/${organizationId}/query/multiproject?${projectIdsQuery}&hideArchived=${hideArchived}`,
         );
         return res.data;
     } catch (error) {

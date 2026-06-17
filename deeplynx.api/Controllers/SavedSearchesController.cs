@@ -116,7 +116,7 @@ public class SavedSearchController : ControllerBase
     /// <returns>List of records retrieved by the query</returns>
     [HttpGet("organizations/{organizationId:long}", Name = "api_query_execute_saved_search")]
     [Auth("read", "record")]
-    public async Task<ActionResult<IEnumerable<HistoricalRecordResponseDto>>> ExecuteSavedSearch(
+    public async Task<ActionResult<IEnumerable<QueryRecordViewResponseDto>>> ExecuteSavedSearch(
         long organizationId, [FromQuery] long[] projectIds, [FromQuery] long savedSearchId)
     {
         try

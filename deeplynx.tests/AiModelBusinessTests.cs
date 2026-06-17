@@ -440,7 +440,7 @@ public class AiModelConfigBusinessTests : IntegrationTestBase
     public async Task GetDefaultAiModelConfigWithToken_Throws_WhenModelRequiresToken_ButNoneStoredForUser()
     {
         // Act & Assert - config1 requires a token but no UserModelToken exists for uid
-        await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
             _aiModelConfigBusiness.GetDefaultAiModelConfigWithToken(uid, oid, pid, "llm"));
     }
 
