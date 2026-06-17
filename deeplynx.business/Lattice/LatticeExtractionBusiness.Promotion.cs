@@ -258,41 +258,41 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
             .ToDictionary(c => c.Name, c => c.Id, StringComparer.OrdinalIgnoreCase)
             : new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
         
-        var nameToNewClassId = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
+        var toProcess = stagingClasses.Where(c =>
+            selectedClassIds.Contains(c.Id) &&
+            (c.ValidationStatus == ExtractionValidationStatus.NovelDiscovery ||
+             c.ValidationStatus == ExtractionValidationStatus.InvalidSchema) &&
+            c.OntologyClassId == null &&
+            c.PromotedId == null).ToList();
 
-        foreach (var sc in stagingClasses.Where(c =>
-                     selectedClassIds.Contains(c.Id) &&
-                     (c.ValidationStatus == ExtractionValidationStatus.NovelDiscovery ||
-                      c.ValidationStatus == ExtractionValidationStatus.InvalidSchema) &&
-                     c.OntologyClassId == null &&
-                     c.PromotedId == null))
-        {
-            if (existingClassByName.TryGetValue(sc.Name, out var existingId))
-            {
-                sc.PromotedId = existingId;
-                continue;
-            }
+        // Assign IDs for classes that already exist in the project
+        foreach (var sc in toProcess.Where(sc => existingClassByName.ContainsKey(sc.Name)))
+            sc.PromotedId = existingClassByName[sc.Name];
 
-            if (nameToNewClassId.TryGetValue(sc.Name, out var batchId))
+        // Batch-create remaining new classes, deduplicated by name
+        var newClasses = toProcess
+            .Where(sc => !sc.PromotedId.HasValue)
+            .GroupBy(sc => sc.Name, StringComparer.OrdinalIgnoreCase)
+            .Select(g => new Class
             {
-                sc.PromotedId = batchId;
-                continue;
-            }
-
-            var newClass = new Class
-            {
-                Name = sc.Name,
+                Name = g.Key,
                 OrganizationId = organizationId,
                 ProjectId = projectId,
                 IsArchived = false,
                 LastUpdatedAt = now,
                 LastUpdatedBy = currentUserId,
                 ExtractionId = extractionId
-            };
-            _context.Classes.Add(newClass);
+            })
+            .ToList();
+
+        if (newClasses.Count > 0)
+        {
+            _context.Classes.AddRange(newClasses);
             await _context.SaveChangesAsync();
-            sc.PromotedId = newClass.Id;
-            nameToNewClassId[sc.Name] = newClass.Id;
+
+            var nameToNewClassId = newClasses.ToDictionary(c => c.Name, c => c.Id, StringComparer.OrdinalIgnoreCase);
+            foreach (var sc in toProcess.Where(sc => !sc.PromotedId.HasValue))
+                sc.PromotedId = nameToNewClassId[sc.Name];
         }
 
         await _latticeContext.SaveChangesAsync();
@@ -312,38 +312,42 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
         long organizationId, long projectId, long extractionId,
         long currentUserId, DateTime now)
     {
-        var newRecordCount = 0;
+        var selected = stagingRecords.Where(r => selectedRecordIds.Contains(r.Id)).ToList();
 
-        foreach (var sr in stagingRecords.Where(r => selectedRecordIds.Contains(r.Id)))
+        // Link records that already exist in the KG — no creation needed
+        foreach (var sr in selected.Where(r => r.DeeplynxRecordId.HasValue))
+            sr.PromotedId = sr.DeeplynxRecordId!.Value;
+
+        // Batch-create new records
+        var toCreate = selected.Where(r => !r.DeeplynxRecordId.HasValue).ToList();
+        if (toCreate.Count > 0)
         {
-            if (sr.DeeplynxRecordId.HasValue)
+            var newRecords = toCreate.Select(sr =>
             {
-                sr.PromotedId = sr.DeeplynxRecordId.Value;
-                continue;
-            }
+                classIdMap.TryGetValue(sr.ExtractionClassId, out var resolvedClassId);
+                return (sr, new Record
+                {
+                    Name = sr.Name,
+                    OriginalId = Guid.NewGuid().ToString(),
+                    Description = string.Empty,
+                    Properties = sr.Attributes ?? "{}",
+                    ClassId = resolvedClassId,
+                    DataSourceId = sr.DataSourceId,
+                    ProjectId = projectId,
+                    OrganizationId = organizationId,
+                    IsArchived = false,
+                    Embedded = false,
+                    LastUpdatedAt = now,
+                    LastUpdatedBy = currentUserId,
+                    ExtractionId = extractionId
+                });
+            }).ToList();
 
-            classIdMap.TryGetValue(sr.ExtractionClassId, out var resolvedClassId);
-
-            var newRecord = new Record
-            {
-                Name = sr.Name,
-                OriginalId = Guid.NewGuid().ToString(),
-                Description = string.Empty,
-                Properties = sr.Attributes ?? "{}",
-                ClassId = resolvedClassId,
-                DataSourceId = sr.DataSourceId,
-                ProjectId = projectId,
-                OrganizationId = organizationId,
-                IsArchived = false,
-                Embedded = false,
-                LastUpdatedAt = now,
-                LastUpdatedBy = currentUserId,
-                ExtractionId = extractionId
-            };
-            _context.Records.Add(newRecord);
+            _context.Records.AddRange(newRecords.Select(x => x.Item2));
             await _context.SaveChangesAsync();
-            sr.PromotedId = newRecord.Id;
-            newRecordCount++;
+
+            foreach (var (sr, newRecord) in newRecords)
+                sr.PromotedId = newRecord.Id;
         }
 
         await _latticeContext.SaveChangesAsync();
@@ -352,7 +356,7 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
             .Where(r => r.PromotedId.HasValue)
             .ToDictionary(r => r.Id, r => r.PromotedId!.Value);
 
-        return (recordIdMap, newRecordCount);
+        return (recordIdMap, toCreate.Count);
     }
 
     /// <summary>
@@ -400,41 +404,50 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
             .ToDictionary(r => r.Name, r => r.Id, StringComparer.OrdinalIgnoreCase)
             : new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
 
-        var nameToPromotedRelId = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
+        var toProcessRels = stagingRelationships.Where(r =>
+            selectedRelIds.Contains(r.Id) &&
+            (r.ValidationStatus == ExtractionValidationStatus.NovelDiscovery ||
+             r.ValidationStatus == ExtractionValidationStatus.InvalidSchema) &&
+            r.OntologyRelationshipId == null &&
+            r.PromotedId == null).ToList();
 
-        foreach (var sr in stagingRelationships.Where(r =>
-                     selectedRelIds.Contains(r.Id) &&
-                     (r.ValidationStatus == ExtractionValidationStatus.NovelDiscovery ||
-                      r.ValidationStatus == ExtractionValidationStatus.InvalidSchema) &&
-                     r.OntologyRelationshipId == null &&
-                     r.PromotedId == null))
+        // Assign IDs for relationships that already exist in the project
+        foreach (var sr in toProcessRels.Where(sr => existingRelByName.ContainsKey(sr.Name)))
+            sr.PromotedId = existingRelByName[sr.Name];
+
+        // Batch-create remaining new relationships, deduplicated by name.
+        // First occurrence of each name determines the origin/destination classes.
+        var newRels = toProcessRels
+            .Where(sr => !sr.PromotedId.HasValue)
+            .GroupBy(sr => sr.Name, StringComparer.OrdinalIgnoreCase)
+            .Select(g =>
+            {
+                var first = g.First();
+                classIdMap.TryGetValue(first.OriginClassId, out var originClassId);
+                classIdMap.TryGetValue(first.DestinationClassId, out var destClassId);
+                return new Relationship
+                {
+                    Name = g.Key,
+                    OriginId = originClassId,
+                    DestinationId = destClassId,
+                    OrganizationId = organizationId,
+                    ProjectId = projectId,
+                    IsArchived = false,
+                    LastUpdatedAt = now,
+                    LastUpdatedBy = currentUserId,
+                    ExtractionId = extractionId
+                };
+            })
+            .ToList();
+
+        if (newRels.Count > 0)
         {
-            if (existingRelByName.TryGetValue(sr.Name, out var existingId) ||
-                nameToPromotedRelId.TryGetValue(sr.Name, out existingId))
-            {
-                sr.PromotedId = existingId;
-                continue;
-            }
-
-            classIdMap.TryGetValue(sr.OriginClassId, out var originClassId);
-            classIdMap.TryGetValue(sr.DestinationClassId, out var destClassId);
-
-            var newRel = new Relationship
-            {
-                Name = sr.Name,
-                OriginId = originClassId,
-                DestinationId = destClassId,
-                OrganizationId = organizationId,
-                ProjectId = projectId,
-                IsArchived = false,
-                LastUpdatedAt = now,
-                LastUpdatedBy = currentUserId,
-                ExtractionId = extractionId
-            };
-            _context.Relationships.Add(newRel);
+            _context.Relationships.AddRange(newRels);
             await _context.SaveChangesAsync();
-            sr.PromotedId = newRel.Id;
-            nameToPromotedRelId[sr.Name] = newRel.Id;
+
+            var nameToNewRelId = newRels.ToDictionary(r => r.Name, r => r.Id, StringComparer.OrdinalIgnoreCase);
+            foreach (var sr in toProcessRels.Where(sr => !sr.PromotedId.HasValue))
+                sr.PromotedId = nameToNewRelId[sr.Name];
         }
 
         await _latticeContext.SaveChangesAsync();
