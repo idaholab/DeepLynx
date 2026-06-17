@@ -39,6 +39,7 @@ public class InvitationBusinessTests : IntegrationTestBase
     public long rid; // role ID
     public long uid; // existing user ID
     public long uid2; // existing user 2 ID
+    public long uidSa; // existing service account user ID
 
     public InvitationBusinessTests(TestSuiteFixture fixture) : base(fixture)
     {
@@ -100,10 +101,19 @@ public class InvitationBusinessTests : IntegrationTestBase
             Password = "test_password",
             IsArchived = false
         };
-        Context.Users.AddRange(user1, user2);
+        var serviceAccount = new User
+        {
+            Name = "Test Service Account",
+            Email = "service_test_account",
+            Username = "service_test_account",
+            IsServiceAccount = true,
+            IsArchived = false
+        };
+        Context.Users.AddRange(user1, user2, serviceAccount);
         await Context.SaveChangesAsync();
         uid = user1.Id;
         uid2 = user2.Id;
+        uidSa = serviceAccount.Id;
 
         // Create organizations
         var org1 = new Organization
@@ -468,6 +478,80 @@ public class InvitationBusinessTests : IntegrationTestBase
                 oid, pid, null, rid, nonExistentUserId, null));
 
         Assert.Contains("not found", exception.Message);
+    }
+
+    #endregion
+
+    #region Service Accounts
+
+    [Fact]
+    public async Task InviteServiceAccount_Success_WhenAdminAndProjectSpecified_AddsToProjectWithoutEmail()
+    {
+        // Arrange
+        _notificationBusiness.Setup(n => n.SendEmail(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<bool>(),
+                It.IsAny<long?>(), It.IsAny<long?>()))
+            .ReturnsAsync(true);
+
+        // Act - admin adds a service account to a project
+        var result = await _invitationBusiness.InviteAndAddUserToHierarchy(
+            oid, pid, null, rid, uidSa, null, true);
+
+        // Assert
+        Assert.True(result);
+        Assert.True(await Context.OrganizationUsers.AnyAsync(ou => ou.UserId == uidSa && ou.OrganizationId == oid));
+
+        var projectMember =
+            await Context.ProjectMembers.FirstOrDefaultAsync(pm => pm.UserId == uidSa && pm.ProjectId == pid);
+        Assert.NotNull(projectMember);
+        Assert.Equal(rid, projectMember.RoleId);
+
+        // Service accounts have no real email, so none should ever be sent
+        _notificationBusiness.Verify(
+            n => n.SendEmail(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<bool>(), It.IsAny<long?>(),
+                It.IsAny<long?>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task InviteServiceAccount_Fails_WhenCallerIsNotAdmin()
+    {
+        // Act & Assert - non-admin caller (default) cannot add a service account
+        var exception = await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            _invitationBusiness.InviteAndAddUserToHierarchy(
+                oid, pid, null, rid, uidSa, null));
+
+        Assert.Contains("Only admins", exception.Message);
+
+        // Nothing should have been added
+        Assert.False(await Context.ProjectMembers.AnyAsync(pm => pm.UserId == uidSa && pm.ProjectId == pid));
+        Assert.False(await Context.OrganizationUsers.AnyAsync(ou => ou.UserId == uidSa && ou.OrganizationId == oid));
+    }
+
+    [Fact]
+    public async Task InviteServiceAccount_Fails_WhenNoProjectSpecified()
+    {
+        // Act & Assert - service accounts cannot be added at the organization level alone
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            _invitationBusiness.InviteAndAddUserToHierarchy(
+                oid, null, null, null, uidSa, null, true));
+
+        Assert.Contains("must be added to a project", exception.Message);
+
+        // Nothing should have been added
+        Assert.False(await Context.OrganizationUsers.AnyAsync(ou => ou.UserId == uidSa && ou.OrganizationId == oid));
+    }
+
+    [Fact]
+    public async Task InviteServiceAccount_ByEmail_Fails_WhenNoProjectSpecified()
+    {
+        // Act & Assert - same org-level restriction applies when resolved by email
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            _invitationBusiness.InviteAndAddUserToHierarchy(
+                oid, null, null, null, null, "service_test_account", true));
+
+        Assert.Contains("must be added to a project", exception.Message);
+
+        Assert.False(await Context.OrganizationUsers.AnyAsync(ou => ou.UserId == uidSa && ou.OrganizationId == oid));
     }
 
     #endregion

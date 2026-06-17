@@ -34,13 +34,17 @@ public class InvitationBusiness : IInvitationBusiness
     /// </summary>
     /// <param name="organizationId"></param>
     /// <param name="projectId"></param>
+    /// <param name="groupId"></param>
     /// <param name="roleId"></param>
+    /// <param name="userId"></param>
     /// <param name="userEmail"></param>
-    /// <param name="userName"></param>
+    /// <param name="callerIsAdmin">
+    ///     Whether the calling user is a sys/org/project admin. Required to add a service account to
+    ///     the hierarchy; non-admins are rejected when the target user is a service account.
+    /// </param>
     /// <returns></returns>
-    /// <exception cref="NotImplementedException"></exception>
     public async Task<bool> InviteAndAddUserToHierarchy(long organizationId, long? projectId, long? groupId,
-        long? roleId, long? userId, string? userEmail)
+        long? roleId, long? userId, string? userEmail, bool callerIsAdmin = false)
     {
         var suppliedCount = (groupId.HasValue ? 1 : 0) +
                             (userId.HasValue ? 1 : 0) +
@@ -70,10 +74,24 @@ public class InvitationBusiness : IInvitationBusiness
             var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId);
             if (user == null) throw new ArgumentException($"User with id '{userId}' not found.");
 
+            if (user.IsServiceAccount)
+            {
+                // Only admins may attach a service account, and only ever to a project - service
+                // accounts cannot be added at the organization level alone.
+                if (!callerIsAdmin)
+                    throw new UnauthorizedAccessException(
+                        "Unauthorized: Only admins can add service accounts to a project.");
+                if (projectId == null)
+                    throw new InvalidOperationException(
+                        "Service accounts must be added to a project and cannot be added at the organization level.");
+            }
+
             var wasAdded = await AddUserToHierarchyWithoutEmail(organizationId, projectId, roleId, user);
 
-            // Only send email if user was actually added to org/project
-            if (wasAdded)
+            // Only send email if user was actually added to org/project. Service accounts have no
+            // real email (a generated placeholder) and never authenticate as people, so skip email
+            // entirely and just add them to the hierarchy.
+            if (wasAdded && !user.IsServiceAccount)
                 await _notificationBusiness.SendEmail(user.Email, user.Name, false, organizationId, projectId);
 
             return true;
@@ -86,11 +104,24 @@ public class InvitationBusiness : IInvitationBusiness
 
             if (user != null)
             {
+                if (user.IsServiceAccount)
+                {
+                    // Only admins may attach a service account, and only ever to a project - service
+                    // accounts cannot be added at the organization level alone.
+                    if (!callerIsAdmin)
+                        throw new UnauthorizedAccessException(
+                            "Unauthorized: Only admins can add service accounts to a project.");
+                    if (projectId == null)
+                        throw new InvalidOperationException(
+                            "Service accounts must be added to a project and cannot be added at the organization level.");
+                }
+
                 // Existing user - no transaction, best-effort email
                 var wasAdded = await AddUserToHierarchyWithoutEmail(organizationId, projectId, roleId, user);
 
-                // Only send email if user was actually added to org/project
-                if (wasAdded)
+                // Only send email if user was actually added to org/project, and never to service
+                // accounts (they have no real email and never authenticate as people).
+                if (wasAdded && !user.IsServiceAccount)
                     await _notificationBusiness.SendEmail(user.Email, user.Name, false, organizationId, projectId);
 
                 return true;

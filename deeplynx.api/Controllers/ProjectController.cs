@@ -384,8 +384,10 @@ public class ProjectController : ControllerBase
     {
         try
         {
+            var callerIsAdmin = UserContextStorage.IsSysAdmin || UserContextStorage.IsOrgAdmin ||
+                                UserContextStorage.IsProjectAdmin;
             await _invitationBusiness.InviteAndAddUserToHierarchy(organizationId, projectId, groupId, roleId, userId,
-                userEmail);
+                userEmail, callerIsAdmin);
             return Ok(new
             {
                 message = $"Invited and added inactive user with email {userEmail} to organization {organizationId}"
