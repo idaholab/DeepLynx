@@ -49,7 +49,7 @@ Two facts about how models reach the system:
 4. **Cheap, transactional DDL stays in EF migrations**: the four metadata columns
    (`organization_id`, `project_id`, `embedding_model`, `dimensions`), the vector-column relax to
    untyped, and the composite btree `(project_id, embedding_model)`. (All delivered in migration
-   `20260617045633_AddEmbeddingMetadataColumns`.)
+   `20260617200804_AddEmbeddingMetadataColumns`.)
 5. **Partial HNSW index DDL is delivered out-of-band**, not as EF migrations — as checked-in,
    idempotent SQL scripts (`deeplynx.datalayer/Scripts/Embeddings/`) executed via the
    [embedding index maintenance runbook](../runbooks/embedding-index-maintenance.md). This is

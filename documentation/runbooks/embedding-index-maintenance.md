@@ -4,14 +4,14 @@ Operational procedures for the per-model partial HNSW indexes on `dl_vector.embe
 For the rationale behind this design, see
 [ADR 002](../adr/002_embedding_ann_index_provisioning.md).
 
-## Background (read first)
+## Background
 
 - ANN search uses **per-model partial HNSW indexes** (cosine / `vector_cosine_ops`). Each index
   casts to one model's dimension and is predicated on one `embedding_model`.
 - These index builds use `CREATE INDEX CONCURRENTLY`, which **cannot run in a transaction** and so
   are **not** EF migrations. They live as checked-in scripts under
   `deeplynx.datalayer/Scripts/Embeddings/` and are run by an operator.
-- A model **without** its index is not broken — queries degrade to (slow) exact scan. So a missing
+- A model **without** its index is not broken — queries degrade to a slower exact scan. So a missing
   index is a performance issue, never a correctness issue.
 
 ## Prerequisites
@@ -20,7 +20,7 @@ For the rationale behind this design, see
 - A DB role with `CREATE` on the `dl_vector` schema.
 - A maintenance window for large builds, and an elevated session `maintenance_work_mem`
   (e.g. `SET maintenance_work_mem = '2GB';` — size to the host; larger = faster build).
-- The Bucket A migration `20260617045633_AddEmbeddingMetadataColumns` already applied (adds the
+- The migration `20260617200804_AddEmbeddingMetadataColumns` already applied (adds the
   metadata columns, relaxes the vector column to untyped, and creates the composite btree).
 
 ---
@@ -94,11 +94,3 @@ model as indexed.
    ```
 
 ---
-
-## Out of scope here (companion source-code PR)
-
-- Read-path switch to cosine (`<=>`) and the `embedding_model` / `project_id` query predicates.
-- Write-path propagation of `organization_id` / `project_id` / `embedding_model` / `dimensions`
-  into the INSERT.
-- ANN session tuning (`hnsw.iterative_scan`, `hnsw.ef_search`).
-- The startup/health check that runs Procedure C automatically.
