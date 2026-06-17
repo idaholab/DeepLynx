@@ -1185,6 +1185,88 @@ public class RecordControllerTests : IDisposable
 
     #endregion
 
+    // =========================================================================
+    // GetInsightEligibleRecords Tests
+    // =========================================================================
+
+    #region GetInsightEligibleRecords Tests
+
+    [Fact]
+    public async Task GetInsightEligibleRecords_Returns200_WithList()
+    {
+        var expected = new List<RecordResponseDto>
+    {
+        new() { Id = 1, Name = "Eligible Record 1" },
+        new() { Id = 2, Name = "Eligible Record 2" }
+    };
+        _mockBusiness.Setup(b => b.GetInsightEligibleRecords(UserId, OrgId, ProjectId, false, false, false))
+                     .ReturnsAsync(expected);
+
+        var result = (await _controller.GetInsightEligibleRecords(OrgId, ProjectId)).Result as OkObjectResult;
+
+        Assert.NotNull(result);
+        Assert.Equal(200, result.StatusCode);
+        Assert.Equal(expected, result.Value);
+    }
+
+    [Fact]
+    public async Task GetInsightEligibleRecords_Returns200_WithEmptyList()
+    {
+        _mockBusiness.Setup(b => b.GetInsightEligibleRecords(
+                         It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(),
+                         It.IsAny<bool>(), It.IsAny<bool>(), It.IsAny<bool>()))
+                     .ReturnsAsync([]);
+
+        var result = (await _controller.GetInsightEligibleRecords(OrgId, ProjectId)).Result as OkObjectResult;
+
+        Assert.NotNull(result);
+        Assert.Equal(200, result.StatusCode);
+        Assert.IsAssignableFrom<IEnumerable<RecordResponseDto>>(result.Value);
+    }
+
+    [Fact]
+    public async Task GetInsightEligibleRecords_Returns500_OnUnexpectedException()
+    {
+        _mockBusiness.Setup(b => b.GetInsightEligibleRecords(
+                         It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(),
+                         It.IsAny<bool>(), It.IsAny<bool>(), It.IsAny<bool>()))
+                     .ThrowsAsync(new Exception("db error"));
+
+        var result = (await _controller.GetInsightEligibleRecords(OrgId, ProjectId)).Result as ObjectResult;
+
+        Assert.NotNull(result);
+        Assert.Equal(500, result.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetInsightEligibleRecords_PassesAdminFlagsToBusinessLayer()
+    {
+        UserContextStorage.IsSysAdmin = true;
+        UserContextStorage.IsOrgAdmin = true;
+        UserContextStorage.IsProjectAdmin = true;
+
+        _mockBusiness.Setup(b => b.GetInsightEligibleRecords(UserId, OrgId, ProjectId, true, true, true))
+                     .ReturnsAsync([]);
+
+        await _controller.GetInsightEligibleRecords(OrgId, ProjectId);
+
+        _mockBusiness.Verify(b => b.GetInsightEligibleRecords(UserId, OrgId, ProjectId, true, true, true), Times.Once);
+    }
+
+    [Fact]
+    public void GetInsightEligibleRecords_HasHttpGetAndReadRecordAndReadTagAuthorization()
+    {
+        var method = GetControllerMethod(
+            nameof(RecordController.GetInsightEligibleRecords),
+            "organizationId",
+            "projectId");
+
+        AssertHasHttpAttribute(method, "HttpGetAttribute");
+        AssertHasAuthAttribute(method, "read", "record");
+        AssertHasAuthAttribute(method, "read", "tag");
+    }
+
+    #endregion
 
     // =========================================================================
     // Test Helpers
