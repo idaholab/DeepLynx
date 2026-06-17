@@ -18,6 +18,7 @@ public class OauthDeviceAuthorizationBusiness : IOauthDeviceAuthorizationBusines
     private const int AccessTokenExpirationMinutes = 480;
     private const int RefreshTokenBytes = 64;
     private const int RefreshTokenExpirationDays = 30;
+    private const int SlowDownIntervalSeconds = 5;
     private const string UserCodeAlphabet = "BCDFGHJKLMNPQRSTVWXZ";
 
     private readonly DeeplynxContext _context;
@@ -129,6 +130,9 @@ public class OauthDeviceAuthorizationBusiness : IOauthDeviceAuthorizationBusines
         }
 
         var nowWithoutTz = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
+        var polledTooSoon = request.LastPolledAt.HasValue
+                            && request.LastPolledAt.Value.AddSeconds(request.PollingIntervalSeconds) > nowWithoutTz;
+
         request.PollCount++;
         request.LastPolledAt = nowWithoutTz;
 
@@ -138,6 +142,13 @@ public class OauthDeviceAuthorizationBusiness : IOauthDeviceAuthorizationBusines
             await _context.SaveChangesAsync();
             await CleanupExpiredOrConsumedRequests();
             throw new InvalidOperationException("expired_token");
+        }
+
+        if (request.Status == OauthDeviceAuthorizationStatus.Pending && polledTooSoon)
+        {
+            request.PollingIntervalSeconds += SlowDownIntervalSeconds;
+            await _context.SaveChangesAsync();
+            throw new InvalidOperationException("slow_down");
         }
 
         if (request.Status == OauthDeviceAuthorizationStatus.Pending)
