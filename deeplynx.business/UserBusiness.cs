@@ -189,9 +189,15 @@ public class UserBusiness : IUserBusiness
             if (!isAdmin)
                 throw new UnauthorizedAccessException("Unauthorized: Only Admins can create service accounts");
 
-            // Service accounts don't authenticate as people. The admin only supplies a display
-            // Name; we generate a unique identifier for both username and email so the account
-            // is guaranteed unique without requiring the caller to pick a unique name.
+            // Service accounts don't authenticate as people; their email and username are
+            // generated, not caller-supplied. Reject contradictory input rather than silently
+            // discarding it so the caller knows these fields are ignored.
+            if (!string.IsNullOrWhiteSpace(dto.Email) || !string.IsNullOrWhiteSpace(dto.Username))
+                throw new ArgumentException("Service accounts cannot be assigned an email or username; these identifiers are generated automatically.");
+
+            // The admin only supplies a display Name; we generate a unique identifier for both
+            // username and email so the account is guaranteed unique without requiring the
+            // caller to pick a unique name.
             var serviceIdentifier = $"service_{Guid.NewGuid()}";
             username = serviceIdentifier; // Note: we do NOT allow username to be changed for any user- only name
             email = serviceIdentifier;
