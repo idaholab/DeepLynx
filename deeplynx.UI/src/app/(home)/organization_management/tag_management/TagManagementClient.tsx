@@ -34,6 +34,7 @@ import OrgTagsPanel from "./OrgTagsPanel";
 import TagEditModal from "./TagEditModal";
 import LabelEditModal from "./LabelEditModal";
 import ConfirmArchiveLabelModal from "./ConfirmArchiveLabelModal";
+import { AxiosError } from "axios";
 
 /* -------------------------------------------------------------------------- */
 /*                                   Types                                    */
@@ -386,7 +387,11 @@ const TagManagementClient: React.FC<Props> = ({ projects }) => {
       );
     } catch (error) {
       console.error("Failed to archive label:", error);
-      toast.error(t.translations.FAILED_TO_ARCHIVE_LABEL);
+      if (String((error as AxiosError).response?.data).includes("Cannot archive")) {
+        toast.error(t.translations.LABEL_IN_USE)
+      } else {
+        toast.error(t.translations.FAILED_TO_ARCHIVE_LABEL);
+      }
     } finally {
       setArchivingLabelId(null);
       setShowArchiveLabelModal(false);
