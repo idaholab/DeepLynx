@@ -275,12 +275,9 @@ Git tracks submodules as a commit hash, not a branch! When you push changes insi
 
 ### Running tests with Playwright
 
-### --Using bash--
+### Using bash
 
 Tests are located in deeplynx.UI/tests and organized by page. When running tests, make sure you are in the deeplynx.UI directory, also make sure you have a running backend in a separate terminal using `dotnet run dev`
-
-#### To setup/update
-`npm install @playwright/test; npx playwright install`
 
 #### To run all tests
 `npx playwright test` or `npm run test`
@@ -303,7 +300,7 @@ Tests are located in deeplynx.UI/tests and organized by page. When running tests
 #### To stop running tests
 Ctrl+C
 
-### --Using Playwright plug-in--
+### Using Playwright plug-in
 
 Go to extensions and search Playwright Test for VSCode. Install plug-in. Detailed instructions can be found in the extension's detail page.
 
