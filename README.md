@@ -275,57 +275,60 @@ Git tracks submodules as a commit hash, not a branch! When you push changes insi
 
 ### Running tests with Playwright
 
-## Using bash
+### --Using bash--
 
-Tests are located in deeplynx.UI/tests and organized by page. When running tests, make sure you are in the deeplynx.UI directory
+Tests are located in deeplynx.UI/tests and organized by page. When running tests, make sure you are in the deeplynx.UI directory, also make sure you have a running backend in a separate terminal using `dotnet run dev`
 
-#To run all tests
-npx playwright test
+#### To setup/update
+`npm install @playwright/test`
 
-#To run tests in UI mode (This allows to step through tests visually)
-npx playwright test --ui
+#### To run all tests
+`npx playwright test` or `npm run test`
 
-#To run tests in headed mode
-npx playwright test --headed
+#### To run tests in UI mode (This allows to step through tests visually)
+`npx playwright test --ui`
 
-#To run a specific file
-npx playwright test tests/organization.spec.ts
+#### To run tests in headed mode
+`npx playwright test --headed`
 
-#To run a specific test by name (-g with partial name will run all related tests)
-npx playwright test -g "user is automatically assigned an organization on startup"
+#### To run a specific file
+`npx playwright test tests/organization.spec.ts`
 
-#To view the HTML report after the test
-npx playwright show-report
+#### To run a specific test by name (-g with partial name will run all related tests)
+`npx playwright test -g "user is automatically assigned an organization on startup"`
 
-#To stop running tests
+#### To view the HTML report after the test
+`npx playwright show-report`
+
+#### To stop running tests
 Ctrl+C
 
-## Using Playwright plug-in
+### --Using Playwright plug-in--
 
 Go to extensions and search Playwright Test for VSCode. Install plug-in. Detailed instructions can be found in the extension's detail page.
 
 A beaker will appear in the left panel - this is Playwright's main testing area
 Additional settings can be configured under Playwright>Settings at the bottom
 
-#To run all tests
+#### To run all tests
 
 - Go to Testing (beaker) click the play button by the Test Explorer on the top - cursor needs to be in the testing area to show the buttons, OR
 - Right click deeplynx.UI/tests folder in the file explorer and click Run Tests
 
-#To run tests in a specific folder
+#### To run tests in a specific folder
 
 - Locate the folder in the testing area and click the play button, OR
 - Right click the folder in the file explorer and click Run Tests
 
-#To run tests in a specific file
+#### To run tests in a specific file
 
 - Locate the file in the testing area and click the play button, OR
 - Right click the file in the file explorer and click Run Tests - You can also click the first play button in the file
 
-#To run a specific test by name
+#### To run a specific test by name
 
 - Type test name in filter bar in the testing area and click the play button on desired test(s), OR
 - In the file explorer, locate the specific test and click the play button on the left
 
-#To stop a running test
+#### To stop a running test
 Click the stop button in the Test Explorer - cursor will need to be in the testing area
