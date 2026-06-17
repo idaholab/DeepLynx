@@ -441,6 +441,33 @@ export async function removeMemberFromProject(
   }
 }
 
+/**
+ * Set project admin status for a user
+ * @param organizationId - The ID of the organization
+ * @param projectId - The ID of the project
+ * @param userId - The ID of the user
+ * @param isAdmin - The admin status to set
+ * @returns Promise with success message
+ */
+export async function setProjectAdminStatus(
+  organizationId: number,
+  projectId: number,
+  userId: number,
+  isAdmin: boolean
+): Promise<{ message: string }> {
+  try {
+    const res = await api.put(
+      `/organizations/${organizationId}/projects/${projectId}/admin`,
+      null,
+      { params: { userId, isAdmin } }
+    );
+    return res.data;
+  } catch (error) {
+    console.error(`Error setting project admin status for user ${userId} in project ${projectId}:`, error);
+    throw error;
+  }
+}
+
 /* -------------------------------------------------------------------------- */
 /*                            PROJECT LOGO SERVICES                           */
 /* -------------------------------------------------------------------------- */

@@ -282,17 +282,19 @@ public class ProjectController : ControllerBase
     /// <param name="roleId">(Optional) ID of member role</param>
     /// <param name="userId">ID of user if user is member</param>
     /// <param name="groupId">ID of group if group is member</param>
+    /// <param name="isProjectAdmin">Whether the member is a project admin. Defaults to false</param>
     /// <returns></returns>
     [HttpPost("{projectId:long}/members", Name = "api_add_member_to_project")]
     [Auth("update", "project")]
     [Auth("update", "user")]
     public async Task<ActionResult> AddMemberToProject(
         long organizationId, long projectId,
-        [FromQuery] long? roleId, [FromQuery] long? userId, [FromQuery] long? groupId)
+        [FromQuery] long? roleId, [FromQuery] long? userId, [FromQuery] long? groupId,
+        [FromQuery] bool isProjectAdmin = false)
     {
         try
         {
-            await _projectBusiness.AddMemberToProject(projectId, roleId, userId, groupId);
+            await _projectBusiness.AddMemberToProject(projectId, roleId, userId, groupId, isProjectAdmin);
             return Ok(new { message = $"Added member {userId ?? groupId} to project {projectId}" });
         }
         catch (Exception exc)
@@ -327,6 +329,36 @@ public class ProjectController : ControllerBase
         catch (Exception exc)
         {
             var message = $"An error occurred while updating member role in project {projectId}: {exc}";
+            _logger.LogError(message);
+            return StatusCode(StatusCodes.Status500InternalServerError, message);
+        }
+    }
+
+    /// <summary>
+    ///     Set Project Admin Status for a Project Member
+    /// </summary>
+    /// <param name="organizationId">ID of the organization to which the project belongs</param>
+    /// <param name="projectId">ID of project</param>
+    /// <param name="userId">ID of user if user is member</param>
+    /// <param name="groupId">ID of group if group is member</param>
+    /// <param name="isAdmin">Project admin status to set the member to</param>
+    /// <returns></returns>
+    [HttpPut("{projectId:long}/admin", Name = "api_update_project_member_admin_status")]
+    [Auth("update", "project")]
+    [Auth("update", "user")]
+    public async Task<ActionResult> SetProjectAdminStatus(
+        long organizationId, long projectId,
+        [FromQuery] long? userId, [FromQuery] long? groupId, [FromQuery] bool isAdmin)
+    {
+        try
+        {
+            await _projectBusiness.SetProjectAdminStatus(projectId, userId, groupId, isAdmin);
+            return Ok(new { message = $"Adjusted admin status for member {userId ?? groupId} in project {projectId}" });
+        }
+        catch (Exception exc)
+        {
+            var message =
+                $"An error occurred while setting admin status for member {userId ?? groupId} in project {projectId}: {exc}";
             _logger.LogError(message);
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }

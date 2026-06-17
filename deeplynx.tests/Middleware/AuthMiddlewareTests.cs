@@ -537,6 +537,90 @@ public class AuthMiddlewareTests : IntegrationTestBase
         Assert.Equal(StatusCodes.Status403Forbidden, context.Response.StatusCode);
     }
 
+    [Fact]
+    public async Task InvokeAsync_Passes_WhenUserIsProjectAdmin_EvenWithoutRolePermission()
+    {
+        // Arrange - project admin lacking the role-based permission should still pass
+        var context = CreateHttpContextWithAuth("write", "project");
+        SetAuthenticatedUser(context, userId1);
+        context.Request.RouteValues["organizationId"] = organizationId1.ToString();
+        context.Request.RouteValues["projectId"] = projectId1.ToString();
+
+        // Resolve the org for the project so the project-admin bypass can run.
+        _organizationServiceMock
+            .Setup(x => x.CheckExistence(projectId1, organizationId1, false))
+            .ReturnsAsync(organizationId1);
+
+        // Project-admin status is now computed fresh via AdminService.
+        _adminServiceMock
+            .Setup(x => x.ProjectAdminCheck(userId1, It.IsAny<long>(), It.Is<List<long>>(l => l.Contains(projectId1))))
+            .ReturnsAsync(true);
+
+        _projectRolePermissionServiceMock
+            .Setup(x => x.PermissionInProject(userId1, projectId1, "write", "project"))
+            .ReturnsAsync(false);
+
+        var nextCalled = false;
+        RequestDelegate next = ctx =>
+        {
+            nextCalled = true;
+            return Task.CompletedTask;
+        };
+        var middleware = new AuthMiddleware(next);
+
+        // Act
+        await middleware.InvokeAsync(context, _orgRolePermissionServiceMock.Object,
+            _projectRolePermissionServiceMock.Object, _adminServiceMock.Object, _organizationServiceMock.Object);
+
+        // Assert - bypass granted access without consulting the role permission result
+        Assert.True(nextCalled);
+        _projectRolePermissionServiceMock.Verify(
+            x => x.PermissionInProject(userId1, projectId1, "write", "project"),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task InvokeAsync_Passes_WhenProjectAdmin_OnOrgLessProjectRoute()
+    {
+        // Arrange - org-less project route (no {organizationId} segment). The middleware
+        // must derive the org from the project and still honor the project-admin bypass.
+        var context = CreateHttpContextWithAuth("read", "data_source");
+        SetAuthenticatedUser(context, userId1);
+        context.Request.RouteValues["projectId"] = projectId1.ToString();
+
+        // No organizationId in the route, so AuthMiddleware derives it from the project.
+        _organizationServiceMock
+            .Setup(x => x.CheckExistence(projectId1, null, false))
+            .ReturnsAsync(organizationId1);
+
+        _adminServiceMock
+            .Setup(x => x.ProjectAdminCheck(userId1, It.IsAny<long>(), It.Is<List<long>>(l => l.Contains(projectId1))))
+            .ReturnsAsync(true);
+
+        // User lacks the role-based permission; the project-admin bypass must still grant access.
+        _projectRolePermissionServiceMock
+            .Setup(x => x.PermissionInProject(userId1, projectId1, "read", "data_source"))
+            .ReturnsAsync(false);
+
+        var nextCalled = false;
+        RequestDelegate next = ctx =>
+        {
+            nextCalled = true;
+            return Task.CompletedTask;
+        };
+        var middleware = new AuthMiddleware(next);
+
+        // Act
+        await middleware.InvokeAsync(context, _orgRolePermissionServiceMock.Object,
+            _projectRolePermissionServiceMock.Object, _adminServiceMock.Object, _organizationServiceMock.Object);
+
+        // Assert - bypass works even though the route carries no organizationId
+        Assert.True(nextCalled);
+        _projectRolePermissionServiceMock.Verify(
+            x => x.PermissionInProject(userId1, projectId1, "read", "data_source"),
+            Times.Never);
+    }
+
     #endregion
 
     #region Middleware Tests - Both Org and Project (OR Logic)

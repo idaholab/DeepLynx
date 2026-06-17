@@ -15,6 +15,8 @@ public interface IAdminService
     Task<bool> ProjectAdminCheck(long userId, long organizationId, List<long> projectIds);
 
     Task<bool> OrgAdminInSystemCheck(long userId);
+
+    Task<bool> ProjectAdminInSystemCheck(long userId);
 }
 
 public class AdminService : IAdminService
@@ -97,11 +99,13 @@ public class AdminService : IAdminService
             return false;
         }
 
-        // Get all project IDs where the user is a direct admin OR an admin through group membership
+        // Get all project IDs where the user is a direct admin OR an admin through group membership.
+        // Scoped by the project's organization (not the member's role) so admin status derives
+        // purely from the is_project_admin flag and does not depend on holding any particular role.
         var adminProjectIds = await _dbContext.ProjectMembers
             .Where(pm =>
-                pm.Role.Name == "Admin" &&
-                pm.Role.OrganizationId == organizationId &&
+                pm.IsProjectAdmin &&
+                pm.Project.OrganizationId == organizationId &&
                 (
                     // Direct membership
                     pm.UserId == userId ||
@@ -131,5 +135,13 @@ public class AdminService : IAdminService
     {
         return await _dbContext.OrganizationUsers
             .AnyAsync(ou => ou.UserId == userId && ou.IsOrgAdmin);
+    }
+
+    public async Task<bool> ProjectAdminInSystemCheck(long userId)
+    {
+        // Is the user a project admin of ANY project, directly or through group membership?
+        return await _dbContext.ProjectMembers
+            .AnyAsync(pm => pm.IsProjectAdmin &&
+                (pm.UserId == userId || pm.Group.Users.Any(gu => gu.Id == userId)));
     }
 }

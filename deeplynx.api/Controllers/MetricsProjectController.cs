@@ -40,7 +40,7 @@ public class MetricsProjectController : ControllerBase
     /// <param name="projectId">The project from which to retrieve the summary statistic</param>
     /// <returns>The total number of bytes of file data stored in this project's registered object storages.</returns>
     [HttpGet("storage/size", Name = "api_storage_size_project")]
-    [SysAdmin]
+    [Auth("read", "data_source")]
     public async Task<IActionResult> GetProjectStorageSize(
         long organizationId,
         long projectId
@@ -93,6 +93,7 @@ public class MetricsProjectController : ControllerBase
     /// <param name="hideArchived">Flag indicating whether to hide archived records from the result</param>
     /// <returns>The record count for the given scope</returns>
     [HttpGet("records/count", Name = "api_record_count_project")]
+    [Auth("read", "record")]
     public async Task<IActionResult> GetProjectRecordCount(
         long organizationId, 
         long projectId, 
@@ -119,6 +120,7 @@ public class MetricsProjectController : ControllerBase
     /// <param name="hideArchived">Flag indicating whether to hide archived files from the result</param>
     /// <returns>The file count for the given scope</returns>
     [HttpGet("files/count", Name = "api_file_count_project")]
+    [Auth("read", "file")]
     public async Task<IActionResult> GetProjectFileCount(
         long organizationId, 
         long projectId, 

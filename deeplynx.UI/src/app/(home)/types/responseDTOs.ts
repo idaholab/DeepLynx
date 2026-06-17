@@ -356,6 +356,7 @@ export type ProjectMemberResponseDto = {
   email: string;
   role?: string;
   roleId?: number;
+  isProjectAdmin?: boolean;
 };
 
 export type AiModelConfigResponseDto = {

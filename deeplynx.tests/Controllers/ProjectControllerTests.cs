@@ -907,7 +907,8 @@ public class ProjectControllerTests : IDisposable
             "projectId",
             "roleId",
             "userId",
-            "groupId");
+            "groupId",
+            "isProjectAdmin");
 
         AssertHasHttpAttribute(method, "HttpPostAttribute");
         AssertHasAuthAttribute(method, "update", "project");
@@ -925,6 +926,23 @@ public class ProjectControllerTests : IDisposable
             "roleId",
             "userId",
             "groupId");
+
+        AssertHasHttpAttribute(method, "HttpPutAttribute");
+        AssertHasAuthAttribute(method, "update", "project");
+        AssertHasAuthAttribute(method, "update", "user");
+        AssertDoesNotHaveSensitivityEnabledAuthAttribute(method);
+    }
+
+    [Fact]
+    public void SetProjectAdminStatus_HasRequiredAuthAttributes()
+    {
+        var method = GetControllerMethod(
+            nameof(ProjectController.SetProjectAdminStatus),
+            "organizationId",
+            "projectId",
+            "userId",
+            "groupId",
+            "isAdmin");
 
         AssertHasHttpAttribute(method, "HttpPutAttribute");
         AssertHasAuthAttribute(method, "update", "project");
