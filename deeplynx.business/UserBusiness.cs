@@ -165,20 +165,16 @@ public class UserBusiness : IUserBusiness
     {
         // TODO: adjusting is_sys_admin is currently disabled. Enable once route permission protections are in place
 
-        // if not specified account types will always be human
-        var humanAccountType = dto.AccountType is null or AccountTypes.Human;
+        // if not specified accounts will always be human
+        var isServiceAccount = dto.IsServiceAccount ?? false;
         var isAdmin = isSysAdmin || isOrgAdmin || isProjectAdmin;
-
-        // TODO: test account logic not yet implemented; remove this guard when it is
-        if (dto.AccountType == AccountTypes.Test)
-            throw new NotSupportedException("Test accounts are not yet supported");
 
         var username = dto.Username;
         var email = dto.Email;
 
-        if (humanAccountType)
+        if (!isServiceAccount)
         {
-            // require email for human account types
+            // require email for human accounts
             if (email is null)
                 throw new ArgumentException("Email is required for human accounts");
 
@@ -187,7 +183,7 @@ public class UserBusiness : IUserBusiness
             if (otherUserHasEmail)
                 throw new ArgumentException("User with email already exists");
         }
-        else if (dto.AccountType == AccountTypes.Service)
+        else
         {
             // service accounts are an admin feature only
             if (!isAdmin)
@@ -208,7 +204,7 @@ public class UserBusiness : IUserBusiness
             Username = username,
             IsActive = dto.IsActive ?? false,
             IsArchived = dto.IsArchived ?? false,
-            AccountType = dto.AccountType ?? AccountTypes.Default,
+            IsServiceAccount = isServiceAccount,
         };
 
         _context.Users.Add(user);
@@ -220,7 +216,7 @@ public class UserBusiness : IUserBusiness
             Name = user.Name,
             Username = user.Username,
             Email = user.Email,
-            AccountType = user.AccountType,
+            IsServiceAccount = user.IsServiceAccount,
             IsSysAdmin = user.IsSysAdmin,
             IsArchived = user.IsArchived,
             IsActive = user.IsActive,
@@ -414,7 +410,7 @@ public class UserBusiness : IUserBusiness
             Name = user.Name,
             Email = user.Email,
             Username = user.Username,
-            AccountType = user.AccountType,
+            IsServiceAccount = user.IsServiceAccount,
             IsSysAdmin = user.IsSysAdmin,
             IsArchived = user.IsArchived,
             IsActive = user.IsActive,

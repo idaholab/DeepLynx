@@ -12,8 +12,8 @@ using deeplynx.datalayer.Models;
 namespace deeplynx.datalayer.Migrations
 {
     [DbContext(typeof(DeeplynxContext))]
-    [Migration("20260610210711_UserAccountTypesAndUniqueUsernames")]
-    partial class UserAccountTypesAndUniqueUsernames
+    [Migration("20260617191117_ServiceBooleanAndCreatedByApiKeys")]
+    partial class ServiceBooleanAndCreatedByApiKeys
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -321,6 +321,10 @@ namespace deeplynx.datalayer.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("application_id");
 
+                    b.Property<long?>("CreatedBy")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by");
+
                     b.Property<string>("Key")
                         .IsRequired()
                         .HasColumnType("text")
@@ -340,6 +344,9 @@ namespace deeplynx.datalayer.Migrations
 
                     b.HasIndex("ApplicationId")
                         .HasDatabaseName("idx_api_keys_application_id");
+
+                    b.HasIndex("CreatedBy")
+                        .HasDatabaseName("idx_api_keys_created_by");
 
                     b.HasIndex("UserId");
 
@@ -2408,13 +2415,6 @@ namespace deeplynx.datalayer.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("Id"));
 
-                    b.Property<string>("AccountType")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("text")
-                        .HasDefaultValue("human")
-                        .HasColumnName("account_type");
-
                     b.Property<string>("Email")
                         .IsRequired()
                         .HasColumnType("text")
@@ -2431,6 +2431,12 @@ namespace deeplynx.datalayer.Migrations
                         .HasColumnType("boolean")
                         .HasDefaultValue(false)
                         .HasColumnName("is_archived");
+
+                    b.Property<bool>("IsServiceAccount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("is_service_account");
 
                     b.Property<bool>("IsSysAdmin")
                         .ValueGeneratedOnAdd()
@@ -2704,12 +2710,20 @@ namespace deeplynx.datalayer.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .HasConstraintName("api_keys_application_id_fkey");
 
+                    b.HasOne("deeplynx.datalayer.Models.User", "CreatedByUser")
+                        .WithMany("CreatedApiKeys")
+                        .HasForeignKey("CreatedBy")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .HasConstraintName("api_keys_created_by_fkey");
+
                     b.HasOne("deeplynx.datalayer.Models.User", "User")
                         .WithMany("ApiKeys")
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("api_keys_user_id_fkey");
+
+                    b.Navigation("CreatedByUser");
 
                     b.Navigation("OauthApplication");
 
@@ -3650,6 +3664,8 @@ namespace deeplynx.datalayer.Migrations
             modelBuilder.Entity("deeplynx.datalayer.Models.User", b =>
                 {
                     b.Navigation("ApiKeys");
+
+                    b.Navigation("CreatedApiKeys");
 
                     b.Navigation("LastUpdatedActions");
 
