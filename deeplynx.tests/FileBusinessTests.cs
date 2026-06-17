@@ -3150,6 +3150,7 @@ public class FileBusinessTests : IntegrationTestBase
         Assert.Equal(5, updatedCount);
     }
 
+    // Verifies that project storage size cache is cleared after backfill
     [Fact]
     public async Task BackfillFileSizes_InvalidateProjectStorageSizeCache()
     {
@@ -3172,6 +3173,51 @@ public class FileBusinessTests : IntegrationTestBase
         Assert.Null(cachedValue);
     }
 
+    // Verifies that backfill updates FileSize for a filesystem record without an ObjectStorageId, but exists.
+    [Fact]
+    public async Task BackfillFileSizes_BackfillsRecordWithoutObjectStorageId_WhenFileExists()
+    {
+        var filePath = Path.Combine(_testDirectory, "legacy-file.txt");
+
+        await File.WriteAllTextAsync(
+            filePath,
+            "legacy content");
+
+        var record = new Record
+        {
+            Name = "legacy-file.txt",
+            Description = "legacy-file.txt",
+            ClassId = Context.Classes.First(c => c.Name == "File" && c.ProjectId == pid).Id,
+            DataSourceId = did,
+            ProjectId = pid,
+            OrganizationId = oid,
+            OriginalId = Guid.NewGuid().ToString(),
+            Properties = "{}",
+            Uri = filePath,
+            ObjectStorageId = null,
+            FileSize = null,
+            IsArchived = false,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid
+        };
+
+        Context.Records.Add(record);
+        await Context.SaveChangesAsync();
+        
+        var result = await _fileBusiness.BackfillFileSizes(oid, pid);
+        
+        var updated = await Context.Records.FindAsync(record.Id);
+        
+        Assert.Equal(1, result.Processed);
+        Assert.Equal(1, result.Updated);
+        Assert.Equal(0, result.Failed);
+        
+        Assert.NotNull(updated!.FileSize);
+        Assert.Equal(
+            Encoding.UTF8.GetBytes("legacy content").Length,
+            updated.FileSize);
+    }
+    
     #endregion
     
     #region CreateUploadTus Tests

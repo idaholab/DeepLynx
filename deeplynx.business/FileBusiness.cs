@@ -531,7 +531,7 @@ public class FileBusiness
         for (var batchNumber = 0; batchNumber < maxBatches; batchNumber++)
         {
             var toBackfill = _context.Records
-                .Where(r => r.Uri != null && r.FileSize == null && r.ObjectStorageId != null && !r.IsArchived);
+                .Where(r => r.Uri != null && r.FileSize == null && !r.IsArchived);
             
             if (organizationId.HasValue)
                 toBackfill = toBackfill.Where(r => r.OrganizationId == organizationId.Value);
@@ -554,7 +554,12 @@ public class FileBusiness
             response.LastRecordId = records.Max(r => r.Id);
 
             var recordsByStorage = records
+                .Where(r => r.ObjectStorageId != null)
                 .GroupBy(r => r.ObjectStorageId!.Value)
+                .ToList();
+            
+            var legacyFilesystemRecords = records
+                .Where(r => r.ObjectStorageId == null)
                 .ToList();
             
             foreach (var storageGroup in recordsByStorage)
@@ -639,6 +644,40 @@ public class FileBusiness
                             record.ObjectStorageId,
                             record.Uri);
                     }
+                }
+            }
+
+            // Check filesystem records that exists, but object_storage_id is null
+            foreach (var record in legacyFilesystemRecords)
+            {
+                try
+                {
+                    if (record.Uri != null && File.Exists(record.Uri))
+                    {
+                        record.FileSize = new FileInfo(record.Uri).Length;
+                        response.Updated++;
+                    }
+                    else
+                    {
+                        response.Failed++;
+
+                        _logger.LogWarning(
+                            "Failed to backfill legacy filesystem size for record {RecordId}, project {ProjectId}, uri {Uri}; file does not exist",
+                            record.Id,
+                            record.ProjectId,
+                            record.Uri);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    response.Failed++;
+                    
+                    _logger.LogWarning(
+                        ex,
+                        "Failed to backfill legacy filesystem size for record {RecordId}, project {ProjectId}, uri {Uri}",
+                        record.Id,
+                        record.ProjectId,
+                        record.Uri);
                 }
             }
 
