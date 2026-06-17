@@ -1,5 +1,4 @@
 import { test, expect } from "@playwright/test";
-<<<<<<< Updated upstream
 import { seedSession } from "../helpers/seed";
 
 test.describe("Login", () => {
@@ -67,7 +66,9 @@ test.describe("Login", () => {
         page.locator("aside", { hasText: "Project Dashboard" }),
       ).toBeVisible({ timeout: 15000 });
     });
-=======
+  });
+});
+
 import * as fs from "fs";
 import * as path from "path";
 
@@ -262,6 +263,5 @@ test.describe("Auth Guard", () => {
     await expect(
       page.getByRole("heading", { name: "System Use Notification" }),
     ).toBeVisible({ timeout: 15000 });
->>>>>>> Stashed changes
   });
 });
