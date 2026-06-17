@@ -40,9 +40,9 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
         _latticeContext.ExtractionClasses.AddRange(extractionClasses);
         await _latticeContext.SaveChangesAsync();
 
-        var classTypeToId = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
-        for (var i = 0; i < uniqueClassTypes.Count; i++)
-            classTypeToId[uniqueClassTypes[i]] = extractionClasses[i].Id;
+        var classTypeToId = uniqueClassTypes
+            .Zip(extractionClasses, (type, cls) => (type, cls.Id))
+            .ToDictionary(x => x.type, x => x.Id, StringComparer.OrdinalIgnoreCase);
 
         return classTypeToId;
     }
@@ -147,9 +147,9 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
         _latticeContext.ExtractionRecords.AddRange(extractionRecords);
         await _latticeContext.SaveChangesAsync();
 
-        var nameToId = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
-        for (var i = 0; i < stagedRecordNames.Count; i++)
-            nameToId[stagedRecordNames[i]] = extractionRecords[i].Id;
+        var nameToId = stagedRecordNames
+            .Zip(extractionRecords, (name, rec) => (name, rec.Id))
+            .ToDictionary(x => x.name, x => x.Id, StringComparer.OrdinalIgnoreCase);
 
         return nameToId;
     }
@@ -256,9 +256,9 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
 
         _latticeContext.ExtractionRelationships.AddRange(extractionRelationships);
         await _latticeContext.SaveChangesAsync();
-        var keyToId = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
-        for (var i = 0; i < patternKeys.Count; i++)
-            keyToId[patternKeys[i]] = extractionRelationships[i].Id;
+        var keyToId = patternKeys
+            .Zip(extractionRelationships, (key, rel) => (key, rel.Id))
+            .ToDictionary(x => x.key, x => x.Id, StringComparer.OrdinalIgnoreCase);
         return keyToId;
     }
 
@@ -278,9 +278,8 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
 
         var maxFrequency = edges.Max(e => e.Frequency);
 
-        var relationshipIds = relationshipKeyToId.Values.Distinct().ToList();
         var relValidationById = await _latticeContext.ExtractionRelationships
-            .Where(r => relationshipIds.Contains(r.Id))
+            .Where(r => relationshipKeyToId.Values.Contains(r.Id))
             .ToDictionaryAsync(r => r.Id, r => r.ValidationStatus);
 
         var extractionEdges = new List<ExtractionEdge>();

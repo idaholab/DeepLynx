@@ -74,7 +74,6 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
                      ?? throw new InvalidOperationException(
                          $"Record {recordId} not found in organization {organizationId}, project {projectId}");
 
-        // Minimum ontology items necessary for extraction
         await EnsureOntologyReady(projectId);
 
         // Ontology embeddings must exist before triggering. If they're missing, queue
@@ -368,6 +367,8 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
             })
             .ToListAsync();
 
+        if (extractions.Count == 0) return new List<ExtractionListItemDto>();
+
         var finalExtraction = extractions
             .Select(e => new ExtractionListItemDto
             {
@@ -379,8 +380,6 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
                 FailureMessage = GetExtractionFailureMessage(e.Properties)
             })
             .ToList();
-
-        if (extractions.Count == 0) return finalExtraction;
         
         return await ProjectTotals(finalExtraction);
     }
