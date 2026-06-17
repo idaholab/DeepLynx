@@ -1175,8 +1175,87 @@ public class UserBusinessTests : IntegrationTestBase
         // Assert
         Assert.Equal(9, users.Count);
         Assert.All(users, u => Assert.False(u.IsArchived));
-        Assert.DoesNotContain(users, u => u.Id == uid2); 
-        Assert.DoesNotContain(users, u => u.Id == uid3); 
+        Assert.DoesNotContain(users, u => u.Id == uid2);
+        Assert.DoesNotContain(users, u => u.Id == uid3);
+    }
+
+    [Fact]
+    public async Task GetAllUsers_ExcludesServiceAccounts_ByDefault()
+    {
+        // Arrange
+        var serviceAccountId = await CreateServiceAccount();
+
+        // Act
+        var result = await _userBusiness.GetAllUsers(null, null);
+        var users = result.ToList();
+
+        // Assert
+        Assert.DoesNotContain(users, u => u.Id == serviceAccountId);
+        Assert.All(users, u => Assert.False(u.IsServiceAccount));
+    }
+
+    [Fact]
+    public async Task GetAllUsers_IncludeServiceAccounts_ReturnsServiceAccounts()
+    {
+        // Arrange
+        var serviceAccountId = await CreateServiceAccount();
+
+        // Act
+        var result = await _userBusiness.GetAllUsers(null, null, includeServiceAccounts: true);
+        var users = result.ToList();
+
+        // Assert
+        Assert.Contains(users, u => u.Id == serviceAccountId && u.IsServiceAccount);
+    }
+
+    [Fact]
+    public async Task GetActiveUserCounts_ExcludesServiceAccounts_ByDefault()
+    {
+        // Arrange
+        var now = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
+        await CreateServiceAccount(isActive: true, lastLogin: now.AddHours(-1));
+
+        // Act
+        var withoutServiceAccounts = await _userBusiness.GetActiveUserCounts(null, null);
+        var withServiceAccounts = await _userBusiness.GetActiveUserCounts(null, null, includeServiceAccounts: true);
+
+        // Assert
+        Assert.Equal(withoutServiceAccounts.ActiveLast24Hours + 1, withServiceAccounts.ActiveLast24Hours);
+        Assert.Equal(withoutServiceAccounts.ActiveLast7Days + 1, withServiceAccounts.ActiveLast7Days);
+        Assert.Equal(withoutServiceAccounts.ActiveLast30Days + 1, withServiceAccounts.ActiveLast30Days);
+    }
+
+    [Fact]
+    public async Task GetActiveUsers_ExcludesServiceAccounts_ByDefault()
+    {
+        // Arrange
+        var now = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
+        var serviceAccountId = await CreateServiceAccount(isActive: true, lastLogin: now.AddHours(-1));
+
+        // Act
+        var defaultActivity = await _userBusiness.GetActiveUsers(null, null);
+        var withServiceAccounts = await _userBusiness.GetActiveUsers(null, null, includeServiceAccounts: true);
+
+        // Assert
+        Assert.DoesNotContain(defaultActivity.Users, u => u.Id == serviceAccountId);
+        Assert.Contains(withServiceAccounts.Users, u => u.Id == serviceAccountId && u.IsServiceAccount);
+    }
+
+    private async Task<long> CreateServiceAccount(bool isActive = false, DateTime? lastLogin = null)
+    {
+        var serviceAccount = new User
+        {
+            Name = "Service Account",
+            Email = $"service_{Guid.NewGuid()}",
+            Username = $"service_{Guid.NewGuid()}",
+            IsServiceAccount = true,
+            IsActive = isActive,
+            LastLogin = lastLogin
+        };
+
+        Context.Users.Add(serviceAccount);
+        await Context.SaveChangesAsync();
+        return serviceAccount.Id;
     }
 
     #endregion

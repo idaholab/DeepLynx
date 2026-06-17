@@ -24,12 +24,16 @@ public class UserBusiness : IUserBusiness
     /// </summary>
     /// <param name="projectId">Optional ID for project</param>
     /// <param name="organizationId">Optional ID for organization</param>
+    /// <param name="includeArchived">Optional Param to include archived users- defaults to false</param>
+    /// <param name="includeServiceAccounts">Optional Param to include service accounts- defaults to false</param>
     /// <returns>A list of users, optionally filtered by project or organization</returns>
-    public async Task<IEnumerable<UserResponseDto>> GetAllUsers(long? projectId, long? organizationId, bool includeArchived = false)
+    public async Task<IEnumerable<UserResponseDto>> GetAllUsers(long? projectId, long? organizationId, bool includeArchived = false, bool includeServiceAccounts = false)
     {
         var users = includeArchived
         ? _context.Users.AsQueryable()
         : _context.Users.Where(p => !p.IsArchived);
+
+        if (!includeServiceAccounts) users = users.Where(u => u.IsServiceAccount == false);
 
         if (projectId != null)
             users = users.Where(u =>
@@ -53,6 +57,7 @@ public class UserBusiness : IUserBusiness
             IsOrgAdmin = organizationId != null
                 ? p.OrganizationUsers.Any(ou => ou.OrganizationId == organizationId && ou.IsOrgAdmin)
                 : null,
+            IsServiceAccount = p.IsServiceAccount,
             IsArchived = p.IsArchived,
             IsActive = p.IsActive,
             LastLogin = p.LastLogin
@@ -260,6 +265,7 @@ public class UserBusiness : IUserBusiness
             Name = user.Name,
             Username = user.Username,
             Email = user.Email,
+            IsServiceAccount = user.IsServiceAccount,
             IsSysAdmin = user.IsSysAdmin,
             IsArchived = user.IsArchived,
             IsActive = user.IsActive,
@@ -455,10 +461,11 @@ public class UserBusiness : IUserBusiness
     /// </summary>
     /// <param name="projectId">Optional ID for project</param>
     /// <param name="organizationId">Optional ID for organization</param>
+    /// <param name="includeServiceAccounts">Optional Param to include service accounts- defaults to false</param>
     /// <returns>Counts for users active within 24 hours, 7 days, and 30 days</returns>
-    public async Task<UserActivityCountsDto> GetActiveUserCounts(long? projectId, long? organizationId)
+    public async Task<UserActivityCountsDto> GetActiveUserCounts(long? projectId, long? organizationId, bool includeServiceAccounts = false)
     {
-        var users = BuildActiveUsersQuery(projectId, organizationId);
+        var users = BuildActiveUsersQuery(projectId, organizationId, includeServiceAccounts);
 
         var now = UtcNowWithoutTimezone();
         var last24Hours = now.AddHours(-24);
@@ -489,13 +496,14 @@ public class UserBusiness : IUserBusiness
     /// </summary>
     /// <param name="projectId">Optional ID for project</param>
     /// <param name="organizationId">Optional ID for organization</param>
+    /// <param name="includeServiceAccounts">Optional Param to include service accounts- defaults to false</param>
     /// <returns>Counts and active user details for the requested scope</returns>
-    public async Task<UserActivityUsersDto> GetActiveUsers(long? projectId, long? organizationId)
+    public async Task<UserActivityUsersDto> GetActiveUsers(long? projectId, long? organizationId, bool includeServiceAccounts = false)
     {
-        var counts = await GetActiveUserCounts(projectId, organizationId);
+        var counts = await GetActiveUserCounts(projectId, organizationId, includeServiceAccounts);
         var last30Days = counts.GeneratedAt.AddDays(-30);
 
-        var users = await BuildActiveUsersQuery(projectId, organizationId)
+        var users = await BuildActiveUsersQuery(projectId, organizationId, includeServiceAccounts)
             .Where(u => u.LastLogin.HasValue && u.LastLogin.Value >= last30Days)
             .OrderByDescending(u => u.LastLogin)
             .Select(u => new UserResponseDto
@@ -508,6 +516,7 @@ public class UserBusiness : IUserBusiness
                 IsOrgAdmin = organizationId != null
                     ? u.OrganizationUsers.Any(ou => ou.OrganizationId == organizationId && ou.IsOrgAdmin)
                     : null,
+                IsServiceAccount = u.IsServiceAccount,
                 IsArchived = u.IsArchived,
                 IsActive = u.IsActive,
                 LastLogin = u.LastLogin
@@ -524,9 +533,11 @@ public class UserBusiness : IUserBusiness
         };
     }
 
-    private IQueryable<User> BuildActiveUsersQuery(long? projectId, long? organizationId)
+    private IQueryable<User> BuildActiveUsersQuery(long? projectId, long? organizationId, bool includeServiceAccounts = false)
     {
         var users = _context.Users.Where(u => !u.IsArchived && u.IsActive);
+
+        if (!includeServiceAccounts) users = users.Where(u => u.IsServiceAccount == false);
 
         if (projectId != null)
             users = users.Where(u =>

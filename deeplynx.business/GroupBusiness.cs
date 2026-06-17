@@ -312,6 +312,11 @@ public class GroupBusiness : IGroupBusiness
         if (user == null || user.IsArchived)
             throw new KeyNotFoundException($"User with id {userId} not found");
 
+        // Service accounts are scoped to the project they are added to and never participate in
+        // groups, which span projects and carry their own project memberships.
+        if (user.IsServiceAccount)
+            throw new InvalidOperationException("Service accounts cannot be added to a group.");
+
         group.Users.Add(user);
         await _context.SaveChangesAsync();
 

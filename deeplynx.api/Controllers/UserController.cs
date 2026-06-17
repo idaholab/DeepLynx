@@ -31,17 +31,19 @@ public class UserController : ControllerBase
     /// </summary>
     /// <param name="projectId">(Optional) ID of project that users are associated with</param>
     /// <param name="organizationId">(Optional) ID of organization that users are associated with</param>
-    /// <param name="includeArchived">Whether to include archived users (default: false)</param>
+    /// <param name="includeArchived">(Optional) Beelean determining if archived accounts will be included (default: false)</param>
+    /// <param name="includeServiceAccounts">(Optional) Boolean determining if service accounts will be included (default: false)</param>
     /// <returns>List of user response DTOs</returns>
     [HttpGet(Name = "api_get_all_users")]
     public async Task<ActionResult<IEnumerable<UserResponseDto>>> GetAllUsers(
         [FromQuery] long? projectId,
         [FromQuery] long? organizationId,
-        [FromQuery] bool includeArchived = false)
+        [FromQuery] bool includeArchived = false,
+        [FromQuery] bool includeServiceAccounts = false)
     {
         try
         {
-            var users = await _userBusiness.GetAllUsers(projectId, organizationId, includeArchived);
+            var users = await _userBusiness.GetAllUsers(projectId, organizationId, includeArchived, includeServiceAccounts);
             return Ok(users);
         }
         catch (Exception exc)
@@ -281,15 +283,17 @@ public class UserController : ControllerBase
     /// </summary>
     /// <param name="projectId">(Optional) ID of project that users are associated with</param>
     /// <param name="organizationId">(Optional) ID of organization that users are associated with</param>
+    /// <param name="includeServiceAccounts">(Optional) Boolean determining if service accounts will be included (default: false)</param>
     /// <returns>Active user counts for 24-hour, 7-day, and 30-day windows</returns>
     [HttpGet("active-counts", Name = "api_get_active_user_counts")]
     public async Task<ActionResult<UserActivityCountsDto>> GetActiveUserCounts(
         [FromQuery] long? projectId,
-        [FromQuery] long? organizationId)
+        [FromQuery] long? organizationId,
+        [FromQuery] bool includeServiceAccounts = false)
     {
         try
         {
-            var counts = await _userBusiness.GetActiveUserCounts(projectId, organizationId);
+            var counts = await _userBusiness.GetActiveUserCounts(projectId, organizationId, includeServiceAccounts);
             return Ok(counts);
         }
         catch (Exception exc)
@@ -305,15 +309,17 @@ public class UserController : ControllerBase
     /// </summary>
     /// <param name="projectId">(Optional) ID of project that users are associated with</param>
     /// <param name="organizationId">(Optional) ID of organization that users are associated with</param>
+    /// <param name="includeServiceAccounts">(Optional) Boolean determining if service accounts will be included (default: false)</param>
     /// <returns>Active user counts and users active in the 30-day window</returns>
     [HttpGet("active-users", Name = "api_get_active_users")]
     public async Task<ActionResult<UserActivityUsersDto>> GetActiveUsers(
         [FromQuery] long? projectId,
-        [FromQuery] long? organizationId)
+        [FromQuery] long? organizationId,
+        [FromQuery] bool includeServiceAccounts = false)
     {
         try
         {
-            var activity = await _userBusiness.GetActiveUsers(projectId, organizationId);
+            var activity = await _userBusiness.GetActiveUsers(projectId, organizationId, includeServiceAccounts);
             return Ok(activity);
         }
         catch (Exception exc)
