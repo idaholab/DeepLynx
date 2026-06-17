@@ -935,6 +935,42 @@ public class UserBusinessTests : IntegrationTestBase
         Assert.NotEqual(first.Email, second.Email);
     }
 
+    [Fact]
+    public async Task CreateUser_Fails_ServiceAccount_IfEmailProvided()
+    {
+        // Arrange — service accounts generate their own email; a caller-supplied one is rejected
+        var dto = new CreateUserRequestDto
+        {
+            Name = "Bot With Email",
+            IsServiceAccount = true,
+            Email = "bot@test.com"
+        };
+
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<ArgumentException>(
+            () => _userBusiness.CreateUser(dto, isOrgAdmin: true));
+
+        Assert.Contains("Service accounts cannot be assigned an email or username", exception.Message);
+    }
+
+    [Fact]
+    public async Task CreateUser_Fails_ServiceAccount_IfUsernameProvided()
+    {
+        // Arrange — service accounts generate their own username; a caller-supplied one is rejected
+        var dto = new CreateUserRequestDto
+        {
+            Name = "Bot With Username",
+            IsServiceAccount = true,
+            Username = "botuser"
+        };
+
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<ArgumentException>(
+            () => _userBusiness.CreateUser(dto, isOrgAdmin: true));
+
+        Assert.Contains("Service accounts cannot be assigned an email or username", exception.Message);
+    }
+
     #endregion
 
     #region GetAllUsers Tests
