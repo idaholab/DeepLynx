@@ -280,7 +280,7 @@ Git tracks submodules as a commit hash, not a branch! When you push changes insi
 Tests are located in deeplynx.UI/tests and organized by page. When running tests, make sure you are in the deeplynx.UI directory, also make sure you have a running backend in a separate terminal using `dotnet run dev`
 
 #### To setup/update
-`npm install @playwright/test`
+`npm install @playwright/test; npx playwright install`
 
 #### To run all tests
 `npx playwright test` or `npm run test`
