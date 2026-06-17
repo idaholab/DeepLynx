@@ -11,6 +11,8 @@ public interface IOauthDeviceAuthorizationBusiness
 
     Task<OauthTokenGrantResponseDto> ExchangeDeviceCodeForToken(string? deviceCode, string? clientId);
 
+    Task<OauthTokenGrantResponseDto> ExchangeRefreshTokenForToken(string? refreshToken, string? clientId);
+
     Task<DeviceVerificationLookupResponseDto> GetDeviceAuthorizationRequest(string? userCode);
 
     Task<DeviceVerificationLookupResponseDto> SetDeviceAuthorizationDecision(

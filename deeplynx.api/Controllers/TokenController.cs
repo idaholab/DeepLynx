@@ -75,6 +75,7 @@ public class TokenController : ControllerBase
     /// </summary>
     /// <param name="grantType">The OAuth grant type</param>
     /// <param name="deviceCode">The device code returned by the device authorization endpoint</param>
+    /// <param name="refreshToken">The refresh token returned by a previous OAuth token response</param>
     /// <param name="clientId">The OAuth application's client ID</param>
     /// <returns>OAuth token response or polling error</returns>
     [AllowAnonymous]
@@ -82,9 +83,11 @@ public class TokenController : ControllerBase
     public async Task<IActionResult> ExchangeOauthToken(
         [FromForm(Name = "grant_type")] string? grantType,
         [FromForm(Name = "device_code")] string? deviceCode,
+        [FromForm(Name = "refresh_token")] string? refreshToken,
         [FromForm(Name = "client_id")] string? clientId)
     {
         const string deviceCodeGrantType = "urn:ietf:params:oauth:grant-type:device_code";
+        const string refreshTokenGrantType = "refresh_token";
 
         try
         {
@@ -93,7 +96,17 @@ public class TokenController : ControllerBase
                 throw new ArgumentException("grant_type is required");
             }
 
-            if (grantType != deviceCodeGrantType)
+            OauthTokenGrantResponseDto response;
+
+            if (grantType == deviceCodeGrantType)
+            {
+                response = await _oauthDeviceAuthorizationBusiness.ExchangeDeviceCodeForToken(deviceCode, clientId);
+            }
+            else if (grantType == refreshTokenGrantType)
+            {
+                response = await _oauthDeviceAuthorizationBusiness.ExchangeRefreshTokenForToken(refreshToken, clientId);
+            }
+            else
             {
                 return BadRequest(new OauthErrorResponseDto
                 {
@@ -101,8 +114,6 @@ public class TokenController : ControllerBase
                     ErrorDescription = "Unsupported grant_type"
                 });
             }
-
-            var response = await _oauthDeviceAuthorizationBusiness.ExchangeDeviceCodeForToken(deviceCode, clientId);
 
             return Ok(response);
         }

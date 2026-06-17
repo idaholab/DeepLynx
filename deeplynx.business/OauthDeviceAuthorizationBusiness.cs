@@ -16,6 +16,8 @@ public class OauthDeviceAuthorizationBusiness : IOauthDeviceAuthorizationBusines
     private const int DefaultPollingIntervalSeconds = 5;
     private const int UserCodeLength = 8;
     private const int AccessTokenExpirationMinutes = 480;
+    private const int RefreshTokenBytes = 64;
+    private const int RefreshTokenExpirationDays = 30;
     private const string UserCodeAlphabet = "BCDFGHJKLMNPQRSTVWXZ";
 
     private readonly DeeplynxContext _context;
@@ -134,6 +136,7 @@ public class OauthDeviceAuthorizationBusiness : IOauthDeviceAuthorizationBusines
         {
             request.Status = OauthDeviceAuthorizationStatus.Expired;
             await _context.SaveChangesAsync();
+            await CleanupExpiredOrConsumedRequests();
             throw new InvalidOperationException("expired_token");
         }
 
@@ -160,15 +163,90 @@ public class OauthDeviceAuthorizationBusiness : IOauthDeviceAuthorizationBusines
             tokenKeys.apiKey,
             tokenKeys.apiSecret,
             AccessTokenExpirationMinutes);
+        var refreshToken = await GenerateUniqueRefreshToken();
 
         request.Status = OauthDeviceAuthorizationStatus.Consumed;
         request.ConsumedAt = nowWithoutTz;
 
+        _context.OauthRefreshTokens.Add(new OauthRefreshToken
+        {
+            TokenHash = HashCode(refreshToken),
+            ApplicationId = application.Id,
+            UserId = request.UserId.Value,
+            Scope = request.Scope,
+            ExpiresAt = nowWithoutTz.AddDays(RefreshTokenExpirationDays),
+            Revoked = false,
+            CreatedAt = nowWithoutTz
+        });
+
         await _context.SaveChangesAsync();
+        await CleanupExpiredOrConsumedRequests();
 
         return new OauthTokenGrantResponseDto
         {
             AccessToken = token,
+            RefreshToken = refreshToken,
+            TokenType = "Bearer",
+            ExpiresIn = AccessTokenExpirationMinutes * 60
+        };
+    }
+
+    public async Task<OauthTokenGrantResponseDto> ExchangeRefreshTokenForToken(string? refreshToken, string? clientId)
+    {
+        if (string.IsNullOrWhiteSpace(refreshToken))
+        {
+            throw new ArgumentException("refresh_token is required");
+        }
+
+        if (string.IsNullOrWhiteSpace(clientId))
+        {
+            throw new ArgumentException("client_id is required");
+        }
+
+        var application = await _context.OauthApplications
+            .Where(application => application.ClientId == clientId)
+            .Where(application => !application.IsArchived)
+            .FirstOrDefaultAsync();
+
+        if (application == null)
+        {
+            throw new KeyNotFoundException($"OAuth application with ClientId '{clientId}' not found or has been archived.");
+        }
+
+        var nowWithoutTz = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
+        var refreshTokenHash = HashCode(refreshToken);
+        var storedRefreshToken = await _context.OauthRefreshTokens
+            .FirstOrDefaultAsync(token => token.TokenHash == refreshTokenHash
+                                          && token.ApplicationId == application.Id);
+
+        if (storedRefreshToken == null || storedRefreshToken.Revoked)
+        {
+            throw new InvalidOperationException("invalid_grant");
+        }
+
+        if (storedRefreshToken.ExpiresAt <= nowWithoutTz)
+        {
+            storedRefreshToken.Revoked = true;
+            storedRefreshToken.RevokedAt = nowWithoutTz;
+            await _context.SaveChangesAsync();
+            await CleanupExpiredOrConsumedRequests();
+            throw new InvalidOperationException("invalid_grant");
+        }
+
+        var tokenKeys = await _tokenBusiness.CreateApiKey(storedRefreshToken.UserId, clientId);
+        var token = await _tokenBusiness.CreateToken(
+            tokenKeys.apiKey,
+            tokenKeys.apiSecret,
+            AccessTokenExpirationMinutes);
+
+        storedRefreshToken.LastUsedAt = nowWithoutTz;
+        await _context.SaveChangesAsync();
+        await CleanupExpiredOrConsumedRequests();
+
+        return new OauthTokenGrantResponseDto
+        {
+            AccessToken = token,
+            RefreshToken = refreshToken,
             TokenType = "Bearer",
             ExpiresIn = AccessTokenExpirationMinutes * 60
         };
@@ -235,16 +313,23 @@ public class OauthDeviceAuthorizationBusiness : IOauthDeviceAuthorizationBusines
             .Where(request => request.ExpiresAt <= nowWithoutTz
                               || request.Status == OauthDeviceAuthorizationStatus.Consumed)
             .ToListAsync();
+        var refreshTokens = await _context.OauthRefreshTokens
+            .Where(token => token.ExpiresAt <= nowWithoutTz || token.Revoked)
+            .ToListAsync();
 
-        if (requests.Count == 0)
+        if (requests.Count == 0 && refreshTokens.Count == 0)
         {
             return 0;
         }
 
         _context.OauthDeviceAuthorizationRequests.RemoveRange(requests);
+        _context.OauthRefreshTokens.RemoveRange(refreshTokens);
 
         var deleted = await _context.SaveChangesAsync();
-        _logger.LogInformation("Cleaned up {RequestCount} OAuth device authorization requests", requests.Count);
+        _logger.LogInformation(
+            "Cleaned up {RequestCount} OAuth device authorization requests and {RefreshTokenCount} refresh tokens",
+            requests.Count,
+            refreshTokens.Count);
 
         return deleted;
     }
@@ -284,6 +369,7 @@ public class OauthDeviceAuthorizationBusiness : IOauthDeviceAuthorizationBusines
 
         request.Status = OauthDeviceAuthorizationStatus.Expired;
         await _context.SaveChangesAsync();
+        await CleanupExpiredOrConsumedRequests();
 
         return true;
     }
@@ -337,6 +423,24 @@ public class OauthDeviceAuthorizationBusiness : IOauthDeviceAuthorizationBusines
         }
 
         throw new InvalidOperationException("Unable to generate a unique user code");
+    }
+
+    private async Task<string> GenerateUniqueRefreshToken()
+    {
+        for (var attempt = 0; attempt < 10; attempt++)
+        {
+            var refreshToken = KeyGenerator.GenerateKeyBase64(RefreshTokenBytes);
+            var refreshTokenHash = HashCode(refreshToken);
+            var exists = await _context.OauthRefreshTokens
+                .AnyAsync(token => token.TokenHash == refreshTokenHash);
+
+            if (!exists)
+            {
+                return refreshToken;
+            }
+        }
+
+        throw new InvalidOperationException("Unable to generate a unique refresh token");
     }
 
     private string GenerateDeviceCode()
