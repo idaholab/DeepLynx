@@ -45,10 +45,10 @@ public static class ExposeUriHelper
 
         try
         {
-            var labels = JsonSerializer.Deserialize<List<Label>>(record.Labels);
+            var labels = JsonSerializer.Deserialize<List<Label>>(record.Labels, CaseInsensitive);
             if (labels is null) return true; // JSON value is explicitly "null" -  generally shouldn't happen, but that's OK
             return labels.Count == 0
-                || labels.All(l => authorizedDownloadLabels.Contains(l.id));
+                || labels.All(l => authorizedDownloadLabels.Contains(l.Id));
         }
         catch (JsonException)
         {
@@ -56,12 +56,14 @@ public static class ExposeUriHelper
         }
     }
 
+    private static readonly JsonSerializerOptions CaseInsensitive = new() { PropertyNameCaseInsensitive = true };
+
     /// <summary>
     /// Helper class for deserializing query record labels.
     /// </summary>
     private class Label
     {
-        public required long id;
-        public required string name;
+        public required long Id { get; init; }
+        public required string Name { get; init; }
     }
 }
