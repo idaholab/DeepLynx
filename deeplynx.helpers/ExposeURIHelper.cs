@@ -35,22 +35,24 @@ public static class ExposeUriHelper
         bool isOrgAdmin = false,
         bool isProjectAdmin = false)
     {
-        if (string.IsNullOrEmpty(record.Labels))
-            return true; // No sensitivity labels, URI may be exposed
+        if (isSysAdmin ||
+            isOrgAdmin ||
+            isProjectAdmin ||
+            string.IsNullOrEmpty(record.Labels))
+        {
+            return true;
+        }
 
         try
         {
             var labels = JsonSerializer.Deserialize<List<Label>>(record.Labels);
-            if (labels is null) return false;
-            return isSysAdmin
-                || isOrgAdmin
-                || isProjectAdmin
-                || labels.Count == 0
+            if (labels is null) return true; // JSON value is explicitly "null" -  generally shouldn't happen, but that's OK
+            return labels.Count == 0
                 || labels.All(l => authorizedDownloadLabels.Contains(l.id));
         }
         catch (JsonException)
         {
-            return false; // likely malformed JSON, don't show URI
+            return false; // likely malformed JSON, don't show URI - we don't know what it's supposed to be
         }
     }
 
