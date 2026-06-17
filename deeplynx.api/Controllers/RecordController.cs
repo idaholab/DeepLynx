@@ -77,6 +77,36 @@ public class RecordController : ControllerBase
     }
 
     /// <summary>
+    ///     Retrieve all insight eligible records for a specific project
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <param name="projectId">The ID of the project whose records are to be retrieved</param>
+    /// <returns>A list of insight eligible records</returns>
+    [HttpGet("insight-eligible", Name = "api_get_insight_eligible_records")]
+    [Auth("read", "record")]
+    [Auth("read", "tag")]
+    [Sensitivity("read record")]
+    public async Task<ActionResult<IEnumerable<RecordResponseDto>>> GetInsightEligibleRecords(long organizationId, long projectId)
+    {
+        try
+        {
+            var currentUserId = UserContextStorage.UserId;
+            var isSysAdmin = UserContextStorage.IsSysAdmin;
+            var isOrgAdmin = UserContextStorage.IsOrgAdmin;
+            var isProjectAdmin = UserContextStorage.IsProjectAdmin;
+            var records =
+                await _recordBusiness.GetInsightEligibleRecords(currentUserId, organizationId, projectId, isSysAdmin, isOrgAdmin, isProjectAdmin);
+            return Ok(records);
+        }
+        catch (Exception exc)
+        {
+            var message = $"An error occurred while retrieving insight eligible records: {exc}";
+            _logger.LogError(message);
+            return StatusCode(StatusCodes.Status500InternalServerError, message);
+        }
+    }
+
+    /// <summary>
     ///     Get Records by Tags
     /// </summary>
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
