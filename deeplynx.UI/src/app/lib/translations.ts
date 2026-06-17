@@ -356,6 +356,7 @@ export const translations = {
       FAILED_TO_LOAD_PROJECT_LABELS: "Failed to load project labels.",
       FAILED_TO_LOAD_PROJECT_TAGS: "Failed to load project tags.",
       FAILED_TO_LOAD_RECENT_RECORDS: "Failed to load recent records.",
+      FAILED_TO_LOAD_RECORD_COLLECTIONS: "Failed to load record collections.",
       FAILED_TO_LOAD_RECORD_HISTORY: "Failed to load record history.",
       FAILED_TO_LOAD_SELECTED_POINT_IN_TIME_SNAPSHOT:
         "Failed to load selected point-in-time snapshot.",
@@ -807,6 +808,7 @@ export const translations = {
       LOADING_PROJECT_SECURITY_LABELS: "Loading project sensitivity labels...",
       LOADING_PROJECT_TAGS: "Loading project tags...",
       LOADING_PROJECTS: "Loading projects...",
+      LOADING_RECORD_COLLECTIONS: "Loading record collections...",
       LOADING_RECORD_HISTORY: "Loading record history...",
       LOCKED: "Locked",
       LOCKED_AT_ORGANIZATION_LEVEL: "locked at the organization level",
@@ -2150,6 +2152,7 @@ export const translations = {
         "No se pudieron cargar las etiquetas del proyecto.",
       FAILED_TO_LOAD_RECENT_RECORDS:
         "No se pudieron cargar los registros recientes.",
+      FAILED_TO_LOAD_RECORD_COLLECTIONS: "No se pudieron cargar las colecciones de registros.",
       FAILED_TO_LOAD_RECORD_HISTORY:
         "Error al cargar el historial del registro.",
       FAILED_TO_LOAD_SELECTED_POINT_IN_TIME_SNAPSHOT:
@@ -2636,6 +2639,7 @@ export const translations = {
         "Cargando etiquetas de sensitividad del proyecto...",
       LOADING_PROJECT_TAGS: "Cargando etiquetas del proyecto...",
       LOADING_PROJECTS: "Cargando proyectos...",
+      LOADING_RECORD_COLLECTIONS: "Cargando colecciones de discos...",
       LOADING_RECORD_HISTORY: "Cargando historial del registro...",
       LOCKED: "Bloqueado",
       LOCKED_AT_ORGANIZATION_LEVEL: "bloqueadas a nivel de organización",

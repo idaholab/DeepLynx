@@ -55,11 +55,11 @@ export default function RecordCollectionsTab({
     number | null
   >(null);
   const [showOnlyChanges, setShowOnlyChanges] = useState(false);
-  const [isLoadingHistory, setIsLoadingHistory] = useState(true);
+  const [isLoadingCollections, setIsLoadingCollections] = useState(true);
   const [isLoadingSnapshot, setIsLoadingSnapshot] = useState(false);
   const [isLoadingComparisonSnapshot, setIsLoadingComparisonSnapshot] =
     useState(false);
-  const [historyError, setHistoryError] = useState<string | null>(null);
+  const [collectionError, setCollectionError] = useState<string | null>(null);
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [sliderIndex, setSliderIndex] = useState(0);
   const [maxRenderedRows, setMaxRenderedRows] = useState(300);
@@ -100,8 +100,8 @@ export default function RecordCollectionsTab({
     let cancelled = false;
 
     const fetchHistory = async () => {
-      setIsLoadingHistory(true);
-      setHistoryError(null);
+      setIsLoadingCollections(true);
+      setCollectionError(null);
 
       try {
         const versions = await getRecordHistory(
@@ -140,10 +140,10 @@ export default function RecordCollectionsTab({
         if (cancelled) return;
         console.error("Error fetching record history:", error);
         setHistory([]);
-        setHistoryError(t.translations.FAILED_TO_LOAD_RECORD_HISTORY);
-        toast.error(t.translations.FAILED_TO_LOAD_RECORD_HISTORY);
+        setCollectionError(t.translations.FAILED_TO_LOAD_RECORD_COLLECTIONS);
+        toast.error(t.translations.FAILED_TO_LOAD_RECORD_COLLECTIONS);
       } finally {
-        if (!cancelled) setIsLoadingHistory(false);
+        if (!cancelled) setIsLoadingCollections(false);
       }
     };
 
@@ -450,25 +450,25 @@ export default function RecordCollectionsTab({
     });
   };
 
-  if (isLoadingHistory) {
+  if (isLoadingCollections) {
     // Initial loading state.
     return (
       <div className="mt-4 card bg-base-100 shadow-lg">
         <div className="card-body">
           <div className="flex items-center gap-3">
             <span className="loading loading-spinner loading-md" />
-            <p>{t.translations.LOADING_RECORD_HISTORY}</p>
+            <p>{t.translations.LOADING_RECORD_COLLECTIONS}</p>
           </div>
         </div>
       </div>
     );
   }
 
-  if (historyError) {
+  if (collectionError) {
     // API error state.
     return (
       <div className="mt-4 alert alert-error">
-        <span>{historyError}</span>
+        <span>{collectionError}</span>
       </div>
     );
   }
