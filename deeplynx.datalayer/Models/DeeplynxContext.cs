@@ -1497,7 +1497,7 @@ public partial class DeeplynxContext : DbContext
                 .HasConstraintName("embeddings_record_id_fkey");
 
             entity.HasIndex(e => new { e.ProjectId, e.EmbeddingModel })
-                .HasDatabaseName("idx_embeddings_org_project_model");
+                .HasDatabaseName("idx_embeddings_project_model");
         });
 
         modelBuilder.Entity<OntologyVector>(entity =>

@@ -39,12 +39,13 @@ namespace deeplynx.datalayer.Migrations
                 nullable: true);
 
             migrationBuilder.CreateIndex(
-                name: "idx_embeddings_org_project_model",
+                name: "idx_embeddings_project_model",
                 schema: "dl_vector",
                 table: "embeddings",
                 columns: new[] { "project_id", "embedding_model" });
 
-            // Relax vector column dimension to accomodate vectors of any size
+            // Relax vector column dimension to accommodate vectors of any size.
+            // Raw SQL: EF cannot express the pgvector typmod change.
             migrationBuilder.Sql("ALTER TABLE dl_vector.embeddings ALTER COLUMN vector TYPE vector;");
         }
 
@@ -52,7 +53,7 @@ namespace deeplynx.datalayer.Migrations
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropIndex(
-                name: "idx_embeddings_org_project_model",
+                name: "idx_embeddings_project_model",
                 schema: "dl_vector",
                 table: "embeddings");
 
@@ -76,7 +77,7 @@ namespace deeplynx.datalayer.Migrations
                 schema: "dl_vector",
                 table: "embeddings");
 
-            // Restore vector column dimension, fixed at 1024, the original
+            // Restore the original fixed dimension (bge-m3, 1024).
             migrationBuilder.Sql("ALTER TABLE dl_vector.embeddings ALTER COLUMN vector TYPE vector(1024);");
         }
     }
