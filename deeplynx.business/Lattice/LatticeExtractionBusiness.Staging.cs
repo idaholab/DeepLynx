@@ -60,20 +60,53 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
     {
         if (!records.Any()) return new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
 
-        var maxFrequency = records.Max(r => r.Frequency);
+        var validRecords = records
+            .Where(record =>
+                !string.IsNullOrWhiteSpace(record.Name) &&
+                !string.IsNullOrWhiteSpace(record.ClassType))
+            .ToList();
+
+        var malformedCount = records.Count - validRecords.Count;
+        if (malformedCount > 0)
+        {
+            _logger.LogWarning(
+                "Skipping {MalformedCount} malformed Lattice records for extraction {ExtractionId}",
+                malformedCount,
+                extractionId);
+        }
+
+        if (!validRecords.Any()) return new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
+
+        var maxFrequency = validRecords.Max(r => r.Frequency);
 
         // Batch KG lookup — inherit canonical name if the instance already exists in the graph
-        var recordNames = records.Select(r => r.Name).ToList();
+        var recordNames = validRecords.Select(r => r.Name.Trim()).ToList();
         var kgMatches = await _context.Records
             .Where(r => r.ProjectId == projectId && recordNames.Contains(r.Name))
             .Select(r => new { r.Id, r.Name })
             .ToListAsync();
         var nameToKg = kgMatches.ToDictionary(r => r.Name, r => r, StringComparer.OrdinalIgnoreCase);
 
-        var extractionRecords = records.Select(record =>
+        var extractionRecords = new List<ExtractionRecord>();
+        var stagedRecordNames = new List<string>();
+
+        foreach (var record in validRecords)
         {
-            classSimilarities.TryGetValue(record.ClassType, out var classMatch);
-            nameToKg.TryGetValue(record.Name, out var kgRecord);
+            var recordName = record.Name.Trim();
+            var classType = record.ClassType.Trim();
+
+            if (!classTypeToId.TryGetValue(classType, out var extractionClassId))
+            {
+                _logger.LogWarning(
+                    "Skipping staged record {RecordName} because class type {ClassType} was not staged for extraction {ExtractionId}",
+                    recordName,
+                    classType,
+                    extractionId);
+                continue;
+            }
+
+            classSimilarities.TryGetValue(classType, out var classMatch);
+            nameToKg.TryGetValue(recordName, out var kgRecord);
 
             var embeddingPlausibility = classMatch?.Score ?? 0.0;
             var statFreq = maxFrequency > 0 ? (double)record.Frequency / maxFrequency : 0.0;
@@ -85,11 +118,11 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
                 ? 1.0
                 : 0.0;
 
-            return new ExtractionRecord
+            extractionRecords.Add(new ExtractionRecord
             {
                 ExtractionId = extractionId,
-                ExtractionClassId = classTypeToId[record.ClassType],
-                Name = kgRecord?.Name ?? record.Name,
+                ExtractionClassId = extractionClassId,
+                Name = kgRecord?.Name ?? recordName,
                 Attributes = record.Attributes?.ToJsonString(),
                 OrganizationId = organizationId,
                 ProjectId = projectId,
@@ -105,15 +138,18 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
                 StructuralConsistency = structuralConsistency,
                 EnsembleScore = CalculateEnsembleScore(
                     record.Confidence, embeddingPlausibility, statFreq, structuralConsistency)
-            };
-        }).ToList();
+            });
+            stagedRecordNames.Add(recordName);
+        }
+
+        if (!extractionRecords.Any()) return new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
 
         _latticeContext.ExtractionRecords.AddRange(extractionRecords);
         await _latticeContext.SaveChangesAsync();
 
         var nameToId = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
-        for (var i = 0; i < records.Count; i++)
-            nameToId[records[i].Name] = extractionRecords[i].Id;
+        for (var i = 0; i < stagedRecordNames.Count; i++)
+            nameToId[stagedRecordNames[i]] = extractionRecords[i].Id;
 
         return nameToId;
     }
@@ -129,12 +165,29 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
         long projectId,
         string mode)
     {
-        // Unique (subjectType, relType, objectType) patterns — one ExtractionRelationship per pattern
-        var uniquePatterns = edges
-            .GroupBy(e => (
-                e.SubjectType.Trim().ToLowerInvariant(),
-                e.RelationshipType.Trim().ToLowerInvariant(),
-                e.ObjectType.Trim().ToLowerInvariant()))
+        var validEdges = edges
+            .Where(e =>
+                !string.IsNullOrWhiteSpace(e.SubjectType) &&
+                !string.IsNullOrWhiteSpace(e.RelationshipType) &&
+                !string.IsNullOrWhiteSpace(e.ObjectType))
+            .ToList();
+
+        var malformedCount = edges.Count - validEdges.Count;
+        if (malformedCount > 0)
+        {
+            _logger.LogWarning(
+                "Skipping {MalformedCount} malformed Lattice relationships for extraction {ExtractionId}",
+                malformedCount,
+                extractionId);
+        }
+
+        if (!validEdges.Any()) return new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
+
+        var uniquePatterns = validEdges
+            .GroupBy(e => RelationshipPatternKey(
+                e.SubjectType,
+                e.RelationshipType,
+                e.ObjectType))
             .Select(g => g.First())
             .ToList();
 
@@ -143,9 +196,13 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
 
         foreach (var edge in uniquePatterns)
         {
-            relSimilarities.TryGetValue(edge.RelationshipType, out var relMatch);
-            classSimilarities.TryGetValue(edge.SubjectType, out var subjectMatch);
-            classSimilarities.TryGetValue(edge.ObjectType, out var objectMatch);
+            var subjectType = edge.SubjectType.Trim();
+            var relationshipType = edge.RelationshipType.Trim();
+            var objectType = edge.ObjectType.Trim();
+
+            relSimilarities.TryGetValue(relationshipType, out var relMatch);
+            classSimilarities.TryGetValue(subjectType, out var subjectMatch);
+            classSimilarities.TryGetValue(objectType, out var objectMatch);
 
             string validationStatus;
             if (relMatch == null)
@@ -154,8 +211,8 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
             }
             else
             {
-                var normalizedSubject = subjectMatch?.OntologyEntityName ?? edge.SubjectType;
-                var normalizedObject = objectMatch?.OntologyEntityName ?? edge.ObjectType;
+                var normalizedSubject = subjectMatch?.OntologyEntityName ?? subjectType;
+                var normalizedObject = objectMatch?.OntologyEntityName ?? objectType;
 
                 var patternExists = ontologyPatterns.Any(p =>
                     string.Equals(p.OriginClassName, normalizedSubject, StringComparison.OrdinalIgnoreCase) &&
@@ -170,17 +227,26 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
                         : ExtractionValidationStatus.InvalidSchema;
             }
 
-            classTypeToId.TryGetValue(edge.SubjectType, out var originClassId);
-            classTypeToId.TryGetValue(edge.ObjectType, out var destinationClassId);
+            if (!classTypeToId.TryGetValue(subjectType, out var originClassId) ||
+                !classTypeToId.TryGetValue(objectType, out var destinationClassId))
+            {
+                _logger.LogWarning(
+                    "Skipping relationship pattern {SubjectType} - {RelationshipType} -> {ObjectType} because one or both classes were not staged for extraction {ExtractionId}",
+                    subjectType,
+                    relationshipType,
+                    objectType,
+                    extractionId);
+                continue;
+            }
 
-            patternKeys.Add($"{edge.SubjectType}|{edge.RelationshipType}|{edge.ObjectType}");
-
+            patternKeys.Add(RelationshipPatternKey(subjectType, relationshipType, objectType));
+            
             extractionRelationships.Add(new ExtractionRelationship
             {
                 ExtractionId = extractionId,
                 OriginClassId = originClassId,
                 DestinationClassId = destinationClassId,
-                Name = relMatch?.OntologyEntityName ?? edge.RelationshipType,
+                Name = relMatch?.OntologyEntityName ?? relationshipType,
                 OntologyRelationshipId = relMatch?.OntologyEntityId,
                 ValidationStatus = validationStatus,
                 OrganizationId = organizationId,
@@ -190,11 +256,9 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
 
         _latticeContext.ExtractionRelationships.AddRange(extractionRelationships);
         await _latticeContext.SaveChangesAsync();
-
         var keyToId = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
         for (var i = 0; i < patternKeys.Count; i++)
             keyToId[patternKeys[i]] = extractionRelationships[i].Id;
-
         return keyToId;
     }
 
@@ -261,4 +325,23 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
 
         return extractionEdges.Count;
     }
+    
+    /// <summary>
+    ///     Builds a stable key that uniquely identifies a relationship pattern by combining
+    ///     the subject type, relationship type, and object type.
+    ///     Leading and trailing whitespace is removed from each component before the key is
+    ///     created.
+    /// </summary>
+    /// <param name="subjectType">The ontology/entity type for the relationship subject.</param>
+    /// <param name="relationshipType">The type or name of the relationship between the subject and object.</param>
+    /// <param name="objectType">The ontology/entity type for the relationship object.</param>
+    /// <returns>
+    ///     A pipe-delimited relationship pattern key in the format
+    ///     <c>subjectType|relationshipType|objectType</c>.
+    /// </returns>
+    private static string RelationshipPatternKey(
+        string subjectType,
+        string relationshipType,
+        string objectType) =>
+        $"{subjectType.Trim()}|{relationshipType.Trim()}|{objectType.Trim()}";
 }
