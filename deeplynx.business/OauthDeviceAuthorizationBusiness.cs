@@ -15,16 +15,20 @@ public class OauthDeviceAuthorizationBusiness : IOauthDeviceAuthorizationBusines
     private const int ExpiresInSeconds = 900;
     private const int DefaultPollingIntervalSeconds = 5;
     private const int UserCodeLength = 8;
+    private const int AccessTokenExpirationMinutes = 480;
     private const string UserCodeAlphabet = "BCDFGHJKLMNPQRSTVWXZ";
 
     private readonly DeeplynxContext _context;
     private readonly ILogger<OauthDeviceAuthorizationBusiness> _logger;
+    private readonly ITokenBusiness _tokenBusiness;
 
     public OauthDeviceAuthorizationBusiness(
         DeeplynxContext context,
+        ITokenBusiness tokenBusiness,
         ILogger<OauthDeviceAuthorizationBusiness> logger)
     {
         _context = context;
+        _tokenBusiness = tokenBusiness;
         _logger = logger;
     }
 
@@ -90,6 +94,139 @@ public class OauthDeviceAuthorizationBusiness : IOauthDeviceAuthorizationBusines
         };
     }
 
+    public async Task<OauthTokenGrantResponseDto> ExchangeDeviceCodeForToken(string? deviceCode, string? clientId)
+    {
+        if (string.IsNullOrWhiteSpace(deviceCode))
+        {
+            throw new ArgumentException("device_code is required");
+        }
+
+        if (string.IsNullOrWhiteSpace(clientId))
+        {
+            throw new ArgumentException("client_id is required");
+        }
+
+        var application = await _context.OauthApplications
+            .Where(application => application.ClientId == clientId)
+            .Where(application => !application.IsArchived)
+            .FirstOrDefaultAsync();
+
+        if (application == null)
+        {
+            throw new KeyNotFoundException($"OAuth application with ClientId '{clientId}' not found or has been archived.");
+        }
+
+        var deviceCodeHash = HashCode(deviceCode);
+        var request = await _context.OauthDeviceAuthorizationRequests
+            .FirstOrDefaultAsync(request => request.DeviceCodeHash == deviceCodeHash
+                                            && request.ApplicationId == application.Id);
+
+        if (request == null)
+        {
+            throw new InvalidOperationException("invalid_grant");
+        }
+
+        var nowWithoutTz = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
+        request.PollCount++;
+        request.LastPolledAt = nowWithoutTz;
+
+        if (request.ExpiresAt <= nowWithoutTz || request.Status == OauthDeviceAuthorizationStatus.Expired)
+        {
+            request.Status = OauthDeviceAuthorizationStatus.Expired;
+            await _context.SaveChangesAsync();
+            throw new InvalidOperationException("expired_token");
+        }
+
+        if (request.Status == OauthDeviceAuthorizationStatus.Pending)
+        {
+            await _context.SaveChangesAsync();
+            throw new InvalidOperationException("authorization_pending");
+        }
+
+        if (request.Status == OauthDeviceAuthorizationStatus.Denied)
+        {
+            await _context.SaveChangesAsync();
+            throw new InvalidOperationException("access_denied");
+        }
+
+        if (request.Status != OauthDeviceAuthorizationStatus.Approved || !request.UserId.HasValue)
+        {
+            await _context.SaveChangesAsync();
+            throw new InvalidOperationException("invalid_grant");
+        }
+
+        var tokenKeys = await _tokenBusiness.CreateApiKey(request.UserId.Value, clientId);
+        var token = await _tokenBusiness.CreateToken(
+            tokenKeys.apiKey,
+            tokenKeys.apiSecret,
+            AccessTokenExpirationMinutes);
+
+        request.Status = OauthDeviceAuthorizationStatus.Consumed;
+        request.ConsumedAt = nowWithoutTz;
+
+        await _context.SaveChangesAsync();
+
+        return new OauthTokenGrantResponseDto
+        {
+            AccessToken = token,
+            TokenType = "Bearer",
+            ExpiresIn = AccessTokenExpirationMinutes * 60
+        };
+    }
+
+    public async Task<DeviceVerificationLookupResponseDto> GetDeviceAuthorizationRequest(string? userCode)
+    {
+        var request = await GetDeviceAuthorizationRequestByUserCode(userCode);
+        var nowWithoutTz = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
+
+        await MarkExpiredIfNeeded(request, nowWithoutTz);
+
+        return ToVerificationLookupResponse(request, userCode!);
+    }
+
+    public async Task<DeviceVerificationLookupResponseDto> SetDeviceAuthorizationDecision(
+        string? userCode,
+        bool approve,
+        long userId)
+    {
+        var request = await GetDeviceAuthorizationRequestByUserCode(userCode);
+        var nowWithoutTz = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
+        var isExpired = await MarkExpiredIfNeeded(request, nowWithoutTz);
+
+        if (isExpired)
+        {
+            throw new InvalidOperationException("Device authorization request has expired");
+        }
+
+        if (request.Status != OauthDeviceAuthorizationStatus.Pending)
+        {
+            throw new InvalidOperationException($"Device authorization request is {request.Status}");
+        }
+
+        request.UserId = userId;
+
+        if (approve)
+        {
+            request.Status = OauthDeviceAuthorizationStatus.Approved;
+            request.ApprovedAt = nowWithoutTz;
+        }
+        else
+        {
+            request.Status = OauthDeviceAuthorizationStatus.Denied;
+            request.DeniedAt = nowWithoutTz;
+        }
+
+        await _context.SaveChangesAsync();
+
+        _logger.LogInformation(
+            "OAuth device authorization request {RequestId} set to {Status} by user {UserId}",
+            request.Id,
+            request.Status,
+            userId);
+
+        return ToVerificationLookupResponse(request, userCode!);
+    }
+
     public async Task<int> CleanupExpiredOrConsumedRequests()
     {
         var nowWithoutTz = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
@@ -110,6 +247,60 @@ public class OauthDeviceAuthorizationBusiness : IOauthDeviceAuthorizationBusines
         _logger.LogInformation("Cleaned up {RequestCount} OAuth device authorization requests", requests.Count);
 
         return deleted;
+    }
+
+    private async Task<OauthDeviceAuthorizationRequest> GetDeviceAuthorizationRequestByUserCode(string? userCode)
+    {
+        if (string.IsNullOrWhiteSpace(userCode))
+        {
+            throw new ArgumentException("user_code is required");
+        }
+
+        var userCodeHash = HashCode(NormalizeUserCode(userCode));
+        var request = await _context.OauthDeviceAuthorizationRequests
+            .Include(request => request.OauthApplication)
+            .FirstOrDefaultAsync(request => request.UserCodeHash == userCodeHash
+                                            && !request.OauthApplication.IsArchived);
+
+        if (request == null)
+        {
+            throw new KeyNotFoundException("Device authorization request not found");
+        }
+
+        return request;
+    }
+
+    private async Task<bool> MarkExpiredIfNeeded(OauthDeviceAuthorizationRequest request, DateTime nowWithoutTz)
+    {
+        if (request.Status == OauthDeviceAuthorizationStatus.Expired)
+        {
+            return true;
+        }
+
+        if (request.ExpiresAt > nowWithoutTz || request.Status == OauthDeviceAuthorizationStatus.Consumed)
+        {
+            return false;
+        }
+
+        request.Status = OauthDeviceAuthorizationStatus.Expired;
+        await _context.SaveChangesAsync();
+
+        return true;
+    }
+
+    private DeviceVerificationLookupResponseDto ToVerificationLookupResponse(
+        OauthDeviceAuthorizationRequest request,
+        string userCode)
+    {
+        return new DeviceVerificationLookupResponseDto
+        {
+            UserCode = FormatUserCode(userCode),
+            ClientId = request.OauthApplication.ClientId,
+            ApplicationName = request.OauthApplication.Name,
+            Scope = request.Scope,
+            ExpiresAt = request.ExpiresAt,
+            Status = request.Status
+        };
     }
 
     private async Task<string> GenerateUniqueDeviceCode()
@@ -180,6 +371,18 @@ public class OauthDeviceAuthorizationBusiness : IOauthDeviceAuthorizationBusines
             .Replace(" ", string.Empty)
             .Trim()
             .ToUpperInvariant();
+    }
+
+    private string FormatUserCode(string userCode)
+    {
+        var normalized = NormalizeUserCode(userCode);
+
+        if (normalized.Length != UserCodeLength)
+        {
+            return normalized;
+        }
+
+        return $"{normalized.Substring(0, 4)}-{normalized.Substring(4, 4)}";
     }
 
     private string BuildVerificationUriComplete(string verificationUri, string userCode)

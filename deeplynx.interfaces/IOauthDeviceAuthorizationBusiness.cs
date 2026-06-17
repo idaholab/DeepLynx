@@ -9,5 +9,14 @@ public interface IOauthDeviceAuthorizationBusiness
         string? scope,
         string verificationUri);
 
+    Task<OauthTokenGrantResponseDto> ExchangeDeviceCodeForToken(string? deviceCode, string? clientId);
+
+    Task<DeviceVerificationLookupResponseDto> GetDeviceAuthorizationRequest(string? userCode);
+
+    Task<DeviceVerificationLookupResponseDto> SetDeviceAuthorizationDecision(
+        string? userCode,
+        bool approve,
+        long userId);
+
     Task<int> CleanupExpiredOrConsumedRequests();
 }
