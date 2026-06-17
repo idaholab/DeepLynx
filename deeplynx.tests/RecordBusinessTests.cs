@@ -1244,10 +1244,10 @@ public class RecordBusinessTests : IntegrationTestBase
                 Properties = (JsonObject)JsonNode.Parse(JsonSerializer.Serialize(new { TestProp = "Value2" }))!
             }
         };
-    
+
         // Act
         var result = await _recordBusiness.BulkCreateRecords(uid, organizationId, pid, did, records);
-    
+
         // Assert
         Assert.NotNull(result);
         Assert.Equal(2, result.Count());
@@ -1255,12 +1255,12 @@ public class RecordBusinessTests : IntegrationTestBase
             r.LastUpdatedBy == uid && !r.IsArchived && r.DataSourceId == did && r.ProjectId == pid));
         Assert.Contains(result, r => r.Name == "A name that is five hundred characters long a name that is five hundred characters long a name that is five hundred characters long a name that is five hundred characters long a name that is five hundred characters long a name that is five hundred characters long a name that is five hundred characters long a name that is five hundred characters long a name that is five hundred characters long a name that is five hundred characters long a name that is five hundred characters long a name that is f");
         Assert.Contains(result, r => r.Name == "A name that is just over one hundred characters long a name that is just over one hundred characters long");
-        
+
         // Ensure that a record create event was logged
         var eventList = await Context.Events.ToListAsync();
         Assert.Single(eventList); // One event is logged with the total bulk count in the properties
     }
-    
+
     [Fact]
     public async Task BulkCreateRecords_WithLabelsAndTags_CreatesMultipleRecordsWithLabelsAndTags()
     {
@@ -4176,6 +4176,519 @@ public class RecordBusinessTests : IntegrationTestBase
         await Context.SaveChangesAsync();
 
         return record;
+    }
+
+    #endregion
+
+    #region GetInsightEligibleRecords Tests
+
+    [Fact]
+    public async Task GetInsightEligibleRecords_EligibleViaFileType_IsReturned()
+    {
+        // Arrange
+        var eligible = new Record
+        {
+            Name = "Eligible PDF",
+            Description = "Eligible record via FileType",
+            OriginalId = Guid.NewGuid().ToString(),
+            Properties = "{}",
+            ProjectId = pid,
+            DataSourceId = did,
+            ClassId = cid,
+            Uri = "localhost:8090/file",
+            FileType = "pdf",
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            OrganizationId = organizationId
+        };
+
+        Context.Records.Add(eligible);
+        await Context.SaveChangesAsync();
+
+        // Act
+        var result = await _recordBusiness.GetInsightEligibleRecords(uid, organizationId, pid);
+
+        // Assert
+        Assert.Contains(result, r => r.Id == eligible.Id);
+    }
+
+    [Fact]
+    public async Task GetInsightEligibleRecords_NoUri_IsNotReturned()
+    {
+        // Arrange - FileType is supported but URI is missing; URI is required for eligibility
+        var noUri = new Record
+        {
+            Name = "No URI Record",
+            Description = "Missing URI so not insight eligible",
+            OriginalId = Guid.NewGuid().ToString(),
+            Properties = "{}",
+            ProjectId = pid,
+            DataSourceId = did,
+            ClassId = cid,
+            Uri = null,
+            FileType = "pdf",
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            OrganizationId = organizationId
+        };
+
+        Context.Records.Add(noUri);
+        await Context.SaveChangesAsync();
+
+        // Act
+        var result = await _recordBusiness.GetInsightEligibleRecords(uid, organizationId, pid);
+
+        // Assert
+        Assert.DoesNotContain(result, r => r.Id == noUri.Id);
+    }
+
+    [Fact]
+    public async Task GetInsightEligibleRecords_UnsupportedFileType_IsNotReturned()
+    {
+        // Arrange - FileType is unsupported; URI/Name extensions are NOT checked when FileType is set
+        var unsupported = new Record
+        {
+            Name = "report.pdf",                        // name has a supported extension
+            Description = "Unsupported file type",
+            OriginalId = Guid.NewGuid().ToString(),
+            Properties = "{}",
+            ProjectId = pid,
+            DataSourceId = did,
+            ClassId = cid,
+            Uri = "localhost:8090/file.pdf",            // URI also has a supported extension
+            FileType = "csv",                           // FileType is set and unsupported — this wins
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            OrganizationId = organizationId
+        };
+
+        Context.Records.Add(unsupported);
+        await Context.SaveChangesAsync();
+
+        // Act
+        var result = await _recordBusiness.GetInsightEligibleRecords(uid, organizationId, pid);
+
+        // Assert - FileType is authoritative when set; URI/Name extensions are ignored
+        Assert.DoesNotContain(result, r => r.Id == unsupported.Id);
+    }
+
+    [Fact]
+    public async Task GetInsightEligibleRecords_NullFileType_FallsBackToUriExtension()
+    {
+        // Arrange
+        var eligibleViaUri = new Record
+        {
+            Name = "No FileType But Good URI",
+            Description = "Eligible via URI extension",
+            OriginalId = Guid.NewGuid().ToString(),
+            Properties = "{}",
+            ProjectId = pid,
+            DataSourceId = did,
+            ClassId = cid,
+            Uri = "localhost:8090/myfile.txt",
+            FileType = null,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            OrganizationId = organizationId
+        };
+
+        Context.Records.Add(eligibleViaUri);
+        await Context.SaveChangesAsync();
+
+        // Act
+        var result = await _recordBusiness.GetInsightEligibleRecords(uid, organizationId, pid);
+
+        // Assert
+        Assert.Contains(result, r => r.Id == eligibleViaUri.Id);
+    }
+
+    [Fact]
+    public async Task GetInsightEligibleRecords_NullFileType_UnsupportedUriExtension_IsNotReturned()
+    {
+        // Arrange - no FileType, URI extension is unsupported, Name has no extension
+        var notEligible = new Record
+        {
+            Name = "No FileType Bad URI",
+            Description = "Not eligible, URI extension unsupported",
+            OriginalId = Guid.NewGuid().ToString(),
+            Properties = "{}",
+            ProjectId = pid,
+            DataSourceId = did,
+            ClassId = cid,
+            Uri = "localhost:8090/myfile.csv",
+            FileType = null,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            OrganizationId = organizationId
+        };
+
+        Context.Records.Add(notEligible);
+        await Context.SaveChangesAsync();
+
+        // Act
+        var result = await _recordBusiness.GetInsightEligibleRecords(uid, organizationId, pid);
+
+        // Assert
+        Assert.DoesNotContain(result, r => r.Id == notEligible.Id);
+    }
+
+    [Fact]
+    public async Task GetInsightEligibleRecords_NullFileType_FallsBackToNameExtension()
+    {
+        // Arrange - no FileType, URI has no supported extension, but Name ends with a supported extension
+        var eligibleViaName = new Record
+        {
+            Name = "document.html",
+            Description = "Eligible via Name extension",
+            OriginalId = Guid.NewGuid().ToString(),
+            Properties = "{}",
+            ProjectId = pid,
+            DataSourceId = did,
+            ClassId = cid,
+            Uri = "localhost:8090/blob/abc123",  // no extension
+            FileType = null,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            OrganizationId = organizationId
+        };
+
+        Context.Records.Add(eligibleViaName);
+        await Context.SaveChangesAsync();
+
+        // Act
+        var result = await _recordBusiness.GetInsightEligibleRecords(uid, organizationId, pid);
+
+        // Assert
+        Assert.Contains(result, r => r.Id == eligibleViaName.Id);
+    }
+
+    [Fact]
+    public async Task GetInsightEligibleRecords_NullFileType_UnsupportedNameExtension_IsNotReturned()
+    {
+        // Arrange - no FileType, URI has no extension, Name extension is unsupported
+        var notEligible = new Record
+        {
+            Name = "report.xlsx",
+            Description = "Not eligible via Name extension",
+            OriginalId = Guid.NewGuid().ToString(),
+            Properties = "{}",
+            ProjectId = pid,
+            DataSourceId = did,
+            ClassId = cid,
+            Uri = "localhost:8090/blob/def456",
+            FileType = null,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            OrganizationId = organizationId
+        };
+
+        Context.Records.Add(notEligible);
+        await Context.SaveChangesAsync();
+
+        // Act
+        var result = await _recordBusiness.GetInsightEligibleRecords(uid, organizationId, pid);
+
+        // Assert
+        Assert.DoesNotContain(result, r => r.Id == notEligible.Id);
+    }
+
+    [Fact]
+    public async Task GetInsightEligibleRecords_ExcludesArchivedRecords()
+    {
+        // Arrange
+        var archived = new Record
+        {
+            Name = "Archived PDF",
+            Description = "Archived eligible record",
+            OriginalId = Guid.NewGuid().ToString(),
+            Properties = "{}",
+            ProjectId = pid,
+            DataSourceId = did,
+            ClassId = cid,
+            Uri = "localhost:8090/archived.pdf",
+            FileType = "pdf",
+            IsArchived = true,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            OrganizationId = organizationId
+        };
+
+        Context.Records.Add(archived);
+        await Context.SaveChangesAsync();
+
+        // Act
+        var result = await _recordBusiness.GetInsightEligibleRecords(uid, organizationId, pid);
+
+        // Assert
+        Assert.DoesNotContain(result, r => r.Id == archived.Id);
+    }
+
+    [Fact]
+    public async Task GetInsightEligibleRecords_ExcludesRecordsFromOtherProjects()
+    {
+        // Arrange
+        var otherProjectRecord = new Record
+        {
+            Name = "Other Project PDF",
+            Description = "Belongs to pid2",
+            OriginalId = Guid.NewGuid().ToString(),
+            Properties = "{}",
+            ProjectId = pid2,
+            DataSourceId = did,
+            ClassId = cid,
+            Uri = "localhost:8090/other.pdf",
+            FileType = "pdf",
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            OrganizationId = organizationId
+        };
+
+        Context.Records.Add(otherProjectRecord);
+        await Context.SaveChangesAsync();
+
+        // Act
+        var result = await _recordBusiness.GetInsightEligibleRecords(uid, organizationId, pid);
+
+        // Assert
+        Assert.DoesNotContain(result, r => r.Id == otherProjectRecord.Id);
+    }
+
+    [Fact]
+    public async Task GetInsightEligibleRecords_ReturnsTags()
+    {
+        // Arrange
+        var record = new Record
+        {
+            Name = "Tagged Eligible Record",
+            Description = "Has a tag and is insight eligible",
+            OriginalId = Guid.NewGuid().ToString(),
+            Properties = "{}",
+            ProjectId = pid,
+            DataSourceId = did,
+            ClassId = cid,
+            Uri = "localhost:8090/tagged.pdf",
+            FileType = "pdf",
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            OrganizationId = organizationId
+        };
+
+        Context.Records.Add(record);
+        await Context.SaveChangesAsync();
+
+        await _recordBusiness.AttachTag(uid, organizationId, pid, record.Id, tid);
+
+        // Act
+        var result = await _recordBusiness.GetInsightEligibleRecords(uid, organizationId, pid);
+
+        // Assert
+        var match = result.First(r => r.Id == record.Id);
+        Assert.NotNull(match.Tags);
+        Assert.Contains(match.Tags, t => t.Name == "Test Tag");
+    }
+
+    [Fact]
+    public async Task GetInsightEligibleRecords_NonAdminUser_ExcludesUnauthorizedLabeledRecords()
+    {
+        // Arrange - create a label with no permissions granted to the non-admin user
+        var restrictedLabel = new SensitivityLabel
+        {
+            Name = $"Restricted Label {Guid.NewGuid()}",
+            Description = "No read permission for non-admin",
+            OrganizationId = organizationId,
+            ProjectId = pid,
+            LastUpdatedBy = uid,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            IsArchived = false
+        };
+
+        var restrictedRecord = new Record
+        {
+            Name = "Restricted Eligible Record",
+            Description = "Eligible file type but unauthorized label",
+            OriginalId = Guid.NewGuid().ToString(),
+            Properties = "{}",
+            ProjectId = pid,
+            DataSourceId = did,
+            ClassId = cid,
+            Uri = "localhost:8090/restricted.pdf",
+            FileType = "pdf",
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            OrganizationId = organizationId,
+            Labels = new List<SensitivityLabel> { restrictedLabel }
+        };
+
+        var otherUser = new User
+        {
+            Name = "Other User",
+            Email = $"other-{Guid.NewGuid()}@test.com",
+            IsActive = true
+        };
+
+        Context.Users.Add(otherUser);
+        Context.Records.Add(restrictedRecord);
+        await Context.SaveChangesAsync();
+
+        // Act
+        var result = await _recordBusiness.GetInsightEligibleRecords(
+            otherUser.Id, organizationId, pid,
+            isSysAdmin: false, isOrgAdmin: false, isProjectAdmin: false);
+
+        // Assert
+        Assert.DoesNotContain(result, r => r.Id == restrictedRecord.Id);
+    }
+
+    [Fact]
+    public async Task GetInsightEligibleRecords_SysAdmin_IncludesAllLabeledRecords()
+    {
+        // Arrange - record with a label that has no explicit permissions
+        var label = new SensitivityLabel
+        {
+            Name = $"Admin-Only Label {Guid.NewGuid()}",
+            Description = "No read permission for regular users",
+            OrganizationId = organizationId,
+            ProjectId = pid,
+            LastUpdatedBy = uid,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            IsArchived = false
+        };
+
+        var labeledRecord = new Record
+        {
+            Name = "Admin Only Eligible Record",
+            Description = "Eligible file but restricted label",
+            OriginalId = Guid.NewGuid().ToString(),
+            Properties = "{}",
+            ProjectId = pid,
+            DataSourceId = did,
+            ClassId = cid,
+            Uri = "localhost:8090/admin-only.jpg",
+            FileType = "jpg",
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            OrganizationId = organizationId,
+            Labels = new List<SensitivityLabel> { label }
+        };
+
+        Context.Records.Add(labeledRecord);
+        await Context.SaveChangesAsync();
+
+        // Act
+        var result = await _recordBusiness.GetInsightEligibleRecords(uid, organizationId, pid, isSysAdmin: true);
+
+        // Assert
+        Assert.Contains(result, r => r.Id == labeledRecord.Id);
+    }
+
+    [Fact]
+    public async Task GetInsightEligibleRecords_AllSupportedFileTypes_AreEligible()
+    {
+        // Arrange - one record per supported file type
+        var supportedTypes = new[] { "pdf", "txt", "html", "htm", "png", "jpg", "jpeg", "webp" };
+
+        var records = supportedTypes.Select(ext => new Record
+        {
+            Name = $"Record {ext}",
+            Description = $"Eligible record with FileType {ext}",
+            OriginalId = Guid.NewGuid().ToString(),
+            Properties = "{}",
+            ProjectId = pid,
+            DataSourceId = did,
+            ClassId = cid,
+            Uri = "localhost:8090/file",
+            FileType = ext,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            OrganizationId = organizationId
+        }).ToList();
+
+        Context.Records.AddRange(records);
+        await Context.SaveChangesAsync();
+
+        // Act
+        var result = await _recordBusiness.GetInsightEligibleRecords(uid, organizationId, pid);
+
+        // Assert
+        foreach (var r in records)
+            Assert.Contains(result, res => res.Id == r.Id);
+    }
+
+    [Fact]
+    public async Task GetInsightEligibleRecords_FileTypeCheck_IsCaseInsensitive()
+    {
+        // Arrange
+        var upperCaseFileType = new Record
+        {
+            Name = "Uppercase FileType",
+            Description = "FileType in uppercase",
+            OriginalId = Guid.NewGuid().ToString(),
+            Properties = "{}",
+            ProjectId = pid,
+            DataSourceId = did,
+            ClassId = cid,
+            Uri = "localhost:8090/file",
+            FileType = "PDF",
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            OrganizationId = organizationId
+        };
+
+        Context.Records.Add(upperCaseFileType);
+        await Context.SaveChangesAsync();
+
+        // Act
+        var result = await _recordBusiness.GetInsightEligibleRecords(uid, organizationId, pid);
+
+        // Assert
+        Assert.Contains(result, r => r.Id == upperCaseFileType.Id);
+    }
+
+    [Fact]
+    public async Task GetInsightEligibleRecords_UriAndNameExtensionChecks_AreCaseInsensitive()
+    {
+        // Arrange - no FileType on either record, so URI/Name extension fallback applies
+        var upperCaseUriExt = new Record
+        {
+            Name = "No FileType Mixed URI",
+            Description = "URI extension in uppercase",
+            OriginalId = Guid.NewGuid().ToString(),
+            Properties = "{}",
+            ProjectId = pid,
+            DataSourceId = did,
+            ClassId = cid,
+            Uri = "localhost:8090/file.TXT",
+            FileType = null,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            OrganizationId = organizationId
+        };
+
+        var upperCaseNameExt = new Record
+        {
+            Name = "Document.PNG",
+            Description = "Name extension in uppercase",
+            OriginalId = Guid.NewGuid().ToString(),
+            Properties = "{}",
+            ProjectId = pid,
+            DataSourceId = did,
+            ClassId = cid,
+            Uri = "localhost:8090/blob/xyz",     // no extension
+            FileType = null,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            OrganizationId = organizationId
+        };
+
+        Context.Records.AddRange(upperCaseUriExt, upperCaseNameExt);
+        await Context.SaveChangesAsync();
+
+        // Act
+        var result = await _recordBusiness.GetInsightEligibleRecords(uid, organizationId, pid);
+
+        // Assert
+        Assert.Contains(result, r => r.Id == upperCaseUriExt.Id);
+        Assert.Contains(result, r => r.Id == upperCaseNameExt.Id);
     }
 
     #endregion
