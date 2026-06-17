@@ -711,8 +711,20 @@ export function useCollectionDetails({
         ),
       ];
 
-      await refreshSelectedCollection();
-      await loadCollectionRecords();
+      let didRefreshFail = false;
+
+      try {
+        await refreshSelectedCollection();
+        await loadCollectionRecords();
+      } catch (refreshError) {
+        didRefreshFail = true;
+        console.error(
+          "Failed to refresh record collection after save:",
+          refreshError,
+        );
+        toast.error(t.translations.RECORD_COLLECTIONS_SAVED_REFRESH_FAILED);
+      }
+
       editStartCollectionRecordsRef.current = null;
       setSelectedCollectionDraft(null);
       setSelectedCollectionPropertiesEditorOpen(false);
@@ -731,7 +743,7 @@ export function useCollectionDetails({
             failedOperations.join(", "),
           ),
         );
-      } else {
+      } else if (!didRefreshFail) {
         toast.success(t.translations.RECORD_COLLECTIONS_UPDATE_SUCCESS);
       }
     } catch (error) {

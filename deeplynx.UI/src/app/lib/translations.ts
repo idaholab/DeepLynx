@@ -1273,6 +1273,8 @@ export const translations = {
         "Failed to search records",
       RECORD_COLLECTIONS_FAILED_UPDATE:
         "Failed to update record collection",
+      RECORD_COLLECTIONS_SAVED_REFRESH_FAILED:
+        "Record collection saved, but the latest data could not be loaded. Reload the page to refresh.",
       RECORD_COLLECTIONS_FIELD: "Field",
       RECORD_COLLECTIONS_FILTER_BY_TITLE_OR_DESCRIPTION:
         "Search by collection title or description...",
@@ -3125,6 +3127,8 @@ export const translations = {
         "No se pudieron buscar los registros",
       RECORD_COLLECTIONS_FAILED_UPDATE:
         "No se pudo actualizar la colección de registros",
+      RECORD_COLLECTIONS_SAVED_REFRESH_FAILED:
+        "La colección de registros se guardó, pero no se pudieron cargar los datos más recientes. Vuelva a cargar la página para actualizarla.",
       RECORD_COLLECTIONS_FIELD: "Campo",
       RECORD_COLLECTIONS_FILTER_BY_TITLE_OR_DESCRIPTION:
         "Buscar por título o descripción de la colección...",

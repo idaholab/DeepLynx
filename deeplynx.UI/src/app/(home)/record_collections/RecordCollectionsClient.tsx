@@ -81,7 +81,7 @@ export default function RecordCollectionsClient({
                   </div>
                   <Link
                     href="/record_collections/new_collection"
-                    className="btn btn-primary px-2 text-base-content"
+                    className="btn btn-primary px-2 text-primary-content"
                   >
                     {t.translations.RECORD_COLLECTIONS_NEW}
                   </Link>
