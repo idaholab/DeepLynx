@@ -1171,7 +1171,7 @@ export const translations = {
       PROJECT_INSIGHT_STATUS_PROCESSING: "Embedding in progress.",
       PROJECT_INSIGHT_STATUS_QUEUED: "Queued for embedding.",
       PROJECT_INSIGHT_STATUS_UNSUPPORTED:
-        "Insight supports PDF, TXT, and HTML files only.",
+        "Insight supports PDF, TXT, HTML, and image files (PNG, JPG, WEBP) only.",
       PROJECT_INSIGHT_UPDATED_FROM: "Updated from",
       PROJECT_INSIGHT_UPDATED_TO: "Updated to",
       PROJECT_LABEL_CREATED: "Project label created.",
