@@ -1495,6 +1495,9 @@ public partial class DeeplynxContext : DbContext
                 .HasForeignKey(d => d.RecordId)
                 .OnDelete(DeleteBehavior.Cascade)
                 .HasConstraintName("embeddings_record_id_fkey");
+
+            entity.HasIndex(e => new { e.ProjectId, e.EmbeddingModel })
+                .HasDatabaseName("idx_embeddings_org_project_model");
         });
 
         modelBuilder.Entity<OntologyVector>(entity =>

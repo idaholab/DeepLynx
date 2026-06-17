@@ -38,13 +38,24 @@ namespace deeplynx.datalayer.Migrations
                 type: "bigint",
                 nullable: true);
 
-            // Relax the vector type to accomodate any model with any dimensions
+            migrationBuilder.CreateIndex(
+                name: "idx_embeddings_org_project_model",
+                schema: "dl_vector",
+                table: "embeddings",
+                columns: new[] { "project_id", "embedding_model" });
+
+            // Relax vector column dimension to accomodate vectors of any size
             migrationBuilder.Sql("ALTER TABLE dl_vector.embeddings ALTER COLUMN vector TYPE vector;");
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.DropIndex(
+                name: "idx_embeddings_org_project_model",
+                schema: "dl_vector",
+                table: "embeddings");
+
             migrationBuilder.DropColumn(
                 name: "dimensions",
                 schema: "dl_vector",
@@ -65,7 +76,7 @@ namespace deeplynx.datalayer.Migrations
                 schema: "dl_vector",
                 table: "embeddings");
 
-            // The rollback will fail if vectors with dimensions other than 1024 are in the table
+            // Restore vector column dimension, fixed at 1024, the original
             migrationBuilder.Sql("ALTER TABLE dl_vector.embeddings ALTER COLUMN vector TYPE vector(1024);");
         }
     }

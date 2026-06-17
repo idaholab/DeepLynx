@@ -681,6 +681,9 @@ namespace deeplynx.datalayer.Migrations
                     b.HasIndex("RecordId")
                         .HasDatabaseName("idx_embeddings_record_id");
 
+                    b.HasIndex("ProjectId", "EmbeddingModel")
+                        .HasDatabaseName("idx_embeddings_org_project_model");
+
                     b.ToTable("embeddings", "dl_vector");
                 });
 
