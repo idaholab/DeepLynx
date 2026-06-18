@@ -8,7 +8,7 @@ import React, {
   useTransition,
 } from "react";
 import toast from "react-hot-toast";
-import { HistoricalRecordResponseDto } from "@/app/(home)/types/responseDTOs";
+import { HistoricalRecordResponseDto, RecordCollectionResponseDto } from "@/app/(home)/types/responseDTOs";
 import { useLanguage } from "@/app/contexts/Language";
 import {
   getHistoricalRecord,
@@ -42,7 +42,7 @@ export default function RecordCollectionsTab({
   const placeholderValue = t.translations.RECORD_HISTORY_NOT_AVAILABLE || "N/A";
 
   // Source data + user selection state.
-  const [history, setHistory] = useState<HistoricalRecordResponseDto[]>([]);
+  const [collections, setCollections] = useState<RecordCollectionResponseDto[]>([]);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [selectedSnapshot, setSelectedSnapshot] =
     useState<HistoricalRecordResponseDto | null>(null);
@@ -118,7 +118,7 @@ export default function RecordCollectionsTab({
 
         if (cancelled) return;
 
-        setHistory(sorted);
+        setCollections(sorted);
 
         if (sorted.length > 0) {
           const latestIndex = sorted.length - 1;
@@ -138,7 +138,7 @@ export default function RecordCollectionsTab({
         }
       } catch (error) {
         if (cancelled) return;
-        console.error("Error fetching record history:", error);
+        console.error("Error fetching record collections:", error);
         setHistory([]);
         setCollectionError(t.translations.FAILED_TO_LOAD_RECORD_COLLECTIONS);
         toast.error(t.translations.FAILED_TO_LOAD_RECORD_COLLECTIONS);
