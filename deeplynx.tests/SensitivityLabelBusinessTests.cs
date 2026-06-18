@@ -470,8 +470,10 @@ public class SensitivityLabelBusinessTests : IntegrationTestBase
         var labels = result.ToList();
 
         // Assert
-        Assert.Equal(2, labels.Count);
+        Assert.Equal(4, labels.Count);
         Assert.Contains(labels, l => l.Id == lid);
+        Assert.Contains(labels, l => l.Id == lid3);
+        Assert.Contains(labels, l => l.Id == lid4);
         Assert.Contains(labels, l => l.Id == lid6);
     }
 

@@ -59,7 +59,7 @@ public class SensitivityLabelBusiness : ISensitivityLabelBusiness
         var user = await _userBusiness.GetUserAdminInfo(currentUserId, organizationId);
 
         // Org and System admins can see everything
-        if (user.IsSysAdmin == false && user.IsOrgAdmin == false) {
+        if (user.IsSysAdmin != true && user.IsOrgAdmin != true) {
             // List of projects user is an admin for
             var adminProjects = new List<long?>(); 
             foreach (var projectId in projectIds ?? Enumerable.Empty<long>())
@@ -68,21 +68,15 @@ public class SensitivityLabelBusiness : ISensitivityLabelBusiness
                 if (projUser.IsProjectAdmin == true) adminProjects.Add(projectId);
             }
 
-            // Find if there's only one project and if the user is the admin (the user is only looking at their personal project, will show everything including org labels)
-            bool? isOneProjAdmin = false;
-            if (projectIds?.Length == 1)
-            {
-                var projUser = await _userBusiness.GetUserAdminInfo(currentUserId, organizationId, projectIds[0]);
-                isOneProjAdmin = projUser.IsProjectAdmin;
-            }
-
-            if (isOneProjAdmin == false) {
-                var authorizedLabels = await labelService.GetAuthorizedSensitivityLabels(currentUserId, organizationId, projectIds, "read record");
-                query = query.Where(c => 
-                    (c.ProjectId.HasValue && adminProjects.Contains(c.ProjectId)) ||
-                    authorizedLabels.Contains(c.Id)
-                );
-            }
+            var authorizedLabels = await labelService.GetAuthorizedSensitivityLabels(currentUserId, organizationId, projectIds, "read record");
+            query = query.Where(c => 
+                // all labels on a project level that the user admins
+                (c.ProjectId.HasValue && adminProjects.Contains(c.ProjectId)) ||
+                // org labels, inherited into the project
+                (c.ProjectId == null && adminProjects.Count > 0) ||
+                // labels the user was granted permission to
+                authorizedLabels.Contains(c.Id)
+            );
         }
 
         return await query.Select(l => new SensitivityLabelResponseDto
