@@ -58,6 +58,7 @@ import {
   bulkAttachTagsToRecords,
   bulkUnattachTagsFromRecords,
 } from "@/app/lib/client_service/record_services.client";
+import Skeleton from "react-loading-skeleton";
 /* ─── Types ──────────────────────────────────────────────────────────────── */
 
 type Props = {
@@ -127,6 +128,12 @@ export default function DataCatalogClient({
 
   // searchTerm is the live value of the search input field.
   const [searchTerm, setSearchTerm] = useState(initialSearchTerm ?? "");
+
+  // loading determines if the records are loading
+  const [loading, setLoading] = useState(false);
+
+  // render helper for loading skeleton
+  const times = (n: number) => Array.from({ length: n }, (_, i) => i);
 
   /**
    * activeFilters is the list of submitted search terms that are currently
@@ -228,6 +235,7 @@ export default function DataCatalogClient({
       setTableData([]);
       return;
     }
+    setLoading(true);
     const data = await getMultiProjectRecords(
       organization?.organizationId as number,
       idsNum,
@@ -262,6 +270,7 @@ export default function DataCatalogClient({
       fileType: "",
     }));
     setTableData(transformedData);
+    setLoading(false);
   }, [effectiveProjectIds, organization?.organizationId, projects]);
 
   /**
@@ -1028,7 +1037,39 @@ export default function DataCatalogClient({
 
           {/* Record list */}
           <div className="min-w-0">
-            {scopedRecords.length === 0 ? (
+            { loading === true ? (
+              <div className="card border border-base-300 bg-base-100 shadow-sm p-1">
+                <ul className="list mt-0">
+                  {times(5).map((i) => (
+                    <li
+                      key={i}
+                      className="border-b border-base-content/20 hover:bg-base-200/30 p-2 pl-0 rounded-sm"
+                    >
+                      <div className="text-accent-content mb-1">
+                        <Skeleton width="55%" />
+                      </div>
+                      <div className="text-sm text-base-300 space-x-2 flex flex-wrap items-center">
+                        <span>
+                          {t.translations.CLASS}{" "}
+                          <span className="badge badge-info badge-sm text-xs">
+                            <Skeleton width={60} />
+                          </span>
+                        </span>
+                        <span className="ml-4">
+                          {t.translations.LAST_EDIT} <Skeleton width={80} />
+                        </span>
+                        <span className="ml-4">
+                          {t.translations.PROJECT} <Skeleton width={120} />
+                        </span>
+                        <span className="ml-4">
+                          {t.translations.DATA_SOURCE} <Skeleton width={100} />
+                        </span>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : scopedRecords.length === 0 ? (
               <div className="card border border-base-300 bg-base-100 shadow-sm">
                 <div className="card-body items-center py-16 text-center">
                   <DocumentTextIcon className="size-12 text-base-content/30" />
