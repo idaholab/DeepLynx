@@ -99,10 +99,8 @@ public static class ExposeUriHelper
 
         try
         {
-            Console.WriteLine("This is it:");
             var labels = JsonSerializer.Deserialize<List<Label>>(record.Labels, CaseInsensitive);
             if (labels is null) return true; // JSON value is explicitly "null" -  generally shouldn't happen, but that's OK
-            Console.WriteLine(JsonSerializer.Serialize(labels));
             return labels.Count == 0
                 || labels.All(l => authorizedDownloadLabels.Contains(l.Id));
         }
