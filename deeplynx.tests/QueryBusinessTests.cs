@@ -24,6 +24,7 @@ public class QueryBusinessTests : IntegrationTestBase
     private INotificationBusiness _notificationBusiness = null!;
     private QueryBusiness _queryBusiness = null!;
     private RecordBusiness _recordBusiness;
+    private UserBusiness _userBusiness = null!;
     private SensitivityLabelBusiness _sensitivityLabelBusiness;
     private ISensitivityLabelService _sensitivityLabelService = null!;
     private TagBusiness _tagBusiness = null!;
@@ -57,7 +58,8 @@ public class QueryBusinessTests : IntegrationTestBase
             new NotificationBusiness(Context, _mockNotificationLogger.Object, _mockHubContext.Object);
         _mockBulkCopyUpsertExecutor = new BulkCopyUpsertExecutor();
         _eventBusiness = new EventBusiness(Context, _notificationBusiness, _mockBulkCopyUpsertExecutor);
-        _sensitivityLabelBusiness = new SensitivityLabelBusiness(Context, _eventBusiness);
+        _userBusiness = new UserBusiness(Context);
+        _sensitivityLabelBusiness = new SensitivityLabelBusiness(Context, _eventBusiness, _userBusiness);
         _tagBusiness = new TagBusiness(Context, _eventBusiness);
         _recordBusiness = new RecordBusiness(Context, _eventBusiness, _mockBulkCopyUpsertExecutor, _tagBusiness,
             _sensitivityLabelBusiness, _sensitivityLabelService);

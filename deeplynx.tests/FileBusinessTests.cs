@@ -27,6 +27,7 @@ public class FileBusinessTests : IntegrationTestBase
     private DataSourceBusiness _dataSourceBusiness = null!;
     private Mock<IEdgeBusiness> _edgeBusiness = null!;
     private EventBusiness _eventBusiness = null!;
+    private UserBusiness _userBusiness = null!;
     private FileBusiness _fileBusiness = null!;
     private Mock<IFileBusinessFactory> _fileBusinessFactory = null!;
     private BulkCopyUpsertExecutor _mockBulkCopyExecutor = null!;
@@ -85,7 +86,8 @@ public class FileBusinessTests : IntegrationTestBase
         _objectStorageBusiness = new ObjectStorageBusiness(Context, _encryptionHelper);
 
         _tagBusiness = new TagBusiness(Context, _eventBusiness);
-        _sensitivityLabelBusiness = new SensitivityLabelBusiness(Context, _eventBusiness);
+        _userBusiness = new UserBusiness(Context);
+        _sensitivityLabelBusiness = new SensitivityLabelBusiness(Context, _eventBusiness, _userBusiness);
         _sensitivityLabelService = new SensitivityLabelService(Context);
         _recordBusiness = new RecordBusiness(Context, _eventBusiness, _mockBulkCopyExecutor, _tagBusiness,
             _sensitivityLabelBusiness, _sensitivityLabelService);
