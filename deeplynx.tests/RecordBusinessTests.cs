@@ -4206,7 +4206,7 @@ public class RecordBusinessTests : IntegrationTestBase
         await Context.SaveChangesAsync();
 
         // Act
-        var result = await _recordBusiness.GetInsightEligibleRecords(uid, organizationId, pid);
+        var result = await _recordBusiness.GetAllRecords(uid, organizationId, pid, null, false, isInsightEligible: true);
 
         // Assert
         Assert.Contains(result, r => r.Id == eligible.Id);
@@ -4236,7 +4236,7 @@ public class RecordBusinessTests : IntegrationTestBase
         await Context.SaveChangesAsync();
 
         // Act
-        var result = await _recordBusiness.GetInsightEligibleRecords(uid, organizationId, pid);
+        var result = await _recordBusiness.GetAllRecords(uid, organizationId, pid, null, false, isInsightEligible: true);
 
         // Assert
         Assert.DoesNotContain(result, r => r.Id == noUri.Id);
@@ -4266,7 +4266,7 @@ public class RecordBusinessTests : IntegrationTestBase
         await Context.SaveChangesAsync();
 
         // Act
-        var result = await _recordBusiness.GetInsightEligibleRecords(uid, organizationId, pid);
+        var result = await _recordBusiness.GetAllRecords(uid, organizationId, pid, null, false, isInsightEligible: true);
 
         // Assert - FileType is authoritative when set; URI/Name extensions are ignored
         Assert.DoesNotContain(result, r => r.Id == unsupported.Id);
@@ -4296,7 +4296,7 @@ public class RecordBusinessTests : IntegrationTestBase
         await Context.SaveChangesAsync();
 
         // Act
-        var result = await _recordBusiness.GetInsightEligibleRecords(uid, organizationId, pid);
+        var result = await _recordBusiness.GetAllRecords(uid, organizationId, pid, null, false, isInsightEligible: true);
 
         // Assert
         Assert.Contains(result, r => r.Id == eligibleViaUri.Id);
@@ -4326,7 +4326,7 @@ public class RecordBusinessTests : IntegrationTestBase
         await Context.SaveChangesAsync();
 
         // Act
-        var result = await _recordBusiness.GetInsightEligibleRecords(uid, organizationId, pid);
+        var result = await _recordBusiness.GetAllRecords(uid, organizationId, pid, null, false, isInsightEligible: true);
 
         // Assert
         Assert.DoesNotContain(result, r => r.Id == notEligible.Id);
@@ -4356,7 +4356,7 @@ public class RecordBusinessTests : IntegrationTestBase
         await Context.SaveChangesAsync();
 
         // Act
-        var result = await _recordBusiness.GetInsightEligibleRecords(uid, organizationId, pid);
+        var result = await _recordBusiness.GetAllRecords(uid, organizationId, pid, null, false, isInsightEligible: true);
 
         // Assert
         Assert.Contains(result, r => r.Id == eligibleViaName.Id);
@@ -4386,41 +4386,10 @@ public class RecordBusinessTests : IntegrationTestBase
         await Context.SaveChangesAsync();
 
         // Act
-        var result = await _recordBusiness.GetInsightEligibleRecords(uid, organizationId, pid);
+        var result = await _recordBusiness.GetAllRecords(uid, organizationId, pid, null, false, isInsightEligible: true);
 
         // Assert
         Assert.DoesNotContain(result, r => r.Id == notEligible.Id);
-    }
-
-    [Fact]
-    public async Task GetInsightEligibleRecords_ExcludesArchivedRecords()
-    {
-        // Arrange
-        var archived = new Record
-        {
-            Name = "Archived PDF",
-            Description = "Archived eligible record",
-            OriginalId = Guid.NewGuid().ToString(),
-            Properties = "{}",
-            ProjectId = pid,
-            DataSourceId = did,
-            ClassId = cid,
-            Uri = "localhost:8090/archived.pdf",
-            FileType = "pdf",
-            IsArchived = true,
-            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
-            LastUpdatedBy = uid,
-            OrganizationId = organizationId
-        };
-
-        Context.Records.Add(archived);
-        await Context.SaveChangesAsync();
-
-        // Act
-        var result = await _recordBusiness.GetInsightEligibleRecords(uid, organizationId, pid);
-
-        // Assert
-        Assert.DoesNotContain(result, r => r.Id == archived.Id);
     }
 
     [Fact]
@@ -4447,7 +4416,7 @@ public class RecordBusinessTests : IntegrationTestBase
         await Context.SaveChangesAsync();
 
         // Act
-        var result = await _recordBusiness.GetInsightEligibleRecords(uid, organizationId, pid);
+        var result = await _recordBusiness.GetAllRecords(uid, organizationId, pid, null, false, isInsightEligible: true);
 
         // Assert
         Assert.DoesNotContain(result, r => r.Id == otherProjectRecord.Id);
@@ -4479,7 +4448,7 @@ public class RecordBusinessTests : IntegrationTestBase
         await _recordBusiness.AttachTag(uid, organizationId, pid, record.Id, tid);
 
         // Act
-        var result = await _recordBusiness.GetInsightEligibleRecords(uid, organizationId, pid);
+        var result = await _recordBusiness.GetAllRecords(uid, organizationId, pid, null, false, isInsightEligible: true);
 
         // Assert
         var match = result.First(r => r.Id == record.Id);
@@ -4531,9 +4500,9 @@ public class RecordBusinessTests : IntegrationTestBase
         await Context.SaveChangesAsync();
 
         // Act
-        var result = await _recordBusiness.GetInsightEligibleRecords(
-            otherUser.Id, organizationId, pid,
-            isSysAdmin: false, isOrgAdmin: false, isProjectAdmin: false);
+        var result = await _recordBusiness.GetAllRecords(
+            otherUser.Id, organizationId, pid, null, false,
+            isSysAdmin: false, isOrgAdmin: false, isProjectAdmin: false, isInsightEligible: true);
 
         // Assert
         Assert.DoesNotContain(result, r => r.Id == restrictedRecord.Id);
@@ -4575,7 +4544,7 @@ public class RecordBusinessTests : IntegrationTestBase
         await Context.SaveChangesAsync();
 
         // Act
-        var result = await _recordBusiness.GetInsightEligibleRecords(uid, organizationId, pid, isSysAdmin: true);
+        var result = await _recordBusiness.GetAllRecords(uid, organizationId, pid, null, false, isSysAdmin: true, isInsightEligible: true);
 
         // Assert
         Assert.Contains(result, r => r.Id == labeledRecord.Id);
@@ -4607,7 +4576,7 @@ public class RecordBusinessTests : IntegrationTestBase
         await Context.SaveChangesAsync();
 
         // Act
-        var result = await _recordBusiness.GetInsightEligibleRecords(uid, organizationId, pid);
+        var result = await _recordBusiness.GetAllRecords(uid, organizationId, pid, null, false, isInsightEligible: true);
 
         // Assert
         foreach (var r in records)
@@ -4638,7 +4607,7 @@ public class RecordBusinessTests : IntegrationTestBase
         await Context.SaveChangesAsync();
 
         // Act
-        var result = await _recordBusiness.GetInsightEligibleRecords(uid, organizationId, pid);
+        var result = await _recordBusiness.GetAllRecords(uid, organizationId, pid, null, false, isInsightEligible: true);
 
         // Assert
         Assert.Contains(result, r => r.Id == upperCaseFileType.Id);
@@ -4684,7 +4653,7 @@ public class RecordBusinessTests : IntegrationTestBase
         await Context.SaveChangesAsync();
 
         // Act
-        var result = await _recordBusiness.GetInsightEligibleRecords(uid, organizationId, pid);
+        var result = await _recordBusiness.GetAllRecords(uid, organizationId, pid, null, false, isInsightEligible: true);
 
         // Assert
         Assert.Contains(result, r => r.Id == upperCaseUriExt.Id);

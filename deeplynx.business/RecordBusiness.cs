@@ -57,15 +57,18 @@ public class RecordBusiness : IRecordBusiness
     /// <param name="isSysAdmin">Optional param determining if the requesting user is a system admin</param>
     /// <param name="isOrgAdmin">Optional param determining if the requesting user is an organization admin</param>
     /// <param name="isProjectAdmin">Optional param determining if the requesting user is a project admin</param>
+    /// <param name="isInsightEligible">Restricts to records that are eligible for use in Insight if `true`</param>
     /// <returns>A list of records based on the applied filters.</returns>
     public async Task<List<RecordResponseDto>> GetAllRecords(
         long currentUserId, long organizationId, long projectId, long? dataSourceId, bool hideArchived,
-        string? fileType = null, bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false)
+        string? fileType = null, bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false, bool isInsightEligible = false)
     {
         var recordQuery = _context.Records
             .Where(r => r.ProjectId == projectId && r.OrganizationId == organizationId);
 
         if (hideArchived) recordQuery = recordQuery.Where(r => !r.IsArchived);
+
+        if (isInsightEligible) recordQuery = recordQuery.WhereInsightEligible();
 
         if (dataSourceId.HasValue) recordQuery = recordQuery.Where(r => r.DataSourceId == dataSourceId);
 
@@ -130,87 +133,6 @@ public class RecordBusiness : IRecordBusiness
                 Name = l.Name
             }).ToList()
         }).ToList();
-    }
-
-    /// <summary>
-    ///     Retrieves all insight eligible records for a specific project.
-    /// </summary>
-    /// <param name="currentUserId">The ID of current user</param>
-    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
-    /// <param name="projectId">The ID of the project whose records are to be retrieved</param>
-    /// <param name="isSysAdmin">Optional param determining if the requesting user is a system admin</param>
-    /// <param name="isOrgAdmin">Optional param determining if the requesting user is an organization admin</param>
-    /// <param name="isProjectAdmin">Optional param determining if the requesting user is a project admin</param>
-    /// <returns>A list of insight eligible records</returns>
-    public async Task<List<RecordResponseDto>> GetInsightEligibleRecords(
-        long currentUserId, long organizationId, long projectId,
-        bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false)
-    {
-        var records = _context.Records
-            .Where(r => r.ProjectId == projectId && r.OrganizationId == organizationId)
-            .Where(r => !r.IsArchived)
-            .WhereInsightEligible();
-
-        // if user is not admin, filter out unauthorized labels
-        if (!isSysAdmin && !isOrgAdmin && !isProjectAdmin)
-        {
-            var userAuthorizedLabels = await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
-                currentUserId, organizationId, projectId, "read record");
-
-            records = records.WithAuthorizedLabels(userAuthorizedLabels);
-        }
-
-        records = records
-            .Include(r => r.Tags)
-            .Include(r => r.Labels);
-
-        var authorizedDownloadLabels = await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
-            currentUserId,
-            organizationId,
-            projectId,
-            "download file");
-
-        var canExposeUri = (Record r) =>
-            ExposeUriHelper.CanExposeUri(
-                r,
-                authorizedDownloadLabels,
-                isSysAdmin,
-                isOrgAdmin,
-                isProjectAdmin);
-
-        return await records.Select(r => RecordToResponse(r, canExposeUri(r))).ToListAsync();
-    }
-
-    private static RecordResponseDto RecordToResponse(Record r, bool exposeUri)
-    {
-        return new RecordResponseDto
-        {
-            Id = r.Id,
-            Description = r.Description,
-            Uri = exposeUri ? r.Uri : null,
-            Properties = r.Properties,
-            OriginalId = r.OriginalId,
-            Name = r.Name,
-            ClassId = r.ClassId,
-            DataSourceId = r.DataSourceId,
-            ProjectId = r.ProjectId,
-            OrganizationId = r.OrganizationId,
-            LastUpdatedBy = r.LastUpdatedBy,
-            LastUpdatedAt = r.LastUpdatedAt,
-            IsArchived = r.IsArchived,
-            FileType = r.FileType,
-            FileSize = r.FileSize,
-            Tags = [.. r.Tags.Select(t => new RecordTagDto
-            {
-                Id = t.Id,
-                Name = t.Name
-            })],
-            Labels = [.. r.Labels.Select(l => new RecordLabelDto
-            {
-                Id = l.Id,
-                Name = l.Name
-            })]
-        };
     }
 
     /// <summary>

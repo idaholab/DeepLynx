@@ -47,6 +47,7 @@ public class RecordController : ControllerBase
     ///     be removed
     /// </param>
     /// <param name="hideArchived">Flag indicating whether to hide archived records from the result (Default true)</param>
+    /// <param name="isInsightEligible">Restricts to records that are eligible for use in Insight if `true`</param>
     /// <returns>A list of records based on the applied filters.</returns>
     [HttpGet(Name = "api_get_all_records")]
     [Auth("read", "record")]
@@ -56,7 +57,8 @@ public class RecordController : ControllerBase
         long projectId,
         [FromQuery] long? dataSourceId = null,
         [FromQuery] string? fileType = null,
-        [FromQuery] bool hideArchived = true)
+        [FromQuery] bool hideArchived = true,
+        [FromQuery] bool isInsightEligible = false)
     {
         try
         {
@@ -65,42 +67,13 @@ public class RecordController : ControllerBase
             var isOrgAdmin = UserContextStorage.IsOrgAdmin;
             var isProjectAdmin = UserContextStorage.IsProjectAdmin;
             var records =
-                await _recordBusiness.GetAllRecords(currentUserId, organizationId, projectId, dataSourceId, hideArchived, fileType, isSysAdmin, isOrgAdmin, isProjectAdmin);
+                await _recordBusiness.GetAllRecords(currentUserId, organizationId, projectId, dataSourceId, hideArchived, fileType,
+                    isSysAdmin, isOrgAdmin, isProjectAdmin, isInsightEligible);
             return Ok(records);
         }
         catch (Exception exc)
         {
             var message = $"An error occurred while listing all records: {exc}";
-            _logger.LogError(message);
-            return StatusCode(StatusCodes.Status500InternalServerError, message);
-        }
-    }
-
-    /// <summary>
-    ///     Retrieve all insight eligible records for a specific project
-    /// </summary>
-    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
-    /// <param name="projectId">The ID of the project whose records are to be retrieved</param>
-    /// <returns>A list of insight eligible records</returns>
-    [HttpGet("insight-eligible", Name = "api_get_insight_eligible_records")]
-    [Auth("read", "record")]
-    [Auth("read", "tag")]
-    [Sensitivity("read record")]
-    public async Task<ActionResult<IEnumerable<RecordResponseDto>>> GetInsightEligibleRecords(long organizationId, long projectId)
-    {
-        try
-        {
-            var currentUserId = UserContextStorage.UserId;
-            var isSysAdmin = UserContextStorage.IsSysAdmin;
-            var isOrgAdmin = UserContextStorage.IsOrgAdmin;
-            var isProjectAdmin = UserContextStorage.IsProjectAdmin;
-            var records =
-                await _recordBusiness.GetInsightEligibleRecords(currentUserId, organizationId, projectId, isSysAdmin, isOrgAdmin, isProjectAdmin);
-            return Ok(records);
-        }
-        catch (Exception exc)
-        {
-            var message = $"An error occurred while retrieving insight eligible records: {exc}";
             _logger.LogError(message);
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
