@@ -131,6 +131,57 @@ public class RecordCollectionController : ControllerBase
     }
 
     /// <summary>
+    ///     Get Record Collections for a Record
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <param name="projectId">The ID of the project to which the collection belongs</param>
+    /// <param name="recordId">The ID of the record whose collections are to be retrieved</param>
+    /// <param name="hideArchived">Flag indicating whether to hide archived collections from the result (Default true)</param>
+    /// <returns>A list of record collections for the specified record.</returns>
+    [HttpGet("~/organizations/{organizationId:long}/projects/{projectId:long}/records/{recordId:long}/record-collections", Name = "api_get_record_collections_for_a_record")]
+    [Auth("read", "record_collection")]
+    [Auth("read", "record")]
+    [Sensitivity("read record")]
+    public async Task<ActionResult<IEnumerable<RecordCollectionResponseDto>>> GetRecordCollectionsForARecord(
+        long organizationId,
+        long projectId,
+        long recordId,
+        [FromQuery] bool hideArchived = true)
+    {
+        try
+        {
+            var currentUserId = UserContextStorage.UserId;
+            var isSysAdmin = UserContextStorage.IsSysAdmin;
+            var isOrgAdmin = UserContextStorage.IsOrgAdmin;
+            var isProjectAdmin = UserContextStorage.IsProjectAdmin;
+            var collections = await _recordCollectionBusiness.GetRecordCollectionsForRecord(
+                currentUserId,
+                organizationId,
+                projectId,
+                recordId,
+                hideArchived,
+                isSysAdmin,
+                isOrgAdmin,
+                isProjectAdmin);
+            return Ok(collections);
+        }
+        catch (KeyNotFoundException exc)
+        {
+            return NotFound(exc.Message);
+        }
+        catch (Exception exc)
+        {
+            return InternalServerError(
+                exc,
+                "An error occurred while listing record collections for the record {recordId} for organization {OrganizationId} and project {ProjectId}",
+                "An unexpected error occurred while listing record collections for the record.",
+                recordId,
+                organizationId,
+                projectId);
+        }
+    }
+
+    /// <summary>
     ///     Get Record Collections by Tags
     /// </summary>
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
