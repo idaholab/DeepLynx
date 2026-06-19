@@ -13,8 +13,7 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
         IEnumerable<string> allClassTypes,
         Dictionary<string, SimilarityResult?> classSimilarities,
         long organizationId,
-        long projectId,
-        string mode)
+        long projectId)
     {
         var uniqueClassTypes = allClassTypes
             .Distinct(StringComparer.OrdinalIgnoreCase)
@@ -54,8 +53,7 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
         Dictionary<string, long> classTypeToId,
         long organizationId,
         long projectId,
-        long dataSourceId,
-        string mode)
+        long dataSourceId)
     {
         if (!records.Any()) return new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
 
@@ -270,8 +268,7 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
         Dictionary<string, long> relationshipKeyToId,
         long organizationId,
         long projectId,
-        long dataSourceId,
-        string mode)
+        long dataSourceId)
     {
         if (!edges.Any()) return 0;
 
