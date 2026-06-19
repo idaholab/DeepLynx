@@ -159,63 +159,28 @@ public class UserBusiness : IUserBusiness
     }
 
     /// <summary>
-    ///     Creates a new user based on the data transfer object supplied.
+    ///     Creates a new standard user based on the data transfer object supplied.
     /// </summary>
     /// <param name="dto">A data transfer object with details on the new user to be created.</param>
-    /// <param name="isSysAdmin">Optional Boolean Value indicating that the user is a system admin.</param>
-    /// <param name="isOrgAdmin">Optional Boolean Value indicating that the user is an organization admin.</param>
-    /// <param name="isProjectAdmin">Optional Boolean Value indicating that the user is a project admin.</param>
     /// <returns>The new user which was just created.</returns>
-    public async Task<UserResponseDto> CreateUser(CreateUserRequestDto dto, bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false)
+    public async Task<UserResponseDto> CreateUser(CreateUserRequestDto dto)
     {
-        // TODO: adjusting is_sys_admin is currently disabled. Enable once route permission protections are in place
+        // require email for human accounts
+        if (dto.Email is null)
+            throw new ArgumentException("Email is required for standard accounts");
 
-        // if not specified accounts will always be human
-        var isServiceAccount = dto.IsServiceAccount ?? false;
-        var isAdmin = isSysAdmin || isOrgAdmin || isProjectAdmin;
-
-        var username = dto.Username;
-        var email = dto.Email;
-
-        if (!isServiceAccount)
-        {
-            // require email for human accounts
-            if (email is null)
-                throw new ArgumentException("Email is required for human accounts");
-
-            // verify email is unique only with human accounts
-            var otherUserHasEmail = await _context.Users.AnyAsync(u => u.Email.ToLower() == email.ToLower());
-            if (otherUserHasEmail)
-                throw new ArgumentException("User with email already exists");
-        }
-        else
-        {
-            // service accounts are an admin feature only
-            if (!isAdmin)
-                throw new UnauthorizedAccessException("Unauthorized: Only Admins can create service accounts");
-
-            // Service accounts don't authenticate as people; their email and username are
-            // generated, not caller-supplied. Reject contradictory input rather than silently
-            // discarding it so the caller knows these fields are ignored.
-            if (!string.IsNullOrWhiteSpace(dto.Email) || !string.IsNullOrWhiteSpace(dto.Username))
-                throw new ArgumentException("Service accounts cannot be assigned an email or username; these identifiers are generated automatically.");
-
-            // The admin only supplies a display Name; we generate a unique identifier for both
-            // username and email so the account is guaranteed unique without requiring the
-            // caller to pick a unique name.
-            var serviceIdentifier = $"service_{Guid.NewGuid()}";
-            username = serviceIdentifier; // Note: we do NOT allow username to be changed for any user- only name
-            email = serviceIdentifier;
-        }
+        // verify email is unique only with human accounts
+        var otherUserHasEmail = await _context.Users.AnyAsync(u => u.Email.ToLower() == dto.Email.ToLower());
+        if (otherUserHasEmail)
+            throw new ArgumentException("User with email already exists");
 
         var user = new User
         {
             Name = dto.Name,
-            Email = email,
-            Username = username,
+            Email = dto.Email,
+            Username = dto.Username,
             IsActive = dto.IsActive ?? false,
             IsArchived = dto.IsArchived ?? false,
-            IsServiceAccount = isServiceAccount,
         };
 
         _context.Users.Add(user);

@@ -106,10 +106,7 @@ public class UserController : ControllerBase
     {
         try
         {
-            var isSysAdmin = UserContextStorage.IsSysAdmin;
-            var isOrgAdmin = UserContextStorage.IsOrgAdmin;
-            var isProjectAdmin = UserContextStorage.IsProjectAdmin;
-            var newUser = await _userBusiness.CreateUser(dto, isSysAdmin, isOrgAdmin, isProjectAdmin);
+            var newUser = await _userBusiness.CreateUser(dto);
             return Ok(newUser);
         }
         catch (Exception exc)
