@@ -56,6 +56,7 @@ public class AuthMiddlewareTests : IntegrationTestBase
         UserContextStorage.UserId = 0;
         UserContextStorage.IsSysAdmin = false;
         UserContextStorage.IsOrgAdmin = false;
+        UserContextStorage.IsOrgMember = false;
         UserContextStorage.IsProjectAdmin = false;
     }
 
@@ -64,11 +65,13 @@ public class AuthMiddlewareTests : IntegrationTestBase
     // Admin flags are pre-populated by UserContextMiddleware in production;
     // tests simulate that by writing directly to UserContextStorage.
     private void SetAuthenticatedUser(HttpContext context, long userId,
-        bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false)
+        bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false,
+        bool isOrgMember = false)
     {
         UserContextStorage.UserId = userId;
         UserContextStorage.IsSysAdmin = isSysAdmin;
         UserContextStorage.IsOrgAdmin = isOrgAdmin;
+        UserContextStorage.IsOrgMember = isOrgMember;
         UserContextStorage.IsProjectAdmin = isProjectAdmin;
 
         var claims = new[]
@@ -2877,6 +2880,171 @@ public async Task InvokeAsync_WithMultipleProjectIdsCommaSeparated_ChecksPermiss
 
         // Assert
         Assert.Equal(StatusCodes.Status403Forbidden, context.Response.StatusCode);
+    }
+
+    #endregion
+
+    #region Middleware Tests - OrgMember Attribute
+
+    private HttpContext CreateHttpContextWithOrgMember(bool includeArchived = false)
+    {
+        var context = new DefaultHttpContext();
+        var endpoint = new Endpoint(
+            ctx => Task.CompletedTask,
+            new EndpointMetadataCollection(new OrgMemberAttribute(includeArchived)),
+            "Test");
+        context.SetEndpoint(endpoint);
+
+        return context;
+    }
+
+    [Fact]
+    public async Task InvokeAsync_OrgMemberAttribute_PassesForOrgMember()
+    {
+        // Arrange
+        var context = CreateHttpContextWithOrgMember();
+        SetAuthenticatedUser(context, userId1, isOrgMember: true);
+        context.Request.RouteValues["organizationId"] = organizationId1.ToString();
+
+        _organizationServiceMock
+            .Setup(x => x.CheckExistence(null, organizationId1, false))
+            .ReturnsAsync(organizationId1);
+
+        var nextCalled = false;
+        RequestDelegate next = ctx =>
+        {
+            nextCalled = true;
+            return Task.CompletedTask;
+        };
+
+        var middleware = new AuthMiddleware(next);
+
+        // Act
+        await middleware.InvokeAsync(context, _orgRolePermissionServiceMock.Object,
+            _projectRolePermissionServiceMock.Object, _adminServiceMock.Object, _organizationServiceMock.Object);
+
+        // Assert
+        Assert.True(nextCalled);
+        // Membership is pre-populated by UserContextMiddleware; AuthMiddleware must not re-check it
+        _adminServiceMock.Verify(x => x.OrgMemberCheck(It.IsAny<long>(), It.IsAny<long>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task InvokeAsync_OrgMemberAttribute_PassesForOrgAdmin()
+    {
+        // Arrange: an org admin is implicitly a member
+        var context = CreateHttpContextWithOrgMember();
+        SetAuthenticatedUser(context, userId3, isOrgAdmin: true);
+        context.Request.RouteValues["organizationId"] = organizationId1.ToString();
+
+        _organizationServiceMock
+            .Setup(x => x.CheckExistence(null, organizationId1, false))
+            .ReturnsAsync(organizationId1);
+
+        var nextCalled = false;
+        RequestDelegate next = ctx =>
+        {
+            nextCalled = true;
+            return Task.CompletedTask;
+        };
+
+        var middleware = new AuthMiddleware(next);
+
+        // Act
+        await middleware.InvokeAsync(context, _orgRolePermissionServiceMock.Object,
+            _projectRolePermissionServiceMock.Object, _adminServiceMock.Object, _organizationServiceMock.Object);
+
+        // Assert
+        Assert.True(nextCalled);
+    }
+
+    [Fact]
+    public async Task InvokeAsync_OrgMemberAttribute_PassesForSysAdmin()
+    {
+        // Arrange
+        var context = CreateHttpContextWithOrgMember();
+        SetAuthenticatedUser(context, userId2, isSysAdmin: true);
+        context.Request.RouteValues["organizationId"] = organizationId1.ToString();
+
+        _organizationServiceMock
+            .Setup(x => x.CheckExistence(null, organizationId1, false))
+            .ReturnsAsync(organizationId1);
+
+        var nextCalled = false;
+        RequestDelegate next = ctx =>
+        {
+            nextCalled = true;
+            return Task.CompletedTask;
+        };
+
+        var middleware = new AuthMiddleware(next);
+
+        // Act
+        await middleware.InvokeAsync(context, _orgRolePermissionServiceMock.Object,
+            _projectRolePermissionServiceMock.Object, _adminServiceMock.Object, _organizationServiceMock.Object);
+
+        // Assert
+        Assert.True(nextCalled);
+    }
+
+    [Fact]
+    public async Task InvokeAsync_OrgMemberAttribute_Returns403ForNonMember()
+    {
+        // Arrange
+        var context = CreateHttpContextWithOrgMember();
+        SetAuthenticatedUser(context, userId1); // not a member, not an admin
+        context.Request.RouteValues["organizationId"] = organizationId1.ToString();
+
+        _organizationServiceMock
+            .Setup(x => x.CheckExistence(null, organizationId1, false))
+            .ReturnsAsync(organizationId1);
+
+        RequestDelegate next = ctx => Task.CompletedTask;
+        var middleware = new AuthMiddleware(next);
+
+        // Act
+        await middleware.InvokeAsync(context, _orgRolePermissionServiceMock.Object,
+            _projectRolePermissionServiceMock.Object, _adminServiceMock.Object, _organizationServiceMock.Object);
+
+        // Assert
+        Assert.Equal(StatusCodes.Status403Forbidden, context.Response.StatusCode);
+    }
+
+    [Fact]
+    public async Task InvokeAsync_OrgMemberAttribute_Returns401ForUnauthenticatedUser()
+    {
+        // Arrange
+        var context = CreateHttpContextWithOrgMember();
+        // Don't set authentication - UserContextStorage.UserId remains 0
+
+        RequestDelegate next = ctx => Task.CompletedTask;
+        var middleware = new AuthMiddleware(next);
+
+        // Act
+        await middleware.InvokeAsync(context, _orgRolePermissionServiceMock.Object,
+            _projectRolePermissionServiceMock.Object, _adminServiceMock.Object, _organizationServiceMock.Object);
+
+        // Assert
+        Assert.Equal(StatusCodes.Status401Unauthorized, context.Response.StatusCode);
+    }
+
+    [Fact]
+    public async Task InvokeAsync_OrgMemberAttribute_Returns400WhenOrganizationIdMissing()
+    {
+        // Arrange
+        var context = CreateHttpContextWithOrgMember();
+        SetAuthenticatedUser(context, userId1, isOrgMember: true);
+        // No organizationId route value
+
+        RequestDelegate next = ctx => Task.CompletedTask;
+        var middleware = new AuthMiddleware(next);
+
+        // Act
+        await middleware.InvokeAsync(context, _orgRolePermissionServiceMock.Object,
+            _projectRolePermissionServiceMock.Object, _adminServiceMock.Object, _organizationServiceMock.Object);
+
+        // Assert
+        Assert.Equal(StatusCodes.Status400BadRequest, context.Response.StatusCode);
     }
 
     #endregion

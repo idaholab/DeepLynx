@@ -318,6 +318,10 @@ namespace deeplynx.datalayer.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("application_id");
 
+                    b.Property<long?>("CreatedBy")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by");
+
                     b.Property<string>("Key")
                         .IsRequired()
                         .HasColumnType("text")
@@ -337,6 +341,9 @@ namespace deeplynx.datalayer.Migrations
 
                     b.HasIndex("ApplicationId")
                         .HasDatabaseName("idx_api_keys_application_id");
+
+                    b.HasIndex("CreatedBy")
+                        .HasDatabaseName("idx_api_keys_created_by");
 
                     b.HasIndex("UserId");
 
@@ -1359,7 +1366,7 @@ namespace deeplynx.datalayer.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("require_sensitivity_label");
 
-                    b.Property<string>("ThemeName")
+                    b.Property<string>("Theme")
                         .IsRequired()
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)")
@@ -1604,6 +1611,12 @@ namespace deeplynx.datalayer.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("group_id");
 
+                    b.Property<bool>("IsProjectAdmin")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("is_project_admin");
+
                     b.Property<long>("ProjectId")
                         .HasColumnType("bigint")
                         .HasColumnName("project_id");
@@ -1639,6 +1652,104 @@ namespace deeplynx.datalayer.Migrations
                         .HasDatabaseName("unique_project_member_ids");
 
                     b.ToTable("project_members", "deeplynx");
+                });
+
+            modelBuilder.Entity("deeplynx.datalayer.Models.QueryRecord", b =>
+                {
+                    b.Property<long?>("ClassId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("class_id");
+
+                    b.Property<string>("ClassName")
+                        .HasColumnType("text")
+                        .HasColumnName("class_name");
+
+                    b.Property<long>("DataSourceId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("data_source_id");
+
+                    b.Property<string>("DataSourceName")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("data_source_name");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("text")
+                        .HasColumnName("description");
+
+                    b.Property<long?>("FileSize")
+                        .HasColumnType("bigint")
+                        .HasColumnName("file_size");
+
+                    b.Property<string>("FileType")
+                        .HasColumnType("text")
+                        .HasColumnName("file_type");
+
+                    b.Property<long>("Id")
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    b.Property<bool>("IsArchived")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_archived");
+
+                    b.Property<string>("Labels")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("labels");
+
+                    b.Property<DateTime>("LastUpdatedAt")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("last_updated_at");
+
+                    b.Property<long?>("LastUpdatedBy")
+                        .HasColumnType("bigint")
+                        .HasColumnName("last_updated_by");
+
+                    b.Property<string>("Name")
+                        .HasColumnType("text")
+                        .HasColumnName("name");
+
+                    b.Property<long?>("ObjectStorageId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("object_storage_id");
+
+                    b.Property<string>("ObjectStorageName")
+                        .HasColumnType("text")
+                        .HasColumnName("object_storage_name");
+
+                    b.Property<long>("OrganizationId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("organization_id");
+
+                    b.Property<string>("OriginalId")
+                        .HasColumnType("text")
+                        .HasColumnName("original_id");
+
+                    b.Property<long>("ProjectId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("project_id");
+
+                    b.Property<string>("ProjectName")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("project_name");
+
+                    b.Property<string>("Properties")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("properties");
+
+                    b.Property<string>("Tags")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("tags");
+
+                    b.Property<string>("Uri")
+                        .HasColumnType("text")
+                        .HasColumnName("uri");
+
+                    b.ToTable((string)null);
+
+                    b.ToView("query_records", "deeplynx");
                 });
 
             modelBuilder.Entity("deeplynx.datalayer.Models.Record", b =>
@@ -2324,6 +2435,12 @@ namespace deeplynx.datalayer.Migrations
                         .HasDefaultValue(false)
                         .HasColumnName("is_archived");
 
+                    b.Property<bool>("IsServiceAccount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("is_service_account");
+
                     b.Property<bool>("IsSysAdmin")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
@@ -2363,6 +2480,10 @@ namespace deeplynx.datalayer.Migrations
 
                     b.HasIndex("SsoId")
                         .HasDatabaseName("idx_users_sso_id");
+
+                    b.HasIndex("Username")
+                        .IsUnique()
+                        .HasDatabaseName("idx_users_username");
 
                     b.ToTable("users", "deeplynx");
                 });
@@ -2592,12 +2713,20 @@ namespace deeplynx.datalayer.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .HasConstraintName("api_keys_application_id_fkey");
 
+                    b.HasOne("deeplynx.datalayer.Models.User", "CreatedByUser")
+                        .WithMany("CreatedApiKeys")
+                        .HasForeignKey("CreatedBy")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .HasConstraintName("api_keys_created_by_fkey");
+
                     b.HasOne("deeplynx.datalayer.Models.User", "User")
                         .WithMany("ApiKeys")
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("api_keys_user_id_fkey");
+
+                    b.Navigation("CreatedByUser");
 
                     b.Navigation("OauthApplication");
 
@@ -3538,6 +3667,8 @@ namespace deeplynx.datalayer.Migrations
             modelBuilder.Entity("deeplynx.datalayer.Models.User", b =>
                 {
                     b.Navigation("ApiKeys");
+
+                    b.Navigation("CreatedApiKeys");
 
                     b.Navigation("LastUpdatedActions");
 

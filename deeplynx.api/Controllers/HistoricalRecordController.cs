@@ -93,9 +93,13 @@ public class HistoricalRecordController : ControllerBase
         try
         {
             var currentUserId = UserContextStorage.UserId;
+            var isSysAdmin = UserContextStorage.IsSysAdmin;
+            var isOrgAdmin = UserContextStorage.IsOrgAdmin;
+            var isProjectAdmin = UserContextStorage.IsProjectAdmin;
+
             var record =
                 await _historicalRecordBusiness.GetHistoricalRecord(
-                    currentUserId, recordId, organizationId, pointInTime, hideArchived);
+                    currentUserId, recordId, organizationId, pointInTime, hideArchived, isSysAdmin, isOrgAdmin, isProjectAdmin);
             return Ok(record);
         }
         catch (Exception exc)
@@ -124,8 +128,13 @@ public class HistoricalRecordController : ControllerBase
         try
         {
             var currentUserId = UserContextStorage.UserId;
+            var isSysAdmin = UserContextStorage.IsSysAdmin;
+            var isOrgAdmin = UserContextStorage.IsOrgAdmin;
+            var isProjectAdmin = UserContextStorage.IsProjectAdmin;
+
             var history = await _historicalRecordBusiness.GetHistoryForRecord(
-                currentUserId, recordId, organizationId);
+                currentUserId, recordId, organizationId, isSysAdmin, isOrgAdmin, isProjectAdmin);
+
             return Ok(history);
         }
         catch (Exception exc)

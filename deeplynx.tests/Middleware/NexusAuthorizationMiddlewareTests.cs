@@ -1225,7 +1225,7 @@ namespace deeplynx.tests.Middleware
                 new Claim("sub", "sub@test.com"),
                 new Claim("name", "name@test.com"),
                 new Claim("uid", "test-sso-id"),
-                new Claim("preferred_username", "testuser")
+                new Claim("preferred_username", "fallback-test-user")
             };
             var identity = new ClaimsIdentity(claims, "Test");
             var principal = new ClaimsPrincipal(identity);
@@ -1252,7 +1252,7 @@ namespace deeplynx.tests.Middleware
                 new Claim("sub", "sub@test.com"),
                 new Claim("name", "name@test.com"),
                 new Claim("uid", "test-sso-id"),
-                new Claim("preferred_username", "testuser")
+                new Claim("preferred_username", "fallback-test-user")
             };
             var identity = new ClaimsIdentity(claims, "Test");
             var principal = new ClaimsPrincipal(identity);
@@ -1278,7 +1278,7 @@ namespace deeplynx.tests.Middleware
                 new Claim("sub", "sub@test.com"),
                 new Claim("name", "name@test.com"),
                 new Claim("uid", "test-sso-id"),
-                new Claim("preferred_username", "testuser")
+                new Claim("preferred_username", "fallback-test-user")
             };
             var identity = new ClaimsIdentity(claims, "Test");
             var principal = new ClaimsPrincipal(identity);
@@ -1303,7 +1303,7 @@ namespace deeplynx.tests.Middleware
                 new Claim("sub", "sub@test.com"),
                 new Claim("name", "name@test.com"),
                 new Claim("uid", "test-sso-id"),
-                new Claim("preferred_username", "testuser")
+                new Claim("preferred_username", "fallback-test-user")
             };
             var identity = new ClaimsIdentity(claims, "Test");
             var principal = new ClaimsPrincipal(identity);
@@ -1327,7 +1327,7 @@ namespace deeplynx.tests.Middleware
             {
                 new Claim("name", "name@test.com"),
                 new Claim("uid", "test-sso-id"),
-                new Claim("preferred_username", "testuser")
+                new Claim("preferred_username", "fallback-test-user")
             };
             var identity = new ClaimsIdentity(claims, "Test");
             var principal = new ClaimsPrincipal(identity);
@@ -1350,7 +1350,7 @@ namespace deeplynx.tests.Middleware
             var claims = new[]
             {
                 new Claim("uid", "test-sso-id"),
-                new Claim("preferred_username", "testuser")
+                new Claim("preferred_username", "fallback-test-user")
             };
             var identity = new ClaimsIdentity(claims, "Test");
             var principal = new ClaimsPrincipal(identity);

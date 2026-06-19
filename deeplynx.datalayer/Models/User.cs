@@ -37,6 +37,9 @@ public partial class User
     [Column("is_sys_admin")]
     public bool IsSysAdmin { get; set; }
 
+    [Column("is_service_account")]
+    public bool IsServiceAccount { get; set; }
+
     [InverseProperty("User")]
     public virtual ICollection<OrganizationUser> OrganizationUsers { get; set; } = new List<OrganizationUser>();
 
@@ -52,6 +55,9 @@ public partial class User
 
     [InverseProperty("User")]
     public virtual ICollection<ApiKey> ApiKeys { get; set; } = new List<ApiKey>();
+
+    [InverseProperty("CreatedByUser")]
+    public virtual ICollection<ApiKey> CreatedApiKeys { get; set; } = new List<ApiKey>();
 
     [InverseProperty("LastUpdatedByUser")]
     public virtual ICollection<Class> LastUpdatedClasses { get; set; } = new List<Class>();

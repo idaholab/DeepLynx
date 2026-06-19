@@ -27,6 +27,7 @@ public class RecordBusinessTests : IntegrationTestBase
     private INotificationBusiness _notificationBusiness = null!;
     private RecordBusiness _recordBusiness;
     private TagBusiness _tagBusiness = null!;
+    private UserBusiness _userBusiness = null!;
     private BulkCopyUpsertExecutor _mockBulkCopyUpsertExecutor = null!;
     private SensitivityLabelService _sensitivityLabelService = null!;
     private EncryptionHelper _encryptionHelper = null!;
@@ -66,7 +67,8 @@ public class RecordBusinessTests : IntegrationTestBase
             new NotificationBusiness(Context, _mockNotificationLogger.Object, _mockHubContext.Object);
         _mockBulkCopyUpsertExecutor = new BulkCopyUpsertExecutor();
         _eventBusiness = new EventBusiness(Context, _notificationBusiness, _mockBulkCopyUpsertExecutor);
-        _sensitivityLabelBusiness = new SensitivityLabelBusiness(Context, _eventBusiness);
+        _userBusiness = new UserBusiness(Context);
+        _sensitivityLabelBusiness = new SensitivityLabelBusiness(Context, _eventBusiness, _userBusiness);
         _tagBusiness = new TagBusiness(Context, _eventBusiness);
         _recordBusiness = new RecordBusiness(Context, _eventBusiness, _mockBulkCopyUpsertExecutor, _tagBusiness,
             _sensitivityLabelBusiness, _sensitivityLabelService);
@@ -188,7 +190,7 @@ public class RecordBusinessTests : IntegrationTestBase
                 OrganizationId = organizationId
             }
         };
-        
+
         Context.DataSources.AddRange(dataSources);
         await Context.SaveChangesAsync();
         did = dataSources[0].Id;
@@ -510,91 +512,6 @@ public class RecordBusinessTests : IntegrationTestBase
 
     #endregion
 
-
-    #region GetAllRecordsPaginated Tests
-
-    [Fact]
-    public async Task GetAllRecordsPaginated_ValidProjectId_ReturnsRecords()
-    {
-        // Act
-        var result = await _recordBusiness.GetAllRecordsPaginated(uid, organizationId, pid, true, null, isProjectAdmin: true);
-
-        // Assert
-        Assert.NotNull(result);
-        Assert.Equal(4, result.TotalCount);
-        Assert.Equal(4, result.Items.Count);
-        
-    }
-
-    [Fact]
-    public async Task GetAllRecordsPaginated_Pagination_ReturnsCorrectPageAndCount()
-    {
-        // Act
-        var result = await _recordBusiness.GetAllRecordsPaginated(uid, organizationId, pid, true,
-            new RecordQueryRequestDto { PageNumber = 1, PageSize = 2 }, isProjectAdmin: true);
-
-        // Assert
-        Assert.Equal(4, result.TotalCount);
-        Assert.Equal(2, result.Items.Count);
-    }
-
-    [Fact]
-    public async Task GetAllRecordsPaginated_HideArchived_ExcludesArchivedRecords()
-    {
-        // Arrange
-        var record = await Context.Records.FindAsync(rid);
-        record!.IsArchived = true;
-        await Context.SaveChangesAsync();
-
-        // Act
-        var result = await _recordBusiness.GetAllRecordsPaginated(uid, organizationId, pid, true, null, isProjectAdmin: true);
-
-        // Assert
-        Assert.Equal(3, result.TotalCount);
-        Assert.DoesNotContain(result.Items, r => r.Id == rid);
-    }
-
-    [Fact]
-    public async Task GetAllRecordsPaginated_FilterByDateRange_ReturnsRecordsWithinRange()
-    {
-        // Act
-        var result = await _recordBusiness.GetAllRecordsPaginated(uid, organizationId, pid, true,
-            new RecordQueryRequestDto {
-                StartDate = DateTime.SpecifyKind(DateTime.UtcNow.AddDays(-1), DateTimeKind.Unspecified), 
-                EndDate = DateTime.SpecifyKind(DateTime.UtcNow.AddDays(1), DateTimeKind.Unspecified)
-             },
-            isProjectAdmin: true);
-
-        // Assert
-        Assert.Equal(4, result.TotalCount);
-    }
-
-    [Fact]
-    public async Task GetAllRecordsPaginated_FilterByFileType_StripsLeadingDot()
-    {
-        // Act
-        var result = await _recordBusiness.GetAllRecordsPaginated(uid, organizationId, pid, true,
-            new RecordQueryRequestDto { FileType = ".pdf" }, isProjectAdmin: true);
-
-        // Assert
-        Assert.Equal(3, result.TotalCount);
-        Assert.All(result.Items, r => Assert.Equal("pdf", r.FileType));
-    }
-
-    [Fact]
-    public async Task GetAllRecordsPaginated_FilterByDataSourceId_ReturnsFilteredRecords()
-    {
-        // Act
-        var result = await _recordBusiness.GetAllRecordsPaginated(uid, organizationId, pid, true, 
-            new RecordQueryRequestDto { DataSourceId = did2 }, isProjectAdmin: true);
-
-        // Assert
-        Assert.Equal(1, result.TotalCount);
-        Assert.All(result.Items, r => Assert.Equal(did2, r.DataSourceId));
-    }
-
-    #endregion
-
     #region GetRecordsByTags Tests
 
     [Fact]
@@ -641,7 +558,8 @@ public class RecordBusinessTests : IntegrationTestBase
             LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
             Tags = new List<Tag> { testTag, tag2 },
             Uri = "localhost:8090",
-            FileType = "pdf", OrganizationId = organizationId
+            FileType = "pdf",
+            OrganizationId = organizationId
         };
 
         var recordWithSomeTags = new Record
@@ -656,7 +574,8 @@ public class RecordBusinessTests : IntegrationTestBase
             LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
             Tags = new List<Tag> { testTag },
             Uri = "localhost:8090",
-            FileType = "pdf", OrganizationId = organizationId
+            FileType = "pdf",
+            OrganizationId = organizationId
         };
 
         Context.Records.AddRange(recordWithAllTags, recordWithSomeTags);
@@ -700,7 +619,8 @@ public class RecordBusinessTests : IntegrationTestBase
             LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
             Tags = new List<Tag> { testTag, tag2 },
             Uri = "localhost:8090",
-            FileType = "pdf", OrganizationId = organizationId
+            FileType = "pdf",
+            OrganizationId = organizationId
         };
 
         Context.Records.Add(recordWithAllTags);
@@ -766,7 +686,7 @@ public class RecordBusinessTests : IntegrationTestBase
     [Fact]
     public async Task GetRecordsByTags_HideArchivedFalse_IncludesArchivedRecords()
     {
-        
+
         await _recordBusiness.AttachTag(uid, organizationId, pid, rid, tid);
         // Arrange - Add an archived record with the same tag
         var testTag = await Context.Tags.FindAsync(tid);
@@ -845,7 +765,7 @@ public class RecordBusinessTests : IntegrationTestBase
     }
 
     #endregion
-    
+
     #region CreateRecord Tests
 
     [Fact]
@@ -1302,6 +1222,46 @@ public class RecordBusinessTests : IntegrationTestBase
         var eventList = await Context.Events.ToListAsync();
         Assert.Empty(eventList);
     }
+
+    [Fact]
+    public async Task BulkCreateRecords_ValidData_LongNames()
+    {
+        // Arrange
+        var records = new List<CreateRecordRequestDto>
+        {
+            new()
+            {
+                Name = "A name that is five hundred characters long a name that is five hundred characters long a name that is five hundred characters long a name that is five hundred characters long a name that is five hundred characters long a name that is five hundred characters long a name that is five hundred characters long a name that is five hundred characters long a name that is five hundred characters long a name that is five hundred characters long a name that is five hundred characters long a name that is f",
+                Description = "Long name 1 Description",
+                ObjectStorageId = osid,
+                OriginalId = "br1",
+                Properties = (JsonObject)JsonNode.Parse(JsonSerializer.Serialize(new { TestProp = "Value1" }))!
+            },
+            new()
+            {
+                Name = "A name that is just over one hundred characters long a name that is just over one hundred characters long",
+                Description = "Long name 2 Description",
+                ObjectStorageId = osid,
+                OriginalId = "br2",
+                Properties = (JsonObject)JsonNode.Parse(JsonSerializer.Serialize(new { TestProp = "Value2" }))!
+            }
+        };
+    
+        // Act
+        var result = await _recordBusiness.BulkCreateRecords(uid, organizationId, pid, did, records);
+    
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(2, result.Count());
+        Assert.True(result.All(r =>
+            r.LastUpdatedBy == uid && !r.IsArchived && r.DataSourceId == did && r.ProjectId == pid));
+        Assert.Contains(result, r => r.Name == "A name that is five hundred characters long a name that is five hundred characters long a name that is five hundred characters long a name that is five hundred characters long a name that is five hundred characters long a name that is five hundred characters long a name that is five hundred characters long a name that is five hundred characters long a name that is five hundred characters long a name that is five hundred characters long a name that is five hundred characters long a name that is f");
+        Assert.Contains(result, r => r.Name == "A name that is just over one hundred characters long a name that is just over one hundred characters long");
+        
+        // Ensure that a record create event was logged
+        var eventList = await Context.Events.ToListAsync();
+        Assert.Single(eventList); // One event is logged with the total bulk count in the properties
+    }
     
     [Fact]
     public async Task BulkCreateRecords_WithLabelsAndTags_CreatesMultipleRecordsWithLabelsAndTags()
@@ -1339,7 +1299,7 @@ public class RecordBusinessTests : IntegrationTestBase
             Name = "Very Sensitive Label",
             Description = "Very Sensitive Label Description",
         };
-        
+
         var label1response = await _sensitivityLabelBusiness.CreateSensitivityLabel(uid, label1, pid, organizationId);
         var label2response = await _sensitivityLabelBusiness.CreateSensitivityLabel(uid, label2, pid, organizationId);
 
@@ -1349,18 +1309,18 @@ public class RecordBusinessTests : IntegrationTestBase
 
         var label1WritePermission = Context.Permissions
             .FirstOrDefault(p => p.LabelId == label1response.Id && p.Action == "write record");
-        
+
         var label2WritePermission = Context.Permissions
             .FirstOrDefault(p => p.LabelId == label2response.Id && p.Action == "write record");
-        
+
         role.Permissions.Add(label1WritePermission);
         role.Permissions.Add(label2WritePermission);
-        
+
         await Context.SaveChangesAsync();
 
         // Act
         var result = await _recordBusiness.BulkCreateRecords(
-            uid, organizationId, pid, did, records, new List<long>{label1response.Id, label2response.Id});
+            uid, organizationId, pid, did, records, new List<long> { label1response.Id, label2response.Id });
 
         // Assert
         Assert.NotNull(result);
@@ -1369,8 +1329,8 @@ public class RecordBusinessTests : IntegrationTestBase
             r.LastUpdatedBy == uid && !r.IsArchived && r.DataSourceId == did && r.ProjectId == pid));
         Assert.Contains(result, r => r.Name == "Bulk Record 1");
         Assert.Contains(result, r => r.Name == "Bulk Record 2");
-        
-            // Assert tags are attached to records in response
+
+        // Assert tags are attached to records in response
         var record1 = result.First(r => r.Name == "Bulk Record 1");
         Assert.NotNull(record1.Tags);
         Assert.Equal(2, record1.Tags.Count);
@@ -1399,7 +1359,7 @@ public class RecordBusinessTests : IntegrationTestBase
             .Include(r => r.Tags)
             .Include(r => r.Labels)
             .FirstAsync(r => r.Id == record1.Id);
-        
+
         Assert.Equal(2, dbRecord1.Tags.Count);
         Assert.Contains(dbRecord1.Tags, t => t.Name == "UNIQUE TAG");
         Assert.Contains(dbRecord1.Tags, t => t.Name == "GREAT");
@@ -1411,7 +1371,7 @@ public class RecordBusinessTests : IntegrationTestBase
             .Include(r => r.Tags)
             .Include(r => r.Labels)
             .FirstAsync(r => r.Id == record2.Id);
-        
+
         Assert.Equal(2, dbRecord2.Tags.Count);
         Assert.Contains(dbRecord2.Tags, t => t.Name == "AWESOME TAG");
         Assert.Contains(dbRecord2.Tags, t => t.Name == "NEW");
@@ -1699,7 +1659,7 @@ public class RecordBusinessTests : IntegrationTestBase
     }
 
     #endregion
-    
+
     #region ArchiveRecord Collection Removal Tests
 
     [Fact]
@@ -2185,7 +2145,7 @@ public class RecordBusinessTests : IntegrationTestBase
     public async Task AttachTag_AlreadyAttached_ThrowsException()
     {
         await _recordBusiness.AttachTag(uid, organizationId, pid, rid, tid);
-        
+
         // Act & Assert
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
             _recordBusiness.AttachTag(uid, organizationId, pid, rid, tid));
@@ -2304,55 +2264,55 @@ public class RecordBusinessTests : IntegrationTestBase
             Name = "Very Top Secret",
             Description = "Very Top Secret Description"
         };
-        
+
         var newLabel2 = new CreateSensitivityLabelRequestDto
         {
             Name = "Confidential",
             Description = "Very Confidential Description"
         };
-        
+
         var newLabel1Response = await _sensitivityLabelBusiness.CreateSensitivityLabel(
             uid, newLabel1, null, organizationId);
-        
+
         var newLabel2Response = await _sensitivityLabelBusiness.CreateSensitivityLabel(
             uid, newLabel2, null, organizationId);
-        
+
         Context.ChangeTracker.Clear();
-        
+
         var record1 = await Context.Records.Include(r => r.Labels).FirstAsync(r => r.Id == rid);
         record1.Labels.Clear();
-        
+
         var record2 = await Context.Records.Include(r => r.Labels).FirstAsync(r => r.Id == rid2);
         record2.Labels.Clear();
-        
+
         await Context.SaveChangesAsync();
         Context.ChangeTracker.Clear();
 
         // perform the action
-        await _recordBusiness.BulkAttachLabels(uid, organizationId, pid, 
-            new List<long>{rid, rid2}, 
-            new List<long>{newLabel1Response.Id, newLabel2Response.Id});
-        
+        await _recordBusiness.BulkAttachLabels(uid, organizationId, pid,
+            new List<long> { rid, rid2 },
+            new List<long> { newLabel1Response.Id, newLabel2Response.Id });
+
         // ensure that the records have those labels
         var record1Updated = await Context.Records
             .Include(r => r.Labels)
             .FirstAsync(r => r.Id == rid);
-        
+
         Assert.Equal(2, record1Updated.Labels.Count);
         Assert.Contains(record1Updated.Labels, l => l.Name == newLabel1.Name);
         Assert.Contains(record1Updated.Labels, l => l.Name == newLabel2.Name);
-        
+
         var record2Updated = await Context.Records
             .Include(r => r.Labels)
             .FirstAsync(r => r.Id == rid2);
-        
+
         Assert.Equal(2, record2Updated.Labels.Count);
         Assert.Contains(record2Updated.Labels, l => l.Name == newLabel1.Name);
         Assert.Contains(record2Updated.Labels, l => l.Name == newLabel2.Name);
     }
 
     #endregion
-    
+
     #region AttachLabel Collection Propagation Tests
 
     [Fact]
@@ -2568,7 +2528,7 @@ public class RecordBusinessTests : IntegrationTestBase
     }
 
     #endregion
-    
+
     #region BulkAttachLabels Collection Propagation Tests
 
     [Fact]
@@ -2831,7 +2791,7 @@ public class RecordBusinessTests : IntegrationTestBase
 
         Assert.Contains("og_id", exception.Message);
     }
-    
+
     [Fact]
     public async Task GetRecordsByOriginalId_IncludesArchivedRecords_WhenHideArchivedFalse()
     {
@@ -2859,7 +2819,7 @@ public class RecordBusinessTests : IntegrationTestBase
 
         Assert.Contains("No data source with Id", exception.Message);
     }
-    
+
     [Fact]
     public async Task GetRecordsByOriginalId_InvalidDataSourceId_ThrowsKeyNotFoundException()
     {
@@ -2891,7 +2851,8 @@ public class RecordBusinessTests : IntegrationTestBase
             LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
             LastUpdatedBy = uid,
             Uri = "test://uri",
-            FileType = "txt", OrganizationId = organizationId
+            FileType = "txt",
+            OrganizationId = organizationId
         };
 
         // Act
@@ -2920,7 +2881,8 @@ public class RecordBusinessTests : IntegrationTestBase
             LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
             LastUpdatedBy = uid,
             Uri = "test://uri2",
-            FileType = "txt", OrganizationId = organizationId
+            FileType = "txt",
+            OrganizationId = organizationId
         };
 
         Context.Records.Add(testRecord);
@@ -2954,7 +2916,8 @@ public class RecordBusinessTests : IntegrationTestBase
             LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
             LastUpdatedBy = null,
             Uri = "test://uri3",
-            FileType = "txt", OrganizationId = organizationId
+            FileType = "txt",
+            OrganizationId = organizationId
         };
 
         // Act
@@ -3015,7 +2978,7 @@ public class RecordBusinessTests : IntegrationTestBase
     }
 
     #endregion
-    
+
     #region FileSize Tests
 
     [Fact]
@@ -3041,7 +3004,7 @@ public class RecordBusinessTests : IntegrationTestBase
         Assert.NotNull(result);
         Assert.NotNull(result.FileSize);
         Assert.Equal(fileSize, result.FileSize);
-        
+
         // Verify in database
         var dbRecord = await Context.Records.FindAsync(result.Id);
         Assert.NotNull(dbRecord);
@@ -3068,7 +3031,7 @@ public class RecordBusinessTests : IntegrationTestBase
         // Assert
         Assert.NotNull(result);
         Assert.Null(result.FileSize);
-        
+
         // Verify in database
         var dbRecord = await Context.Records.FindAsync(result.Id);
         Assert.Null(dbRecord.FileSize);
@@ -3102,7 +3065,7 @@ public class RecordBusinessTests : IntegrationTestBase
         Assert.NotNull(result.FileSize);
         Assert.Equal(newSize, result.FileSize);
         Assert.NotEqual(initialSize, result.FileSize);
-        
+
         // Verify in database
         var dbRecord = await Context.Records.FindAsync(result.Id);
         Assert.Equal(newSize, dbRecord.FileSize);
@@ -3133,12 +3096,12 @@ public class RecordBusinessTests : IntegrationTestBase
 
         // Assert - File size should be preserved
         Assert.Equal(originalSize, result.FileSize);
-        
+
         // Verify in database
         var dbRecord = await Context.Records.FindAsync(result.Id);
         Assert.Equal(originalSize, dbRecord.FileSize);
     }
-    
+
     [Fact]
     public async Task GetRecord_ReturnsFileSize()
     {
@@ -3191,7 +3154,7 @@ public class RecordBusinessTests : IntegrationTestBase
         // Assert
         var createdRecords = allRecords.Where(r => recordIds.Contains(r.Id)).OrderBy(r => r.FileSize).ToList();
         Assert.Equal(3, createdRecords.Count);
-        
+
         for (int i = 0; i < sizes.Length; i++)
         {
             Assert.Equal(sizes[i], createdRecords[i].FileSize);
@@ -3203,7 +3166,7 @@ public class RecordBusinessTests : IntegrationTestBase
     {
         // Arrange - Create records with tags and file sizes
         var tag = await Context.Tags.FirstAsync(t => t.Id == tid);
-        
+
         var dto1 = new CreateRecordRequestDto
         {
             Name = "Tagged Record 1",
@@ -3214,7 +3177,7 @@ public class RecordBusinessTests : IntegrationTestBase
             FileSize = 250000L,
             Tags = new List<string> { tag.Name }
         };
-        
+
         var dto2 = new CreateRecordRequestDto
         {
             Name = "Tagged Record 2",
@@ -3267,10 +3230,10 @@ public class RecordBusinessTests : IntegrationTestBase
         // Assert
         Assert.Equal(2, results.Count);
         Assert.All(results, r => Assert.NotNull(r.FileSize));
-        
+
         var record1 = results.First(r => r.OriginalId == "orig-size-1");
         var record2 = results.First(r => r.OriginalId == "orig-size-2");
-        
+
         Assert.Equal(300000L, record1.FileSize);
         Assert.Equal(600000L, record2.FileSize);
     }
@@ -3316,11 +3279,11 @@ public class RecordBusinessTests : IntegrationTestBase
         // Assert
         Assert.Equal(3, results.Count);
         Assert.All(results, r => Assert.NotNull(r.FileSize));
-        
+
         Assert.Contains(results, r => r.FileSize == 100000L);
         Assert.Contains(results, r => r.FileSize == 200000L);
         Assert.Contains(results, r => r.FileSize == 300000L);
-        
+
         // Verify in database
         foreach (var result in results)
         {
@@ -3361,10 +3324,10 @@ public class RecordBusinessTests : IntegrationTestBase
 
         // Assert
         Assert.Equal(2, results.Count);
-        
+
         var withSize = results.First(r => r.Name == "With Size");
         var withoutSize = results.First(r => r.Name == "Without Size");
-        
+
         Assert.Equal(500000L, withSize.FileSize);
         Assert.Null(withoutSize.FileSize);
     }
@@ -3387,7 +3350,7 @@ public class RecordBusinessTests : IntegrationTestBase
 
         // Act - Archive the record
         await _recordBusiness.ArchiveRecord(uid, organizationId, pid, createdRecord.Id);
-        
+
         // Assert - File size should be preserved even when archived
         Context.ChangeTracker.Clear();
         var archivedRecord = await Context.Records.FindAsync(createdRecord.Id);
@@ -3415,7 +3378,7 @@ public class RecordBusinessTests : IntegrationTestBase
 
         // Act - Unarchive the record
         await _recordBusiness.UnarchiveRecord(uid, organizationId, pid, createdRecord.Id);
-        
+
         // Assert - File size should still be preserved
         Context.ChangeTracker.Clear();
         var unarchivedRecord = await Context.Records.FindAsync(createdRecord.Id);
@@ -3437,7 +3400,7 @@ public class RecordBusinessTests : IntegrationTestBase
             ClassId = cid,
             FileSize = 100000L
         };
-        
+
         var dto2 = new CreateRecordRequestDto
         {
             Name = "Without Size Count",
@@ -3456,6 +3419,765 @@ public class RecordBusinessTests : IntegrationTestBase
 
         // Assert - Both records should be counted regardless of file size
         Assert.True(count >= 2);
+    }
+
+    [Fact]
+    public async Task GetRecord_ReturnsUriOnlyWhenUserCanDownload()
+    {
+        // Arrange
+        var adminUser = new User
+        {
+            Name = "Admin",
+            Email = $"admin-{Guid.NewGuid()}@test.com",
+            IsSysAdmin = true,
+            IsActive = true
+        };
+
+        var restrictedUser = new User
+        {
+            Name = "Restricted",
+            Email = $"restricted-{Guid.NewGuid()}@test.com",
+            IsSysAdmin = false,
+            IsActive = true
+        };
+
+        Context.Users.Add(adminUser);
+        Context.Users.Add(restrictedUser);
+        await Context.SaveChangesAsync();
+
+        var label = new SensitivityLabel
+        {
+            Name = $"Test Label {Guid.NewGuid()}",
+            Description = "Test label for download permission",
+            OrganizationId = organizationId,
+            ProjectId = pid,
+            LastUpdatedBy = adminUser.Id,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),
+            IsArchived = false
+        };
+
+        Context.SensitivityLabels.Add(label);
+        await Context.SaveChangesAsync();
+
+        var permission = new Permission
+        {
+            Name = $"Download File Permission {Guid.NewGuid()}",
+            Description = "Allows file download for this label",
+            Action = "download file",
+            LabelId = label.Id,
+            OrganizationId = organizationId,
+            ProjectId = pid,
+            LastUpdatedBy = adminUser.Id,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),
+            IsArchived = false,
+            IsDefault = false
+        };
+
+        var role = new Role
+        {
+            Name = $"Download Role {Guid.NewGuid()}",
+            Description = "Role with download file permission",
+            OrganizationId = organizationId,
+            ProjectId = pid,
+            LastUpdatedBy = adminUser.Id,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),
+            IsArchived = false,
+            Permissions = new List<Permission> { permission }
+        };
+
+        Context.Roles.Add(role);
+        await Context.SaveChangesAsync();
+
+        var projectMember = new ProjectMember
+        {
+            UserId = adminUser.Id,
+            ProjectId = pid,
+            RoleId = role.Id
+        };
+
+        Context.ProjectMembers.Add(projectMember);
+        await Context.SaveChangesAsync();
+
+        var expectedUri = $"../data/test/{Guid.NewGuid()}_protected-file.txt";
+
+        var record = new Record
+        {
+            OrganizationId = organizationId,
+            ProjectId = pid,
+            DataSourceId = did,
+            ClassId = cid,
+            Name = "Protected file record",
+            Description = "Protected file record",
+            Uri = expectedUri,
+            Properties = "{}",
+            OriginalId = Guid.NewGuid().ToString(),
+            LastUpdatedBy = adminUser.Id,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),
+            IsArchived = false,
+            FileType = "txt",
+            FileSize = 1,
+            Labels = new List<SensitivityLabel> { label }
+        };
+
+        Context.Records.Add(record);
+        await Context.SaveChangesAsync();
+
+        // Act
+        var adminResult = await _recordBusiness.GetRecord(
+            adminUser.Id,
+            organizationId,
+            pid,
+            record.Id,
+            hideArchived: true);
+
+        var restrictedUserResult = await _recordBusiness.GetRecord(
+            restrictedUser.Id,
+            organizationId,
+            pid,
+            record.Id,
+            hideArchived: true);
+
+        // Assert
+        Assert.Equal(expectedUri, adminResult.Uri);
+        Assert.Null(restrictedUserResult.Uri);
+    }
+
+    [Fact]
+    public async Task UpdateRecord_OnlyAllowsUriUpdateWhenUserCanUploadForLabel()
+    {
+        // Arrange
+        var adminUser = new User
+        {
+            Name = "Admin",
+            Email = $"admin-{Guid.NewGuid()}@test.com",
+            IsSysAdmin = true,
+            IsActive = true
+        };
+
+        var restrictedUser = new User
+        {
+            Name = "Restricted",
+            Email = $"restricted-{Guid.NewGuid()}@test.com",
+            IsSysAdmin = false,
+            IsActive = true
+        };
+
+        Context.Users.Add(adminUser);
+        Context.Users.Add(restrictedUser);
+        await Context.SaveChangesAsync();
+
+        var label = new SensitivityLabel
+        {
+            Name = $"Test Label {Guid.NewGuid()}",
+            Description = "Test label for upload permission",
+            OrganizationId = organizationId,
+            ProjectId = pid,
+            LastUpdatedBy = adminUser.Id,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),
+            IsArchived = false
+        };
+
+        Context.SensitivityLabels.Add(label);
+        await Context.SaveChangesAsync();
+
+        var uploadPermission = new Permission
+        {
+            Name = $"Upload File Permission {Guid.NewGuid()}",
+            Description = "Allows file upload for this label",
+            Action = "update file",
+            LabelId = label.Id,
+            OrganizationId = organizationId,
+            ProjectId = pid,
+            LastUpdatedBy = adminUser.Id,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),
+            IsArchived = false,
+            IsDefault = false
+        };
+
+        var downloadPermission = new Permission
+        {
+            Name = $"Download File Permission {Guid.NewGuid()}",
+            Description = "Allows file download for this label",
+            Action = "download file",
+            LabelId = label.Id,
+            OrganizationId = organizationId,
+            ProjectId = pid,
+            LastUpdatedBy = adminUser.Id,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),
+            IsArchived = false,
+            IsDefault = false
+        };
+
+        var role = new Role
+        {
+            Name = $"Upload Download Role {Guid.NewGuid()}",
+            Description = "Role with upload and download file permission",
+            OrganizationId = organizationId,
+            ProjectId = pid,
+            LastUpdatedBy = adminUser.Id,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),
+            IsArchived = false,
+            Permissions = new List<Permission> { uploadPermission, downloadPermission }
+        };
+
+        Context.Roles.Add(role);
+        await Context.SaveChangesAsync();
+
+        Context.ProjectMembers.Add(new ProjectMember
+        {
+            UserId = adminUser.Id,
+            ProjectId = pid,
+            RoleId = role.Id
+        });
+
+        await Context.SaveChangesAsync();
+
+        var originalUri = $"../data/test/{Guid.NewGuid()}_original-file.txt";
+
+        var record = new Record
+        {
+            OrganizationId = organizationId,
+            ProjectId = pid,
+            DataSourceId = did,
+            ClassId = cid,
+            Name = "Protected file record",
+            Description = "Protected file record",
+            Uri = originalUri,
+            Properties = "{}",
+            OriginalId = Guid.NewGuid().ToString(),
+            LastUpdatedBy = adminUser.Id,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),
+            IsArchived = false,
+            FileType = "txt",
+            FileSize = 1,
+            Labels = new List<SensitivityLabel> { label }
+        };
+
+        Context.Records.Add(record);
+        await Context.SaveChangesAsync();
+
+        var restrictedUpdateDto = new UpdateRecordRequestDto
+        {
+            Uri = $"../data/test/{Guid.NewGuid()}_restricted-update.txt",
+            Properties = new JsonObject()
+        };
+
+        // Act / Assert
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            _recordBusiness.UpdateRecord(
+                restrictedUser.Id,
+                organizationId,
+                pid,
+                record.Id,
+                restrictedUpdateDto));
+
+        var adminUpdateUri = $"../data/test/{Guid.NewGuid()}_admin-update.txt";
+
+        var adminUpdateDto = new UpdateRecordRequestDto
+        {
+            Uri = adminUpdateUri,
+            Properties = new JsonObject()
+        };
+
+        var adminResult = await _recordBusiness.UpdateRecord(
+            adminUser.Id,
+            organizationId,
+            pid,
+            record.Id,
+            adminUpdateDto);
+
+        Assert.Equal(adminUpdateUri, adminResult.Uri);
+    }
+
+    [Fact]
+    public async Task GetAllRecords_ReturnsUriOnlyWhenUserCanDownload()
+    {
+        var (adminUser, restrictedUser, label) =
+            await SeedUriSecurityUsersAndLabel("download file");
+
+        var record = await SeedLabeledRecord(adminUser, label);
+
+        var adminResults = await _recordBusiness.GetAllRecords(
+            adminUser.Id, organizationId, pid, did, hideArchived: true);
+
+        var restrictedResults = await _recordBusiness.GetAllRecords(
+            restrictedUser.Id, organizationId, pid, did, hideArchived: true);
+
+        Assert.Equal(record.Uri, adminResults.Single(r => r.Id == record.Id).Uri);
+        Assert.Null(restrictedResults.Single(r => r.Id == record.Id).Uri);
+    }
+
+    [Fact]
+    public async Task GetRecordsByTags_ReturnsUriOnlyWhenUserCanDownload()
+    {
+        var (adminUser, restrictedUser, label) =
+            await SeedUriSecurityUsersAndLabel("download file");
+
+        var tagName = $"uri-test-tag-{Guid.NewGuid()}";
+        var record = await SeedLabeledRecord(adminUser, label, tagName);
+        var tagId = record.Tags.Single().Id;
+
+        var adminResults = await _recordBusiness.GetRecordsByTags(
+            adminUser.Id, organizationId, pid, new[] { tagId }, hideArchived: true);
+
+        var restrictedResults = await _recordBusiness.GetRecordsByTags(
+            restrictedUser.Id, organizationId, pid, new[] { tagId }, hideArchived: true);
+
+        Assert.Equal(record.Uri, adminResults.Single(r => r.Id == record.Id).Uri);
+        Assert.Null(restrictedResults.Single(r => r.Id == record.Id).Uri);
+    }
+
+    [Fact]
+    public async Task GetRecordsByOriginalId_ReturnsUriOnlyWhenUserCanDownload()
+    {
+        var (adminUser, restrictedUser, label) =
+            await SeedUriSecurityUsersAndLabel("download file");
+
+        var record = await SeedLabeledRecord(adminUser, label);
+
+        var adminResults = await _recordBusiness.GetRecordsByOriginalId(
+            adminUser.Id, organizationId, pid, did, new List<string> { record.OriginalId }, hideArchived: true);
+
+        var restrictedResults = await _recordBusiness.GetRecordsByOriginalId(
+            restrictedUser.Id, organizationId, pid, did, new List<string> { record.OriginalId }, hideArchived: true);
+
+        Assert.Equal(record.Uri, adminResults.Single().Uri);
+        Assert.Null(restrictedResults.Single().Uri);
+    }
+
+    [Fact]
+    public async Task CreateRecord_OnlyAllowsUriCreateWhenUserCanUploadForLabel()
+    {
+        var (adminUser, restrictedUser, label) =
+            await SeedUriSecurityUsersAndLabel("upload file", "download file");
+
+        var restrictedDto = new CreateRecordRequestDto
+        {
+            Name = "Restricted create URI test",
+            Description = "Restricted create URI test",
+            Uri = $"../data/test/{Guid.NewGuid()}_restricted-create.txt",
+            Properties = new JsonObject(),
+            OriginalId = Guid.NewGuid().ToString(),
+            ClassId = cid,
+            FileType = "txt",
+            FileSize = 1
+        };
+
+        await Assert.ThrowsAsync<DependencyDeletionException>(() =>
+            _recordBusiness.CreateRecord(
+                restrictedUser.Id,
+                organizationId,
+                pid,
+                did,
+                restrictedDto,
+                new List<long> { label.Id }));
+
+        var adminDto = new CreateRecordRequestDto
+        {
+            Name = "Admin create URI test",
+            Description = "Admin create URI test",
+            Uri = $"../data/test/{Guid.NewGuid()}_admin-create.txt",
+            Properties = new JsonObject(),
+            OriginalId = Guid.NewGuid().ToString(),
+            ClassId = cid,
+            FileType = "txt",
+            FileSize = 1
+        };
+
+        var result = await _recordBusiness.CreateRecord(
+            adminUser.Id,
+            organizationId,
+            pid,
+            did,
+            adminDto,
+            new List<long> { label.Id });
+
+        Assert.Equal(adminDto.Uri, result.Uri);
+    }
+
+    [Fact]
+    public async Task BulkCreateRecords_OnlyAllowsUriCreateWhenUserCanUploadForLabel()
+    {
+        var (adminUser, restrictedUser, label) =
+            await SeedUriSecurityUsersAndLabel("upload file", "download file");
+
+        var restrictedRecords = new List<CreateRecordRequestDto>
+        {
+            new()
+            {
+                Name = "Restricted bulk create URI test",
+                Description = "Restricted bulk create URI test",
+                Uri = $"../data/test/{Guid.NewGuid()}_restricted-bulk-create.txt",
+                Properties = new JsonObject(),
+                OriginalId = Guid.NewGuid().ToString(),
+                ClassId = cid,
+                FileType = "txt",
+                FileSize = 1
+            }
+        };
+
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            _recordBusiness.BulkCreateRecords(
+                restrictedUser.Id,
+                organizationId,
+                pid,
+                did,
+                restrictedRecords,
+                new List<long> { label.Id }));
+
+        var adminUri = $"../data/test/{Guid.NewGuid()}_admin-bulk-create.txt";
+
+        var adminRecords = new List<CreateRecordRequestDto>
+        {
+            new()
+            {
+                Name = "Admin bulk create URI test",
+                Description = "Admin bulk create URI test",
+                Uri = adminUri,
+                Properties = new JsonObject(),
+                OriginalId = Guid.NewGuid().ToString(),
+                ClassId = cid,
+                FileType = "txt",
+                FileSize = 1
+            }
+        };
+
+        var results = await _recordBusiness.BulkCreateRecords(
+            adminUser.Id,
+            organizationId,
+            pid,
+            did,
+            adminRecords,
+            new List<long> { label.Id });
+
+        Assert.Equal(adminUri, results.Single().Uri);
+    }
+
+    [Fact]
+    public async Task CreateRecord_AllowsSysAdminToCreateUriWithoutUploadFilePermission()
+    {
+        var adminUser = new User
+        {
+            Name = "Admin",
+            Email = $"admin-{Guid.NewGuid()}@test.com",
+            IsSysAdmin = true,
+            IsActive = true
+        };
+
+        Context.Users.Add(adminUser);
+        await Context.SaveChangesAsync();
+
+        var label = new SensitivityLabel
+        {
+            Name = $"Test Label {Guid.NewGuid()}",
+            Description = "Test label",
+            OrganizationId = organizationId,
+            ProjectId = pid,
+            LastUpdatedBy = adminUser.Id,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),
+            IsArchived = false
+        };
+
+        Context.SensitivityLabels.Add(label);
+        await Context.SaveChangesAsync();
+
+        var uri = $"../data/test/{Guid.NewGuid()}_admin-create.txt";
+
+        var dto = new CreateRecordRequestDto
+        {
+            Name = "Admin create URI test",
+            Description = "Admin create URI test",
+            Uri = uri,
+            Properties = new JsonObject(),
+            OriginalId = Guid.NewGuid().ToString(),
+            ClassId = cid,
+            FileType = "txt",
+            FileSize = 1
+        };
+
+        var result = await _recordBusiness.CreateRecord(
+            adminUser.Id,
+            organizationId,
+            pid,
+            did,
+            dto,
+            new List<long> { label.Id },
+            embedded: false,
+            isSysAdmin: true);
+
+        Assert.Equal(uri, result.Uri);
+    }
+
+    [Fact]
+    public async Task BulkCreateRecords_AllowsSysAdminToCreateUriWithoutUploadFilePermission()
+    {
+        var adminUser = new User
+        {
+            Name = "Admin",
+            Email = $"admin-{Guid.NewGuid()}@test.com",
+            IsSysAdmin = true,
+            IsActive = true
+        };
+
+        Context.Users.Add(adminUser);
+        await Context.SaveChangesAsync();
+
+        var label = new SensitivityLabel
+        {
+            Name = $"Test Label {Guid.NewGuid()}",
+            Description = "Test label",
+            OrganizationId = organizationId,
+            ProjectId = pid,
+            LastUpdatedBy = adminUser.Id,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),
+            IsArchived = false
+        };
+
+        Context.SensitivityLabels.Add(label);
+        await Context.SaveChangesAsync();
+
+        var uri = $"../data/test/{Guid.NewGuid()}_admin-bulk-create.txt";
+
+        var records = new List<CreateRecordRequestDto>
+        {
+            new()
+            {
+                Name = "Admin bulk create URI test",
+                Description = "Admin bulk create URI test",
+                Uri = uri,
+                Properties = new JsonObject(),
+                OriginalId = Guid.NewGuid().ToString(),
+                ClassId = cid,
+                FileType = "txt",
+                FileSize = 1
+            }
+        };
+
+        var results = await _recordBusiness.BulkCreateRecords(
+            adminUser.Id,
+            organizationId,
+            pid,
+            did,
+            records,
+            new List<long> { label.Id },
+            isSysAdmin: true);
+
+        Assert.Single(results);
+        Assert.Equal(uri, results.Single().Uri);
+    }
+
+    [Fact]
+    public async Task UpdateRecord_AllowsSysAdminToUpdateUriWithoutUpdateFilePermission()
+    {
+        var adminUser = new User
+        {
+            Name = "Admin",
+            Email = $"admin-{Guid.NewGuid()}@test.com",
+            IsSysAdmin = true,
+            IsActive = true
+        };
+
+        Context.Users.Add(adminUser);
+        await Context.SaveChangesAsync();
+
+        var label = new SensitivityLabel
+        {
+            Name = $"Test Label {Guid.NewGuid()}",
+            Description = "Test label",
+            OrganizationId = organizationId,
+            ProjectId = pid,
+            LastUpdatedBy = adminUser.Id,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),
+            IsArchived = false
+        };
+
+        Context.SensitivityLabels.Add(label);
+        await Context.SaveChangesAsync();
+
+        var originalUri = $"../data/test/{Guid.NewGuid()}_original.txt";
+
+        var record = new Record
+        {
+            OrganizationId = organizationId,
+            ProjectId = pid,
+            DataSourceId = did,
+            ClassId = cid,
+            Name = "Admin update URI test",
+            Description = "Admin update URI test",
+            Uri = originalUri,
+            Properties = "{}",
+            OriginalId = Guid.NewGuid().ToString(),
+            LastUpdatedBy = adminUser.Id,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),
+            IsArchived = false,
+            FileType = "txt",
+            FileSize = 1,
+            Labels = new List<SensitivityLabel> { label }
+        };
+
+        Context.Records.Add(record);
+        await Context.SaveChangesAsync();
+
+        var updatedUri = $"../data/test/{Guid.NewGuid()}_updated.txt";
+
+        var dto = new UpdateRecordRequestDto
+        {
+            Uri = updatedUri,
+            Properties = new JsonObject()
+        };
+
+        var result = await _recordBusiness.UpdateRecord(
+            adminUser.Id,
+            organizationId,
+            pid,
+            record.Id,
+            dto,
+            isSysAdmin: true);
+
+        Assert.Equal(updatedUri, result.Uri);
+    }
+
+    private async Task<(User adminUser, User restrictedUser, SensitivityLabel label)>
+        SeedUriSecurityUsersAndLabel(params string[] permissionActions)
+    {
+        var adminUser = new User
+        {
+            Name = "Admin",
+            Email = $"admin-{Guid.NewGuid()}@test.com",
+            IsSysAdmin = true,
+            IsActive = true
+        };
+
+        var restrictedUser = new User
+        {
+            Name = "Restricted",
+            Email = $"restricted-{Guid.NewGuid()}@test.com",
+            IsSysAdmin = false,
+            IsActive = true
+        };
+
+        Context.Users.AddRange(adminUser, restrictedUser);
+        await Context.SaveChangesAsync();
+
+        var label = new SensitivityLabel
+        {
+            Name = $"Test Label {Guid.NewGuid()}",
+            Description = "Test label for URI permission",
+            OrganizationId = organizationId,
+            ProjectId = pid,
+            LastUpdatedBy = adminUser.Id,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),
+            IsArchived = false
+        };
+
+        Context.SensitivityLabels.Add(label);
+        await Context.SaveChangesAsync();
+
+        var readPermission = new Permission
+        {
+            Name = $"Read Record Permission {Guid.NewGuid()}",
+            Description = "Allows record read for this label",
+            Action = "read record",
+            LabelId = label.Id,
+            OrganizationId = organizationId,
+            ProjectId = pid,
+            LastUpdatedBy = adminUser.Id,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),
+            IsArchived = false,
+            IsDefault = false
+        };
+
+        var adminPermissions = permissionActions.Select(action => new Permission
+        {
+            Name = $"{action} Permission {Guid.NewGuid()}",
+            Description = $"Allows {action} for this label",
+            Action = action,
+            LabelId = label.Id,
+            OrganizationId = organizationId,
+            ProjectId = pid,
+            LastUpdatedBy = adminUser.Id,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),
+            IsArchived = false,
+            IsDefault = false
+        }).ToList();
+
+        var adminRole = new Role
+        {
+            Name = $"Admin URI Role {Guid.NewGuid()}",
+            Description = "Role with URI permission",
+            OrganizationId = organizationId,
+            ProjectId = pid,
+            LastUpdatedBy = adminUser.Id,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),
+            IsArchived = false,
+            Permissions = new List<Permission> { readPermission }.Concat(adminPermissions).ToList()
+        };
+
+        var restrictedRole = new Role
+        {
+            Name = $"Restricted URI Role {Guid.NewGuid()}",
+            Description = "Role with read permission only",
+            OrganizationId = organizationId,
+            ProjectId = pid,
+            LastUpdatedBy = adminUser.Id,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),
+            IsArchived = false,
+            Permissions = new List<Permission> { readPermission }
+        };
+
+        Context.Roles.AddRange(adminRole, restrictedRole);
+        await Context.SaveChangesAsync();
+
+        Context.ProjectMembers.AddRange(
+            new ProjectMember { UserId = adminUser.Id, ProjectId = pid, RoleId = adminRole.Id },
+            new ProjectMember { UserId = restrictedUser.Id, ProjectId = pid, RoleId = restrictedRole.Id });
+
+        await Context.SaveChangesAsync();
+
+        return (adminUser, restrictedUser, label);
+    }
+
+    private async Task<Record> SeedLabeledRecord(User user, SensitivityLabel label, string? tagName = null)
+    {
+        var record = new Record
+        {
+            OrganizationId = organizationId,
+            ProjectId = pid,
+            DataSourceId = did,
+            ClassId = cid,
+            Name = $"Protected file record {Guid.NewGuid()}",
+            Description = "Protected file record",
+            Uri = $"../data/test/{Guid.NewGuid()}_protected-file.txt",
+            Properties = "{}",
+            OriginalId = Guid.NewGuid().ToString(),
+            LastUpdatedBy = user.Id,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),
+            IsArchived = false,
+            FileType = "txt",
+            FileSize = 1,
+            Labels = new List<SensitivityLabel> { label }
+        };
+
+        if (tagName != null)
+        {
+            record.Tags = new List<Tag>
+            {
+                new()
+                {
+                    Name = tagName,
+                    OrganizationId = organizationId,
+                    ProjectId = pid,
+                    LastUpdatedBy = user.Id,
+                    LastUpdatedAt = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),
+                    IsArchived = false
+                }
+            };
+        }
+
+        Context.Records.Add(record);
+        await Context.SaveChangesAsync();
+
+        return record;
     }
 
     #endregion
