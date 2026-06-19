@@ -15,7 +15,7 @@ public class TagOrganizationControllerTests : IDisposable
 {
     private readonly Mock<ITagBusiness> _mockTagBusiness;
     private readonly Mock<ILogger<TagProjectController>> _mockLogger;
-    private readonly TagOrganizationController _TagOrganizationController;
+    private readonly TagOrganizationController _tagOrganizationController;
 
     private const long UserId = 10L;
     private const long OrgId = 1L;
@@ -32,7 +32,7 @@ public class TagOrganizationControllerTests : IDisposable
         _mockTagBusiness = new Mock<ITagBusiness>();
         _mockLogger = new Mock<ILogger<TagProjectController>>();
 
-        _TagOrganizationController = new TagOrganizationController(
+        _tagOrganizationController = new TagOrganizationController(
             _mockTagBusiness.Object,
             _mockLogger.Object
         );
@@ -68,7 +68,7 @@ public class TagOrganizationControllerTests : IDisposable
             .ReturnsAsync(expected);
 
         // Act
-        var actionResult = await _TagOrganizationController.GetAllTags(OrgId, null, true);
+        var actionResult = await _tagOrganizationController.GetAllTags(OrgId, null, true);
 
         // Assert
         var result = Assert.IsType<OkObjectResult>(actionResult.Result);
@@ -87,7 +87,7 @@ public class TagOrganizationControllerTests : IDisposable
             .ReturnsAsync([]);
 
         // Act
-        var actionResult = await _TagOrganizationController.GetAllTags(It.IsAny<long>(), null, It.IsAny<bool>());
+        var actionResult = await _tagOrganizationController.GetAllTags(It.IsAny<long>(), null, It.IsAny<bool>());
 
         // Assert
         var result = Assert.IsType<OkObjectResult>(actionResult.Result);
@@ -109,7 +109,7 @@ public class TagOrganizationControllerTests : IDisposable
             .ThrowsAsync(new Exception("db error"));
 
         // Act
-        var actionResult = await _TagOrganizationController.GetAllTags(
+        var actionResult = await _tagOrganizationController.GetAllTags(
             OrgId,
             null,
             true);
@@ -133,7 +133,7 @@ public class TagOrganizationControllerTests : IDisposable
             .ReturnsAsync(expected);
 
         // Act
-        await _TagOrganizationController.GetAllTags(OrgId, null, true);
+        await _tagOrganizationController.GetAllTags(OrgId, null, true);
 
         // Assert
         _mockTagBusiness.Verify(
@@ -155,6 +155,131 @@ public class TagOrganizationControllerTests : IDisposable
     #endregion
 
     // =========================================================================
+    // GetTagsByName Tests
+    // =========================================================================
+
+    #region GetTagsByName Tests
+
+    [Fact]
+    public async Task GetTagsByName_Returns200_WithTags()
+    {
+        // Arrange
+        List<TagResponseDto> expected =
+            new List<TagResponseDto>();
+
+        List<string> tagNames =
+            new List<string>();
+
+        _mockTagBusiness
+            .Setup(b => b.GetTagsByName(OrgId, null, tagNames, true))
+            .ReturnsAsync(expected);
+
+        // Act
+        var actionResult = await _tagOrganizationController.GetTagsByName(
+            OrgId,
+            tagNames,
+            true);
+
+        // Assert
+        var result = Assert.IsType<OkObjectResult>(actionResult.Result);
+
+        Assert.Equal(StatusCodes.Status200OK, result.StatusCode);
+        Assert.Equal(expected, result.Value);
+    }
+
+    [Fact]
+    public async Task GetTagsByName_Returns200_WithEmptyList()
+    {
+        // Arrange
+        List<string> tagNames =
+            new List<string>();
+
+        _mockTagBusiness
+            .Setup(b => b.GetTagsByName(It.IsAny<long>(), null, tagNames, It.IsAny<bool>()))
+            .ReturnsAsync([]);
+
+        // Act
+        var actionResult = await _tagOrganizationController.GetTagsByName(
+            It.IsAny<long>(),
+            tagNames,
+            It.IsAny<bool>());
+
+        // Assert
+        var result = Assert.IsType<OkObjectResult>(actionResult.Result);
+
+        Assert.NotNull(result);
+
+        Assert.Equal(StatusCodes.Status200OK, result.StatusCode);
+
+    }
+
+    [Fact]
+    public async Task GetTagsByName_Returns500_OnUnexpectedException()
+    {
+        // Arrange
+        UserContextStorage.UserId = UserId;
+
+        List<string> tagNames =
+            new List<string>();
+
+        _mockTagBusiness
+            .Setup(b => b.GetTagsByName(OrgId, null, tagNames, true))
+            .ThrowsAsync(new Exception("db error"));
+
+        // Act
+        var actionResult = await _tagOrganizationController.GetTagsByName(
+            OrgId,
+            tagNames,
+            true);
+
+        // Assert
+        var result = Assert.IsType<ObjectResult>(actionResult.Result);
+
+        Assert.NotNull(result);
+        Assert.Equal(StatusCodes.Status500InternalServerError, result.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetTagsByName_PassesToBusinessLayer()
+    {
+        // Arrange
+
+        List<string> tagNames =
+            new List<string>();
+
+        var expected = new List<TagResponseDto>();
+
+        _mockTagBusiness
+            .Setup(b => b.GetTagsByName(OrgId, null, tagNames, true))
+            .ReturnsAsync(expected);
+
+        // Act
+        await _tagOrganizationController.GetTagsByName(
+            OrgId,
+            tagNames,
+            true);
+
+        // Assert
+        _mockTagBusiness.Verify(
+            b => b.GetTagsByName(OrgId, null, tagNames, true),
+            Times.Once);
+    }
+
+    [Fact]
+    public void GetTagsByName_HasHttpPost()
+    {
+        var method = GetControllerMethod(
+            nameof(TagOrganizationController.GetTagsByName),
+            "organizationId",
+            "tagNames",
+            "hideArchived");
+
+        AssertHasHttpAttribute(method, nameof(HttpPostAttribute));
+    }
+
+    #endregion
+
+    // =========================================================================
     // GetTag Tests
     // =========================================================================
 
@@ -171,7 +296,7 @@ public class TagOrganizationControllerTests : IDisposable
             .ReturnsAsync(expected);
 
         // Act
-        var actionResult = await _TagOrganizationController.GetTag(
+        var actionResult = await _tagOrganizationController.GetTag(
             OrgId,
             TagId,
             true);
@@ -193,7 +318,7 @@ public class TagOrganizationControllerTests : IDisposable
             .ReturnsAsync((TagResponseDto)null!);
 
         // Act
-        var actionResult = await _TagOrganizationController.GetTag(
+        var actionResult = await _tagOrganizationController.GetTag(
             OrgId,
             TagId,
             true);
@@ -214,7 +339,7 @@ public class TagOrganizationControllerTests : IDisposable
             .ThrowsAsync(new Exception("db error"));
 
         // Act
-        var actionResult = await _TagOrganizationController.GetTag(
+        var actionResult = await _tagOrganizationController.GetTag(
             OrgId,
             TagId,
             true);
@@ -239,7 +364,7 @@ public class TagOrganizationControllerTests : IDisposable
             .ReturnsAsync(expected);
 
         // Act
-        var actionResult = await _TagOrganizationController.GetTag(
+        var actionResult = await _tagOrganizationController.GetTag(
             OrgId,
             TagId,
             true);
@@ -290,7 +415,7 @@ public class TagOrganizationControllerTests : IDisposable
             .ReturnsAsync(expected);
 
         // Act
-        var actionResult = await _TagOrganizationController.CreateTag(
+        var actionResult = await _tagOrganizationController.CreateTag(
             OrgId,
             input);
 
@@ -310,7 +435,7 @@ public class TagOrganizationControllerTests : IDisposable
             .Setup(b => b.CreateTag(OrgId, UserId, null, input))
             .ThrowsAsync(new Exception("db error"));
 
-        var actionResult = await _TagOrganizationController.CreateTag(
+        var actionResult = await _tagOrganizationController.CreateTag(
             OrgId,
             input);
 
@@ -336,7 +461,7 @@ public class TagOrganizationControllerTests : IDisposable
             .ReturnsAsync(expected);
 
         // Act
-        var actionResult = await _TagOrganizationController.CreateTag(
+        var actionResult = await _tagOrganizationController.CreateTag(
             OrgId,
             input);
 
@@ -362,6 +487,131 @@ public class TagOrganizationControllerTests : IDisposable
     #endregion
 
     // =========================================================================
+    // BulkCreateTag Tests
+    // =========================================================================
+
+    #region BulkCreateTag Tests
+
+    [Fact]
+    public async Task BulkCreateTag_Returns200_WithTags()
+    {
+        // Arrange
+        UserContextStorage.UserId = UserId;
+
+        List<TagResponseDto> expected =
+            new List<TagResponseDto>();
+
+        List<CreateTagRequestDto> tagRequestDto =
+            new List<CreateTagRequestDto>();
+
+        _mockTagBusiness
+            .Setup(b => b.BulkCreateTags(OrgId, UserId, null, tagRequestDto))
+            .ReturnsAsync(expected);
+
+        // Act
+        var actionResult = await _tagOrganizationController.BulkCreateTag(
+            OrgId,
+            tagRequestDto);
+
+        // Assert
+        var result = Assert.IsType<OkObjectResult>(actionResult.Result);
+
+        Assert.Equal(StatusCodes.Status200OK, result.StatusCode);
+        Assert.Equal(expected, result.Value);
+    }
+
+    [Fact]
+    public async Task BulkCreateTag_Returns200_WithEmptyList()
+    {
+        // Arrange
+        UserContextStorage.UserId = UserId;
+
+        List<CreateTagRequestDto> tagRequestDto =
+            new List<CreateTagRequestDto>();
+
+        _mockTagBusiness
+            .Setup(b => b.BulkCreateTags(It.IsAny<long>(), UserId, null, tagRequestDto))
+            .ReturnsAsync([]);
+
+        // Act
+        var actionResult = await _tagOrganizationController.BulkCreateTag(
+            It.IsAny<long>(),
+            tagRequestDto);
+
+        // Assert
+        var result = Assert.IsType<OkObjectResult>(actionResult.Result);
+
+        Assert.NotNull(result);
+
+        Assert.Equal(StatusCodes.Status200OK, result.StatusCode);
+
+    }
+
+    [Fact]
+    public async Task BulkCreateTag_Returns500_OnUnexpectedException()
+    {
+        // Arrange
+        UserContextStorage.UserId = UserId;
+
+        List<CreateTagRequestDto> tagRequestDto =
+            new List<CreateTagRequestDto>();
+
+        _mockTagBusiness
+            .Setup(b => b.BulkCreateTags(OrgId, UserId, null, tagRequestDto))
+            .ThrowsAsync(new Exception("db error"));
+
+        // Act
+        var actionResult = await _tagOrganizationController.BulkCreateTag(
+            OrgId,
+            tagRequestDto);
+
+        // Assert
+        var result = Assert.IsType<ObjectResult>(actionResult.Result);
+
+        Assert.NotNull(result);
+        Assert.Equal(StatusCodes.Status500InternalServerError, result.StatusCode);
+    }
+
+    [Fact]
+    public async Task BulkCreateTag_PassesToBusinessLayer()
+    {
+        // Arrange
+        UserContextStorage.UserId = UserId;
+
+        List<CreateTagRequestDto> tagRequestDto =
+            new List<CreateTagRequestDto>();
+
+        var expected = new List<TagResponseDto>();
+
+        _mockTagBusiness
+            .Setup(b => b.BulkCreateTags(OrgId, UserId, null, tagRequestDto))
+            .ReturnsAsync(expected);
+
+        // Act
+        await _tagOrganizationController.BulkCreateTag(
+            OrgId,
+            tagRequestDto);
+
+        // Assert
+        _mockTagBusiness.Verify(
+            b => b.BulkCreateTags(OrgId, UserId, null, tagRequestDto),
+            Times.Once);
+    }
+
+    [Fact]
+    public void BulkCreateTag_HasHttpPost()
+    {
+        var method = GetControllerMethod(
+            nameof(TagOrganizationController.BulkCreateTag),
+            "organizationId",
+            "tagRequestDto");
+
+        AssertHasHttpAttribute(method, nameof(HttpPostAttribute));
+    }
+
+    #endregion
+
+    // =========================================================================
     // UpdateTag Tests
     // =========================================================================
 
@@ -376,11 +626,11 @@ public class TagOrganizationControllerTests : IDisposable
         UpdateTagRequestDto input = new UpdateTagRequestDto();
 
         _mockTagBusiness
-            .Setup(b => b.UpdateTag(UserId, TagId, OrgId, null, input))
+            .Setup(b => b.UpdateTag(OrgId, UserId, null, TagId, input))
             .ReturnsAsync(expected);
 
         // Act
-        var actionResult = await _TagOrganizationController.UpdateTag(
+        var actionResult = await _tagOrganizationController.UpdateTag(
             OrgId,
             TagId,
             input);
@@ -398,10 +648,10 @@ public class TagOrganizationControllerTests : IDisposable
     {
         UpdateTagRequestDto input = new UpdateTagRequestDto();
         _mockTagBusiness
-            .Setup(b => b.UpdateTag(UserId, TagId, OrgId, null, input))
+            .Setup(b => b.UpdateTag(OrgId, UserId, null, TagId, input))
             .ThrowsAsync(new Exception("db error"));
 
-        var actionResult = await _TagOrganizationController.UpdateTag(
+        var actionResult = await _tagOrganizationController.UpdateTag(
             OrgId,
             TagId,
             input);
@@ -424,11 +674,11 @@ public class TagOrganizationControllerTests : IDisposable
         UserContextStorage.IsSysAdmin = true;
 
         _mockTagBusiness
-            .Setup(b => b.UpdateTag(UserId, TagId, OrgId, null, input))
+            .Setup(b => b.UpdateTag(OrgId, UserId, null, TagId, input))
             .ReturnsAsync(expected);
 
         // Act
-        var actionResult = await _TagOrganizationController.UpdateTag(
+        var actionResult = await _tagOrganizationController.UpdateTag(
             OrgId,
             TagId,
             input);
@@ -437,7 +687,7 @@ public class TagOrganizationControllerTests : IDisposable
 
         // Assert
         _mockTagBusiness.Verify(
-            b => b.UpdateTag(UserId, TagId, OrgId, null, input),
+            b => b.UpdateTag(OrgId, UserId, null, TagId, input),
             Times.Once);
     }
 
@@ -447,8 +697,8 @@ public class TagOrganizationControllerTests : IDisposable
         var method = GetControllerMethod(
             nameof(TagOrganizationController.UpdateTag),
             "organizationId",
-            "TagId",
-            "dto");
+            "tagId",
+            "tagRequestDto");
 
         AssertHasHttpAttribute(method, nameof(HttpPutAttribute));
     }
@@ -465,14 +715,14 @@ public class TagOrganizationControllerTests : IDisposable
     public async Task DeleteTag_Returns200()
     {
         // Arrange
-        var expectedMessage = $"Deleted Tag {TagId}";
+        var expectedMessage = $"Tag deleted successfully";
 
         _mockTagBusiness
-            .Setup(b => b.DeleteTag(UserId, TagId, OrgId, null))
+            .Setup(b => b.DeleteTag(OrgId, null, TagId))
             .ReturnsAsync(true);
 
         // Act
-        var actionResult = await _TagOrganizationController.DeleteTag(
+        var actionResult = await _tagOrganizationController.DeleteTag(
             OrgId,
             TagId);
 
@@ -494,10 +744,10 @@ public class TagOrganizationControllerTests : IDisposable
     public async Task DeleteTag_Returns500_OnUnexpectedException()
     {
         _mockTagBusiness
-            .Setup(b => b.DeleteTag(UserId, TagId, OrgId, null))
+            .Setup(b => b.DeleteTag(OrgId, null, TagId))
             .ThrowsAsync(new Exception("db error"));
 
-        var actionResult = await _TagOrganizationController.DeleteTag(
+        var actionResult = await _tagOrganizationController.DeleteTag(
             OrgId,
             TagId);
 
@@ -516,11 +766,11 @@ public class TagOrganizationControllerTests : IDisposable
         UserContextStorage.IsSysAdmin = true;
 
         _mockTagBusiness
-            .Setup(b => b.DeleteTag(UserId, TagId, OrgId, null))
+            .Setup(b => b.DeleteTag(OrgId, null, TagId))
             .ReturnsAsync(true);
 
         // Act
-        var actionResult = await _TagOrganizationController.DeleteTag(
+        var actionResult = await _tagOrganizationController.DeleteTag(
             OrgId,
             TagId);
 
@@ -528,7 +778,7 @@ public class TagOrganizationControllerTests : IDisposable
 
         // Assert
         _mockTagBusiness.Verify(
-            b => b.DeleteTag(UserId, TagId, OrgId, null),
+            b => b.DeleteTag(OrgId, null, TagId),
             Times.Once);
     }
 
@@ -538,7 +788,7 @@ public class TagOrganizationControllerTests : IDisposable
         var method = GetControllerMethod(
             nameof(TagOrganizationController.DeleteTag),
             "organizationId",
-            "TagId");
+            "tagId");
 
         AssertHasHttpAttribute(method, nameof(HttpDeleteAttribute));
     }
@@ -555,17 +805,17 @@ public class TagOrganizationControllerTests : IDisposable
     public async Task ArchiveTag_Returns200_WhenArchiving()
     {
         // Arrange
-        var expectedMessage = $"Archived Tag {TagId}";
+        var expectedMessage = $"Archived tag {TagId}";
 
         UserContextStorage.UserId = UserId;
         UserContextStorage.IsSysAdmin = true;
 
         _mockTagBusiness
-            .Setup(b => b.ArchiveTag(UserId, TagId, OrgId, null))
+            .Setup(b => b.ArchiveTag(OrgId, UserId, null, TagId))
             .ReturnsAsync(true);
 
         // Act
-        var actionResult = await _TagOrganizationController.ArchiveTag(
+        var actionResult = await _tagOrganizationController.ArchiveTag(
             OrgId,
             TagId,
             true);
@@ -587,17 +837,17 @@ public class TagOrganizationControllerTests : IDisposable
     public async Task ArchiveTag_Returns200_WhenUnarchiving()
     {
         // Arrange
-        var expectedMessage = $"Unarchived Tag {TagId}";
+        var expectedMessage = $"Unarchived tag {TagId}";
 
         UserContextStorage.UserId = UserId;
         UserContextStorage.IsSysAdmin = true;
 
         _mockTagBusiness
-            .Setup(b => b.UnarchiveTag(UserId, TagId, OrgId, null))
+            .Setup(b => b.UnarchiveTag(OrgId, UserId, null, TagId))
             .ReturnsAsync(true);
 
         // Act
-        var actionResult = await _TagOrganizationController.ArchiveTag(
+        var actionResult = await _tagOrganizationController.ArchiveTag(
             OrgId,
             TagId,
             false);
@@ -623,11 +873,11 @@ public class TagOrganizationControllerTests : IDisposable
         UserContextStorage.IsSysAdmin = true;
 
         _mockTagBusiness
-            .Setup(b => b.ArchiveTag(UserId, TagId, OrgId, null))
+            .Setup(b => b.ArchiveTag(OrgId, UserId, null, TagId))
             .ThrowsAsync(new Exception("db error"));
 
         // Act
-        var actionResult = await _TagOrganizationController.ArchiveTag(
+        var actionResult = await _tagOrganizationController.ArchiveTag(
             OrgId,
             TagId,
             true);
@@ -641,7 +891,7 @@ public class TagOrganizationControllerTests : IDisposable
         var message = Assert.IsType<string>(result.Value);
 
         Assert.Contains(
-            $"An error occurred while archiving Tag {TagId}",
+            $"An error occurred while archiving tag {TagId}",
             message);
     }
 
@@ -653,11 +903,11 @@ public class TagOrganizationControllerTests : IDisposable
         UserContextStorage.IsSysAdmin = true;
 
         _mockTagBusiness
-            .Setup(b => b.UnarchiveTag(UserId, TagId, OrgId, null))
+            .Setup(b => b.UnarchiveTag(OrgId, UserId, null, TagId))
             .ThrowsAsync(new Exception("db error"));
 
         // Act
-        var actionResult = await _TagOrganizationController.ArchiveTag(
+        var actionResult = await _tagOrganizationController.ArchiveTag(
             OrgId,
             TagId,
             false);
@@ -671,7 +921,7 @@ public class TagOrganizationControllerTests : IDisposable
         var message = Assert.IsType<string>(result.Value);
 
         Assert.Contains(
-            $"An error occurred while unarchiving Tag {TagId}",
+            $"An error occurred while unarchiving tag {TagId}",
             message);
     }
 
@@ -683,11 +933,11 @@ public class TagOrganizationControllerTests : IDisposable
         UserContextStorage.IsSysAdmin = true;
 
         _mockTagBusiness
-            .Setup(b => b.ArchiveTag(UserId, TagId, OrgId, null))
+            .Setup(b => b.ArchiveTag(OrgId, UserId, null, TagId))
             .ReturnsAsync(true);
 
         // Act
-        var actionResult = await _TagOrganizationController.ArchiveTag(
+        var actionResult = await _tagOrganizationController.ArchiveTag(
             OrgId,
             TagId,
             true);
@@ -696,11 +946,11 @@ public class TagOrganizationControllerTests : IDisposable
 
         // Assert
         _mockTagBusiness.Verify(
-            b => b.ArchiveTag(UserId, TagId, OrgId, null),
+            b => b.ArchiveTag(OrgId, UserId, null, TagId),
             Times.Once);
 
         _mockTagBusiness.Verify(
-            b => b.UnarchiveTag(UserId, TagId, OrgId, null),
+            b => b.UnarchiveTag(OrgId, UserId, null, TagId),
             Times.Never);
     }
 
@@ -712,11 +962,11 @@ public class TagOrganizationControllerTests : IDisposable
         UserContextStorage.IsSysAdmin = true;
 
         _mockTagBusiness
-            .Setup(b => b.UnarchiveTag(UserId, TagId, OrgId, null))
+            .Setup(b => b.UnarchiveTag(OrgId, UserId, null, TagId))
             .ReturnsAsync(true);
 
         // Act
-        var actionResult = await _TagOrganizationController.ArchiveTag(
+        var actionResult = await _tagOrganizationController.ArchiveTag(
             OrgId,
             TagId,
             false);
@@ -725,11 +975,11 @@ public class TagOrganizationControllerTests : IDisposable
 
         // Assert
         _mockTagBusiness.Verify(
-            b => b.UnarchiveTag(UserId, TagId, OrgId, null),
+            b => b.UnarchiveTag(OrgId, UserId, null, TagId),
             Times.Once);
 
         _mockTagBusiness.Verify(
-            b => b.ArchiveTag(UserId, TagId, OrgId, null),
+            b => b.ArchiveTag(OrgId, UserId, null, TagId),
             Times.Never);
     }
 
@@ -739,7 +989,7 @@ public class TagOrganizationControllerTests : IDisposable
         var method = GetControllerMethod(
             nameof(TagOrganizationController.ArchiveTag),
             "organizationId",
-            "TagId",
+            "tagId",
             "archive");
 
         AssertHasHttpAttribute(method, nameof(HttpPatchAttribute));
@@ -747,452 +997,6 @@ public class TagOrganizationControllerTests : IDisposable
 
     #endregion
 
-    // =========================================================================
-    // GetPermissionsByTag Tests
-    // =========================================================================
-
-    #region GetPermissionsByTag Tests
-
-    [Fact]
-    public async Task GetPermissionsByTag_Returns200_WithPermission()
-    {
-        // Arrange
-        List<PermissionResponseDto> expected = new List<PermissionResponseDto>();
-
-        _mockTagBusiness
-            .Setup(b => b.GetPermissionsByTag(TagId, OrgId, null))
-            .ReturnsAsync(expected);
-
-        // Act
-        var actionResult = await _TagOrganizationController.GetPermissionsByTag(
-            OrgId,
-            TagId);
-
-        // Assert
-        var result = Assert.IsType<OkObjectResult>(actionResult.Result);
-
-        Assert.Equal(StatusCodes.Status200OK, result.StatusCode);
-        Assert.Equal(expected, result.Value);
-    }
-
-    [Fact]
-    public async Task GetPermissionsByTag_Returns200_WithEmptyList()
-    {
-        // Arrange
-
-        _mockTagBusiness
-            .Setup(b => b.GetPermissionsByTag(TagId, OrgId, null))
-            .ReturnsAsync((List<PermissionResponseDto>)null!);
-
-        // Act
-        var actionResult = await _TagOrganizationController.GetPermissionsByTag(
-            OrgId,
-            TagId);
-
-        // Assert
-        var result = Assert.IsType<OkObjectResult>(actionResult.Result);
-
-        Assert.Equal(StatusCodes.Status200OK, result.StatusCode);
-        Assert.Null(result.Value);
-    }
-
-    [Fact]
-    public async Task GetPermissionsByTag_Returns500_OnUnexpectedException()
-    {
-        // Arrange
-        _mockTagBusiness
-            .Setup(b => b.GetPermissionsByTag(TagId, OrgId, null))
-            .ThrowsAsync(new Exception("db error"));
-
-        // Act
-        var actionResult = await _TagOrganizationController.GetPermissionsByTag(
-            OrgId,
-            TagId);
-
-        // Assert
-        var result = Assert.IsType<ObjectResult>(actionResult.Result);
-
-        Assert.Equal(StatusCodes.Status500InternalServerError, result.StatusCode);
-    }
-
-    [Fact]
-    public async Task GetPermissionsByTag_PassesToBusinessLayer()
-    {
-        // Arrange
-        UserContextStorage.UserId = UserId;
-        UserContextStorage.IsSysAdmin = true;
-
-        var expected = new List<PermissionResponseDto>();
-
-        _mockTagBusiness
-            .Setup(b => b.GetPermissionsByTag(TagId, OrgId, null))
-            .ReturnsAsync(expected);
-
-        // Act
-        var actionResult = await _TagOrganizationController.GetPermissionsByTag(
-            OrgId,
-            TagId);
-
-        // Assert
-        var result = Assert.IsType<OkObjectResult>(actionResult.Result);
-
-        // Assert
-        _mockTagBusiness.Verify(
-            b => b.GetPermissionsByTag(TagId, OrgId, null),
-            Times.Once);
-    }
-
-    [Fact]
-    public void GetPermissionsByTag_HasHttpGet()
-    {
-        var method = GetControllerMethod(
-            nameof(TagOrganizationController.GetPermissionsByTag),
-            "organizationId",
-            "TagId");
-
-        AssertHasHttpAttribute(method, nameof(HttpGetAttribute));
-    }
-
-    #endregion
-
-    // =========================================================================
-    // AddPermissionToTag Tests
-    // =========================================================================
-
-    #region AddPermissionToTag Tests
-
-    [Fact]
-    public async Task AddPermissionToTag_Returns200_WithPermission()
-    {
-        // Arrange
-        var expectedMessage = $"Added permission {PermissionId} to Tag {TagId}";
-
-        _mockTagBusiness
-            .Setup(b => b.AddPermissionToTag(TagId, PermissionId, OrgId, null))
-            .ReturnsAsync(true);
-
-        // Act
-        var actionResult = await _TagOrganizationController.AddPermissionToTag(
-            OrgId,
-            TagId,
-            PermissionId);
-
-        // Assert
-        var result = Assert.IsType<OkObjectResult>(actionResult);
-
-        Assert.Equal(StatusCodes.Status200OK, result.StatusCode);
-        Assert.NotNull(result.Value);
-
-        var messageProperty = result.Value.GetType().GetProperty("message");
-        Assert.NotNull(messageProperty);
-
-        var actualMessage = messageProperty.GetValue(result.Value) as string;
-        Assert.Equal(expectedMessage, actualMessage);
-    }
-
-    [Fact]
-    public async Task AddPermissionToTag_Returns500_OnUnexpectedException()
-    {
-        // Arrange
-        _mockTagBusiness
-            .Setup(b => b.AddPermissionToTag(TagId, PermissionId, OrgId, null))
-            .ThrowsAsync(new Exception("db error"));
-
-        // Act
-        var actionResult = await _TagOrganizationController.AddPermissionToTag(
-            OrgId,
-            TagId,
-            PermissionId);
-
-        // Assert
-        var result = Assert.IsType<ObjectResult>(actionResult);
-
-        Assert.NotNull(result);
-        Assert.Equal(500, result.StatusCode);
-    }
-
-    [Fact]
-    public async Task AddPermissionToTag_PassesToBusinessLayer()
-    {
-        // Arrange
-        UserContextStorage.UserId = UserId;
-        UserContextStorage.IsSysAdmin = true;
-
-        var expected = new List<PermissionResponseDto>();
-
-        _mockTagBusiness
-            .Setup(b => b.AddPermissionToTag(TagId, PermissionId, OrgId, null))
-            .ReturnsAsync(true);
-
-        // Act
-        var actionResult = await _TagOrganizationController.AddPermissionToTag(
-            OrgId,
-            TagId,
-            PermissionId);
-
-        // Assert
-        _mockTagBusiness.Verify(
-            b => b.AddPermissionToTag(TagId, PermissionId, OrgId, null),
-            Times.Once);
-    }
-
-    [Fact]
-    public void AddPermissionToTag_HasHttpPost()
-    {
-        var method = GetControllerMethod(
-            nameof(TagOrganizationController.AddPermissionToTag),
-            "organizationId",
-            "TagId",
-            "permissionId");
-
-        AssertHasHttpAttribute(method, nameof(HttpPostAttribute));
-    }
-
-    #endregion
-
-    // =========================================================================
-    // RemovePermissionFromTag Tests
-    // =========================================================================
-
-    #region RemovePermissionFromTag Tests
-
-    [Fact]
-    public async Task RemovePermissionFromTag_Returns200_WithPermission()
-    {
-        // Arrange
-        var expectedMessage = $"Removed permission {PermissionId} from Tag {TagId}";
-
-        _mockTagBusiness
-            .Setup(b => b.RemovePermissionFromTag(TagId, PermissionId, OrgId, null))
-            .ReturnsAsync(true);
-
-        // Act
-        var actionResult = await _TagOrganizationController.RemovePermissionFromTag(
-            OrgId,
-            TagId,
-            PermissionId);
-
-        // Assert
-        var result = Assert.IsType<OkObjectResult>(actionResult);
-
-        Assert.Equal(StatusCodes.Status200OK, result.StatusCode);
-        Assert.NotNull(result.Value);
-
-        var messageProperty = result.Value.GetType().GetProperty("message");
-        Assert.NotNull(messageProperty);
-
-        var actualMessage = messageProperty.GetValue(result.Value) as string;
-        Assert.Equal(expectedMessage, actualMessage);
-    }
-
-    [Fact]
-    public async Task RemovePermissionFromTag_Returns200_WithEmptyList()
-    {
-        // Arrange
-
-        _mockTagBusiness
-            .Setup(b => b.RemovePermissionFromTag(TagId, PermissionId, OrgId, null))
-            .ReturnsAsync(true);
-
-        // Act
-        var actionResult = await _TagOrganizationController.RemovePermissionFromTag(
-            OrgId,
-            TagId,
-            PermissionId);
-
-        // Assert
-        var result = Assert.IsType<OkObjectResult>(actionResult);
-
-        Assert.Equal(StatusCodes.Status200OK, result.StatusCode);
-        Assert.NotNull(result.Value);
-
-        var messageProperty = result.Value.GetType().GetProperty("message");
-        Assert.NotNull(messageProperty);
-
-        var actualMessage = messageProperty.GetValue(result.Value) as string;
-    }
-
-    [Fact]
-    public async Task RemovePermissionFromTag_Returns500_OnUnexpectedException()
-    {
-        // Arrange
-        _mockTagBusiness
-            .Setup(b => b.RemovePermissionFromTag(TagId, PermissionId, OrgId, null))
-            .ThrowsAsync(new Exception("db error"));
-
-        // Act
-        var actionResult = await _TagOrganizationController.RemovePermissionFromTag(
-            OrgId,
-            TagId,
-            PermissionId);
-
-        // Assert
-        var result = Assert.IsType<ObjectResult>(actionResult);
-
-        Assert.NotNull(result);
-        Assert.Equal(500, result.StatusCode);
-    }
-
-    [Fact]
-    public async Task RemovePermissionFromTag_PassesToBusinessLayer()
-    {
-        // Arrange
-        UserContextStorage.UserId = UserId;
-        UserContextStorage.IsSysAdmin = true;
-
-        var expected = new List<PermissionResponseDto>();
-
-        _mockTagBusiness
-            .Setup(b => b.RemovePermissionFromTag(TagId, PermissionId, OrgId, null))
-            .ReturnsAsync(true);
-
-        // Act
-        var actionResult = await _TagOrganizationController.RemovePermissionFromTag(
-            OrgId,
-            TagId,
-            PermissionId);
-
-        // Assert
-        _mockTagBusiness.Verify(
-            b => b.RemovePermissionFromTag(TagId, PermissionId, OrgId, null),
-            Times.Once);
-    }
-
-    [Fact]
-    public void RemovePermissionFromTag_HasHttpDelete()
-    {
-        var method = GetControllerMethod(
-            nameof(TagOrganizationController.RemovePermissionFromTag),
-            "organizationId",
-            "TagId",
-            "permissionId");
-
-        AssertHasHttpAttribute(method, nameof(HttpDeleteAttribute));
-    }
-
-    #endregion
-
-    // =========================================================================
-    // SetPermissionsForTag Tests
-    // =========================================================================
-
-    #region SetPermissionsForTag Tests
-
-    [Fact]
-    public async Task SetPermissionsForTag_Returns200_WithPermission()
-    {
-        // Arrange
-        var expectedMessage = $"Set permissions for Tag {TagId}";
-
-        _mockTagBusiness
-            .Setup(b => b.SetPermissionsForTag(TagId, PermissionList, OrgId, null))
-            .ReturnsAsync(true);
-
-        // Act
-        var actionResult = await _TagOrganizationController.SetPermissionsForTag(
-            OrgId,
-            TagId,
-            PermissionList);
-
-        // Assert
-        var result = Assert.IsType<OkObjectResult>(actionResult);
-
-        Assert.Equal(StatusCodes.Status200OK, result.StatusCode);
-        Assert.NotNull(result.Value);
-
-        var messageProperty = result.Value.GetType().GetProperty("message");
-        Assert.NotNull(messageProperty);
-
-        var actualMessage = messageProperty.GetValue(result.Value) as string;
-        Assert.Equal(expectedMessage, actualMessage);
-    }
-
-    [Fact]
-    public async Task SetPermissionsForTag_Returns200_WithEmptyList()
-    {
-        // Arrange
-
-        _mockTagBusiness
-            .Setup(b => b.SetPermissionsForTag(TagId, PermissionList, OrgId, null))
-            .ReturnsAsync(true);
-
-        // Act
-        var actionResult = await _TagOrganizationController.SetPermissionsForTag(
-            OrgId,
-            TagId,
-            PermissionList);
-
-        // Assert
-        var result = Assert.IsType<OkObjectResult>(actionResult);
-
-        Assert.Equal(StatusCodes.Status200OK, result.StatusCode);
-        Assert.NotNull(result.Value);
-
-        var messageProperty = result.Value.GetType().GetProperty("message");
-        Assert.NotNull(messageProperty);
-
-        var actualMessage = messageProperty.GetValue(result.Value) as string;
-    }
-
-    [Fact]
-    public async Task SetPermissionsForTag_Returns500_OnUnexpectedException()
-    {
-        // Arrange
-        _mockTagBusiness
-            .Setup(b => b.SetPermissionsForTag(TagId, PermissionList, OrgId, null))
-            .ThrowsAsync(new Exception("db error"));
-
-        // Act
-        var actionResult = await _TagOrganizationController.SetPermissionsForTag(
-            OrgId,
-            TagId,
-            PermissionList);
-
-        // Assert
-        var result = Assert.IsType<ObjectResult>(actionResult);
-
-        Assert.NotNull(result);
-        Assert.Equal(500, result.StatusCode);
-    }
-
-    [Fact]
-    public async Task SetPermissionsForTag_PassesToBusinessLayer()
-    {
-        // Arrange
-        UserContextStorage.UserId = UserId;
-        UserContextStorage.IsSysAdmin = true;
-
-        var expected = new List<PermissionResponseDto>();
-
-        _mockTagBusiness
-            .Setup(b => b.SetPermissionsForTag(TagId, PermissionList, OrgId, null))
-            .ReturnsAsync(true);
-
-        // Act
-        var actionResult = await _TagOrganizationController.SetPermissionsForTag(
-            OrgId,
-            TagId,
-            PermissionList);
-
-        // Assert
-        _mockTagBusiness.Verify(
-            b => b.SetPermissionsForTag(TagId, PermissionList, OrgId, null),
-            Times.Once);
-    }
-
-    [Fact]
-    public void SetPermissionsForTag_HasHttpPut()
-    {
-        var method = GetControllerMethod(
-            nameof(TagOrganizationController.SetPermissionsForTag),
-            "organizationId",
-            "TagId",
-            "permissionIds");
-
-        AssertHasHttpAttribute(method, nameof(HttpPutAttribute));
-    }
-
-    #endregion
 
     // =========================================================================
     // Test Helpers
