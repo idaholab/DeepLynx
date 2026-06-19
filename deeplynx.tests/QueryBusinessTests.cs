@@ -24,6 +24,7 @@ public class QueryBusinessTests : IntegrationTestBase
     private INotificationBusiness _notificationBusiness = null!;
     private QueryBusiness _queryBusiness = null!;
     private RecordBusiness _recordBusiness;
+    private UserBusiness _userBusiness = null!;
     private SensitivityLabelBusiness _sensitivityLabelBusiness;
     private ISensitivityLabelService _sensitivityLabelService = null!;
     private TagBusiness _tagBusiness = null!;
@@ -57,7 +58,8 @@ public class QueryBusinessTests : IntegrationTestBase
             new NotificationBusiness(Context, _mockNotificationLogger.Object, _mockHubContext.Object);
         _mockBulkCopyUpsertExecutor = new BulkCopyUpsertExecutor();
         _eventBusiness = new EventBusiness(Context, _notificationBusiness, _mockBulkCopyUpsertExecutor);
-        _sensitivityLabelBusiness = new SensitivityLabelBusiness(Context, _eventBusiness);
+        _userBusiness = new UserBusiness(Context);
+        _sensitivityLabelBusiness = new SensitivityLabelBusiness(Context, _eventBusiness, _userBusiness);
         _tagBusiness = new TagBusiness(Context, _eventBusiness);
         _recordBusiness = new RecordBusiness(Context, _eventBusiness, _mockBulkCopyUpsertExecutor, _tagBusiness,
             _sensitivityLabelBusiness, _sensitivityLabelService);
@@ -3744,6 +3746,154 @@ public class QueryBusinessTests : IntegrationTestBase
         // Assert
         Assert.Contains(result.Items, r => r.Name == "Captain Rex");
         Assert.Equal(5, result.Items.Count());
+    }
+
+    #endregion
+
+    #region URI Accessibility Tests
+
+    [Fact]
+    public async Task GetRecordsPaginated_UriExposed_WhenRecordHasNoLabels()
+    {
+        // Arrange - Captain Rex has no labels attached
+
+        // Act
+        var result = await _queryBusiness.GetRecordsPaginated(uid, organizationId, SortRecordsRequestDto.NameAZ,
+            new PaginatedRequestDto { PageNumber = 1, PageSize = 10 }, [pid]);
+
+        var rex = result.Items.FirstOrDefault(r => r.Name == "Captain Rex");
+
+        // Assert
+        Assert.NotNull(rex);
+        Assert.NotNull(rex.Uri);
+    }
+
+    [Fact]
+    public async Task GetRecordsPaginated_UriHidden_WhenUserLacksDownloadPermissionForLabel()
+    {
+        // Arrange - attach a label with no download permission granted to user
+        var labelDto = new CreateSensitivityLabelRequestDto
+        {
+            Name = "Download Restricted",
+            Description = "Label with no download permission"
+        };
+        var label = await _sensitivityLabelBusiness.CreateSensitivityLabel(uid, labelDto, pid, organizationId);
+        Context.ChangeTracker.Clear();
+
+        // Grant only write (to attach) and read — but NOT download file
+        var writePermission = await Context.Permissions.AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "write record");
+        var readPermission = await Context.Permissions.AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "read record");
+
+        var role = await Context.Roles.Include(r => r.Permissions)
+            .FirstOrDefaultAsync(r => r.Id == roleId);
+
+        if (role != null && writePermission != null && readPermission != null)
+        {
+            role.Permissions.Add(writePermission);
+            role.Permissions.Add(readPermission);
+            await Context.SaveChangesAsync();
+        }
+
+        Context.ChangeTracker.Clear();
+        await _recordBusiness.AttachLabel(uid, organizationId, pid, rid, label.Id);
+        Context.ChangeTracker.Clear();
+
+        // Act
+        var result = await _queryBusiness.GetRecordsPaginated(uid, organizationId, SortRecordsRequestDto.NameAZ,
+            new PaginatedRequestDto { PageNumber = 1, PageSize = 10 }, [pid],
+            isSysAdmin: false, isOrgAdmin: false, isProjectAdmin: false);
+
+        var rex = result.Items.FirstOrDefault(r => r.Name == "Captain Rex");
+
+        // Assert - record is visible (user has read) but URI is hidden (no download permission)
+        Assert.NotNull(rex);
+        Assert.Null(rex.Uri);
+    }
+
+    [Fact]
+    public async Task GetRecordsPaginated_UriExposed_WhenUserHasDownloadPermissionForLabel()
+    {
+        // Arrange
+        var labelDto = new CreateSensitivityLabelRequestDto
+        {
+            Name = "Download Allowed",
+            Description = "Label with download permission"
+        };
+        var label = await _sensitivityLabelBusiness.CreateSensitivityLabel(uid, labelDto, pid, organizationId);
+        Context.ChangeTracker.Clear();
+
+        var writePermission = await Context.Permissions.AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "write record");
+        var readPermission = await Context.Permissions.AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "read record");
+        var downloadPermission = await Context.Permissions.AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "download file");
+
+        var role = await Context.Roles.Include(r => r.Permissions)
+            .FirstOrDefaultAsync(r => r.Id == roleId);
+
+        if (role != null && writePermission != null && readPermission != null && downloadPermission != null)
+        {
+            role.Permissions.Add(writePermission);
+            role.Permissions.Add(readPermission);
+            role.Permissions.Add(downloadPermission);
+            await Context.SaveChangesAsync();
+        }
+
+        Context.ChangeTracker.Clear();
+        await _recordBusiness.AttachLabel(uid, organizationId, pid, rid, label.Id);
+        Context.ChangeTracker.Clear();
+
+        // Act
+        var result = await _queryBusiness.GetRecordsPaginated(uid, organizationId, SortRecordsRequestDto.NameAZ,
+            new PaginatedRequestDto { PageNumber = 1, PageSize = 10 }, [pid]);
+
+        var rex = result.Items.FirstOrDefault(r => r.Name == "Captain Rex");
+
+        // Assert
+        Assert.NotNull(rex);
+        Assert.NotNull(rex.Uri);
+    }
+
+    [Fact]
+    public async Task GetRecordsPaginated_UriExposed_ForSysAdminRegardlessOfLabels()
+    {
+        // Arrange - attach a label with no download permission
+        var labelDto = new CreateSensitivityLabelRequestDto
+        {
+            Name = "Top Secret URI",
+            Description = "Label blocking URI"
+        };
+        var label = await _sensitivityLabelBusiness.CreateSensitivityLabel(uid, labelDto, pid, organizationId);
+        Context.ChangeTracker.Clear();
+
+        var writePermission = await Context.Permissions.AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "write record");
+
+        var role = await Context.Roles.Include(r => r.Permissions)
+            .FirstOrDefaultAsync(r => r.Id == roleId);
+
+        if (role != null && writePermission != null)
+        {
+            role.Permissions.Add(writePermission);
+            await Context.SaveChangesAsync();
+        }
+
+        Context.ChangeTracker.Clear();
+        await _recordBusiness.AttachLabel(uid, organizationId, pid, rid, label.Id);
+        Context.ChangeTracker.Clear();
+
+        // Act
+        var result = await _queryBusiness.GetRecordsPaginated(uid, organizationId, SortRecordsRequestDto.NameAZ,
+            new PaginatedRequestDto { PageNumber = 1, PageSize = 10 }, [pid], isSysAdmin: true);
+
+        var rex = result.Items.FirstOrDefault(r => r.Name == "Captain Rex");
+
+        // Assert - SysAdmin always sees URI
+        Assert.NotNull(rex);
+        Assert.NotNull(rex.Uri);
     }
 
     #endregion
