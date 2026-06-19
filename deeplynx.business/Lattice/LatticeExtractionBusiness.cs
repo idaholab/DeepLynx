@@ -212,10 +212,10 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
             await using var transaction = await _latticeContext.Database.BeginTransactionAsync();
             try
             {
-                var classes = await StageClasses(extraction.Id, allClassTypes, classSimilarities, organizationId, projectId, mode);
-                var records = await StageRecords(extraction.Id, dedupedRecords, classSimilarities, ontologyPatterns, classes, organizationId, projectId, dataSourceId, mode);
+                var classes = await StageClasses(extraction.Id, allClassTypes, classSimilarities, organizationId, projectId);
+                var records = await StageRecords(extraction.Id, dedupedRecords, classSimilarities, ontologyPatterns, classes, organizationId, projectId, dataSourceId);
                 var relationships = await StageRelationships(extraction.Id, dedupedEdges, classSimilarities, relSimilarities, ontologyPatterns, classes, organizationId, projectId, mode);
-                var edgeCount = await StageEdges(extraction.Id, dedupedEdges, relSimilarities, ontologyPatterns, records, relationships, organizationId, projectId, dataSourceId, mode);
+                var edgeCount = await StageEdges(extraction.Id, dedupedEdges, relSimilarities, ontologyPatterns, records, relationships, organizationId, projectId, dataSourceId);
                 
                 await transaction.CommitAsync();
 
