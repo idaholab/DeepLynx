@@ -60,10 +60,14 @@ export default async function Page() {
       // Fallback to org ID 1
       organizationId = 1;
     }
+    if (!organizationId) {
+      console.log("Enter redirect at line 65");
+      redirect("/select-org");
+    }
   }
 
   // If still no org (shouldn't happen), redirect
-  if (!organizationId) {
+  if (!organizationId && !isAuthDisabled) {
     redirect("/select-org");
   }
 
