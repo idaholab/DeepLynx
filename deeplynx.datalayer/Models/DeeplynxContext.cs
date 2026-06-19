@@ -33,6 +33,8 @@ public partial class DeeplynxContext : DbContext
 
     public virtual DbSet<HistoricalRecord> HistoricalRecords { get; set; }
 
+    public virtual DbSet<IngestionProvenanceRecord> IngestionProvenanceRecords { get; set; }
+
     public virtual DbSet<OauthApplication> OauthApplications { get; set; }
 
     public virtual DbSet<OauthToken> OauthTokens { get; set; }
@@ -1498,6 +1500,43 @@ public partial class DeeplynxContext : DbContext
                 .HasForeignKey(d => d.RecordId)
                 .OnDelete(DeleteBehavior.Cascade)
                 .HasConstraintName("embeddings_record_id_fkey");
+        });
+
+        modelBuilder.Entity<IngestionProvenanceRecord>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("ingestion_provenance_records_pkey");
+
+            entity.HasIndex(e => e.Id)
+                .HasDatabaseName("idx_ingestion_provenance_records_id");
+
+            entity.HasIndex(e => e.RecordId)
+                .HasDatabaseName("idx_ingestion_provenance_records_record_id");
+
+            entity.HasIndex(e => e.ArtifactVersionId)
+                .HasDatabaseName("idx_ingestion_provenance_records_artifact_version_id")
+                .IsUnique();
+
+            entity.HasIndex(e => e.ProvId)
+                .HasDatabaseName("idx_ingestion_provenance_records_prov_id")
+                .IsUnique();
+
+            entity.HasIndex(e => e.ContentHash)
+                .HasDatabaseName("idx_ingestion_provenance_records_content_hash");
+
+            entity.Property(e => e.Id).UseIdentityAlwaysColumn();
+            entity.Property(e => e.ArtifactVersionId).IsRequired();
+            entity.Property(e => e.PipelineRunId).IsRequired();
+            entity.Property(e => e.ProvId).IsRequired();
+            entity.Property(e => e.ContentHash).HasMaxLength(64).IsRequired();
+            entity.Property(e => e.ProvenanceJson).HasColumnType("jsonb").IsRequired();
+            entity.Property(e => e.SignedPayloadHash).HasMaxLength(64);
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+            entity.HasOne(d => d.Record)
+                .WithMany()
+                .HasForeignKey(d => d.RecordId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("ingestion_provenance_records_record_id_fkey");
         });
 
         modelBuilder.Entity<OntologyVector>(entity =>
