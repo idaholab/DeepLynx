@@ -34,7 +34,6 @@ public class ExtractionClass
     [Column("ontology_class_id")]
     public long? OntologyClassId { get; set; }
 
-    /// <summary>Set when a reviewer rejects this staged item; rejected items are never promoted.</summary>
     [Column("rejected")]
     public bool Rejected { get; set; }
 
