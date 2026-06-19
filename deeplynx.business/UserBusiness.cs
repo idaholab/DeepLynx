@@ -166,13 +166,12 @@ public class UserBusiness : IUserBusiness
         // TODO: adjusting is_sys_admin is currently disabled. Enable once route permission protections are in place
 
         // if not specified accounts will always be human
-        var isServiceAccount = dto.IsServiceAccount ?? false;
         var isAdmin = isSysAdmin || isOrgAdmin || isProjectAdmin;
 
         var username = dto.Username;
         var email = dto.Email;
 
-        if (!isServiceAccount)
+        if (dto.AccountType != AccountType.ServiceAccount)
         {
             // require email for human accounts
             if (email is null)
@@ -210,7 +209,7 @@ public class UserBusiness : IUserBusiness
             Username = username,
             IsActive = dto.IsActive ?? false,
             IsArchived = dto.IsArchived ?? false,
-            IsServiceAccount = isServiceAccount,
+            AccountType = dto.AccountType
         };
 
         _context.Users.Add(user);
@@ -222,7 +221,7 @@ public class UserBusiness : IUserBusiness
             Name = user.Name,
             Username = user.Username,
             Email = user.Email,
-            IsServiceAccount = user.IsServiceAccount,
+            AccountType = user.AccountType,
             IsSysAdmin = user.IsSysAdmin,
             IsArchived = user.IsArchived,
             IsActive = user.IsActive,
@@ -416,7 +415,7 @@ public class UserBusiness : IUserBusiness
             Name = user.Name,
             Email = user.Email,
             Username = user.Username,
-            IsServiceAccount = user.IsServiceAccount,
+            AccountType = user.AccountType,
             IsSysAdmin = user.IsSysAdmin,
             IsArchived = user.IsArchived,
             IsActive = user.IsActive,

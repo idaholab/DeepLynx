@@ -8,6 +8,9 @@ public class CreateUserRequestDto
     public bool? IsArchived { get; set; } = false;
     public bool? IsActive { get; set; } = false;
 
-    /// <summary>Whether to create a service account. Defaults to a human account when not specified.</summary>
-    public bool? IsServiceAccount { get; set; } = false;
+    /// <summary>
+    /// The type of account to create. Defaults to standard.
+    /// Valid values: "standard", "service", "test"
+    /// </summary>
+    public string AccountType { get; set; } = models.AccountType.Standard;
 }
