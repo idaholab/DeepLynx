@@ -314,7 +314,7 @@ public class GroupBusiness : IGroupBusiness
 
         // Service accounts are scoped to the project they are added to and never participate in
         // groups, which span projects and carry their own project memberships.
-        if (user.IsServiceAccount)
+        if (user.AccountType == AccountType.Service)
             throw new InvalidOperationException("Service accounts cannot be added to a group.");
 
         group.Users.Add(user);

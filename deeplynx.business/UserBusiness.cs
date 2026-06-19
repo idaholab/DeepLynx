@@ -1,3 +1,4 @@
+using deeplynx.datalayer.Migrations;
 using deeplynx.datalayer.Models;
 using deeplynx.interfaces;
 using deeplynx.models;
@@ -33,7 +34,7 @@ public class UserBusiness : IUserBusiness
         ? _context.Users.AsQueryable()
         : _context.Users.Where(p => !p.IsArchived);
 
-        if (!includeServiceAccounts) users = users.Where(u => u.AccountType == AccountType.Service);
+        if (!includeServiceAccounts) users = users.Where(u => u.AccountType != AccountType.Service);
 
         if (projectId != null)
             users = users.Where(u =>
@@ -165,20 +166,41 @@ public class UserBusiness : IUserBusiness
     /// <returns>The new user which was just created.</returns>
     public async Task<UserResponseDto> CreateUser(CreateUserRequestDto dto)
     {
-        // require email for human accounts
-        if (dto.Email is null)
-            throw new ArgumentException("Email is required for standard accounts");
+        // Service users can only be created in the project level. See Invitation Business "CreateAndAddServiceAccountToProject"
+        if (dto.AccountType == AccountType.Service)
+            throw new InvalidOperationException("Service Accounts can only be created per project");
 
-        // verify email is unique only with human accounts
-        var otherUserHasEmail = await _context.Users.AnyAsync(u => u.Email.ToLower() == dto.Email.ToLower());
-        if (otherUserHasEmail)
-            throw new ArgumentException("User with email already exists");
+        var username = dto.Username;
+        var name = dto.Name; // Note: Names can be changed, usernames cannot
+        var email = dto.Email;
+
+        // Email enforcement with standard accounts
+        if (dto.AccountType == AccountType.Standard)
+        {
+            // require email for standard accounts
+            if (dto.Email is null)
+                throw new ArgumentException("Email is required for standard accounts");
+
+            // verify email is unique only with standard accounts
+            var otherUserHasEmail = await _context.Users.AnyAsync(u => u.Email.ToLower() == dto.Email.ToLower());
+            if (otherUserHasEmail)
+                throw new ArgumentException("User with email already exists");
+        }
+
+        // Test and Service accounts do not need email or username in the request
+        if (dto.AccountType == AccountType.Test)
+        {
+            // the "Name" property of a user can be changed. Unique identifier is used for username and email.
+            var identifier = $"{dto.AccountType}_{Guid.NewGuid()}";
+            username = identifier;
+            email = identifier;
+        }
 
         var user = new User
         {
             Name = dto.Name,
-            Email = dto.Email,
-            Username = dto.Username,
+            Email = email!,
+            Username = username,
             IsActive = dto.IsActive ?? false,
             IsArchived = dto.IsArchived ?? false,
             AccountType = dto.AccountType
@@ -482,7 +504,7 @@ public class UserBusiness : IUserBusiness
                 IsOrgAdmin = organizationId != null
                     ? u.OrganizationUsers.Any(ou => ou.OrganizationId == organizationId && ou.IsOrgAdmin)
                     : null,
-                IsServiceAccount = u.IsServiceAccount,
+                AccountType = u.AccountType,
                 IsArchived = u.IsArchived,
                 IsActive = u.IsActive,
                 LastLogin = u.LastLogin
@@ -503,7 +525,7 @@ public class UserBusiness : IUserBusiness
     {
         var users = _context.Users.Where(u => !u.IsArchived && u.IsActive);
 
-        if (!includeServiceAccounts) users = users.Where(u => u.IsServiceAccount == false);
+        if (!includeServiceAccounts) users = users.Where(u => u.AccountType != AccountType.Service);
 
         if (projectId != null)
             users = users.Where(u =>

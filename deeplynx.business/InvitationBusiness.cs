@@ -73,7 +73,7 @@ public class InvitationBusiness : IInvitationBusiness
             var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId);
             if (user == null) throw new ArgumentException($"User with id '{userId}' not found.");
 
-            if (user.IsServiceAccount)
+            if (user.AccountType == AccountType.Service)
             {
                 throw new InvalidOperationException("Cannot add user: Service accounts are prohibited, standard user accounts only");
             }
@@ -94,7 +94,7 @@ public class InvitationBusiness : IInvitationBusiness
 
             if (user != null)
             {
-                if (user.IsServiceAccount)
+                if (user.AccountType == AccountType.Service)
                 {
                     throw new InvalidOperationException("Cannot add user: Service accounts are prohibited, standard user accounts only");
                 }
@@ -201,7 +201,7 @@ public class InvitationBusiness : IInvitationBusiness
             Name = name,
             Email = email,
             Username = username,
-            IsServiceAccount = true
+            AccountType = AccountType.Service
         };
 
         // Create Service Account

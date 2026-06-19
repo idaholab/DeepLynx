@@ -223,7 +223,7 @@ public class TokenBusiness : ITokenBusiness
             throw new KeyNotFoundException($"User with id {currentUserId} not found");
         }
 
-        if (user.IsServiceAccount)
+        if (user.AccountType == AccountType.Service)
             throw new InvalidOperationException("Service accounts cannot perform this action");
 
         // Look up application by ClientId if provided

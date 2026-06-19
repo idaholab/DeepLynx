@@ -451,7 +451,8 @@ public class UserBusinessTests : IntegrationTestBase
             DataSourceId = dsid4,
             ClassId = cid,
             LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
-            Uri = "localhost:8090/record6", OrganizationId = oid
+            Uri = "localhost:8090/record6",
+            OrganizationId = oid
         };
 
         Context.Records.AddRange(record1, record2, record3, record4, record5, record6, archivedRecord);
@@ -743,7 +744,7 @@ public class UserBusinessTests : IntegrationTestBase
             UserId = nonAdminUid
         };
         Context.ProjectMembers.AddRange(
-            directMember1, directMember2, groupMember, 
+            directMember1, directMember2, groupMember,
             regularMember1, regularMember2);
         await Context.SaveChangesAsync();
     }
@@ -851,123 +852,6 @@ public class UserBusinessTests : IntegrationTestBase
             () => _userBusiness.CreateUser(dto));
 
         Assert.Contains("Email is required for human accounts", exception.Message);
-    }
-
-    // -- Service account tests --
-
-    [Fact]
-    public async Task CreateUser_Succeeds_ServiceAccount_AsOrgAdmin()
-    {
-        // Arrange
-        var dto = new CreateUserRequestDto
-        {
-            Name = "CI Bot",
-            AccountType = "service"
-        };
-
-        // Act
-        var result = await _userBusiness.CreateUser(dto, isOrgAdmin: true);
-
-        // Assert — admin-provided Name is kept; username/email are generated as service_<guid>
-        Assert.NotNull(result);
-        Assert.Equal("CI Bot", result.Name);
-        Assert.Equal("service", result.AccountType);
-        Assert.StartsWith("service_", result.Username);
-        Assert.StartsWith("service_", result.Email);
-        Assert.Equal(result.Username, result.Email);
-    }
-
-    [Fact]
-    public async Task CreateUser_Succeeds_ServiceAccount_AsProjectAdmin()
-    {
-        // Arrange
-        var dto = new CreateUserRequestDto
-        {
-            Name = "Deploy Bot",
-            AccountType = "service"
-        };
-
-        // Act
-        var result = await _userBusiness.CreateUser(dto, isProjectAdmin: true);
-
-        // Assert
-        Assert.NotNull(result);
-        Assert.Equal("service", result.AccountType);
-    }
-
-    [Fact]
-    public async Task CreateUser_Fails_ServiceAccount_IfNotAdmin()
-    {
-        // Arrange
-        var dto = new CreateUserRequestDto
-        {
-            Name = "Unauthorized Bot",
-            AccountType = "service"
-        };
-
-        // Act & Assert
-        var exception = await Assert.ThrowsAsync<UnauthorizedAccessException>(
-            () => _userBusiness.CreateUser(dto));
-
-        Assert.Contains("Only Admins can create service accounts", exception.Message);
-    }
-
-    [Fact]
-    public async Task CreateUser_Succeeds_ServiceAccount_WithDuplicateName_GeneratesUniqueIdentifier()
-    {
-        // Arrange — service account Names need not be unique; uniqueness comes from the
-        // generated service_<guid> username/email. Create two with the same Name.
-        var dto = new CreateUserRequestDto
-        {
-            Name = "Shared Bot Name",
-            AccountType = "service"
-        };
-
-        // Act
-        var first = await _userBusiness.CreateUser(dto, isOrgAdmin: true);
-        var second = await _userBusiness.CreateUser(dto, isOrgAdmin: true);
-
-        // Assert — same Name, distinct generated identifiers
-        Assert.Equal("Shared Bot Name", first.Name);
-        Assert.Equal("Shared Bot Name", second.Name);
-        Assert.NotEqual(first.Username, second.Username);
-        Assert.NotEqual(first.Email, second.Email);
-    }
-
-    [Fact]
-    public async Task CreateUser_Fails_ServiceAccount_IfEmailProvided()
-    {
-        // Arrange — service accounts generate their own email; a caller-supplied one is rejected
-        var dto = new CreateUserRequestDto
-        {
-            Name = "Bot With Email",
-            AccountType = "service",
-            Email = "bot@test.com"
-        };
-
-        // Act & Assert
-        var exception = await Assert.ThrowsAsync<ArgumentException>(
-            () => _userBusiness.CreateUser(dto, isOrgAdmin: true));
-
-        Assert.Contains("Service accounts cannot be assigned an email or username", exception.Message);
-    }
-
-    [Fact]
-    public async Task CreateUser_Fails_ServiceAccount_IfUsernameProvided()
-    {
-        // Arrange — service accounts generate their own username; a caller-supplied one is rejected
-        var dto = new CreateUserRequestDto
-        {
-            Name = "Bot With Username",
-            AccountType = "service",
-            Username = "botuser"
-        };
-
-        // Act & Assert
-        var exception = await Assert.ThrowsAsync<ArgumentException>(
-            () => _userBusiness.CreateUser(dto, isOrgAdmin: true));
-
-        Assert.Contains("Service accounts cannot be assigned an email or username", exception.Message);
     }
 
     #endregion
@@ -1159,8 +1043,8 @@ public class UserBusinessTests : IntegrationTestBase
         var users = result.ToList();
 
         // Assert
-        Assert.Equal(10, users.Count); 
-        Assert.Contains(users, u => u.Id == uid2); 
+        Assert.Equal(10, users.Count);
+        Assert.Contains(users, u => u.Id == uid2);
         Assert.DoesNotContain(users, u => u.Id == uid3);
     }
 
@@ -1190,7 +1074,7 @@ public class UserBusinessTests : IntegrationTestBase
 
         // Assert
         Assert.DoesNotContain(users, u => u.Id == serviceAccountId);
-        Assert.All(users, u => Assert.False(u.IsServiceAccount));
+        Assert.All(users, u => Assert.Equal(AccountType.Service, u.AccountType));
     }
 
     [Fact]
@@ -1204,7 +1088,7 @@ public class UserBusinessTests : IntegrationTestBase
         var users = result.ToList();
 
         // Assert
-        Assert.Contains(users, u => u.Id == serviceAccountId && u.IsServiceAccount);
+        Assert.Contains(users, u => u.Id == serviceAccountId && (u.AccountType == AccountType.Service));
     }
 
     [Fact]
@@ -1237,7 +1121,7 @@ public class UserBusinessTests : IntegrationTestBase
 
         // Assert
         Assert.DoesNotContain(defaultActivity.Users, u => u.Id == serviceAccountId);
-        Assert.Contains(withServiceAccounts.Users, u => u.Id == serviceAccountId && u.IsServiceAccount);
+        Assert.Contains(withServiceAccounts.Users, u => u.Id == serviceAccountId && (u.AccountType == AccountType.Service));
     }
 
     private async Task<long> CreateServiceAccount(bool isActive = false, DateTime? lastLogin = null)
@@ -1247,7 +1131,7 @@ public class UserBusinessTests : IntegrationTestBase
             Name = "Service Account",
             Email = $"service_{Guid.NewGuid()}",
             Username = $"service_{Guid.NewGuid()}",
-            IsServiceAccount = true,
+            AccountType = AccountType.Service,
             IsActive = isActive,
             LastLogin = lastLogin
         };
@@ -1486,8 +1370,8 @@ public class UserBusinessTests : IntegrationTestBase
     {
         // Act - SysAdmin user with all admin privileges
         var adminResult = await _userBusiness.GetUserAdminInfo(
-            adminUid, 
-            adminOrgId, 
+            adminUid,
+            adminOrgId,
             directAdminPid);
 
         // Assert
@@ -1499,8 +1383,8 @@ public class UserBusinessTests : IntegrationTestBase
 
         // Act - Regular user with org and project admin privileges
         var regularResult = await _userBusiness.GetUserAdminInfo(
-            nonAdminUid, 
-            adminOrgId, 
+            nonAdminUid,
+            adminOrgId,
             directAdminPid);
 
         // Assert
@@ -1516,8 +1400,8 @@ public class UserBusinessTests : IntegrationTestBase
     {
         // Act - SysAdmin user with mixed permissions (sys admin, org admin, not project admin)
         var result1 = await _userBusiness.GetUserAdminInfo(
-            adminUid, 
-            adminOrgId, 
+            adminUid,
+            adminOrgId,
             nonAdminPid);
 
         // Assert
@@ -1528,8 +1412,8 @@ public class UserBusinessTests : IntegrationTestBase
 
         // Act - Regular user with mixed permissions (not sys admin, not org admin, is project admin via group)
         var result2 = await _userBusiness.GetUserAdminInfo(
-            nonAdminUid, 
-            nonAdminOrgId, 
+            nonAdminUid,
+            nonAdminOrgId,
             groupAdminPid);
 
         // Assert
@@ -1883,7 +1767,7 @@ public class UserBusinessTests : IntegrationTestBase
         Assert.Equal(0, result.Records);
         Assert.Equal(0, result.Tags);
     }
-    
+
     [Fact]
     public async Task GetUserOverview_Fails_WhenUserDoesNotExist()
     {
