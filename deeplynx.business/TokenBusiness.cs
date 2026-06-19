@@ -52,7 +52,7 @@ public class TokenBusiness : ITokenBusiness
         {
             var oauthApp = await _context.OauthApplications
                 .FirstOrDefaultAsync(app => app.Id == apiKeyRecord.ApplicationId.Value && !app.IsArchived);
-        
+
             if (oauthApp == null)
             {
                 throw new InvalidOperationException(
@@ -190,13 +190,13 @@ public class TokenBusiness : ITokenBusiness
     /// <exception cref="KeyNotFoundException"></exception>
     public async Task<ApiKey> GetApiKey(string key)
     {
-            var apiKey = await _context.ApiKeys.FirstOrDefaultAsync(k => k.Key == key);
-            if (apiKey == null)
-            {
-                throw new KeyNotFoundException($"Api Keypair with key {apiKey} not found");
-            }
-            
-            return apiKey;
+        var apiKey = await _context.ApiKeys.FirstOrDefaultAsync(k => k.Key == key);
+        if (apiKey == null)
+        {
+            throw new KeyNotFoundException($"Api Keypair with key {apiKey} not found");
+        }
+
+        return apiKey;
     }
 
     /// <summary>
@@ -204,9 +204,10 @@ public class TokenBusiness : ITokenBusiness
     /// </summary>
     /// <param name="currentUserId">The ID of the requesting user</param>
     /// <param name="clientId">(optional) the client ID of the oauth application requesting</param>
+    /// <param name="createdByUserId">(optional) the client ID of the oauth application requesting</param>
     /// <returns></returns>
     /// <exception cref="KeyNotFoundException">Returned if user or application not found</exception>
-    public async Task<TokenResponseDto> CreateApiKey(long currentUserId, string? clientId = null)
+    public async Task<TokenResponseDto> CreateApiKey(long currentUserId, string? clientId = null, long? createdByUserId = null)
     {
         // Generate random key and secret
         string apiKey = KeyGenerator.GenerateKeyBase64();
@@ -222,19 +223,22 @@ public class TokenBusiness : ITokenBusiness
             throw new KeyNotFoundException($"User with id {currentUserId} not found");
         }
 
+        if (user.IsServiceAccount)
+            throw new InvalidOperationException("Service accounts cannot perform this action");
+
         // Look up application by ClientId if provided
         long? applicationId = null;
         if (!string.IsNullOrEmpty(clientId))
         {
             var oauthApp = await _context.OauthApplications
                 .FirstOrDefaultAsync(app => app.ClientId == clientId && !app.IsArchived);
-        
+
             if (oauthApp == null)
             {
                 throw new KeyNotFoundException(
                     $"OAuth application with ClientId '{clientId}' not found or has been archived.");
             }
-        
+
             applicationId = oauthApp.Id;
         }
 
@@ -244,7 +248,8 @@ public class TokenBusiness : ITokenBusiness
             Key = apiKey,
             UserId = user.Id,
             Secret = hashedSecret,
-            ApplicationId = applicationId
+            ApplicationId = applicationId,
+            CreatedBy = createdByUserId
         });
         await _context.SaveChangesAsync();
 
@@ -254,6 +259,19 @@ public class TokenBusiness : ITokenBusiness
             apiKey = apiKey,
             apiSecret = apiSecret
         };
+    }
+
+    /// <summary>
+    /// Admin only: Create a new api keypair for a given user
+    /// </summary>
+    /// <param name="currentUserId">The ID of the requesting user</param>
+    /// <param name="serviceAccountId">The ID of the service account</param>
+    public async Task<TokenResponseDto> GenerateServiceAccountApiKey(long currentUserId, long serviceAccountId)
+    {
+        // admin only 
+        TokenResponseDto key = await CreateApiKey(serviceAccountId, createdByUserId: currentUserId);
+
+        return key;
     }
 
     /// <summary>
