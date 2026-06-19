@@ -84,11 +84,12 @@ public class RecordBusiness : IRecordBusiness
             recordQuery = recordQuery.WithAuthorizedLabels(userAuthorizedLabels);
         }
 
-        var authorizedDownloadLabels = await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
+        var isUriAuthorized = await ExposeUriHelper.GetRecordUriExposer(
+            _sensitivityLabelService,
             currentUserId,
             organizationId,
-            projectId,
-            "download file");
+            [projectId],
+            isSysAdmin || isOrgAdmin || isProjectAdmin);
 
         var records = await recordQuery
             .Include(r => r.Tags)
@@ -99,12 +100,7 @@ public class RecordBusiness : IRecordBusiness
         {
             Id = r.Id,
             Description = r.Description,
-            Uri = ExposeUriHelper.CanExposeUri(
-                r,
-                authorizedDownloadLabels,
-                isSysAdmin,
-                isOrgAdmin,
-                isProjectAdmin)
+            Uri = isUriAuthorized(r)
                     ? r.Uri
                     : null,
             Properties = r.Properties,
@@ -165,11 +161,12 @@ public class RecordBusiness : IRecordBusiness
             recordQuery = recordQuery.WithAuthorizedLabels(userAuthorizedLabels);
         }
 
-        var authorizedDownloadLabels = await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
+        var isUriAuthorized = await ExposeUriHelper.GetRecordUriExposer(
+            _sensitivityLabelService,
             currentUserId,
             organizationId,
-            projectId,
-            "download file");
+            [projectId],
+            isSysAdmin || isOrgAdmin || isProjectAdmin);
 
         var records = await recordQuery
             .Include(r => r.Tags)
@@ -181,12 +178,7 @@ public class RecordBusiness : IRecordBusiness
             {
                 Id = r.Id,
                 Description = r.Description,
-                Uri = ExposeUriHelper.CanExposeUri(
-                    r,
-                    authorizedDownloadLabels,
-                    isSysAdmin,
-                    isOrgAdmin,
-                    isProjectAdmin)
+                Uri = isUriAuthorized(r)
                         ? r.Uri
                         : null,
                 Properties = r.Properties,
@@ -246,17 +238,18 @@ public class RecordBusiness : IRecordBusiness
 
         if (hideArchived && record.IsArchived) throw new KeyNotFoundException($"Record with id {recordId} is archived");
 
-        var authorizedDownloadLabels = await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
+        var isUriAuthorized = await ExposeUriHelper.GetRecordUriExposer(
+            _sensitivityLabelService,
             currentUserId,
             organizationId,
-            projectId,
-            "download file");
+            [projectId],
+            isSysAdmin || isOrgAdmin || isProjectAdmin);
 
         return new RecordResponseDto
         {
             Id = record.Id,
             Description = record.Description,
-            Uri = ExposeUriHelper.CanExposeUri(record, authorizedDownloadLabels, isSysAdmin, isOrgAdmin, isProjectAdmin)
+            Uri = isUriAuthorized(record)
                 ? record.Uri
                 : null,
             Properties = record.Properties,
@@ -762,22 +755,18 @@ public class RecordBusiness : IRecordBusiness
 
             await transaction.CommitAsync();
 
-            var authorizedDownloadLabels = await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
+            var isUriAuthorized = await ExposeUriHelper.GetRecordUriExposer(
+                _sensitivityLabelService,
                 currentUserId,
                 organizationId,
-                projectId,
-                "download file");
+                [projectId],
+                isSysAdmin || isOrgAdmin || isProjectAdmin);
 
             return new RecordResponseDto
             {
                 Id = record.Id,
                 Description = record.Description,
-                Uri = ExposeUriHelper.CanExposeUri(
-                    record,
-                    authorizedDownloadLabels,
-                    isSysAdmin,
-                    isOrgAdmin,
-                    isProjectAdmin)
+                Uri = isUriAuthorized(record)
                         ? record.Uri
                         : null,
                 Properties = record.Properties,
@@ -1420,22 +1409,18 @@ public class RecordBusiness : IRecordBusiness
             DataSourceId = returnedRecord.DataSourceId
         });
 
-        var authorizedDownloadLabels = await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
+        var isUriAuthorized = await ExposeUriHelper.GetRecordUriExposer(
+            _sensitivityLabelService,
             currentUserId,
             organizationId,
-            projectId,
-            "download file");
+            [projectId],
+            isSysAdmin || isOrgAdmin || isProjectAdmin);
 
         return new RecordResponseDto
         {
             Id = returnedRecord.Id,
             Description = returnedRecord.Description,
-            Uri = ExposeUriHelper.CanExposeUri(
-                returnedRecord,
-                authorizedDownloadLabels,
-                isSysAdmin,
-                isOrgAdmin,
-                isProjectAdmin)
+            Uri = isUriAuthorized(returnedRecord)
                     ? returnedRecord.Uri
                     : null,
             Properties = returnedRecord.Properties,
@@ -1558,23 +1543,19 @@ public class RecordBusiness : IRecordBusiness
             throw new KeyNotFoundException(
                 $"Records not found or access is unauthorized with original IDs: {string.Join(", ", missingOriginalIds)}");
 
-        var authorizedDownloadLabels = await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
+        var isUriAuthorized = await ExposeUriHelper.GetRecordUriExposer(
+            _sensitivityLabelService,
             currentUserId,
             organizationId,
-            projectId,
-            "download file");
+            [projectId],
+            isSysAdmin || isOrgAdmin || isProjectAdmin);
 
         // Convert to DTOs
         return existingRecords.Select(r => new RecordResponseDto
         {
             Id = r.Id,
             Description = r.Description,
-            Uri = ExposeUriHelper.CanExposeUri(
-                r,
-                authorizedDownloadLabels,
-                isSysAdmin,
-                isOrgAdmin,
-                isProjectAdmin)
+            Uri = isUriAuthorized(r)
                     ? r.Uri
                     : null,
             Properties = r.Properties,
