@@ -22,6 +22,7 @@ EXTRACTION RULES (STRICT MODE - Ontology Compliance):
 6. Assign confidence scores (0.0 to 1.0) based on extraction certainty
 7. DO NOT create new class types - use only the types listed above
 8. Apply to ANY domain: military operations, facilities, organizations, equipment, personnel, missions, etc.
+9. Each extracted class and relationship MUST include the record_id of the source chunk it was extracted from
 
 ATTRIBUTE EXTRACTION RULES:
 1. Attributes MUST be explicitly stated in the document text.
@@ -33,19 +34,23 @@ ATTRIBUTE EXTRACTION RULES:
 
 DOCUMENT TEXT:
 
+Each text chunk below is tagged with a [record_id: N] marker identifying its source document.
+You MUST include the corresponding record_id on every extracted class and relationship.
+If an entity appears across multiple chunks, use the record_id of the chunk where it is most clearly defined.
+
 {text}
 
 Return ONLY valid JSON (no markdown, no explanations):
 
 {
     "classes": [
-        {"class": "RAF Mildenhall", "class_type": "Air Force Base", "confidence": 0.95, "attributes": {"location": "United Kingdom", "unit": "100th Air Refueling Wing"}},
-        {"class": "100th Air Refueling Wing", "class_type": "Military Organization", "confidence": 0.92, "attributes": {"role": "air refueling", "commander": "Col. Johnny Galbert"}}
+        {"class": "RAF Mildenhall", "class_type": "Air Force Base", "confidence": 0.95, "record_id": 1, "attributes": {"location": "United Kingdom", "unit": "100th Air Refueling Wing"}},
+        {"class": "100th Air Refueling Wing", "class_type": "Military Organization", "confidence": 0.92, "record_id": 1, "attributes": {"role": "air refueling", "commander": "Col. Johnny Galbert"}}
     ],
     "relationships": [
         {"subject": "100th Air Refueling Wing", "subject_type": "Military Organization",
-        "relationship_type": "located at", "object": "RAF Mildenhall", "object_type": "Air Force Base", "confidence": 0.90}
+        "relationship_type": "located at", "object": "RAF Mildenhall", "object_type": "Air Force Base", "confidence": 0.90, "record_id": 1}
     ]
 }
 
-CRITICAL: Use EXACT class type names from the ontology schema. Be thorough - extract all relevant classes and relationships from the document.
+CRITICAL: Use EXACT class type names from the ontology schema. Be thorough - extract all relevant classes and relationships from the document. Every item MUST include the record_id from its source chunk.

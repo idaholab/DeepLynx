@@ -34,6 +34,7 @@ public class StagedRecordDto
     [JsonPropertyName("ensemble_score")] public double EnsembleScore { get; set; }
     [JsonPropertyName("frequency")] public int Frequency { get; set; }
     [JsonPropertyName("deeplynx_record_id")] public long? DeeplynxRecordId { get; set; }
+    [JsonPropertyName("source_record_id")] public long? SourceRecordId { get; set; }
     [JsonPropertyName("promoted_id")] public long? PromotedId { get; set; }
 }
 
@@ -57,5 +58,6 @@ public class StagedEdgeDto
     [JsonPropertyName("validation_status")] public string? ValidationStatus { get; set; }
     [JsonPropertyName("ensemble_score")] public double EnsembleScore { get; set; }
     [JsonPropertyName("frequency")] public int Frequency { get; set; }
+    [JsonPropertyName("source_record_id")] public long? SourceRecordId { get; set; }
     [JsonPropertyName("promoted_id")] public long? PromotedId { get; set; }
 }

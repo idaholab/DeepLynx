@@ -29,7 +29,8 @@ public class ExtractionValidation : IExtractionValidation
                     first.ClassType.Trim(),
                     g.Average(c => c.Confidence == 0 ? DefaultConfidence : c.Confidence),
                     MergeAttributes(g.Select(c => c.Attributes)),
-                    g.Count());
+                    g.Count(),
+                    first.RecordId);
             })
             .ToList();
 
@@ -48,7 +49,8 @@ public class ExtractionValidation : IExtractionValidation
                     first.Object.Trim(),
                     first.ObjectType.Trim(),
                     g.Average(r => r.Confidence == 0 ? DefaultConfidence : r.Confidence),
-                    g.Count());
+                    g.Count(),
+                    first.RecordId);
             })
             .ToList();
 

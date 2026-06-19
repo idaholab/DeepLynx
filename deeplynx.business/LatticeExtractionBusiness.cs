@@ -1129,13 +1129,12 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
             .Select(r =>
                 $"({r.RelationshipPattern!.OriginClassName}) -{r.RelationshipPattern.RelationshipName}-> ({r.RelationshipPattern.DestinationClassName})");
 
+        // Tag each text chunk with its source record_id
         var textChunks = results
             .Where(r => !string.IsNullOrEmpty(r.TextChunk))
             .DistinctBy(r => r.TextChunk)
-            .Select(r => r.TextChunk!);
+            .Select(r => $"[record_id: {recordId}]\n{r.TextChunk!}");
 
-        //TODO: context_block is graph context, 2 hops from record node
-        //TODO: {truncation} is for document text chunk truncation, necessary only if it exceeds a certain character limit. Plus the "...truncated" message to the LLM
         var values = new Dictionary<string, string>
         {
             ["class_list"] = string.Join("\n", classes),
@@ -1146,6 +1145,7 @@ public class LatticeExtractionBusiness : ILatticeExtractionBusiness
         var templateName = mode == ExtractionMode.Strict ? "lattice_strict.md" : "lattice_discovery.md";
         return LoadPrompt(templateName, values);
     }
+
 
     /// <summary>
     ///     Loads an embedded prompt template by file name (e.g., "lattice_strict.md") and substitutes

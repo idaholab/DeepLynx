@@ -61,6 +61,9 @@ public class ExtractionRecord
     [Column("deeplynx_record_id")]
     public long? DeeplynxRecordId { get; set; }
 
+    [Column("source_record_id")]
+    public long? SourceRecordId { get; set; }
+
     public virtual ExtractionClass? ExtractionClass { get; set; }
     public virtual ICollection<ExtractionEdge> OriginEdges { get; set; } = [];
     public virtual ICollection<ExtractionEdge> DestinationEdges { get; set; } = [];
