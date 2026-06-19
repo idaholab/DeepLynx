@@ -826,7 +826,7 @@ public class ProjectControllerTests : IDisposable
             "dto");
 
         AssertHasHttpAttribute(method, "HttpPostAttribute");
-        AssertHasAuthAttribute(method, "write", "project");
+        AssertHasAttribute(method, "OrgMemberAttribute");
         AssertDoesNotHaveSensitivityEnabledAuthAttribute(method);
     }
 
@@ -985,6 +985,14 @@ public class ProjectControllerTests : IDisposable
     }
 
     private static void AssertHasHttpAttribute(
+        System.Reflection.MethodInfo method,
+        string expectedAttributeName)
+    {
+        Assert.Contains(method.GetCustomAttributesData(), attribute =>
+            attribute.AttributeType.Name == expectedAttributeName);
+    }
+
+    private static void AssertHasAttribute(
         System.Reflection.MethodInfo method,
         string expectedAttributeName)
     {

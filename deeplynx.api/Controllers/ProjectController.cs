@@ -121,7 +121,7 @@ public class ProjectController : ControllerBase
     /// <param name="dto">A data transfer object with details on the new project to be created.</param>
     /// <returns>The new project which was just created.</returns>
     [HttpPost(Name = "api_create_a_project")]
-    [Auth("write", "project")]
+    [OrgMember]
     public async Task<ActionResult<ProjectResponseDto>> CreateProject(
         long organizationId,
         [FromBody] CreateProjectRequestDto dto)
