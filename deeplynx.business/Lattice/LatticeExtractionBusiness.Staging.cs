@@ -287,10 +287,10 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
             if (!instanceNameToRecordId.TryGetValue(edge.Object, out var destRecordId)) continue;
 
             relSimilarities.TryGetValue(edge.RelationshipType, out var relMatch);
-            var patternKey = $"{edge.SubjectType}|{edge.RelationshipType}|{edge.ObjectType}";
+            var patternKey = RelationshipPatternKey(edge.SubjectType, edge.RelationshipType, edge.ObjectType);
             relationshipKeyToId.TryGetValue(patternKey, out var relId);
             relValidationById.TryGetValue(relId, out var validationStatus);
-
+            
             var embeddingPlausibility = relMatch?.Score ?? 0.0;
             var statFreq = maxFrequency > 0 ? (double)edge.Frequency / maxFrequency : 0.0;
             var structuralConsistency = validationStatus == ExtractionValidationStatus.Valid ? 1.0 : 0.0;
