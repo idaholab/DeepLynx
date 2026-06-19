@@ -726,21 +726,6 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
 
         Assert.Contains(nonExistentPath, exception.Message);
     }
-
-    // [Fact]
-    // public async Task GetFileSize_ThrowsException_WhenMountPathIsNull()
-    // {
-    //     // Arrange
-    //     var config = new ObjectStorageConfigDto { MountPath = null };
-    //     var testFilePath = Path.Combine(_testDirectory, "test.txt");
-    //
-    //     // Act & Assert
-    //     var exception = await Assert.ThrowsAsync<Exception>(() =>
-    //         _fileBusiness.GetFileSize(testFilePath, config)
-    //     );
-    //
-    //     Assert.Contains("File system mount path not set", exception.Message);
-    // }
     
     [Fact]
     public async Task GetFileSize_ReturnsCorrectSize_WhenMountPathIsNull()

@@ -417,6 +417,8 @@ public class FileFilesystemBusiness : IFileBusiness
     /// <exception cref="FileNotFoundException"></exception>
     public async Task<long> GetFileSize(string fileUri, ObjectStorageConfigDto objectStorageConfig)
     {
+        // Kept for IFileBusiness interface compatability.
+        // Filesystem records store the full file path in the uri.
         _ = objectStorageConfig;
         
         if (string.IsNullOrWhiteSpace(fileUri))
