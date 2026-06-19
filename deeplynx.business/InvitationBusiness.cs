@@ -30,7 +30,8 @@ public class InvitationBusiness : IInvitationBusiness
 
     /// <summary>
     ///     Invites user and adds them to the organization and/or project. If the user exists,
-    ///     it will just add them to the org/project with no role.
+    ///     it will just add them to the org/project with no role. Standard User Accounts only. 
+    ///     Use the CreateAndAddServiceAccountToProject endpoint for service accounts
     /// </summary>
     /// <param name="organizationId"></param>
     /// <param name="projectId"></param>
@@ -39,8 +40,6 @@ public class InvitationBusiness : IInvitationBusiness
     /// <param name="userId"></param>
     /// <param name="userEmail"></param>
     /// <param name="callerIsAdmin">
-    ///     Whether the calling user is a sys/org/project admin. Required to add a service account to
-    ///     the hierarchy; non-admins are rejected when the target user is a service account.
     /// </param>
     /// <returns></returns>
     public async Task<bool> InviteAndAddUserToHierarchy(long organizationId, long? projectId, long? groupId,
@@ -76,22 +75,13 @@ public class InvitationBusiness : IInvitationBusiness
 
             if (user.IsServiceAccount)
             {
-                // Only admins may attach a service account, and only ever to a project - service
-                // accounts cannot be added at the organization level alone.
-                if (!callerIsAdmin)
-                    throw new UnauthorizedAccessException(
-                        "Unauthorized: Only admins can add service accounts to a project.");
-                if (projectId == null)
-                    throw new InvalidOperationException(
-                        "Service accounts must be added to a project and cannot be added at the organization level.");
+                throw new InvalidOperationException("Cannot add user: Service accounts are prohibited, standard user accounts only");
             }
 
             var wasAdded = await AddUserToHierarchyWithoutEmail(organizationId, projectId, roleId, user);
 
-            // Only send email if user was actually added to org/project. Service accounts have no
-            // real email (a generated placeholder) and never authenticate as people, so skip email
-            // entirely and just add them to the hierarchy.
-            if (wasAdded && !user.IsServiceAccount)
+            // Only send email if user was actually added to org/project.
+            if (wasAdded)
                 await _notificationBusiness.SendEmail(user.Email, user.Name, false, organizationId, projectId);
 
             return true;
@@ -106,22 +96,14 @@ public class InvitationBusiness : IInvitationBusiness
             {
                 if (user.IsServiceAccount)
                 {
-                    // Only admins may attach a service account, and only ever to a project - service
-                    // accounts cannot be added at the organization level alone.
-                    if (!callerIsAdmin)
-                        throw new UnauthorizedAccessException(
-                            "Unauthorized: Only admins can add service accounts to a project.");
-                    if (projectId == null)
-                        throw new InvalidOperationException(
-                            "Service accounts must be added to a project and cannot be added at the organization level.");
+                    throw new InvalidOperationException("Cannot add user: Service accounts are prohibited, standard user accounts only");
                 }
 
                 // Existing user - no transaction, best-effort email
                 var wasAdded = await AddUserToHierarchyWithoutEmail(organizationId, projectId, roleId, user);
 
-                // Only send email if user was actually added to org/project, and never to service
-                // accounts (they have no real email and never authenticate as people).
-                if (wasAdded && !user.IsServiceAccount)
+                // Only send email if user was actually added to org/project.
+                if (wasAdded)
                     await _notificationBusiness.SendEmail(user.Email, user.Name, false, organizationId, projectId);
 
                 return true;
@@ -162,7 +144,6 @@ public class InvitationBusiness : IInvitationBusiness
             }
         }
 
-
         // Handle group - NO transaction, best-effort email delivery
         if (groupId != null)
         {
@@ -196,6 +177,39 @@ public class InvitationBusiness : IInvitationBusiness
                         await _notificationBusiness.SendEmail(user.Email, user.Name, false, organizationId, projectId);
             }
         }
+
+        return true;
+    }
+
+    /// <summary>
+    ///     Admin only: Creates new service account and adds the account as a project member with the role supplied.
+    /// </summary>
+    /// <param name="organizationId"></param>
+    /// <param name="projectId"></param>
+    /// <param name="roleId"></param>
+    /// <param name="name">
+    /// </param>
+    /// <returns></returns>
+    public async Task<bool> CreateAndAddServiceAccountToProject(long organizationId, long projectId, long roleId, string name)
+    {
+        var serviceIdentifier = $"service_{Guid.NewGuid()}";
+        var username = serviceIdentifier; // Note: we do NOT allow username to be changed for any user- only name
+        var email = serviceIdentifier;
+
+        var serviceAccount = new User
+        {
+            Name = name,
+            Email = email,
+            Username = username,
+            IsServiceAccount = true
+        };
+
+        // Create Service Account
+        _context.Users.Add(serviceAccount);
+        await _context.SaveChangesAsync();
+
+        // Add user to project with the role supplied
+        await AddUserToHierarchyWithoutEmail(organizationId, projectId, roleId, serviceAccount);
 
         return true;
     }
