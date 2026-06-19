@@ -27,14 +27,16 @@ public class UserBusiness : IUserBusiness
     /// <param name="organizationId">Optional ID for organization</param>
     /// <param name="includeArchived">Optional Param to include archived users- defaults to false</param>
     /// <param name="includeServiceAccounts">Optional Param to include service accounts- defaults to false</param>
+    /// <param name="includeTestAccounts">Optional Param to include test accounts- defaults to false</param>
     /// <returns>A list of users, optionally filtered by project or organization</returns>
-    public async Task<IEnumerable<UserResponseDto>> GetAllUsers(long? projectId, long? organizationId, bool includeArchived = false, bool includeServiceAccounts = false)
+    public async Task<IEnumerable<UserResponseDto>> GetAllUsers(long? projectId, long? organizationId, bool includeArchived = false, bool includeServiceAccounts = false, bool includeTestAccounts = false)
     {
         var users = includeArchived
         ? _context.Users.AsQueryable()
         : _context.Users.Where(p => !p.IsArchived);
 
         if (!includeServiceAccounts) users = users.Where(u => u.AccountType != AccountType.Service);
+        if (!includeTestAccounts) users = users.Where(u => u.AccountType != AccountType.Test);
 
         if (projectId != null)
             users = users.Where(u =>
@@ -171,16 +173,11 @@ public class UserBusiness : IUserBusiness
             throw new InvalidOperationException("Service Accounts can only be created per project");
 
         var username = dto.Username;
-        var name = dto.Name; // Note: Names can be changed, usernames cannot
         var email = dto.Email;
 
         // Email enforcement with standard accounts
         if (dto.AccountType == AccountType.Standard)
         {
-            // require email for standard accounts
-            if (dto.Email is null)
-                throw new ArgumentException("Email is required for standard accounts");
-
             // verify email is unique only with standard accounts
             var otherUserHasEmail = await _context.Users.AnyAsync(u => u.Email.ToLower() == dto.Email.ToLower());
             if (otherUserHasEmail)
@@ -191,7 +188,7 @@ public class UserBusiness : IUserBusiness
         if (dto.AccountType == AccountType.Test)
         {
             // the "Name" property of a user can be changed. Unique identifier is used for username and email.
-            var identifier = $"{dto.AccountType}_{Guid.NewGuid()}";
+            var identifier = $"test_{Guid.NewGuid()}";
             username = identifier;
             email = identifier;
         }
@@ -346,6 +343,10 @@ public class UserBusiness : IUserBusiness
         if (candidate == null)
             throw new KeyNotFoundException($"User with ID {candidateId} not found.");
 
+        // Service accounts can never be system admins
+        if (candidate.AccountType == AccountType.Service)
+            throw new InvalidOperationException("Service accounts cannot be granted system administrator privileges.");
+
         if (authorizerId == candidateId && !userIsAdmin)
             throw new InvalidOperationException("You cannot remove your own system administrator access.");
 
@@ -446,6 +447,7 @@ public class UserBusiness : IUserBusiness
 
     /// <summary>
     ///     Retrieves rolling active user counts using the users' most recent successful login timestamp.
+    ///     Service accounts are excluded by default. Test users are always excluded. 
     /// </summary>
     /// <param name="projectId">Optional ID for project</param>
     /// <param name="organizationId">Optional ID for organization</param>
@@ -453,6 +455,7 @@ public class UserBusiness : IUserBusiness
     /// <returns>Counts for users active within 24 hours, 7 days, and 30 days</returns>
     public async Task<UserActivityCountsDto> GetActiveUserCounts(long? projectId, long? organizationId, bool includeServiceAccounts = false)
     {
+        // user accounts with the type test are always excluded
         var users = BuildActiveUsersQuery(projectId, organizationId, includeServiceAccounts);
 
         var now = UtcNowWithoutTimezone();
@@ -523,7 +526,8 @@ public class UserBusiness : IUserBusiness
 
     private IQueryable<User> BuildActiveUsersQuery(long? projectId, long? organizationId, bool includeServiceAccounts = false)
     {
-        var users = _context.Users.Where(u => !u.IsArchived && u.IsActive);
+        // Test accounts are always excluded, service accounts are optional- default to false
+        var users = _context.Users.Where(u => !u.IsArchived && u.IsActive && u.AccountType != AccountType.Test);
 
         if (!includeServiceAccounts) users = users.Where(u => u.AccountType != AccountType.Service);
 

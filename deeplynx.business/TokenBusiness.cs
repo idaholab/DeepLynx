@@ -262,16 +262,46 @@ public class TokenBusiness : ITokenBusiness
     }
 
     /// <summary>
-    /// Admin only: Create a new api keypair for a given user
+    /// Admin only: Create a new api keypair for a service account.
+    /// Accessible by Project, Org, or SysAdmin.
     /// </summary>
-    /// <param name="currentUserId">The ID of the requesting user</param>
-    /// <param name="serviceAccountId">The ID of the service account</param>
-    public async Task<TokenResponseDto> GenerateServiceAccountApiKey(long currentUserId, long serviceAccountId)
+    public async Task<TokenResponseDto> GenerateServiceAccountApiKey(
+        long currentUserId,
+        long serviceAccountId,
+        bool isSysAdmin = false,
+        bool isOrgAdmin = false,
+        bool isProjectAdmin = false)
     {
-        // admin only 
-        TokenResponseDto key = await CreateApiKey(serviceAccountId, createdByUserId: currentUserId);
+        if (!isSysAdmin && !isOrgAdmin && !isProjectAdmin)
+            throw new UnauthorizedAccessException("Only Project, Org, or SysAdmins can generate service account keys.");
 
-        return key;
+        var account = await _context.Users.FindAsync(serviceAccountId)
+            ?? throw new KeyNotFoundException($"Service account {serviceAccountId} not found.");
+
+        if (account.AccountType != AccountType.Service)
+            throw new InvalidOperationException("Target account is not a service account.");
+
+        return await CreateApiKey(serviceAccountId, createdByUserId: currentUserId);
+    }
+
+    /// <summary>
+    /// SysAdmin only: Create a new api keypair for a test account.
+    /// </summary>
+    public async Task<TokenResponseDto> GenerateTestAccountApiKey(
+        long currentUserId,
+        long testAccountId,
+        bool isSysAdmin = false)
+    {
+        if (!isSysAdmin)
+            throw new UnauthorizedAccessException("Only SysAdmins can generate test account keys.");
+
+        var account = await _context.Users.FindAsync(testAccountId)
+            ?? throw new KeyNotFoundException($"Test account {testAccountId} not found.");
+
+        if (account.AccountType != AccountType.Test)
+            throw new InvalidOperationException("Target account is not a test account.");
+
+        return await CreateApiKey(testAccountId, createdByUserId: currentUserId);
     }
 
     /// <summary>

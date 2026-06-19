@@ -192,26 +192,32 @@ public class InvitationBusiness : IInvitationBusiness
     /// <returns></returns>
     public async Task<bool> CreateAndAddServiceAccountToProject(long organizationId, long projectId, long roleId, string name)
     {
-        var serviceIdentifier = $"service_{Guid.NewGuid()}";
-        var username = serviceIdentifier; // Note: we do NOT allow username to be changed for any user- only name
-        var email = serviceIdentifier;
-
-        var serviceAccount = new User
+        using var transaction = await _context.Database.BeginTransactionAsync();
+        try
         {
-            Name = name,
-            Email = email,
-            Username = username,
-            AccountType = AccountType.Service
-        };
+            var serviceIdentifier = $"service_{Guid.NewGuid()}";
 
-        // Create Service Account
-        _context.Users.Add(serviceAccount);
-        await _context.SaveChangesAsync();
+            var serviceAccount = new User
+            {
+                Name = name,
+                Email = serviceIdentifier,
+                Username = serviceIdentifier,
+                AccountType = AccountType.Service
+            };
 
-        // Add user to project with the role supplied
-        await AddUserToHierarchyWithoutEmail(organizationId, projectId, roleId, serviceAccount);
+            _context.Users.Add(serviceAccount);
+            await _context.SaveChangesAsync();
 
-        return true;
+            await AddUserToHierarchyWithoutEmail(organizationId, projectId, roleId, serviceAccount);
+
+            await transaction.CommitAsync();
+            return true;
+        }
+        catch
+        {
+            await transaction.RollbackAsync();
+            throw;
+        }
     }
 
     private async Task<bool> AddUserToHierarchyWithoutEmail(long organizationId, long? projectId, long? roleId,

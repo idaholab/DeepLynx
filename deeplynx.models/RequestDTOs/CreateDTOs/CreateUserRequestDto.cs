@@ -3,6 +3,7 @@ namespace deeplynx.models;
 
 public class CreateUserRequestDto : IValidatableObject
 {
+    [Required]
     public string Name { get; set; }
     public string? Email { get; set; }
     public string? Username { get; set; }
@@ -17,11 +18,11 @@ public class CreateUserRequestDto : IValidatableObject
 
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
     {
+        if (string.IsNullOrWhiteSpace(Name))
+            yield return new ValidationResult("Name is required.", [nameof(Name)]);
+
         if (AccountType == models.AccountType.Standard)
         {
-            if (string.IsNullOrWhiteSpace(Name))
-                yield return new ValidationResult("Name is required for standard accounts.", [nameof(Name)]);
-
             if (string.IsNullOrWhiteSpace(Email))
                 yield return new ValidationResult("Email is required for standard accounts.", [nameof(Email)]);
 
