@@ -33,7 +33,7 @@ public class UserBusiness : IUserBusiness
         ? _context.Users.AsQueryable()
         : _context.Users.Where(p => !p.IsArchived);
 
-        if (!includeServiceAccounts) users = users.Where(u => u.IsServiceAccount == false);
+        if (!includeServiceAccounts) users = users.Where(u => u.AccountType == AccountType.Service);
 
         if (projectId != null)
             users = users.Where(u =>
@@ -57,7 +57,7 @@ public class UserBusiness : IUserBusiness
             IsOrgAdmin = organizationId != null
                 ? p.OrganizationUsers.Any(ou => ou.OrganizationId == organizationId && ou.IsOrgAdmin)
                 : null,
-            IsServiceAccount = p.IsServiceAccount,
+            AccountType = p.AccountType,
             IsArchived = p.IsArchived,
             IsActive = p.IsActive,
             LastLogin = p.LastLogin
@@ -181,6 +181,7 @@ public class UserBusiness : IUserBusiness
             Username = dto.Username,
             IsActive = dto.IsActive ?? false,
             IsArchived = dto.IsArchived ?? false,
+            AccountType = dto.AccountType
         };
 
         _context.Users.Add(user);
@@ -192,7 +193,7 @@ public class UserBusiness : IUserBusiness
             Name = user.Name,
             Username = user.Username,
             Email = user.Email,
-            IsServiceAccount = user.IsServiceAccount,
+            AccountType = user.AccountType,
             IsSysAdmin = user.IsSysAdmin,
             IsArchived = user.IsArchived,
             IsActive = user.IsActive,
@@ -230,7 +231,7 @@ public class UserBusiness : IUserBusiness
             Name = user.Name,
             Username = user.Username,
             Email = user.Email,
-            IsServiceAccount = user.IsServiceAccount,
+            AccountType = user.AccountType,
             IsSysAdmin = user.IsSysAdmin,
             IsArchived = user.IsArchived,
             IsActive = user.IsActive,
@@ -387,7 +388,7 @@ public class UserBusiness : IUserBusiness
             Name = user.Name,
             Email = user.Email,
             Username = user.Username,
-            IsServiceAccount = user.IsServiceAccount,
+            AccountType = user.AccountType,
             IsSysAdmin = user.IsSysAdmin,
             IsArchived = user.IsArchived,
             IsActive = user.IsActive,

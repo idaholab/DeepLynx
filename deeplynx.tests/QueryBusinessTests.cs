@@ -3748,6 +3748,92 @@ public class QueryBusinessTests : IntegrationTestBase
         Assert.Equal(5, result.Items.Count());
     }
 
+    [Fact]
+    public async Task QueryBuilder_BugRepro_TagEquality_ShouldNotMatchPartialTags()
+    {
+        // Arrange
+        // 1. Create tags: 'a', 'cat', 'dog'
+        var tagA = new Tag { Name = "a", ProjectId = pid, OrganizationId = organizationId };
+        var tagCat = new Tag { Name = "cat", ProjectId = pid, OrganizationId = organizationId };
+        var tagDog = new Tag { Name = "dog", ProjectId = pid, OrganizationId = organizationId };
+        Context.Tags.AddRange(tagA, tagCat, tagDog);
+        await Context.SaveChangesAsync();
+
+        // 2. Create records
+        // Record 1: Tag = 'a'
+        var recA = new Record
+        {
+            Name = "Record A",
+            Description = "Admin bulk create URI test",
+            OriginalId = Guid.NewGuid().ToString(),
+            ProjectId = pid,
+            DataSourceId = did,
+            OrganizationId = organizationId,
+            Properties = "{}", // Fix for null constraint
+            Tags = new List<Tag> { tagA }
+        };
+        // Record 2: Tag = 'cat'
+        var recCat = new Record
+        {
+            Name = "Record Cat",
+            Description = "Admin bulk create URI test",
+            OriginalId = Guid.NewGuid().ToString(),
+            ProjectId = pid,
+            DataSourceId = did,
+            OrganizationId = organizationId,
+            Properties = "{}", // Fix for null constraint
+            Tags = new List<Tag> { tagCat }
+        };
+        // Record 3: Tag = 'dog'
+        var recDog = new Record
+        {
+            Name = "Record Dog",
+            Description = "Admin bulk create URI test",
+            OriginalId = Guid.NewGuid().ToString(),
+            ProjectId = pid,
+            DataSourceId = did,
+            OrganizationId = organizationId,
+            Properties = "{}", // Fix for null constraint
+            Tags = new List<Tag> { tagDog }
+        };
+        Context.Records.AddRange(recA, recCat, recDog);
+        await Context.SaveChangesAsync();
+
+        // Act & Assert
+
+        // Test Query: Tag = 'a'
+        // Should ONLY match recA. If it matches recCat or recDog due to partial matching, it fails.
+        var dtoA = new CustomQueryDtos.CustomQueryRequestDto
+        {
+            Connector = "AND", Filter = "tags", Operator = "=", Value = "a"
+        };
+        var resultA = await _queryBusiness.QueryBuilder(uid, [dtoA], organizationId, [pid]);
+
+        Assert.Single(resultA);
+        Assert.Equal("Record A", resultA.First().Name);
+
+        // Test Query: Tag = 'cat'
+        // Should ONLY match recCat.
+        var dtoCat = new CustomQueryDtos.CustomQueryRequestDto
+        {
+            Connector = "AND", Filter = "tags", Operator = "=", Value = "cat"
+        };
+        var resultCat = await _queryBusiness.QueryBuilder(uid, [dtoCat], organizationId, [pid]);
+        Assert.Single(resultCat);
+        Assert.Equal("Record Cat", resultCat.First().Name);
+
+        // Test Query: Tag = 'd'
+        // Should return nothing because no tag is named exactly 'd'.
+        // If it returns recDog, then it's doing substring match.
+        var dtoD = new CustomQueryDtos.CustomQueryRequestDto
+        {
+            Connector = "AND", Filter = "tags", Operator = "=", Value = "d"
+        };
+        var resultD = await _queryBusiness.QueryBuilder(uid, [dtoD], organizationId, [pid]);
+
+        Assert.Empty(resultD);
+    }
+
     #endregion
 
     #region URI Accessibility Tests

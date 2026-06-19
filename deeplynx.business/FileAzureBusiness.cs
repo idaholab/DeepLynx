@@ -601,6 +601,7 @@ public class FileAzureBusiness : IFileBusiness
             throw new Exception("Azure configuration not set in object storage");
 
         var results = new Dictionary<string, long>();
+        var requestedUris = fileUris.ToHashSet();
 
         // Create BlobContainerClient with connection string
         var containerClient = new BlobContainerClient(
@@ -613,13 +614,13 @@ public class FileAzureBusiness : IFileBusiness
         // Get all blobs at once with their properties
         await foreach (var blob in containerClient.GetBlobsAsync())
         {
-            if (fileUris.Contains(blob.Name) && blob.Properties.ContentLength.HasValue)
+            if (requestedUris.Contains(blob.Name) && blob.Properties.ContentLength.HasValue)
             {
                 results[blob.Name] = blob.Properties.ContentLength.Value;
             }
 
             // exit once all requested files are found
-            if (results.Count == fileUris.Count)
+            if (results.Count == requestedUris.Count)
                 break;
         }
 

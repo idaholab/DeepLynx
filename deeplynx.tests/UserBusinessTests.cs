@@ -771,7 +771,7 @@ public class UserBusinessTests : IntegrationTestBase
         Assert.Equal("New User", result.Name);
         Assert.Equal("newuser@test.com", result.Email);
         Assert.Equal("newuser", result.Username);
-        Assert.False(result.IsServiceAccount);
+        Assert.Equal("standard", result.AccountType);
         Assert.True(result.IsActive);
         Assert.False(result.IsArchived);
 
@@ -799,7 +799,7 @@ public class UserBusinessTests : IntegrationTestBase
         Assert.True(result.Id > 0);
         Assert.Equal("Minimal User", result.Name);
         Assert.Equal("minimal@test.com", result.Email);
-        Assert.False(result.IsServiceAccount);
+        Assert.Equal("standard", result.AccountType);
         Assert.False(result.IsActive);
         Assert.False(result.IsArchived);
     }
@@ -828,7 +828,6 @@ public class UserBusinessTests : IntegrationTestBase
         var dto = new CreateUserRequestDto
         {
             Name = "No Email User",
-            IsServiceAccount = false
         };
 
         // Act & Assert
@@ -863,7 +862,7 @@ public class UserBusinessTests : IntegrationTestBase
         var dto = new CreateUserRequestDto
         {
             Name = "CI Bot",
-            IsServiceAccount = true
+            AccountType = "service"
         };
 
         // Act
@@ -872,7 +871,7 @@ public class UserBusinessTests : IntegrationTestBase
         // Assert — admin-provided Name is kept; username/email are generated as service_<guid>
         Assert.NotNull(result);
         Assert.Equal("CI Bot", result.Name);
-        Assert.True(result.IsServiceAccount);
+        Assert.Equal("service", result.AccountType);
         Assert.StartsWith("service_", result.Username);
         Assert.StartsWith("service_", result.Email);
         Assert.Equal(result.Username, result.Email);
@@ -885,7 +884,7 @@ public class UserBusinessTests : IntegrationTestBase
         var dto = new CreateUserRequestDto
         {
             Name = "Deploy Bot",
-            IsServiceAccount = true
+            AccountType = "service"
         };
 
         // Act
@@ -893,7 +892,7 @@ public class UserBusinessTests : IntegrationTestBase
 
         // Assert
         Assert.NotNull(result);
-        Assert.True(result.IsServiceAccount);
+        Assert.Equal("service", result.AccountType);
     }
 
     [Fact]
@@ -903,7 +902,7 @@ public class UserBusinessTests : IntegrationTestBase
         var dto = new CreateUserRequestDto
         {
             Name = "Unauthorized Bot",
-            IsServiceAccount = true
+            AccountType = "service"
         };
 
         // Act & Assert
@@ -921,7 +920,7 @@ public class UserBusinessTests : IntegrationTestBase
         var dto = new CreateUserRequestDto
         {
             Name = "Shared Bot Name",
-            IsServiceAccount = true
+            AccountType = "service"
         };
 
         // Act
@@ -942,7 +941,7 @@ public class UserBusinessTests : IntegrationTestBase
         var dto = new CreateUserRequestDto
         {
             Name = "Bot With Email",
-            IsServiceAccount = true,
+            AccountType = "service",
             Email = "bot@test.com"
         };
 
@@ -960,7 +959,7 @@ public class UserBusinessTests : IntegrationTestBase
         var dto = new CreateUserRequestDto
         {
             Name = "Bot With Username",
-            IsServiceAccount = true,
+            AccountType = "service",
             Username = "botuser"
         };
 
