@@ -230,12 +230,13 @@ export default function DataCatalogClient({
    * accept a search term — search results come from runSearchTerms instead.
    */
   const fetchRecordsForSelection = useCallback(async () => {
+    setLoading(true);
     const idsNum = effectiveProjectIds.map(Number).filter(Number.isFinite);
     if (idsNum.length === 0) {
       setTableData([]);
+      setLoading(false);
       return;
     }
-    setLoading(true);
     const data = await getMultiProjectRecords(
       organization?.organizationId as number,
       idsNum,
