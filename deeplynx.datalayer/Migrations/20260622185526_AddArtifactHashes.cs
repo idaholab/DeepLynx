@@ -1,14 +1,10 @@
-﻿using deeplynx.datalayer.Models;
-using Microsoft.EntityFrameworkCore.Infrastructure;
-using Microsoft.EntityFrameworkCore.Migrations;
+﻿using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
 namespace deeplynx.datalayer.Migrations
 {
     /// <inheritdoc />
-    [DbContext(typeof(DeeplynxContext))]
-    [Migration("20260608145912_AddArtifactHashes")]
     public partial class AddArtifactHashes : Migration
     {
         /// <inheritdoc />
