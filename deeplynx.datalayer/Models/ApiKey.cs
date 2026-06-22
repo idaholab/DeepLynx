@@ -16,6 +16,8 @@ public class ApiKey
 
     [Column("application_id")] public long? ApplicationId { get; set; }
 
+    [Column("created_by")] public long? CreatedBy { get; set; }
+
     [ForeignKey("UserId")]
     [InverseProperty("ApiKeys")]
     public virtual User User { get; set; } = null!;
@@ -23,4 +25,8 @@ public class ApiKey
     [ForeignKey("ApplicationId")]
     [InverseProperty("ApiKeys")]
     public virtual OauthApplication? OauthApplication { get; set; }
+
+    [ForeignKey("CreatedBy")]
+    [InverseProperty("CreatedApiKeys")]
+    public virtual User? CreatedByUser { get; set; }
 }

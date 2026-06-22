@@ -1,3 +1,4 @@
+using deeplynx.datalayer.Models;
 using deeplynx.helpers.Context;
 using deeplynx.interfaces;
 using deeplynx.models;
@@ -44,8 +45,9 @@ public class SensitivityLabelOrganizationController : ControllerBase
     {
         try
         {
+            var currentUserId = UserContextStorage.UserId;
             var labels = await _sensitivityLabelBusiness
-                .GetAllSensitivityLabels(projectIds, organizationId,
+                .GetAllSensitivityLabels(currentUserId,projectIds, organizationId,
                     hideArchived); //setting project ID null for now to circumvent xor logic
             return Ok(labels);
         }
