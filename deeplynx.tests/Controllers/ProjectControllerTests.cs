@@ -841,7 +841,7 @@ public class ProjectControllerTests : IDisposable
             "dto");
 
         AssertHasHttpAttribute(method, "HttpPutAttribute");
-        AssertHasAuthAttribute(method, "update", "project");
+        AssertHasProjectAdminAttribute(method);
         AssertDoesNotHaveSensitivityEnabledAuthAttribute(method);
     }
 
@@ -854,7 +854,7 @@ public class ProjectControllerTests : IDisposable
             "projectId");
 
         AssertHasHttpAttribute(method, "HttpDeleteAttribute");
-        AssertHasAuthAttribute(method, "write", "project");
+        AssertHasProjectAdminAttribute(method);
         AssertDoesNotHaveSensitivityEnabledAuthAttribute(method);
     }
 
@@ -868,8 +868,8 @@ public class ProjectControllerTests : IDisposable
             "archive");
 
         AssertHasHttpAttribute(method, "HttpPatchAttribute");
-        AssertHasAuthAttribute(method, "update", "project");
-        AssertHasSensitivityEnabledAuthAttribute(method, "update", "project");
+        AssertHasProjectAdminAttribute(method, includeArchived: true);
+        AssertDoesNotHaveSensitivityEnabledAuthAttribute(method);
     }
 
     [Fact]
@@ -881,7 +881,7 @@ public class ProjectControllerTests : IDisposable
             "projectId");
 
         AssertHasHttpAttribute(method, "HttpGetAttribute");
-        AssertHasAuthAttribute(method, "read", "project");
+        AssertHasProjectAdminAttribute(method);
         AssertDoesNotHaveSensitivityEnabledAuthAttribute(method);
     }
 
@@ -912,8 +912,7 @@ public class ProjectControllerTests : IDisposable
             "isProjectAdmin");
 
         AssertHasHttpAttribute(method, "HttpPostAttribute");
-        AssertHasAuthAttribute(method, "update", "project");
-        AssertHasAuthAttribute(method, "update", "user");
+        AssertHasProjectAdminAttribute(method);
         AssertDoesNotHaveSensitivityEnabledAuthAttribute(method);
     }
 
@@ -930,8 +929,7 @@ public class ProjectControllerTests : IDisposable
             "isProjectAdmin");
 
         AssertHasHttpAttribute(method, "HttpPutAttribute");
-        AssertHasAuthAttribute(method, "update", "project");
-        AssertHasAuthAttribute(method, "update", "user");
+        AssertHasProjectAdminAttribute(method);
         AssertDoesNotHaveSensitivityEnabledAuthAttribute(method);
     }
 
@@ -947,8 +945,7 @@ public class ProjectControllerTests : IDisposable
             "isAdmin");
 
         AssertHasHttpAttribute(method, "HttpPutAttribute");
-        AssertHasAuthAttribute(method, "update", "project");
-        AssertHasAuthAttribute(method, "update", "user");
+        AssertHasProjectAdminAttribute(method);
         AssertDoesNotHaveSensitivityEnabledAuthAttribute(method);
     }
 
@@ -963,8 +960,7 @@ public class ProjectControllerTests : IDisposable
             "groupId");
 
         AssertHasHttpAttribute(method, "HttpDeleteAttribute");
-        AssertHasAuthAttribute(method, "update", "project");
-        AssertHasAuthAttribute(method, "update", "user");
+        AssertHasProjectAdminAttribute(method);
         AssertDoesNotHaveSensitivityEnabledAuthAttribute(method);
     }
 
@@ -981,9 +977,7 @@ public class ProjectControllerTests : IDisposable
             "roleId");
 
         AssertHasHttpAttribute(method, "HttpPostAttribute");
-        AssertHasAuthAttribute(method, "write", "user");
-        AssertHasAuthAttribute(method, "update", "user");
-        AssertHasAuthAttribute(method, "update", "project");
+        AssertHasProjectAdminAttribute(method);
         AssertDoesNotHaveSensitivityEnabledAuthAttribute(method);
     }
 
@@ -1033,6 +1027,26 @@ public class ProjectControllerTests : IDisposable
             attribute.ConstructorArguments.Count >= 2 &&
             attribute.ConstructorArguments[0].Value?.ToString() == expectedAction &&
             attribute.ConstructorArguments[1].Value?.ToString() == expectedResource);
+    }
+
+    private static void AssertHasProjectAdminAttribute(
+        System.Reflection.MethodInfo method,
+        bool includeArchived = false)
+    {
+        var attribute = Assert.Single(method.GetCustomAttributesData()
+            .Where(attribute => attribute.AttributeType.Name == "ProjectAdminAttribute"));
+
+        var actualIncludeArchived = false;
+        if (attribute.ConstructorArguments.Count > 0 &&
+            attribute.ConstructorArguments[0].Value is bool constructorValue)
+            actualIncludeArchived = constructorValue;
+
+        var namedIncludeArchived = attribute.NamedArguments
+            .FirstOrDefault(argument => argument.MemberName == "IncludeArchived");
+        if (namedIncludeArchived.TypedValue.Value is bool namedValue)
+            actualIncludeArchived = namedValue;
+
+        Assert.Equal(includeArchived, actualIncludeArchived);
     }
 
     private static void AssertHasSensitivityEnabledAuthAttribute(

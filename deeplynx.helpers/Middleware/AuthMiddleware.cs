@@ -110,7 +110,8 @@ public class AuthMiddleware
         var authAttributes = endpoint.Metadata.GetOrderedMetadata<AuthAttribute>();
 
         // If no auth attributes at all, continue
-        if (sysAdminAttr == null && orgAdminAttr == null && !authAttributes.Any())
+        if (sysAdminAttr == null && orgAdminAttr == null && projectAdminAttr == null &&
+            orgMemberAttr == null && !authAttributes.Any())
         {
             await _next(context);
             return;

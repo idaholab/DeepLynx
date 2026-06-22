@@ -200,7 +200,7 @@ public class ProjectController : ControllerBase
     /// <param name="archive">True to archive the project, false to unarchive it.</param>
     /// <returns>A message stating the project was successfully archived or unarchived.</returns>
     [HttpPatch("{projectId:long}", Name = "api_archive_project")]
-    [ProjectAdmin]
+    [ProjectAdmin(includeArchived: true)]
     public async Task<IActionResult> ArchiveProject(
         long organizationId,
         long projectId,
@@ -319,7 +319,7 @@ public class ProjectController : ControllerBase
     public async Task<ActionResult> UpdateProjectMemberRole(
         long organizationId, long projectId,
         [FromQuery] long roleId, [FromQuery] long? userId, [FromQuery] long? groupId,
-        [FromQuery] bool? isProjectAdmin)
+        [FromQuery] bool? isProjectAdmin = null)
     {
         try
         {
