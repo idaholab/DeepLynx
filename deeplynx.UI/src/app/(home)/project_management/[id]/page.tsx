@@ -18,6 +18,7 @@ import {
 } from "@/app/lib/server_service/projects_services.server";
 import { getAllRolesServer } from "@/app/lib/server_service/role_services.server";
 import { getAllPermissionsServer } from "@/app/lib/server_service/permissions_services.server";
+import { requireProjectAdminServer } from "@/app/lib/server_service/rbac_guards.server";
 
 export const dynamic = "force-dynamic";
 
@@ -52,6 +53,8 @@ export default async function ProjectManagementPage({ params }: Props) {
     console.error("Failed to parse organization session:", e);
     redirect("/select-org");
   }
+
+  await requireProjectAdminServer(organizationId, projectId);
 
   let project: ProjectResponseDto | null = null;
   let projectMembers: ProjectMemberResponseDto[] = [];
@@ -90,8 +93,8 @@ export default async function ProjectManagementPage({ params }: Props) {
 
     // Extract groups from projectMembers (groups have empty emails)
     const projectGroups: GroupResponseDto[] = projectMembers
-      .filter(member => member.email === "" && member.memberId !== undefined)
-      .map(member => ({
+      .filter((member) => member.email === "" && member.memberId !== undefined)
+      .map((member) => ({
         id: member.memberId!,
         name: member.name,
         isArchived: false,

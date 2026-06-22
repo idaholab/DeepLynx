@@ -48,7 +48,7 @@ public partial class DeeplynxContext : DbContext
     public virtual DbSet<Project> Projects { get; set; }
 
     public virtual DbSet<ProjectMember> ProjectMembers { get; set; }
-    
+
     public virtual DbSet<QueryRecord> QueryRecords { get; set; }
 
     public virtual DbSet<Record> Records { get; set; }
@@ -1394,7 +1394,7 @@ public partial class DeeplynxContext : DbContext
 
             entity.Property(e => e.IsActive).HasDefaultValue(false);
 
-            entity.Property(e => e.IsServiceAccount).HasDefaultValue(false);
+            entity.Property(e => e.AccountType).HasDefaultValue("standard");
         });
 
         modelBuilder.Entity<SavedSearch>(entity =>

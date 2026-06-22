@@ -4,7 +4,7 @@ public class UserResponseDto
 {
     public long Id { get; set; }
     public string Name { get; set; }
-    public bool IsServiceAccount { get; set; }
+    public string AccountType { get; set; }
     public string? Email { get; set; }
     public string? Username { get; set; }
     public bool IsSysAdmin { get; set; }
