@@ -6,7 +6,7 @@ public interface IRecordBusiness
 {
     Task<List<RecordResponseDto>> GetAllRecords(
         long currentUserId, long organizationId, long projectId, long? dataSourceId, bool hideArchived, string? fileType,
-        bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false);
+        bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false, bool isInsightEligible = false);
 
     Task<List<RecordResponseDto>> GetRecordsByTags(
         long currentUserId, long organizationId, long projectId, long[] tagIds, bool hideArchived,
@@ -20,8 +20,8 @@ public interface IRecordBusiness
         long organizationId, long projectId, long dataSourceId, bool hideArchived);
 
     Task<RecordResponseDto> CreateRecord(
-        long currentUserId, long organizationId, long projectId, long dataSourceId, CreateRecordRequestDto dto, 
-        List<long>? sensitivityLabelIds = null, bool embedded = false,  bool isSysAdmin = false, bool isOrgAdmin = false,
+        long currentUserId, long organizationId, long projectId, long dataSourceId, CreateRecordRequestDto dto,
+        List<long>? sensitivityLabelIds = null, bool embedded = false, bool isSysAdmin = false, bool isOrgAdmin = false,
         bool isProjectAdmin = false);
 
     Task<List<RecordResponseDto>> BulkCreateRecords(

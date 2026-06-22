@@ -58,6 +58,10 @@ public class ExtractionEdge
     [Column("ensemble_score")]
     public double EnsembleScore { get; set; }
 
+    /// <summary>Set when a reviewer rejects this staged item; rejected items are never promoted.</summary>
+    [Column("rejected")]
+    public bool Rejected { get; set; }
+
     public virtual ExtractionRelationship? ExtractionRelationship { get; set; }
     public virtual ExtractionRecord? OriginRecord { get; set; }
     public virtual ExtractionRecord? DestinationRecord { get; set; }
