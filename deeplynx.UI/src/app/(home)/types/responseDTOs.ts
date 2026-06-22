@@ -99,6 +99,14 @@ export type RecordResponseDto = {
   labels?: { id: number | null; name: string }[];
 };
 
+export type PaginatedResponse<T> = {
+  items: T[] | [];
+  pageNumber: number;
+  pageSize: number;
+  maxPageSize: number;
+  totalCount: number;
+};
+
 export type QueryRecordViewResponseDto = {
   id: number | null;
   uri?: string | null;
@@ -121,7 +129,7 @@ export type QueryRecordViewResponseDto = {
   lastUpdatedAt?: string;
   lastUpdatedBy?: number | null;
   isArchived?: boolean;
-}
+};
 
 export type ObjectStorageResponseDto = {
   id: number | string;

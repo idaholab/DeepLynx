@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from "react";
 import toast from "react-hot-toast";
+import { useRouter } from "next/navigation";
 import { useLanguage } from "@/app/contexts/Language";
 import {
   updateUser,
   setSysAdmin,
 } from "@/app/lib/client_service/user_services.client";
 import { setOrganizationAdminStatus } from "@/app/lib/client_service/organization_services.client";
+import { useRBAC } from "@/app/(home)/rbac/useRBAC";
 import { setProjectAdminStatus } from "@/app/lib/client_service/projects_services.client";
 interface EditSysUserProps {
   isOpen: boolean;
@@ -35,6 +37,8 @@ const EditSysUser = ({
   projectId,
 }: EditSysUserProps) => {
   const { t } = useLanguage();
+  const router = useRouter();
+  const { user, refreshUser } = useRBAC();
   const [name, setName] = useState(userName);
   const [isOrgAdmin, setIsOrgAdmin] = useState(currentOrgAdminStatus);
   const [isSysAdmin, setIsSysAdmin] = useState(currentSysAdminStatus);
@@ -118,7 +122,14 @@ const EditSysUser = ({
         toast.success(successMessage);
       }
 
-      onUserUpdated();
+      await onUserUpdated();
+
+      const currentUserWasEdited = user?.id === userId;
+      if (currentUserWasEdited && (orgAdminChanged || sysAdminChanged)) {
+        await refreshUser();
+        router.refresh();
+      }
+
       onClose();
     } catch (error) {
       console.error("Error updating user:", error);

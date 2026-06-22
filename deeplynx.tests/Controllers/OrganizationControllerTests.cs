@@ -73,7 +73,7 @@ public class OrganizationControllerTests : IDisposable
             .ReturnsAsync(expected);
 
         // Act
-        var actionResult = await _organizationController.GetAllOrganizations();
+        var actionResult = await _organizationController.GetAllOrganizations(true);
 
         // Assert
         var result = Assert.IsType<OkObjectResult>(actionResult.Result);
@@ -96,7 +96,7 @@ public class OrganizationControllerTests : IDisposable
             .ReturnsAsync([]);
 
         // Act
-        var actionResult = await _organizationController.GetAllOrganizations();
+        var actionResult = await _organizationController.GetAllOrganizations(true);
 
         // Assert
         var result = Assert.IsType<OkObjectResult>(actionResult.Result);
@@ -114,7 +114,7 @@ public class OrganizationControllerTests : IDisposable
             .Setup(b => b.GetAllOrganizations(It.IsAny<long>(), It.IsAny<bool>(), It.IsAny<bool>()))
             .ThrowsAsync(new Exception("db error"));
 
-        var result = (await _organizationController.GetAllOrganizations()).Result as ObjectResult;
+        var result = (await _organizationController.GetAllOrganizations(true)).Result as ObjectResult;
 
         Assert.NotNull(result);
         Assert.Equal(500, result.StatusCode);
@@ -174,7 +174,7 @@ public class OrganizationControllerTests : IDisposable
             .ReturnsAsync(expected);
 
         // Act
-        var actionResult = await _organizationController.GetAllOrganizationsForUser();
+        var actionResult = await _organizationController.GetAllOrganizationsForUser(true);
 
         // Assert
         var result = Assert.IsType<OkObjectResult>(actionResult.Result);
@@ -197,7 +197,7 @@ public class OrganizationControllerTests : IDisposable
             .ReturnsAsync([]);
 
         // Act
-        var actionResult = await _organizationController.GetAllOrganizationsForUser();
+        var actionResult = await _organizationController.GetAllOrganizationsForUser(true);
 
         // Assert
         var result = Assert.IsType<OkObjectResult>(actionResult.Result);
@@ -215,7 +215,7 @@ public class OrganizationControllerTests : IDisposable
             .Setup(b => b.GetAllOrganizationsForUser(It.IsAny<long>(), It.IsAny<bool>(), It.IsAny<bool>()))
             .ThrowsAsync(new Exception("db error"));
 
-        var result = (await _organizationController.GetAllOrganizationsForUser()).Result as ObjectResult;
+        var result = (await _organizationController.GetAllOrganizationsForUser(true)).Result as ObjectResult;
 
         Assert.NotNull(result);
         Assert.Equal(500, result.StatusCode);
@@ -375,7 +375,7 @@ public class OrganizationControllerTests : IDisposable
         CreateOrganizationRequestDto input = new CreateOrganizationRequestDto();
 
         _mockOrganizationBusiness
-            .Setup(b => b.CreateOrganization(UserId, input))
+            .Setup(b => b.CreateOrganization(UserId, input, false))
             .ReturnsAsync(expected);
 
         // Act
@@ -388,7 +388,7 @@ public class OrganizationControllerTests : IDisposable
         Assert.Equal(expected, result.Value);
 
         _mockOrganizationBusiness.Verify(
-            b => b.CreateOrganization(UserId, input),
+            b => b.CreateOrganization(UserId, input, false),
             Times.Once);
     }
 
@@ -397,7 +397,7 @@ public class OrganizationControllerTests : IDisposable
     public async Task CreateOrganization_Returns500_OnUnexpectedException()
     {
         _mockOrganizationBusiness
-            .Setup(b => b.CreateOrganization(It.IsAny<long>(), It.IsAny<CreateOrganizationRequestDto>()))
+            .Setup(b => b.CreateOrganization(It.IsAny<long>(), It.IsAny<CreateOrganizationRequestDto>(), false))
             .ThrowsAsync(new Exception("db error"));
 
         var result = (await _organizationController.CreateOrganization(It.IsAny<CreateOrganizationRequestDto>())).Result as ObjectResult;
@@ -410,7 +410,6 @@ public class OrganizationControllerTests : IDisposable
     public async Task CreateOrganization_PassesFiltersAndAdminFlagsToBusinessLayer()
     {
         // Arrange
-        const bool hideArchived = false;
         CreateOrganizationRequestDto input = new CreateOrganizationRequestDto();
 
         UserContextStorage.UserId = UserId;
@@ -419,7 +418,7 @@ public class OrganizationControllerTests : IDisposable
         var expected = new OrganizationResponseDto();
 
         _mockOrganizationBusiness
-            .Setup(b => b.CreateOrganization(UserId, input))
+            .Setup(b => b.CreateOrganization(UserId, input, false))
             .ReturnsAsync(expected);
 
         // Act
@@ -427,7 +426,7 @@ public class OrganizationControllerTests : IDisposable
 
         // Assert
         _mockOrganizationBusiness.Verify(
-            b => b.CreateOrganization(UserId, input),
+            b => b.CreateOrganization(UserId, input, false),
             Times.Once);
     }
 
@@ -493,7 +492,6 @@ public class OrganizationControllerTests : IDisposable
     public async Task UpdateOrganization_PassesFiltersAndAdminFlagsToBusinessLayer()
     {
         // Arrange
-        const bool hideArchived = false;
         UpdateOrganizationRequestDto input = new UpdateOrganizationRequestDto();
 
         UserContextStorage.UserId = UserId;

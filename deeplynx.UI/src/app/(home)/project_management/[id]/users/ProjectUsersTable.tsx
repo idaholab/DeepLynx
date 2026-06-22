@@ -12,7 +12,9 @@ import {
   updateProjectMemberRole,
 } from "@/app/lib/client_service/projects_services.client";
 import { getAllUsers } from "@/app/lib/client_service/user_services.client";
+import { useRBAC } from "@/app/(home)/rbac/useRBAC";
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 
 import { InviteUserToOrganizationRequestDto } from "@/app/(home)/types/requestDTOs";
@@ -60,6 +62,8 @@ const ProjectUsersTable = ({ members, roles, project }: Props) => {
   );
   const [loading, setLoading] = useState(false);
   const { t } = useLanguage();
+  const router = useRouter();
+  const { user, refreshUser } = useRBAC();
 
   /* ------------------------------------------------------------------------ */
   /*                           Add User Modal State                           */
@@ -132,6 +136,19 @@ const ProjectUsersTable = ({ members, roles, project }: Props) => {
     ? Number(organization.organizationId)
     : undefined;
   const projectId = project?.id ? Number(project.id) : undefined;
+  const currentUserId = user?.id ? Number(user.id) : undefined;
+
+  const refreshAccessIfAffected = async (
+    memberType?: "user" | "group" | null,
+    memberId?: number | null,
+  ) => {
+    if (!currentUserId) return;
+
+    if (memberType === "group" || memberId === currentUserId) {
+      await refreshUser();
+      router.refresh();
+    }
+  };
 
   /* ------------------------------------------------------------------------ */
   /*                    Sync server-provided members -> table                 */
@@ -220,6 +237,10 @@ const ProjectUsersTable = ({ members, roles, project }: Props) => {
       }
     } catch (refreshError) {
       console.error("Failed to refresh members list:", refreshError);
+    }
+
+    if (typeof emailOrUserId === "number") {
+      await refreshAccessIfAffected("user", emailOrUserId);
     }
   };
 
@@ -339,6 +360,7 @@ const ProjectUsersTable = ({ members, roles, project }: Props) => {
       // Refresh the members list
       const updatedMembers = await getProjectMembers(organizationId, projectId);
       setTableData(buildTableData(updatedMembers));
+      await refreshAccessIfAffected("group", groupId);
 
       setShowAddGroupModal(false);
       setSelectedGroupId("");
@@ -419,6 +441,7 @@ const ProjectUsersTable = ({ members, roles, project }: Props) => {
         ),
       );
 
+      await refreshAccessIfAffected(editRoleModal.memberType, memberId);
       toast.success(t.translations.MEMBER_ROLE_UPDATED);
     } catch (error) {
       console.error("Failed to update member role:", error);
@@ -475,6 +498,7 @@ const ProjectUsersTable = ({ members, roles, project }: Props) => {
       }
 
       setTableData((prev) => prev.filter((row) => row.memberId !== memberId));
+      await refreshAccessIfAffected(confirmModal.memberType, memberId);
 
       toast.success(t.translations.MEMBER_REMOVED_FROM_PROJECT);
     } catch (error) {

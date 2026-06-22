@@ -4,35 +4,56 @@ using deeplynx.interfaces;
 using deeplynx.models;
 using deeplynx.models.MetricsDTOs;
 using Microsoft.EntityFrameworkCore;
-using Newtonsoft.Json;
+using deeplynx.helpers.Cache;
 
 namespace deeplynx.business;
 
 public class MetricsBusiness : IMetricsBusiness
 {
     private readonly DeeplynxContext _context;
-    private readonly IFileBusinessFactory _fileBusinessFactory;
-    private readonly IObjectStorageBusiness _objectStorageBusiness;
+    private readonly TimeSpan _storageSizeCacheTtl = TimeSpan.FromHours(1);
 
     /// <summary>
     ///     Initializes a new instance of the <see cref="MetricsBusiness" /> class.
     /// </summary>
     /// <param name="context">The database context used for database retrieval</param>
-    /// <param name="fileBusinessFactory">Factory to create storage-specific file business instances</param>
     public MetricsBusiness(
-        DeeplynxContext context, 
-        IFileBusinessFactory fileBusinessFactory, 
-        IObjectStorageBusiness objectStorageBusiness)
+        DeeplynxContext context)
     {
         _context = context;
-        _fileBusinessFactory = fileBusinessFactory;
-        _objectStorageBusiness = objectStorageBusiness;
     }
 
     // -------------------------------------------------------------------------
     // Storage Metrics
     // -------------------------------------------------------------------------
 
+    private async Task<long> BuildProjectStorageSizeFromDb(long projectId)
+    {
+        return await _context.Records
+            .Where(r =>
+                r.ProjectId == projectId &&
+                !r.IsArchived &&
+                r.FileSize != null)
+            .SumAsync(r => r.FileSize ?? 0);
+    }
+
+    private async Task<long> GetProjectStorageSizeBytes(long projectId)
+    {
+        var cacheKey = CacheKeys.ProjectStorageSize(projectId);
+
+        var cachedSize = await CacheService.Instance.GetAsync<long?>(cacheKey);
+        if (cachedSize.HasValue)
+        {
+            return cachedSize.Value;
+        }
+        
+        var totalSize = await BuildProjectStorageSizeFromDb(projectId);
+        
+        await CacheService.Instance.SetAsync(cacheKey, totalSize, _storageSizeCacheTtl);
+
+        return totalSize;
+    }
+    
     /// <summary>
     ///     Gets total bytes for a specific object storage within an optional project scope
     /// </summary>
@@ -44,14 +65,22 @@ public class MetricsBusiness : IMetricsBusiness
         long? projectId,
         long objectStorageId)
     {
-        var objectStorage = await _objectStorageBusiness.GetDecryptedObjectStorage(objectStorageId);
+        await ExistenceHelper.EnsureOrganizationExistsAsync(_context, organizationId);
 
-        // Build prefix based on scope and storage type
-        long? effectiveProjectId = projectId ?? objectStorage.ProjectId;
-        var fileBusiness = _fileBusinessFactory.CreateFileBusiness(objectStorage.Type);
-        var prefix = fileBusiness.BuildPrefix(organizationId, effectiveProjectId);
+        var query = _context.Records
+            .Where(r =>
+                r.OrganizationId == organizationId &&
+                r.ObjectStorageId == objectStorageId &&
+                !r.IsArchived &&
+                r.FileSize != null);
+
+        if (projectId.HasValue)
+        {
+            query = query.Where(r => r.ProjectId == projectId.Value);
+        }
+
+        var totalBytes = await query.SumAsync(r => r.FileSize ?? 0);
         
-        var totalBytes = await fileBusiness.GetStorageSize(prefix, objectStorage.Config);
         return new StorageSizeDto{ Bytes = totalBytes };
     }
 
@@ -72,32 +101,7 @@ public class MetricsBusiness : IMetricsBusiness
         if (project.OrganizationId != organizationId)
             throw new InvalidOperationException($"Project {projectId} does not belong to organization {organizationId}");
         
-        long totalBytes = 0;
-        
-        var objectStorages = await _objectStorageBusiness.GetDecryptedObjectStorages(
-            organizationId, projectId, null);
-
-        // Group by unique config to avoid counting shared storage backends multiple times
-        var uniqueStorages = objectStorages
-            .GroupBy(os => new { os.Type, ConfigJson = JsonConvert.SerializeObject(os.Config) })
-            .Select(g => g.First())
-            .ToList();
-        
-        foreach (var objectStorage in uniqueStorages)
-        {
-            try
-            {
-                var fileBusiness = _fileBusinessFactory.CreateFileBusiness(objectStorage.Type);
-                var prefix = fileBusiness.BuildPrefix(organizationId, projectId);
-                
-                var osBytes = await fileBusiness.GetStorageSize(prefix, objectStorage.Config);
-                totalBytes += osBytes;
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Failed to get size for object storage {objectStorage.Id}: {ex.Message}");
-            }
-        }
+        var totalBytes = await GetProjectStorageSizeBytes(projectId);
         
         return new StorageSizeDto{ Bytes = totalBytes };
     }
@@ -112,31 +116,16 @@ public class MetricsBusiness : IMetricsBusiness
         // verify organization exists
         await ExistenceHelper.EnsureOrganizationExistsAsync(_context, organizationId);
 
+        var projectIds = await _context.Projects
+            .Where(p => p.OrganizationId == organizationId && !p.IsArchived)
+            .Select(p => p.Id)
+            .ToListAsync();
+
         long totalBytes = 0;
-        
-        var objectStorages = await _objectStorageBusiness.GetDecryptedObjectStorages(
-            organizationId, null, null);
-        
-        // Group by unique config to avoid counting shared storage backends multiple times
-        var uniqueStorages = objectStorages
-            .GroupBy(os => new { os.Type, ConfigJson = JsonConvert.SerializeObject(os.Config) })
-            .Select(g => g.First())
-            .ToList();
-        
-        foreach (var objectStorage in uniqueStorages)
+
+        foreach (var projectId in projectIds)
         {
-            try
-            {
-                var fileBusiness = _fileBusinessFactory.CreateFileBusiness(objectStorage.Type);
-                var prefix = fileBusiness.BuildPrefix(organizationId, null);
-                
-                var osBytes = await fileBusiness.GetStorageSize(prefix, objectStorage.Config);
-                totalBytes += osBytes;
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Failed to get size for object storage {objectStorage.Id}: {ex.Message}");
-            }
+            totalBytes += await GetProjectStorageSizeBytes(projectId);
         }
         
         return new StorageSizeDto{ Bytes = totalBytes };
@@ -148,33 +137,16 @@ public class MetricsBusiness : IMetricsBusiness
     /// <returns>Dictionary of objectStorageId -> total bytes</returns>
     public async Task<StorageSizeDto> GetSystemStorageSize()
     {
+        var projectIds = await _context.Projects
+            .Where(p => !p.IsArchived)
+            .Select(p => p.Id)
+            .ToListAsync();
+        
         long totalBytes = 0;
-        
-        // select only the first of each unique config in order to eliminate duplicates
-        var objectStorages = await _objectStorageBusiness.GetDecryptedObjectStorages(
-            null, null, null);
-        
-        // Group by unique config to avoid counting shared storage backends multiple times
-        var uniqueStorages = objectStorages
-            .GroupBy(os => new { os.Type, ConfigJson = JsonConvert.SerializeObject(os.Config) })
-            .Select(g => g.First())
-            .ToList();
-        
-        foreach (var objectStorage in uniqueStorages)
+
+        foreach (var projectId in projectIds)
         {
-            try
-            {
-                var fileBusiness = _fileBusinessFactory.CreateFileBusiness(objectStorage.Type);
-                // Empty prefix for system-wide (get everything in this storage)
-                var prefix = "";
-                
-                var osBytes = await fileBusiness.GetStorageSize(prefix, objectStorage.Config);
-                totalBytes += osBytes;
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Failed to get size for object storage {objectStorage.Id}: {ex.Message}");
-            }
+            totalBytes += await GetProjectStorageSizeBytes(projectId);
         }
         
         return new StorageSizeDto{ Bytes = totalBytes };

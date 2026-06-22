@@ -66,6 +66,22 @@ public class ProjectAdminAttribute : Attribute
     }
 }
 
+/// <summary>
+/// Requires the user to be a member of the organization in the route (any role), an organization
+/// admin, or a system admin. Use this for organization-scoped actions that every member should be
+/// able to perform, such as creating a project.
+/// </summary>
+[AttributeUsage(AttributeTargets.Class | AttributeTargets.Method, AllowMultiple = false)]
+public class OrgMemberAttribute : Attribute
+{
+    public bool IncludeArchived { get; set; }
+
+    public OrgMemberAttribute(bool includeArchived = false)
+    {
+        IncludeArchived = includeArchived;
+    }
+}
+
 public class AuthMiddleware
 {
     private readonly RequestDelegate _next;
@@ -89,11 +105,10 @@ public class AuthMiddleware
         // Check for admin attributes first
         var sysAdminAttr = endpoint.Metadata.GetMetadata<SysAdminAttribute>();
         var orgAdminAttr = endpoint.Metadata.GetMetadata<OrgAdminAttribute>();
-        var projectAdminAttr = endpoint.Metadata.GetMetadata<ProjectAdminAttribute>();
         var authAttributes = endpoint.Metadata.GetOrderedMetadata<AuthAttribute>();
 
         // If no auth attributes at all, continue
-        if (sysAdminAttr == null && orgAdminAttr == null && projectAdminAttr == null && !authAttributes.Any())
+        if (sysAdminAttr == null && orgAdminAttr == null && !authAttributes.Any())
         {
             await _next(context);
             return;
@@ -258,6 +273,45 @@ public class AuthMiddleware
 
             context.Response.StatusCode = StatusCodes.Status403Forbidden;
             await context.Response.WriteAsJsonAsync(new { error = "Forbidden: Project administrator access required" });
+            return;
+        }
+
+        // Handle OrgMember attribute
+        if (orgMemberAttr != null)
+        {
+            if (!organizationId.HasValue)
+            {
+                context.Response.StatusCode = StatusCodes.Status400BadRequest;
+                await context.Response.WriteAsJsonAsync(new { error = "Bad Request: Organization ID required for organization membership check" });
+                return;
+            }
+
+            // Check organization existence
+            capturedOrgId = await organizationService.CheckExistence(
+                null,
+                organizationId,
+                orgMemberAttr.IncludeArchived
+            );
+
+            if (capturedOrgId.HasValue)
+                UserContextStorage.OrganizationId = capturedOrgId.Value;
+
+            // System admins automatically pass
+            if (isSysAdmin)
+            {
+                await _next(context);
+                return;
+            }
+
+            // IsOrgMember (and IsOrgAdmin) are pre-populated by UserContextMiddleware
+            if (!UserContextStorage.IsOrgMember && !UserContextStorage.IsOrgAdmin)
+            {
+                context.Response.StatusCode = StatusCodes.Status403Forbidden;
+                await context.Response.WriteAsJsonAsync(new { error = "Forbidden: Organization membership required" });
+                return;
+            }
+
+            await _next(context);
             return;
         }
 
