@@ -105,6 +105,8 @@ public class AuthMiddleware
         // Check for admin attributes first
         var sysAdminAttr = endpoint.Metadata.GetMetadata<SysAdminAttribute>();
         var orgAdminAttr = endpoint.Metadata.GetMetadata<OrgAdminAttribute>();
+        var projectAdminAttr = endpoint.Metadata.GetMetadata<ProjectAdminAttribute>();
+        var orgMemberAttr = endpoint.Metadata.GetMetadata<OrgMemberAttribute>();
         var authAttributes = endpoint.Metadata.GetOrderedMetadata<AuthAttribute>();
 
         // If no auth attributes at all, continue
