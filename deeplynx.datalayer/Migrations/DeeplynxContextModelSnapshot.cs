@@ -632,16 +632,6 @@ namespace deeplynx.datalayer.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("Id"));
 
-                    b.Property<string>("ChunkHash")
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)")
-                        .HasColumnName("chunk_hash");
-
-                    b.Property<string>("EmbeddingHash")
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)")
-                        .HasColumnName("embedding_hash");
-
                     b.Property<DateTime>("LastUpdatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp without time zone")
@@ -655,6 +645,16 @@ namespace deeplynx.datalayer.Migrations
                     b.Property<long>("RecordId")
                         .HasColumnType("bigint")
                         .HasColumnName("record_id");
+
+                    b.Property<string>("ChunkHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("chunk_hash");
+
+                    b.Property<string>("EmbeddingHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("embedding_hash");
 
                     b.Property<string>("TextChunk")
                         .IsRequired()
@@ -676,123 +676,6 @@ namespace deeplynx.datalayer.Migrations
                         .HasDatabaseName("idx_embeddings_record_id");
 
                     b.ToTable("embeddings", "dl_vector");
-                });
-
-            modelBuilder.Entity("deeplynx.datalayer.Models.IngestionProvenanceRecord", b =>
-                {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint")
-                        .HasColumnName("id");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("Id"));
-
-                    b.Property<string>("ArtifactVersionId")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("artifact_version_id");
-
-                    b.Property<string>("ContentHash")
-                        .IsRequired()
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)")
-                        .HasColumnName("content_hash");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp without time zone")
-                        .HasColumnName("created_at")
-                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
-
-                    b.Property<string>("EmbeddingModelName")
-                        .HasColumnType("text")
-                        .HasColumnName("embedding_model_name");
-
-                    b.Property<long>("OrganizationId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("organization_id");
-
-                    b.Property<string>("PipelineRunId")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("pipeline_run_id");
-
-                    b.Property<string>("PipelineVersion")
-                        .HasColumnType("text")
-                        .HasColumnName("pipeline_version");
-
-                    b.Property<string>("ProcessingConfigVersion")
-                        .HasColumnType("text")
-                        .HasColumnName("processing_config_version");
-
-                    b.Property<string>("ProvId")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("prov_id");
-
-                    b.Property<string>("ProvenanceJson")
-                        .IsRequired()
-                        .HasColumnType("jsonb")
-                        .HasColumnName("provenance_json");
-
-                    b.Property<long>("ProjectId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("project_id");
-
-                    b.Property<long>("RecordId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("record_id");
-
-                    b.Property<string>("Signature")
-                        .HasColumnType("text")
-                        .HasColumnName("signature");
-
-                    b.Property<string>("SignatureAlgorithm")
-                        .HasColumnType("text")
-                        .HasColumnName("signature_algorithm");
-
-                    b.Property<DateTime?>("SignedAt")
-                        .HasColumnType("timestamp without time zone")
-                        .HasColumnName("signed_at");
-
-                    b.Property<string>("SignedPayloadHash")
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)")
-                        .HasColumnName("signed_payload_hash");
-
-                    b.Property<string>("SigningKeyName")
-                        .HasColumnType("text")
-                        .HasColumnName("signing_key_name");
-
-                    b.Property<string>("SigningKeyVersion")
-                        .HasColumnType("text")
-                        .HasColumnName("signing_key_version");
-
-                    b.Property<string>("VerificationStatus")
-                        .HasColumnType("text")
-                        .HasColumnName("verification_status");
-
-                    b.HasKey("Id")
-                        .HasName("ingestion_provenance_records_pkey");
-
-                    b.HasIndex("ArtifactVersionId")
-                        .IsUnique()
-                        .HasDatabaseName("idx_ingestion_provenance_records_artifact_version_id");
-
-                    b.HasIndex("ContentHash")
-                        .HasDatabaseName("idx_ingestion_provenance_records_content_hash");
-
-                    b.HasIndex("Id")
-                        .HasDatabaseName("idx_ingestion_provenance_records_id");
-
-                    b.HasIndex("ProvId")
-                        .IsUnique()
-                        .HasDatabaseName("idx_ingestion_provenance_records_prov_id");
-
-                    b.HasIndex("RecordId")
-                        .HasDatabaseName("idx_ingestion_provenance_records_record_id");
-
-                    b.ToTable("ingestion_provenance_records", "deeplynx");
                 });
 
             modelBuilder.Entity("deeplynx.datalayer.Models.Event", b =>
@@ -1898,6 +1781,11 @@ namespace deeplynx.datalayer.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("embedded");
 
+                    b.Property<string>("NormalizedContentHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("normalized_content_hash");
+
                     b.Property<long?>("ExtractionId")
                         .HasColumnType("bigint")
                         .HasColumnName("extraction_id");
@@ -1930,11 +1818,6 @@ namespace deeplynx.datalayer.Migrations
                         .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("name");
-
-                    b.Property<string>("NormalizedContentHash")
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)")
-                        .HasColumnName("normalized_content_hash");
 
                     b.Property<long?>("ObjectStorageId")
                         .HasColumnType("bigint")
@@ -2977,18 +2860,6 @@ namespace deeplynx.datalayer.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("embeddings_record_id_fkey");
-
-                    b.Navigation("Record");
-                });
-
-            modelBuilder.Entity("deeplynx.datalayer.Models.IngestionProvenanceRecord", b =>
-                {
-                    b.HasOne("deeplynx.datalayer.Models.Record", "Record")
-                        .WithMany()
-                        .HasForeignKey("RecordId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("ingestion_provenance_records_record_id_fkey");
 
                     b.Navigation("Record");
                 });
