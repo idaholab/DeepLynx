@@ -614,11 +614,11 @@ public class ProjectControllerTests : IDisposable
     [Fact]
     public async Task UpdateProjectMemberRole_Returns200_OnSuccess()
     {
-        _mockBusiness.Setup(b => b.UpdateProjectMemberRole(ProjectId, RoleId, OtherUserId, null))
+        _mockBusiness.Setup(b => b.UpdateProjectMemberRole(ProjectId, RoleId, OtherUserId, null, null))
                      .Returns(Task.FromResult(true));
 
         var result = await _controller.UpdateProjectMemberRole(
-            OrgId, ProjectId, RoleId, OtherUserId, groupId: null) as OkObjectResult;
+            OrgId, ProjectId, RoleId, OtherUserId, groupId: null, isProjectAdmin: null) as OkObjectResult;
 
         Assert.NotNull(result);
         Assert.Equal(200, result.StatusCode);
@@ -629,11 +629,12 @@ public class ProjectControllerTests : IDisposable
     public async Task UpdateProjectMemberRole_Returns500_OnUnexpectedException()
     {
         _mockBusiness.Setup(b => b.UpdateProjectMemberRole(
-                         It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long?>(), It.IsAny<long?>()))
+                         It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long?>(), It.IsAny<long?>(),
+                         It.IsAny<bool?>()))
                      .ThrowsAsync(new Exception("db error"));
 
         var result = await _controller.UpdateProjectMemberRole(
-            OrgId, ProjectId, RoleId, OtherUserId, groupId: null) as ObjectResult;
+            OrgId, ProjectId, RoleId, OtherUserId, groupId: null, isProjectAdmin: null) as ObjectResult;
 
         Assert.NotNull(result);
         Assert.Equal(500, result.StatusCode);
@@ -642,14 +643,14 @@ public class ProjectControllerTests : IDisposable
     [Fact]
     public async Task UpdateProjectMemberRole_PassesParametersToBusinessLayer()
     {
-        _mockBusiness.Setup(b => b.UpdateProjectMemberRole(ProjectId, RoleId, null, GroupId))
+        _mockBusiness.Setup(b => b.UpdateProjectMemberRole(ProjectId, RoleId, null, GroupId, true))
                      .Returns(Task.FromResult(true));
 
         await _controller.UpdateProjectMemberRole(
-            OrgId, ProjectId, RoleId, userId: null, groupId: GroupId);
+            OrgId, ProjectId, RoleId, userId: null, groupId: GroupId, isProjectAdmin: true);
 
         _mockBusiness.Verify(
-            b => b.UpdateProjectMemberRole(ProjectId, RoleId, null, GroupId),
+            b => b.UpdateProjectMemberRole(ProjectId, RoleId, null, GroupId, true),
             Times.Once);
     }
 
@@ -925,7 +926,8 @@ public class ProjectControllerTests : IDisposable
             "projectId",
             "roleId",
             "userId",
-            "groupId");
+            "groupId",
+            "isProjectAdmin");
 
         AssertHasHttpAttribute(method, "HttpPutAttribute");
         AssertHasAuthAttribute(method, "update", "project");
