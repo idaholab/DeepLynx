@@ -401,4 +401,21 @@ public class ProjectController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
+
+    [Tags("Service Accounts")]
+    [ProjectAdmin]
+    [HttpPost("{projectId:long}/invite/serviceAccount", Name = "api_add_service_account")]
+    public async Task<ActionResult> CreateAndAddServiceAccountToProject(
+        long organizationId,
+        long projectId,
+        [FromQuery] long roleId,
+        [FromQuery] string name)
+    {
+        try
+        {
+            var callerIsAdmin = UserContextStorage.IsSysAdmin || UserContextStorage.IsOrgAdmin ||
+                                UserContextStorage.IsProjectAdmin;
+            await _invitationBusiness.CreateAndAddServiceAccountToProject(organizationId, projectId, roleId, name, callerIsAdmin);
+        }
+    }
 }
