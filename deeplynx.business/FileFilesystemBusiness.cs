@@ -417,9 +417,10 @@ public class FileFilesystemBusiness : IFileBusiness
     /// <exception cref="FileNotFoundException"></exception>
     public async Task<long> GetFileSize(string fileUri, ObjectStorageConfigDto objectStorageConfig)
     {
-        if (objectStorageConfig.MountPath == null)
-            throw new Exception("File system mount path not set in object storage");
-
+        // Kept for IFileBusiness interface compatability.
+        // Filesystem records store the full file path in the uri.
+        _ = objectStorageConfig;
+        
         if (string.IsNullOrWhiteSpace(fileUri))
             throw new ArgumentException("File URI is not specified.");
 

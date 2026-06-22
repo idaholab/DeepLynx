@@ -48,7 +48,7 @@ public partial class DeeplynxContext : DbContext
     public virtual DbSet<Project> Projects { get; set; }
 
     public virtual DbSet<ProjectMember> ProjectMembers { get; set; }
-    
+
     public virtual DbSet<QueryRecord> QueryRecords { get; set; }
 
     public virtual DbSet<Record> Records { get; set; }
@@ -117,6 +117,9 @@ public partial class DeeplynxContext : DbContext
             entity.HasIndex(e => e.ApplicationId)
                 .HasDatabaseName("idx_api_keys_application_id");
 
+            entity.HasIndex(e => e.CreatedBy)
+                .HasDatabaseName("idx_api_keys_created_by");
+
             entity.HasOne(d => d.User).WithMany(p => p.ApiKeys)
                 .HasForeignKey(d => d.UserId)
                 .HasConstraintName("api_keys_user_id_fkey");
@@ -125,6 +128,11 @@ public partial class DeeplynxContext : DbContext
                 .HasForeignKey(d => d.ApplicationId)
                 .OnDelete(DeleteBehavior.Cascade)
                 .HasConstraintName("api_keys_application_id_fkey");
+
+            entity.HasOne(d => d.CreatedByUser).WithMany(p => p.CreatedApiKeys)
+                .HasForeignKey(d => d.CreatedBy)
+                .OnDelete(DeleteBehavior.NoAction)
+                .HasConstraintName("api_keys_created_by_fkey");
         });
 
         modelBuilder.Entity<Class>(entity =>
@@ -1374,6 +1382,10 @@ public partial class DeeplynxContext : DbContext
             entity.HasIndex(e => e.SsoId)
                 .HasDatabaseName("idx_users_sso_id");
 
+            entity.HasIndex(e => e.Username)
+                .HasDatabaseName("idx_users_username")
+                .IsUnique();
+
             entity.Property(e => e.Id).UseIdentityAlwaysColumn();
 
             entity.Property(e => e.IsArchived).HasDefaultValue(false);
@@ -1381,6 +1393,8 @@ public partial class DeeplynxContext : DbContext
             entity.Property(e => e.IsSysAdmin).HasDefaultValue(false);
 
             entity.Property(e => e.IsActive).HasDefaultValue(false);
+
+            entity.Property(e => e.AccountType).HasDefaultValue("standard");
         });
 
         modelBuilder.Entity<SavedSearch>(entity =>

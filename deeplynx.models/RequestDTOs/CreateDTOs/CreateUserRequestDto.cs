@@ -3,8 +3,14 @@ namespace deeplynx.models;
 public class CreateUserRequestDto
 {
     public string Name { get; set; }
-    public string Email { get; set; }
+    public string? Email { get; set; }
     public string? Username { get; set; }
     public bool? IsArchived { get; set; } = false;
     public bool? IsActive { get; set; } = false;
+
+    /// <summary>
+    /// The type of account to create. Defaults to standard.
+    /// Valid values: "standard", "service", "test"
+    /// </summary>
+    public string AccountType { get; set; } = models.AccountType.Standard;
 }

@@ -8,6 +8,7 @@ using Moq;
 using DlRecord = deeplynx.datalayer.Models.Record;
 using Testcontainers.Azurite;
 using Record = deeplynx.datalayer.Models.Record;
+using deeplynx.helpers.Cache;
 
 namespace deeplynx.tests;
  
@@ -105,7 +106,7 @@ public class MetricsBusinessTests : IntegrationTestBase, IClassFixture<MetricsAz
         
         _fileBusinessFactory = fileBusinessFactory.Object;
         
-        _metricsBusiness = new MetricsBusiness(Context, _fileBusinessFactory, _objectStorageBusiness);
+        _metricsBusiness = new MetricsBusiness(Context);
     }
  
     public override async Task DisposeAsync()
@@ -629,70 +630,205 @@ public class MetricsBusinessTests : IntegrationTestBase, IClassFixture<MetricsAz
         using var stream = new MemoryStream(content);
         await blob.UploadAsync(stream, overwrite: true);
     }
+
+    private async Task<(long ProjectId, long DataSourceId)> CreateMetricsStorageTestProject(long organizationId)
+    {
+        var project = new Project
+        {
+            Name = $"Storage Metrics Test Project {Guid.NewGuid()}",
+            OrganizationId = organizationId,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = _userId
+        };
+        
+        Context.Projects.Add(project);
+        await Context.SaveChangesAsync();
+
+        var dataSource = new DataSource
+        {
+            Name = $"Storage Metrics Test DS {Guid.NewGuid()}",
+            OrganizationId = organizationId,
+            ProjectId = project.Id,
+            IsArchived = false
+        };
+        
+        Context.DataSources.Add(dataSource);
+        await Context.SaveChangesAsync();
+        
+        return (project.Id, dataSource.Id);
+    }
+
+    private Record CreateStorageMetricRecord(
+        long organizationId,
+        long projectId,
+        long dataSourceId,
+        long? objectStorageId,
+        long? fileSize,
+        bool isArchived = false)
+    {
+        return new Record
+        {
+            Name = $"storage-metric-record-{Guid.NewGuid()}",
+            Description = "storage metric test record",
+            OriginalId = Guid.NewGuid().ToString(),
+            Properties = "{}",
+            OrganizationId = organizationId,
+            ProjectId = projectId,
+            DataSourceId = dataSourceId,
+            ObjectStorageId = objectStorageId,
+            FileSize = fileSize,
+            IsArchived = isArchived,
+            Uri = "storage-metric-test-file",
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = _userId
+        };
+    }
  
     #endregion
  
     #region Get_StorageSize Tests
- 
+    
+    // Verifies that project storage size is calculated by summing FileSize values from active records with null FileSize excluded.
     [Fact]
-    public async Task GetProjectStorageSize_AggregatesAllStorageTypes()
+    public async Task GetProjectStorageSize_ExcludesNullFileSizes()
     {
-        // Arrange
-        // Org2 Project1 has:
-        // - Filesystem: 5KB (2KB + 3KB)
-        // - Azure: 6KB (3KB + 3KB)
-        // Total: 11KB
- 
-        // Act
-        var result = await _metricsBusiness.GetProjectStorageSize(_org2Id, _org2Proj1Id);
- 
-        // Assert
-        Assert.NotNull(result);
-        Assert.Equal(11264, result.Bytes); // Filesystem: 5120 + Azure: 6144 = 11264 bytes
+        var scope = await CreateMetricsStorageTestProject(_org1Id);
+
+        Context.Records.AddRange(
+            CreateStorageMetricRecord(_org1Id, scope.ProjectId, scope.DataSourceId, _fsOrg1Proj1StorageId, 100),
+            CreateStorageMetricRecord(_org1Id, scope.ProjectId, scope.DataSourceId, _fsOrg1Proj1StorageId, null),
+            CreateStorageMetricRecord(_org1Id, scope.ProjectId, scope.DataSourceId, _fsOrg1Proj1StorageId, 200));
+
+        await Context.SaveChangesAsync();
+
+        var result = await _metricsBusiness.GetProjectStorageSize(_org1Id, scope.ProjectId);
+
+        Assert.Equal(300, result.Bytes);
     }
     
+    // Verifies that archived records are excluded from project storage size.
     [Fact]
-    public async Task GetOrganizationStorageSize_ReturnsAllStorages_InOrganization()
+    public async Task GetProjectStorageSize_ExcludesArchivedRecords()
     {
-        // Arrange
-        // Org2 has:
-        // - Project1 Filesystem: 5KB (2KB + 3KB)
-        // - Project1 Azure: 6KB (3KB + 3KB)
-        // - Project2 Filesystem: 7KB (3KB + 4KB)
-        // - Project2 Azure: 9KB (4KB + 5KB)
-        // Total: 27KB
+        var scope = await CreateMetricsStorageTestProject(_org1Id);
 
-        // Act
+        Context.Records.AddRange(
+            CreateStorageMetricRecord(_org1Id, scope.ProjectId, scope.DataSourceId, _fsOrg1Proj1StorageId, 100),
+            CreateStorageMetricRecord(_org1Id, scope.ProjectId, scope.DataSourceId, _fsOrg1Proj1StorageId, 200, isArchived: true));
+
+        await Context.SaveChangesAsync();
+
+        var result = await _metricsBusiness.GetProjectStorageSize(_org1Id, scope.ProjectId);
+
+        Assert.Equal(100, result.Bytes);
+    }
+    
+    // Verifies that object storage size only sums records matching the requested ObjectStorageId.
+    [Fact]
+    public async Task GetObjectStorageSize_SumsOnlyMatchingObjectStorage()
+    {
+        var scope = await CreateMetricsStorageTestProject(_org1Id);
+
+        Context.Records.AddRange(
+            CreateStorageMetricRecord(_org1Id, scope.ProjectId, scope.DataSourceId, _fsOrg1Proj1StorageId, 100),
+            CreateStorageMetricRecord(_org1Id, scope.ProjectId, scope.DataSourceId, _fsOrg1Proj1StorageId, 200),
+            CreateStorageMetricRecord(_org1Id, scope.ProjectId, scope.DataSourceId, _azureOrg1Proj1StorageId, 500));
+
+        await Context.SaveChangesAsync();
+
+        var result = await _metricsBusiness.GetObjectStorageSize(
+            _org1Id,
+            scope.ProjectId,
+            _fsOrg1Proj1StorageId);
+
+        Assert.Equal(300, result.Bytes);
+    }
+    
+    // Verifies that organization storage size sums FileSize values across projects in the organization.
+    [Fact]
+    public async Task GetOrganizationStorageSize_SumsProjectsInOrganization()
+    {
+        var scope1 = await CreateMetricsStorageTestProject(_org2Id);
+        var scope2 = await CreateMetricsStorageTestProject(_org2Id);
+
+        Context.Records.AddRange(
+            CreateStorageMetricRecord(_org2Id, scope1.ProjectId, scope1.DataSourceId, _fsOrg2Proj1StorageId, 100),
+            CreateStorageMetricRecord(_org2Id, scope2.ProjectId, scope2.DataSourceId, _fsOrg2Proj2StorageId, 200));
+
+        await Context.SaveChangesAsync();
+
         var result = await _metricsBusiness.GetOrganizationStorageSize(_org2Id);
 
-        // Assert
-        Assert.NotNull(result);
-        Assert.Equal(27648, result.Bytes); // (5120 + 6144) + (7168 + 9216) = 27648 bytes
+        Assert.Equal(300, result.Bytes);
     }
-
+    
+    // Verifies that system storage size sums FileSize values across all organizations.
     [Fact]
-    public async Task GetSystemStorageSize_ReturnsAllStorages_SystemWide()
+    public async Task GetSystemStorageSize_SumsAllProjects()
     {
-        // Arrange
-        // System-wide storage across all organizations:
-        // Org1:
-        // - Project1 Filesystem: 3KB (1KB + 2KB)
-        // - Project1 Azure: 4KB (2KB + 2KB)
-        // Org2:
-        // - Project1 Filesystem: 5KB (2KB + 3KB)
-        // - Project1 Azure: 6KB (3KB + 3KB)
-        // - Project2 Filesystem: 7KB (3KB + 4KB)
-        // - Project2 Azure: 9KB (4KB + 5KB)
-        // Total: 34KB
+        var org1Scope = await CreateMetricsStorageTestProject(_org1Id);
+        var org2Scope = await CreateMetricsStorageTestProject(_org2Id);
 
-        // Act
+        Context.Records.AddRange(
+            CreateStorageMetricRecord(_org1Id, org1Scope.ProjectId, org1Scope.DataSourceId, _fsOrg1Proj1StorageId, 100),
+            CreateStorageMetricRecord(_org2Id, org2Scope.ProjectId, org2Scope.DataSourceId, _fsOrg2Proj1StorageId, 200));
+
+        await Context.SaveChangesAsync();
+
         var result = await _metricsBusiness.GetSystemStorageSize();
 
-        // Assert
-        Assert.NotNull(result);
-        Assert.Equal(34816, result.Bytes); // Org1: (3072 + 4096) + Org2: (5120 + 6144 + 7168 + 9216) = 34816 bytes
+        Assert.Equal(300, result.Bytes);
     }
- 
+    
+    // Check if 0 is returned if no records are matched
+    [Fact]
+    public async Task GetProjectStorageSize_ReturnsZero_WhenNoMatchingRecordsExist()
+    {
+        var scope = await CreateMetricsStorageTestProject(_org1Id);
+
+        var result = await _metricsBusiness.GetProjectStorageSize(
+            _org1Id,
+            scope.ProjectId);
+
+        Assert.Equal(0, result.Bytes);
+    }
+    
+    // Verifies that project storage size returns the cached value instead of recalculating from DB.
+    [Fact]
+    public async Task GetProjectStorageSize_ReturnsCachedValue_WhenCacheHit()
+    {
+        var scope = await CreateMetricsStorageTestProject(_org1Id);
+        var cacheKey = CacheKeys.ProjectStorageSize(scope.ProjectId);
+
+        Context.Records.Add(
+            CreateStorageMetricRecord(
+                _org1Id,
+                scope.ProjectId,
+                scope.DataSourceId,
+                _fsOrg1Proj1StorageId,
+                100));
+
+        await Context.SaveChangesAsync();
+
+        await CacheService.Instance.SetAsync(
+            cacheKey,
+            999L,
+            TimeSpan.FromHours(1));
+
+        try
+        {
+            var result = await _metricsBusiness.GetProjectStorageSize(
+                _org1Id,
+                scope.ProjectId);
+
+            Assert.Equal(999, result.Bytes);
+        }
+        finally
+        {
+            await CacheService.Instance.DeleteAsync(cacheKey);
+        }
+    }
+    
     #endregion
     
     #region GetSystemDataSourceCount Tests

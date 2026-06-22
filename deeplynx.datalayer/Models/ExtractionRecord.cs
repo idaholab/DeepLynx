@@ -61,6 +61,10 @@ public class ExtractionRecord
     [Column("deeplynx_record_id")]
     public long? DeeplynxRecordId { get; set; }
 
+    /// <summary>Set when a reviewer rejects this staged item; rejected items are never promoted.</summary>
+    [Column("rejected")]
+    public bool Rejected { get; set; }
+
     public virtual ExtractionClass? ExtractionClass { get; set; }
     public virtual ICollection<ExtractionEdge> OriginEdges { get; set; } = [];
     public virtual ICollection<ExtractionEdge> DestinationEdges { get; set; } = [];

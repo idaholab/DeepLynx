@@ -40,6 +40,10 @@ public class ExtractionRelationship
     [Column("ontology_relationship_id")]
     public long? OntologyRelationshipId { get; set; }
 
+    /// <summary>Set when a reviewer rejects this staged item; rejected items are never promoted.</summary>
+    [Column("rejected")]
+    public bool Rejected { get; set; }
+
     public virtual ExtractionClass? OriginClass { get; set; }
     public virtual ExtractionClass? DestinationClass { get; set; }
     public virtual ICollection<ExtractionEdge> Edges { get; set; } = [];
