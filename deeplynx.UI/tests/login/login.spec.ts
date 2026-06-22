@@ -31,9 +31,7 @@ test.describe("Login", () => {
       await seedSession(page);
       await page.goto("/login/signin", { waitUntil: "domcontentloaded" });
       // The System Use Notification and Sign In button should not render
-      await expect(
-        page.getByText("System Use Notification"),
-      ).not.toBeVisible();
+      await expect(page.getByText("System Use Notification")).not.toBeVisible();
     });
   });
 
@@ -50,15 +48,15 @@ test.describe("Login", () => {
     });
 
     test("welcome greeting includes the dev user name", async ({ page }) => {
-      await expect(
-        page.getByText(/Welcome Back,\s+Local/i),
-      ).toBeVisible({ timeout: 15000 });
+      await expect(page.getByText(/Welcome Back,\s+Local/i)).toBeVisible({
+        timeout: 15000,
+      });
     });
 
     test("Your Projects section is visible", async ({ page }) => {
-      await expect(
-        page.locator('[data-tour="projects-section"]'),
-      ).toBeVisible({ timeout: 15000 });
+      await expect(page.locator('[data-tour="projects-section"]')).toBeVisible({
+        timeout: 15000,
+      });
     });
 
     test("sidebar renders with navigation links", async ({ page }) => {
@@ -71,9 +69,8 @@ test.describe("Login", () => {
 
 import * as fs from "fs";
 import * as path from "path";
+import { seedSession } from "../helpers/seed";
 
-// Read .env files in Next.js precedence order to determine whether
-// frontend authentication is enabled. Later files override earlier ones.
 function isAuthEnabled(): boolean {
   const root = path.resolve(__dirname, "../..");
   const envFiles = [
@@ -94,7 +91,7 @@ function isAuthEnabled(): boolean {
         disabled = match[1].trim().replace(/["']/g, "") === "true";
       }
     } catch {
-      // File doesn't exist, skip
+      // Missing env files are expected in some environments.
     }
   }
 
@@ -103,7 +100,72 @@ function isAuthEnabled(): boolean {
 
 const AUTH_ENABLED = isAuthEnabled();
 
-test.describe("Login Page", () => {
+test.describe("Login page redirect (auth disabled)", () => {
+  test.skip(
+    AUTH_ENABLED,
+    "Auth is enabled (NEXT_PUBLIC_DISABLE_FRONTEND_AUTHENTICATION=false)",
+  );
+
+  test("visiting /login/signin redirects to the home page", async ({
+    page,
+  }) => {
+    await seedSession(page);
+    await page.goto("/login/signin", { waitUntil: "domcontentloaded" });
+    await page.waitForURL("/", { timeout: 15000 });
+  });
+
+  test("login page shows Nexus logo while redirecting", async ({ page }) => {
+    await seedSession(page);
+    await page.goto("/login/signin", { waitUntil: "domcontentloaded" });
+    await expect(page.getByAltText("DeepLynx logo")).toBeVisible();
+  });
+
+  test("login page does not show the sign-in form when auth is disabled", async ({
+    page,
+  }) => {
+    await seedSession(page);
+    await page.goto("/login/signin", { waitUntil: "domcontentloaded" });
+    await expect(page.getByText("System Use Notification")).not.toBeVisible();
+  });
+});
+
+test.describe("Authenticated session (local dev user)", () => {
+  test.skip(
+    AUTH_ENABLED,
+    "Auth is enabled (NEXT_PUBLIC_DISABLE_FRONTEND_AUTHENTICATION=false)",
+  );
+
+  test.beforeEach(async ({ page }) => {
+    await seedSession(page);
+    await page.goto("/", { waitUntil: "domcontentloaded" });
+  });
+
+  test("home page loads with welcome greeting", async ({ page }) => {
+    await expect(
+      page.getByRole("heading", { name: /Welcome Back/i }),
+    ).toBeVisible({ timeout: 15000 });
+  });
+
+  test("welcome greeting includes the dev user name", async ({ page }) => {
+    await expect(page.getByText(/Welcome Back,\s+Local/i)).toBeVisible({
+      timeout: 15000,
+    });
+  });
+
+  test("Your Projects section is visible", async ({ page }) => {
+    await expect(page.locator('[data-tour="projects-section"]')).toBeVisible({
+      timeout: 15000,
+    });
+  });
+
+  test("sidebar renders with navigation links", async ({ page }) => {
+    await expect(
+      page.locator("aside", { hasText: "Project Dashboard" }),
+    ).toBeVisible({ timeout: 15000 });
+  });
+});
+
+test.describe("Login page (auth enabled)", () => {
   test.skip(
     !AUTH_ENABLED,
     "Auth is disabled (NEXT_PUBLIC_DISABLE_FRONTEND_AUTHENTICATION=true)",
@@ -120,18 +182,18 @@ test.describe("Login Page", () => {
   });
 
   test("displays DOE computer system notice", async ({ page }) => {
-    await expect(
-      page.getByText("This is a DOE computer system"),
-    ).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText("This is a DOE computer system")).toBeVisible({
+      timeout: 15000,
+    });
     await expect(
       page.getByText("THERE IS NO RIGHT OF PRIVACY IN THIS SYSTEM"),
     ).toBeVisible();
   });
 
   test("displays warning banner text", async ({ page }) => {
-    await expect(
-      page.getByText(/\*\*WARNING\*\*WARNING\*\*/),
-    ).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText(/\*\*WARNING\*\*WARNING\*\*/)).toBeVisible({
+      timeout: 15000,
+    });
   });
 
   test("displays I Acknowledge button", async ({ page }) => {
@@ -147,18 +209,13 @@ test.describe("Login Page", () => {
       page.getByRole("heading", { name: "System Use Notification" }),
     ).toBeVisible({ timeout: 15000 });
 
-    // Track whether any auth request is made
     let authRequestMade = false;
     await page.route("**/api/auth/signin/**", async (route) => {
       authRequestMade = true;
       await route.fulfill({ status: 200, body: "" });
     });
 
-    // The Sign In button exists in the DOM but handleOktaSignIn
-    // returns early when hasAcknowledged is false
     await page.getByRole("button", { name: "Sign In" }).click({ force: true });
-
-    // Give time for any async request to fire, then verify none did
     await page.waitForTimeout(2000);
     expect(authRequestMade).toBe(false);
   });
@@ -166,18 +223,11 @@ test.describe("Login Page", () => {
   test("clicking I Acknowledge reveals the Sign In button", async ({
     page,
   }) => {
-    await expect(
-      page.getByRole("button", { name: "I Acknowledge" }),
-    ).toBeVisible({ timeout: 15000 });
     await page.getByRole("button", { name: "I Acknowledge" }).click();
-
-    await expect(
-      page.getByRole("button", { name: "Sign In" }),
-    ).toBeVisible();
+    await expect(page.getByRole("button", { name: "Sign In" })).toBeVisible();
   });
 
   test("clicking Sign In initiates the OAuth flow", async ({ page }) => {
-    // Intercept the CSRF endpoint so signIn() can get a token
     await page.route("**/api/auth/csrf", async (route) => {
       await route.fulfill({
         status: 200,
@@ -186,7 +236,6 @@ test.describe("Login Page", () => {
       });
     });
 
-    // Intercept the signin endpoint to prevent external redirect
     await page.route("**/api/auth/signin/**", async (route) => {
       await route.fulfill({
         status: 200,
@@ -195,25 +244,19 @@ test.describe("Login Page", () => {
       });
     });
 
-    await expect(
-      page.getByRole("button", { name: "I Acknowledge" }),
-    ).toBeVisible({ timeout: 15000 });
     await page.getByRole("button", { name: "I Acknowledge" }).click();
 
     const [request] = await Promise.all([
-      page.waitForRequest(
-        (req) => req.url().includes("/api/auth/signin"),
-        { timeout: 10000 },
-      ),
+      page.waitForRequest((req) => req.url().includes("/api/auth/signin"), {
+        timeout: 10000,
+      }),
       page.getByRole("button", { name: "Sign In" }).click(),
     ]);
 
     expect(request.url()).toContain("/api/auth/signin");
   });
 
-  test("displays Vulnerability Disclosure Program banner", async ({
-    page,
-  }) => {
+  test("displays Vulnerability Disclosure Program banner", async ({ page }) => {
     const link = page.getByRole("link", {
       name: "Vulnerability Disclosure Program",
     });
@@ -246,7 +289,6 @@ test.describe("Auth Guard", () => {
   test("unauthenticated visit to home page redirects to login", async ({
     page,
   }) => {
-    // No session seeded — AuthGuard should redirect to /login/signin
     await page.goto("/", { waitUntil: "domcontentloaded" });
     await page.waitForURL(/\/login\/signin/, { timeout: 15000 });
     await expect(
@@ -257,7 +299,6 @@ test.describe("Auth Guard", () => {
   test("unauthenticated visit to a protected route redirects to login", async ({
     page,
   }) => {
-    // Try accessing a protected project route without any session
     await page.goto("/settings", { waitUntil: "domcontentloaded" });
     await page.waitForURL(/\/login\/signin/, { timeout: 15000 });
     await expect(

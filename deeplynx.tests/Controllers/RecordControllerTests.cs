@@ -91,7 +91,7 @@ public class RecordControllerTests : IDisposable
         _mockBusiness.Setup(b => b.GetAllRecords(
                          It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(),
                          It.IsAny<long?>(), It.IsAny<bool>(), It.IsAny<string?>(),
-                         It.IsAny<bool>(), It.IsAny<bool>(), It.IsAny<bool>()))
+                         It.IsAny<bool>(), It.IsAny<bool>(), It.IsAny<bool>(), It.IsAny<bool>()))
                      .ReturnsAsync([]);
 
         var result = (await _controller.GetAllRecords(OrgId, ProjectId, null, null, true)).Result as OkObjectResult;
@@ -107,7 +107,7 @@ public class RecordControllerTests : IDisposable
         _mockBusiness.Setup(b => b.GetAllRecords(
                          It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(),
                          It.IsAny<long?>(), It.IsAny<bool>(), It.IsAny<string?>(),
-                         It.IsAny<bool>(), It.IsAny<bool>(), It.IsAny<bool>()))
+                         It.IsAny<bool>(), It.IsAny<bool>(), It.IsAny<bool>(), It.IsAny<bool>()))
                      .ThrowsAsync(new Exception("db error"));
 
         var result = (await _controller.GetAllRecords(OrgId, ProjectId, null, null, true)).Result as ObjectResult;
