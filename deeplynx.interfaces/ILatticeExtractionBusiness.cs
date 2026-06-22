@@ -22,7 +22,9 @@ public interface ILatticeExtractionBusiness
         long organizationId,
         long projectId,
         long extractionId,
-        bool approve);
+        PromoteExtractionRequestDto request);
+
+    Task<ExtractionResponseDto> RejectExtraction(long extractionId, RejectExtractionRequestDto request);
 
     Task<EmbeddingStatusResponseDto> GetEmbeddingStatus(long projectId);
 
