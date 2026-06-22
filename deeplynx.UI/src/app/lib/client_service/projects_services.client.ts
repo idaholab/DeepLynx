@@ -371,6 +371,7 @@ export async function addMemberToProject(
     roleId?: number;
     userId?: number;
     groupId?: number;
+    isProjectAdmin?: boolean;
   }
 ): Promise<{ message: string }> {
   try {
@@ -393,6 +394,7 @@ export async function addMemberToProject(
  * @param roleId - The new role ID
  * @param userId - Optional user ID (required if not providing groupId)
  * @param groupId - Optional group ID (required if not providing userId)
+ * @param isProjectAdmin - Optional flag to set project admin status
  * @returns Promise with success message
  */
 export async function updateProjectMemberRole(
@@ -400,13 +402,14 @@ export async function updateProjectMemberRole(
   projectId: number,
   roleId: number,
   userId?: number,
-  groupId?: number
+  groupId?: number,
+  isProjectAdmin?: boolean
 ): Promise<{ message: string }> {
   try {
     const res = await api.put(
       `/organizations/${organizationId}/projects/${projectId}/members`,
       null,
-      { params: { roleId, userId, groupId } }
+      { params: { roleId, userId, groupId, isProjectAdmin } }
     );
     return res.data;
   } catch (error) {

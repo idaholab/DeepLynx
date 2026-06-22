@@ -117,8 +117,10 @@ const ProjectUsersTable = ({ members, roles, project }: Props) => {
     memberName: "",
     memberType: null,
     currentRoleId: null,
+    currentIsProjectAdmin: false,
   });
   const [editRoleSelectedId, setEditRoleSelectedId] = useState<string>("");
+  const [editIsProjectAdmin, setEditIsProjectAdmin] = useState<boolean>(false);
 
   /* ------------------------------------------------------------------------ */
   /*                          Org / Project Context                           */
@@ -180,6 +182,7 @@ const ProjectUsersTable = ({ members, roles, project }: Props) => {
   const handleAddInviteUser = async (
     emailOrUserId: string | number,
     roleId?: number,
+    isProjectAdmin?: boolean,
   ) => {
     if (!organizationId) {
       throw new Error(t.translations.MISSING_ORG_ID);
@@ -199,6 +202,7 @@ const ProjectUsersTable = ({ members, roles, project }: Props) => {
       await addMemberToProject(organizationId, projectId, {
         roleId,
         userId: emailOrUserId,
+        isProjectAdmin: isProjectAdmin ?? false,
       });
     }
 
@@ -358,8 +362,10 @@ const ProjectUsersTable = ({ members, roles, project }: Props) => {
       memberName: row.name,
       memberType: row.memberType,
       currentRoleId: row.roleId ?? null,
+      currentIsProjectAdmin: row.isProjectAdmin,
     });
     setEditRoleSelectedId(row.roleId ? String(row.roleId) : "");
+    setEditIsProjectAdmin(row.isProjectAdmin);
   };
 
   const handleSaveMemberRole = async () => {
@@ -390,6 +396,7 @@ const ProjectUsersTable = ({ members, roles, project }: Props) => {
           roleId,
           memberId,
           undefined,
+          editIsProjectAdmin,
         );
       } else {
         await updateProjectMemberRole(
@@ -398,6 +405,7 @@ const ProjectUsersTable = ({ members, roles, project }: Props) => {
           roleId,
           undefined,
           memberId,
+          editIsProjectAdmin,
         );
       }
 
@@ -406,7 +414,7 @@ const ProjectUsersTable = ({ members, roles, project }: Props) => {
       setTableData((prev) =>
         prev.map((row) =>
           row.memberId === memberId
-            ? { ...row, role: selectedRole?.name ?? null, roleId }
+            ? { ...row, role: selectedRole?.name ?? null, roleId, isProjectAdmin: editIsProjectAdmin }
             : row,
         ),
       );
@@ -423,8 +431,10 @@ const ProjectUsersTable = ({ members, roles, project }: Props) => {
         memberName: "",
         memberType: null,
         currentRoleId: null,
+        currentIsProjectAdmin: false,
       });
       setEditRoleSelectedId("");
+      setEditIsProjectAdmin(false);
     }
   };
 
@@ -568,7 +578,9 @@ const ProjectUsersTable = ({ members, roles, project }: Props) => {
             roles={roles}
             loading={loading}
             selectedRoleId={editRoleSelectedId}
+            isProjectAdmin={editIsProjectAdmin}
             onChangeRole={setEditRoleSelectedId}
+            onChangeIsProjectAdmin={setEditIsProjectAdmin}
             onCancel={() => {
               setEditRoleModal({
                 isOpen: false,
@@ -576,8 +588,10 @@ const ProjectUsersTable = ({ members, roles, project }: Props) => {
                 memberName: "",
                 memberType: null,
                 currentRoleId: null,
+                currentIsProjectAdmin: false,
               });
               setEditRoleSelectedId("");
+              setEditIsProjectAdmin(false);
             }}
             onSave={handleSaveMemberRole}
           />

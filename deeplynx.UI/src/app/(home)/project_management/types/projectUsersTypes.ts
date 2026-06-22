@@ -38,6 +38,7 @@ export type EditRoleModalState = {
   memberName: string;
   memberType: MemberType | null;
   currentRoleId: number | null;
+  currentIsProjectAdmin: boolean;
 };
 
 /* -------------------------------------------------------------------------- */
