@@ -1,3 +1,4 @@
+using deeplynx.datalayer.Models;
 using deeplynx.models;
 
 namespace deeplynx.interfaces;
@@ -18,7 +19,7 @@ public interface ISensitivityLabelBusiness
         long organizationId, long currentUserId, long? projectId, List<CreateSensitivityLabelRequestDto> labels);
 
     Task<IEnumerable<SensitivityLabelResponseDto>> GetAllSensitivityLabels(
-        long[]? projectIds, long organizationId, bool hideArchived = true);
+        long currentUserId, long[]? projectIds, long organizationId, bool hideArchived = true);
 
     Task<SensitivityLabelResponseDto> GetSensitivityLabel(long labelId, long? projectId, long organizationId,
         bool hideArchived = true);
