@@ -50,24 +50,8 @@ export default async function Page() {
     }
   }
 
-  // When auth is disabled and no org cookie, fetch from local dev user
-  if (isAuthDisabled && !organizationId) {
-    try {
-      const localUser = (await getLocalDevUserServer()) as LocalDevUser;
-      organizationId = localUser.organizationId;
-    } catch (e) {
-      console.error("Failed to get local dev user organization:", e);
-      // Fallback to org ID 1
-      organizationId = 1;
-    }
-    if (!organizationId) {
-      console.log("Enter redirect at line 65");
-      redirect("/select-org");
-    }
-  }
-
-  // If still no org (shouldn't happen), redirect
-  if (!organizationId && !isAuthDisabled) {
+  // If no org, redirect
+  if (organizationId == null) {
     redirect("/select-org");
   }
 
