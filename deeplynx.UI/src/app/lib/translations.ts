@@ -1317,6 +1317,8 @@ export const translations = {
       RECORD_COLLECTIONS_CANNOT_CONTINUE_WITH_INCOMPLETE_RECORD_METADATA:
         "Some selected records are still missing full metadata. Remove them or retry before continuing.",
       RECORD_COLLECTIONS_OPEN_DETAILS: "Open details",
+      RECORD_NOT_IN_ANY_COLLECTIONS:
+        "This record is not in any collections.",
       RECORD_COLLECTIONS_PARTIAL_UPDATE:
         "Collection details saved, but some changes failed: {operations}",
       RECORD_COLLECTIONS_PARTIAL_UPDATE_ADD_LABEL:
@@ -3174,6 +3176,8 @@ export const translations = {
       RECORD_COLLECTIONS_CANNOT_CONTINUE_WITH_INCOMPLETE_RECORD_METADATA:
         "Algunos registros seleccionados todavía no tienen metadatos completos. Quítelos o vuelva a intentarlo antes de continuar.",
       RECORD_COLLECTIONS_OPEN_DETAILS: "Abrir detalles",
+      RECORD_NOT_IN_ANY_COLLECTIONS:
+        "Este registro no pertenece a ninguna colección.",
       RECORD_COLLECTIONS_PARTIAL_UPDATE:
         "Se guardaron los detalles de la colección, pero algunos cambios fallaron: {operations}",
       RECORD_COLLECTIONS_PARTIAL_UPDATE_ADD_LABEL:

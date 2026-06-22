@@ -253,13 +253,14 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
     /// <param name="recordId"></param>
     /// <param name="hideArchived"></param>
     /// <param name="isSysAdmin"></param>
+    /// <param name="dto">The data transfer object of the search parameters and pagination</param>
     /// <param name="isOrgAdmin"></param>
     /// <param name="isProjectAdmin"></param>
     /// <returns></returns>
     /// <exception cref="KeyNotFoundException"></exception>
-    public async Task<List<RecordCollectionResponseDto>> GetRecordCollectionsForRecord(
+    public async Task<PaginatedResponse<RecordCollectionResponseDto>> GetRecordCollectionsForRecord(
         long currentUserId, long organizationId, long projectId, long recordId, bool hideArchived,
-        bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false)
+        RecordCollectionQueryRequestDto dto, bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false)
     {
         var recordExists = await _context.Records.AnyAsync(r =>
             r.Id == recordId &&
@@ -289,35 +290,48 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
                 c.Labels.All(l => userAuthorizedLabels.Contains(l.Id)));
         }
 
-        var collections = await collectionQuery
-            .Include(c => c.Tags)
-            .Include(c => c.Labels)
-            .ToListAsync();
+        // Get total count before pagination
+        var totalCount = await collectionQuery.CountAsync();
 
-        return collections
-        .Select(c => new RecordCollectionResponseDto
+        // Get pagination values
+        var pageNumber = Math.Max(1, dto.PageNumber);
+        var pageSize = dto.GetValidatedPageSize();
+
+        var items = await collectionQuery
+            .Skip((pageNumber - 1) * pageSize)
+            .Take(pageSize)
+            .Select(c => new RecordCollectionResponseDto
+            {
+                Id = c.Id,
+                Description = c.Description,
+                Properties = c.Properties,
+                Name = c.Name,
+                ProjectId = c.ProjectId,
+                OrganizationId = c.OrganizationId,
+                LastUpdatedBy = c.LastUpdatedBy,
+                LastUpdatedAt = c.LastUpdatedAt,
+                IsArchived = c.IsArchived,
+                RecordCount = c.Records.Count(),
+                Tags = c.Tags.Select(t => new RecordCollectionTagDto
+                {
+                    Id = t.Id,
+                    Name = t.Name
+                }).ToList(),
+                Labels = c.Labels.Select(l => new RecordCollectionLabelDto
+                {
+                    Id = l.Id,
+                    Name = l.Name
+                }).ToList()
+            }).ToListAsync();
+
+        return new PaginatedResponse<RecordCollectionResponseDto>
         {
-            Id = c.Id,
-            Description = c.Description,
-            Properties = c.Properties,
-            Name = c.Name,
-            ProjectId = c.ProjectId,
-            OrganizationId = c.OrganizationId,
-            LastUpdatedBy = c.LastUpdatedBy,
-            LastUpdatedAt = c.LastUpdatedAt,
-            IsArchived = c.IsArchived,
-            RecordCount = c.Records.Count(),
-            Tags = c.Tags.Select(t => new RecordCollectionTagDto
-            {
-                Id = t.Id,
-                Name = t.Name
-            }).ToList(),
-            Labels = c.Labels.Select(l => new RecordCollectionLabelDto
-            {
-                Id = l.Id,
-                Name = l.Name
-            }).ToList()
-        }).ToList();
+            Items = items,
+            PageNumber = pageNumber,
+            PageSize = pageSize,
+            TotalCount = totalCount
+        };
+
     }
 
     /// <summary>

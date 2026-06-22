@@ -101,9 +101,8 @@ export default function RecordCollectionsClient({
               </div>
 
               <div
-                className={`grid gap-4 transition-opacity ${
-                  summary.isLoading ? "opacity-70" : "opacity-100"
-                }`}
+                className={`grid gap-4 transition-opacity ${summary.isLoading ? "opacity-70" : "opacity-100"
+                  }`}
               >
                 {collectionCards.items.map((collection) => {
                   const labelsExpanded = collectionCards.isLabelsExpanded(collection.id);
@@ -118,7 +117,7 @@ export default function RecordCollectionsClient({
                       getSensitivityClass={getSensitivityClass}
                       onToggleLabels={collectionCards.onToggleLabels}
                       onToggleTags={collectionCards.onToggleTags}
-                      detailsHref={`/record_collections/${collection.id}`}
+                      detailsHref={`/record_collections/${collection.id}?returnTo=${encodeURIComponent("/record_collections")}`}
                     />
                   );
                 })}

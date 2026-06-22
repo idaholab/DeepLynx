@@ -142,10 +142,11 @@ public class RecordCollectionController : ControllerBase
     [Auth("read", "record_collection")]
     [Auth("read", "record")]
     [Sensitivity("read record")]
-    public async Task<ActionResult<IEnumerable<RecordCollectionResponseDto>>> GetRecordCollectionsForARecord(
+    public async Task<ActionResult<PaginatedResponse<RecordCollectionResponseDto>>> GetRecordCollectionsForARecord(
         long organizationId,
         long projectId,
         long recordId,
+        [FromQuery] RecordCollectionQueryRequestDto dto,
         [FromQuery] bool hideArchived = true)
     {
         try
@@ -160,6 +161,7 @@ public class RecordCollectionController : ControllerBase
                 projectId,
                 recordId,
                 hideArchived,
+                dto,
                 isSysAdmin,
                 isOrgAdmin,
                 isProjectAdmin);
