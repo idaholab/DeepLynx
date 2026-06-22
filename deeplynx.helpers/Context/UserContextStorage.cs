@@ -8,6 +8,7 @@ public static class UserContextStorage
     private static AsyncLocal<string> _token = new();
     private static AsyncLocal<bool> _isSysAdmin = new();
     private static AsyncLocal<bool> _isOrgAdmin = new();
+    private static AsyncLocal<bool> _isOrgMember = new();
     private static AsyncLocal<bool> _isProjectAdmin = new();
 
     public static string Email
@@ -44,6 +45,12 @@ public static class UserContextStorage
     {
         get => _isOrgAdmin.Value;
         set => _isOrgAdmin.Value = value;
+    }
+    
+    public static bool IsOrgMember
+    {
+        get => _isOrgMember.Value;
+        set => _isOrgMember.Value = value;
     }
     
     public static bool IsProjectAdmin

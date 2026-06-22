@@ -1,6 +1,7 @@
 using deeplynx.datalayer.Models;
 using deeplynx.helpers.Context;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Routing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -59,6 +60,16 @@ public class UserContextMiddleware
                         {
                             UserContextStorage.UserId = user.Id;
                             _logger.LogInformation($"User found: {user.Email} (ID: {user.Id})");
+                            
+                            var adminService = scope.ServiceProvider.GetRequiredService<IAdminService>();
+                            
+                            var organizationId = ExtractOrganizationId(context);
+                            if (organizationId.HasValue)
+                            {
+
+                                UserContextStorage.IsOrgMember =
+                                    await adminService.OrgMemberCheck(user.Id, organizationId.Value);
+                            }
                         }
                         else
                         {
@@ -72,6 +83,7 @@ public class UserContextMiddleware
                     _logger.LogWarning("Could not extract email from claims");
                     UserContextStorage.Email = null;
                     UserContextStorage.UserId = 0;
+                    UserContextStorage.IsOrgMember = false;
                 }
             }
             else
@@ -89,5 +101,13 @@ public class UserContextMiddleware
             UserContextStorage.Email = null;
             UserContextStorage.UserId = 0;
         }
+    }
+    
+    private static long? ExtractOrganizationId(HttpContext context)
+    {
+        var routeOrgId = context.GetRouteValue("organizationId")?.ToString();
+        if (!string.IsNullOrEmpty(routeOrgId) && long.TryParse(routeOrgId, out var orgId))
+            return orgId;
+        return null;
     }
 }
