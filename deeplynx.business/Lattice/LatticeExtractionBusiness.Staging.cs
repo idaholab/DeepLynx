@@ -55,7 +55,6 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
         long projectId,
         long dataSourceId)
     {
-        if (!records.Any()) return new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
 
         var validRecords = records
             .Where(record =>
@@ -71,9 +70,7 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
                 malformedCount,
                 extractionId);
         }
-
-        if (!validRecords.Any()) return new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
-
+        
         var maxFrequency = validRecords.Max(r => r.Frequency);
 
         // Batch KG lookup — inherit canonical name if the instance already exists in the graph
@@ -86,6 +83,7 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
 
         var extractionRecords = new List<ExtractionRecord>();
         var stagedRecordNames = new List<string>();
+        var stagedRecordClasses = new List<string>();
 
         foreach (var record in validRecords)
         {
@@ -137,16 +135,18 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
                     record.Confidence, embeddingPlausibility, statFreq, structuralConsistency)
             });
             stagedRecordNames.Add(recordName);
+            stagedRecordClasses.Add(classType);
         }
-
-        if (!extractionRecords.Any()) return new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
-
+        
         _latticeContext.ExtractionRecords.AddRange(extractionRecords);
         await _latticeContext.SaveChangesAsync();
 
         var nameToId = stagedRecordNames
-            .Zip(extractionRecords, (name, rec) => (name, rec.Id))
-            .ToDictionary(x => x.name, x => x.Id, StringComparer.OrdinalIgnoreCase);
+            .Zip(stagedRecordClasses, (name, cls) => (name, cls))
+            .Zip(extractionRecords, (nc, rec) => (nc.name, nc.cls, rec.Id))
+            .ToDictionary(
+                x => MakeRecordKey(x.cls, x.name), 
+                x => x.Id);
 
         return nameToId;
     }
@@ -283,8 +283,8 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
         {
             // Skip edges whose subject or object wasn't staged as a record — this can happen when
             // the LLM references an entity in a relationship that it didn't include in the classes array
-            if (!instanceNameToRecordId.TryGetValue(edge.Subject, out var originRecordId)) continue;
-            if (!instanceNameToRecordId.TryGetValue(edge.Object, out var destRecordId)) continue;
+            if (!instanceNameToRecordId.TryGetValue(MakeRecordKey(edge.SubjectType, edge.Subject), out var originRecordId)) continue;
+            if (!instanceNameToRecordId.TryGetValue(MakeRecordKey(edge.ObjectType, edge.Object), out var destRecordId)) continue;
 
             relSimilarities.TryGetValue(edge.RelationshipType, out var relMatch);
             var patternKey = RelationshipPatternKey(edge.SubjectType, edge.RelationshipType, edge.ObjectType);
@@ -320,6 +320,9 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
 
         return extractionEdges.Count;
     }
+    
+    private static string MakeRecordKey(string classType, string name) =>
+        $"{classType.Trim().ToLowerInvariant()}::{name.Trim().ToLowerInvariant()}";
     
     /// <summary>
     ///     Builds a stable key that uniquely identifies a relationship pattern by combining
