@@ -43,7 +43,7 @@ import { useRouter } from "next/navigation";
 
 interface Props {
   projects: ProjectResponseDto[];
-  initialLabels: SensitivityLabelsDto[] | undefined;
+  initialLabels: SensitivityLabelsDto[];
 }
 
 type ModalMode = "tag";
@@ -72,7 +72,7 @@ const TagManagementClient: React.FC<Props> = ({ projects, initialLabels }) => {
   const [archivingTagId, setArchivingTagId] = useState<number | null>(null);
 
   // Labels loaded from backend
-  const [labels, setLabels] = useState<SensitivityLabelsDto[]>([]);
+  const [labels, setLabels] = useState<SensitivityLabelsDto[]>(initialLabels);
   const [labelsLocked, setLabelsLocked] = useState(false);
 
   const [labelsLoading, setLabelsLoading] = useState(false);
@@ -236,15 +236,7 @@ const TagManagementClient: React.FC<Props> = ({ projects, initialLabels }) => {
     try {
       setLabelsLoading(true);
       setLabelsError(null);
-
-      if (!initialLabels) {
-        const dtoList: SensitivityLabelsDto[] = 
-          await getAllSensitivityLabelsOrg(orgId);
-        setLabels(dtoList.filter((l) => !l.isArchived));
-      } else {
-        setLabels(initialLabels.filter((l) => !l.isArchived));
-      }
-      router.refresh();
+      setLabels(initialLabels.filter((l) => !l.isArchived));
     } catch (error) {
       console.error("Failed to load organization labels:", error);
       setLabelsError(t.translations.FAILED_TO_LOAD_ORGANIZATION_LABELS);
@@ -258,7 +250,7 @@ const TagManagementClient: React.FC<Props> = ({ projects, initialLabels }) => {
     loadOrganizationTags();
     loadOrganizationLabels();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [orgId]);
+  }, [orgId, initialLabels]);
 
   /* ------------------------------------------------------------------------ */
   /*                         Create / Update / Archive                        */

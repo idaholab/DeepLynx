@@ -41,13 +41,15 @@ const ProjectManagementClient = ({
   const { t } = useLanguage();
   const { project: sessionProject, setProject } = useProjectSession();
   const [editingProject, setEditingProject] = useState(project); 
-  const [labels, setLabels] = useState<SensitivityLabelsDto[]>();
+  const [labels, setLabels] = useState<SensitivityLabelsDto[]>([]);
   const [permissions, setPermissions] = useState(projectPermissions);
 
-  useEffect(() => {
+  useEffect(() => {    
     if (!editingProject?.id || !editingProject?.name) {
       return;
     }
+
+    loadLabels();
 
     if (
       sessionProject?.projectId?.toString() === editingProject.id.toString() &&
@@ -66,18 +68,22 @@ const ProjectManagementClient = ({
     setActiveTab(label);
   };
 
+  const loadLabels = async () => {
+    try {
+      const dtoList: SensitivityLabelsDto[] = await getAllSensitivityLabelsProject(Number(project?.id));
+      setLabels(dtoList);
+    } catch(e) {
+      console.error("getAllSensitivityLabels failed: ", e);
+    }
+  }
+
   const refreshLabels = async () => {
+    loadLabels();
     try {
       const updatedPermissions = await getAllPermissions(Number(project?.organizationId), Number(project?.id), undefined, true);
       setPermissions(updatedPermissions);
     } catch (e) {
-      console.error("getAllpermissionsServer failed: ", e);
-    }
-    try {
-      const dtoList: SensitivityLabelsDto[] = await getAllSensitivityLabelsProject(Number(project?.id));
-      setLabels(dtoList);
-    } catch (e) {
-      console.error("getAllSensitivityLabels failed: ", e);
+      console.error("getAllPermissions failed: ", e);
     }
   }
 

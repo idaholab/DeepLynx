@@ -46,8 +46,8 @@ interface Props {
   project: ProjectResponseDto;
   /** From backend: whether org has locked tags */
   orgTagsLocked: boolean;
-  initialLabels: SensitivityLabelsDto[] | undefined;
-  refreshLabels: Function;
+  initialLabels: SensitivityLabelsDto[];
+  refreshLabels: () => Promise<void>;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -89,7 +89,7 @@ const ProjectTagAndLabelManagementClient: React.FC<Props> = ({
   /*                               Label State                                */
   /* ------------------------------------------------------------------------ */
 
-  const [labels, setLabels] = useState<SensitivityLabelsDto[]>([]);
+  const [labels, setLabels] = useState<SensitivityLabelsDto[]>(initialLabels);
   const [labelsLoading, setLabelsLoading] = useState(false);
   const [labelsError, setLabelsError] = useState<string | null>(null);
   const [archivingLabelId, setArchivingLabelId] = useState<number | null>(null);
@@ -239,14 +239,7 @@ const ProjectTagAndLabelManagementClient: React.FC<Props> = ({
     try {
       setLabelsLoading(true);
       setLabelsError(null);
-      if (!initialLabels) {
-        const dtoList: SensitivityLabelsDto[] = 
-          await getAllSensitivityLabelsProject(projectId);
-        setLabels(dtoList.filter((l) => !l.isArchived));
-      } else {
-        setLabels(initialLabels.filter((l) => !l.isArchived));
-      }
-      await refreshLabels();
+      setLabels(initialLabels.filter((l) => !l.isArchived));
     } catch (error) {
       console.error("Failed to load project labels:", error);
       setLabelsError(t.translations.FAILED_TO_LOAD_PROJECT_LABELS);
