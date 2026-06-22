@@ -75,7 +75,7 @@ public class InvitationBusiness : IInvitationBusiness
 
             if (user.AccountType == AccountType.Service)
             {
-                throw new InvalidOperationException("Cannot add user: Service accounts are prohibited, standard user accounts only");
+                throw new UnauthorizedAccessException("Cannot add user: Service accounts are prohibited, standard user accounts only");
             }
 
             var wasAdded = await AddUserToHierarchyWithoutEmail(organizationId, projectId, roleId, user);
@@ -90,13 +90,16 @@ public class InvitationBusiness : IInvitationBusiness
         // Handle user by email
         if (userEmail != null)
         {
+            if (userEmail.StartsWith("service_", StringComparison.OrdinalIgnoreCase))
+                throw new UnauthorizedAccessException("Cannot add user: Service accounts are prohibited, standard user accounts only");
+            
             var user = await _context.Users.FirstOrDefaultAsync(u => u.Email.ToLower() == userEmail.ToLower());
 
             if (user != null)
             {
                 if (user.AccountType == AccountType.Service)
                 {
-                    throw new InvalidOperationException("Cannot add user: Service accounts are prohibited, standard user accounts only");
+                    throw new UnauthorizedAccessException("Cannot add user: Service accounts are prohibited, standard user accounts only");
                 }
 
                 // Existing user - no transaction, best-effort email
@@ -208,7 +211,9 @@ public class InvitationBusiness : IInvitationBusiness
             _context.Users.Add(serviceAccount);
             await _context.SaveChangesAsync();
 
-            await AddUserToHierarchyWithoutEmail(organizationId, projectId, roleId, serviceAccount);
+            // Bypass AddUserToHierarchyWithoutEmail - service accounts skip org membership
+            // and are added directly to their project only
+            await _projectBusiness.AddMemberToProject(projectId, roleId, serviceAccount.Id, groupId: null, allowServiceAccount: true);
 
             await transaction.CommitAsync();
             return true;
@@ -223,6 +228,10 @@ public class InvitationBusiness : IInvitationBusiness
     private async Task<bool> AddUserToHierarchyWithoutEmail(long organizationId, long? projectId, long? roleId,
         User user)
     {
+        // Service Accounts must only live in the project that they are created.
+        if (user.AccountType == AccountType.Service)
+            throw new InvalidOperationException("Service accounts must be added via CreateAndAddServiceAccountToProject.");
+        
         var addedToOrg = false;
         var addedToProject = false;
 

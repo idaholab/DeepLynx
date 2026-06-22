@@ -1,7 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 namespace deeplynx.models;
 
-public class CreateUserRequestDto : IValidatableObject
+public class CreateUserRequestDto
 {
     [Required]
     public string Name { get; set; }
@@ -15,19 +15,4 @@ public class CreateUserRequestDto : IValidatableObject
     /// Valid values: "standard", "service", "test"
     /// </summary>
     public string AccountType { get; set; } = models.AccountType.Standard;
-
-    public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
-    {
-        if (string.IsNullOrWhiteSpace(Name))
-            yield return new ValidationResult("Name is required.", [nameof(Name)]);
-
-        if (AccountType == models.AccountType.Standard)
-        {
-            if (string.IsNullOrWhiteSpace(Email))
-                yield return new ValidationResult("Email is required for standard accounts.", [nameof(Email)]);
-
-            if (string.IsNullOrWhiteSpace(Username))
-                yield return new ValidationResult("Username is required for standard accounts.", [nameof(Username)]);
-        }
-    }
 }

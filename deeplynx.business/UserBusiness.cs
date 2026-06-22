@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using deeplynx.datalayer.Migrations;
 using deeplynx.datalayer.Models;
 using deeplynx.interfaces;
@@ -165,29 +166,37 @@ public class UserBusiness : IUserBusiness
     ///     Creates a new standard user based on the data transfer object supplied.
     /// </summary>
     /// <param name="dto">A data transfer object with details on the new user to be created.</param>
+    /// <param name="isSysAdmin">Optional Boolean value determining if the requesting user is a system admin.</param>
     /// <returns>The new user which was just created.</returns>
-    public async Task<UserResponseDto> CreateUser(CreateUserRequestDto dto)
+    public async Task<UserResponseDto> CreateUser(CreateUserRequestDto dto, bool isSysAdmin = false)
     {
-        // Service users can only be created in the project level. See Invitation Business "CreateAndAddServiceAccountToProject"
+        if (string.IsNullOrWhiteSpace(dto.Name))
+            throw new InvalidOperationException("Name is required.");
+
         if (dto.AccountType == AccountType.Service)
             throw new InvalidOperationException("Service Accounts can only be created per project");
+
+        if (dto.AccountType == AccountType.Test && !isSysAdmin)
+            throw new InvalidOperationException("Only System Admins can create test accounts");
 
         var username = dto.Username;
         var email = dto.Email;
 
-        // Email enforcement with standard accounts
         if (dto.AccountType == AccountType.Standard)
         {
-            // verify email is unique only with standard accounts
+            if (string.IsNullOrWhiteSpace(dto.Email))
+                throw new InvalidOperationException("Email is required for standard accounts.");
+
+            if (string.IsNullOrWhiteSpace(dto.Username))
+                throw new InvalidOperationException("Username is required for standard accounts.");
+
             var otherUserHasEmail = await _context.Users.AnyAsync(u => u.Email.ToLower() == dto.Email.ToLower());
             if (otherUserHasEmail)
                 throw new ArgumentException("User with email already exists");
         }
 
-        // Test and Service accounts do not need email or username in the request
         if (dto.AccountType == AccountType.Test)
         {
-            // the "Name" property of a user can be changed. Unique identifier is used for username and email.
             var identifier = $"test_{Guid.NewGuid()}";
             username = identifier;
             email = identifier;

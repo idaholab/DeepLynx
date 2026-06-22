@@ -832,10 +832,10 @@ public class UserBusinessTests : IntegrationTestBase
         };
 
         // Act & Assert
-        var exception = await Assert.ThrowsAsync<ArgumentException>(
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
             () => _userBusiness.CreateUser(dto));
 
-        Assert.Contains("Email is required for human accounts", exception.Message);
+        Assert.Contains("Email is required for standard accounts.", exception.InnerException?.Message ?? exception.Message);
     }
 
     [Fact]
@@ -848,10 +848,10 @@ public class UserBusinessTests : IntegrationTestBase
         };
 
         // Act & Assert
-        var exception = await Assert.ThrowsAsync<ArgumentException>(
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
             () => _userBusiness.CreateUser(dto));
 
-        Assert.Contains("Email is required for human accounts", exception.Message);
+        Assert.Contains("Email is required for standard accounts.", exception.InnerException?.Message ?? exception.Message);
     }
 
     #endregion
@@ -1074,7 +1074,7 @@ public class UserBusinessTests : IntegrationTestBase
 
         // Assert
         Assert.DoesNotContain(users, u => u.Id == serviceAccountId);
-        Assert.All(users, u => Assert.Equal(AccountType.Service, u.AccountType));
+        Assert.All(users, u => Assert.Equal(AccountType.Standard, u.AccountType));
     }
 
     [Fact]

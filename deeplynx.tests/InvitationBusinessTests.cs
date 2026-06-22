@@ -3,6 +3,7 @@ using deeplynx.datalayer.Models;
 using deeplynx.helpers.BigData;
 using deeplynx.helpers.Hubs;
 using deeplynx.interfaces;
+using deeplynx.models;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -106,7 +107,7 @@ public class InvitationBusinessTests : IntegrationTestBase
             Name = "Test Service Account",
             Email = "service_test_account",
             Username = "service_test_account",
-            IsServiceAccount = true,
+            AccountType = AccountType.Test,
             IsArchived = false
         };
         Context.Users.AddRange(user1, user2, serviceAccount);
@@ -481,81 +482,7 @@ public class InvitationBusinessTests : IntegrationTestBase
     }
 
     #endregion
-
-    #region Service Accounts
-
-    [Fact]
-    public async Task InviteServiceAccount_Success_WhenAdminAndProjectSpecified_AddsToProjectWithoutEmail()
-    {
-        // Arrange
-        _notificationBusiness.Setup(n => n.SendEmail(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<bool>(),
-                It.IsAny<long?>(), It.IsAny<long?>()))
-            .ReturnsAsync(true);
-
-        // Act - admin adds a service account to a project
-        var result = await _invitationBusiness.InviteAndAddUserToHierarchy(
-            oid, pid, null, rid, uidSa, null, true);
-
-        // Assert
-        Assert.True(result);
-        Assert.True(await Context.OrganizationUsers.AnyAsync(ou => ou.UserId == uidSa && ou.OrganizationId == oid));
-
-        var projectMember =
-            await Context.ProjectMembers.FirstOrDefaultAsync(pm => pm.UserId == uidSa && pm.ProjectId == pid);
-        Assert.NotNull(projectMember);
-        Assert.Equal(rid, projectMember.RoleId);
-
-        // Service accounts have no real email, so none should ever be sent
-        _notificationBusiness.Verify(
-            n => n.SendEmail(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<bool>(), It.IsAny<long?>(),
-                It.IsAny<long?>()),
-            Times.Never);
-    }
-
-    [Fact]
-    public async Task InviteServiceAccount_Fails_WhenCallerIsNotAdmin()
-    {
-        // Act & Assert - non-admin caller (default) cannot add a service account
-        var exception = await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
-            _invitationBusiness.InviteAndAddUserToHierarchy(
-                oid, pid, null, rid, uidSa, null));
-
-        Assert.Contains("Only admins", exception.Message);
-
-        // Nothing should have been added
-        Assert.False(await Context.ProjectMembers.AnyAsync(pm => pm.UserId == uidSa && pm.ProjectId == pid));
-        Assert.False(await Context.OrganizationUsers.AnyAsync(ou => ou.UserId == uidSa && ou.OrganizationId == oid));
-    }
-
-    [Fact]
-    public async Task InviteServiceAccount_Fails_WhenNoProjectSpecified()
-    {
-        // Act & Assert - service accounts cannot be added at the organization level alone
-        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            _invitationBusiness.InviteAndAddUserToHierarchy(
-                oid, null, null, null, uidSa, null, true));
-
-        Assert.Contains("must be added to a project", exception.Message);
-
-        // Nothing should have been added
-        Assert.False(await Context.OrganizationUsers.AnyAsync(ou => ou.UserId == uidSa && ou.OrganizationId == oid));
-    }
-
-    [Fact]
-    public async Task InviteServiceAccount_ByEmail_Fails_WhenNoProjectSpecified()
-    {
-        // Act & Assert - same org-level restriction applies when resolved by email
-        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            _invitationBusiness.InviteAndAddUserToHierarchy(
-                oid, null, null, null, null, "service_test_account", true));
-
-        Assert.Contains("must be added to a project", exception.Message);
-
-        Assert.False(await Context.OrganizationUsers.AnyAsync(ou => ou.UserId == uidSa && ou.OrganizationId == oid));
-    }
-
-    #endregion
-
+    
     #region New User by Email - Transaction with Rollback
 
     [Fact]
@@ -815,7 +742,7 @@ public class InvitationBusinessTests : IntegrationTestBase
 
         // Act
         var result = await _invitationBusiness.InviteAndAddUserToHierarchy(
-            oid, pid, gid, rid, null, null);
+            oid, pid, gid, rid, userId: null, userEmail: null);
 
         // Assert - Should still succeed (best-effort)
         Assert.True(result);

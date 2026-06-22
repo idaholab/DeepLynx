@@ -78,7 +78,7 @@ public class GroupBusinessTests : IntegrationTestBase
             Name = "Test Service Account",
             Email = "service_test_account",
             Username = "service_test_account",
-            IsServiceAccount = true,
+            AccountType = AccountType.Service,
             IsArchived = false
         };
         Context.Users.AddRange(testUser, testUser2, serviceAccount);
@@ -636,10 +636,10 @@ public class GroupBusinessTests : IntegrationTestBase
     public async Task AddUser_Fails_IfUserIsServiceAccount()
     {
         // Act & Assert - service accounts are project-scoped and cannot join groups
-        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+        var exception = await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
             _groupBusiness.AddUserToGroup(uidSa, oid, gid));
 
-        Assert.Contains("Service accounts cannot be added to a group", exception.Message);
+        Assert.Contains("Service accounts cannot be added to a group.", exception.Message);
 
         // The service account should not have been added to the group
         var group = await Context.Groups.Include(g => g.Users).FirstOrDefaultAsync(g => g.Id == gid);
