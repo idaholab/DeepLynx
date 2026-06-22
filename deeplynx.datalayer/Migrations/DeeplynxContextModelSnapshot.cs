@@ -682,6 +682,8 @@ namespace deeplynx.datalayer.Migrations
                     b.HasKey("Id")
                         .HasName("embeddings_pkey");
 
+                    b.HasIndex("EmbeddingModel");
+
                     b.HasIndex("Id")
                         .HasDatabaseName("idx_embeddings_id");
 
@@ -2884,12 +2886,21 @@ namespace deeplynx.datalayer.Migrations
 
             modelBuilder.Entity("deeplynx.datalayer.Models.Embedding", b =>
                 {
+                    b.HasOne("deeplynx.datalayer.Models.AiModelConfig", "AiModelConfig")
+                        .WithMany()
+                        .HasForeignKey("EmbeddingModel")
+                        .HasPrincipalKey("ModelName")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("embeddings_embedding_model_fkey");
+
                     b.HasOne("deeplynx.datalayer.Models.Record", "Record")
                         .WithMany("Embeddings")
                         .HasForeignKey("RecordId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("embeddings_record_id_fkey");
+
+                    b.Navigation("AiModelConfig");
 
                     b.Navigation("Record");
                 });

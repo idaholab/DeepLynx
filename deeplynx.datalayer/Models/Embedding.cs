@@ -40,4 +40,7 @@ public class Embedding
     [ForeignKey("RecordId")]
     [InverseProperty("Embeddings")]
     public virtual Record Record { get; set; } = null!;
+
+    [ForeignKey("EmbeddingModel")]
+    public virtual AiModelConfig? AiModelConfig { get; set; }
 }

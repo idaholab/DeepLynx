@@ -12,8 +12,8 @@ using deeplynx.datalayer.Models;
 namespace deeplynx.datalayer.Migrations
 {
     [DbContext(typeof(DeeplynxContext))]
-    [Migration("20260617200804_AddEmbeddingMetadataColumns")]
-    partial class AddEmbeddingMetadataColumns
+    [Migration("20260622182404_AddEmbeddingMetadata")]
+    partial class AddEmbeddingMetadata
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -321,6 +321,10 @@ namespace deeplynx.datalayer.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("application_id");
 
+                    b.Property<long?>("CreatedBy")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by");
+
                     b.Property<string>("Key")
                         .IsRequired()
                         .HasColumnType("text")
@@ -340,6 +344,9 @@ namespace deeplynx.datalayer.Migrations
 
                     b.HasIndex("ApplicationId")
                         .HasDatabaseName("idx_api_keys_application_id");
+
+                    b.HasIndex("CreatedBy")
+                        .HasDatabaseName("idx_api_keys_created_by");
 
                     b.HasIndex("UserId");
 
@@ -677,6 +684,8 @@ namespace deeplynx.datalayer.Migrations
 
                     b.HasKey("Id")
                         .HasName("embeddings_pkey");
+
+                    b.HasIndex("EmbeddingModel");
 
                     b.HasIndex("Id")
                         .HasDatabaseName("idx_embeddings_id");
@@ -2433,6 +2442,13 @@ namespace deeplynx.datalayer.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("Id"));
 
+                    b.Property<string>("AccountType")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("text")
+                        .HasDefaultValue("standard")
+                        .HasColumnName("account_type");
+
                     b.Property<string>("Email")
                         .IsRequired()
                         .HasColumnType("text")
@@ -2489,6 +2505,10 @@ namespace deeplynx.datalayer.Migrations
 
                     b.HasIndex("SsoId")
                         .HasDatabaseName("idx_users_sso_id");
+
+                    b.HasIndex("Username")
+                        .IsUnique()
+                        .HasDatabaseName("idx_users_username");
 
                     b.ToTable("users", "deeplynx");
                 });
@@ -2718,12 +2738,20 @@ namespace deeplynx.datalayer.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .HasConstraintName("api_keys_application_id_fkey");
 
+                    b.HasOne("deeplynx.datalayer.Models.User", "CreatedByUser")
+                        .WithMany("CreatedApiKeys")
+                        .HasForeignKey("CreatedBy")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .HasConstraintName("api_keys_created_by_fkey");
+
                     b.HasOne("deeplynx.datalayer.Models.User", "User")
                         .WithMany("ApiKeys")
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("api_keys_user_id_fkey");
+
+                    b.Navigation("CreatedByUser");
 
                     b.Navigation("OauthApplication");
 
@@ -2861,12 +2889,21 @@ namespace deeplynx.datalayer.Migrations
 
             modelBuilder.Entity("deeplynx.datalayer.Models.Embedding", b =>
                 {
+                    b.HasOne("deeplynx.datalayer.Models.AiModelConfig", "AiModelConfig")
+                        .WithMany()
+                        .HasForeignKey("EmbeddingModel")
+                        .HasPrincipalKey("ModelName")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("embeddings_embedding_model_fkey");
+
                     b.HasOne("deeplynx.datalayer.Models.Record", "Record")
                         .WithMany("Embeddings")
                         .HasForeignKey("RecordId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("embeddings_record_id_fkey");
+
+                    b.Navigation("AiModelConfig");
 
                     b.Navigation("Record");
                 });
@@ -3664,6 +3701,8 @@ namespace deeplynx.datalayer.Migrations
             modelBuilder.Entity("deeplynx.datalayer.Models.User", b =>
                 {
                     b.Navigation("ApiKeys");
+
+                    b.Navigation("CreatedApiKeys");
 
                     b.Navigation("LastUpdatedActions");
 

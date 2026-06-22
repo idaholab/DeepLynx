@@ -5,7 +5,7 @@
 namespace deeplynx.datalayer.Migrations
 {
     /// <inheritdoc />
-    public partial class AddEmbeddingMetadataColumns : Migration
+    public partial class AddEmbeddingMetadata : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -38,12 +38,34 @@ namespace deeplynx.datalayer.Migrations
                 type: "bigint",
                 nullable: true);
 
+            migrationBuilder.AddUniqueConstraint(
+                name: "AK_ai_model_configs_model_name",
+                schema: "deeplynx",
+                table: "ai_model_configs",
+                column: "model_name");
+
             migrationBuilder.CreateIndex(
                 name: "idx_embeddings_project_model",
                 schema: "dl_vector",
                 table: "embeddings",
                 columns: new[] { "project_id", "embedding_model" });
 
+            migrationBuilder.CreateIndex(
+                name: "IX_embeddings_embedding_model",
+                schema: "dl_vector",
+                table: "embeddings",
+                column: "embedding_model");
+
+            migrationBuilder.AddForeignKey(
+                name: "embeddings_embedding_model_fkey",
+                schema: "dl_vector",
+                table: "embeddings",
+                column: "embedding_model",
+                principalSchema: "deeplynx",
+                principalTable: "ai_model_configs",
+                principalColumn: "model_name",
+                onDelete: ReferentialAction.Restrict);
+            
             // Relax vector column dimension to accommodate vectors of any size.
             // Raw SQL: EF cannot express the pgvector typmod change.
             migrationBuilder.Sql("ALTER TABLE dl_vector.embeddings ALTER COLUMN vector TYPE vector;");
@@ -52,10 +74,25 @@ namespace deeplynx.datalayer.Migrations
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.DropForeignKey(
+                name: "embeddings_embedding_model_fkey",
+                schema: "dl_vector",
+                table: "embeddings");
+
             migrationBuilder.DropIndex(
                 name: "idx_embeddings_project_model",
                 schema: "dl_vector",
                 table: "embeddings");
+
+            migrationBuilder.DropIndex(
+                name: "IX_embeddings_embedding_model",
+                schema: "dl_vector",
+                table: "embeddings");
+
+            migrationBuilder.DropUniqueConstraint(
+                name: "AK_ai_model_configs_model_name",
+                schema: "deeplynx",
+                table: "ai_model_configs");
 
             migrationBuilder.DropColumn(
                 name: "dimensions",
@@ -76,7 +113,7 @@ namespace deeplynx.datalayer.Migrations
                 name: "project_id",
                 schema: "dl_vector",
                 table: "embeddings");
-
+            
             // Restore the original fixed dimension (bge-m3, 1024).
             migrationBuilder.Sql("ALTER TABLE dl_vector.embeddings ALTER COLUMN vector TYPE vector(1024);");
         }
