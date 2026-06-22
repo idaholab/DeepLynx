@@ -429,7 +429,7 @@ public class FileBusiness
             objectStorage.Config, request, guid);
 
         var fileClass = await _classBusiness.GetOrCreateClass(currentUserId, organizationId, projectId, "File");
-        var fileSize = new FileInfo(uri).Length;
+        var fileSize = await fileBusiness.GetFileSize(uri, objectStorage.Config);
         var recordRequest = new CreateRecordRequestDto
         {
             Properties = metadata?.Properties ?? new JsonObject
