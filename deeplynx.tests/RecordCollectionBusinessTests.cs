@@ -19,6 +19,7 @@ namespace deeplynx.tests;
 public class RecordCollectionBusinessTests : IntegrationTestBase
 {
     private EventBusiness _eventBusiness = null!;
+    private UserBusiness _userBusiness = null!;
     private Mock<IHubContext<EventNotificationHub>> _mockHubContext = null!;
     private Mock<ILogger<NotificationBusiness>> _mockNotificationLogger = null!;
     private INotificationBusiness _notificationBusiness = null!;
@@ -57,7 +58,8 @@ public class RecordCollectionBusinessTests : IntegrationTestBase
         _bulkCopyUpsertExecutor = new BulkCopyUpsertExecutor();
         _eventBusiness = new EventBusiness(Context, _notificationBusiness, _bulkCopyUpsertExecutor);
         _tagBusiness = new TagBusiness(Context, _eventBusiness);
-        _sensitivityLabelBusiness = new SensitivityLabelBusiness(Context, _eventBusiness);
+        _userBusiness = new UserBusiness(Context);
+        _sensitivityLabelBusiness = new SensitivityLabelBusiness(Context, _eventBusiness, _userBusiness);
         _sensitivityLabelService = new SensitivityLabelService(Context);
         _recordCollectionBusiness = new RecordCollectionBusiness(
             Context,

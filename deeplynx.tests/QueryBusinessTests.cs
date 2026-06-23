@@ -24,6 +24,7 @@ public class QueryBusinessTests : IntegrationTestBase
     private INotificationBusiness _notificationBusiness = null!;
     private QueryBusiness _queryBusiness = null!;
     private RecordBusiness _recordBusiness;
+    private UserBusiness _userBusiness = null!;
     private SensitivityLabelBusiness _sensitivityLabelBusiness;
     private ISensitivityLabelService _sensitivityLabelService = null!;
     private TagBusiness _tagBusiness = null!;
@@ -57,7 +58,8 @@ public class QueryBusinessTests : IntegrationTestBase
             new NotificationBusiness(Context, _mockNotificationLogger.Object, _mockHubContext.Object);
         _mockBulkCopyUpsertExecutor = new BulkCopyUpsertExecutor();
         _eventBusiness = new EventBusiness(Context, _notificationBusiness, _mockBulkCopyUpsertExecutor);
-        _sensitivityLabelBusiness = new SensitivityLabelBusiness(Context, _eventBusiness);
+        _userBusiness = new UserBusiness(Context);
+        _sensitivityLabelBusiness = new SensitivityLabelBusiness(Context, _eventBusiness, _userBusiness);
         _tagBusiness = new TagBusiness(Context, _eventBusiness);
         _recordBusiness = new RecordBusiness(Context, _eventBusiness, _mockBulkCopyUpsertExecutor, _tagBusiness,
             _sensitivityLabelBusiness, _sensitivityLabelService);
@@ -3744,6 +3746,240 @@ public class QueryBusinessTests : IntegrationTestBase
         // Assert
         Assert.Contains(result.Items, r => r.Name == "Captain Rex");
         Assert.Equal(5, result.Items.Count());
+    }
+
+    [Fact]
+    public async Task QueryBuilder_BugRepro_TagEquality_ShouldNotMatchPartialTags()
+    {
+        // Arrange
+        // 1. Create tags: 'a', 'cat', 'dog'
+        var tagA = new Tag { Name = "a", ProjectId = pid, OrganizationId = organizationId };
+        var tagCat = new Tag { Name = "cat", ProjectId = pid, OrganizationId = organizationId };
+        var tagDog = new Tag { Name = "dog", ProjectId = pid, OrganizationId = organizationId };
+        Context.Tags.AddRange(tagA, tagCat, tagDog);
+        await Context.SaveChangesAsync();
+
+        // 2. Create records
+        // Record 1: Tag = 'a'
+        var recA = new Record
+        {
+            Name = "Record A",
+            Description = "Admin bulk create URI test",
+            OriginalId = Guid.NewGuid().ToString(),
+            ProjectId = pid,
+            DataSourceId = did,
+            OrganizationId = organizationId,
+            Properties = "{}", // Fix for null constraint
+            Tags = new List<Tag> { tagA }
+        };
+        // Record 2: Tag = 'cat'
+        var recCat = new Record
+        {
+            Name = "Record Cat",
+            Description = "Admin bulk create URI test",
+            OriginalId = Guid.NewGuid().ToString(),
+            ProjectId = pid,
+            DataSourceId = did,
+            OrganizationId = organizationId,
+            Properties = "{}", // Fix for null constraint
+            Tags = new List<Tag> { tagCat }
+        };
+        // Record 3: Tag = 'dog'
+        var recDog = new Record
+        {
+            Name = "Record Dog",
+            Description = "Admin bulk create URI test",
+            OriginalId = Guid.NewGuid().ToString(),
+            ProjectId = pid,
+            DataSourceId = did,
+            OrganizationId = organizationId,
+            Properties = "{}", // Fix for null constraint
+            Tags = new List<Tag> { tagDog }
+        };
+        Context.Records.AddRange(recA, recCat, recDog);
+        await Context.SaveChangesAsync();
+
+        // Act & Assert
+
+        // Test Query: Tag = 'a'
+        // Should ONLY match recA. If it matches recCat or recDog due to partial matching, it fails.
+        var dtoA = new CustomQueryDtos.CustomQueryRequestDto
+        {
+            Connector = "AND", Filter = "tags", Operator = "=", Value = "a"
+        };
+        var resultA = await _queryBusiness.QueryBuilder(uid, [dtoA], organizationId, [pid]);
+
+        Assert.Single(resultA);
+        Assert.Equal("Record A", resultA.First().Name);
+
+        // Test Query: Tag = 'cat'
+        // Should ONLY match recCat.
+        var dtoCat = new CustomQueryDtos.CustomQueryRequestDto
+        {
+            Connector = "AND", Filter = "tags", Operator = "=", Value = "cat"
+        };
+        var resultCat = await _queryBusiness.QueryBuilder(uid, [dtoCat], organizationId, [pid]);
+        Assert.Single(resultCat);
+        Assert.Equal("Record Cat", resultCat.First().Name);
+
+        // Test Query: Tag = 'd'
+        // Should return nothing because no tag is named exactly 'd'.
+        // If it returns recDog, then it's doing substring match.
+        var dtoD = new CustomQueryDtos.CustomQueryRequestDto
+        {
+            Connector = "AND", Filter = "tags", Operator = "=", Value = "d"
+        };
+        var resultD = await _queryBusiness.QueryBuilder(uid, [dtoD], organizationId, [pid]);
+
+        Assert.Empty(resultD);
+    }
+
+    #endregion
+
+    #region URI Accessibility Tests
+
+    [Fact]
+    public async Task GetRecordsPaginated_UriExposed_WhenRecordHasNoLabels()
+    {
+        // Arrange - Captain Rex has no labels attached
+
+        // Act
+        var result = await _queryBusiness.GetRecordsPaginated(uid, organizationId, SortRecordsRequestDto.NameAZ,
+            new PaginatedRequestDto { PageNumber = 1, PageSize = 10 }, [pid]);
+
+        var rex = result.Items.FirstOrDefault(r => r.Name == "Captain Rex");
+
+        // Assert
+        Assert.NotNull(rex);
+        Assert.NotNull(rex.Uri);
+    }
+
+    [Fact]
+    public async Task GetRecordsPaginated_UriHidden_WhenUserLacksDownloadPermissionForLabel()
+    {
+        // Arrange - attach a label with no download permission granted to user
+        var labelDto = new CreateSensitivityLabelRequestDto
+        {
+            Name = "Download Restricted",
+            Description = "Label with no download permission"
+        };
+        var label = await _sensitivityLabelBusiness.CreateSensitivityLabel(uid, labelDto, pid, organizationId);
+        Context.ChangeTracker.Clear();
+
+        // Grant only write (to attach) and read — but NOT download file
+        var writePermission = await Context.Permissions.AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "write record");
+        var readPermission = await Context.Permissions.AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "read record");
+
+        var role = await Context.Roles.Include(r => r.Permissions)
+            .FirstOrDefaultAsync(r => r.Id == roleId);
+
+        if (role != null && writePermission != null && readPermission != null)
+        {
+            role.Permissions.Add(writePermission);
+            role.Permissions.Add(readPermission);
+            await Context.SaveChangesAsync();
+        }
+
+        Context.ChangeTracker.Clear();
+        await _recordBusiness.AttachLabel(uid, organizationId, pid, rid, label.Id);
+        Context.ChangeTracker.Clear();
+
+        // Act
+        var result = await _queryBusiness.GetRecordsPaginated(uid, organizationId, SortRecordsRequestDto.NameAZ,
+            new PaginatedRequestDto { PageNumber = 1, PageSize = 10 }, [pid],
+            isSysAdmin: false, isOrgAdmin: false, isProjectAdmin: false);
+
+        var rex = result.Items.FirstOrDefault(r => r.Name == "Captain Rex");
+
+        // Assert - record is visible (user has read) but URI is hidden (no download permission)
+        Assert.NotNull(rex);
+        Assert.Null(rex.Uri);
+    }
+
+    [Fact]
+    public async Task GetRecordsPaginated_UriExposed_WhenUserHasDownloadPermissionForLabel()
+    {
+        // Arrange
+        var labelDto = new CreateSensitivityLabelRequestDto
+        {
+            Name = "Download Allowed",
+            Description = "Label with download permission"
+        };
+        var label = await _sensitivityLabelBusiness.CreateSensitivityLabel(uid, labelDto, pid, organizationId);
+        Context.ChangeTracker.Clear();
+
+        var writePermission = await Context.Permissions.AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "write record");
+        var readPermission = await Context.Permissions.AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "read record");
+        var downloadPermission = await Context.Permissions.AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "download file");
+
+        var role = await Context.Roles.Include(r => r.Permissions)
+            .FirstOrDefaultAsync(r => r.Id == roleId);
+
+        if (role != null && writePermission != null && readPermission != null && downloadPermission != null)
+        {
+            role.Permissions.Add(writePermission);
+            role.Permissions.Add(readPermission);
+            role.Permissions.Add(downloadPermission);
+            await Context.SaveChangesAsync();
+        }
+
+        Context.ChangeTracker.Clear();
+        await _recordBusiness.AttachLabel(uid, organizationId, pid, rid, label.Id);
+        Context.ChangeTracker.Clear();
+
+        // Act
+        var result = await _queryBusiness.GetRecordsPaginated(uid, organizationId, SortRecordsRequestDto.NameAZ,
+            new PaginatedRequestDto { PageNumber = 1, PageSize = 10 }, [pid]);
+
+        var rex = result.Items.FirstOrDefault(r => r.Name == "Captain Rex");
+
+        // Assert
+        Assert.NotNull(rex);
+        Assert.NotNull(rex.Uri);
+    }
+
+    [Fact]
+    public async Task GetRecordsPaginated_UriExposed_ForSysAdminRegardlessOfLabels()
+    {
+        // Arrange - attach a label with no download permission
+        var labelDto = new CreateSensitivityLabelRequestDto
+        {
+            Name = "Top Secret URI",
+            Description = "Label blocking URI"
+        };
+        var label = await _sensitivityLabelBusiness.CreateSensitivityLabel(uid, labelDto, pid, organizationId);
+        Context.ChangeTracker.Clear();
+
+        var writePermission = await Context.Permissions.AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "write record");
+
+        var role = await Context.Roles.Include(r => r.Permissions)
+            .FirstOrDefaultAsync(r => r.Id == roleId);
+
+        if (role != null && writePermission != null)
+        {
+            role.Permissions.Add(writePermission);
+            await Context.SaveChangesAsync();
+        }
+
+        Context.ChangeTracker.Clear();
+        await _recordBusiness.AttachLabel(uid, organizationId, pid, rid, label.Id);
+        Context.ChangeTracker.Clear();
+
+        // Act
+        var result = await _queryBusiness.GetRecordsPaginated(uid, organizationId, SortRecordsRequestDto.NameAZ,
+            new PaginatedRequestDto { PageNumber = 1, PageSize = 10 }, [pid], isSysAdmin: true);
+
+        var rex = result.Items.FirstOrDefault(r => r.Name == "Captain Rex");
+
+        // Assert - SysAdmin always sees URI
+        Assert.NotNull(rex);
+        Assert.NotNull(rex.Uri);
     }
 
     #endregion

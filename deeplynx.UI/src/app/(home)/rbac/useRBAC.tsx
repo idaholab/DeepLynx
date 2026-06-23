@@ -11,7 +11,7 @@ export function useRBAC() {
     throw new Error("useRBAC must be used within RBACProvider");
   }
 
-  const { user } = context;
+  const { user, refreshUser } = context;
 
   /* ------------------------------------------------------------------------ */
   /*                              Role Helpers                                */
@@ -107,6 +107,7 @@ export function useRBAC() {
     hasAllPermissions,
     hasRole,
     isUserActive,
+    refreshUser,
     role: getPrimaryRole(), // e.g. "sysAdmin" | "orgAdmin" | "projectAdmin" | "viewer"
     roles: getAllRoles(), // e.g. ["orgAdmin", "projectAdmin"]
     PERMISSIONS,

@@ -1,6 +1,24 @@
 // src/app/lib/api-client.server.ts
 import "server-only";
+import { cache } from "react";
 import { auth } from "../../../../auth";
+
+/**
+ * Request-scoped memoized session getter.
+ *
+ * A single request can call auth() many times (once per apiFetch, plus any
+ * direct calls), and the jwt callback in auth.ts refreshes the access token
+ * near expiry. Without memoization, concurrent calls within a request can each
+ * trigger a refresh against the same single-use Okta refresh token — the same
+ * rotation race that signs users out on the client.
+ *
+ * React cache() memoizes per request, so all callers within one request share a
+ * single auth() computation (and at most one refresh). It is intentionally NOT
+ * a module-level singleton: that would be shared across every concurrent
+ * request/user in the Node process and could leak one user's session to
+ * another. cache() is request-scoped, so it isolates users correctly.
+ */
+export const getServerSession = cache(() => auth());
 
 /** ----- Strict env handling (lazy) ----- */
 let _BASE: string | null = null;
@@ -40,7 +58,7 @@ function extractAccessToken(x: unknown): string | null {
 }
 
 async function getBearer(): Promise<string | null> {
-  const session: unknown = await auth().catch(() => null);
+  const session: unknown = await getServerSession().catch(() => null);
   const userToken = extractAccessToken(session);
   return userToken ?? (SERVICE_TOKEN || null);
 }

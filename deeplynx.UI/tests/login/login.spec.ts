@@ -82,15 +82,15 @@ test.describe("Login", () => {
     });
 
     test("welcome greeting includes the dev user name", async ({ page }) => {
-      await expect(
-        page.getByText(/Welcome Back,\s+Local/i),
-      ).toBeVisible({ timeout: 15000 });
+      await expect(page.getByText(/Welcome Back,\s+Local/i)).toBeVisible({
+        timeout: 15000,
+      });
     });
 
     test("Your Projects section is visible", async ({ page }) => {
-      await expect(
-        page.locator('[data-tour="projects-section"]'),
-      ).toBeVisible({ timeout: 15000 });
+      await expect(page.locator('[data-tour="projects-section"]')).toBeVisible({
+        timeout: 15000,
+      });
     });
 
     test("sidebar renders with navigation links", async ({ page }) => {
@@ -101,7 +101,72 @@ test.describe("Login", () => {
   });
 });
 
-test.describe("Login Page", () => {
+test.describe("Login page redirect (auth disabled)", () => {
+  test.skip(
+    AUTH_ENABLED,
+    "Auth is enabled (NEXT_PUBLIC_DISABLE_FRONTEND_AUTHENTICATION=false)",
+  );
+
+  test("visiting /login/signin redirects to the home page", async ({
+    page,
+  }) => {
+    await seedSession(page);
+    await page.goto("/login/signin", { waitUntil: "domcontentloaded" });
+    await page.waitForURL("/", { timeout: 15000 });
+  });
+
+  test("login page shows Nexus logo while redirecting", async ({ page }) => {
+    await seedSession(page);
+    await page.goto("/login/signin", { waitUntil: "domcontentloaded" });
+    await expect(page.getByAltText("DeepLynx logo")).toBeVisible();
+  });
+
+  test("login page does not show the sign-in form when auth is disabled", async ({
+    page,
+  }) => {
+    await seedSession(page);
+    await page.goto("/login/signin", { waitUntil: "domcontentloaded" });
+    await expect(page.getByText("System Use Notification")).not.toBeVisible();
+  });
+});
+
+test.describe("Authenticated session (local dev user)", () => {
+  test.skip(
+    AUTH_ENABLED,
+    "Auth is enabled (NEXT_PUBLIC_DISABLE_FRONTEND_AUTHENTICATION=false)",
+  );
+
+  test.beforeEach(async ({ page }) => {
+    await seedSession(page);
+    await page.goto("/", { waitUntil: "domcontentloaded" });
+  });
+
+  test("home page loads with welcome greeting", async ({ page }) => {
+    await expect(
+      page.getByRole("heading", { name: /Welcome Back/i }),
+    ).toBeVisible({ timeout: 15000 });
+  });
+
+  test("welcome greeting includes the dev user name", async ({ page }) => {
+    await expect(page.getByText(/Welcome Back,\s+Local/i)).toBeVisible({
+      timeout: 15000,
+    });
+  });
+
+  test("Your Projects section is visible", async ({ page }) => {
+    await expect(page.locator('[data-tour="projects-section"]')).toBeVisible({
+      timeout: 15000,
+    });
+  });
+
+  test("sidebar renders with navigation links", async ({ page }) => {
+    await expect(
+      page.locator("aside", { hasText: "Project Dashboard" }),
+    ).toBeVisible({ timeout: 15000 });
+  });
+});
+
+test.describe("Login page (auth enabled)", () => {
   test.skip(
     !AUTH_ENABLED,
     "Auth is disabled (NEXT_PUBLIC_DISABLE_FRONTEND_AUTHENTICATION=true)",
@@ -118,18 +183,18 @@ test.describe("Login Page", () => {
   });
 
   test("displays DOE computer system notice", async ({ page }) => {
-    await expect(
-      page.getByText("This is a DOE computer system"),
-    ).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText("This is a DOE computer system")).toBeVisible({
+      timeout: 15000,
+    });
     await expect(
       page.getByText("THERE IS NO RIGHT OF PRIVACY IN THIS SYSTEM"),
     ).toBeVisible();
   });
 
   test("displays warning banner text", async ({ page }) => {
-    await expect(
-      page.getByText(/\*\*WARNING\*\*WARNING\*\*/),
-    ).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText(/\*\*WARNING\*\*WARNING\*\*/)).toBeVisible({
+      timeout: 15000,
+    });
   });
 
   test("displays I Acknowledge button", async ({ page }) => {
@@ -159,14 +224,8 @@ test.describe("Login Page", () => {
   test("clicking I Acknowledge reveals the Sign In button", async ({
     page,
   }) => {
-    await expect(
-      page.getByRole("button", { name: "I Acknowledge" }),
-    ).toBeVisible({ timeout: 15000 });
     await page.getByRole("button", { name: "I Acknowledge" }).click();
-
-    await expect(
-      page.getByRole("button", { name: "Sign In" }),
-    ).toBeVisible();
+    await expect(page.getByRole("button", { name: "Sign In" })).toBeVisible();
   });
 
   test("clicking Sign In initiates the OAuth flow", async ({ page }) => {
@@ -186,25 +245,19 @@ test.describe("Login Page", () => {
       });
     });
 
-    await expect(
-      page.getByRole("button", { name: "I Acknowledge" }),
-    ).toBeVisible({ timeout: 15000 });
     await page.getByRole("button", { name: "I Acknowledge" }).click();
 
     const [request] = await Promise.all([
-      page.waitForRequest(
-        (req) => req.url().includes("/api/auth/signin"),
-        { timeout: 10000 },
-      ),
+      page.waitForRequest((req) => req.url().includes("/api/auth/signin"), {
+        timeout: 10000,
+      }),
       page.getByRole("button", { name: "Sign In" }).click(),
     ]);
 
     expect(request.url()).toContain("/api/auth/signin");
   });
 
-  test("displays Vulnerability Disclosure Program banner", async ({
-    page,
-  }) => {
+  test("displays Vulnerability Disclosure Program banner", async ({ page }) => {
     const link = page.getByRole("link", {
       name: "Vulnerability Disclosure Program",
     });

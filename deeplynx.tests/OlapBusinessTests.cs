@@ -13,6 +13,7 @@ using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Newtonsoft.Json;
 using Parquet;
@@ -61,6 +62,7 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
     private Mock<IEdgeBusiness> _edgeBusiness = null!;
     private EventBusiness _eventBusiness = null!;
     private FileBusiness _fileBusiness = null!;
+    private UserBusiness _userBusiness = null!;
     private Mock<IFileBusinessFactory> _fileBusinessFactory = null!;
     private long _fileSystemObjectStorageId;
     private BulkCopyUpsertExecutor _mockBulkCopyUpsertExecutor = null!;
@@ -135,7 +137,8 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
         _eventBusiness = new EventBusiness(Context, _notificationBusiness, _mockBulkCopyUpsertExecutor);
         _classBusiness = new ClassBusiness(Context, _recordBusiness, _mockRelationshipBusiness.Object, _eventBusiness);
         _tagBusiness = new TagBusiness(Context, _eventBusiness);
-        _sensitivityLabelBusiness = new SensitivityLabelBusiness(Context, _eventBusiness);
+        _userBusiness = new UserBusiness(Context);
+        _sensitivityLabelBusiness = new SensitivityLabelBusiness(Context, _eventBusiness, _userBusiness);
         _recordBusiness = new RecordBusiness(Context, _eventBusiness, _mockBulkCopyUpsertExecutor, _tagBusiness,
             _sensitivityLabelBusiness, _sensitivityLabelService);
 
@@ -167,7 +170,8 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
             _recordBusiness,
             _insightBusiness.Object,
             _olapBusiness,
-            _objectStorageBusiness
+            _objectStorageBusiness,
+            NullLogger<FileBusiness>.Instance
         );
     }
 
