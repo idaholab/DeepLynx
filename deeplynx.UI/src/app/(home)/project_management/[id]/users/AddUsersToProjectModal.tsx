@@ -346,7 +346,7 @@ const AddUsersToProjectModal: React.FC<AddUsersToProjectModalProps> = ({
                       {roles.map((role) => (
                         <li
                           key={role.id}
-                          onClick={() => setSelectedRoleId(role.id.toString())}
+                          onClick={() => { setSelectedRoleId(role.id.toString()); (document.activeElement as HTMLElement)?.blur(); }}
                         >
                           <a>
                             <span>{role.name}</span>
