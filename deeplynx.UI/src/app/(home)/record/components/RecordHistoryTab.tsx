@@ -14,6 +14,7 @@ import {
   getHistoricalRecord,
   getRecordHistory,
 } from "@/app/lib/client_service/historical_record_services.client";
+import { getAllClasses } from "@/app/lib/client_service/class_services.client";
 import { formatRecordHistoryDate } from "./RecordHistoryDate";
 import RecordHistoryControls from "./RecordHistoryControls";
 import RecordHistoryDifferenceTable from "./RecordHistoryDifferenceTable";
@@ -64,6 +65,9 @@ export default function RecordHistoryTab({
   const [sliderIndex, setSliderIndex] = useState(0);
   const [maxRenderedRows, setMaxRenderedRows] = useState(300);
   const [isUiPending, startUiTransition] = useTransition();
+  const [activeClassNames, setActiveClassNames] = useState<Set<string>>(new Set());
+  const [_, setAreClassesLoading] = useState(true);
+
 
   // Runtime caches + debounce timers for high-frequency interactions.
   const snapshotCacheRef = useRef<Map<string, HistoricalRecordResponseDto>>(
@@ -158,6 +162,37 @@ export default function RecordHistoryTab({
     recordId,
     t.translations.FAILED_TO_LOAD_RECORD_HISTORY,
   ]);
+
+  useEffect(() => {
+    if (!projectId) {
+      setActiveClassNames(new Set());
+      setAreClassesLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+
+    const fetchActiveClasses = async () => {
+      try {
+        setAreClassesLoading(true);
+        const classes = await getAllClasses(projectId, true);
+        if (cancelled) return;
+        const names = new Set(classes.map((cls) => cls.name));
+        setActiveClassNames(names);
+      } catch (error) {
+        console.error("Failed to fetch active classes", error);
+        if (!cancelled) setActiveClassNames(new Set());
+      } finally {
+        if (!cancelled) setAreClassesLoading(false);
+      }
+    };
+
+    fetchActiveClasses();
+
+    return () => {
+      cancelled = true
+    }
+  }, [projectId]);
 
   useEffect(() => {
     // Keep slider UI in sync when selected version changes elsewhere.
@@ -568,6 +603,7 @@ export default function RecordHistoryTab({
         }
         onToggleExpand={toggleExpand}
         onLoadMore={() => setMaxRenderedRows((prev) => prev + 300)}
+        activeClassNames={activeClassNames}
       />
     </div>
   );

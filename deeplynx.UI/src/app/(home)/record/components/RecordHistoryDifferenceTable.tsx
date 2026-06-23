@@ -18,6 +18,7 @@ interface Props {
   onShowOnlyChangesChange: (checked: boolean) => void;
   onToggleExpand: (id: string) => void;
   onLoadMore: () => void;
+  activeClassNames: Set<string>;
 }
 
 export default function RecordHistoryDifferenceTable({
@@ -35,8 +36,22 @@ export default function RecordHistoryDifferenceTable({
   onShowOnlyChangesChange,
   onToggleExpand,
   onLoadMore,
+  activeClassNames
 }: Props) {
   const { t } = useLanguage();
+
+  function normalizeClassNameWithArchivedLabel(
+    className: string | undefined | null,
+    activeClassNames: Set<string>
+  ): string {
+    if (!className) return t.translations.NO_CLASS;
+
+    if (!activeClassNames.has(className.trim())) {
+      return `${className} (Archived)`;
+    }
+
+    return className;
+  }
 
   return (
     // Difference card: filters, loading states, and expandable difference tree table.
@@ -109,14 +124,22 @@ export default function RecordHistoryDifferenceTable({
                   </td>
                 </tr>
               ) : (
-                visibleRows.map(({ node, depth }) => {
+                visibleRows.map(({ node, depth }, _) => {
                   const hasChildren = node.children.length > 0;
                   const isExpanded = expandedRows.has(node.id);
+
+                  const isClassNameRow = node.field === "record.className";
+
+                  const currentValue = isClassNameRow
+                    ? normalizeClassNameWithArchivedLabel(node.current, activeClassNames)
+                    : node.current ?? placeholderValue;
+
+                  const compareValue = isClassNameRow
+                    ? normalizeClassNameWithArchivedLabel(node.compare, activeClassNames)
+                    : node.compare ?? placeholderValue;
+
                   return (
-                    <tr
-                      key={node.id}
-                      className={node.changed ? "bg-warning/10" : ""}
-                    >
+                    <tr key={node.id} className={node.changed ? "bg-warning/10" : ""}>
                       <td className="align-top">
                         <div
                           className="flex items-start gap-2"
@@ -143,10 +166,8 @@ export default function RecordHistoryDifferenceTable({
                               <div className="text-xs opacity-70">
                                 {isExpanded
                                   ? t.translations.RECORD_HISTORY_EXPANDED
-                                  : t.translations
-                                      .RECORD_HISTORY_COLLAPSED}{" "}
-                                ({node.leafCount}{" "}
-                                {t.translations.RECORD_HISTORY_FIELDS})
+                                  : t.translations.RECORD_HISTORY_COLLAPSED}{" "}
+                                ({node.leafCount} {t.translations.RECORD_HISTORY_FIELDS})
                               </div>
                             )}
                           </div>
@@ -163,7 +184,7 @@ export default function RecordHistoryDifferenceTable({
                           </span>
                         ) : (
                           <div className="whitespace-pre-wrap break-all text-xs">
-                            {node.current ?? placeholderValue}
+                            {currentValue}
                           </div>
                         )}
                       </td>
@@ -178,7 +199,7 @@ export default function RecordHistoryDifferenceTable({
                           </span>
                         ) : (
                           <div className="whitespace-pre-wrap break-all text-xs">
-                            {node.compare ?? placeholderValue}
+                            {compareValue}
                           </div>
                         )}
                       </td>
