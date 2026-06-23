@@ -6,10 +6,10 @@ import {
   TagResponseDto,
 } from "@/app/(home)/types/responseDTOs";
 import {
+  NewCollectionSelectedRecord,
   FacetOption,
   MetadataRow,
-  NewCollectionSelectedRecord,
-} from "./recordCollections.types";
+} from "../(home)/record_collections/components/recordCollections.types";
 
 /**
  * Escapes special RegExp metacharacters in a string so it can be safely
@@ -148,7 +148,9 @@ export function countFacet(values: string[]) {
     .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
 }
 
-export function getSelectedRecordLabelNames(record: NewCollectionSelectedRecord) {
+export function getSelectedRecordLabelNames(
+  record: NewCollectionSelectedRecord,
+) {
   if (record.fullRecord?.labels?.length) {
     return record.fullRecord.labels.map((label) => label.name);
   }
@@ -168,7 +170,9 @@ export function buildAlphabeticalFacetOptions(values: string[]): FacetOption[] {
   );
 }
 
-export function parseProperties(properties?: string | null): Record<string, unknown> {
+export function parseProperties(
+  properties?: string | null,
+): Record<string, unknown> {
   if (!properties) return {};
 
   try {
@@ -183,7 +187,9 @@ export function getMetadataRows(properties?: string | null): MetadataRow[] {
   return Object.entries(parseProperties(properties)).map(([label, value]) => ({
     label,
     value:
-      typeof value === "string" || typeof value === "number" || typeof value === "boolean"
+      typeof value === "string" ||
+      typeof value === "number" ||
+      typeof value === "boolean"
         ? String(value)
         : JSON.stringify(value),
   }));
@@ -196,7 +202,8 @@ export function getSensitivity(collection: RecordCollectionResponseDto) {
 export function getSensitivityClass(label: string) {
   const lower = label.toLowerCase();
   if (lower.includes("high")) return "badge-error";
-  if (lower.includes("moderate") || lower.includes("medium")) return "badge-warning";
+  if (lower.includes("moderate") || lower.includes("medium"))
+    return "badge-warning";
   if (lower.includes("low")) return "badge-success";
   return "badge-outline";
 }
@@ -230,7 +237,9 @@ export function mergeDraftEntities<T extends { id: number; name: string }>(
   return Array.from(resultIds)
     .map((id) => itemMap.get(id))
     .filter((item): item is T => Boolean(item))
-    .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
+    .sort((a, b) =>
+      a.name.localeCompare(b.name, undefined, { sensitivity: "base" }),
+    );
 }
 
 export function deriveSelectedRecordMetadata(params: {

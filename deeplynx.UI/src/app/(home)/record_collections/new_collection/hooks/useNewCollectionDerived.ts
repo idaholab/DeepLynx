@@ -6,15 +6,15 @@ import {
   TagResponseDto,
 } from "../../../types/responseDTOs";
 import {
-  countFacet,
-  deriveSelectedRecordMetadata,
-  getSelectedRecordLabelNames,
-  getSelectedRecordTagNames,
-} from "../../components/utils";
-import {
   NewCollectionSelectedRecord,
   SelectionState,
 } from "../../components/recordCollections.types";
+import {
+  countFacet,
+  getSelectedRecordLabelNames,
+  getSelectedRecordTagNames,
+  deriveSelectedRecordMetadata,
+} from "@/app/lib/record_helpers";
 
 type Params = {
   availableLabels: SensitivityLabelsDto[];
