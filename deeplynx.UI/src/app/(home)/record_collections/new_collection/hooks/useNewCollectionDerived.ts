@@ -5,9 +5,7 @@ import {
   SensitivityLabelsDto,
   TagResponseDto,
 } from "../../../types/responseDTOs";
-import {
-  countFacet,
-} from "../../components/utils";
+import { countFacet } from "@/app/lib/record_helpers";
 import {
   deriveSelectedRecordMetadata,
   getSelectedRecordLabelNames,

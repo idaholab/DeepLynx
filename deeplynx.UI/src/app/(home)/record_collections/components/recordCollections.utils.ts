@@ -2,7 +2,7 @@ import {
   RecordCollectionResponseDto,
   SensitivityLabelsDto,
 } from "../../types/responseDTOs";
-import { countFacet, parseRecordTags } from "./utils";
+import { countFacet, parseRecordTags } from "@/app/lib/record_helpers";
 import {
   FacetOption,
   MetadataRow,

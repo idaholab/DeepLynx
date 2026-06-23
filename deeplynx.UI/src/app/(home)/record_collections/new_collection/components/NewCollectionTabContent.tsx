@@ -12,7 +12,7 @@ import NewCollectionStepIndicator from "./NewCollectionStepIndicator";
 import SelectedRecordsPreviewPanel from "../../components/SelectedRecordsPreviewPanel";
 import SectionCard from "../../components/SectionCard";
 import { NewCollectionTabController } from "../../components/componentTypes";
-import { interpolateTemplate } from "../../components/utils";
+import { interpolateTemplate } from "@/app/lib/record_helpers";
 
 type Props = {
   controller: NewCollectionTabController;

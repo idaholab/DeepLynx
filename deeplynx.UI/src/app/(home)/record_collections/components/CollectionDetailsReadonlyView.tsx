@@ -8,7 +8,7 @@ import React from "react";
 import { formatLocalDateTime } from "@/app/lib/date_time";
 import { MetadataRow } from "./recordCollections.types";
 import SectionCard from "./SectionCard";
-import { interpolateTemplate } from "./utils";
+import { interpolateTemplate } from "@/app/lib/record_helpers";
 
 type NamedItem = {
   id: number | string;

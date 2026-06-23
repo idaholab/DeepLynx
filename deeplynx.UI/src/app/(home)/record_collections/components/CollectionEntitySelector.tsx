@@ -4,7 +4,7 @@ import SearchInput from "@/app/(home)/components/SearchInput";
 import { useLanguage } from "@/app/contexts/Language";
 import { XCircleIcon } from "@heroicons/react/24/outline";
 import React from "react";
-import { interpolateTemplate } from "./utils";
+import { interpolateTemplate } from "@/app/lib/record_helpers";
 
 type NamedItem = {
   id: number | string;

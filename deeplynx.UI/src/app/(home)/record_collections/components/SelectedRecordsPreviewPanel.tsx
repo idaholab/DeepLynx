@@ -6,7 +6,7 @@ import { useLanguage } from "@/app/contexts/Language";
 import { formatLocalDateTime } from "@/app/lib/date_time";
 import React from "react";
 import { NewCollectionSelectedRecord } from "./recordCollections.types";
-import { interpolateTemplate } from "./utils";
+import { interpolateTemplate } from "@/app/lib/record_helpers";
 
 type Props = {
   title: string;

@@ -8,7 +8,7 @@ import CollectionRecordSearchControls from "./CollectionRecordSearchControls";
 import CollectionRecordSearchResultsTable from "./CollectionRecordSearchResultsTable";
 import SectionCard from "./SectionCard";
 import { SelectedCollectionDetailsController } from "./componentTypes";
-import { interpolateTemplate } from "./utils";
+import { interpolateTemplate } from "@/app/lib/record_helpers";
 
 type Props = {
   controller: SelectedCollectionDetailsController;
