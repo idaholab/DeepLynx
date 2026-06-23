@@ -3,12 +3,14 @@ using deeplynx.datalayer.Models;
 using deeplynx.helpers;
 using deeplynx.interfaces;
 using deeplynx.models;
+using deeplynx.models.ResponseDTOs;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using JsonSerializer = System.Text.Json.JsonSerializer;
+using deeplynx.helpers.Cache;
 
 namespace deeplynx.business;
 
@@ -23,6 +25,7 @@ public class FileBusiness
     private readonly IOlapBusiness _olapBusiness;
     private readonly IInsightBusiness _insightBusiness;
     private readonly IObjectStorageBusiness _objectStorageBusiness;
+    private readonly ILogger<FileBusiness> _logger;
 
 
     // NOTE: Chunked upload methods currently only support filesystem storage.
@@ -36,7 +39,8 @@ public class FileBusiness
         IRecordBusiness recordBusiness,
         IInsightBusiness insightBusiness,
         IOlapBusiness olapBusiness,
-        IObjectStorageBusiness objectStorageBusiness)
+        IObjectStorageBusiness objectStorageBusiness,
+        ILogger<FileBusiness> logger)
     {
         _context = context;
         _factory = factory;
@@ -46,6 +50,7 @@ public class FileBusiness
         _insightBusiness = insightBusiness;
         _olapBusiness = olapBusiness;
         _objectStorageBusiness = objectStorageBusiness;
+        _logger = logger;
 
         var chunkSizeStr = Environment.GetEnvironmentVariable("RECOMMENDED_CHUNK_SIZE")
                            ?? throw new InvalidOperationException(
@@ -56,7 +61,7 @@ public class FileBusiness
 
         _recommendedChunkSize = chunkSize;
     }
-
+    
     /// <summary>
     ///     Upload a File
     /// </summary>
@@ -165,6 +170,8 @@ public class FileBusiness
                             createdRecord.Uri!, vlmConfig, embeddingModelConfig, userJwt);
         }
 
+        await InvalidateProjectStorageSizeCache(projectId);
+
         return createdRecord;
     }
 
@@ -229,6 +236,8 @@ public class FileBusiness
             _insightBusiness.TriggerEmbedding(projectId, updatedRecord.Id, updatedRecord.Uri!, vlmConfig, embeddingModelConfig, userJwt, overwrite: true);
         }
 
+        await InvalidateProjectStorageSizeCache(projectId);
+        
         return updatedRecord;
     }
 
@@ -294,8 +303,12 @@ public class FileBusiness
         var fileBusiness = _factory.CreateFileBusiness(objectStorage.Type);
 
         await fileBusiness.DeleteFile(record, objectStorage.Config);
+        
+        var deleted = await _recordBusiness.DeleteRecord(currentUserId, organizationId, projectId, recordId);
+        
+        await InvalidateProjectStorageSizeCache(projectId);
 
-        return await _recordBusiness.DeleteRecord(currentUserId, organizationId, projectId, recordId);
+        return deleted;
 
         // Embeddings made by Insight that reference this record will be auto deleted
     }
@@ -459,6 +472,8 @@ public class FileBusiness
                 createdRecord.Uri!, vlmConfig, embeddingModelConfig);
         }
 
+        await InvalidateProjectStorageSizeCache(projectId);
+
         return createdRecord;
     }
 
@@ -495,60 +510,197 @@ public class FileBusiness
     /// <param name="organizationId">ID of the organization in which to backfill file sizes</param>
     /// <param name="projectId">ID of the project in which to backfill file sizes</param>
     /// <exception cref="InvalidOperationException">Returned if org ID or project ID not supplied</exception>
-    public async Task BackfillFileSizes(
+    public async Task<BackfillFileSizesResponseDto> BackfillFileSizes(
         long? organizationId,
-        long? projectId)
+        long? projectId,
+        long? afterRecordId = null,
+        int batchSize = 500,
+        int maxBatches = 5)
     {
         if (organizationId == null && projectId == null)
             throw new InvalidOperationException("At least one of organization or project must be specified.");
+        
+        if (batchSize <= 0)
+            throw new ArgumentException("batchSize must be greater than zero.");
+        
+        if (maxBatches <= 0)
+            throw new ArgumentException("maxBatches must be greater than zero.");
+        
+        var response = new BackfillFileSizesResponseDto();
 
-        // only backfill for records that have a uri and an object storage id
-        var toBackfill = _context.Records
-            .Where(r => r.Uri != null && r.FileSize == null && r.ObjectStorageId != null);
-
-        if (organizationId.HasValue)
-            toBackfill = toBackfill.Where(r => r.OrganizationId == organizationId.Value);
-        if (projectId.HasValue)
-            toBackfill = toBackfill.Where(r => r.ProjectId == projectId.Value);
-
-        var backfillRecords = await toBackfill.ToListAsync();
-
-        // group by storage to avoid per-record storage lookup
-        var recordsByStorage = backfillRecords
-            .GroupBy(r => r.ObjectStorageId!.Value)
-            .ToList();
-
-        foreach (var storageGroup in recordsByStorage)
+        for (var batchNumber = 0; batchNumber < maxBatches; batchNumber++)
         {
-            var objectStorageId = storageGroup.Key;
-            var objectStorage = await _objectStorageBusiness.GetDecryptedObjectStorage(objectStorageId);
-            var fileBusiness = _factory.CreateFileBusiness(objectStorage.Type);
+            var toBackfill = _context.Records
+                .Where(r => r.Uri != null && r.FileSize == null && !r.IsArchived);
+            
+            if (organizationId.HasValue)
+                toBackfill = toBackfill.Where(r => r.OrganizationId == organizationId.Value);
+            
+            if (projectId.HasValue)
+                toBackfill = toBackfill.Where(r => r.ProjectId == projectId.Value);
+            
+            if (afterRecordId.HasValue)
+                toBackfill = toBackfill.Where(r => r.Id > afterRecordId.Value);
+            
+            var records = await toBackfill
+                .OrderBy(r => r.Id)
+                .Take(batchSize)
+                .ToListAsync();
 
-            // for azure, try batch operation first
-            if (objectStorage.Type == "azure" && fileBusiness is FileAzureBusiness azureBusiness)
+            if (records.Count == 0)
+                break;
+            
+            response.Processed += records.Count;
+            response.LastRecordId = records.Max(r => r.Id);
+
+            var recordsByStorage = records
+                .Where(r => r.ObjectStorageId != null)
+                .GroupBy(r => r.ObjectStorageId!.Value)
+                .ToList();
+            
+            var legacyFilesystemRecords = records
+                .Where(r => r.ObjectStorageId == null)
+                .ToList();
+            
+            foreach (var storageGroup in recordsByStorage)
             {
-                var uris = storageGroup.Select(r => r.Uri).ToList();
-                var sizes = await azureBusiness.GetFileSizesBatch(uris, objectStorage.Config);
+                var objectStorageId = storageGroup.Key;
+                ObjectStorageDecryptedDto objectStorage;
+                
+                try
+                {
+                    objectStorage = await _objectStorageBusiness.GetDecryptedObjectStorage(objectStorageId);
+                }
+                catch (Exception ex)
+                {
+                    response.Failed += storageGroup.Count();
+                    
+                    _logger.LogWarning(
+                        ex,
+                        "Object storage {ObjectStorageId} not found or archived while backfilling file sizes",
+                        storageGroup.Key);
 
+                    continue;
+                }
+
+                var fileBusiness = _factory.CreateFileBusiness(objectStorage.Type);
+
+                // for azure, try batch operation first
+                if (objectStorage.Type == "azure_object" && fileBusiness is FileAzureBusiness azureBusiness)
+                {
+                    try
+                    {
+                        var uris = storageGroup.Select(r => r.Uri!).ToList();
+                        var sizes = await azureBusiness.GetFileSizesBatch(uris, objectStorage.Config);
+
+                        foreach (var record in storageGroup)
+                        {
+                            if (record.Uri != null && sizes.TryGetValue(record.Uri, out var size))
+                            {
+                                record.FileSize = size;
+                                response.Updated++;
+                            }
+                            else
+                            {
+                                response.Failed++;
+
+                                _logger.LogWarning(
+                                    "Failed to backfill size for record {RecordId}, project {ProjectId}, object storage {ObjectStorageId}, uri {Uri}",
+                                    record.Id,
+                                    record.ProjectId,
+                                    record.ObjectStorageId,
+                                    record.Uri);
+                            }
+                        }
+
+                        continue;
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(
+                            ex,
+                            "Azure batch file size lookup failed for object storage {ObjectStorageId}; falling back to individual file size lookups",
+                            storageGroup.Key);
+                    }
+                }
+                // fall back to individual calls for non-Azure path or Azure batch fallback path
                 foreach (var record in storageGroup)
                 {
-                    if (sizes.TryGetValue(record.Uri, out var size))
-                        record.FileSize = size;
+                    try
+                    {
+                        var fileSize = await fileBusiness.GetFileSize(record.Uri!, objectStorage.Config);
+                        record.FileSize = fileSize;
+                        response.Updated++;
+                    }
+                    catch (Exception ex)
+                    {
+                        response.Failed++;
+                        
+                        _logger.LogWarning(
+                            ex,
+                            "Failed to backfill size for record {RecordId}, project {ProjectId}, object storage {ObjectStorageId}, uri {Uri} while individual calls",
+                            record.Id,
+                            record.ProjectId,
+                            record.ObjectStorageId,
+                            record.Uri);
+                    }
                 }
             }
-            else
+
+            // Check filesystem records that exists, but object_storage_id is null
+            foreach (var record in legacyFilesystemRecords)
             {
-                // fall back to individual calls for filesystem
-                foreach (var record in storageGroup)
+                try
                 {
-                    var fileSize = await fileBusiness.GetFileSize(record.Uri, objectStorage.Config);
-                    record.FileSize = fileSize;
+                    if (record.Uri != null && File.Exists(record.Uri))
+                    {
+                        record.FileSize = new FileInfo(record.Uri).Length;
+                        response.Updated++;
+                    }
+                    else
+                    {
+                        response.Failed++;
+
+                        _logger.LogWarning(
+                            "Failed to backfill legacy filesystem size for record {RecordId}, project {ProjectId}, uri {Uri}; file does not exist",
+                            record.Id,
+                            record.ProjectId,
+                            record.Uri);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    response.Failed++;
+                    
+                    _logger.LogWarning(
+                        ex,
+                        "Failed to backfill legacy filesystem size for record {RecordId}, project {ProjectId}, uri {Uri}",
+                        record.Id,
+                        record.ProjectId,
+                        record.Uri);
                 }
             }
+
+            var affectedProjectIds = records
+                .Select(r => r.ProjectId)
+                .Distinct()
+                .ToList();
+
+            // save progress after each batch so the backfill can resume if a later batch fails.
+            await _context.SaveChangesAsync();
+
+            foreach (var affectedProjectId in affectedProjectIds)
+            {
+                await InvalidateProjectStorageSizeCache(affectedProjectId);
+            }
+
+            afterRecordId = response.LastRecordId;
+
+            if (records.Count < batchSize)
+                break;
         }
-
-        // save all changes at once to avoid multiple DB trips
-        await _context.SaveChangesAsync();
+        
+        return response;
     }
 
     public async Task<TusFileUploadSessionResponseDto> CreateUploadTus(
@@ -670,6 +822,8 @@ public class FileBusiness
             var createdRecord = await _recordBusiness.CreateRecord(currentUserId, organizationId, projectId,
                 realDataSourceId, recordRequest, sensitivityLabelIds, embedded: embed);
 
+            await InvalidateProjectStorageSizeCache(projectId);
+
             if (embed)
             {
                 var vlmConfig = await _insightBusiness.ResolveModelConfig(currentUserId, organizationId, projectId, vlmConfigId, "vlm");
@@ -687,6 +841,12 @@ public class FileBusiness
     // Private helpers
     // -------------------------------------------------------------------------
 
+    private static async Task InvalidateProjectStorageSizeCache(long projectId)
+    {
+        await CacheService.Instance.DeleteAsync(
+            CacheKeys.ProjectStorageSize(projectId));
+    }
+    
     private async Task<long> ResolveDataSourceId(long organizationId, long projectId, long? dataSourceId)
     {
         if (dataSourceId.HasValue)
