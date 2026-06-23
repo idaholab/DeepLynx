@@ -4,18 +4,18 @@ import { useLanguage } from "@/app/contexts/Language";
 import { getAllSensitivityLabelsProject } from "@/app/lib/client_service/sensitivity_labels_services.client";
 import { getAllTags } from "@/app/lib/client_service/tag_services.client";
 import { useEffect, useState } from "react";
-import toast from "react-hot-toast";
-import {
-  SensitivityLabelsDto,
-  TagResponseDto,
-} from "../../types/responseDTOs";
+import { SensitivityLabelsDto, TagResponseDto } from "../../types/responseDTOs";
+import { useToast } from "@/app/contexts/ToastProvider";
 
 export function useProjectCollectionOptions(projectId: number) {
   const { t } = useLanguage();
   const [labelsLoading, setLabelsLoading] = useState(false);
-  const [availableLabels, setAvailableLabels] = useState<SensitivityLabelsDto[]>([]);
+  const [availableLabels, setAvailableLabels] = useState<
+    SensitivityLabelsDto[]
+  >([]);
   const [tagsLoading, setTagsLoading] = useState(false);
   const [availableTags, setAvailableTags] = useState<TagResponseDto[]>([]);
+  const { showToast } = useToast();
 
   useEffect(() => {
     let cancelled = false;
@@ -34,14 +34,20 @@ export function useProjectCollectionOptions(projectId: number) {
         setAvailableLabels(labelsResult.value);
       } else {
         console.error("Failed to load project labels:", labelsResult.reason);
-        toast.error(t.translations.RECORD_COLLECTIONS_FAILED_LOAD_PROJECT_LABELS);
+        showToast(
+          "error",
+          t.translations.RECORD_COLLECTIONS_FAILED_LOAD_PROJECT_LABELS,
+        );
       }
 
       if (tagsResult.status === "fulfilled") {
         setAvailableTags(tagsResult.value);
       } else {
         console.error("Failed to load project tags:", tagsResult.reason);
-        toast.error(t.translations.RECORD_COLLECTIONS_FAILED_LOAD_PROJECT_TAGS);
+        showToast(
+          "error",
+          t.translations.RECORD_COLLECTIONS_FAILED_LOAD_PROJECT_TAGS,
+        );
       }
 
       if (!cancelled) {

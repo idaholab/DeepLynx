@@ -1,15 +1,12 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
-import toast from "react-hot-toast";
-import {
-  PaginatedRecordCollectionsResponseDto,
-  RecordCollectionResponseDto,
-} from "@/app/(home)/types/responseDTOs";
+import { PaginatedRecordCollectionsResponseDto } from "@/app/(home)/types/responseDTOs";
 import { useLanguage } from "@/app/contexts/Language";
 import { getRecordCollectionsForRecord } from "@/app/lib/client_service/record_collection_services.client";
+import { useEffect, useState } from "react";
 import PaginationControls from "../../components/PaginationControls";
 import CollectionDashboardCard from "../../record_collections/components/CollectionDashboardCard";
+import { useToast } from "@/app/contexts/ToastProvider";
 
 interface Props {
   organizationId: number;
@@ -26,7 +23,7 @@ export default function RecordCollectionsTab({
 
   const [pageNumber, setPageNumber] = useState(1);
   const [pageSize, setPageSize] = useState(10);
-
+  const { showToast } = useToast();
   const [pageData, setPageData] =
     useState<PaginatedRecordCollectionsResponseDto | null>(null);
   const collections = pageData?.items ?? [];
@@ -54,7 +51,7 @@ export default function RecordCollectionsTab({
         console.error("Error fetching record collections:", error);
         setPageData(null);
         setCollectionError(t.translations.FAILED_TO_LOAD_RECORD_COLLECTIONS);
-        toast.error(t.translations.FAILED_TO_LOAD_RECORD_COLLECTIONS);
+        showToast("error", t.translations.FAILED_TO_LOAD_RECORD_COLLECTIONS);
       } finally {
         if (!cancelled) setIsLoadingCollections(false);
       }

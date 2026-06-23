@@ -2,7 +2,6 @@
 
 import { XMarkIcon } from "@heroicons/react/24/outline";
 import React, { useCallback, useContext, useState } from "react";
-import { success } from "zod";
 
 type ToastType = "success" | "error" | "info" | "warning";
 
@@ -10,11 +9,11 @@ type AppToast = {
   id: number;
   type: ToastType;
   message: string;
-  position: string;
+  position?: string;
 };
 
 type ToastContextValue = {
-  showToast: (type: ToastType, message: string, position: string) => void;
+  showToast: (type: ToastType, message: string, position?: string) => void;
 };
 
 const ToastContext = React.createContext<ToastContextValue | null>(null);
@@ -34,7 +33,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const showToast = useCallback(
-    (type: ToastType, message: string, position: string) => {
+    (type: ToastType, message: string, position = "toast-top toast-end") => {
       const id = Date.now();
       setToasts((current) => [...current, { id, type, message, position }]);
 
@@ -48,7 +47,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
       {children}
 
       {toasts.map((toast) => (
-        <div className={`toast z-50 ${toast.position}`}>
+        <div className={`toast z-50 pt-16 ${toast.position}`}>
           <div
             key={toast.id}
             role={toast.type === "error" ? "alert" : "status"}
