@@ -645,6 +645,7 @@ export const translations = {
       LABEL_CREATED: "Label created",
       LABEL_CREATED_AND_ATTACHED: "created and attached",
       LABEL_CREATED_BUT_FAILED_TO_ATTACH: "created but failed to attach",
+      LABEL_IN_USE: "Label is currently in use. Remove the label from the record(s) before archiving.",
       LABEL_NAME: "Label Name",
       LABEL_NAME_PLACEHOLDER: "e.g., CUI, ITAR, Public",
       LABELS_ARE_LOCKED: "Labels are locked",
@@ -999,6 +1000,8 @@ export const translations = {
       ORGANIZATION: "Organization",
       ORGANIZATION_ADMIN_ACCESS_UPDATED: "Organization admin access updated.",
       ORGANIZATION_DEFAULT: "Organization Default",
+      PROJECT_ADMIN: "Project Admin",
+      PROJECT_ADMIN_ACCESS_UPDATED: "Project admin access updated.",
       ORGANIZATION_ID: "Organization ID",
       ORGANIZATION_LABEL: "Organization Label",
       ORGANIZATION_LABEL_CREATED: "Organization label created.",
@@ -1170,7 +1173,7 @@ export const translations = {
       PROJECT_INSIGHT_STATUS_PROCESSING: "Embedding in progress.",
       PROJECT_INSIGHT_STATUS_QUEUED: "Queued for embedding.",
       PROJECT_INSIGHT_STATUS_UNSUPPORTED:
-        "Insight supports PDF, TXT, and HTML files only.",
+        "Insight supports PDF, TXT, HTML, and image files (PNG, JPG, WEBP) only.",
       PROJECT_INSIGHT_UPDATED_FROM: "Updated from",
       PROJECT_INSIGHT_UPDATED_TO: "Updated to",
       PROJECT_LABEL_CREATED: "Project label created.",
@@ -1720,6 +1723,8 @@ export const translations = {
         "User and organization admin access updated.",
       USER_AND_SYSTEM_ADMIN_ACCESS_UPDATED:
         "User and system admin access updated.",
+      USER_AND_PROJECT_ADMIN_ACCESS_UPDATED:
+        "User and project admin access updated.",
       USER_ARCHIVED_SUCCESSFULLY: "User archived successfully.",
       USER_MANAGEMENT: "User Management",
       USER_REMOVED_FROM_ORG: "User removed from organization",
@@ -2464,6 +2469,7 @@ export const translations = {
       LABEL_CREATED: "Etiqueta creada",
       LABEL_CREATED_AND_ATTACHED: "creada y adjuntada",
       LABEL_CREATED_BUT_FAILED_TO_ATTACH: "creada pero no se pudo adjuntar",
+      LABEL_IN_USE: "La etiqueta está en uso actualmente. Quita la etiqueta del(los) registro(s) antes de archivarlo(s).",
       LABEL_NAME: "Nombre de la etiqueta",
       LABEL_NAME_PLACEHOLDER: "p. ej., CUI, ITAR, Pública",
       LABELS_ARE_LOCKED: "Las etiquetas de sensibilidad están bloqueadas",
@@ -2837,6 +2843,9 @@ export const translations = {
       ORGANIZATION_ADMIN_ACCESS_UPDATED:
         "Se actualizo el acceso de administrador de la organizacion.",
       ORGANIZATION_DEFAULT: "Predeterminado de la organización",
+      PROJECT_ADMIN: "Administrador del Proyecto",
+      PROJECT_ADMIN_ACCESS_UPDATED:
+        "Se actualizo el acceso de administrador del proyecto.",
       ORGANIZATION_ID: "ID de la organización",
       ORGANIZATION_LABEL: "Etiqueta de la organización",
       ORGANIZATION_LABEL_CREATED: "Etiqueta de la organización creada.",
@@ -3606,6 +3615,8 @@ export const translations = {
         "Se actualizaron el usuario y el acceso de administrador de la organizacion.",
       USER_AND_SYSTEM_ADMIN_ACCESS_UPDATED:
         "Se actualizaron el usuario y el acceso de administrador del sistema.",
+      USER_AND_PROJECT_ADMIN_ACCESS_UPDATED:
+        "Se actualizaron el usuario y el acceso de administrador del proyecto.",
       USER_ARCHIVED_SUCCESSFULLY: "Usuario archivado correctamente.",
       USER_MANAGEMENT: "Gestión de usuarios",
       USER_REMOVED_FROM_ORG: "Usuario eliminado de la organización",

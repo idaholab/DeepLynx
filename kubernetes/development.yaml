@@ -6,6 +6,7 @@ metadata:
   labels:
     name: deeplynxv3-dev
 
+
 # Secret for Azure Storage Account with SAS Token
 ---
 apiVersion: v1
@@ -19,6 +20,7 @@ stringData:
   azurestorageaccountsastoken: ${AZURE_STORAGE_ACCOUNT_SAS_TOKEN}
   azurestorageaccountkey: ${AZURE_STORAGE_ACCOUNT_KEY}
   azurestorageconnectionstring: ${AZURE_OBJECT_CONNECTION_STRING}
+
 
 # Persistent Volume pointing to existing Azure File Share
 ---
@@ -57,6 +59,7 @@ spec:
       name: azure-storage-secret
       namespace: deeplynxv3-dev
 
+
 # Storage Class (simplified for static provisioning)
 ---
 apiVersion: storage.k8s.io/v1
@@ -70,6 +73,7 @@ parameters:
 reclaimPolicy: Retain
 allowVolumeExpansion: true
 volumeBindingMode: Immediate
+
 
 # Persistent Volume Claim
 ---
@@ -166,6 +170,8 @@ spec:
               value: ${LATTICE_MODEL}
             - name: TENANT_MODE
               value: ${TENANT_MODE}
+            - name: NEXT_PUBLIC_HIDE_INSIGHT
+              value: ${NEXT_PUBLIC_HIDE_INSIGHT}
             - name: OKTA_CLIENT_SECRET
               # Runtime environment variables from secrets (sensitive)
               valueFrom:
@@ -338,8 +344,10 @@ spec:
             - name: AIRFLOW_PASSWORD
               value: ${AIRFLOW_PASSWORD}
             - name: OKTA_CLIENT_SECRET
+            - name: HIDE_INSIGHT
+              value: ${HIDE_INSIGHT}
               # Backend may also need these environment variables
-
+            - name: OKTA_CLIENT_SECRET
               valueFrom:
                 secretKeyRef:
                   name: app-secrets
@@ -407,6 +415,7 @@ spec:
           persistentVolumeClaim:
             claimName: ${AZURE_FILE_SHARE_PVC}
 
+
 #docs
 ---
 apiVersion: apps/v1
@@ -445,6 +454,7 @@ spec:
           ports:
             - containerPort: 3001
 
+
 #mcp
 ---
 apiVersion: apps/v1
@@ -480,6 +490,7 @@ spec:
               cpu: "500m"
           ports:
             - containerPort: 43656
+
 
 # insight-rabbitmq
 ---
@@ -538,6 +549,7 @@ spec:
             timeoutSeconds: 5
             failureThreshold: 3
 
+
 # insight-storage: scratch volume for the Insight processing pipeline
 ---
 apiVersion: v1
@@ -552,6 +564,7 @@ spec:
     requests:
       storage: 25Gi
   storageClassName: ${AZURE_FILE_SHARE_STORAGE_CLASS}
+
 
 # insight-fastapi
 ---
@@ -661,6 +674,7 @@ spec:
         - name: insight-storage
           persistentVolumeClaim:
             claimName: insight-storage
+
 
 # insight-rabbitmq-runner
 ---
