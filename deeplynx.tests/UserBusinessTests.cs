@@ -716,20 +716,23 @@ public class UserBusinessTests : IntegrationTestBase
         {
             ProjectId = directAdminPid,
             UserId = adminUid,
-            RoleId = dapAdminRole.Id
+            RoleId = dapAdminRole.Id,
+            IsProjectAdmin = true
         };
         var directMember2 = new ProjectMember
         {
             ProjectId = directAdminPid,
             UserId = nonAdminUid,
-            RoleId = dapAdminRole.Id
+            RoleId = dapAdminRole.Id,
+            IsProjectAdmin = true
         };
         // Make group a project admin in groupAdminProject
         var groupMember = new ProjectMember
         {
             ProjectId = groupAdminPid,
             GroupId = adminGroupId,
-            RoleId = gapAdminRole.Id
+            RoleId = gapAdminRole.Id,
+            IsProjectAdmin = true
         };
         // Make users non-admin members of regularProject
         var regularMember1 = new ProjectMember
@@ -771,10 +774,10 @@ public class UserBusinessTests : IntegrationTestBase
         Assert.Equal("New User", result.Name);
         Assert.Equal("newuser@test.com", result.Email);
         Assert.Equal("newuser", result.Username);
+        Assert.Equal("standard", result.AccountType);
         Assert.True(result.IsActive);
         Assert.False(result.IsArchived);
 
-        // Verify it was actually saved to DB
         var savedUser = await Context.Users.FindAsync(result.Id);
         Assert.NotNull(savedUser);
         Assert.Equal("New User", savedUser.Name);
@@ -799,6 +802,7 @@ public class UserBusinessTests : IntegrationTestBase
         Assert.True(result.Id > 0);
         Assert.Equal("Minimal User", result.Name);
         Assert.Equal("minimal@test.com", result.Email);
+        Assert.Equal("standard", result.AccountType);
         Assert.False(result.IsActive);
         Assert.False(result.IsArchived);
     }
@@ -818,6 +822,155 @@ public class UserBusinessTests : IntegrationTestBase
             () => _userBusiness.CreateUser(dto));
 
         Assert.Contains("User with email already exists", exception.Message);
+    }
+
+    [Fact]
+    public async Task CreateUser_Fails_IfEmailMissing_ForHumanAccount()
+    {
+        // Arrange
+        var dto = new CreateUserRequestDto
+        {
+            Name = "No Email User",
+        };
+
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<ArgumentException>(
+            () => _userBusiness.CreateUser(dto));
+
+        Assert.Contains("Email is required for human accounts", exception.Message);
+    }
+
+    [Fact]
+    public async Task CreateUser_Fails_IfEmailMissing_WhenIsServiceAccountIsNull()
+    {
+        // Arrange — null IsServiceAccount should be treated as human, so email is still required
+        var dto = new CreateUserRequestDto
+        {
+            Name = "No Email User"
+        };
+
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<ArgumentException>(
+            () => _userBusiness.CreateUser(dto));
+
+        Assert.Contains("Email is required for human accounts", exception.Message);
+    }
+
+    // -- Service account tests --
+
+    [Fact]
+    public async Task CreateUser_Succeeds_ServiceAccount_AsOrgAdmin()
+    {
+        // Arrange
+        var dto = new CreateUserRequestDto
+        {
+            Name = "CI Bot",
+            AccountType = "service"
+        };
+
+        // Act
+        var result = await _userBusiness.CreateUser(dto, isOrgAdmin: true);
+
+        // Assert — admin-provided Name is kept; username/email are generated as service_<guid>
+        Assert.NotNull(result);
+        Assert.Equal("CI Bot", result.Name);
+        Assert.Equal("service", result.AccountType);
+        Assert.StartsWith("service_", result.Username);
+        Assert.StartsWith("service_", result.Email);
+        Assert.Equal(result.Username, result.Email);
+    }
+
+    [Fact]
+    public async Task CreateUser_Succeeds_ServiceAccount_AsProjectAdmin()
+    {
+        // Arrange
+        var dto = new CreateUserRequestDto
+        {
+            Name = "Deploy Bot",
+            AccountType = "service"
+        };
+
+        // Act
+        var result = await _userBusiness.CreateUser(dto, isProjectAdmin: true);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal("service", result.AccountType);
+    }
+
+    [Fact]
+    public async Task CreateUser_Fails_ServiceAccount_IfNotAdmin()
+    {
+        // Arrange
+        var dto = new CreateUserRequestDto
+        {
+            Name = "Unauthorized Bot",
+            AccountType = "service"
+        };
+
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<UnauthorizedAccessException>(
+            () => _userBusiness.CreateUser(dto));
+
+        Assert.Contains("Only Admins can create service accounts", exception.Message);
+    }
+
+    [Fact]
+    public async Task CreateUser_Succeeds_ServiceAccount_WithDuplicateName_GeneratesUniqueIdentifier()
+    {
+        // Arrange — service account Names need not be unique; uniqueness comes from the
+        // generated service_<guid> username/email. Create two with the same Name.
+        var dto = new CreateUserRequestDto
+        {
+            Name = "Shared Bot Name",
+            AccountType = "service"
+        };
+
+        // Act
+        var first = await _userBusiness.CreateUser(dto, isOrgAdmin: true);
+        var second = await _userBusiness.CreateUser(dto, isOrgAdmin: true);
+
+        // Assert — same Name, distinct generated identifiers
+        Assert.Equal("Shared Bot Name", first.Name);
+        Assert.Equal("Shared Bot Name", second.Name);
+        Assert.NotEqual(first.Username, second.Username);
+        Assert.NotEqual(first.Email, second.Email);
+    }
+
+    [Fact]
+    public async Task CreateUser_Fails_ServiceAccount_IfEmailProvided()
+    {
+        // Arrange — service accounts generate their own email; a caller-supplied one is rejected
+        var dto = new CreateUserRequestDto
+        {
+            Name = "Bot With Email",
+            AccountType = "service",
+            Email = "bot@test.com"
+        };
+
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<ArgumentException>(
+            () => _userBusiness.CreateUser(dto, isOrgAdmin: true));
+
+        Assert.Contains("Service accounts cannot be assigned an email or username", exception.Message);
+    }
+
+    [Fact]
+    public async Task CreateUser_Fails_ServiceAccount_IfUsernameProvided()
+    {
+        // Arrange — service accounts generate their own username; a caller-supplied one is rejected
+        var dto = new CreateUserRequestDto
+        {
+            Name = "Bot With Username",
+            AccountType = "service",
+            Username = "botuser"
+        };
+
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<ArgumentException>(
+            () => _userBusiness.CreateUser(dto, isOrgAdmin: true));
+
+        Assert.Contains("Service accounts cannot be assigned an email or username", exception.Message);
     }
 
     #endregion
@@ -1674,7 +1827,7 @@ public class UserBusinessTests : IntegrationTestBase
         {
             Name = "Admin Alan",
             Email = "adminalan@test.com",
-            Username = "admin",
+            Username = $"admin_{Guid.NewGuid()}",
             IsActive = true,
             IsSysAdmin = true
         };
@@ -1682,7 +1835,7 @@ public class UserBusinessTests : IntegrationTestBase
         {
             Name = "Regular Joe",
             Email = "regularjoe@test.com",
-            Username = "regular",
+            Username = $"regular_{Guid.NewGuid()}",
             IsActive = true,
             IsSysAdmin = false
         };
@@ -1709,7 +1862,7 @@ public class UserBusinessTests : IntegrationTestBase
         {
             Name = "Regular Joe",
             Email = "regularjoe@test.com",
-            Username = "regular",
+            Username = $"regular_{Guid.NewGuid()}",
             IsActive = true,
             IsSysAdmin = false
         };
@@ -1717,7 +1870,7 @@ public class UserBusinessTests : IntegrationTestBase
         {
             Name = "Candidate User",
             Email = "candidate@test.com",
-            Username = "candidate",
+            Username = $"candidate_{Guid.NewGuid()}",
             IsActive = true,
             IsSysAdmin = false
         };

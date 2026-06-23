@@ -54,16 +54,16 @@ const ProjectUsersListTable: React.FC<ProjectUsersListTableProps> = ({
               <tr key={`${row.memberType}-${row.memberId}`} className="hover">
                 <td className="flex gap-2">
                   <div>{row.name || "—"}</div>
-                  {row.role && (
+                  {(row.isProjectAdmin || row.role) && (
                     <div
                       className={[
                         "badge badge-sm",
-                        row.role.toLowerCase() === "admin"
+                        row.isProjectAdmin
                           ? "badge-warning"
                           : "badge-info",
                       ].join(" ")}
                     >
-                      {row.role}
+                      {row.isProjectAdmin ? "Admin" : row.role}
                     </div>
                   )}
                 </td>

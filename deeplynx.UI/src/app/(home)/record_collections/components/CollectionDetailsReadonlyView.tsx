@@ -48,6 +48,7 @@ type Props = {
   badgeDisplayLimit: number;
   getMetadataRows: (properties?: string | null) => MetadataRow[];
   getSensitivityClass: (label: string) => string;
+  showProperties?: boolean;
   records: CollectionRecordLike[];
   filteredRecords: CollectionRecordLike[];
   visibleRecords: CollectionRecordLike[];
@@ -81,6 +82,7 @@ export default function CollectionDetailsReadonlyView({
   badgeDisplayLimit,
   getMetadataRows,
   getSensitivityClass,
+  showProperties = true,
   records,
   filteredRecords,
   visibleRecords,
@@ -190,37 +192,39 @@ export default function CollectionDetailsReadonlyView({
             </div>
           </div>
 
-          <div className="rounded-2xl border border-base-300 bg-base-100 p-5">
-            <h3 className="font-semibold text-base-content">
-              {t.translations.RECORD_COLLECTIONS_ADDITIONAL_PROPERTIES}
-            </h3>
-            <div className="mt-4 max-h-[17.5rem] overflow-auto pr-1">
-              <table className="table table-pin-rows">
-                <thead className="bg-base-100">
-                  <tr>
-                    <th>{t.translations.RECORD_COLLECTIONS_FIELD}</th>
-                    <th>{t.translations.RECORD_COLLECTIONS_VALUE}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {getMetadataRows(collection.properties).length ? (
-                    getMetadataRows(collection.properties).map((row) => (
-                      <tr key={row.label} className="h-10">
-                        <td className="font-medium">{row.label}</td>
-                        <td>{row.value}</td>
-                      </tr>
-                    ))
-                  ) : (
+          {showProperties ? (
+            <div className="rounded-2xl border border-base-300 bg-base-100 p-5">
+              <h3 className="font-semibold text-base-content">
+                {t.translations.RECORD_COLLECTIONS_ADDITIONAL_PROPERTIES}
+              </h3>
+              <div className="mt-4 max-h-[17.5rem] overflow-auto pr-1">
+                <table className="table table-pin-rows">
+                  <thead className="bg-base-100">
                     <tr>
-                      <td colSpan={2}>
-                        {t.translations.RECORD_COLLECTIONS_NO_ADDITIONAL_PROPERTIES_SET}
-                      </td>
+                      <th>{t.translations.RECORD_COLLECTIONS_FIELD}</th>
+                      <th>{t.translations.RECORD_COLLECTIONS_VALUE}</th>
                     </tr>
-                  )}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {getMetadataRows(collection.properties).length ? (
+                      getMetadataRows(collection.properties).map((row) => (
+                        <tr key={row.label} className="h-10">
+                          <td className="font-medium">{row.label}</td>
+                          <td>{row.value}</td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={2}>
+                          {t.translations.RECORD_COLLECTIONS_NO_ADDITIONAL_PROPERTIES_SET}
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
-          </div>
+          ) : null}
         </div>
       </SectionCard>
 

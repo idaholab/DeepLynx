@@ -6,32 +6,27 @@ import {
   addRecordsToRecordCollection,
   createRecordCollection,
 } from "@/app/lib/client_service/record_collection_services.client";
-import {
-  createSensitivityLabelProject,
-  getAllSensitivityLabelsProject,
-} from "@/app/lib/client_service/sensitivity_labels_services.client";
+import { createSensitivityLabelProject } from "@/app/lib/client_service/sensitivity_labels_services.client";
 import {
   fullTextSearch,
   getMultiProjectRecords,
 } from "@/app/lib/client_service/query_services.client";
 import { getRecord } from "@/app/lib/client_service/record_services.client";
-import { getAllTags } from "@/app/lib/client_service/tag_services.client";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
-import toast from "react-hot-toast";
+import { QueryRecordViewResponseDto } from "../../../types/responseDTOs";
 import {
-  QueryRecordViewResponseDto,
-  SensitivityLabelsDto,
-  TagResponseDto,
-} from "../../../types/responseDTOs";
-import { NewCollectionTabController, NewCollectionStep } from "../../components/componentTypes";
-import { NewCollectionSelectedRecord } from "../../components/recordCollections.types";
+  NewCollectionSelectedRecord,
+  NewCollectionStep,
+} from "../../components/recordCollections.types";
 import {
   getSelectedRecordLabelNames,
   getSelectedRecordTagNames,
   getSensitivityClass,
-} from "../../components/recordCollections.utils";
+} from "../../components/utils";
+import { useProjectCollectionOptions } from "../../hooks/useProjectCollectionOptions";
 import { useNewCollectionDerived } from "./useNewCollectionDerived";
+import { useToast } from "@/app/contexts/ToastProvider";
 
 type Params = {
   organizationId: number;
@@ -44,15 +39,18 @@ const getRecordDisplayName = (record: { id?: number | null; name: string }) =>
 export function useNewCollectionWorkflow({
   organizationId,
   projectId,
-}: Params): { controller: NewCollectionTabController } {
+}: Params) {
   const router = useRouter();
   const { t } = useLanguage();
-  const [labelsLoading, setLabelsLoading] = useState(false);
   const [newCollectionLabelCreating, setNewCollectionLabelCreating] =
     useState(false);
-  const [availableLabels, setAvailableLabels] = useState<SensitivityLabelsDto[]>([]);
-  const [tagsLoading, setTagsLoading] = useState(false);
-  const [availableTags, setAvailableTags] = useState<TagResponseDto[]>([]);
+  const {
+    availableLabels,
+    setAvailableLabels,
+    labelsLoading,
+    availableTags,
+    tagsLoading,
+  } = useProjectCollectionOptions(projectId);
   const [saving, setSaving] = useState(false);
   const [newCollectionStep, setNewCollectionStep] =
     useState<NewCollectionStep>("Records");
@@ -68,23 +66,28 @@ export function useNewCollectionWorkflow({
     useState<number[]>([]);
   const [newCollectionRecordSearchTerm, setNewCollectionRecordSearchTerm] =
     useState("");
-  const [newCollectionRecordSearchResults, setNewCollectionRecordSearchResults] =
-    useState<QueryRecordViewResponseDto[]>([]);
+  const [
+    newCollectionRecordSearchResults,
+    setNewCollectionRecordSearchResults,
+  ] = useState<QueryRecordViewResponseDto[]>([]);
   const [newCollectionRecordPage, setNewCollectionRecordPage] = useState(1);
-  const [newCollectionRecordsPerPage, setNewCollectionRecordsPerPage] = useState(
-    DEFAULT_PAGE_SIZE_OPTIONS[0],
-  );
+  const [newCollectionRecordsPerPage, setNewCollectionRecordsPerPage] =
+    useState(DEFAULT_PAGE_SIZE_OPTIONS[0]);
   const [newCollectionSelectedRecordIds, setNewCollectionSelectedRecordIds] =
     useState<number[]>([]);
   const [newCollectionSelectedRecords, setNewCollectionSelectedRecords] =
     useState<NewCollectionSelectedRecord[]>([]);
-  const [confirmClearNewCollectionRecords, setConfirmClearNewCollectionRecords] =
-    useState(false);
+  const [
+    confirmClearNewCollectionRecords,
+    setConfirmClearNewCollectionRecords,
+  ] = useState(false);
   const [newCollectionReviewSearchTerm, setNewCollectionReviewSearchTerm] =
     useState("");
   const [newCollectionReviewPage, setNewCollectionReviewPage] = useState(1);
-  const [newCollectionRecordSearchLoading, setNewCollectionRecordSearchLoading] =
-    useState(false);
+  const [
+    newCollectionRecordSearchLoading,
+    setNewCollectionRecordSearchLoading,
+  ] = useState(false);
   const [enrichingSelectedRecordIds, setEnrichingSelectedRecordIds] = useState<
     number[]
   >([]);
@@ -92,6 +95,7 @@ export function useNewCollectionWorkflow({
     failedSelectedRecordEnrichmentIds,
     setFailedSelectedRecordEnrichmentIds,
   ] = useState<number[]>([]);
+  const { showToast } = useToast();
 
   const {
     newCollectionSelectedLabelTally,
@@ -126,45 +130,14 @@ export function useNewCollectionWorkflow({
     setNewCollectionReviewPage,
   });
 
-  const handleSetNewCollectionRecordsPerPage = useCallback((pageSize: number) => {
-    setNewCollectionRecordsPerPage(pageSize);
-    setNewCollectionRecordPage(1);
-    setNewCollectionReviewPage(1);
-  }, []);
-
-  useEffect(() => {
-    const loadLabels = async () => {
-      setLabelsLoading(true);
-      try {
-        const labels = await getAllSensitivityLabelsProject(projectId);
-        setAvailableLabels(labels);
-      } catch (error) {
-        console.error("Failed to load project labels:", error);
-        toast.error(t.translations.RECORD_COLLECTIONS_FAILED_LOAD_PROJECT_LABELS);
-      } finally {
-        setLabelsLoading(false);
-      }
-    };
-
-    void loadLabels();
-  }, [projectId, t]);
-
-  useEffect(() => {
-    const loadTags = async () => {
-      setTagsLoading(true);
-      try {
-        const tags = await getAllTags(projectId);
-        setAvailableTags(tags);
-      } catch (error) {
-        console.error("Failed to load project tags:", error);
-        toast.error(t.translations.RECORD_COLLECTIONS_FAILED_LOAD_PROJECT_TAGS);
-      } finally {
-        setTagsLoading(false);
-      }
-    };
-
-    void loadTags();
-  }, [projectId, t]);
+  const handleSetNewCollectionRecordsPerPage = useCallback(
+    (pageSize: number) => {
+      setNewCollectionRecordsPerPage(pageSize);
+      setNewCollectionRecordPage(1);
+      setNewCollectionReviewPage(1);
+    },
+    [],
+  );
 
   useEffect(() => {
     const selectedIdSet = new Set(newCollectionSelectedRecordIds);
@@ -232,11 +205,13 @@ export function useNewCollectionWorkflow({
         ]);
 
         if ((options?.notifyOnFailure ?? true) && failedNames.length > 0) {
-          toast.error(
+          showToast(
+            "error",
             t.translations.RECORD_COLLECTIONS_FAILED_LOAD_SELECTED_RECORD_METADATA.replace(
               "{records}",
               failedNames.join(", "),
             ),
+            "toast-top toast-center",
           );
         }
 
@@ -255,7 +230,10 @@ export function useNewCollectionWorkflow({
       const unselectedRecords = records.filter(
         (
           record,
-        ): record is QueryRecordViewResponseDto & { id: number; projectId?: number | null } =>
+        ): record is QueryRecordViewResponseDto & {
+          id: number;
+          projectId?: number | null;
+        } =>
           typeof record.id === "number" &&
           !newCollectionSelectedRecordIds.includes(record.id),
       );
@@ -265,14 +243,19 @@ export function useNewCollectionWorkflow({
         ...prev,
         ...unselectedRecords.map((record) => record.id),
       ]);
-      setNewCollectionSelectedRecords((prev) => [...prev, ...unselectedRecords]);
+      setNewCollectionSelectedRecords((prev) => [
+        ...prev,
+        ...unselectedRecords,
+      ]);
 
       await enrichSelectedRecords(unselectedRecords);
     },
     [enrichSelectedRecords, newCollectionSelectedRecordIds],
   );
 
-  const toggleNewCollectionRecord = async (record: QueryRecordViewResponseDto) => {
+  const toggleNewCollectionRecord = async (
+    record: QueryRecordViewResponseDto,
+  ) => {
     if (typeof record.id !== "number") return;
 
     if (newCollectionSelectedRecordIds.includes(record.id)) {
@@ -374,10 +357,18 @@ export function useNewCollectionWorkflow({
       setAvailableLabels((prev) => [...prev, createdLabel]);
       addNewCollectionLabel(createdLabel.id);
       setNewCollectionLabelSearchTerm("");
-      toast.success(t.translations.RECORD_COLLECTIONS_LABEL_CREATED);
+      showToast(
+        "success",
+        t.translations.RECORD_COLLECTIONS_LABEL_CREATED,
+        "toast-top toast-center",
+      );
     } catch (error) {
       console.error("Failed to create sensitivity label:", error);
-      toast.error(t.translations.RECORD_COLLECTIONS_FAILED_CREATE_LABEL);
+      showToast(
+        "error",
+        t.translations.RECORD_COLLECTIONS_FAILED_CREATE_LABEL,
+        "toast-top toast-center",
+      );
     } finally {
       setNewCollectionLabelCreating(false);
     }
@@ -420,7 +411,11 @@ export function useNewCollectionWorkflow({
         setNewCollectionRecordPage(1);
       } catch (error) {
         console.error("Failed to search records:", error);
-        toast.error(t.translations.RECORD_COLLECTIONS_FAILED_SEARCH_RECORDS);
+        showToast(
+          "error",
+          t.translations.RECORD_COLLECTIONS_FAILED_SEARCH_RECORDS,
+          "toast-top toast-center",
+        );
       } finally {
         setNewCollectionRecordSearchLoading(false);
       }
@@ -456,7 +451,11 @@ export function useNewCollectionWorkflow({
     const name = newCollectionName.trim();
     const description = newCollectionDescription.trim();
     if (!name || !description) {
-      toast.error(t.translations.RECORD_COLLECTIONS_NAME_AND_DESCRIPTION_REQUIRED);
+      showToast(
+        "error",
+        t.translations.RECORD_COLLECTIONS_NAME_AND_DESCRIPTION_REQUIRED,
+        "toast-top toast-center",
+      );
       return;
     }
 
@@ -481,12 +480,20 @@ export function useNewCollectionWorkflow({
           newCollectionSelectedRecordIds,
         );
       }
-      toast.success(t.translations.RECORD_COLLECTIONS_CREATED);
+      showToast(
+        "success",
+        t.translations.RECORD_COLLECTIONS_CREATED,
+        "toast-center toast-top",
+      );
       router.push("/record_collections");
       router.refresh();
     } catch (error) {
       console.error("Failed to create record collection:", error);
-      toast.error(t.translations.RECORD_COLLECTIONS_FAILED_CREATE);
+      showToast(
+        "error",
+        t.translations.RECORD_COLLECTIONS_FAILED_CREATE,
+        "toast-top toast-top",
+      );
     } finally {
       setSaving(false);
     }
@@ -494,8 +501,10 @@ export function useNewCollectionWorkflow({
 
   const goToNewCollectionModifyStep = async () => {
     if (enrichingSelectedRecordIds.length > 0) {
-      toast.error(
+      showToast(
+        "error",
         t.translations.RECORD_COLLECTIONS_WAIT_FOR_SELECTED_RECORD_METADATA,
+        "toast-top toast-center",
       );
       return;
     }
@@ -503,7 +512,10 @@ export function useNewCollectionWorkflow({
     const failedSelectedRecords = newCollectionSelectedRecords.filter(
       (
         record,
-      ): record is QueryRecordViewResponseDto & { id: number; projectId?: number | null } =>
+      ): record is QueryRecordViewResponseDto & {
+        id: number;
+        projectId?: number | null;
+      } =>
         typeof record.id === "number" &&
         failedSelectedRecordEnrichmentIds.includes(record.id),
     );
@@ -514,11 +526,23 @@ export function useNewCollectionWorkflow({
       });
 
       if (retryResult.failedIds.length > 0) {
-        toast.error(
-          t.translations.RECORD_COLLECTIONS_CANNOT_CONTINUE_WITH_INCOMPLETE_RECORD_METADATA,
+        showToast(
+          "error",
+          t.translations
+            .RECORD_COLLECTIONS_CANNOT_CONTINUE_WITH_INCOMPLETE_RECORD_METADATA,
+          "toast-top toast-center",
         );
         return;
       }
+    }
+
+    if (!newCollectionName.trim() || !newCollectionDescription.trim()) {
+      showToast(
+        "error",
+        t.translations.RECORD_COLLECTIONS_NAME_AND_DESCRIPTION_REQUIRED,
+        "toast-top toast-center",
+      );
+      return;
     }
 
     setNewCollectionSelectedLabelIds(selectedRecordMetadata.labelIds);
@@ -532,7 +556,7 @@ export function useNewCollectionWorkflow({
     setNewCollectionStep("Review");
   };
 
-  const controller: NewCollectionTabController = {
+  const controller = {
     workflow: {
       projectId,
       newCollectionStep,
@@ -624,3 +648,7 @@ export function useNewCollectionWorkflow({
 
   return { controller };
 }
+
+export type NewCollectionTabController = ReturnType<
+  typeof useNewCollectionWorkflow
+>["controller"];

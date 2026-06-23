@@ -7,16 +7,21 @@ import { formatLocalDateTime } from "@/app/lib/date_time";
 import CollectionRecordSearchControls from "./CollectionRecordSearchControls";
 import CollectionRecordSearchResultsTable from "./CollectionRecordSearchResultsTable";
 import SectionCard from "./SectionCard";
-import { SelectedCollectionRecordsController } from "./componentTypes";
 import { interpolateTemplate } from "@/app/lib/record_helpers";
+import type { CollectionDetailsController } from "../[collectionId]/hooks/useCollectionDetails";
 
 type Props = {
-  controller: SelectedCollectionRecordsController;
+  controller: CollectionDetailsController["recordsController"];
 };
 
 export default function SelectedCollectionRecordsTab({
   controller: {
-    overview: { selectedCollection, projectId, collectionRecords, recordsLoading },
+    overview: {
+      selectedCollection,
+      projectId,
+      collectionRecords,
+      recordsLoading,
+    },
     search: {
       recordSearchTerm,
       setRecordSearchTerm,
@@ -58,7 +63,9 @@ export default function SelectedCollectionRecordsTab({
           <CollectionRecordSearchControls
             searchTerm={recordSearchTerm}
             setSearchTerm={setRecordSearchTerm}
-            placeholder={t.translations.RECORD_COLLECTIONS_SEARCH_RECORDS_TO_ADD}
+            placeholder={
+              t.translations.RECORD_COLLECTIONS_SEARCH_RECORDS_TO_ADD
+            }
             searchLoading={recordSearchLoading}
             onSearch={onSearchRecords}
             action={
@@ -95,12 +102,14 @@ export default function SelectedCollectionRecordsTab({
                 ),
                 name: record.name,
                 className:
-                  record.className ?? t.translations.RECORD_COLLECTIONS_UNCLASSIFIED,
+                  record.className ??
+                  t.translations.RECORD_COLLECTIONS_UNCLASSIFIED,
                 sourceName: record.dataSourceName ?? t.translations.UNKNOWN,
                 updatedAt: record.lastUpdatedAt,
               }))}
               emptyMessage={
-                t.translations.RECORD_COLLECTIONS_ALL_MATCHING_ALREADY_IN_THIS_COLLECTION
+                t.translations
+                  .RECORD_COLLECTIONS_ALL_MATCHING_ALREADY_IN_THIS_COLLECTION
               }
               maxHeightClassName="max-h-fit"
               pinnedHeader={false}
@@ -145,10 +154,14 @@ export default function SelectedCollectionRecordsTab({
                             t.translations.RECORD_COLLECTIONS_UNNAMED_RECORD}
                         </Link>
                       ) : (
-                        record.name ?? t.translations.RECORD_COLLECTIONS_UNNAMED_RECORD
+                        (record.name ??
+                        t.translations.RECORD_COLLECTIONS_UNNAMED_RECORD)
                       )}
                     </td>
-                    <td>{record.classId ?? t.translations.RECORD_COLLECTIONS_UNCLASSIFIED}</td>
+                    <td>
+                      {record.classId ??
+                        t.translations.RECORD_COLLECTIONS_UNCLASSIFIED}
+                    </td>
                     <td>{record.projectId ?? projectId}</td>
                     <td>
                       {record.lastUpdatedAt
@@ -160,7 +173,10 @@ export default function SelectedCollectionRecordsTab({
               ) : (
                 <tr>
                   <td colSpan={4}>
-                    {t.translations.RECORD_COLLECTIONS_NO_RECORDS_ARE_CURRENTLY_ASSIGNED}
+                    {
+                      t.translations
+                        .RECORD_COLLECTIONS_NO_RECORDS_ARE_CURRENTLY_ASSIGNED
+                    }
                   </td>
                 </tr>
               )}

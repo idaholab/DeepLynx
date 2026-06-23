@@ -6,15 +6,13 @@ import PaginationControls, {
 import SearchInput from "@/app/(home)/components/SearchInput";
 import { useLanguage } from "@/app/contexts/Language";
 import Link from "next/link";
-import React from "react";
 import { PaginatedRecordCollectionsResponseDto } from "../types/responseDTOs";
 import CollectionDashboardCard from "./components/CollectionDashboardCard";
 import CollectionSortControl from "./components/CollectionSortControl";
 import FilterSidebar from "./components/FilterSidebar";
 import SectionCard from "./components/SectionCard";
 import { COLLECTION_BADGE_DISPLAY_LIMIT } from "./components/recordCollections.constants";
-import { getSensitivityClass } from "./components/recordCollections.utils";
-import { renderCollectionSortLabel } from "./components/recordCollections.view-utils";
+import { getSensitivityClass } from "./components/utils";
 import { useCollectionsDashboard } from "./hooks/useCollectionsDashboard";
 
 type Props = {
@@ -68,7 +66,9 @@ export default function RecordCollectionsClient({
 
             <SectionCard
               title={t.translations.RECORD_COLLECTIONS_ALL}
-              subtitle={t.translations.RECORD_COLLECTIONS_BROWSE_SEARCH_OPEN_PROJECT}
+              subtitle={
+                t.translations.RECORD_COLLECTIONS_BROWSE_SEARCH_OPEN_PROJECT
+              }
               action={
                 <div className="flex flex-wrap items-center justify-end gap-3">
                   <div className="rounded-lg border border-base-300 bg-base-200/50 px-3 py-2 text-sm">
@@ -91,13 +91,13 @@ export default function RecordCollectionsClient({
               <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_18rem]">
                 <SearchInput
                   className="self-end"
-                  placeholder={t.translations.RECORD_COLLECTIONS_FILTER_BY_TITLE_OR_DESCRIPTION}
+                  placeholder={
+                    t.translations
+                      .RECORD_COLLECTIONS_FILTER_BY_TITLE_OR_DESCRIPTION
+                  }
                   {...searchInput}
                 />
-                <CollectionSortControl
-                  {...sortControl}
-                  renderLabel={(option) => renderCollectionSortLabel(option, t)}
-                />
+                <CollectionSortControl {...sortControl} />
               </div>
 
               <div
@@ -106,8 +106,12 @@ export default function RecordCollectionsClient({
                 }`}
               >
                 {collectionCards.items.map((collection) => {
-                  const labelsExpanded = collectionCards.isLabelsExpanded(collection.id);
-                  const tagsExpanded = collectionCards.isTagsExpanded(collection.id);
+                  const labelsExpanded = collectionCards.isLabelsExpanded(
+                    collection.id,
+                  );
+                  const tagsExpanded = collectionCards.isTagsExpanded(
+                    collection.id,
+                  );
                   return (
                     <CollectionDashboardCard
                       key={collection.id}
@@ -118,7 +122,7 @@ export default function RecordCollectionsClient({
                       getSensitivityClass={getSensitivityClass}
                       onToggleLabels={collectionCards.onToggleLabels}
                       onToggleTags={collectionCards.onToggleTags}
-                      detailsHref={`/record_collections/${collection.id}`}
+                      detailsHref={`/record_collections/${collection.id}?returnTo=${encodeURIComponent("/record_collections")}`}
                     />
                   );
                 })}
@@ -127,7 +131,8 @@ export default function RecordCollectionsClient({
                   <div className="rounded-xl border border-dashed border-base-300 bg-base-100/60 px-4 py-8 text-center text-sm text-base-content/70">
                     {summary.isLoading
                       ? t.translations.LOADING
-                      : t.translations.RECORD_COLLECTIONS_NO_RECORDS_MATCH_SEARCH}
+                      : t.translations
+                          .RECORD_COLLECTIONS_NO_RECORDS_MATCH_SEARCH}
                   </div>
                 ) : null}
               </div>

@@ -12,25 +12,19 @@ import {
   unattachTagFromRecordCollection,
   updateRecordCollection,
 } from "@/app/lib/client_service/record_collection_services.client";
-import {
-  createSensitivityLabelProject,
-  getAllSensitivityLabelsProject,
-} from "@/app/lib/client_service/sensitivity_labels_services.client";
+import { createSensitivityLabelProject } from "@/app/lib/client_service/sensitivity_labels_services.client";
 import {
   fullTextSearch,
   getMultiProjectRecords,
 } from "@/app/lib/client_service/query_services.client";
-import { createTag, getAllTags } from "@/app/lib/client_service/tag_services.client";
+import { createTag } from "@/app/lib/client_service/tag_services.client";
 import { useCallback, useEffect, useRef, useState } from "react";
-import toast from "react-hot-toast";
 import {
   QueryRecordViewResponseDto,
   RecordCollectionLabelDto,
   RecordCollectionResponseDto,
   RecordCollectionTagDto,
   RecordResponseDto,
-  SensitivityLabelsDto,
-  TagResponseDto,
 } from "../../../types/responseDTOs";
 import {
   COLLECTION_BADGE_DISPLAY_LIMIT,
@@ -43,11 +37,13 @@ import {
 import {
   getMetadataRows,
   getSensitivityClass,
+  mapSearchResultToCollectionRecord,
   parseProperties,
-} from "../../components/recordCollections.utils";
-import { useSelectedCollectionDetailsController } from "../../hooks/useSelectedCollectionDetailsController";
+} from "../../components/utils";
 import { useSelectedCollectionDetailsView } from "../../hooks/useSelectedCollectionDetailsView";
 import { useSelectedCollectionEditDerived } from "../../hooks/useSelectedCollectionEditDerived";
+import { useProjectCollectionOptions } from "../../hooks/useProjectCollectionOptions";
+import { useToast } from "@/app/contexts/ToastProvider";
 
 type Params = {
   organizationId: number;
@@ -57,29 +53,6 @@ type Params = {
 };
 
 type CollectionWorkspaceTabId = "Details" | "Records";
-
-const mapSearchResultToCollectionRecord = (
-  record: QueryRecordViewResponseDto,
-): RecordResponseDto => ({
-  id: record.id,
-  name: record.name,
-  description: record.description,
-  uri: record.uri,
-  properties: record.properties,
-  objectStorageId: record.objectStorageId,
-  originalId: record.originalId,
-  classId: record.classId,
-  dataSourceId: record.dataSourceId,
-  projectId: record.projectId,
-  lastUpdatedAt: record.lastUpdatedAt,
-  lastUpdatedBy:
-    record.lastUpdatedBy === null || record.lastUpdatedBy === undefined
-      ? null
-      : String(record.lastUpdatedBy),
-  isArchived: record.isArchived,
-  fileType: record.fileType,
-  fileSize: record.fileSize,
-});
 
 export function useCollectionDetails({
   organizationId,
@@ -99,13 +72,17 @@ export function useCollectionDetails({
     setSelectedCollectionPropertiesEditorOpen,
   ] = useState(false);
   const skipInitialCollectionRecordsLoad = useRef(true);
-  const collectionRecordsRef = useRef<RecordResponseDto[]>(initialCollectionRecords);
-  const editStartCollectionRecordsRef = useRef<RecordResponseDto[] | null>(null);
-  const [collectionWorkspaceTab, setCollectionWorkspaceTab] =
-    useState<CollectionWorkspaceTabId>("Details");
-  const [collectionRecords, setCollectionRecords] = useState<RecordResponseDto[]>(
+  const collectionRecordsRef = useRef<RecordResponseDto[]>(
     initialCollectionRecords,
   );
+  const editStartCollectionRecordsRef = useRef<RecordResponseDto[] | null>(
+    null,
+  );
+  const [collectionWorkspaceTab, setCollectionWorkspaceTab] =
+    useState<CollectionWorkspaceTabId>("Details");
+  const [collectionRecords, setCollectionRecords] = useState<
+    RecordResponseDto[]
+  >(initialCollectionRecords);
   const [recordSearchTerm, setRecordSearchTerm] = useState("");
   const [recordSearchResults, setRecordSearchResults] = useState<
     QueryRecordViewResponseDto[]
@@ -113,25 +90,33 @@ export function useCollectionDetails({
   const [selectedRecordIds, setSelectedRecordIds] = useState<number[]>([]);
   const [recordMutationStatusById, setRecordMutationStatusById] =
     useState<RecordMutationStatusById>({});
-  const [pendingRecordChanges, setPendingRecordChanges] = useState<PendingRecordChanges>({
-    added: [],
-    removed: [],
-  });
+  const [pendingRecordChanges, setPendingRecordChanges] =
+    useState<PendingRecordChanges>({
+      added: [],
+      removed: [],
+    });
   const [recordsLoading, setRecordsLoading] = useState(false);
   const [recordSearchLoading, setRecordSearchLoading] = useState(false);
-  const [labelsLoading, setLabelsLoading] = useState(false);
-  const [availableLabels, setAvailableLabels] = useState<SensitivityLabelsDto[]>([]);
-  const [tagsLoading, setTagsLoading] = useState(false);
-  const [availableTags, setAvailableTags] = useState<TagResponseDto[]>([]);
+  const {
+    availableLabels,
+    setAvailableLabels,
+    labelsLoading,
+    availableTags,
+    setAvailableTags,
+    tagsLoading,
+  } = useProjectCollectionOptions(projectId);
   const [saving, setSaving] = useState(false);
-  const [selectedCollectionLabelSearchTerm, setSelectedCollectionLabelSearchTerm] =
-    useState("");
+  const [
+    selectedCollectionLabelSearchTerm,
+    setSelectedCollectionLabelSearchTerm,
+  ] = useState("");
   const [selectedCollectionTagSearchTerm, setSelectedCollectionTagSearchTerm] =
     useState("");
   const [selectedCollectionLabelCreating, setSelectedCollectionLabelCreating] =
     useState(false);
   const [selectedCollectionTagCreating, setSelectedCollectionTagCreating] =
     useState(false);
+  const { showToast } = useToast();
 
   const collectionDetailsView = useSelectedCollectionDetailsView({
     selectedCollection,
@@ -157,40 +142,6 @@ export function useCollectionDetails({
   useEffect(() => {
     collectionRecordsRef.current = collectionRecords;
   }, [collectionRecords]);
-
-  useEffect(() => {
-    const loadLabels = async () => {
-      setLabelsLoading(true);
-      try {
-        const labels = await getAllSensitivityLabelsProject(projectId);
-        setAvailableLabels(labels);
-      } catch (error) {
-        console.error("Failed to load project labels:", error);
-        toast.error(t.translations.RECORD_COLLECTIONS_FAILED_LOAD_PROJECT_LABELS);
-      } finally {
-        setLabelsLoading(false);
-      }
-    };
-
-    void loadLabels();
-  }, [projectId, t]);
-
-  useEffect(() => {
-    const loadTags = async () => {
-      setTagsLoading(true);
-      try {
-        const tags = await getAllTags(projectId);
-        setAvailableTags(tags);
-      } catch (error) {
-        console.error("Failed to load project tags:", error);
-        toast.error(t.translations.RECORD_COLLECTIONS_FAILED_LOAD_PROJECT_TAGS);
-      } finally {
-        setTagsLoading(false);
-      }
-    };
-
-    void loadTags();
-  }, [projectId, t]);
 
   const syncSelectedCollectionRecordCount = useCallback((count: number) => {
     setSelectedCollection((current) => ({ ...current, recordCount: count }));
@@ -285,7 +236,7 @@ export function useCollectionDetails({
       return records;
     } catch (error) {
       console.error("Failed to load records in record collection:", error);
-      toast.error(t.translations.RECORD_COLLECTIONS_FAILED_LOAD_COLLECTION_RECORDS);
+      t.translations.RECORD_COLLECTIONS_FAILED_LOAD_COLLECTION_RECORDS;
       return [];
     } finally {
       setRecordsLoading(false);
@@ -313,9 +264,8 @@ export function useCollectionDetails({
         .map((recordId) =>
           recordSearchResults.find((record) => record.id === recordId),
         )
-        .filter(
-          (record): record is QueryRecordViewResponseDto =>
-            Boolean(record && typeof record.id === "number"),
+        .filter((record): record is QueryRecordViewResponseDto =>
+          Boolean(record && typeof record.id === "number"),
         )
         .map(mapSearchResultToCollectionRecord);
 
@@ -323,7 +273,10 @@ export function useCollectionDetails({
         return false;
       }
 
-      stageCollectionRecords([...collectionRecordsRef.current, ...recordsToAdd]);
+      stageCollectionRecords([
+        ...collectionRecordsRef.current,
+        ...recordsToAdd,
+      ]);
       trackAddedRecords(
         recordsToAdd
           .map((record) => record.id)
@@ -356,11 +309,10 @@ export function useCollectionDetails({
     let pageNumber = 1;
 
     while (true) {
-      const page = await getAllRecordCollections(
-        organizationId,
-        projectId,
-        { pageNumber, pageSize: 500 },
-      );
+      const page = await getAllRecordCollections(organizationId, projectId, {
+        pageNumber,
+        pageSize: 500,
+      });
 
       const refreshedCollection = page.items.find(
         (collection) => collection.id === selectedCollection.id,
@@ -402,7 +354,10 @@ export function useCollectionDetails({
       setSelectedRecordIds([]);
     } catch (error) {
       console.error("Failed to search records:", error);
-      toast.error(t.translations.RECORD_COLLECTIONS_FAILED_SEARCH_RECORDS);
+      showToast(
+        "error",
+        t.translations.RECORD_COLLECTIONS_FAILED_SEARCH_RECORDS,
+      );
     } finally {
       setRecordSearchLoading(false);
     }
@@ -426,7 +381,7 @@ export function useCollectionDetails({
       setSelectedRecordIds([]);
       setRecordSearchResults([]);
       setRecordSearchTerm("");
-      toast.success(t.translations.RECORD_COLLECTIONS_RECORDS_ADDED);
+      showToast("success", t.translations.RECORD_COLLECTIONS_RECORDS_ADDED);
       return;
     }
 
@@ -444,10 +399,10 @@ export function useCollectionDetails({
       setSelectedRecordIds([]);
       setRecordSearchResults([]);
       setRecordSearchTerm("");
-      toast.success(t.translations.RECORD_COLLECTIONS_RECORDS_ADDED);
+      showToast("success", t.translations.RECORD_COLLECTIONS_RECORDS_ADDED);
     } catch (error) {
       console.error("Failed to add records to collection:", error);
-      toast.error(t.translations.RECORD_COLLECTIONS_FAILED_UPDATE);
+      showToast("error", t.translations.RECORD_COLLECTIONS_FAILED_UPDATE);
     } finally {
       setSaving(false);
     }
@@ -460,7 +415,7 @@ export function useCollectionDetails({
       const didStageRecord = stageAddedRecords([recordId]);
       if (!didStageRecord) return;
 
-      toast.success(t.translations.RECORD_COLLECTIONS_RECORD_ADDED);
+      showToast("success", t.translations.RECORD_COLLECTIONS_RECORD_ADDED);
       return;
     }
 
@@ -475,10 +430,10 @@ export function useCollectionDetails({
       const records = await loadCollectionRecords();
       syncSelectedCollectionRecordCount(records.length);
       trackAddedRecords([recordId]);
-      toast.success(t.translations.RECORD_COLLECTIONS_RECORD_ADDED);
+      showToast("success", t.translations.RECORD_COLLECTIONS_RECORD_ADDED);
     } catch (error) {
       console.error("Failed to add record to collection:", error);
-      toast.error(t.translations.RECORD_COLLECTIONS_FAILED_UPDATE);
+      showToast("error", t.translations.RECORD_COLLECTIONS_FAILED_UPDATE);
     } finally {
       clearRecordMutationStatus(recordId);
     }
@@ -492,7 +447,7 @@ export function useCollectionDetails({
       if (!didStageRecord) return;
 
       setSelectedRecordIds((prev) => prev.filter((id) => id !== recordId));
-      toast.success(t.translations.RECORD_COLLECTIONS_RECORD_REMOVED);
+      showToast("success", t.translations.RECORD_COLLECTIONS_RECORD_REMOVED);
       return;
     }
 
@@ -508,10 +463,10 @@ export function useCollectionDetails({
       syncSelectedCollectionRecordCount(records.length);
       trackRemovedRecords([recordId]);
       setSelectedRecordIds((prev) => prev.filter((id) => id !== recordId));
-      toast.success(t.translations.RECORD_COLLECTIONS_RECORD_REMOVED);
+      showToast("success", t.translations.RECORD_COLLECTIONS_RECORD_REMOVED);
     } catch (error) {
       console.error("Failed to remove record from collection:", error);
-      toast.error(t.translations.RECORD_COLLECTIONS_FAILED_UPDATE);
+      showToast("error", t.translations.RECORD_COLLECTIONS_FAILED_UPDATE);
     } finally {
       clearRecordMutationStatus(recordId);
     }
@@ -585,8 +540,9 @@ export function useCollectionDetails({
       const recordMutationOperations = [
         ...pendingRecordChanges.added.map((recordId) => {
           const addedRecord =
-            collectionRecordsRef.current.find((record) => record.id === recordId) ??
-            recordSearchResults.find((record) => record.id === recordId);
+            collectionRecordsRef.current.find(
+              (record) => record.id === recordId,
+            ) ?? recordSearchResults.find((record) => record.id === recordId);
 
           return {
             description:
@@ -705,9 +661,9 @@ export function useCollectionDetails({
             : [],
         ),
         ...labelAndTagMutationResults.flatMap((result, index) =>
-        result.status === "rejected"
-          ? [labelAndTagMutationOperations[index].description]
-          : [],
+          result.status === "rejected"
+            ? [labelAndTagMutationOperations[index].description]
+            : [],
         ),
       ];
 
@@ -722,7 +678,10 @@ export function useCollectionDetails({
           "Failed to refresh record collection after save:",
           refreshError,
         );
-        toast.error(t.translations.RECORD_COLLECTIONS_SAVED_REFRESH_FAILED);
+        showToast(
+          "error",
+          t.translations.RECORD_COLLECTIONS_SAVED_REFRESH_FAILED,
+        );
       }
 
       editStartCollectionRecordsRef.current = null;
@@ -737,18 +696,19 @@ export function useCollectionDetails({
       setIsEditingSelectedCollection(false);
 
       if (failedOperations.length > 0) {
-        toast.error(
+        showToast(
+          "error",
           t.translations.RECORD_COLLECTIONS_PARTIAL_UPDATE.replace(
             "{operations}",
             failedOperations.join(", "),
           ),
         );
       } else if (!didRefreshFail) {
-        toast.success(t.translations.RECORD_COLLECTIONS_UPDATE_SUCCESS);
+        showToast("success", t.translations.RECORD_COLLECTIONS_UPDATE_SUCCESS);
       }
     } catch (error) {
       console.error("Failed to update record collection:", error);
-      toast.error(t.translations.RECORD_COLLECTIONS_FAILED_UPDATE);
+      showToast("error", t.translations.RECORD_COLLECTIONS_FAILED_UPDATE);
     } finally {
       setSaving(false);
     }
@@ -772,7 +732,9 @@ export function useCollectionDetails({
 
     setSelectedCollectionDraft({
       ...selectedCollectionDraft,
-      labels: selectedCollectionDraft.labels?.filter((label) => label.id !== labelId),
+      labels: selectedCollectionDraft.labels?.filter(
+        (label) => label.id !== labelId,
+      ),
     });
   };
 
@@ -804,7 +766,9 @@ export function useCollectionDetails({
 
     setSelectedCollectionDraft({
       ...selectedCollectionDraft,
-      tags: (selectedCollectionDraft.tags ?? []).some((item) => item.id === tag.id)
+      tags: (selectedCollectionDraft.tags ?? []).some(
+        (item) => item.id === tag.id,
+      )
         ? selectedCollectionDraft.tags
         : [...(selectedCollectionDraft.tags ?? []), tag],
     });
@@ -837,10 +801,10 @@ export function useCollectionDetails({
         id: createdLabel.id,
         name: createdLabel.name,
       });
-      toast.success(t.translations.RECORD_COLLECTIONS_LABEL_CREATED);
+      showToast("success", t.translations.RECORD_COLLECTIONS_LABEL_CREATED);
     } catch (error) {
       console.error("Failed to create sensitivity label:", error);
-      toast.error(t.translations.RECORD_COLLECTIONS_FAILED_CREATE_LABEL);
+      showToast("error", t.translations.RECORD_COLLECTIONS_FAILED_CREATE_LABEL);
     } finally {
       setSelectedCollectionLabelCreating(false);
     }
@@ -869,10 +833,10 @@ export function useCollectionDetails({
         id: createdTag.id,
         name: createdTag.name,
       });
-      toast.success(t.translations.RECORD_COLLECTIONS_TAG_CREATED);
+      showToast("success", t.translations.RECORD_COLLECTIONS_TAG_CREATED);
     } catch (error) {
       console.error("Failed to create tag:", error);
-      toast.error(t.translations.RECORD_COLLECTIONS_FAILED_CREATE_TAG);
+      showToast("error", t.translations.RECORD_COLLECTIONS_FAILED_CREATE_TAG);
     } finally {
       setSelectedCollectionTagCreating(false);
     }
@@ -904,18 +868,26 @@ export function useCollectionDetails({
     },
   };
 
-  const detailsController = useSelectedCollectionDetailsController({
-    context: {
-      projectId,
+  const activeSelectedCollection =
+    editableSelectedCollection ?? selectedCollection;
+  const detailsController = {
+    readonlyView: {
       selectedCollection,
+      ...collectionDetailsView,
+      badgeDisplayLimit: COLLECTION_BADGE_DISPLAY_LIMIT,
+      getMetadataRows,
+      getSensitivityClass,
       collectionRecords,
       recordsLoading,
-      saving,
-      isEditingSelectedCollection,
+      onViewAllCollectionRecords: () => setCollectionWorkspaceTab("Records"),
+      recordsPerPage: NEW_COLLECTION_RECORDS_PER_PAGE,
+      projectId,
+      onOpenSelectedCollectionEdit: openSelectedCollectionEdit,
     },
-    view: collectionDetailsView,
-    editDerived: selectedCollectionEditDerived,
-    editState: {
+    editView: {
+      editableSelectedCollection: activeSelectedCollection,
+      isEditingSelectedCollection,
+      saving,
       setSelectedCollectionDraft,
       setSelectedCollectionPropertiesEditorOpen,
       selectedCollectionLabelSearchTerm,
@@ -926,43 +898,31 @@ export function useCollectionDetails({
       selectedCollectionTagCreating,
       labelsLoading,
       tagsLoading,
-    },
-    labelAndTagActions: {
-      onAddSelectedCollectionLabelFromSearch: addSelectedCollectionLabelFromSearch,
+      ...selectedCollectionEditDerived,
+      onAddSelectedCollectionLabelFromSearch:
+        addSelectedCollectionLabelFromSearch,
       onAddSelectedCollectionTagFromSearch: addSelectedCollectionTagFromSearch,
       onAddSelectedCollectionLabel: addSelectedCollectionLabel,
       onAddSelectedCollectionTag: addSelectedCollectionTag,
       onRemoveLabel: handleRemoveLabel,
       onRemoveTag: handleRemoveTag,
-    },
-    recordSearch: {
       recordSearchTerm,
       setRecordSearchTerm,
       recordSearchLoading,
       onSearchRecords: handleSearchRecords,
-    },
-    recordMutations: {
       recordMutationStatusById,
       onRemoveCollectionRecord: handleRemoveCollectionRecord,
       onAddCollectionRecord: handleAddCollectionRecord,
-    },
-    navigation: {
       onCancelSelectedCollectionEdit: cancelSelectedCollectionEdit,
       onSaveSelectedDetails: handleSaveSelectedDetails,
-      onViewAllCollectionRecords: () => setCollectionWorkspaceTab("Records"),
-      onOpenSelectedCollectionEdit: openSelectedCollectionEdit,
     },
-    formatting: {
-      getMetadataRows,
-      getSensitivityClass,
-    },
-  });
+  };
 
   return {
     workspace: {
       tab: collectionWorkspaceTab,
     },
-    detailsController: detailsController!,
+    detailsController,
     recordsController,
     propertiesEditor: {
       isOpen: selectedCollectionPropertiesEditorOpen,
@@ -973,3 +933,7 @@ export function useCollectionDetails({
     },
   };
 }
+
+export type CollectionDetailsController = ReturnType<
+  typeof useCollectionDetails
+>;

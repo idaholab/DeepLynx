@@ -84,7 +84,7 @@ export function RestrictedRoute({
       return <>{fallback}</>;
     }
 
-    return <></>;
+    return null;
   }
 
   return <>{children}</>;

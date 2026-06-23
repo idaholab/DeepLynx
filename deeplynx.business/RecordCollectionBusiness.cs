@@ -258,6 +258,96 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
     }
 
     /// <summary>
+    /// Retrieves all authorized record collections for a specific record.
+    /// </summary>
+    /// <param name="currentUserId"></param>
+    /// <param name="organizationId"></param>
+    /// <param name="projectId"></param>
+    /// <param name="recordId"></param>
+    /// <param name="hideArchived"></param>
+    /// <param name="isSysAdmin"></param>
+    /// <param name="dto">The data transfer object of the search parameters and pagination</param>
+    /// <param name="isOrgAdmin"></param>
+    /// <param name="isProjectAdmin"></param>
+    /// <returns></returns>
+    /// <exception cref="KeyNotFoundException"></exception>
+    public async Task<PaginatedResponse<RecordCollectionResponseDto>> GetRecordCollectionsForRecord(
+        long currentUserId, long organizationId, long projectId, long recordId, bool hideArchived,
+        RecordCollectionQueryRequestDto dto, bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false)
+    {
+        var recordExists = await _context.Records.AnyAsync(r =>
+            r.Id == recordId &&
+            r.OrganizationId == organizationId &&
+            r.ProjectId == projectId &&
+            (!hideArchived || !r.IsArchived));
+
+        if (!recordExists)
+            throw new KeyNotFoundException($"Record with id {recordId} not found");
+
+        var collectionQuery = _context.RecordCollections
+            .Where(c =>
+                c.OrganizationId == organizationId &&
+                c.ProjectId == projectId &&
+                c.Records.Any(r => r.Id == recordId));
+
+        if (hideArchived)
+            collectionQuery = collectionQuery.Where(c => !c.IsArchived);
+
+        if (!isSysAdmin && !isOrgAdmin && !isProjectAdmin)
+        {
+            var userAuthorizedLabels = await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
+                currentUserId, organizationId, projectId, "read record");
+
+            collectionQuery = collectionQuery.Where(c =>
+                c.Labels.Count == 0 ||
+                c.Labels.All(l => userAuthorizedLabels.Contains(l.Id)));
+        }
+
+        // Get total count before pagination
+        var totalCount = await collectionQuery.CountAsync();
+
+        // Get pagination values
+        var pageNumber = Math.Max(1, dto.PageNumber);
+        var pageSize = dto.GetValidatedPageSize();
+
+        var items = await collectionQuery
+            .Skip((pageNumber - 1) * pageSize)
+            .Take(pageSize)
+            .Select(c => new RecordCollectionResponseDto
+            {
+                Id = c.Id,
+                Description = c.Description,
+                Properties = c.Properties,
+                Name = c.Name,
+                ProjectId = c.ProjectId,
+                OrganizationId = c.OrganizationId,
+                LastUpdatedBy = c.LastUpdatedBy,
+                LastUpdatedAt = c.LastUpdatedAt,
+                IsArchived = c.IsArchived,
+                RecordCount = c.Records.Count(),
+                Tags = c.Tags.Select(t => new RecordCollectionTagDto
+                {
+                    Id = t.Id,
+                    Name = t.Name
+                }).ToList(),
+                Labels = c.Labels.Select(l => new RecordCollectionLabelDto
+                {
+                    Id = l.Id,
+                    Name = l.Name
+                }).ToList()
+            }).ToListAsync();
+
+        return new PaginatedResponse<RecordCollectionResponseDto>
+        {
+            Items = items,
+            PageNumber = pageNumber,
+            PageSize = pageSize,
+            TotalCount = totalCount
+        };
+
+    }
+
+    /// <summary>
     ///     Get all records that contain all given tags
     /// </summary>
     /// <param name="currentUserId">The ID of current user</param>
