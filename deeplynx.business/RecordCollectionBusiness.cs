@@ -82,34 +82,29 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
 
         if (hideArchived) recordCollectionQuery = recordCollectionQuery.Where(c => !c.IsArchived);
 
-        var isAdmin = isSysAdmin || isOrgAdmin || isProjectAdmin;
-        var userAuthorizedLabels = isAdmin
-            ? []
-            : await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
-                currentUserId,
-                organizationId,
-                projectId,
-                "read record");
-
-        if (dto.SensitivityLabelIds?.Length > 0)
+        if (!isSysAdmin && !isOrgAdmin && !isProjectAdmin)
         {
-            if (!isAdmin && dto.SensitivityLabelIds.Any(id => !userAuthorizedLabels.Contains(id)))
+            var userAuthorizedLabels = await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
+                currentUserId, organizationId, projectId, "read record");
+
+            if (dto.SensitivityLabelIds?.Any(id => !userAuthorizedLabels.Contains(id)) == true)
             {
                 throw new UnauthorizedAccessException(
                     "User is not authorized to filter by one or more sensitivity labels.");
             }
 
-            foreach (var labelId in dto.SensitivityLabelIds.Distinct())
-            {
-                recordCollectionQuery = recordCollectionQuery.Where(c => c.Labels.Any(l => l.Id == labelId));
-            }
+            recordCollectionQuery = recordCollectionQuery.Where(c =>
+                c.Labels.Count == 0 ||
+                c.Labels.All(l => userAuthorizedLabels.Contains(l.Id)));
         }
 
-        if (!isAdmin)
+        if (dto.SensitivityLabelIds?.Length > 0)
         {
-            recordCollectionQuery = recordCollectionQuery.Where(r =>
-                r.Labels.Count == 0 ||
-                r.Labels.All(l => userAuthorizedLabels.Contains(l.Id)));
+            foreach (var labelId in dto.SensitivityLabelIds.Distinct())
+            {
+                recordCollectionQuery = recordCollectionQuery.Where(c =>
+                    c.Labels.Any(l => l.Id == labelId));
+            }
         }
 
         if (dto.TagIds?.Length > 0)

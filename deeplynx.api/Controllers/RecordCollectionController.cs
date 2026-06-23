@@ -160,13 +160,9 @@ public class RecordCollectionController : ControllerBase
         }
         catch (Exception exc)
         {
-            return InternalServerError(
-                exc,
-                "An error occurred while listing record collections for the record {recordId} for organization {OrganizationId} and project {ProjectId}",
-                "An unexpected error occurred while listing record collections for the record.",
-                recordId,
-                organizationId,
-                projectId);
+            var message = $"An error occurred while listing record collections for the record: {exc}";
+            _logger.LogError(message);
+            return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
 
