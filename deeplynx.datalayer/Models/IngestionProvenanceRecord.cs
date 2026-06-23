@@ -3,8 +3,8 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace deeplynx.datalayer.Models;
 
-[Table("ingestion_provenance_records", Schema = "deeplynx")]
-public class IngestionProvenanceRecord
+[Table("provenance_records", Schema = "deeplynx")]
+public class ProvenanceRecord
 {
     [Key]
     [Column("id")]
@@ -70,5 +70,14 @@ public class IngestionProvenanceRecord
     public DateTime CreatedAt { get; set; }
 
     [ForeignKey("RecordId")]
+    [InverseProperty("ProvenanceRecords")]
     public virtual Record Record { get; set; } = null!;
+
+    [ForeignKey("ProjectId")]
+    [InverseProperty("ProvenanceRecords")]
+    public virtual Project Project { get; set; } = null!;
+
+    [ForeignKey("OrganizationId")]
+    [InverseProperty("ProvenanceRecords")]
+    public virtual Organization Organization { get; set; } = null!;
 }

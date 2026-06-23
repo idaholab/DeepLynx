@@ -33,6 +33,8 @@ public partial class DeeplynxContext : DbContext
 
     public virtual DbSet<HistoricalRecord> HistoricalRecords { get; set; }
 
+    public virtual DbSet<ProvenanceRecord> ProvenanceRecords { get; set; }
+
     public virtual DbSet<OauthApplication> OauthApplications { get; set; }
 
     public virtual DbSet<OauthToken> OauthTokens { get; set; }
@@ -504,6 +506,45 @@ public partial class DeeplynxContext : DbContext
             entity.HasOne(d => d.Project)
                 .WithMany(p => p.HistoricalRecords)
                 .HasConstraintName("historical_records_project_id_fkey");
+        });
+
+        modelBuilder.Entity<ProvenanceRecord>(entity => {
+            entity.HasKey(e => e.Id).HasName("provenance_records_pkey");
+
+            entity.HasIndex(e => e.Id)
+                .HasDatabaseName("idx_provenance_records_id");
+
+            entity.HasIndex(e => e.RecordId)
+                .HasDatabaseName("idx_provenance_records_record_id");
+
+            entity.HasIndex(e => e.ProjectId)
+                .HasDatabaseName("idx_provenance_records_project_id");
+
+            entity.HasIndex(e => e.OrganizationId)
+                .HasDatabaseName("idx_provenance_records_organization_id");
+
+            entity.HasIndex(e => e.ContentHash)
+                .HasDatabaseName("idx_provenance_records_content_hash");
+
+            entity.Property(e => e.Id).UseIdentityAlwaysColumn();
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+            entity.Property(e => e.ContentHash).HasMaxLength(64);
+            entity.Property(e => e.SignedPayloadHash).HasMaxLength(64);
+
+            entity.HasOne(d => d.Record).WithMany(p => p.ProvenanceRecords)
+                .HasForeignKey(d => d.RecordId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("provenance_records_record_id_fkey");
+
+            entity.HasOne(d => d.Project).WithMany(p => p.ProvenanceRecords)
+                .HasForeignKey(d => d.ProjectId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("provenance_records_project_id_fkey");
+
+            entity.HasOne(d => d.Organization).WithMany(p => p.ProvenanceRecords)
+                .HasForeignKey(d => d.OrganizationId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("provenance_records_organization_id_fkey");
         });
 
         modelBuilder.Entity<OauthApplication>(entity =>
