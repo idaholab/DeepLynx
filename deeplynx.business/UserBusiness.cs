@@ -30,7 +30,8 @@ public class UserBusiness : IUserBusiness
     /// <param name="includeServiceAccounts">Optional Param to include service accounts- defaults to false</param>
     /// <param name="includeTestAccounts">Optional Param to include test accounts- defaults to false</param>
     /// <returns>A list of users, optionally filtered by project or organization</returns>
-    public async Task<IEnumerable<UserResponseDto>> GetAllUsers(long? projectId, long? organizationId, bool includeArchived = false, bool includeServiceAccounts = false, bool includeTestAccounts = false)
+    public async Task<IEnumerable<UserResponseDto>> GetAllUsers(long? projectId, long? organizationId, bool includeArchived = false, 
+        bool includeServiceAccounts = false, bool includeTestAccounts = false)
     {
         var users = includeArchived
         ? _context.Users.AsQueryable()

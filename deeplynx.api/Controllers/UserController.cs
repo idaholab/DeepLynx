@@ -33,17 +33,19 @@ public class UserController : ControllerBase
     /// <param name="organizationId">(Optional) ID of organization that users are associated with</param>
     /// <param name="includeArchived">(Optional) Beelean determining if archived accounts will be included (default: false)</param>
     /// <param name="includeServiceAccounts">(Optional) Boolean determining if service accounts will be included (default: false)</param>
+    /// <param name="includeTestAccounts">(Optional) Boolean determining if test accounts will be included (default: false)</param>
     /// <returns>List of user response DTOs</returns>
     [HttpGet(Name = "api_get_all_users")]
     public async Task<ActionResult<IEnumerable<UserResponseDto>>> GetAllUsers(
         [FromQuery] long? projectId,
         [FromQuery] long? organizationId,
         [FromQuery] bool includeArchived = false,
-        [FromQuery] bool includeServiceAccounts = false)
+        [FromQuery] bool includeServiceAccounts = false,
+        [FromQuery] bool includeTestAccounts = false)
     {
         try
         {
-            var users = await _userBusiness.GetAllUsers(projectId, organizationId, includeArchived, includeServiceAccounts);
+            var users = await _userBusiness.GetAllUsers(projectId, organizationId, includeArchived, includeServiceAccounts, includeTestAccounts);
             return Ok(users);
         }
         catch (Exception exc)
