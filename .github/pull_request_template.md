@@ -38,6 +38,5 @@ Uncomment this section if a screenshot is needed.
 - [ ] I have read the [CONTRIBUTING](../blob/develop/CONTRIBUTING.md) document.
 - [ ] All relevant repo and/or project documentation has been updated to reflect the changes in this PR.
 - [ ] Unit tests in `deeplynx.tests` have been added and/or modified to cover the changes in this PR.
-- [ ] API tests in `deeplynx.apitest` have been added and/or modified to cover the changes in this PR.
-- [ ] Frontend changes have been tested locally, in the docker app, and on the deployed instance.
+- [ ] Changes have been tested locally, in the docker app, and on the deployed instance.
 - [ ] All new and existing tests pass.
