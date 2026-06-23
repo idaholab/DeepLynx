@@ -27,8 +27,7 @@ builder.WebHost.ConfigureKestrel(options => { options.Limits.MaxRequestBodySize 
 
 builder.Services.Configure<FormOptions>(options => { options.MultipartBodyLengthLimit = 2L * 1024 * 1024 * 1024; });
 
-builder.Services.AddGrpc().AddFlightServer<NexusFlightServer>();
-builder.Services.AddGrpcReflection();
+
 
 var connectionString = ConnectionStringsProvider.GetPostgresConnectionString(builder.Configuration);
 
@@ -226,6 +225,9 @@ try
     builder.Services.AddHttpClient<InsightServiceClient>();
     builder.Services.AddHttpClient<AirflowServiceClient>();
     builder.Services.AddSingleton<EncryptionHelper>();
+
+    builder.Services.AddGrpc().AddFlightServer<NexusFlightServer>();
+    builder.Services.AddGrpcReflection();
 
     /*
     ╔════════════════════════════╗
