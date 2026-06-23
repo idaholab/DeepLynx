@@ -318,6 +318,10 @@ namespace deeplynx.datalayer.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("application_id");
 
+                    b.Property<long?>("CreatedBy")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by");
+
                     b.Property<string>("Key")
                         .IsRequired()
                         .HasColumnType("text")
@@ -337,6 +341,9 @@ namespace deeplynx.datalayer.Migrations
 
                     b.HasIndex("ApplicationId")
                         .HasDatabaseName("idx_api_keys_application_id");
+
+                    b.HasIndex("CreatedBy")
+                        .HasDatabaseName("idx_api_keys_created_by");
 
                     b.HasIndex("UserId");
 
@@ -2426,6 +2433,13 @@ namespace deeplynx.datalayer.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("Id"));
 
+                    b.Property<string>("AccountType")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("text")
+                        .HasDefaultValue("standard")
+                        .HasColumnName("account_type");
+
                     b.Property<string>("Email")
                         .IsRequired()
                         .HasColumnType("text")
@@ -2482,6 +2496,10 @@ namespace deeplynx.datalayer.Migrations
 
                     b.HasIndex("SsoId")
                         .HasDatabaseName("idx_users_sso_id");
+
+                    b.HasIndex("Username")
+                        .IsUnique()
+                        .HasDatabaseName("idx_users_username");
 
                     b.ToTable("users", "deeplynx");
                 });
@@ -2711,12 +2729,20 @@ namespace deeplynx.datalayer.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .HasConstraintName("api_keys_application_id_fkey");
 
+                    b.HasOne("deeplynx.datalayer.Models.User", "CreatedByUser")
+                        .WithMany("CreatedApiKeys")
+                        .HasForeignKey("CreatedBy")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .HasConstraintName("api_keys_created_by_fkey");
+
                     b.HasOne("deeplynx.datalayer.Models.User", "User")
                         .WithMany("ApiKeys")
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("api_keys_user_id_fkey");
+
+                    b.Navigation("CreatedByUser");
 
                     b.Navigation("OauthApplication");
 
@@ -3657,6 +3683,8 @@ namespace deeplynx.datalayer.Migrations
             modelBuilder.Entity("deeplynx.datalayer.Models.User", b =>
                 {
                     b.Navigation("ApiKeys");
+
+                    b.Navigation("CreatedApiKeys");
 
                     b.Navigation("LastUpdatedActions");
 

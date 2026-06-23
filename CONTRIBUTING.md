@@ -213,7 +213,7 @@ to remove (skip to step 3 if you have not applied it).
 
 1. To easily find the full migration name, run:
 ```
-dotnet ef migrations list --project deeplynx.datalayer --startup-project deeplynx.api
+dotnet ef migrations list --project deeplynx.datalayer --startup-project deeplynx.api --context DeeplynxContext
 ```
 
 2. Use the full name to run this command (replacing <Full_Migration_Name>):
