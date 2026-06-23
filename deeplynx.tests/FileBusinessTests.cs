@@ -185,7 +185,14 @@ public class FileBusinessTests : IntegrationTestBase
             LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
             OrganizationId = oid
         };
-        Context.Classes.Add(testClass);
+        var testClass2 = new Class
+        {
+            Name = "Report",
+            ProjectId = pid,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            OrganizationId = oid
+        };
+        Context.Classes.AddRange(testClass, testClass2);
         await Context.SaveChangesAsync();
     }
 
@@ -840,6 +847,317 @@ public class FileBusinessTests : IntegrationTestBase
         Assert.NotNull(properties);
         Assert.NotNull(properties!["columns"]);
         Assert.Equal("lab-bench-1", properties["source"]!.GetValue<string>());
+    }
+
+    [Fact]
+    public async Task UploadFile_MetadataNoClassInformation_ReturnsDefault()
+    {
+        // Arrange
+        var content = "This is a plain text document, not tabular data.";
+        var ms = new MemoryStream(Encoding.UTF8.GetBytes(content));
+        var file = new FormFile(ms, 0, ms.Length, "file", "notes.txt")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "text/plain"
+        };
+
+        var fileClass = Context.Classes.First(c => c.Name == "File" && c.ProjectId == pid);
+
+        var metadata = new CreateRecordFileUploadRequestDto
+        {
+            Name = "Override Name",
+            Description = "Override Description",
+            Properties = new JsonObject(),
+            OriginalId = "override-original-id"
+        };
+
+        var metadataJson = JsonSerializer.Serialize(metadata);
+        var metadataBytes = Encoding.UTF8.GetBytes(metadataJson);
+        var metadataStream = new MemoryStream(metadataBytes);
+        var metadataFile = new FormFile(metadataStream, 0, metadataStream.Length, "metadataFile", "metadata.json")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "application/json"
+        };
+
+        // Act
+        var result = await _fileBusiness.UploadFile(uid, oid, pid, did, osid, file, null, metadataFile);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(fileClass.Id, result.ClassId);
+    }
+
+    [Fact]
+    public async Task UploadFile_MetadataOnlyClassId_ReturnsCorrectClass()
+    {
+        // Arrange
+        var content = "This is a plain text document, not tabular data.";
+        var ms = new MemoryStream(Encoding.UTF8.GetBytes(content));
+        var file = new FormFile(ms, 0, ms.Length, "file", "notes.txt")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "text/plain"
+        };
+
+        var fileClass = Context.Classes.First(c => c.Name == "Report" && c.ProjectId == pid);
+
+        var metadata = new CreateRecordFileUploadRequestDto
+        {
+            Name = "Override Name",
+            Description = "Override Description",
+            Properties = new JsonObject(),
+            OriginalId = "override-original-id",
+            ClassId = fileClass.Id
+        };
+
+        var metadataJson = JsonSerializer.Serialize(metadata);
+        var metadataBytes = Encoding.UTF8.GetBytes(metadataJson);
+        var metadataStream = new MemoryStream(metadataBytes);
+        var metadataFile = new FormFile(metadataStream, 0, metadataStream.Length, "metadataFile", "metadata.json")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "application/json"
+        };
+
+        // Act
+        var result = await _fileBusiness.UploadFile(uid, oid, pid, did, osid, file, null, metadataFile);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(fileClass.Id, result.ClassId);
+    }
+
+    [Fact]
+    public async Task UploadFile_MetadataOnlyClassName_ReturnsCorrectClass()
+    {
+        // Arrange
+        var content = "This is a plain text document, not tabular data.";
+        var ms = new MemoryStream(Encoding.UTF8.GetBytes(content));
+        var file = new FormFile(ms, 0, ms.Length, "file", "notes.txt")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "text/plain"
+        };
+
+        var fileClass = Context.Classes.First(c => c.Name == "Report" && c.ProjectId == pid);
+
+        var metadata = new CreateRecordFileUploadRequestDto
+        {
+            Name = "Override Name",
+            Description = "Override Description",
+            Properties = new JsonObject(),
+            OriginalId = "override-original-id",
+            ClassName = fileClass.Name
+        };
+
+        var metadataJson = JsonSerializer.Serialize(metadata);
+        var metadataBytes = Encoding.UTF8.GetBytes(metadataJson);
+        var metadataStream = new MemoryStream(metadataBytes);
+        var metadataFile = new FormFile(metadataStream, 0, metadataStream.Length, "metadataFile", "metadata.json")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "application/json"
+        };
+
+        // Act
+        var result = await _fileBusiness.UploadFile(uid, oid, pid, did, osid, file, null, metadataFile);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(fileClass.Id, result.ClassId);
+    }
+
+    [Fact]
+    public async Task UploadFile_MetadataClassInformation_ReturnsCorrectClass()
+    {
+        // Arrange
+        var content = "This is a plain text document, not tabular data.";
+        var ms = new MemoryStream(Encoding.UTF8.GetBytes(content));
+        var file = new FormFile(ms, 0, ms.Length, "file", "notes.txt")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "text/plain"
+        };
+
+        var fileClass = Context.Classes.First(c => c.Name == "Report" && c.ProjectId == pid);
+
+        var metadata = new CreateRecordFileUploadRequestDto
+        {
+            Name = "Override Name",
+            Description = "Override Description",
+            Properties = new JsonObject(),
+            OriginalId = "override-original-id",
+            ClassName = fileClass.Name,
+            ClassId = fileClass.Id
+        };
+
+        var metadataJson = JsonSerializer.Serialize(metadata);
+        var metadataBytes = Encoding.UTF8.GetBytes(metadataJson);
+        var metadataStream = new MemoryStream(metadataBytes);
+        var metadataFile = new FormFile(metadataStream, 0, metadataStream.Length, "metadataFile", "metadata.json")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "application/json"
+        };
+
+        // Act
+        var result = await _fileBusiness.UploadFile(uid, oid, pid, did, osid, file, null, metadataFile);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(fileClass.Id, result.ClassId);
+    }
+
+    [Fact]
+    public async Task UploadFile_MetadataMismatchingClassInformation_ThrowsArgumentException()
+    {
+        // Arrange
+        var content = "This is a plain text document, not tabular data.";
+        var ms = new MemoryStream(Encoding.UTF8.GetBytes(content));
+        var file = new FormFile(ms, 0, ms.Length, "file", "notes.txt")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "text/plain"
+        };
+
+        var fileClass = Context.Classes.First(c => c.Name == "File" && c.ProjectId == pid);
+        var fileClass2 = Context.Classes.First(c => c.Name == "Report" && c.ProjectId == pid);
+
+        var metadata = new CreateRecordFileUploadRequestDto
+        {
+            Name = "Override Name",
+            Description = "Override Description",
+            Properties = new JsonObject(),
+            OriginalId = "override-original-id",
+            ClassName = fileClass.Name,
+            ClassId = fileClass2.Id
+        };
+
+        var metadataJson = JsonSerializer.Serialize(metadata);
+        var metadataBytes = Encoding.UTF8.GetBytes(metadataJson);
+        var metadataStream = new MemoryStream(metadataBytes);
+        var metadataFile = new FormFile(metadataStream, 0, metadataStream.Length, "metadataFile", "metadata.json")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "application/json"
+        };
+
+        // Act & Assert
+        await Assert.ThrowsAsync<ArgumentException>(() =>
+            _fileBusiness.UploadFile(uid, oid, pid, did, osid, file, null, metadataFile));
+    }
+
+    [Fact]
+    public async Task UploadFile_MetadataInvalidClassId_ThrowsKeyNotFoundException()
+    {
+        // Arrange
+        var content = "This is a plain text document, not tabular data.";
+        var ms = new MemoryStream(Encoding.UTF8.GetBytes(content));
+        var file = new FormFile(ms, 0, ms.Length, "file", "notes.txt")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "text/plain"
+        };
+
+        var metadata = new CreateRecordFileUploadRequestDto
+        {
+            Name = "Override Name",
+            Description = "Override Description",
+            Properties = new JsonObject(),
+            OriginalId = "override-original-id",
+            ClassId = 4
+        };
+
+        var metadataJson = JsonSerializer.Serialize(metadata);
+        var metadataBytes = Encoding.UTF8.GetBytes(metadataJson);
+        var metadataStream = new MemoryStream(metadataBytes);
+        var metadataFile = new FormFile(metadataStream, 0, metadataStream.Length, "metadataFile", "metadata.json")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "application/json"
+        };
+
+        // Act & Assert
+        await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            _fileBusiness.UploadFile(uid, oid, pid, did, osid, file, null, metadataFile));
+    }
+
+    [Fact]
+    public async Task UploadFile_MetadataInvalidClassIdAndName_ThrowsKeyNotFoundException()
+    {
+        // Arrange
+        var content = "This is a plain text document, not tabular data.";
+        var ms = new MemoryStream(Encoding.UTF8.GetBytes(content));
+        var file = new FormFile(ms, 0, ms.Length, "file", "notes.txt")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "text/plain"
+        };
+
+        var fileClass = Context.Classes.First(c => c.Name == "File" && c.ProjectId == pid);
+
+        var metadata = new CreateRecordFileUploadRequestDto
+        {
+            Name = "Override Name",
+            Description = "Override Description",
+            Properties = new JsonObject(),
+            OriginalId = "override-original-id",
+            ClassId = 4,
+            ClassName = fileClass.Name
+        };
+
+        var metadataJson = JsonSerializer.Serialize(metadata);
+        var metadataBytes = Encoding.UTF8.GetBytes(metadataJson);
+        var metadataStream = new MemoryStream(metadataBytes);
+        var metadataFile = new FormFile(metadataStream, 0, metadataStream.Length, "metadataFile", "metadata.json")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "application/json"
+        };
+
+        // Act & Assert
+        await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            _fileBusiness.UploadFile(uid, oid, pid, did, osid, file, null, metadataFile));
+    }
+
+    [Fact]
+    public async Task UploadFile_MetadataInvalidClassName_CreatesNewClass()
+    {
+        // Arrange
+        var content = "This is a plain text document, not tabular data.";
+        var ms = new MemoryStream(Encoding.UTF8.GetBytes(content));
+        var file = new FormFile(ms, 0, ms.Length, "file", "notes.txt")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "text/plain"
+        };
+
+        var metadata = new CreateRecordFileUploadRequestDto
+        {
+            Name = "Override Name",
+            Description = "Override Description",
+            Properties = new JsonObject(),
+            OriginalId = "override-original-id",
+            ClassName = "Bob",
+        };
+
+        var metadataJson = JsonSerializer.Serialize(metadata);
+        var metadataBytes = Encoding.UTF8.GetBytes(metadataJson);
+        var metadataStream = new MemoryStream(metadataBytes);
+        var metadataFile = new FormFile(metadataStream, 0, metadataStream.Length, "metadataFile", "metadata.json")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "application/json"
+        };
+
+        // Act
+        var result = await _fileBusiness.UploadFile(uid, oid, pid, did, osid, file, null, metadataFile);
+
+        // Assert
+        var fileClass = Context.Classes.First(c => c.Name == "Bob" && c.ProjectId == pid);
+        Assert.NotNull(result);
+        Assert.Equal(fileClass.Id, result.ClassId);
     }
 
     #endregion
