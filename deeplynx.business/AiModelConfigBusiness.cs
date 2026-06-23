@@ -177,7 +177,9 @@ public class AiModelConfigBusiness : IAiModelConfigBusiness
                 .FirstOrDefaultAsync();
 
             if (token == null)
-                throw new KeyNotFoundException("No token found");
+                throw new InvalidOperationException(
+                    $"The model configuration (ID: {modelConfig.Id}) requires an API token, " +
+                    $"but none was found for user {currentUserId}. Please add a token for this model.");
 
             token = _encryptionHelper.Decrypt(token);
         }
@@ -316,8 +318,9 @@ public class AiModelConfigBusiness : IAiModelConfigBusiness
                 .FirstOrDefaultAsync();
 
             if (rawToken is null)
-                throw new KeyNotFoundException(
-                    $"No token found for user {currentUserId} on model configuration {modelConfig.Id}.");
+                throw new InvalidOperationException(
+                    $"The {modelType} model configuration (ID: {modelConfig.Id}) requires an API token, " +
+                    $"but none was found for user {currentUserId}. Please add a token for this model.");
 
             token = _encryptionHelper.Decrypt(rawToken);
         }

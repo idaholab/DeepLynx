@@ -580,7 +580,8 @@ public class ProjectBusiness : IProjectBusiness
                 MemberId = pm.UserId,
                 Email = pm.User.Email,
                 Role = pm.Role.Name,
-                RoleId = pm.Role.Id
+                RoleId = pm.Role.Id,
+                IsProjectAdmin = pm.IsProjectAdmin
             });
 
         var groups = _context.ProjectMembers
@@ -591,7 +592,8 @@ public class ProjectBusiness : IProjectBusiness
                 MemberId = pm.GroupId,
                 Email = string.Empty,
                 Role = pm.Role.Name,
-                RoleId = pm.Role.Id
+                RoleId = pm.Role.Id,
+                IsProjectAdmin = pm.IsProjectAdmin
             });
 
         return await users.Union(groups).ToListAsync();
@@ -607,9 +609,10 @@ public class ProjectBusiness : IProjectBusiness
     /// <returns>True if user or group successfully added to project</returns>
     /// <returns>False if user or group already exists in project</returns>
     /// <exception cref="ArgumentException">Returned if none or both of userID/groupID supplied</exception>
+    /// <param name="isProjectAdmin">(optional) Whether the member is a project admin. Defaults to false</param>
     /// <exception cref="KeyNotFoundException">Returned if user, group, role or project not found</exception>
     public async Task<bool> AddMemberToProject(long projectId, long? roleId, long? userId,
-        long? groupId)
+        long? groupId, bool isProjectAdmin = false)
     {
         // ensure one and only one of userID or groupID is supplied
         if (!userId.HasValue && !groupId.HasValue)
@@ -648,7 +651,8 @@ public class ProjectBusiness : IProjectBusiness
             ProjectId = projectId,
             RoleId = roleId,
             UserId = userId,
-            GroupId = groupId
+            GroupId = groupId,
+            IsProjectAdmin = isProjectAdmin
         };
 
         _context.ProjectMembers.Add(projMember);
@@ -664,11 +668,12 @@ public class ProjectBusiness : IProjectBusiness
     /// <param name="roleId">ID of role to adjust</param>
     /// <param name="userId">(optional) ID of user to adjust</param>
     /// <param name="groupId">(optional) ID of group to adjust</param>
+    /// <param name="isProjectAdmin">(optional) project admin status to set; left unchanged when null</param>
     /// <returns>True if user or group role adjusted</returns>
     /// <exception cref="ArgumentException">Returned if none or both of userID/groupID supplied</exception>
     /// <exception cref="KeyNotFoundException">Returned if member doesn't exist in project</exception>
     public async Task<bool> UpdateProjectMemberRole(long projectId, long roleId, long? userId,
-        long? groupId)
+        long? groupId, bool? isProjectAdmin = null)
     {
         // ensure one and only one of userID or groupID is supplied
         if (!userId.HasValue && !groupId.HasValue)
@@ -693,8 +698,49 @@ public class ProjectBusiness : IProjectBusiness
             throw new KeyNotFoundException($"{memberType} with id {memberId} is not a member of project {projectId}");
         }
 
-        // Update the role
+        // Update the role, and the admin flag when explicitly supplied
         existingProjectMember.RoleId = roleId;
+        if (isProjectAdmin.HasValue)
+            existingProjectMember.IsProjectAdmin = isProjectAdmin.Value;
+        _context.ProjectMembers.Update(existingProjectMember);
+        await _context.SaveChangesAsync();
+
+        return true;
+    }
+
+    /// <summary>
+    ///     Set a user or group's project admin status within a project
+    /// </summary>
+    /// <param name="projectId">ID of project in which to adjust admin status</param>
+    /// <param name="userId">(optional) ID of user to adjust</param>
+    /// <param name="groupId">(optional) ID of group to adjust</param>
+    /// <param name="isAdmin">Project admin status to set the member to</param>
+    /// <returns>True if the member's admin status was updated</returns>
+    /// <exception cref="ArgumentException">Returned if none or both of userID/groupID supplied</exception>
+    /// <exception cref="KeyNotFoundException">Returned if member doesn't exist in project</exception>
+    public async Task<bool> SetProjectAdminStatus(long projectId, long? userId, long? groupId,
+        bool isAdmin = false)
+    {
+        // ensure one and only one of userID or groupID is supplied
+        if (!userId.HasValue && !groupId.HasValue)
+            throw new ArgumentException("One of User ID or Group ID must be provided");
+        if (userId.HasValue && groupId.HasValue)
+            throw new ArgumentException("Please provide only one of User ID or Group ID, not both");
+
+        // Find the existing project member to update
+        var existingProjectMember = await _context.ProjectMembers
+            .FirstOrDefaultAsync(pm => pm.ProjectId == projectId &&
+                                       ((userId.HasValue && pm.UserId == userId) ||
+                                        (groupId.HasValue && pm.GroupId == groupId)));
+        if (existingProjectMember == null)
+        {
+            var memberType = userId.HasValue ? "User" : "Group";
+            var memberId = userId ?? groupId;
+            throw new KeyNotFoundException($"{memberType} with id {memberId} is not a member of project {projectId}");
+        }
+
+        // set admin status and save to DB
+        existingProjectMember.IsProjectAdmin = isAdmin;
         _context.ProjectMembers.Update(existingProjectMember);
         await _context.SaveChangesAsync();
 
@@ -828,10 +874,7 @@ public class ProjectBusiness : IProjectBusiness
         // ===============================
         // Add current user as admin to project
         // ===============================
-        var adminRole = await _context.Roles.FirstOrDefaultAsync(r => r.Name == "Admin" && r.OrganizationId == organizationId);
-        if (adminRole == null)
-            throw new InvalidOperationException($"Admin role not found for organization {organizationId}");
-    
-        await AddMemberToProject(projectId, adminRole.Id, currentUserId, null);
+        await AddMemberToProject(projectId, null, currentUserId, null, isProjectAdmin: true);
     }
-}
+} 
+

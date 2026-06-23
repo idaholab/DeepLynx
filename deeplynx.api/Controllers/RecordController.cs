@@ -47,6 +47,7 @@ public class RecordController : ControllerBase
     ///     be removed
     /// </param>
     /// <param name="hideArchived">Flag indicating whether to hide archived records from the result (Default true)</param>
+    /// <param name="isInsightEligible">Restricts to records that are eligible for use in Insight if `true`</param>
     /// <returns>A list of records based on the applied filters.</returns>
     [HttpGet(Name = "api_get_all_records")]
     [Auth("read", "record")]
@@ -56,7 +57,8 @@ public class RecordController : ControllerBase
         long projectId,
         [FromQuery] long? dataSourceId = null,
         [FromQuery] string? fileType = null,
-        [FromQuery] bool hideArchived = true)
+        [FromQuery] bool hideArchived = true,
+        [FromQuery] bool isInsightEligible = false)
     {
         try
         {
@@ -65,7 +67,8 @@ public class RecordController : ControllerBase
             var isOrgAdmin = UserContextStorage.IsOrgAdmin;
             var isProjectAdmin = UserContextStorage.IsProjectAdmin;
             var records =
-                await _recordBusiness.GetAllRecords(currentUserId, organizationId, projectId, dataSourceId, hideArchived, fileType, isSysAdmin, isOrgAdmin, isProjectAdmin);
+                await _recordBusiness.GetAllRecords(currentUserId, organizationId, projectId, dataSourceId, hideArchived, fileType,
+                    isSysAdmin, isOrgAdmin, isProjectAdmin, isInsightEligible);
             return Ok(records);
         }
         catch (Exception exc)
@@ -75,53 +78,6 @@ public class RecordController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
-
-
-    /// <summary>
-    /// GetAllRecords (Paginated)
-    /// </summary>
-    /// <param name="organizationId">The id of the organization</param>
-    /// <param name="projectId">The id of the project</param>
-    /// <param name="hideArchived">Whether to hide archived records</param>
-    /// <param name="queryDto">Pagination parameters</param>
-    /// <returns>A paginated list of records based on applied filters</returns>
-    [HttpGet("GetAllRecordsPaginated", Name = "api_get_all_records_paginated")]
-    public async Task<ActionResult<PaginatedResponse<RecordResponseDto>>> GetAllRecordsPaginated(
-        long organizationId,
-        long projectId,
-        bool hideArchived,
-        [FromQuery] RecordQueryRequestDto? queryDto
-    )
-    {
-        try
-        {
-            var currentUserID  = UserContextStorage.UserId;
-            var isSysAdmin     = UserContextStorage.IsSysAdmin;
-            var isOrgAdmin     = UserContextStorage.IsOrgAdmin;
-            var isProjectAdmin = UserContextStorage.IsProjectAdmin;
-
-            var records = await _recordBusiness.GetAllRecordsPaginated(
-                currentUserID,
-                organizationId,
-                projectId,
-                hideArchived,
-                queryDto,
-                isSysAdmin,
-                isOrgAdmin,
-                isProjectAdmin
-            );
-
-            return Ok(records);
-        }
-        catch (Exception e)
-        {
-            var message = $"An unexpected error occurred while fetching records: {e}";
-            _logger.LogError(message);
-            return StatusCode(StatusCodes.Status500InternalServerError, message);
-        }
-    }
-
-
 
     /// <summary>
     ///     Get Records by Tags
@@ -157,7 +113,7 @@ public class RecordController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
-    
+
     /// <summary>
     ///     Get Records by Original IDs
     /// </summary>
@@ -301,8 +257,20 @@ public class RecordController : ControllerBase
         try
         {
             var currentUserId = UserContextStorage.UserId;
-            var record =
-                await _recordBusiness.CreateRecord(currentUserId, organizationId, projectId, dataSourceId, dto, sensitivityLabelIds);
+            var isSysAdmin = UserContextStorage.IsSysAdmin;
+            var isOrgAdmin = UserContextStorage.IsOrgAdmin;
+            var isProjectAdmin = UserContextStorage.IsProjectAdmin;
+            var record = await _recordBusiness.CreateRecord(
+                currentUserId,
+                organizationId,
+                projectId,
+                dataSourceId,
+                dto,
+                sensitivityLabelIds,
+                embedded: false,
+                isSysAdmin,
+                isOrgAdmin,
+                isProjectAdmin);
             return Ok(record);
         }
         catch (Exception exc)
@@ -379,7 +347,12 @@ public class RecordController : ControllerBase
         try
         {
             var currentUserId = UserContextStorage.UserId;
-            var updated = await _recordBusiness.UpdateRecord(currentUserId, organizationId, projectId, recordId, dto);
+            var isSysAdmin = UserContextStorage.IsSysAdmin;
+            var isOrgAdmin = UserContextStorage.IsOrgAdmin;
+            var isProjectAdmin = UserContextStorage.IsProjectAdmin;
+            var updated = await _recordBusiness.UpdateRecord(currentUserId, organizationId, projectId, recordId, dto, isSysAdmin,
+                isOrgAdmin,
+                isProjectAdmin);
             return Ok(updated);
         }
         catch (Exception exc)
@@ -598,7 +571,7 @@ public class RecordController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
-    
+
     /// <summary>
     ///     Attach a Sensitivity Label to a Record
     /// </summary>

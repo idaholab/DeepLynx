@@ -153,8 +153,16 @@ public class QueryBusiness : IQueryBusiness
 
                         if (jsonbColumns.Contains(query.Filter.ToLower()))
                         {
-                            condition = $"jsonb_pretty(qr.{query.Filter}) ILIKE @{paramName}";
-                            parameters.Add(new NpgsqlParameter(paramName, $"%{query.Value}%"));
+                            if (query.Filter.ToLower() == "tags")
+                            {
+                                condition = $"EXISTS (SELECT 1 FROM jsonb_array_elements(qr.{query.Filter}) elem WHERE elem->>'name' = @{paramName})";
+                                parameters.Add(new NpgsqlParameter(paramName, query.Value));
+                            }
+                            else
+                            {
+                                condition = $"jsonb_pretty(qr.{query.Filter}) ILIKE @{paramName}";
+                                parameters.Add(new NpgsqlParameter(paramName, $"%{query.Value}%"));
+                            }
                         }
                         else
                         {
@@ -176,7 +184,7 @@ public class QueryBusiness : IQueryBusiness
                     }
                     else if (query.Operator == ">")
                     {
-                        
+
                         condition = $"qr.{query.Filter} > @{paramName}";
 
                         if (DateTime.TryParse(query.Value, out var dateVal))
@@ -259,29 +267,15 @@ public class QueryBusiness : IQueryBusiness
 
             // Execute the query with parameters
             var queryRecordResults = _context.QueryRecords.FromSqlRaw(sql, parameters.ToArray());
-            
-            return await queryRecordResults
-                .Select(r => new QueryRecordViewResponseDto
-                {
-                    Id = r.Id,
-                    Uri = r.Uri,
-                    Properties = r.Properties,
-                    OriginalId = r.OriginalId,
-                    Name = r.Name,
-                    Description = r.Description,
-                    ClassId = r.ClassId,
-                    ClassName = r.ClassName,
-                    DataSourceId = r.DataSourceId,
-                    DataSourceName = r.DataSourceName,
-                    ObjectStorageId = r.ObjectStorageId,
-                    ObjectStorageName = r.ObjectStorageName,
-                    ProjectId = r.ProjectId,
-                    ProjectName = r.ProjectName,
-                    Tags = r.Tags,
-                    LastUpdatedBy = r.LastUpdatedBy,
-                    LastUpdatedAt = r.LastUpdatedAt,
-                    IsArchived =  r.IsArchived
-                }).ToListAsync();
+
+            var isUriAuthorized = await ExposeUriHelper.GetQueryRecordUriExposer(
+                _sensitivityLabelService,
+                currentUserId,
+                organizationId,
+                projectIds,
+                isSysAdmin || isOrgAdmin || isProjectAdmin);
+
+            return await queryRecordResults.Select(r => QueryRecordToResponse(r, isUriAuthorized(r))).ToListAsync();
         }
         catch (PostgresException ex) when (ex.SqlState == "42703") // undefined_column
         {
@@ -321,7 +315,7 @@ public class QueryBusiness : IQueryBusiness
     /// <param name="isProjectAdmin">Optional param determining if the requesting user is a project admin</param>
     /// <returns>A list of record response dtos from the query view that match provided query parameters</returns>
     public async Task<IEnumerable<QueryRecordViewResponseDto>> Search(
-        long currentUserId, string userQuery, long organizationId, long[] projectIds, 
+        long currentUserId, string userQuery, long organizationId, long[] projectIds,
         bool hideArchived = true, bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false)
     {
         if (string.IsNullOrWhiteSpace(userQuery))
@@ -420,28 +414,14 @@ public class QueryBusiness : IQueryBusiness
         var queryRecordsResults =
             _context.QueryRecords.FromSqlRaw(sql, parameters.ToArray());
 
-        return await queryRecordsResults
-            .Select(r => new QueryRecordViewResponseDto
-            {
-                Id = r.Id,
-                Uri = r.Uri,
-                Properties = r.Properties,
-                OriginalId = r.OriginalId,
-                Name = r.Name,
-                Description = r.Description,
-                ClassId = r.ClassId,
-                ClassName = r.ClassName,
-                DataSourceId = r.DataSourceId,
-                DataSourceName = r.DataSourceName,
-                ObjectStorageId = r.ObjectStorageId,
-                ObjectStorageName = r.ObjectStorageName,
-                ProjectId = r.ProjectId,
-                ProjectName = r.ProjectName,
-                Tags = r.Tags,
-                LastUpdatedBy = r.LastUpdatedBy,
-                LastUpdatedAt = r.LastUpdatedAt,
-                IsArchived = r.IsArchived
-            }).ToListAsync();
+        var isUriAuthorized = await ExposeUriHelper.GetQueryRecordUriExposer(
+            _sensitivityLabelService,
+            currentUserId,
+            organizationId,
+            projectIds,
+            isSysAdmin || isOrgAdmin || isProjectAdmin);
+
+        return await queryRecordsResults.Select(r => QueryRecordToResponse(r, isUriAuthorized(r))).ToListAsync();
     }
 
     /// <summary>
@@ -470,20 +450,89 @@ public class QueryBusiness : IQueryBusiness
             var authorizedLabelIds = await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
                 currentUserId, organizationId, projectIds, "read record");
 
-            var authorizedRecordIds = await _context.Records
+            var authorizedRecordIds = _context.Records
+                .Where(rec => rec.OrganizationId == organizationId && projectIds.Contains(rec.ProjectId))
                 .WithAuthorizedLabels(authorizedLabelIds)
-                .Select(rec => rec.Id)
-                .ToListAsync();
+                .Select(rec => rec.Id);
 
             query = query.Where(r => authorizedRecordIds.Contains(r.Id));
         }
 
         var records = await query.ToListAsync();
 
-        return records.Select(r => new QueryRecordViewResponseDto
+        var isUriAuthorized = await ExposeUriHelper.GetQueryRecordUriExposer(
+            _sensitivityLabelService,
+            currentUserId,
+            organizationId,
+            projectIds,
+            isSysAdmin || isOrgAdmin || isProjectAdmin);
+
+        return records.Select(r => QueryRecordToResponse(r, isUriAuthorized(r)));
+    }
+
+    /// <summary>
+    ///     Retrieves current paginated records for projects, ordered as specified
+    /// </summary>
+    /// <param name="currentUserId">The ID of current user</param>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <param name="projectId">An array of project ids</param>
+    /// <param name="sortBy">The sorting method</param>
+    /// <param name="paginated">Pagination details</param>
+    /// <param name="isSysAdmin">Optional param determining if the requesting user is a system admin</param>
+    /// <param name="isOrgAdmin">Optional param determining if the requesting user is an organization admin</param>
+    /// <param name="isProjectAdmin">Optional param determining if the requesting user is a project admin</param>
+    /// <returns>Paginated records</returns>
+    public async Task<PaginatedResponse<QueryRecordViewResponseDto>> GetRecordsPaginated(
+        long currentUserId, long organizationId, SortRecordsRequestDto sortBy, PaginatedRequestDto paginated,
+        long[] projectId, bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false)
+    {
+        if (projectId.Length == 0)
+            return new PaginatedResponse<QueryRecordViewResponseDto> { Items = [], PageSize = paginated.PageSize, PageNumber = paginated.PageNumber };
+
+        var query = _context.QueryRecords
+            .Where(r => r.OrganizationId == organizationId && !r.IsArchived)
+            .Where(r => projectId.Contains(r.ProjectId));
+
+        if (!isSysAdmin && !isOrgAdmin && !isProjectAdmin)
+        {
+            var authorizedLabelIds = await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
+                currentUserId, organizationId, projectId, "read record");
+
+            var authorizedRecordIds = _context.Records
+                .Where(rec => rec.OrganizationId == organizationId && projectId.Contains(rec.ProjectId))
+                .WithAuthorizedLabels(authorizedLabelIds)
+                .Select(rec => rec.Id);
+
+            query = query.Where(r => authorizedRecordIds.Contains(r.Id));
+        }
+
+        query = sortBy switch
+        {
+            SortRecordsRequestDto.NameAZ => query.OrderBy(r => (r.Name ?? "").ToLower()).ThenBy(r => r.Id),
+            SortRecordsRequestDto.NameZA => query.OrderByDescending(r => (r.Name ?? "").ToLower()).ThenBy(r => r.Id),
+            SortRecordsRequestDto.DateNew => query.OrderByDescending(r => r.LastUpdatedAt).ThenBy(r => r.Id),
+            SortRecordsRequestDto.DateOld => query.OrderBy(r => r.LastUpdatedAt).ThenBy(r => r.Id),
+            _ => query.OrderByDescending(r => r.LastUpdatedAt).ThenBy(r => r.Id), // Sorts date by default
+        };
+
+
+        var isUriAuthorized = await ExposeUriHelper.GetQueryRecordUriExposer(
+            _sensitivityLabelService,
+            currentUserId,
+            organizationId,
+            projectId,
+            isSysAdmin || isOrgAdmin || isProjectAdmin);
+
+        return await Paginator.Paginate(paginated, query, r => QueryRecordToResponse(r, isUriAuthorized(r)));
+    }
+
+    static private QueryRecordViewResponseDto QueryRecordToResponse(
+        QueryRecord r, bool exposeUri)
+    {
+        return new QueryRecordViewResponseDto
         {
             Id = r.Id,
-            Uri = r.Uri,
+            Uri = exposeUri ? r.Uri : null,
             Properties = r.Properties,
             OriginalId = r.OriginalId,
             Name = r.Name,
@@ -494,11 +543,12 @@ public class QueryBusiness : IQueryBusiness
             ProjectId = r.ProjectId,
             ProjectName = r.ProjectName,
             Tags = r.Tags,
+            Labels = r.Labels,
             Description = r.Description,
             LastUpdatedBy = r.LastUpdatedBy,
             IsArchived = r.IsArchived,
             LastUpdatedAt = r.LastUpdatedAt
-        });
+        };
     }
 
     /// <summary>
@@ -531,37 +581,23 @@ public class QueryBusiness : IQueryBusiness
             var authorizedLabelIds = await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
                 currentUserId, organizationId, projects, "read record");
 
-            var authorizedRecordIds = await _context.Records
+            var authorizedRecordIds = _context.Records
+                .Where(rec => rec.OrganizationId == organizationId && projects.Contains(rec.ProjectId))
                 .WithAuthorizedLabels(authorizedLabelIds)
-                .Select(rec => rec.Id)
-                .ToListAsync();
+                .Select(rec => rec.Id);
 
             recordQuery = recordQuery.Where(r => authorizedRecordIds.Contains(r.Id));
         }
 
         var records = await recordQuery.ToListAsync();
 
-        return records
-            .Select(r => new QueryRecordViewResponseDto
-            {
-                Id = r.Id,
-                Uri = r.Uri,
-                Properties = r.Properties,
-                OriginalId = r.OriginalId,
-                Name = r.Name,
-                Description = r.Description,
-                ClassId = r.ClassId,
-                ClassName = r.ClassName,
-                DataSourceId = r.DataSourceId,
-                DataSourceName = r.DataSourceName,
-                ObjectStorageId = r.ObjectStorageId,
-                ObjectStorageName = r.ObjectStorageName,
-                ProjectId = r.ProjectId,
-                ProjectName = r.ProjectName,
-                Tags = r.Tags,
-                LastUpdatedBy = r.LastUpdatedBy,
-                LastUpdatedAt = r.LastUpdatedAt,
-                IsArchived = r.IsArchived
-            });
+        var isUriAuthorized = await ExposeUriHelper.GetQueryRecordUriExposer(
+            _sensitivityLabelService,
+            currentUserId,
+            organizationId,
+            projects,
+            isSysAdmin || isOrgAdmin || isProjectAdmin);
+
+        return records.Select(r => QueryRecordToResponse(r, isUriAuthorized(r)));
     }
 }

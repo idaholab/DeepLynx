@@ -24,7 +24,6 @@ public class LatticeExtractionBusinessTests : IntegrationTestBase
     private Mock<HttpMessageHandler> _mockHandler = null!;
     private InsightServiceClient _client = null!;
     private Mock<ILogger<LatticeExtractionBusiness>> _mockLogger = null!;
-    private ExtractionValidation _validation = null!;
 
     private const long NotFoundId = 99_999L;
 
@@ -58,12 +57,10 @@ public class LatticeExtractionBusinessTests : IntegrationTestBase
         Environment.SetEnvironmentVariable("INSIGHT_FASTAPI_URL", "http://localhost:5000");
         _client = new InsightServiceClient(new HttpClient(_mockHandler.Object));
         _mockLogger = new Mock<ILogger<LatticeExtractionBusiness>>();
-        _validation = new ExtractionValidation(Context);
 
         _business = new LatticeExtractionBusiness(
             Context, _latticeCtx,
-            _mockInsight.Object, _client,
-            _validation, _mockLogger.Object);
+            _mockInsight.Object, _client, _mockLogger.Object);
     }
 
     public override async Task DisposeAsync()
@@ -148,7 +145,8 @@ public class LatticeExtractionBusinessTests : IntegrationTestBase
             Properties = "{}",
             IsArchived = false,
             LastUpdatedAt = UnspecifiedNow(),
-            LastUpdatedBy = uid
+            LastUpdatedBy = uid,
+            Uri = "/usr/src/app"
         };
         Context.Records.Add(rec);
         await Context.SaveChangesAsync();
@@ -235,6 +233,24 @@ public class LatticeExtractionBusinessTests : IntegrationTestBase
         return new StagingIds(sc1.Id, sc2.Id, sr1.Id, sr2.Id, srel.Id, se.Id);
     }
 
+    // Promotes every staged item of an extraction — the "approve all" equivalent under the
+    // selection-based promote API.
+    private async Task<ExtractionResponseDto> PromoteAllAsync(long exId)
+    {
+        var request = new PromoteExtractionRequestDto
+        {
+            ClassIds = await _latticeCtx.ExtractionClasses
+                .Where(c => c.ExtractionId == exId).Select(c => c.Id).ToListAsync(),
+            RecordIds = await _latticeCtx.ExtractionRecords
+                .Where(r => r.ExtractionId == exId).Select(r => r.Id).ToListAsync(),
+            RelationshipIds = await _latticeCtx.ExtractionRelationships
+                .Where(r => r.ExtractionId == exId).Select(r => r.Id).ToListAsync(),
+            EdgeIds = await _latticeCtx.ExtractionEdges
+                .Where(e => e.ExtractionId == exId).Select(e => e.Id).ToListAsync()
+        };
+        return await _business.PromoteExtraction(uid, oid, pid, exId, request);
+    }
+
     // =========================================================================
     // MarkExtractionFailed Tests
     // =========================================================================
@@ -244,7 +260,7 @@ public class LatticeExtractionBusinessTests : IntegrationTestBase
     [Fact]
     public async Task MarkExtractionFailed_SetsStatusToFailed()
     {
-        await _business.MarkExtractionFailed(extractionId, "test error");
+        await _business.MarkExtractionFailed(extractionId, oid, pid, "test error");
 
         Context.ChangeTracker.Clear();
         var ex = await Context.Extractions.FindAsync(extractionId);
@@ -256,7 +272,24 @@ public class LatticeExtractionBusinessTests : IntegrationTestBase
     public async Task MarkExtractionFailed_Throws_WhenExtractionNotFound()
     {
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            _business.MarkExtractionFailed(NotFoundId));
+            _business.MarkExtractionFailed(NotFoundId, oid, pid));
+    }
+
+    [Fact]
+    public async Task MarkExtractionFailed_Throws_WhenScopedToWrongProject()
+    {
+        var otherProj = new Project
+        {
+            Name = "Wrong Scope Project",
+            OrganizationId = oid,
+            LastUpdatedAt = UnspecifiedNow(),
+            LastUpdatedBy = uid
+        };
+        Context.Projects.Add(otherProj);
+        await Context.SaveChangesAsync();
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            _business.MarkExtractionFailed(extractionId, oid, otherProj.Id, "wrong scope"));
     }
 
     #endregion
@@ -265,7 +298,7 @@ public class LatticeExtractionBusinessTests : IntegrationTestBase
     // ListExtractionsByProject Tests
     // =========================================================================
 
-    #region ListExtractionsByUser Tests
+    #region ListExtractionsByProject Tests
 
     [Fact]
     public async Task ListExtractionsByProject_ReturnsExtractionsForCorrectProject()
@@ -288,15 +321,15 @@ public class LatticeExtractionBusinessTests : IntegrationTestBase
     public async Task ListExtractionsByProject_DoesNotReturnOtherProjectExtractions()
     {
         //add a project with no extractions
-        var otherProj = new Project { Name = "Other Project", IsArchived = false, OrganizationId = oid};
+        var otherProj = new Project { Name = "Other Project", IsArchived = false, OrganizationId = oid };
         Context.Projects.Add(otherProj);
-        
+
         //add an extraction to pid
         var other = new User { Name = "Other User", Email = "other@test.com", Password = "pw", IsArchived = false };
         Context.Users.Add(other);
         await Context.SaveChangesAsync();
-        
-        var extraction = new Extraction { CreatedBy = other.Id, ProjectId = pid }; 
+
+        var extraction = new Extraction { CreatedBy = other.Id, ProjectId = pid };
         Context.Extractions.Add(extraction);
         await Context.SaveChangesAsync();
 
@@ -312,6 +345,17 @@ public class LatticeExtractionBusinessTests : IntegrationTestBase
 
         Assert.Contains(result, e => e.Id == extractionId && e.Status == ExtractionStatus.Running && e.Mode == ExtractionMode.Strict);
         Assert.Contains(result, e => e.Id == completeExtractionId && e.Status == ExtractionStatus.Complete && e.Mode == ExtractionMode.Discovery);
+    }
+
+    [Fact]
+    public async Task ListExtractionsByProject_ReturnsFailureMessage()
+    {
+        const string failureMessage = "LLM model endpoint rejected the request.";
+        await _business.MarkExtractionFailed(extractionId, oid, pid, failureMessage);
+
+        var result = await _business.ListExtractionsByProject(pid);
+
+        Assert.Contains(result, e => e.Id == extractionId && e.FailureMessage == failureMessage);
     }
 
     #endregion
@@ -352,7 +396,29 @@ public class LatticeExtractionBusinessTests : IntegrationTestBase
     }
 
     [Fact]
-    public async Task GetEmbeddingStatus_ReturnsOntologyReady_WhenClassesAreEmbedded()
+    public async Task GetEmbeddingStatus_ReturnsMinimumTargets_WhenOnlyDefaultClassesExist()
+    {
+        var proj = new Project { Name = "Default Schema Status Proj", OrganizationId = oid, LastUpdatedAt = UnspecifiedNow(), LastUpdatedBy = uid };
+        Context.Projects.Add(proj);
+        await Context.SaveChangesAsync();
+
+        Context.Classes.AddRange(
+            new Class { Name = "File", ProjectId = proj.Id, OrganizationId = oid, IsArchived = false, LastUpdatedAt = UnspecifiedNow(), LastUpdatedBy = uid },
+            new Class { Name = "Report", ProjectId = proj.Id, OrganizationId = oid, IsArchived = false, LastUpdatedAt = UnspecifiedNow(), LastUpdatedBy = uid },
+            new Class { Name = "Timeseries", ProjectId = proj.Id, OrganizationId = oid, IsArchived = false, LastUpdatedAt = UnspecifiedNow(), LastUpdatedBy = uid });
+        await Context.SaveChangesAsync();
+
+        var result = await _business.GetEmbeddingStatus(proj.Id);
+
+        Assert.Equal(2, result.ClassCount);
+        Assert.Equal(0, result.EmbeddedClassCount);
+        Assert.Equal(1, result.RelationshipCount);
+        Assert.Equal(0, result.EmbeddedRelationshipCount);
+        Assert.False(result.OntologyReady);
+    }
+
+    [Fact]
+    public async Task GetEmbeddingStatus_ReturnsOntologyReady_WhenRequiredSchemaIsEmbedded()
     {
         // OntologyVector.Vector is typed as string in the model but the DB column is
         // type vector with a NOT NULL constraint — EF Core cannot bridge that gap.
@@ -361,10 +427,45 @@ public class LatticeExtractionBusinessTests : IntegrationTestBase
             "INSERT INTO dl_vector.ontology_vector (class_id, vector) VALUES ({0}, '[0]')", cid1);
         await Context.Database.ExecuteSqlRawAsync(
             "INSERT INTO dl_vector.ontology_vector (class_id, vector) VALUES ({0}, '[0]')", cid2);
+        await Context.Database.ExecuteSqlRawAsync(
+            "INSERT INTO dl_vector.ontology_vector (relationship_id, vector) VALUES ({0}, '[0]')", relid1);
 
         var result = await _business.GetEmbeddingStatus(pid);
 
         Assert.Equal(2, result.EmbeddedClassCount);
+        Assert.Equal(1, result.EmbeddedRelationshipCount);
+        Assert.True(result.OntologyReady);
+    }
+
+    [Fact]
+    public async Task GetEmbeddingStatus_CapsReadinessCountsAtRequiredSchemaMinimum()
+    {
+        var c3 = new Class { Name = "Aircraft", ProjectId = pid, OrganizationId = oid, IsArchived = false, LastUpdatedAt = UnspecifiedNow(), LastUpdatedBy = uid };
+        var c4 = new Class { Name = "Mission", ProjectId = pid, OrganizationId = oid, IsArchived = false, LastUpdatedAt = UnspecifiedNow(), LastUpdatedBy = uid };
+        Context.Classes.AddRange(c3, c4);
+        await Context.SaveChangesAsync();
+
+        var rel2 = new Relationship { Name = "supports", OriginId = c3.Id, DestinationId = c4.Id, ProjectId = pid, OrganizationId = oid, IsArchived = false, LastUpdatedAt = UnspecifiedNow(), LastUpdatedBy = uid };
+        Context.Relationships.Add(rel2);
+        await Context.SaveChangesAsync();
+
+        await Context.Database.ExecuteSqlRawAsync(
+            "INSERT INTO dl_vector.ontology_vector (class_id, vector) VALUES ({0}, '[0]')", cid1);
+        await Context.Database.ExecuteSqlRawAsync(
+            "INSERT INTO dl_vector.ontology_vector (class_id, vector) VALUES ({0}, '[0]')", cid2);
+        await Context.Database.ExecuteSqlRawAsync(
+            "INSERT INTO dl_vector.ontology_vector (class_id, vector) VALUES ({0}, '[0]')", c3.Id);
+        await Context.Database.ExecuteSqlRawAsync(
+            "INSERT INTO dl_vector.ontology_vector (relationship_id, vector) VALUES ({0}, '[0]')", relid1);
+        await Context.Database.ExecuteSqlRawAsync(
+            "INSERT INTO dl_vector.ontology_vector (relationship_id, vector) VALUES ({0}, '[0]')", rel2.Id);
+
+        var result = await _business.GetEmbeddingStatus(pid);
+
+        Assert.Equal(2, result.ClassCount);
+        Assert.Equal(2, result.EmbeddedClassCount);
+        Assert.Equal(1, result.RelationshipCount);
+        Assert.Equal(1, result.EmbeddedRelationshipCount);
         Assert.True(result.OntologyReady);
     }
 
@@ -512,7 +613,7 @@ public class LatticeExtractionBusinessTests : IntegrationTestBase
     #region PromoteExtraction Tests
 
     [Fact]
-    public async Task PromoteExtraction_Reject_SetsRejectedStatus_AndWritesNoDeeplynxRows()
+    public async Task RejectExtraction_SetsRejectedStatus_AndWritesNoDeeplynxRows()
     {
         await SeedStagingAsync(completeExtractionId);
 
@@ -521,7 +622,8 @@ public class LatticeExtractionBusinessTests : IntegrationTestBase
         var relsBefore = Context.Relationships.Count();
         var edgesBefore = Context.Edges.Count();
 
-        await _business.PromoteExtraction(uid, oid, pid, completeExtractionId, false);
+        await _business.RejectExtraction(completeExtractionId,
+            new RejectExtractionRequestDto { RejectAllRemaining = true });
 
         Context.ChangeTracker.Clear();
         var ex = await Context.Extractions.FindAsync(completeExtractionId);
@@ -536,14 +638,14 @@ public class LatticeExtractionBusinessTests : IntegrationTestBase
     public async Task PromoteExtraction_Throws_WhenExtractionNotFound()
     {
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            _business.PromoteExtraction(uid, oid, pid, NotFoundId, true));
+            _business.PromoteExtraction(uid, oid, pid, NotFoundId, new PromoteExtractionRequestDto()));
     }
 
     [Fact]
     public async Task PromoteExtraction_Throws_WhenExtractionStatusIsNotComplete()
     {
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            _business.PromoteExtraction(uid, oid, pid, extractionId, true));
+            _business.PromoteExtraction(uid, oid, pid, extractionId, new PromoteExtractionRequestDto()));
     }
 
     [Fact]
@@ -552,7 +654,7 @@ public class LatticeExtractionBusinessTests : IntegrationTestBase
         await SeedStagingAsync(completeExtractionId, ExtractionValidationStatus.Valid);
         var classesBefore = Context.Classes.Count();
 
-        await _business.PromoteExtraction(uid, oid, pid, completeExtractionId, true);
+        await PromoteAllAsync(completeExtractionId);
 
         Context.ChangeTracker.Clear();
         Assert.Equal(classesBefore, Context.Classes.Count());
@@ -564,7 +666,7 @@ public class LatticeExtractionBusinessTests : IntegrationTestBase
         await SeedStagingAsync(completeExtractionId, ExtractionValidationStatus.InvalidSchema);
         var classesBefore = Context.Classes.Count();
 
-        await _business.PromoteExtraction(uid, oid, pid, completeExtractionId, true);
+        await PromoteAllAsync(completeExtractionId);
 
         Context.ChangeTracker.Clear();
         Assert.Equal(classesBefore + 2, Context.Classes.Count());
@@ -575,7 +677,7 @@ public class LatticeExtractionBusinessTests : IntegrationTestBase
     {
         await SeedStagingAsync(completeExtractionId, ExtractionValidationStatus.InvalidSchema);
 
-        await _business.PromoteExtraction(uid, oid, pid, completeExtractionId, true);
+        await PromoteAllAsync(completeExtractionId);
 
         _latticeCtx.ChangeTracker.Clear();
         var stagingClasses = _latticeCtx.ExtractionClasses
@@ -594,7 +696,7 @@ public class LatticeExtractionBusinessTests : IntegrationTestBase
 
         var classesBefore = Context.Classes.Count();
 
-        await _business.PromoteExtraction(uid, oid, pid, completeExtractionId, true);
+        await PromoteAllAsync(completeExtractionId);
 
         Context.ChangeTracker.Clear();
         Assert.Equal(classesBefore + 1, Context.Classes.Count());
@@ -612,7 +714,7 @@ public class LatticeExtractionBusinessTests : IntegrationTestBase
         await SeedStagingAsync(completeExtractionId, ExtractionValidationStatus.InvalidSchema);
         var recsBefore = Context.Records.Count();
 
-        await _business.PromoteExtraction(uid, oid, pid, completeExtractionId, true);
+        await PromoteAllAsync(completeExtractionId);
 
         Context.ChangeTracker.Clear();
         Assert.Equal(recsBefore + 2, Context.Records.Count());
@@ -651,7 +753,7 @@ public class LatticeExtractionBusinessTests : IntegrationTestBase
 
         var recsBefore = Context.Records.Count();
 
-        await _business.PromoteExtraction(uid, oid, pid, completeExtractionId, true);
+        await PromoteAllAsync(completeExtractionId);
 
         Context.ChangeTracker.Clear();
         Assert.Equal(recsBefore, Context.Records.Count());
@@ -667,7 +769,7 @@ public class LatticeExtractionBusinessTests : IntegrationTestBase
         await SeedStagingAsync(completeExtractionId, ExtractionValidationStatus.Valid);
         var relsBefore = Context.Relationships.Count();
 
-        await _business.PromoteExtraction(uid, oid, pid, completeExtractionId, true);
+        await PromoteAllAsync(completeExtractionId);
 
         Context.ChangeTracker.Clear();
         Assert.Equal(relsBefore, Context.Relationships.Count());
@@ -679,7 +781,7 @@ public class LatticeExtractionBusinessTests : IntegrationTestBase
         await SeedStagingAsync(completeExtractionId, ExtractionValidationStatus.InvalidSchema);
         var relsBefore = Context.Relationships.Count();
 
-        await _business.PromoteExtraction(uid, oid, pid, completeExtractionId, true);
+        await PromoteAllAsync(completeExtractionId);
 
         Context.ChangeTracker.Clear();
         Assert.Equal(relsBefore + 1, Context.Relationships.Count());
@@ -690,7 +792,7 @@ public class LatticeExtractionBusinessTests : IntegrationTestBase
     {
         var ids = await SeedStagingAsync(completeExtractionId, ExtractionValidationStatus.InvalidSchema);
 
-        await _business.PromoteExtraction(uid, oid, pid, completeExtractionId, true);
+        await PromoteAllAsync(completeExtractionId);
 
         _latticeCtx.ChangeTracker.Clear();
         var stagingRel = _latticeCtx.ExtractionRelationships.Find(ids.RelId);
@@ -712,7 +814,7 @@ public class LatticeExtractionBusinessTests : IntegrationTestBase
 
         var relsBefore = Context.Relationships.Count();
 
-        await _business.PromoteExtraction(uid, oid, pid, completeExtractionId, true);
+        await PromoteAllAsync(completeExtractionId);
 
         Context.ChangeTracker.Clear();
         Assert.Equal(relsBefore + 1, Context.Relationships.Count());
@@ -730,7 +832,7 @@ public class LatticeExtractionBusinessTests : IntegrationTestBase
         await SeedStagingAsync(completeExtractionId, ExtractionValidationStatus.InvalidSchema);
         var edgesBefore = Context.Edges.Count();
 
-        await _business.PromoteExtraction(uid, oid, pid, completeExtractionId, true);
+        await PromoteAllAsync(completeExtractionId);
 
         Context.ChangeTracker.Clear();
         Assert.Equal(edgesBefore + 1, Context.Edges.Count());
@@ -741,7 +843,7 @@ public class LatticeExtractionBusinessTests : IntegrationTestBase
     {
         var ids = await SeedStagingAsync(completeExtractionId, ExtractionValidationStatus.InvalidSchema);
 
-        await _business.PromoteExtraction(uid, oid, pid, completeExtractionId, true);
+        await PromoteAllAsync(completeExtractionId);
 
         _latticeCtx.ChangeTracker.Clear();
         var stagingEdge = _latticeCtx.ExtractionEdges.Find(ids.EId);
@@ -753,11 +855,192 @@ public class LatticeExtractionBusinessTests : IntegrationTestBase
     {
         await SeedStagingAsync(completeExtractionId, ExtractionValidationStatus.InvalidSchema);
 
-        await _business.PromoteExtraction(uid, oid, pid, completeExtractionId, true);
+        await PromoteAllAsync(completeExtractionId);
 
         Context.ChangeTracker.Clear();
         var ex = await Context.Extractions.FindAsync(completeExtractionId);
         Assert.Equal(ExtractionStatus.Promoted, ex!.Status);
+    }
+
+    [Fact]
+    public async Task PromoteExtraction_PartialSelection_SetsPartiallyPromoted_AndLeavesRestStaged()
+    {
+        var ids = await SeedStagingAsync(completeExtractionId, ExtractionValidationStatus.InvalidSchema);
+        var recsBefore = Context.Records.Count();
+
+        // Promote only the classes — records/relationship/edge are left staged.
+        await _business.PromoteExtraction(uid, oid, pid, completeExtractionId,
+            new PromoteExtractionRequestDto { ClassIds = [ids.CId1, ids.CId2] });
+
+        Context.ChangeTracker.Clear();
+        var ex = await Context.Extractions.FindAsync(completeExtractionId);
+        Assert.Equal(ExtractionStatus.PartiallyPromoted, ex!.Status);
+        Assert.Equal(recsBefore, Context.Records.Count());
+
+        _latticeCtx.ChangeTracker.Clear();
+        Assert.Null(_latticeCtx.ExtractionRecords.Find(ids.RId1)!.PromotedId);
+    }
+
+    [Fact]
+    public async Task PromoteExtraction_Throws_WhenSelectedRecordsClassNotIncluded()
+    {
+        var ids = await SeedStagingAsync(completeExtractionId, ExtractionValidationStatus.InvalidSchema);
+
+        // Selecting a record whose (novel) class is neither selected nor promoted must fail strictly.
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            _business.PromoteExtraction(uid, oid, pid, completeExtractionId,
+                new PromoteExtractionRequestDto { RecordIds = [ids.RId1] }));
+    }
+
+    [Fact]
+    public async Task PromoteExtraction_SecondRound_CompletesPromotion()
+    {
+        var ids = await SeedStagingAsync(completeExtractionId, ExtractionValidationStatus.InvalidSchema);
+
+        await _business.PromoteExtraction(uid, oid, pid, completeExtractionId,
+            new PromoteExtractionRequestDto { ClassIds = [ids.CId1, ids.CId2] });
+        var classesAfterRound1 = Context.Classes.Count();
+
+        // Second round promotes everything that remains; already-promoted classes are not duplicated.
+        await PromoteAllAsync(completeExtractionId);
+
+        Context.ChangeTracker.Clear();
+        var ex = await Context.Extractions.FindAsync(completeExtractionId);
+        Assert.Equal(ExtractionStatus.Promoted, ex!.Status);
+        Assert.Equal(classesAfterRound1, Context.Classes.Count());
+    }
+
+    [Fact]
+    public async Task PromoteExtraction_ApproveByStatus_Valid_PromotesAndCompletes()
+    {
+        await SeedStagingAsync(completeExtractionId, ExtractionValidationStatus.Valid);
+
+        await _business.PromoteExtraction(uid, oid, pid, completeExtractionId,
+            new PromoteExtractionRequestDto { ApproveByStatus = [ExtractionValidationStatus.Valid] });
+
+        Context.ChangeTracker.Clear();
+        var ex = await Context.Extractions.FindAsync(completeExtractionId);
+        Assert.Equal(ExtractionStatus.Promoted, ex!.Status);
+    }
+
+    [Fact]
+    public async Task PromoteExtraction_ApproveByStatus_InvalidSchema_Throws()
+    {
+        await SeedStagingAsync(completeExtractionId, ExtractionValidationStatus.InvalidSchema);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            _business.PromoteExtraction(uid, oid, pid, completeExtractionId,
+                new PromoteExtractionRequestDto { ApproveByStatus = [ExtractionValidationStatus.InvalidSchema] }));
+    }
+
+    [Fact]
+    public async Task PromoteExtraction_Throws_WhenNothingSelected()
+    {
+        await SeedStagingAsync(completeExtractionId, ExtractionValidationStatus.Valid);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            _business.PromoteExtraction(uid, oid, pid, completeExtractionId, new PromoteExtractionRequestDto()));
+    }
+
+    #endregion
+
+    // =========================================================================
+    // RejectExtraction (per-item) Tests
+    // =========================================================================
+
+    #region RejectExtraction Tests
+
+    [Fact]
+    public async Task RejectExtraction_FlagsSelectedLeafItem_AndKeepsInProgress()
+    {
+        var ids = await SeedStagingAsync(completeExtractionId, ExtractionValidationStatus.InvalidSchema);
+
+        // The edge is a leaf — rejecting it has no dependents to drag along.
+        await _business.RejectExtraction(completeExtractionId,
+            new RejectExtractionRequestDto { EdgeIds = [ids.EId] });
+
+        _latticeCtx.ChangeTracker.Clear();
+        Assert.True(_latticeCtx.ExtractionEdges.Find(ids.EId)!.Rejected);
+
+        Context.ChangeTracker.Clear();
+        var ex = await Context.Extractions.FindAsync(completeExtractionId);
+        Assert.Equal(ExtractionStatus.PartiallyPromoted, ex!.Status);
+    }
+
+    [Fact]
+    public async Task RejectExtraction_Strict_Throws_WhenDependentsNotIncluded()
+    {
+        var ids = await SeedStagingAsync(completeExtractionId, ExtractionValidationStatus.InvalidSchema);
+
+        // Rejecting only the class strands its record, relationship, and edge.
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            _business.RejectExtraction(completeExtractionId,
+                new RejectExtractionRequestDto { ClassIds = [ids.CId1] }));
+    }
+
+    [Fact]
+    public async Task RejectExtraction_RejectsFullDependentClosure()
+    {
+        var ids = await SeedStagingAsync(completeExtractionId, ExtractionValidationStatus.InvalidSchema);
+
+        await _business.RejectExtraction(completeExtractionId, new RejectExtractionRequestDto
+        {
+            ClassIds = [ids.CId1],
+            RecordIds = [ids.RId1],
+            RelationshipIds = [ids.RelId],
+            EdgeIds = [ids.EId]
+        });
+
+        _latticeCtx.ChangeTracker.Clear();
+        Assert.True(_latticeCtx.ExtractionClasses.Find(ids.CId1)!.Rejected);
+        Assert.True(_latticeCtx.ExtractionRecords.Find(ids.RId1)!.Rejected);
+        Assert.True(_latticeCtx.ExtractionEdges.Find(ids.EId)!.Rejected);
+    }
+
+    [Fact]
+    public async Task RejectExtraction_ByStatus_RejectsAllMatching_AndCompletesAsRejected()
+    {
+        var ids = await SeedStagingAsync(completeExtractionId, ExtractionValidationStatus.InvalidSchema);
+
+        await _business.RejectExtraction(completeExtractionId,
+            new RejectExtractionRequestDto { RejectByStatus = [ExtractionValidationStatus.InvalidSchema] });
+
+        _latticeCtx.ChangeTracker.Clear();
+        Assert.True(_latticeCtx.ExtractionEdges.Find(ids.EId)!.Rejected);
+
+        Context.ChangeTracker.Clear();
+        var ex = await Context.Extractions.FindAsync(completeExtractionId);
+        Assert.Equal(ExtractionStatus.Rejected, ex!.Status);
+    }
+
+    [Fact]
+    public async Task RejectExtraction_RejectAllRemaining_AfterPartialPromote_KeepsPromotedAndCompletes()
+    {
+        var ids = await SeedStagingAsync(completeExtractionId, ExtractionValidationStatus.InvalidSchema);
+
+        await _business.PromoteExtraction(uid, oid, pid, completeExtractionId,
+            new PromoteExtractionRequestDto { ClassIds = [ids.CId1, ids.CId2] });
+        var classesAfterPromote = Context.Classes.Count();
+
+        await _business.RejectExtraction(completeExtractionId,
+            new RejectExtractionRequestDto { RejectAllRemaining = true });
+
+        Context.ChangeTracker.Clear();
+        var ex = await Context.Extractions.FindAsync(completeExtractionId);
+        Assert.Equal(ExtractionStatus.Promoted, ex!.Status);
+        Assert.Equal(classesAfterPromote, Context.Classes.Count());
+    }
+
+    [Fact]
+    public async Task PromoteExtraction_Throws_WhenSelectingPreviouslyRejectedItem()
+    {
+        var ids = await SeedStagingAsync(completeExtractionId, ExtractionValidationStatus.InvalidSchema);
+        await _business.RejectExtraction(completeExtractionId,
+            new RejectExtractionRequestDto { EdgeIds = [ids.EId] });
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            _business.PromoteExtraction(uid, oid, pid, completeExtractionId,
+                new PromoteExtractionRequestDto { EdgeIds = [ids.EId] }));
     }
 
     #endregion
@@ -892,12 +1175,13 @@ public class LatticeExtractionBusinessTests : IntegrationTestBase
         Context.Projects.Add(proj);
         await Context.SaveChangesAsync();
 
-        var ts = new Class { Name = "Timeseries", ProjectId = proj.Id, OrganizationId = oid, IsArchived = false, LastUpdatedAt = UnspecifiedNow(), LastUpdatedBy = uid };
         var file = new Class { Name = "File", ProjectId = proj.Id, OrganizationId = oid, IsArchived = false, LastUpdatedAt = UnspecifiedNow(), LastUpdatedBy = uid };
+        var report = new Class { Name = "Report", ProjectId = proj.Id, OrganizationId = oid, IsArchived = false, LastUpdatedAt = UnspecifiedNow(), LastUpdatedBy = uid };
+        var ts = new Class { Name = "Timeseries", ProjectId = proj.Id, OrganizationId = oid, IsArchived = false, LastUpdatedAt = UnspecifiedNow(), LastUpdatedBy = uid };
         var ds = new DataSource { Name = "Default DS", ProjectId = proj.Id, OrganizationId = oid, LastUpdatedAt = UnspecifiedNow(), LastUpdatedBy = uid };
-        Context.Classes.AddRange(ts, file);
+        Context.Classes.AddRange(file, report, ts);
         Context.DataSources.Add(ds);
-        await Context.SaveChangesAsync(); // ts.Id and file.Id are now populated
+        await Context.SaveChangesAsync();
 
         // Build the Relationship AFTER saving so both FK columns carry real PKs
         var rel = new Relationship { Name = "some rel", OriginId = ts.Id, DestinationId = file.Id, ProjectId = proj.Id, OrganizationId = oid, IsArchived = false, LastUpdatedAt = UnspecifiedNow(), LastUpdatedBy = uid };

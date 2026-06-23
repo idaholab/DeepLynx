@@ -530,6 +530,102 @@ public class QueryControllerTests : IDisposable
     #endregion
 
     // =========================================================================
+    // GetRecordsPaginated Tests
+    // =========================================================================
+
+    #region GetRecordsPaginated Tests
+
+    [Fact]
+    public async Task GetRecordsPaginated_Returns200_WithPaginatedResponse()
+    {
+        var expected = new PaginatedResponse<QueryRecordViewResponseDto>();
+        var paginatedDto = new PaginatedRequestDto { PageNumber = 1, PageSize = 25 };
+
+        _mockQueryBusiness
+            .Setup(b => b.GetRecordsPaginated(
+                UserId, OrgId, SortRecordsRequestDto.NameAZ, paginatedDto, ProjectList, false, false, false))
+            .ReturnsAsync(expected);
+
+        var actionResult = await _QueryController.GetRecordsPaginated(
+            OrgId, ProjectList, SortRecordsRequestDto.NameAZ, paginatedDto);
+
+        var result = actionResult.Result as OkObjectResult;
+
+        Assert.NotNull(result);
+        Assert.Equal(200, result.StatusCode);
+        Assert.Same(expected, result.Value);
+    }
+
+    [Fact]
+    public async Task GetRecordsPaginated_Returns200_WithEmptyResponse()
+    {
+        var paginatedDto = new PaginatedRequestDto { PageNumber = 1, PageSize = 25 };
+
+        _mockQueryBusiness
+            .Setup(b => b.GetRecordsPaginated(
+                UserId, OrgId, SortRecordsRequestDto.NameAZ, paginatedDto, ProjectList, false, false, false))
+            .ReturnsAsync(new PaginatedResponse<QueryRecordViewResponseDto>());
+
+        var actionResult = await _QueryController.GetRecordsPaginated(
+            OrgId, ProjectList, SortRecordsRequestDto.NameAZ, paginatedDto);
+
+        var result = actionResult.Result as OkObjectResult;
+
+        Assert.NotNull(result);
+        Assert.Equal(200, result.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetRecordsPaginated_Returns500_UnexpectedException()
+    {
+        var paginatedDto = new PaginatedRequestDto { PageNumber = 1, PageSize = 25 };
+
+        _mockQueryBusiness
+            .Setup(b => b.GetRecordsPaginated(
+                UserId, OrgId, SortRecordsRequestDto.NameAZ, paginatedDto, ProjectList, false, false, false))
+            .ThrowsAsync(new Exception("db error"));
+
+        var actionResult = await _QueryController.GetRecordsPaginated(
+            OrgId, ProjectList, SortRecordsRequestDto.NameAZ, paginatedDto);
+
+        var result = Assert.IsType<ObjectResult>(actionResult.Result);
+
+        Assert.Equal(StatusCodes.Status500InternalServerError, result.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetRecordsPaginated_PassesToBusinessLayer()
+    {
+        var expected = new PaginatedResponse<QueryRecordViewResponseDto>();
+        var paginatedDto = new PaginatedRequestDto { PageNumber = 1, PageSize = 25 };
+
+        _mockQueryBusiness
+            .Setup(b => b.GetRecordsPaginated(
+                UserId, OrgId, SortRecordsRequestDto.NameAZ, paginatedDto, ProjectList, false, false, false))
+            .ReturnsAsync(expected);
+
+        await _QueryController.GetRecordsPaginated(
+            OrgId, ProjectList, SortRecordsRequestDto.NameAZ, paginatedDto);
+
+        _mockQueryBusiness.Verify(
+            b => b.GetRecordsPaginated(
+                UserId, OrgId, SortRecordsRequestDto.NameAZ, paginatedDto, ProjectList, false, false, false),
+            Times.Once);
+    }
+
+    [Fact]
+    public void GetRecordsPaginated_HasHttpGet()
+    {
+        var method = GetControllerMethod(
+            nameof(QueryController.GetRecordsPaginated),
+            "organizationId");
+
+        AssertHasHttpAttribute(method, nameof(HttpGetAttribute));
+    }
+
+    #endregion
+
+    // =========================================================================
     // Test Helpers
     // =========================================================================
 

@@ -162,7 +162,7 @@ public class OrganizationController : ControllerBase
     /// <param name="organizationId">ID of the organization to hard delete</param>
     /// <returns></returns>
     [HttpDelete("{organizationId:long}", Name = "api_delete_organization")]
-    [Auth("write", "organization")]
+    [SysAdmin]
     public async Task<ActionResult> DeleteOrganization(long organizationId)
     {
         try
@@ -219,6 +219,7 @@ public class OrganizationController : ControllerBase
     /// <param name="isAdmin"></param>
     /// <returns></returns>
     [HttpPost("{organizationId:long}/user", Name = "api_add_user_to_organization")]
+    [OrgAdmin]
     [Auth("update", "organization")]
     [Auth("update", "user")]
     public async Task<ActionResult> AddUserToOrganization(
@@ -247,6 +248,7 @@ public class OrganizationController : ControllerBase
     /// <param name="isAdmin">isAdmin status</param>
     /// <returns></returns>
     [HttpPut("{organizationId:long}/admin", Name = "api_update_organization_admin_status")]
+    [OrgAdmin]
     [Auth("update", "organization")]
     [Auth("update", "user")]
     public async Task<ActionResult> SetOrganizationAdminStatus(
@@ -275,6 +277,7 @@ public class OrganizationController : ControllerBase
     /// <param name="userId">ID of user to be removed</param>
     /// <returns></returns>
     [HttpDelete("{organizationId:long}/user", Name = "api_remove_user_from_organization")]
+    [OrgAdmin]
     [Auth("update", "organization")]
     [Auth("update", "user")]
     public async Task<ActionResult> RemoveUserFromOrganization(
@@ -302,10 +305,7 @@ public class OrganizationController : ControllerBase
     /// <param name="userName"></param>
     /// <returns></returns>
     [HttpPost("{organizationId:long}/invite", Name = "api_invite_user_to_organization")]
-    [OrgAdmin] // skip permission checks for org admins
-    [Auth("write", "user")]
-    [Auth("update", "user")]
-    [Auth("update", "organization")]
+    [ProjectAdmin] 
     public async Task<ActionResult> InviteUserToOrganization(
         long organizationId,
         [FromQuery] string userEmail,

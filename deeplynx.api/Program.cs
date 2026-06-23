@@ -14,6 +14,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
 using Apache.Arrow.Flight.Server;
+using Microsoft.AspNetCore.Mvc;
 using Npgsql;
 using Scalar.AspNetCore;
 using Serilog;
@@ -128,6 +129,19 @@ try
         {
             options.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles;
             options.JsonSerializerOptions.MaxDepth = 64;
+        })
+        .ConfigureApiBehaviorOptions(options =>
+        {
+            options.InvalidModelStateResponseFactory = context =>
+            {
+                return new BadRequestObjectResult(
+                    BadRequestProblemDetailsFactory.CreateForModelState(
+                        context.ModelState,
+                        context.ActionDescriptor.Parameters))
+                {
+                    ContentTypes = { "application/problem+json" }
+                };
+            };
         });
 
     /*
@@ -200,7 +214,6 @@ try
     builder.Services.AddScoped<ISensitivityLabelService, SensitivityLabelService>();
     builder.Services.AddScoped<FileBusiness>();
     builder.Services.AddTransient<IInsightBusiness, InsightBusiness>();
-    builder.Services.AddTransient<IExtractionValidation, ExtractionValidation>();
     builder.Services.AddTransient<ILatticeExtractionBusiness, LatticeExtractionBusiness>();
     builder.Services.AddMemoryCache();
     builder.Services.AddHttpClient<InsightServiceClient>();
