@@ -18,6 +18,10 @@
 <!-- Include details of your testing environment, and the tests you ran to -->
 <!-- see how your change affects other areas of the code, etc. -->
 
+## Link to GitHub Test Build
+
+<!-- Include the link to the GitHub action showing that you test deployed your code -->
+
 <!--
 ## 📷 Screenshots (if appropriate) ##
 
@@ -38,5 +42,6 @@ Uncomment this section if a screenshot is needed.
 - [ ] I have read the [CONTRIBUTING](../blob/develop/CONTRIBUTING.md) document.
 - [ ] All relevant repo and/or project documentation has been updated to reflect the changes in this PR.
 - [ ] Unit tests in `deeplynx.tests` have been added and/or modified to cover the changes in this PR.
-- [ ] Changes have been tested locally, in the docker app, and on the deployed instance.
+- [ ] Changes have been tested in a local build and in the docker app.
+- [ ] A test deployment of the code has been run and smoke tested.
 - [ ] All new and existing tests pass.
