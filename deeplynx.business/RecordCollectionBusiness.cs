@@ -82,12 +82,34 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
 
         if (hideArchived) recordCollectionQuery = recordCollectionQuery.Where(c => !c.IsArchived);
 
+        var isAdmin = isSysAdmin || isOrgAdmin || isProjectAdmin;
+        var userAuthorizedLabels = isAdmin
+            ? []
+            : await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
+                currentUserId,
+                organizationId,
+                projectId,
+                "read record");
+
         if (dto.SensitivityLabelIds?.Length > 0)
         {
+            if (!isAdmin && dto.SensitivityLabelIds.Any(id => !userAuthorizedLabels.Contains(id)))
+            {
+                throw new UnauthorizedAccessException(
+                    "User is not authorized to filter by one or more sensitivity labels.");
+            }
+
             foreach (var labelId in dto.SensitivityLabelIds.Distinct())
             {
                 recordCollectionQuery = recordCollectionQuery.Where(c => c.Labels.Any(l => l.Id == labelId));
             }
+        }
+
+        if (!isAdmin)
+        {
+            recordCollectionQuery = recordCollectionQuery.Where(r =>
+                r.Labels.Count == 0 ||
+                r.Labels.All(l => userAuthorizedLabels.Contains(l.Id)));
         }
 
         if (dto.TagIds?.Length > 0)
@@ -96,17 +118,6 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
             {
                 recordCollectionQuery = recordCollectionQuery.Where(c => c.Tags.Any(t => t.Id == tagId));
             }
-        }
-
-        // if user is not admin, filter out unauthorized labels
-        if (!isSysAdmin && !isOrgAdmin && !isProjectAdmin)
-        {
-            var userAuthorizedLabels = await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
-                currentUserId, organizationId, projectId, "read record");
-
-            recordCollectionQuery = recordCollectionQuery.Where(r =>
-                r.Labels.Count == 0 ||
-                r.Labels.All(l => userAuthorizedLabels.Contains(l.Id)));
         }
 
         recordCollectionQuery = dto.Sort switch
