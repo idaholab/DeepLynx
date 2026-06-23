@@ -546,16 +546,12 @@ public class OrganizationBusiness : IOrganizationBusiness
         // ===============================
         var defaultRoles = new List<CreateRoleRequestDto>
         {
-            new() { Name = "Admin", Description = "Administrator role with full permissions" },
             new() { Name = "User", Description = "User role with limited permissions" }
         };
         var roles = await _roleBusiness.BulkCreateRoles(currentUserId, organizationId, null, defaultRoles);
-        var adminRoleId = roles.Single(r => r.Name == "Admin").Id;
         var userRoleId = roles.Single(r => r.Name == "User").Id;
 
-        // set role permissions for admin and user
-        await _roleBusiness.SetPermissionsByPattern(adminRoleId, DefaultRolePermissions.Admin.AllowedPermissions,
-            organizationId, null);
+        // set role permissions for user
         await _roleBusiness.SetPermissionsByPattern(userRoleId, DefaultRolePermissions.User.AllowedPermissions,
             organizationId, null);
     }

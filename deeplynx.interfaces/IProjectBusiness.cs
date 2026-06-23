@@ -16,7 +16,10 @@ public interface IProjectBusiness
     Task<bool> UnarchiveProject(long currentUserId, long organizationId, long projectId);
     Task<ProjectStatResponseDto> GetProjectStats(long organizationId, long projectId);
     Task<IEnumerable<ProjectMemberResponseDto>> GetProjectMembers(long projectId);
-    Task<bool> AddMemberToProject(long projectId, long? roleId, long? userId, long? groupId, bool allowServiceAccount = false);
-    Task<bool> UpdateProjectMemberRole(long projectId, long roleId, long? userId, long? groupId);
+    Task<bool> AddMemberToProject(long projectId, long? roleId, long? userId, long? groupId, 
+        bool isProjectAdmin = false, bool allowServiceAccount = false);
+    Task<bool> UpdateProjectMemberRole(long projectId, long roleId, long? userId, long? groupId,
+        bool? isProjectAdmin = null);
+    Task<bool> SetProjectAdminStatus(long projectId, long? userId, long? groupId, bool isAdmin = false);
     Task<bool> RemoveMemberFromProject(long projectId, long? userId, long? groupId);
 }

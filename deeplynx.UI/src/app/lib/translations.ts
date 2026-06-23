@@ -1000,6 +1000,8 @@ export const translations = {
       ORGANIZATION: "Organization",
       ORGANIZATION_ADMIN_ACCESS_UPDATED: "Organization admin access updated.",
       ORGANIZATION_DEFAULT: "Organization Default",
+      PROJECT_ADMIN: "Project Admin",
+      PROJECT_ADMIN_ACCESS_UPDATED: "Project admin access updated.",
       ORGANIZATION_ID: "Organization ID",
       ORGANIZATION_LABEL: "Organization Label",
       ORGANIZATION_LABEL_CREATED: "Organization label created.",
@@ -1552,6 +1554,8 @@ export const translations = {
         "User and organization admin access updated.",
       USER_AND_SYSTEM_ADMIN_ACCESS_UPDATED:
         "User and system admin access updated.",
+      USER_AND_PROJECT_ADMIN_ACCESS_UPDATED:
+        "User and project admin access updated.",
       USER_ARCHIVED_SUCCESSFULLY: "User archived successfully.",
       USER_MANAGEMENT: "User Management",
       USER_REMOVED_FROM_ORG: "User removed from organization",
@@ -2670,6 +2674,9 @@ export const translations = {
       ORGANIZATION_ADMIN_ACCESS_UPDATED:
         "Se actualizo el acceso de administrador de la organizacion.",
       ORGANIZATION_DEFAULT: "Predeterminado de la organización",
+      PROJECT_ADMIN: "Administrador del Proyecto",
+      PROJECT_ADMIN_ACCESS_UPDATED:
+        "Se actualizo el acceso de administrador del proyecto.",
       ORGANIZATION_ID: "ID de la organización",
       ORGANIZATION_LABEL: "Etiqueta de la organización",
       ORGANIZATION_LABEL_CREATED: "Etiqueta de la organización creada.",
@@ -3247,6 +3254,8 @@ export const translations = {
         "Se actualizaron el usuario y el acceso de administrador de la organizacion.",
       USER_AND_SYSTEM_ADMIN_ACCESS_UPDATED:
         "Se actualizaron el usuario y el acceso de administrador del sistema.",
+      USER_AND_PROJECT_ADMIN_ACCESS_UPDATED:
+        "Se actualizaron el usuario y el acceso de administrador del proyecto.",
       USER_ARCHIVED_SUCCESSFULLY: "Usuario archivado correctamente.",
       USER_MANAGEMENT: "Gestión de usuarios",
       USER_REMOVED_FROM_ORG: "Usuario eliminado de la organización",

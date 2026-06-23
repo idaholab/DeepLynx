@@ -717,20 +717,23 @@ public class UserBusinessTests : IntegrationTestBase
         {
             ProjectId = directAdminPid,
             UserId = adminUid,
-            RoleId = dapAdminRole.Id
+            RoleId = dapAdminRole.Id,
+            IsProjectAdmin = true
         };
         var directMember2 = new ProjectMember
         {
             ProjectId = directAdminPid,
             UserId = nonAdminUid,
-            RoleId = dapAdminRole.Id
+            RoleId = dapAdminRole.Id,
+            IsProjectAdmin = true
         };
         // Make group a project admin in groupAdminProject
         var groupMember = new ProjectMember
         {
             ProjectId = groupAdminPid,
             GroupId = adminGroupId,
-            RoleId = gapAdminRole.Id
+            RoleId = gapAdminRole.Id,
+            IsProjectAdmin = true
         };
         // Make users non-admin members of regularProject
         var regularMember1 = new ProjectMember
