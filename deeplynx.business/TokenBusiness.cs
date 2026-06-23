@@ -266,15 +266,8 @@ public class TokenBusiness : ITokenBusiness
     /// Accessible by Project, Org, or SysAdmin.
     /// </summary>
     public async Task<TokenResponseDto> GenerateServiceAccountApiKey(
-        long currentUserId,
-        long serviceAccountId,
-        bool isSysAdmin = false,
-        bool isOrgAdmin = false,
-        bool isProjectAdmin = false)
+        long currentUserId, long serviceAccountId)
     {
-        if (!isSysAdmin && !isOrgAdmin && !isProjectAdmin)
-            throw new UnauthorizedAccessException("Only Project, Org, or SysAdmins can generate service account keys.");
-
         var account = await _context.Users.FindAsync(serviceAccountId)
             ?? throw new KeyNotFoundException($"Service account {serviceAccountId} not found.");
 
@@ -288,13 +281,8 @@ public class TokenBusiness : ITokenBusiness
     /// SysAdmin only: Create a new api keypair for a test account.
     /// </summary>
     public async Task<TokenResponseDto> GenerateTestAccountApiKey(
-        long currentUserId,
-        long testAccountId,
-        bool isSysAdmin = false)
+        long currentUserId, long testAccountId)
     {
-        if (!isSysAdmin)
-            throw new UnauthorizedAccessException("Only SysAdmins can generate test account keys.");
-
         var account = await _context.Users.FindAsync(testAccountId)
             ?? throw new KeyNotFoundException($"Test account {testAccountId} not found.");
 

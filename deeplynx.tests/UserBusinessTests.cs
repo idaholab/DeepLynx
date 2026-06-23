@@ -792,7 +792,8 @@ public class UserBusinessTests : IntegrationTestBase
         var dto = new CreateUserRequestDto
         {
             Name = "Minimal User",
-            Email = "minimal@test.com"
+            Email = "minimal@test.com",
+            Username = "minimal",
         };
 
         // Act
@@ -815,14 +816,15 @@ public class UserBusinessTests : IntegrationTestBase
         var dto = new CreateUserRequestDto
         {
             Name = "Duplicate Email User",
-            Email = "user1@test.com" // User 1 already has this email
+            Email = "user1@test.com", // User 1 already has this email
+            Username = "user1@test.com"
         };
 
         // Act & Assert
         var exception = await Assert.ThrowsAsync<ArgumentException>(
             () => _userBusiness.CreateUser(dto));
 
-        Assert.Contains("User with email already exists", exception.Message);
+        Assert.Contains("A user with that email already exists.", exception.Message);
     }
 
     [Fact]
@@ -832,6 +834,7 @@ public class UserBusinessTests : IntegrationTestBase
         var dto = new CreateUserRequestDto
         {
             Name = "No Email User",
+            Username = "user1@test.com"
         };
 
         // Act & Assert
@@ -842,7 +845,7 @@ public class UserBusinessTests : IntegrationTestBase
     }
 
     [Fact]
-    public async Task CreateUser_Fails_IfEmailMissing_WhenIsServiceAccountIsNull()
+    public async Task CreateUser_Fails_IfEmailMissing_ForStandardAccount()
     {
         // Arrange — null IsServiceAccount should be treated as human, so email is still required
         var dto = new CreateUserRequestDto
@@ -855,6 +858,165 @@ public class UserBusinessTests : IntegrationTestBase
             () => _userBusiness.CreateUser(dto));
 
         Assert.Contains("Email is required for standard accounts.", exception.InnerException?.Message ?? exception.Message);
+    }
+
+    #endregion
+    
+    #region CreateTestAccount Tests
+
+    [Fact]
+    public async Task CreateTestAccount_Succeeds_WithValidName()
+    {
+        // Act
+        var result = await _userBusiness.CreateTestAccount("Test Account 1");
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.True(result.Id > 0);
+        Assert.Equal("Test Account 1", result.Name);
+        Assert.Equal("test", result.AccountType.ToString().ToLower());
+        Assert.False(result.IsActive);
+        Assert.False(result.IsArchived);
+
+        // Verify email/username are auto-generated with "test_" prefix
+        var savedUser = await Context.Users.FindAsync(result.Id);
+        Assert.NotNull(savedUser);
+        Assert.StartsWith("test_", savedUser.Email);
+        Assert.StartsWith("test_", savedUser.Username);
+    }
+
+    [Fact]
+    public async Task CreateTestAccount_Fails_WithEmptyName()
+    {
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => _userBusiness.CreateTestAccount(""));
+
+        Assert.Contains("Name is required", exception.Message);
+    }
+
+    [Fact]
+    public async Task CreateTestAccount_GeneratesUniqueIdentifiers()
+    {
+        // Act
+        var result1 = await _userBusiness.CreateTestAccount("Test Account A");
+        var result2 = await _userBusiness.CreateTestAccount("Test Account B");
+
+        // Assert — identifiers must not collide
+        Assert.NotEqual(result1.Email, result2.Email);
+        Assert.NotEqual(result1.Username, result2.Username);
+    }
+
+    #endregion
+
+    #region GetUserBySsoId Tests
+
+    [Fact]
+    public async Task GetUserBySsoId_ReturnsUser_WhenSsoIdExists()
+    {
+        // Arrange
+        var ssoId = $"okta|{Guid.NewGuid()}";
+        var user = new User
+        {
+            Name = "SSO User",
+            Email = "ssouser@test.com",
+            Username = "ssouser",
+            SsoId = ssoId,
+            IsActive = true
+        };
+        Context.Users.Add(user);
+        await Context.SaveChangesAsync();
+
+        // Act
+        var result = await _userBusiness.GetUserBySsoId(ssoId);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(user.Id, result.Id);
+        Assert.Equal("ssouser@test.com", result.Email);
+    }
+
+    [Fact]
+    public async Task GetUserBySsoId_ReturnsNull_WhenSsoIdNotFound()
+    {
+        // Act
+        var result = await _userBusiness.GetUserBySsoId("nonexistent|sso-id");
+
+        // Assert
+        Assert.Null(result);
+    }
+
+    // Note: GetUserBySsoId does not filter out archived users — worth verifying
+    // that behavior is intentional or flagging it for a fix.
+    [Fact]
+    public async Task GetUserBySsoId_ReturnsArchivedUser()
+    {
+        // Arrange
+        var ssoId = $"okta|{Guid.NewGuid()}";
+        var archivedUser = new User
+        {
+            Name = "Archived SSO User",
+            Email = "archivedsso@test.com",
+            Username = "archivedsso",
+            SsoId = ssoId,
+            IsArchived = true
+        };
+        Context.Users.Add(archivedUser);
+        await Context.SaveChangesAsync();
+
+        // Act
+        var result = await _userBusiness.GetUserBySsoId(ssoId);
+
+        // Assert — documents current behavior; update if archival filtering is added
+        Assert.NotNull(result);
+        Assert.True(result.IsArchived);
+    }
+
+    #endregion
+
+    #region GetUserByEmail Tests
+
+    [Fact]
+    public async Task GetUserByEmail_ReturnsUser_WhenEmailExists()
+    {
+        // Act
+        var result = await _userBusiness.GetUserByEmail("user1@test.com");
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(uid1, result.Id);
+        Assert.Equal("User 1", result.Name);
+    }
+
+    [Fact]
+    public async Task GetUserByEmail_IsCaseInsensitive()
+    {
+        // Act
+        var result = await _userBusiness.GetUserByEmail("USER1@TEST.COM");
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(uid1, result.Id);
+    }
+
+    [Fact]
+    public async Task GetUserByEmail_ReturnsNull_WhenEmailNotFound()
+    {
+        // Act
+        var result = await _userBusiness.GetUserByEmail("nobody@nowhere.com");
+
+        // Assert
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public async Task GetUserByEmail_ReturnsNull_WhenUserIsArchived()
+    {
+        // Act — uid2 is the seeded archived user
+        var result = await _userBusiness.GetUserByEmail("user2@test.com");
+
+        // Assert
+        Assert.Null(result);
     }
 
     #endregion

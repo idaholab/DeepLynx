@@ -606,14 +606,14 @@ public class ProjectBusiness : IProjectBusiness
     /// <param name="roleId">(optional) Role which member will be added under</param>
     /// <param name="userId">(optional) ID of user to be added</param>
     /// <param name="groupId">(optional) ID of group to be added</param>
+    /// <param name="makeProjectAdmin">(optional) Make new member a project admin. Defaults to false</param>
     /// <param name="allowServiceAccount">Bypass for service accounts to be added (only used internally)</param>
     /// <returns>True if user or group successfully added to project</returns>
     /// <returns>False if user or group already exists in project</returns>
     /// <exception cref="ArgumentException">Returned if none or both of userID/groupID supplied</exception>
-    /// <param name="isProjectAdmin">(optional) Whether the member is a project admin. Defaults to false</param>
     /// <exception cref="KeyNotFoundException">Returned if user, group, role or project not found</exception>
     public async Task<bool> AddMemberToProject(long projectId, long? roleId, long? userId,
-        long? groupId, bool isProjectAdmin = false, bool allowServiceAccount = false)
+        long? groupId, bool makeProjectAdmin = false, bool allowServiceAccount = false)
     {
         // ensure one and only one of userID or groupID is supplied
         if (!userId.HasValue && !groupId.HasValue)
@@ -657,7 +657,7 @@ public class ProjectBusiness : IProjectBusiness
             RoleId = roleId,
             UserId = userId,
             GroupId = groupId,
-            IsProjectAdmin = isProjectAdmin
+            IsProjectAdmin = makeProjectAdmin
         };
 
         _context.ProjectMembers.Add(projMember);
@@ -887,7 +887,7 @@ public class ProjectBusiness : IProjectBusiness
         // ===============================
         // Add current user as admin to project
         // ===============================
-        await AddMemberToProject(projectId, null, currentUserId, null, isProjectAdmin: true);
+        await AddMemberToProject(projectId, null, currentUserId, null, makeProjectAdmin: true);
     }
 } 
 

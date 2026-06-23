@@ -437,6 +437,7 @@ public class ProjectController : ControllerBase
     /// <param name="projectId"></param>
     /// <param name="roleId"></param>
     /// <param name="name"></param>
+    /// <param name="makeProjectAdmin"></param>
     /// <returns></returns>
     [Tags("Service Accounts")]
     [ProjectAdmin]
@@ -445,11 +446,12 @@ public class ProjectController : ControllerBase
         long organizationId,
         long projectId,
         [FromQuery] long roleId,
-        [FromQuery] string name)
+        [FromQuery] string name,
+        [FromQuery] bool makeProjectAdmin)
     {
         try
         {
-            await _invitationBusiness.CreateAndAddServiceAccountToProject(organizationId, projectId, roleId, name);
+            await _invitationBusiness.CreateAndAddServiceAccountToProject(projectId, roleId, name, makeProjectAdmin: false);
             return Ok(new { message = $"Created service account {name} and added to project {projectId}" });
         }
         catch (Exception exc)

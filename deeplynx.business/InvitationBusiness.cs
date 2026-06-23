@@ -192,10 +192,10 @@ public class InvitationBusiness : IInvitationBusiness
     /// <param name="organizationId"></param>
     /// <param name="projectId"></param>
     /// <param name="roleId"></param>
-    /// <param name="name">
-    /// </param>
+    /// <param name="name"></param>
+    /// <param name="makeProjectAdmin"></param>
     /// <returns></returns>
-    public async Task<bool> CreateAndAddServiceAccountToProject(long organizationId, long projectId, long roleId, string name)
+    public async Task<bool> CreateAndAddServiceAccountToProject(long projectId, long roleId, string name, bool makeProjectAdmin = false)
     {
         using var transaction = await _context.Database.BeginTransactionAsync();
         try
@@ -215,7 +215,7 @@ public class InvitationBusiness : IInvitationBusiness
 
             // Bypass AddUserToHierarchyWithoutEmail - service accounts skip org membership
             // and are added directly to their project only
-            await _projectBusiness.AddMemberToProject(projectId, roleId, serviceAccount.Id, groupId: null, allowServiceAccount: true);
+            await _projectBusiness.AddMemberToProject(projectId, roleId, serviceAccount.Id, groupId: null, makeProjectAdmin, allowServiceAccount: true);
 
             await transaction.CommitAsync();
             return true;

@@ -166,68 +166,78 @@ public class UserBusiness : IUserBusiness
     ///     Creates a new standard user based on the data transfer object supplied.
     /// </summary>
     /// <param name="dto">A data transfer object with details on the new user to be created.</param>
-    /// <param name="isSysAdmin">Optional Boolean value determining if the requesting user is a system admin.</param>
     /// <returns>The new user which was just created.</returns>
-    public async Task<UserResponseDto> CreateUser(CreateUserRequestDto dto, bool isSysAdmin = false)
+    public async Task<UserResponseDto> CreateUser(CreateUserRequestDto dto)
     {
         if (string.IsNullOrWhiteSpace(dto.Name))
             throw new InvalidOperationException("Name is required.");
 
-        if (dto.AccountType == AccountType.Service)
-            throw new InvalidOperationException("Service Accounts can only be created per project");
+        if (string.IsNullOrWhiteSpace(dto.Email))
+            throw new InvalidOperationException("Email is required for standard accounts.");
 
-        if (dto.AccountType == AccountType.Test && !isSysAdmin)
-            throw new InvalidOperationException("Only System Admins can create test accounts");
+        if (string.IsNullOrWhiteSpace(dto.Username))
+            throw new InvalidOperationException("Username is required for standard accounts.");
 
-        var username = dto.Username;
-        var email = dto.Email;
-
-        if (dto.AccountType == AccountType.Standard)
-        {
-            if (string.IsNullOrWhiteSpace(dto.Email))
-                throw new InvalidOperationException("Email is required for standard accounts.");
-
-            if (string.IsNullOrWhiteSpace(dto.Username))
-                throw new InvalidOperationException("Username is required for standard accounts.");
-
-            var otherUserHasEmail = await _context.Users.AnyAsync(u => u.Email.ToLower() == dto.Email.ToLower());
-            if (otherUserHasEmail)
-                throw new ArgumentException("User with email already exists");
-        }
-
-        if (dto.AccountType == AccountType.Test)
-        {
-            var identifier = $"test_{Guid.NewGuid()}";
-            username = identifier;
-            email = identifier;
-        }
+        var otherUserHasEmail = await _context.Users.AnyAsync(u => u.Email.ToLower() == dto.Email.ToLower());
+        if (otherUserHasEmail)
+            throw new ArgumentException("A user with that email already exists.");
 
         var user = new User
         {
             Name = dto.Name,
-            Email = email!,
-            Username = username,
+            Email = dto.Email,
+            Username = dto.Username,
             IsActive = dto.IsActive ?? false,
             IsArchived = dto.IsArchived ?? false,
-            AccountType = dto.AccountType
+            AccountType = AccountType.Standard
         };
 
         _context.Users.Add(user);
         await _context.SaveChangesAsync();
 
-        return new UserResponseDto
-        {
-            Id = user.Id,
-            Name = user.Name,
-            Username = user.Username,
-            Email = user.Email,
-            AccountType = user.AccountType,
-            IsSysAdmin = user.IsSysAdmin,
-            IsArchived = user.IsArchived,
-            IsActive = user.IsActive,
-            LastLogin = user.LastLogin,
-        };
+        return MapToResponseDto(user);
     }
+
+    /// <summary>
+    ///     SysAdmin only: Creates a new test account with an auto-generated identifier.
+    /// </summary>
+    /// <param name="name">Display name for the test account.</param>
+    /// <returns>The new test account which was just created.</returns>
+    public async Task<UserResponseDto> CreateTestAccount(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+            throw new InvalidOperationException("Name is required.");
+
+        var identifier = $"test_{Guid.NewGuid()}";
+
+        var user = new User
+        {
+            Name = name,
+            Email = identifier,
+            Username = identifier,
+            IsActive = false,
+            IsArchived = false,
+            AccountType = AccountType.Test
+        };
+
+        _context.Users.Add(user);
+        await _context.SaveChangesAsync();
+
+        return MapToResponseDto(user);
+    }
+
+    private static UserResponseDto MapToResponseDto(User user) => new()
+    {
+        Id = user.Id,
+        Name = user.Name,
+        Username = user.Username,
+        Email = user.Email,
+        AccountType = user.AccountType,
+        IsSysAdmin = user.IsSysAdmin,
+        IsArchived = user.IsArchived,
+        IsActive = user.IsActive,
+        LastLogin = user.LastLogin,
+    };
 
     /// <summary>
     ///     Updates an existing user by ID

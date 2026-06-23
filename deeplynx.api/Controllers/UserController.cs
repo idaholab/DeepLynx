@@ -106,8 +106,7 @@ public class UserController : ControllerBase
     {
         try
         {
-            var isSysAdmin = UserContextStorage.IsSysAdmin;
-            var newUser = await _userBusiness.CreateUser(dto, isSysAdmin);
+            var newUser = await _userBusiness.CreateUser(dto);
             return Ok(newUser);
         }
         catch (Exception exc)
@@ -118,6 +117,29 @@ public class UserController : ControllerBase
         }
     }
 
+    /// <summary>
+    ///     Create a Test Account
+    /// </summary>
+    /// <param name="name">Display name for the test account</param>
+    /// <returns>User response DTO</returns>
+    [Tags("Test Accounts")]
+    [HttpPost("test", Name = "api_create_test_account")]
+    [SysAdmin]
+    public async Task<ActionResult<UserResponseDto>> CreateTestAccount([FromQuery] string name)
+    {
+        try
+        {
+            var newUser = await _userBusiness.CreateTestAccount(name);
+            return Ok(newUser);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error creating test account");
+            return StatusCode(StatusCodes.Status500InternalServerError,
+                new { message = "An unexpected error occurred while creating the test account." });
+        }
+    }
+    
     /// <summary>
     ///     Update a User
     /// </summary>

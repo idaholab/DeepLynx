@@ -10,11 +10,8 @@ public interface ITokenBusiness
     Task<TokenResponseDto> CreateApiKey(long currentUserId, string? clientId = null, long? createdByUserId = null);
     Task<TokenResponseDto> GenerateServiceAccountApiKey(
         long currentUserId,
-        long serviceAccountId,
-        bool isSysAdmin = false,
-        bool isOrgAdmin = false,
-        bool isProjectAdmin = false);
-    Task<TokenResponseDto> GenerateTestAccountApiKey(long currentUserId, long testAccountId, bool isSysAdmin = false);
+        long serviceAccountId);
+    Task<TokenResponseDto> GenerateTestAccountApiKey(long currentUserId, long testAccountId);
     Task<ApiKey> GetApiKey(string apiKey);
     Task<bool> DeleteApiKey(long currentUserId, string key);
     Task<List<string>> GetAllUserKeys(long currentUserId);

@@ -614,6 +614,111 @@ public class InvitationBusinessTests : IntegrationTestBase
     }
 
     #endregion
+    
+    #region CreateAndAddServiceAccountToProject Tests
+
+    [Fact]
+    public async Task CreateAndAddServiceAccount_Succeeds_WithValidInputs()
+    {
+        // Act
+        var result = await _invitationBusiness.CreateAndAddServiceAccountToProject(pid, rid, "My Service Account");
+
+        // Assert
+        Assert.True(result);
+
+        var serviceAccount = await Context.Users
+            .FirstOrDefaultAsync(u => u.Name == "My Service Account" && u.AccountType == AccountType.Service);
+        Assert.NotNull(serviceAccount);
+        Assert.StartsWith("service_", serviceAccount.Email);
+        Assert.StartsWith("service_", serviceAccount.Username);
+
+        var projectMember = await Context.ProjectMembers
+            .FirstOrDefaultAsync(pm => pm.UserId == serviceAccount.Id && pm.ProjectId == pid);
+        Assert.NotNull(projectMember);
+        Assert.Equal(rid, projectMember.RoleId);
+    }
+
+    [Fact]
+    public async Task CreateAndAddServiceAccount_Succeeds_AsProjectAdmin()
+    {
+        // Act
+        var result = await _invitationBusiness.CreateAndAddServiceAccountToProject(
+            pid, rid, "Admin Service Account", makeProjectAdmin: true);
+
+        // Assert
+        Assert.True(result);
+
+        var serviceAccount = await Context.Users
+            .FirstOrDefaultAsync(u => u.Name == "Admin Service Account" && u.AccountType == AccountType.Service);
+        Assert.NotNull(serviceAccount);
+
+        var projectMember = await Context.ProjectMembers
+            .FirstOrDefaultAsync(pm => pm.UserId == serviceAccount.Id && pm.ProjectId == pid);
+        Assert.NotNull(projectMember);
+        Assert.True(projectMember.IsProjectAdmin);
+    }
+
+    [Fact]
+    public async Task CreateAndAddServiceAccount_DoesNotAddToOrganization()
+    {
+        // Act
+        await _invitationBusiness.CreateAndAddServiceAccountToProject(pid, rid, "Org-Less Service Account");
+
+        // Assert — service accounts skip org membership entirely
+        var serviceAccount = await Context.Users
+            .FirstOrDefaultAsync(u => u.Name == "Org-Less Service Account" && u.AccountType == AccountType.Service);
+        Assert.NotNull(serviceAccount);
+
+        var inOrg = await Context.OrganizationUsers
+            .AnyAsync(ou => ou.UserId == serviceAccount.Id);
+        Assert.False(inOrg);
+    }
+
+    [Fact]
+    public async Task CreateAndAddServiceAccount_GeneratesUniqueIdentifiers_AcrossMultipleAccounts()
+    {
+        // Act
+        await _invitationBusiness.CreateAndAddServiceAccountToProject(pid, rid, "Service Account A");
+        await _invitationBusiness.CreateAndAddServiceAccountToProject(pid, rid, "Service Account B");
+
+        // Assert
+        var accounts = await Context.Users
+            .Where(u => u.AccountType == AccountType.Service && 
+                        (u.Name == "Service Account A" || u.Name == "Service Account B"))
+            .ToListAsync();
+
+        Assert.Equal(2, accounts.Count);
+        Assert.NotEqual(accounts[0].Email, accounts[1].Email);
+        Assert.NotEqual(accounts[0].Username, accounts[1].Username);
+    }
+
+    [Fact]
+    public async Task CreateAndAddServiceAccount_RollsBack_WhenProjectDoesNotExist()
+    {
+        var nonExistentProjectId = 99999L;
+        var userCountBefore = await Context.Users.CountAsync(u => u.AccountType == AccountType.Service);
+
+        await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            _invitationBusiness.CreateAndAddServiceAccountToProject(nonExistentProjectId, rid, "Orphan Service Account"));
+
+        var userCountAfter = await Context.Users.CountAsync(u => u.AccountType == AccountType.Service);
+        Assert.Equal(userCountBefore, userCountAfter);
+    }
+
+    [Fact]
+    public async Task CreateAndAddServiceAccount_RollsBack_WhenRoleDoesNotExist()
+    {
+        var nonExistentRoleId = 99999L;
+        var userCountBefore = await Context.Users.CountAsync(u => u.AccountType == AccountType.Service);
+
+        await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            _invitationBusiness.CreateAndAddServiceAccountToProject(pid, nonExistentRoleId, "Bad Role Service Account"));
+
+        var userCountAfter = await Context.Users.CountAsync(u => u.AccountType == AccountType.Service);
+        Assert.Equal(userCountBefore, userCountAfter);
+    }
+
+    #endregion
 
     #region Group Tests
 
