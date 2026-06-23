@@ -398,6 +398,8 @@ public class ProjectController : ControllerBase
     /// <param name="organizationId"></param>
     /// <param name="projectId"></param>
     /// <param name="userEmail"></param>
+    /// <param name="userId"></param>
+    /// <param name="groupId"></param>
     /// <param name="roleId"></param>
     /// <returns></returns>
     [HttpPost("{projectId:long}/invite", Name = "api_invite_user_to_project")]
@@ -427,7 +429,15 @@ public class ProjectController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
-
+    
+    /// <summary>
+    /// Create and add service account to project
+    /// </summary>
+    /// <param name="organizationId"></param>
+    /// <param name="projectId"></param>
+    /// <param name="roleId"></param>
+    /// <param name="name"></param>
+    /// <returns></returns>
     [Tags("Service Accounts")]
     [ProjectAdmin]
     [HttpPost("{projectId:long}/invite/serviceAccount", Name = "api_add_service_account")]
@@ -439,9 +449,15 @@ public class ProjectController : ControllerBase
     {
         try
         {
-            var callerIsAdmin = UserContextStorage.IsSysAdmin || UserContextStorage.IsOrgAdmin ||
-                                UserContextStorage.IsProjectAdmin;
-            await _invitationBusiness.CreateAndAddServiceAccountToProject(organizationId, projectId, roleId, name, callerIsAdmin);
+            await _invitationBusiness.CreateAndAddServiceAccountToProject(organizationId, projectId, roleId, name);
+            return Ok(new { message = $"Created service account {name} and added to project {projectId}" });
+        }
+        catch (Exception exc)
+        {
+            var message =
+                $"An error occurred while creating and adding service account to project";
+            _logger.LogError(message);
+            return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
 }

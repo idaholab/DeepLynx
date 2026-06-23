@@ -119,8 +119,10 @@ public class InvitationBusiness : IInvitationBusiness
                 var createUserDto = new CreateUserRequestDto
                 {
                     Name = userEmail,
-                    Email = userEmail
+                    Email = userEmail,
+                    Username = userEmail,
                 };
+                
                 var createdUserResponseDto = await _userBusiness.CreateUser(createUserDto);
 
                 await _organizationBusiness.AddUserToOrganization(organizationId, createdUserResponseDto.Id);

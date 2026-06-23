@@ -239,7 +239,7 @@ public class UserControllerTests : IDisposable
 
         var expected = new UserResponseDto { Id = 1, Name = "User 1", AccountType = "Dev", Email = "123@inl.gov", Username = "Testy", IsActive = true, IsArchived = false, IsOrgAdmin = false, IsSysAdmin = true, LastLogin = System.DateTime.Now };
 
-        _mockUserBusiness.Setup(b => b.CreateUser(dto, true, false, false))
+        _mockUserBusiness.Setup(b => b.CreateUser(dto, isSysAdmin: true))
                     .ReturnsAsync(expected);
 
         var result = (await _userController.CreateUser(dto)).Result as OkObjectResult;
@@ -265,7 +265,7 @@ public class UserControllerTests : IDisposable
             IsActive = false
         };
 
-        _mockUserBusiness.Setup(b => b.CreateUser(dto, true, false, false))
+        _mockUserBusiness.Setup(b => b.CreateUser(dto, isSysAdmin: true))
                     .ThrowsAsync(new Exception("db error"));
 
         var result = (await _userController.CreateUser(dto)).Result as ObjectResult;
@@ -293,13 +293,13 @@ public class UserControllerTests : IDisposable
 
         var expected = new UserResponseDto { Id = 1, Name = "User 1", AccountType = "Dev", Email = "123@inl.gov", Username = "Testy", IsActive = true, IsArchived = false, IsOrgAdmin = false, IsSysAdmin = true, LastLogin = System.DateTime.Now };
 
-        _mockUserBusiness.Setup(b => b.CreateUser(dto, true, false, false))
+        _mockUserBusiness.Setup(b => b.CreateUser(dto, isSysAdmin: true))
                     .ReturnsAsync(expected);
 
         await _userController.CreateUser(dto);
 
         _mockUserBusiness.Verify(
-            b => b.CreateUser(dto, true, false, false),
+            b => b.CreateUser(dto, isSysAdmin: true),
             Times.Once);
     }
 
