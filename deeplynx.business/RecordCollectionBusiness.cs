@@ -63,7 +63,7 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
         long currentUserId, long organizationId, long projectId, RecordCollectionQueryRequestDto dto,
         bool hideArchived, bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false)
     {
-        var search = dto.Search?.Trim().ToLower();
+        var search = dto.Search?.Trim();
 
 
         var recordCollectionQuery = _context.RecordCollections
@@ -71,11 +71,13 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
 
         if (!string.IsNullOrWhiteSpace(search))
         {
+            var searchPattern = $"%{search}%";
+
             recordCollectionQuery = recordCollectionQuery.Where(c =>
-                            c.Name.ToLower().Contains(search) ||
-                            (c.Description != null && c.Description.ToLower().Contains(search)) ||
-                            c.Labels.Any(l => l.Name.ToLower().Contains(search)) ||
-                            c.Tags.Any(t => t.Name.ToLower().Contains(search)));
+                            EF.Functions.ILike(c.Name, searchPattern) ||
+                            (c.Description != null && EF.Functions.ILike(c.Description, searchPattern)) ||
+                            c.Labels.Any(l => EF.Functions.ILike(l.Name, searchPattern)) ||
+                            c.Tags.Any(t => EF.Functions.ILike(t.Name, searchPattern)));
         }
 
         if (hideArchived) recordCollectionQuery = recordCollectionQuery.Where(c => !c.IsArchived);
