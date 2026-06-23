@@ -5,12 +5,12 @@ import {
   SensitivityLabelsDto,
   TagResponseDto,
 } from "../../../types/responseDTOs";
-import { countFacet } from "@/app/lib/record_helpers";
 import {
+  countFacet,
   deriveSelectedRecordMetadata,
   getSelectedRecordLabelNames,
   getSelectedRecordTagNames,
-} from "../../components/recordCollections.utils";
+} from "../../components/utils";
 import {
   NewCollectionSelectedRecord,
   SelectionState,
@@ -107,19 +107,25 @@ export function useNewCollectionDerived({
           ),
       )
       .filter((tag) => tag.name.toLowerCase().includes(query));
-  }, [availableTags, newCollectionSelectedTagNames, newCollectionTagSearchTerm]);
+  }, [
+    availableTags,
+    newCollectionSelectedTagNames,
+    newCollectionTagSearchTerm,
+  ]);
 
   const canAddTypedNewCollectionTag =
     newCollectionTagSearchTerm.trim().length > 0 &&
     !newCollectionSelectedTagNames.some(
-      (name) => name.toLowerCase() === newCollectionTagSearchTerm.trim().toLowerCase(),
+      (name) =>
+        name.toLowerCase() === newCollectionTagSearchTerm.trim().toLowerCase(),
     );
 
   const canAddTypedNewCollectionLabel =
     newCollectionLabelSearchTerm.trim().length > 0 &&
     !selectedNewCollectionLabels.some(
       (label) =>
-        label.name.toLowerCase() === newCollectionLabelSearchTerm.trim().toLowerCase(),
+        label.name.toLowerCase() ===
+        newCollectionLabelSearchTerm.trim().toLowerCase(),
     );
 
   const newCollectionRecordPageCount = Math.max(
@@ -129,8 +135,15 @@ export function useNewCollectionDerived({
 
   const visibleNewCollectionRecords = useMemo(() => {
     const startIndex = (newCollectionRecordPage - 1) * recordsPerPage;
-    return newCollectionRecordSearchResults.slice(startIndex, startIndex + recordsPerPage);
-  }, [newCollectionRecordPage, newCollectionRecordSearchResults, recordsPerPage]);
+    return newCollectionRecordSearchResults.slice(
+      startIndex,
+      startIndex + recordsPerPage,
+    );
+  }, [
+    newCollectionRecordPage,
+    newCollectionRecordSearchResults,
+    recordsPerPage,
+  ]);
 
   const visibleNewCollectionRecordIds = useMemo(
     () =>
@@ -190,8 +203,15 @@ export function useNewCollectionDerived({
 
   const visibleNewCollectionReviewRecords = useMemo(() => {
     const startIndex = (newCollectionReviewPage - 1) * recordsPerPage;
-    return filteredNewCollectionSelectedRecords.slice(startIndex, startIndex + recordsPerPage);
-  }, [filteredNewCollectionSelectedRecords, newCollectionReviewPage, recordsPerPage]);
+    return filteredNewCollectionSelectedRecords.slice(
+      startIndex,
+      startIndex + recordsPerPage,
+    );
+  }, [
+    filteredNewCollectionSelectedRecords,
+    newCollectionReviewPage,
+    recordsPerPage,
+  ]);
 
   useEffect(() => {
     setNewCollectionReviewPage(1);

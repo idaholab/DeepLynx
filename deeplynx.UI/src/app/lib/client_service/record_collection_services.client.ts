@@ -123,10 +123,25 @@ export const getAllRecordCollections = async (
   projectId: number,
   dto?: RecordCollectionQueryRequestDto,
   hideArchived: boolean = true,
-) : Promise<PaginatedRecordCollectionsResponseDto> => {
+): Promise<PaginatedRecordCollectionsResponseDto> => {
   const res = await api.get(recordCollectionsPath(organizationId, projectId), {
     params: buildRecordCollectionQueryParams(dto, hideArchived),
   });
+  return normalizeRecordCollectionsPage(res.data);
+};
+
+export const getRecordCollectionsForRecord = async (
+  organizationId: number,
+  projectId: number,
+  recordId: number,
+  dto?: RecordCollectionQueryRequestDto,
+  hideArchived: boolean = true,
+): Promise<PaginatedRecordCollectionsResponseDto> => {
+  const res = await api.get(
+    `/organizations/${organizationId}/projects/${projectId}/records/${recordId}/record-collections`,
+    {
+      params: buildRecordCollectionQueryParams(dto, hideArchived),
+    });
   return normalizeRecordCollectionsPage(res.data);
 };
 

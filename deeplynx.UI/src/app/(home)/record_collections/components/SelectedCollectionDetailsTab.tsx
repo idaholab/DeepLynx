@@ -1,24 +1,24 @@
 "use client";
 
 import { useLanguage } from "@/app/contexts/Language";
+import { formatLocalDateTime } from "@/app/lib/date_time";
 import React from "react";
 import CollectionEntitySelector from "./CollectionEntitySelector";
 import CollectionDetailsReadonlyView from "./CollectionDetailsReadonlyView";
 import CollectionRecordSearchControls from "./CollectionRecordSearchControls";
 import CollectionRecordSearchResultsTable from "./CollectionRecordSearchResultsTable";
 import SectionCard from "./SectionCard";
-import { SelectedCollectionDetailsController } from "./componentTypes";
 import { interpolateTemplate } from "@/app/lib/record_helpers";
+import type { CollectionDetailsController } from "../[collectionId]/hooks/useCollectionDetails";
 
 type Props = {
-  controller: SelectedCollectionDetailsController;
+  controller: CollectionDetailsController["detailsController"];
 };
 
 export default function SelectedCollectionDetailsTab({
   controller: {
     readonlyView: {
       selectedCollection,
-      collectionSummaryPanel,
       selectedDescriptionRef,
       selectedDescriptionExpanded,
       selectedDescriptionExpandable,
@@ -94,14 +94,49 @@ export default function SelectedCollectionDetailsTab({
   const handleConfirmRemoveRecord = React.useCallback(
     async (recordId: number) => {
       await onRemoveCollectionRecord(recordId);
-      setConfirmRemoveRecordId((current) => (current === recordId ? null : current));
+      setConfirmRemoveRecordId((current) =>
+        current === recordId ? null : current,
+      );
     },
     [onRemoveCollectionRecord],
   );
 
   return (
     <div className="mt-4 space-y-4">
-      {collectionSummaryPanel}
+      <div className="grid gap-4 rounded-2xl border border-base-300 bg-base-200/30 p-4 text-sm sm:grid-cols-2 lg:grid-cols-4">
+        <div>
+          <p className="text-base-content/60">
+            {t.translations.RECORD_COLLECTIONS_COLLECTION_ID}
+          </p>
+          <p className="font-semibold text-base-content">
+            {selectedCollection.id}
+          </p>
+        </div>
+        <div>
+          <p className="text-base-content/60">
+            {t.translations.RECORD_COLLECTIONS_TOTAL_RECORDS}
+          </p>
+          <p className="font-semibold text-base-content">
+            {selectedCollection.recordCount}
+          </p>
+        </div>
+        <div>
+          <p className="text-base-content/60">
+            {t.translations.RECORD_COLLECTIONS_UPDATED}
+          </p>
+          <p className="font-semibold text-base-content">
+            {formatLocalDateTime(selectedCollection.lastUpdatedAt)}
+          </p>
+        </div>
+        <div>
+          <p className="text-base-content/60">
+            {t.translations.RECORD_COLLECTIONS_LAST_UPDATED_BY}
+          </p>
+          <p className="font-semibold text-base-content">
+            {selectedCollection.lastUpdatedBy ?? t.translations.UNKNOWN}
+          </p>
+        </div>
+      </div>
       {!isEditingSelectedCollection ? (
         <CollectionDetailsReadonlyView
           summaryPanel={null}
@@ -159,7 +194,9 @@ export default function SelectedCollectionDetailsTab({
       ) : (
         <SectionCard
           title={t.translations.RECORD_COLLECTIONS_MANAGE}
-          subtitle={t.translations.RECORD_COLLECTIONS_MANAGE_IDENTITY_LABELS_METADATA}
+          subtitle={
+            t.translations.RECORD_COLLECTIONS_MANAGE_IDENTITY_LABELS_METADATA
+          }
           action={
             <div className="flex flex-wrap justify-end gap-2">
               <button
@@ -231,7 +268,9 @@ export default function SelectedCollectionDetailsTab({
                     type="button"
                     className="btn btn-outline btn-sm"
                     disabled={saving}
-                    onClick={() => setSelectedCollectionPropertiesEditorOpen(true)}
+                    onClick={() =>
+                      setSelectedCollectionPropertiesEditorOpen(true)
+                    }
                   >
                     {t.translations.EDIT}
                   </button>
@@ -245,8 +284,11 @@ export default function SelectedCollectionDetailsTab({
                       </tr>
                     </thead>
                     <tbody>
-                      {getMetadataRows(editableSelectedCollection.properties).length ? (
-                        getMetadataRows(editableSelectedCollection.properties).map((row) => (
+                      {getMetadataRows(editableSelectedCollection.properties)
+                        .length ? (
+                        getMetadataRows(
+                          editableSelectedCollection.properties,
+                        ).map((row) => (
                           <tr key={row.label} className="h-10">
                             <td className="font-medium">{row.label}</td>
                             <td>{row.value}</td>
@@ -255,7 +297,10 @@ export default function SelectedCollectionDetailsTab({
                       ) : (
                         <tr>
                           <td colSpan={2}>
-                            {t.translations.RECORD_COLLECTIONS_NO_ADDITIONAL_PROPERTIES_SET}
+                            {
+                              t.translations
+                                .RECORD_COLLECTIONS_NO_ADDITIONAL_PROPERTIES_SET
+                            }
                           </td>
                         </tr>
                       )}
@@ -273,11 +318,17 @@ export default function SelectedCollectionDetailsTab({
                     selectedItems={editableSelectedCollection.labels ?? []}
                     searchTerm={selectedCollectionLabelSearchTerm}
                     setSearchTerm={setSelectedCollectionLabelSearchTerm}
-                    searchPlaceholder={t.translations.RECORD_COLLECTIONS_SEARCH_OR_ADD_LABEL}
+                    searchPlaceholder={
+                      t.translations.RECORD_COLLECTIONS_SEARCH_OR_ADD_LABEL
+                    }
                     options={filteredSelectedCollectionLabelOptions}
                     loading={labelsLoading}
-                    loadingText={t.translations.RECORD_COLLECTIONS_LOADING_LABELS}
-                    emptyOptionsText={t.translations.RECORD_COLLECTIONS_NO_LABELS_FOUND}
+                    loadingText={
+                      t.translations.RECORD_COLLECTIONS_LOADING_LABELS
+                    }
+                    emptyOptionsText={
+                      t.translations.RECORD_COLLECTIONS_NO_LABELS_FOUND
+                    }
                     addDisabled={
                       saving ||
                       selectedCollectionLabelCreating ||
@@ -301,11 +352,15 @@ export default function SelectedCollectionDetailsTab({
                     selectedItems={editableSelectedCollection.tags ?? []}
                     searchTerm={selectedCollectionTagSearchTerm}
                     setSearchTerm={setSelectedCollectionTagSearchTerm}
-                    searchPlaceholder={t.translations.RECORD_COLLECTIONS_SEARCH_OR_ADD_TAG}
+                    searchPlaceholder={
+                      t.translations.RECORD_COLLECTIONS_SEARCH_OR_ADD_TAG
+                    }
                     options={filteredSelectedCollectionTagOptions}
                     loading={tagsLoading}
                     loadingText={t.translations.RECORD_COLLECTIONS_LOADING_TAGS}
-                    emptyOptionsText={t.translations.RECORD_COLLECTIONS_NO_TAGS_FOUND}
+                    emptyOptionsText={
+                      t.translations.RECORD_COLLECTIONS_NO_TAGS_FOUND
+                    }
                     addDisabled={
                       saving ||
                       selectedCollectionTagCreating ||
@@ -351,16 +406,20 @@ export default function SelectedCollectionDetailsTab({
               <CollectionRecordSearchControls
                 searchTerm={recordSearchTerm}
                 setSearchTerm={setRecordSearchTerm}
-                placeholder={t.translations.RECORD_COLLECTIONS_SEARCH_ALL_RECORDS}
+                placeholder={
+                  t.translations.RECORD_COLLECTIONS_SEARCH_ALL_RECORDS
+                }
                 searchLoading={recordSearchLoading}
                 onSearch={onSearchRecords}
               />
 
               <CollectionRecordSearchResultsTable
                 rows={editRecordResults.map((record) => {
-                  const recordId = typeof record.id === "number" ? record.id : null;
+                  const recordId =
+                    typeof record.id === "number" ? record.id : null;
                   const isAssigned =
-                    typeof recordId === "number" && collectionRecordIds.has(recordId);
+                    typeof recordId === "number" &&
+                    collectionRecordIds.has(recordId);
                   const mutationStatus =
                     typeof recordId === "number"
                       ? recordMutationStatusById[recordId]
@@ -368,13 +427,16 @@ export default function SelectedCollectionDetailsTab({
                   const isAdding = mutationStatus === "adding";
                   const isRemoving = mutationStatus === "removing";
                   const showRemoveConfirmation =
-                    typeof recordId === "number" && confirmRemoveRecordId === recordId;
+                    typeof recordId === "number" &&
+                    confirmRemoveRecordId === recordId;
 
                   return {
                     key: record.id ?? record.name ?? "record",
                     name: record.name,
                     className:
-                      ("className" in record ? record.className : record.classId) ??
+                      ("className" in record
+                        ? record.className
+                        : record.classId) ??
                       t.translations.RECORD_COLLECTIONS_UNCLASSIFIED,
                     sourceName:
                       ("dataSourceName" in record
@@ -421,7 +483,8 @@ export default function SelectedCollectionDetailsTab({
                               className="btn btn-error btn-outline btn-xs"
                               disabled={isRemoving || recordId === null}
                               onClick={() =>
-                                recordId !== null && setConfirmRemoveRecordId(recordId)
+                                recordId !== null &&
+                                setConfirmRemoveRecordId(recordId)
                               }
                             >
                               {isRemoving ? (
@@ -437,7 +500,8 @@ export default function SelectedCollectionDetailsTab({
                             className="btn btn-primary btn-xs"
                             disabled={isAdding || recordId === null}
                             onClick={() =>
-                              recordId !== null && void onAddCollectionRecord(recordId)
+                              recordId !== null &&
+                              void onAddCollectionRecord(recordId)
                             }
                           >
                             {isAdding ? (
@@ -454,7 +518,8 @@ export default function SelectedCollectionDetailsTab({
                 emptyMessage={
                   recordSearchTerm.trim()
                     ? t.translations.RECORD_COLLECTIONS_NO_RECORDS_MATCH_SEARCH
-                    : t.translations.RECORD_COLLECTIONS_NO_RECORDS_ARE_CURRENTLY_ASSIGNED
+                    : t.translations
+                        .RECORD_COLLECTIONS_NO_RECORDS_ARE_CURRENTLY_ASSIGNED
                 }
               />
 
@@ -468,7 +533,6 @@ export default function SelectedCollectionDetailsTab({
           </div>
         </SectionCard>
       )}
-
     </div>
   );
 }

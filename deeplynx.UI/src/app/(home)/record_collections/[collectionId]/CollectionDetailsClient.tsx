@@ -3,7 +3,7 @@
 import AdditionalPropertiesEditor from "@/app/(home)/record/components/AdditionalPropertiesEditor";
 import { useLanguage } from "@/app/contexts/Language";
 import { ArrowLeftIcon } from "@heroicons/react/24/outline";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import React from "react";
 import {
   RecordCollectionResponseDto,
@@ -27,7 +27,13 @@ export default function CollectionDetailsClient({
   initialCollectionRecords,
 }: Props) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { t } = useLanguage();
+  const returnTo = searchParams.get("returnTo");
+  const backHref =
+    returnTo && returnTo.startsWith("/") && !returnTo.startsWith("//")
+      ? returnTo
+      : "/record_collections";
   const { workspace, detailsController, recordsController, propertiesEditor } =
     useCollectionDetails({
       organizationId,
@@ -54,7 +60,7 @@ export default function CollectionDetailsClient({
           <button
             type="button"
             className="btn btn-outline btn-sm"
-            onClick={() => router.push("/record_collections")}
+            onClick={() => router.push(backHref)}
           >
             <ArrowLeftIcon className="size-4" />
             {t.translations.RECORD_COLLECTIONS_BACK_TO_COLLECTIONS}
