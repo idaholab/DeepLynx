@@ -2,9 +2,11 @@
 "use client";
 
 import { CustomQueryRequestDto } from "@/app/(home)/types/requestDTOs";
-import { QueryRecordViewResponseDto } from "@/app/(home)/types/responseDTOs";
+import {
+    QueryRecordViewResponseDto,
+    PaginatedResponse,
+} from "@/app/(home)/types/responseDTOs";
 import api from "./api";
-
 
 /**
  * Full text search for records
@@ -21,9 +23,11 @@ export async function fullTextSearch(
     hideArchived: boolean = true,
 ): Promise<QueryRecordViewResponseDto[]> {
     try {
-        const projectIdsQuery = projectIds.map(id => `projectIds=${id}`).join('&');
+        const projectIdsQuery = projectIds
+            .map((id) => `projectIds=${id}`)
+            .join("&");
         const res = await api.get(
-            `/organizations/${organizationId}/query/records?userQuery=${encodeURIComponent(userQuery)}&${projectIdsQuery}&hideArchived=${hideArchived}`
+            `/organizations/${organizationId}/query/records?userQuery=${encodeURIComponent(userQuery)}&${projectIdsQuery}&hideArchived=${hideArchived}`,
         );
         return res.data;
     } catch (error) {
@@ -44,7 +48,7 @@ export async function queryBuilder(
     organizationId: number,
     queryObj: CustomQueryRequestDto[],
     projectIds: number[],
-    textSearch?: string | null
+    textSearch?: string | null,
 ): Promise<QueryRecordViewResponseDto[]> {
     try {
         // Building json string format from key/value input
@@ -55,13 +59,17 @@ export async function queryBuilder(
             }
         }
 
-        const projectIdsQuery = projectIds.map(id => `projectIds=${id}`).join('&');
-        const textSearchParam = textSearch ? `&textSearch=${encodeURIComponent(textSearch)}` : '';
+        const projectIdsQuery = projectIds
+            .map((id) => `projectIds=${id}`)
+            .join("&");
+        const textSearchParam = textSearch
+            ? `&textSearch=${encodeURIComponent(textSearch)}`
+            : "";
 
         const res = await api.post(
             `/organizations/${organizationId}/query/records/advanced?${projectIdsQuery}${textSearchParam}`,
             queryObj,
-            { headers: { "Content-Type": "application/json" } }
+            { headers: { "Content-Type": "application/json" } },
         );
         return res.data;
     } catch (error) {
@@ -78,16 +86,52 @@ export async function queryBuilder(
  */
 export async function getRecentlyAddedRecords(
     organizationId: number,
-    projectIds: number[]
+    projectIds: number[],
 ): Promise<QueryRecordViewResponseDto[]> {
     try {
-        const projectIdsQuery = projectIds.map(id => `projectIds=${id}`).join('&');
+        const projectIdsQuery = projectIds
+            .map((id) => `projectIds=${id}`)
+            .join("&");
         const res = await api.get<QueryRecordViewResponseDto[]>(
-            `/organizations/${organizationId}/query/recent?${projectIdsQuery}`
+            `/organizations/${organizationId}/query/recent?${projectIdsQuery}`,
         );
         return res.data;
     } catch (error) {
         console.error("Error getting recently added records:", error);
+        throw error;
+    }
+}
+
+/**
+ * Get paginated records
+ * @param organizationId - The ID of the organization
+ * @param projectIds - Array of project IDs
+ * @param sortBy - Field to sort by
+ * @param paginatedDto - Pagination information (pageNumber, pageSize)
+ * @returns Promise with paginated QueryRecordViewResponseDto
+ */
+export async function getRecordsPaginated(
+    organizationId: number,
+    projectIds: number[],
+    sortBy: string,
+    pageNumber: number,
+    pageSize: number,
+): Promise<PaginatedResponse<QueryRecordViewResponseDto>> {
+    try {
+        const params = new URLSearchParams();
+        projectIds.forEach((id) => params.append("projectIds", String(id)));
+        params.append("sortBy", sortBy);
+        params.append("pageNumber", String(pageNumber ?? 1));
+        params.append("pageSize", String(pageSize ?? 25));
+
+        const res = await api.get<
+            PaginatedResponse<QueryRecordViewResponseDto>
+        >(
+            `/organizations/${organizationId}/query/records/paginated?${params.toString()}`,
+        );
+        return res.data;
+    } catch (error) {
+        console.error("Error getting paginated records:", error);
         throw error;
     }
 }
@@ -102,12 +146,14 @@ export async function getRecentlyAddedRecords(
 export async function getMultiProjectRecords(
     organizationId: number,
     projectIds: number[],
-    hideArchived: boolean = true
+    hideArchived: boolean = true,
 ): Promise<QueryRecordViewResponseDto[]> {
     try {
-        const projectIdsQuery = projectIds.map(id => `projects=${id}`).join('&');
+        const projectIdsQuery = projectIds
+            .map((id) => `projects=${id}`)
+            .join("&");
         const res = await api.get(
-            `/organizations/${organizationId}/query/multiproject?${projectIdsQuery}&hideArchived=${hideArchived}`
+            `/organizations/${organizationId}/query/multiproject?${projectIdsQuery}&hideArchived=${hideArchived}`,
         );
         return res.data;
     } catch (error) {

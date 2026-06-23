@@ -1,3 +1,4 @@
+using System.Net;
 using System.Text;
 using deeplynx.api.Controllers;
 using deeplynx.datalayer.Models;
@@ -186,6 +187,26 @@ public class LatticeExtractionControllerTests : IDisposable
     }
 
     [Fact]
+    public async Task EmbedOntology_Returns400_OnSchemaNotReady()
+    {
+        _mockInsight.Setup(i => i.QueueInsightEmbedStrings(
+                        It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long?>()))
+                    .ThrowsAsync(new InvalidOperationException("Define at least one relationship before queueing data schema embeddings."));
+
+        var result = await _controller.EmbedOntology(OrgId, ProjectId) as BadRequestObjectResult;
+
+        Assert.NotNull(result);
+        Assert.Equal(400, result.StatusCode);
+        Assert.NotNull(result.Value);
+        Assert.Equal(
+            "ontology_schema_not_ready",
+            result.Value.GetType().GetProperty("error")?.GetValue(result.Value));
+        Assert.Equal(
+            "Define at least one relationship before queueing data schema embeddings.",
+            result.Value.GetType().GetProperty("message")?.GetValue(result.Value));
+    }
+
+    [Fact]
     public async Task EmbedOntology_Returns500_OnUnexpectedException()
     {
         _mockInsight.Setup(i => i.QueueInsightEmbedStrings(
@@ -208,21 +229,21 @@ public class LatticeExtractionControllerTests : IDisposable
     #region InsightExtractionFailure Tests
 
     [Fact]
-    public async Task InsightExtractionFailure_Returns200_OnSuccess()
+    public async Task InsightExtractionFailure_Returns202_OnSuccess()
     {
-        _mockBusiness.Setup(b => b.MarkExtractionFailed(5L, It.IsAny<string?>()))
+        _mockBusiness.Setup(b => b.MarkExtractionFailed(5L, OrgId, ProjectId, It.IsAny<string?>()))
                      .Returns(Task.CompletedTask);
 
-        var result = await _controller.InsightExtractionFailure(OrgId, ProjectId, 5L) as OkResult;
+        var result = await _controller.InsightExtractionFailure(OrgId, ProjectId, 5L) as AcceptedResult;
 
         Assert.NotNull(result);
-        Assert.Equal(200, result.StatusCode);
+        Assert.Equal(202, result.StatusCode);
     }
 
     [Fact]
     public async Task InsightExtractionFailure_Returns404_OnInvalidOperationException()
     {
-        _mockBusiness.Setup(b => b.MarkExtractionFailed(NotFoundId, It.IsAny<string?>()))
+        _mockBusiness.Setup(b => b.MarkExtractionFailed(NotFoundId, OrgId, ProjectId, It.IsAny<string?>()))
                      .ThrowsAsync(new InvalidOperationException($"Extraction {NotFoundId} not found."));
 
         var result = await _controller.InsightExtractionFailure(OrgId, ProjectId, NotFoundId) as NotFoundObjectResult;
@@ -235,7 +256,7 @@ public class LatticeExtractionControllerTests : IDisposable
     [Fact]
     public async Task InsightExtractionFailure_Returns500_OnUnexpectedException()
     {
-        _mockBusiness.Setup(b => b.MarkExtractionFailed(It.IsAny<long>(), It.IsAny<string?>()))
+        _mockBusiness.Setup(b => b.MarkExtractionFailed(It.IsAny<long>(), OrgId, ProjectId, It.IsAny<string?>()))
                      .ThrowsAsync(new Exception("db error"));
 
         var result = await _controller.InsightExtractionFailure(OrgId, ProjectId, 5L) as ObjectResult;
@@ -249,11 +270,36 @@ public class LatticeExtractionControllerTests : IDisposable
     public async Task InsightExtractionFailure_PassesErrorMessageToBusinessLayer()
     {
         const string msg = "LLM timed out";
-        _mockBusiness.Setup(b => b.MarkExtractionFailed(5L, msg)).Returns(Task.CompletedTask);
+        _mockBusiness.Setup(b => b.MarkExtractionFailed(5L, OrgId, ProjectId, msg)).Returns(Task.CompletedTask);
 
         await _controller.InsightExtractionFailure(OrgId, ProjectId, 5L, msg);
 
-        _mockBusiness.Verify(b => b.MarkExtractionFailed(5L, msg), Times.Once);
+        _mockBusiness.Verify(b => b.MarkExtractionFailed(5L, OrgId, ProjectId, msg), Times.Once);
+    }
+
+    [Fact]
+    public async Task InsightExtractionFailure_ReadsPlainTextBody_WhenQueryMessageMissing()
+    {
+        const string msg = "Error: model or endpoint not found";
+        SetRequestBody(msg);
+        _controller.Request.ContentType = "text/plain";
+        _mockBusiness.Setup(b => b.MarkExtractionFailed(5L, OrgId, ProjectId, msg)).Returns(Task.CompletedTask);
+
+        await _controller.InsightExtractionFailure(OrgId, ProjectId, 5L);
+
+        _mockBusiness.Verify(b => b.MarkExtractionFailed(5L, OrgId, ProjectId, msg), Times.Once);
+    }
+
+    [Fact]
+    public async Task InsightExtractionFailure_ReadsJsonDetailBody_WhenQueryMessageMissing()
+    {
+        const string msg = "model does not exist";
+        SetRequestBody("""{"error":"model_not_found","detail":"model does not exist"}""");
+        _mockBusiness.Setup(b => b.MarkExtractionFailed(5L, OrgId, ProjectId, msg)).Returns(Task.CompletedTask);
+
+        await _controller.InsightExtractionFailure(OrgId, ProjectId, 5L);
+
+        _mockBusiness.Verify(b => b.MarkExtractionFailed(5L, OrgId, ProjectId, msg), Times.Once);
     }
 
     #endregion
@@ -340,14 +386,14 @@ public class LatticeExtractionControllerTests : IDisposable
     public async Task InsightExtractionCallback_CallsMarkFailed_AndReturns400_WhenJsonParseFails()
     {
         SetRequestBody("{ broken }");
-        _mockBusiness.Setup(b => b.MarkExtractionFailed(7L, It.IsAny<string>()))
+        _mockBusiness.Setup(b => b.MarkExtractionFailed(7L, OrgId, ProjectId, It.IsAny<string>()))
                      .Returns(Task.CompletedTask);
 
         var result = await _controller.InsightExtractionCallback(OrgId, ProjectId, 7L, 3L) as BadRequestObjectResult;
 
         Assert.NotNull(result);
         Assert.Equal(400, result.StatusCode);
-        _mockBusiness.Verify(b => b.MarkExtractionFailed(7L, It.IsAny<string>()), Times.Once);
+        _mockBusiness.Verify(b => b.MarkExtractionFailed(7L, OrgId, ProjectId, It.IsAny<string>()), Times.Once);
     }
 
     /// <summary>
@@ -358,7 +404,7 @@ public class LatticeExtractionControllerTests : IDisposable
     public async Task InsightExtractionCallback_Returns400_EvenWhenMarkFailedThrows_OnJsonParseFailure()
     {
         SetRequestBody("{ broken }");
-        _mockBusiness.Setup(b => b.MarkExtractionFailed(7L, It.IsAny<string>()))
+        _mockBusiness.Setup(b => b.MarkExtractionFailed(7L, OrgId, ProjectId, It.IsAny<string>()))
                      .ThrowsAsync(new Exception("db unavailable"));
 
         var result = await _controller.InsightExtractionCallback(OrgId, ProjectId, 7L, 3L) as BadRequestObjectResult;
@@ -420,7 +466,7 @@ public class LatticeExtractionControllerTests : IDisposable
             Relationships = [new StagedRelationshipDto { Id = 1, Name = "located at" }],
             Edges = [new StagedEdgeDto { Id = 1, OriginRecordName = "100th Wing", DestinationRecordName = "RAF Mildenhall" }]
         };
-        _mockBusiness.Setup(b => b.GetExtractionStaging(7L)).ReturnsAsync(expected);
+        _mockBusiness.Setup(b => b.GetExtractionStaging(7L, OrgId, ProjectId)).ReturnsAsync(expected);
 
         var result = await _controller.GetExtractionStaging(OrgId, ProjectId, 7L) as OkObjectResult;
 
@@ -432,7 +478,7 @@ public class LatticeExtractionControllerTests : IDisposable
     [Fact]
     public async Task GetExtractionStaging_Returns404_OnInvalidOperationException()
     {
-        _mockBusiness.Setup(b => b.GetExtractionStaging(NotFoundId))
+        _mockBusiness.Setup(b => b.GetExtractionStaging(NotFoundId, OrgId, ProjectId))
                      .ThrowsAsync(new InvalidOperationException($"Extraction {NotFoundId} not found."));
 
         var result = await _controller.GetExtractionStaging(OrgId, ProjectId, NotFoundId) as NotFoundObjectResult;
@@ -445,7 +491,7 @@ public class LatticeExtractionControllerTests : IDisposable
     [Fact]
     public async Task GetExtractionStaging_Returns500_OnUnexpectedException()
     {
-        _mockBusiness.Setup(b => b.GetExtractionStaging(It.IsAny<long>()))
+        _mockBusiness.Setup(b => b.GetExtractionStaging(It.IsAny<long>(), OrgId, ProjectId))
                      .ThrowsAsync(new Exception("unexpected"));
 
         var result = await _controller.GetExtractionStaging(OrgId, ProjectId, 7L) as ObjectResult;
@@ -464,13 +510,14 @@ public class LatticeExtractionControllerTests : IDisposable
     #region PromoteExtraction Tests
 
     [Fact]
-    public async Task PromoteExtraction_Approve_Returns200_WithResult()
+    public async Task PromoteExtraction_Returns200_WithResult()
     {
+        var request = new PromoteExtractionRequestDto { ClassIds = [1L], RecordIds = [2L] };
         var expected = new ExtractionResponseDto { Id = 7, ClassCount = 2, RecordCount = 2, EdgeCount = 1 };
-        _mockBusiness.Setup(b => b.PromoteExtraction(UserId, OrgId, ProjectId, 7L, true))
+        _mockBusiness.Setup(b => b.PromoteExtraction(UserId, OrgId, ProjectId, 7L, request))
                      .ReturnsAsync(expected);
 
-        var result = await _controller.PromoteExtraction(OrgId, ProjectId, 7L, true) as OkObjectResult;
+        var result = await _controller.PromoteExtraction(OrgId, ProjectId, 7L, request) as OkObjectResult;
 
         Assert.NotNull(result);
         Assert.Equal(200, result.StatusCode);
@@ -478,12 +525,13 @@ public class LatticeExtractionControllerTests : IDisposable
     }
 
     [Fact]
-    public async Task PromoteExtraction_Reject_Returns200()
+    public async Task RejectExtraction_Returns200()
     {
-        _mockBusiness.Setup(b => b.PromoteExtraction(UserId, OrgId, ProjectId, 7L, false))
+        var request = new RejectExtractionRequestDto { RejectAllRemaining = true };
+        _mockBusiness.Setup(b => b.RejectExtraction(7L, request))
                      .ReturnsAsync(new ExtractionResponseDto { Id = 7 });
 
-        var result = await _controller.PromoteExtraction(OrgId, ProjectId, 7L, false) as OkObjectResult;
+        var result = await _controller.RejectExtraction(OrgId, ProjectId, 7L, request) as OkObjectResult;
 
         Assert.NotNull(result);
         Assert.Equal(200, result.StatusCode);
@@ -493,10 +541,13 @@ public class LatticeExtractionControllerTests : IDisposable
     public async Task PromoteExtraction_Returns400_OnInvalidOperationException()
     {
         _mockBusiness.Setup(b => b.PromoteExtraction(
-                         It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(), It.IsAny<bool>()))
+                         It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(),
+                         It.IsAny<PromoteExtractionRequestDto>()))
                      .ThrowsAsync(new InvalidOperationException("Cannot promote — status is running."));
 
-        var result = await _controller.PromoteExtraction(OrgId, ProjectId, 7L, true) as BadRequestObjectResult;
+        var result =
+            await _controller.PromoteExtraction(OrgId, ProjectId, 7L, new PromoteExtractionRequestDto()) as
+                BadRequestObjectResult;
 
         Assert.NotNull(result);
         Assert.Equal(400, result.StatusCode);
@@ -507,10 +558,12 @@ public class LatticeExtractionControllerTests : IDisposable
     public async Task PromoteExtraction_Returns500_OnUnexpectedException()
     {
         _mockBusiness.Setup(b => b.PromoteExtraction(
-                         It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(), It.IsAny<bool>()))
+                         It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(),
+                         It.IsAny<PromoteExtractionRequestDto>()))
                      .ThrowsAsync(new Exception("db error"));
 
-        var result = await _controller.PromoteExtraction(OrgId, ProjectId, 7L, true) as ObjectResult;
+        var result =
+            await _controller.PromoteExtraction(OrgId, ProjectId, 7L, new PromoteExtractionRequestDto()) as ObjectResult;
 
         Assert.NotNull(result);
         Assert.Equal(500, result.StatusCode);
@@ -521,12 +574,13 @@ public class LatticeExtractionControllerTests : IDisposable
     public async Task PromoteExtraction_PassesCurrentUserIdToBusinessLayer()
     {
         UserContextStorage.UserId = 42L;
-        _mockBusiness.Setup(b => b.PromoteExtraction(42L, OrgId, ProjectId, 7L, true))
+        var request = new PromoteExtractionRequestDto();
+        _mockBusiness.Setup(b => b.PromoteExtraction(42L, OrgId, ProjectId, 7L, request))
                      .ReturnsAsync(new ExtractionResponseDto { Id = 7 });
 
-        await _controller.PromoteExtraction(OrgId, ProjectId, 7L, true);
+        await _controller.PromoteExtraction(OrgId, ProjectId, 7L, request);
 
-        _mockBusiness.Verify(b => b.PromoteExtraction(42L, OrgId, ProjectId, 7L, true), Times.Once);
+        _mockBusiness.Verify(b => b.PromoteExtraction(42L, OrgId, ProjectId, 7L, request), Times.Once);
     }
 
     #endregion
@@ -554,17 +608,41 @@ public class LatticeExtractionControllerTests : IDisposable
     }
 
     [Fact]
-    public async Task TriggerExtraction_Returns400_OnInvalidOperationException()
+    public async Task TriggerExtraction_Returns409_WithStructuredError_WhenEmbeddingsNotReady()
     {
         _mockBusiness.Setup(b => b.TriggerLatticeExtraction(
                          It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(), It.IsAny<string>()))
                      .ThrowsAsync(new InvalidOperationException("Embeddings are being generated."));
 
-        var result = await _controller.TriggerExtraction(OrgId, ProjectId, 5L, ExtractionMode.Strict) as BadRequestObjectResult;
+        var result = await _controller.TriggerExtraction(OrgId, ProjectId, 5L, ExtractionMode.Strict) as ConflictObjectResult;
 
         Assert.NotNull(result);
-        Assert.Equal(400, result.StatusCode);
+        Assert.Equal(409, result.StatusCode);
         Assert.NotNull(result.Value);
+        var errorProp = result.Value.GetType().GetProperty("error");
+        Assert.NotNull(errorProp);
+        Assert.Equal("embeddings_not_ready", errorProp.GetValue(result.Value));
+    }
+
+    [Fact]
+    public async Task TriggerExtraction_PreservesInsightFailureStatusCode()
+    {
+        _mockBusiness.Setup(b => b.TriggerLatticeExtraction(
+                         It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(), It.IsAny<string>()))
+                     .ThrowsAsync(new InsightServiceException(
+                         "Insight /lattice_query failed with 424 Failed Dependency.",
+                         HttpStatusCode.FailedDependency,
+                         """{"detail":"model missing"}"""));
+
+        var result = await _controller.TriggerExtraction(OrgId, ProjectId, 5L, ExtractionMode.Strict) as ObjectResult;
+
+        Assert.NotNull(result);
+        Assert.Equal(424, result.StatusCode);
+        Assert.NotNull(result.Value);
+
+        var errorProp = result.Value.GetType().GetProperty("error");
+        Assert.NotNull(errorProp);
+        Assert.Equal("lattice_trigger_failed", errorProp.GetValue(result.Value));
     }
 
     [Fact]

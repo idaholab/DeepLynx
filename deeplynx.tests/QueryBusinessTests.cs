@@ -24,6 +24,7 @@ public class QueryBusinessTests : IntegrationTestBase
     private INotificationBusiness _notificationBusiness = null!;
     private QueryBusiness _queryBusiness = null!;
     private RecordBusiness _recordBusiness;
+    private UserBusiness _userBusiness = null!;
     private SensitivityLabelBusiness _sensitivityLabelBusiness;
     private ISensitivityLabelService _sensitivityLabelService = null!;
     private TagBusiness _tagBusiness = null!;
@@ -57,7 +58,8 @@ public class QueryBusinessTests : IntegrationTestBase
             new NotificationBusiness(Context, _mockNotificationLogger.Object, _mockHubContext.Object);
         _mockBulkCopyUpsertExecutor = new BulkCopyUpsertExecutor();
         _eventBusiness = new EventBusiness(Context, _notificationBusiness, _mockBulkCopyUpsertExecutor);
-        _sensitivityLabelBusiness = new SensitivityLabelBusiness(Context, _eventBusiness);
+        _userBusiness = new UserBusiness(Context);
+        _sensitivityLabelBusiness = new SensitivityLabelBusiness(Context, _eventBusiness, _userBusiness);
         _tagBusiness = new TagBusiness(Context, _eventBusiness);
         _recordBusiness = new RecordBusiness(Context, _eventBusiness, _mockBulkCopyUpsertExecutor, _tagBusiness,
             _sensitivityLabelBusiness, _sensitivityLabelService);
@@ -372,7 +374,7 @@ public class QueryBusinessTests : IntegrationTestBase
         };
         await Context.Records.AddAsync(crosshair);
         await Context.SaveChangesAsync();
-        
+
         var echo = new Record
         {
             Name = "Echo",
@@ -454,7 +456,7 @@ public class QueryBusinessTests : IntegrationTestBase
         };
         await Context.Records.AddAsync(wedge);
         await Context.SaveChangesAsync();
-        
+
         var chewie = new Record
         {
             Name = "Chewbacca",
@@ -614,7 +616,7 @@ public class QueryBusinessTests : IntegrationTestBase
         Assert.Contains(records, r => r.ProjectId == pid2);
         Assert.All(records, r => Assert.False(r.IsArchived));
     }
-    
+
     [Fact]
     public async Task GetMultiProjectRecords_Success_ReturnsOnlyUnarchivedRecords()
     {
@@ -629,7 +631,7 @@ public class QueryBusinessTests : IntegrationTestBase
         Assert.NotEmpty(records);
         Assert.All(records, r => Assert.False(r.IsArchived));
     }
-    
+
     [Fact]
     public async Task GetMultiProjectRecords_Success_ReturnsWithArchivedRecords()
     {
@@ -1165,7 +1167,7 @@ public class QueryBusinessTests : IntegrationTestBase
         Assert.Equal("Tech", records.First().Name);
         Assert.Equal(pid, records.First().ProjectId);
     }
-    
+
     [Fact]
     public async Task Search_Success_FindsArchivedRecordByName()
     {
@@ -1207,7 +1209,7 @@ public class QueryBusinessTests : IntegrationTestBase
 
         Assert.Contains("Search query is required", exception.Message);
     }
-    
+
     [Fact]
     public async Task Search_ReturnsEmpty_IfRecordArchived()
     {
@@ -1460,7 +1462,10 @@ public class QueryBusinessTests : IntegrationTestBase
         // Arrange
         var dto = new CustomQueryDtos.CustomQueryRequestDto
         {
-            Connector = "AND", Filter = "name", Operator = "=", Value = "Tech"
+            Connector = "AND",
+            Filter = "name",
+            Operator = "=",
+            Value = "Tech"
         };
 
         // Act
@@ -1524,14 +1529,17 @@ public class QueryBusinessTests : IntegrationTestBase
         // Assert
         Assert.Empty(result);
     }
-    
+
     [Fact]
     public async Task QueryBuilder_Success_ExcludesArchivedRecords()
     {
         // Arrange
         var dto = new CustomQueryDtos.CustomQueryRequestDto
         {
-            Connector = "AND", Filter = "name", Operator = "=", Value = "Echo"
+            Connector = "AND",
+            Filter = "name",
+            Operator = "=",
+            Value = "Echo"
         };
 
         // Act
@@ -1541,14 +1549,17 @@ public class QueryBusinessTests : IntegrationTestBase
         // Assert
         Assert.Empty(records);
     }
-    
+
     [Fact]
     public async Task QueryBuilder_Success_AllRecordsExcludesArchivedRecords()
     {
         // Arrange
         var dto = new CustomQueryDtos.CustomQueryRequestDto
         {
-            Connector = "AND", Filter = "project_name", Operator = "LIKE", Value = "rebellion"
+            Connector = "AND",
+            Filter = "project_name",
+            Operator = "LIKE",
+            Value = "rebellion"
         };
 
         // Act
@@ -1566,7 +1577,10 @@ public class QueryBusinessTests : IntegrationTestBase
         // Arrange
         var dto = new CustomQueryDtos.CustomQueryRequestDto
         {
-            Connector = "AND", Filter = "name", Operator = "LIKE", Value = "tech"
+            Connector = "AND",
+            Filter = "name",
+            Operator = "LIKE",
+            Value = "tech"
         };
 
         // Act
@@ -1650,11 +1664,17 @@ public class QueryBusinessTests : IntegrationTestBase
         // Arrange
         var dto1 = new CustomQueryDtos.CustomQueryRequestDto
         {
-            Connector = "AND", Filter = "data_source_name", Operator = "LIKE", Value = "R2D2"
+            Connector = "AND",
+            Filter = "data_source_name",
+            Operator = "LIKE",
+            Value = "R2D2"
         };
         var dto2 = new CustomQueryDtos.CustomQueryRequestDto
         {
-            Connector = "AND", Filter = "original_id", Operator = "LIKE", Value = "CT-7567"
+            Connector = "AND",
+            Filter = "original_id",
+            Operator = "LIKE",
+            Value = "CT-7567"
         };
 
         // Act
@@ -1671,11 +1691,17 @@ public class QueryBusinessTests : IntegrationTestBase
         // Arrange
         var dto1 = new CustomQueryDtos.CustomQueryRequestDto
         {
-            Connector = "", Filter = "name", Operator = "=", Value = "Tech"
+            Connector = "",
+            Filter = "name",
+            Operator = "=",
+            Value = "Tech"
         };
         var dto2 = new CustomQueryDtos.CustomQueryRequestDto
         {
-            Connector = "OR", Filter = "name", Operator = "=", Value = "Wrecker"
+            Connector = "OR",
+            Filter = "name",
+            Operator = "=",
+            Value = "Wrecker"
         };
 
         // Act
@@ -1692,15 +1718,24 @@ public class QueryBusinessTests : IntegrationTestBase
         // Arrange
         var dto1 = new CustomQueryDtos.CustomQueryRequestDto
         {
-            Connector = null, Filter = "name", Operator = "LIKE", Value = "rex"
+            Connector = null,
+            Filter = "name",
+            Operator = "LIKE",
+            Value = "rex"
         };
         var dto2 = new CustomQueryDtos.CustomQueryRequestDto
         {
-            Connector = "OR", Filter = "name", Operator = "=", Value = "Tech"
+            Connector = "OR",
+            Filter = "name",
+            Operator = "=",
+            Value = "Tech"
         };
         var dto3 = new CustomQueryDtos.CustomQueryRequestDto
         {
-            Connector = "OR", Filter = "name", Operator = "=", Value = "Hunter"
+            Connector = "OR",
+            Filter = "name",
+            Operator = "=",
+            Value = "Hunter"
         };
 
         // Act
@@ -1717,15 +1752,24 @@ public class QueryBusinessTests : IntegrationTestBase
         // Arrange
         var dto1 = new CustomQueryDtos.CustomQueryRequestDto
         {
-            Connector = null, Filter = "project_name", Operator = "LIKE", Value = "Anakin"
+            Connector = null,
+            Filter = "project_name",
+            Operator = "LIKE",
+            Value = "Anakin"
         };
         var dto2 = new CustomQueryDtos.CustomQueryRequestDto
         {
-            Connector = "AND", Filter = "name", Operator = "=", Value = "Tech"
+            Connector = "AND",
+            Filter = "name",
+            Operator = "=",
+            Value = "Tech"
         };
         var dto3 = new CustomQueryDtos.CustomQueryRequestDto
         {
-            Connector = "OR", Filter = "name", Operator = "=", Value = "Hunter"
+            Connector = "OR",
+            Filter = "name",
+            Operator = "=",
+            Value = "Hunter"
         };
 
         // Act
@@ -1742,7 +1786,10 @@ public class QueryBusinessTests : IntegrationTestBase
         // Arrange
         var dto = new CustomQueryDtos.CustomQueryRequestDto
         {
-            Connector = "AND", Filter = "data_source_name", Operator = "LIKE", Value = "R2D2"
+            Connector = "AND",
+            Filter = "data_source_name",
+            Operator = "LIKE",
+            Value = "R2D2"
         };
 
         // Act
@@ -1759,7 +1806,10 @@ public class QueryBusinessTests : IntegrationTestBase
         // Arrange
         var dto = new CustomQueryDtos.CustomQueryRequestDto
         {
-            Connector = "AND", Filter = "description", Operator = "LIKE", Value = "stop"
+            Connector = "AND",
+            Filter = "description",
+            Operator = "LIKE",
+            Value = "stop"
         };
 
         // Act
@@ -1777,7 +1827,10 @@ public class QueryBusinessTests : IntegrationTestBase
         // Arrange
         var dto = new CustomQueryDtos.CustomQueryRequestDto
         {
-            Connector = "AND", Filter = "original_id", Operator = "LIKE", Value = "CT-99"
+            Connector = "AND",
+            Filter = "original_id",
+            Operator = "LIKE",
+            Value = "CT-99"
         };
 
         // Act
@@ -1794,7 +1847,10 @@ public class QueryBusinessTests : IntegrationTestBase
         // Arrange
         var dto = new CustomQueryDtos.CustomQueryRequestDto
         {
-            Connector = null, Filter = "name", Operator = "LIKE", Value = "a"
+            Connector = null,
+            Filter = "name",
+            Operator = "LIKE",
+            Value = "a"
         };
 
         // Act
@@ -1811,7 +1867,10 @@ public class QueryBusinessTests : IntegrationTestBase
         // Arrange
         var dto = new CustomQueryDtos.CustomQueryRequestDto
         {
-            Connector = null, Filter = "project_name", Operator = "LIKE", Value = "Rebellion"
+            Connector = null,
+            Filter = "project_name",
+            Operator = "LIKE",
+            Value = "Rebellion"
         };
 
         // Act
@@ -1828,7 +1887,10 @@ public class QueryBusinessTests : IntegrationTestBase
         // Arrange
         var dto = new CustomQueryDtos.CustomQueryRequestDto
         {
-            Connector = null, Filter = "project_name", Operator = "=", Value = "The Galactic Empire"
+            Connector = null,
+            Filter = "project_name",
+            Operator = "=",
+            Value = "The Galactic Empire"
         };
 
         // Act
@@ -1845,7 +1907,10 @@ public class QueryBusinessTests : IntegrationTestBase
         // Arrange
         var dto = new CustomQueryDtos.CustomQueryRequestDto
         {
-            Connector = null, Filter = "project_name", Operator = "LIKE", Value = "Mandalorians"
+            Connector = null,
+            Filter = "project_name",
+            Operator = "LIKE",
+            Value = "Mandalorians"
         };
 
         // Act
@@ -1873,7 +1938,10 @@ public class QueryBusinessTests : IntegrationTestBase
         // Arrange
         var dto = new CustomQueryDtos.CustomQueryRequestDto
         {
-            Connector = null, Filter = "project_name", Operator = "=", Value = "Anakin"
+            Connector = null,
+            Filter = "project_name",
+            Operator = "=",
+            Value = "Anakin"
         };
 
         // Act
@@ -1890,7 +1958,10 @@ public class QueryBusinessTests : IntegrationTestBase
         // Arrange
         var dto = new CustomQueryDtos.CustomQueryRequestDto
         {
-            Connector = null, Filter = "data_source_name", Operator = "LIKE", Value = "Yavin"
+            Connector = null,
+            Filter = "data_source_name",
+            Operator = "LIKE",
+            Value = "Yavin"
         };
 
         // Act
@@ -1907,7 +1978,10 @@ public class QueryBusinessTests : IntegrationTestBase
         // Arrange
         var dto = new CustomQueryDtos.CustomQueryRequestDto
         {
-            Connector = null, Filter = "name", Operator = "LIKE", Value = "a"
+            Connector = null,
+            Filter = "name",
+            Operator = "LIKE",
+            Value = "a"
         };
 
         // Act
@@ -1924,7 +1998,10 @@ public class QueryBusinessTests : IntegrationTestBase
         // Arrange
         var dto = new CustomQueryDtos.CustomQueryRequestDto
         {
-            Connector = null, Filter = "original_id", Operator = "LIKE", Value = "REB-"
+            Connector = null,
+            Filter = "original_id",
+            Operator = "LIKE",
+            Value = "REB-"
         };
 
         // Act
@@ -1941,7 +2018,10 @@ public class QueryBusinessTests : IntegrationTestBase
         // Arrange
         var dto = new CustomQueryDtos.CustomQueryRequestDto
         {
-            Connector = null, Filter = "original_id", Operator = "LIKE", Value = "CT-"
+            Connector = null,
+            Filter = "original_id",
+            Operator = "LIKE",
+            Value = "CT-"
         };
 
         // Act
@@ -1958,11 +2038,17 @@ public class QueryBusinessTests : IntegrationTestBase
         // Arrange
         var dto1 = new CustomQueryDtos.CustomQueryRequestDto
         {
-            Connector = null, Filter = "project_name", Operator = "=", Value = "Anakin"
+            Connector = null,
+            Filter = "project_name",
+            Operator = "=",
+            Value = "Anakin"
         };
         var dto2 = new CustomQueryDtos.CustomQueryRequestDto
         {
-            Connector = "OR", Filter = "project_name", Operator = "=", Value = "The Galactic Empire"
+            Connector = "OR",
+            Filter = "project_name",
+            Operator = "=",
+            Value = "The Galactic Empire"
         };
 
         // Act
@@ -2082,7 +2168,10 @@ public class QueryBusinessTests : IntegrationTestBase
         // Arrange
         var dto = new CustomQueryDtos.CustomQueryRequestDto
         {
-            Connector = "AND", Filter = "data_source_name", Operator = "LIKE", Value = "R2D2"
+            Connector = "AND",
+            Filter = "data_source_name",
+            Operator = "LIKE",
+            Value = "R2D2"
         };
 
         // Act
@@ -2099,7 +2188,10 @@ public class QueryBusinessTests : IntegrationTestBase
         // Arrange
         var dto = new CustomQueryDtos.CustomQueryRequestDto
         {
-            Connector = "AND", Filter = "InvalidField", Operator = "=", Value = "test"
+            Connector = "AND",
+            Filter = "InvalidField",
+            Operator = "=",
+            Value = "test"
         };
 
         // Act & Assert
@@ -2113,7 +2205,10 @@ public class QueryBusinessTests : IntegrationTestBase
         // Arrange
         var dto = new CustomQueryDtos.CustomQueryRequestDto
         {
-            Connector = "AND", Filter = "name", Operator = "INVALID", Value = "test"
+            Connector = "AND",
+            Filter = "name",
+            Operator = "INVALID",
+            Value = "test"
         };
 
         // Act & Assert
@@ -2127,7 +2222,10 @@ public class QueryBusinessTests : IntegrationTestBase
         // Arrange
         var dto = new CustomQueryDtos.CustomQueryRequestDto
         {
-            Connector = "AND", Filter = "last_updated_at", Operator = ">", Value = "invalid-date"
+            Connector = "AND",
+            Filter = "last_updated_at",
+            Operator = ">",
+            Value = "invalid-date"
         };
 
         // Act & Assert
@@ -2141,7 +2239,10 @@ public class QueryBusinessTests : IntegrationTestBase
         // Arrange
         var dto = new CustomQueryDtos.CustomQueryRequestDto
         {
-            Connector = "AND", Filter = "name", Operator = "=", Value = null
+            Connector = "AND",
+            Filter = "name",
+            Operator = "=",
+            Value = null
         };
 
         // Act & Assert
@@ -2155,7 +2256,10 @@ public class QueryBusinessTests : IntegrationTestBase
         // Arrange
         var dto = new CustomQueryDtos.CustomQueryRequestDto
         {
-            Connector = "AND", Filter = "name", Operator = "=", Value = ""
+            Connector = "AND",
+            Filter = "name",
+            Operator = "=",
+            Value = ""
         };
 
         // Act & Assert
@@ -2204,15 +2308,24 @@ public class QueryBusinessTests : IntegrationTestBase
 
         var dto1 = new CustomQueryDtos.CustomQueryRequestDto
         {
-            Connector = null, Filter = "name", Operator = "LIKE", Value = "rex"
+            Connector = null,
+            Filter = "name",
+            Operator = "LIKE",
+            Value = "rex"
         };
         var dto2 = new CustomQueryDtos.CustomQueryRequestDto
         {
-            Connector = "OR", Filter = "name", Operator = "=", Value = "Tech"
+            Connector = "OR",
+            Filter = "name",
+            Operator = "=",
+            Value = "Tech"
         };
         var dto3 = new CustomQueryDtos.CustomQueryRequestDto
         {
-            Connector = "OR", Filter = "name", Operator = "=", Value = "Hunter"
+            Connector = "OR",
+            Filter = "name",
+            Operator = "=",
+            Value = "Hunter"
         };
 
         // Act
@@ -2266,15 +2379,24 @@ public class QueryBusinessTests : IntegrationTestBase
 
         var dto1 = new CustomQueryDtos.CustomQueryRequestDto
         {
-            Connector = null, Filter = "name", Operator = "LIKE", Value = "rex"
+            Connector = null,
+            Filter = "name",
+            Operator = "LIKE",
+            Value = "rex"
         };
         var dto2 = new CustomQueryDtos.CustomQueryRequestDto
         {
-            Connector = "OR", Filter = "name", Operator = "=", Value = "Tech"
+            Connector = "OR",
+            Filter = "name",
+            Operator = "=",
+            Value = "Tech"
         };
         var dto3 = new CustomQueryDtos.CustomQueryRequestDto
         {
-            Connector = "OR", Filter = "name", Operator = "=", Value = "Hunter"
+            Connector = "OR",
+            Filter = "name",
+            Operator = "=",
+            Value = "Hunter"
         };
 
         // Act
@@ -2339,15 +2461,24 @@ public class QueryBusinessTests : IntegrationTestBase
 
         var dto1 = new CustomQueryDtos.CustomQueryRequestDto
         {
-            Connector = null, Filter = "name", Operator = "LIKE", Value = "rex"
+            Connector = null,
+            Filter = "name",
+            Operator = "LIKE",
+            Value = "rex"
         };
         var dto2 = new CustomQueryDtos.CustomQueryRequestDto
         {
-            Connector = "OR", Filter = "name", Operator = "=", Value = "Tech"
+            Connector = "OR",
+            Filter = "name",
+            Operator = "=",
+            Value = "Tech"
         };
         var dto3 = new CustomQueryDtos.CustomQueryRequestDto
         {
-            Connector = "OR", Filter = "name", Operator = "=", Value = "Hunter"
+            Connector = "OR",
+            Filter = "name",
+            Operator = "=",
+            Value = "Hunter"
         };
 
         // Act
@@ -2426,15 +2557,24 @@ public class QueryBusinessTests : IntegrationTestBase
 
         var dto1 = new CustomQueryDtos.CustomQueryRequestDto
         {
-            Connector = null, Filter = "name", Operator = "LIKE", Value = "rex"
+            Connector = null,
+            Filter = "name",
+            Operator = "LIKE",
+            Value = "rex"
         };
         var dto2 = new CustomQueryDtos.CustomQueryRequestDto
         {
-            Connector = "OR", Filter = "name", Operator = "=", Value = "Tech"
+            Connector = "OR",
+            Filter = "name",
+            Operator = "=",
+            Value = "Tech"
         };
         var dto3 = new CustomQueryDtos.CustomQueryRequestDto
         {
-            Connector = "OR", Filter = "name", Operator = "=", Value = "Hunter"
+            Connector = "OR",
+            Filter = "name",
+            Operator = "=",
+            Value = "Hunter"
         };
 
         // Act
@@ -2455,7 +2595,10 @@ public class QueryBusinessTests : IntegrationTestBase
     {
         var dto = new CustomQueryDtos.CustomQueryRequestDto
         {
-            Connector = null, Filter = "tags", Operator = "LIKE", Value = "a"
+            Connector = null,
+            Filter = "tags",
+            Operator = "LIKE",
+            Value = "a"
         };
 
         var result = await _queryBusiness.QueryBuilder(uid, [dto], organizationId, [pid]);
@@ -2470,7 +2613,10 @@ public class QueryBusinessTests : IntegrationTestBase
     {
         var dto = new CustomQueryDtos.CustomQueryRequestDto
         {
-            Connector = null, Filter = "tags", Operator = "LIKE", Value = "d"
+            Connector = null,
+            Filter = "tags",
+            Operator = "LIKE",
+            Value = "d"
         };
 
         var result = await _queryBusiness.QueryBuilder(uid, [dto], organizationId, [pid]);
@@ -2485,7 +2631,10 @@ public class QueryBusinessTests : IntegrationTestBase
     {
         var dto = new CustomQueryDtos.CustomQueryRequestDto
         {
-            Connector = null, Filter = "tags", Operator = "LIKE", Value = "6"
+            Connector = null,
+            Filter = "tags",
+            Operator = "LIKE",
+            Value = "6"
         };
 
         var result = await _queryBusiness.QueryBuilder(uid, [dto], organizationId, [pid]);
@@ -2499,7 +2648,10 @@ public class QueryBusinessTests : IntegrationTestBase
     {
         var dto = new CustomQueryDtos.CustomQueryRequestDto
         {
-            Connector = null, Filter = "tags", Operator = "LIKE", Value = "z"
+            Connector = null,
+            Filter = "tags",
+            Operator = "LIKE",
+            Value = "z"
         };
 
         var result = await _queryBusiness.QueryBuilder(uid, [dto], organizationId, [pid]);
@@ -2513,7 +2665,10 @@ public class QueryBusinessTests : IntegrationTestBase
     {
         var dto = new CustomQueryDtos.CustomQueryRequestDto
         {
-            Connector = null, Filter = "tags", Operator = "LIKE", Value = "z"
+            Connector = null,
+            Filter = "tags",
+            Operator = "LIKE",
+            Value = "z"
         };
 
         var result = await _queryBusiness.QueryBuilder(uid, [dto], organizationId, [pid4]);
@@ -2527,7 +2682,10 @@ public class QueryBusinessTests : IntegrationTestBase
     {
         var dto = new CustomQueryDtos.CustomQueryRequestDto
         {
-            Connector = null, Filter = "tags", Operator = "LIKE", Value = "hunt"
+            Connector = null,
+            Filter = "tags",
+            Operator = "LIKE",
+            Value = "hunt"
         };
 
         var result = await _queryBusiness.QueryBuilder(uid, [dto], organizationId, [pid4]);
@@ -2542,7 +2700,10 @@ public class QueryBusinessTests : IntegrationTestBase
     {
         var dto = new CustomQueryDtos.CustomQueryRequestDto
         {
-            Connector = null, Filter = "tags", Operator = "LIKE", Value = "Alliance"
+            Connector = null,
+            Filter = "tags",
+            Operator = "LIKE",
+            Value = "Alliance"
         };
 
         var result = await _queryBusiness.QueryBuilder(uid, [dto], organizationId, [pid2]);
@@ -2562,7 +2723,10 @@ public class QueryBusinessTests : IntegrationTestBase
     {
         var dto = new CustomQueryDtos.CustomQueryRequestDto
         {
-            Connector = null, Filter = "properties", Operator = "LIKE", Value = "Rank"
+            Connector = null,
+            Filter = "properties",
+            Operator = "LIKE",
+            Value = "Rank"
         };
 
         var result = await _queryBusiness.QueryBuilder(uid, [dto], organizationId, [pid2]);
@@ -2576,7 +2740,10 @@ public class QueryBusinessTests : IntegrationTestBase
     {
         var dto = new CustomQueryDtos.CustomQueryRequestDto
         {
-            Connector = null, Filter = "properties", Operator = "LIKE", Value = "General"
+            Connector = null,
+            Filter = "properties",
+            Operator = "LIKE",
+            Value = "General"
         };
 
         var result = await _queryBusiness.QueryBuilder(uid, [dto], organizationId, [pid2]);
@@ -2591,7 +2758,10 @@ public class QueryBusinessTests : IntegrationTestBase
     {
         var dto = new CustomQueryDtos.CustomQueryRequestDto
         {
-            Connector = null, Filter = "properties", Operator = "LIKE", Value = "501"
+            Connector = null,
+            Filter = "properties",
+            Operator = "LIKE",
+            Value = "501"
         };
 
         var result = await _queryBusiness.QueryBuilder(uid, [dto], organizationId, [pid]);
@@ -2606,7 +2776,10 @@ public class QueryBusinessTests : IntegrationTestBase
     {
         var dto = new CustomQueryDtos.CustomQueryRequestDto
         {
-            Connector = null, Filter = "properties", Operator = "LIKE", Value = "99"
+            Connector = null,
+            Filter = "properties",
+            Operator = "LIKE",
+            Value = "99"
         };
 
         var result = await _queryBusiness.QueryBuilder(uid, [dto], organizationId, [pid]);
@@ -2658,7 +2831,7 @@ public class QueryBusinessTests : IntegrationTestBase
         // Assert - Archived records should not appear
         Assert.All(records, r => Assert.False(r.IsArchived));
         Assert.DoesNotContain(records, r => r.Name == "Echo");
-        Assert.DoesNotContain(records, r=> r.Name == "Chewbacca");
+        Assert.DoesNotContain(records, r => r.Name == "Chewbacca");
     }
 
     [Fact]
@@ -3141,6 +3314,672 @@ public class QueryBusinessTests : IntegrationTestBase
         Assert.Contains(records, r => r.Name == "Tech");
         Assert.Contains(records, r => r.Name == "Wrecker");
         Assert.Contains(records, r => r.Name == "Crosshair");
+    }
+
+    #endregion
+
+    #region GetRecordsPaginated Tests
+
+    [Fact]
+    public async Task GetRecordsPaginated_ReturnsEmpty_WhenNoProjectIdsProvided()
+    {
+        // Act
+        var result = await _queryBusiness.GetRecordsPaginated(uid, organizationId, SortRecordsRequestDto.NameAZ,
+            new PaginatedRequestDto { PageNumber = 1, PageSize = 10 }, []);
+
+        // Assert
+        Assert.Empty(result.Items);
+    }
+
+    [Fact]
+    public async Task GetRecordsPaginated_ReturnsRecords_ForSingleProject()
+    {
+        // Act
+        var result = await _queryBusiness.GetRecordsPaginated(uid, organizationId, SortRecordsRequestDto.NameAZ,
+            new PaginatedRequestDto { PageNumber = 1, PageSize = 10 }, [pid]);
+
+        // Assert
+        Assert.NotEmpty(result.Items);
+        Assert.All(result.Items, r => Assert.Equal(pid, r.ProjectId));
+    }
+
+    [Fact]
+    public async Task GetRecordsPaginated_ReturnsRecords_ForMultipleProjects()
+    {
+        // Act
+        var result = await _queryBusiness.GetRecordsPaginated(uid, organizationId, SortRecordsRequestDto.NameAZ,
+            new PaginatedRequestDto { PageNumber = 1, PageSize = 25 }, [pid, pid2]);
+
+        // Assert
+        Assert.NotEmpty(result.Items);
+        Assert.Contains(result.Items, r => r.ProjectId == pid);
+        Assert.Contains(result.Items, r => r.ProjectId == pid2);
+    }
+
+    [Fact]
+    public async Task GetRecordsPaginated_ExcludesArchivedRecords()
+    {
+        // Act
+        var result = await _queryBusiness.GetRecordsPaginated(uid, organizationId, SortRecordsRequestDto.NameAZ,
+            new PaginatedRequestDto { PageNumber = 1, PageSize = 25 }, [pid, pid2]);
+
+        // Assert
+        Assert.All(result.Items, r => Assert.False(r.IsArchived));
+        Assert.DoesNotContain(result.Items, r => r.Name == "Echo");
+        Assert.DoesNotContain(result.Items, r => r.Name == "Chewbacca");
+    }
+
+    [Fact]
+    public async Task GetRecordsPaginated_SortByNameAZ_ReturnsSortedAscending()
+    {
+        // Act
+        var result = await _queryBusiness.GetRecordsPaginated(uid, organizationId, SortRecordsRequestDto.NameAZ,
+            new PaginatedRequestDto { PageNumber = 1, PageSize = 25 }, [pid]);
+        var names = result.Items.Select(r => r.Name).ToList();
+
+        // Assert
+        Assert.Equal(names.OrderBy(n => n).ToList(), names);
+    }
+
+    [Fact]
+    public async Task GetRecordsPaginated_SortByNameZA_ReturnsSortedDescending()
+    {
+        // Act
+        var result = await _queryBusiness.GetRecordsPaginated(uid, organizationId, SortRecordsRequestDto.NameZA,
+            new PaginatedRequestDto { PageNumber = 1, PageSize = 25 }, [pid]);
+        var names = result.Items.Select(r => r.Name).ToList();
+
+        // Assert
+        Assert.Equal(names.OrderByDescending(n => n).ToList(), names);
+    }
+
+    [Fact]
+    public async Task GetRecordsPaginated_SortByDateNew_ReturnsMostRecentFirst()
+    {
+        // Act
+        var result = await _queryBusiness.GetRecordsPaginated(uid, organizationId, SortRecordsRequestDto.DateNew,
+            new PaginatedRequestDto { PageNumber = 1, PageSize = 25 }, [pid]);
+        var dates = result.Items.Select(r => r.LastUpdatedAt).ToList();
+
+        // Assert
+        Assert.Equal(dates.OrderByDescending(d => d).ToList(), dates);
+    }
+
+    [Fact]
+    public async Task GetRecordsPaginated_SortByDateOld_ReturnsOldestFirst()
+    {
+        // Act
+        var result = await _queryBusiness.GetRecordsPaginated(uid, organizationId, SortRecordsRequestDto.DateOld,
+            new PaginatedRequestDto { PageNumber = 1, PageSize = 25 }, [pid]);
+        var dates = result.Items.Select(r => r.LastUpdatedAt).ToList();
+
+        // Assert
+        Assert.Equal(dates.OrderBy(d => d).ToList(), dates);
+    }
+
+    [Fact]
+    public async Task GetRecordsPaginated_Pagination_ReturnsCorrectPage()
+    {
+        // Arrange - pid has 5 non-archived records; fetch page 2 with 2 per page
+        var page1 = await _queryBusiness.GetRecordsPaginated(uid, organizationId, SortRecordsRequestDto.NameAZ,
+            new PaginatedRequestDto { PageNumber = 1, PageSize = 2 }, [pid]);
+        var page2 = await _queryBusiness.GetRecordsPaginated(uid, organizationId, SortRecordsRequestDto.NameAZ,
+            new PaginatedRequestDto { PageNumber = 2, PageSize = 2 }, [pid]);
+
+        // Assert
+        Assert.Equal(2, page1.Items.Count());
+        Assert.Equal(2, page2.Items.Count());
+        Assert.Empty(page1.Items.Select(r => r.Id).Intersect(page2.Items.Select(r => r.Id)));
+    }
+
+    [Fact]
+    public async Task GetRecordsPaginated_Pagination_TotalCountIsCorrect()
+    {
+        // Act
+        var result = await _queryBusiness.GetRecordsPaginated(uid, organizationId, SortRecordsRequestDto.NameAZ,
+            new PaginatedRequestDto { PageNumber = 1, PageSize = 2 }, [pid]);
+
+        // Assert - 5 non-archived records in pid
+        Assert.Equal(5, result.TotalCount);
+    }
+
+    [Fact]
+    public async Task GetRecordsPaginated_Pagination_LastPageHasRemainder()
+    {
+        // pid has 5 non-archived records; page 3 with 2 per page should have 1 record
+        var result = await _queryBusiness.GetRecordsPaginated(uid, organizationId, SortRecordsRequestDto.NameAZ,
+            new PaginatedRequestDto { PageNumber = 3, PageSize = 2 }, [pid]);
+
+        // Assert
+        Assert.Single(result.Items);
+    }
+
+    [Fact]
+    public async Task GetRecordsPaginated_Pagination_BeyondLastPageReturnsEmpty()
+    {
+        // Act
+        var result = await _queryBusiness.GetRecordsPaginated(uid, organizationId, SortRecordsRequestDto.NameAZ,
+            new PaginatedRequestDto { PageNumber = 99, PageSize = 10 }, [pid]);
+
+        // Assert
+        Assert.Empty(result.Items);
+    }
+
+    #endregion
+
+    #region GetRecordsPaginated_SensitivityLabel_Authorization Tests
+
+    [Fact]
+    public async Task GetRecordsPaginated_FiltersUnauthorizedRecord()
+    {
+        // Arrange
+        var labelDto = new CreateSensitivityLabelRequestDto
+        {
+            Name = "Top Secret Label",
+            Description = "Top Secret Label"
+        };
+        var label = await _sensitivityLabelBusiness.CreateSensitivityLabel(uid, labelDto, pid, organizationId);
+        Context.ChangeTracker.Clear();
+
+        var writePermission = await Context.Permissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "write record");
+
+        var role = await Context.Roles
+            .Include(r => r.Permissions)
+            .FirstOrDefaultAsync(r => r.Id == roleId);
+
+        if (role != null && writePermission != null)
+        {
+            role.Permissions.Add(writePermission);
+            await Context.SaveChangesAsync();
+        }
+
+        Context.ChangeTracker.Clear();
+
+        await _recordBusiness.AttachLabel(uid, organizationId, pid, rid, label.Id);
+        Context.ChangeTracker.Clear();
+
+        // Act
+        var result = await _queryBusiness.GetRecordsPaginated(uid, organizationId, SortRecordsRequestDto.NameAZ,
+            new PaginatedRequestDto { PageNumber = 1, PageSize = 10 }, [pid]);
+
+        // Assert
+        Assert.DoesNotContain(result.Items, r => r.Name == "Captain Rex");
+        Assert.Equal(4, result.Items.Count());
+    }
+
+    [Fact]
+    public async Task GetRecordsPaginated_ReturnsAuthorizedRecord_WhenUserHasReadPermission()
+    {
+        // Arrange
+        var labelDto = new CreateSensitivityLabelRequestDto
+        {
+            Name = "Top Secret Label",
+            Description = "Top Secret Label"
+        };
+        var label = await _sensitivityLabelBusiness.CreateSensitivityLabel(uid, labelDto, pid, organizationId);
+        Context.ChangeTracker.Clear();
+
+        var writePermission = await Context.Permissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "write record");
+
+        var readPermission = await Context.Permissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "read record");
+
+        var role = await Context.Roles
+            .Include(r => r.Permissions)
+            .FirstOrDefaultAsync(r => r.Id == roleId);
+
+        if (role != null && writePermission != null && readPermission != null)
+        {
+            role.Permissions.Add(writePermission);
+            role.Permissions.Add(readPermission);
+            await Context.SaveChangesAsync();
+        }
+
+        Context.ChangeTracker.Clear();
+
+        await _recordBusiness.AttachLabel(uid, organizationId, pid, rid, label.Id);
+        Context.ChangeTracker.Clear();
+
+        // Act
+        var result = await _queryBusiness.GetRecordsPaginated(uid, organizationId, SortRecordsRequestDto.NameAZ,
+            new PaginatedRequestDto { PageNumber = 1, PageSize = 10 }, [pid]);
+
+        // Assert
+        Assert.Contains(result.Items, r => r.Name == "Captain Rex");
+        Assert.Equal(5, result.Items.Count());
+    }
+
+    [Fact]
+    public async Task GetRecordsPaginated_MultipleLabels_FiltersWhenUserMissingOneLabel()
+    {
+        // Arrange
+        var label = await _sensitivityLabelBusiness.CreateSensitivityLabel(uid,
+            new CreateSensitivityLabelRequestDto { Name = "Label A", Description = "A" }, pid, organizationId);
+        var label2 = await _sensitivityLabelBusiness.CreateSensitivityLabel(uid,
+            new CreateSensitivityLabelRequestDto { Name = "Label B", Description = "B" }, pid, organizationId);
+        Context.ChangeTracker.Clear();
+
+        var writePermission = await Context.Permissions.AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "write record");
+        var writePermission2 = await Context.Permissions.AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label2.Id && p.Action == "write record");
+        var readPermission = await Context.Permissions.AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "read record");
+        // Intentionally omit readPermission2
+
+        var role = await Context.Roles.Include(r => r.Permissions)
+            .FirstOrDefaultAsync(r => r.Id == roleId);
+
+        if (role != null && writePermission != null && writePermission2 != null && readPermission != null)
+        {
+            role.Permissions.Add(writePermission);
+            role.Permissions.Add(writePermission2);
+            role.Permissions.Add(readPermission);
+            await Context.SaveChangesAsync();
+        }
+
+        Context.ChangeTracker.Clear();
+
+        await _recordBusiness.AttachLabel(uid, organizationId, pid, rid, label.Id);
+        await _recordBusiness.AttachLabel(uid, organizationId, pid, rid, label2.Id);
+        Context.ChangeTracker.Clear();
+
+        // Act
+        var result = await _queryBusiness.GetRecordsPaginated(uid, organizationId, SortRecordsRequestDto.NameAZ,
+            new PaginatedRequestDto { PageNumber = 1, PageSize = 10 }, [pid]);
+
+        // Assert - user lacks read on label2, so Captain Rex is filtered
+        Assert.DoesNotContain(result.Items, r => r.Name == "Captain Rex");
+        Assert.Equal(4, result.Items.Count());
+    }
+
+    [Fact]
+    public async Task GetRecordsPaginated_MultipleLabels_ReturnsRecordWhenUserHasAllPermissions()
+    {
+        // Arrange
+        var label = await _sensitivityLabelBusiness.CreateSensitivityLabel(uid,
+            new CreateSensitivityLabelRequestDto { Name = "Label A", Description = "A" }, pid, organizationId);
+        var label2 = await _sensitivityLabelBusiness.CreateSensitivityLabel(uid,
+            new CreateSensitivityLabelRequestDto { Name = "Label B", Description = "B" }, pid, organizationId);
+        Context.ChangeTracker.Clear();
+
+        var writePermission = await Context.Permissions.AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "write record");
+        var writePermission2 = await Context.Permissions.AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label2.Id && p.Action == "write record");
+        var readPermission = await Context.Permissions.AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "read record");
+        var readPermission2 = await Context.Permissions.AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label2.Id && p.Action == "read record");
+
+        var role = await Context.Roles.Include(r => r.Permissions)
+            .FirstOrDefaultAsync(r => r.Id == roleId);
+
+        if (role != null && writePermission != null && writePermission2 != null
+            && readPermission != null && readPermission2 != null)
+        {
+            role.Permissions.Add(writePermission);
+            role.Permissions.Add(writePermission2);
+            role.Permissions.Add(readPermission);
+            role.Permissions.Add(readPermission2);
+            await Context.SaveChangesAsync();
+        }
+
+        Context.ChangeTracker.Clear();
+
+        await _recordBusiness.AttachLabel(uid, organizationId, pid, rid, label.Id);
+        await _recordBusiness.AttachLabel(uid, organizationId, pid, rid, label2.Id);
+        Context.ChangeTracker.Clear();
+
+        // Act
+        var result = await _queryBusiness.GetRecordsPaginated(uid, organizationId, SortRecordsRequestDto.NameAZ,
+            new PaginatedRequestDto { PageNumber = 1, PageSize = 10 }, [pid]);
+
+        // Assert
+        Assert.Contains(result.Items, r => r.Name == "Captain Rex");
+        Assert.Equal(5, result.Items.Count());
+    }
+
+    #endregion
+
+    #region GetRecordsPaginated_AdminBypass Tests
+
+    [Fact]
+    public async Task GetRecordsPaginated_SysAdmin_BypassesSensitivityLabelFilter()
+    {
+        // Arrange - attach a label that the user has no read permission for
+        var label = await _sensitivityLabelBusiness.CreateSensitivityLabel(uid,
+            new CreateSensitivityLabelRequestDto { Name = "Restricted", Description = "Restricted" }, pid, organizationId);
+        Context.ChangeTracker.Clear();
+
+        var writePermission = await Context.Permissions.AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "write record");
+
+        var role = await Context.Roles.Include(r => r.Permissions)
+            .FirstOrDefaultAsync(r => r.Id == roleId);
+
+        if (role != null && writePermission != null)
+        {
+            role.Permissions.Add(writePermission);
+            await Context.SaveChangesAsync();
+        }
+
+        Context.ChangeTracker.Clear();
+        await _recordBusiness.AttachLabel(uid, organizationId, pid, rid, label.Id);
+        Context.ChangeTracker.Clear();
+
+        // Act - isSysAdmin bypasses label check
+        var result = await _queryBusiness.GetRecordsPaginated(uid, organizationId, SortRecordsRequestDto.NameAZ,
+            new PaginatedRequestDto { PageNumber = 1, PageSize = 10 }, [pid], isSysAdmin: true);
+
+        // Assert - Captain Rex is included despite no read permission
+        Assert.Contains(result.Items, r => r.Name == "Captain Rex");
+        Assert.Equal(5, result.Items.Count());
+    }
+
+    [Fact]
+    public async Task GetRecordsPaginated_OrgAdmin_BypassesSensitivityLabelFilter()
+    {
+        // Arrange
+        var label = await _sensitivityLabelBusiness.CreateSensitivityLabel(uid,
+            new CreateSensitivityLabelRequestDto { Name = "Restricted", Description = "Restricted" }, pid, organizationId);
+        Context.ChangeTracker.Clear();
+
+        var writePermission = await Context.Permissions.AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "write record");
+
+        var role = await Context.Roles.Include(r => r.Permissions)
+            .FirstOrDefaultAsync(r => r.Id == roleId);
+
+        if (role != null && writePermission != null)
+        {
+            role.Permissions.Add(writePermission);
+            await Context.SaveChangesAsync();
+        }
+
+        Context.ChangeTracker.Clear();
+        await _recordBusiness.AttachLabel(uid, organizationId, pid, rid, label.Id);
+        Context.ChangeTracker.Clear();
+
+        // Act
+        var result = await _queryBusiness.GetRecordsPaginated(uid, organizationId, SortRecordsRequestDto.NameAZ,
+            new PaginatedRequestDto { PageNumber = 1, PageSize = 10 }, [pid], isOrgAdmin: true);
+
+        // Assert
+        Assert.Contains(result.Items, r => r.Name == "Captain Rex");
+        Assert.Equal(5, result.Items.Count());
+    }
+
+    [Fact]
+    public async Task GetRecordsPaginated_ProjectAdmin_BypassesSensitivityLabelFilter()
+    {
+        // Arrange
+        var label = await _sensitivityLabelBusiness.CreateSensitivityLabel(uid,
+            new CreateSensitivityLabelRequestDto { Name = "Restricted", Description = "Restricted" }, pid, organizationId);
+        Context.ChangeTracker.Clear();
+
+        var writePermission = await Context.Permissions.AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "write record");
+
+        var role = await Context.Roles.Include(r => r.Permissions)
+            .FirstOrDefaultAsync(r => r.Id == roleId);
+
+        if (role != null && writePermission != null)
+        {
+            role.Permissions.Add(writePermission);
+            await Context.SaveChangesAsync();
+        }
+
+        Context.ChangeTracker.Clear();
+        await _recordBusiness.AttachLabel(uid, organizationId, pid, rid, label.Id);
+        Context.ChangeTracker.Clear();
+
+        // Act
+        var result = await _queryBusiness.GetRecordsPaginated(uid, organizationId, SortRecordsRequestDto.NameAZ,
+            new PaginatedRequestDto { PageNumber = 1, PageSize = 10 }, [pid], isProjectAdmin: true);
+
+        // Assert
+        Assert.Contains(result.Items, r => r.Name == "Captain Rex");
+        Assert.Equal(5, result.Items.Count());
+    }
+
+    [Fact]
+    public async Task QueryBuilder_BugRepro_TagEquality_ShouldNotMatchPartialTags()
+    {
+        // Arrange
+        // 1. Create tags: 'a', 'cat', 'dog'
+        var tagA = new Tag { Name = "a", ProjectId = pid, OrganizationId = organizationId };
+        var tagCat = new Tag { Name = "cat", ProjectId = pid, OrganizationId = organizationId };
+        var tagDog = new Tag { Name = "dog", ProjectId = pid, OrganizationId = organizationId };
+        Context.Tags.AddRange(tagA, tagCat, tagDog);
+        await Context.SaveChangesAsync();
+
+        // 2. Create records
+        // Record 1: Tag = 'a'
+        var recA = new Record
+        {
+            Name = "Record A",
+            Description = "Admin bulk create URI test",
+            OriginalId = Guid.NewGuid().ToString(),
+            ProjectId = pid,
+            DataSourceId = did,
+            OrganizationId = organizationId,
+            Properties = "{}", // Fix for null constraint
+            Tags = new List<Tag> { tagA }
+        };
+        // Record 2: Tag = 'cat'
+        var recCat = new Record
+        {
+            Name = "Record Cat",
+            Description = "Admin bulk create URI test",
+            OriginalId = Guid.NewGuid().ToString(),
+            ProjectId = pid,
+            DataSourceId = did,
+            OrganizationId = organizationId,
+            Properties = "{}", // Fix for null constraint
+            Tags = new List<Tag> { tagCat }
+        };
+        // Record 3: Tag = 'dog'
+        var recDog = new Record
+        {
+            Name = "Record Dog",
+            Description = "Admin bulk create URI test",
+            OriginalId = Guid.NewGuid().ToString(),
+            ProjectId = pid,
+            DataSourceId = did,
+            OrganizationId = organizationId,
+            Properties = "{}", // Fix for null constraint
+            Tags = new List<Tag> { tagDog }
+        };
+        Context.Records.AddRange(recA, recCat, recDog);
+        await Context.SaveChangesAsync();
+
+        // Act & Assert
+
+        // Test Query: Tag = 'a'
+        // Should ONLY match recA. If it matches recCat or recDog due to partial matching, it fails.
+        var dtoA = new CustomQueryDtos.CustomQueryRequestDto
+        {
+            Connector = "AND", Filter = "tags", Operator = "=", Value = "a"
+        };
+        var resultA = await _queryBusiness.QueryBuilder(uid, [dtoA], organizationId, [pid]);
+
+        Assert.Single(resultA);
+        Assert.Equal("Record A", resultA.First().Name);
+
+        // Test Query: Tag = 'cat'
+        // Should ONLY match recCat.
+        var dtoCat = new CustomQueryDtos.CustomQueryRequestDto
+        {
+            Connector = "AND", Filter = "tags", Operator = "=", Value = "cat"
+        };
+        var resultCat = await _queryBusiness.QueryBuilder(uid, [dtoCat], organizationId, [pid]);
+        Assert.Single(resultCat);
+        Assert.Equal("Record Cat", resultCat.First().Name);
+
+        // Test Query: Tag = 'd'
+        // Should return nothing because no tag is named exactly 'd'.
+        // If it returns recDog, then it's doing substring match.
+        var dtoD = new CustomQueryDtos.CustomQueryRequestDto
+        {
+            Connector = "AND", Filter = "tags", Operator = "=", Value = "d"
+        };
+        var resultD = await _queryBusiness.QueryBuilder(uid, [dtoD], organizationId, [pid]);
+
+        Assert.Empty(resultD);
+    }
+
+    #endregion
+
+    #region URI Accessibility Tests
+
+    [Fact]
+    public async Task GetRecordsPaginated_UriExposed_WhenRecordHasNoLabels()
+    {
+        // Arrange - Captain Rex has no labels attached
+
+        // Act
+        var result = await _queryBusiness.GetRecordsPaginated(uid, organizationId, SortRecordsRequestDto.NameAZ,
+            new PaginatedRequestDto { PageNumber = 1, PageSize = 10 }, [pid]);
+
+        var rex = result.Items.FirstOrDefault(r => r.Name == "Captain Rex");
+
+        // Assert
+        Assert.NotNull(rex);
+        Assert.NotNull(rex.Uri);
+    }
+
+    [Fact]
+    public async Task GetRecordsPaginated_UriHidden_WhenUserLacksDownloadPermissionForLabel()
+    {
+        // Arrange - attach a label with no download permission granted to user
+        var labelDto = new CreateSensitivityLabelRequestDto
+        {
+            Name = "Download Restricted",
+            Description = "Label with no download permission"
+        };
+        var label = await _sensitivityLabelBusiness.CreateSensitivityLabel(uid, labelDto, pid, organizationId);
+        Context.ChangeTracker.Clear();
+
+        // Grant only write (to attach) and read — but NOT download file
+        var writePermission = await Context.Permissions.AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "write record");
+        var readPermission = await Context.Permissions.AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "read record");
+
+        var role = await Context.Roles.Include(r => r.Permissions)
+            .FirstOrDefaultAsync(r => r.Id == roleId);
+
+        if (role != null && writePermission != null && readPermission != null)
+        {
+            role.Permissions.Add(writePermission);
+            role.Permissions.Add(readPermission);
+            await Context.SaveChangesAsync();
+        }
+
+        Context.ChangeTracker.Clear();
+        await _recordBusiness.AttachLabel(uid, organizationId, pid, rid, label.Id);
+        Context.ChangeTracker.Clear();
+
+        // Act
+        var result = await _queryBusiness.GetRecordsPaginated(uid, organizationId, SortRecordsRequestDto.NameAZ,
+            new PaginatedRequestDto { PageNumber = 1, PageSize = 10 }, [pid],
+            isSysAdmin: false, isOrgAdmin: false, isProjectAdmin: false);
+
+        var rex = result.Items.FirstOrDefault(r => r.Name == "Captain Rex");
+
+        // Assert - record is visible (user has read) but URI is hidden (no download permission)
+        Assert.NotNull(rex);
+        Assert.Null(rex.Uri);
+    }
+
+    [Fact]
+    public async Task GetRecordsPaginated_UriExposed_WhenUserHasDownloadPermissionForLabel()
+    {
+        // Arrange
+        var labelDto = new CreateSensitivityLabelRequestDto
+        {
+            Name = "Download Allowed",
+            Description = "Label with download permission"
+        };
+        var label = await _sensitivityLabelBusiness.CreateSensitivityLabel(uid, labelDto, pid, organizationId);
+        Context.ChangeTracker.Clear();
+
+        var writePermission = await Context.Permissions.AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "write record");
+        var readPermission = await Context.Permissions.AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "read record");
+        var downloadPermission = await Context.Permissions.AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "download file");
+
+        var role = await Context.Roles.Include(r => r.Permissions)
+            .FirstOrDefaultAsync(r => r.Id == roleId);
+
+        if (role != null && writePermission != null && readPermission != null && downloadPermission != null)
+        {
+            role.Permissions.Add(writePermission);
+            role.Permissions.Add(readPermission);
+            role.Permissions.Add(downloadPermission);
+            await Context.SaveChangesAsync();
+        }
+
+        Context.ChangeTracker.Clear();
+        await _recordBusiness.AttachLabel(uid, organizationId, pid, rid, label.Id);
+        Context.ChangeTracker.Clear();
+
+        // Act
+        var result = await _queryBusiness.GetRecordsPaginated(uid, organizationId, SortRecordsRequestDto.NameAZ,
+            new PaginatedRequestDto { PageNumber = 1, PageSize = 10 }, [pid]);
+
+        var rex = result.Items.FirstOrDefault(r => r.Name == "Captain Rex");
+
+        // Assert
+        Assert.NotNull(rex);
+        Assert.NotNull(rex.Uri);
+    }
+
+    [Fact]
+    public async Task GetRecordsPaginated_UriExposed_ForSysAdminRegardlessOfLabels()
+    {
+        // Arrange - attach a label with no download permission
+        var labelDto = new CreateSensitivityLabelRequestDto
+        {
+            Name = "Top Secret URI",
+            Description = "Label blocking URI"
+        };
+        var label = await _sensitivityLabelBusiness.CreateSensitivityLabel(uid, labelDto, pid, organizationId);
+        Context.ChangeTracker.Clear();
+
+        var writePermission = await Context.Permissions.AsNoTracking()
+            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "write record");
+
+        var role = await Context.Roles.Include(r => r.Permissions)
+            .FirstOrDefaultAsync(r => r.Id == roleId);
+
+        if (role != null && writePermission != null)
+        {
+            role.Permissions.Add(writePermission);
+            await Context.SaveChangesAsync();
+        }
+
+        Context.ChangeTracker.Clear();
+        await _recordBusiness.AttachLabel(uid, organizationId, pid, rid, label.Id);
+        Context.ChangeTracker.Clear();
+
+        // Act
+        var result = await _queryBusiness.GetRecordsPaginated(uid, organizationId, SortRecordsRequestDto.NameAZ,
+            new PaginatedRequestDto { PageNumber = 1, PageSize = 10 }, [pid], isSysAdmin: true);
+
+        var rex = result.Items.FirstOrDefault(r => r.Name == "Captain Rex");
+
+        // Assert - SysAdmin always sees URI
+        Assert.NotNull(rex);
+        Assert.NotNull(rex.Uri);
     }
 
     #endregion

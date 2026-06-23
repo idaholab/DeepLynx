@@ -16,7 +16,9 @@ namespace deeplynx.tests;
 public class SensitivityLabelBusinessTests : IntegrationTestBase
 {
     private EventBusiness _eventBusiness;
+    private UserBusiness _userBusiness;
     private SensitivityLabelBusiness _labelBusiness;
+    private RoleBusiness _roleBusiness;
     private Mock<IHubContext<EventNotificationHub>> _mockHubContext = null!;
     private Mock<ILogger<NotificationBusiness>> _mockNotificationLogger = null!;
     private INotificationBusiness _notificationBusiness = null!;
@@ -26,10 +28,25 @@ public class SensitivityLabelBusinessTests : IntegrationTestBase
     public long lid3;
     public long lid4;
     public long lid5; 
+    public long lid6;
 
     public long oid; // organization ID
     public long pid; // project ID
+    public long pid2;
     public long uid; // user ID
+    public long uid2;
+    public long uid3;
+    public long uid4;
+    public long rid1; // role id
+    public long rid2;
+    public long rid3;
+    public long rid4;
+    public long rid5;
+    public long mid; // member id
+    public long mid2;
+    public long mid3;
+    public long mid4;
+    public long mid5;
 
     public SensitivityLabelBusinessTests(TestSuiteFixture fixture) : base(fixture)
     {
@@ -44,7 +61,9 @@ public class SensitivityLabelBusinessTests : IntegrationTestBase
             new NotificationBusiness(Context, _mockNotificationLogger.Object, _mockHubContext.Object);
         _mockBulkCopyUpsertExecutor = new Mock<IBulkCopyUpsertExecutor>();
         _eventBusiness = new EventBusiness(Context, _notificationBusiness, _mockBulkCopyUpsertExecutor.Object);
-        _labelBusiness = new SensitivityLabelBusiness(Context, _eventBusiness);
+        _userBusiness = new UserBusiness(Context);
+        _labelBusiness = new SensitivityLabelBusiness(Context, _eventBusiness, _userBusiness);
+        _roleBusiness = new RoleBusiness(Context, _eventBusiness);
     }
 
     protected override async Task SeedTestDataAsync()
@@ -58,9 +77,31 @@ public class SensitivityLabelBusinessTests : IntegrationTestBase
             Password = "test_password",
             IsArchived = false
         };
-        Context.Users.Add(user);
+        var user2 = new User
+        {
+            Name = "Second Test User",
+            Email = "test_label2@example.com",
+            Password = "password",
+            IsArchived = false
+        };
+        var orgAdmin = new User
+        {
+            Name = "Org Admin",
+            Email = "org_admin@example.com",
+            IsArchived = false  
+        };
+        var orgUser = new User
+        {
+            Name = "Org User",
+            Email = "org_user@example.com",
+            IsArchived = false
+        };
+        Context.Users.AddRange(user, user2, orgAdmin, orgUser);
         await Context.SaveChangesAsync();
         uid = user.Id;
+        uid2 = user2.Id;
+        uid3 = orgAdmin.Id;
+        uid4 = orgUser.Id;
 
         // create test organization
         var testOrg = new Organization
@@ -85,9 +126,19 @@ public class SensitivityLabelBusinessTests : IntegrationTestBase
             IsArchived = false,
             OrganizationId = oid
         };
-        Context.Projects.Add(testProject);
+        var testProject2 = new Project
+        {
+            Name = "Test Project 2",
+            Description = "Test project for unit tests",
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            IsArchived = false,
+            OrganizationId = oid
+        };
+        Context.Projects.AddRange(testProject, testProject2);
         await Context.SaveChangesAsync();
         pid = testProject.Id;
+        pid2 = testProject2.Id;
 
         // create test labels
         var testLabel = new SensitivityLabel
@@ -136,14 +187,58 @@ public class SensitivityLabelBusinessTests : IntegrationTestBase
             LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
             IsArchived = true
         }; 
+        var proj2Label = new SensitivityLabel
+        {
+            Name = "Test Label",
+            Description = "Test label for unit tests",
+            ProjectId = pid2,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            IsArchived = false,
+            OrganizationId = oid
+        };
         
-        Context.SensitivityLabels.AddRange(testLabel, archivedLabel, label1, label2, label3);
+        Context.SensitivityLabels.AddRange(testLabel, archivedLabel, label1, label2, label3, proj2Label);
         await Context.SaveChangesAsync();
         lid = testLabel.Id;
         lid2 = archivedLabel.Id;
         lid3 = label1.Id;
         lid4 = label2.Id;
         lid5 = label3.Id;
+        lid6 = proj2Label.Id;
+
+        // Create user roles
+        var projAdmin = new Role { Name = "Admin", OrganizationId = oid, ProjectId = pid };
+        var projUser = new Role { Name = "User", OrganizationId = oid, ProjectId = pid };
+        var projUser2 = new Role { Name = "Another User", OrganizationId = oid, ProjectId = pid2 };
+        var orgAdminRole = new Role { Name = "Org Admin", OrganizationId = oid };
+        var orgUserRole = new Role { Name = "OrgUser", OrganizationId = oid };
+
+        Context.Roles.AddRange(projAdmin, projUser, projUser2, orgAdminRole, orgUserRole);
+        await Context.SaveChangesAsync();
+        rid1 = projAdmin.Id;
+        rid2 = projUser.Id;
+        rid3 = projUser2.Id;
+        rid4 = orgAdminRole.Id;
+        rid5 = orgUserRole.Id;
+
+        // Add Users to Project / Org
+        var orgMember = new OrganizationUser { OrganizationId = oid, UserId = uid3, IsOrgAdmin = true };
+        var orgMember2 = new OrganizationUser { OrganizationId = oid, UserId = uid4 };
+        var projectMember = new ProjectMember { ProjectId = pid, UserId = uid, RoleId = rid1 };
+        var projectMember2 = new ProjectMember { ProjectId = pid2, UserId = uid, RoleId = rid3 };
+        var projectMember3 = new ProjectMember { ProjectId = pid, UserId = uid2, RoleId = rid2 };
+        var projectMember4 = new ProjectMember { ProjectId = pid2, UserId = uid2, RoleId = rid3 };
+        var projectMember5 = new ProjectMember { ProjectId = pid, UserId = uid4, RoleId = rid5 };
+
+        Context.ProjectMembers.AddRange(projectMember, projectMember2, projectMember3, projectMember4, projectMember5);
+        Context.OrganizationUsers.AddRange(orgMember, orgMember2);
+        await Context.SaveChangesAsync();
+        mid = projectMember.Id;
+        mid2 = projectMember2.Id;
+        mid3 = projectMember3.Id;
+        mid4 = projectMember4.Id;
+        mid5 = projectMember5.Id;
     }
 
     #region GetAllSensitivityLabels Tests
@@ -152,7 +247,7 @@ public class SensitivityLabelBusinessTests : IntegrationTestBase
     public async Task GetAllSensitivityLabels_ExcludesArchived()
     {
         // Act
-        var result = await _labelBusiness.GetAllSensitivityLabels([pid], oid);
+        var result = await _labelBusiness.GetAllSensitivityLabels(uid, [pid], oid);
         var labels = result.ToList();
 
         // Assert
@@ -165,7 +260,7 @@ public class SensitivityLabelBusinessTests : IntegrationTestBase
     public async Task GetAllSensitivityLabels_WithHideArchivedFalse_IncludesArchived()
     {
         // Act
-        var result = await _labelBusiness.GetAllSensitivityLabels([pid], oid, false);
+        var result = await _labelBusiness.GetAllSensitivityLabels(uid, [pid], oid, false);
         var labels = result.ToList();
 
         // Assert
@@ -178,7 +273,7 @@ public class SensitivityLabelBusinessTests : IntegrationTestBase
     public async Task GetAllSensitivityLabels_InheritsOrganizationLabels()
     {
         // Act
-        var result = await _labelBusiness.GetAllSensitivityLabels([pid], oid);
+        var result = await _labelBusiness.GetAllSensitivityLabels(uid, [pid], oid);
         var labels = result.ToList();
 
         // Assert
@@ -201,12 +296,226 @@ public class SensitivityLabelBusinessTests : IntegrationTestBase
         await Context.SaveChangesAsync();
 
         // Act
-        var result = await _labelBusiness.GetAllSensitivityLabels(null, oid);
+        var result = await _labelBusiness.GetAllSensitivityLabels(uid3, null, oid);
         var labels = result.ToList();
 
         // Assert
         Assert.All(labels, l => Assert.Equal(oid, l.OrganizationId));
         Assert.Contains(labels, l => l.Id == orgLabel.Id);
+    }
+
+    [Fact]
+    public async Task GetAllSensitivityLabels_NoPermission_ReturnsEmpty()
+    {
+        // Act
+        var result = await _labelBusiness.GetAllSensitivityLabels(uid2, [pid], oid);
+        var labels = result.ToList();
+
+        // Assert
+        Assert.Empty(labels);
+    }
+
+    [Fact]
+    public async Task GetAllSensitivityLabels_OneLabelVisible_ReturnsSingleLabel()
+    {
+        // Arrange
+        var permission1 = new Permission
+        {
+            Name = "Read Permission",
+            Action = "read record", 
+            LabelId = lid,
+            OrganizationId = oid,
+            ProjectId = pid
+        };
+        Context.Permissions.Add(permission1);
+        await Context.SaveChangesAsync();
+        long permid = permission1.Id;
+
+        await _roleBusiness.AddPermissionToRole(rid2, permid, oid, pid);
+
+        var role1perms = await Context.Roles
+            .Include(r => r.Permissions)
+            .FirstAsync(r => r.Id == rid2);
+        role1perms.Permissions.Add(permission1);
+        await Context.SaveChangesAsync();
+
+        // Act
+        var result = await _labelBusiness.GetAllSensitivityLabels(uid2, [pid], oid);
+        var labels = result.ToList();
+
+        // Assert
+        Assert.Contains(labels, l => l.Id == lid);
+    }
+
+    [Fact]
+    public async Task GetAllSensitivityLabels_OrgUser_OnlySeesVisibleLabels()
+    {
+        // Arrange
+        var orgLabel = new SensitivityLabel
+        {
+            Name = "Org Label",
+            Description = "Organization level label",
+            OrganizationId = oid,
+            IsArchived = false,
+        };
+        Context.SensitivityLabels.Add(orgLabel);
+        await Context.SaveChangesAsync();
+        long orgLabelId = orgLabel.Id;
+
+        var orgPermission = new Permission
+        {
+            Name = "Read Permission",
+            Action = "read record", 
+            LabelId = orgLabelId,
+            OrganizationId = oid
+        };
+        Context.Permissions.Add(orgPermission);
+        await Context.SaveChangesAsync();
+        long permid = orgPermission.Id;
+
+        await _roleBusiness.AddPermissionToRole(rid5, permid, oid, null);
+
+        // Act
+        var result = await _labelBusiness.GetAllSensitivityLabels(uid4, [pid], oid);
+        var labels = result.ToList();
+
+        // Assert
+        Assert.Contains(labels, l => l.Id == orgLabelId);
+    }
+
+    [Fact]
+    public async Task GetAllSensitivityLabels_OrgUser_NoLabels()
+    {
+        // Act
+        var result = await _labelBusiness.GetAllSensitivityLabels(uid4, [pid], oid);
+        var labels = result.ToList();
+
+        // Assert
+        Assert.Empty(labels);
+    }
+
+    [Fact]
+    public async Task GetAllSensitivityLabels_ProjectAdmin_SeesAllLabels()
+    {
+        // Act
+        var result = await _labelBusiness.GetAllSensitivityLabels(uid, [pid], oid);
+        var labels = result.ToList();
+
+        // Assert
+        Assert.Equal(3, labels.Count);
+        Assert.Contains(labels, l => l.Id == lid);
+        Assert.Contains(labels, l => l.Id == lid3);
+        Assert.Contains(labels, l => l.Id == lid4);
+    }
+
+    [Fact]
+    public async Task GetAllSensitivityLabels_MultipleProjectsUser_SeesLabelsFromBoth()
+    {
+        // Arrange
+        //Give user access to lid6 from proj 2 and lid
+        var permission1 = new Permission
+        {
+            Name = "Read Permission",
+            Action = "read record", 
+            LabelId = lid,
+            OrganizationId = oid,
+            ProjectId = pid
+        };
+        var permission2 = new Permission
+        {
+            Name = "Read Permission",
+            Action = "read record",
+            LabelId = lid6,
+            OrganizationId = oid,
+            ProjectId = pid2
+        };
+        Context.Permissions.AddRange(permission1, permission2);
+        await Context.SaveChangesAsync();
+        long permid = permission1.Id;
+        long permid2 = permission2.Id;
+
+        await _roleBusiness.AddPermissionToRole(rid2, permid, oid, pid);
+        await _roleBusiness.AddPermissionToRole(rid3, permid2, oid, pid2);
+
+        // Act
+        var result = await _labelBusiness.GetAllSensitivityLabels(uid2, [pid, pid2], oid);
+        var labels = result.ToList();
+
+        // Assert
+        Assert.Equal(2, labels.Count);
+        Assert.Contains(labels, l => l.Id == lid);
+        Assert.Contains(labels, l => l.Id == lid6);
+    }
+
+    [Fact]
+    public async Task GetAllSensitivityLabels_MultipleProjectsAdminAndUser_SeesLabelsFromBoth()
+    {
+        // Arrange
+        var permission = new Permission
+        {
+            Name = "Read Permission",
+            Action = "read record",
+            LabelId = lid6,
+            OrganizationId = oid,
+            ProjectId = pid2
+        };
+        Context.Permissions.Add(permission);
+        await Context.SaveChangesAsync();
+        long permid = permission.Id;
+
+        await _roleBusiness.AddPermissionToRole(rid3, permid, oid, pid2);
+
+        // Act
+        var result = await _labelBusiness.GetAllSensitivityLabels(uid, [pid, pid2], oid);
+        var labels = result.ToList();
+
+        // Assert
+        Assert.Equal(4, labels.Count);
+        Assert.Contains(labels, l => l.Id == lid);
+        Assert.Contains(labels, l => l.Id == lid3);
+        Assert.Contains(labels, l => l.Id == lid4);
+        Assert.Contains(labels, l => l.Id == lid6);
+    }
+
+    [Fact]
+    public async Task GetAllSensitivityLabels_OrgAdmin_SeesAllLabels()
+    {
+        // Act
+        var result = await _labelBusiness.GetAllSensitivityLabels(uid3, [pid, pid2], oid);
+        var labels = result.ToList();
+
+        // Assert
+        Assert.Equal(4, labels.Count);
+        Assert.Contains(labels, l => l.Id == lid);
+        Assert.Contains(labels, l => l.Id == lid3);
+        Assert.Contains(labels, l => l.Id == lid4);
+        Assert.Contains(labels, l => l.Id == lid6);
+    }
+
+    [Fact]
+    public async Task GetAllSensitivityLabels_SysAdmin_SeesAllLabels()
+    {
+        // Arrange
+        var sysAdmin = new User
+        {
+            Name = "Sys Admin",
+            Email = "sys_admin@example.com",
+            IsArchived = false,
+            IsSysAdmin = true  
+        };
+        Context.Users.Add(sysAdmin);
+        await Context.SaveChangesAsync();
+
+        // Act
+        var result = await _labelBusiness.GetAllSensitivityLabels(sysAdmin.Id, [pid, pid2], oid);
+        var labels = result.ToList();
+
+        // Assert
+        Assert.Equal(4, labels.Count);
+        Assert.Contains(labels, l => l.Id == lid);
+        Assert.Contains(labels, l => l.Id == lid3);
+        Assert.Contains(labels, l => l.Id == lid4);
+        Assert.Contains(labels, l => l.Id == lid6);
     }
 
     #endregion
