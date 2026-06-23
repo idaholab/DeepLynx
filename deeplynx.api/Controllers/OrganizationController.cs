@@ -305,9 +305,7 @@ public class OrganizationController : ControllerBase
     /// <param name="userName"></param>
     /// <returns></returns>
     [HttpPost("{organizationId:long}/invite", Name = "api_invite_user_to_organization")]
-    [SysAdmin] // skip permission checks for sys admins
-    [OrgAdmin] // skip permission checks for org admins
-    [ProjectAdmin] //skip permission checks for project admins
+    [ProjectAdmin] 
     public async Task<ActionResult> InviteUserToOrganization(
         long organizationId,
         [FromQuery] string userEmail,
