@@ -13,8 +13,7 @@ import CollectionSortControl from "./components/CollectionSortControl";
 import FilterSidebar from "./components/FilterSidebar";
 import SectionCard from "./components/SectionCard";
 import { COLLECTION_BADGE_DISPLAY_LIMIT } from "./components/recordCollections.constants";
-import { getSensitivityClass } from "./components/recordCollections.utils";
-import { renderCollectionSortLabel } from "./components/recordCollections.view-utils";
+import { getSensitivityClass } from "./components/utils";
 import { useCollectionsDashboard } from "./hooks/useCollectionsDashboard";
 
 type Props = {
@@ -94,10 +93,7 @@ export default function RecordCollectionsClient({
                   placeholder={t.translations.RECORD_COLLECTIONS_FILTER_BY_TITLE_OR_DESCRIPTION}
                   {...searchInput}
                 />
-                <CollectionSortControl
-                  {...sortControl}
-                  renderLabel={(option) => renderCollectionSortLabel(option, t)}
-                />
+                <CollectionSortControl {...sortControl} />
               </div>
 
               <div

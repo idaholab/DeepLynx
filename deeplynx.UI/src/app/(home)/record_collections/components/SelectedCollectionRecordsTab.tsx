@@ -7,11 +7,11 @@ import { formatLocalDateTime } from "@/app/lib/date_time";
 import CollectionRecordSearchControls from "./CollectionRecordSearchControls";
 import CollectionRecordSearchResultsTable from "./CollectionRecordSearchResultsTable";
 import SectionCard from "./SectionCard";
-import { SelectedCollectionRecordsController } from "./componentTypes";
 import { interpolateTemplate } from "./utils";
+import type { CollectionDetailsController } from "../[collectionId]/hooks/useCollectionDetails";
 
 type Props = {
-  controller: SelectedCollectionRecordsController;
+  controller: CollectionDetailsController["recordsController"];
 };
 
 export default function SelectedCollectionRecordsTab({

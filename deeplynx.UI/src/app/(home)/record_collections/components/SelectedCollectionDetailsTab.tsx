@@ -1,24 +1,24 @@
 "use client";
 
 import { useLanguage } from "@/app/contexts/Language";
+import { formatLocalDateTime } from "@/app/lib/date_time";
 import React from "react";
 import CollectionEntitySelector from "./CollectionEntitySelector";
 import CollectionDetailsReadonlyView from "./CollectionDetailsReadonlyView";
 import CollectionRecordSearchControls from "./CollectionRecordSearchControls";
 import CollectionRecordSearchResultsTable from "./CollectionRecordSearchResultsTable";
 import SectionCard from "./SectionCard";
-import { SelectedCollectionDetailsController } from "./componentTypes";
 import { interpolateTemplate } from "./utils";
+import type { CollectionDetailsController } from "../[collectionId]/hooks/useCollectionDetails";
 
 type Props = {
-  controller: SelectedCollectionDetailsController;
+  controller: CollectionDetailsController["detailsController"];
 };
 
 export default function SelectedCollectionDetailsTab({
   controller: {
     readonlyView: {
       selectedCollection,
-      collectionSummaryPanel,
       selectedDescriptionRef,
       selectedDescriptionExpanded,
       selectedDescriptionExpandable,
@@ -101,7 +101,38 @@ export default function SelectedCollectionDetailsTab({
 
   return (
     <div className="mt-4 space-y-4">
-      {collectionSummaryPanel}
+      <div className="grid gap-4 rounded-2xl border border-base-300 bg-base-200/30 p-4 text-sm sm:grid-cols-2 lg:grid-cols-4">
+        <div>
+          <p className="text-base-content/60">
+            {t.translations.RECORD_COLLECTIONS_COLLECTION_ID}
+          </p>
+          <p className="font-semibold text-base-content">{selectedCollection.id}</p>
+        </div>
+        <div>
+          <p className="text-base-content/60">
+            {t.translations.RECORD_COLLECTIONS_TOTAL_RECORDS}
+          </p>
+          <p className="font-semibold text-base-content">
+            {selectedCollection.recordCount}
+          </p>
+        </div>
+        <div>
+          <p className="text-base-content/60">
+            {t.translations.RECORD_COLLECTIONS_UPDATED}
+          </p>
+          <p className="font-semibold text-base-content">
+            {formatLocalDateTime(selectedCollection.lastUpdatedAt)}
+          </p>
+        </div>
+        <div>
+          <p className="text-base-content/60">
+            {t.translations.RECORD_COLLECTIONS_LAST_UPDATED_BY}
+          </p>
+          <p className="font-semibold text-base-content">
+            {selectedCollection.lastUpdatedBy ?? t.translations.UNKNOWN}
+          </p>
+        </div>
+      </div>
       {!isEditingSelectedCollection ? (
         <CollectionDetailsReadonlyView
           summaryPanel={null}

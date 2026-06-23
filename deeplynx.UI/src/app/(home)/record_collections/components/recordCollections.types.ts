@@ -11,6 +11,8 @@ export type CollectionSortOption =
   | "recordCountDesc"
   | "recordCountAsc";
 
+export type NewCollectionStep = "Records" | "Metadata" | "Modify" | "Review";
+
 export type MetadataRow = {
   label: string;
   value: string;

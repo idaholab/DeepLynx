@@ -1251,13 +1251,11 @@ export const translations = {
       RECORD_COLLECTIONS_CREATED: "Record collection created",
       RECORD_COLLECTIONS_CREATE_IN_ACTIVE_PROJECT:
         "Create a record collection in the active project.",
-      RECORD_COLLECTIONS_DESELECT_RECORDS_WITH:
-        "Deselect records with {name}",
+      RECORD_COLLECTIONS_DESELECT_RECORDS_WITH: "Deselect records with {name}",
       RECORD_COLLECTIONS_EDIT_COLLECTION: "Edit Collection",
       RECORD_COLLECTIONS_FAILED_CANCEL_CHANGES:
         "Failed to cancel collection changes",
-      RECORD_COLLECTIONS_FAILED_CREATE:
-        "Failed to create record collection",
+      RECORD_COLLECTIONS_FAILED_CREATE: "Failed to create record collection",
       RECORD_COLLECTIONS_FAILED_CREATE_LABEL:
         "Failed to create sensitivity label",
       RECORD_COLLECTIONS_FAILED_CREATE_TAG: "Failed to create tag",
@@ -1271,10 +1269,8 @@ export const translations = {
         "Failed to load project tags",
       RECORD_COLLECTIONS_FAILED_LOAD_SELECTED_RECORD_METADATA:
         "Failed to load full record metadata for: {records}",
-      RECORD_COLLECTIONS_FAILED_SEARCH_RECORDS:
-        "Failed to search records",
-      RECORD_COLLECTIONS_FAILED_UPDATE:
-        "Failed to update record collection",
+      RECORD_COLLECTIONS_FAILED_SEARCH_RECORDS: "Failed to search records",
+      RECORD_COLLECTIONS_FAILED_UPDATE: "Failed to update record collection",
       RECORD_COLLECTIONS_SAVED_REFRESH_FAILED:
         "Record collection saved, but the latest data could not be loaded. Reload the page to refresh.",
       RECORD_COLLECTIONS_FIELD: "Field",
@@ -1291,18 +1287,17 @@ export const translations = {
       RECORD_COLLECTIONS_MANAGE_RECORDS: "Manage Records",
       RECORD_COLLECTIONS_MANAGE_RECORDS_DESCRIPTION:
         "Add records to this collection or remove records already assigned.",
-      RECORD_COLLECTIONS_MODIFY_LABELS_AND_TAGS:
-        "Collection Labels and Tags",
+      RECORD_COLLECTIONS_MODIFY_LABELS_AND_TAGS: "Collection Labels and Tags",
       RECORD_COLLECTIONS_MODIFY_LABELS_AND_TAGS_HELP:
         "These labels and tags will be applied to the collection itself. They do not change the included records.",
       RECORD_COLLECTIONS_NAME_AND_DESCRIPTION_REQUIRED:
         "Name and description are required",
+      RECORD_COLLECTIONS_NAME_REQUIRED: "Collection Title is required.",
       RECORD_COLLECTIONS_NEW: "New Collection",
       RECORD_COLLECTIONS_NOT_UPDATED: "Not updated",
       RECORD_COLLECTIONS_NO_ADDITIONAL_PROPERTIES_SET:
         "No additional properties set.",
-      RECORD_COLLECTIONS_NO_DESCRIPTION_PROVIDED:
-        "No description provided.",
+      RECORD_COLLECTIONS_NO_DESCRIPTION_PROVIDED: "No description provided.",
       RECORD_COLLECTIONS_NO_LABELS_FOUND: "No labels found.",
       RECORD_COLLECTIONS_NO_RECORDS_ARE_CURRENTLY_ASSIGNED:
         "No records are currently assigned.",
@@ -1317,22 +1312,15 @@ export const translations = {
       RECORD_COLLECTIONS_CANNOT_CONTINUE_WITH_INCOMPLETE_RECORD_METADATA:
         "Some selected records are still missing full metadata. Remove them or retry before continuing.",
       RECORD_COLLECTIONS_OPEN_DETAILS: "Open details",
-      RECORD_NOT_IN_ANY_COLLECTIONS:
-        "This record is not in any collections.",
+      RECORD_NOT_IN_ANY_COLLECTIONS: "This record is not in any collections.",
       RECORD_COLLECTIONS_PARTIAL_UPDATE:
         "Collection details saved, but some changes failed: {operations}",
-      RECORD_COLLECTIONS_PARTIAL_UPDATE_ADD_LABEL:
-        'add label "{name}"',
-      RECORD_COLLECTIONS_PARTIAL_UPDATE_ADD_RECORD:
-        'add record "{name}"',
-      RECORD_COLLECTIONS_PARTIAL_UPDATE_ADD_TAG:
-        'add tag "{name}"',
-      RECORD_COLLECTIONS_PARTIAL_UPDATE_REMOVE_LABEL:
-        'remove label "{name}"',
-      RECORD_COLLECTIONS_PARTIAL_UPDATE_REMOVE_RECORD:
-        'remove record "{name}"',
-      RECORD_COLLECTIONS_PARTIAL_UPDATE_REMOVE_TAG:
-        'remove tag "{name}"',
+      RECORD_COLLECTIONS_PARTIAL_UPDATE_ADD_LABEL: 'add label "{name}"',
+      RECORD_COLLECTIONS_PARTIAL_UPDATE_ADD_RECORD: 'add record "{name}"',
+      RECORD_COLLECTIONS_PARTIAL_UPDATE_ADD_TAG: 'add tag "{name}"',
+      RECORD_COLLECTIONS_PARTIAL_UPDATE_REMOVE_LABEL: 'remove label "{name}"',
+      RECORD_COLLECTIONS_PARTIAL_UPDATE_REMOVE_RECORD: 'remove record "{name}"',
+      RECORD_COLLECTIONS_PARTIAL_UPDATE_REMOVE_TAG: 'remove tag "{name}"',
       RECORD_COLLECTIONS_RECORDS_ADDED: "Records added to collection",
       RECORD_COLLECTIONS_RECORDS_ASSIGNED_TO:
         "Records currently assigned to {name}.",
@@ -1351,10 +1339,8 @@ export const translations = {
         "Search records in this collection",
       RECORD_COLLECTIONS_SEARCH_OR_ADD_LABEL: "Search or add label",
       RECORD_COLLECTIONS_SEARCH_OR_ADD_TAG: "Search or add tag",
-      RECORD_COLLECTIONS_SEARCH_RECORDS_TO_ADD:
-        "Search records to add",
-      RECORD_COLLECTIONS_SEARCH_SELECTED_RECORDS:
-        "Search selected records",
+      RECORD_COLLECTIONS_SEARCH_RECORDS_TO_ADD: "Search records to add",
+      RECORD_COLLECTIONS_SEARCH_SELECTED_RECORDS: "Search selected records",
       RECORD_COLLECTIONS_SEARCHING_RECORDS: "Searching records",
       RECORD_COLLECTIONS_SELECTED_LABELS_AND_TAGS:
         "Labels and Tags on Selected Records",
@@ -1362,8 +1348,7 @@ export const translations = {
         "This is a read-only summary of the labels and tags already present on the selected records.",
       RECORD_COLLECTIONS_SELECTED_RECORD_METADATA_INCOMPLETE:
         "{count} selected record(s) still need full metadata before you can continue.",
-      RECORD_COLLECTIONS_SELECTED_RECORDS_COUNT:
-        "{count} records selected",
+      RECORD_COLLECTIONS_SELECTED_RECORDS_COUNT: "{count} records selected",
       RECORD_COLLECTIONS_SELECTED_RECORDS_SHOWN:
         "{shown} of {total} records shown",
       RECORD_COLLECTIONS_SHOW_MORE: "Show more",
@@ -1780,7 +1765,7 @@ export const translations = {
       FAILED_TO_UPDATE_THEME: "Failed to update theme",
       ARCHIVED_USERS: "Archived Users",
       UNARCHIVE_USER: "Unarchive",
-      NO_ARCHIVED_USERS: "No archived users."
+      NO_ARCHIVED_USERS: "No archived users.",
     },
   },
   es: {
@@ -2156,7 +2141,8 @@ export const translations = {
         "No se pudieron cargar las etiquetas del proyecto.",
       FAILED_TO_LOAD_RECENT_RECORDS:
         "No se pudieron cargar los registros recientes.",
-      FAILED_TO_LOAD_RECORD_COLLECTIONS: "No se pudieron cargar las colecciones de registros.",
+      FAILED_TO_LOAD_RECORD_COLLECTIONS:
+        "No se pudieron cargar las colecciones de registros.",
       FAILED_TO_LOAD_RECORD_HISTORY:
         "Error al cargar el historial del registro.",
       FAILED_TO_LOAD_SELECTED_POINT_IN_TIME_SNAPSHOT:
@@ -3083,8 +3069,7 @@ export const translations = {
       RECORD_CREATED_SUCCESSFULLY: "¡Registro creado correctamente!",
       RECORD_COLLECTIONS: "Colecciones de registros",
       RECORD_COLLECTIONS_ADD_SELECTED: "Agregar seleccionados",
-      RECORD_COLLECTIONS_ADDITIONAL_PROPERTIES:
-        "Propiedades adicionales",
+      RECORD_COLLECTIONS_ADDITIONAL_PROPERTIES: "Propiedades adicionales",
       RECORD_COLLECTIONS_ALL: "Todas las colecciones",
       RECORD_COLLECTIONS_ALL_MATCHING_ALREADY_IN_THIS_COLLECTION:
         "Todos los registros coincidentes ya están en esta colección.",
@@ -3092,18 +3077,15 @@ export const translations = {
       RECORD_COLLECTIONS_ASSIGNED_COUNT: "{count} asignados",
       RECORD_COLLECTIONS_ASSIGNED_RECORDS_SHOWN:
         "Se muestran {shown} de {total} registros asignados.",
-      RECORD_COLLECTIONS_BACK_TO_COLLECTIONS:
-        "Volver a las colecciones",
+      RECORD_COLLECTIONS_BACK_TO_COLLECTIONS: "Volver a las colecciones",
       RECORD_COLLECTIONS_BACK_TO_DETAILS: "Volver a los detalles",
       RECORD_COLLECTIONS_BROWSE_CREATE_MODIFY_EXISTING:
         "Explora colecciones, crea nuevas colecciones y modifica las existentes.",
       RECORD_COLLECTIONS_BROWSE_SEARCH_OPEN_PROJECT:
         "Explora, busca y modifica colecciones de registros para este proyecto.",
       RECORD_COLLECTIONS_CLASS: "Clase",
-      RECORD_COLLECTIONS_COLLECTION_DASHBOARD:
-        "Panel de colecciones",
-      RECORD_COLLECTIONS_COLLECTION_DETAILS:
-        "Detalles de la colección",
+      RECORD_COLLECTIONS_COLLECTION_DASHBOARD: "Panel de colecciones",
+      RECORD_COLLECTIONS_COLLECTION_DETAILS: "Detalles de la colección",
       RECORD_COLLECTIONS_COLLECTION_ID: "ID de la colección",
       RECORD_COLLECTIONS_CREATED: "Colección de registros creada",
       RECORD_COLLECTIONS_CREATE_IN_ACTIVE_PROJECT:
@@ -3117,8 +3099,7 @@ export const translations = {
         "No se pudo crear la colección de registros",
       RECORD_COLLECTIONS_FAILED_CREATE_LABEL:
         "No se pudo crear la etiqueta de sensibilidad",
-      RECORD_COLLECTIONS_FAILED_CREATE_TAG:
-        "No se pudo crear la etiqueta",
+      RECORD_COLLECTIONS_FAILED_CREATE_TAG: "No se pudo crear la etiqueta",
       RECORD_COLLECTIONS_FAILED_LOAD_COLLECTIONS:
         "No se pudieron cargar las colecciones de registros",
       RECORD_COLLECTIONS_FAILED_LOAD_COLLECTION_RECORDS:
@@ -3149,12 +3130,13 @@ export const translations = {
       RECORD_COLLECTIONS_MANAGE_RECORDS: "Administrar registros",
       RECORD_COLLECTIONS_MANAGE_RECORDS_DESCRIPTION:
         "Agrega registros a esta colección o elimina registros ya asignados.",
-      RECORD_COLLECTIONS_MODIFY_LABELS_AND_TAGS:
-        "Etiquetas de la colección",
+      RECORD_COLLECTIONS_MODIFY_LABELS_AND_TAGS: "Etiquetas de la colección",
       RECORD_COLLECTIONS_MODIFY_LABELS_AND_TAGS_HELP:
         "Estas etiquetas se aplicarán a la colección misma. No cambian los registros incluidos.",
       RECORD_COLLECTIONS_NAME_AND_DESCRIPTION_REQUIRED:
         "El nombre y la descripción son obligatorios",
+      RECORD_COLLECTIONS_NAME_REQUIRED:
+        "El título de la colección es obligatorio.",
       RECORD_COLLECTIONS_NEW: "Nueva colección",
       RECORD_COLLECTIONS_NOT_UPDATED: "No actualizado",
       RECORD_COLLECTIONS_NO_ADDITIONAL_PROPERTIES_SET:
@@ -3164,8 +3146,7 @@ export const translations = {
       RECORD_COLLECTIONS_NO_LABELS_FOUND: "No se encontraron etiquetas.",
       RECORD_COLLECTIONS_NO_RECORDS_ARE_CURRENTLY_ASSIGNED:
         "No hay registros asignados actualmente.",
-      RECORD_COLLECTIONS_NO_RECORDS_FOUND:
-        "No se encontraron registros.",
+      RECORD_COLLECTIONS_NO_RECORDS_FOUND: "No se encontraron registros.",
       RECORD_COLLECTIONS_NO_RECORDS_MATCH_SEARCH:
         "Ningún registro coincide con esta búsqueda.",
       RECORD_COLLECTIONS_NO_SELECTED_RECORDS_MATCH_SEARCH:
@@ -3184,45 +3165,35 @@ export const translations = {
         'agregar la etiqueta de sensibilidad "{name}"',
       RECORD_COLLECTIONS_PARTIAL_UPDATE_ADD_RECORD:
         'agregar el registro "{name}"',
-      RECORD_COLLECTIONS_PARTIAL_UPDATE_ADD_TAG:
-        'agregar la etiqueta "{name}"',
+      RECORD_COLLECTIONS_PARTIAL_UPDATE_ADD_TAG: 'agregar la etiqueta "{name}"',
       RECORD_COLLECTIONS_PARTIAL_UPDATE_REMOVE_LABEL:
         'quitar la etiqueta de sensibilidad "{name}"',
       RECORD_COLLECTIONS_PARTIAL_UPDATE_REMOVE_RECORD:
         'quitar el registro "{name}"',
       RECORD_COLLECTIONS_PARTIAL_UPDATE_REMOVE_TAG:
         'quitar la etiqueta "{name}"',
-      RECORD_COLLECTIONS_RECORDS_ADDED:
-        "Registros agregados a la colección",
+      RECORD_COLLECTIONS_RECORDS_ADDED: "Registros agregados a la colección",
       RECORD_COLLECTIONS_RECORDS_ASSIGNED_TO:
         "Registros asignados actualmente a {name}.",
-      RECORD_COLLECTIONS_RECORD_ADDED:
-        "Registro agregado a la colección",
-      RECORD_COLLECTIONS_RECORD_REMOVED:
-        "Registro eliminado de la colección",
-      RECORD_COLLECTIONS_RECORD_SUMMARY:
-        "Resumen de registros incluidos",
+      RECORD_COLLECTIONS_RECORD_ADDED: "Registro agregado a la colección",
+      RECORD_COLLECTIONS_RECORD_REMOVED: "Registro eliminado de la colección",
+      RECORD_COLLECTIONS_RECORD_SUMMARY: "Resumen de registros incluidos",
       RECORD_COLLECTIONS_RECORD_SUMMARY_HELP:
         "Estas etiquetas provienen de los registros seleccionados actualmente para esta colección. Úsalas para refinar qué registros se incluyen.",
       RECORD_COLLECTIONS_REMOVE_ITEM: "Eliminar {name}",
       RECORD_COLLECTIONS_REVIEW_AND_MODIFY_DETAILS:
         "Revisa y modifica los detalles de la colección.",
       RECORD_COLLECTIONS_SAVE_COLLECTION: "Guardar colección",
-      RECORD_COLLECTIONS_SAVE_MODIFICATIONS:
-        "Guardar modificaciones",
-      RECORD_COLLECTIONS_SEARCH_ALL_RECORDS:
-        "Buscar en todos los registros",
+      RECORD_COLLECTIONS_SAVE_MODIFICATIONS: "Guardar modificaciones",
+      RECORD_COLLECTIONS_SEARCH_ALL_RECORDS: "Buscar en todos los registros",
       RECORD_COLLECTIONS_SEARCH_IN_THIS_COLLECTION:
         "Buscar registros en esta colección",
-      RECORD_COLLECTIONS_SEARCH_OR_ADD_LABEL:
-        "Buscar o agregar etiqueta",
+      RECORD_COLLECTIONS_SEARCH_OR_ADD_LABEL: "Buscar o agregar etiqueta",
       RECORD_COLLECTIONS_SEARCH_OR_ADD_TAG: "Buscar o agregar etiqueta",
-      RECORD_COLLECTIONS_SEARCH_RECORDS_TO_ADD:
-        "Buscar registros para agregar",
+      RECORD_COLLECTIONS_SEARCH_RECORDS_TO_ADD: "Buscar registros para agregar",
       RECORD_COLLECTIONS_SEARCH_SELECTED_RECORDS:
         "Buscar registros seleccionados",
-      RECORD_COLLECTIONS_SEARCHING_RECORDS:
-        "Buscando registros",
+      RECORD_COLLECTIONS_SEARCHING_RECORDS: "Buscando registros",
       RECORD_COLLECTIONS_SELECTED_LABELS_AND_TAGS:
         "Etiquetas de los registros seleccionados",
       RECORD_COLLECTIONS_SELECTED_LABELS_AND_TAGS_HELP:
@@ -3237,39 +3208,31 @@ export const translations = {
       RECORD_COLLECTIONS_SOURCE: "Fuente",
       RECORD_COLLECTIONS_SORT_ALPHABETICAL_ASC: "Alfabético (A a Z)",
       RECORD_COLLECTIONS_SORT_ALPHABETICAL_DESC: "Alfabético (Z a A)",
-      RECORD_COLLECTIONS_SORT_RECORD_COUNT_ASC:
-        "# de registros (menor)",
-      RECORD_COLLECTIONS_SORT_RECORD_COUNT_DESC:
-        "# de registros (mayor)",
-      RECORD_COLLECTIONS_SORT_UPDATED_ASC:
-        "Última actualización (más antigua)",
+      RECORD_COLLECTIONS_SORT_RECORD_COUNT_ASC: "# de registros (menor)",
+      RECORD_COLLECTIONS_SORT_RECORD_COUNT_DESC: "# de registros (mayor)",
+      RECORD_COLLECTIONS_SORT_UPDATED_ASC: "Última actualización (más antigua)",
       RECORD_COLLECTIONS_SORT_UPDATED_DESC:
         "Última actualización (más reciente)",
       RECORD_COLLECTIONS_STEP_1: "Paso 1",
       RECORD_COLLECTIONS_STEP_2: "Paso 2",
       RECORD_COLLECTIONS_STEP_3: "Paso 3",
       RECORD_COLLECTIONS_STEP_4: "Paso 4",
-      RECORD_COLLECTIONS_STEP_ADD_METADATA:
-        "Describir colección",
+      RECORD_COLLECTIONS_STEP_ADD_METADATA: "Describir colección",
       RECORD_COLLECTIONS_STEP_MODIFY_LABELS_AND_TAGS:
         "Definir etiquetas de la colección",
       RECORD_COLLECTIONS_STEP_REVIEW: "Revisar",
-      RECORD_COLLECTIONS_STEP_SELECT_RECORDS:
-        "Seleccionar registros incluidos",
+      RECORD_COLLECTIONS_STEP_SELECT_RECORDS: "Seleccionar registros incluidos",
       RECORD_COLLECTIONS_TAGS: "Etiquetas",
       RECORD_COLLECTIONS_TAG_CREATED: "Etiqueta creada",
       RECORD_COLLECTIONS_TITLE: "Título de la colección",
-      RECORD_COLLECTIONS_TOTAL_COLLECTIONS:
-        "Total de colecciones:",
+      RECORD_COLLECTIONS_TOTAL_COLLECTIONS: "Total de colecciones:",
       RECORD_COLLECTIONS_TOTAL_RECORDS: "Total de registros",
       RECORD_COLLECTIONS_UNCLASSIFIED: "Sin clasificar",
       RECORD_COLLECTIONS_UNNAMED_RECORD: "Registro sin nombre",
       RECORD_COLLECTIONS_UNSELECT_ALL: "Deseleccionar todo",
-      RECORD_COLLECTIONS_UNTITLED_COLLECTION:
-        "Colección sin título",
+      RECORD_COLLECTIONS_UNTITLED_COLLECTION: "Colección sin título",
       RECORD_COLLECTIONS_UPDATED: "Actualizado",
-      RECORD_COLLECTIONS_UPDATE_SUCCESS:
-        "Colección de registros actualizada",
+      RECORD_COLLECTIONS_UPDATE_SUCCESS: "Colección de registros actualizada",
       RECORD_COLLECTIONS_UPDATED_ON_CREATE: "Al crear",
       RECORD_COLLECTIONS_VALUE: "Valor",
       RECORD_COLLECTIONS_VIEW_ALL: "Ver todos",
@@ -3670,7 +3633,7 @@ export const translations = {
       FAILED_TO_UPDATE_THEME: "Error al actualizar el tema",
       ARCHIVED_USERS: "Usuarios Archivados",
       UNARCHIVE_USER: "Desarchivar",
-      NO_ARCHIVED_USERS: "No hay usuarios archivados."
+      NO_ARCHIVED_USERS: "No hay usuarios archivados.",
     },
   },
 };

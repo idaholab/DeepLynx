@@ -7,12 +7,10 @@ import {
 } from "../../../types/responseDTOs";
 import {
   countFacet,
-} from "../../components/utils";
-import {
   deriveSelectedRecordMetadata,
   getSelectedRecordLabelNames,
   getSelectedRecordTagNames,
-} from "../../components/recordCollections.utils";
+} from "../../components/utils";
 import {
   NewCollectionSelectedRecord,
   SelectionState,

@@ -12,15 +12,12 @@ import {
   unattachTagFromRecordCollection,
   updateRecordCollection,
 } from "@/app/lib/client_service/record_collection_services.client";
-import {
-  createSensitivityLabelProject,
-  getAllSensitivityLabelsProject,
-} from "@/app/lib/client_service/sensitivity_labels_services.client";
+import { createSensitivityLabelProject } from "@/app/lib/client_service/sensitivity_labels_services.client";
 import {
   fullTextSearch,
   getMultiProjectRecords,
 } from "@/app/lib/client_service/query_services.client";
-import { createTag, getAllTags } from "@/app/lib/client_service/tag_services.client";
+import { createTag } from "@/app/lib/client_service/tag_services.client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import {
@@ -29,8 +26,6 @@ import {
   RecordCollectionResponseDto,
   RecordCollectionTagDto,
   RecordResponseDto,
-  SensitivityLabelsDto,
-  TagResponseDto,
 } from "../../../types/responseDTOs";
 import {
   COLLECTION_BADGE_DISPLAY_LIMIT,
@@ -43,11 +38,12 @@ import {
 import {
   getMetadataRows,
   getSensitivityClass,
+  mapSearchResultToCollectionRecord,
   parseProperties,
-} from "../../components/recordCollections.utils";
-import { useSelectedCollectionDetailsController } from "../../hooks/useSelectedCollectionDetailsController";
+} from "../../components/utils";
 import { useSelectedCollectionDetailsView } from "../../hooks/useSelectedCollectionDetailsView";
 import { useSelectedCollectionEditDerived } from "../../hooks/useSelectedCollectionEditDerived";
+import { useProjectCollectionOptions } from "../../hooks/useProjectCollectionOptions";
 
 type Params = {
   organizationId: number;
@@ -57,29 +53,6 @@ type Params = {
 };
 
 type CollectionWorkspaceTabId = "Details" | "Records";
-
-const mapSearchResultToCollectionRecord = (
-  record: QueryRecordViewResponseDto,
-): RecordResponseDto => ({
-  id: record.id,
-  name: record.name,
-  description: record.description,
-  uri: record.uri,
-  properties: record.properties,
-  objectStorageId: record.objectStorageId,
-  originalId: record.originalId,
-  classId: record.classId,
-  dataSourceId: record.dataSourceId,
-  projectId: record.projectId,
-  lastUpdatedAt: record.lastUpdatedAt,
-  lastUpdatedBy:
-    record.lastUpdatedBy === null || record.lastUpdatedBy === undefined
-      ? null
-      : String(record.lastUpdatedBy),
-  isArchived: record.isArchived,
-  fileType: record.fileType,
-  fileSize: record.fileSize,
-});
 
 export function useCollectionDetails({
   organizationId,
@@ -119,10 +92,14 @@ export function useCollectionDetails({
   });
   const [recordsLoading, setRecordsLoading] = useState(false);
   const [recordSearchLoading, setRecordSearchLoading] = useState(false);
-  const [labelsLoading, setLabelsLoading] = useState(false);
-  const [availableLabels, setAvailableLabels] = useState<SensitivityLabelsDto[]>([]);
-  const [tagsLoading, setTagsLoading] = useState(false);
-  const [availableTags, setAvailableTags] = useState<TagResponseDto[]>([]);
+  const {
+    availableLabels,
+    setAvailableLabels,
+    labelsLoading,
+    availableTags,
+    setAvailableTags,
+    tagsLoading,
+  } = useProjectCollectionOptions(projectId);
   const [saving, setSaving] = useState(false);
   const [selectedCollectionLabelSearchTerm, setSelectedCollectionLabelSearchTerm] =
     useState("");
@@ -157,40 +134,6 @@ export function useCollectionDetails({
   useEffect(() => {
     collectionRecordsRef.current = collectionRecords;
   }, [collectionRecords]);
-
-  useEffect(() => {
-    const loadLabels = async () => {
-      setLabelsLoading(true);
-      try {
-        const labels = await getAllSensitivityLabelsProject(projectId);
-        setAvailableLabels(labels);
-      } catch (error) {
-        console.error("Failed to load project labels:", error);
-        toast.error(t.translations.RECORD_COLLECTIONS_FAILED_LOAD_PROJECT_LABELS);
-      } finally {
-        setLabelsLoading(false);
-      }
-    };
-
-    void loadLabels();
-  }, [projectId, t]);
-
-  useEffect(() => {
-    const loadTags = async () => {
-      setTagsLoading(true);
-      try {
-        const tags = await getAllTags(projectId);
-        setAvailableTags(tags);
-      } catch (error) {
-        console.error("Failed to load project tags:", error);
-        toast.error(t.translations.RECORD_COLLECTIONS_FAILED_LOAD_PROJECT_TAGS);
-      } finally {
-        setTagsLoading(false);
-      }
-    };
-
-    void loadTags();
-  }, [projectId, t]);
 
   const syncSelectedCollectionRecordCount = useCallback((count: number) => {
     setSelectedCollection((current) => ({ ...current, recordCount: count }));
@@ -904,18 +847,25 @@ export function useCollectionDetails({
     },
   };
 
-  const detailsController = useSelectedCollectionDetailsController({
-    context: {
-      projectId,
+  const activeSelectedCollection = editableSelectedCollection ?? selectedCollection;
+  const detailsController = {
+    readonlyView: {
       selectedCollection,
+      ...collectionDetailsView,
+      badgeDisplayLimit: COLLECTION_BADGE_DISPLAY_LIMIT,
+      getMetadataRows,
+      getSensitivityClass,
       collectionRecords,
       recordsLoading,
-      saving,
-      isEditingSelectedCollection,
+      onViewAllCollectionRecords: () => setCollectionWorkspaceTab("Records"),
+      recordsPerPage: NEW_COLLECTION_RECORDS_PER_PAGE,
+      projectId,
+      onOpenSelectedCollectionEdit: openSelectedCollectionEdit,
     },
-    view: collectionDetailsView,
-    editDerived: selectedCollectionEditDerived,
-    editState: {
+    editView: {
+      editableSelectedCollection: activeSelectedCollection,
+      isEditingSelectedCollection,
+      saving,
       setSelectedCollectionDraft,
       setSelectedCollectionPropertiesEditorOpen,
       selectedCollectionLabelSearchTerm,
@@ -926,43 +876,30 @@ export function useCollectionDetails({
       selectedCollectionTagCreating,
       labelsLoading,
       tagsLoading,
-    },
-    labelAndTagActions: {
+      ...selectedCollectionEditDerived,
       onAddSelectedCollectionLabelFromSearch: addSelectedCollectionLabelFromSearch,
       onAddSelectedCollectionTagFromSearch: addSelectedCollectionTagFromSearch,
       onAddSelectedCollectionLabel: addSelectedCollectionLabel,
       onAddSelectedCollectionTag: addSelectedCollectionTag,
       onRemoveLabel: handleRemoveLabel,
       onRemoveTag: handleRemoveTag,
-    },
-    recordSearch: {
       recordSearchTerm,
       setRecordSearchTerm,
       recordSearchLoading,
       onSearchRecords: handleSearchRecords,
-    },
-    recordMutations: {
       recordMutationStatusById,
       onRemoveCollectionRecord: handleRemoveCollectionRecord,
       onAddCollectionRecord: handleAddCollectionRecord,
-    },
-    navigation: {
       onCancelSelectedCollectionEdit: cancelSelectedCollectionEdit,
       onSaveSelectedDetails: handleSaveSelectedDetails,
-      onViewAllCollectionRecords: () => setCollectionWorkspaceTab("Records"),
-      onOpenSelectedCollectionEdit: openSelectedCollectionEdit,
     },
-    formatting: {
-      getMetadataRows,
-      getSensitivityClass,
-    },
-  });
+  };
 
   return {
     workspace: {
       tab: collectionWorkspaceTab,
     },
-    detailsController: detailsController!,
+    detailsController,
     recordsController,
     propertiesEditor: {
       isOpen: selectedCollectionPropertiesEditorOpen,
@@ -973,3 +910,5 @@ export function useCollectionDetails({
     },
   };
 }
+
+export type CollectionDetailsController = ReturnType<typeof useCollectionDetails>;

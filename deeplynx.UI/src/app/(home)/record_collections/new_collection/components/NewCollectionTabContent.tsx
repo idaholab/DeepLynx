@@ -11,8 +11,8 @@ import CollectionRecordSearchResultsTable from "../../components/CollectionRecor
 import NewCollectionStepIndicator from "./NewCollectionStepIndicator";
 import SelectedRecordsPreviewPanel from "../../components/SelectedRecordsPreviewPanel";
 import SectionCard from "../../components/SectionCard";
-import { NewCollectionTabController } from "../../components/componentTypes";
 import { interpolateTemplate } from "../../components/utils";
+import type { NewCollectionTabController } from "../hooks/useNewCollectionWorkflow";
 
 type Props = {
   controller: NewCollectionTabController;
@@ -105,8 +105,10 @@ export default function NewCollectionTabContent({
   },
 }: Props) {
   const { t } = useLanguage();
-  const [reviewDescriptionExpanded, setReviewDescriptionExpanded] = React.useState(false);
-  const [reviewDescriptionExpandable, setReviewDescriptionExpandable] = React.useState(false);
+  const [reviewDescriptionExpanded, setReviewDescriptionExpanded] =
+    React.useState(false);
+  const [reviewDescriptionExpandable, setReviewDescriptionExpandable] =
+    React.useState(false);
   const [reviewLabelsExpanded, setReviewLabelsExpanded] = React.useState(false);
   const [reviewTagsExpanded, setReviewTagsExpanded] = React.useState(false);
   const reviewDescriptionRef = React.useRef<HTMLParagraphElement | null>(null);
@@ -124,7 +126,9 @@ export default function NewCollectionTabContent({
       );
     };
 
-    const frameId = window.requestAnimationFrame(measureReviewDescriptionOverflow);
+    const frameId = window.requestAnimationFrame(
+      measureReviewDescriptionOverflow,
+    );
     window.addEventListener("resize", measureReviewDescriptionOverflow);
 
     return () => {
@@ -133,10 +137,12 @@ export default function NewCollectionTabContent({
     };
   }, [newCollectionDescription, newCollectionStep]);
 
-  const reviewTagItems = newCollectionSelectedTagNames.map((tagName, index) => ({
-    id: `${tagName}-${index}`,
-    name: tagName,
-  }));
+  const reviewTagItems = newCollectionSelectedTagNames.map(
+    (tagName, index) => ({
+      id: `${tagName}-${index}`,
+      name: tagName,
+    }),
+  );
   const visibleReviewLabels = reviewLabelsExpanded
     ? selectedNewCollectionLabels
     : selectedNewCollectionLabels.slice(0, 10);
@@ -149,7 +155,9 @@ export default function NewCollectionTabContent({
         <p className="text-base-content/60">
           {t.translations.RECORD_COLLECTIONS_COLLECTION_ID}
         </p>
-        <p className="font-semibold text-base-content">{t.translations.PENDING}</p>
+        <p className="font-semibold text-base-content">
+          {t.translations.PENDING}
+        </p>
       </div>
       <div>
         <p className="text-base-content/60">
@@ -171,10 +179,36 @@ export default function NewCollectionTabContent({
         <p className="text-base-content/60">
           {t.translations.RECORD_COLLECTIONS_LAST_UPDATED_BY}
         </p>
-        <p className="font-semibold text-base-content">{t.translations.PENDING}</p>
+        <p className="font-semibold text-base-content">
+          {t.translations.PENDING}
+        </p>
       </div>
     </div>
   );
+  const selectedRecordsPreview = (
+    <SelectedRecordsPreviewPanel
+      title={t.translations.SELECTED_RECORDS}
+      shownCount={filteredNewCollectionSelectedRecords.length}
+      totalCount={newCollectionSelectedRecords.length}
+      searchTerm={newCollectionReviewSearchTerm}
+      setSearchTerm={setNewCollectionReviewSearchTerm}
+      records={visibleNewCollectionReviewRecords}
+      emptyMessage={
+        t.translations.RECORD_COLLECTIONS_NO_SELECTED_RECORDS_MATCH_SEARCH
+      }
+      currentPage={newCollectionReviewPage}
+      setCurrentPage={setNewCollectionReviewPage}
+      pageCount={newCollectionReviewPageCount}
+      pageSize={recordsPerPage}
+      pageSizeOptions={recordPageSizeOptions}
+      onPageSizeChange={setRecordsPerPage}
+    />
+  );
+
+  const hasSelectedRecords = newCollectionSelectedRecordIds.length > 0;
+  const hasRequiredMetadata =
+    newCollectionName.trim().length > 0 &&
+    newCollectionDescription.trim().length > 0;
 
   return (
     <div className="mt-4">
@@ -196,7 +230,8 @@ export default function NewCollectionTabContent({
             },
             {
               label: t.translations.RECORD_COLLECTIONS_STEP_3,
-              detail: t.translations.RECORD_COLLECTIONS_STEP_MODIFY_LABELS_AND_TAGS,
+              detail:
+                t.translations.RECORD_COLLECTIONS_STEP_MODIFY_LABELS_AND_TAGS,
               active: newCollectionStep === "Modify",
             },
             {
@@ -221,7 +256,9 @@ export default function NewCollectionTabContent({
                   <CollectionRecordSearchControls
                     searchTerm={newCollectionRecordSearchTerm}
                     setSearchTerm={setNewCollectionRecordSearchTerm}
-                    placeholder={t.translations.RECORD_COLLECTIONS_SEARCH_RECORDS_TO_ADD}
+                    placeholder={
+                      t.translations.RECORD_COLLECTIONS_SEARCH_RECORDS_TO_ADD
+                    }
                     searchLoading={newCollectionRecordSearchLoading}
                     onSearch={() => void onSearchRecords()}
                     action={
@@ -242,18 +279,19 @@ export default function NewCollectionTabContent({
                   <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-base-content/70">
                     <span>
                       {interpolateTemplate(
-                        t.translations.RECORD_COLLECTIONS_SELECTED_RECORDS_COUNT,
+                        t.translations
+                          .RECORD_COLLECTIONS_SELECTED_RECORDS_COUNT,
                         { count: newCollectionSelectedRecordIds.length },
                       )}
                     </span>
                     <button
                       type="button"
                       className="btn btn-xs btn-outline"
-                        disabled={
-                          newCollectionRecordSearchLoading ||
-                          newCollectionRecordSearchResults.length === 0 ||
-                          retrievedSelectionState === "all"
-                        }
+                      disabled={
+                        newCollectionRecordSearchLoading ||
+                        newCollectionRecordSearchResults.length === 0 ||
+                        retrievedSelectionState === "all"
+                      }
                       onClick={() => void onSelectAllSearchedRecords()}
                     >
                       {t.translations.SELECT_ALL}
@@ -261,11 +299,11 @@ export default function NewCollectionTabContent({
                     <button
                       type="button"
                       className="btn btn-xs btn-outline"
-                        disabled={
-                          newCollectionRecordSearchLoading ||
-                          newCollectionRecordSearchResults.length === 0 ||
-                          retrievedSelectionState !== "all"
-                        }
+                      disabled={
+                        newCollectionRecordSearchLoading ||
+                        newCollectionRecordSearchResults.length === 0 ||
+                        retrievedSelectionState !== "all"
+                      }
                       onClick={onClearSelectedRecords}
                     >
                       {t.translations.RECORD_COLLECTIONS_UNSELECT_ALL}
@@ -283,20 +321,27 @@ export default function NewCollectionTabContent({
                               className="checkbox checkbox-sm"
                               checked={
                                 typeof record.id === "number" &&
-                                newCollectionSelectedRecordIds.includes(record.id)
+                                newCollectionSelectedRecordIds.includes(
+                                  record.id,
+                                )
                               }
                               disabled={typeof record.id !== "number"}
-                              onChange={() => void onToggleNewCollectionRecord(record)}
+                              onChange={() =>
+                                void onToggleNewCollectionRecord(record)
+                              }
                             />
                           ),
                           name: record.name,
                           className:
                             record.className ??
                             t.translations.RECORD_COLLECTIONS_UNCLASSIFIED,
-                          sourceName: record.dataSourceName ?? t.translations.UNKNOWN,
+                          sourceName:
+                            record.dataSourceName ?? t.translations.UNKNOWN,
                           updatedAt: record.lastUpdatedAt,
                         }))}
-                        emptyMessage={t.translations.RECORD_COLLECTIONS_NO_RECORDS_FOUND}
+                        emptyMessage={
+                          t.translations.RECORD_COLLECTIONS_NO_RECORDS_FOUND
+                        }
                         maxHeightClassName="max-h-fit"
                         pinnedHeader={false}
                         leadingHeaderCell={
@@ -310,11 +355,14 @@ export default function NewCollectionTabContent({
                                   visibleSelectionState === "some";
                               }
                             }}
-                            onChange={() => void onToggleSelectAllVisibleRecords()}
+                            onChange={() =>
+                              void onToggleSelectAllVisibleRecords()
+                            }
                           />
                         }
                       />
-                      {newCollectionRecordSearchResults.length > recordsPerPage ? (
+                      {newCollectionRecordSearchResults.length >
+                      recordsPerPage ? (
                         <div className="flex flex-col gap-3 px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between">
                           <span className="text-base-content/70">
                             {`${t.translations.SHOWING} ${(newCollectionRecordPage - 1) * recordsPerPage + 1}-${Math.min(
@@ -355,14 +403,17 @@ export default function NewCollectionTabContent({
                   <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-base-content/70">
                     <span>
                       {interpolateTemplate(
-                        t.translations.RECORD_COLLECTIONS_SELECTED_RECORDS_COUNT,
+                        t.translations
+                          .RECORD_COLLECTIONS_SELECTED_RECORDS_COUNT,
                         { count: newCollectionSelectedRecords.length },
                       )}
                     </span>
                     {newCollectionSelectedRecords.length > 0 ? (
                       confirmClearNewCollectionRecords ? (
                         <span className="flex flex-wrap items-center gap-2">
-                          <span>{t.translations.RECORD_COLLECTIONS_ARE_YOU_SURE}</span>
+                          <span>
+                            {t.translations.RECORD_COLLECTIONS_ARE_YOU_SURE}
+                          </span>
                           <button
                             type="button"
                             className="btn btn-error btn-xs"
@@ -373,7 +424,9 @@ export default function NewCollectionTabContent({
                           <button
                             type="button"
                             className="btn btn-ghost btn-xs"
-                            onClick={() => setConfirmClearNewCollectionRecords(false)}
+                            onClick={() =>
+                              setConfirmClearNewCollectionRecords(false)
+                            }
                           >
                             {t.translations.NO}
                           </button>
@@ -381,11 +434,13 @@ export default function NewCollectionTabContent({
                       ) : (
                         <button
                           type="button"
-                        className="btn btn-outline btn-xs"
-                        onClick={() => setConfirmClearNewCollectionRecords(true)}
-                      >
-                        {t.translations.CLEAR}
-                      </button>
+                          className="btn btn-outline btn-xs"
+                          onClick={() =>
+                            setConfirmClearNewCollectionRecords(true)
+                          }
+                        >
+                          {t.translations.CLEAR}
+                        </button>
                       )
                     ) : null}
                   </div>
@@ -404,7 +459,10 @@ export default function NewCollectionTabContent({
                 <div className="flex flex-wrap justify-end gap-2 self-end">
                   {selectedRecordEnrichmentPending ? (
                     <p className="w-full text-right text-sm text-base-content/70">
-                      {t.translations.RECORD_COLLECTIONS_WAIT_FOR_SELECTED_RECORD_METADATA}
+                      {
+                        t.translations
+                          .RECORD_COLLECTIONS_WAIT_FOR_SELECTED_RECORD_METADATA
+                      }
                     </p>
                   ) : null}
                   {!selectedRecordEnrichmentPending &&
@@ -427,6 +485,9 @@ export default function NewCollectionTabContent({
                     type="button"
                     className="btn btn-primary btn-sm"
                     onClick={() => setNewCollectionStep("Metadata")}
+                    disabled={
+                      !hasSelectedRecords || selectedRecordEnrichmentPending
+                    }
                   >
                     {t.translations.NEXT}
                   </button>
@@ -450,6 +511,7 @@ export default function NewCollectionTabContent({
                         type="text"
                         className="input input-bordered w-full"
                         value={newCollectionName}
+                        required
                         onChange={(event) =>
                           setNewCollectionName(event.target.value)
                         }
@@ -465,29 +527,14 @@ export default function NewCollectionTabContent({
                       <textarea
                         className="textarea textarea-bordered min-h-32 w-full resize-y"
                         value={newCollectionDescription}
+                        required
                         onChange={(event) =>
                           setNewCollectionDescription(event.target.value)
                         }
                       />
                     </label>
 
-                    <SelectedRecordsPreviewPanel
-                      title={t.translations.SELECTED_RECORDS}
-                      shownCount={filteredNewCollectionSelectedRecords.length}
-                      totalCount={newCollectionSelectedRecords.length}
-                      searchTerm={newCollectionReviewSearchTerm}
-                      setSearchTerm={setNewCollectionReviewSearchTerm}
-                      records={visibleNewCollectionReviewRecords}
-                      emptyMessage={
-                        t.translations.RECORD_COLLECTIONS_NO_SELECTED_RECORDS_MATCH_SEARCH
-                      }
-                      currentPage={newCollectionReviewPage}
-                      setCurrentPage={setNewCollectionReviewPage}
-                      pageCount={newCollectionReviewPageCount}
-                      pageSize={recordsPerPage}
-                      pageSizeOptions={recordPageSizeOptions}
-                      onPageSizeChange={setRecordsPerPage}
-                    />
+                    {selectedRecordsPreview}
                   </div>
                 </div>
               </div>
@@ -498,7 +545,10 @@ export default function NewCollectionTabContent({
                     {t.translations.RECORD_COLLECTIONS_SELECTED_LABELS_AND_TAGS}
                   </h3>
                   <p className="mt-2 text-sm text-base-content/70">
-                    {t.translations.RECORD_COLLECTIONS_SELECTED_LABELS_AND_TAGS_HELP}
+                    {
+                      t.translations
+                        .RECORD_COLLECTIONS_SELECTED_LABELS_AND_TAGS_HELP
+                    }
                   </p>
                   <div className="mt-5">
                     <CollectionFacetSummary
@@ -527,7 +577,11 @@ export default function NewCollectionTabContent({
                   <button
                     type="button"
                     className="btn btn-primary btn-sm"
-                    disabled={saving || selectedRecordEnrichmentPending}
+                    disabled={
+                      saving ||
+                      selectedRecordEnrichmentPending ||
+                      !hasRequiredMetadata
+                    }
                     onClick={() => void onGoToModifyStep()}
                   >
                     {t.translations.NEXT}
@@ -569,23 +623,7 @@ export default function NewCollectionTabContent({
                       />
                     </label>
 
-                    <SelectedRecordsPreviewPanel
-                      title={t.translations.SELECTED_RECORDS}
-                      shownCount={filteredNewCollectionSelectedRecords.length}
-                      totalCount={newCollectionSelectedRecords.length}
-                      searchTerm={newCollectionReviewSearchTerm}
-                      setSearchTerm={setNewCollectionReviewSearchTerm}
-                      records={visibleNewCollectionReviewRecords}
-                      emptyMessage={
-                        t.translations.RECORD_COLLECTIONS_NO_SELECTED_RECORDS_MATCH_SEARCH
-                      }
-                      currentPage={newCollectionReviewPage}
-                      setCurrentPage={setNewCollectionReviewPage}
-                      pageCount={newCollectionReviewPageCount}
-                      pageSize={recordsPerPage}
-                      pageSizeOptions={recordPageSizeOptions}
-                      onPageSizeChange={setRecordsPerPage}
-                    />
+                    {selectedRecordsPreview}
                   </div>
                 </div>
               </div>
@@ -596,7 +634,10 @@ export default function NewCollectionTabContent({
                     {t.translations.RECORD_COLLECTIONS_MODIFY_LABELS_AND_TAGS}
                   </h3>
                   <p className="mt-2 text-sm text-base-content/70">
-                    {t.translations.RECORD_COLLECTIONS_MODIFY_LABELS_AND_TAGS_HELP}
+                    {
+                      t.translations
+                        .RECORD_COLLECTIONS_MODIFY_LABELS_AND_TAGS_HELP
+                    }
                   </p>
                   <div className="mt-5 space-y-6">
                     <CollectionEntitySelector
@@ -604,13 +645,20 @@ export default function NewCollectionTabContent({
                       selectedItems={selectedNewCollectionLabels}
                       searchTerm={newCollectionLabelSearchTerm}
                       setSearchTerm={setNewCollectionLabelSearchTerm}
-                      searchPlaceholder={t.translations.RECORD_COLLECTIONS_SEARCH_OR_ADD_LABEL}
+                      searchPlaceholder={
+                        t.translations.RECORD_COLLECTIONS_SEARCH_OR_ADD_LABEL
+                      }
                       options={filteredNewCollectionLabelOptions}
                       loading={labelsLoading}
-                      loadingText={t.translations.RECORD_COLLECTIONS_LOADING_LABELS}
-                      emptyOptionsText={t.translations.RECORD_COLLECTIONS_NO_LABELS_FOUND}
+                      loadingText={
+                        t.translations.RECORD_COLLECTIONS_LOADING_LABELS
+                      }
+                      emptyOptionsText={
+                        t.translations.RECORD_COLLECTIONS_NO_LABELS_FOUND
+                      }
                       addDisabled={
-                        !canAddTypedNewCollectionLabel || newCollectionLabelCreating
+                        !canAddTypedNewCollectionLabel ||
+                        newCollectionLabelCreating
                       }
                       addButtonLoading={newCollectionLabelCreating}
                       selectedItemClassName={(item) =>
@@ -627,17 +675,25 @@ export default function NewCollectionTabContent({
 
                     <CollectionEntitySelector
                       title={t.translations.RECORD_COLLECTIONS_TAGS}
-                      selectedItems={newCollectionSelectedTagNames.map((tag) => ({
-                        id: tag,
-                        name: tag,
-                      }))}
+                      selectedItems={newCollectionSelectedTagNames.map(
+                        (tag) => ({
+                          id: tag,
+                          name: tag,
+                        }),
+                      )}
                       searchTerm={newCollectionTagSearchTerm}
                       setSearchTerm={setNewCollectionTagSearchTerm}
-                      searchPlaceholder={t.translations.RECORD_COLLECTIONS_SEARCH_OR_ADD_TAG}
+                      searchPlaceholder={
+                        t.translations.RECORD_COLLECTIONS_SEARCH_OR_ADD_TAG
+                      }
                       options={filteredNewCollectionTagOptions}
                       loading={tagsLoading}
-                      loadingText={t.translations.RECORD_COLLECTIONS_LOADING_TAGS}
-                      emptyOptionsText={t.translations.RECORD_COLLECTIONS_NO_TAGS_FOUND}
+                      loadingText={
+                        t.translations.RECORD_COLLECTIONS_LOADING_TAGS
+                      }
+                      emptyOptionsText={
+                        t.translations.RECORD_COLLECTIONS_NO_TAGS_FOUND
+                      }
                       addDisabled={!canAddTypedNewCollectionTag}
                       selectedItemClassName={() =>
                         "badge badge-sm badge-outline badge-secondary gap-1"
@@ -706,6 +762,7 @@ export default function NewCollectionTabContent({
                 badgeDisplayLimit={10}
                 getMetadataRows={() => []}
                 getSensitivityClass={getSensitivityClass}
+                showProperties={false}
                 records={newCollectionSelectedRecords}
                 filteredRecords={filteredNewCollectionSelectedRecords}
                 visibleRecords={visibleNewCollectionReviewRecords}
@@ -753,7 +810,6 @@ export default function NewCollectionTabContent({
             </>
           ) : null}
         </div>
-
       </SectionCard>
     </div>
   );

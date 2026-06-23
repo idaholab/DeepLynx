@@ -15,7 +15,6 @@ type Props = {
   options: CollectionSortOption[];
   onToggleMenu: () => void;
   onSelectOption: (option: CollectionSortOption) => void;
-  renderLabel: (option: CollectionSortOption) => React.ReactNode;
 };
 
 export default function CollectionSortControl({
@@ -25,9 +24,16 @@ export default function CollectionSortControl({
   options,
   onToggleMenu,
   onSelectOption,
-  renderLabel,
 }: Props) {
   const { t } = useLanguage();
+  const labels: Record<CollectionSortOption, string> = {
+    updatedDesc: t.translations.RECORD_COLLECTIONS_SORT_UPDATED_DESC,
+    updatedAsc: t.translations.RECORD_COLLECTIONS_SORT_UPDATED_ASC,
+    alphabeticalAsc: t.translations.RECORD_COLLECTIONS_SORT_ALPHABETICAL_ASC,
+    alphabeticalDesc: t.translations.RECORD_COLLECTIONS_SORT_ALPHABETICAL_DESC,
+    recordCountDesc: t.translations.RECORD_COLLECTIONS_SORT_RECORD_COUNT_DESC,
+    recordCountAsc: t.translations.RECORD_COLLECTIONS_SORT_RECORD_COUNT_ASC,
+  };
 
   return (
     <label className="form-control w-full lg:w-64">
@@ -45,7 +51,7 @@ export default function CollectionSortControl({
           onClick={onToggleMenu}
         >
           <span className="inline-flex items-center gap-1.5">
-            {renderLabel(collectionSort)}
+            {labels[collectionSort]}
           </span>
           <ChevronDownIcon
             className={`size-4 transition-transform ${
@@ -73,7 +79,7 @@ export default function CollectionSortControl({
                       onClick={() => onSelectOption(option)}
                     >
                       <span className="inline-flex items-center gap-1.5">
-                        {renderLabel(option)}
+                        {labels[option]}
                       </span>
                       {isSelected ? (
                         <CheckIcon className="size-4 flex-shrink-0" />
