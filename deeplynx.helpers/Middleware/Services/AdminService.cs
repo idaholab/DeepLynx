@@ -12,6 +12,8 @@ public interface IAdminService
     
     Task<bool> OrgAdminCheck(long userId, long organizationId);
     
+    Task<bool> OrgMemberCheck(long userId, long organizationId);
+    
     Task<bool> ProjectAdminCheck(long userId, long organizationId, List<long> projectIds);
 }
 
@@ -81,6 +83,32 @@ public class AdminService : IAdminService
                 userId);
 
         return hasPermission;
+    }
+    
+    public async Task<bool> OrgMemberCheck(
+        long userId, long organizationId)
+    {
+        var isMember = _dbContext.Database
+            .SqlQuery<bool>($@"
+            SELECT EXISTS(
+                SELECT 1
+                FROM deeplynx.organization_users ou
+                WHERE ou.organization_id = {organizationId}
+                  AND ou.user_id = {userId}
+                ) as has_permission")
+            .AsEnumerable()
+            .FirstOrDefault();
+
+        if (isMember)
+            _logger.LogInformation(
+                "Membership confirmed - User: {UserId}, Organization: {OrganizationId}",
+                userId, organizationId);
+        else
+            _logger.LogWarning(
+                "Membership denied - User: {UserId}, Organization: {OrganizationId}",
+                userId, organizationId);
+
+        return isMember;
     }
     
     public async Task<bool> ProjectAdminCheck(
