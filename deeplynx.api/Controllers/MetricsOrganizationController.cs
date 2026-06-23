@@ -62,7 +62,6 @@ public class MetricsOrganizationController : ControllerBase
     /// <param name="hideArchived">Flag indicating whether to hide archived data sources from the result (Default true)</param>
     /// <returns>A count of data sources for the given organization and its projects.</returns>
     [HttpGet("count", Name = "api_count_data_sources_for_organization")]
-    [Auth("read", "data_source")]
     public async Task<ActionResult<int>> GetDataSourceCount(
         long organizationId,
         [FromQuery] long[]? projectIds,
