@@ -19,14 +19,14 @@ import {
   NewCollectionSelectedRecord,
   NewCollectionStep,
 } from "../../components/recordCollections.types";
+import { useProjectCollectionOptions } from "../../hooks/useProjectCollectionOptions";
+import { useNewCollectionDerived } from "./useNewCollectionDerived";
+import { useToast } from "@/app/contexts/ToastProvider";
 import {
   getSelectedRecordLabelNames,
   getSelectedRecordTagNames,
   getSensitivityClass,
-} from "../../components/utils";
-import { useProjectCollectionOptions } from "../../hooks/useProjectCollectionOptions";
-import { useNewCollectionDerived } from "./useNewCollectionDerived";
-import { useToast } from "@/app/contexts/ToastProvider";
+} from "@/app/lib/record_helpers";
 
 type Params = {
   organizationId: number;

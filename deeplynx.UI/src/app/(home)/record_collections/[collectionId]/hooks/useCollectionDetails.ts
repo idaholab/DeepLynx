@@ -34,16 +34,16 @@ import {
   PendingRecordChanges,
   RecordMutationStatusById,
 } from "../../components/recordCollections.types";
-import {
-  getMetadataRows,
-  getSensitivityClass,
-  mapSearchResultToCollectionRecord,
-  parseProperties,
-} from "../../components/utils";
 import { useSelectedCollectionDetailsView } from "../../hooks/useSelectedCollectionDetailsView";
 import { useSelectedCollectionEditDerived } from "../../hooks/useSelectedCollectionEditDerived";
 import { useProjectCollectionOptions } from "../../hooks/useProjectCollectionOptions";
 import { useToast } from "@/app/contexts/ToastProvider";
+import {
+  mapSearchResultToCollectionRecord,
+  parseProperties,
+  getMetadataRows,
+  getSensitivityClass,
+} from "@/app/lib/record_helpers";
 
 type Params = {
   organizationId: number;

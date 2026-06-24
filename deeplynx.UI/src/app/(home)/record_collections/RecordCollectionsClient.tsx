@@ -12,8 +12,8 @@ import CollectionSortControl from "./components/CollectionSortControl";
 import FilterSidebar from "./components/FilterSidebar";
 import SectionCard from "./components/SectionCard";
 import { COLLECTION_BADGE_DISPLAY_LIMIT } from "./components/recordCollections.constants";
-import { getSensitivityClass } from "./components/utils";
 import { useCollectionsDashboard } from "./hooks/useCollectionsDashboard";
+import { getSensitivityClass } from "@/app/lib/record_helpers";
 
 type Props = {
   organizationId: number;
