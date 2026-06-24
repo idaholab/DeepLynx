@@ -1,27 +1,55 @@
 import { test, expect } from "@playwright/test";
+import * as fs from "fs";
+import * as path from "path";
 import { seedSession } from "../helpers/seed";
 
-test.describe("Login", () => {
-  /**
-   * In the test environment NEXT_PUBLIC_DISABLE_FRONTEND_AUTHENTICATION=true,
-   * so the login page immediately redirects to "/". These tests verify that
-   * the auth-disabled flow works correctly and the local dev user is loaded.
-   */
+function isAuthEnabled(): boolean {
+  const root = path.resolve(__dirname, "../..");
+  const envFiles = [
+    ".env",
+    ".env.local",
+    ".env.development",
+    ".env.development.local",
+  ];
+  let disabled = false;
 
+  for (const file of envFiles) {
+    try {
+      const content = fs.readFileSync(path.join(root, file), "utf-8");
+      const match = content.match(
+        /NEXT_PUBLIC_DISABLE_FRONTEND_AUTHENTICATION\s*=\s*(.+)/,
+      );
+      if (match) {
+        disabled = match[1].trim().replace(/["']/g, "") === "true";
+      }
+    } catch {
+      // File doesn't exist, skip.
+    }
+  }
+
+  return !disabled;
+}
+
+const AUTH_ENABLED = isAuthEnabled();
+
+test.describe("Login", () => {
   test.describe("Login page redirect (auth disabled)", () => {
+    test.skip(
+      AUTH_ENABLED,
+      "Auth is enabled; redirect tests apply only to local auth-disabled mode",
+    );
+
     test("visiting /login/signin redirects to the home page", async ({
       page,
     }) => {
       await seedSession(page);
       await page.goto("/login/signin", { waitUntil: "domcontentloaded" });
-      // The login page detects auth is disabled and redirects to "/"
       await page.waitForURL("/", { timeout: 15000 });
     });
 
     test("login page shows Nexus logo while redirecting", async ({ page }) => {
       await seedSession(page);
       await page.goto("/login/signin", { waitUntil: "domcontentloaded" });
-      // The logo should be visible during the redirect
       await expect(page.getByAltText("DeepLynx logo")).toBeVisible();
     });
 
@@ -30,12 +58,18 @@ test.describe("Login", () => {
     }) => {
       await seedSession(page);
       await page.goto("/login/signin", { waitUntil: "domcontentloaded" });
-      // The System Use Notification and Sign In button should not render
-      await expect(page.getByText("System Use Notification")).not.toBeVisible();
+      await expect(
+        page.getByText("System Use Notification"),
+      ).not.toBeVisible();
     });
   });
 
   test.describe("Authenticated session (local dev user)", () => {
+    test.skip(
+      AUTH_ENABLED,
+      "Auth is enabled; local seeded-session tests apply only to auth-disabled mode",
+    );
+
     test.beforeEach(async ({ page }) => {
       await seedSession(page);
       await page.goto("/", { waitUntil: "domcontentloaded" });
@@ -66,39 +100,6 @@ test.describe("Login", () => {
     });
   });
 });
-
-import * as fs from "fs";
-import * as path from "path";
-import { seedSession } from "../helpers/seed";
-
-function isAuthEnabled(): boolean {
-  const root = path.resolve(__dirname, "../..");
-  const envFiles = [
-    ".env",
-    ".env.local",
-    ".env.development",
-    ".env.development.local",
-  ];
-  let disabled = false;
-
-  for (const file of envFiles) {
-    try {
-      const content = fs.readFileSync(path.join(root, file), "utf-8");
-      const match = content.match(
-        /NEXT_PUBLIC_DISABLE_FRONTEND_AUTHENTICATION\s*=\s*(.+)/,
-      );
-      if (match) {
-        disabled = match[1].trim().replace(/["']/g, "") === "true";
-      }
-    } catch {
-      // Missing env files are expected in some environments.
-    }
-  }
-
-  return !disabled;
-}
-
-const AUTH_ENABLED = isAuthEnabled();
 
 test.describe("Login page redirect (auth disabled)", () => {
   test.skip(

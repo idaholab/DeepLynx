@@ -46,6 +46,8 @@ interface Props {
   project: ProjectResponseDto;
   /** From backend: whether org has locked tags */
   orgTagsLocked: boolean;
+  initialLabels: SensitivityLabelsDto[];
+  refreshLabels: () => Promise<void>;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -55,6 +57,8 @@ interface Props {
 const ProjectTagAndLabelManagementClient: React.FC<Props> = ({
   project,
   orgTagsLocked,
+  initialLabels,
+  refreshLabels
 }) => {
   const { organization } = useOrganizationSession();
   const orgId = organization?.organizationId as number | undefined;
@@ -85,7 +89,7 @@ const ProjectTagAndLabelManagementClient: React.FC<Props> = ({
   /*                               Label State                                */
   /* ------------------------------------------------------------------------ */
 
-  const [labels, setLabels] = useState<SensitivityLabelsDto[]>([]);
+  const [labels, setLabels] = useState<SensitivityLabelsDto[]>(initialLabels);
   const [labelsLoading, setLabelsLoading] = useState(false);
   const [labelsError, setLabelsError] = useState<string | null>(null);
   const [archivingLabelId, setArchivingLabelId] = useState<number | null>(null);
@@ -235,11 +239,7 @@ const ProjectTagAndLabelManagementClient: React.FC<Props> = ({
     try {
       setLabelsLoading(true);
       setLabelsError(null);
-
-      const dtoList: SensitivityLabelsDto[] =
-        await getAllSensitivityLabelsProject(projectId);
-
-      setLabels(dtoList.filter((l) => !l.isArchived));
+      setLabels(initialLabels.filter((l) => !l.isArchived));
     } catch (error) {
       console.error("Failed to load project labels:", error);
       setLabelsError(t.translations.FAILED_TO_LOAD_PROJECT_LABELS);
@@ -347,6 +347,7 @@ const ProjectTagAndLabelManagementClient: React.FC<Props> = ({
         setLabels((prev) =>
           prev.map((l) => (l.id === updated.id ? updated : l)),
         );
+        await refreshLabels();
         toast.success(t.translations.PROJECT_LABEL_UPDATED);
       } else {
         const created = await createSensitivityLabelProject(projectId, {
@@ -355,6 +356,7 @@ const ProjectTagAndLabelManagementClient: React.FC<Props> = ({
         });
 
         setLabels((prev) => [...prev, created]);
+        await refreshLabels();
         toast.success(t.translations.PROJECT_LABEL_CREATED);
       }
 
@@ -414,6 +416,7 @@ const ProjectTagAndLabelManagementClient: React.FC<Props> = ({
       await archiveSensitivityLabelProject(projectId, labelToArchive.id, true);
 
       setLabels((prev) => prev.filter((l) => l.id !== labelToArchive.id));
+      await refreshLabels();
       toast.success(
         `${t.translations.LABEL} "${labelToArchive.name}" ${t.translations.ARCHIVED}.`,
       );

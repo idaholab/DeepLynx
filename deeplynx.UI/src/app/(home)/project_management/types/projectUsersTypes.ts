@@ -16,6 +16,7 @@ export type ProjectMemberTableRow = {
   role: string | null;
   roleId: number | null;
   memberType: MemberType;
+  isProjectAdmin: boolean;
 };
 
 export type ConfirmModalState = {
@@ -37,6 +38,7 @@ export type EditRoleModalState = {
   memberName: string;
   memberType: MemberType | null;
   currentRoleId: number | null;
+  currentIsProjectAdmin: boolean;
 };
 
 /* -------------------------------------------------------------------------- */
@@ -56,6 +58,7 @@ export const buildTableData = (
       role: m.role ?? null,
       roleId: m.roleId ?? null,
       memberType,
+      isProjectAdmin: m.isProjectAdmin ?? false,
     };
   });
 };

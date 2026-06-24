@@ -39,14 +39,16 @@ public class RecordCollectionController : ControllerBase
     /// </summary>
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
     /// <param name="projectId">The ID of the project whose collections are to be retrieved</param>
+    /// <param name="dto">The collection data transfer object used to search and return collections</param>
     /// <param name="hideArchived">Flag indicating whether to hide archived collections from the result (Default true)</param>
-    /// <returns>A list of record collections based on the applied filters.</returns>
+    /// <returns>A paginated response of record collections based on the applied filters.</returns>
     [HttpGet(Name = "api_get_all_record_collections")]
     [Auth("read", "record_collection")]
     [Sensitivity("read record")]
-    public async Task<ActionResult<IEnumerable<RecordCollectionResponseDto>>> GetAllRecordCollections(
+    public async Task<ActionResult<PaginatedResponse<RecordCollectionResponseDto>>> GetAllRecordCollections(
         long organizationId,
         long projectId,
+        [FromQuery] RecordCollectionQueryRequestDto dto,
         [FromQuery] bool hideArchived = true)
     {
         try
@@ -56,12 +58,13 @@ public class RecordCollectionController : ControllerBase
             var isOrgAdmin = UserContextStorage.IsOrgAdmin;
             var isProjectAdmin = UserContextStorage.IsProjectAdmin;
             var recordCollections =
-                await _recordCollectionBusiness.GetAllRecordCollections(currentUserId, organizationId, projectId, hideArchived, isSysAdmin, isOrgAdmin, isProjectAdmin);
+                await _recordCollectionBusiness.GetAllRecordCollections(currentUserId, organizationId, projectId, dto, hideArchived, isSysAdmin, isOrgAdmin, isProjectAdmin);
             return Ok(recordCollections);
         }
         catch (Exception exc)
         {
-            var message = $"An error occurred while listing all record collections: {exc}";
+
+            var message = $"An error occurred while listing all record collections for org and project: {exc}";
             _logger.LogError(message);
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
@@ -108,7 +111,56 @@ public class RecordCollectionController : ControllerBase
         }
         catch (Exception exc)
         {
-            var message = $"An error occurred while listing records in collection {recordCollectionId}: {exc}";
+            var message = $"An error occurred while listing records in record collection: {exc}";
+            _logger.LogError(message);
+            return StatusCode(StatusCodes.Status500InternalServerError, message);
+        }
+    }
+
+    /// <summary>
+    ///     Get Record Collections for a Record
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <param name="projectId">The ID of the project to which the collection belongs</param>
+    /// <param name="recordId">The ID of the record whose collections are to be retrieved</param>
+    /// <param name="hideArchived">Flag indicating whether to hide archived collections from the result (Default true)</param>
+    /// <returns>A list of record collections for the specified record.</returns>
+    [HttpGet("~/organizations/{organizationId:long}/projects/{projectId:long}/records/{recordId:long}/record-collections", Name = "api_get_record_collections_for_a_record")]
+    [Auth("read", "record_collection")]
+    [Auth("read", "record")]
+    [Sensitivity("read record")]
+    public async Task<ActionResult<PaginatedResponse<RecordCollectionResponseDto>>> GetRecordCollectionsForARecord(
+        long organizationId,
+        long projectId,
+        long recordId,
+        [FromQuery] RecordCollectionQueryRequestDto dto,
+        [FromQuery] bool hideArchived = true)
+    {
+        try
+        {
+            var currentUserId = UserContextStorage.UserId;
+            var isSysAdmin = UserContextStorage.IsSysAdmin;
+            var isOrgAdmin = UserContextStorage.IsOrgAdmin;
+            var isProjectAdmin = UserContextStorage.IsProjectAdmin;
+            var collections = await _recordCollectionBusiness.GetRecordCollectionsForRecord(
+                currentUserId,
+                organizationId,
+                projectId,
+                recordId,
+                hideArchived,
+                dto,
+                isSysAdmin,
+                isOrgAdmin,
+                isProjectAdmin);
+            return Ok(collections);
+        }
+        catch (KeyNotFoundException exc)
+        {
+            return NotFound(exc.Message);
+        }
+        catch (Exception exc)
+        {
+            var message = $"An error occurred while listing record collections for the record: {exc}";
             _logger.LogError(message);
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
@@ -143,12 +195,12 @@ public class RecordCollectionController : ControllerBase
         }
         catch (Exception exc)
         {
-            var message = $"An error occurred while listing records by tags: {exc}";
+            var message = $"An error occurred while listing record collections by tags: {exc}";
             _logger.LogError(message);
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
-    
+
     /// <summary>
     ///     Update Record Collection Metadata
     /// </summary>
@@ -178,7 +230,7 @@ public class RecordCollectionController : ControllerBase
         }
         catch (Exception exc)
         {
-            var message = $"An error occurred while updating record collection {recordCollectionId}: {exc}";
+            var message = $"An error occurred while updating record collection: {exc}";
             _logger.LogError(message);
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
@@ -223,7 +275,7 @@ public class RecordCollectionController : ControllerBase
         }
         catch (Exception exc)
         {
-            var message = $"An error occurred while updating record collection records: {exc}";
+            var message = $"An error occurred while adding records to record collection: {exc}";
             _logger.LogError(message);
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
@@ -277,7 +329,7 @@ public class RecordCollectionController : ControllerBase
         }
         catch (Exception exc)
         {
-            var message = $"An error occurred while updating record collection records: {exc}";
+            var message = $"An error occurred while removing records from record collection: {exc}";
             _logger.LogError(message);
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
@@ -288,7 +340,7 @@ public class RecordCollectionController : ControllerBase
     /// </summary>
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
     /// <param name="projectId">The ID of the project to which the record belongs</param>
-    /// <param name="dto">The record request data transfer object containing record details</param>
+    /// <param name="dto">The collection request data transfer object containing collection details</param>
     /// <param name="sensitivityLabelIds">sensitivity labels to apply to the collection on creation</param>
     /// <returns>The created Record Collection</returns>
     [HttpPost(Name = "api_create_a_record_collection")]
@@ -314,7 +366,7 @@ public class RecordCollectionController : ControllerBase
         }
         catch (Exception exc)
         {
-            var message = $"An error occurred while creating record collection: {exc}";
+            var message = $"An error occurred while creating a record collection: {exc}";
             _logger.LogError(message);
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
@@ -347,12 +399,12 @@ public class RecordCollectionController : ControllerBase
         }
         catch (Exception exc)
         {
-            var message = $"An error occurred while deleting record collection {recordCollectionId}: {exc}";
+            var message = $"An error occurred while deleting a record collection: {exc}";
             _logger.LogError(message);
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
-    
+
     /// <summary>
     ///     Archive or Unarchive a Record Collection
     /// </summary>
@@ -388,13 +440,12 @@ public class RecordCollectionController : ControllerBase
         }
         catch (Exception exc)
         {
-            var action = archive ? "archiving" : "unarchiving";
-            var message = $"An error occurred while {action} record collection{recordCollectionId}: {exc}";
+            var message = $"An error occurred while archiving/unarchiving a record collection: {exc}";
             _logger.LogError(message);
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
-    
+
     /// <summary>
     ///     Attach a Tag to a Record Collection
     /// </summary>
@@ -428,12 +479,12 @@ public class RecordCollectionController : ControllerBase
         }
         catch (Exception exc)
         {
-            var message = $"An error occurred while attaching tag {tagId} to record collection{recordCollectionId}: {exc}";
+            var message = $"An error occurred while attaching tag(s) to record collection: {exc}";
             _logger.LogError(message);
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
-    
+
     /// <summary>
     ///     Unattach a Tag from a Record Collection
     /// </summary>
@@ -463,12 +514,12 @@ public class RecordCollectionController : ControllerBase
         }
         catch (Exception exc)
         {
-            var message = $"An error occurred while unattaching tag {tagId} from record collection {recordCollectionId}: {exc}";
+            var message = $"An error occurred while detaching tag(s) from record collection: {exc}";
             _logger.LogError(message);
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
-    
+
     /// <summary>
     ///     Attach a Sensitivity Label to a Record Collection
     /// </summary>
@@ -502,12 +553,12 @@ public class RecordCollectionController : ControllerBase
         }
         catch (Exception exc)
         {
-            var message = $"An error occurred while attaching label {sensitivityLabelId} to record {recordCollectionId}: {exc}";
+            var message = $"An error occurred while attaching sensitivity label(s) to record collection: {exc}";
             _logger.LogError(message);
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
-    
+
     /// <summary>
     ///     Unattach a sensitivity label from a Record Collection
     /// </summary>
@@ -541,13 +592,13 @@ public class RecordCollectionController : ControllerBase
         }
         catch (Exception exc)
         {
-            var message = $"An error occurred while unattaching sensitivity label {sensitivityLabelId} from record collection {recordCollectionId}: {exc}";
+            var message = $"An error occurred while detaching sensitivity label(s) from record collection: {exc}";
             _logger.LogError(message);
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
-    
-    
+
+
     /// <summary>
     ///     Get Sensitivity Labels for a Record Collection
     /// </summary>
@@ -575,10 +626,10 @@ public class RecordCollectionController : ControllerBase
         }
         catch (Exception exc)
         {
-            var message = $"An error occurred while retrieving sensitivity labels for record collection {recordCollectionId}: {exc}";
+            var message = $"An error occurred while retrieving sensitivity lables for record collection: {exc}";
             _logger.LogError(message);
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
-    
+
 }

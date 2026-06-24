@@ -18,10 +18,10 @@ public static class AdminHelper
     public static async Task<bool> IsProjectAdmin(DeeplynxContext context, long userId, long projectId)
     {
         return await context.ProjectMembers
-            .AnyAsync(pm => pm.UserId == userId
+            .AnyAsync(pm => pm.IsProjectAdmin
                 && pm.ProjectId == projectId
-                && pm.RoleId != null
-                && pm.Role.Name == "Admin");
+                && (pm.UserId == userId
+                    || pm.Group.Users.Any(gu => gu.Id == userId)));
     }
 
     /// <summary>
@@ -43,8 +43,17 @@ public static class AdminHelper
                 WHERE user_id = {0} AND organization_id = {1} AND is_org_admin = true
               UNION ALL
               SELECT 1 FROM deeplynx.project_members pm
-              JOIN deeplynx.roles r ON r.id = pm.role_id
-                WHERE pm.user_id = {0} AND pm.project_id = {2} AND r.name = 'Admin'
+              JOIN deeplynx.projects p ON p.id = pm.project_id
+                WHERE pm.project_id = {2}
+                  AND pm.is_project_admin = true
+                  AND p.organization_id = {1}
+                  AND (
+                    pm.user_id = {0}
+                    OR EXISTS (
+                      SELECT 1 FROM deeplynx.group_users gu
+                        WHERE gu.group_id = pm.group_id AND gu.user_id = {0}
+                    )
+                  )
               LIMIT 1
               """
             : """

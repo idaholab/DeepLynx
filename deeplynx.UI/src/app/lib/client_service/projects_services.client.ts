@@ -371,6 +371,7 @@ export async function addMemberToProject(
     roleId?: number;
     userId?: number;
     groupId?: number;
+    isProjectAdmin?: boolean;
   }
 ): Promise<{ message: string }> {
   try {
@@ -393,6 +394,7 @@ export async function addMemberToProject(
  * @param roleId - The new role ID
  * @param userId - Optional user ID (required if not providing groupId)
  * @param groupId - Optional group ID (required if not providing userId)
+ * @param isProjectAdmin - Optional flag to set project admin status
  * @returns Promise with success message
  */
 export async function updateProjectMemberRole(
@@ -400,13 +402,14 @@ export async function updateProjectMemberRole(
   projectId: number,
   roleId: number,
   userId?: number,
-  groupId?: number
+  groupId?: number,
+  isProjectAdmin?: boolean
 ): Promise<{ message: string }> {
   try {
     const res = await api.put(
       `/organizations/${organizationId}/projects/${projectId}/members`,
       null,
-      { params: { roleId, userId, groupId } }
+      { params: { roleId, userId, groupId, isProjectAdmin } }
     );
     return res.data;
   } catch (error) {
@@ -437,6 +440,33 @@ export async function removeMemberFromProject(
     return res.data;
   } catch (error) {
     console.error(`Error removing member from project ${projectId}:`, error);
+    throw error;
+  }
+}
+
+/**
+ * Set project admin status for a user
+ * @param organizationId - The ID of the organization
+ * @param projectId - The ID of the project
+ * @param userId - The ID of the user
+ * @param isAdmin - The admin status to set
+ * @returns Promise with success message
+ */
+export async function setProjectAdminStatus(
+  organizationId: number,
+  projectId: number,
+  userId: number,
+  isAdmin: boolean
+): Promise<{ message: string }> {
+  try {
+    const res = await api.put(
+      `/organizations/${organizationId}/projects/${projectId}/admin`,
+      null,
+      { params: { userId, isAdmin } }
+    );
+    return res.data;
+  } catch (error) {
+    console.error(`Error setting project admin status for user ${userId} in project ${projectId}:`, error);
     throw error;
   }
 }

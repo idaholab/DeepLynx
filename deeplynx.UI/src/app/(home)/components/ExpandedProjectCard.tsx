@@ -84,7 +84,7 @@ const ExpandedProjectCard: React.FC<Props> = ({ project, onClose }) => {
     : t.translations.UNKNOWN;
 
   const projectContacts = members
-    .filter((member) => member.role?.trim().toLowerCase() === "admin")
+    .filter((member) => member.isProjectAdmin === true)
     .slice(0, MAX_VISIBLE_CONTACTS);
   const visibleMembers = members.slice(0, MAX_VISIBLE_MEMBERS);
   const hiddenMemberCount = Math.max(members.length - visibleMembers.length, 0);

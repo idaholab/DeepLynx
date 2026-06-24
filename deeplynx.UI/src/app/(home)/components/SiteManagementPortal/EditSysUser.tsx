@@ -8,16 +8,19 @@ import {
 } from "@/app/lib/client_service/user_services.client";
 import { setOrganizationAdminStatus } from "@/app/lib/client_service/organization_services.client";
 import { useRBAC } from "@/app/(home)/rbac/useRBAC";
+import { setProjectAdminStatus } from "@/app/lib/client_service/projects_services.client";
 interface EditSysUserProps {
   isOpen: boolean;
   onClose: () => void;
   userId: number;
   userName: string;
   onUserUpdated: () => void;
-  scope: "org" | "site";
+  scope: "org" | "site" | "project";
   currentOrgAdminStatus: boolean;
   currentSysAdminStatus: boolean;
+  currentProjectAdminStatus?: boolean;
   organizationId: number;
+  projectId?: number;
 }
 
 const EditSysUser = ({
@@ -29,7 +32,9 @@ const EditSysUser = ({
   scope,
   currentOrgAdminStatus,
   currentSysAdminStatus,
+  currentProjectAdminStatus = false,
   organizationId,
+  projectId,
 }: EditSysUserProps) => {
   const { t } = useLanguage();
   const router = useRouter();
@@ -37,6 +42,7 @@ const EditSysUser = ({
   const [name, setName] = useState(userName);
   const [isOrgAdmin, setIsOrgAdmin] = useState(currentOrgAdminStatus);
   const [isSysAdmin, setIsSysAdmin] = useState(currentSysAdminStatus);
+  const [isProjectAdmin, setIsProjectAdmin] = useState(currentProjectAdminStatus);
   const [isSaving, setIsSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -45,9 +51,10 @@ const EditSysUser = ({
       setName(userName);
       setIsOrgAdmin(currentOrgAdminStatus);
       setIsSysAdmin(currentSysAdminStatus);
+      setIsProjectAdmin(currentProjectAdminStatus);
       setErrorMsg(null);
     }
-  }, [isOpen, userName, currentOrgAdminStatus, currentSysAdminStatus]);
+  }, [isOpen, userName, currentOrgAdminStatus, currentSysAdminStatus, currentProjectAdminStatus]);
 
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -57,13 +64,15 @@ const EditSysUser = ({
       scope === "org" && isOrgAdmin !== currentOrgAdminStatus;
     const sysAdminChanged =
       scope === "site" && isSysAdmin !== currentSysAdminStatus;
+    const projectAdminChanged =
+      scope === "project" && isProjectAdmin !== currentProjectAdminStatus;
 
     if (!trimmedName) {
       setErrorMsg(t.translations.NAME_REQUIRED);
       return;
     }
 
-    if (!nameChanged && !orgAdminChanged && !sysAdminChanged) {
+    if (!nameChanged && !orgAdminChanged && !sysAdminChanged && !projectAdminChanged) {
       onClose();
       return;
     }
@@ -84,6 +93,10 @@ const EditSysUser = ({
         await setSysAdmin(userId, isSysAdmin);
       }
 
+      if (projectAdminChanged && projectId) {
+        await setProjectAdminStatus(organizationId, projectId, userId, isProjectAdmin);
+      }
+
       let successMessage: string | null = null;
 
       if (nameChanged && orgAdminChanged) {
@@ -92,12 +105,17 @@ const EditSysUser = ({
       } else if (nameChanged && sysAdminChanged) {
         successMessage =
           t.translations.USER_AND_SYSTEM_ADMIN_ACCESS_UPDATED;
+      } else if (nameChanged && projectAdminChanged) {
+        successMessage =
+          t.translations.USER_AND_PROJECT_ADMIN_ACCESS_UPDATED;
       } else if (nameChanged) {
         successMessage = t.translations.USER_UPDATED_SUCCESSFULLY;
       } else if (orgAdminChanged) {
         successMessage = t.translations.ORGANIZATION_ADMIN_ACCESS_UPDATED;
       } else if (sysAdminChanged) {
         successMessage = t.translations.SYSTEM_ADMIN_ACCESS_UPDATED;
+      } else if (projectAdminChanged) {
+        successMessage = t.translations.PROJECT_ADMIN_ACCESS_UPDATED;
       }
 
       if (successMessage) {
@@ -171,6 +189,22 @@ const EditSysUser = ({
                     className="select select-primary w-full"
                     value={isSysAdmin ? "true" : "false"}
                     onChange={(e) => setIsSysAdmin(e.target.value === "true")}
+                    disabled={isSaving}
+                  >
+                    <option value="false">{t.translations.NO}</option>
+                    <option value="true">{t.translations.YES}</option>
+                  </select>
+                </div>
+              )}
+              {scope === "project" && (
+                <div className="flex flex-col gap-2">
+                  <label className="font-semibold text-sm text-neutral">
+                    {t.translations.PROJECT_ADMIN}
+                  </label>
+                  <select
+                    className="select select-primary w-full"
+                    value={isProjectAdmin ? "true" : "false"}
+                    onChange={(e) => setIsProjectAdmin(e.target.value === "true")}
                     disabled={isSaving}
                   >
                     <option value="false">{t.translations.NO}</option>

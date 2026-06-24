@@ -639,15 +639,40 @@ namespace deeplynx.datalayer.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("Id"));
 
+                    b.Property<int?>("Dimensions")
+                        .HasColumnType("integer")
+                        .HasColumnName("dimensions");
+
+                    b.Property<long?>("EmbeddingModel")
+                        .HasColumnType("bigint")
+                        .HasColumnName("embedding_model");
+                    b.Property<string>("ChunkHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("chunk_hash");
+
+                    b.Property<string>("EmbeddingHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("embedding_hash");
+
                     b.Property<DateTime>("LastUpdatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp without time zone")
                         .HasColumnName("last_updated_at")
                         .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
+                    b.Property<long?>("OrganizationId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("organization_id");
+
                     b.Property<int>("PageNumber")
                         .HasColumnType("integer")
                         .HasColumnName("page_number");
+
+                    b.Property<long?>("ProjectId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("project_id");
 
                     b.Property<long>("RecordId")
                         .HasColumnType("bigint")
@@ -666,11 +691,17 @@ namespace deeplynx.datalayer.Migrations
                     b.HasKey("Id")
                         .HasName("embeddings_pkey");
 
+                    b.HasIndex("EmbeddingModel")
+                        .HasDatabaseName("idx_embeddings_embedding_model");
+
                     b.HasIndex("Id")
                         .HasDatabaseName("idx_embeddings_id");
 
                     b.HasIndex("RecordId")
                         .HasDatabaseName("idx_embeddings_record_id");
+
+                    b.HasIndex("ProjectId", "EmbeddingModel")
+                        .HasDatabaseName("idx_embeddings_project_model");
 
                     b.ToTable("embeddings", "dl_vector");
                 });
@@ -1811,6 +1842,11 @@ namespace deeplynx.datalayer.Migrations
                         .HasColumnType("text")
                         .HasColumnName("name");
 
+                    b.Property<string>("NormalizedContentHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("normalized_content_hash");
+
                     b.Property<long?>("ObjectStorageId")
                         .HasColumnType("bigint")
                         .HasColumnName("object_storage_id");
@@ -2865,12 +2901,20 @@ namespace deeplynx.datalayer.Migrations
 
             modelBuilder.Entity("deeplynx.datalayer.Models.Embedding", b =>
                 {
+                    b.HasOne("deeplynx.datalayer.Models.AiModelConfig", "AiModelConfig")
+                        .WithMany()
+                        .HasForeignKey("EmbeddingModel")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("embeddings_embedding_model_fkey");
+
                     b.HasOne("deeplynx.datalayer.Models.Record", "Record")
                         .WithMany("Embeddings")
                         .HasForeignKey("RecordId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("embeddings_record_id_fkey");
+
+                    b.Navigation("AiModelConfig");
 
                     b.Navigation("Record");
                 });

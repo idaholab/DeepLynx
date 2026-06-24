@@ -12,11 +12,13 @@ import {
   PermissionResponseDto,
   ProjectResponseDto,
   RoleResponseDto,
+  SensitivityLabelsDto,
   UserResponseDto,
 } from "../types/responseDTOs";
 import OrganizationManagmentClient from "./OrganizationManagementClient";
 import { getAllOrgPermissionsServer } from "@/app/lib/server_service/permissions_services.server";
 import { requireOrgAdminServer } from "@/app/lib/server_service/rbac_guards.server";
+import { getAllSensitivityLabelsOrg } from "@/app/lib/client_service/sensitivity_labels_services.client";
 
 export const dynamic = "force-dynamic";
 
@@ -70,17 +72,16 @@ const OrganizationManagementPage = async ({
     console.error("getAllGroups failed:", error);
   }
 
-  // Fetch roles and permissions in parallel
+  // Fetch roles, permissions, and labels in parallel
   let roles: RoleResponseDto[] = [];
   let permissions: PermissionResponseDto[] = [];
+  let labels: SensitivityLabelsDto[] = [];
 
   try {
     // First, fetch roles for the organization
     roles = await getAllOrgRolesServer(Number(organizationId));
-    permissions = await getAllOrgPermissionsServer(
-      Number(organizationId),
-      true,
-    );
+    permissions = await getAllOrgPermissionsServer(Number(organizationId), true);
+    labels = await getAllSensitivityLabelsOrg(Number(organizationId));
   } catch (error) {
     console.error("Failed to fetch roles or permissions:", error);
   }
@@ -108,6 +109,7 @@ const OrganizationManagementPage = async ({
       initialRoles={roles}
       initialSelectedProject={initialSelectedProject}
       initialPermissions={permissions}
+      initialLabels={labels}
     />
   );
 };

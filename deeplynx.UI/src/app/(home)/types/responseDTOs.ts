@@ -100,12 +100,42 @@ export type RecordResponseDto = {
 };
 
 export type PaginatedResponse<T> = {
-  items: T[] | [];
+  items: T[];
   pageNumber: number;
   pageSize: number;
-  maxPageSize: number;
   totalCount: number;
+  totalPages: number;
+  hasPrevious: boolean;
+  hasNext: boolean;
 };
+
+export type RecordCollectionTagDto = {
+  id: number;
+  name: string;
+};
+
+export type RecordCollectionLabelDto = {
+  id: number;
+  name: string;
+};
+
+export type RecordCollectionResponseDto = {
+  id: number;
+  name: string;
+  description: string;
+  properties?: string | null;
+  projectId: number;
+  organizationId: number;
+  lastUpdatedAt: string;
+  lastUpdatedBy?: number | null;
+  isArchived: boolean;
+  recordCount: number;
+  tags?: RecordCollectionTagDto[];
+  labels?: RecordCollectionLabelDto[];
+};
+
+export type PaginatedRecordCollectionsResponseDto =
+  PaginatedResponse<RecordCollectionResponseDto>;
 
 export type QueryRecordViewResponseDto = {
   id: number | null;
@@ -307,13 +337,7 @@ export type OauthApplicationSecureResponseDto = {
   clientSecretRaw: string;
 };
 
-export type PaginatedEventsResponseDto = {
-  items: EventResponseDto[] | [];
-  pageNumber: number;
-  pageSize: number;
-  maxPageSize: number;
-  totalCount: number;
-};
+export type PaginatedEventsResponseDto = PaginatedResponse<EventResponseDto>;
 
 export type EventResponseDto = {
   id: number;
@@ -364,6 +388,7 @@ export type ProjectMemberResponseDto = {
   email: string;
   role?: string;
   roleId?: number;
+  isProjectAdmin?: boolean;
 };
 
 export type AiModelConfigResponseDto = {
@@ -404,10 +429,5 @@ export interface SavedSearchesResponseDto {
   };
 }
 
-export type PaginatedSavedSearchesResponseDto = {
-  items: SavedSearchesResponseDto[] | [];
-  pageNumber: number;
-  pageSize: number;
-  maxPageSize: number;
-  totalCount: number;
-};
+export type PaginatedSavedSearchesResponseDto =
+  PaginatedResponse<SavedSearchesResponseDto>;

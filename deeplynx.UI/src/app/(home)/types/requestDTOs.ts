@@ -8,6 +8,28 @@ export type CustomQueryRequestDto = {
   jsonValue?: string;
 };
 
+export type CreateRecordCollectionRequestDto = {
+  name: string;
+  description: string;
+  properties: Record<string, unknown>;
+  tags?: string[];
+};
+
+export type RecordCollectionQueryRequestDto = {
+  search?: string;
+  sensitivityLabelIds?: number[];
+  tagIds?: number[];
+  sort?: string;
+  pageNumber?: number;
+  pageSize?: number;
+};
+
+export type UpdateRecordCollectionRequestDto = {
+  name?: string;
+  description?: string;
+  properties?: Record<string, unknown>;
+};
+
 export type RelatedRecordsRequestDto = {
   recordId?: number;
   isOrigin?: boolean;
