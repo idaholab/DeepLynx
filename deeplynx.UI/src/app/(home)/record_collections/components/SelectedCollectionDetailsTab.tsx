@@ -441,8 +441,7 @@ export default function SelectedCollectionDetailsTab({
                     sourceName:
                       ("dataSourceName" in record
                         ? record.dataSourceName
-                        : record.projectId) ??
-                      projectId ??
+                        : record.dataSourceId) ??
                       t.translations.UNKNOWN,
                     updatedAt: record.lastUpdatedAt,
                     actionCell: (

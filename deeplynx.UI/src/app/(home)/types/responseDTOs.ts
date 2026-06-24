@@ -88,7 +88,9 @@ export type RecordResponseDto = {
   objectStorageId?: number | null;
   originalId?: string | null;
   classId?: number | null;
+  className?: string | null;
   dataSourceId?: number | null;
+  dataSourceName?: string | null;
   projectId?: number | null;
   lastUpdatedAt?: string;
   lastUpdatedBy?: string | null;

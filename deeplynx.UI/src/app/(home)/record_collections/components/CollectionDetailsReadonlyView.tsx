@@ -20,6 +20,8 @@ type CollectionRecordLike = {
   name?: string | null;
   classId?: string | number | null;
   className?: string | null;
+  dataSourceId?: string | number | null;
+  dataSourceName?: string | null;
   projectId?: number | null;
   lastUpdatedAt?: string | null;
 };
@@ -276,11 +278,15 @@ export default function CollectionDetailsReadonlyView({
                       )}
                     </td>
                     <td>
-                      {record.classId ??
-                        record.className ??
+                      {record.className ??
+                        record.classId ??
                         t.translations.RECORD_COLLECTIONS_UNCLASSIFIED}
                     </td>
-                    <td>{record.projectId ?? projectId}</td>
+                    <td>
+                      {record.dataSourceName ??
+                        record.dataSourceId ??
+                        t.translations.UNKNOWN}
+                    </td>
                     <td>
                       {record.lastUpdatedAt
                         ? formatLocalDateTime(record.lastUpdatedAt)
