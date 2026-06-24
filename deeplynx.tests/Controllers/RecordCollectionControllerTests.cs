@@ -120,21 +120,42 @@ public class RecordCollectionControllerTests : IDisposable
     [Fact]
     public async Task GetAllRecordCollections_Returns500_OnUnexpectedException()
     {
-        _mockRecordCollectionBusiness.Setup(b => b.GetAllRecordCollections(
-                         It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(),
-                         It.IsAny<RecordCollectionQueryRequestDto>(), It.IsAny<bool>(),
-                         It.IsAny<bool>(), It.IsAny<bool>(), It.IsAny<bool>()))
-                     .ThrowsAsync(new Exception("db error"));
+        // Arrange
+        UserContextStorage.UserId = UserId;
+        UserContextStorage.IsSysAdmin = false;
+        UserContextStorage.IsOrgAdmin = false;
+        UserContextStorage.IsProjectAdmin = false;
 
         var queryDto = new RecordCollectionQueryRequestDto();
-        var result = (await _recordCollectionController.GetAllRecordCollections(
-            OrgId,
-            ProjectId, queryDto, true)).Result as ObjectResult;
 
-        Assert.NotNull(result);
-        Assert.Equal(500, result.StatusCode);
-        Assert.IsType<string>(result.Value);
-        Assert.Equal("An unexpected error occurred while listing record collections.", result.Value);
+        _mockRecordCollectionBusiness
+            .Setup(b => b.GetAllRecordCollections(
+                UserId,
+                OrgId,
+                ProjectId,
+                It.Is<RecordCollectionQueryRequestDto>(dto => ReferenceEquals(dto, queryDto)),
+                true,
+                false,
+                false,
+                false))
+            .ThrowsAsync(new Exception("db error"));
+
+        // Act
+        var actionResult = await _recordCollectionController.GetAllRecordCollections(
+            OrgId,
+            ProjectId,
+            queryDto,
+            true);
+
+        // Assert
+        var result = Assert.IsType<ObjectResult>(actionResult.Result);
+        var message = Assert.IsType<string>(result.Value);
+
+        Assert.Equal(StatusCodes.Status500InternalServerError, result.StatusCode);
+        Assert.Contains(
+            "An error occurred while listing all record collections for org and project:",
+            message);
+        Assert.Contains("System.Exception: db error", message);
     }
 
     [Fact]
@@ -243,20 +264,42 @@ public class RecordCollectionControllerTests : IDisposable
     [Fact]
     public async Task GetRecordsInRecordCollection_Returns500_OnUnexpectedException()
     {
-        _mockRecordCollectionBusiness.Setup(b => b.GetRecordsInRecordCollection(
-                         It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(),
-                         It.IsAny<bool>(), It.IsAny<bool>(), It.IsAny<bool>(), It.IsAny<bool>()))
-                     .ThrowsAsync(new Exception("db error"));
+        // Arrange
+        UserContextStorage.UserId = UserId;
+        UserContextStorage.IsSysAdmin = false;
+        UserContextStorage.IsOrgAdmin = false;
+        UserContextStorage.IsProjectAdmin = false;
 
-        var result = (await _recordCollectionController.GetRecordsInRecordCollection(
+        var queryDto = new RecordCollectionQueryRequestDto();
+
+        _mockRecordCollectionBusiness
+            .Setup(b => b.GetRecordsInRecordCollection(
+                UserId,
+                OrgId,
+                ProjectId,
+                CollectionId,
+                true,
+                false,
+                false,
+                false))
+            .ThrowsAsync(new Exception("db error"));
+
+        // Act
+        var actionResult = await _recordCollectionController.GetRecordsInRecordCollection(
             OrgId,
             ProjectId,
-            CollectionId, true)).Result as ObjectResult;
+            CollectionId,
+            true);
 
-        Assert.NotNull(result);
-        Assert.Equal(500, result.StatusCode);
-        Assert.IsType<string>(result.Value);
-        Assert.Equal("An unexpected error occurred while listing records in the record collection.", result.Value);
+        // Assert
+        var result = Assert.IsType<ObjectResult>(actionResult.Result);
+        var message = Assert.IsType<string>(result.Value);
+
+        Assert.Equal(StatusCodes.Status500InternalServerError, result.StatusCode);
+        Assert.Contains(
+            "An error occurred while listing records in record collection:",
+            message);
+        Assert.Contains("System.Exception: db error", message);
     }
 
     [Fact]
@@ -373,21 +416,42 @@ public class RecordCollectionControllerTests : IDisposable
     [Fact]
     public async Task AddRecordsToRecordCollection_Returns500_OnUnexpectedException()
     {
-        _mockRecordCollectionBusiness.Setup(b => b.AddRecordsToRecordCollection(
-                         It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(),
-                         It.IsAny<long[]>(), It.IsAny<bool>(), It.IsAny<bool>(), It.IsAny<bool>()))
-                     .ThrowsAsync(new Exception("db error"));
+        // Arrange
+        UserContextStorage.UserId = UserId;
+        UserContextStorage.IsSysAdmin = false;
+        UserContextStorage.IsOrgAdmin = false;
+        UserContextStorage.IsProjectAdmin = false;
 
-        var result = await _recordCollectionController.AddRecordsToRecordCollection(
+        var recordIds = ProjectList;
+
+        _mockRecordCollectionBusiness
+            .Setup(b => b.AddRecordsToRecordCollection(
+                UserId,
+                OrgId,
+                ProjectId,
+                CollectionId,
+                It.Is<long[]>(ids => ids.SequenceEqual(recordIds)),
+                false,
+                false,
+                false))
+            .ThrowsAsync(new Exception("db error"));
+
+        // Act
+        var actionResult = await _recordCollectionController.AddRecordsToRecordCollection(
             OrgId,
             ProjectId,
             CollectionId,
-            ProjectList) as ObjectResult;
+            recordIds);
 
-        Assert.NotNull(result);
-        Assert.Equal(500, result.StatusCode);
-        Assert.IsType<string>(result.Value);
-        Assert.Equal("An unexpected error occurred while adding records to the record collection.", result.Value);
+        // Assert
+        var result = Assert.IsType<ObjectResult>(actionResult);
+        var message = Assert.IsType<string>(result.Value);
+
+        Assert.Equal(StatusCodes.Status500InternalServerError, result.StatusCode);
+        Assert.Contains(
+            "An error occurred while adding records to record collection:",
+            message);
+        Assert.Contains("System.Exception: db error", message);
     }
 
     [Fact]
@@ -518,26 +582,42 @@ public class RecordCollectionControllerTests : IDisposable
     [Fact]
     public async Task RemoveRecordsFromRecordCollection_Returns500_OnUnexpectedException()
     {
-        var request = new UpdateRecordCollectionRequestDto
-        {
-            RecordIds = new List<long> { RecordIdConst }
-        };
+        // Arrange
+        UserContextStorage.UserId = UserId;
+        UserContextStorage.IsSysAdmin = false;
+        UserContextStorage.IsOrgAdmin = false;
+        UserContextStorage.IsProjectAdmin = false;
 
-        _mockRecordCollectionBusiness.Setup(b => b.RemoveRecordsFromRecordCollection(
-                         It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(),
-                         It.IsAny<long[]>(), It.IsAny<bool>(), It.IsAny<bool>(), It.IsAny<bool>()))
-                     .ThrowsAsync(new Exception("db error"));
+        var recordIds = ProjectList;
 
-        var result = await _recordCollectionController.RemoveRecordsFromRecordCollection(
+        _mockRecordCollectionBusiness
+            .Setup(b => b.RemoveRecordsFromRecordCollection(
+                UserId,
+                OrgId,
+                ProjectId,
+                CollectionId,
+                It.Is<long[]>(ids => ids.SequenceEqual(recordIds)),
+                false,
+                false,
+                false))
+            .ThrowsAsync(new Exception("db error"));
+
+        // Act
+        var actionResult = await _recordCollectionController.RemoveRecordsFromRecordCollection(
             OrgId,
             ProjectId,
             CollectionId,
-            ProjectList) as ObjectResult;
+            recordIds);
 
-        Assert.NotNull(result);
-        Assert.Equal(500, result.StatusCode);
-        Assert.IsType<string>(result.Value);
-        Assert.Equal("An unexpected error occurred while removing records from the record collection.", result.Value);
+        // Assert
+        var result = Assert.IsType<ObjectResult>(actionResult);
+        var message = Assert.IsType<string>(result.Value);
+
+        Assert.Equal(StatusCodes.Status500InternalServerError, result.StatusCode);
+        Assert.Contains(
+            "An error occurred while removing records from record collection:",
+            message);
+        Assert.Contains("System.Exception: db error", message);
     }
 
     [Fact]
@@ -613,23 +693,37 @@ public class RecordCollectionControllerTests : IDisposable
     [Fact]
     public async Task CreateRecordCollection_Returns500_OnUnexpectedException()
     {
+        // Arrange
+        UserContextStorage.UserId = UserId;
+
+        var sensitivityLabelIds = new List<long>();
         var request = new CreateRecordCollectionRequestDto();
 
-        _mockRecordCollectionBusiness.Setup(b => b.CreateRecordCollection(
-                         It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(), It.IsAny<List<long>>(),
-                         It.IsAny<CreateRecordCollectionRequestDto>()))
-                     .ThrowsAsync(new Exception("db error"));
+        _mockRecordCollectionBusiness
+            .Setup(b => b.CreateRecordCollection(
+                UserId,
+                OrgId,
+                ProjectId,
+                It.Is<List<long>>(ids => ReferenceEquals(ids, sensitivityLabelIds)),
+                It.Is<CreateRecordCollectionRequestDto>(dto => ReferenceEquals(dto, request))))
+            .ThrowsAsync(new Exception("db error"));
 
-        var result = (await _recordCollectionController.CreateRecordCollection(
+        // Act
+        var actionResult = await _recordCollectionController.CreateRecordCollection(
             OrgId,
             ProjectId,
-            It.IsAny<List<long>>(),
-            request)).Result as ObjectResult;
+            sensitivityLabelIds,
+            request);
 
-        Assert.NotNull(result);
-        Assert.Equal(500, result.StatusCode);
-        Assert.IsType<string>(result.Value);
-        Assert.Equal("An unexpected error occurred while creating the record collection.", result.Value);
+        // Assert
+        var result = Assert.IsType<ObjectResult>(actionResult.Result);
+        var message = Assert.IsType<string>(result.Value);
+
+        Assert.Equal(StatusCodes.Status500InternalServerError, result.StatusCode);
+        Assert.Contains(
+            "An error occurred while creating a record collection:",
+            message);
+        Assert.Contains("System.Exception: db error", message);
     }
 
     [Fact]
@@ -680,19 +774,32 @@ public class RecordCollectionControllerTests : IDisposable
     [Fact]
     public async Task DeleteRecordCollection_Returns500_OnUnexpectedException()
     {
-        _mockRecordCollectionBusiness.Setup(b => b.DeleteRecordCollection(
-                         It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>()))
-                     .ThrowsAsync(new Exception("db error"));
+        // Arrange
+        UserContextStorage.UserId = UserId;
 
-        var result = await _recordCollectionController.DeleteRecordCollection(
+        _mockRecordCollectionBusiness
+            .Setup(b => b.DeleteRecordCollection(
+                UserId,
+                OrgId,
+                ProjectId,
+                RecordCollectionId))
+            .ThrowsAsync(new Exception("db error"));
+
+        // Act
+        var actionResult = await _recordCollectionController.DeleteRecordCollection(
             OrgId,
             ProjectId,
-            RecordCollectionId) as ObjectResult;
+            RecordCollectionId);
 
-        Assert.NotNull(result);
-        Assert.Equal(500, result.StatusCode);
-        Assert.IsType<string>(result.Value);
-        Assert.Equal("An unexpected error occurred while deleting the record collection.", result.Value);
+        // Assert
+        var result = Assert.IsType<ObjectResult>(actionResult);
+        var message = Assert.IsType<string>(result.Value);
+
+        Assert.Equal(StatusCodes.Status500InternalServerError, result.StatusCode);
+        Assert.Contains(
+            "An error occurred while deleting a record collection:",
+            message);
+        Assert.Contains("System.Exception: db error", message);
     }
 
     [Fact]
