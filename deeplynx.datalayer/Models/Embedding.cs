@@ -19,8 +19,16 @@ public class Embedding
     [Column("text_chunk")]
     public string TextChunk { get; set; } = null!;
 
+    [StringLength(64)]
+    [Column("chunk_hash")]
+    public string? ChunkHash { get; set; }
+
     [Column("vector")]
     public string Vector { get; set; } = null!;
+
+    [StringLength(64)]
+    [Column("embedding_hash")]
+    public string? EmbeddingHash { get; set; }
 
     [Column("last_updated_at", TypeName = "timestamp without time zone")]
     public DateTime LastUpdatedAt { get; set; }

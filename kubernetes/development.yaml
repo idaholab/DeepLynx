@@ -343,7 +343,6 @@ spec:
               value: ${AIRFLOW_USERNAME}
             - name: AIRFLOW_PASSWORD
               value: ${AIRFLOW_PASSWORD}
-            - name: OKTA_CLIENT_SECRET
             - name: HIDE_INSIGHT
               value: ${HIDE_INSIGHT}
               # Backend may also need these environment variables

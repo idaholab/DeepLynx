@@ -885,6 +885,7 @@ public partial class DeeplynxContext : DbContext
 
             entity.Property(e => e.Id).UseIdentityAlwaysColumn();
             entity.Property(e => e.LastUpdatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+            entity.Property(e => e.NormalizedContentHash).HasMaxLength(64);
 
             entity.Property(e => e.IsArchived).HasDefaultValue(false);
 
@@ -1503,6 +1504,8 @@ public partial class DeeplynxContext : DbContext
             entity.Property(e => e.Id).UseIdentityAlwaysColumn();
             entity.Property(e => e.LastUpdatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
             entity.Property(e => e.Vector).HasColumnType("vector");
+            entity.Property(e => e.ChunkHash).HasMaxLength(64);
+            entity.Property(e => e.EmbeddingHash).HasMaxLength(64);
 
             entity.HasOne(d => d.Record)
                 .WithMany(p => p.Embeddings)
