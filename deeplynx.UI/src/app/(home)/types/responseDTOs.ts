@@ -431,3 +431,46 @@ export interface SavedSearchesResponseDto {
 
 export type PaginatedSavedSearchesResponseDto =
   PaginatedResponse<SavedSearchesResponseDto>;
+
+export type AirflowDagTagResponseDto = {
+  name: string;
+};
+
+export type AirflowDagResponseDto = {
+  dag_id: string;
+  dag_display_name?: string | null;
+  description?: string | null;
+  is_paused: boolean;
+  is_active: boolean;
+  owners: string[];
+  tags: AirflowDagTagResponseDto[];
+  timetable_description?: string | null;
+  params?: Record<string, unknown> | null;
+};
+
+export type AirflowDagListResponseDto = {
+  dags: AirflowDagResponseDto[];
+  total_entries: number;
+};
+
+export type AirflowDagRunResponseDto = {
+  dag_run_id?: string | null;
+  dag_id: string;
+  dag_display_name?: string | null;
+  logical_date?: string | null;
+  queued_at?: string | null;
+  start_date?: string | null;
+  end_date?: string | null;
+  duration?: number | null;
+  data_interval_start?: string | null;
+  data_interval_end?: string | null;
+  run_after?: string | null;
+  last_scheduling_decision?: string | null;
+  run_type?: string | null;
+  state?: string | null;
+  triggered_by?: string | null;
+  triggering_user_name?: string | null;
+  conf?: Record<string, unknown> | null;
+  note?: string | null;
+  bundle_version?: string | null;
+};
