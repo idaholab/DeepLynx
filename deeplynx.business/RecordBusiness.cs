@@ -1440,7 +1440,13 @@ public class RecordBusiness : IRecordBusiness
             LastUpdatedAt = returnedRecord.LastUpdatedAt,
             IsArchived = returnedRecord.IsArchived,
             FileType = returnedRecord.FileType,
-            FileSize = returnedRecord.FileSize
+            FileSize = returnedRecord.FileSize,
+            Tags = new List<RecordTagDto>(),
+            Labels = returnedRecord.Labels.Select(l => new RecordLabelDto
+            {
+                Id = l.Id,
+                Name = l.Name
+            }).ToList()
         };
     }
 

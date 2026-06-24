@@ -6,6 +6,7 @@ using deeplynx.helpers;
 using deeplynx.helpers.BigData;
 using deeplynx.helpers.ExceptionHandlers;
 using deeplynx.helpers.Hubs;
+using deeplynx.helpers.Json;
 using deeplynx.interfaces;
 using deeplynx.api.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -129,6 +130,7 @@ try
         {
             options.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles;
             options.JsonSerializerOptions.MaxDepth = 64;
+            options.JsonSerializerOptions.Converters.Add(new UtcDateTimeJsonConverter());
         })
         .ConfigureApiBehaviorOptions(options =>
         {
@@ -143,6 +145,11 @@ try
                 };
             };
         });
+
+    builder.Services.ConfigureHttpJsonOptions(options =>
+    {
+        options.SerializerOptions.Converters.Add(new UtcDateTimeJsonConverter());
+    });
 
     /*
     ╔════════════════════════════╗
@@ -214,7 +221,6 @@ try
     builder.Services.AddScoped<ISensitivityLabelService, SensitivityLabelService>();
     builder.Services.AddScoped<FileBusiness>();
     builder.Services.AddTransient<IInsightBusiness, InsightBusiness>();
-    builder.Services.AddTransient<IExtractionValidation, ExtractionValidation>();
     builder.Services.AddTransient<ILatticeExtractionBusiness, LatticeExtractionBusiness>();
     builder.Services.AddMemoryCache();
     builder.Services.AddHttpClient<InsightServiceClient>();
