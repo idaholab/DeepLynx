@@ -55,6 +55,10 @@ public partial class Record
     [Column("file_size")]
     public long? FileSize { get; set; }
 
+    [StringLength(64)]
+    [Column("normalized_content_hash")]
+    public string? NormalizedContentHash { get; set; }
+
     [Column("embedded")]
     public bool Embedded { get; set; }
 

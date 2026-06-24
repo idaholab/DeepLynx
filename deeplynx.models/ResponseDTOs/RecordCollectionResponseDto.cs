@@ -35,6 +35,8 @@ public class RecordCollectionResponseDto
 
     [Column("is_archived")] public bool IsArchived { get; set; } = false;
 
+    [NotMapped] public int RecordCount { get; set; }
+
     [NotMapped] public ICollection<RecordCollectionTagDto> Tags { get; set; }
     [NotMapped] public ICollection<RecordCollectionLabelDto> Labels { get; set; }
 }
