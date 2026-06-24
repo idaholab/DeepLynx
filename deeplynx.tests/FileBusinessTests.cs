@@ -2331,6 +2331,420 @@ public class FileBusinessTests : IntegrationTestBase
         _fileBusinessFactory.Verify(x => x.CreateFileBusiness("azure_object"), Times.Once);
     }
 
+    [Fact]
+    public async Task CompleteUpload_MetadataNoClassInformation_ReturnsDefault()
+    {
+        // Arrange
+        var fileName = "final.txt";
+        var initRequest = new FileUploadInitRequestDto
+        {
+            FileName = fileName,
+            FileSize = 2048
+        };
+
+        var session = await _fileBusiness.StartUpload(oid, pid, did, osid, initRequest);
+
+        var chunk0 = CreateFormFile("first-");
+        await _fileBusiness.UploadChunk(oid, pid, did, osid, chunk0, session.UploadId, 0);
+
+        var chunk1 = CreateFormFile("second");
+        await _fileBusiness.UploadChunk(oid, pid, did, osid, chunk1, session.UploadId, 1);
+
+        var completeRequest = new FileUploadCompleteRequestDto
+        {
+            UploadId = session.UploadId,
+            FileName = fileName,
+            TotalChunks = 2
+        };
+
+        var uploadPath = Path.Combine(
+            _testDirectory,
+            $"project_{pid}",
+            $"datasource_{did}",
+            "uploads",
+            session.UploadId
+        );
+
+        var fileClass = Context.Classes.First(c => c.Name == "File" && c.ProjectId == pid);
+
+        var metadata = new CreateRecordFileUploadRequestDto
+        {
+            Name = "Override Name",
+            Description = "Override Description",
+            Properties = new JsonObject(),
+            OriginalId = "override-original-id"
+        };
+
+        // Act
+        var result = await _fileBusiness.CompleteUpload(uid, oid, pid, did, osid, completeRequest, metadata: metadata);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(fileClass.Id, result.ClassId);
+    }
+
+    [Fact]
+    public async Task CompleteUpload_MetadataOnlyClassId_ReturnsCorrectClass()
+    {
+        // Arrange
+        var fileName = "final.txt";
+        var initRequest = new FileUploadInitRequestDto
+        {
+            FileName = fileName,
+            FileSize = 2048
+        };
+
+        var session = await _fileBusiness.StartUpload(oid, pid, did, osid, initRequest);
+
+        var chunk0 = CreateFormFile("first-");
+        await _fileBusiness.UploadChunk(oid, pid, did, osid, chunk0, session.UploadId, 0);
+
+        var chunk1 = CreateFormFile("second");
+        await _fileBusiness.UploadChunk(oid, pid, did, osid, chunk1, session.UploadId, 1);
+
+        var completeRequest = new FileUploadCompleteRequestDto
+        {
+            UploadId = session.UploadId,
+            FileName = fileName,
+            TotalChunks = 2
+        };
+
+        var uploadPath = Path.Combine(
+            _testDirectory,
+            $"project_{pid}",
+            $"datasource_{did}",
+            "uploads",
+            session.UploadId
+        );
+
+        var fileClass = Context.Classes.First(c => c.Name == "Report" && c.ProjectId == pid);
+
+        var metadata = new CreateRecordFileUploadRequestDto
+        {
+            Name = "Override Name",
+            Description = "Override Description",
+            Properties = new JsonObject(),
+            OriginalId = "override-original-id",
+            ClassId = fileClass.Id
+        };
+
+        // Act
+        var result = await _fileBusiness.CompleteUpload(uid, oid, pid, did, osid, completeRequest, metadata: metadata);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(fileClass.Id, result.ClassId);
+    }
+
+    [Fact]
+    public async Task CompleteUpload_MetadataOnlyClassName_ReturnsCorrectClass()
+    {
+        // Arrange
+        var fileName = "final.txt";
+        var initRequest = new FileUploadInitRequestDto
+        {
+            FileName = fileName,
+            FileSize = 2048
+        };
+
+        var session = await _fileBusiness.StartUpload(oid, pid, did, osid, initRequest);
+
+        var chunk0 = CreateFormFile("first-");
+        await _fileBusiness.UploadChunk(oid, pid, did, osid, chunk0, session.UploadId, 0);
+
+        var chunk1 = CreateFormFile("second");
+        await _fileBusiness.UploadChunk(oid, pid, did, osid, chunk1, session.UploadId, 1);
+
+        var completeRequest = new FileUploadCompleteRequestDto
+        {
+            UploadId = session.UploadId,
+            FileName = fileName,
+            TotalChunks = 2
+        };
+
+        var uploadPath = Path.Combine(
+            _testDirectory,
+            $"project_{pid}",
+            $"datasource_{did}",
+            "uploads",
+            session.UploadId
+        );
+
+        var fileClass = Context.Classes.First(c => c.Name == "Report" && c.ProjectId == pid);
+
+        var metadata = new CreateRecordFileUploadRequestDto
+        {
+            Name = "Override Name",
+            Description = "Override Description",
+            Properties = new JsonObject(),
+            OriginalId = "override-original-id",
+            ClassName = fileClass.Name
+        };
+
+        var result = await _fileBusiness.CompleteUpload(uid, oid, pid, did, osid, completeRequest, metadata: metadata);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(fileClass.Id, result.ClassId);
+    }
+
+    [Fact]
+    public async Task CompleteUpload_MetadataClassInformation_ReturnsCorrectClass()
+    {
+        // Arrange
+        var fileName = "final.txt";
+        var initRequest = new FileUploadInitRequestDto
+        {
+            FileName = fileName,
+            FileSize = 2048
+        };
+
+        var session = await _fileBusiness.StartUpload(oid, pid, did, osid, initRequest);
+
+        var chunk0 = CreateFormFile("first-");
+        await _fileBusiness.UploadChunk(oid, pid, did, osid, chunk0, session.UploadId, 0);
+
+        var chunk1 = CreateFormFile("second");
+        await _fileBusiness.UploadChunk(oid, pid, did, osid, chunk1, session.UploadId, 1);
+
+        var completeRequest = new FileUploadCompleteRequestDto
+        {
+            UploadId = session.UploadId,
+            FileName = fileName,
+            TotalChunks = 2
+        };
+
+        var uploadPath = Path.Combine(
+            _testDirectory,
+            $"project_{pid}",
+            $"datasource_{did}",
+            "uploads",
+            session.UploadId
+        );
+
+        var fileClass = Context.Classes.First(c => c.Name == "Report" && c.ProjectId == pid);
+
+        var metadata = new CreateRecordFileUploadRequestDto
+        {
+            Name = "Override Name",
+            Description = "Override Description",
+            Properties = new JsonObject(),
+            OriginalId = "override-original-id",
+            ClassName = fileClass.Name,
+            ClassId = fileClass.Id
+        };
+
+        // Act
+        var result = await _fileBusiness.CompleteUpload(uid, oid, pid, did, osid, completeRequest, metadata: metadata);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(fileClass.Id, result.ClassId);
+    }
+
+    [Fact]
+    public async Task CompleteUpload_MetadataMismatchingClassInformation_ThrowsArgumentException()
+    {
+        // Arrange
+        var fileName = "final.txt";
+        var initRequest = new FileUploadInitRequestDto
+        {
+            FileName = fileName,
+            FileSize = 2048
+        };
+
+        var session = await _fileBusiness.StartUpload(oid, pid, did, osid, initRequest);
+
+        var chunk0 = CreateFormFile("first-");
+        await _fileBusiness.UploadChunk(oid, pid, did, osid, chunk0, session.UploadId, 0);
+
+        var chunk1 = CreateFormFile("second");
+        await _fileBusiness.UploadChunk(oid, pid, did, osid, chunk1, session.UploadId, 1);
+
+        var completeRequest = new FileUploadCompleteRequestDto
+        {
+            UploadId = session.UploadId,
+            FileName = fileName,
+            TotalChunks = 2
+        };
+
+        var uploadPath = Path.Combine(
+            _testDirectory,
+            $"project_{pid}",
+            $"datasource_{did}",
+            "uploads",
+            session.UploadId
+        );
+
+        var fileClass = Context.Classes.First(c => c.Name == "File" && c.ProjectId == pid);
+        var fileClass2 = Context.Classes.First(c => c.Name == "Report" && c.ProjectId == pid);
+
+        var metadata = new CreateRecordFileUploadRequestDto
+        {
+            Name = "Override Name",
+            Description = "Override Description",
+            Properties = new JsonObject(),
+            OriginalId = "override-original-id",
+            ClassName = fileClass.Name,
+            ClassId = fileClass2.Id
+        };
+
+        // Act & Assert
+        await Assert.ThrowsAsync<ArgumentException>(() =>
+            _fileBusiness.CompleteUpload(uid, oid, pid, did, osid, completeRequest, metadata: metadata));
+    }
+
+    [Fact]
+    public async Task CompleteUpload_MetadataInvalidClassId_ThrowsKeyNotFoundException()
+    {
+        // Arrange
+        var fileName = "final.txt";
+        var initRequest = new FileUploadInitRequestDto
+        {
+            FileName = fileName,
+            FileSize = 2048
+        };
+
+        var session = await _fileBusiness.StartUpload(oid, pid, did, osid, initRequest);
+
+        var chunk0 = CreateFormFile("first-");
+        await _fileBusiness.UploadChunk(oid, pid, did, osid, chunk0, session.UploadId, 0);
+
+        var chunk1 = CreateFormFile("second");
+        await _fileBusiness.UploadChunk(oid, pid, did, osid, chunk1, session.UploadId, 1);
+
+        var completeRequest = new FileUploadCompleteRequestDto
+        {
+            UploadId = session.UploadId,
+            FileName = fileName,
+            TotalChunks = 2
+        };
+
+        var uploadPath = Path.Combine(
+            _testDirectory,
+            $"project_{pid}",
+            $"datasource_{did}",
+            "uploads",
+            session.UploadId
+        );
+
+        var metadata = new CreateRecordFileUploadRequestDto
+        {
+            Name = "Override Name",
+            Description = "Override Description",
+            Properties = new JsonObject(),
+            OriginalId = "override-original-id",
+            ClassId = 4
+        };
+
+        // Act & Assert
+        await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            _fileBusiness.CompleteUpload(uid, oid, pid, did, osid, completeRequest, metadata: metadata));
+    }
+
+    [Fact]
+    public async Task CompleteUpload_MetadataInvalidClassIdAndName_ThrowsKeyNotFoundException()
+    {
+        // Arrange
+        var fileName = "final.txt";
+        var initRequest = new FileUploadInitRequestDto
+        {
+            FileName = fileName,
+            FileSize = 2048
+        };
+
+        var session = await _fileBusiness.StartUpload(oid, pid, did, osid, initRequest);
+
+        var chunk0 = CreateFormFile("first-");
+        await _fileBusiness.UploadChunk(oid, pid, did, osid, chunk0, session.UploadId, 0);
+
+        var chunk1 = CreateFormFile("second");
+        await _fileBusiness.UploadChunk(oid, pid, did, osid, chunk1, session.UploadId, 1);
+
+        var completeRequest = new FileUploadCompleteRequestDto
+        {
+            UploadId = session.UploadId,
+            FileName = fileName,
+            TotalChunks = 2
+        };
+
+        var uploadPath = Path.Combine(
+            _testDirectory,
+            $"project_{pid}",
+            $"datasource_{did}",
+            "uploads",
+            session.UploadId
+        );
+
+        var fileClass = Context.Classes.First(c => c.Name == "File" && c.ProjectId == pid);
+
+        var metadata = new CreateRecordFileUploadRequestDto
+        {
+            Name = "Override Name",
+            Description = "Override Description",
+            Properties = new JsonObject(),
+            OriginalId = "override-original-id",
+            ClassId = 4,
+            ClassName = fileClass.Name
+        };
+
+        // Act & Assert
+        await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            _fileBusiness.CompleteUpload(uid, oid, pid, did, osid, completeRequest, metadata: metadata));
+    }
+
+    [Fact]
+    public async Task CompleteUpload_MetadataInvalidClassName_CreatesNewClass()
+    {
+        // Arrange
+        var fileName = "final.txt";
+        var initRequest = new FileUploadInitRequestDto
+        {
+            FileName = fileName,
+            FileSize = 2048
+        };
+
+        var session = await _fileBusiness.StartUpload(oid, pid, did, osid, initRequest);
+
+        var chunk0 = CreateFormFile("first-");
+        await _fileBusiness.UploadChunk(oid, pid, did, osid, chunk0, session.UploadId, 0);
+
+        var chunk1 = CreateFormFile("second");
+        await _fileBusiness.UploadChunk(oid, pid, did, osid, chunk1, session.UploadId, 1);
+
+        var completeRequest = new FileUploadCompleteRequestDto
+        {
+            UploadId = session.UploadId,
+            FileName = fileName,
+            TotalChunks = 2
+        };
+
+        var uploadPath = Path.Combine(
+            _testDirectory,
+            $"project_{pid}",
+            $"datasource_{did}",
+            "uploads",
+            session.UploadId
+        );
+
+        var metadata = new CreateRecordFileUploadRequestDto
+        {
+            Name = "Override Name",
+            Description = "Override Description",
+            Properties = new JsonObject(),
+            OriginalId = "override-original-id",
+            ClassName = "Bob",
+        };
+
+        // Act
+        var result = await _fileBusiness.CompleteUpload(uid, oid, pid, did, osid, completeRequest, metadata: metadata);
+
+        // Assert
+        var fileClass = Context.Classes.First(c => c.Name == "Bob" && c.ProjectId == pid);
+        Assert.NotNull(result);
+        Assert.Equal(fileClass.Id, result.ClassId);
+    }
+
     #endregion
 
     #region Default Object Storage Tests

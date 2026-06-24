@@ -473,6 +473,33 @@ public class FileBusiness
             fileClass,
             objectStorage.Type == "filesystem" ? () => File.OpenRead(uri) : null);
 
+        var providedClassId = metadata?.ClassId;
+        var providedClassName = metadata?.ClassName;
+        ClassResponseDto? resolvedClass = null;
+
+        // If Class Id was provided
+        if (providedClassId.HasValue)
+        {
+            resolvedClass = await _classBusiness.GetClass(organizationId, projectId, providedClassId.Value, true);
+            if (resolvedClass is null) {
+                throw new ArgumentException($"Class ID {providedClassId} does not exist in this project.");
+            } 
+            if (!string.IsNullOrWhiteSpace(providedClassName) && resolvedClass.Name != providedClassName) {
+                // Class Name was provided and doesn't match the Class Name from the Id
+                throw new ArgumentException($"Class Name {providedClassName} does not match Class Id {providedClassId}. Expected {resolvedClass.Name}");
+            }
+        } 
+        // No Class Id provided, Class Name was provided
+        else if (!string.IsNullOrWhiteSpace(providedClassName)) 
+        {
+            resolvedClass = await _classBusiness.GetOrCreateClass(currentUserId, organizationId, projectId, providedClassName);
+        }
+        // No Class Id or Name provided, set to default File or TimeSeries
+        else
+        {
+            resolvedClass = fileClass;
+        }
+
         var recordRequest = new CreateRecordRequestDto
         {
             Properties = properties,
@@ -481,8 +508,8 @@ public class FileBusiness
             Description = metadata?.Description ?? $"File uploaded via chunked upload (session: {request.UploadId})",
             OriginalId = metadata?.OriginalId ?? guid.ToString(),
             Uri = uri,
-            ClassId = metadata?.ClassId ?? fileClass.Id,
-            ClassName = metadata?.ClassName ?? fileClass.Name,
+            ClassId = resolvedClass.Id,
+            ClassName = resolvedClass.Name,
             FileType = fileExtension,
             FileSize = fileSize
         };
