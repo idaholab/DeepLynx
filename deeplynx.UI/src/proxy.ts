@@ -30,35 +30,30 @@ export async function proxy(request: NextRequest) {
     if (pathname.startsWith("/login")) {
       return NextResponse.redirect(new URL("/", request.url));
     }
-    
-    // Redirect org selection page if auth is disabled
-    if (pathname.startsWith("/select-org")) {
-      return NextResponse.redirect(new URL("/", request.url));
-    }
-    
+
     return NextResponse.next();
   }
-  
+
   // ============================================================================
   // SECTION 3: Handle Auth ENABLED Mode
   // ============================================================================
-  
+
   // Allow public routes without authentication
   if (isPublicRoute) {
     return NextResponse.next();
   }
-  
+
   // STEP 1: Check Authentication FIRST
   let session;
   try {
     session = await auth();
   } catch (error) {
     console.error("Auth error in middleware:", error);
-    
+
     const response = NextResponse.redirect(
       new URL("/login/signin?session_expired=true", request.url)
     );
-    
+
     const cookiesToClear = [
       "next-auth.session-token",
       "__Secure-next-auth.session-token",
@@ -69,31 +64,31 @@ export async function proxy(request: NextRequest) {
       "organizationSession",
       "projectSession"
     ];
-    
+
     cookiesToClear.forEach(cookieName => {
       response.cookies.delete(cookieName);
     });
-    
+
     return response;
   }
-  
+
   if (!session) {
     return NextResponse.redirect(new URL("/login/signin", request.url));
   }
-  
+
   if (session.error) {
     const response = NextResponse.redirect(
       new URL("/login/signin?session_expired=true", request.url)
     );
-    
+
     response.cookies.delete("next-auth.session-token");
     response.cookies.delete("__Secure-next-auth.session-token");
     response.cookies.delete("organizationSession");
     response.cookies.delete("projectSession");
-    
+
     return response;
   }
-  
+
   // STEP 2: User is authenticated, NOW check org selection
   const orgSessionCookie = request.cookies.get("organizationSession");
   const hasOrgSession = !!orgSessionCookie?.value;
