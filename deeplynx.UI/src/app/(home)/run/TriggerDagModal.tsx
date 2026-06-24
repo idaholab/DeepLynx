@@ -1,6 +1,7 @@
 "use client";
 
 import { useLanguage } from "@/app/contexts/Language";
+import { useToast } from "@/app/contexts/ToastProvider";
 import {
   getDagDetails,
   getDagRun,
@@ -12,7 +13,6 @@ import {
   AirflowDagRunResponseDto,
 } from "../types/responseDTOs";
 import { useEffect, useState } from "react";
-import toast from "react-hot-toast";
 
 interface TriggerDagModalProps {
   // The DAG to trigger. When null the modal is closed.
@@ -30,6 +30,7 @@ function toIso(local: string): string | undefined {
 
 const DAG_RUN_POLL_INTERVAL_MS = 2000;
 const DAG_RUN_MAX_POLLS = 45;
+const DAG_RUN_TOAST_POSITION = "toast-top toast-center";
 
 function delay(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -88,6 +89,7 @@ async function waitForDagRunCompletion(
 
 const TriggerDagModal = ({ dag, onClose }: TriggerDagModalProps) => {
   const { t } = useLanguage();
+  const { showToast } = useToast();
   const [runId, setRunId] = useState("");
   const [logicalDate, setLogicalDate] = useState("");
   const [dataIntervalStart, setDataIntervalStart] = useState("");
@@ -173,28 +175,32 @@ const TriggerDagModal = ({ dag, onClose }: TriggerDagModalProps) => {
     };
 
     setSubmitting(true);
-    const toastId = toast.loading(
-      `${t.translations.DAG_RUN_SUBMITTED} ${dagLabel}...`,
-    );
-
     let run: AirflowDagRunResponseDto;
     try {
       run = await triggerDagRun(dag.dag_id, dto);
     } catch {
-      toast.error(`${t.translations.FAILED_TO_TRIGGER} ${dagLabel}.`, {
-        id: toastId,
-      });
+      showToast(
+        "error",
+        `${t.translations.FAILED_TO_TRIGGER} ${dagLabel}.`,
+        DAG_RUN_TOAST_POSITION,
+      );
       setSubmitting(false);
       return;
     }
 
     setSubmitting(false);
     onClose();
+    showToast(
+      "info",
+      `${t.translations.DAG_RUN_SUBMITTED} ${dagLabel}.`,
+      DAG_RUN_TOAST_POSITION,
+    );
 
     if (!run.dag_run_id) {
-      toast(
+      showToast(
+        "warning",
         `${t.translations.DAG_RUN_STATUS_UNAVAILABLE} ${dagLabel}.`,
-        { id: toastId },
+        DAG_RUN_TOAST_POSITION,
       );
       return;
     }
@@ -209,25 +215,29 @@ const TriggerDagModal = ({ dag, onClose }: TriggerDagModalProps) => {
       const runSuffix = ` (${run.dag_run_id})`;
 
       if (state === "success") {
-        toast.success(
+        showToast(
+          "success",
           `${t.translations.DAG_RUN_SUCCEEDED} ${dagLabel}${runSuffix}`,
-          { id: toastId },
+          DAG_RUN_TOAST_POSITION,
         );
       } else if (state === "failed") {
-        toast.error(
+        showToast(
+          "error",
           `${t.translations.DAG_RUN_FAILED} ${dagLabel}${runSuffix}`,
-          { id: toastId },
+          DAG_RUN_TOAST_POSITION,
         );
       } else {
-        toast(
+        showToast(
+          "warning",
           `${t.translations.DAG_RUN_STILL_RUNNING} ${dagLabel}${runSuffix}`,
-          { id: toastId },
+          DAG_RUN_TOAST_POSITION,
         );
       }
     } catch {
-      toast.error(
+      showToast(
+        "error",
         `${t.translations.FAILED_TO_CHECK_DAG_RUN_STATUS} ${dagLabel}.`,
-        { id: toastId },
+        DAG_RUN_TOAST_POSITION,
       );
     }
   };

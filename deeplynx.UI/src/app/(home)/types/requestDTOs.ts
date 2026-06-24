@@ -345,7 +345,7 @@ export interface SavedSearchFilterRequest {
   pageSize?: number;
 }
 
-export interface TriggerDagRunRequestDto {
+export type TriggerDagRunRequestDto = {
   dag_run_id?: string | null;
   logical_date?: string | null;
   data_interval_start?: string | null;
@@ -353,4 +353,4 @@ export interface TriggerDagRunRequestDto {
   run_after?: string | null;
   conf?: Record<string, unknown> | null;
   note?: string | null;
-}
+};
