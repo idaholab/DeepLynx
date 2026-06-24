@@ -308,7 +308,7 @@ public class OrganizationController : ControllerBase
     [ProjectAdmin] 
     public async Task<ActionResult> InviteUserToOrganization(
         long organizationId,
-        [FromQuery] string userEmail,
+        [FromQuery] string? userEmail,
         [FromQuery] long? userId)
     {
         try
