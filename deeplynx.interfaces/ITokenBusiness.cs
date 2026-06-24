@@ -7,7 +7,9 @@ namespace deeplynx.interfaces;
 public interface ITokenBusiness
 {
     Task<string> CreateToken(string apiKey, string apiSecret, double? expirationMinutes);
-    Task<TokenResponseDto> CreateApiKey(long currentUserId, string? clientId = null, long? createdByUserId = null);
+
+    Task<TokenResponseDto> CreateApiKey(long currentUserId, string? clientId = null, long? createdByUserId = null,
+        bool allowServiceAccount = false);
     Task<TokenResponseDto> GenerateServiceAccountApiKey(
         long currentUserId,
         long serviceAccountId);

@@ -205,9 +205,10 @@ public class TokenBusiness : ITokenBusiness
     /// <param name="currentUserId">The ID of the requesting user</param>
     /// <param name="clientId">(optional) the client ID of the oauth application requesting</param>
     /// <param name="createdByUserId">(optional) the client ID of the oauth application requesting</param>
+    /// <param name="allowServiceAccount">(Internal use only) override for service account to have api keys created. Defaults to false</param>
     /// <returns></returns>
     /// <exception cref="KeyNotFoundException">Returned if user or application not found</exception>
-    public async Task<TokenResponseDto> CreateApiKey(long currentUserId, string? clientId = null, long? createdByUserId = null)
+    public async Task<TokenResponseDto> CreateApiKey(long currentUserId, string? clientId = null, long? createdByUserId = null, bool allowServiceAccount = false)
     {
         // Generate random key and secret
         string apiKey = KeyGenerator.GenerateKeyBase64();
@@ -223,7 +224,7 @@ public class TokenBusiness : ITokenBusiness
             throw new KeyNotFoundException($"User with id {currentUserId} not found");
         }
 
-        if (user.AccountType == AccountType.Service)
+        if (user.AccountType == AccountType.Service && !allowServiceAccount)
             throw new InvalidOperationException("Service accounts cannot perform this action");
 
         // Look up application by ClientId if provided
@@ -274,7 +275,7 @@ public class TokenBusiness : ITokenBusiness
         if (account.AccountType != AccountType.Service)
             throw new InvalidOperationException("Target account is not a service account.");
 
-        return await CreateApiKey(serviceAccountId, createdByUserId: currentUserId);
+        return await CreateApiKey(serviceAccountId, createdByUserId: currentUserId, allowServiceAccount: true);
     }
 
     /// <summary>

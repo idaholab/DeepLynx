@@ -31,6 +31,7 @@ public class InvitationBusinessTests : IntegrationTestBase
     private Mock<IRelationshipBusiness> _relationshipBusiness = null!;
     private Mock<IRoleBusiness> _roleBusiness = null!;
     private UserBusiness _userBusiness = null!;
+    private Mock<ILogger<InvitationBusiness>> _mockInvitationLogger = null!;
     public long gid; // group ID
 
     public long oid; // organization ID
@@ -49,7 +50,8 @@ public class InvitationBusinessTests : IntegrationTestBase
     public override async Task InitializeAsync()
     {
         await base.InitializeAsync();
-
+        
+        _mockInvitationLogger = new Mock<ILogger<InvitationBusiness>>();
         _recordBusiness = new Mock<IRecordBusiness>();
         _relationshipBusiness = new Mock<IRelationshipBusiness>();
         _dataSourceBusiness = new Mock<IDataSourceBusiness>();
@@ -80,7 +82,8 @@ public class InvitationBusinessTests : IntegrationTestBase
             _notificationBusiness.Object,
             _projectBusiness,
             _organizationBusiness,
-            _userBusiness);
+            _userBusiness,
+            _mockInvitationLogger.Object);
     }
 
     protected override async Task SeedTestDataAsync()
@@ -621,7 +624,7 @@ public class InvitationBusinessTests : IntegrationTestBase
     public async Task CreateAndAddServiceAccount_Succeeds_WithValidInputs()
     {
         // Act
-        var result = await _invitationBusiness.CreateAndAddServiceAccountToProject(pid, rid, "My Service Account");
+        var result = await _invitationBusiness.CreateAndAddServiceAccountToProject(pid, "My Service Account", rid);
 
         // Assert
         Assert.True(result);
@@ -643,7 +646,7 @@ public class InvitationBusinessTests : IntegrationTestBase
     {
         // Act
         var result = await _invitationBusiness.CreateAndAddServiceAccountToProject(
-            pid, rid, "Admin Service Account", makeProjectAdmin: true);
+            pid, "Admin Service Account", rid, makeProjectAdmin: true);
 
         // Assert
         Assert.True(result);
@@ -662,7 +665,7 @@ public class InvitationBusinessTests : IntegrationTestBase
     public async Task CreateAndAddServiceAccount_DoesNotAddToOrganization()
     {
         // Act
-        await _invitationBusiness.CreateAndAddServiceAccountToProject(pid, rid, "Org-Less Service Account");
+        await _invitationBusiness.CreateAndAddServiceAccountToProject(pid, "Org-Less Service Account", rid);
 
         // Assert — service accounts skip org membership entirely
         var serviceAccount = await Context.Users
@@ -678,8 +681,8 @@ public class InvitationBusinessTests : IntegrationTestBase
     public async Task CreateAndAddServiceAccount_GeneratesUniqueIdentifiers_AcrossMultipleAccounts()
     {
         // Act
-        await _invitationBusiness.CreateAndAddServiceAccountToProject(pid, rid, "Service Account A");
-        await _invitationBusiness.CreateAndAddServiceAccountToProject(pid, rid, "Service Account B");
+        await _invitationBusiness.CreateAndAddServiceAccountToProject(pid, "Service Account A", rid);
+        await _invitationBusiness.CreateAndAddServiceAccountToProject(pid, "Service Account B", rid);
 
         // Assert
         var accounts = await Context.Users
@@ -699,7 +702,7 @@ public class InvitationBusinessTests : IntegrationTestBase
         var userCountBefore = await Context.Users.CountAsync(u => u.AccountType == AccountType.Service);
 
         await Assert.ThrowsAsync<KeyNotFoundException>(() =>
-            _invitationBusiness.CreateAndAddServiceAccountToProject(nonExistentProjectId, rid, "Orphan Service Account"));
+            _invitationBusiness.CreateAndAddServiceAccountToProject(nonExistentProjectId, "Orphan Service Account", rid));
 
         var userCountAfter = await Context.Users.CountAsync(u => u.AccountType == AccountType.Service);
         Assert.Equal(userCountBefore, userCountAfter);
@@ -712,7 +715,7 @@ public class InvitationBusinessTests : IntegrationTestBase
         var userCountBefore = await Context.Users.CountAsync(u => u.AccountType == AccountType.Service);
 
         await Assert.ThrowsAsync<KeyNotFoundException>(() =>
-            _invitationBusiness.CreateAndAddServiceAccountToProject(pid, nonExistentRoleId, "Bad Role Service Account"));
+            _invitationBusiness.CreateAndAddServiceAccountToProject(pid, "Bad Role Service Account", nonExistentRoleId));
 
         var userCountAfter = await Context.Users.CountAsync(u => u.AccountType == AccountType.Service);
         Assert.Equal(userCountBefore, userCountAfter);

@@ -2,6 +2,7 @@ using deeplynx.datalayer.Models;
 using deeplynx.interfaces;
 using deeplynx.models;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace deeplynx.business;
 
@@ -12,19 +13,22 @@ public class InvitationBusiness : IInvitationBusiness
     private readonly IOrganizationBusiness _organizationBusiness;
     private readonly IProjectBusiness _projectBusiness;
     private readonly IUserBusiness _userBusiness;
+    private readonly ILogger<InvitationBusiness> _logger;
 
     public InvitationBusiness(
         DeeplynxContext context,
         INotificationBusiness notificationBusiness,
         IProjectBusiness projectBusiness,
         IOrganizationBusiness organizationBusiness,
-        IUserBusiness userBusiness)
+        IUserBusiness userBusiness,
+        ILogger<InvitationBusiness> logger)
     {
         _context = context;
         _notificationBusiness = notificationBusiness;
         _projectBusiness = projectBusiness;
         _organizationBusiness = organizationBusiness;
         _userBusiness = userBusiness;
+        _logger = logger;
     }
 
 
@@ -195,34 +199,44 @@ public class InvitationBusiness : IInvitationBusiness
     /// <param name="name"></param>
     /// <param name="makeProjectAdmin"></param>
     /// <returns></returns>
-    public async Task<bool> CreateAndAddServiceAccountToProject(long projectId, long roleId, string name, bool makeProjectAdmin = false)
+    public async Task<bool> CreateAndAddServiceAccountToProject(long projectId, string name, long? roleId, bool makeProjectAdmin = false)
     {
-        using var transaction = await _context.Database.BeginTransactionAsync();
+        var serviceIdentifier = $"service_{Guid.NewGuid()}";
+
+        var serviceAccount = new User
+        {
+            Name = name,
+            Email = serviceIdentifier,
+            Username = serviceIdentifier,
+            AccountType = AccountType.Service
+        };
+
+        _context.Users.Add(serviceAccount);
+        await _context.SaveChangesAsync();
+
         try
         {
-            var serviceIdentifier = $"service_{Guid.NewGuid()}";
+            await _projectBusiness.AddMemberToProject(
+                projectId, roleId, serviceAccount.Id,
+                groupId: null, makeProjectAdmin, allowServiceAccount: true);
 
-            var serviceAccount = new User
-            {
-                Name = name,
-                Email = serviceIdentifier,
-                Username = serviceIdentifier,
-                AccountType = AccountType.Service
-            };
-
-            _context.Users.Add(serviceAccount);
-            await _context.SaveChangesAsync();
-
-            // Bypass AddUserToHierarchyWithoutEmail - service accounts skip org membership
-            // and are added directly to their project only
-            await _projectBusiness.AddMemberToProject(projectId, roleId, serviceAccount.Id, groupId: null, makeProjectAdmin, allowServiceAccount: true);
-
-            await transaction.CommitAsync();
             return true;
         }
-        catch
+        catch (Exception ex)
         {
-            await transaction.RollbackAsync();
+            try
+            {
+                _context.Users.Remove(serviceAccount);
+                await _context.SaveChangesAsync();
+            }
+            catch (Exception cleanupEx)
+            {
+                // Orphaned service account — needs manual cleanup
+                _logger.LogError(cleanupEx,
+                    "Failed to remove orphaned service account {UserId} ({ServiceIdentifier}) after project membership failure: {OriginalError}",
+                    serviceAccount.Id, serviceIdentifier, ex.Message);
+            }
+
             throw;
         }
     }

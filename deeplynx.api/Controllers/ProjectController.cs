@@ -445,13 +445,13 @@ public class ProjectController : ControllerBase
     public async Task<ActionResult> CreateAndAddServiceAccountToProject(
         long organizationId,
         long projectId,
-        [FromQuery] long roleId,
         [FromQuery] string name,
-        [FromQuery] bool makeProjectAdmin)
+        [FromQuery] long? roleId,
+        [FromQuery] bool? makeProjectAdmin)
     {
         try
         {
-            await _invitationBusiness.CreateAndAddServiceAccountToProject(projectId, roleId, name, makeProjectAdmin: false);
+            await _invitationBusiness.CreateAndAddServiceAccountToProject(projectId, name, roleId, makeProjectAdmin: false);
             return Ok(new { message = $"Created service account {name} and added to project {projectId}" });
         }
         catch (Exception exc)
