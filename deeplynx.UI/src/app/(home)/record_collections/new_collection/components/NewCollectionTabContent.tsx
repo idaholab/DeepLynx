@@ -363,13 +363,7 @@ export default function NewCollectionTabContent({
                       />
                       {newCollectionRecordSearchResults.length >
                       recordsPerPage ? (
-                        <div className="flex flex-col gap-3 px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between">
-                          <span className="text-base-content/70">
-                            {`${t.translations.SHOWING} ${(newCollectionRecordPage - 1) * recordsPerPage + 1}-${Math.min(
-                              newCollectionRecordPage * recordsPerPage,
-                              newCollectionRecordSearchResults.length,
-                            )} ${t.translations.OF} ${newCollectionRecordSearchResults.length}`}
-                          </span>
+                        <div className="px-4 py-3 text-sm">
                           <PaginationControls
                             currentPage={newCollectionRecordPage}
                             pageSize={recordsPerPage}
