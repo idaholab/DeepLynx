@@ -44,6 +44,31 @@ public class AirflowController : ControllerBase
     }
 
     /// <summary>
+    ///     Get details for a DAG
+    /// </summary>
+    /// <param name="dagId">ID of the DAG</param>
+    /// <returns>Details for the requested DAG</returns>
+    [HttpGet("dags/{dagId}/details", Name = "api_get_dag_details")]
+    public async Task<ActionResult<AirflowDagDto>> GetDagDetails(string dagId)
+    {
+        try
+        {
+            var dag = await _airflowClient.GetDagDetails(dagId);
+            return Ok(dag);
+        }
+        catch (HttpRequestException exc)
+        {
+            return HandleAirflowError(exc, $"retrieving DAG details for '{dagId}'");
+        }
+        catch (Exception exc)
+        {
+            var message = $"An error occurred while retrieving DAG details for '{dagId}': {exc}";
+            _logger.LogError(message);
+            return StatusCode(StatusCodes.Status500InternalServerError, message);
+        }
+    }
+
+    /// <summary>
     ///     Trigger a DAG Run
     /// </summary>
     /// <param name="dagId">ID of the DAG to trigger</param>
@@ -66,6 +91,34 @@ public class AirflowController : ControllerBase
         catch (Exception exc)
         {
             var message = $"An error occurred while triggering DAG run for '{dagId}': {exc}";
+            _logger.LogError(message);
+            return StatusCode(StatusCodes.Status500InternalServerError, message);
+        }
+    }
+
+    /// <summary>
+    ///     Get a DAG run
+    /// </summary>
+    /// <param name="dagId">ID of the DAG</param>
+    /// <param name="dagRunId">ID of the DAG run</param>
+    /// <returns>Details of the requested DAG run</returns>
+    [HttpGet("dags/{dagId}/runs/{dagRunId}", Name = "api_get_dag_run")]
+    public async Task<ActionResult<AirflowDagRunResponseDto>> GetDagRun(
+        string dagId,
+        string dagRunId)
+    {
+        try
+        {
+            var dagRun = await _airflowClient.GetDagRun(dagId, dagRunId);
+            return Ok(dagRun);
+        }
+        catch (HttpRequestException exc)
+        {
+            return HandleAirflowError(exc, $"retrieving DAG run '{dagRunId}' for '{dagId}'");
+        }
+        catch (Exception exc)
+        {
+            var message = $"An error occurred while retrieving DAG run '{dagRunId}' for '{dagId}': {exc}";
             _logger.LogError(message);
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }

@@ -1,9 +1,16 @@
 "use client";
 
 import { useLanguage } from "@/app/contexts/Language";
-import { triggerDagRun } from "@/app/lib/client_service/airflow_services.client";
+import {
+  getDagDetails,
+  getDagRun,
+  triggerDagRun,
+} from "@/app/lib/client_service/airflow_services.client";
 import { TriggerDagRunRequestDto } from "../types/requestDTOs";
-import { AirflowDagResponseDto } from "../types/responseDTOs";
+import {
+  AirflowDagResponseDto,
+  AirflowDagRunResponseDto,
+} from "../types/responseDTOs";
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 
@@ -21,6 +28,64 @@ function toIso(local: string): string | undefined {
   return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
 }
 
+const DAG_RUN_POLL_INTERVAL_MS = 2000;
+const DAG_RUN_MAX_POLLS = 45;
+
+function delay(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function normalizeDagParams(
+  params: Record<string, unknown>,
+): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries(params).map(([key, value]) => {
+      if (
+        value &&
+        typeof value === "object" &&
+        !Array.isArray(value) &&
+        "value" in value
+      ) {
+        return [key, (value as { value: unknown }).value];
+      }
+
+      return [key, value];
+    }),
+  );
+}
+
+function formatDagParams(
+  params?: Record<string, unknown> | null,
+): string | null {
+  if (!params || Object.keys(params).length === 0) return null;
+  return JSON.stringify(normalizeDagParams(params), null, 2);
+}
+
+function getDagRunState(run: AirflowDagRunResponseDto) {
+  return run.state?.trim().toLowerCase() ?? "";
+}
+
+function isTerminalDagRun(run: AirflowDagRunResponseDto) {
+  const state = getDagRunState(run);
+  return state === "success" || state === "failed";
+}
+
+async function waitForDagRunCompletion(
+  dagId: string,
+  dagRunId: string,
+  initialRun: AirflowDagRunResponseDto,
+): Promise<AirflowDagRunResponseDto> {
+  let latestRun = initialRun;
+
+  for (let poll = 0; poll < DAG_RUN_MAX_POLLS; poll += 1) {
+    if (isTerminalDagRun(latestRun)) return latestRun;
+    await delay(DAG_RUN_POLL_INTERVAL_MS);
+    latestRun = await getDagRun(dagId, dagRunId);
+  }
+
+  return latestRun;
+}
+
 const TriggerDagModal = ({ dag, onClose }: TriggerDagModalProps) => {
   const { t } = useLanguage();
   const [runId, setRunId] = useState("");
@@ -32,20 +97,41 @@ const TriggerDagModal = ({ dag, onClose }: TriggerDagModalProps) => {
   const [note, setNote] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [confError, setConfError] = useState<string | null>(null);
+  const [dagDetailsLoading, setDagDetailsLoading] = useState(false);
 
   // Reset the form whenever a new DAG is opened.
   useEffect(() => {
-    if (dag) {
-      setRunId("");
-      setLogicalDate("");
-      setDataIntervalStart("");
-      setDataIntervalEnd("");
-      setRunAfter("");
-      setConf("");
-      setNote("");
-      setConfError(null);
-      setSubmitting(false);
-    }
+    if (!dag) return;
+
+    setRunId("");
+    setLogicalDate("");
+    setDataIntervalStart("");
+    setDataIntervalEnd("");
+    setRunAfter("");
+    setConf("");
+    setNote("");
+    setConfError(null);
+    setSubmitting(false);
+    setDagDetailsLoading(true);
+
+    let cancelled = false;
+    getDagDetails(dag.dag_id)
+      .then((details) => {
+        if (cancelled) return;
+        const defaultConf = formatDagParams(details.params);
+        if (!defaultConf) return;
+        setConf((current) => (current.trim() ? current : defaultConf));
+      })
+      .catch((error) => {
+        console.warn(`Failed to load DAG details for '${dag.dag_id}':`, error);
+      })
+      .finally(() => {
+        if (!cancelled) setDagDetailsLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, [dag]);
 
   if (!dag) return null;
@@ -53,7 +139,7 @@ const TriggerDagModal = ({ dag, onClose }: TriggerDagModalProps) => {
   const dagLabel = dag.dag_display_name || dag.dag_id;
 
   const handleSubmit = async () => {
-    if (submitting) return;
+    if (submitting || dagDetailsLoading) return;
 
     // Parse and validate the optional conf JSON.
     let parsedConf: Record<string, unknown> | undefined;
@@ -86,19 +172,63 @@ const TriggerDagModal = ({ dag, onClose }: TriggerDagModalProps) => {
       note: note.trim() || undefined,
     };
 
+    setSubmitting(true);
+    const toastId = toast.loading(
+      `${t.translations.DAG_RUN_SUBMITTED} ${dagLabel}...`,
+    );
+
+    let run: AirflowDagRunResponseDto;
     try {
-      setSubmitting(true);
-      const run = await triggerDagRun(dag.dag_id, dto);
-      toast.success(
-        `${t.translations.TRIGGERED} ${dagLabel}${
-          run.dag_run_id ? ` (${run.dag_run_id})` : ""
-        }`,
-      );
-      onClose();
+      run = await triggerDagRun(dag.dag_id, dto);
     } catch {
-      toast.error(`${t.translations.FAILED_TO_TRIGGER} ${dagLabel}.`);
-    } finally {
+      toast.error(`${t.translations.FAILED_TO_TRIGGER} ${dagLabel}.`, {
+        id: toastId,
+      });
       setSubmitting(false);
+      return;
+    }
+
+    setSubmitting(false);
+    onClose();
+
+    if (!run.dag_run_id) {
+      toast(
+        `${t.translations.DAG_RUN_STATUS_UNAVAILABLE} ${dagLabel}.`,
+        { id: toastId },
+      );
+      return;
+    }
+
+    try {
+      const completedRun = await waitForDagRunCompletion(
+        dag.dag_id,
+        run.dag_run_id,
+        run,
+      );
+      const state = getDagRunState(completedRun);
+      const runSuffix = ` (${run.dag_run_id})`;
+
+      if (state === "success") {
+        toast.success(
+          `${t.translations.DAG_RUN_SUCCEEDED} ${dagLabel}${runSuffix}`,
+          { id: toastId },
+        );
+      } else if (state === "failed") {
+        toast.error(
+          `${t.translations.DAG_RUN_FAILED} ${dagLabel}${runSuffix}`,
+          { id: toastId },
+        );
+      } else {
+        toast(
+          `${t.translations.DAG_RUN_STILL_RUNNING} ${dagLabel}${runSuffix}`,
+          { id: toastId },
+        );
+      }
+    } catch {
+      toast.error(
+        `${t.translations.FAILED_TO_CHECK_DAG_RUN_STATUS} ${dagLabel}.`,
+        { id: toastId },
+      );
     }
   };
 
@@ -133,18 +263,27 @@ const TriggerDagModal = ({ dag, onClose }: TriggerDagModalProps) => {
             </label>
             <textarea
               placeholder={'{\n  "key": "value"\n}'}
-              className={`textarea w-full h-32 font-mono ${
+              className={`textarea min-h-56 w-full font-mono ${
                 confError ? "textarea-error" : ""
               }`}
               value={conf}
               onChange={(e) => setConf(e.target.value)}
             />
             <p
-              className={`mt-1 text-xs ${
+              className={`mt-1 flex items-center gap-2 text-xs ${
                 confError ? "text-error" : "text-base-content/60"
               }`}
             >
-              {confError ?? t.translations.CONF_HELP}
+              {confError ? (
+                confError
+              ) : dagDetailsLoading ? (
+                <>
+                  <span className="loading loading-spinner loading-xs" />
+                  <span>{t.translations.LOADING_DAG_PARAMETERS}</span>
+                </>
+              ) : (
+                t.translations.CONF_HELP
+              )}
             </p>
           </div>
 
@@ -219,7 +358,7 @@ const TriggerDagModal = ({ dag, onClose }: TriggerDagModalProps) => {
             <button
               type="submit"
               className="btn btn-primary"
-              disabled={submitting}
+              disabled={submitting || dagDetailsLoading}
             >
               {submitting && (
                 <span className="loading loading-spinner loading-sm" />

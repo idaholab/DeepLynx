@@ -48,6 +48,9 @@ export default function RunClient() {
                 <h1 className="text-2xl font-bold text-base-content sm:text-3xl">
                   {t.translations.ALL_DAGS}
                 </h1>
+                <p className="mt-2 max-w-3xl text-sm leading-6 text-base-content/65">
+                  {t.translations.DAGS_OVERVIEW_DESCRIPTION}
+                </p>
               </div>
             </div>
           </div>
@@ -126,17 +129,29 @@ export default function RunClient() {
                       </div>
                     </td>
                     <td className="text-right">
-                      <button
-                        type="button"
-                        className="btn btn-ghost btn-sm btn-circle"
-                        onClick={() => setDagToTrigger(dag)}
-                        aria-label={`${t.translations.TRIGGER} ${
-                          dag.dag_display_name || dag.dag_id
-                        }`}
-                        title={t.translations.TRIGGER_DAG}
+                      <span
+                        className="tooltip tooltip-left inline-flex"
+                        data-tip={
+                          dag.is_paused
+                            ? t.translations.DAG_PAUSED_TOOLTIP
+                            : t.translations.TRIGGER_DAG_TOOLTIP
+                        }
                       >
-                        <PlayIcon className="size-5" />
-                      </button>
+                        <button
+                          type="button"
+                          className="btn btn-ghost btn-sm btn-circle"
+                          onClick={() => setDagToTrigger(dag)}
+                          disabled={dag.is_paused}
+                          aria-label={`${t.translations.TRIGGER} ${dag.dag_display_name || dag.dag_id}`}
+                          title={
+                            dag.is_paused
+                              ? t.translations.DAG_PAUSED_TOOLTIP
+                              : t.translations.TRIGGER_DAG_TOOLTIP
+                          }
+                        >
+                          <PlayIcon className="size-5" />
+                        </button>
+                      </span>
                     </td>
                   </tr>
                 ))}

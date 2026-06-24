@@ -31,17 +31,43 @@ public class AirflowServiceClient
                ?? throw new InvalidOperationException("Airflow returned an empty response body");
     }
 
+    public async Task<AirflowDagDto> GetDagDetails(string dagId)
+    {
+        using var request = new HttpRequestMessage(
+            HttpMethod.Get,
+            $"api/v2/dags/{Uri.EscapeDataString(dagId)}/details");
+        await AuthorizeRequest(request);
+        var response = await _client.SendAsync(request);
+        await EnsureSuccess(response);
+        return await response.Content.ReadFromJsonAsync<AirflowDagDto>()
+               ?? throw new InvalidOperationException($"Airflow returned an empty response body for DAG '{dagId}'");
+    }
+
     public async Task<AirflowDagRunResponseDto> TriggerDagRun(string dagId, TriggerDagRunRequestDto dto)
     {
         // logical_date is required by Airflow's trigger API; default to UtcNow if not provided by the caller
         dto.LogicalDate ??= DateTimeOffset.UtcNow;
-        using var request = new HttpRequestMessage(HttpMethod.Post, $"api/v2/dags/{dagId}/dagRuns");
+        using var request = new HttpRequestMessage(
+            HttpMethod.Post,
+            $"api/v2/dags/{Uri.EscapeDataString(dagId)}/dagRuns");
         request.Content = JsonContent.Create(dto);
         await AuthorizeRequest(request);
         var response = await _client.SendAsync(request);
         await EnsureSuccess(response);
         return await response.Content.ReadFromJsonAsync<AirflowDagRunResponseDto>()
                ?? throw new InvalidOperationException($"Airflow returned an empty response body for DAG '{dagId}'");
+    }
+
+    public async Task<AirflowDagRunResponseDto> GetDagRun(string dagId, string dagRunId)
+    {
+        using var request = new HttpRequestMessage(
+            HttpMethod.Get,
+            $"api/v2/dags/{Uri.EscapeDataString(dagId)}/dagRuns/{Uri.EscapeDataString(dagRunId)}");
+        await AuthorizeRequest(request);
+        var response = await _client.SendAsync(request);
+        await EnsureSuccess(response);
+        return await response.Content.ReadFromJsonAsync<AirflowDagRunResponseDto>()
+               ?? throw new InvalidOperationException($"Airflow returned an empty DAG run response for '{dagRunId}'");
     }
 
     private async Task AuthorizeRequest(HttpRequestMessage request)

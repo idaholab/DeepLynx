@@ -426,6 +426,7 @@ export type AirflowDagResponseDto = {
   owners: string[];
   tags: AirflowDagTagResponseDto[];
   timetable_description?: string | null;
+  params?: Record<string, unknown> | null;
 };
 
 export type AirflowDagListResponseDto = {
