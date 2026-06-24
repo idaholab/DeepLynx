@@ -220,8 +220,6 @@ public class OrganizationController : ControllerBase
     /// <returns></returns>
     [HttpPost("{organizationId:long}/user", Name = "api_add_user_to_organization")]
     [OrgAdmin]
-    [Auth("update", "organization")]
-    [Auth("update", "user")]
     public async Task<ActionResult> AddUserToOrganization(
         long organizationId,
         [FromQuery] long userId,
