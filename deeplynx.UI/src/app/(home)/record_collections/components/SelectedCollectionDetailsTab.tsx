@@ -103,7 +103,7 @@ export default function SelectedCollectionDetailsTab({
 
   return (
     <div className="mt-4 space-y-4">
-      <div className="grid gap-4 rounded-2xl border border-base-300 bg-base-200/30 p-4 text-sm sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 rounded-2xl border border-base-300/50 bg-base-100 p-4 text-sm sm:grid-cols-2 lg:grid-cols-4">
         <div>
           <p className="text-base-content/60">
             {t.translations.RECORD_COLLECTIONS_COLLECTION_ID}
@@ -259,7 +259,7 @@ export default function SelectedCollectionDetailsTab({
                 />
               </div>
 
-              <div className="rounded-2xl border border-base-300 bg-base-100 p-5">
+              <div className="rounded-2xl border border-base-300/50 bg-base-100 p-5">
                 <div className="flex items-start justify-between gap-3">
                   <h3 className="font-semibold text-base-content">
                     {t.translations.RECORD_COLLECTIONS_ADDITIONAL_PROPERTIES}
@@ -311,7 +311,7 @@ export default function SelectedCollectionDetailsTab({
             </div>
 
             <div className="space-y-4">
-              <div className="rounded-2xl border border-base-300 bg-base-200/30 p-5">
+              <div className="rounded-2xl border border-base-300/50 bg-base-100 p-5">
                 <div className="mt-1 space-y-3 text-sm text-base-content/80">
                   <CollectionEntitySelector
                     title={t.translations.RECORD_COLLECTIONS_LABELS}
@@ -384,7 +384,7 @@ export default function SelectedCollectionDetailsTab({
             </div>
           </div>
 
-          <div className="mt-6 rounded-2xl border border-base-300 bg-base-100 p-5">
+          <div className="mt-6 rounded-2xl border border-base-300/50 bg-base-100 p-5">
             <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
               <div>
                 <h3 className="font-semibold text-base-content">
@@ -402,7 +402,7 @@ export default function SelectedCollectionDetailsTab({
               </span>
             </div>
 
-            <div className="mt-4 rounded-2xl border border-base-300 bg-base-200/30 p-4">
+            <div className="mt-4 rounded-2xl border border-base-300/50 bg-base-100 p-4">
               <CollectionRecordSearchControls
                 searchTerm={recordSearchTerm}
                 setSearchTerm={setRecordSearchTerm}

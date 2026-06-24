@@ -205,7 +205,7 @@ export default function CollectionDetailsReadonlyView({
           </div>
 
           {showProperties ? (
-            <div className="rounded-2xl border border-base-300 bg-base-100 p-5">
+            <div className="rounded-2xl border border-base-300/50 bg-base-100 p-5">
               <h3 className="font-semibold text-base-content">
                 {t.translations.RECORD_COLLECTIONS_ADDITIONAL_PROPERTIES}
               </h3>
@@ -257,7 +257,7 @@ export default function CollectionDetailsReadonlyView({
           onChange={(event) => setRecordSearchTerm(event.target.value)}
         />
 
-        <div className="overflow-x-auto rounded-2xl border border-base-300">
+        <div className="overflow-x-auto rounded-2xl border border-base-300/50">
           <table className="table">
             <thead>
               <tr>

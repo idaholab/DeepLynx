@@ -22,7 +22,7 @@ export default function NewCollectionStepIndicator({ steps }: Props) {
             className={`flex-1 rounded-xl border px-4 py-3 ${
               step.active
                 ? "border-primary bg-primary/10 text-base-content"
-                : "border-base-300 bg-base-100 text-base-content/70"
+                : "border-base-300/50 bg-base-100 text-base-content/70"
             }`}
           >
             <p className="text-xs font-semibold uppercase">{step.label}</p>

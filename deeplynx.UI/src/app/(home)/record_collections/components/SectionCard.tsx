@@ -26,7 +26,7 @@ export default function SectionCard({
   return (
     <section
       className={`card bg-base-100 ${elevated ? "shadow-sm" : ""} ${
-        bordered ? "border border-base-300" : ""
+        bordered ? "border border-base-300/50" : ""
       } ${className}`}
     >
       <div className={`card-body ${bodyClassName}`}>

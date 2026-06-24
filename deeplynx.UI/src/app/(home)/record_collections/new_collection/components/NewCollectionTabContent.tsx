@@ -149,7 +149,7 @@ export default function NewCollectionTabContent({
     ? reviewTagItems
     : reviewTagItems.slice(0, 10);
   const reviewSummaryPanel = (
-    <div className="grid gap-4 rounded-2xl border border-base-300 bg-base-200/30 p-4 text-sm sm:grid-cols-2 lg:grid-cols-4">
+    <div className="grid gap-4 rounded-2xl border border-base-300/50 bg-base-100 p-4 text-sm sm:grid-cols-2 lg:grid-cols-4">
       <div>
         <p className="text-base-content/60">
           {t.translations.RECORD_COLLECTIONS_COLLECTION_ID}
@@ -248,7 +248,7 @@ export default function NewCollectionTabContent({
           {newCollectionStep === "Records" ? (
             <>
               <div className="space-y-4">
-                <div className="rounded-2xl border border-base-300 bg-base-200/30 p-4">
+                <div className="rounded-2xl border border-base-300/50 bg-base-100 p-4">
                   <CollectionRecordSearchControls
                     searchTerm={newCollectionRecordSearchTerm}
                     setSearchTerm={setNewCollectionRecordSearchTerm}
@@ -383,7 +383,7 @@ export default function NewCollectionTabContent({
               </div>
 
               <div className="flex h-full flex-col justify-between gap-4">
-                <div className="rounded-2xl border border-base-300 bg-base-100 p-5">
+                <div className="rounded-2xl border border-base-300/50 bg-base-100 p-5">
                   <h3 className="font-semibold text-base-content">
                     {t.translations.RECORD_COLLECTIONS_RECORD_SUMMARY}
                   </h3>
@@ -489,7 +489,7 @@ export default function NewCollectionTabContent({
           {newCollectionStep === "Metadata" ? (
             <>
               <div className="space-y-4">
-                <div className="rounded-2xl border border-base-300 bg-base-200/30 p-5">
+                <div className="rounded-2xl border border-base-300/50 bg-base-100 p-5">
                   <div className="space-y-4">
                     <label className="form-control w-full">
                       <div className="label">
@@ -530,7 +530,7 @@ export default function NewCollectionTabContent({
               </div>
 
               <div className="flex h-full flex-col justify-between gap-4">
-                <div className="rounded-2xl border border-base-300 bg-base-100 p-5">
+                <div className="rounded-2xl border border-base-300/50 bg-base-100 p-5">
                   <h3 className="font-semibold text-base-content">
                     {t.translations.RECORD_COLLECTIONS_SELECTED_LABELS_AND_TAGS}
                   </h3>
@@ -584,7 +584,7 @@ export default function NewCollectionTabContent({
           {newCollectionStep === "Modify" ? (
             <>
               <div className="space-y-4">
-                <div className="rounded-2xl border border-base-300 bg-base-200/30 p-5">
+                <div className="rounded-2xl border border-base-300/50 bg-base-100 p-5">
                   <div className="space-y-4">
                     <label className="form-control w-full">
                       <div className="label">
@@ -619,7 +619,7 @@ export default function NewCollectionTabContent({
               </div>
 
               <div className="flex h-full flex-col justify-between gap-4">
-                <div className="rounded-2xl border border-base-300 bg-base-100 p-5">
+                <div className="rounded-2xl border border-base-300/50 bg-base-100 p-5">
                   <h3 className="font-semibold text-base-content">
                     {t.translations.RECORD_COLLECTIONS_MODIFY_LABELS_AND_TAGS}
                   </h3>
