@@ -339,10 +339,9 @@ public class OrganizationBusinessTests : IntegrationTestBase
 
         var defaultRoles = await Context.Roles.Where(r => r.OrganizationId == result.Id).Include(r => r.Permissions)
             .ToListAsync();
-        var adminRole = defaultRoles.Single(r => r.Name == "Admin");
+        Assert.DoesNotContain(defaultRoles, r => r.Name == "Admin");
         var userRole = defaultRoles.Single(r => r.Name == "User");
 
-        AssertRolePermissions(adminRole, DefaultRolePermissions.Admin.AllowedPermissions);
         AssertRolePermissions(userRole, DefaultRolePermissions.User.AllowedPermissions);
     }
 

@@ -57,15 +57,18 @@ public class RecordBusiness : IRecordBusiness
     /// <param name="isSysAdmin">Optional param determining if the requesting user is a system admin</param>
     /// <param name="isOrgAdmin">Optional param determining if the requesting user is an organization admin</param>
     /// <param name="isProjectAdmin">Optional param determining if the requesting user is a project admin</param>
+    /// <param name="isInsightEligible">Restricts to records that are eligible for use in Insight if `true`</param>
     /// <returns>A list of records based on the applied filters.</returns>
     public async Task<List<RecordResponseDto>> GetAllRecords(
         long currentUserId, long organizationId, long projectId, long? dataSourceId, bool hideArchived,
-        string? fileType = null, bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false)
+        string? fileType = null, bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false, bool isInsightEligible = false)
     {
         var recordQuery = _context.Records
             .Where(r => r.ProjectId == projectId && r.OrganizationId == organizationId);
 
         if (hideArchived) recordQuery = recordQuery.Where(r => !r.IsArchived);
+
+        if (isInsightEligible) recordQuery = recordQuery.WhereInsightEligible();
 
         if (dataSourceId.HasValue) recordQuery = recordQuery.Where(r => r.DataSourceId == dataSourceId);
 
@@ -105,6 +108,7 @@ public class RecordBusiness : IRecordBusiness
                     : null,
             Properties = r.Properties,
             OriginalId = r.OriginalId,
+            ObjectStorageId = r.ObjectStorageId,
             Name = r.Name,
             ClassId = r.ClassId,
             DataSourceId = r.DataSourceId,
@@ -183,6 +187,7 @@ public class RecordBusiness : IRecordBusiness
                         : null,
                 Properties = r.Properties,
                 OriginalId = r.OriginalId,
+                ObjectStorageId = r.ObjectStorageId,
                 Name = r.Name,
                 ClassId = r.ClassId,
                 DataSourceId = r.DataSourceId,
@@ -1435,7 +1440,13 @@ public class RecordBusiness : IRecordBusiness
             LastUpdatedAt = returnedRecord.LastUpdatedAt,
             IsArchived = returnedRecord.IsArchived,
             FileType = returnedRecord.FileType,
-            FileSize = returnedRecord.FileSize
+            FileSize = returnedRecord.FileSize,
+            Tags = new List<RecordTagDto>(),
+            Labels = returnedRecord.Labels.Select(l => new RecordLabelDto
+            {
+                Id = l.Id,
+                Name = l.Name
+            }).ToList()
         };
     }
 
@@ -1560,6 +1571,7 @@ public class RecordBusiness : IRecordBusiness
                     : null,
             Properties = r.Properties,
             OriginalId = r.OriginalId,
+            ObjectStorageId = r.ObjectStorageId,
             Name = r.Name,
             ClassId = r.ClassId,
             DataSourceId = r.DataSourceId,
