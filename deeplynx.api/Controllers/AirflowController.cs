@@ -1,4 +1,5 @@
 using System.Net;
+using System.Text.Json.Nodes;
 using deeplynx.models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -38,6 +39,30 @@ public class AirflowController : ControllerBase
         catch (Exception exc)
         {
             var message = $"An error occurred while retrieving DAGs: {exc}";
+            _logger.LogError(message);
+            return StatusCode(StatusCodes.Status500InternalServerError, message);
+        }
+    }
+
+    /// <summary>
+    ///     Check Airflow health
+    /// </summary>
+    /// <returns>Health details from the configured Airflow instance</returns>
+    [HttpGet("health", Name = "api_get_airflow_health")]
+    public async Task<ActionResult<JsonObject>> GetHealth()
+    {
+        try
+        {
+            var health = await _airflowClient.GetHealth();
+            return Ok(health);
+        }
+        catch (HttpRequestException exc)
+        {
+            return HandleAirflowError(exc, "checking Airflow health");
+        }
+        catch (Exception exc)
+        {
+            var message = $"An error occurred while checking Airflow health: {exc}";
             _logger.LogError(message);
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
