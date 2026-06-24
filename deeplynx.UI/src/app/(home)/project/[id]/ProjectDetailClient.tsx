@@ -131,7 +131,7 @@ export default function ProjectDetailClient({
         <div className="flex-1 lg:w-3/5 transition-opacity duration-300">
           {/* Data Catalog Card */}
           <div
-            className="card bg-base-200/30 border border-base-300/50 shadow-sm mb-6"
+            className="card bg-base-100 border border-base-300/50 shadow-sm mb-6"
             data-tour="data-catalog-card"
           >
             <div className="card-body">
